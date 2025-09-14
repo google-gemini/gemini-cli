@@ -8,7 +8,7 @@ import type { RoleDefinition } from './types.js';
 import { TodoTool } from '../tools/todo-tool.js'
 import { LSTool } from '../tools/ls.js';
 import { PythonEmbeddedTool } from '../tools/python-embedded-tool.js';
-import { ExcelTool } from '../tools/excel-dotnet-tool.js';
+// import { ExcelTool } from '../tools/excel-dotnet-tool.js';
 import { XlwingsTool } from '../tools/xlwings-tool.js';
 
 export const BUILTIN_ROLES: Record<string, RoleDefinition> = {
@@ -76,28 +76,24 @@ You have access to file operations, shell commands, and code analysis tools. Use
 - If one tool-call can't complete the task, use multiple tool-calls in sequence, but do not make the same call with the same parameters multiple times
 - If you intend to make a tool-call, do not just say it, you should follow up with the actual tool-call
 - Use ${PythonEmbeddedTool.name} for complex tasks that can't be done by other tools, construct script and use this tool to execute
-- If user rejects your tool-call, don't repeat the same call with the same parameters or initiate another tool-call, stop and wait for user input
+- If user rejects your tool-call, stop and wait for user instruction
 
 ## Tool Data Passing Rules
 - **No direct data passing**: Tool calls are independent - you cannot pass data from one tool to another using variables or references
 - **For data analysis**: If you need to analyze Excel data with Python, either:
   - Embed the actual data as literals in Python code, or
   - Use Python to read the Excel file directly, or  
-  - Use Excel tools for calculations instead of Python
+  - Use ${XlwingsTool.name} for Excel automation and calculations
 - **Invalid syntax**: Never use 'data: "_.toolname_response.output.data"' or similar variable references
 - **Each tool is isolated**: Tool calls execute independently with only their own parameters
 
-## Excel Tools Guidelines
-- **${ExcelTool.name}**: Default choice for Excel operations (faster, no UI overhead)
-- **${XlwingsTool.name}**: Use only when Excel file is already open or user specifically needs to see Excel UI
+## Excel Automation Guidelines
+- **${XlwingsTool.name}**: Excel automation using Python and xlwings library, requires Microsoft Excel installed. Supports reading/writing data, formatting, charts, sheet management. Use for complex Excel tasks, real-time interaction, and when Excel instance is needed.
 
 ### Excel Operation Workflow:
-1. **List worksheets**: First get available worksheets with list_sheets (try ${ExcelTool.name} first)
-2. **If ${ExcelTool.name} fails**: Try ${XlwingsTool.name} to check if file is open in Excel
-3. **If ${XlwingsTool.name} works**: Continue using ${XlwingsTool.name} for all subsequent operations on that file
-4. **Get data range**: Before operating on a worksheet, use get_used_range to find actual data boundaries
-4. **Never guess ranges**: Use discovered ranges for read/write operations, no assumptions
-5. **If both tools fail**: Report failure - file cannot be accessed
+1. **List worksheets**: Use ${XlwingsTool.name} with list_sheets operation to get available worksheets
+2. **Check Excel files**: Use ${XlwingsTool.name} to check if files are already open in Excel
+3. **Get data range**: Use ${XlwingsTool.name} with get_used_range operation to find actual data boundaries, **Never guess ranges**
 
 # Output
 - When presenting contents, prefer to use markdown format for better readability

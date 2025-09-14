@@ -17,7 +17,7 @@ import { ShellTool } from './shell.js';
 import { MemoryTool } from './memoryTool.js';
 // import { WebSearchTool } from './web-search.js';
 // import { ExcelTool } from './excel-tool.js';
-import { ExcelTool } from './excel-dotnet-tool.js';
+// import { ExcelTool } from './excel-dotnet-tool.js';
 import { PDFTool } from './pdf-tool.js';
 import { ZipTool } from './zip-tool.js';
 import { FileTool } from './file-tool.js';
@@ -51,7 +51,6 @@ const ROLE_TOOLSET_MAP: Record<string, ToolClass[]> = {
     FileTool,
     ShellTool,
     WebTool,
-    ExcelTool,
     XlwingsTool,
     PDFTool,
     ZipTool,
@@ -78,7 +77,6 @@ const ROLE_TOOLSET_MAP: Record<string, ToolClass[]> = {
     ShellTool,
     RipGrepTool,
     // WebSearchTool,
-    ExcelTool,
     XlwingsTool
   ]
 };

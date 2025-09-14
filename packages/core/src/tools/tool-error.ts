@@ -67,4 +67,8 @@ export enum ToolErrorType {
 
   // WebSearch-specific Errors
   WEB_SEARCH_FAILED = 'web_search_failed',
+
+  // Web-tool-specific Errors
+  NO_LINKS_FOUND = 'no_links_found',
+  LINK_DISCOVERY_FAILED = 'link_discovery_failed',
 }

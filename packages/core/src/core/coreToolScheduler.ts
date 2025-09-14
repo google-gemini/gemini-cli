@@ -766,7 +766,7 @@ export class CoreToolScheduler {
       this.setStatusInternal(
         callId,
         'cancelled',
-        'User declined to authorize this tool execution. Please respect the user\'s decision and either try a different approach or ask for clarification about their concerns.',
+        'Stop and wait for user\'s next instruction.',
       );
     } else if (outcome === ToolConfirmationOutcome.ModifyWithEditor) {
       const waitingToolCall = toolCall as WaitingToolCall;

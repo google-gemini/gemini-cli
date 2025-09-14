@@ -111,7 +111,7 @@ interface XlwingsParams {
   op: 
   // Range operations
   'read_range' | 'write_range' | 'clear_range' | 'formula_range' | 'format_range' |
-  'get_range_info' | 'insert_range' | 'delete_range' |
+  'get_cell_info' | 'insert_range' | 'delete_range' |
   'copy_paste_range' | 'replace_range' | 'find_range' | 'get_used_range' | 'sort_range' |
   'merge_range' | 'unmerge_range' | 'get_sheet_info' |
   // Row/Column size operations
@@ -151,7 +151,8 @@ interface XlwingsParams {
   
   /** Chart configuration (for chart operations) */
   chart?: {
-    type: 'line' | 'column' | 'bar' | 'pie' | 'scatter' | 'area';
+    name?: string;
+    type?: 'line' | 'column' | 'bar' | 'pie' | 'scatter' | 'area';
     title?: string;
     x_axis_title?: string;
     y_axis_title?: string;
@@ -159,9 +160,6 @@ interface XlwingsParams {
     categories_range?: string;
     position?: string; // Where to place the chart
   };
-  
-  /** Chart name/identifier (for chart management operations) */
-  chart_name?: string;
   
   /** Formatting options */
   format?: {
@@ -183,8 +181,8 @@ interface XlwingsParams {
   /** Formula to set (for formula operations) */
   formula?: string;
   
-  /** Search and replace options */
-  search?: {
+  /** Find and replace options */
+  find_replace?: {
     find: string;
     replace: string;
     match_case?: boolean;
@@ -288,13 +286,13 @@ interface XlwingsParams {
     shift_direction?: 'right' | 'down' | 'left' | 'up';
     /** Number of cells/rows/columns to insert or delete */
     count?: number;
-    /** Whether to include cell formatting information (for get_range_info) */
+    /** Whether to include cell formatting information (for get_cell_info) */
     include_formatting?: boolean;
-    /** Whether to include formula information (for get_range_info) */
+    /** Whether to include formula information (for get_cell_info) */
     include_formulas?: boolean;
-    /** Whether to include data validation info (for get_range_info) */
+    /** Whether to include data validation info (for get_cell_info) */
     include_validation?: boolean;
-    /** Whether to include comments (for get_range_info) */
+    /** Whether to include comments (for get_cell_info) */
     include_comments?: boolean;
   };
   
@@ -353,41 +351,32 @@ interface XlwingsParams {
   /** Whether to save existing changes before closing (for close_workbook) */
   save_before_close?: boolean;
   
-  /** VBA module name */
-  vba_module?: string;
-  
-  /** VBA code content */
-  vba_code?: string;
-  
-  /** VBA macro name to run */
-  macro_name?: string;
-  
-  /** Image file path (for insert_image operations) */
-  image_path?: string;
-  
-  /** Image name/identifier (for image management operations) */
-  image_name?: string;
-  
-  /** Image width (for image operations) */
-  width?: number;
-  
-  /** Image height (for image operations) */
-  height?: number;
-  
+  /** VBA module configuration */
+  vba?: {
+    module_name?: string;
+    code?: string;
+    macro_name?: string;
+  };
+
+  /** Image configuration */
+  image?: {
+    path?: string;
+    name?: string;
+    width?: number;
+    height?: number;
+    position?: string;
+  };
+
   /** Output file path (for export operations) */
   output_path?: string;
-  
-  /** Search term (for search_data operation) */
-  search_term?: string;
-  
-  /** Search column name or index (for search_data operation, optional - searches all columns if not specified) */
-  search_column?: string | number;
-  
-  /** Search in formulas as well as values (for search_data operation, default: true) */
-  search_formulas?: boolean;
-  
-  /** Auto-select cell if only one match found (for search_data operation, default: true) */
-  auto_select?: boolean;
+
+  /** Search configuration */
+  search?: {
+    term?: string;
+    column?: string | number;
+    formulas?: boolean;
+    auto_select?: boolean;
+  };
   
   /** Excel application PID or index to connect to (optional, uses active if not specified) */
   app_id?: number;
@@ -401,18 +390,18 @@ interface XlwingsParams {
   /** Shape configuration (for shape operations) */
   shape?: {
     /** Shape type */
-    type: 'rectangle' | 'oval' | 'triangle' | 'line' | 'arrow' | 'textbox' |
+    type?: 'rectangle' | 'oval' | 'triangle' | 'rounded_rectangle' | 'line' | 'arrow' | 'textbox' |
           'flowchart_process' | 'flowchart_decision' | 'flowchart_start_end' |
           'flowchart_connector' | 'straight_connector' | 'elbow_connector' | 'curved_connector' |
           'right_arrow' | 'left_arrow' | 'up_arrow' | 'down_arrow' |
           'star' | 'pentagon' | 'hexagon';
     /** Shape name/identifier (for management operations) */
     name?: string;
-    /** Position and size */
-    left: number;
-    top: number;
-    width: number;
-    height: number;
+    /** Position and size (required for create operations) */
+    left?: number;
+    top?: number;
+    width?: number;
+    height?: number;
     /** Text content (for shapes that support text) */
     text?: string;
     /** Style configuration */
@@ -506,32 +495,27 @@ interface XlwingsParams {
       /** Connection site index on end shape (0-based) */
       end_connection_site?: number;
     };
+    /** Shape movement settings (for move_shape operations) */
+    move?: {
+      /** New position */
+      new_left: number;
+      new_top: number;
+      /** Whether to animate the movement */
+      animate?: boolean;
+    };
+    /** Shape resize settings (for resize_shape operations) */
+    resize?: {
+      /** New dimensions */
+      new_width: number;
+      new_height: number;
+      /** Whether to maintain aspect ratio */
+      keep_aspect_ratio?: boolean;
+      /** Resize anchor point */
+      anchor?: 'top_left' | 'top_center' | 'top_right' |
+               'middle_left' | 'center' | 'middle_right' |
+               'bottom_left' | 'bottom_center' | 'bottom_right';
+    };
   };
-
-  /** Shape movement settings (for move_shape operations) */
-  shape_move?: {
-    /** New position */
-    new_left: number;
-    new_top: number;
-    /** Whether to animate the movement */
-    animate?: boolean;
-  };
-
-  /** Shape resize settings (for resize_shape operations) */
-  shape_resize?: {
-    /** New dimensions */
-    new_width: number;
-    new_height: number;
-    /** Whether to maintain aspect ratio */
-    keep_aspect_ratio?: boolean;
-    /** Resize anchor point */
-    anchor?: 'top_left' | 'top_center' | 'top_right' | 
-             'middle_left' | 'center' | 'middle_right' | 
-             'bottom_left' | 'bottom_center' | 'bottom_right';
-  };
-
-  /** Shape name/identifier (for shape management operations) */
-  shape_name?: string;
 }
 
 /**
@@ -821,8 +805,8 @@ export class XlwingsTool extends BasePythonTool<XlwingsParams, XlwingsResult> {
         properties: {
           op: {
             type: 'string',
-            enum: ['read_range', 'write_range', 'clear_range', 'formula_range', 'format_range', 'get_range_info', 'insert_range', 'delete_range', 'copy_paste_range', 'replace_range', 'find_range', 'get_used_range', 'sort_range', 'merge_range', 'unmerge_range', 'get_sheet_info', 'set_row_height', 'set_column_width', 'get_row_height', 'get_column_width', 'add_comment', 'edit_comment', 'delete_comment', 'list_comments', 'create_chart', 'update_chart', 'delete_chart', 'list_charts', 'create_shape', 'create_textbox', 'list_shapes', 'modify_shape', 'delete_shape', 'move_shape', 'resize_shape', 'add_sheet', 'alter_sheet', 'delete_sheet', 'move_sheet', 'copy_sheet', 'list_workbooks', 'list_sheets', 'get_selection', 'set_selection', 'create_workbook', 'open_workbook', 'save_workbook', 'close_workbook', 'get_last_row', 'get_last_column', 'convert_data_types', 'add_vba_module', 'run_vba_macro', 'update_vba_code', 'list_vba_modules', 'delete_vba_module', 'insert_image', 'list_images', 'delete_image', 'resize_image', 'move_image', /* 'save_range_as_image', */ 'save_chart_as_image', 'list_apps', 'insert_row', 'insert_column', 'delete_row', 'delete_column'],
-            description: 'Operation to perform. Key operations: get_sheet_info (recommended for table analysis), get_used_range (basic range info), get_range_info (detailed cell analysis), sort_range (use get_sheet_info first to identify data boundaries)'
+            enum: ['read_range', 'write_range', 'clear_range', 'formula_range', 'format_range', 'get_cell_info', 'insert_range', 'delete_range', 'copy_paste_range', 'replace_range', 'find_range', 'get_used_range', 'sort_range', 'merge_range', 'unmerge_range', 'get_sheet_info', 'set_row_height', 'set_column_width', 'get_row_height', 'get_column_width', 'add_comment', 'edit_comment', 'delete_comment', 'list_comments', 'create_chart', 'update_chart', 'delete_chart', 'list_charts', 'create_shape', 'create_textbox', 'list_shapes', 'modify_shape', 'delete_shape', 'move_shape', 'resize_shape', 'add_sheet', 'alter_sheet', 'delete_sheet', 'move_sheet', 'copy_sheet', 'list_workbooks', 'list_sheets', 'get_selection', 'set_selection', 'create_workbook', 'open_workbook', 'save_workbook', 'close_workbook', 'get_last_row', 'get_last_column', 'convert_data_types', 'add_vba_module', 'run_vba_macro', 'update_vba_code', 'list_vba_modules', 'delete_vba_module', 'insert_image', 'list_images', 'delete_image', 'resize_image', 'move_image', /* 'save_range_as_image', */ 'save_chart_as_image', 'list_apps', 'insert_row', 'insert_column', 'delete_row', 'delete_column'],
+            description: 'Operation to perform. Key operations: get_sheet_info (recommended for table analysis), get_used_range (basic range info), get_cell_info (detailed single cell analysis), sort_range (use get_sheet_info first to identify data boundaries)'
           },
           workbook: {
             type: 'string',
@@ -844,6 +828,7 @@ export class XlwingsTool extends BasePythonTool<XlwingsParams, XlwingsResult> {
             type: 'object',
             description: 'Chart configuration',
             properties: {
+              name: { type: 'string', description: 'Chart name/identifier (for chart management operations)' },
               type: {
                 type: 'string',
                 enum: ['line', 'column', 'bar', 'pie', 'scatter', 'area'],
@@ -876,9 +861,9 @@ export class XlwingsTool extends BasePythonTool<XlwingsParams, XlwingsResult> {
             type: 'string',
             description: 'Formula to set (e.g., "=SUM(A1:A10)")'
           },
-          search: {
+          find_replace: {
             type: 'object',
-            description: 'Search and replace options',
+            description: 'Find and replace options',
             properties: {
               find: { type: 'string', description: 'Text to find' },
               replace: { type: 'string', description: 'Replacement text' },
@@ -984,11 +969,10 @@ export class XlwingsTool extends BasePythonTool<XlwingsParams, XlwingsResult> {
                 enum: ['right', 'down', 'left', 'up'], 
                 description: 'Direction to shift cells when inserting/deleting' 
               },
-              count: { type: 'number', description: 'Number of cells/rows/columns to insert or delete' },
-              include_formatting: { type: 'boolean', description: 'Whether to include cell formatting information (for get_range_info)' },
-              include_formulas: { type: 'boolean', description: 'Whether to include formula information (for get_range_info)' },
-              include_validation: { type: 'boolean', description: 'Whether to include data validation info (for get_range_info)' },
-              include_comments: { type: 'boolean', description: 'Whether to include comments (for get_range_info)' }
+              include_formatting: { type: 'boolean', description: 'Whether to include cell formatting information (for get_cell_info)' },
+              include_formulas: { type: 'boolean', description: 'Whether to include formula information (for get_cell_info)' },
+              include_validation: { type: 'boolean', description: 'Whether to include data validation info (for get_cell_info)' },
+              include_comments: { type: 'boolean', description: 'Whether to include comments (for get_cell_info)' }
             }
           },
           sort: {
@@ -1045,64 +1029,92 @@ export class XlwingsTool extends BasePythonTool<XlwingsParams, XlwingsResult> {
               include_merged_cells: { type: 'boolean', description: 'Include merged cell information' }
             }
           },
+          // Workbook Management
           file_path: {
             type: 'string',
-            description: 'File path for create_workbook, open_workbook, save_workbook operations'
+            description: 'File path for workbook operations (create_workbook, open_workbook, save_workbook)'
           },
           save_before_close: {
             type: 'boolean',
             description: 'Whether to save existing changes before closing (for close_workbook)'
           },
-          vba_module: {
-            type: 'string',
-            description: 'VBA module name (for VBA operations)'
+
+          // VBA Operations
+          vba: {
+            type: 'object',
+            description: 'VBA module configuration',
+            properties: {
+              module_name: {
+                type: 'string',
+                description: 'VBA module name (for VBA operations)'
+              },
+              code: {
+                type: 'string',
+                description: 'VBA code content (for add_vba_module, update_vba_code operations)'
+              },
+              macro_name: {
+                type: 'string',
+                description: 'VBA macro name to run (for run_vba_macro operation)'
+              }
+            }
           },
-          vba_code: {
-            type: 'string',
-            description: 'VBA code content (for add_vba_module, update_vba_code operations)'
+
+
+          // Image Operations
+          image: {
+            type: 'object',
+            description: 'Image configuration',
+            properties: {
+              path: {
+                type: 'string',
+                description: 'Image file path (for insert_image operations)'
+              },
+              name: {
+                type: 'string',
+                description: 'Image name/identifier (for image management operations)'
+              },
+              width: {
+                type: 'number',
+                description: 'Image width in pixels'
+              },
+              height: {
+                type: 'number',
+                description: 'Image height in pixels'
+              },
+              position: {
+                type: 'string',
+                description: 'Image position (cell reference like "A1" or "C3")'
+              }
+            }
           },
-          macro_name: {
-            type: 'string',
-            description: 'VBA macro name to run (for run_vba_macro operation)'
+
+          // Search Operations
+          search: {
+            type: 'object',
+            description: 'Search configuration',
+            properties: {
+              term: {
+                type: 'string',
+                description: 'Search term to find in cells'
+              },
+              column: {
+                description: 'Column name (string) or index (number) to search in (optional, searches all columns if not specified)'
+              },
+              formulas: {
+                type: 'boolean',
+                description: 'Search in cell formulas as well as values (default: true)'
+              },
+              auto_select: {
+                type: 'boolean',
+                description: 'Auto-select cell if only one match found (default: true)'
+              }
+            }
           },
-          chart_name: {
-            type: 'string',
-            description: 'Chart name/identifier (for chart management operations)'
-          },
-          image_path: {
-            type: 'string',
-            description: 'Image file path (for insert_image operations)'
-          },
-          image_name: {
-            type: 'string', 
-            description: 'Image name/identifier (for image management operations)'
-          },
-          width: {
-            type: 'number',
-            description: 'Image width in pixels (for image operations)'
-          },
-          height: {
-            type: 'number',
-            description: 'Image height in pixels (for image operations)'
-          },
+
+          // Export Operations
           output_path: {
             type: 'string',
-            description: 'Output file path (for export operations)'
-          },
-          search_term: {
-            type: 'string',
-            description: 'Search term to find in cells (for search_data operation)'
-          },
-          search_column: {
-            description: 'Column name (string) or index (number) to search in (optional, searches all columns if not specified)'
-          },
-          search_formulas: {
-            type: 'boolean',
-            description: 'Search in cell formulas as well as values (default: true)'
-          },
-          auto_select: {
-            type: 'boolean',
-            description: 'Auto-select cell if only one match found (default: true)'
+            description: 'Output file path for export operations (save_chart_as_image)'
           },
           app_id: {
             type: 'number',
@@ -1121,7 +1133,7 @@ export class XlwingsTool extends BasePythonTool<XlwingsParams, XlwingsResult> {
             properties: {
               type: {
                 type: 'string',
-                enum: ['rectangle', 'oval', 'triangle', 'line', 'arrow', 'textbox', 'flowchart_process', 'flowchart_decision', 'flowchart_start_end', 'flowchart_connector', 'straight_connector', 'elbow_connector', 'curved_connector', 'right_arrow', 'left_arrow', 'up_arrow', 'down_arrow', 'star', 'pentagon', 'hexagon'],
+                enum: ['rectangle', 'oval', 'triangle', 'rounded_rectangle', 'line', 'arrow', 'textbox', 'flowchart_process', 'flowchart_decision', 'flowchart_start_end', 'flowchart_connector', 'straight_connector', 'elbow_connector', 'curved_connector', 'right_arrow', 'left_arrow', 'up_arrow', 'down_arrow', 'star', 'pentagon', 'hexagon'],
                 description: 'Shape type'
               },
               name: {
@@ -1323,53 +1335,49 @@ export class XlwingsTool extends BasePythonTool<XlwingsParams, XlwingsResult> {
                     description: 'Connection site index on end shape (0-based)'
                   }
                 }
+              },
+              move: {
+                type: 'object',
+                description: 'Shape movement settings for move_shape operations',
+                properties: {
+                  new_left: {
+                    type: 'number',
+                    description: 'New left position'
+                  },
+                  new_top: {
+                    type: 'number',
+                    description: 'New top position'
+                  },
+                  animate: {
+                    type: 'boolean',
+                    description: 'Whether to animate the movement'
+                  }
+                }
+              },
+              resize: {
+                type: 'object',
+                description: 'Shape resize settings for resize_shape operations',
+                properties: {
+                  new_width: {
+                    type: 'number',
+                    description: 'New width'
+                  },
+                  new_height: {
+                    type: 'number',
+                    description: 'New height'
+                  },
+                  keep_aspect_ratio: {
+                    type: 'boolean',
+                    description: 'Whether to maintain aspect ratio'
+                  },
+                  anchor: {
+                    type: 'string',
+                    enum: ['top_left', 'top_center', 'top_right', 'middle_left', 'center', 'middle_right', 'bottom_left', 'bottom_center', 'bottom_right'],
+                    description: 'Resize anchor point'
+                  }
+                }
               }
             }
-          },
-          shape_move: {
-            type: 'object',
-            description: 'Shape movement settings for move_shape operations',
-            properties: {
-              new_left: {
-                type: 'number',
-                description: 'New left position'
-              },
-              new_top: {
-                type: 'number',
-                description: 'New top position'
-              },
-              animate: {
-                type: 'boolean',
-                description: 'Whether to animate the movement'
-              }
-            }
-          },
-          shape_resize: {
-            type: 'object',
-            description: 'Shape resize settings for resize_shape operations',
-            properties: {
-              new_width: {
-                type: 'number',
-                description: 'New width'
-              },
-              new_height: {
-                type: 'number',
-                description: 'New height'
-              },
-              keep_aspect_ratio: {
-                type: 'boolean',
-                description: 'Whether to maintain aspect ratio'
-              },
-              anchor: {
-                type: 'string',
-                enum: ['top_left', 'top_center', 'top_right', 'middle_left', 'center', 'middle_right', 'bottom_left', 'bottom_center', 'bottom_right'],
-                description: 'Resize anchor point'
-              }
-            }
-          },
-          shape_name: {
-            type: 'string',
-            description: 'Shape name/identifier for shape management operations'
           }
         }
       },
@@ -1396,7 +1404,7 @@ export class XlwingsTool extends BasePythonTool<XlwingsParams, XlwingsResult> {
         let llmContent = '';
         if (result.success) {
           // Check if this operation has optimized success response
-          const optimizedOps = ['get_sheet_info', 'sort_range', 'read_range', 'find_range', 'get_range_info', 'create_shape', 'list_shapes', 'create_textbox'];
+          const optimizedOps = ['get_sheet_info', 'sort_range', 'read_range', 'find_range', 'get_cell_info', 'create_shape', 'list_shapes', 'create_textbox'];
           if (optimizedOps.includes(result.operation || params.op)) {
             // Use new helpful success response generator
             llmContent = this.generateHelpfulSuccessResponse(result, params);
@@ -1949,8 +1957,8 @@ export class XlwingsTool extends BasePythonTool<XlwingsParams, XlwingsResult> {
           }
           
           // Cell information and manipulation operation results
-          if (result.operation === 'get_range_info') {
-            llmContent += ` Retrieved detailed information for ${result.total_cells} cell(s) in range ${result.range}`;
+          if (result.operation === 'get_cell_info') {
+            llmContent += ` Retrieved detailed information for cell ${result.range}`;
             if (result.info_included) {
               const included = [];
               if (result.info_included.formatting) included.push('formatting');
@@ -2267,16 +2275,17 @@ def get_excel_app(app_id=None):
     except:
         return xw.apps.active if xw.apps else None
 
-def get_workbook_smart(workbook_name=None, preferred_app=None, auto_open=True, create_if_missing=False):
+def get_workbook_smart(workbook_name=None, preferred_app=None):
     """
-    Smart workbook finder with multi-instance support and auto-open capability
-    
+    Smart workbook finder that handles all scenarios intelligently:
+    1. If workbook is already open (by name or path), use it
+    2. If workbook_name is a path and file exists, open it
+    3. If workbook_name is just a name (no path), create new workbook with that name
+
     Args:
-        workbook_name: Workbook name or path to find/open
+        workbook_name: Workbook name or path to find/open/create
         preferred_app: Preferred Excel app instance (optional)
-        auto_open: Whether to attempt opening if not found (default: True)
-        create_if_missing: Whether to create new workbook if file doesn't exist (default: False)
-    
+
     Returns:
         tuple: (workbook_object, app_instance, was_opened_by_us, was_created_by_us)
     """
@@ -2305,37 +2314,29 @@ def get_workbook_smart(workbook_name=None, preferred_app=None, auto_open=True, c
             if wb:
                 return wb, app, False, False
     
-    # Phase 2: Not found in any instance - try to open if auto_open enabled
-    if not auto_open:
-        return None, None, False, False
-    
+    # Phase 2: Not found in any instance - smart decision making
     # Resolve file path
     file_path = _resolve_workbook_path(workbook_name)
-    
-    # Choose Excel instance for opening
+
+    # Choose Excel instance
     target_app = preferred_app if preferred_app else (all_apps[0] if all_apps else xw.App(visible=False))
-    
-    # Try to open existing file
+
+    # Smart logic: if it looks like a path and file exists, open it
     if file_path and os.path.exists(file_path):
         try:
             wb = target_app.books.open(file_path)
             return wb, target_app, True, False
         except Exception as e:
             raise Exception(f"Failed to open workbook '{file_path}': {str(e)}")
-    
-    # Phase 3: File doesn't exist - create if requested
-    if create_if_missing:
-        try:
-            wb = target_app.books.add()
-            if file_path:
-                # Save with the specified name/path
-                wb.save(file_path)
-            return wb, target_app, True, True
-        except Exception as e:
-            raise Exception(f"Failed to create workbook '{workbook_name}': {str(e)}")
-    
-    # File not found and creation not requested
-    raise Exception(f"Workbook '{workbook_name}' not found and auto_open/create_if_missing disabled")
+
+    # Smart logic: if no path or file doesn't exist, create new workbook (don't save automatically)
+    try:
+        wb = target_app.books.add()
+        # Don't save automatically - let the calling operation decide when/where to save
+        # The workbook will have a temporary name like "Book1" until explicitly saved
+        return wb, target_app, True, True
+    except Exception as e:
+        raise Exception(f"Failed to create workbook '{workbook_name}': {str(e)}")
 
 def _search_workbook_in_app(workbook_name, app):
     """Search for workbook in specific Excel app instance"""
@@ -2347,6 +2348,9 @@ def _search_workbook_in_app(workbook_name, app):
                 return book
             # Try basename match (without path)
             if book.name == os.path.basename(workbook_name):
+                return book
+            # Try match without extension (Excel often shows names without .xlsx)
+            if book.name == os.path.splitext(os.path.basename(workbook_name))[0]:
                 return book
             # Try fullname match (with path)
             try:
@@ -2390,8 +2394,11 @@ def _resolve_workbook_path(workbook_name):
 # Legacy function for backward compatibility
 def get_workbook(workbook_name=None, app=None):
     """Legacy get_workbook function - calls smart version"""
-    wb, found_app, _, _ = get_workbook_smart(workbook_name, app, auto_open=False)
-    return wb
+    try:
+        wb, found_app, _, _ = get_workbook_smart(workbook_name, app)
+        return wb
+    except:
+        return None
 
 def get_worksheet(wb, worksheet_name=None):
     """Get worksheet by name or return active worksheet"""
@@ -2537,7 +2544,7 @@ def get_worksheet(wb, worksheet_name=None):
         return this.generateGetRowHeightLogic(params);
       case 'get_column_width':
         return this.generateGetColumnWidthLogic(params);
-      case 'get_range_info':
+      case 'get_cell_info':
         return this.generateGetCellInfoLogic(params);
       case 'insert_range':
         return this.generateInsertCellsLogic(params);
@@ -2850,7 +2857,7 @@ if not ws:
 chart_type = "${chartConfig.type || 'column'}"
 data_range = "${chartConfig.data_range || 'A1:B10'}"
 position = "${chartConfig.position || 'D1'}"
-chart_name = "${params.chart_name || ''}"
+chart_name = "${params.chart?.name || ''}"
 
 chart = ws.charts.add()
 chart.set_source_data(ws.range(data_range))
@@ -3184,9 +3191,7 @@ cut_mode = ${cutModePython}
 try:
     # Phase 1: Find/open source workbook
     source_wb, source_app, source_opened_by_us, source_created_by_us = get_workbook_smart(
-        "${sourceWorkbook}", 
-        auto_open=True, 
-        create_if_missing=False
+        "${sourceWorkbook}"
     )
     if not source_wb:
         raise Exception(f"Could not find or open source workbook '${sourceWorkbook}'")
@@ -3484,8 +3489,8 @@ print(json.dumps(result))`;
   }
 
   private generateFindReplaceLogic(params: XlwingsParams): string {
-    if (!params.search) {
-      return 'raise ValueError("Search configuration is required")';
+    if (!params.find_replace) {
+      return 'raise ValueError("Find and replace configuration is required")';
     }
 
     return `
@@ -3502,8 +3507,8 @@ ws = get_worksheet(wb, "${params.worksheet || ''}")
 if not ws:
     raise Exception("Could not find the specified worksheet")
 
-find_text = "${params.search.find}"
-replace_text = "${params.search.replace}"
+find_text = "${params.find_replace.find}"
+replace_text = "${params.find_replace.replace}"
 range_str = "${params.range || ''}"
 
 if range_str:
@@ -3716,9 +3721,7 @@ print(json.dumps(result))`;
 # Smart move sheet with multi-instance support
 # Phase 1: Find/open source workbook
 source_wb, source_app, source_opened_by_us, source_created_by_us = get_workbook_smart(
-    "${params.workbook || ''}", 
-    auto_open=True, 
-    create_if_missing=False
+    "${params.workbook || ''}"
 )
 
 if not source_wb:
@@ -3734,9 +3737,7 @@ if "${targetWorkbook}":
     # Cross-workbook move
     target_wb, target_app, target_opened_by_us, target_created_by_us = get_workbook_smart(
         "${targetWorkbook}",
-        preferred_app=source_app,  # Prefer same instance as source
-        auto_open=True,
-        create_if_missing=True  # Create target workbook if it doesn't exist
+        preferred_app=source_app  # Prefer same instance as source
     )
     
     if not target_wb:
@@ -3844,10 +3845,7 @@ try:
                         rows = len(sheet_data)
                         cols = len(sheet_data[0]) if isinstance(sheet_data[0], list) else 1
                         # Build proper range address
-                        if cols <= 26:
-                            col_addr = chr(64 + cols)
-                        else:
-                            col_addr = chr(64 + cols//26) + chr(64 + cols%26)
+                        col_addr = column_number_to_letter(cols)
                         target_range = f"A1:{col_addr}{rows}"
                         moved_ws.range(target_range).value = sheet_data
                 else:
@@ -3873,8 +3871,8 @@ try:
                         first_row = sheet_data[0]
                         if isinstance(first_row, list) and len(first_row) > 0:
                             cols = len(first_row)
-                            col_addr = chr(64 + cols) if cols <= 26 else chr(64 + cols//26) + chr(64 + cols%26)
-                            
+                            col_addr = column_number_to_letter(cols)
+
                             source_header_range = source_ws.range(f"A1:{col_addr}1")
                             target_header_range = moved_ws.range(f"A1:{col_addr}1")
                             
@@ -4051,9 +4049,7 @@ print(json.dumps(result))`;
 # Smart copy sheet with multi-instance support
 # Phase 1: Find/open source workbook
 source_wb, source_app, source_opened_by_us, source_created_by_us = get_workbook_smart(
-    "${params.workbook || ''}", 
-    auto_open=True, 
-    create_if_missing=False
+    "${params.workbook || ''}"
 )
 
 if not source_wb:
@@ -4069,9 +4065,7 @@ if "${targetWorkbook}":
     # Cross-workbook copy
     target_wb, target_app, target_opened_by_us, target_created_by_us = get_workbook_smart(
         "${targetWorkbook}",
-        preferred_app=source_app,  # Prefer same instance as source
-        auto_open=True,
-        create_if_missing=True  # Create target workbook if it doesn't exist
+        preferred_app=source_app  # Prefer same instance as source
     )
     
     if not target_wb:
@@ -4176,7 +4170,8 @@ try:
                     if len(sheet_data) > 0:
                         rows = len(sheet_data)
                         cols = len(sheet_data[0]) if isinstance(sheet_data[0], list) else 1
-                        target_range = f"A1:{chr(64 + cols)}{rows}" if cols <= 26 else f"A1:{chr(64 + cols//26)}{chr(64 + cols%26)}{rows}"
+                        col_letter = column_number_to_letter(cols)
+                        target_range = f"A1:{col_letter}{rows}"
                         copied_ws.range(target_range).value = sheet_data
                 else:
                     # Single value
@@ -4203,8 +4198,9 @@ try:
                         first_row = sheet_data[0]
                         if isinstance(first_row, list) and len(first_row) > 0:
                             # Try to copy bold formatting from source header
-                            source_header_range = source_ws.range("A1:" + chr(64 + len(first_row)) + "1")
-                            target_header_range = copied_ws.range("A1:" + chr(64 + len(first_row)) + "1")
+                            col_letter = column_number_to_letter(len(first_row))
+                            source_header_range = source_ws.range(f"A1:{col_letter}1")
+                            target_header_range = copied_ws.range(f"A1:{col_letter}1")
                             
                             # Copy bold formatting
                             try:
@@ -4406,7 +4402,7 @@ try:
         raise Exception("Comments can only be added to single cells, not ranges")
     
     # Add comment
-    comment_text = "${commentText}"
+    comment_text = "${commentText || ''}"
     if not comment_text:
         raise Exception("comment.text is required for add_comment operation")
     
@@ -4417,8 +4413,17 @@ try:
     except:
         pass  # Note doesn't exist, continue
 
-    # Add new comment using note.text property
-    cell.note.text = comment_text
+    # Add new comment using COM API then set text
+    try:
+        # Use COM API to add comment first
+        cell.api.AddComment()
+        cell.api.Comment.Text(comment_text)
+    except:
+        # Fallback: try direct note.text assignment
+        try:
+            cell.note.text = comment_text
+        except Exception as e:
+            raise Exception(f"Failed to add comment using both COM API and note.text methods: {str(e)}")
     
     # Note: xlwings Note object only supports text property
     # Author and visibility are not supported in the current Note API
@@ -4430,8 +4435,8 @@ try:
         "worksheet": ws.name,
         "range": range_str,
         "comment_text": comment_text,
-        "comment_author": author if author else "System",
-        "comment_visible": visible
+        "comment_author": "System",
+        "comment_visible": True
     }
     
 except Exception as e:
@@ -5296,113 +5301,116 @@ if not ws:
     raise Exception("Could not find the specified worksheet")
 
 # Get target range
-range_str = "${params.range || 'A1'}"
-if not range_str:
-    raise Exception("range parameter is required for get_range_info operation")
+# Get single cell address (not range)
+cell_address = "${params.range || 'A1'}"
+if not cell_address:
+    raise Exception("cell address parameter is required for get_cell_info operation")
+
+# Ensure it's a single cell, not a range
+if ':' in cell_address:
+    raise Exception("get_cell_info only supports single cell addresses, not ranges")
 
 try:
-    range_obj = ws.range(range_str)
-    cells_info = []
-    
+    cell_obj = ws.range(cell_address)
+
+    # Ensure it's actually a single cell
+    if cell_obj.size > 1:
+        raise Exception("get_cell_info only supports single cells")
+
     include_formatting = ${includeFormattingPython}
     include_formulas = ${includeFormulasPython}
     include_validation = ${includeValidationPython}
     include_comments = ${includeCommentsPython}
-    
-    # Iterate through each cell in the range
-    for row in range(range_obj.row, range_obj.row + range_obj.rows.count):
-        for col in range(range_obj.column, range_obj.column + range_obj.columns.count):
-            cell = ws.range((row, col))
-            
-            # Basic cell information
-            cell_info = {
-                "address": cell.address,
-                "row": row,
-                "column": col,
-                "value": cell.value,
-                "data_type": str(type(cell.value).__name__) if cell.value is not None else "NoneType"
+
+    # Get information for the single cell
+    cell = cell_obj
+
+    # Basic cell information
+    cell_info = {
+        "address": cell.address,
+        "row": cell.row,
+        "column": cell.column,
+        "value": cell.value,
+        "data_type": str(type(cell.value).__name__) if cell.value is not None else "NoneType"
+    }
+
+    # Formula information
+    if include_formulas:
+        try:
+            formula = cell.formula
+            cell_info["formula"] = formula if formula else None
+            cell_info["has_formula"] = bool(formula)
+        except:
+            cell_info["formula"] = None
+            cell_info["has_formula"] = False
+
+    # Formatting information
+    if include_formatting:
+        try:
+            cell_info["formatting"] = {
+                "font_name": getattr(cell.api.Font, 'Name', None),
+                "font_size": getattr(cell.api.Font, 'Size', None),
+                "font_bold": getattr(cell.api.Font, 'Bold', None),
+                "font_italic": getattr(cell.api.Font, 'Italic', None),
+                "font_color": getattr(cell.api.Font, 'Color', None),
+                "fill_color": getattr(cell.api.Interior, 'Color', None),
+                "number_format": getattr(cell.api, 'NumberFormat', None),
+                "horizontal_alignment": getattr(cell.api, 'HorizontalAlignment', None),
+                "vertical_alignment": getattr(cell.api, 'VerticalAlignment', None),
+                "has_border": bool(getattr(cell.api.Borders, 'LineStyle', None))
             }
-            
-            # Formula information
-            if include_formulas:
-                try:
-                    formula = cell.formula
-                    cell_info["formula"] = formula if formula else None
-                    cell_info["has_formula"] = bool(formula)
-                except:
-                    cell_info["formula"] = None
-                    cell_info["has_formula"] = False
-            
-            # Formatting information
-            if include_formatting:
-                try:
-                    cell_info["formatting"] = {
-                        "font_name": getattr(cell.api.Font, 'Name', None),
-                        "font_size": getattr(cell.api.Font, 'Size', None),
-                        "font_bold": getattr(cell.api.Font, 'Bold', None),
-                        "font_italic": getattr(cell.api.Font, 'Italic', None),
-                        "font_color": getattr(cell.api.Font, 'Color', None),
-                        "fill_color": getattr(cell.api.Interior, 'Color', None),
-                        "number_format": getattr(cell.api, 'NumberFormat', None),
-                        "horizontal_alignment": getattr(cell.api, 'HorizontalAlignment', None),
-                        "vertical_alignment": getattr(cell.api, 'VerticalAlignment', None),
-                        "has_border": bool(getattr(cell.api.Borders, 'LineStyle', None))
-                    }
-                except Exception as fmt_error:
-                    cell_info["formatting"] = {"error": str(fmt_error)}
-            
-            # Comment information
-            if include_comments:
-                try:
-                    if cell.note:
-                        cell_info["comment"] = {
-                            "text": cell.note.text,
-                            "author": "Unknown",  # Not available in Note API
-                            "visible": False  # Not available in Note API
-                        }
-                    else:
-                        cell_info["comment"] = None
-                except:
-                    cell_info["comment"] = None
-            
-            # Data validation information
-            if include_validation:
-                try:
-                    validation = cell.api.Validation
-                    if validation.Type > 0:  # Has validation
-                        cell_info["validation"] = {
-                            "type": validation.Type,
-                            "formula1": validation.Formula1,
-                            "formula2": validation.Formula2,
-                            "input_message": validation.InputMessage,
-                            "error_message": validation.ErrorMessage,
-                            "show_input": validation.ShowInput,
-                            "show_error": validation.ShowError
-                        }
-                    else:
-                        cell_info["validation"] = None
-                except:
-                    cell_info["validation"] = None
-            
-            # Additional properties
-            try:
-                cell_info["is_merged"] = cell.api.MergeCells
-                if cell_info["is_merged"]:
-                    cell_info["merge_area"] = cell.api.MergeArea.Address
-            except:
-                cell_info["is_merged"] = False
-                cell_info["merge_area"] = None
-            
-            cells_info.append(cell_info)
+        except Exception as fmt_error:
+            cell_info["formatting"] = {"error": str(fmt_error)}
+
+    # Comment information
+    if include_comments:
+        try:
+            if cell.note:
+                cell_info["comment"] = {
+                    "text": cell.note.text,
+                    "author": "Unknown",  # Not available in Note API
+                    "visible": False  # Not available in Note API
+                }
+            else:
+                cell_info["comment"] = None
+        except:
+            cell_info["comment"] = None
+
+    # Data validation information
+    if include_validation:
+        try:
+            validation = cell.api.Validation
+            if validation.Type > 0:  # Has validation
+                cell_info["validation"] = {
+                    "type": validation.Type,
+                    "formula1": validation.Formula1,
+                    "formula2": validation.Formula2,
+                    "input_message": validation.InputMessage,
+                    "error_message": validation.ErrorMessage,
+                    "show_input": validation.ShowInput,
+                    "show_error": validation.ShowError
+                }
+            else:
+                cell_info["validation"] = None
+        except:
+            cell_info["validation"] = None
+
+    # Additional properties
+    try:
+        cell_info["is_merged"] = cell.api.MergeCells
+        if cell_info["is_merged"]:
+            cell_info["merge_area"] = cell.api.MergeArea.Address
+    except:
+        cell_info["is_merged"] = False
+        cell_info["merge_area"] = None
     
     result = {
         "success": True,
-        "operation": "get_range_info",
+        "operation": "get_cell_info",
         "workbook": wb.name,
         "worksheet": ws.name,
-        "range": range_str,
-        "cells": cells_info,
-        "total_cells": len(cells_info),
+        "range": cell_address,
+        "cell_info": cell_info,
         "info_included": {
             "formatting": include_formatting,
             "formulas": include_formulas,
@@ -5410,14 +5418,14 @@ try:
             "comments": include_comments
         }
     }
-    
+
 except Exception as e:
     result = {
         "success": False,
-        "operation": "get_range_info",
+        "operation": "get_cell_info",
         "workbook": wb.name if 'wb' in locals() else None,
         "worksheet": ws.name if 'ws' in locals() else None,
-        "range": range_str,
+        "range": cell_address if 'cell_address' in locals() else None,
         "error": str(e)
     }
 
@@ -5713,84 +5721,81 @@ try:
              range_obj.column + range_obj.columns.count - 2)
         )
     
-    # Use Excel's Sort object for advanced sorting
-    sort_obj = wb.api.Worksheets(ws.name).Sort
-    
-    # Clear existing sort criteria
-    sort_obj.SortFields.Clear()
-    
-    # Process sort keys
-    for i, key in enumerate(sort_keys):
+    # Use pandas-based sorting to avoid Excel Sort API issues
+    import pandas as pd
+
+    # Read current data into pandas DataFrame
+    data = range_obj.value
+    if not data or len(data) == 0:
+        raise Exception("No data found in the specified range")
+
+    # Convert to DataFrame
+    df = pd.DataFrame(data)
+
+    # Set up column names for easier sorting
+    if has_header:
+        # First row is header
+        df.columns = df.iloc[0]
+        df = df.drop(df.index[0]).reset_index(drop=True)
+    else:
+        # No header, use numeric column names
+        df.columns = [f'Col{i+1}' for i in range(len(df.columns))]
+
+    # Process sort keys for pandas
+    sort_columns = []
+    sort_ascending = []
+
+    for key in sort_keys:
         if orientation == 'rows':
-            # Sorting by columns (vertical sort)
             col_spec = key.get('column', 1)
-            
-            # Convert column specification to relative position within the range
+
+            # Convert column specification to pandas column name
             if isinstance(col_spec, str):
-                # If it's a letter (like "I"), get its absolute column number
+                # If it's a letter (like "I"), get its position within the range
                 abs_col_num = column_to_number(col_spec)
-                # Calculate relative position within the range (1-based)
                 relative_col_num = abs_col_num - range_obj.column + 1
+                if 1 <= relative_col_num <= len(df.columns):
+                    pandas_col = df.columns[relative_col_num - 1]
+                else:
+                    raise Exception(f"Sort column {col_spec} (position {relative_col_num}) is outside the range")
             else:
-                # If it's already a number, treat as relative position
-                relative_col_num = int(col_spec)
-            
-            # For Excel Sort, we need to use a single cell from the sort column as the key
-            # This should be relative to the sort range, not absolute coordinates
-            if 1 <= relative_col_num <= range_obj.columns.count:
-                # Use the first row of the specified column within the sort range
-                key_col_index = range_obj.column + relative_col_num - 1
-                sort_key_cell = ws.range((sort_range.row, key_col_index))
-                
-                sort_order = xl_ascending if key.get('order', 'asc') == 'asc' else xl_descending
-                data_type = data_type_constants.get(key.get('data_type', 'auto'), xl_sort_normal)
-                
-                sort_obj.SortFields.Add(
-                    Key=sort_key_cell.api,
-                    SortOn=xl_sort_on_values,
-                    Order=sort_order,
-                    DataOption=data_type
-                )
-            else:
-                raise Exception(f"Sort column {col_spec} (relative position {relative_col_num}) is outside the range which has {range_obj.columns.count} columns")
+                # If it's a number, treat as 1-based column index
+                col_index = int(col_spec) - 1
+                if 0 <= col_index < len(df.columns):
+                    pandas_col = df.columns[col_index]
+                else:
+                    raise Exception(f"Sort column {col_spec} is outside the range")
+
+            sort_columns.append(pandas_col)
+            sort_ascending.append(key.get('order', 'asc') == 'asc')
         else:
-            # Sorting by rows (horizontal sort)  
-            row_num = key.get('row', 1)
-            
-            # For Excel Sort, we need to use a single cell from the sort row as the key
-            if row_num <= range_obj.rows.count:
-                # Use the first column of the specified row within the sort range
-                key_row_index = range_obj.row + row_num - 1
-                sort_key_cell = ws.range((key_row_index, sort_range.column))
-                
-                sort_order = xl_ascending if key.get('order', 'asc') == 'asc' else xl_descending
-                
-                sort_obj.SortFields.Add(
-                    Key=sort_key_cell.api,
-                    SortOn=xl_sort_on_values, 
-                    Order=sort_order
-                )
-            else:
-                raise Exception(f"Sort row {row_num} is outside the range which has {range_obj.rows.count} rows")
-    
-    # Set sort range and execute
-    sort_obj.SetRange(sort_range.api)
-    sort_obj.Header = 1 if has_header else 2  # xlNo = 2, xlYes = 1
-    sort_obj.MatchCase = case_sensitive
-    sort_obj.Orientation = xl_sort_rows if orientation == 'rows' else xl_sort_columns
-    
-    # Apply custom sort order if provided
-    if custom_order and orientation == 'rows' and len(sort_keys) > 0:
-        try:
-            # Create custom list (this is Excel version dependent)
-            custom_list = custom_order
-            # Note: Custom sort orders are complex in xlwings/Excel API
-            # For now, we'll note it in the result but may not apply it
-        except:
-            pass
-    
-    # Execute the sort
-    sort_obj.Apply()
+            # Horizontal sorting not commonly supported by pandas directly
+            # Would need to transpose, sort, then transpose back
+            raise Exception("Horizontal sorting (by rows) is not yet supported")
+
+    # Perform the sort
+    if sort_columns:
+        # Handle mixed data types in sort columns
+        for col in sort_columns:
+            # Try to convert to numeric if possible
+            try:
+                df[col] = pd.to_numeric(df[col], errors='ignore')
+            except:
+                pass
+
+        df_sorted = df.sort_values(by=sort_columns, ascending=sort_ascending, na_position='last')
+    else:
+        df_sorted = df
+
+    # Write the sorted data back to Excel
+    sorted_data = df_sorted.values.tolist()
+
+    # If there was a header, we need to add it back
+    if has_header and len(data) > 0:
+        sorted_data.insert(0, list(df_sorted.columns))
+
+    # Write back to the range
+    range_obj.value = sorted_data
     
     # Prepare result information
     sort_summary = []
@@ -6168,8 +6173,8 @@ print(json.dumps(result))`;
   }
 
   private generateAddVbaModuleLogic(params: XlwingsParams): string {
-    const moduleName = params.vba_module || 'Module1';
-    const vbaCode = params.vba_code || '';
+    const moduleName = params.vba?.module_name || 'Module1';
+    const vbaCode = params.vba?.code || '';
     
     return `
 # Connect to Excel
@@ -6231,7 +6236,7 @@ except Exception as e:
   }
 
   private generateRunVbaMacroLogic(params: XlwingsParams): string {
-    const macroName = params.macro_name || '';
+    const macroName = params.vba?.macro_name || '';
     
     return `
 # Connect to Excel
@@ -6245,7 +6250,7 @@ if not wb:
 
 try:
     if not "${macroName}":
-        raise ValueError("macro_name is required for run_vba_macro operation")
+        raise ValueError("vba.macro_name is required for run_vba_macro operation")
     
     # Run the macro
     try:
@@ -6274,8 +6279,8 @@ except Exception as e:
   }
 
   private generateUpdateVbaCodeLogic(params: XlwingsParams): string {
-    const moduleName = params.vba_module || 'Module1';
-    const vbaCode = params.vba_code || '';
+    const moduleName = params.vba?.module_name || 'Module1';
+    const vbaCode = params.vba?.code || '';
     
     return `
 # Connect to Excel
@@ -6373,7 +6378,7 @@ except Exception as e:
   }
 
   private generateDeleteVbaModuleLogic(params: XlwingsParams): string {
-    const moduleName = params.vba_module || '';
+    const moduleName = params.vba?.module_name || '';
     
     return `
 # Connect to Excel
@@ -6387,7 +6392,7 @@ if not wb:
 
 try:
     if not "${moduleName}":
-        raise ValueError("vba_module is required for delete_vba_module operation")
+        raise ValueError("vba.module_name is required for delete_vba_module operation")
     
     # Access VBA project
     vba_project = wb.api.VBProject
@@ -6423,7 +6428,7 @@ except Exception as e:
 
   private generateUpdateChartLogic(params: XlwingsParams): string {
     const chartConfig = params.chart;
-    const chartName = params.chart_name || '';
+    const chartName = params.chart?.name || '';
     
     if (!chartName) {
       return 'raise ValueError("chart_name is required for update_chart operation")';
@@ -6530,7 +6535,7 @@ except Exception as e:
   }
 
   private generateDeleteChartLogic(params: XlwingsParams): string {
-    const chartName = params.chart_name || '';
+    const chartName = params.chart?.name || '';
     
     if (!chartName) {
       return 'raise ValueError("chart_name is required for delete_chart operation")';
@@ -6642,14 +6647,14 @@ except Exception as e:
   }
 
   private generateInsertImageLogic(params: XlwingsParams): string {
-    const imagePath = params.image_path || '';
-    const range = params.range || 'A1';
-    const width = params.width;
-    const height = params.height;
-    const imageName = params.image_name;
+    const imagePath = params.image?.path || '';
+    const range = params.image?.position || params.range || 'A1';
+    const width = params.image?.width;
+    const height = params.image?.height;
+    const imageName = params.image?.name;
     
     if (!imagePath) {
-      return 'raise ValueError("image_path is required for insert_image operation")';
+      return 'raise ValueError("image.path is required for insert_image operation")';
     }
     
     return `
@@ -6788,10 +6793,10 @@ except Exception as e:
   }
 
   private generateDeleteImageLogic(params: XlwingsParams): string {
-    const imageName = params.image_name || '';
+    const imageName = params.image?.name || '';
     
     if (!imageName) {
-      return 'raise ValueError("image_name is required for delete_image operation")';
+      return 'raise ValueError("image.name is required for delete_image operation")';
     }
     
     return `
@@ -6842,12 +6847,12 @@ except Exception as e:
   }
 
   private generateResizeImageLogic(params: XlwingsParams): string {
-    const imageName = params.image_name || '';
-    const width = params.width;
-    const height = params.height;
+    const imageName = params.image?.name || '';
+    const width = params.image?.width;
+    const height = params.image?.height;
     
     if (!imageName) {
-      return 'raise ValueError("image_name is required for resize_image operation")';
+      return 'raise ValueError("image.name is required for resize_image operation")';
     }
     
     return `
@@ -6906,11 +6911,11 @@ except Exception as e:
   }
 
   private generateMoveImageLogic(params: XlwingsParams): string {
-    const imageName = params.image_name || '';
+    const imageName = params.image?.name || '';
     const range = params.range || '';
     
     if (!imageName) {
-      return 'raise ValueError("image_name is required for move_image operation")';
+      return 'raise ValueError("image.name is required for move_image operation")';
     }
     
     if (!range) {
@@ -7055,7 +7060,7 @@ except Exception as e:
   } */
 
   private generateSaveChartAsImageLogic(params: XlwingsParams): string {
-    const chartName = params.chart_name || '';
+    const chartName = params.chart?.name || '';
     const outputPath = params.output_path || '';
     
     if (!chartName) {
@@ -7128,16 +7133,16 @@ except Exception as e:
   }
 
   private generateSearchDataLogic(params: XlwingsParams): string {
-    const searchTerm = params.search_term || '';
-    const searchColumn = params.search_column;
-    const searchFormulas = params.search_formulas !== false; // Default true
-    const autoSelect = params.auto_select !== false; // Default true
+    const searchTerm = params.search?.term || '';
+    const searchColumn = params.search?.column;
+    const searchFormulas = params.search?.formulas !== false; // Default true
+    const autoSelect = params.search?.auto_select !== false; // Default true
     const searchFormulasPython = searchFormulas ? 'True' : 'False';
     const autoSelectPython = autoSelect ? 'True' : 'False';
     const targetWorksheet = params.worksheet || '';
     
     if (!searchTerm) {
-      return 'raise ValueError("search_term is required for search_data operation")';
+      return 'raise ValueError("search.term is required for search_data operation")';
     }
     
     return `
@@ -7586,10 +7591,10 @@ except Exception as e:
 
     const shape = params.shape;
     const shapeType = shape.type;
-    const left = shape.left;
-    const top = shape.top;
-    const width = shape.width;
-    const height = shape.height;
+    const left = shape.left ?? 100;
+    const top = shape.top ?? 100;
+    const width = shape.width ?? 100;
+    const height = shape.height ?? 50;
     const text = shape.text || '';
     const name = shape.name || `Shape_${Date.now()}`;
 
@@ -7635,7 +7640,8 @@ try:
         'flowchart_connector': 103,   # msoShapeFlowchartConnector
         'line': 9,                    # msoShapeLineSegment (for simple lines)
         # Basic geometric shapes
-        'triangle': 5,                # msoShapeIsoscelesTriangle
+        'triangle': 7,                # msoShapeIsoscelesTriangle (corrected value)
+        'rounded_rectangle': 5,       # msoShapeRoundedRectangle (what was showing as triangle)
         'star': 12,                   # msoShape32pointStar
         'pentagon': 7,                # msoShapePentagon
         'hexagon': 8                  # msoShapeHexagon
@@ -7687,11 +7693,16 @@ try:
         "operation": "create_shape",
         "workbook": wb.name,
         "worksheet": ws.name,
-        "shape_name": shape_obj.Name,
-        "shape_type": "${shapeType}",
-        "position": {"left": ${left}, "top": ${top}},
-        "size": {"width": ${width}, "height": ${height}},
-        "text": "${text}"
+        "shape": {
+            "name": shape_obj.Name,
+            "type": "${shapeType}",
+            "left": ${left},
+            "top": ${top},
+            "width": ${width},
+            "height": ${height},
+            "text": "${text}"
+        },
+        "shape_created": True
     }
     print(json.dumps(result))
     
@@ -7710,10 +7721,10 @@ except Exception as e:
     }
 
     const shape = params.shape;
-    const left = shape.left;
-    const top = shape.top;
-    const width = shape.width;
-    const height = shape.height;
+    const left = shape.left ?? 100;
+    const top = shape.top ?? 100;
+    const width = shape.width ?? 100;
+    const height = shape.height ?? 50;
     const text = shape.text || '';
     const name = shape.name || `Textbox_${Date.now()}`;
 
@@ -7815,7 +7826,7 @@ except Exception as e:
   }
 
   private generateModifyShapeLogic(params: XlwingsParams): string {
-    const shapeName = params.shape_name || params.shape?.name;
+    const shapeName = params.shape?.name;
     if (!shapeName) {
       return 'raise ValueError("Shape name is required for modify_shape operation")';
     }
@@ -7859,7 +7870,7 @@ except Exception as e:
   }
 
   private generateDeleteShapeLogic(params: XlwingsParams): string {
-    const shapeName = params.shape_name || params.shape?.name;
+    const shapeName = params.shape?.name;
     if (!shapeName) {
       return 'raise ValueError("Shape name is required for delete_shape operation")';
     }
@@ -7902,10 +7913,10 @@ except Exception as e:
   }
 
   private generateMoveShapeLogic(params: XlwingsParams): string {
-    const shapeName = params.shape_name || params.shape?.name;
-    const moveSettings = params.shape_move;
+    const shapeName = params.shape?.name;
+    const moveSettings = params.shape?.move;
     if (!shapeName || !moveSettings) {
-      return 'raise ValueError("Shape name and movement settings are required for move_shape operation")';
+      return 'raise ValueError("shape.name and shape.move are required for move_shape operation")';
     }
 
     return `${this.generateExcelConnectionCode(params)}
@@ -7953,10 +7964,10 @@ except Exception as e:
   }
 
   private generateResizeShapeLogic(params: XlwingsParams): string {
-    const shapeName = params.shape_name || params.shape?.name;
-    const resizeSettings = params.shape_resize;
+    const shapeName = params.shape?.name;
+    const resizeSettings = params.shape?.resize;
     if (!shapeName || !resizeSettings) {
-      return 'raise ValueError("Shape name and resize settings are required for resize_shape operation")';
+      return 'raise ValueError("shape.name and shape.resize are required for resize_shape operation")';
     }
     const keepAspectRatio = resizeSettings.keep_aspect_ratio || false;
     const keepAspectRatioPython = keepAspectRatio ? 'True' : 'False';
@@ -8047,9 +8058,18 @@ except Exception as e:
                 end_shape = existing_shape
 
         if start_shape and end_shape:
-            # Connect the connector to the shapes
-            shape_obj.ConnectorFormat.BeginConnect(start_shape, ${connection.start_connection_site || 0})
-            shape_obj.ConnectorFormat.EndConnect(end_shape, ${connection.end_connection_site || 0})
+            # Connect the connector to the shapes using proper connection sites
+            # Connection sites are numbered from 1 to the total number of connection sites on the shape
+            start_site = ${connection.start_connection_site || 1}  # Default to site 1 instead of 0
+            end_site = ${connection.end_connection_site || 1}      # Default to site 1 instead of 0
+
+            shape_obj.ConnectorFormat.BeginConnect(ConnectedShape=start_shape, ConnectionSite=start_site)
+            shape_obj.ConnectorFormat.EndConnect(ConnectedShape=end_shape, ConnectionSite=end_site)
+
+            # Automatically find the shortest path between the connected shapes
+            shape_obj.RerouteConnections()
+
+            print(f"Connected {shape_obj.Name} from {start_shape.Name} (site {start_site}) to {end_shape.Name} (site {end_site})")
         else:
             print(f"Warning: Could not find shapes to connect - start: ${connection.start_shape}, end: ${connection.end_shape}")
     except Exception as conn_e:
@@ -8443,18 +8463,22 @@ print(json.dumps(result))`;
   /**
    * Format data as markdown table
    */
-  private formatDataAsTable(data: CellInfo[][] | unknown[][], maxCols: number = 10): string {
+  private formatDataAsTable(data: unknown[][], maxCols: number = 10): string {
     if (!data || data.length === 0) return '';
 
-    // Handle both CellInfo format and simple array format
+    // Normalize data to simple array format
     const visibleData = data.map(row => {
-      const rowData = Array.isArray(row) ? row.slice(0, maxCols) : [];
-      return rowData.map(cell => {
-        // Check if it's CellInfo format (has value property) or simple format
+      if (!Array.isArray(row)) {
+        // Handle case where data is not properly formatted as 2D array
+        return [row].slice(0, maxCols).map(cell => String(cell ?? ''));
+      }
+
+      return row.slice(0, maxCols).map(cell => {
+        // Handle both CellInfo format and simple format
         if (cell && typeof cell === 'object' && 'value' in cell) {
-          return (cell as CellInfo).value ?? '';
+          return String((cell as CellInfo).value ?? '');
         } else {
-          return cell ?? '';
+          return String(cell ?? '');
         }
       });
     });
@@ -8475,8 +8499,8 @@ print(json.dumps(result))`;
     }
     table += '\n';
 
-    // Data rows (skip first if it's headers)
-    const startRow = this.detectHeaders(data[0]) ? 1 : 0;
+    // Data rows (skip first if it's headers, but always show data if only one row)
+    const startRow = (data.length > 1 && this.detectHeaders(data[0])) ? 1 : 0;
     for (let row = startRow; row < Math.min(data.length, startRow + 5); row++) {
       table += '| ';
       for (let col = 0; col < colCount; col++) {
@@ -8710,6 +8734,21 @@ print(json.dumps(result))`;
       return 'sort_column_outside_range';
     }
 
+    // Image specific errors
+    if (msg.includes('image') && msg.includes('not found')) {
+      return 'image_not_found';
+    }
+    if (msg.includes('image.path is required') || (msg.includes('image path') && msg.includes('required'))) {
+      return 'image_path_required';
+    }
+    if (msg.includes('image.name is required') || (msg.includes('image name') && msg.includes('required'))) {
+      return 'image_name_required';
+    }
+    if ((msg.includes('file not found') || (msg.includes('path') && msg.includes('not found'))) &&
+        (msg.includes('.jpg') || msg.includes('.png') || msg.includes('.gif') || msg.includes('.bmp'))) {
+      return 'image_file_not_found';
+    }
+
     // File specific errors
     if (msg.includes('file not found') || msg.includes('path') && msg.includes('not found')) {
       return 'file_not_found';
@@ -8770,6 +8809,14 @@ print(json.dumps(result))`;
 
       case 'sort_column_outside_range':
         return this.getSortColumnOutsideRangeTemplate(context);
+      case 'image_not_found':
+        return this.getImageNotFoundTemplate(context);
+      case 'image_path_required':
+        return this.getImagePathRequiredTemplate(context);
+      case 'image_name_required':
+        return this.getImageNameRequiredTemplate(context);
+      case 'image_file_not_found':
+        return this.getImageFileNotFoundTemplate(context);
 
       default:
         return this.getGenericErrorTemplate(context);
@@ -8899,6 +8946,68 @@ print(json.dumps(result))`;
   }
 
   /**
+   * Template for image not found error
+   */
+  private getImageNotFoundTemplate(context: ErrorContext): string {
+    let response = `# Image Not Found: Image does not exist\n\n`;
+    response += `## Error Summary\n`;
+    response += `The requested image could not be found in the worksheet.\n\n`;
+
+    response += `## Resolving This Issue\n`;
+    response += `- List available images: list_images(worksheet: "${context.worksheet || ''}")\n`;
+    response += `- Check image name spelling and case\n`;
+    response += `- Insert image first: insert_image(image: { path: "path/to/image.jpg", position: "A1" })`;
+
+    return response;
+  }
+  /**
+   * Template for image path required error
+   */
+  private getImagePathRequiredTemplate(_context: ErrorContext): string {
+    let response = `# Missing Parameter: Image path required\n\n`;
+    response += `## Error Summary\n`;
+    response += `The 'image.path' parameter is required for insert_image operation.\n\n`;
+
+    response += `## Resolving This Issue\n`;
+    response += `- Provide image file path: insert_image(image: { path: "C:\\path\\to\\image.jpg", position: "A1" })\n`;
+    response += `- Supported formats: .jpg, .png, .gif, .bmp\n`;
+    response += `- Use absolute path for best results`;
+
+    return response;
+  }
+  /**
+   * Template for image name required error
+   */
+  private getImageNameRequiredTemplate(context: ErrorContext): string {
+    let response = `# Missing Parameter: Image name required\n\n`;
+    response += `## Error Summary\n`;
+    response += `The 'image.name' parameter is required for this image operation.\n\n`;
+
+    response += `## Resolving This Issue\n`;
+    response += `- List available images: list_images(worksheet: "${context.worksheet || ''}")\n`;
+    response += `- Use exact image name from the list\n`;
+    response += `- Example: resize_image(image: { name: "Picture 1", width: 200, height: 150 })`;
+
+    return response;
+  }
+  /**
+   * Template for image file not found error
+   */
+  private getImageFileNotFoundTemplate(context: ErrorContext): string {
+    let response = `# File Not Found: Image file does not exist at ${context.worksheet}\n\n`;
+    response += `## Error Summary\n`;
+    response += `The specified image file could not be found on disk.\n\n`;
+
+    response += `## Resolving This Issue\n`;
+    response += `- Verify file path exists and is accessible\n`;
+    response += `- Check file permissions\n`;
+    response += `- Use absolute path: "C:\\Users\\YourName\\Pictures\\image.jpg"\n`;
+    response += `- Supported formats: .jpg, .png, .gif, .bmp`;
+
+    return response;
+  }
+
+  /**
    * Template for duplicate workbook name error
    */
   private getDuplicateWorkbookNameTemplate(context: ErrorContext): string {
@@ -9008,25 +9117,30 @@ print(json.dumps(result))`;
         response += `- **Specify ranges:** Both source and destination ranges are required\n`;
         response += `- **Check range validity:** Ensure ranges exist and are properly formatted`;
         break;
-      case 'search':
-        response += `- **Add search config:** ${operation}(search: {find: "old_text", replace: "new_text"})\n`;
+      case 'find_replace':
+        response += `- **Add find/replace config:** ${operation}(find_replace: {find: "old_text", replace: "new_text"})\n`;
         response += `- **Specify search terms:** Both find and replace values are required\n`;
         response += `- **Consider options:** Set match_case or whole_words if needed`;
         break;
-      case 'vba_module':
-        response += `- **Specify module name:** ${operation}(vba_module: "Module1")\n`;
+      case 'search':
+        response += `- **Add search config:** ${operation}(search: {term: "text_to_find", column: "ColumnName"})\n`;
+        response += `- **Search options:** Set formulas: true to search in formulas\n`;
+        response += `- **Auto-select:** Set auto_select: false to disable auto-selection`;
+        break;
+      case 'vba':
+        response += `- **Specify VBA config:** ${operation}(vba: {module_name: "Module1", code: "Sub Test()\\nEnd Sub"})\n`;
         response += `- **List modules:** list_vba_modules() to see existing modules\n`;
-        response += `- **Check spelling:** Ensure module name is spelled correctly`;
+        response += `- **For macros:** Use vba: {macro_name: "MacroName"} to run existing macros`;
+        break;
+      case 'image':
+        response += `- **Specify image config:** ${operation}(image: {path: "C:\\\\path\\\\to\\\\image.jpg", name: "MyImage"})\n`;
+        response += `- **For positioning:** Add image: {position: "A1"} to specify cell location\n`;
+        response += `- **For sizing:** Add image: {width: 200, height: 150} for custom dimensions`;
         break;
       case 'range':
         response += `- **Add range:** ${operation}(range: "A1:C10")\n`;
         response += `- **Check format:** Use Excel range format like A1:B2 or A:A\n`;
         response += `- **Get used range:** get_used_range() to find data boundaries`;
-        break;
-      case 'search_term':
-        response += `- **Add search term:** ${operation}(search_term: "text_to_find")\n`;
-        response += `- **Check data:** Ensure the text exists in the worksheet\n`;
-        response += `- **Use wildcards:** Try patterns like "*text*" for partial matches`;
         break;
       case 'shape_config':
         response += `- **Add shape config:** ${operation}(shape_config: {type: "rectangle", left: 100, top: 100, width: 200, height: 100})\n`;
@@ -9125,14 +9239,20 @@ print(json.dumps(result))`;
       paramName = 'chart_config';
     } else if (errorMsg.includes('copy/paste configuration is required')) {
       paramName = 'copy_paste';
-    } else if (errorMsg.includes('search configuration is required')) {
+    } else if (errorMsg.includes('Find and replace configuration is required')) {
+      paramName = 'find_replace';
+    } else if (errorMsg.includes('vba.module_name is required')) {
+      paramName = 'vba';
+    } else if (errorMsg.includes('vba.macro_name is required')) {
+      paramName = 'vba';
+    } else if (errorMsg.includes('image.path is required')) {
+      paramName = 'image';
+    } else if (errorMsg.includes('image.name is required')) {
+      paramName = 'image';
+    } else if (errorMsg.includes('search.term is required')) {
       paramName = 'search';
-    } else if (errorMsg.includes('vba_module is required')) {
-      paramName = 'vba_module';
     } else if (errorMsg.includes('range is required')) {
       paramName = 'range';
-    } else if (errorMsg.includes('search_term is required')) {
-      paramName = 'search_term';
     } else if (errorMsg.includes('shape configuration is required')) {
       paramName = 'shape_config';
     }

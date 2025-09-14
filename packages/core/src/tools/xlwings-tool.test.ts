@@ -89,27 +89,100 @@ describe('XlwingsTool - REAL EXECUTION TESTS - ALL 67 OPERATIONS', () => {
       }
     }, 30000);
 
-    // 1. read_range - now with real data
+    // 1. read_range - debug empty data issue with fresh test workbook
     it('should execute read_range operation', async () => {
       try {
-        // First write some test data to active workbook
-        const writeParams = { op: 'write_range' as const, range: 'A1:C3', data: [['Name', 'Age', 'City'], ['Alice', 25, 'NYC'], ['Bob', 30, 'LA']] };
-        const writeInvocation = xlwingsTool['createInvocation'](writeParams);
-        await writeInvocation.execute(new AbortController().signal);
+        const timestamp = Date.now();
+        const testWorkbookName = `read_range_debug_${timestamp}.xlsx`;
+        const testWorksheetName = 'TestSheet';
 
-        // Then read the data back
-        const params = { op: 'read_range' as const, range: 'A1:C3' };
-        const invocation = xlwingsTool['createInvocation'](params);
-        const result = await invocation.execute(new AbortController().signal);
-        saveLLMOutput('read_range', String(result.returnDisplay || result.llmContent), result.success);
-        expect(typeof (result.returnDisplay || result.llmContent)).toBe('string');
-        expect(typeof result.success).toBe('boolean');
+        // Step 1: Create a new test workbook
+        console.log('\n=== STEP 1: Creating test workbook ===');
+        const createWorkbookParams = {
+          op: 'create_workbook' as const,
+          file_path: `C:\\tmp\\${testWorkbookName}`
+        };
+        const createResult = await xlwingsTool['createInvocation'](createWorkbookParams).execute(new AbortController().signal);
+        console.log('Create workbook success:', createResult.success);
+        saveLLMOutput('debug_create_workbook', String(createResult.returnDisplay || createResult.llmContent), createResult.success);
+
+        // Step 2: Add a test worksheet
+        console.log('\n=== STEP 2: Adding test worksheet ===');
+        const addSheetParams = {
+          op: 'add_sheet' as const,
+          workbook: testWorkbookName,
+          sheet_name: testWorksheetName
+        };
+        const addSheetResult = await xlwingsTool['createInvocation'](addSheetParams).execute(new AbortController().signal);
+        console.log('Add sheet success:', addSheetResult.success);
+        saveLLMOutput('debug_add_sheet', String(addSheetResult.returnDisplay || addSheetResult.llmContent), addSheetResult.success);
+
+        // Step 3: Write test data to A1:J1
+        console.log('\n=== STEP 3: Writing test data to A1:J1 ===');
+        const writeParams = {
+          op: 'write_range' as const,
+          workbook: testWorkbookName,
+          worksheet: testWorksheetName,
+          range: "A1:J1",
+          data: [['科目', '语文', '数学', '英语', '物理', '化学', '生物', '历史', '地理', '总分']]
+        };
+        const writeResult = await xlwingsTool['createInvocation'](writeParams).execute(new AbortController().signal);
+        console.log('Write data success:', writeResult.success);
+        saveLLMOutput('debug_write_data', String(writeResult.returnDisplay || writeResult.llmContent), writeResult.success);
+
+        // Step 4: Now test reading the exact same range that was problematic
+        console.log('\n=== STEP 4: Reading A1:J1 data ===');
+        const readParams = {
+          range: "A1:J1",
+          worksheet: testWorksheetName,
+          workbook: testWorkbookName,
+          summary_mode: false,
+          op: 'read_range' as const
+        };
+
+        console.log('Read parameters:', JSON.stringify(readParams, null, 2));
+        const readResult = await xlwingsTool['createInvocation'](readParams).execute(new AbortController().signal);
+
+        console.log('\n=== STEP 4 RESULTS ===');
+        console.log('Read success:', readResult.success);
+        console.log('Result content length:', String(readResult.returnDisplay || readResult.llmContent || '').length);
+        console.log('Result content preview:');
+        console.log(String(readResult.returnDisplay || readResult.llmContent || '').substring(0, 500));
+
+        saveLLMOutput('debug_read_range_A1_J1', String(readResult.returnDisplay || readResult.llmContent), readResult.success);
+
+        // Step 5: Also test reading a smaller range for comparison
+        console.log('\n=== STEP 5: Reading A1:C1 for comparison ===');
+        const readSmallParams = {
+          op: 'read_range' as const,
+          workbook: testWorkbookName,
+          worksheet: testWorksheetName,
+          range: "A1:C1"
+        };
+        const readSmallResult = await xlwingsTool['createInvocation'](readSmallParams).execute(new AbortController().signal);
+        console.log('Read small range success:', readSmallResult.success);
+        saveLLMOutput('debug_read_range_A1_C1', String(readSmallResult.returnDisplay || readSmallResult.llmContent), readSmallResult.success);
+
+        // Clean up - close the test workbook
+        try {
+          const closeParams = { op: 'close_workbook' as const, workbook: testWorkbookName };
+          await xlwingsTool['createInvocation'](closeParams).execute(new AbortController().signal);
+        } catch (cleanupError) {
+          console.log('Cleanup error (ignored):', cleanupError);
+        }
+
+        expect(typeof (readResult.returnDisplay || readResult.llmContent)).toBe('string');
+        expect(typeof readResult.success).toBe('boolean');
+
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
-        saveLLMOutput('read_range', errorMessage, false);
+        console.log('\n=== ERROR DETAILS ===');
+        console.log('Error message:', errorMessage);
+        console.log('Error stack:', error instanceof Error ? error.stack : 'No stack trace');
+        saveLLMOutput('debug_read_range_error', errorMessage, false);
         throw error;
       }
-    }, 15000);
+    }, 60000);
 
     // 2. write_range
     it('should execute write_range operation', async () => {
@@ -145,7 +218,7 @@ describe('XlwingsTool - REAL EXECUTION TESTS - ALL 67 OPERATIONS', () => {
 
     // 4. update_chart
     it('should execute update_chart operation', async () => {
-      const params = { op: 'update_chart' as const, chart_name: 'Chart 1', title: 'Updated Chart' };
+      const params = { op: 'update_chart' as const, chart: { name: 'Chart 1', title: 'Updated Chart' } };
       try {
         const invocation = xlwingsTool['createInvocation'](params);
         const result = await invocation.execute(new AbortController().signal);
@@ -161,7 +234,7 @@ describe('XlwingsTool - REAL EXECUTION TESTS - ALL 67 OPERATIONS', () => {
 
     // 5. delete_chart
     it('should execute delete_chart operation', async () => {
-      const params = { op: 'delete_chart' as const, chart_name: 'Chart 1' };
+      const params = { op: 'delete_chart' as const, chart: { name: 'Chart 1' } };
       try {
         const invocation = xlwingsTool['createInvocation'](params);
         const result = await invocation.execute(new AbortController().signal);
@@ -271,21 +344,75 @@ describe('XlwingsTool - REAL EXECUTION TESTS - ALL 67 OPERATIONS', () => {
       }
     }, 15000);
 
-    // 12. copy_sheet
+    // 12. copy_sheet - test workbook conflict scenario
     it('should execute copy_sheet operation', async () => {
-      const params = { op: 'copy_sheet' as const, worksheet: 'Sheet1', new_name: 'CopiedSheet' };
       try {
+        // Step 1: First create both source and target workbooks to ensure they exist
+        const createSourceParams = {
+          op: 'create_workbook' as const,
+          file_path: 'C:\\tmp\\班级成绩统计.xlsx'
+        };
+        const createTargetParams = {
+          op: 'create_workbook' as const,
+          file_path: 'C:\\tmp\\班级成绩统计副本.xlsx'
+        };
+
+        // Create source workbook
+        const createSourceInvocation = xlwingsTool['createInvocation'](createSourceParams);
+        const createSourceResult = await createSourceInvocation.execute(new AbortController().signal);
+        saveLLMOutput('create_source_workbook', String(createSourceResult.returnDisplay || createSourceResult.llmContent), createSourceResult.success);
+
+        // Add a test sheet to source workbook
+        const addSheetParams = {
+          op: 'add_sheet' as const,
+          workbook: '班级成绩统计.xlsx',
+          sheet_name: '年级成绩汇总表'
+        };
+        const addSheetInvocation = xlwingsTool['createInvocation'](addSheetParams);
+        const addSheetResult = await addSheetInvocation.execute(new AbortController().signal);
+        saveLLMOutput('add_test_sheet', String(addSheetResult.returnDisplay || addSheetResult.llmContent), addSheetResult.success);
+
+        // Create target workbook
+        const createTargetInvocation = xlwingsTool['createInvocation'](createTargetParams);
+        const createTargetResult = await createTargetInvocation.execute(new AbortController().signal);
+        saveLLMOutput('create_target_workbook', String(createTargetResult.returnDisplay || createTargetResult.llmContent), createTargetResult.success);
+
+        // Step 2: Now test the copy_sheet operation that might cause conflict
+        const params = {
+          op: 'copy_sheet' as const,
+          worksheet: '年级成绩汇总表',
+          sheet_copy: {
+            target_workbook: '班级成绩统计副本.xlsx'
+          },
+          workbook: '班级成绩统计.xlsx'
+        };
+
         const invocation = xlwingsTool['createInvocation'](params);
         const result = await invocation.execute(new AbortController().signal);
         saveLLMOutput('copy_sheet', String(result.returnDisplay || result.llmContent), result.success);
+
         expect(typeof result.returnDisplay || result.llmContent).toBe('string');
         expect(typeof result.success).toBe('boolean');
+
+        // Clean up - close workbooks
+        try {
+          const closeSourceParams = { op: 'close_workbook' as const, workbook: '班级成绩统计.xlsx' };
+          const closeSourceInvocation = xlwingsTool['createInvocation'](closeSourceParams);
+          await closeSourceInvocation.execute(new AbortController().signal);
+
+          const closeTargetParams = { op: 'close_workbook' as const, workbook: '班级成绩统计副本.xlsx' };
+          const closeTargetInvocation = xlwingsTool['createInvocation'](closeTargetParams);
+          await closeTargetInvocation.execute(new AbortController().signal);
+        } catch (cleanupError) {
+          // Ignore cleanup errors
+        }
+
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
         saveLLMOutput('copy_sheet', errorMessage, false);
         throw error;
       }
-    }, 15000);
+    }, 30000);
 
     // 13. list_workbooks
     it('should execute list_workbooks operation', async () => {
@@ -401,7 +528,7 @@ describe('XlwingsTool - REAL EXECUTION TESTS - ALL 67 OPERATIONS', () => {
 
     // 20. replace_range
     it('should execute replace_range operation', async () => {
-      const params = { op: 'replace_range' as const, range: 'A1:C3', search: { find: 'Alice', replace: 'Charlie' } };
+      const params = { op: 'replace_range' as const, range: 'A1:C3', find_replace: { find: 'Alice', replace: 'Charlie' } };
       try {
         const invocation = xlwingsTool['createInvocation'](params);
         const result = await invocation.execute(new AbortController().signal);
@@ -650,7 +777,7 @@ describe('XlwingsTool - REAL EXECUTION TESTS - ALL 67 OPERATIONS', () => {
 
     // 35. insert_image
     it('should execute insert_image operation', async () => {
-      const params = { op: 'insert_image' as const, image_path: 'C:\\tmp\\test.jpg', position: 'A1' };
+      const params = { op: 'insert_image' as const, image: { path: 'C:\\tmp\\test.jpg', position: 'A1' } };
       try {
         const invocation = xlwingsTool['createInvocation'](params);
         const result = await invocation.execute(new AbortController().signal);
@@ -682,7 +809,7 @@ describe('XlwingsTool - REAL EXECUTION TESTS - ALL 67 OPERATIONS', () => {
 
     // 37. resize_image
     it('should execute resize_image operation', async () => {
-      const params = { op: 'resize_image' as const, image_name: 'Picture 2', width: 100, height: 100 };
+      const params = { op: 'resize_image' as const, image: { name: 'Picture 2', width: 100, height: 100 } };
       try {
         const invocation = xlwingsTool['createInvocation'](params);
         const result = await invocation.execute(new AbortController().signal);
@@ -698,7 +825,7 @@ describe('XlwingsTool - REAL EXECUTION TESTS - ALL 67 OPERATIONS', () => {
 
     // 38. move_image
     it('should execute move_image operation', async () => {
-      const params = { op: 'move_image' as const, image_name: 'Picture 2', range: 'C3' };
+      const params = { op: 'move_image' as const, image: { name: 'Picture 2' }, range: 'C3' };
       try {
         const invocation = xlwingsTool['createInvocation'](params);
         const result = await invocation.execute(new AbortController().signal);
@@ -714,7 +841,7 @@ describe('XlwingsTool - REAL EXECUTION TESTS - ALL 67 OPERATIONS', () => {
 
     // 39. delete_image
     it('should execute delete_image operation', async () => {
-      const params = { op: 'delete_image' as const, image_name: 'Picture 2' };
+      const params = { op: 'delete_image' as const, image: { name: 'Picture 2' } };
       try {
         const invocation = xlwingsTool['createInvocation'](params);
         const result = await invocation.execute(new AbortController().signal);
@@ -732,14 +859,14 @@ describe('XlwingsTool - REAL EXECUTION TESTS - ALL 67 OPERATIONS', () => {
     it('should execute save_chart_as_image operation', async () => {
       // First recreate a chart since it was deleted in earlier tests
       try {
-        const createChartParams = { op: 'create_chart' as const, chart: { type: 'column', data_range: 'A1:B3' } };
+        const createChartParams = { op: 'create_chart' as const, chart: { type: 'column' as const, data_range: 'A1:B3' } };
         const createInvocation = xlwingsTool['createInvocation'](createChartParams);
         await createInvocation.execute(new AbortController().signal);
       } catch (error) {
         // Continue even if chart creation fails
       }
 
-      const params = { op: 'save_chart_as_image' as const, chart_name: 'Chart 1', output_path: 'C:\\tmp\\chart.png' };
+      const params = { op: 'save_chart_as_image' as const, chart: { name: 'Chart 1' }, output_path: 'C:\\tmp\\chart.png' };
       try {
         const invocation = xlwingsTool['createInvocation'](params);
         const result = await invocation.execute(new AbortController().signal);
@@ -945,18 +1072,18 @@ describe('XlwingsTool - REAL EXECUTION TESTS - ALL 67 OPERATIONS', () => {
       }
     }, 15000);
 
-    // 53. get_range_info
-    it('should execute get_range_info operation', async () => {
-      const params = { op: 'get_range_info' as const, range: 'A1:C3' };
+    // 53. get_cell_info - single cell analysis only
+    it('should execute get_cell_info operation', async () => {
+      const params = { op: 'get_cell_info' as const, range: 'A1' };  // Single cell only
       try {
         const invocation = xlwingsTool['createInvocation'](params);
         const result = await invocation.execute(new AbortController().signal);
-        saveLLMOutput('get_range_info', String(result.returnDisplay || result.llmContent), result.success);
+        saveLLMOutput('get_cell_info', String(result.returnDisplay || result.llmContent), result.success);
         expect(typeof result.returnDisplay || result.llmContent).toBe('string');
         expect(typeof result.success).toBe('boolean');
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
-        saveLLMOutput('get_range_info', errorMessage, false);
+        saveLLMOutput('get_cell_info', errorMessage, false);
         throw error;
       }
     }, 15000);
@@ -1073,18 +1200,162 @@ describe('XlwingsTool - REAL EXECUTION TESTS - ALL 67 OPERATIONS', () => {
       }
     }, 15000);
 
-    // 61. create_shape
-    it('should execute create_shape operation', async () => {
-      const params = { op: 'create_shape' as const, shape: { type: 'rectangle' as const, left: 100, top: 100, width: 100, height: 50 } };
+    // 61. create_shape - rectangle
+    it('should execute create_shape operation - rectangle', async () => {
+      const params = {
+        op: 'create_shape' as const,
+        shape: {
+          type: 'rectangle' as const,
+          name: 'TestRectangle',
+          left: 100,
+          top: 100,
+          width: 100,
+          height: 50,
+          text: 'Rectangle',
+          style: {
+            fill_color: '#FFE4B5',
+            border_color: '#8B4513',
+            border_width: 2
+          }
+        }
+      };
       try {
         const invocation = xlwingsTool['createInvocation'](params);
         const result = await invocation.execute(new AbortController().signal);
-        saveLLMOutput('create_shape', String(result.returnDisplay || result.llmContent), result.success);
+        saveLLMOutput('create_rectangle', String(result.returnDisplay || result.llmContent), result.success);
         expect(typeof result.returnDisplay || result.llmContent).toBe('string');
         expect(typeof result.success).toBe('boolean');
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
-        saveLLMOutput('create_shape', errorMessage, false);
+        saveLLMOutput('create_rectangle', errorMessage, false);
+        throw error;
+      }
+    }, 15000);
+
+    // 61b. create_shape - oval (perfect circle)
+    it('should execute create_shape operation - oval', async () => {
+      const params = {
+        op: 'create_shape' as const,
+        shape: {
+          type: 'oval' as const,
+          name: 'TestCircle',
+          left: 220,
+          top: 100,
+          width: 80,
+          height: 80,
+          text: 'Perfect Circle',
+          style: {
+            fill_color: '#E6E6FA',
+            border_color: '#9370DB',
+            border_width: 2
+          }
+        }
+      };
+      try {
+        const invocation = xlwingsTool['createInvocation'](params);
+        const result = await invocation.execute(new AbortController().signal);
+        saveLLMOutput('create_oval', String(result.returnDisplay || result.llmContent), result.success);
+        expect(typeof result.returnDisplay || result.llmContent).toBe('string');
+        expect(typeof result.success).toBe('boolean');
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        saveLLMOutput('create_oval', errorMessage, false);
+        throw error;
+      }
+    }, 15000);
+
+    // 61c. create_shape - triangle
+    it('should execute create_shape operation - triangle', async () => {
+      const params = {
+        op: 'create_shape' as const,
+        shape: {
+          type: 'triangle' as const,
+          name: 'TestTriangle',
+          left: 320,
+          top: 100,
+          width: 70,
+          height: 60,
+          text: 'Triangle',
+          style: {
+            fill_color: '#FFB6C1',
+            border_color: '#DC143C',
+            border_width: 2
+          }
+        }
+      };
+      try {
+        const invocation = xlwingsTool['createInvocation'](params);
+        const result = await invocation.execute(new AbortController().signal);
+        saveLLMOutput('create_triangle', String(result.returnDisplay || result.llmContent), result.success);
+        expect(typeof result.returnDisplay || result.llmContent).toBe('string');
+        expect(typeof result.success).toBe('boolean');
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        saveLLMOutput('create_triangle', errorMessage, false);
+        throw error;
+      }
+    }, 15000);
+
+    // 61c2. create_shape - rounded_rectangle
+    it('should execute create_shape operation - rounded_rectangle', async () => {
+      const params = {
+        op: 'create_shape' as const,
+        shape: {
+          type: 'rounded_rectangle' as const,
+          name: 'TestRoundedRect',
+          left: 320,
+          top: 200,
+          width: 100,
+          height: 50,
+          text: 'Rounded Box',
+          style: {
+            fill_color: '#F0E68C',
+            border_color: '#DAA520',
+            border_width: 2
+          }
+        }
+      };
+      try {
+        const invocation = xlwingsTool['createInvocation'](params);
+        const result = await invocation.execute(new AbortController().signal);
+        saveLLMOutput('create_rounded_rectangle', String(result.returnDisplay || result.llmContent), result.success);
+        expect(typeof result.returnDisplay || result.llmContent).toBe('string');
+        expect(typeof result.success).toBe('boolean');
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        saveLLMOutput('create_rounded_rectangle', errorMessage, false);
+        throw error;
+      }
+    }, 15000);
+
+    // 61d. create_shape - right_arrow
+    it('should execute create_shape operation - right_arrow', async () => {
+      const params = {
+        op: 'create_shape' as const,
+        shape: {
+          type: 'right_arrow' as const,
+          name: 'TestArrow',
+          left: 420,
+          top: 100,
+          width: 90,
+          height: 40,
+          text: 'Arrow',
+          style: {
+            fill_color: '#98FB98',
+            border_color: '#228B22',
+            border_width: 2
+          }
+        }
+      };
+      try {
+        const invocation = xlwingsTool['createInvocation'](params);
+        const result = await invocation.execute(new AbortController().signal);
+        saveLLMOutput('create_right_arrow', String(result.returnDisplay || result.llmContent), result.success);
+        expect(typeof result.returnDisplay || result.llmContent).toBe('string');
+        expect(typeof result.success).toBe('boolean');
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        saveLLMOutput('create_right_arrow', errorMessage, false);
         throw error;
       }
     }, 15000);
@@ -1123,7 +1394,7 @@ describe('XlwingsTool - REAL EXECUTION TESTS - ALL 67 OPERATIONS', () => {
 
     // 64. modify_shape
     it('should execute modify_shape operation', async () => {
-      const params = { op: 'modify_shape' as const, shape_name: 'Picture 2', properties: { fill_color: '#FF0000' } };
+      const params = { op: 'modify_shape' as const, shape: { name: 'Picture 2', style: { fill_color: '#FF0000' } } };
       try {
         const invocation = xlwingsTool['createInvocation'](params);
         const result = await invocation.execute(new AbortController().signal);
@@ -1139,7 +1410,7 @@ describe('XlwingsTool - REAL EXECUTION TESTS - ALL 67 OPERATIONS', () => {
 
     // 65. delete_shape
     it('should execute delete_shape operation', async () => {
-      const params = { op: 'delete_shape' as const, shape_name: 'Picture 2' };
+      const params = { op: 'delete_shape' as const, shape: { name: 'Picture 2' } };
       try {
         const invocation = xlwingsTool['createInvocation'](params);
         const result = await invocation.execute(new AbortController().signal);
@@ -1155,7 +1426,7 @@ describe('XlwingsTool - REAL EXECUTION TESTS - ALL 67 OPERATIONS', () => {
 
     // 66. move_shape
     it('should execute move_shape operation', async () => {
-      const params = { op: 'move_shape' as const, shape_name: 'Picture 2', shape_move: { left: 100, top: 100 } };
+      const params = { op: 'move_shape' as const, shape: { name: 'Picture 2', move: { new_left: 100, new_top: 100 } } };
       try {
         const invocation = xlwingsTool['createInvocation'](params);
         const result = await invocation.execute(new AbortController().signal);
@@ -1171,7 +1442,7 @@ describe('XlwingsTool - REAL EXECUTION TESTS - ALL 67 OPERATIONS', () => {
 
     // 67. resize_shape
     it('should execute resize_shape operation', async () => {
-      const params = { op: 'resize_shape' as const, shape_name: 'Picture 2', shape_resize: { width: 150, height: 75 } };
+      const params = { op: 'resize_shape' as const, shape: { name: 'Picture 2', resize: { new_width: 150, new_height: 75 } } };
       try {
         const invocation = xlwingsTool['createInvocation'](params);
         const result = await invocation.execute(new AbortController().signal);
@@ -1184,6 +1455,43 @@ describe('XlwingsTool - REAL EXECUTION TESTS - ALL 67 OPERATIONS', () => {
         throw error;
       }
     }, 15000);
+
+    // 61e. create connector between triangle and rounded rectangle
+    it('should create connector between triangle and rounded rectangle', async () => {
+      const params = {
+        op: 'create_shape' as const,
+        shape: {
+          type: 'elbow_connector' as const,
+          name: 'TriangleToRoundedRect',
+          left: 320,  // Start from triangle area
+          top: 130,
+          width: 100,  // Connect to rounded rectangle
+          height: 70,
+          connection: {
+            start_shape: 'TestTriangle',
+            end_shape: 'TestRoundedRect',
+            start_connection_site: 1,
+            end_connection_site: 1
+          },
+          style: {
+            border_color: '#FF6347',
+            border_width: 3
+          }
+        }
+      };
+
+      try {
+        const invocation = xlwingsTool['createInvocation'](params);
+        const result = await invocation.execute(new AbortController().signal);
+        saveLLMOutput('create_triangle_to_rounded_connector', String(result.returnDisplay || result.llmContent), result.success);
+        expect(typeof result.returnDisplay || result.llmContent).toBe('string');
+        expect(typeof result.success).toBe('boolean');
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        saveLLMOutput('create_triangle_to_rounded_connector', errorMessage, false);
+        throw error;
+      }
+    }, 20000);
   });
 
   describe('Connector Shape Tests', () => {
@@ -1208,7 +1516,7 @@ describe('XlwingsTool - REAL EXECUTION TESTS - ALL 67 OPERATIONS', () => {
       try {
         const invocation = xlwingsTool['createInvocation'](params);
         const result = await invocation.execute(new AbortController().signal);
-        saveLLMOutput('create_straight_connector', result.content, result.success);
+        saveLLMOutput('create_straight_connector', String(result.returnDisplay || result.llmContent), result.success);
 
         expect(result).toBeDefined();
         expect(typeof result.success).toBe('boolean');
@@ -1284,7 +1592,7 @@ describe('XlwingsTool - REAL EXECUTION TESTS - ALL 67 OPERATIONS', () => {
         // Create connector between them
         const invocation3 = xlwingsTool['createInvocation'](connectorParams);
         const result = await invocation3.execute(new AbortController().signal);
-        saveLLMOutput('create_connector_with_connection', result.content, result.success);
+        saveLLMOutput('create_connector_with_connection', String(result.returnDisplay || result.llmContent), result.success);
 
         expect(result).toBeDefined();
         expect(typeof result.success).toBe('boolean');
@@ -1315,7 +1623,7 @@ describe('XlwingsTool - REAL EXECUTION TESTS - ALL 67 OPERATIONS', () => {
       try {
         const invocation = xlwingsTool['createInvocation'](params);
         const result = await invocation.execute(new AbortController().signal);
-        saveLLMOutput('create_elbow_connector', result.content, result.success);
+        saveLLMOutput('create_elbow_connector', String(result.returnDisplay || result.llmContent), result.success);
 
         expect(result).toBeDefined();
         expect(typeof result.success).toBe('boolean');
@@ -1346,12 +1654,11 @@ describe('XlwingsTool - REAL EXECUTION TESTS - ALL 67 OPERATIONS', () => {
       try {
         const invocation = xlwingsTool['createInvocation'](params);
         const result = await invocation.execute(new AbortController().signal);
-        saveLLMOutput('create_curved_connector', result.content, result.success);
+        saveLLMOutput('create_curved_connector', String(result.returnDisplay || result.llmContent), result.success);
 
         expect(result).toBeDefined();
         expect(typeof result.success).toBe('boolean');
       } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
         throw error;
       }
     }, 15000);

@@ -57,7 +57,7 @@ export abstract class BasePythonTool<
       params,
       this.config,
       this.allowlist,
-      this.defaultRequirements,
+      this.getRequirements(params),
     );
   }
 
@@ -190,11 +190,11 @@ class BasePythonToolInvocation<
         if (updateOutput) {
           updateOutput(`Installing Python packages: ${requirements.join(', ')}...\\n`);
         }
-        
+
         try {
           const installCommand = `"${embeddedPythonPath}" -m pip install ${requirements.join(' ')} --quiet`;
           const workingDir = this.config.getTargetDir();
-          
+
           const { result: installPromise } = await ShellExecutionService.execute(
             installCommand,
             workingDir,
@@ -202,16 +202,16 @@ class BasePythonToolInvocation<
             signal,
             false,
           );
-          
+
           const installResult = await installPromise;
-          
+
           if (installResult.exitCode !== 0) {
             return {
               llmContent: `Failed to install Python requirements: ${installResult.output}`,
               returnDisplay: `❌ Failed to install Python requirements`,
             } as TResult;
           }
-          
+
           if (updateOutput) {
             updateOutput(`✅ Packages installed successfully\\n\\n`);
           }
