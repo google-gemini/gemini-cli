@@ -13,6 +13,7 @@ import os from 'node:os';
 import type { IPty } from '@lydell/node-pty';
 import { getCachedEncodingForBuffer } from '../utils/systemEncoding.js';
 import { isBinary } from '../utils/textUtils.js';
+import { getShellConfiguration } from '../utils/shell-utils.js';
 import pkg from '@xterm/headless';
 import {
   serializeTerminalToObject,
@@ -167,12 +168,13 @@ export class ShellExecutionService {
   ): ShellExecutionHandle {
     try {
       const isWindows = os.platform() === 'win32';
+      const shellConfig = getShellConfiguration();
 
       const child = cpSpawn(commandToExecute, [], {
         cwd,
         stdio: ['ignore', 'pipe', 'pipe'],
         windowsVerbatimArguments: true,
-        shell: isWindows ? true : 'bash',
+        shell: shellConfig.executable,
         detached: !isWindows,
         env: {
           ...process.env,
@@ -353,11 +355,13 @@ export class ShellExecutionService {
     try {
       const cols = shellExecutionConfig.terminalWidth ?? 80;
       const rows = shellExecutionConfig.terminalHeight ?? 30;
-      const isWindows = os.platform() === 'win32';
-      const shell = isWindows ? 'cmd.exe' : 'bash';
-      const args = isWindows
-        ? `/c ${commandToExecute}`
-        : ['-c', commandToExecute];
+      const shellConfig = getShellConfiguration();
+
+      // Use the detected shell configuration
+      const shell = shellConfig.executable;
+      const args = shellConfig.shell === 'cmd'
+        ? ['/c', commandToExecute]
+        : shellConfig.argsPrefix.concat([commandToExecute]);
 
       const ptyProcess = ptyInfo.module.spawn(shell, args, {
         cwd,

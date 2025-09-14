@@ -10,7 +10,100 @@ import os from 'node:os';
 import { quote } from 'shell-quote';
 import { doesToolInvocationMatch } from './tool-utils.js';
 
+// Declare process for environments where it's not automatically available
+declare const process: {
+  env: Record<string, string | undefined>;
+};
+
 const SHELL_TOOL_NAMES = ['run_shell_command', 'ShellTool'];
+
+/**
+ * Detects the shell that the user launched Gemini from by examining environment variables.
+ * This allows using the same shell the user prefers instead of defaulting to cmd.exe on Windows.
+ * 
+ * Detection logic:
+ * - **Unix-like systems**: Uses SHELL environment variable or defaults to bash
+ * - **Windows Priority Order**:
+ *   1. **SHELL variable**: Respects user's preferred shell (Git Bash, MSYS2, WSL, etc.)
+ *   2. **LOGINSHELL variable**: Fallback if SHELL is not set  
+ *   3. **PowerShell via PSModulePath**: Detects PowerShell environment
+ *   4. **PowerShell via ComSpec**: ComSpec points to powershell/pwsh
+ *   5. **Final fallback**: cmd.exe
+ * 
+ * @returns Shell configuration with executable path, args prefix, and shell type
+ */
+function detectParentShell(): ShellConfiguration {
+  if (!isWindows()) {
+    // On Unix-like systems, use the SHELL environment variable or default to bash
+    const shellPath = process.env['SHELL'] || 'bash';
+    return {
+      executable: shellPath,
+      argsPrefix: ['-c'],
+      shell: 'bash',
+    };
+  }
+
+  // On Windows, detect the shell based on environment variables
+  const shell = process.env['SHELL'];
+  const psModulePath = process.env['PSModulePath'];
+  const comSpec = process.env['ComSpec'];
+  const loginShell = process.env['LOGINSHELL'];
+
+  // Priority 1: Respect SHELL environment variable if set (Git Bash, MSYS2, WSL, etc.)
+  if (shell) {
+    if (shell.includes('bash')) {
+      return {
+        executable: shell,
+        argsPrefix: ['-c'],
+        shell: 'bash',
+      };
+    }
+    // Could be other shells like zsh, fish, etc. - treat as bash for now
+    return {
+      executable: shell,
+      argsPrefix: ['-c'],
+      shell: 'bash',
+    };
+  }
+
+  // Priority 2: Check LOGINSHELL if SHELL is not set
+  if (loginShell && loginShell.includes('bash')) {
+    return {
+      executable: 'bash',
+      argsPrefix: ['-c'],
+      shell: 'bash',
+    };
+  }
+
+  // Priority 3: PowerShell detection via PSModulePath
+  if (psModulePath) {
+    // Check if ComSpec points to PowerShell, otherwise assume standard PowerShell
+    const executable = comSpec && (comSpec.toLowerCase().includes('powershell') || comSpec.toLowerCase().includes('pwsh'))
+      ? comSpec
+      : 'powershell.exe';
+    return {
+      executable,
+      argsPrefix: ['-NoProfile', '-Command'],
+      shell: 'powershell',
+    };
+  }
+
+  // Priority 4: PowerShell via ComSpec detection
+  if (comSpec && (comSpec.toLowerCase().includes('powershell') || comSpec.toLowerCase().includes('pwsh'))) {
+    return {
+      executable: comSpec,
+      argsPrefix: ['-NoProfile', '-Command'],
+      shell: 'powershell',
+    };
+  }
+
+  // Final fallback: cmd.exe when no specific shell is detected
+  return {
+    executable: 'cmd.exe',
+    argsPrefix: ['/d', '/s', '/c'],
+    shell: 'cmd',
+  };
+}
 
 /**
  * An identifier for the shell type.
@@ -40,38 +133,8 @@ export interface ShellConfiguration {
  * @returns The ShellConfiguration for the current environment.
  */
 export function getShellConfiguration(): ShellConfiguration {
-  if (isWindows()) {
-    const comSpec = process.env['ComSpec'] || 'cmd.exe';
-    const executable = comSpec.toLowerCase();
-
-    if (
-      executable.endsWith('powershell.exe') ||
-      executable.endsWith('pwsh.exe')
-    ) {
-      // For PowerShell, the arguments are different.
-      // -NoProfile: Speeds up startup.
-      // -Command: Executes the following command.
-      return {
-        executable: comSpec,
-        argsPrefix: ['-NoProfile', '-Command'],
-        shell: 'powershell',
-      };
-    }
-
-    // Default to cmd.exe for anything else on Windows.
-    // Flags for CMD:
-    // /d: Skip execution of AutoRun commands.
-    // /s: Modifies the treatment of the command string (important for quoting).
-    // /c: Carries out the command specified by the string and then terminates.
-    return {
-      executable: comSpec,
-      argsPrefix: ['/d', '/s', '/c'],
-      shell: 'cmd',
-    };
-  }
-
-  // Unix-like systems (Linux, macOS)
-  return { executable: 'bash', argsPrefix: ['-c'], shell: 'bash' };
+  // Detect the parent shell that launched Gemini
+  return detectParentShell();
 }
 
 /**

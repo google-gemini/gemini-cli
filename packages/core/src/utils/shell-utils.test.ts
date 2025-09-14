@@ -434,5 +434,113 @@ describe('getShellConfiguration', () => {
       expect(config.argsPrefix).toEqual(['-NoProfile', '-Command']);
       expect(config.shell).toBe('powershell');
     });
+
+    it('should prioritize SHELL over PSModulePath - Git Bash case', () => {
+      process.env['SHELL'] = '/usr/bin/bash';
+      process.env['PSModulePath'] = 'C:\\Program Files\\WindowsPowerShell\\Modules';
+      delete process.env['ComSpec'];
+      delete process.env['LOGINSHELL'];
+      
+      const config = getShellConfiguration();
+      expect(config.executable).toBe('/usr/bin/bash');
+      expect(config.argsPrefix).toEqual(['-c']);
+      expect(config.shell).toBe('bash');
+    });
+
+    it('should prioritize SHELL over PSModulePath - MSYS2 case', () => {
+      process.env['SHELL'] = '/usr/bin/bash';
+      process.env['PSModulePath'] = 'C:\\Program Files\\WindowsPowerShell\\Modules';
+      process.env['LOGINSHELL'] = 'bash';
+      delete process.env['ComSpec'];
+      
+      const config = getShellConfiguration();
+      expect(config.executable).toBe('/usr/bin/bash');
+      expect(config.argsPrefix).toEqual(['-c']);
+      expect(config.shell).toBe('bash');
+    });
+
+    it('should use LOGINSHELL when SHELL is not set', () => {
+      process.env['LOGINSHELL'] = 'bash';
+      delete process.env['SHELL'];
+      delete process.env['PSModulePath'];
+      delete process.env['ComSpec'];
+      
+      const config = getShellConfiguration();
+      expect(config.executable).toBe('bash');
+      expect(config.argsPrefix).toEqual(['-c']);
+      expect(config.shell).toBe('bash');
+    });
+
+    it('should handle non-bash shells in SHELL variable', () => {
+      process.env['SHELL'] = '/usr/bin/zsh';
+      delete process.env['PSModulePath'];
+      delete process.env['ComSpec'];
+      delete process.env['LOGINSHELL'];
+      
+      const config = getShellConfiguration();
+      expect(config.executable).toBe('/usr/bin/zsh');
+      expect(config.argsPrefix).toEqual(['-c']);
+      expect(config.shell).toBe('bash'); // Treated as bash for compatibility
+    });
+
+    it('should detect PowerShell when PSModulePath exists but no SHELL/LOGINSHELL', () => {
+      process.env['PSModulePath'] = 'C:\\Users\\ASUS\\Documents\\WindowsPowerShell\\Modules;C:\\Program Files\\WindowsPowerShell\\Modules';
+      delete process.env['SHELL'];
+      delete process.env['ComSpec'];
+      delete process.env['LOGINSHELL'];
+      
+      const config = getShellConfiguration();
+      expect(config.executable).toBe('powershell.exe');
+      expect(config.argsPrefix).toEqual(['-NoProfile', '-Command']);
+      expect(config.shell).toBe('powershell');
+    });
+
+    it('should detect PowerShell when ComSpec points to PowerShell executable', () => {
+      process.env['ComSpec'] = 'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe';
+      delete process.env['SHELL'];
+      delete process.env['PSModulePath'];
+      delete process.env['LOGINSHELL'];
+      
+      const config = getShellConfiguration();
+      expect(config.executable).toBe('C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe');
+      expect(config.argsPrefix).toEqual(['-NoProfile', '-Command']);
+      expect(config.shell).toBe('powershell');
+    });
+
+    it('should fall back to cmd.exe when no specific shell is detected', () => {
+      delete process.env['SHELL'];
+      delete process.env['PSModulePath'];
+      delete process.env['ComSpec'];
+      delete process.env['LOGINSHELL'];
+      
+      const config = getShellConfiguration();
+      expect(config.executable).toBe('cmd.exe');
+      expect(config.argsPrefix).toEqual(['/d', '/s', '/c']);
+      expect(config.shell).toBe('cmd');
+    });
+  });
+
+  describe('parent shell detection on Unix-like systems', () => {
+    beforeEach(() => {
+      mockPlatform.mockReturnValue('linux');
+    });
+
+    it('should use SHELL environment variable when available', () => {
+      process.env['SHELL'] = '/bin/zsh';
+      
+      const config = getShellConfiguration();
+      expect(config.executable).toBe('/bin/zsh');
+      expect(config.argsPrefix).toEqual(['-c']);
+      expect(config.shell).toBe('bash');
+    });
+
+    it('should default to bash when SHELL is not set', () => {
+      delete process.env['SHELL'];
+      
+      const config = getShellConfiguration();
+      expect(config.executable).toBe('bash');
+      expect(config.argsPrefix).toEqual(['-c']);
+      expect(config.shell).toBe('bash');
+    });
   });
 });
