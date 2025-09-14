@@ -560,4 +560,56 @@ describe('getShellConfiguration', () => {
       expect(config.shell).toBe('cmd');
     });
   });
+
+  describe('shell type detection edge cases', () => {
+    beforeEach(() => {
+      mockPlatform.mockReturnValue('win32');
+      delete process.env['ComSpec'];
+    });
+
+    it('should NOT misclassify paths containing "cmd" as cmd.exe', () => {
+      process.env['SHELL'] = '/home/user/commands/my-script.sh';
+      
+      const config = getShellConfiguration();
+      expect(config.executable).toBe('/home/user/commands/my-script.sh');
+      expect(config.argsPrefix).toEqual(['-c']);
+      expect(config.shell).toBe('bash'); // Should be bash, not cmd
+    });
+
+    it('should NOT misclassify directory names containing "cmd"', () => {
+      process.env['SHELL'] = '/path/to/cmdtools/bash';
+      
+      const config = getShellConfiguration();
+      expect(config.executable).toBe('/path/to/cmdtools/bash');
+      expect(config.argsPrefix).toEqual(['-c']);
+      expect(config.shell).toBe('bash'); // Should be bash, not cmd
+    });
+
+    it('should correctly identify actual cmd.exe', () => {
+      process.env['SHELL'] = 'cmd.exe';
+      
+      const config = getShellConfiguration();
+      expect(config.executable).toBe('cmd.exe');
+      expect(config.argsPrefix).toEqual(['/d', '/s', '/c']);
+      expect(config.shell).toBe('cmd');
+    });
+
+    it('should correctly identify cmd with full Windows path', () => {
+      process.env['SHELL'] = 'C:\\Windows\\System32\\cmd.exe';
+      
+      const config = getShellConfiguration();
+      expect(config.executable).toBe('C:\\Windows\\System32\\cmd.exe');
+      expect(config.argsPrefix).toEqual(['/d', '/s', '/c']);
+      expect(config.shell).toBe('cmd');
+    });
+
+    it('should correctly identify cmd without .exe extension', () => {
+      process.env['SHELL'] = '/usr/bin/cmd';
+      
+      const config = getShellConfiguration();
+      expect(config.executable).toBe('/usr/bin/cmd');
+      expect(config.argsPrefix).toEqual(['/d', '/s', '/c']);
+      expect(config.shell).toBe('cmd');
+    });
+  });
 });

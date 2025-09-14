@@ -87,7 +87,7 @@ function getShellTypeFromPath(shellPath: string): ShellType {
   if (shellName.includes('powershell') || shellName.includes('pwsh')) {
     return 'powershell';
   }
-  if (shellName.includes('cmd') || shellName.endsWith('cmd.exe')) {
+  if (/(^|\\|\/)cmd(\.exe)?$/.test(shellName)) {
     return 'cmd';
   }
   return 'bash';
