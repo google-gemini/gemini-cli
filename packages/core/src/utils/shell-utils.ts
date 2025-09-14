@@ -67,12 +67,24 @@ function detectParentShell(): ShellConfiguration {
   // Environment variables are identical, and PowerShell variables aren't exported as env vars.
   // PowerShell: "Windows PowerShell" vs PowerShell Core: "pwsh" vs cmd.exe: "Command Prompt - node <script>"
   const lowerCaseTitle = process.title?.toLowerCase();
-  if (lowerCaseTitle?.includes('pwsh') || lowerCaseTitle?.includes('powershell')) {
-    return {
-      executable: lowerCaseTitle.includes('pwsh') ? 'pwsh.exe' : 'powershell.exe',
-      argsPrefix: getArgsForShellType('powershell'),
-      shell: 'powershell',
-    };
+  if (lowerCaseTitle) {
+    // Look for "Windows PowerShell" (traditional PowerShell)
+    if (lowerCaseTitle.includes('windows powershell')) {
+      return {
+        executable: 'powershell.exe',
+        argsPrefix: getArgsForShellType('powershell'),
+        shell: 'powershell',
+      };
+    }
+    // Look for "pwsh" as executable name (PowerShell Core)
+    // Match when pwsh appears at start/end or surrounded by spaces (not in file paths)
+    if (/(?:^|\s)pwsh(?:\s|$)/.test(lowerCaseTitle)) {
+      return {
+        executable: 'pwsh.exe',
+        argsPrefix: getArgsForShellType('powershell'),
+        shell: 'powershell',
+      };
+    }
   }
 
   return {
@@ -84,7 +96,7 @@ function detectParentShell(): ShellConfiguration {
 
 function getShellTypeFromPath(shellPath: string): ShellType {
   const shellName = shellPath.toLowerCase();
-  if (shellName.includes('powershell') || shellName.includes('pwsh')) {
+  if (/(^|\\|\/)(powershell|pwsh)(\.exe)?$/.test(shellName)) {
     return 'powershell';
   }
   if (/(^|\\|\/)cmd(\.exe)?$/.test(shellName)) {

@@ -650,5 +650,62 @@ describe('getShellConfiguration', () => {
       expect(config.argsPrefix).toEqual(['/d', '/s', '/c']);
       expect(config.shell).toBe('cmd');
     });
+
+    it('should NOT misclassify paths containing "powershell" as PowerShell', () => {
+      process.env['SHELL'] = '/usr/bin/not-powershell';
+      
+      const config = getShellConfiguration();
+      expect(config.executable).toBe('/usr/bin/not-powershell');
+      expect(config.argsPrefix).toEqual(['-c']);
+      expect(config.shell).toBe('bash'); // Should be bash, not powershell
+    });
+
+    it('should NOT misclassify directory names containing "powershell"', () => {
+      process.env['SHELL'] = '/path/to/powershell-tools/bash';
+      
+      const config = getShellConfiguration();
+      expect(config.executable).toBe('/path/to/powershell-tools/bash');
+      expect(config.argsPrefix).toEqual(['-c']);
+      expect(config.shell).toBe('bash'); // Should be bash, not powershell
+    });
+
+    it('should NOT misclassify paths containing "pwsh" as PowerShell', () => {
+      process.env['SHELL'] = '/usr/bin/my-pwsh-wrapper';
+      
+      const config = getShellConfiguration();
+      expect(config.executable).toBe('/usr/bin/my-pwsh-wrapper');
+      expect(config.argsPrefix).toEqual(['-c']);
+      expect(config.shell).toBe('bash'); // Should be bash, not powershell
+    });
+
+    it('should NOT misclassify process.title containing "powershell" as substring', () => {
+      const originalTitle = process.title;
+      process.title = 'C:\\WINDOWS\\system32\\cmd.exe - node.exe my-powershell-backup.js';
+      delete process.env['SHELL'];
+      delete process.env['LOGINSHELL'];
+      delete process.env['ComSpec'];
+      
+      const config = getShellConfiguration();
+      expect(config.executable).toBe('cmd.exe');
+      expect(config.argsPrefix).toEqual(['/d', '/s', '/c']);
+      expect(config.shell).toBe('cmd'); // Should be cmd, not powershell
+      
+      process.title = originalTitle;
+    });
+
+    it('should NOT misclassify process.title containing "pwsh" as substring', () => {
+      const originalTitle = process.title;
+      process.title = 'Command Prompt - my-pwsh-script.js';
+      delete process.env['SHELL'];
+      delete process.env['LOGINSHELL'];
+      delete process.env['ComSpec'];
+      
+      const config = getShellConfiguration();
+      expect(config.executable).toBe('cmd.exe');
+      expect(config.argsPrefix).toEqual(['/d', '/s', '/c']);
+      expect(config.shell).toBe('cmd'); // Should be cmd, not powershell
+      
+      process.title = originalTitle;
+    });
   });
 });
