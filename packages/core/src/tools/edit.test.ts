@@ -10,7 +10,13 @@ const mockEnsureCorrectEdit = vi.hoisted(() => vi.fn());
 const mockGenerateJson = vi.hoisted(() => vi.fn());
 const mockOpenDiff = vi.hoisted(() => vi.fn());
 
-import { IDEConnectionStatus } from '../ide/ide-client.js';
+import { IdeClient } from '../ide/ide-client.js';
+
+vi.mock('../ide/ide-client.js', () => ({
+  IdeClient: {
+    getInstance: vi.fn(),
+  },
+}));
 
 vi.mock('../utils/editCorrector.js', () => ({
   ensureCorrectEdit: mockEnsureCorrectEdit,
@@ -70,7 +76,6 @@ describe('EditTool', () => {
       setApprovalMode: vi.fn(),
       getWorkspaceContext: () => createMockWorkspaceContext(rootDir),
       getFileSystemService: () => new StandardFileSystemService(),
-      getIdeClient: () => undefined,
       getIdeMode: () => false,
       // getGeminiConfig: () => ({ apiKey: 'test-api-key' }), // This was not a real Config method
       // Add other properties/methods of Config if EditTool uses them
@@ -188,6 +193,86 @@ describe('EditTool', () => {
       expect(applyReplacement('hello world', '', 'new', false)).toBe(
         'hello world',
       );
+    });
+
+    it('should treat $ literally and not as replacement pattern', () => {
+      const current = "price is $100 and pattern end is ' '";
+      const oldStr = 'price is $100';
+      const newStr = 'price is $200';
+      const result = applyReplacement(current, oldStr, newStr, false);
+      expect(result).toBe("price is $200 and pattern end is ' '");
+    });
+
+    it("should treat $' literally and not as a replacement pattern", () => {
+      const current = 'foo';
+      const oldStr = 'foo';
+      const newStr = "bar$'baz";
+      const result = applyReplacement(current, oldStr, newStr, false);
+      expect(result).toBe("bar$'baz");
+    });
+
+    it('should treat $& literally and not as a replacement pattern', () => {
+      const current = 'hello world';
+      const oldStr = 'hello';
+      const newStr = '$&-replacement';
+      const result = applyReplacement(current, oldStr, newStr, false);
+      expect(result).toBe('$&-replacement world');
+    });
+
+    it('should treat $` literally and not as a replacement pattern', () => {
+      const current = 'prefix-middle-suffix';
+      const oldStr = 'middle';
+      const newStr = 'new$`content';
+      const result = applyReplacement(current, oldStr, newStr, false);
+      expect(result).toBe('prefix-new$`content-suffix');
+    });
+
+    it('should treat $1, $2 capture groups literally', () => {
+      const current = 'test string';
+      const oldStr = 'test';
+      const newStr = '$1$2replacement';
+      const result = applyReplacement(current, oldStr, newStr, false);
+      expect(result).toBe('$1$2replacement string');
+    });
+
+    it('should use replaceAll for normal strings without problematic $ sequences', () => {
+      const current = 'normal text replacement';
+      const oldStr = 'text';
+      const newStr = 'string';
+      const result = applyReplacement(current, oldStr, newStr, false);
+      expect(result).toBe('normal string replacement');
+    });
+
+    it('should handle multiple occurrences with problematic $ sequences', () => {
+      const current = 'foo bar foo baz';
+      const oldStr = 'foo';
+      const newStr = "test$'end";
+      const result = applyReplacement(current, oldStr, newStr, false);
+      expect(result).toBe("test$'end bar test$'end baz");
+    });
+
+    it('should handle complex regex patterns with $ at end', () => {
+      const current = "| select('match', '^[sv]d[a-z]$')";
+      const oldStr = "'^[sv]d[a-z]$'";
+      const newStr = "'^[sv]d[a-z]$' # updated";
+      const result = applyReplacement(current, oldStr, newStr, false);
+      expect(result).toBe("| select('match', '^[sv]d[a-z]$' # updated)");
+    });
+
+    it('should handle empty replacement with problematic $ in newString', () => {
+      const current = 'test content';
+      const oldStr = 'nothing';
+      const newStr = "replacement$'text";
+      const result = applyReplacement(current, oldStr, newStr, false);
+      expect(result).toBe('test content'); // No replacement because oldStr not found
+    });
+
+    it('should handle $$ (escaped dollar) correctly', () => {
+      const current = 'price value';
+      const oldStr = 'value';
+      const newStr = '$$100';
+      const result = applyReplacement(current, oldStr, newStr, false);
+      expect(result).toBe('price $$100');
     });
   });
 
@@ -467,7 +552,20 @@ describe('EditTool', () => {
       expect(result.llmContent).toMatch(/Created new file/);
       expect(fs.existsSync(newFilePath)).toBe(true);
       expect(fs.readFileSync(newFilePath, 'utf8')).toBe(fileContent);
-      expect(result.returnDisplay).toBe(`Created ${newFileName}`);
+
+      const display = result.returnDisplay as FileDiff;
+      expect(display.fileDiff).toMatch(/\+Content for the new file\./);
+      expect(display.fileName).toBe(newFileName);
+      expect((result.returnDisplay as FileDiff).diffStat).toStrictEqual({
+        model_added_lines: 1,
+        model_removed_lines: 0,
+        model_added_chars: 25,
+        model_removed_chars: 0,
+        user_added_lines: 0,
+        user_removed_lines: 0,
+        user_added_chars: 0,
+        user_removed_chars: 0,
+      });
     });
 
     it('should return error if old_string is not found in file', async () => {
@@ -528,10 +626,14 @@ describe('EditTool', () => {
       expect(display.fileDiff).toMatch(/\+new text\n\+new text\n\+new text/);
       expect(display.fileName).toBe(testFile);
       expect((result.returnDisplay as FileDiff).diffStat).toStrictEqual({
-        ai_added_lines: 3,
-        ai_removed_lines: 3,
+        model_added_lines: 3,
+        model_removed_lines: 3,
+        model_added_chars: 24,
+        model_removed_chars: 24,
         user_added_lines: 0,
         user_removed_lines: 0,
+        user_added_chars: 0,
+        user_removed_chars: 0,
       });
     });
 
@@ -589,10 +691,14 @@ describe('EditTool', () => {
         /User modified the `new_string` content/,
       );
       expect((result.returnDisplay as FileDiff).diffStat).toStrictEqual({
-        ai_added_lines: 1,
-        ai_removed_lines: 1,
+        model_added_lines: 1,
+        model_removed_lines: 1,
+        model_added_chars: 7,
+        model_removed_chars: 8,
         user_added_lines: 1,
         user_removed_lines: 1,
+        user_added_chars: 8,
+        user_removed_chars: 7,
       });
     });
 
@@ -866,12 +972,10 @@ describe('EditTool', () => {
       filePath = path.join(rootDir, testFile);
       ideClient = {
         openDiff: vi.fn(),
-        getConnectionStatus: vi.fn().mockReturnValue({
-          status: IDEConnectionStatus.Connected,
-        }),
+        isDiffingEnabled: vi.fn().mockReturnValue(true),
       };
+      vi.mocked(IdeClient.getInstance).mockResolvedValue(ideClient);
       (mockConfig as any).getIdeMode = () => true;
-      (mockConfig as any).getIdeClient = () => ideClient;
     });
 
     it('should call ideClient.openDiff and update params on confirmation', async () => {

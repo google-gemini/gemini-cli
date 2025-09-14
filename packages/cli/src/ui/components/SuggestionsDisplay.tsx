@@ -5,14 +5,15 @@
  */
 
 import { Box, Text } from 'ink';
-import { Colors } from '../colors.js';
+import { theme } from '../semantic-colors.js';
 import { PrepareLabel } from './PrepareLabel.js';
-import { isSlashCommand } from '../utils/commandUtils.js';
+import { CommandKind } from '../commands/types.js';
 export interface Suggestion {
   label: string;
   value: string;
   description?: string;
   matchedIndex?: number;
+  commandKind?: CommandKind;
 }
 interface SuggestionsDisplayProps {
   suggestions: Suggestion[];
@@ -53,29 +54,22 @@ export function SuggestionsDisplay({
   );
   const visibleSuggestions = suggestions.slice(startIndex, endIndex);
 
-  const isSlashCommandMode = isSlashCommand(userInput);
-  let commandNameWidth = 0;
+  const getFullLabel = (s: Suggestion) =>
+    s.label + (s.commandKind === CommandKind.MCP_PROMPT ? ' [MCP]' : '');
 
-  if (isSlashCommandMode) {
-    const maxLabelLength = visibleSuggestions.length
-      ? Math.max(...visibleSuggestions.map((s) => s.label.length))
-      : 0;
-
-    const maxAllowedWidth = Math.floor(width * 0.35);
-    commandNameWidth = Math.max(
-      15,
-      Math.min(maxLabelLength + 2, maxAllowedWidth),
-    );
-  }
+  const maxLabelLength = Math.max(
+    ...suggestions.map((s) => getFullLabel(s).length),
+  );
+  const commandColumnWidth = Math.min(maxLabelLength, Math.floor(width * 0.5));
 
   return (
     <Box flexDirection="column" paddingX={1} width={width}>
-      {scrollOffset > 0 && <Text color={Colors.Foreground}>▲</Text>}
+      {scrollOffset > 0 && <Text color={theme.text.primary}>▲</Text>}
 
       {visibleSuggestions.map((suggestion, index) => {
         const originalIndex = startIndex + index;
         const isActive = originalIndex === activeIndex;
-        const textColor = isActive ? Colors.AccentPurple : Colors.Gray;
+        const textColor = isActive ? theme.text.accent : theme.text.secondary;
         const labelElement = (
           <PrepareLabel
             label={suggestion.label}
@@ -86,34 +80,23 @@ export function SuggestionsDisplay({
         );
 
         return (
-          <Box key={`${suggestion.value}-${originalIndex}`} width={width}>
-            <Box flexDirection="row">
-              {isSlashCommandMode ? (
-                <>
-                  <Box width={commandNameWidth} flexShrink={0}>
-                    {labelElement}
-                  </Box>
-                  {suggestion.description ? (
-                    <Box flexGrow={1} marginLeft={1}>
-                      <Text color={textColor} wrap="wrap">
-                        {suggestion.description}
-                      </Text>
-                    </Box>
-                  ) : null}
-                </>
-              ) : (
-                <>
-                  {labelElement}
-                  {suggestion.description ? (
-                    <Box flexGrow={1} marginLeft={1}>
-                      <Text color={textColor} wrap="wrap">
-                        {suggestion.description}
-                      </Text>
-                    </Box>
-                  ) : null}
-                </>
-              )}
+          <Box key={`${suggestion.value}-${originalIndex}`} flexDirection="row">
+            <Box width={commandColumnWidth} flexShrink={0}>
+              <Box>
+                {labelElement}
+                {suggestion.commandKind === CommandKind.MCP_PROMPT && (
+                  <Text color={textColor}> [MCP]</Text>
+                )}
+              </Box>
             </Box>
+
+            {suggestion.description && (
+              <Box flexGrow={1} paddingLeft={3}>
+                <Text color={textColor} wrap="truncate">
+                  {suggestion.description}
+                </Text>
+              </Box>
+            )}
           </Box>
         );
       })}
