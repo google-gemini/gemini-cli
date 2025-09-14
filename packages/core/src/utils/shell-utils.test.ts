@@ -528,6 +528,45 @@ describe('getShellConfiguration', () => {
       process.title = originalTitle;
     });
 
+    it('should detect PowerShell Core via process.title containing "pwsh"', () => {
+      const originalTitle = process.title;
+      process.title = 'pwsh';
+      delete process.env['ComSpec'];
+      
+      const config = getShellConfiguration();
+      expect(config.executable).toBe('pwsh.exe');
+      expect(config.argsPrefix).toEqual(['-NoProfile', '-Command']);
+      expect(config.shell).toBe('powershell');
+      
+      process.title = originalTitle;
+    });
+
+    it('should detect PowerShell Core via process.title case-insensitive', () => {
+      const originalTitle = process.title;
+      process.title = 'PWSH';
+      delete process.env['ComSpec'];
+      
+      const config = getShellConfiguration();
+      expect(config.executable).toBe('pwsh.exe');
+      expect(config.argsPrefix).toEqual(['-NoProfile', '-Command']);
+      expect(config.shell).toBe('powershell');
+      
+      process.title = originalTitle;
+    });
+
+    it('should prioritize pwsh over powershell when both are in process.title', () => {
+      const originalTitle = process.title;
+      process.title = 'PowerShell Core pwsh';
+      delete process.env['ComSpec'];
+      
+      const config = getShellConfiguration();
+      expect(config.executable).toBe('pwsh.exe'); // Should prefer pwsh
+      expect(config.argsPrefix).toEqual(['-NoProfile', '-Command']);
+      expect(config.shell).toBe('powershell');
+      
+      process.title = originalTitle;
+    });
+
     it('should NOT detect PowerShell when process.title is cmd-like', () => {
       const originalTitle = process.title;
       process.title = 'Command Prompt - node test.js';

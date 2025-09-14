@@ -65,11 +65,11 @@ function detectParentShell(): ShellConfiguration {
 
   // Process.title is the only reliable way to distinguish cmd.exe from PowerShell on Windows.
   // Environment variables are identical, and PowerShell variables aren't exported as env vars.
-  // PowerShell: "Windows PowerShell" vs cmd.exe: "Command Prompt - node <script>"
-  const isPowerShellFromTitle = !!(process.title && process.title.toLowerCase().includes('powershell'));
-  if (isPowerShellFromTitle) {
+  // PowerShell: "Windows PowerShell" vs PowerShell Core: "pwsh" vs cmd.exe: "Command Prompt - node <script>"
+  const lowerCaseTitle = process.title?.toLowerCase();
+  if (lowerCaseTitle?.includes('pwsh') || lowerCaseTitle?.includes('powershell')) {
     return {
-      executable: 'powershell.exe',
+      executable: lowerCaseTitle.includes('pwsh') ? 'pwsh.exe' : 'powershell.exe',
       argsPrefix: getArgsForShellType('powershell'),
       shell: 'powershell',
     };
