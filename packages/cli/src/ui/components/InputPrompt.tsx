@@ -76,7 +76,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   const [escPressCount, setEscPressCount] = useState(0);
   const [showEscapePrompt, setShowEscapePrompt] = useState(false);
   const escapeTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const [recentPasteTime] = useState<number | null>(null);
+  const [recentPasteTime, setRecentPasteTime] = useState<number | null>(null);
   const pasteTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const [dirs, setDirs] = useState<readonly string[]>(
@@ -265,6 +265,15 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
             if (imageWasPasted) {
               return;
             }
+            // If no image was pasted, handle as a regular text paste.
+            setRecentPasteTime(Date.now());
+            if (pasteTimeoutRef.current) {
+              clearTimeout(pasteTimeoutRef.current);
+            }
+            pasteTimeoutRef.current = setTimeout(() => {
+              setRecentPasteTime(null);
+              pasteTimeoutRef.current = null;
+            }, 500);
             buffer.handleInput(key);
           });
           return;
@@ -272,6 +281,14 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
         // On other platforms, we rely on the specific Ctrl+V keybinding for
         // images, so any generic paste event is treated as text.
+        setRecentPasteTime(Date.now());
+        if (pasteTimeoutRef.current) {
+          clearTimeout(pasteTimeoutRef.current);
+        }
+        pasteTimeoutRef.current = setTimeout(() => {
+          setRecentPasteTime(null);
+          pasteTimeoutRef.current = null;
+        }, 500);
         buffer.handleInput(key);
         return;
       }
