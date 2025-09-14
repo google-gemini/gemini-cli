@@ -8,15 +8,15 @@ Use `run_shell_command` to interact with the underlying system, run scripts, or 
 
 ## Shell Detection
 
-The Gemini CLI automatically detects and uses the shell you're running it from:
+The Gemini CLI automatically detects your shell in this order:
 
-- **Unix-like systems**: Uses the `SHELL` environment variable or defaults to bash
-- **Windows Priority Order**:
-  1. **SHELL variable**: Respects your preferred shell (Git Bash, MSYS2, WSL, zsh, etc.)
-  2. **LOGINSHELL variable**: Fallback if SHELL is not set  
-  3. **PowerShell detection**: When PSModulePath environment variable exists
-  4. **PowerShell via ComSpec**: When ComSpec points to powershell/pwsh
-  5. **Final fallback**: cmd.exe
+1. **SHELL environment variable** (all platforms)
+2. **LOGINSHELL environment variable** (all platforms)
+3. **PowerShell via ComSpec** (Windows only)
+4. **PowerShell via process title** (Windows only)
+5. **Default shell**: `bash` on Unix/Linux/macOS, `cmd.exe` on Windows
+
+Supports PowerShell Core (`pwsh`) on all platforms.
 
 ### Arguments
 

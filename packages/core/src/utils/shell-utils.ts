@@ -13,77 +13,125 @@ import { doesToolInvocationMatch } from './tool-utils.js';
 // Declare process for environments where it's not automatically available
 declare const process: {
   env: Record<string, string | undefined>;
+  title: string;
 };
 
 const SHELL_TOOL_NAMES = ['run_shell_command', 'ShellTool'];
 
 /**
- * Detects the shell that the user launched Gemini from by examining environment variables.
- * This allows using the same shell the user prefers instead of defaulting to cmd.exe on Windows.
+ * Export the platform detection constant for use in process management (e.g., killing processes).
+ */
+export const isWindows = () => os.platform() === 'win32';
+
+/**
+ * Detects the shell that the user launched Gemini from by examining environment variables
+ * and process information.
+ * This allows using the same shell the user prefers instead of defaulting to platform defaults.
  * 
- * Detection logic:
- * - **Unix-like systems**: Uses SHELL environment variable or defaults to bash
- * - **Windows Priority Order**:
- *   1. **SHELL variable**: Respects user's preferred shell (Git Bash, MSYS2, WSL, zsh, etc.)
- *   2. **LOGINSHELL variable**: Fallback if SHELL is not set  
- *   3. **PowerShell detection**: When PSModulePath exists or ComSpec points to powershell/pwsh
- *   4. **Final fallback**: cmd.exe
+ * Detection logic (cross-platform priority order):
+ *   1. **SHELL variable**: User's preferred shell (bash, zsh, pwsh, etc.)
+ *   2. **LOGINSHELL variable**: Fallback if SHELL is not set
+ *   3. **PowerShell via ComSpec** (Windows): When ComSpec points to powershell/pwsh
+ *   4. **PowerShell via process.title** (Windows): When title indicates "Windows PowerShell"
+ *   5. **Platform defaults**: bash on Unix, cmd.exe on Windows
+ * 
+ * **Why process.title for PowerShell detection:**
+ * 
+ * Environment variables are identical between cmd.exe and PowerShell, and PowerShell's
+ * internal variables aren't exported as environment variables. Process.title is the only
+ * reliable way to distinguish them:
+ * - PowerShell: "Windows PowerShell"  
+ * - cmd.exe: "Command Prompt - node <script>"
  * 
  * @returns Shell configuration with executable path, args prefix, and shell type
  */
 function detectParentShell(): ShellConfiguration {
+  const userPreferredShell = process.env['SHELL'];
+  const fallbackShell = process.env['LOGINSHELL'];
+  const systemComSpec = process.env['ComSpec'];
+
+  if (userPreferredShell) {
+    const shellType = getShellTypeFromPath(userPreferredShell);
+    return {
+      executable: userPreferredShell,
+      argsPrefix: getArgsForShellType(shellType),
+      shell: shellType,
+    };
+  }
+
+  if (fallbackShell) {
+    const shellType = getShellTypeFromPath(fallbackShell);
+    return {
+      executable: fallbackShell,
+      argsPrefix: getArgsForShellType(shellType),
+      shell: shellType,
+    };
+  }
+
   if (!isWindows()) {
-    // On Unix-like systems, use the SHELL environment variable or default to bash
-    const shellPath = process.env['SHELL'] || 'bash';
     return {
-      executable: shellPath,
+      executable: 'bash',
       argsPrefix: ['-c'],
       shell: 'bash',
     };
   }
 
-  // On Windows, detect the shell based on environment variables
-  const shell = process.env['SHELL'];
-  const psModulePath = process.env['PSModulePath'];
-  const comSpec = process.env['ComSpec'];
-  const loginShell = process.env['LOGINSHELL'];
-
-  // Priority 1: Respect SHELL environment variable if set (Git Bash, MSYS2, WSL, etc.)
-  if (shell) {
+  const isPowerShellFromComSpec =
+    systemComSpec &&
+    (systemComSpec.toLowerCase().includes('powershell') ||
+      systemComSpec.toLowerCase().includes('pwsh'));
+  
+  if (isPowerShellFromComSpec) {
     return {
-      executable: shell,
-      argsPrefix: ['-c'],
-      shell: 'bash',
-    };
-  }
-
-  // Priority 2: Check LOGINSHELL if SHELL is not set
-  if (loginShell) {
-    return {
-      executable: loginShell,
-      argsPrefix: ['-c'],
-      shell: 'bash',
-    };
-  }
-
-  // Priority 3 & 4: PowerShell detection (via PSModulePath or ComSpec)
-  const isComSpecPowerShell = comSpec && (comSpec.toLowerCase().includes('powershell') || comSpec.toLowerCase().includes('pwsh'));
-  if (psModulePath || isComSpecPowerShell) {
-    // If ComSpec points to PowerShell, use it; otherwise, default to powershell.exe
-    const executable = isComSpecPowerShell ? comSpec! : 'powershell.exe';
-    return {
-      executable,
+      executable: systemComSpec!,
       argsPrefix: ['-NoProfile', '-Command'],
       shell: 'powershell',
     };
   }
 
-  // Final fallback: cmd.exe when no specific shell is detected
+  const isPowerShellFromTitle = !!(process.title && process.title.toLowerCase().includes('powershell'));
+  if (isPowerShellFromTitle) {
+    return {
+      executable: 'powershell.exe',
+      argsPrefix: ['-NoProfile', '-Command'],
+      shell: 'powershell',
+    };
+  }
+
   return {
-    executable: 'cmd.exe',
+    executable: systemComSpec || 'cmd.exe',
     argsPrefix: ['/d', '/s', '/c'],
     shell: 'cmd',
   };
+}
+
+/**
+ * Determines shell type from executable path
+ */
+function getShellTypeFromPath(shellPath: string): ShellType {
+  const shellName = shellPath.toLowerCase();
+  if (shellName.includes('powershell') || shellName.includes('pwsh')) {
+    return 'powershell';
+  }
+  if (shellName.includes('cmd') || shellName.endsWith('cmd.exe')) {
+    return 'cmd';
+  }
+  return 'bash'; // Default for Unix shells (bash, zsh, fish, etc.)
+}
+
+/**
+ * Gets appropriate arguments for shell type
+ */
+function getArgsForShellType(shellType: ShellType): string[] {
+  switch (shellType) {
+    case 'powershell':
+      return ['-NoProfile', '-Command'];
+    case 'cmd':
+      return ['/d', '/s', '/c'];
+    case 'bash':
+    default:
+      return ['-c'];
+  }
 }
 
 /**
@@ -117,11 +165,6 @@ export function getShellConfiguration(): ShellConfiguration {
   // Detect the parent shell that launched Gemini
   return detectParentShell();
 }
-
-/**
- * Export the platform detection constant for use in process management (e.g., killing processes).
- */
-export const isWindows = () => os.platform() === 'win32';
 
 /**
  * Escapes a string so that it can be safely used as a single argument
