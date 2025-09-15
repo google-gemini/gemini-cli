@@ -84,18 +84,6 @@ describe('handleInstall', () => {
     );
   });
 
-  it('should install an extension from a sso source', async () => {
-    mockInstallExtension.mockResolvedValue('sso-extension');
-
-    await handleInstall({
-      source: 'sso://google.com',
-    });
-
-    expect(consoleLogSpy).toHaveBeenCalledWith(
-      'Extension "sso-extension" installed successfully and enabled.',
-    );
-  });
-
   it('throws an error from an unknown source', async () => {
     await handleInstall({
       source: 'test://google.com',
@@ -133,7 +121,7 @@ describe('handleInstall', () => {
       new Error('Install extension failed'),
     );
 
-    await handleInstall({ source: 'sso://google.com' });
+    await handleInstall({ source: 'git@some-url' });
 
     expect(consoleErrorSpy).toHaveBeenCalledWith('Install extension failed');
     expect(processSpy).toHaveBeenCalledWith(1);
