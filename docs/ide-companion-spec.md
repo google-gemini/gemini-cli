@@ -112,7 +112,7 @@ The extension **MUST** register an `openDiff` tool on its MCP server.
 The extension **MUST** register a `closeDiff` tool on its MCP server.
 
 - **Description:** This tool instructs the IDE to close an open diff view for a specific file.
-- **Request (`CallToolRequest`):**  The tool is invoked via a `tools/call` request. The `arguments` field within the request's `params` **MUST** be an `CloseDiffRequest` object (`@packages/core/src/ide/types.ts`).
+- **Request (`CloseDiffRequest`):**  The tool is invoked via a `tools/call` request. The `arguments` field within the request's `params` **MUST** be an `CloseDiffRequest` object (`@packages/core/src/ide/types.ts`).
 
   ```typescript
   interface CloseDiffRequest {
