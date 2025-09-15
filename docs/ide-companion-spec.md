@@ -50,7 +50,7 @@ The extension **MAY** send an `ide/contextUpdate` [notification](https://modelco
 - **Triggering Events:** This notification should be sent (with a recommended debounce of 50ms) when:
   - A file is opened, closed, or focused.
   - The user's cursor position or text selection changes in the active file.
-- **Payload (`IdeContext`):** The notification parameters **MUST** be an `IdeContext` object (`@packages/core/src/ide/types.ts`):
+- **Payload (`IdeContext`):** The notification parameters **MUST** be an `IdeContext` object:
 
   ```typescript
   interface IdeContext {
@@ -61,14 +61,20 @@ The extension **MAY** send an `ide/contextUpdate` [notification](https://modelco
   }
 
   interface File {
-    path: string; // Absolute path to the file
-    timestamp: number; // Last focused Unix timestamp (for ordering)
-    isActive?: boolean; // True if this is the currently focused file
+    // Absolute path to the file
+    path: string;
+    // Last focused Unix timestamp (for ordering)
+    timestamp: number;
+    // True if this is the currently focused file
+    isActive?: boolean;
     cursor?: {
-      line: number; // 1-based line number
-      character: number; // 1-based character number
+      // 1-based line number
+      line: number;
+      // 1-based character number
+      character: number;
     };
-    selectedText?: string; // The text currently selected by the user
+    // The text currently selected by the user
+    selectedText?: string;
   }
   ```
 
@@ -93,12 +99,14 @@ To enable interactive code modifications, the extension **MAY** expose a diffing
 The extension **MUST** register an `openDiff` tool on its MCP server.
 
 - **Description:** This tool instructs the IDE to open a modifiable diff view for a specific file.
-- **Request (`OpenDiffRequest`):** The tool is invoked via a `tools/call` request. The `arguments` field within the request's `params` **MUST** be an `OpenDiffRequest` object (`@packages/core/src/ide/types.ts`).
+- **Request (`OpenDiffRequest`):** The tool is invoked via a `tools/call` request. The `arguments` field within the request's `params` **MUST** be an `OpenDiffRequest` object.
 
   ```typescript
   interface OpenDiffRequest {
-    filePath: string; // The absolute path to the file to be diffed.
-    newContent: string; // The proposed new content for the file.
+    // The absolute path to the file to be diffed.
+    filePath: string;
+    // The proposed new content for the file.
+    newContent: string;
   }
   ```
 - **Response (`CallToolResult`):** The tool **MUST** immediately return a `CallToolResult` to acknowledge the request and report whether the diff view was successfully opened.
@@ -112,11 +120,12 @@ The extension **MUST** register an `openDiff` tool on its MCP server.
 The extension **MUST** register a `closeDiff` tool on its MCP server.
 
 - **Description:** This tool instructs the IDE to close an open diff view for a specific file.
-- **Request (`CloseDiffRequest`):**  The tool is invoked via a `tools/call` request. The `arguments` field within the request's `params` **MUST** be an `CloseDiffRequest` object (`@packages/core/src/ide/types.ts`).
+- **Request (`CloseDiffRequest`):**  The tool is invoked via a `tools/call` request. The `arguments` field within the request's `params` **MUST** be an `CloseDiffRequest` object.
 
   ```typescript
   interface CloseDiffRequest {
-    filePath: string; // The absolute path to the file whose diff view should be closed.
+    // The absolute path to the file whose diff view should be closed.
+    filePath: string;
   }
   ```
 - **Response (`CallToolResult`):** The tool **MUST** return a `CallToolResult`.
@@ -131,8 +140,10 @@ When the user accepts the changes in a diff view (e.g., by clicking an "Apply" o
 
   ```typescript
   {
-    filePath: string; // The absolute path to the file that was diffed.
-    content: string; // The full content of the file after acceptance.
+     // The absolute path to the file that was diffed.
+    filePath: string;
+    // The full content of the file after acceptance.
+    content: string; 
   }
   ```
 
@@ -144,7 +155,8 @@ When the user rejects the changes (e.g., by closing the diff view without accept
 
   ```typescript
   {
-    filePath: string; // The absolute path to the file that was diffed.
+    // The absolute path to the file that was diffed.
+    filePath: string;
   }
   ```
 
