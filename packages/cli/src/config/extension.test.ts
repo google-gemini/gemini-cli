@@ -31,6 +31,7 @@ import {
   type MCPServerConfig,
   ClearcutLogger,
   type Config,
+  ExtensionUninstallEvent,
 } from '@google/gemini-cli-core';
 import { execSync } from 'node:child_process';
 import { SettingScope, loadSettings } from './settings.js';
@@ -76,15 +77,18 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const actual =
     await importOriginal<typeof import('@google/gemini-cli-core')>();
   const mockLogExtensionInstallEvent = vi.fn();
+  const mockLogExtensionUninstallEvent = vi.fn();
   return {
     ...actual,
     ClearcutLogger: {
       getInstance: vi.fn(() => ({
         logExtensionInstallEvent: mockLogExtensionInstallEvent,
+        logExtensionUninstallEvent: mockLogExtensionUninstallEvent,
       })),
     },
     Config: vi.fn(),
     ExtensionInstallEvent: vi.fn(),
+    ExtensionUninstallEvent: vi.fn(),
   };
 });
 
@@ -581,6 +585,45 @@ describe('installExtension', () => {
     expect(logger?.logExtensionInstallEvent).toHaveBeenCalled();
   });
 
+  it('should show users information on their mcp server when installing', async () => {
+    const consoleInfoSpy = vi.spyOn(console, 'info');
+    const sourceExtDir = createExtension({
+      extensionsDir: tempHomeDir,
+      name: 'my-local-extension',
+      version: '1.0.0',
+      mcpServers: {
+        'test-server': {
+          command: 'node',
+          args: ['server.js'],
+          description: 'a local mcp server',
+        },
+        'test-server-2': {
+          description: 'a remote mcp server',
+          httpUrl: 'https://google.com',
+        },
+      },
+    });
+
+    mockQuestion.mockImplementation((_query, callback) => callback('y'));
+
+    await expect(
+      installExtension({ source: sourceExtDir, type: 'local' }),
+    ).resolves.toBe('my-local-extension');
+
+    expect(consoleInfoSpy).toHaveBeenCalledWith(
+      'This extension will run the following MCP servers: ',
+    );
+    expect(consoleInfoSpy).toHaveBeenCalledWith(
+      '  * test-server (local): a local mcp server',
+    );
+    expect(consoleInfoSpy).toHaveBeenCalledWith(
+      '  * test-server-2 (remote): a remote mcp server',
+    );
+    expect(consoleInfoSpy).toHaveBeenCalledWith(
+      'The extension will append info to your gemini.md context',
+    );
+  });
+
   it('should continue installation if user accepts prompt for local extension with mcp servers', async () => {
     const sourceExtDir = createExtension({
       extensionsDir: tempHomeDir,
@@ -687,6 +730,21 @@ describe('uninstallExtension', () => {
   it('should throw an error if the extension does not exist', async () => {
     await expect(uninstallExtension('nonexistent-extension')).rejects.toThrow(
       'Extension "nonexistent-extension" not found.',
+    );
+  });
+
+  it('should log uninstall event', async () => {
+    createExtension({
+      extensionsDir: userExtensionsDir,
+      name: 'my-local-extension',
+      version: '1.0.0',
+    });
+
+    await uninstallExtension('my-local-extension');
+
+    const logger = ClearcutLogger.getInstance({} as Config);
+    expect(logger?.logExtensionUninstallEvent).toHaveBeenCalledWith(
+      new ExtensionUninstallEvent('my-local-extension', 'success'),
     );
   });
 });

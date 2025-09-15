@@ -4,7 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useMemo, useState, useCallback, useEffect, useRef } from 'react';
+import {
+  useMemo,
+  useState,
+  useCallback,
+  useEffect,
+  useRef,
+  useLayoutEffect,
+} from 'react';
 import { type DOMElement, measureElement } from 'ink';
 import { App } from './App.js';
 import { AppContext } from './contexts/AppContext.js';
@@ -155,12 +162,6 @@ export const AppContainer = (props: AppContainerProps) => {
   const [userTier, setUserTier] = useState<UserTierId | undefined>(undefined);
 
   const [isConfigInitialized, setConfigInitialized] = useState(false);
-
-  // Auto-accept indicator
-  const showAutoAcceptIndicator = useAutoAcceptIndicator({
-    config,
-    addItem: historyManager.addItem,
-  });
 
   const logger = useLogger(config.storage);
   const [userMessages, setUserMessages] = useState<string[]>([]);
@@ -529,6 +530,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
     pendingHistoryItems: pendingGeminiHistoryItems,
     thought,
     cancelOngoingRequest,
+    handleApprovalModeChange,
     activePtyId,
     loopDetectionConfirmationRequest,
   } = useGeminiStream(
@@ -552,6 +554,13 @@ Logging in with Google... Please restart Gemini CLI to continue.
     terminalHeight,
     shellFocused,
   );
+
+  // Auto-accept indicator
+  const showAutoAcceptIndicator = useAutoAcceptIndicator({
+    config,
+    addItem: historyManager.addItem,
+    onApprovalModeChange: handleApprovalModeChange,
+  });
 
   const { messageQueue, addMessage, clearQueue, getQueuedMessagesText } =
     useMessageQueue({
@@ -622,18 +631,27 @@ Logging in with Google... Please restart Gemini CLI to continue.
       streamingState === StreamingState.Responding) &&
     !proQuotaRequest;
 
-  // Compute available terminal height based on controls measurement
-  const availableTerminalHeight = useMemo(() => {
+  const [controlsHeight, setControlsHeight] = useState(0);
+
+  useLayoutEffect(() => {
     if (mainControlsRef.current) {
       const fullFooterMeasurement = measureElement(mainControlsRef.current);
-      return terminalHeight - fullFooterMeasurement.height - staticExtraHeight;
+      if (fullFooterMeasurement.height > 0) {
+        setControlsHeight(fullFooterMeasurement.height);
+      }
     }
-    return terminalHeight - staticExtraHeight;
-  }, [terminalHeight]);
+  }, [buffer, terminalWidth, terminalHeight]);
+
+  // Compute available terminal height based on controls measurement
+  const availableTerminalHeight =
+    terminalHeight - controlsHeight - staticExtraHeight;
 
   config.setShellExecutionConfig({
     terminalWidth: Math.floor(terminalWidth * SHELL_WIDTH_FRACTION),
-    terminalHeight: Math.floor(availableTerminalHeight - SHELL_HEIGHT_PADDING),
+    terminalHeight: Math.max(
+      Math.floor(availableTerminalHeight - SHELL_HEIGHT_PADDING),
+      1,
+    ),
     pager: settings.merged.tools?.shell?.pager,
     showColor: settings.merged.tools?.shell?.showColor,
   });
@@ -660,16 +678,10 @@ Logging in with Google... Please restart Gemini CLI to continue.
       ShellExecutionService.resizePty(
         activePtyId,
         Math.floor(terminalWidth * SHELL_WIDTH_FRACTION),
-        Math.floor(availableTerminalHeight - SHELL_HEIGHT_PADDING),
+        Math.max(Math.floor(availableTerminalHeight - SHELL_HEIGHT_PADDING), 1),
       );
     }
-  }, [
-    terminalHeight,
-    terminalWidth,
-    availableTerminalHeight,
-    activePtyId,
-    geminiClient,
-  ]);
+  }, [terminalWidth, availableTerminalHeight, activePtyId]);
 
   useEffect(() => {
     if (

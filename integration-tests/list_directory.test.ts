@@ -29,7 +29,7 @@ describe('list_directory', () => {
       50, // check every 50ms
     );
 
-    const prompt = `Can you list the files in the current directory. Display them in the style of 'ls'`;
+    const prompt = `Can you list the files in the current directory.`;
 
     const result = await rig.run(prompt);
 
