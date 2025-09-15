@@ -30,8 +30,7 @@ const IDE_WORKSPACE_PATH_ENV_VAR = 'GEMINI_CLI_IDE_WORKSPACE_PATH';
 async function writePortAndWorkspace(
   context: vscode.ExtensionContext,
   port: number,
-  portFile: string,
-  ppidPortFile: string,
+  portFile: string | undefined,
   log: (message: string) => void,
 ): Promise<void> {
   const workspaceFolders = vscode.workspace.workspaceFolders;
@@ -49,16 +48,16 @@ async function writePortAndWorkspace(
     workspacePath,
   );
 
-  const content = JSON.stringify({ port, workspacePath, ppid: process.ppid });
+  if (!portFile) {
+    return;
+  }
+
+  const content = JSON.stringify({ port, workspacePath });
 
   log(`Writing port file to: ${portFile}`);
-  log(`Writing ppid port file to: ${ppidPortFile}`);
 
   try {
-    await Promise.all([
-      fs.writeFile(portFile, content),
-      fs.writeFile(ppidPortFile, content),
-    ]);
+    await fs.writeFile(portFile, content);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     log(`Failed to write port to file: ${message}`);
@@ -93,7 +92,6 @@ export class IDEServer {
   private context: vscode.ExtensionContext | undefined;
   private log: (message: string) => void;
   private portFile: string | undefined;
-  private ppidPortFile: string | undefined;
   private port: number | undefined;
   private transports: { [sessionId: string]: StreamableHTTPServerTransport } =
     {};
@@ -240,23 +238,21 @@ export class IDEServer {
         const address = (this.server as HTTPServer).address();
         if (address && typeof address !== 'string') {
           this.port = address.port;
-          this.portFile = path.join(
-            os.tmpdir(),
-            `gemini-ide-server-${this.port}.json`,
-          );
-          this.ppidPortFile = path.join(
-            os.tmpdir(),
-            `gemini-ide-server-${process.ppid}.json`,
-          );
           this.log(`IDE server listening on port ${this.port}`);
-
-          await writePortAndWorkspace(
-            context,
-            this.port,
-            this.portFile,
-            this.ppidPortFile,
-            this.log,
-          );
+          let portFile: string | undefined;
+          try {
+            const portDir = path.join(os.tmpdir(), 'gemini', 'ide');
+            await fs.mkdir(portDir, { recursive: true });
+            portFile = path.join(
+              portDir,
+              `gemini-ide-server-${process.ppid}-${this.port}.json`,
+            );
+            this.portFile = portFile;
+          } catch (err) {
+            const message = err instanceof Error ? err.message : String(err);
+            this.log(`Failed to create IDE port file: ${message}`);
+          }
+          await writePortAndWorkspace(context, this.port, portFile, this.log);
         }
         resolve();
       });
@@ -277,18 +273,11 @@ export class IDEServer {
   }
 
   async syncEnvVars(): Promise<void> {
-    if (
-      this.context &&
-      this.server &&
-      this.port &&
-      this.portFile &&
-      this.ppidPortFile
-    ) {
+    if (this.context && this.server && this.port) {
       await writePortAndWorkspace(
         this.context,
         this.port,
         this.portFile,
-        this.ppidPortFile,
         this.log,
       );
       this.broadcastIdeContextUpdate();
@@ -316,13 +305,6 @@ export class IDEServer {
     if (this.portFile) {
       try {
         await fs.unlink(this.portFile);
-      } catch (_err) {
-        // Ignore errors if the file doesn't exist.
-      }
-    }
-    if (this.ppidPortFile) {
-      try {
-        await fs.unlink(this.ppidPortFile);
       } catch (_err) {
         // Ignore errors if the file doesn't exist.
       }
@@ -356,14 +338,8 @@ const createMcpServer = (diffManager: DiffManager) => {
       description: '(IDE Tool) Close an open diff view for a specific file.',
       inputSchema: CloseDiffRequestSchema.shape,
     },
-    async ({
-      filePath,
-      suppressNotification,
-    }: z.infer<typeof CloseDiffRequestSchema>) => {
-      const content = await diffManager.closeDiff(
-        filePath,
-        suppressNotification,
-      );
+    async ({ filePath }: z.infer<typeof CloseDiffRequestSchema>) => {
+      const content = await diffManager.closeDiff(filePath);
       const response = { content: content ?? undefined };
       return {
         content: [
