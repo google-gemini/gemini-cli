@@ -24,6 +24,10 @@ export const ChatArea = forwardRef<ChatAreaHandle, ChatAreaProps>(({ onTemplateR
   const { sessions, activeSessionId } = useAppStore();
   const { isStreaming, isThinking, streamingMessage, error, setError, compressionNotification, setCompressionNotification, toolConfirmation, setApprovalMode } = useChatStore();
   const messageInputRef = useRef<{ setMessage: (message: string) => void }>(null);
+  const messageListRef = useRef<{ scrollToBottom: () => void }>(null);
+
+
+
 
   useImperativeHandle(ref, () => ({
     setMessage: (message: string) => {
@@ -33,6 +37,10 @@ export const ChatArea = forwardRef<ChatAreaHandle, ChatAreaProps>(({ onTemplateR
   }));
 
   const activeSession = sessions.find(session => session.id === activeSessionId);
+
+
+
+
 
   const handlePromptSelect = (prompt: string) => {
     // Focus the message input and set the selected prompt
@@ -98,6 +106,7 @@ export const ChatArea = forwardRef<ChatAreaHandle, ChatAreaProps>(({ onTemplateR
         <EmptyState onPromptSelect={handlePromptSelect} />
       ) : (
         <MessageList
+          ref={messageListRef}
           messages={activeSession!.messages}
           isStreaming={isStreaming}
           isThinking={isThinking}
@@ -115,3 +124,5 @@ export const ChatArea = forwardRef<ChatAreaHandle, ChatAreaProps>(({ onTemplateR
     </div>    
   );
 });
+
+ChatArea.displayName = 'ChatArea';
