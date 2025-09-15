@@ -4,7 +4,9 @@ This document describes the `run_shell_command` tool for the Gemini CLI.
 
 ## Description
 
-Use `run_shell_command` to interact with the underlying system, run scripts, or perform command-line operations. `run_shell_command` executes a given shell command. On Windows, the command will be executed with `cmd.exe /c`. On other platforms, the command will be executed with `bash -c`.
+Use `run_shell_command` to interact with the underlying system, run scripts, or perform command-line operations. `run_shell_command` executes a given shell command, including interactive commands that require user input (e.g., `vim`, `git rebase -i`) if the `tools.usePty` setting is set to `true`.
+
+On Windows, commands are executed with `cmd.exe /c`. On other platforms, they are executed with `bash -c`.
 
 ### Arguments
 
@@ -53,10 +55,65 @@ Start a background server:
 run_shell_command(command="npm run dev &", description="Start development server in background")
 ```
 
+## Configuration
+
+You can configure the behavior of the `run_shell_command` tool by modifying your `settings.json` file or by using the `/setting` command in the Gemini CLI.
+
+### Enabling Interactive Commands
+
+To enable interactive commands, you need to set the `tools.usePty` setting to `true`. This will use `node-pty` for shell command execution, which allows for interactive sessions. If `node-pty` is not available, it will fall back to the `child_process` implementation, which does not support interactive commands.
+
+**Example `settings.json`:**
+
+```json
+{
+  "tools": {
+    "usePty": true
+  }
+}
+```
+
+### Showing Color in Output
+
+To show color in the shell output, you need to set the `tools.shell.showColor` setting to `true`. **Note: This setting only applies when `tools.usePty` is enabled.**
+
+**Example `settings.json`:**
+
+```json
+{
+  "tools": {
+    "shell": {
+      "showColor": true
+    }
+  }
+}
+```
+
+### Setting the Pager
+
+You can set a custom pager for the shell output by setting the `tools.shell.pager` setting. The default pager is `cat`. **Note: This setting only applies when `tools.usePty` is enabled.**
+
+**Example `settings.json`:**
+
+```json
+{
+  "tools": {
+    "shell": {
+      "pager": "less"
+    }
+  }
+}
+```
+
+## Interactive Commands
+
+The `run_shell_command` tool now supports interactive commands by integrating a pseudo-terminal (pty). This allows you to run commands that require real-time user input, such as text editors (`vim`, `nano`), terminal-based UIs (`htop`), and interactive version control operations (`git rebase -i`).
+
+When an interactive command is running, you can send input to it from the Gemini CLI. To focus on the interactive shell, press `ctrl+f`. The terminal output, including complex TUIs, will be rendered correctly.
+
 ## Important notes
 
 - **Security:** Be cautious when executing commands, especially those constructed from user input, to prevent security vulnerabilities.
-- **Interactive commands:** Avoid commands that require interactive user input, as this can cause the tool to hang. Use non-interactive flags if available (e.g., `npm init -y`).
 - **Error handling:** Check the `Stderr`, `Error`, and `Exit Code` fields to determine if a command executed successfully.
 - **Background processes:** When a command is run in the background with `&`, the tool will return immediately and the process will continue to run in the background. The `Background PIDs` field will contain the process ID of the background process.
 
