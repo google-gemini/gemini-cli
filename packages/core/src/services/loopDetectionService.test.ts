@@ -20,6 +20,7 @@ import { LoopDetectionService } from './loopDetectionService.js';
 
 vi.mock('../telemetry/loggers.js', () => ({
   logLoopDetected: vi.fn(),
+  logLoopDetectionDisabled: vi.fn(),
 }));
 
 const TOOL_CALL_LOOP_THRESHOLD = 5;
@@ -134,6 +135,7 @@ describe('LoopDetectionService', () => {
 
     it('should not detect a loop when disabled for session', () => {
       service.disableForSession();
+      expect(loggers.logLoopDetectionDisabled).toHaveBeenCalledTimes(1);
       const event = createToolCallRequestEvent('testTool', { param: 'value' });
       for (let i = 0; i < TOOL_CALL_LOOP_THRESHOLD; i++) {
         expect(service.addAndCheck(event)).toBe(false);
@@ -746,6 +748,7 @@ describe('LoopDetectionService LLM Checks', () => {
 
   it('should not trigger LLM check when disabled for session', async () => {
     service.disableForSession();
+    expect(loggers.logLoopDetectionDisabled).toHaveBeenCalledTimes(1);
     await advanceTurns(30);
     const result = await service.turnStarted(abortController.signal);
     expect(result).toBe(false);

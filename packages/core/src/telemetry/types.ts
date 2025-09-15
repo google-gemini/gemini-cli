@@ -313,6 +313,18 @@ export class LoopDetectedEvent implements BaseTelemetryEvent {
   }
 }
 
+export class LoopDetectionDisabledEvent implements BaseTelemetryEvent {
+  'event.name': 'loop_detection_disabled';
+  'event.timestamp': string;
+  prompt_id: string;
+
+  constructor(prompt_id: string) {
+    this['event.name'] = 'loop_detection_disabled';
+    this['event.timestamp'] = new Date().toISOString();
+    this.prompt_id = prompt_id;
+  }
+}
+
 export class NextSpeakerCheckEvent implements BaseTelemetryEvent {
   'event.name': 'next_speaker_check';
   'event.timestamp': string;
@@ -524,6 +536,7 @@ export type TelemetryEvent =
   | ApiResponseEvent
   | FlashFallbackEvent
   | LoopDetectedEvent
+  | LoopDetectionDisabledEvent
   | NextSpeakerCheckEvent
   | KittySequenceOverflowEvent
   | MalformedJsonResponseEvent
