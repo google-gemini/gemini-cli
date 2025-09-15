@@ -57,10 +57,14 @@ describe('Help Component', () => {
 
   it('renders help component with current platform shortcuts', () => {
     const { lastFrame } = render(<Help commands={mockCommands} />);
-    
+
     // Use existing platform-specific snapshots from the platform behavior tests
-    const snapshotName = process.platform === 'win32' ? 'win32-shortcuts' : 
-                        process.platform === 'darwin' ? 'darwin-shortcuts' : 'linux-shortcuts';
+    const snapshotName =
+      process.platform === 'win32'
+        ? 'win32-shortcuts'
+        : process.platform === 'darwin'
+          ? 'darwin-shortcuts'
+          : 'linux-shortcuts';
     expect(lastFrame()).toMatchSnapshot(snapshotName);
   });
 
