@@ -585,6 +585,45 @@ describe('installExtension', () => {
     expect(logger?.logExtensionInstallEvent).toHaveBeenCalled();
   });
 
+  it('should show users information on their mcp server when installing', async () => {
+    const consoleInfoSpy = vi.spyOn(console, 'info');
+    const sourceExtDir = createExtension({
+      extensionsDir: tempHomeDir,
+      name: 'my-local-extension',
+      version: '1.0.0',
+      mcpServers: {
+        'test-server': {
+          command: 'node',
+          args: ['server.js'],
+          description: 'a local mcp server',
+        },
+        'test-server-2': {
+          description: 'a remote mcp server',
+          httpUrl: 'https://google.com',
+        },
+      },
+    });
+
+    mockQuestion.mockImplementation((_query, callback) => callback('y'));
+
+    await expect(
+      installExtension({ source: sourceExtDir, type: 'local' }),
+    ).resolves.toBe('my-local-extension');
+
+    expect(consoleInfoSpy).toHaveBeenCalledWith(
+      'This extension will run the following MCP servers: ',
+    );
+    expect(consoleInfoSpy).toHaveBeenCalledWith(
+      '  * test-server (local): a local mcp server',
+    );
+    expect(consoleInfoSpy).toHaveBeenCalledWith(
+      '  * test-server-2 (remote): a remote mcp server',
+    );
+    expect(consoleInfoSpy).toHaveBeenCalledWith(
+      'The extension will append info to your gemini.md context',
+    );
+  });
+
   it('should continue installation if user accepts prompt for local extension with mcp servers', async () => {
     const sourceExtDir = createExtension({
       extensionsDir: tempHomeDir,
