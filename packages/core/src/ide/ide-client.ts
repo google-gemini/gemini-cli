@@ -60,6 +60,7 @@ type StdioConfig = {
 type ConnectionConfig = {
   port?: string;
   stdio?: StdioConfig;
+  authToken?: string;
 };
 
 function getRealPath(path: string): string {
@@ -86,6 +87,7 @@ export class IdeClient {
   private currentIde: DetectedIde | undefined;
   private currentIdeDisplayName: string | undefined;
   private ideProcessInfo: { pid: number; command: string } | undefined;
+  private authToken: string | undefined;
   private diffResponses = new Map<string, (result: DiffUpdateResult) => void>();
   private statusListeners = new Set<(state: IDEConnectionState) => void>();
   private trustChangeListeners = new Set<(isTrusted: boolean) => void>();
@@ -145,6 +147,9 @@ export class IdeClient {
     this.setState(IDEConnectionStatus.Connecting);
 
     const configFromFile = await this.getConnectionConfigFromFile();
+    if (configFromFile?.authToken) {
+      this.authToken = configFromFile.authToken;
+    }
     const workspacePath =
       configFromFile?.workspacePath ??
       process.env['GEMINI_CLI_IDE_WORKSPACE_PATH'];
@@ -772,6 +777,11 @@ export class IdeClient {
         new URL(`http://${getIdeServerHost()}:${port}/mcp`),
         {
           fetch: this.createProxyAwareFetch(),
+          requestInit: {
+            headers: this.authToken
+              ? { Authorization: `Bearer ${this.authToken}` }
+              : {},
+          },
         },
       );
       await this.client.connect(transport);
