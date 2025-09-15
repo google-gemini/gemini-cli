@@ -2,7 +2,7 @@
 
 ## Release Cadence and Tags
 
-We will follow https://semver.org/ as closely as possible but will call out when or if we have to deviate from it. Our weekly releases will be minor version increments and any bug or hotfixes btween releases will go out as patch versions on the most recent release.
+We will follow https://semver.org/ as closely as possible but will call out when or if we have to deviate from it. Our weekly releases will be minor version increments and any bug or hotfixes between releases will go out as patch versions on the most recent release.
 
 ### Preview
 
@@ -28,9 +28,7 @@ npm install -g @google/gemini-cli@latest
 npm install -g @google/gemini-cli@nightly
 ```
 
-# Release Process.
-
-Where `x.y.z` is the next version to be released. In most all cases for the weekly release this will be an increment on `y`, aka minor version update. Major version updates `x` will need broader coordination and communication. For patches `z` see below. When possible we will do our best to adher to https://semver.org/
+# Release Process
 
 Our release cadence is new releases are sent to a preview channel for a week and then promoted to stable after a week. Version numbers will follow SemVer with weekly releases incrementing the minor version. Patches and bug fixes to both preview and stable releases will increment the patch version.
 
@@ -38,70 +36,74 @@ Our release cadence is new releases are sent to a preview channel for a week and
 
 Each night at UTC 0000 we will auto deploy a nightly release from `main`. This will be a version of the next production release, x.y.z, with the nightly tag.
 
-## Create Preview Release
+## Weekly Release Promotion
 
-Each Tuesday at UTC 2359 we will auto deploy a preview release of the next production release x.y.z.
+Each Tuesday, the on-call engineer will trigger the "Promote Release" workflow. This single action automates the entire weekly release process:
 
-- This will happen as a scheduled instance of the ‘release’ action. It will be cut off of Main.
-- This will create a branch `release/vx.y.z-preview.n`
-- We will run evals and smoke testing against this branch and the npm package. For now this should be manual smoke testing, we don't have a dedicated matrix or specific detailed process. There is work coming soon to make this more formalized and automatic see https://github.com/google-gemini/gemini-cli/issues/3788
-- Users installing `@preview` will get this release as well
+1.  **Promotes Preview to Stable:** The workflow identifies the latest `preview` release and promotes it to `stable`. This becomes the new `latest` version on npm.
+2.  **Promotes Nightly to Preview:** The latest `nightly` release is then promoted to become the new `preview` version.
+3.  **Prepares for next Nightly:** A pull request is automatically created and merged to bump the version in `main` in preparation for the next nightly release.
 
-## Promote Stable Release
-
-After one week (On the following Tuesday) with all signals a go, we will manually release at 2000 UTC via the current on-call person.
-
-- The release action will be used with the source branch as `release/vx.y.z-preview.n`
-- The version will be x.y.z
-- The releaser will create and merge a pr into main with the version changes.
-- Smoke tests and manual validation will be run. For now this should be manual smoke testing, we don't have a dedicated matrix or specific detailed process. There is work coming soon to make this more formalized and automatic see https://github.com/google-gemini/gemini-cli/issues/3788
+This process ensures a consistent and reliable release cadence with minimal manual intervention.
 
 ## Patching Releases
 
-If a critical bug needs to be fixed before the next scheduled release, follow this process to create a patch.
+If a critical bug that is already fixed on `main` needs to be patched on a `stable` or `preview` release, the process is now highly automated.
 
-### 1. Create a Hotfix Branch
+### 1. Create the Patch Pull Request
 
-First, create a new branch for your fix. The source for this branch depends on whether you are patching a stable or a preview release.
+There are two ways to create a patch pull request:
 
-- **For a stable release patch:**
-  Create a branch from the Git tag of the version you need to patch. Tag names are formatted as `vx.y.z`.
+**Option A: From a GitHub Comment (Recommended)**
 
-  ```bash
-  # Example: Create a hotfix branch for v0.2.0
-  git checkout v0.2.0 -b hotfix/issue-123-fix-for-v0.2.0
-  ```
+After a pull request has been merged, a maintainer can add a comment on that same PR with the following format:
 
-- **For a preview release patch:**
-  Create a branch from the existing preview release branch, which is formatted as `release/vx.y.z-preview.n`.
+`/patch <channel> [--dry-run]`
 
-  ```bash
-  # Example: Create a hotfix branch for a preview release
-  git checkout release/v0.2.0-preview.0 && git checkout -b hotfix/issue-456-fix-for-preview
-  ```
+- **channel**: `stable` or `preview`
+- **--dry-run** (optional): If included, the workflow will run in dry-run mode. This will create the PR with "[DRY RUN]" in the title, and merging it will trigger a dry run of the final release, so nothing is actually published.
 
-### 2. Implement the Fix
+Example: `/patch stable --dry-run`
 
-In your new hotfix branch, either create a new commit with the fix or cherry-pick an existing commit from the `main` branch. Merge your changes into the source of the hotfix branch (ex. https://github.com/google-gemini/gemini-cli/pull/6850).
+The workflow will automatically find the merge commit SHA and begin the patch process. If the PR is not yet merged, it will post a comment indicating the failure.
 
-### 3. Perform the Release
+**Option B: Manually Triggering the Workflow**
 
-Follow the manual release process using the "Release" GitHub Actions workflow.
+Follow the manual release process using the "Patch Release" GitHub Actions workflow.
 
-- **Version**: For stable patches, increment the patch version (e.g., `v0.2.0` -> `v0.2.1`). For preview patches, increment the preview number (e.g., `v0.2.0-preview.0` -> `v0.2.0-preview.1`).
+- **Type**: Select whether you are patching a `stable` or `preview` release. The workflow will automatically calculate the next patch version.
 - **Ref**: Use your source branch as the reference (ex. `release/v0.2.0-preview.0`)
+  Navigate to the **Actions** tab and run the **Create Patch PR** workflow.
 
-![How to run a release](assets/release_patch.png)
+- **Commit**: The full SHA of the commit on `main` that you want to cherry-pick.
+- **Channel**: The channel you want to patch (`stable` or `preview`).
 
-### 4. Update Versions
+This workflow will automatically:
 
-After the hotfix is released, merge the changes back to the appropriate branch.
+1. Find the latest release tag for the channel.
+2. Create a release branch from that tag if one doesn't exist (e.g., `release/v0.5.1`).
+3. Create a new hotfix branch from the release branch.
+4. Cherry-pick your specified commit into the hotfix branch.
+5. Create a pull request from the hotfix branch back to the release branch.
 
-- **For a stable release hotfix:**
-  Open a pull request to merge the release branch (e.g., `release/0.2.1`) back into `main`. This keeps the version number in `main` up to date.
+**Important:** If you select `stable`, the workflow will run twice, creating one PR for the `stable` channel and a second PR for the `preview` channel.
 
-- **For a preview release hotfix:**
-  Open a pull request to merge the new preview release branch (e.g., `release/v0.2.0-preview.1`) back into the existing preview release branch (`release/v0.2.0-preview.0`) (ex. https://github.com/google-gemini/gemini-cli/pull/6868)
+### 2. Review and Merge
+
+Review the automatically created pull request(s) to ensure the cherry-pick was successful and the changes are correct. Once approved, merge the pull request.
+
+**Security Note:** The `release/*` branches are protected by branch protection rules. A pull request to one of these branches requires at least one review from a code owner before it can be merged. This ensures that no unauthorized code is released.
+
+### 3. Automatic Release
+
+Upon merging the pull request, a final workflow is automatically triggered. It will:
+
+1. Run the `patch-release` workflow.
+2. Build and test the patched code.
+3. Publish the new patch version to npm.
+4. Create a new GitHub release with the patch notes.
+
+This fully automated process ensures that patches are created and released consistently and reliably.
 
 ## Release Schedule
 
@@ -166,14 +168,28 @@ After the hotfix is released, merge the changes back to the appropriate branch.
 
 ## How To Release
 
-Releases are managed through the [release.yml](https://github.com/google-gemini/gemini-cli/actions/workflows/release.yml) GitHub Actions workflow. To perform a manual release for a patch or hotfix:
+Releases are managed through GitHub Actions workflows.
+
+### Weekly Promotions
+
+To perform the weekly promotion of `preview` to `stable` and `nightly` to `preview`:
 
 1.  Navigate to the **Actions** tab of the repository.
-2.  Select the **Release** workflow from the list.
+2.  Select the **Promote Release** workflow from the list.
+3.  Click the **Run workflow** dropdown button.
+4.  Leave **Dry Run** as `true` to test the workflow without publishing, or set to `false` to perform a live release.
+5.  Click **Run workflow**.
+
+### Patching a Release
+
+To perform a manual release for a patch or hotfix:
+
+1.  Navigate to the **Actions** tab of the repository.
+2.  Select the **Patch Release** workflow from the list.
 3.  Click the **Run workflow** dropdown button.
 4.  Fill in the required inputs:
-    - **Version**: The exact version to release (e.g., `v0.2.1`).
-    - **Ref**: The branch or commit SHA to release from (defaults to `main`).
+    - **Type**: Select whether you are patching a `stable` or `preview` release.
+    - **Ref**: The branch or commit SHA to release from.
     - **Dry Run**: Leave as `true` to test the workflow without publishing, or set to `false` to perform a live release.
 5.  Click **Run workflow**.
 

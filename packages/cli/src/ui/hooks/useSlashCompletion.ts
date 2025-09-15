@@ -7,7 +7,11 @@
 import { useState, useEffect, useMemo } from 'react';
 import { AsyncFzf } from 'fzf';
 import type { Suggestion } from '../components/SuggestionsDisplay.js';
-import type { CommandContext, SlashCommand } from '../commands/types.js';
+import {
+  CommandKind,
+  type CommandContext,
+  type SlashCommand,
+} from '../commands/types.js';
 
 // Type alias for improved type safety based on actual fzf result structure
 type FzfCommandResult = {
@@ -93,9 +97,13 @@ function useCommandParser(
       const found: SlashCommand | undefined = currentLevel.find((cmd) =>
         matchesCommand(cmd, part),
       );
+
       if (found) {
         leafCommand = found;
         currentLevel = found.subCommands as readonly SlashCommand[] | undefined;
+        if (found.kind === CommandKind.MCP_PROMPT) {
+          break;
+        }
       } else {
         leafCommand = null;
         currentLevel = [];
@@ -194,7 +202,17 @@ function useCommandSuggestions(
           const depth = commandPathParts.length;
           const argString = rawParts.slice(depth).join(' ');
           const results =
-            (await leafCommand.completion(commandContext, argString)) || [];
+            (await leafCommand.completion(
+              {
+                ...commandContext,
+                invocation: {
+                  raw: `/${rawParts.join(' ')}`,
+                  name: leafCommand.name,
+                  args: argString,
+                },
+              },
+              argString,
+            )) || [];
 
           if (!signal.aborted) {
             const finalSuggestions = results.map((s) => ({
@@ -225,7 +243,7 @@ function useCommandSuggestions(
         if (partial === '') {
           // If no partial query, show all available commands
           potentialSuggestions = commandsToSearch.filter(
-            (cmd) => cmd.description,
+            (cmd) => cmd.description && !cmd.hidden,
           );
         } else {
           // Use fuzzy search for non-empty partial queries with fallback
@@ -267,6 +285,7 @@ function useCommandSuggestions(
             label: cmd.name,
             value: cmd.name,
             description: cmd.description,
+            commandKind: cmd.kind,
           }));
 
           setSuggestions(finalSuggestions);
@@ -399,7 +418,7 @@ export function useSlashCompletion(props: UseSlashCompletionProps): {
       const commandMap = new Map<string, SlashCommand>();
 
       commands.forEach((cmd) => {
-        if (cmd.description) {
+        if (cmd.description && !cmd.hidden) {
           commandItems.push(cmd.name);
           commandMap.set(cmd.name, cmd);
 
@@ -443,6 +462,7 @@ export function useSlashCompletion(props: UseSlashCompletionProps): {
       commands.filter(
         (cmd) =>
           cmd.description &&
+          !cmd.hidden &&
           (cmd.name.toLowerCase().startsWith(partial.toLowerCase()) ||
             cmd.altNames?.some((alt) =>
               alt.toLowerCase().startsWith(partial.toLowerCase()),

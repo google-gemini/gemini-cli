@@ -6,7 +6,7 @@
 
 import type React from 'react';
 import { Box, Text } from 'ink';
-import { Colors } from '../colors.js';
+import { theme } from '../semantic-colors.js';
 import { formatDuration } from '../utils/formatters.js';
 import {
   calculateAverageLatency,
@@ -34,13 +34,16 @@ const StatRow: React.FC<StatRowProps> = ({
 }) => (
   <Box>
     <Box width={METRIC_COL_WIDTH}>
-      <Text bold={isSection} color={isSection ? undefined : Colors.LightBlue}>
+      <Text
+        bold={isSection}
+        color={isSection ? theme.text.primary : theme.text.link}
+      >
         {isSubtle ? `  ↳ ${title}` : title}
       </Text>
     </Box>
     {values.map((value, index) => (
       <Box width={MODEL_COL_WIDTH} key={index}>
-        <Text>{value}</Text>
+        <Text color={theme.text.primary}>{value}</Text>
       </Box>
     ))}
   </Box>
@@ -57,11 +60,13 @@ export const ModelStatsDisplay: React.FC = () => {
     return (
       <Box
         borderStyle="round"
-        borderColor={Colors.Gray}
+        borderColor={theme.border.default}
         paddingY={1}
         paddingX={2}
       >
-        <Text>No API calls have been made in this session.</Text>
+        <Text color={theme.text.primary}>
+          No API calls have been made in this session.
+        </Text>
       </Box>
     );
   }
@@ -83,12 +88,12 @@ export const ModelStatsDisplay: React.FC = () => {
   return (
     <Box
       borderStyle="round"
-      borderColor={Colors.Gray}
+      borderColor={theme.border.default}
       flexDirection="column"
       paddingY={1}
       paddingX={2}
     >
-      <Text bold color={Colors.AccentPurple}>
+      <Text bold color={theme.text.accent}>
         Model Stats For Nerds
       </Text>
       <Box height={1} />
@@ -96,11 +101,15 @@ export const ModelStatsDisplay: React.FC = () => {
       {/* Header */}
       <Box>
         <Box width={METRIC_COL_WIDTH}>
-          <Text bold>Metric</Text>
+          <Text bold color={theme.text.primary}>
+            Metric
+          </Text>
         </Box>
         {modelNames.map((name) => (
           <Box width={MODEL_COL_WIDTH} key={name}>
-            <Text bold>{name}</Text>
+            <Text bold color={theme.text.primary}>
+              {name}
+            </Text>
           </Box>
         ))}
       </Box>
@@ -112,6 +121,7 @@ export const ModelStatsDisplay: React.FC = () => {
         borderTop={false}
         borderLeft={false}
         borderRight={false}
+        borderColor={theme.border.default}
       />
 
       {/* API Section */}
@@ -127,7 +137,7 @@ export const ModelStatsDisplay: React.FC = () => {
           return (
             <Text
               color={
-                m.api.totalErrors > 0 ? Colors.AccentRed : Colors.Foreground
+                m.api.totalErrors > 0 ? theme.status.error : theme.text.primary
               }
             >
               {m.api.totalErrors.toLocaleString()} ({errorRate.toFixed(1)}%)
@@ -150,7 +160,7 @@ export const ModelStatsDisplay: React.FC = () => {
       <StatRow
         title="Total"
         values={getModelValues((m) => (
-          <Text color={Colors.AccentYellow}>
+          <Text color={theme.status.warning}>
             {m.tokens.total.toLocaleString()}
           </Text>
         ))}
@@ -167,7 +177,7 @@ export const ModelStatsDisplay: React.FC = () => {
           values={getModelValues((m) => {
             const cacheHitRate = calculateCacheHitRate(m);
             return (
-              <Text color={Colors.AccentGreen}>
+              <Text color={theme.status.success}>
                 {m.tokens.cached.toLocaleString()} ({cacheHitRate.toFixed(1)}%)
               </Text>
             );
