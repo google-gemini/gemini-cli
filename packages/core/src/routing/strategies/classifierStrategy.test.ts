@@ -140,9 +140,30 @@ describe('ClassifierStrategy', () => {
     );
 
     expect(decision).toBeNull();
-    expect(consoleWarnSpy).toHaveBeenCalledWith(
-      `[Routing] ClassifierStrategy failed: ${testError.message}`,
+    expect(consoleWarnSpy).toHaveBeenCalled();
+    consoleWarnSpy.mockRestore();
+  });
+
+  it('should return null if the classifier returns a malformed JSON object', async () => {
+    const consoleWarnSpy = vi
+      .spyOn(console, 'warn')
+      .mockImplementation(() => {});
+    const malformedApiResponse = {
+      reasoning: 'This is a simple task.',
+      // model_choice is missing, which will cause a Zod parsing error.
+    };
+    vi.mocked(mockBaseLlmClient.generateJson).mockResolvedValue(
+      malformedApiResponse,
     );
+
+    const decision = await strategy.route(
+      mockContext,
+      mockConfig,
+      mockBaseLlmClient,
+    );
+
+    expect(decision).toBeNull();
+    expect(consoleWarnSpy).toHaveBeenCalled();
     consoleWarnSpy.mockRestore();
   });
 

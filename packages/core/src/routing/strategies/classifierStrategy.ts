@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { z } from 'zod';
 import type { BaseLlmClient } from '../../core/baseLlmClient.js';
 import { promptIdContext } from '../../utils/promptIdContext.js';
 import type {
@@ -132,10 +133,10 @@ const RESPONSE_SCHEMA = {
   required: ['reasoning', 'model_choice'],
 };
 
-interface ClassifierResponse {
-  reasoning: string;
-  model_choice: typeof FLASH_MODEL | typeof PRO_MODEL;
-}
+const ClassifierResponseSchema = z.object({
+  reasoning: z.string(),
+  model_choice: z.enum([FLASH_MODEL, PRO_MODEL]),
+});
 
 export class ClassifierStrategy implements RoutingStrategy {
   readonly name = 'classifier';
@@ -168,7 +169,7 @@ export class ClassifierStrategy implements RoutingStrategy {
       // Take the last N turns from the *cleaned* history.
       const finalHistory = cleanHistory.slice(-HISTORY_TURNS_FOR_CONTEXT);
 
-      const routerResponse = (await baseLlmClient.generateJson({
+      const jsonResponse = await baseLlmClient.generateJson({
         contents: [...finalHistory, createUserContent(context.request)],
         schema: RESPONSE_SCHEMA,
         model: DEFAULT_GEMINI_FLASH_LITE_MODEL,
@@ -176,7 +177,9 @@ export class ClassifierStrategy implements RoutingStrategy {
         config: CLASSIFIER_GENERATION_CONFIG,
         abortSignal: context.signal,
         promptId,
-      })) as unknown as ClassifierResponse;
+      });
+
+      const routerResponse = ClassifierResponseSchema.parse(jsonResponse);
 
       const reasoning = routerResponse.reasoning;
       const latencyMs = Date.now() - startTime;
@@ -203,11 +206,7 @@ export class ClassifierStrategy implements RoutingStrategy {
     } catch (error) {
       // If the classifier fails for any reason (API error, parsing error, etc.),
       // we log it and return null to allow the composite strategy to proceed.
-      console.warn(
-        `[Routing] ClassifierStrategy failed: ${
-          error instanceof Error ? error.message : String(error)
-        }`,
-      );
+      console.warn(`[Routing] ClassifierStrategy failed:`, error);
       return null;
     }
   }
