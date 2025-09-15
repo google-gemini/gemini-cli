@@ -129,7 +129,7 @@ async function addMcpServer(
     console.log(`MCP server "${name}" updated in ${scope} settings.`);
   } else {
     console.log(
-      `MCP server "${name}" added to ${settingsScope} settings. (${transport})`,
+      `MCP server "${name}" added to ${scope} settings. (${transport})`,
     );
   }
 }
