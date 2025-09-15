@@ -741,7 +741,7 @@ const SETTINGS_SCHEMA = {
         label: 'Use Ripgrep',
         category: 'Tools',
         requiresRestart: false,
-        default: false,
+        default: true,
         description:
           'Use ripgrep for file content search instead of the fallback implementation. Provides faster search performance.',
         showInDialog: true,
@@ -960,6 +960,16 @@ const SETTINGS_SCHEMA = {
         requiresRestart: true,
         default: true,
         description: 'Enable extension management features.',
+        showInDialog: false,
+      },
+      useModelRouter: {
+        type: 'boolean',
+        label: 'Use Model Router',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: false,
+        description:
+          'Enable model routing to route requests to the best model based on complexity.',
         showInDialog: false,
       },
     },
