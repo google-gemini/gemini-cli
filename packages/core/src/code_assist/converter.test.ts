@@ -299,6 +299,17 @@ describe('converter', () => {
         codeAssistRes.response.automaticFunctionCallingHistory,
       );
     });
+
+    it('should handle modelVersion', () => {
+      const codeAssistRes: CaGenerateContentResponse = {
+        response: {
+          candidates: [],
+          modelVersion: 'gemini-2.5-pro',
+        },
+      };
+      const genaiRes = fromGenerateContentResponse(codeAssistRes);
+      expect(genaiRes.modelVersion).toEqual('gemini-2.5-pro');
+    });
   });
 
   describe('toContents', () => {
