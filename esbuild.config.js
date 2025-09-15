@@ -52,7 +52,7 @@ const cliConfig = {
 const a2aServerConfig = {
   ...baseConfig,
   entryPoints: ['packages/a2a-server/src/http/server.ts'],
-  outfile: 'bundle/a2a-server.js',
+  outfile: 'bundle/a2a-server.mjs',
 };
 
 Promise.all([
