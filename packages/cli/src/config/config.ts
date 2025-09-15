@@ -617,7 +617,7 @@ export async function loadCliConfig(
     cwd,
     fileDiscoveryService: fileService,
     bugCommand: settings.advanced?.bugCommand,
-    model: argv.model || settings.model?.name || 'gemini-pro',
+    model: argv.model || process.env['GEMINI_MODEL'] || settings.model?.name || 'gemini-pro',
     extensionContextFilePaths,
     maxSessionTurns: settings.model?.maxSessionTurns ?? -1,
     experimentalZedIntegration: argv.experimentalAcp || false,
