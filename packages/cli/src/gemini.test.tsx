@@ -174,6 +174,15 @@ describe('gemini.tsx main function kitty protocol', () => {
       (process.stdin as any).setRawMode = vi.fn();
     }
     setRawModeSpy = vi.spyOn(process.stdin, 'setRawMode');
+
+    Object.defineProperty(process.stdin, 'isTTY', {
+      value: true,
+      configurable: true,
+    });
+    Object.defineProperty(process.stdin, 'isRaw', {
+      value: false,
+      configurable: true,
+    });
   });
 
   it('should call setRawMode and detectAndEnableKittyProtocol when isInteractive is true', async () => {
