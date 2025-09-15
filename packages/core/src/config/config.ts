@@ -41,7 +41,6 @@ import {
   DEFAULT_OTLP_ENDPOINT,
   uiTelemetryService,
 } from '../telemetry/index.js';
-import { StartSessionEvent } from '../telemetry/types.js';
 import { tokenLimit } from '../core/tokenLimits.js';
 import { StartSessionEvent } from '../telemetry/index.js';
 import {
