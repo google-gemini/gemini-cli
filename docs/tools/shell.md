@@ -57,7 +57,7 @@ run_shell_command(command="npm run dev &", description="Start development server
 
 ## Configuration
 
-You can configure the behavior of the `run_shell_command` tool by modifying your `settings.json` file or by using the `/setting` command in the Gemini CLI.
+You can configure the behavior of the `run_shell_command` tool by modifying your `settings.json` file or by using the `/settings` command in the Gemini CLI.
 
 ### Enabling Interactive Commands
 
