@@ -56,7 +56,9 @@ describe('ShellTool', () => {
       getDebugMode: vi.fn().mockReturnValue(false),
       getTargetDir: vi.fn().mockReturnValue('/test/dir'),
       getSummarizeToolOutputConfig: vi.fn().mockReturnValue(undefined),
-      getWorkspaceContext: () => createMockWorkspaceContext('.'),
+      getWorkspaceContext: vi
+        .fn()
+        .mockReturnValue(createMockWorkspaceContext('/test/dir')),
       getGeminiClient: vi.fn(),
       getShouldUseNodePtyShell: vi.fn().mockReturnValue(false),
     } as unknown as Config;
@@ -107,13 +109,32 @@ describe('ShellTool', () => {
       );
     });
 
-    it('should throw an error for a non-existent directory', () => {
-      vi.mocked(fs.existsSync).mockReturnValue(false);
+    it('should throw an error for a relative directory path', () => {
       expect(() =>
         shellTool.build({ command: 'ls', directory: 'rel/path' }),
-      ).toThrow(
-        "Directory 'rel/path' is not a registered workspace directory.",
+      ).toThrow('Directory must be an absolute path.');
+    });
+
+    it('should throw an error for a directory outside the workspace', () => {
+      (mockConfig.getWorkspaceContext as Mock).mockReturnValue(
+        createMockWorkspaceContext('/test/dir', ['/another/workspace']),
       );
+      expect(() =>
+        shellTool.build({ command: 'ls', directory: '/not/in/workspace' }),
+      ).toThrow(
+        "Directory '/not/in/workspace' is not within any of the registered workspace directories.",
+      );
+    });
+
+    it('should return an invocation for a valid absolute directory path', () => {
+      (mockConfig.getWorkspaceContext as Mock).mockReturnValue(
+        createMockWorkspaceContext('/test/dir', ['/another/workspace']),
+      );
+      const invocation = shellTool.build({
+        command: 'ls',
+        directory: '/test/dir/subdir',
+      });
+      expect(invocation).toBeDefined();
     });
   });
 
@@ -151,15 +172,38 @@ describe('ShellTool', () => {
       const wrappedCommand = `{ my-command & }; __code=$?; pgrep -g 0 >${tmpFile} 2>&1; exit $__code;`;
       expect(mockShellExecutionService).toHaveBeenCalledWith(
         wrappedCommand,
-        expect.any(String),
+        '/test/dir',
         expect.any(Function),
         mockAbortSignal,
         false,
-        undefined,
-        undefined,
+        {},
       );
       expect(result.llmContent).toContain('Background PIDs: 54322');
       expect(vi.mocked(fs.unlinkSync)).toHaveBeenCalledWith(tmpFile);
+    });
+
+    it('should use the provided directory as cwd', async () => {
+      (mockConfig.getWorkspaceContext as Mock).mockReturnValue(
+        createMockWorkspaceContext('/test/dir'),
+      );
+      const invocation = shellTool.build({
+        command: 'ls',
+        directory: '/test/dir/subdir',
+      });
+      const promise = invocation.execute(mockAbortSignal);
+      resolveShellExecution();
+      await promise;
+
+      const tmpFile = path.join(os.tmpdir(), 'shell_pgrep_abcdef.tmp');
+      const wrappedCommand = `{ ls; }; __code=$?; pgrep -g 0 >${tmpFile} 2>&1; exit $__code;`;
+      expect(mockShellExecutionService).toHaveBeenCalledWith(
+        wrappedCommand,
+        '/test/dir/subdir',
+        expect.any(Function),
+        mockAbortSignal,
+        false,
+        {},
+      );
     });
 
     it('should not wrap command on windows', async () => {
@@ -179,12 +223,11 @@ describe('ShellTool', () => {
       await promise;
       expect(mockShellExecutionService).toHaveBeenCalledWith(
         'dir',
-        expect.any(String),
+        '/test/dir',
         expect.any(Function),
         mockAbortSignal,
         false,
-        undefined,
-        undefined,
+        {},
       );
     });
 
@@ -231,12 +274,9 @@ describe('ShellTool', () => {
     });
 
     it('should throw an error for invalid directory', () => {
-      vi.mocked(fs.existsSync).mockReturnValue(false);
       expect(() =>
         shellTool.build({ command: 'ls', directory: 'nonexistent' }),
-      ).toThrow(
-        `Directory 'nonexistent' is not a registered workspace directory.`,
-      );
+      ).toThrow('Directory must be an absolute path.');
     });
 
     it('should summarize output when configured', async () => {
@@ -294,43 +334,6 @@ describe('ShellTool', () => {
       });
       afterEach(() => {
         vi.useRealTimers();
-      });
-
-      it('should throttle text output updates', async () => {
-        const invocation = shellTool.build({ command: 'stream' });
-        const promise = invocation.execute(mockAbortSignal, updateOutputMock);
-
-        // First chunk, should be throttled.
-        mockShellOutputCallback({
-          type: 'data',
-          chunk: 'hello ',
-        });
-        expect(updateOutputMock).not.toHaveBeenCalled();
-
-        // Advance time past the throttle interval.
-        await vi.advanceTimersByTimeAsync(OUTPUT_UPDATE_INTERVAL_MS + 1);
-
-        // Send a second chunk. THIS event triggers the update with the CUMULATIVE content.
-        mockShellOutputCallback({
-          type: 'data',
-          chunk: 'world',
-        });
-
-        // It should have been called once now with the combined output.
-        expect(updateOutputMock).toHaveBeenCalledOnce();
-        expect(updateOutputMock).toHaveBeenCalledWith('hello world');
-
-        resolveExecutionPromise({
-          rawOutput: Buffer.from(''),
-          output: '',
-          exitCode: 0,
-          signal: null,
-          error: null,
-          aborted: false,
-          pid: 12345,
-          executionMethod: 'child_process',
-        });
-        await promise;
       });
 
       it('should immediately show binary detection message and throttle progress', async () => {
@@ -420,40 +423,5 @@ describe('ShellTool', () => {
       const shellTool = new ShellTool(mockConfig);
       expect(shellTool.description).toMatchSnapshot();
     });
-  });
-});
-
-describe('build', () => {
-  it('should return an invocation for valid directory', () => {
-    const config = {
-      getCoreTools: () => undefined,
-      getExcludeTools: () => undefined,
-      getTargetDir: () => '/root',
-      getWorkspaceContext: () =>
-        createMockWorkspaceContext('/root', ['/users/test']),
-    } as unknown as Config;
-    const shellTool = new ShellTool(config);
-    const invocation = shellTool.build({
-      command: 'ls',
-      directory: 'test',
-    });
-    expect(invocation).toBeDefined();
-  });
-
-  it('should throw an error for directory outside workspace', () => {
-    const config = {
-      getCoreTools: () => undefined,
-      getExcludeTools: () => undefined,
-      getTargetDir: () => '/root',
-      getWorkspaceContext: () =>
-        createMockWorkspaceContext('/root', ['/users/test']),
-    } as unknown as Config;
-    const shellTool = new ShellTool(config);
-    expect(() =>
-      shellTool.build({
-        command: 'ls',
-        directory: 'test2',
-      }),
-    ).toThrow('is not a registered workspace directory');
   });
 });

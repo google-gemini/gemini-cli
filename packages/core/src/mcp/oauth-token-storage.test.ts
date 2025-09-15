@@ -4,21 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {
-  afterEach,
-  beforeEach,
-  describe,
-  expect,
-  it,
-  vi,
-  type Mock,
-} from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
 import { MCPOAuthTokenStorage } from './oauth-token-storage.js';
-import { HybridTokenStorage } from './token-storage/hybrid-token-storage.js';
 import { FORCE_ENCRYPTED_FILE_ENV_VAR } from './token-storage/index.js';
 import type { OAuthCredentials, OAuthToken } from './token-storage/types.js';
+import { GEMINI_DIR } from '../utils/paths.js';
 
 // Mock dependencies
 vi.mock('node:fs', () => ({
@@ -41,8 +33,6 @@ vi.mock('../config/storage.js', () => ({
   },
 }));
 
-vi.mock('./token-storage/hybrid-token-storage.js');
-
 const mockHybridTokenStorage = {
   listServers: vi.fn(),
   setCredentials: vi.fn(),
@@ -51,6 +41,11 @@ const mockHybridTokenStorage = {
   clearAll: vi.fn(),
   getAllCredentials: vi.fn(),
 };
+vi.mock('./token-storage/hybrid-token-storage.js', () => ({
+  HybridTokenStorage: vi.fn(() => mockHybridTokenStorage),
+}));
+
+const ONE_HR_MS = 3600000;
 
 describe('MCPOAuthTokenStorage', () => {
   let tokenStorage: MCPOAuthTokenStorage;
@@ -60,7 +55,7 @@ describe('MCPOAuthTokenStorage', () => {
     refreshToken: 'refresh_token_456',
     tokenType: 'Bearer',
     scope: 'read write',
-    expiresAt: Date.now() + 3600000, // 1 hour from now
+    expiresAt: Date.now() + ONE_HR_MS,
   };
 
   const mockCredentials: OAuthCredentials = {
@@ -73,17 +68,15 @@ describe('MCPOAuthTokenStorage', () => {
 
   describe('with encrypted flag false', () => {
     beforeEach(() => {
-      process.env[FORCE_ENCRYPTED_FILE_ENV_VAR] = 'false';
-      (HybridTokenStorage as Mock).mockImplementation(
-        () => mockHybridTokenStorage,
-      );
+      vi.stubEnv(FORCE_ENCRYPTED_FILE_ENV_VAR, 'false');
       tokenStorage = new MCPOAuthTokenStorage();
 
       vi.clearAllMocks();
-      vi.spyOn(console, 'error').mockImplementation(() => {});
+      vi.spyOn(console, 'error');
     });
 
     afterEach(() => {
+      vi.unstubAllEnvs();
       vi.restoreAllMocks();
     });
 
@@ -106,7 +99,7 @@ describe('MCPOAuthTokenStorage', () => {
         expect(tokens.size).toBe(1);
         expect(tokens.get('test-server')).toEqual(mockCredentials);
         expect(fs.readFile).toHaveBeenCalledWith(
-          path.join('/mock/home', '.gemini', 'mcp-oauth-tokens.json'),
+          path.join('/mock/home', GEMINI_DIR, 'mcp-oauth-tokens.json'),
           'utf-8',
         );
       });
@@ -149,18 +142,18 @@ describe('MCPOAuthTokenStorage', () => {
         );
 
         expect(fs.mkdir).toHaveBeenCalledWith(
-          path.join('/mock/home', '.gemini'),
+          path.join('/mock/home', GEMINI_DIR),
           { recursive: true },
         );
         expect(fs.writeFile).toHaveBeenCalledWith(
-          path.join('/mock/home', '.gemini', 'mcp-oauth-tokens.json'),
+          path.join('/mock/home', GEMINI_DIR, 'mcp-oauth-tokens.json'),
           expect.stringContaining('test-server'),
           { mode: 0o600 },
         );
       });
 
       it('should update existing token for same server', async () => {
-        const existingCredentials = {
+        const existingCredentials: OAuthCredentials = {
           ...mockCredentials,
           serverName: 'existing-server',
         };
@@ -169,11 +162,16 @@ describe('MCPOAuthTokenStorage', () => {
         );
         vi.mocked(fs.writeFile).mockResolvedValue(undefined);
 
-        const newToken = { ...mockToken, accessToken: 'new_access_token' };
+        const newToken: OAuthToken = {
+          ...mockToken,
+          accessToken: 'new_access_token',
+        };
         await tokenStorage.saveToken('existing-server', newToken);
 
         const writeCall = vi.mocked(fs.writeFile).mock.calls[0];
-        const savedData = JSON.parse(writeCall[1] as string);
+        const savedData = JSON.parse(
+          writeCall[1] as string,
+        ) as OAuthCredentials[];
 
         expect(savedData).toHaveLength(1);
         expect(savedData[0].token.accessToken).toBe('new_access_token');
@@ -228,8 +226,14 @@ describe('MCPOAuthTokenStorage', () => {
 
     describe('deleteCredentials', () => {
       it('should remove token for specific server', async () => {
-        const credentials1 = { ...mockCredentials, serverName: 'server1' };
-        const credentials2 = { ...mockCredentials, serverName: 'server2' };
+        const credentials1: OAuthCredentials = {
+          ...mockCredentials,
+          serverName: 'server1',
+        };
+        const credentials2: OAuthCredentials = {
+          ...mockCredentials,
+          serverName: 'server2',
+        };
         vi.mocked(fs.readFile).mockResolvedValue(
           JSON.stringify([credentials1, credentials2]),
         );
@@ -253,7 +257,7 @@ describe('MCPOAuthTokenStorage', () => {
         await tokenStorage.deleteCredentials('test-server');
 
         expect(fs.unlink).toHaveBeenCalledWith(
-          path.join('/mock/home', '.gemini', 'mcp-oauth-tokens.json'),
+          path.join('/mock/home', GEMINI_DIR, 'mcp-oauth-tokens.json'),
         );
         expect(fs.writeFile).not.toHaveBeenCalled();
       });
@@ -285,7 +289,7 @@ describe('MCPOAuthTokenStorage', () => {
 
     describe('isTokenExpired', () => {
       it('should return false for token without expiry', () => {
-        const tokenWithoutExpiry = { ...mockToken };
+        const tokenWithoutExpiry: OAuthToken = { ...mockToken };
         delete tokenWithoutExpiry.expiresAt;
 
         const result = tokenStorage.isTokenExpired(tokenWithoutExpiry);
@@ -294,9 +298,9 @@ describe('MCPOAuthTokenStorage', () => {
       });
 
       it('should return false for valid token', () => {
-        const futureToken = {
+        const futureToken: OAuthToken = {
           ...mockToken,
-          expiresAt: Date.now() + 3600000, // 1 hour from now
+          expiresAt: Date.now() + ONE_HR_MS,
         };
 
         const result = tokenStorage.isTokenExpired(futureToken);
@@ -305,9 +309,9 @@ describe('MCPOAuthTokenStorage', () => {
       });
 
       it('should return true for expired token', () => {
-        const expiredToken = {
+        const expiredToken: OAuthToken = {
           ...mockToken,
-          expiresAt: Date.now() - 3600000, // 1 hour ago
+          expiresAt: Date.now() - ONE_HR_MS,
         };
 
         const result = tokenStorage.isTokenExpired(expiredToken);
@@ -316,7 +320,7 @@ describe('MCPOAuthTokenStorage', () => {
       });
 
       it('should return true for token expiring within buffer time', () => {
-        const soonToExpireToken = {
+        const soonToExpireToken: OAuthToken = {
           ...mockToken,
           expiresAt: Date.now() + 60000, // 1 minute from now (within 5-minute buffer)
         };
@@ -334,7 +338,7 @@ describe('MCPOAuthTokenStorage', () => {
         await tokenStorage.clearAll();
 
         expect(fs.unlink).toHaveBeenCalledWith(
-          path.join('/mock/home', '.gemini', 'mcp-oauth-tokens.json'),
+          path.join('/mock/home', GEMINI_DIR, 'mcp-oauth-tokens.json'),
         );
       });
 
@@ -360,17 +364,15 @@ describe('MCPOAuthTokenStorage', () => {
 
   describe('with encrypted flag true', () => {
     beforeEach(() => {
-      process.env[FORCE_ENCRYPTED_FILE_ENV_VAR] = 'true';
-      (HybridTokenStorage as Mock).mockImplementation(
-        () => mockHybridTokenStorage,
-      );
+      vi.stubEnv(FORCE_ENCRYPTED_FILE_ENV_VAR, 'true');
       tokenStorage = new MCPOAuthTokenStorage();
 
       vi.clearAllMocks();
-      vi.spyOn(console, 'error').mockImplementation(() => {});
+      vi.spyOn(console, 'error');
     });
 
     afterEach(() => {
+      vi.unstubAllEnvs();
       vi.restoreAllMocks();
     });
 
