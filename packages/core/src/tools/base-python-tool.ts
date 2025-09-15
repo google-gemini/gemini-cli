@@ -7,7 +7,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import crypto from 'node:crypto';
 import type { Config } from '../config/config.js';
 import type {
   ToolInvocation,
@@ -228,19 +227,20 @@ class BasePythonToolInvocation<
       
       // Create temporary Python script file
       const tempDir = os.tmpdir();
-      const scriptId = crypto.randomUUID();
-      const scriptPath = path.join(tempDir, `${this.tool.name}_${scriptId}.py`);
+      const timestamp = Date.now();
+      const operation = (this.params as any)?.op || 'unknown';
+      const scriptPath = path.join(tempDir, `${this.tool.name}_${operation}_${timestamp}.py`);
       
       // Write Python code to temporary file with UTF-8 encoding
-      const codeWithEncoding = `# -*- coding: utf-8 -*-\n${pythonCode}`;
+      const codeWithEncoding = `# -*- coding: utf-8 -*-\nimport sys\nimport io\nsys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')\nsys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')\n${pythonCode}`;
       await fs.promises.writeFile(scriptPath, codeWithEncoding, 'utf-8');
-      
+
       // Prepare execution command with UTF-8 environment settings
       const isWindows = process.platform === 'win32';
-      const command = isWindows 
-        ? `chcp 65001 > nul && set PYTHONIOENCODING=utf-8 && "${embeddedPythonPath}" "${scriptPath}"`
+      const command = isWindows
+        ? `chcp 65001 > nul && set PYTHONIOENCODING=utf-8 && set PYTHONLEGACYWINDOWSSTDIO=1 && "${embeddedPythonPath}" "${scriptPath}"`
         : `PYTHONIOENCODING=utf-8 "${embeddedPythonPath}" "${scriptPath}"`;
-      
+
       // Set working directory
       const workingDir = this.config.getTargetDir();
       

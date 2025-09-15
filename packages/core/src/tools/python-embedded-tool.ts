@@ -143,14 +143,80 @@ class PythonEmbeddedToolInvocation extends BaseToolInvocation<
       const scriptId = crypto.randomUUID();
       const scriptPath = path.join(tempDir, `gemini_python_${scriptId}.py`);
       
-      // Write Python code to temporary file with UTF-8 BOM to ensure proper encoding
-      const codeWithEncoding = `# -*- coding: utf-8 -*-\n${this.params.code}`;
+      // Write Python code to temporary file with UTF-8 encoding
+      // Wrap output in Base64 to avoid encoding issues on Windows with non-ASCII characters
+      const codeWithEncoding = `# -*- coding: utf-8 -*-
+import sys
+import io
+import base64
+import json
+
+# Force UTF-8 for internal processing
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
+
+# Capture all output
+_output_lines = []
+_error_lines = []
+_original_print = print
+_original_stderr_write = sys.stderr.write
+
+def print(*args, **kwargs):
+    """Capture print output"""
+    import io
+    str_io = io.StringIO()
+    _original_print(*args, file=str_io, **kwargs)
+    output = str_io.getvalue()
+    _output_lines.append(output)
+
+def stderr_write(text):
+    """Capture stderr output"""
+    _error_lines.append(text)
+    return len(text)
+
+sys.stderr.write = stderr_write
+
+# Execute user code
+_exit_code = 0
+try:
+${this.params.code.split('\n').map(line => '    ' + line).join('\n')}
+except SystemExit as e:
+    _exit_code = e.code if e.code else 0
+except Exception as e:
+    import traceback
+    _error_lines.append(f"Error: {str(e)}\\n")
+    _error_lines.append(traceback.format_exc())
+    _exit_code = 1
+
+# Restore original functions
+print = _original_print
+sys.stderr.write = _original_stderr_write
+
+# Combine output
+_final_output = ''.join(_output_lines)
+_final_errors = ''.join(_error_lines)
+
+# Output result with special markers
+if _final_output or _final_errors:
+    result_data = {
+        "stdout": _final_output,
+        "stderr": _final_errors,
+        "exit_code": _exit_code
+    }
+    # Encode as JSON then Base64 to avoid any encoding issues
+    json_str = json.dumps(result_data, ensure_ascii=False)
+    encoded = base64.b64encode(json_str.encode('utf-8')).decode('ascii')
+    print(f"__PYTHON_RESULT_BASE64__{encoded}__END__")
+else:
+    print("__PYTHON_RESULT_BASE64__eyJzdGRvdXQiOiAiIiwgInN0ZGVyciI6ICIiLCAiZXhpdF9jb2RlIjogMH0=__END__")
+
+sys.exit(_exit_code)`;
       await fs.promises.writeFile(scriptPath, codeWithEncoding, 'utf-8');
       
       // Prepare execution command with UTF-8 environment settings
       const isWindows = process.platform === 'win32';
-      const command = isWindows 
-        ? `chcp 65001 > nul && set PYTHONIOENCODING=utf-8 && "${embeddedPythonPath}" "${scriptPath}"`
+      const command = isWindows
+        ? `chcp 65001 > nul && set PYTHONIOENCODING=utf-8 && set PYTHONLEGACYWINDOWSSTDIO=1 && "${embeddedPythonPath}" "${scriptPath}"`
         : `PYTHONIOENCODING=utf-8 "${embeddedPythonPath}" "${scriptPath}"`;
       
       // Set working directory
@@ -180,21 +246,45 @@ class PythonEmbeddedToolInvocation extends BaseToolInvocation<
         console.warn('Failed to delete temporary Python script:', cleanupError);
       }
       
-      // Format output  
-      const output = result.output.trim();
-      const hasError = result.exitCode !== 0;
-      
-      const formattedOutput = output || (hasError 
-        ? 'Python script executed with errors (no output)' 
+      // Parse output - check for Base64 encoded result
+      let output = result.output.trim();
+      let actualExitCode = result.exitCode;
+
+      // Check for Base64 encoded result marker
+      const base64Match = output.match(/__PYTHON_RESULT_BASE64__([A-Za-z0-9+/=]+)__END__/);
+      if (base64Match) {
+        try {
+          // Decode Base64 result
+          const base64Data = base64Match[1];
+          const jsonStr = Buffer.from(base64Data, 'base64').toString('utf-8');
+          const resultData = JSON.parse(jsonStr);
+
+          // Use decoded output
+          output = resultData.stdout || '';
+          if (resultData.stderr) {
+            output = output ? `${output}\n${resultData.stderr}` : resultData.stderr;
+          }
+          actualExitCode = resultData.exit_code || 0;
+        } catch (decodeError) {
+          console.warn('Failed to decode Base64 result:', decodeError);
+          // Fall back to raw output
+          output = result.output.trim();
+        }
+      }
+
+      const hasError = actualExitCode !== 0;
+
+      const formattedOutput = output || (hasError
+        ? 'Python script executed with errors (no output)'
         : 'Python script executed successfully (no output)');
-      
+
       // Add execution summary
-      const summary = hasError 
-        ? `❌ Python execution completed with errors (exit code: ${result.exitCode})`
+      const summary = hasError
+        ? `❌ Python execution completed with errors (exit code: ${actualExitCode})`
         : '✅ Python execution completed successfully';
-      
+
       const finalOutput = `${summary}\n\n${formattedOutput}`;
-      
+
       return {
         llmContent: finalOutput,
         returnDisplay: finalOutput,
