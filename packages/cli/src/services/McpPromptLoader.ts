@@ -141,23 +141,69 @@ export class McpPromptLoader implements ICommandLoader {
               };
             }
           },
-          completion: async (_: CommandContext, partialArg: string) => {
-            if (!prompt || !prompt.arguments) {
+          completion: async (
+            commandContext: CommandContext,
+            partialArg: string,
+          ) => {
+            const invocation = commandContext.invocation;
+            if (!prompt || !prompt.arguments || !invocation) {
               return [];
             }
-
-            const suggestions: string[] = [];
-            const usedArgNames = new Set(
-              (partialArg.match(/--([^=]+)/g) || []).map((s) => s.substring(2)),
-            );
-
-            for (const arg of prompt.arguments) {
-              if (!usedArgNames.has(arg.name)) {
-                suggestions.push(`--${arg.name}=""`);
-              }
+            const indexOfFirstSpace = invocation.raw.indexOf(' ') + 1;
+            let promptInputs =
+              indexOfFirstSpace === 0
+                ? {}
+                : this.parseArgs(
+                    invocation.raw.substring(indexOfFirstSpace),
+                    prompt.arguments,
+                  );
+            if (promptInputs instanceof Error) {
+              promptInputs = {};
             }
 
-            return suggestions;
+            const providedArgNames = Object.keys(promptInputs);
+            const unusedArguments =
+              prompt.arguments
+                .filter((arg) => {
+                  // If this arguments is not in the prompt inputs
+                  // add it to unusedArguments
+                  if (!providedArgNames.includes(arg.name)) {
+                    return true;
+                  }
+
+                  // The parseArgs method assigns the value
+                  // at the end of the prompt as a final value
+                  // The argument should still be suggested
+                  // Example /add --numberOne="34" --num
+                  // numberTwo would be assigned a value of --num
+                  // numberTwo should still be considered unused
+                  const argValue = promptInputs[arg.name];
+                  return argValue === partialArg;
+                })
+                .map((argument) => `--${argument.name}="`) || [];
+
+            const exactlyMatchingArgumentAtTheEnd = prompt.arguments
+              .map((argument) => `--${argument.name}="`)
+              .filter((flagArgument) => {
+                const regex = new RegExp(`${flagArgument}[^"]*$`);
+                return regex.test(invocation.raw);
+              });
+
+            if (exactlyMatchingArgumentAtTheEnd.length === 1) {
+              if (exactlyMatchingArgumentAtTheEnd[0] === partialArg) {
+                return [`${partialArg}"`];
+              }
+              if (partialArg.endsWith('"')) {
+                return [partialArg];
+              }
+              return [`${partialArg}"`];
+            }
+
+            const matchingArguments = unusedArguments.filter((flagArgument) =>
+              flagArgument.startsWith(partialArg),
+            );
+
+            return matchingArguments;
           },
         };
         promptCommands.push(newPromptCommand);
