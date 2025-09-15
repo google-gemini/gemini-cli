@@ -17,32 +17,32 @@ This document lists the available keyboard shortcuts in the Gemini CLI.
 
 ## Input Prompt
 
-| Shortcut                                           | Description                                                                                                                         |
-| -------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| `!`                                                | Toggle shell mode when the input is empty.                                                                                          |
-| `\` (at end of line) + `Enter` / `Shift+Enter` / `Ctrl+J` | Insert a newline. `Shift+Enter` is only supported in terminals that support the Kitty keyboard protocol. |
-| `Down Arrow`                                       | Navigate down through the input history.                                                                                            |
-| `Enter`                                            | Submit the current prompt.                                                                                                          |
-| `Meta+Delete` / `Ctrl+Delete`                      | Delete the word to the right of the cursor.                                                                                         |
-| `Tab`                                              | Autocomplete the current suggestion if one exists.                                                                                  |
-| `Up Arrow`                                         | Navigate up through the input history.                                                                                              |
-| `Ctrl+A` / `Home`                                  | Move the cursor to the beginning of the line.                                                                                       |
-| `Ctrl+B` / `Left Arrow`                            | Move the cursor one character to the left.                                                                                          |
-| `Ctrl+C`                                           | Clear the input prompt                                                                                                              |
-| `Esc` (double press)                               | Clear the input prompt.                                                                                                             |
-| `Ctrl+D` / `Delete`                                | Delete the character to the right of the cursor.                                                                                    |
-| `Ctrl+E` / `End`                                   | Move the cursor to the end of the line.                                                                                             |
-| `Ctrl+F` / `Right Arrow`                           | Move the cursor one character to the right.                                                                                         |
-| `Ctrl+H` / `Backspace`                             | Delete the character to the left of the cursor.                                                                                     |
-| `Ctrl+K`                                           | Delete from the cursor to the end of the line.                                                                                      |
-| `Ctrl+Left Arrow` / `Meta+Left Arrow` / `Meta+B`   | Move the cursor one word to the left.                                                                                               |
-| `Ctrl+N`                                           | Navigate down through the input history.                                                                                            |
-| `Ctrl+P`                                           | Navigate up through the input history.                                                                                              |
-| `Ctrl+Right Arrow` / `Meta+Right Arrow` / `Meta+F` | Move the cursor one word to the right.                                                                                              |
-| `Ctrl+U`                                           | Delete from the cursor to the beginning of the line.                                                                                |
-| `Ctrl+V`                                           | Paste clipboard content. If the clipboard contains an image, it will be saved and a reference to it will be inserted in the prompt. |
-| `Ctrl+W` / `Meta+Backspace` / `Ctrl+Backspace`     | Delete the word to the left of the cursor.                                                                                          |
-| `Ctrl+X` / `Meta+Enter`                            | Open the current input in an external editor.                                                                                       |
+| Shortcut                                                  | Description                                                                                                                         |
+| --------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `!`                                                       | Toggle shell mode when the input is empty.                                                                                          |
+| `\` (at end of line) + `Enter` / `Shift+Enter` / `Ctrl+J` | Insert a newline. `Shift+Enter` is only supported in terminals that support the Kitty keyboard protocol.                            |
+| `Down Arrow`                                              | Navigate down through the input history.                                                                                            |
+| `Enter`                                                   | Submit the current prompt.                                                                                                          |
+| `Meta+Delete` / `Ctrl+Delete`                             | Delete the word to the right of the cursor.                                                                                         |
+| `Tab`                                                     | Autocomplete the current suggestion if one exists.                                                                                  |
+| `Up Arrow`                                                | Navigate up through the input history.                                                                                              |
+| `Ctrl+A` / `Home`                                         | Move the cursor to the beginning of the line.                                                                                       |
+| `Ctrl+B` / `Left Arrow`                                   | Move the cursor one character to the left.                                                                                          |
+| `Ctrl+C`                                                  | Clear the input prompt                                                                                                              |
+| `Esc` (double press)                                      | Clear the input prompt.                                                                                                             |
+| `Ctrl+D` / `Delete`                                       | Delete the character to the right of the cursor.                                                                                    |
+| `Ctrl+E` / `End`                                          | Move the cursor to the end of the line.                                                                                             |
+| `Ctrl+F` / `Right Arrow`                                  | Move the cursor one character to the right.                                                                                         |
+| `Ctrl+H` / `Backspace`                                    | Delete the character to the left of the cursor.                                                                                     |
+| `Ctrl+K`                                                  | Delete from the cursor to the end of the line.                                                                                      |
+| `Ctrl+Left Arrow` / `Meta+Left Arrow` / `Meta+B`          | Move the cursor one word to the left.                                                                                               |
+| `Ctrl+N`                                                  | Navigate down through the input history.                                                                                            |
+| `Ctrl+P`                                                  | Navigate up through the input history.                                                                                              |
+| `Ctrl+Right Arrow` / `Meta+Right Arrow` / `Meta+F`        | Move the cursor one word to the right.                                                                                              |
+| `Ctrl+U`                                                  | Delete from the cursor to the beginning of the line.                                                                                |
+| `Ctrl+V`                                                  | Paste clipboard content. If the clipboard contains an image, it will be saved and a reference to it will be inserted in the prompt. |
+| `Ctrl+W` / `Meta+Backspace` / `Ctrl+Backspace`            | Delete the word to the left of the cursor.                                                                                          |
+| `Ctrl+X` / `Meta+Enter`                                   | Open the current input in an external editor.                                                                                       |
 
 ## Suggestions
 
