@@ -1,10 +1,12 @@
 # Gemini CLI Companion Extension: Interface Specification
 
+> Last Updated: September 15, 2025
+
 This document defines the contract for building a companion extension to enable Gemini CLI's IDE mode. For VS Code, these features (native diffing, context awareness) are provided by the official extension ([marketplace](https://marketplace.visualstudio.com/items?itemName=Google.gemini-cli-vscode-ide-companion)). This specification is for contributors who wish to bring similar functionality to other editors like JetBrains IDEs, Sublime Text, etc.
 
 ## I. The Communication Interface
 
-The foundation of the IDE integration is a local communication channel between Gemini CLI and the IDE extension.
+Gemini CLI and the IDE extension communicate through a local communication channel.
 
 ### 1. Transport Layer: MCP over HTTP
 
@@ -39,7 +41,7 @@ For Gemini CLI to connect, it needs to discover which IDE instance it's running 
 
 ## II. The Context Interface
 
-A powerful capability of the extension is to provide the CLI with real-time information about the user's activity in the IDE.
+To enable context awareness, the extension **MAY** provide the CLI with real-time information about the user's activity in the IDE.
 
 ### `ide/contextUpdate` Notification
 
@@ -48,7 +50,7 @@ The extension **MAY** send an `ide/contextUpdate` [notification](https://modelco
 - **Triggering Events:** This notification should be sent (with a recommended debounce of 50ms) when:
   - A file is opened, closed, or focused.
   - The user's cursor position or text selection changes in the active file.
-- **Payload (`IdeContext`):** The notification parameters **MUST** be an `IdeContext` object (`@packages/core/src/ide/types.ts`):
+- **Payload (`IdeContext`):** The notification parameters **MUST** be an `IdeContext` object:
 
   ```typescript
   interface IdeContext {
@@ -59,14 +61,20 @@ The extension **MAY** send an `ide/contextUpdate` [notification](https://modelco
   }
 
   interface File {
-    path: string; // Absolute path to the file
-    timestamp: number; // Last focused Unix timestamp (for ordering)
-    isActive?: boolean; // True if this is the currently focused file
+    // Absolute path to the file
+    path: string;
+    // Last focused Unix timestamp (for ordering)
+    timestamp: number;
+    // True if this is the currently focused file
+    isActive?: boolean;
     cursor?: {
-      line: number; // 1-based line number
-      character: number; // 1-based character number
+      // 1-based line number
+      line: number;
+      // 1-based character number
+      character: number;
     };
-    selectedText?: string; // The text currently selected by the user
+    // The text currently selected by the user
+    selectedText?: string;
   }
   ```
 
@@ -82,7 +90,79 @@ After receiving the `IdeContext` object, the CLI performs several normalization 
 
 While the CLI handles the final truncation, it is highly recommended that your extension also limits the amount of context it sends.
 
-## III. Supporting Additional IDEs
+## III. The Diffing Interface
+
+To enable interactive code modifications, the extension **MAY** expose a diffing interface. This allows the CLI to request that the IDE open a diff view, showing proposed changes to a file. The user can then review, edit, and ultimately accept or reject these changes directly within the IDE.
+
+### `openDiff` Tool
+
+The extension **MUST** register an `openDiff` tool on its MCP server.
+
+- **Description:** This tool instructs the IDE to open a modifiable diff view for a specific file.
+- **Request (`OpenDiffRequest`):** The tool is invoked via a `tools/call` request. The `arguments` field within the request's `params` **MUST** be an `OpenDiffRequest` object.
+
+  ```typescript
+  interface OpenDiffRequest {
+    // The absolute path to the file to be diffed.
+    filePath: string;
+    // The proposed new content for the file.
+    newContent: string;
+  }
+  ```
+
+- **Response (`CallToolResult`):** The tool **MUST** immediately return a `CallToolResult` to acknowledge the request and report whether the diff view was successfully opened.
+  - On Success: If the diff view was opened successfully, the response **MUST** contain empty content (i.e., `content: []`).
+  - On Failure: If an error prevented the diff view from opening, the response **MUST** have `isError: true` and include a `TextContent` block in the `content` array describing the error.
+
+  The actual outcome of the diff (acceptance or rejection) is communicated asynchronously via notifications.
+
+### `closeDiff` Tool
+
+The extension **MUST** register a `closeDiff` tool on its MCP server.
+
+- **Description:** This tool instructs the IDE to close an open diff view for a specific file.
+- **Request (`CloseDiffRequest`):** The tool is invoked via a `tools/call` request. The `arguments` field within the request's `params` **MUST** be an `CloseDiffRequest` object.
+
+  ```typescript
+  interface CloseDiffRequest {
+    // The absolute path to the file whose diff view should be closed.
+    filePath: string;
+  }
+  ```
+
+- **Response (`CallToolResult`):** The tool **MUST** return a `CallToolResult`.
+  - On Success: If the diff view was closed successfully, the response **MUST** include a single **TextContent** block in the content array containing the file's final content before closing.
+  - On Failure: If an error prevented the diff view from closing, the response **MUST** have `isError: true` and include a `TextContent` block in the `content` array describing the error.
+
+### `ide/diffAccepted` Notification
+
+When the user accepts the changes in a diff view (e.g., by clicking an "Apply" or "Save" button), the extension **MUST** send an `ide/diffAccepted` notification to the CLI.
+
+- **Payload:** The notification parameters **MUST** include the file path and the final content of the file. The content may differ from the original `newContent` if the user made manual edits in the diff view.
+
+  ```typescript
+  {
+    // The absolute path to the file that was diffed.
+    filePath: string;
+    // The full content of the file after acceptance.
+    content: string;
+  }
+  ```
+
+### `ide/diffRejected` Notification
+
+When the user rejects the changes (e.g., by closing the diff view without accepting), the extension **MUST** send an `ide/diffRejected` notification to the CLI.
+
+- **Payload:** The notification parameters **MUST** include the file path of the rejected diff.
+
+  ```typescript
+  {
+    // The absolute path to the file that was diffed.
+    filePath: string;
+  }
+  ```
+
+## IV. Supporting Additional IDEs
 
 To add support for a new IDE, two main components in the Gemini CLI codebase need to be updated: the detection logic and the installer logic.
 
@@ -107,7 +187,7 @@ The CLI provides a command (`/ide install`) to help users automatically install 
   3.  Return a result object indicating success or failure.
 - **Update `getIdeInstaller`:** Add a case to the `switch` statement in this factory function to return an instance of your new installer class when your `DetectedIde` enum is matched.
 
-## IV. The Lifecycle Interface
+## V. The Lifecycle Interface
 
 The extension **MUST** manage its resources and the discovery file correctly based on the IDE's lifecycle.
 
