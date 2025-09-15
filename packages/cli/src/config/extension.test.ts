@@ -748,7 +748,7 @@ describe('performWorkspaceExtensionMigration', () => {
       });
 
       const failed = await performWorkspaceExtensionMigration([
-        loadExtension(ext1Path)!,
+        loadExtension(ext1Path, tempWorkspaceDir)!,
       ]);
 
       expect(failed).toEqual(['ext1']);
@@ -762,7 +762,9 @@ describe('performWorkspaceExtensionMigration', () => {
         version: '1.0.0',
       });
 
-      await performWorkspaceExtensionMigration([loadExtension(ext1Path)!]);
+      await performWorkspaceExtensionMigration([
+        loadExtension(ext1Path, tempWorkspaceDir)!,
+      ]);
 
       const userExtensionsDir = path.join(
         tempHomeDir,
@@ -781,7 +783,9 @@ describe('performWorkspaceExtensionMigration', () => {
         version: '1.0.0',
       });
 
-      await performWorkspaceExtensionMigration([loadExtension(ext1Path)!]);
+      await performWorkspaceExtensionMigration([
+        loadExtension(ext1Path, tempWorkspaceDir)!,
+      ]);
       const extensions = loadExtensions();
 
       expect(extensions).toEqual([]);
@@ -800,8 +804,8 @@ describe('performWorkspaceExtensionMigration', () => {
       version: '1.0.0',
     });
     const extensionsToMigrate: Extension[] = [
-      loadExtension(ext1Path)!,
-      loadExtension(ext2Path)!,
+      loadExtension(ext1Path, tempWorkspaceDir)!,
+      loadExtension(ext2Path, tempWorkspaceDir)!,
     ];
     const failed =
       await performWorkspaceExtensionMigration(extensionsToMigrate);
@@ -830,7 +834,7 @@ describe('performWorkspaceExtensionMigration', () => {
     });
 
     const extensions: Extension[] = [
-      loadExtension(ext1Path)!,
+      loadExtension(ext1Path, tempWorkspaceDir)!,
       {
         path: '/ext/path/1',
         config: { name: 'ext2', version: '1.0.0' },
@@ -925,7 +929,7 @@ describe('updateExtension', () => {
     });
     mockGit.getRemotes.mockResolvedValue([{ name: 'origin' }]);
     const extension = annotateActiveExtensions(
-      [loadExtension(targetExtDir)!],
+      [loadExtension(targetExtDir, process.cwd())!],
       [],
       process.cwd(),
     )[0];
@@ -970,7 +974,7 @@ describe('updateExtension', () => {
     const setExtensionUpdateState = vi.fn();
 
     const extension = annotateActiveExtensions(
-      [loadExtension(extensionDir)!],
+      [loadExtension(extensionDir, process.cwd())!],
       [],
       process.cwd(),
     )[0];
@@ -1001,7 +1005,7 @@ describe('updateExtension', () => {
 
     const setExtensionUpdateState = vi.fn();
     const extension = annotateActiveExtensions(
-      [loadExtension(extensionDir)!],
+      [loadExtension(extensionDir, process.cwd())!],
       [],
       process.cwd(),
     )[0];
@@ -1047,7 +1051,7 @@ describe('checkForAllExtensionUpdates', () => {
       },
     });
     const extension = annotateActiveExtensions(
-      [loadExtension(extensionDir)!],
+      [loadExtension(extensionDir, process.cwd())!],
       [],
       process.cwd(),
     )[0];
@@ -1074,7 +1078,7 @@ describe('checkForAllExtensionUpdates', () => {
       },
     });
     const extension = annotateActiveExtensions(
-      [loadExtension(extensionDir)!],
+      [loadExtension(extensionDir, process.cwd())!],
       [],
       process.cwd(),
     )[0];
@@ -1098,7 +1102,7 @@ describe('checkForAllExtensionUpdates', () => {
       installMetadata: { source: '/local/path', type: 'local' },
     });
     const extension = annotateActiveExtensions(
-      [loadExtension(extensionDir)!],
+      [loadExtension(extensionDir, process.cwd())!],
       [],
       process.cwd(),
     )[0];
@@ -1119,7 +1123,7 @@ describe('checkForAllExtensionUpdates', () => {
       },
     });
     const extension = annotateActiveExtensions(
-      [loadExtension(extensionDir)!],
+      [loadExtension(extensionDir, process.cwd())!],
       [],
       process.cwd(),
     )[0];
@@ -1161,7 +1165,7 @@ describe('checkForExtensionUpdate', () => {
       },
     });
     const extension = annotateActiveExtensions(
-      [loadExtension(extensionDir)!],
+      [loadExtension(extensionDir, process.cwd())!],
       [],
       process.cwd(),
     )[0];
@@ -1187,7 +1191,7 @@ describe('checkForExtensionUpdate', () => {
       },
     });
     const extension = annotateActiveExtensions(
-      [loadExtension(extensionDir)!],
+      [loadExtension(extensionDir, process.cwd())!],
       [],
       process.cwd(),
     )[0];
@@ -1209,7 +1213,7 @@ describe('checkForExtensionUpdate', () => {
       version: '1.0.0',
     });
     const extension = annotateActiveExtensions(
-      [loadExtension(extensionDir)!],
+      [loadExtension(extensionDir, process.cwd())!],
       [],
       process.cwd(),
     )[0];
@@ -1229,7 +1233,7 @@ describe('checkForExtensionUpdate', () => {
       },
     });
     const extension = annotateActiveExtensions(
-      [loadExtension(extensionDir)!],
+      [loadExtension(extensionDir, process.cwd())!],
       [],
       process.cwd(),
     )[0];

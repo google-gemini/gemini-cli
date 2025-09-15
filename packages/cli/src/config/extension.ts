@@ -188,7 +188,7 @@ export function loadExtensionsFromDir(dir: string): Extension[] {
   for (const subdir of fs.readdirSync(extensionsDir)) {
     const extensionDir = path.join(extensionsDir, subdir);
 
-    const extension = loadExtension(extensionDir);
+    const extension = loadExtension(extensionDir, dir);
     if (extension != null) {
       extensions.push(extension);
     }
@@ -196,7 +196,10 @@ export function loadExtensionsFromDir(dir: string): Extension[] {
   return extensions;
 }
 
-export function loadExtension(extensionDir: string): Extension | null {
+export function loadExtension(
+  extensionDir: string,
+  workspaceDir: string,
+): Extension | null {
   if (!fs.statSync(extensionDir).isDirectory()) {
     console.error(
       `Warning: unexpected file ${extensionDir} in extensions directory.`,
@@ -226,6 +229,7 @@ export function loadExtension(extensionDir: string): Extension | null {
     const configContent = fs.readFileSync(configFilePath, 'utf-8');
     let config = recursivelyHydrateStrings(JSON.parse(configContent), {
       extensionPath: extensionDir,
+      workspacePath: workspaceDir,
       '/': path.sep,
       pathSeparator: path.sep,
     }) as unknown as ExtensionConfig;
@@ -544,6 +548,7 @@ export async function installExtension(
 
 export async function loadExtensionConfig(
   extensionDir: string,
+  workspaceDir: string = process.cwd(),
 ): Promise<ExtensionConfig | null> {
   const configFilePath = path.join(extensionDir, EXTENSIONS_CONFIG_FILENAME);
   if (!fs.existsSync(configFilePath)) {
@@ -553,6 +558,7 @@ export async function loadExtensionConfig(
     const configContent = fs.readFileSync(configFilePath, 'utf-8');
     const config = recursivelyHydrateStrings(JSON.parse(configContent), {
       extensionPath: extensionDir,
+      workspacePath: workspaceDir,
       '/': path.sep,
       pathSeparator: path.sep,
     }) as unknown as ExtensionConfig;
@@ -675,6 +681,7 @@ export async function updateExtension(
     const updatedExtensionStorage = new ExtensionStorage(extension.name);
     const updatedExtension = loadExtension(
       updatedExtensionStorage.getExtensionDir(),
+      cwd,
     );
     if (!updatedExtension) {
       setExtensionUpdateState(ExtensionUpdateState.ERROR);
