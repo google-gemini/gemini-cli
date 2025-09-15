@@ -279,7 +279,8 @@ export class ClearcutLogger {
       },
     ];
 
-    if (this.config?.getDebugMode()) {
+    //if (this.config?.getDebugMode()) {
+    if (this.config) { // Temp change
       // Flatten the nested arrays of events into a single list of all event entries
       const allEventEntries = request.flatMap(req => req.log_event).flat();
 
@@ -293,13 +294,6 @@ export class ClearcutLogger {
           return false;
         }
       });
-
-      if (containsStartSession) {
-        console.log(
-          'Clearcut request containing START_SESSION:',
-          safeJsonStringify(request),
-        );
-      }
     }
 
     let result: LogResponse = {};
