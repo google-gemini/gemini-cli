@@ -279,6 +279,47 @@ class GrepToolInvocation extends BaseToolInvocation<
   }
 
   /**
+   * Gets the list of files to search using FileDiscoveryService with chunked processing
+   * @param searchPath The absolute path to search in
+   * @param include Optional include pattern
+   * @param options File filtering options from config
+   * @returns Array of file paths to search
+   */
+  private async getFilesToSearchChunked(
+    searchPath: string,
+    include?: string,
+    options: { respectGitIgnore: boolean; respectGeminiIgnore: boolean } = { respectGitIgnore: true, respectGeminiIgnore: true }
+  ): Promise<string[]> {
+    try {
+      // Use glob to get all files
+      const globPattern = include || '**/*';
+      const filesStream = globStream(globPattern, {
+        cwd: searchPath,
+        dot: true,
+        absolute: true,
+        nodir: true,
+      });
+
+      const allFiles: string[] = [];
+      for await (const filePath of filesStream) {
+        allFiles.push(filePath as string);
+      }
+
+      // Filter files based on ignore rules using FileDiscoveryService
+      const fileService = this.config.getFileService();
+      const filteredFiles = fileService.filterFiles(allFiles, {
+        respectGitIgnore: options.respectGitIgnore,
+        respectGeminiIgnore: options.respectGeminiIgnore,
+      });
+
+      return filteredFiles;
+    } catch (error) {
+      console.warn(`Failed to get files to search: ${getErrorMessage(error)}`);
+      return [];
+    }
+  }
+
+  /**
    * Gets a description of the grep operation
    * @returns A string describing the grep
    */
@@ -336,14 +377,31 @@ class GrepToolInvocation extends BaseToolInvocation<
 
       if (gitAvailable) {
         strategyUsed = 'git grep';
-        const gitArgs = [
-          'grep',
-          '--untracked',
-          '-n',
-          '-E',
-          '--ignore-case',
-          pattern,
-        ];
+        
+        // Get file filtering options from config
+        const fileFilteringOptions = this.config.getFileFilteringOptions();
+        
+        const gitArgs = ['grep', '-n', '-E', '--ignore-case'];
+        
+        // Control gitignore behavior based on configuration
+        if (fileFilteringOptions.respectGitIgnore) {
+          // When respectGitIgnore is true, include untracked files but respect gitignore
+          gitArgs.push('--untracked');
+        } else {
+          // When respectGitIgnore is false, search all files including ignored ones
+          gitArgs.push('--no-index');
+        }
+        
+        // Add geminiignore support if enabled
+        if (fileFilteringOptions.respectGeminiIgnore) {
+          const geminiignorePath = path.join(absolutePath, '.geminiignore');
+          if (fs.existsSync(geminiignorePath)) {
+            gitArgs.push('--exclude-from', geminiignorePath);
+          }
+        }
+        
+        gitArgs.push(pattern);
+        
         if (include) {
           gitArgs.push('--', include);
         }
@@ -388,102 +446,104 @@ class GrepToolInvocation extends BaseToolInvocation<
       const grepAvailable = await this.isCommandAvailable('grep');
       if (grepAvailable) {
         strategyUsed = 'system grep';
-        const grepArgs = ['-r', '-n', '-H', '-E'];
-        // Extract directory names from exclusion patterns for grep --exclude-dir
-        const globExcludes = this.fileExclusions.getGlobExcludes();
-        const commonExcludes = globExcludes
-          .map((pattern) => {
-            let dir = pattern;
-            if (dir.startsWith('**/')) {
-              dir = dir.substring(3);
-            }
-            if (dir.endsWith('/**')) {
-              dir = dir.slice(0, -3);
-            } else if (dir.endsWith('/')) {
-              dir = dir.slice(0, -1);
-            }
-
-            // Only consider patterns that are likely directories. This filters out file patterns.
-            if (dir && !dir.includes('/') && !dir.includes('*')) {
-              return dir;
-            }
-            return null;
-          })
-          .filter((dir): dir is string => !!dir);
-        commonExcludes.forEach((dir) => grepArgs.push(`--exclude-dir=${dir}`));
-        if (include) {
-          grepArgs.push(`--include=${include}`);
+        
+        // Get file filtering options from config
+        const fileFilteringOptions = this.config.getFileFilteringOptions();
+        
+        // Use FileDiscoveryService for better ignore support and chunked processing
+        const filesToSearch = await this.getFilesToSearchChunked(absolutePath, include, fileFilteringOptions);
+        
+        if (filesToSearch.length === 0) {
+          return []; // No files to search
         }
-        grepArgs.push(pattern);
-        grepArgs.push('.');
 
-        try {
-          const output = await new Promise<string>((resolve, reject) => {
-            const child = spawn('grep', grepArgs, {
-              cwd: absolutePath,
-              windowsHide: true,
+        // Process files in chunks to avoid command line length limits
+        const CHUNK_SIZE = 100; // Process 100 files at a time
+        const chunks = [];
+        for (let i = 0; i < filesToSearch.length; i += CHUNK_SIZE) {
+          chunks.push(filesToSearch.slice(i, i + CHUNK_SIZE));
+        }
+
+        const allMatches: GrepMatch[] = [];
+        
+        for (const chunk of chunks) {
+          const grepArgs = ['-n', '-H', '-E'];
+          if (include) {
+            grepArgs.push(`--include=${include}`);
+          }
+          grepArgs.push(pattern);
+          grepArgs.push(...chunk);
+
+          try {
+            const output = await new Promise<string>((resolve, reject) => {
+              const child = spawn('grep', grepArgs, {
+                cwd: absolutePath,
+                windowsHide: true,
+              });
+              const stdoutChunks: Buffer[] = [];
+              const stderrChunks: Buffer[] = [];
+
+              const onData = (chunk: Buffer) => stdoutChunks.push(chunk);
+              const onStderr = (chunk: Buffer) => {
+                const stderrStr = chunk.toString();
+                // Suppress common harmless stderr messages
+                if (
+                  !stderrStr.includes('Permission denied') &&
+                  !/grep:.*: Is a directory/i.test(stderrStr)
+                ) {
+                  stderrChunks.push(chunk);
+                }
+              };
+              const onError = (err: Error) => {
+                cleanup();
+                reject(new Error(`Failed to start system grep: ${err.message}`));
+              };
+              const onClose = (code: number | null) => {
+                const stdoutData = Buffer.concat(stdoutChunks).toString('utf8');
+                const stderrData = Buffer.concat(stderrChunks)
+                  .toString('utf8')
+                  .trim();
+                cleanup();
+                if (code === 0) resolve(stdoutData);
+                else if (code === 1)
+                  resolve(''); // No matches
+                else {
+                  if (stderrData)
+                    reject(
+                      new Error(
+                        `System grep exited with code ${code}: ${stderrData}`,
+                      ),
+                    );
+                  else resolve(''); // Exit code > 1 but no stderr, likely just suppressed errors
+                }
+              };
+
+              const cleanup = () => {
+                child.stdout.removeListener('data', onData);
+                child.stderr.removeListener('data', onStderr);
+                child.removeListener('error', onError);
+                child.removeListener('close', onClose);
+                if (child.connected) {
+                  child.disconnect();
+                }
+              };
+
+              child.stdout.on('data', onData);
+              child.stderr.on('data', onStderr);
+              child.on('error', onError);
+              child.on('close', onClose);
             });
-            const stdoutChunks: Buffer[] = [];
-            const stderrChunks: Buffer[] = [];
-
-            const onData = (chunk: Buffer) => stdoutChunks.push(chunk);
-            const onStderr = (chunk: Buffer) => {
-              const stderrStr = chunk.toString();
-              // Suppress common harmless stderr messages
-              if (
-                !stderrStr.includes('Permission denied') &&
-                !/grep:.*: Is a directory/i.test(stderrStr)
-              ) {
-                stderrChunks.push(chunk);
-              }
-            };
-            const onError = (err: Error) => {
-              cleanup();
-              reject(new Error(`Failed to start system grep: ${err.message}`));
-            };
-            const onClose = (code: number | null) => {
-              const stdoutData = Buffer.concat(stdoutChunks).toString('utf8');
-              const stderrData = Buffer.concat(stderrChunks)
-                .toString('utf8')
-                .trim();
-              cleanup();
-              if (code === 0) resolve(stdoutData);
-              else if (code === 1)
-                resolve(''); // No matches
-              else {
-                if (stderrData)
-                  reject(
-                    new Error(
-                      `System grep exited with code ${code}: ${stderrData}`,
-                    ),
-                  );
-                else resolve(''); // Exit code > 1 but no stderr, likely just suppressed errors
-              }
-            };
-
-            const cleanup = () => {
-              child.stdout.removeListener('data', onData);
-              child.stderr.removeListener('data', onStderr);
-              child.removeListener('error', onError);
-              child.removeListener('close', onClose);
-              if (child.connected) {
-                child.disconnect();
-              }
-            };
-
-            child.stdout.on('data', onData);
-            child.stderr.on('data', onStderr);
-            child.on('error', onError);
-            child.on('close', onClose);
-          });
-          return this.parseGrepOutput(output, absolutePath);
-        } catch (grepError: unknown) {
-          console.debug(
-            `GrepLogic: System grep failed: ${getErrorMessage(
-              grepError,
-            )}. Falling back...`,
-          );
+            
+            const chunkMatches = this.parseGrepOutput(output, absolutePath);
+            allMatches.push(...chunkMatches);
+          } catch (chunkError: unknown) {
+            console.debug(
+              `GrepLogic: Chunk processing failed: ${getErrorMessage(chunkError)}. Continuing...`,
+            );
+          }
         }
+        
+        return allMatches;
       }
 
       // --- Strategy 3: Pure JavaScript Fallback ---
@@ -491,6 +551,10 @@ class GrepToolInvocation extends BaseToolInvocation<
         'GrepLogic: Falling back to JavaScript grep implementation.',
       );
       strategyUsed = 'javascript fallback';
+      
+      // Get file filtering options from config
+      const fileFilteringOptions = this.config.getFileFilteringOptions();
+      
       const globPattern = include ? include : '**/*';
       const ignorePatterns = this.fileExclusions.getGlobExcludes();
 
@@ -503,11 +567,27 @@ class GrepToolInvocation extends BaseToolInvocation<
         signal: options.signal,
       });
 
+      // Respect .gitignore and .geminiignore via FileDiscoveryService
+      const respectGitIgnore = fileFilteringOptions.respectGitIgnore;
+      const respectGeminiIgnore = fileFilteringOptions.respectGeminiIgnore;
+      const fileService = this.config.getFileService();
+
       const regex = new RegExp(pattern, 'i');
       const allMatches: GrepMatch[] = [];
 
       for await (const filePath of filesStream) {
         const fileAbsolutePath = filePath as string;
+        
+        // Skip files ignored by git/gemini ignore according to config
+        if (
+          fileService.shouldIgnoreFile(fileAbsolutePath, {
+            respectGitIgnore,
+            respectGeminiIgnore,
+          })
+        ) {
+          continue;
+        }
+        
         try {
           const content = await fsPromises.readFile(fileAbsolutePath, 'utf8');
           const lines = content.split(/\r?\n/);
@@ -657,3 +737,4 @@ export class GrepTool extends BaseDeclarativeTool<GrepToolParams, ToolResult> {
     return new GrepToolInvocation(this.config, params);
   }
 }
+
