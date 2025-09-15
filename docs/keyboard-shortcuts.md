@@ -20,7 +20,7 @@ This document lists the available keyboard shortcuts in the Gemini CLI.
 | Shortcut                                           | Description                                                                                                                         |
 | -------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
 | `!`                                                | Toggle shell mode when the input is empty.                                                                                          |
-| `\` (at end of line) + `Enter`                     | Insert a newline.                                                                                                                   |
+| `\` (at end of line) + `Enter` / `Shift+Enter` / `Ctrl+J` | Insert a newline. `Shift+Enter` is only supported in terminals that support the Kitty keyboard protocol. |
 | `Down Arrow`                                       | Navigate down through the input history.                                                                                            |
 | `Enter`                                            | Submit the current prompt.                                                                                                          |
 | `Meta+Delete` / `Ctrl+Delete`                      | Delete the word to the right of the cursor.                                                                                         |
