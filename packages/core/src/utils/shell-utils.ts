@@ -10,7 +10,112 @@ import os from 'node:os';
 import { quote } from 'shell-quote';
 import { doesToolInvocationMatch } from './tool-utils.js';
 
+// Declare process for environments where it's not automatically available
+declare const process: {
+  env: Record<string, string | undefined>;
+  title: string;
+};
+
 const SHELL_TOOL_NAMES = ['run_shell_command', 'ShellTool'];
+
+export const isWindows = () => os.platform() === 'win32';
+
+/**
+ * Detects the shell that the user launched Gemini from by examining environment variables
+ * and process information.
+ */
+function detectParentShell(): ShellConfiguration {
+  const userPreferredShell = process.env['SHELL'];
+  const fallbackShell = process.env['LOGINSHELL'];
+  const systemComSpec = process.env['ComSpec'];
+
+  if (userPreferredShell) {
+    const shellType = getShellTypeFromPath(userPreferredShell);
+    return {
+      executable: userPreferredShell,
+      argsPrefix: getArgsForShellType(shellType),
+      shell: shellType,
+    };
+  }
+
+  if (fallbackShell) {
+    const shellType = getShellTypeFromPath(fallbackShell);
+    return {
+      executable: fallbackShell,
+      argsPrefix: getArgsForShellType(shellType),
+      shell: shellType,
+    };
+  }
+
+  if (!isWindows()) {
+    return {
+      executable: 'bash',
+      argsPrefix: getArgsForShellType('bash'),
+      shell: 'bash',
+    };
+  }
+
+  if (systemComSpec && getShellTypeFromPath(systemComSpec) === 'powershell') {
+    return {
+      executable: systemComSpec,
+      argsPrefix: getArgsForShellType('powershell'),
+      shell: 'powershell',
+    };
+  }
+
+  // Process.title is the only reliable way to distinguish cmd.exe from PowerShell on Windows.
+  // Environment variables are identical, and PowerShell variables aren't exported as env vars.
+  // PowerShell: "Windows PowerShell" vs PowerShell Core: "pwsh" vs cmd.exe: "Command Prompt - node <script>"
+  const lowerCaseTitle = process.title?.toLowerCase();
+  if (lowerCaseTitle) {
+    // Look for "Windows PowerShell" (traditional PowerShell)
+    if (lowerCaseTitle.includes('windows powershell')) {
+      return {
+        executable: 'powershell.exe',
+        argsPrefix: getArgsForShellType('powershell'),
+        shell: 'powershell',
+      };
+    }
+    // Look for "pwsh" as executable name (PowerShell Core)
+    // Match when pwsh appears at start/end or surrounded by spaces (not in file paths)
+    if (/(?:^|\s)pwsh(?:\s|$)/.test(lowerCaseTitle)) {
+      return {
+        executable: 'pwsh.exe',
+        argsPrefix: getArgsForShellType('powershell'),
+        shell: 'powershell',
+      };
+    }
+  }
+
+  return {
+    executable: systemComSpec || 'cmd.exe',
+    argsPrefix: getArgsForShellType('cmd'),
+    shell: 'cmd',
+  };
+}
+
+function getShellTypeFromPath(shellPath: string): ShellType {
+  const shellName = shellPath.toLowerCase();
+  if (/(^|\\|\/)(powershell|pwsh)(\.exe)?$/.test(shellName)) {
+    return 'powershell';
+  }
+  if (/(^|\\|\/)cmd(\.exe)?$/.test(shellName)) {
+    return 'cmd';
+  }
+  return 'bash';
+}
+
+function getArgsForShellType(shellType: ShellType): string[] {
+  switch (shellType) {
+    case 'powershell':
+      return ['-NoProfile', '-Command'];
+    case 'cmd':
+      return ['/d', '/s', '/c'];
+    case 'bash':
+    default:
+      return ['-c'];
+  }
+}
 
 /**
  * An identifier for the shell type.
@@ -40,44 +145,8 @@ export interface ShellConfiguration {
  * @returns The ShellConfiguration for the current environment.
  */
 export function getShellConfiguration(): ShellConfiguration {
-  if (isWindows()) {
-    const comSpec = process.env['ComSpec'] || 'cmd.exe';
-    const executable = comSpec.toLowerCase();
-
-    if (
-      executable.endsWith('powershell.exe') ||
-      executable.endsWith('pwsh.exe')
-    ) {
-      // For PowerShell, the arguments are different.
-      // -NoProfile: Speeds up startup.
-      // -Command: Executes the following command.
-      return {
-        executable: comSpec,
-        argsPrefix: ['-NoProfile', '-Command'],
-        shell: 'powershell',
-      };
-    }
-
-    // Default to cmd.exe for anything else on Windows.
-    // Flags for CMD:
-    // /d: Skip execution of AutoRun commands.
-    // /s: Modifies the treatment of the command string (important for quoting).
-    // /c: Carries out the command specified by the string and then terminates.
-    return {
-      executable: comSpec,
-      argsPrefix: ['/d', '/s', '/c'],
-      shell: 'cmd',
-    };
-  }
-
-  // Unix-like systems (Linux, macOS)
-  return { executable: 'bash', argsPrefix: ['-c'], shell: 'bash' };
+  return detectParentShell();
 }
-
-/**
- * Export the platform detection constant for use in process management (e.g., killing processes).
- */
-export const isWindows = () => os.platform() === 'win32';
 
 /**
  * Escapes a string so that it can be safely used as a single argument

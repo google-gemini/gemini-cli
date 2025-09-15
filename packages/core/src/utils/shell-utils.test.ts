@@ -15,6 +15,12 @@ import {
 } from './shell-utils.js';
 import type { Config } from '../config/config.js';
 
+// Declare process for environments where it's not automatically available
+declare const process: {
+  env: Record<string, string | undefined>;
+  title: string;
+};
+
 const mockPlatform = vi.hoisted(() => vi.fn());
 const mockHomedir = vi.hoisted(() => vi.fn());
 vi.mock('os', () => ({
@@ -370,69 +376,336 @@ describe('getShellConfiguration', () => {
     process.env = originalEnv;
   });
 
-  it('should return bash configuration on Linux', () => {
-    mockPlatform.mockReturnValue('linux');
-    const config = getShellConfiguration();
-    expect(config.executable).toBe('bash');
-    expect(config.argsPrefix).toEqual(['-c']);
-    expect(config.shell).toBe('bash');
+  describe('cross-platform SHELL variable detection', () => {
+    it('should use SHELL variable on Unix systems', () => {
+      mockPlatform.mockReturnValue('linux');
+      process.env['SHELL'] = '/bin/zsh';
+      
+      const config = getShellConfiguration();
+      expect(config.executable).toBe('/bin/zsh');
+      expect(config.argsPrefix).toEqual(['-c']);
+      expect(config.shell).toBe('bash');
+    });
+
+    it('should use SHELL variable on Windows (Git Bash, MSYS2, etc.)', () => {
+      mockPlatform.mockReturnValue('win32');
+      process.env['SHELL'] = '/usr/bin/bash';
+      
+      const config = getShellConfiguration();
+      expect(config.executable).toBe('/usr/bin/bash');
+      expect(config.argsPrefix).toEqual(['-c']);
+      expect(config.shell).toBe('bash');
+    });
+
+    it('should detect PowerShell Core from SHELL variable on Unix', () => {
+      mockPlatform.mockReturnValue('linux');
+      process.env['SHELL'] = '/usr/bin/pwsh';
+      
+      const config = getShellConfiguration();
+      expect(config.executable).toBe('/usr/bin/pwsh');
+      expect(config.argsPrefix).toEqual(['-NoProfile', '-Command']);
+      expect(config.shell).toBe('powershell');
+    });
+
+    it('should detect PowerShell from SHELL variable on Windows', () => {
+      mockPlatform.mockReturnValue('win32');
+      process.env['SHELL'] = 'C:\\Program Files\\PowerShell\\7\\pwsh.exe';
+      
+      const config = getShellConfiguration();
+      expect(config.executable).toBe('C:\\Program Files\\PowerShell\\7\\pwsh.exe');
+      expect(config.argsPrefix).toEqual(['-NoProfile', '-Command']);
+      expect(config.shell).toBe('powershell');
+    });
   });
 
-  it('should return bash configuration on macOS (darwin)', () => {
-    mockPlatform.mockReturnValue('darwin');
-    const config = getShellConfiguration();
-    expect(config.executable).toBe('bash');
-    expect(config.argsPrefix).toEqual(['-c']);
-    expect(config.shell).toBe('bash');
+  describe('LOGINSHELL fallback detection', () => {
+    it('should use LOGINSHELL when SHELL is not set', () => {
+      mockPlatform.mockReturnValue('win32');
+      delete process.env['SHELL'];
+      process.env['LOGINSHELL'] = '/usr/bin/bash';
+      
+      const config = getShellConfiguration();
+      expect(config.executable).toBe('/usr/bin/bash');
+      expect(config.argsPrefix).toEqual(['-c']);
+      expect(config.shell).toBe('bash');
+    });
+
+    it('should detect PowerShell from LOGINSHELL variable', () => {
+      mockPlatform.mockReturnValue('win32');
+      delete process.env['SHELL'];
+      process.env['LOGINSHELL'] = 'pwsh';
+      
+      const config = getShellConfiguration();
+      expect(config.executable).toBe('pwsh');
+      expect(config.argsPrefix).toEqual(['-NoProfile', '-Command']);
+      expect(config.shell).toBe('powershell');
+    });
   });
 
-  describe('on Windows', () => {
+  describe('Unix platform defaults', () => {
+    it('should default to bash on Linux when no shell variables are set', () => {
+      mockPlatform.mockReturnValue('linux');
+      delete process.env['SHELL'];
+      delete process.env['LOGINSHELL'];
+      
+      const config = getShellConfiguration();
+      expect(config.executable).toBe('bash');
+      expect(config.argsPrefix).toEqual(['-c']);
+      expect(config.shell).toBe('bash');
+    });
+
+    it('should default to bash on macOS when no shell variables are set', () => {
+      mockPlatform.mockReturnValue('darwin');
+      delete process.env['SHELL'];
+      delete process.env['LOGINSHELL'];
+      
+      const config = getShellConfiguration();
+      expect(config.executable).toBe('bash');
+      expect(config.argsPrefix).toEqual(['-c']);
+      expect(config.shell).toBe('bash');
+    });
+  });
+
+  describe('Windows-specific detection', () => {
     beforeEach(() => {
       mockPlatform.mockReturnValue('win32');
+      delete process.env['SHELL'];
+      delete process.env['LOGINSHELL'];
     });
 
-    it('should return cmd.exe configuration by default', () => {
-      delete process.env['ComSpec'];
-      const config = getShellConfiguration();
-      expect(config.executable).toBe('cmd.exe');
-      expect(config.argsPrefix).toEqual(['/d', '/s', '/c']);
-      expect(config.shell).toBe('cmd');
-    });
-
-    it('should respect ComSpec for cmd.exe', () => {
-      const cmdPath = 'C:\\WINDOWS\\system32\\cmd.exe';
-      process.env['ComSpec'] = cmdPath;
-      const config = getShellConfiguration();
-      expect(config.executable).toBe(cmdPath);
-      expect(config.argsPrefix).toEqual(['/d', '/s', '/c']);
-      expect(config.shell).toBe('cmd');
-    });
-
-    it('should return PowerShell configuration if ComSpec points to powershell.exe', () => {
-      const psPath =
-        'C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe';
+    it('should detect PowerShell via ComSpec pointing to powershell.exe', () => {
+      const psPath = 'C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe';
       process.env['ComSpec'] = psPath;
+      
       const config = getShellConfiguration();
       expect(config.executable).toBe(psPath);
       expect(config.argsPrefix).toEqual(['-NoProfile', '-Command']);
       expect(config.shell).toBe('powershell');
     });
 
-    it('should return PowerShell configuration if ComSpec points to pwsh.exe', () => {
+    it('should detect PowerShell via ComSpec pointing to pwsh.exe', () => {
       const pwshPath = 'C:\\Program Files\\PowerShell\\7\\pwsh.exe';
       process.env['ComSpec'] = pwshPath;
+      
       const config = getShellConfiguration();
       expect(config.executable).toBe(pwshPath);
       expect(config.argsPrefix).toEqual(['-NoProfile', '-Command']);
       expect(config.shell).toBe('powershell');
     });
 
-    it('should be case-insensitive when checking ComSpec', () => {
+    it('should be case-insensitive when checking ComSpec for PowerShell', () => {
       process.env['ComSpec'] = 'C:\\Path\\To\\POWERSHELL.EXE';
+      
       const config = getShellConfiguration();
       expect(config.executable).toBe('C:\\Path\\To\\POWERSHELL.EXE');
       expect(config.argsPrefix).toEqual(['-NoProfile', '-Command']);
       expect(config.shell).toBe('powershell');
+    });
+
+    it('should detect PowerShell via process.title containing "Windows PowerShell"', () => {
+      const originalTitle = process.title;
+      process.title = 'Windows PowerShell';
+      delete process.env['ComSpec'];
+      
+      const config = getShellConfiguration();
+      expect(config.executable).toBe('powershell.exe');
+      expect(config.argsPrefix).toEqual(['-NoProfile', '-Command']);
+      expect(config.shell).toBe('powershell');
+      
+      process.title = originalTitle;
+    });
+
+    it('should detect PowerShell via process.title case-insensitive', () => {
+      const originalTitle = process.title;
+      process.title = 'windows powershell';
+      delete process.env['ComSpec'];
+      
+      const config = getShellConfiguration();
+      expect(config.executable).toBe('powershell.exe');
+      expect(config.argsPrefix).toEqual(['-NoProfile', '-Command']);
+      expect(config.shell).toBe('powershell');
+      
+      process.title = originalTitle;
+    });
+
+    it('should detect PowerShell Core via process.title containing "pwsh"', () => {
+      const originalTitle = process.title;
+      process.title = 'pwsh';
+      delete process.env['ComSpec'];
+      
+      const config = getShellConfiguration();
+      expect(config.executable).toBe('pwsh.exe');
+      expect(config.argsPrefix).toEqual(['-NoProfile', '-Command']);
+      expect(config.shell).toBe('powershell');
+      
+      process.title = originalTitle;
+    });
+
+    it('should detect PowerShell Core via process.title case-insensitive', () => {
+      const originalTitle = process.title;
+      process.title = 'PWSH';
+      delete process.env['ComSpec'];
+      
+      const config = getShellConfiguration();
+      expect(config.executable).toBe('pwsh.exe');
+      expect(config.argsPrefix).toEqual(['-NoProfile', '-Command']);
+      expect(config.shell).toBe('powershell');
+      
+      process.title = originalTitle;
+    });
+
+    it('should prioritize pwsh over powershell when both are in process.title', () => {
+      const originalTitle = process.title;
+      process.title = 'PowerShell Core pwsh';
+      delete process.env['ComSpec'];
+      
+      const config = getShellConfiguration();
+      expect(config.executable).toBe('pwsh.exe'); // Should prefer pwsh
+      expect(config.argsPrefix).toEqual(['-NoProfile', '-Command']);
+      expect(config.shell).toBe('powershell');
+      
+      process.title = originalTitle;
+    });
+
+    it('should NOT detect PowerShell when process.title is cmd-like', () => {
+      const originalTitle = process.title;
+      process.title = 'Command Prompt - node test.js';
+      delete process.env['ComSpec'];
+      
+      const config = getShellConfiguration();
+      expect(config.executable).toBe('cmd.exe');
+      expect(config.argsPrefix).toEqual(['/d', '/s', '/c']);
+      expect(config.shell).toBe('cmd');
+      
+      process.title = originalTitle;
+    });
+
+    it('should respect ComSpec for cmd.exe path', () => {
+      const cmdPath = 'C:\\WINDOWS\\system32\\cmd.exe';
+      process.env['ComSpec'] = cmdPath;
+      
+      const config = getShellConfiguration();
+      expect(config.executable).toBe(cmdPath);
+      expect(config.argsPrefix).toEqual(['/d', '/s', '/c']);
+      expect(config.shell).toBe('cmd');
+    });
+
+    it('should default to cmd.exe when no specific shell is detected', () => {
+      delete process.env['ComSpec'];
+      
+      const config = getShellConfiguration();
+      expect(config.executable).toBe('cmd.exe');
+      expect(config.argsPrefix).toEqual(['/d', '/s', '/c']);
+      expect(config.shell).toBe('cmd');
+    });
+  });
+
+  describe('shell type detection edge cases', () => {
+    beforeEach(() => {
+      mockPlatform.mockReturnValue('win32');
+      delete process.env['ComSpec'];
+    });
+
+    it('should NOT misclassify paths containing "cmd" as cmd.exe', () => {
+      process.env['SHELL'] = '/home/user/commands/my-script.sh';
+      
+      const config = getShellConfiguration();
+      expect(config.executable).toBe('/home/user/commands/my-script.sh');
+      expect(config.argsPrefix).toEqual(['-c']);
+      expect(config.shell).toBe('bash'); // Should be bash, not cmd
+    });
+
+    it('should NOT misclassify directory names containing "cmd"', () => {
+      process.env['SHELL'] = '/path/to/cmdtools/bash';
+      
+      const config = getShellConfiguration();
+      expect(config.executable).toBe('/path/to/cmdtools/bash');
+      expect(config.argsPrefix).toEqual(['-c']);
+      expect(config.shell).toBe('bash'); // Should be bash, not cmd
+    });
+
+    it('should correctly identify actual cmd.exe', () => {
+      process.env['SHELL'] = 'cmd.exe';
+      
+      const config = getShellConfiguration();
+      expect(config.executable).toBe('cmd.exe');
+      expect(config.argsPrefix).toEqual(['/d', '/s', '/c']);
+      expect(config.shell).toBe('cmd');
+    });
+
+    it('should correctly identify cmd with full Windows path', () => {
+      process.env['SHELL'] = 'C:\\Windows\\System32\\cmd.exe';
+      
+      const config = getShellConfiguration();
+      expect(config.executable).toBe('C:\\Windows\\System32\\cmd.exe');
+      expect(config.argsPrefix).toEqual(['/d', '/s', '/c']);
+      expect(config.shell).toBe('cmd');
+    });
+
+    it('should correctly identify cmd without .exe extension', () => {
+      process.env['SHELL'] = '/usr/bin/cmd';
+      
+      const config = getShellConfiguration();
+      expect(config.executable).toBe('/usr/bin/cmd');
+      expect(config.argsPrefix).toEqual(['/d', '/s', '/c']);
+      expect(config.shell).toBe('cmd');
+    });
+
+    it('should NOT misclassify paths containing "powershell" as PowerShell', () => {
+      process.env['SHELL'] = '/usr/bin/not-powershell';
+      
+      const config = getShellConfiguration();
+      expect(config.executable).toBe('/usr/bin/not-powershell');
+      expect(config.argsPrefix).toEqual(['-c']);
+      expect(config.shell).toBe('bash'); // Should be bash, not powershell
+    });
+
+    it('should NOT misclassify directory names containing "powershell"', () => {
+      process.env['SHELL'] = '/path/to/powershell-tools/bash';
+      
+      const config = getShellConfiguration();
+      expect(config.executable).toBe('/path/to/powershell-tools/bash');
+      expect(config.argsPrefix).toEqual(['-c']);
+      expect(config.shell).toBe('bash'); // Should be bash, not powershell
+    });
+
+    it('should NOT misclassify paths containing "pwsh" as PowerShell', () => {
+      process.env['SHELL'] = '/usr/bin/my-pwsh-wrapper';
+      
+      const config = getShellConfiguration();
+      expect(config.executable).toBe('/usr/bin/my-pwsh-wrapper');
+      expect(config.argsPrefix).toEqual(['-c']);
+      expect(config.shell).toBe('bash'); // Should be bash, not powershell
+    });
+
+    it('should NOT misclassify process.title containing "powershell" as substring', () => {
+      const originalTitle = process.title;
+      process.title = 'C:\\WINDOWS\\system32\\cmd.exe - node.exe my-powershell-backup.js';
+      delete process.env['SHELL'];
+      delete process.env['LOGINSHELL'];
+      delete process.env['ComSpec'];
+      
+      const config = getShellConfiguration();
+      expect(config.executable).toBe('cmd.exe');
+      expect(config.argsPrefix).toEqual(['/d', '/s', '/c']);
+      expect(config.shell).toBe('cmd'); // Should be cmd, not powershell
+      
+      process.title = originalTitle;
+    });
+
+    it('should NOT misclassify process.title containing "pwsh" as substring', () => {
+      const originalTitle = process.title;
+      process.title = 'Command Prompt - my-pwsh-script.js';
+      delete process.env['SHELL'];
+      delete process.env['LOGINSHELL'];
+      delete process.env['ComSpec'];
+      
+      const config = getShellConfiguration();
+      expect(config.executable).toBe('cmd.exe');
+      expect(config.argsPrefix).toEqual(['/d', '/s', '/c']);
+      expect(config.shell).toBe('cmd'); // Should be cmd, not powershell
+      
+      process.title = originalTitle;
     });
   });
 });

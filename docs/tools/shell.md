@@ -4,7 +4,19 @@ This document describes the `run_shell_command` tool for the Gemini CLI.
 
 ## Description
 
-Use `run_shell_command` to interact with the underlying system, run scripts, or perform command-line operations. `run_shell_command` executes a given shell command. On Windows, the command will be executed with `cmd.exe /c`. On other platforms, the command will be executed with `bash -c`.
+Use `run_shell_command` to interact with the underlying system, run scripts, or perform command-line operations. `run_shell_command` executes a given shell command using your current shell environment.
+
+## Shell Detection
+
+The Gemini CLI automatically detects your shell in this order:
+
+1. **SHELL environment variable** (all platforms)
+2. **LOGINSHELL environment variable** (all platforms)
+3. **PowerShell via ComSpec** (Windows only)
+4. **PowerShell via process title** (Windows only)
+5. **Default shell**: `bash` on Unix/Linux/macOS, `cmd.exe` on Windows
+
+Supports PowerShell Core (`pwsh`) on all platforms.
 
 ### Arguments
 
