@@ -102,7 +102,7 @@ exports[`Help Component > Platform-specific behavior > renders correct shortcuts
 "
 `;
 
-exports[`Help Component > renders help component with mock commands 1`] = `
+exports[`Help Component > renders help component with current platform shortcuts > current-platform-linux 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
 │                                                                                                  │
 │ Basics:                                                                                          │

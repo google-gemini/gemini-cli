@@ -55,27 +55,13 @@ describe('Help Component', () => {
     }
   });
 
-  it('renders help component with mock commands', () => {
+  it('renders help component with current platform shortcuts', () => {
     const { lastFrame } = render(<Help commands={mockCommands} />);
-    const output = lastFrame();
     
-    // Test platform-agnostic content
-    expect(output).toContain('Basics:');
-    expect(output).toContain('Add context: Use @ to specify files');
-    expect(output).toContain('Shell mode: Execute shell commands via !');
-    expect(output).toContain('Commands:');
-    expect(output).toContain('/test - A test command');
-    expect(output).toContain('/parent - A parent command');
-    expect(output).toContain('visible-child - A visible child command');
-    expect(output).toContain('Keyboard Shortcuts:');
-    expect(output).toContain('Alt+Left/Right - Jump through words');
-    expect(output).toContain('Ctrl+C - Quit application');
-    expect(output).toContain('Ctrl+L - Clear the screen');
-    expect(output).toContain('Ctrl+Y - Toggle YOLO mode');
-    expect(output).toContain('Enter - Send message');
-    expect(output).toContain('Esc - Cancel operation');
-    expect(output).toContain('Up/Down - Cycle through your prompt history');
-    expect(output).toContain('docs/keyboard-shortcuts.md');
+    // Use platform-specific snapshot that matches current runtime platform
+    const platformSuffix = process.platform === 'win32' ? 'win32' : 
+                          process.platform === 'darwin' ? 'darwin' : 'linux';
+    expect(lastFrame()).toMatchSnapshot(`current-platform-${platformSuffix}`);
   });
 
   describe('Platform-specific behavior', () => {
