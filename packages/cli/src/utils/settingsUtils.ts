@@ -8,7 +8,7 @@ import type {
   Settings,
   SettingScope,
   LoadedSettings,
-} from '../config/settings.js';
+} from '../config/settings.ts';
 import type {
   SettingDefinition,
   SettingsSchema,

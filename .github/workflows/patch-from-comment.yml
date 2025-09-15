@@ -7,12 +7,19 @@ on:
 jobs:
   slash-command:
     runs-on: 'ubuntu-latest'
+    permissions:
+      contents: 'read'
+      issues: 'write'
+      pull-requests: 'write'
+      actions: 'write'
     steps:
       - name: 'Slash Command Dispatch'
         id: 'slash_command'
         uses: 'peter-evans/slash-command-dispatch@40877f718dce0101edfc7aea2b3800cc192f9ed5'
         with:
-          token: '${{ secrets.GITHUB_TOKEN }}'
+          # GITHUB_TOKEN does not work for slash-command-dispatch; use a PAT.
+          # Create a repo secret SLASH_COMMAND_PAT with repo scope (or fine-grained equivalent).
+          token: '${{ secrets.SLASH_COMMAND_PAT }}'
           commands: 'patch'
           permission: 'write'
           issue-type: 'pull-request'
@@ -33,6 +40,7 @@ jobs:
         if: "steps.pr_status.outputs.STATE == 'MERGED'"
         uses: 'actions/github-script@00f12e3e20659f42342b1c0226afda7f7c042325'
         with:
+          github-token: '${{ secrets.SLASH_COMMAND_PAT }}'
           script: |
             const args = JSON.parse('${{ steps.slash_command.outputs.command-arguments }}');
             github.rest.actions.createWorkflowDispatch({
@@ -51,6 +59,7 @@ jobs:
         if: "steps.pr_status.outputs.STATE != 'MERGED'"
         uses: 'peter-evans/create-or-update-comment@67dcc547d311b736a8e6c5c236542148a47adc3d'
         with:
+          token: '${{ secrets.SLASH_COMMAND_PAT }}'
           issue-number: '${{ github.event.issue.number }}'
           body: |
             :x: The `/patch` command failed. This pull request must be merged before a patch can be created.

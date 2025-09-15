@@ -43,6 +43,7 @@ export interface ContentGenerator {
 
 export enum AuthType {
   LOGIN_WITH_GOOGLE = 'oauth-personal',
+  LOGIN_WITH_LINKEDIN = 'oauth-linkedin',
   USE_GEMINI = 'gemini-api-key',
   USE_VERTEX_AI = 'vertex-ai',
   CLOUD_SHELL = 'cloud-shell',
@@ -69,9 +70,10 @@ export function createContentGeneratorConfig(
     proxy: config?.getProxy(),
   };
 
-  // If we are using Google auth or we are in Cloud Shell, there is nothing else to validate for now
+  // If we are using Google auth, LinkedIn auth, or we are in Cloud Shell, there is nothing else to validate for now
   if (
     authType === AuthType.LOGIN_WITH_GOOGLE ||
+    authType === AuthType.LOGIN_WITH_LINKEDIN ||
     authType === AuthType.CLOUD_SHELL
   ) {
     return contentGeneratorConfig;

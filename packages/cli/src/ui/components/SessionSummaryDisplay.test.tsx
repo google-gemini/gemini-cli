@@ -5,7 +5,7 @@
  */
 
 import { render } from 'ink-testing-library';
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { SessionSummaryDisplay } from './SessionSummaryDisplay.js';
 import * as SessionContext from '../contexts/SessionContext.js';
 import type { SessionMetrics } from '../contexts/SessionContext.js';
@@ -37,6 +37,11 @@ const renderWithMockedStats = (metrics: SessionMetrics) => {
 };
 
 describe('<SessionSummaryDisplay />', () => {
+  // Keep mocks clean between tests without changing behavior
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
   it('renders the summary display with a title', () => {
     const metrics: SessionMetrics = {
       models: {
@@ -66,10 +71,13 @@ describe('<SessionSummaryDisplay />', () => {
       },
     };
 
-    const { lastFrame } = renderWithMockedStats(metrics);
+    const { lastFrame, unmount } = renderWithMockedStats(metrics);
     const output = lastFrame();
 
     expect(output).toContain('Agent powering down. Goodbye!');
     expect(output).toMatchSnapshot();
+
+    // Ensure resources are released promptly
+    unmount();
   });
 });

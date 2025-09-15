@@ -13,6 +13,7 @@ import {
   WriteFileTool,
   DEFAULT_GEMINI_MODEL,
   DEFAULT_GEMINI_MODEL_AUTO,
+  OutputFormat,
 } from '@google/gemini-cli-core';
 import { loadCliConfig, parseArguments, type CliArgs } from './config.js';
 import type { Settings } from './settings.js';
@@ -2112,7 +2113,7 @@ describe('Output Format Configuration', () => {
       'test-session',
       argv,
     );
-    expect(config.getOutputFormat()).toBe(ServerConfig.OutputFormat.TEXT);
+    expect(config.getOutputFormat()).toBe(OutputFormat.TEXT);
   });
 
   it('should use the format from settings when no flag is provided', async () => {
@@ -2120,7 +2121,7 @@ describe('Output Format Configuration', () => {
     const settings: Settings = { output: { format: 'json' } };
     const argv = await parseArguments(settings);
     const config = await loadCliConfig(settings, [], 'test-session', argv);
-    expect(config.getOutputFormat()).toBe(ServerConfig.OutputFormat.JSON);
+    expect(config.getOutputFormat()).toBe(OutputFormat.JSON);
   });
 
   it('should use the format from the flag when provided', async () => {
@@ -2132,7 +2133,7 @@ describe('Output Format Configuration', () => {
       'test-session',
       argv,
     );
-    expect(config.getOutputFormat()).toBe(ServerConfig.OutputFormat.JSON);
+    expect(config.getOutputFormat()).toBe(OutputFormat.JSON);
   });
 
   it('should prioritize the flag over the setting', async () => {
@@ -2140,7 +2141,7 @@ describe('Output Format Configuration', () => {
     const settings: Settings = { output: { format: 'json' } };
     const argv = await parseArguments(settings);
     const config = await loadCliConfig(settings, [], 'test-session', argv);
-    expect(config.getOutputFormat()).toBe(ServerConfig.OutputFormat.TEXT);
+    expect(config.getOutputFormat()).toBe(OutputFormat.TEXT);
   });
 });
 

@@ -326,8 +326,8 @@ describe('loadExtensions', () => {
       );
       expect(serverConfig?.env?.STATIC_VALUE).toBe('no-substitution');
     } finally {
-      delete process.env.TEST_API_KEY;
-      delete process.env.TEST_DB_URL;
+      delete process.env['TEST_API_KEY'];
+      delete process.env['TEST_DB_URL'];
     }
   });
 

@@ -33,6 +33,7 @@ describe('ShellExecutionService programmatic integration tests', () => {
       onOutputEvent,
       abortController.signal,
       false,
+      {},
     );
 
     const result = await handle.result;
@@ -107,6 +108,7 @@ describe('ShellExecutionService programmatic integration tests', () => {
       onOutputEvent,
       abortController.signal,
       false,
+      {},
     );
 
     // Abort shortly after starting

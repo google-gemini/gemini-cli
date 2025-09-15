@@ -9,7 +9,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { getInstallationInfo, PackageManager } from './installationInfo.js';
 import { updateEventEmitter } from './updateEventEmitter.js';
 import type { UpdateObject } from '../ui/utils/updateCheck.js';
-import type { LoadedSettings } from '../config/settings.js';
+import type { LoadedSettings } from '../config/settings.ts';
 import EventEmitter from 'node:events';
 import { handleAutoUpdate } from './handleAutoUpdate.js';
 

@@ -165,6 +165,11 @@ describe('InputPrompt', () => {
         text: '',
         accept: vi.fn(),
         clear: vi.fn(),
+        isLoading: false,
+        isActive: false,
+        markSelected: function (selectedText: string): void {
+          throw new Error('Function not implemented.');
+        }
       },
     };
     mockedUseCommandCompletion.mockReturnValue(mockCommandCompletion);
