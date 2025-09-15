@@ -85,11 +85,11 @@ function extractLinksFromHtml(
     pattern?: string;
     extensions?: string[];
   } = {}
-): { url: string; filename: string; text?: string }[] {
+): Array<{ url: string; filename: string; text?: string }> {
   const { selector = 'a[href]', pattern, extensions } = options;
   
   // Enhanced HTML parsing to support CSS selectors
-  const links: { url: string; filename: string; text?: string }[] = [];
+  const links: Array<{ url: string; filename: string; text?: string }> = [];
   
   // For now, we'll use regex with enhanced selector support
   let linkRegex: RegExp;
@@ -370,7 +370,7 @@ class WebToolInvocation extends BaseToolInvocation<WebParams, WebResult> {
       const contentType = response.headers.get('content-type') || '';
       const html = await response.text();
       let content: string;
-      let extractedLinks: { url: string; filename: string; text?: string }[] | undefined;
+      let extractedLinks: Array<{ url: string; filename: string; text?: string }> | undefined;
 
       // If extractLinks is requested, extract and filter links
       if (extractLinks && contentType.includes('text/html')) {
@@ -460,58 +460,66 @@ class WebToolInvocation extends BaseToolInvocation<WebParams, WebResult> {
           break;
           
         case 'links':
-          const linkRegex = /<a[^>]+href=["']([^"']+)["'][^>]*>([^<]*)<\/a>/gi;
-          const links: Array<{ url: string; text: string }> = [];
-          let linkMatch;
-          while ((linkMatch = linkRegex.exec(html)) !== null) {
-            const linkUrl = linkMatch[1];
-            const linkText = linkMatch[2].trim();
-            if (linkUrl && linkText) {
-              links.push({ url: linkUrl, text: linkText });
+          {
+            const linkRegex = /<a[^>]+href=["']([^"']+)["'][^>]*>([^<]*)<\/a>/gi;
+            const links: Array<{ url: string; text: string }> = [];
+            let linkMatch;
+            while ((linkMatch = linkRegex.exec(html)) !== null) {
+              const linkUrl = linkMatch[1];
+              const linkText = linkMatch[2].trim();
+              if (linkUrl && linkText) {
+                links.push({ url: linkUrl, text: linkText });
+              }
             }
+            extracted = links;
+            break;
           }
-          extracted = links;
-          break;
           
         case 'images':
-          const imgRegex = /<img[^>]+src=["']([^"']+)["'][^>]*(?:alt=["']([^"']*)["'])?[^>]*>/gi;
-          const images: Array<{ src: string; alt?: string }> = [];
-          let imgMatch;
-          while ((imgMatch = imgRegex.exec(html)) !== null) {
-            images.push({ 
-              src: imgMatch[1], 
-              alt: imgMatch[2] || undefined 
-            });
+          {
+            const imgRegex = /<img[^>]+src=["']([^"']+)["'][^>]*(?:alt=["']([^"']*)["'])?[^>]*>/gi;
+            const images: Array<{ src: string; alt?: string }> = [];
+            let imgMatch;
+            while ((imgMatch = imgRegex.exec(html)) !== null) {
+              images.push({ 
+                src: imgMatch[1], 
+                alt: imgMatch[2] || undefined 
+              });
+            }
+            extracted = images;
+            break;
           }
-          extracted = images;
-          break;
           
         case 'metadata':
-          const titleMatch = html.match(/<title[^>]*>([^<]*)<\/title>/i);
-          const descMatch = html.match(/<meta[^>]+name=["']description["'][^>]+content=["']([^"']*)["'][^>]*>/i);
-          const keywordsMatch = html.match(/<meta[^>]+name=["']keywords["'][^>]+content=["']([^"']*)["'][^>]*>/i);
-          
-          extracted = {
-            title: titleMatch?.[1]?.trim() || null,
-            description: descMatch?.[1]?.trim() || null,
-            keywords: keywordsMatch?.[1]?.trim() || null,
-            url: processedUrl,
-          };
-          break;
+          {
+            const titleMatch = html.match(/<title[^>]*>([^<]*)<\/title>/i);
+            const descMatch = html.match(/<meta[^>]+name=["']description["'][^>]+content=["']([^"']*)["'][^>]*>/i);
+            const keywordsMatch = html.match(/<meta[^>]+name=["']keywords["'][^>]+content=["']([^"']*)["'][^>]*>/i);
+            
+            extracted = {
+              title: titleMatch?.[1]?.trim() || null,
+              description: descMatch?.[1]?.trim() || null,
+              keywords: keywordsMatch?.[1]?.trim() || null,
+              url: processedUrl,
+            };
+            break;
+          }
           
         case 'tables':
-          const tableRegex = /<table[^>]*>(.*?)<\/table>/gis;
-          const tables: Array<{ html: string; text: string }> = [];
-          let tableMatch;
-          while ((tableMatch = tableRegex.exec(html)) !== null) {
-            const tableHtml = tableMatch[0];
-            const tableText = convert(tableHtml, { wordwrap: false });
-            if (tableText.trim()) {
-              tables.push({ html: tableHtml, text: tableText });
+          {
+            const tableRegex = /<table[^>]*>(.*?)<\/table>/gis;
+            const tables: Array<{ html: string; text: string }> = [];
+            let tableMatch;
+            while ((tableMatch = tableRegex.exec(html)) !== null) {
+              const tableHtml = tableMatch[0];
+              const tableText = convert(tableHtml, { wordwrap: false });
+              if (tableText.trim()) {
+                tables.push({ html: tableHtml, text: tableText });
+              }
             }
+            extracted = tables;
+            break;
           }
-          extracted = tables;
-          break;
           
         default:
           extracted = convert(html, { wordwrap: false });
@@ -582,7 +590,7 @@ class WebToolInvocation extends BaseToolInvocation<WebParams, WebResult> {
             op: 'batch',
             error: {
               message: `No matching links found for pattern "${linkPattern}" on ${url}`,
-              type: 'NO_LINKS_FOUND' as any,
+              type: ToolErrorType.NO_LINKS_FOUND,
             },
             llmContent: `web(batch): No links found matching pattern "${linkPattern}" on ${url}`,
             returnDisplay: `web(batch): No matching links found`,
@@ -597,7 +605,7 @@ class WebToolInvocation extends BaseToolInvocation<WebParams, WebResult> {
           op: 'batch',
           error: {
             message: `Failed to discover links from ${url}: ${errorMessage}`,
-            type: 'LINK_DISCOVERY_FAILED' as any,
+            type: ToolErrorType.LINK_DISCOVERY_FAILED,
           },
           llmContent: `web(batch): Link discovery failed: ${errorMessage}`,
           returnDisplay: `web(batch): Link discovery failed`,
