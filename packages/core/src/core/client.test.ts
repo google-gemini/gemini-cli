@@ -295,6 +295,12 @@ describe('Gemini Client (client.ts)', () => {
         getProjectTempDir: vi.fn().mockReturnValue('/test/temp'),
       },
       getContentGenerator: vi.fn().mockReturnValue(mockContentGenerator),
+      getBaseLlmClient: vi.fn().mockReturnValue({
+        generateJson: vi.fn().mockResolvedValue({
+          next_speaker: 'user',
+          reasoning: 'test',
+        }),
+      }),
     } as unknown as Config;
 
     client = new GeminiClient(mockConfig);
