@@ -27,14 +27,23 @@ const MCP_SESSION_ID_HEADER = 'mcp-session-id';
 const IDE_SERVER_PORT_ENV_VAR = 'GEMINI_CLI_IDE_SERVER_PORT';
 const IDE_WORKSPACE_PATH_ENV_VAR = 'GEMINI_CLI_IDE_WORKSPACE_PATH';
 
-async function writePortAndWorkspace(
-  context: vscode.ExtensionContext,
-  port: number,
-  portFile: string,
-  ppidPortFile: string,
-  authToken: string,
-  log: (message: string) => void,
-): Promise<void> {
+interface WritePortAndWorkspaceArgs {
+  context: vscode.ExtensionContext;
+  port: number;
+  portFile: string;
+  ppidPortFile: string;
+  authToken: string;
+  log: (message: string) => void;
+}
+
+async function writePortAndWorkspace({
+  context,
+  port,
+  portFile,
+  ppidPortFile,
+  authToken,
+  log,
+}: WritePortAndWorkspaceArgs): Promise<void> {
   const workspaceFolders = vscode.workspace.workspaceFolders;
   const workspacePath =
     workspaceFolders && workspaceFolders.length > 0
@@ -62,8 +71,8 @@ async function writePortAndWorkspace(
 
   try {
     await Promise.all([
-      fs.writeFile(portFile, content),
-      fs.writeFile(ppidPortFile, content),
+      fs.writeFile(portFile, content, { mode: 0o600 }),
+      fs.writeFile(ppidPortFile, content, { mode: 0o600 }),
     ]);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -278,14 +287,14 @@ export class IDEServer {
           this.log(`IDE server listening on port ${this.port}`);
 
           if (this.authToken) {
-            await writePortAndWorkspace(
+            await writePortAndWorkspace({
               context,
-              this.port,
-              this.portFile,
-              this.ppidPortFile,
-              this.authToken,
-              this.log,
-            );
+              port: this.port,
+              portFile: this.portFile,
+              ppidPortFile: this.ppidPortFile,
+              authToken: this.authToken,
+              log: this.log,
+            });
           }
         }
         resolve();
@@ -315,14 +324,14 @@ export class IDEServer {
       this.ppidPortFile &&
       this.authToken
     ) {
-      await writePortAndWorkspace(
-        this.context,
-        this.port,
-        this.portFile,
-        this.ppidPortFile,
-        this.authToken,
-        this.log,
-      );
+      await writePortAndWorkspace({
+        context: this.context,
+        port: this.port,
+        portFile: this.portFile,
+        ppidPortFile: this.ppidPortFile,
+        authToken: this.authToken,
+        log: this.log,
+      });
       this.broadcastIdeContextUpdate();
     }
   }
