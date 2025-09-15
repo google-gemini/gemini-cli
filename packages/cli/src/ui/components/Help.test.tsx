@@ -85,6 +85,17 @@ describe('Help Component', () => {
     expect(output).toContain('Model Context Protocol command');
   });
 
+  // Only test snapshots on Linux to avoid cross-platform differences
+  it('renders help component with mock commands (Linux only)', () => {
+    // Skip on non-Linux platforms to avoid cross-platform CI failures
+    if (process.platform !== 'linux') {
+      return;
+    }
+
+    const { lastFrame } = render(<Help commands={mockCommands} />);
+    expect(lastFrame()).toMatchSnapshot();
+  });
+
   it('renders platform-specific shortcuts correctly', () => {
     const { lastFrame } = render(<Help commands={mockCommands} />);
     const output = lastFrame();
