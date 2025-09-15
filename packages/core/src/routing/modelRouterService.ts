@@ -11,6 +11,7 @@ import type {
   TerminalStrategy,
 } from './routingStrategy.js';
 import { DefaultStrategy } from './strategies/defaultStrategy.js';
+import { ClassifierStrategy } from './strategies/classifierStrategy.js';
 import { CompositeStrategy } from './strategies/compositeStrategy.js';
 import { FallbackStrategy } from './strategies/fallbackStrategy.js';
 import { OverrideStrategy } from './strategies/overrideStrategy.js';
@@ -31,7 +32,12 @@ export class ModelRouterService {
     // Initialize the composite strategy with the desired priority order.
     // The strategies are ordered in order of highest priority.
     return new CompositeStrategy(
-      [new FallbackStrategy(), new OverrideStrategy(), new DefaultStrategy()],
+      [
+        new FallbackStrategy(),
+        new OverrideStrategy(),
+        new ClassifierStrategy(),
+        new DefaultStrategy(),
+      ],
       'agent-router',
     );
   }
