@@ -314,23 +314,26 @@ describe('editor utils', () => {
   });
 
   describe('openDiff', () => {
-    const spawnEditors: EditorType[] = [
+    const editors: EditorType[] = [
       'vscode',
       'vscodium',
       'windsurf',
       'cursor',
       'zed',
+      'vim',
+      'neovim',
+      'emacs',
     ];
-    for (const editor of spawnEditors) {
+
+    for (const editor of editors) {
       it(`should call spawn for ${editor}`, async () => {
-        const mockSpawn = {
-          on: vi.fn((event, cb) => {
-            if (event === 'close') {
-              cb(0);
-            }
-          }),
-        };
-        (spawn as Mock).mockReturnValue(mockSpawn);
+        const mockSpawnOn = vi.fn((event, cb) => {
+          if (event === 'close') {
+            cb(0);
+          }
+        });
+        (spawn as Mock).mockReturnValue({ on: mockSpawnOn });
+
         await openDiff('old.txt', 'new.txt', editor, () => {});
         const diffCommand = getDiffCommand('old.txt', 'new.txt', editor)!;
         expect(spawn).toHaveBeenCalledWith(
@@ -338,77 +341,37 @@ describe('editor utils', () => {
           diffCommand.args,
           {
             stdio: 'inherit',
-            shell: true,
           },
         );
-        expect(mockSpawn.on).toHaveBeenCalledWith(
-          'close',
-          expect.any(Function),
-        );
-        expect(mockSpawn.on).toHaveBeenCalledWith(
-          'error',
-          expect.any(Function),
-        );
+        expect(mockSpawnOn).toHaveBeenCalledWith('close', expect.any(Function));
+        expect(mockSpawnOn).toHaveBeenCalledWith('error', expect.any(Function));
       });
 
       it(`should reject if spawn for ${editor} fails`, async () => {
         const mockError = new Error('spawn error');
-        const mockSpawn = {
-          on: vi.fn((event, cb) => {
-            if (event === 'error') {
-              cb(mockError);
-            }
-          }),
-        };
-        (spawn as Mock).mockReturnValue(mockSpawn);
+        const mockSpawnOn = vi.fn((event, cb) => {
+          if (event === 'error') {
+            cb(mockError);
+          }
+        });
+        (spawn as Mock).mockReturnValue({ on: mockSpawnOn });
+
         await expect(
           openDiff('old.txt', 'new.txt', editor, () => {}),
         ).rejects.toThrow('spawn error');
       });
 
       it(`should reject if ${editor} exits with non-zero code`, async () => {
-        const mockSpawn = {
-          on: vi.fn((event, cb) => {
-            if (event === 'close') {
-              cb(1);
-            }
-          }),
-        };
-        (spawn as Mock).mockReturnValue(mockSpawn);
+        const mockSpawnOn = vi.fn((event, cb) => {
+          if (event === 'close') {
+            cb(1);
+          }
+        });
+        (spawn as Mock).mockReturnValue({ on: mockSpawnOn });
+
         await expect(
           openDiff('old.txt', 'new.txt', editor, () => {}),
         ).rejects.toThrow(`${editor} exited with code 1`);
-      });
-    }
-
-    const execSyncEditors: EditorType[] = ['vim', 'neovim', 'emacs'];
-    for (const editor of execSyncEditors) {
-      it(`should call execSync for ${editor} on non-windows`, async () => {
-        Object.defineProperty(process, 'platform', { value: 'linux' });
-        await openDiff('old.txt', 'new.txt', editor, () => {});
-        expect(execSync).toHaveBeenCalledTimes(1);
-        const diffCommand = getDiffCommand('old.txt', 'new.txt', editor)!;
-        const expectedCommand = `${
-          diffCommand.command
-        } ${diffCommand.args.map((arg) => `"${arg}"`).join(' ')}`;
-        expect(execSync).toHaveBeenCalledWith(expectedCommand, {
-          stdio: 'inherit',
-          encoding: 'utf8',
-        });
-      });
-
-      it(`should call execSync for ${editor} on windows`, async () => {
-        Object.defineProperty(process, 'platform', { value: 'win32' });
-        await openDiff('old.txt', 'new.txt', editor, () => {});
-        expect(execSync).toHaveBeenCalledTimes(1);
-        const diffCommand = getDiffCommand('old.txt', 'new.txt', editor)!;
-        const expectedCommand = `${diffCommand.command} ${diffCommand.args.join(
-          ' ',
-        )}`;
-        expect(execSync).toHaveBeenCalledWith(expectedCommand, {
-          stdio: 'inherit',
-          encoding: 'utf8',
-        });
       });
     }
 
@@ -424,38 +387,58 @@ describe('editor utils', () => {
     });
 
     describe('onEditorClose callback', () => {
-      it('should call onEditorClose for execSync editors', async () => {
-        (execSync as Mock).mockReturnValue(Buffer.from(`/usr/bin/`));
-        const onEditorClose = vi.fn();
-        await openDiff('old.txt', 'new.txt', 'vim', onEditorClose);
-        expect(execSync).toHaveBeenCalledTimes(1);
-        expect(onEditorClose).toHaveBeenCalledTimes(1);
-      });
-
-      it('should call onEditorClose for execSync editors when an error is thrown', async () => {
-        (execSync as Mock).mockImplementation(() => {
-          throw new Error('test error');
-        });
-        const onEditorClose = vi.fn();
-        openDiff('old.txt', 'new.txt', 'vim', onEditorClose);
-        expect(execSync).toHaveBeenCalledTimes(1);
-        expect(onEditorClose).toHaveBeenCalledTimes(1);
-      });
-
-      it('should not call onEditorClose for spawn editors', async () => {
-        const onEditorClose = vi.fn();
-        const mockSpawn = {
-          on: vi.fn((event, cb) => {
+      const terminalEditors: EditorType[] = ['vim', 'neovim', 'emacs'];
+      for (const editor of terminalEditors) {
+        it(`should call onEditorClose for ${editor} on close`, async () => {
+          const onEditorClose = vi.fn();
+          const mockSpawnOn = vi.fn((event, cb) => {
             if (event === 'close') {
               cb(0);
             }
-          }),
-        };
-        (spawn as Mock).mockReturnValue(mockSpawn);
-        await openDiff('old.txt', 'new.txt', 'vscode', onEditorClose);
-        expect(spawn).toHaveBeenCalledTimes(1);
-        expect(onEditorClose).not.toHaveBeenCalled();
-      });
+          });
+          (spawn as Mock).mockReturnValue({ on: mockSpawnOn });
+
+          await openDiff('old.txt', 'new.txt', editor, onEditorClose);
+          expect(onEditorClose).toHaveBeenCalledTimes(1);
+        });
+
+        it(`should call onEditorClose for ${editor} on error`, async () => {
+          const onEditorClose = vi.fn();
+          const mockError = new Error('spawn error');
+          const mockSpawnOn = vi.fn((event, cb) => {
+            if (event === 'error') {
+              cb(mockError);
+            }
+          });
+          (spawn as Mock).mockReturnValue({ on: mockSpawnOn });
+
+          await expect(
+            openDiff('old.txt', 'new.txt', editor, onEditorClose),
+          ).rejects.toThrow('spawn error');
+          expect(onEditorClose).toHaveBeenCalledTimes(1);
+        });
+      }
+
+      const guiEditors: EditorType[] = [
+        'vscode',
+        'vscodium',
+        'windsurf',
+        'cursor',
+        'zed',
+      ];
+      for (const editor of guiEditors) {
+        it(`should not call onEditorClose for ${editor}`, async () => {
+          const onEditorClose = vi.fn();
+          const mockSpawnOn = vi.fn((event, cb) => {
+            if (event === 'close') {
+              cb(0);
+            }
+          });
+          (spawn as Mock).mockReturnValue({ on: mockSpawnOn });
+          await openDiff('old.txt', 'new.txt', editor, onEditorClose);
+          expect(onEditorClose).not.toHaveBeenCalled();
+        });
+      }
     });
   });
 

@@ -173,56 +173,37 @@ export async function openDiff(
   }
 
   try {
-    switch (editor) {
-      case 'vscode':
-      case 'vscodium':
-      case 'windsurf':
-      case 'cursor':
-      case 'zed':
-        // Use spawn for GUI-based editors to avoid blocking the entire process
-        return new Promise((resolve, reject) => {
-          const childProcess = spawn(diffCommand.command, diffCommand.args, {
-            stdio: 'inherit',
-            shell: true,
-          });
+    return new Promise<void>((resolve, reject) => {
+      const isTerminalEditor = ['vim', 'emacs', 'neovim'].includes(editor);
 
-          childProcess.on('close', (code) => {
-            if (code === 0) {
-              resolve();
-            } else {
-              reject(new Error(`${editor} exited with code ${code}`));
-            }
-          });
+      const childProcess = spawn(diffCommand.command, diffCommand.args, {
+        stdio: 'inherit',
+      });
 
-          childProcess.on('error', (error) => {
-            reject(error);
-          });
-        });
-
-      case 'vim':
-      case 'emacs':
-      case 'neovim': {
-        // Use execSync for terminal-based editors
-        const command =
-          process.platform === 'win32'
-            ? `${diffCommand.command} ${diffCommand.args.join(' ')}`
-            : `${diffCommand.command} ${diffCommand.args.map((arg) => `"${arg}"`).join(' ')}`;
-        try {
-          execSync(command, {
-            stdio: 'inherit',
-            encoding: 'utf8',
-          });
-        } catch (e) {
-          console.error('Error in onEditorClose callback:', e);
-        } finally {
-          onEditorClose();
+      const onFinally = () => {
+        if (isTerminalEditor) {
+          try {
+            onEditorClose();
+          } catch (e) {
+            console.error('Error in onEditorClose callback:', e);
+          }
         }
-        break;
-      }
+      };
 
-      default:
-        throw new Error(`Unsupported editor: ${editor}`);
-    }
+      childProcess.on('close', (code) => {
+        onFinally();
+        if (code === 0) {
+          resolve();
+        } else {
+          reject(new Error(`${editor} exited with code ${code}`));
+        }
+      });
+
+      childProcess.on('error', (error) => {
+        onFinally();
+        reject(error);
+      });
+    });
   } catch (error) {
     console.error(error);
   }

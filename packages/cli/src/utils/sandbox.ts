@@ -302,9 +302,9 @@ export async function start_sandbox(
           sandboxEnv['NO_PROXY'] = noProxy;
           sandboxEnv['no_proxy'] = noProxy;
         }
-        proxyProcess = spawn(proxyCommand, {
+        const [proxyCmd, ...proxyArgs] = parse(proxyCommand).map(String);
+        proxyProcess = spawn(proxyCmd, proxyArgs, {
           stdio: ['ignore', 'pipe', 'pipe'],
-          shell: true,
           detached: true,
         });
         // install handlers to stop proxy on exit/signal
@@ -751,10 +751,26 @@ export async function start_sandbox(
 
     if (proxyCommand) {
       // run proxyCommand in its own container
-      const proxyContainerCommand = `${config.command} run --rm --init ${userFlag} --name ${SANDBOX_PROXY_NAME} --network ${SANDBOX_PROXY_NAME} -p 8877:8877 -v ${process.cwd()}:${workdir} --workdir ${workdir} ${image} ${proxyCommand}`;
-      proxyProcess = spawn(proxyContainerCommand, {
+      const proxyContainerArgs = [
+        'run',
+        '--rm',
+        '--init',
+        ...(userFlag ? userFlag.split(' ').filter((s) => s) : []),
+        '--name',
+        SANDBOX_PROXY_NAME,
+        '--network',
+        SANDBOX_PROXY_NAME,
+        '-p',
+        '8877:8877',
+        '-v',
+        `${process.cwd()}:${workdir}`,
+        '--workdir',
+        workdir,
+        image,
+        ...parse(proxyCommand).map(String),
+      ];
+      proxyProcess = spawn(config.command, proxyContainerArgs, {
         stdio: ['ignore', 'pipe', 'pipe'],
-        shell: true,
         detached: true,
       });
       // install handlers to stop proxy on exit/signal
@@ -777,8 +793,9 @@ export async function start_sandbox(
         if (sandboxProcess?.pid) {
           process.kill(-sandboxProcess.pid, 'SIGTERM');
         }
+        const commandString = [config.command, ...proxyContainerArgs].join(' ');
         throw new FatalSandboxError(
-          `Proxy container command '${proxyContainerCommand}' exited with code ${code}, signal ${signal}`,
+          `Proxy container command '${commandString}' exited with code ${code}, signal ${signal}`,
         );
       });
       console.log('waiting for proxy to start ...');
