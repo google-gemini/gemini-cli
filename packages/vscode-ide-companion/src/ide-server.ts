@@ -32,6 +32,7 @@ async function writePortAndWorkspace(
   port: number,
   portFile: string,
   ppidPortFile: string,
+  authToken: string,
   log: (message: string) => void,
 ): Promise<void> {
   const workspaceFolders = vscode.workspace.workspaceFolders;
@@ -49,7 +50,12 @@ async function writePortAndWorkspace(
     workspacePath,
   );
 
-  const content = JSON.stringify({ port, workspacePath, ppid: process.ppid });
+  const content = JSON.stringify({
+    port,
+    workspacePath,
+    ppid: process.ppid,
+    authToken,
+  });
 
   log(`Writing port file to: ${portFile}`);
   log(`Writing ppid port file to: ${ppidPortFile}`);
@@ -95,6 +101,7 @@ export class IDEServer {
   private portFile: string | undefined;
   private ppidPortFile: string | undefined;
   private port: number | undefined;
+  private authToken: string | undefined;
   private transports: { [sessionId: string]: StreamableHTTPServerTransport } =
     {};
   private openFilesManager: OpenFilesManager | undefined;
@@ -108,10 +115,33 @@ export class IDEServer {
   start(context: vscode.ExtensionContext): Promise<void> {
     return new Promise((resolve) => {
       this.context = context;
+      this.authToken = randomUUID();
       const sessionsWithInitialNotification = new Set<string>();
 
       const app = express();
       app.use(express.json({ limit: '10mb' }));
+      app.use((req, res, next) => {
+        const authHeader = req.headers.authorization;
+        if (!authHeader) {
+          this.log('Missing Authorization header. Rejecting request.');
+          res.status(401).send('Unauthorized');
+          return;
+        }
+        const parts = authHeader.split(' ');
+        if (parts.length !== 2 || parts[0] !== 'Bearer') {
+          this.log('Malformed Authorization header. Rejecting request.');
+          res.status(401).send('Unauthorized');
+          return;
+        }
+        const token = parts[1];
+        if (token !== this.authToken) {
+          this.log('Invalid auth token provided. Rejecting request.');
+          res.status(401).send('Unauthorized');
+          return;
+        }
+        next();
+      });
+
       const mcpServer = createMcpServer(this.diffManager);
 
       this.openFilesManager = new OpenFilesManager(context);
@@ -250,13 +280,16 @@ export class IDEServer {
           );
           this.log(`IDE server listening on port ${this.port}`);
 
-          await writePortAndWorkspace(
-            context,
-            this.port,
-            this.portFile,
-            this.ppidPortFile,
-            this.log,
-          );
+          if (this.authToken) {
+            await writePortAndWorkspace(
+              context,
+              this.port,
+              this.portFile,
+              this.ppidPortFile,
+              this.authToken,
+              this.log,
+            );
+          }
         }
         resolve();
       });
@@ -282,13 +315,15 @@ export class IDEServer {
       this.server &&
       this.port &&
       this.portFile &&
-      this.ppidPortFile
+      this.ppidPortFile &&
+      this.authToken
     ) {
       await writePortAndWorkspace(
         this.context,
         this.port,
         this.portFile,
         this.ppidPortFile,
+        this.authToken,
         this.log,
       );
       this.broadcastIdeContextUpdate();

@@ -12,6 +12,10 @@ import * as path from 'node:path';
 import { IDEServer } from './ide-server.js';
 import type { DiffManager } from './diff-manager.js';
 
+vi.mock('node:crypto', () => ({
+  randomUUID: vi.fn(() => 'test-auth-token'),
+}));
+
 const mocks = vi.hoisted(() => ({
   diffManager: {
     onDidChange: vi.fn(() => ({ dispose: vi.fn() })),
@@ -134,6 +138,7 @@ describe('IDEServer', () => {
       port: parseInt(port, 10),
       workspacePath: expectedWorkspacePaths,
       ppid: process.ppid,
+      authToken: 'test-auth-token',
     });
     expect(fs.writeFile).toHaveBeenCalledWith(
       expectedPortFile,
@@ -169,6 +174,7 @@ describe('IDEServer', () => {
       port: parseInt(port, 10),
       workspacePath: '/foo/bar',
       ppid: process.ppid,
+      authToken: 'test-auth-token',
     });
     expect(fs.writeFile).toHaveBeenCalledWith(
       expectedPortFile,
@@ -204,6 +210,7 @@ describe('IDEServer', () => {
       port: parseInt(port, 10),
       workspacePath: '',
       ppid: process.ppid,
+      authToken: 'test-auth-token',
     });
     expect(fs.writeFile).toHaveBeenCalledWith(
       expectedPortFile,
@@ -253,6 +260,7 @@ describe('IDEServer', () => {
       port: parseInt(port, 10),
       workspacePath: expectedWorkspacePaths,
       ppid: process.ppid,
+      authToken: 'test-auth-token',
     });
     expect(fs.writeFile).toHaveBeenCalledWith(
       expectedPortFile,
@@ -275,6 +283,7 @@ describe('IDEServer', () => {
       port: parseInt(port, 10),
       workspacePath: '/baz/qux',
       ppid: process.ppid,
+      authToken: 'test-auth-token',
     });
     expect(fs.writeFile).toHaveBeenCalledWith(
       expectedPortFile,
@@ -335,6 +344,7 @@ describe('IDEServer', () => {
         port: parseInt(port, 10),
         workspacePath: expectedWorkspacePaths,
         ppid: process.ppid,
+        authToken: 'test-auth-token',
       });
       expect(fs.writeFile).toHaveBeenCalledWith(
         expectedPortFile,
@@ -346,4 +356,92 @@ describe('IDEServer', () => {
       );
     },
   );
+
+  describe('auth token', () => {
+    let port: number;
+
+    beforeEach(async () => {
+      await ideServer.start(mockContext);
+      port = (ideServer as unknown as { port: number }).port;
+    });
+
+    it('should reject request without auth token', async () => {
+      const response = await fetch(`http://localhost:${port}/mcp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          method: 'initialize',
+          params: {},
+          id: 1,
+        }),
+      });
+      expect(response.status).toBe(401);
+      const body = await response.text();
+      expect(body).toBe('Unauthorized');
+    });
+
+    it('should allow request with valid auth token', async () => {
+      const response = await fetch(`http://localhost:${port}/mcp`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer test-auth-token`,
+        },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          method: 'initialize',
+          params: {},
+          id: 1,
+        }),
+      });
+      expect(response.status).not.toBe(401);
+    });
+
+    it('should reject request with invalid auth token', async () => {
+      const response = await fetch(`http://localhost:${port}/mcp`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer invalid-token',
+        },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          method: 'initialize',
+          params: {},
+          id: 1,
+        }),
+      });
+      expect(response.status).toBe(401);
+      const body = await response.text();
+      expect(body).toBe('Unauthorized');
+    });
+
+    it('should reject request with malformed auth token', async () => {
+      const malformedHeaders = [
+        'Bearer',
+        'invalid-token',
+        'Bearer token extra',
+      ];
+
+      for (const header of malformedHeaders) {
+        const response = await fetch(`http://localhost:${port}/mcp`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: header,
+          },
+          body: JSON.stringify({
+            jsonrpc: '2.0',
+            method: 'initialize',
+            params: {},
+            id: 1,
+          }),
+        });
+        expect(response.status, `Failed for header: ${header}`).toBe(401);
+        const body = await response.text();
+        expect(body, `Failed for header: ${header}`).toBe('Unauthorized');
+      }
+    });
+  });
 });
