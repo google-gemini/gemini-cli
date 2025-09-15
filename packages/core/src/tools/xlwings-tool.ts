@@ -721,10 +721,16 @@ interface XlwingsResult extends ToolResult {
     name: string;
     type: string;
     text?: string;
-    left: number;
-    top: number;
-    width: number;
-    height: number;
+    position: {
+      left: number;
+      top: number;
+    };
+    size: {
+      width: number;
+      height: number;
+    };
+    rotation?: number;
+    visible?: boolean;
   };
   shapes?: Array<{
     name: string;
@@ -815,7 +821,7 @@ export class XlwingsTool extends BasePythonTool<XlwingsParams, XlwingsResult> {
           },
           range: {
             type: 'string',
-            description: 'Cell range (e.g., "A1", "A1:C10", "Sheet1!A1:B5")'
+            description: 'Cell range (e.g., "A1", "A1:C10", "Sheet1!A1:B5"). For write_range: specify a range that matches your data size (e.g., "A1:G26" for 26 rows × 7 columns of data). Single cell like "A1" will auto-expand to fit data size.'
           },
           data: {
             type: 'array',
@@ -2453,15 +2459,6 @@ def _resolve_workbook_path(workbook_name):
     # Return as-is (might be for creation)
     return os.path.abspath(workbook_name)
 
-# Legacy function for backward compatibility
-def get_workbook(workbook_name=None, app=None):
-    """Legacy get_workbook function - calls smart version"""
-    try:
-        wb, found_app, _, _ = get_workbook_smart(workbook_name, app)
-        return wb
-    except:
-        return None
-
 def get_worksheet(wb, worksheet_name=None):
     """Get worksheet by name or return active worksheet"""
     try:
@@ -2650,24 +2647,9 @@ def get_worksheet(wb, worksheet_name=None):
 # Connect to Excel
 app = get_excel_app(${appId || 'None'})
 if not app:
-    result = {
-        "success": False,
-        "operation": "connect_excel",
-        "error_type": "excel_not_running",
-        "error_message": "No Excel application found. Please open Excel first.",
-        "context": {
-            "required_action": "open_excel"
-        },
-        "suggested_actions": [
-            "Open Microsoft Excel application",
-            "Create or open a workbook",
-            "Try the operation again"
-        ]
-    }
-    print(json.dumps(result))
-    exit()
+    app = xw.App(visible=False)
 
-wb = get_workbook("${params.workbook || ''}", app)
+wb, app_used, opened_by_us, created_by_us = get_workbook_smart("${this.escapePythonPath(params.workbook || '')}", app)
 if not wb:
     wb = app.books.active if app.books else None
     if not wb:
@@ -2853,19 +2835,9 @@ print(json.dumps(result))`;
 # Connect to Excel
 app = xw.apps.active if xw.apps else None
 if not app:
-    result = {
-        "success": False,
-        "operation": "write_range",
-        "error_type": "excel_not_running",
-        "error_message": "No active Excel application found. Please open Excel first.",
-        "context": {
-            "required_action": "open_excel"
-        }
-    }
-    print(json.dumps(result))
-    exit()
+    app = xw.App(visible=False)
 
-wb = get_workbook("${params.workbook || ''}")
+wb, app_used, opened_by_us, created_by_us = get_workbook_smart("${this.escapePythonPath(params.workbook || '')}", app)
 if not wb:
     result = {
         "success": False,
@@ -2906,67 +2878,108 @@ data = ${JSON.stringify(params.data || [])}
 range_str = "${params.range || 'A1'}"
 
 if data:
-    # Get the target range dimensions
-    range_obj = ws.range(range_str)
-    rows_count = range_obj.rows.count
-    cols_count = range_obj.columns.count
-    
-    # Prepare data to fill the entire range
-    if isinstance(data, list):
-        # Check if data is 2D or 1D
+    # Check if range is a single cell (e.g., "A1", "B2") or a range (e.g., "A1:C10")
+    is_single_cell = ':' not in range_str
+
+    if is_single_cell and isinstance(data, list):
+        # Auto-expand range to fit data when only a single cell is specified
         if len(data) > 0 and isinstance(data[0], list):
-            # 2D data - expand to fill the range
-            target_data = []
-            for row in range(rows_count):
-                target_row = []
-                for col in range(cols_count):
-                    if row < len(data) and col < len(data[row]):
-                        target_row.append(data[row][col])
-                    elif row < len(data) and len(data[row]) > 0:
-                        # Repeat last value in row if row exists but is shorter
-                        target_row.append(data[row][-1])
-                    elif len(data) > 0 and isinstance(data[0], list) and len(data[0]) > 0:
-                        # Use first row's data if we run out of rows
-                        target_row.append(data[0][col % len(data[0])])
-                    else:
-                        target_row.append("")
-                target_data.append(target_row)
+            # 2D data - calculate actual range needed
+            data_rows = len(data)
+            data_cols = max(len(row) for row in data) if data else 0
+
+            if data_rows > 0 and data_cols > 0:
+                # Parse the starting cell
+                import re
+                match = re.match(r'([A-Z]+)(\\d+)', range_str.upper())
+                if match:
+                    start_col_letter = match.group(1)
+                    start_row = int(match.group(2))
+
+                    # Calculate ending cell
+                    start_col_num = 0
+                    for char in start_col_letter:
+                        start_col_num = start_col_num * 26 + (ord(char) - ord('A') + 1)
+
+                    end_col_num = start_col_num + data_cols - 1
+                    end_row = start_row + data_rows - 1
+
+                    # Convert end column number back to letter
+                    end_col_letter = ''
+                    temp = end_col_num
+                    while temp > 0:
+                        temp -= 1
+                        end_col_letter = chr(temp % 26 + ord('A')) + end_col_letter
+                        temp //= 26
+
+                    # Create the expanded range
+                    expanded_range = f"{range_str}:{end_col_letter}{end_row}"
+                    range_obj = ws.range(expanded_range)
+                else:
+                    range_obj = ws.range(range_str)
+            else:
+                range_obj = ws.range(range_str)
         else:
-            # 1D data - expand to fill the range
-            target_data = []
-            for row in range(rows_count):
-                target_row = []
-                for col in range(cols_count):
-                    if len(data) == 1:
-                        # Single value - fill entire range with same value
-                        target_row.append(data[0])
-                    elif row < len(data):
-                        # Use corresponding data element
-                        target_row.append(data[row])
-                    elif len(data) > 0:
-                        # Repeat last value if we run out of data
-                        target_row.append(data[-1])
-                    else:
-                        target_row.append("")
-                target_data.append(target_row)
+            # 1D data - expand as a column
+            data_rows = len(data)
+            if data_rows > 0:
+                import re
+                match = re.match(r'([A-Z]+)(\\d+)', range_str.upper())
+                if match:
+                    col_letter = match.group(1)
+                    start_row = int(match.group(2))
+                    end_row = start_row + data_rows - 1
+                    expanded_range = f"{range_str}:{col_letter}{end_row}"
+                    range_obj = ws.range(expanded_range)
+                else:
+                    range_obj = ws.range(range_str)
+            else:
+                range_obj = ws.range(range_str)
     else:
-        # Single value - fill entire range
-        target_data = [[data] * cols_count for _ in range(rows_count)]
-    
-    # Write the expanded data to the range
-    ws.range(range_str).value = target_data
-    cells_count = rows_count * cols_count
+        # Use the specified range as-is
+        range_obj = ws.range(range_str)
+
+    # Simply write the data directly - xlwings handles the sizing
+    ws.range(range_obj).value = data
+
+    # Calculate data dimensions and cells affected
+    if isinstance(data, list) and len(data) > 0 and isinstance(data[0], list):
+        data_rows = len(data)
+        data_cols = max(len(row) for row in data) if data else 0
+        cells_count = data_rows * data_cols
+        data_shape = f"{data_rows} rows × {data_cols} columns"
+    elif isinstance(data, list):
+        data_rows = len(data)
+        data_cols = 1
+        cells_count = data_rows
+        data_shape = f"{data_rows} rows × 1 column"
+    else:
+        data_rows = 1
+        data_cols = 1
+        cells_count = 1
+        data_shape = "1 cell"
+
+    # Get the actual range that was written to
+    actual_range = range_obj.address if 'range_obj' in locals() else range_str
 else:
     cells_count = 0
+    data_rows = 0
+    data_cols = 0
+    data_shape = "no data"
+    actual_range = range_str
 
 result = {
     "success": True,
     "operation": "write_range",
     "workbook": wb.name,
     "worksheet": ws.name,
-    "range": range_str,
-    "cells_affected": cells_count,
-    "data_expanded": True if data else False
+    "range_specified": range_str,
+    "range_written": actual_range,
+    "data_received": data_shape,
+    "cells_written": cells_count,
+    "rows_written": data_rows,
+    "columns_written": data_cols,
+    "auto_expanded": is_single_cell if 'is_single_cell' in locals() else False
 }
 print(json.dumps(result))`;
   }
@@ -2981,19 +2994,9 @@ print(json.dumps(result))`;
 # Connect to Excel
 app = xw.apps.active if xw.apps else None
 if not app:
-    result = {
-        "success": False,
-        "operation": "create_chart",
-        "error_type": "excel_not_running",
-        "error_message": "No active Excel application found. Please open Excel first.",
-        "context": {
-            "required_action": "open_excel"
-        }
-    }
-    print(json.dumps(result))
-    exit()
+    app = xw.App(visible=False)
 
-wb = get_workbook("${params.workbook || ''}")
+wb, app_used, opened_by_us, created_by_us = get_workbook_smart("${this.escapePythonPath(params.workbook || '')}", app)
 if not wb:
     result = {
         "success": False,
@@ -3133,19 +3136,9 @@ print(json.dumps(result))`;
 # Connect to Excel
 app = xw.apps.active if xw.apps else None
 if not app:
-    result = {
-        "success": False,
-        "operation": "format_range",
-        "error_type": "excel_not_running",
-        "error_message": "No active Excel application found. Please open Excel first.",
-        "context": {
-            "required_action": "open_excel"
-        }
-    }
-    print(json.dumps(result))
-    exit()
+    app = xw.App(visible=False)
 
-wb = get_workbook("${params.workbook || ''}")
+wb, app_used, opened_by_us, created_by_us = get_workbook_smart("${this.escapePythonPath(params.workbook || '')}", app)
 if not wb:
     result = {
         "success": False,
@@ -3237,19 +3230,9 @@ print(json.dumps(result))`;
 # Connect to Excel
 app = xw.apps.active if xw.apps else None
 if not app:
-    result = {
-        "success": False,
-        "operation": "list_sheets",
-        "error_type": "excel_not_running",
-        "error_message": "No active Excel application found. Please open Excel first.",
-        "context": {
-            "required_action": "open_excel"
-        }
-    }
-    print(json.dumps(result))
-    exit()
+    app = xw.App(visible=False)
 
-wb = get_workbook("${params.workbook || ''}")
+wb, app_used, opened_by_us, created_by_us = get_workbook_smart("${this.escapePythonPath(params.workbook || '')}", app)
 if not wb:
     result = {
         "success": False,
@@ -3281,17 +3264,7 @@ print(json.dumps(result))`;
 # Get current selection
 app = xw.apps.active if xw.apps else None
 if not app:
-    result = {
-        "success": False,
-        "operation": "get_selection",
-        "error_type": "excel_not_running",
-        "error_message": "No active Excel application found. Please open Excel first.",
-        "context": {
-            "required_action": "open_excel"
-        }
-    }
-    print(json.dumps(result))
-    exit()
+    app = xw.App(visible=False)
 
 selection = app.selection
 wb = xw.books.active
@@ -3312,19 +3285,9 @@ print(json.dumps(result))`;
 # Set selection
 app = xw.apps.active if xw.apps else None
 if not app:
-    result = {
-        "success": False,
-        "operation": "set_selection",
-        "error_type": "excel_not_running",
-        "error_message": "No active Excel application found. Please open Excel first.",
-        "context": {
-            "required_action": "open_excel"
-        }
-    }
-    print(json.dumps(result))
-    exit()
+    app = xw.App(visible=False)
 
-wb = get_workbook("${params.workbook || ''}")
+wb, app_used, opened_by_us, created_by_us = get_workbook_smart("${this.escapePythonPath(params.workbook || '')}", app)
 if not wb:
     wb = xw.books.active
 
@@ -3350,24 +3313,9 @@ print(json.dumps(result))`;
 # Set formula
 app = xw.apps.active if xw.apps else None
 if not app:
-    result = {
-        "success": False,
-        "operation": "formula_range",
-        "error_type": "excel_not_running",
-        "error_message": "No active Excel application found. Please open Excel first.",
-        "context": {
-            "required_action": "open_excel"
-        },
-        "suggested_actions": [
-            "Open Microsoft Excel application",
-            "Create or open a workbook",
-            "Try the operation again"
-        ]
-    }
-    print(json.dumps(result))
-    exit()
+    app = xw.App(visible=False)
 
-wb = get_workbook("${params.workbook || ''}")
+wb, app_used, opened_by_us, created_by_us = get_workbook_smart("${this.escapePythonPath(params.workbook || '')}", app)
 if not wb:
     result = {
         "success": False,
@@ -3434,24 +3382,9 @@ print(json.dumps(result))`;
 # Clear range
 app = xw.apps.active if xw.apps else None
 if not app:
-    result = {
-        "success": False,
-        "operation": "clear_range",
-        "error_type": "excel_not_running",
-        "error_message": "No active Excel application found. Please open Excel first.",
-        "context": {
-            "required_action": "open_excel"
-        },
-        "suggested_actions": [
-            "Open Microsoft Excel application",
-            "Create or open a workbook",
-            "Try the operation again"
-        ]
-    }
-    print(json.dumps(result))
-    exit()
+    app = xw.App(visible=False)
 
-wb = get_workbook("${params.workbook || ''}")
+wb, app_used, opened_by_us, created_by_us = get_workbook_smart("${this.escapePythonPath(params.workbook || '')}", app)
 if not wb:
     result = {
         "success": False,
@@ -3911,24 +3844,9 @@ print(json.dumps(result))`;
 # Find and replace
 app = xw.apps.active if xw.apps else None
 if not app:
-    result = {
-        "success": False,
-        "operation": "replace_range",
-        "error_type": "excel_not_running",
-        "error_message": "No active Excel application found. Please open Excel first.",
-        "context": {
-            "required_action": "open_excel"
-        },
-        "suggested_actions": [
-            "Open Microsoft Excel application",
-            "Create or open a workbook",
-            "Try the operation again"
-        ]
-    }
-    print(json.dumps(result))
-    exit()
+    app = xw.App(visible=False)
 
-wb = get_workbook("${params.workbook || ''}")
+wb, app_used, opened_by_us, created_by_us = get_workbook_smart("${this.escapePythonPath(params.workbook || '')}", app)
 if not wb:
     result = {
         "success": False,
@@ -4004,41 +3922,22 @@ print(json.dumps(result))`;
   private generateAddSheetLogic(params: XlwingsParams): string {
     return `
 # Add new sheet
-app = xw.apps.active if xw.apps else None
-if not app:
-    result = {
-        "success": False,
-        "operation": "add_sheet",
-        "error_type": "no_excel_application",
-        "error_message": "No active Excel application found. Please open Excel first.",
-        "context": {
-            "required": "active_excel_application"
-        },
-        "suggested_actions": [
-            "Open Excel application first",
-            "Ensure Excel is running and accessible",
-            "Try opening any workbook in Excel to activate the application",
-            "Restart Excel if it's not responding"
-        ]
-    }
-    print(json.dumps(result))
-    exit()
-
-wb = get_workbook("${params.workbook || ''}")
+# get_workbook_smart will automatically create Excel app if needed
+wb, app_used, opened_by_us, created_by_us = get_workbook_smart("${this.escapePythonPath(params.workbook || '')}")
 if not wb:
     result = {
         "success": False,
         "operation": "add_sheet",
         "error_type": "workbook_not_found",
-        "error_message": "Could not find the specified workbook",
+        "error_message": "Could not find or create the specified workbook",
         "context": {
-            "workbook": "${params.workbook || ''}"
+            "workbook": "${this.escapePythonPath(params.workbook || '')}"
         },
         "suggested_actions": [
-            "Check the workbook name spelling and ensure it's open in Excel",
-            "Open the workbook in Excel first, then try again",
-            "Use the exact workbook name as it appears in Excel",
-            "Verify the workbook is not protected or corrupted"
+            "Check the workbook path spelling",
+            "Ensure you have write permission to create the file if it doesn't exist",
+            "Verify the target directory exists",
+            "Try creating the workbook manually first"
         ]
     }
     print(json.dumps(result))
@@ -4077,7 +3976,7 @@ app = xw.apps.active if xw.apps else None
 if not app:
     app = xw.App(visible=False)
 
-wb = get_workbook("${params.workbook || ''}", app)
+wb, app_used, opened_by_us, created_by_us = get_workbook_smart("${this.escapePythonPath(params.workbook || '')}", app)
 if not wb:
     # Get list of available workbooks for debugging
     available_workbooks = [book.name for book in app.books] if app.books else []
@@ -4262,7 +4161,7 @@ app = xw.apps.active if xw.apps else None
 if not app:
     app = xw.App(visible=False)
 
-wb = get_workbook("${params.workbook || ''}", app)
+wb, app_used, opened_by_us, created_by_us = get_workbook_smart("${this.escapePythonPath(params.workbook || '')}", app)
 if not wb:
     # Get list of available workbooks for debugging
     available_workbooks = [book.name for book in app.books] if app.books else []
@@ -5397,7 +5296,7 @@ app = xw.apps.active if xw.apps else None
 if not app:
     app = xw.App(visible=False)
 
-wb = get_workbook("${params.workbook || ''}", app)
+wb, app_used, opened_by_us, created_by_us = get_workbook_smart("${this.escapePythonPath(params.workbook || '')}", app)
 if not wb:
     # Get list of available workbooks for debugging
     available_workbooks = [book.name for book in app.books] if app.books else []
@@ -5576,7 +5475,7 @@ app = xw.apps.active if xw.apps else None
 if not app:
     app = xw.App(visible=False)
 
-wb = get_workbook("${params.workbook || ''}", app)
+wb, app_used, opened_by_us, created_by_us = get_workbook_smart("${this.escapePythonPath(params.workbook || '')}", app)
 if not wb:
     # Get list of available workbooks for debugging
     available_workbooks = [book.name for book in app.books] if app.books else []
@@ -5728,7 +5627,7 @@ app = xw.apps.active if xw.apps else None
 if not app:
     app = xw.App(visible=False)
 
-wb = get_workbook("${params.workbook || ''}", app)
+wb, app_used, opened_by_us, created_by_us = get_workbook_smart("${this.escapePythonPath(params.workbook || '')}", app)
 if not wb:
     # Get list of available workbooks for debugging
     available_workbooks = [book.name for book in app.books] if app.books else []
@@ -5868,7 +5767,7 @@ app = xw.apps.active if xw.apps else None
 if not app:
     app = xw.App(visible=False)
 
-wb = get_workbook("${params.workbook || ''}", app)
+wb, app_used, opened_by_us, created_by_us = get_workbook_smart("${this.escapePythonPath(params.workbook || '')}", app)
 if not wb:
     # Get list of available workbooks for debugging
     available_workbooks = [book.name for book in app.books] if app.books else []
@@ -5974,7 +5873,7 @@ app = xw.apps.active if xw.apps else None
 if not app:
     app = xw.App(visible=False)
 
-wb = get_workbook("${params.workbook || ''}", app)
+wb, app_used, opened_by_us, created_by_us = get_workbook_smart("${this.escapePythonPath(params.workbook || '')}", app)
 if not wb:
     # Get list of available workbooks for debugging
     available_workbooks = [book.name for book in app.books] if app.books else []
@@ -6115,7 +6014,7 @@ app = xw.apps.active if xw.apps else None
 if not app:
     app = xw.App(visible=False)
 
-wb = get_workbook("${params.workbook || ''}", app)
+wb, app_used, opened_by_us, created_by_us = get_workbook_smart("${this.escapePythonPath(params.workbook || '')}", app)
 if not wb:
     # Get list of available workbooks for debugging
     available_workbooks = [book.name for book in app.books] if app.books else []
@@ -6262,7 +6161,7 @@ app = xw.apps.active if xw.apps else None
 if not app:
     app = xw.App(visible=False)
 
-wb = get_workbook("${params.workbook || ''}", app)
+wb, app_used, opened_by_us, created_by_us = get_workbook_smart("${this.escapePythonPath(params.workbook || '')}", app)
 if not wb:
     # Get list of available workbooks for debugging
     available_workbooks = [book.name for book in app.books] if app.books else []
@@ -6395,7 +6294,7 @@ app = xw.apps.active if xw.apps else None
 if not app:
     app = xw.App(visible=False)
 
-wb = get_workbook("${params.workbook || ''}", app)
+wb, app_used, opened_by_us, created_by_us = get_workbook_smart("${this.escapePythonPath(params.workbook || '')}", app)
 if not wb:
     # Get list of available workbooks for debugging
     available_workbooks = [book.name for book in app.books] if app.books else []
@@ -6549,7 +6448,7 @@ app = xw.apps.active if xw.apps else None
 if not app:
     app = xw.App(visible=False)
 
-wb = get_workbook("${params.workbook || ''}", app)
+wb, app_used, opened_by_us, created_by_us = get_workbook_smart("${this.escapePythonPath(params.workbook || '')}", app)
 if not wb:
     # Get list of available workbooks for debugging
     available_workbooks = [book.name for book in app.books] if app.books else []
@@ -6667,7 +6566,7 @@ app = xw.apps.active if xw.apps else None
 if not app:
     app = xw.App(visible=False)
 
-wb = get_workbook("${params.workbook || ''}", app)
+wb, app_used, opened_by_us, created_by_us = get_workbook_smart("${this.escapePythonPath(params.workbook || '')}", app)
 if not wb:
     # Get list of available workbooks for debugging
     available_workbooks = [book.name for book in app.books] if app.books else []
@@ -6823,7 +6722,7 @@ app = xw.apps.active if xw.apps else None
 if not app:
     app = xw.App(visible=False)
 
-wb = get_workbook("${params.workbook || ''}", app)
+wb, app_used, opened_by_us, created_by_us = get_workbook_smart("${this.escapePythonPath(params.workbook || '')}", app)
 if not wb:
     # Get list of available workbooks for debugging
     available_workbooks = [book.name for book in app.books] if app.books else []
@@ -7058,7 +6957,7 @@ app = xw.apps.active if xw.apps else None
 if not app:
     app = xw.App(visible=False)
 
-wb = get_workbook("${params.workbook || ''}", app)
+wb, app_used, opened_by_us, created_by_us = get_workbook_smart("${this.escapePythonPath(params.workbook || '')}", app)
 if not wb:
     # Get list of available workbooks for debugging
     available_workbooks = [book.name for book in app.books] if app.books else []
@@ -7223,7 +7122,7 @@ app = xw.apps.active if xw.apps else None
 if not app:
     app = xw.App(visible=False)
 
-wb = get_workbook("${params.workbook || ''}", app)
+wb, app_used, opened_by_us, created_by_us = get_workbook_smart("${this.escapePythonPath(params.workbook || '')}", app)
 if not wb:
     # Get list of available workbooks for debugging
     available_workbooks = [book.name for book in app.books] if app.books else []
@@ -7391,7 +7290,7 @@ app = xw.apps.active if xw.apps else None
 if not app:
     app = xw.App(visible=False)
 
-wb = get_workbook("${params.workbook || ''}", app)
+wb, app_used, opened_by_us, created_by_us = get_workbook_smart("${this.escapePythonPath(params.workbook || '')}", app)
 if not wb:
     # Get list of available workbooks for debugging
     available_workbooks = [book.name for book in app.books] if app.books else []
@@ -7800,7 +7699,7 @@ if not app:
     print(json.dumps(result))
     exit()
 
-wb = get_workbook("${params.workbook || ''}")
+wb, app_used, opened_by_us, created_by_us = get_workbook_smart("${this.escapePythonPath(params.workbook || '')}")
 if not wb:
     wb = xw.books.active
 
@@ -7848,7 +7747,7 @@ if not app:
     print(json.dumps(result))
     exit()
 
-wb = get_workbook("${params.workbook || ''}")
+wb, app_used, opened_by_us, created_by_us = get_workbook_smart("${this.escapePythonPath(params.workbook || '')}")
 if not wb:
     wb = xw.books.active
 
@@ -7896,7 +7795,7 @@ if not app:
     print(json.dumps(result))
     exit()
 
-wb = get_workbook("${params.workbook || ''}")
+wb, app_used, opened_by_us, created_by_us = get_workbook_smart("${this.escapePythonPath(params.workbook || '')}")
 if not wb:
     wb = xw.books.active
 
@@ -7955,7 +7854,7 @@ if not app:
     print(json.dumps(result))
     exit()
 
-wb = get_workbook("${params.workbook || ''}")
+wb, app_used, opened_by_us, created_by_us = get_workbook_smart("${this.escapePythonPath(params.workbook || '')}")
 if not wb:
     wb = xw.books.active
 
@@ -8018,7 +7917,7 @@ if not app:
     print(json.dumps(result))
     exit()
 
-wb = get_workbook("${params.workbook || ''}")
+wb, app_used, opened_by_us, created_by_us = get_workbook_smart("${this.escapePythonPath(params.workbook || '')}")
 if not wb:
     wb = xw.books.active
 
@@ -8082,7 +7981,7 @@ if not app:
     print(json.dumps(result))
     exit()
 
-wb = get_workbook("${params.workbook || ''}")
+wb, app_used, opened_by_us, created_by_us = get_workbook_smart("${this.escapePythonPath(params.workbook || '')}")
 if not wb:
     wb = xw.books.active
 
@@ -8162,7 +8061,7 @@ if not app:
     print(json.dumps(result))
     exit()
 
-wb = get_workbook("${params.workbook || ''}")
+wb, app_used, opened_by_us, created_by_us = get_workbook_smart("${this.escapePythonPath(params.workbook || '')}")
 if not wb:
     wb = xw.books.active
 
@@ -8240,7 +8139,7 @@ if not app:
     print(json.dumps(result))
     exit()
 
-wb = get_workbook("${params.workbook || ''}")
+wb, app_used, opened_by_us, created_by_us = get_workbook_smart("${this.escapePythonPath(params.workbook || '')}")
 if not wb:
     wb = xw.books.active
 
@@ -8300,7 +8199,7 @@ if not app:
     print(json.dumps(result))
     exit()
 
-wb = get_workbook("${params.workbook || ''}")
+wb, app_used, opened_by_us, created_by_us = get_workbook_smart("${this.escapePythonPath(params.workbook || '')}")
 if not wb:
     wb = xw.books.active
 
@@ -8383,7 +8282,7 @@ if not app:
     print(json.dumps(result))
     exit()
 
-wb = get_workbook("${params.workbook || ''}")
+wb, app_used, opened_by_us, created_by_us = get_workbook_smart("${this.escapePythonPath(params.workbook || '')}")
 if not wb:
     wb = xw.books.active
 
@@ -8447,7 +8346,7 @@ if not app:
     print(json.dumps(result))
     exit()
 
-wb = get_workbook("${params.workbook || ''}")
+wb, app_used, opened_by_us, created_by_us = get_workbook_smart("${this.escapePythonPath(params.workbook || '')}")
 if not wb:
     wb = xw.books.active
 
@@ -8534,7 +8433,7 @@ if not app:
     print(json.dumps(result))
     exit()
 
-wb = get_workbook("${params.workbook || ''}")
+wb, app_used, opened_by_us, created_by_us = get_workbook_smart("${this.escapePythonPath(params.workbook || '')}")
 if not wb:
     wb = xw.books.active
 
@@ -8675,7 +8574,7 @@ if not app:
     print(json.dumps(result))
     exit()
 
-wb = get_workbook("${params.workbook || ''}")
+wb, app_used, opened_by_us, created_by_us = get_workbook_smart("${this.escapePythonPath(params.workbook || '')}")
 if not wb:
     wb = xw.books.active
 
@@ -8757,7 +8656,7 @@ if not app:
     print(json.dumps(result))
     exit()
 
-wb = get_workbook("${params.workbook || ''}")
+wb, app_used, opened_by_us, created_by_us = get_workbook_smart("${this.escapePythonPath(params.workbook || '')}")
 if not wb:
     wb = xw.books.active
 
@@ -8841,7 +8740,7 @@ if not app:
     print(json.dumps(result))
     exit()
 
-wb = get_workbook("${params.workbook || ''}")
+wb, app_used, opened_by_us, created_by_us = get_workbook_smart("${this.escapePythonPath(params.workbook || '')}")
 if not wb:
     wb = xw.books.active
 
@@ -8929,7 +8828,7 @@ if not app:
     print(json.dumps(result))
     exit()
 
-wb = get_workbook("${params.workbook || ''}")
+wb, app_used, opened_by_us, created_by_us = get_workbook_smart("${this.escapePythonPath(params.workbook || '')}")
 if not wb:
     wb = xw.books.active
 
@@ -9015,7 +8914,7 @@ if not app:
     print(json.dumps(result))
     exit()
 
-wb = get_workbook("${params.workbook || ''}")
+wb, app_used, opened_by_us, created_by_us = get_workbook_smart("${this.escapePythonPath(params.workbook || '')}")
 if not wb:
     wb = xw.books.active
 
@@ -9105,7 +9004,7 @@ if not app:
     print(json.dumps(result))
     exit()
 
-wb = get_workbook("${params.workbook || ''}")
+wb, app_used, opened_by_us, created_by_us = get_workbook_smart("${this.escapePythonPath(params.workbook || '')}")
 if not wb:
     wb = xw.books.active
 
@@ -9206,7 +9105,7 @@ if not app:
     print(json.dumps(result))
     exit()
 
-wb = get_workbook("${params.workbook || ''}")
+wb, app_used, opened_by_us, created_by_us = get_workbook_smart("${this.escapePythonPath(params.workbook || '')}")
 if not wb:
     wb = xw.books.active
 
@@ -9306,7 +9205,7 @@ if not app:
     print(json.dumps(result))
     exit()
 
-wb = get_workbook("${params.workbook || ''}")
+wb, app_used, opened_by_us, created_by_us = get_workbook_smart("${this.escapePythonPath(params.workbook || '')}")
 if not wb:
     wb = xw.books.active
 
@@ -9405,7 +9304,7 @@ if not app:
     print(json.dumps(result))
     exit()
 
-wb = get_workbook("${params.workbook || ''}")
+wb, app_used, opened_by_us, created_by_us = get_workbook_smart("${this.escapePythonPath(params.workbook || '')}")
 if not wb:
     wb = xw.books.active
 
@@ -9513,7 +9412,7 @@ if not app:
     print(json.dumps(result))
     exit()
 
-wb = get_workbook("${params.workbook || ''}")
+wb, app_used, opened_by_us, created_by_us = get_workbook_smart("${this.escapePythonPath(params.workbook || '')}")
 if not wb:
     wb = xw.books.active
 
@@ -10574,7 +10473,7 @@ app = xw.apps.active if xw.apps else None
 if not app:
     app = xw.App(visible=False)
 
-wb = get_workbook("${params.workbook || ''}", app)
+wb, app_used, opened_by_us, created_by_us = get_workbook_smart("${this.escapePythonPath(params.workbook || '')}", app)
 if not wb:
     # Get list of available workbooks for debugging
     available_workbooks = [book.name for book in app.books] if app.books else []
