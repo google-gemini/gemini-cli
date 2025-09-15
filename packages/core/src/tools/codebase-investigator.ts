@@ -12,7 +12,6 @@ import type { ContextState } from '../core/subagent.js';
 import { processSingleFileContent } from '../utils/fileUtils.js';
 import fs from 'node:fs';
 
-
 const OUTPUT_SCHEMA_JSON = `
 \`\`\`json
 {
@@ -27,7 +26,7 @@ const OUTPUT_SCHEMA_JSON = `
     "exploration_trace": "1. Grepped for 'payment'. 2. Read 'payment_service.ts'. 3. Discovered import of 'tax_calculator.ts' and read it. 4. Grepped for 'PaymentService' to find its usage in 'payment_controller.ts'."
 }
 \`\`\`
-`
+`;
 
 const SYSTEM_PROMPT = `
 You are **Codebase Investigator**, a hyper-specialized AI agent and an expert in navigating complex software projects.

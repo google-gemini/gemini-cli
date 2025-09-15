@@ -12,7 +12,6 @@ import type { ContextState } from '../core/subagent.js';
 import { processSingleFileContent } from '../utils/fileUtils.js';
 import fs from 'node:fs';
 
-
 const OUTPUT_SCHEMA_JSON = `
 \`\`\`json
 {
@@ -60,7 +59,7 @@ const OUTPUT_SCHEMA_JSON = `
   ]
 }
 \`\`\`
-`
+`;
 
 const SYSTEM_PROMPT = `
 You are **Solution Planner**, an expert AI agent specializing in full-stack software engineering, system design, and meticulous implementation planning.
