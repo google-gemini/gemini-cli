@@ -5,7 +5,6 @@
  */
 
 import type {
-  EmbedContentParameters,
   GenerateContentConfig,
   PartListUnion,
   Content,
@@ -756,41 +755,6 @@ export class GeminiClient {
         `Failed to generate content with model ${currentAttemptModel}: ${getErrorMessage(error)}`,
       );
     }
-  }
-
-  async generateEmbedding(texts: string[]): Promise<number[][]> {
-    if (!texts || texts.length === 0) {
-      return [];
-    }
-    const embedModelParams: EmbedContentParameters = {
-      model: this.config.getEmbeddingModel(),
-      contents: texts,
-    };
-
-    const embedContentResponse =
-      await this.getContentGeneratorOrFail().embedContent(embedModelParams);
-    if (
-      !embedContentResponse.embeddings ||
-      embedContentResponse.embeddings.length === 0
-    ) {
-      throw new Error('No embeddings found in API response.');
-    }
-
-    if (embedContentResponse.embeddings.length !== texts.length) {
-      throw new Error(
-        `API returned a mismatched number of embeddings. Expected ${texts.length}, got ${embedContentResponse.embeddings.length}.`,
-      );
-    }
-
-    return embedContentResponse.embeddings.map((embedding, index) => {
-      const values = embedding.values;
-      if (!values || values.length === 0) {
-        throw new Error(
-          `API returned an empty embedding for input text at index ${index}: "${texts[index]}"`,
-        );
-      }
-      return values;
-    });
   }
 
   async tryCompressChat(

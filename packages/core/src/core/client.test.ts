@@ -237,7 +237,6 @@ describe('Gemini Client (client.ts)', () => {
       generateContent: mockGenerateContentFn,
       generateContentStream: vi.fn(),
       countTokens: vi.fn().mockResolvedValue({ totalTokens: 100 }),
-      embedContent: vi.fn(),
       batchEmbedContents: vi.fn(),
     } as unknown as ContentGenerator;
 
@@ -310,97 +309,6 @@ describe('Gemini Client (client.ts)', () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
-  });
-
-  describe('generateEmbedding', () => {
-    const texts = ['hello world', 'goodbye world'];
-    const testEmbeddingModel = 'test-embedding-model';
-
-    it('should call embedContent with correct parameters and return embeddings', async () => {
-      const mockEmbeddings = [
-        [0.1, 0.2, 0.3],
-        [0.4, 0.5, 0.6],
-      ];
-      vi.mocked(mockContentGenerator.embedContent).mockResolvedValue({
-        embeddings: [
-          { values: mockEmbeddings[0] },
-          { values: mockEmbeddings[1] },
-        ],
-      });
-
-      const result = await client.generateEmbedding(texts);
-
-      expect(mockContentGenerator.embedContent).toHaveBeenCalledTimes(1);
-      expect(mockContentGenerator.embedContent).toHaveBeenCalledWith({
-        model: testEmbeddingModel,
-        contents: texts,
-      });
-      expect(result).toEqual(mockEmbeddings);
-    });
-
-    it('should return an empty array if an empty array is passed', async () => {
-      const result = await client.generateEmbedding([]);
-      expect(result).toEqual([]);
-      expect(mockContentGenerator.embedContent).not.toHaveBeenCalled();
-    });
-
-    it('should throw an error if API response has no embeddings array', async () => {
-      vi.mocked(mockContentGenerator.embedContent).mockResolvedValue({});
-
-      await expect(client.generateEmbedding(texts)).rejects.toThrow(
-        'No embeddings found in API response.',
-      );
-    });
-
-    it('should throw an error if API response has an empty embeddings array', async () => {
-      vi.mocked(mockContentGenerator.embedContent).mockResolvedValue({
-        embeddings: [],
-      });
-
-      await expect(client.generateEmbedding(texts)).rejects.toThrow(
-        'No embeddings found in API response.',
-      );
-    });
-
-    it('should throw an error if API returns a mismatched number of embeddings', async () => {
-      vi.mocked(mockContentGenerator.embedContent).mockResolvedValue({
-        embeddings: [{ values: [1, 2, 3] }], // Only one for two texts
-      });
-
-      await expect(client.generateEmbedding(texts)).rejects.toThrow(
-        'API returned a mismatched number of embeddings. Expected 2, got 1.',
-      );
-    });
-
-    it('should throw an error if any embedding has nullish values', async () => {
-      vi.mocked(mockContentGenerator.embedContent).mockResolvedValue({
-        embeddings: [{ values: [1, 2, 3] }, { values: undefined }], // Second one is bad
-      });
-
-      await expect(client.generateEmbedding(texts)).rejects.toThrow(
-        'API returned an empty embedding for input text at index 1: "goodbye world"',
-      );
-    });
-
-    it('should throw an error if any embedding has an empty values array', async () => {
-      vi.mocked(mockContentGenerator.embedContent).mockResolvedValue({
-        embeddings: [{ values: [] }, { values: [1, 2, 3] }], // First one is bad
-      });
-
-      await expect(client.generateEmbedding(texts)).rejects.toThrow(
-        'API returned an empty embedding for input text at index 0: "hello world"',
-      );
-    });
-
-    it('should propagate errors from the API call', async () => {
-      vi.mocked(mockContentGenerator.embedContent).mockRejectedValue(
-        new Error('API Failure'),
-      );
-
-      await expect(client.generateEmbedding(texts)).rejects.toThrow(
-        'API Failure',
-      );
-    });
   });
 
   describe('generateJson', () => {
