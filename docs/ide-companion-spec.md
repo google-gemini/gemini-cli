@@ -41,7 +41,7 @@ For Gemini CLI to connect, it needs to discover which IDE instance it's running 
 
 ## II. The Context Interface
 
-To enable context awareness, the extension MAY provide the CLI with real-time information about the user's activity in the IDE.
+To enable context awareness, the extension **MAY** provide the CLI with real-time information about the user's activity in the IDE.
 
 ### `ide/contextUpdate` Notification
 
