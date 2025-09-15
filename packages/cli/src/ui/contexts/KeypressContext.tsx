@@ -23,6 +23,7 @@ import { PassThrough } from 'node:stream';
 import {
   BACKSLASH_ENTER_DETECTION_WINDOW_MS,
   CHAR_CODE_ESC,
+  IME_ESCAPE_CODE_TIMEOUT_MS,
   KITTY_CTRL_C,
   KITTY_KEYCODE_BACKSPACE,
   KITTY_KEYCODE_ENTER,
@@ -655,7 +656,6 @@ export function KeypressProvider({
     };
 
     let rl: readline.Interface;
-    const IME_ESCAPE_CODE_TIMEOUT_MS = 20;
 
     if (usePassthrough) {
       rl = readline.createInterface({
