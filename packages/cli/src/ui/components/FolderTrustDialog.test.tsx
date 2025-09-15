@@ -70,25 +70,13 @@ describe('FolderTrustDialog', () => {
     );
 
     expect(lastFrame()).toContain(
-      'To see changes, Gemini CLI must be restarted',
+      'Gemini CLI is restarting to apply changes...',
     );
   });
 
-  it('should call process.exit when "r" is pressed and isRestarting is true', async () => {
+  it('should not respond to "r" key press since manual restart is no longer supported', async () => {
     const { stdin } = renderWithProviders(
       <FolderTrustDialog onSelect={vi.fn()} isRestarting={true} />,
-    );
-
-    stdin.write('r');
-
-    await waitFor(() => {
-      expect(mockedExit).toHaveBeenCalledWith(0);
-    });
-  });
-
-  it('should not call process.exit when "r" is pressed and isRestarting is false', async () => {
-    const { stdin } = renderWithProviders(
-      <FolderTrustDialog onSelect={vi.fn()} isRestarting={false} />,
     );
 
     stdin.write('r');
