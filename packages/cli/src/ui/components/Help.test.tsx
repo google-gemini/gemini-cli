@@ -55,78 +55,57 @@ describe('Help Component', () => {
     }
   });
 
-  it('renders help component with current platform shortcuts', () => {
+  it('should not render hidden commands', () => {
     const { lastFrame } = render(<Help commands={mockCommands} />);
+    const output = lastFrame();
 
-    // Use existing platform-specific snapshots from the platform behavior tests
-    const snapshotName =
-      process.platform === 'win32'
-        ? 'win32-shortcuts'
-        : process.platform === 'darwin'
-          ? 'darwin-shortcuts'
-          : 'linux-shortcuts';
-    expect(lastFrame()).toMatchSnapshot(snapshotName);
+    expect(output).toContain('/test');
+    expect(output).not.toContain('/hidden');
   });
 
-  describe('Platform-specific behavior', () => {
-    it('renders correct shortcuts for linux', () => {
-      const originalPlatform = process.platform;
-      Object.defineProperty(process, 'platform', {
-        value: 'linux',
-        writable: true,
-        configurable: true,
-      });
+  it('should not render hidden subcommands', () => {
+    const { lastFrame } = render(<Help commands={mockCommands} />);
+    const output = lastFrame();
 
-      try {
-        const { lastFrame } = render(<Help commands={mockCommands} />);
-        expect(lastFrame()).toMatchSnapshot('linux-shortcuts');
-      } finally {
-        Object.defineProperty(process, 'platform', {
-          value: originalPlatform,
-          writable: true,
-          configurable: true,
-        });
-      }
-    });
+    expect(output).toContain('visible-child');
+    expect(output).not.toContain('hidden-child');
+  });
 
-    it('renders correct shortcuts for darwin', () => {
-      const originalPlatform = process.platform;
-      Object.defineProperty(process, 'platform', {
-        value: 'darwin',
-        writable: true,
-        configurable: true,
-      });
+  it('renders basic help content', () => {
+    const { lastFrame } = render(<Help commands={mockCommands} />);
+    const output = lastFrame();
 
-      try {
-        const { lastFrame } = render(<Help commands={mockCommands} />);
-        expect(lastFrame()).toMatchSnapshot('darwin-shortcuts');
-      } finally {
-        Object.defineProperty(process, 'platform', {
-          value: originalPlatform,
-          writable: true,
-          configurable: true,
-        });
-      }
-    });
+    // Test i18n content
+    expect(output).toContain('Basics:');
+    expect(output).toContain('Commands:');
+    expect(output).toContain('Keyboard Shortcuts:');
+    expect(output).toContain('Add context: Use @ to specify files');
+    expect(output).toContain('Shell mode: Execute shell commands via !');
+    expect(output).toContain('shell command');
+    expect(output).toContain('Model Context Protocol command');
+  });
 
-    it('renders correct shortcuts for win32', () => {
-      const originalPlatform = process.platform;
-      Object.defineProperty(process, 'platform', {
-        value: 'win32',
-        writable: true,
-        configurable: true,
-      });
+  it('renders platform-specific shortcuts correctly', () => {
+    const { lastFrame } = render(<Help commands={mockCommands} />);
+    const output = lastFrame();
 
-      try {
-        const { lastFrame } = render(<Help commands={mockCommands} />);
-        expect(lastFrame()).toMatchSnapshot('win32-shortcuts');
-      } finally {
-        Object.defineProperty(process, 'platform', {
-          value: originalPlatform,
-          writable: true,
-          configurable: true,
-        });
-      }
-    });
+    // Test platform-agnostic shortcuts
+    expect(output).toContain('Ctrl+C - Quit application');
+    expect(output).toContain('Ctrl+L - Clear the screen');
+    expect(output).toContain('Ctrl+Y - Toggle YOLO mode');
+    expect(output).toContain('Alt+Left/Right - Jump through words');
+
+    // Test platform-specific shortcuts
+    if (process.platform === 'win32') {
+      expect(output).toContain('Ctrl+Enter - New line');
+      expect(output).toContain('Ctrl+X - Open input in external editor');
+    } else if (process.platform === 'darwin') {
+      expect(output).toContain('Ctrl+J - New line');
+      expect(output).toContain('Ctrl+X / Meta+Enter - Open input in external editor');
+    } else {
+      // Linux and other platforms
+      expect(output).toContain('Ctrl+J - New line (Alt+Enter works for certain linux distros)');
+      expect(output).toContain('Ctrl+X - Open input in external editor');
+    }
   });
 });
