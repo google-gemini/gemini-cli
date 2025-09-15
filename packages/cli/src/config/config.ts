@@ -15,6 +15,7 @@ import type {
   TelemetryTarget,
   FileFilteringOptions,
   MCPServerConfig,
+  OutputFormat,
 } from '@google/gemini-cli-core';
 import { extensionsCommand } from '../commands/extensions.js';
 import {
@@ -24,6 +25,7 @@ import {
   getCurrentGeminiMdFilename,
   ApprovalMode,
   DEFAULT_GEMINI_MODEL,
+  DEFAULT_GEMINI_MODEL_AUTO,
   DEFAULT_GEMINI_EMBEDDING_MODEL,
   DEFAULT_MEMORY_FILE_FILTERING_OPTIONS,
   FileDiscoveryService,
@@ -82,6 +84,7 @@ export interface CliArgs {
   useSmartEdit: boolean | undefined;
   sessionSummary: string | undefined;
   promptWords: string[] | undefined;
+  outputFormat: string | undefined;
 }
 
 export async function parseArguments(settings: Settings): Promise<CliArgs> {
@@ -97,7 +100,6 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
           alias: 'm',
           type: 'string',
           description: `Model`,
-          default: process.env['GEMINI_MODEL'],
         })
         .option('prompt', {
           alias: 'p',
@@ -240,45 +242,50 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
           type: 'string',
           description: 'File to write session summary to.',
         })
+        .option('output-format', {
+          type: 'string',
+          description: 'The format of the CLI output.',
+          choices: ['text', 'json'],
+        })
         .deprecateOption(
           'telemetry',
-          'Use settings.json instead. This flag will be removed in a future version.',
+          'Use the "telemetry.enabled" setting in settings.json instead. This flag will be removed in a future version.',
         )
         .deprecateOption(
           'telemetry-target',
-          'Use settings.json instead. This flag will be removed in a future version.',
+          'Use the "telemetry.target" setting in settings.json instead. This flag will be removed in a future version.',
         )
         .deprecateOption(
           'telemetry-otlp-endpoint',
-          'Use settings.json instead. This flag will be removed in a future version.',
+          'Use the "telemetry.otlpEndpoint" setting in settings.json instead. This flag will be removed in a future version.',
         )
         .deprecateOption(
           'telemetry-otlp-protocol',
-          'Use settings.json instead. This flag will be removed in a future version.',
+          'Use the "telemetry.otlpProtocol" setting in settings.json instead. This flag will be removed in a future version.',
         )
         .deprecateOption(
           'telemetry-log-prompts',
-          'Use settings.json instead. This flag will be removed in a future version.',
+          'Use the "telemetry.logPrompts" setting in settings.json instead. This flag will be removed in a future version.',
         )
         .deprecateOption(
           'telemetry-outfile',
-          'Use settings.json instead. This flag will be removed in a future version.',
+          'Use the "telemetry.outfile" setting in settings.json instead. This flag will be removed in a future version.',
         )
         .deprecateOption(
           'show-memory-usage',
-          'Use settings.json instead. This flag will be removed in a future version.',
+          'Use the "ui.showMemoryUsage" setting in settings.json instead. This flag will be removed in a future version.',
         )
         .deprecateOption(
           'sandbox-image',
-          'Use settings.json instead. This flag will be removed in a future version.',
+          'Use the "tools.sandbox" setting in settings.json instead. This flag will be removed in a future version.',
         )
         .deprecateOption(
           'proxy',
-          'Use settings.json instead. This flag will be removed in a future version.',
+          'Use the "proxy" setting in settings.json instead. This flag will be removed in a future version.',
         )
         .deprecateOption(
           'checkpointing',
-          'Use settings.json instead. This flag will be removed in a future version.',
+          'Use the "general.checkpointing.enabled" setting in settings.json instead. This flag will be removed in a future version.',
         )
         .deprecateOption(
           'all-files',
@@ -311,7 +318,7 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
     // Register MCP subcommands
     .command(mcpCommand);
 
-  if (settings?.experimental?.extensionManagement ?? false) {
+  if (settings?.experimental?.extensionManagement ?? true) {
     yargsInstance.command(extensionsCommand);
   }
 
@@ -549,6 +556,16 @@ export async function loadCliConfig(
     );
   }
 
+  const useModelRouter = settings.experimental?.useModelRouter ?? false;
+  const defaultModel = useModelRouter
+    ? DEFAULT_GEMINI_MODEL_AUTO
+    : DEFAULT_GEMINI_MODEL;
+  const resolvedModel: string =
+    argv.model ||
+    process.env['GEMINI_MODEL'] ||
+    settings.model?.name ||
+    defaultModel;
+
   const sandboxConfig = await loadSandboxConfig(settings, argv);
   const screenReader =
     argv.screenReader !== undefined
@@ -614,7 +631,7 @@ export async function loadCliConfig(
     cwd,
     fileDiscoveryService: fileService,
     bugCommand: settings.advanced?.bugCommand,
-    model: argv.model || settings.model?.name || DEFAULT_GEMINI_MODEL,
+    model: resolvedModel,
     extensionContextFilePaths,
     maxSessionTurns: settings.model?.maxSessionTurns ?? -1,
     experimentalZedIntegration: argv.experimentalAcp || false,
@@ -632,8 +649,15 @@ export async function loadCliConfig(
     shouldUseNodePtyShell: settings.tools?.usePty,
     skipNextSpeakerCheck: settings.model?.skipNextSpeakerCheck,
     enablePromptCompletion: settings.general?.enablePromptCompletion ?? false,
+    truncateToolOutputThreshold: settings.tools?.truncateToolOutputThreshold,
+    truncateToolOutputLines: settings.tools?.truncateToolOutputLines,
+    enableToolOutputTruncation: settings.tools?.enableToolOutputTruncation,
     eventEmitter: appEvents,
     useSmartEdit: argv.useSmartEdit ?? settings.useSmartEdit,
+    output: {
+      format: (argv.outputFormat ?? settings.output?.format) as OutputFormat,
+    },
+    useModelRouter,
   });
 }
 

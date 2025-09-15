@@ -26,6 +26,8 @@ import type {
   AnyToolInvocation,
 } from '@google/gemini-cli-core';
 import {
+  DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
+  DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
   ToolConfirmationOutcome,
   ApprovalMode,
   MockTool,
@@ -54,6 +56,11 @@ const mockConfig = {
   getSessionId: () => 'test-session-id',
   getUsageStatisticsEnabled: () => true,
   getDebugMode: () => false,
+  storage: {
+    getProjectTempDir: () => '/tmp',
+  },
+  getTruncateToolOutputThreshold: () => DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
+  getTruncateToolOutputLines: () => DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
   getAllowedTools: vi.fn(() => []),
   getContentGeneratorConfig: () => ({
     model: 'test-model',
@@ -61,6 +68,7 @@ const mockConfig = {
   }),
   getUseSmartEdit: () => false,
   getGeminiClient: () => null, // No client needed for these tests
+  getShellExecutionConfig: () => ({ terminalWidth: 80, terminalHeight: 24 }),
 } as unknown as Config;
 
 const mockTool = new MockTool({
@@ -117,7 +125,6 @@ describe('useReactToolScheduler in YOLO Mode', () => {
         onComplete,
         mockConfig as unknown as Config,
         setPendingHistoryItem,
-        () => undefined,
         () => {},
       ),
     );
@@ -156,7 +163,7 @@ describe('useReactToolScheduler in YOLO Mode', () => {
     expect(mockToolRequiresConfirmation.execute).toHaveBeenCalledWith(
       request.args,
       expect.any(AbortSignal),
-      undefined /*updateOutputFn*/,
+      undefined,
     );
 
     // Check that onComplete was called with success
@@ -265,7 +272,6 @@ describe('useReactToolScheduler', () => {
         onComplete,
         mockConfig as unknown as Config,
         setPendingHistoryItem,
-        () => undefined,
         () => {},
       ),
     );
@@ -307,7 +313,7 @@ describe('useReactToolScheduler', () => {
     expect(mockTool.execute).toHaveBeenCalledWith(
       request.args,
       expect.any(AbortSignal),
-      undefined /*updateOutputFn*/,
+      undefined,
     );
     expect(onComplete).toHaveBeenCalledWith([
       expect.objectContaining({

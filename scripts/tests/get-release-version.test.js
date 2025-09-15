@@ -4,151 +4,123 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { getReleaseVersion } from '../get-release-version';
+import { vi, describe, it, expect, beforeEach } from 'vitest';
+import { getVersion } from '../get-release-version.js';
+import { execSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 
-// Mock child_process so we can spy on execSync
-vi.mock('child_process', () => ({
-  execSync: vi.fn(),
-}));
+vi.mock('node:child_process');
+vi.mock('node:fs');
 
-describe('getReleaseVersion', async () => {
-  // Dynamically import execSync after mocking
-  const { execSync } = await import('node:child_process');
-  const originalEnv = { ...process.env };
-
+describe('getReleaseVersion', () => {
   beforeEach(() => {
     vi.resetAllMocks();
-    process.env = { ...originalEnv };
     // Mock date to be consistent
-    vi.setSystemTime(new Date('2025-08-20T00:00:00.000Z'));
-    // Provide a default mock for execSync to avoid toString() on undefined
-    vi.mocked(execSync).mockReturnValue('');
+    vi.setSystemTime(new Date('2025-09-11T00:00:00.000Z'));
   });
 
-  afterEach(() => {
-    process.env = originalEnv;
-    vi.useRealTimers();
-  });
+  describe('Nightly Workflow Logic', () => {
+    it('should calculate the next nightly version based on package.json', () => {
+      vi.mocked(readFileSync).mockReturnValue('{"version": "0.5.0"}');
+      vi.mocked(execSync).mockImplementation((command) => {
+        if (command.includes('rev-parse')) return 'a1b2c3d';
+        if (command.includes('release list'))
+          return 'v0.5.0-nightly.20250910.abcdef';
+        return '';
+      });
 
-  it('should generate a nightly version and get previous tag', () => {
-    process.env.IS_NIGHTLY = 'true';
+      const result = getVersion({ type: 'nightly' });
 
-    vi.mocked(execSync).mockImplementation((command) => {
-      if (command.includes('git tag')) {
-        return 'v0.1.0\nv0.0.1';
-      }
-      if (command.includes('git rev-parse')) {
-        return 'abcdef';
-      }
-      if (command.includes('gh release list')) {
-        return 'v0.3.0-nightly.20250819.abcdef';
-      }
-      return '';
+      expect(result.releaseVersion).toBe('0.6.0-nightly.20250911.a1b2c3d');
+      expect(result.npmTag).toBe('nightly');
+      expect(result.previousReleaseTag).toBe('v0.5.0-nightly.20250910.abcdef');
     });
 
-    const result = getReleaseVersion();
+    it('should default minor to 0 if missing in package.json version', () => {
+      vi.mocked(readFileSync).mockReturnValue('{"version": "0"}');
+      vi.mocked(execSync).mockImplementation((command) => {
+        if (command.includes('rev-parse')) return 'a1b2c3d';
+        if (command.includes('release list'))
+          return 'v0.0.0-nightly.20250910.abcdef';
+        return '';
+      });
 
-    expect(result).toEqual({
-      releaseTag: 'v0.3.0-nightly.20250820.abcdef',
-      releaseVersion: '0.3.0-nightly.20250820.abcdef',
-      npmTag: 'nightly',
-      previousReleaseTag: 'v0.3.0-nightly.20250819.abcdef',
-    });
-  });
+      const result = getVersion({ type: 'nightly' });
 
-  it('should generate a preview version and get previous tag', () => {
-    process.env.IS_PREVIEW = 'true';
-
-    vi.mocked(execSync).mockImplementation((command) => {
-      if (command.includes('git tag')) {
-        return 'v0.1.0\nv0.0.1';
-      }
-      if (command.includes('gh release list')) {
-        return 'v0.1.0'; // Previous stable release
-      }
-      return '';
-    });
-
-    const result = getReleaseVersion();
-
-    expect(result).toEqual({
-      releaseTag: 'v0.2.0-preview',
-      releaseVersion: '0.2.0-preview',
-      npmTag: 'preview',
-      previousReleaseTag: 'v0.1.0',
+      expect(result.releaseVersion).toBe('0.1.0-nightly.20250911.a1b2c3d');
+      expect(result.npmTag).toBe('nightly');
+      expect(result.previousReleaseTag).toBe('v0.0.0-nightly.20250910.abcdef');
     });
   });
 
-  it('should use the manual version and get previous tag', () => {
-    process.env.MANUAL_VERSION = 'v0.1.1';
+  describe('Promote Workflow Logic', () => {
+    it('should calculate stable version from the latest preview tag', () => {
+      const latestPreview = 'v0.5.0-preview';
+      const latestStable = 'v0.4.0';
 
-    vi.mocked(execSync).mockImplementation((command) => {
-      if (command.includes('gh release list')) {
-        return 'v0.1.0'; // Previous stable release
-      }
-      return '';
+      vi.mocked(execSync).mockImplementation((command) => {
+        if (command.includes('not')) return latestStable;
+        if (command.includes('contains("preview")')) return latestPreview;
+        return '';
+      });
+
+      const result = getVersion({ type: 'stable' });
+
+      expect(result.releaseVersion).toBe('0.5.0');
+      expect(result.npmTag).toBe('latest');
+      expect(result.previousReleaseTag).toBe(latestStable);
     });
 
-    const result = getReleaseVersion();
+    it('should calculate preview version from the latest nightly tag', () => {
+      const latestNightly = 'v0.6.0-nightly.20250910.abcdef';
+      const latestPreview = 'v0.5.0-preview';
 
-    expect(result).toEqual({
-      releaseTag: 'v0.1.1',
-      releaseVersion: '0.1.1',
-      npmTag: 'latest',
-      previousReleaseTag: 'v0.1.0',
+      vi.mocked(execSync).mockImplementation((command) => {
+        if (command.includes('nightly')) return latestNightly;
+        if (command.includes('preview')) return latestPreview;
+        return '';
+      });
+
+      const result = getVersion({ type: 'preview' });
+
+      expect(result.releaseVersion).toBe('0.6.0-preview');
+      expect(result.npmTag).toBe('preview');
+      expect(result.previousReleaseTag).toBe(latestPreview);
     });
   });
 
-  it('should prepend v to manual version if missing', () => {
-    process.env.MANUAL_VERSION = '1.2.3';
-    const { releaseTag } = getReleaseVersion();
-    expect(releaseTag).toBe('v1.2.3');
-  });
+  describe('Patch Workflow Logic', () => {
+    it('should calculate the next patch version for a stable release', () => {
+      const latestStable = 'v0.5.1';
+      vi.mocked(execSync).mockReturnValue(latestStable);
 
-  it('should handle pre-release versions correctly', () => {
-    process.env.MANUAL_VERSION = 'v1.2.3-beta.1';
-    const { releaseTag, releaseVersion, npmTag } = getReleaseVersion();
-    expect(releaseTag).toBe('v1.2.3-beta.1');
-    expect(releaseVersion).toBe('1.2.3-beta.1');
-    expect(npmTag).toBe('beta');
-  });
+      const result = getVersion({ type: 'patch', patchFrom: 'stable' });
 
-  it('should throw an error for invalid version format', () => {
-    process.env.MANUAL_VERSION = '1.2';
-    expect(() => getReleaseVersion()).toThrow(
-      'Error: Version must be in the format vX.Y.Z or vX.Y.Z-prerelease',
-    );
-  });
-
-  it('should throw an error if no version is provided for non-nightly/preview release', () => {
-    expect(() => getReleaseVersion()).toThrow(
-      'Error: No version specified and this is not a nightly or preview release.',
-    );
-  });
-
-  it('should throw an error for versions with build metadata', () => {
-    process.env.MANUAL_VERSION = 'v1.2.3+build456';
-    expect(() => getReleaseVersion()).toThrow(
-      'Error: Versions with build metadata (+) are not supported for releases.',
-    );
-  });
-
-  it('should correctly calculate the next version from a patch release', () => {
-    process.env.IS_PREVIEW = 'true';
-
-    vi.mocked(execSync).mockImplementation((command) => {
-      if (command.includes('git tag')) {
-        return 'v1.1.3\nv1.1.2\nv1.1.1\nv1.1.0\nv1.0.0';
-      }
-      if (command.includes('gh release list')) {
-        return 'v1.1.3';
-      }
-      return '';
+      expect(result.releaseVersion).toBe('0.5.2');
+      expect(result.npmTag).toBe('latest');
+      expect(result.previousReleaseTag).toBe(latestStable);
     });
 
-    const result = getReleaseVersion();
+    it('should calculate the next patch version for a preview release', () => {
+      const latestPreview = 'v0.6.0-preview';
+      vi.mocked(execSync).mockReturnValue(latestPreview);
 
-    expect(result.releaseTag).toBe('v1.2.0-preview');
+      const result = getVersion({ type: 'patch', patchFrom: 'preview' });
+
+      expect(result.releaseVersion).toBe('0.6.1-preview');
+      expect(result.npmTag).toBe('preview');
+      expect(result.previousReleaseTag).toBe(latestPreview);
+    });
+
+    it('should default patch to 0 if missing in stable release', () => {
+      const latestStable = 'v0.5';
+      vi.mocked(execSync).mockReturnValue(latestStable);
+
+      const result = getVersion({ type: 'patch', patchFrom: 'stable' });
+
+      expect(result.releaseVersion).toBe('0.5.1');
+      expect(result.npmTag).toBe('latest');
+      expect(result.previousReleaseTag).toBe(latestStable);
+    });
   });
 });

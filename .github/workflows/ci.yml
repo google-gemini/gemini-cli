@@ -375,6 +375,8 @@ jobs:
   # Check for changes in bundle size.
   bundle_size:
     name: 'Check Bundle Size'
+    if: |-
+      ${{ github.event_name != 'merge_group' }}
     runs-on: 'ubuntu-latest'
     permissions:
       contents: 'read' # For checkout
@@ -392,3 +394,4 @@ jobs:
           pattern: './bundle/**/*.{js,sb}'
           minimum-change-threshold: '1000'
           compression: 'none'
+          clean-script: 'clean'
