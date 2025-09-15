@@ -182,13 +182,8 @@ export class ClassifierStrategy implements RoutingStrategy {
       const latencyMs = Date.now() - startTime;
 
       if (routerResponse.model_choice === FLASH_MODEL) {
-        // WORKAROUND: Due to a known model bug, using Flash early in the conversation can cause empty token responses.
-        // We temporarily use Flash Lite if the conversation history has fewer than 5 messages.
         return {
-          model:
-            context.history.length < 5
-              ? DEFAULT_GEMINI_FLASH_LITE_MODEL
-              : DEFAULT_GEMINI_FLASH_MODEL,
+          model: DEFAULT_GEMINI_FLASH_MODEL,
           metadata: {
             source: 'Classifier',
             latencyMs,

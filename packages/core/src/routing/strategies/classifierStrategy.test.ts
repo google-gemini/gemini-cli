@@ -29,10 +29,6 @@ describe('ClassifierStrategy', () => {
   let mockContext: RoutingContext;
   let mockConfig: Config;
   let mockBaseLlmClient: BaseLlmClient;
-  const mockContent: Content = {
-    role: 'user',
-    parts: [{ text: 'mock history item' }],
-  };
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -77,7 +73,7 @@ describe('ClassifierStrategy', () => {
     );
   });
 
-  it('should route to FLASH model for a simple task with long history', async () => {
+  it('should route to FLASH model for a simple task', async () => {
     const mockApiResponse = {
       reasoning: 'This is a simple task.',
       model_choice: 'flash',
@@ -85,7 +81,6 @@ describe('ClassifierStrategy', () => {
     vi.mocked(mockBaseLlmClient.generateJson).mockResolvedValue(
       mockApiResponse,
     );
-    mockContext.history = new Array(5).fill(mockContent);
 
     const decision = await strategy.route(
       mockContext,
@@ -102,25 +97,6 @@ describe('ClassifierStrategy', () => {
         reasoning: mockApiResponse.reasoning,
       },
     });
-  });
-
-  it('should route to FLASH_LITE model for a simple task with short history', async () => {
-    const mockApiResponse = {
-      reasoning: 'This is a simple task.',
-      model_choice: 'flash',
-    };
-    vi.mocked(mockBaseLlmClient.generateJson).mockResolvedValue(
-      mockApiResponse,
-    );
-    mockContext.history = new Array(4).fill(mockContent);
-
-    const decision = await strategy.route(
-      mockContext,
-      mockConfig,
-      mockBaseLlmClient,
-    );
-
-    expect(decision?.model).toBe(DEFAULT_GEMINI_FLASH_LITE_MODEL);
   });
 
   it('should route to PRO model for a complex task', async () => {
