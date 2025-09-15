@@ -55,43 +55,13 @@ describe('Help Component', () => {
     }
   });
 
-  // Test for current runtime platform
   it('renders help component with current platform shortcuts', () => {
     const { lastFrame } = render(<Help commands={mockCommands} />);
     
-    // Use platform-specific snapshot that matches current runtime platform
-    const platformSuffix = process.platform === 'win32' ? 'win32' : 
-                          process.platform === 'darwin' ? 'darwin' : 'linux';
-    expect(lastFrame()).toMatchSnapshot(`current-platform-${platformSuffix}`);
-  });
-
-  // Ensure all platform snapshots exist by generating them explicitly
-  it('generates snapshots for all platforms', () => {
-    const platforms = [
-      { name: 'linux', value: 'linux' },
-      { name: 'darwin', value: 'darwin' },
-      { name: 'win32', value: 'win32' }
-    ];
-
-    platforms.forEach(({ name, value }) => {
-      const originalPlatform = process.platform;
-      Object.defineProperty(process, 'platform', {
-        value: value,
-        writable: true,
-        configurable: true,
-      });
-
-      try {
-        const { lastFrame } = render(<Help commands={mockCommands} />);
-        expect(lastFrame()).toMatchSnapshot(`current-platform-${name}`);
-      } finally {
-        Object.defineProperty(process, 'platform', {
-          value: originalPlatform,
-          writable: true,
-          configurable: true,
-        });
-      }
-    });
+    // Use existing platform-specific snapshots from the platform behavior tests
+    const snapshotName = process.platform === 'win32' ? 'win32-shortcuts' : 
+                        process.platform === 'darwin' ? 'darwin-shortcuts' : 'linux-shortcuts';
+    expect(lastFrame()).toMatchSnapshot(snapshotName);
   });
 
   describe('Platform-specific behavior', () => {
