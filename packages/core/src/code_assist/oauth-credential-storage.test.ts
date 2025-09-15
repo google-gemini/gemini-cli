@@ -14,7 +14,14 @@ import * as os from 'node:os';
 import { promises as fs } from 'node:fs';
 
 // Mock external dependencies
-vi.mock('../mcp/token-storage/hybrid-token-storage.js');
+const mockHybridTokenStorage = vi.hoisted(() => ({
+  getCredentials: vi.fn(),
+  setCredentials: vi.fn(),
+  deleteCredentials: vi.fn(),
+}));
+vi.mock('../mcp/token-storage/hybrid-token-storage.js', () => ({
+  HybridTokenStorage: vi.fn(() => mockHybridTokenStorage),
+}));
 vi.mock('node:fs', () => ({
   promises: {
     readFile: vi.fn(),
@@ -48,22 +55,13 @@ describe('OAuthCredentialStorage', () => {
   const oldFilePath = '/mock/home/.gemini/oauth.json';
 
   beforeEach(() => {
-    vi.spyOn(
-      OAuthCredentialStorage['storage'],
-      'getCredentials',
-    ).mockResolvedValue(null);
-    vi.spyOn(
-      OAuthCredentialStorage['storage'],
-      'getCredentials',
-    ).mockResolvedValue(null);
-    vi.spyOn(
-      OAuthCredentialStorage['storage'],
-      'setCredentials',
-    ).mockResolvedValue(undefined);
-    vi.spyOn(
-      OAuthCredentialStorage['storage'],
-      'deleteCredentials',
-    ).mockResolvedValue(undefined);
+    vi.spyOn(mockHybridTokenStorage, 'getCredentials').mockResolvedValue(null);
+    vi.spyOn(mockHybridTokenStorage, 'setCredentials').mockResolvedValue(
+      undefined,
+    );
+    vi.spyOn(mockHybridTokenStorage, 'deleteCredentials').mockResolvedValue(
+      undefined,
+    );
 
     vi.spyOn(fs, 'readFile').mockRejectedValue(new Error('File not found'));
     vi.spyOn(fs, 'rm').mockResolvedValue(undefined);
@@ -78,37 +76,33 @@ describe('OAuthCredentialStorage', () => {
 
   describe('loadCredentials', () => {
     it('should load credentials from HybridTokenStorage if available', async () => {
-      vi.spyOn(
-        OAuthCredentialStorage['storage'],
-        'getCredentials',
-      ).mockResolvedValue(mockMcpCredentials);
+      vi.spyOn(mockHybridTokenStorage, 'getCredentials').mockResolvedValue(
+        mockMcpCredentials,
+      );
 
       const result = await OAuthCredentialStorage.loadCredentials();
 
-      expect(
-        OAuthCredentialStorage['storage'].getCredentials,
-      ).toHaveBeenCalledWith('main-account');
+      expect(mockHybridTokenStorage.getCredentials).toHaveBeenCalledWith(
+        'main-account',
+      );
       expect(result).toEqual(mockCredentials);
     });
 
     it('should fallback to migrateFromFileStorage if no credentials in HybridTokenStorage', async () => {
-      vi.spyOn(
-        OAuthCredentialStorage['storage'],
-        'getCredentials',
-      ).mockResolvedValue(null);
+      vi.spyOn(mockHybridTokenStorage, 'getCredentials').mockResolvedValue(
+        null,
+      );
       vi.spyOn(fs, 'readFile').mockResolvedValue(
         JSON.stringify(mockCredentials),
       );
 
       const result = await OAuthCredentialStorage.loadCredentials();
 
-      expect(
-        OAuthCredentialStorage['storage'].getCredentials,
-      ).toHaveBeenCalledWith('main-account');
+      expect(mockHybridTokenStorage.getCredentials).toHaveBeenCalledWith(
+        'main-account',
+      );
       expect(fs.readFile).toHaveBeenCalledWith(oldFilePath, 'utf-8');
-      expect(
-        OAuthCredentialStorage['storage'].setCredentials,
-      ).toHaveBeenCalled(); // Verify credentials were saved
+      expect(mockHybridTokenStorage.setCredentials).toHaveBeenCalled(); // Verify credentials were saved
       expect(fs.rm).toHaveBeenCalledWith(oldFilePath, { force: true }); // Verify old file was removed
       expect(result).toEqual(mockCredentials);
     });
@@ -125,10 +119,9 @@ describe('OAuthCredentialStorage', () => {
     });
 
     it('should throw an error if loading fails', async () => {
-      vi.spyOn(
-        OAuthCredentialStorage['storage'],
-        'getCredentials',
-      ).mockRejectedValue(new Error('Loading error'));
+      vi.spyOn(mockHybridTokenStorage, 'getCredentials').mockRejectedValue(
+        new Error('Loading error'),
+      );
 
       await expect(OAuthCredentialStorage.loadCredentials()).rejects.toThrow(
         'Failed to load OAuth credentials',
@@ -136,10 +129,9 @@ describe('OAuthCredentialStorage', () => {
     });
 
     it('should throw an error if read file fails', async () => {
-      vi.spyOn(
-        OAuthCredentialStorage['storage'],
-        'getCredentials',
-      ).mockResolvedValue(null);
+      vi.spyOn(mockHybridTokenStorage, 'getCredentials').mockResolvedValue(
+        null,
+      );
       vi.spyOn(fs, 'readFile').mockRejectedValue(
         new Error('Permission denied'),
       );
@@ -150,10 +142,9 @@ describe('OAuthCredentialStorage', () => {
     });
 
     it('should not throw error if migration file removal failed', async () => {
-      vi.spyOn(
-        OAuthCredentialStorage['storage'],
-        'getCredentials',
-      ).mockResolvedValue(null);
+      vi.spyOn(mockHybridTokenStorage, 'getCredentials').mockResolvedValue(
+        null,
+      );
       vi.spyOn(fs, 'readFile').mockResolvedValue(
         JSON.stringify(mockCredentials),
       );
@@ -172,9 +163,9 @@ describe('OAuthCredentialStorage', () => {
     it('should save credentials to HybridTokenStorage', async () => {
       await OAuthCredentialStorage.saveCredentials(mockCredentials);
 
-      expect(
-        OAuthCredentialStorage['storage'].setCredentials,
-      ).toHaveBeenCalledWith(mockMcpCredentials);
+      expect(mockHybridTokenStorage.setCredentials).toHaveBeenCalledWith(
+        mockMcpCredentials,
+      );
     });
 
     it('should throw an error if access_token is missing', async () => {
@@ -194,9 +185,9 @@ describe('OAuthCredentialStorage', () => {
     it('should delete credentials from HybridTokenStorage', async () => {
       await OAuthCredentialStorage.clearCredentials();
 
-      expect(
-        OAuthCredentialStorage['storage'].deleteCredentials,
-      ).toHaveBeenCalledWith('main-account');
+      expect(mockHybridTokenStorage.deleteCredentials).toHaveBeenCalledWith(
+        'main-account',
+      );
     });
 
     it('should attempt to remove the old file-based storage', async () => {
@@ -214,10 +205,9 @@ describe('OAuthCredentialStorage', () => {
     });
 
     it('should throw an error if clearing from HybridTokenStorage fails', async () => {
-      vi.spyOn(
-        OAuthCredentialStorage['storage'],
-        'deleteCredentials',
-      ).mockRejectedValue(new Error('Deletion error'));
+      vi.spyOn(mockHybridTokenStorage, 'deleteCredentials').mockRejectedValue(
+        new Error('Deletion error'),
+      );
 
       await expect(OAuthCredentialStorage.clearCredentials()).rejects.toThrow(
         'Failed to clear OAuth credentials',
