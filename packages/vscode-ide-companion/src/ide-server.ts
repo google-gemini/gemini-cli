@@ -71,8 +71,10 @@ async function writePortAndWorkspace({
 
   try {
     await Promise.all([
-      fs.writeFile(portFile, content, { mode: 0o600 }),
-      fs.writeFile(ppidPortFile, content, { mode: 0o600 }),
+      fs.writeFile(portFile, content).then(() => fs.chmod(portFile, 0o600)),
+      fs
+        .writeFile(ppidPortFile, content)
+        .then(() => fs.chmod(ppidPortFile, 0o600)),
     ]);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

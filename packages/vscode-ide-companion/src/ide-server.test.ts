@@ -25,6 +25,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock('node:fs/promises', () => ({
   writeFile: vi.fn(() => Promise.resolve(undefined)),
   unlink: vi.fn(() => Promise.resolve(undefined)),
+  chmod: vi.fn(() => Promise.resolve(undefined)),
 }));
 
 vi.mock('node:os', async (importOriginal) => {
@@ -148,6 +149,8 @@ describe('IDEServer', () => {
       expectedPpidPortFile,
       expectedContent,
     );
+    expect(fs.chmod).toHaveBeenCalledWith(expectedPortFile, 0o600);
+    expect(fs.chmod).toHaveBeenCalledWith(expectedPpidPortFile, 0o600);
   });
 
   it('should set a single folder path', async () => {
@@ -184,6 +187,8 @@ describe('IDEServer', () => {
       expectedPpidPortFile,
       expectedContent,
     );
+    expect(fs.chmod).toHaveBeenCalledWith(expectedPortFile, 0o600);
+    expect(fs.chmod).toHaveBeenCalledWith(expectedPpidPortFile, 0o600);
   });
 
   it('should set an empty string if no folders are open', async () => {
@@ -220,6 +225,8 @@ describe('IDEServer', () => {
       expectedPpidPortFile,
       expectedContent,
     );
+    expect(fs.chmod).toHaveBeenCalledWith(expectedPortFile, 0o600);
+    expect(fs.chmod).toHaveBeenCalledWith(expectedPpidPortFile, 0o600);
   });
 
   it('should update the path when workspace folders change', async () => {
@@ -270,6 +277,8 @@ describe('IDEServer', () => {
       expectedPpidPortFile,
       expectedContent,
     );
+    expect(fs.chmod).toHaveBeenCalledWith(expectedPortFile, 0o600);
+    expect(fs.chmod).toHaveBeenCalledWith(expectedPpidPortFile, 0o600);
 
     // Simulate removing a folder
     vscodeMock.workspace.workspaceFolders = [{ uri: { fsPath: '/baz/qux' } }];
@@ -293,6 +302,8 @@ describe('IDEServer', () => {
       expectedPpidPortFile,
       expectedContent2,
     );
+    expect(fs.chmod).toHaveBeenCalledWith(expectedPortFile, 0o600);
+    expect(fs.chmod).toHaveBeenCalledWith(expectedPpidPortFile, 0o600);
   });
 
   it('should clear env vars and delete port file on stop', async () => {
@@ -354,6 +365,8 @@ describe('IDEServer', () => {
         expectedPpidPortFile,
         expectedContent,
       );
+      expect(fs.chmod).toHaveBeenCalledWith(expectedPortFile, 0o600);
+      expect(fs.chmod).toHaveBeenCalledWith(expectedPpidPortFile, 0o600);
     },
   );
 
