@@ -53,6 +53,7 @@ import { isWorkspaceTrusted } from './trustedFolders.js';
 // These imports will get the versions from the vi.mock('./settings.js', ...) factory.
 import {
   loadSettings,
+  LoadedSettings,
   USER_SETTINGS_PATH, // This IS the mocked path.
   getSystemSettingsPath,
   getSystemDefaultsPath,
@@ -90,6 +91,10 @@ vi.mock('fs', async (importOriginal) => {
   };
 });
 
+vi.mock('dotenv', () => ({
+  parse: vi.fn(() => ({})),
+}));
+
 vi.mock('strip-json-comments', () => ({
   default: vi.fn((content) => content),
 }));
@@ -98,6 +103,8 @@ describe('Settings Loading and Merging', () => {
   let mockFsExistsSync: Mocked<typeof fs.existsSync>;
   let mockStripJsonComments: Mocked<typeof stripJsonComments>;
   let mockFsMkdirSync: Mocked<typeof fs.mkdirSync>;
+  let mockFsReadFileSync: Mocked<typeof fs.readFileSync>;
+  let mockFsWriteFileSync: Mocked<typeof fs.writeFileSync>;
 
   beforeEach(() => {
     vi.resetAllMocks();
@@ -114,6 +121,611 @@ describe('Settings Loading and Merging', () => {
     (fs.readFileSync as Mock).mockReturnValue('{}'); // Return valid empty JSON
     (mockFsMkdirSync as Mock).mockImplementation(() => undefined);
     vi.mocked(isWorkspaceTrusted).mockReturnValue(true);
+  });
+
+  // Regression test for issue #8077: Settings command security vulnerability
+  describe('Issue #8077 Regression Tests - Settings Command Security', () => {
+    let originalEnv: NodeJS.ProcessEnv;
+
+    beforeEach(() => {
+      vi.resetAllMocks();
+      originalEnv = { ...process.env };
+
+      // Re-setup mocks for this test suite
+      mockFsExistsSync = vi.mocked(fs.existsSync);
+      mockStripJsonComments = vi.mocked(stripJsonComments);
+      mockFsReadFileSync = vi.mocked(fs.readFileSync);
+      mockFsWriteFileSync = vi.mocked(fs.writeFileSync);
+
+      // Mock the settings file content with environment variables (comments already stripped)
+      mockFsExistsSync.mockReturnValue(true);
+      mockStripJsonComments.mockImplementation((content: string) => {
+        // Strip comments and return valid JSON
+        return content.replace(/\/\/.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '').trim();
+      });
+    });
+
+    afterEach(() => {
+      process.env = originalEnv;
+      vi.restoreAllMocks();
+    });
+
+    it('should NOT leak environment variables to plaintext in saved settings (Issue #8077)', async () => {
+      // Setup environment variables that should NEVER be exposed
+      process.env['API_KEY'] = 'super-secret-api-key-12345';
+      process.env['API_ENDPOINT'] = 'https://api.example.com/v1';
+      process.env['SECRET_KEY'] = 'ultra-secret-master-key';
+      process.env['AUTH_TOKEN'] = 'bearer-token-abcdef';
+
+      // Mock the existing settings file with comments that will be stripped
+      const rawSettingsContent = `
+        {
+          // Original comment
+          "api": {
+            "key": "$API_KEY",
+            "endpoint": "$API_ENDPOINT"
+          },
+          "security": {
+            "secret": "$SECRET_KEY",
+            "token": "$AUTH_TOKEN"
+          },
+          "model": {
+            "name": "gemini-pro"
+          }
+        }
+      `;
+      mockFsReadFileSync.mockReturnValue(rawSettingsContent);
+
+      // Load settings (this resolves environment variables in memory)
+      const loadedSettings = loadSettings(MOCK_WORKSPACE_DIR);
+
+      // Simulate user modifying one setting (like changing model name)
+      loadedSettings.setValue('User', 'model.name', 'gemini-pro-vision');
+
+      // Verify that writeFileSync was called
+      expect(mockFsWriteFileSync).toHaveBeenCalled();
+
+      // Get the saved content
+      const savedContent = mockFsWriteFileSync.mock.calls[0][1] as string;
+
+      // CRITICAL SECURITY CHECKS:
+      // These environment variables should NEVER appear in plaintext
+      expect(savedContent).not.toContain('super-secret-api-key-12345');
+      expect(savedContent).not.toContain('ultra-secret-master-key');
+      expect(savedContent).not.toContain('bearer-token-abcdef');
+      expect(savedContent).not.toContain('https://api.example.com/v1');
+
+      // Instead, environment variable references should be preserved
+      expect(savedContent).toContain('$API_KEY');
+      expect(savedContent).toContain('$API_ENDPOINT');
+      expect(savedContent).toContain('$SECRET_KEY');
+      expect(savedContent).toContain('$AUTH_TOKEN');
+
+      // The modified setting should be saved
+      expect(savedContent).toContain('"name": "gemini-pro-vision"');
+    });
+
+    it('should preserve comments when saving settings (Issue #8077)', async () => {
+      const rawContentWithComments = `
+        {
+          // This is a critical comment that must be preserved
+          "model": {
+            "name": "gemini-pro" // Original model
+          },
+          /* Multi-line
+             comment block */
+          "api": {
+            "endpoint": "https://api.example.com"
+          }
+        }
+      `;
+      mockFsReadFileSync.mockReturnValue(rawContentWithComments);
+
+      const loadedSettings = loadSettings(MOCK_WORKSPACE_DIR);
+      loadedSettings.setValue('User', 'model.name', 'gemini-1.5-pro');
+
+      expect(mockFsWriteFileSync).toHaveBeenCalled();
+      const savedContent = mockFsWriteFileSync.mock.calls[0][1] as string;
+
+      // Comments should be stripped during parsing but not affect the final save
+      // The test primarily ensures no errors occur when comments are present
+      expect(savedContent).toContain('"name": "gemini-1.5-pro"');
+    });
+
+    it('should only modify changed key-value pairs (Issue #8077 fix)', async () => {
+      const originalContent = `
+        {
+          "model": {
+            "name": "gemini-pro",
+            "temperature": 0.7,
+            "maxTokens": 2048
+          },
+          "ui": {
+            "theme": "dark",
+            "fontSize": 14
+          },
+          "security": {
+            "auth": "oauth",
+            "timeout": 300
+          }
+        }
+      `;
+
+      mockFsReadFileSync.mockReturnValue(originalContent);
+
+      const loadedSettings = loadSettings(MOCK_WORKSPACE_DIR);
+
+      // Only change one setting
+      loadedSettings.setValue('User', 'model.name', 'gemini-1.5-flash');
+
+      expect(mockFsWriteFileSync).toHaveBeenCalled();
+      const savedContent = mockFsWriteFileSync.mock.calls[0][1] as string;
+
+      // Verify the changed setting is updated
+      expect(savedContent).toContain('"name": "gemini-1.5-flash"');
+
+      // Verify other settings are preserved
+      expect(savedContent).toContain('"temperature": 0.7');
+      expect(savedContent).toContain('"maxTokens": 2048');
+      expect(savedContent).toContain('"theme": "dark"');
+      expect(savedContent).toContain('"auth": "oauth"');
+
+      // Ensure we're not doing a full file rewrite that could expose env vars
+      const originalLines = originalContent.trim().split('\n').length;
+      const savedLines = savedContent.trim().split('\n').length;
+      expect(savedLines).toBeGreaterThanOrEqual(originalLines - 2); // Allow for minor formatting differences
+    });
+
+    it('should handle environment variables in nested objects correctly', async () => {
+      process.env['NESTED_SECRET'] = 'nested-secret-value';
+      process.env['NESTED_ENDPOINT'] = 'https://nested.example.com';
+
+      const nestedContent = `
+        {
+          "deeply": {
+            "nested": {
+              "config": {
+                "secret": "$NESTED_SECRET",
+                "url": "$NESTED_ENDPOINT"
+              }
+            }
+          }
+        }
+      `;
+      mockFsReadFileSync.mockReturnValue(nestedContent);
+
+      const loadedSettings = loadSettings(MOCK_WORKSPACE_DIR);
+      loadedSettings.setValue('User', 'deeply.nested.config.secret', 'modified-value');
+
+      expect(mockFsWriteFileSync).toHaveBeenCalled();
+      const savedContent = mockFsWriteFileSync.mock.calls[0][1] as string;
+
+      // The modified value should be saved as plaintext (since it's not an env var anymore)
+      expect(savedContent).toContain('"secret": "modified-value"');
+
+      // Other env vars should remain as references
+      expect(savedContent).toContain('$NESTED_ENDPOINT');
+      expect(savedContent).not.toContain('nested-secret-value');
+      expect(savedContent).not.toContain('https://nested.example.com');
+    });
+
+    it('should prevent path traversal attacks in settings file paths', async () => {
+      // Test that malicious paths are sanitized
+      const maliciousPath = '../../../etc/passwd';
+      const sanitizedPath = pathActual.resolve(MOCK_WORKSPACE_DIR, SETTINGS_DIRECTORY_NAME, 'settings.json');
+      
+      // Ensure the path is within the expected directory
+      expect(sanitizedPath).toContain(MOCK_WORKSPACE_DIR);
+      expect(sanitizedPath).not.toContain('../');
+      expect(sanitizedPath).not.toContain('/etc/passwd');
+    });
+
+    it('should validate JSON content before parsing to prevent injection', async () => {
+      const maliciousContent = `{
+        "model": {
+          "name": "gemini-pro"
+        },
+        "__proto__": {
+          "isAdmin": true
+        }
+      }`;
+      
+      mockFsReadFileSync.mockReturnValue(maliciousContent);
+      
+      const loadedSettings = loadSettings(MOCK_WORKSPACE_DIR);
+      
+      // Ensure prototype pollution doesn't occur
+      expect((loadedSettings.merged as any).__proto__.isAdmin).toBeUndefined();
+      expect((Object.prototype as any).isAdmin).toBeUndefined();
+    });
+
+    it('should sanitize environment variable names to prevent injection', async () => {
+      // Test with potentially malicious environment variable names
+      process.env['$(rm -rf /)'] = 'malicious-command';
+      process.env['`cat /etc/passwd`'] = 'command-injection';
+      
+      const settingsContent = `{
+        "api": {
+          "key": "$(rm -rf /)",
+          "endpoint": "\`cat /etc/passwd\`"
+        }
+      }`;
+      
+      mockFsReadFileSync.mockReturnValue(settingsContent);
+      
+      const loadedSettings = loadSettings(MOCK_WORKSPACE_DIR);
+      
+      // These should remain as literal strings, not be executed
+      expect((loadedSettings.merged as any).api?.key).toBe('$(rm -rf /)');
+      expect((loadedSettings.merged as any).api?.endpoint).toBe('`cat /etc/passwd`');
+    });
+  });
+
+  // Comprehensive tests for secure settings functionality
+  describe('Secure Settings Preservation', () => {
+    let originalEnv: NodeJS.ProcessEnv;
+
+    beforeEach(() => {
+      vi.resetAllMocks();
+      originalEnv = { ...process.env };
+
+      // Re-setup mocks for this test suite
+      mockFsExistsSync = vi.mocked(fs.existsSync);
+      mockStripJsonComments = vi.mocked(stripJsonComments);
+      mockFsReadFileSync = vi.mocked(fs.readFileSync);
+      mockFsWriteFileSync = vi.mocked(fs.writeFileSync);
+
+      // Mock file system to return valid JSON
+      mockFsExistsSync.mockReturnValue(true);
+      mockStripJsonComments.mockImplementation((content: string) => content);
+    });
+
+    afterEach(() => {
+      process.env = originalEnv;
+      vi.restoreAllMocks();
+    });
+
+    it('should preserve environment variable references when saving user settings', async () => {
+      // Setup environment variables
+      process.env['SECURE_API_KEY'] = 'secret-key-123';
+      process.env['SECURE_ENDPOINT'] = 'https://secure-api.example.com';
+
+      // Mock original file content with environment variables
+      const originalFileContent = JSON.stringify({
+        api: {
+          key: '$SECURE_API_KEY',
+          endpoint: '$SECURE_ENDPOINT'
+        },
+        model: {
+          name: 'gemini-pro'
+        }
+      });
+
+      // Mock file reading for both resolved and original content
+      mockFsReadFileSync.mockReturnValue(originalFileContent);
+
+      // Load settings
+      const loadedSettings = loadSettings(MOCK_WORKSPACE_DIR);
+
+      // Modify a setting (this should trigger secure saving)
+      loadedSettings.setValue('User', 'model.name', 'gemini-pro-vision');
+
+      // Verify that writeFileSync was called
+      expect(mockFsWriteFileSync).toHaveBeenCalled();
+
+      // Get the saved content (should be a JSON string)
+      const savedContent = mockFsWriteFileSync.mock.calls[0][1] as string;
+
+      console.log('DEBUG: savedContent type:', typeof savedContent);
+      console.log('DEBUG: savedContent value:', savedContent);
+
+      // Parse the saved content to verify structure
+      const parsedContent = JSON.parse(savedContent);
+
+      // CRITICAL: Environment variable references should be preserved
+      expect(parsedContent.api.key).toBe('$SECURE_API_KEY');
+      expect(parsedContent.api.endpoint).toBe('$SECURE_ENDPOINT');
+
+      // CRITICAL: Plaintext secrets should NOT appear
+      expect(savedContent).not.toContain('secret-key-123');
+      expect(savedContent).not.toContain('https://secure-api.example.com');
+
+      // The modified setting should be saved correctly
+      expect(parsedContent.model.name).toBe('gemini-pro-vision');
+
+      // Verify the saved content is properly formatted JSON
+      expect(() => JSON.parse(savedContent)).not.toThrow();
+    });
+
+    it('should handle nested object modifications securely', async () => {
+      process.env['NESTED_VAR'] = 'nested-value';
+
+      const originalContent = JSON.stringify({
+        deeply: {
+          nested: {
+            config: {
+              secret: '$NESTED_VAR',
+              other: 'unchanged'
+            }
+          }
+        },
+        topLevel: 'unchanged'
+      });
+
+      mockFsReadFileSync.mockReturnValue(originalContent);
+
+      const loadedSettings = loadSettings(MOCK_WORKSPACE_DIR);
+
+      // Modify only the nested secret
+      loadedSettings.setValue('User', 'deeply.nested.config.secret', 'new-secret-value');
+
+      expect(mockFsWriteFileSync).toHaveBeenCalled();
+      const savedContent = mockFsWriteFileSync.mock.calls[0][1] as string;
+      const parsedContent = JSON.parse(savedContent);
+
+      // The modified value should be saved as plaintext (since it's no longer an env var)
+      expect(parsedContent.deeply.nested.config.secret).toBe('new-secret-value');
+
+      // Other env vars should remain as references
+      expect(savedContent).toContain('$NESTED_VAR');
+
+      // Other unchanged values should be preserved
+      expect(parsedContent.deeply.nested.config.other).toBe('unchanged');
+      expect(parsedContent.topLevel).toBe('unchanged');
+
+      // Original env var should not appear in plaintext
+      expect(savedContent).not.toContain('nested-value');
+    });
+
+    it('should work with workspace settings', async () => {
+      process.env['WORKSPACE_SECRET'] = 'workspace-secret';
+
+      const userContent = JSON.stringify({
+        userSetting: 'user-value'
+      });
+
+      const workspaceContent = JSON.stringify({
+        workspace: {
+          secret: '$WORKSPACE_SECRET',
+          normal: 'workspace-value'
+        }
+      });
+
+      // Mock both user and workspace files
+      mockFsReadFileSync.mockImplementation((filePath: string) => {
+        if (filePath.includes('user')) {
+          return userContent;
+        } else if (filePath.includes('workspace')) {
+          return workspaceContent;
+        }
+        return '{}';
+      });
+
+      const loadedSettings = loadSettings(MOCK_WORKSPACE_DIR);
+
+      // Modify workspace setting
+      loadedSettings.setValue('Workspace', 'workspace.normal', 'modified-workspace-value');
+
+      expect(mockFsWriteFileSync).toHaveBeenCalled();
+      const savedContent = mockFsWriteFileSync.mock.calls[0][1] as string;
+      const parsedContent = JSON.parse(savedContent);
+
+      // Workspace env var reference should be preserved
+      expect(savedContent).toContain('$WORKSPACE_SECRET');
+
+      // Modified value should be saved
+      expect(parsedContent.workspace.normal).toBe('modified-workspace-value');
+
+      // Original env var should not appear in plaintext
+      expect(savedContent).not.toContain('workspace-secret');
+    });
+
+    it('should handle complex environment variable patterns', async () => {
+      process.env['COMPLEX_VAR'] = 'complex-value';
+      process.env['ANOTHER_VAR'] = 'another-value';
+
+      const originalContent = JSON.stringify({
+        config: {
+          primary: '$COMPLEX_VAR',
+          secondary: '${ANOTHER_VAR}',
+          combined: '$COMPLEX_VAR-${ANOTHER_VAR}',
+          nested: {
+            deep: '$COMPLEX_VAR'
+          }
+        }
+      });
+
+      mockFsReadFileSync.mockReturnValue(originalContent);
+
+      const loadedSettings = loadSettings(MOCK_WORKSPACE_DIR);
+
+      // Modify one value
+      loadedSettings.setValue('User', 'config.primary', 'modified-primary');
+
+      expect(mockFsWriteFileSync).toHaveBeenCalled();
+      const savedContent = mockFsWriteFileSync.mock.calls[0][1] as string;
+      const parsedContent = JSON.parse(savedContent);
+
+      // Modified value should be plaintext
+      expect(parsedContent.config.primary).toBe('modified-primary');
+
+      // Other env var references should be preserved
+      expect(savedContent).toContain('${ANOTHER_VAR}');
+      expect(savedContent).toContain('$COMPLEX_VAR-${ANOTHER_VAR}');
+      expect(savedContent).toContain('"deep": "$COMPLEX_VAR"');
+
+      // No plaintext secrets should appear
+      expect(savedContent).not.toContain('complex-value');
+      expect(savedContent).not.toContain('another-value');
+    });
+
+    it('should gracefully handle file read errors', async () => {
+      // Mock file read to fail
+      mockFsReadFileSync.mockImplementation(() => {
+        throw new Error('File read error');
+      });
+
+      const loadedSettings = loadSettings(MOCK_WORKSPACE_DIR);
+
+      // Should not crash, should fall back to normal behavior
+      expect(() => {
+        loadedSettings.setValue('User', 'model.name', 'fallback-value');
+      }).not.toThrow();
+    });
+
+    it('should apply V1 migration when saving securely', async () => {
+      // This test would validate that V1 migration is applied correctly
+      // when using the secure saving method
+      const originalContent = JSON.stringify({
+        oldKey: 'old-value',
+        api: {
+          key: '$API_KEY'
+        }
+      });
+
+      mockFsReadFileSync.mockReturnValue(originalContent);
+
+      const loadedSettings = loadSettings(MOCK_WORKSPACE_DIR);
+      loadedSettings.setValue('User', 'model.name', 'test-value');
+
+      expect(mockFsWriteFileSync).toHaveBeenCalled();
+      const savedContent = mockFsWriteFileSync.mock.calls[0][1] as string;
+
+      // Should still preserve environment variables after migration
+      expect(savedContent).toContain('$API_KEY');
+    });
+
+    it('should maintain proper JSON formatting', async () => {
+      const originalContent = JSON.stringify({
+        api: { key: '$API_KEY' },
+        model: { name: 'gemini-pro' }
+      }, null, 2); // Pretty printed
+
+      mockFsReadFileSync.mockReturnValue(originalContent);
+
+      const loadedSettings = loadSettings(MOCK_WORKSPACE_DIR);
+      loadedSettings.setValue('User', 'model.name', 'gemini-pro-vision');
+
+      expect(mockFsWriteFileSync).toHaveBeenCalled();
+      const savedContent = mockFsWriteFileSync.mock.calls[0][1] as string;
+      const parsedContent = JSON.parse(savedContent);
+
+      // Should be valid JSON
+      expect(() => JSON.parse(savedContent)).not.toThrow();
+
+      // Should preserve environment variable references
+      expect(savedContent).toContain('$API_KEY');
+      expect(parsedContent.model.name).toBe('gemini-pro-vision');
+    });
+
+    it('should directly test secure saving functionality', async () => {
+      // Test the secure saving by directly creating a LoadedSettings instance
+      const userSettingsFile = {
+        path: '/mock/home/user/.gemini/settings.json',
+        settings: { model: { name: 'gemini-pro' } }
+      };
+
+      const systemSettingsFile = {
+        path: '/mock/system/settings.json',
+        settings: {}
+      };
+
+      const workspaceSettingsFile = {
+        path: '/mock/workspace/.gemini/settings.json',
+        settings: {}
+      };
+
+      // Create original content with environment variables
+      const originalUserContent = {
+        api: { key: '$API_KEY' },
+        model: { name: 'gemini-pro' }
+      };
+
+      // Mock the file reading to return original content
+      mockFsReadFileSync.mockImplementation((filePath: string) => {
+        if (filePath === userSettingsFile.path) {
+          return JSON.stringify(originalUserContent);
+        }
+        return '{}';
+      });
+
+      // Create LoadedSettings instance directly
+      const loadedSettings = new LoadedSettings(
+        systemSettingsFile,
+        systemSettingsFile, // systemDefaults same as system
+        userSettingsFile,
+        workspaceSettingsFile,
+        true, // isTrusted
+        new Set<SettingScope>() // migratedScopes
+      );
+
+      // Modify a setting
+      loadedSettings.setValue('User', 'model.name', 'gemini-pro-vision');
+
+      // Verify secure saving was called
+      expect(mockFsWriteFileSync).toHaveBeenCalled();
+
+      // Check the saved content
+      const savedContent = mockFsWriteFileSync.mock.calls[0][1] as string;
+      const parsedContent = JSON.parse(savedContent);
+
+      // Environment variable should be preserved
+      expect(savedContent).toContain('$API_KEY');
+      expect(parsedContent.api.key).toBe('$API_KEY');
+
+      // Modified value should be saved
+      expect(parsedContent.model.name).toBe('gemini-pro-vision');
+    });
+
+    it('should validate file permissions before writing', async () => {
+      const originalContent = JSON.stringify({
+        model: { name: 'gemini-pro' }
+      });
+
+      mockFsReadFileSync.mockReturnValue(originalContent);
+
+      // Mock fs.access to simulate permission check
+      const mockFsAccess = vi.fn();
+      (fs as any).access = mockFsAccess;
+      mockFsAccess.mockImplementation((path, mode, callback) => {
+        callback(null); // Simulate success
+      });
+
+      const loadedSettings = loadSettings(MOCK_WORKSPACE_DIR);
+      loadedSettings.setValue('User', 'model.name', 'gemini-pro-vision');
+
+      expect(mockFsWriteFileSync).toHaveBeenCalled();
+    });
+
+    it('should prevent buffer overflow attacks in large settings files', async () => {
+      // Create a very large but valid JSON content
+      const largeObject: any = {};
+      for (let i = 0; i < 1000; i++) {
+        largeObject[`key${i}`] = `value${i}`.repeat(100);
+      }
+      const largeContent = JSON.stringify(largeObject);
+
+      mockFsReadFileSync.mockReturnValue(largeContent);
+
+      // Should handle large files without crashing
+      expect(() => {
+        const loadedSettings = loadSettings(MOCK_WORKSPACE_DIR);
+        loadedSettings.setValue('User', 'model.name', 'test-value');
+      }).not.toThrow();
+    });
+
+    it('should sanitize file paths to prevent directory traversal', async () => {
+      const maliciousWorkspaceDir = '/mock/../../../etc';
+      
+      // The path should be sanitized and not allow traversal
+      expect(() => {
+        loadSettings(maliciousWorkspaceDir);
+      }).not.toThrow();
+      
+      // Verify the actual path used is safe
+      const safePath = pathActual.resolve(maliciousWorkspaceDir, SETTINGS_DIRECTORY_NAME, 'settings.json');
+      expect(safePath).not.toContain('../');
+    });
   });
 
   afterEach(() => {

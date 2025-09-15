@@ -362,6 +362,12 @@ export class LoadedSettings {
     this.workspace = workspace;
     this.isTrusted = isTrusted;
     this.migratedInMemorScopes = migratedInMemorScopes;
+
+    // Store original file content before environment variable resolution
+    this.originalSystemContent = this.loadOriginalFileContent(system.path);
+    this.originalUserContent = this.loadOriginalFileContent(user.path);
+    this.originalWorkspaceContent = this.loadOriginalFileContent(workspace.path);
+
     this._merged = this.computeMergedSettings();
   }
 
@@ -371,6 +377,11 @@ export class LoadedSettings {
   readonly workspace: SettingsFile;
   readonly isTrusted: boolean;
   readonly migratedInMemorScopes: Set<SettingScope>;
+
+  // Track original file content to preserve environment variable references
+  private readonly originalSystemContent: Record<string, unknown> | null;
+  private readonly originalUserContent: Record<string, unknown> | null;
+  private readonly originalWorkspaceContent: Record<string, unknown> | null;
 
   private _merged: Settings;
 
@@ -405,9 +416,88 @@ export class LoadedSettings {
 
   setValue(scope: SettingScope, key: string, value: unknown): void {
     const settingsFile = this.forScope(scope);
+    const originalContent = this.getOriginalContent(scope);
+
+    if (originalContent) {
+      // Use secure saving that preserves environment variable references
+      const updatedOriginal = this.applyChangeToOriginal(originalContent, key, value);
+      this.saveSettingsSecure(settingsFile, updatedOriginal);
+    } else {
+      // Fallback to old behavior if original content not available
+      setNestedProperty(settingsFile.settings, key, value);
+      saveSettings(settingsFile);
+    }
+
+    // Update in-memory resolved values
     setNestedProperty(settingsFile.settings, key, value);
     this._merged = this.computeMergedSettings();
-    saveSettings(settingsFile);
+  }
+
+  private loadOriginalFileContent(filePath: string): Record<string, unknown> | null {
+    try {
+      if (fs.existsSync(filePath)) {
+        const content = fs.readFileSync(filePath, 'utf-8');
+        const parsed = JSON.parse(stripJsonComments(content));
+        return parsed as Record<string, unknown>;
+      }
+    } catch (error) {
+      // Silently ignore errors and return null
+      console.warn(`Could not load original content from ${filePath}:`, error);
+    }
+    return null;
+  }
+
+  private getOriginalContent(scope: SettingScope): Record<string, unknown> | null {
+    switch (scope) {
+      case SettingScope.User:
+        return this.originalUserContent;
+      case SettingScope.Workspace:
+        return this.originalWorkspaceContent;
+      case SettingScope.System:
+        return this.originalSystemContent;
+      default:
+        return null;
+    }
+  }
+
+  private applyChangeToOriginal(
+    original: Record<string, unknown>,
+    key: string,
+    value: unknown
+  ): Record<string, unknown> {
+    const updated = JSON.parse(JSON.stringify(original)); // Deep clone
+    setNestedProperty(updated, key, value);
+    return updated;
+  }
+
+  private saveSettingsSecure(
+    settingsFile: SettingsFile,
+    originalContent: Record<string, unknown>
+  ): void {
+    try {
+      // Ensure the directory exists
+      const dirPath = path.dirname(settingsFile.path);
+      if (!fs.existsSync(dirPath)) {
+        fs.mkdirSync(dirPath, { recursive: true });
+      }
+
+      let settingsToSave = originalContent;
+
+      // Apply V1 migration if needed, but preserve environment variable references
+      if (!MIGRATE_V2_OVERWRITE) {
+        settingsToSave = migrateSettingsToV1(settingsToSave as Record<string, unknown>) as Record<string, unknown>;
+      }
+
+      fs.writeFileSync(
+        settingsFile.path,
+        JSON.stringify(settingsToSave, null, 2),
+        'utf-8',
+      );
+    } catch (error) {
+      console.error('Error saving settings securely:', error);
+      // Fallback to original save method
+      saveSettings(settingsFile);
+    }
   }
 }
 
