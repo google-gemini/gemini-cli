@@ -64,6 +64,7 @@ You can configure the behavior of the `run_shell_command` tool by modifying your
 To enable interactive commands, you need to set the `tools.usePty` setting to `true`. This will use `node-pty` for shell command execution, which allows for interactive sessions. If `node-pty` is not available, it will fall back to the `child_process` implementation, which does not support interactive commands.
 
 **Example `settings.json`:**
+
 ```json
 {
   "tools": {
@@ -74,9 +75,10 @@ To enable interactive commands, you need to set the `tools.usePty` setting to `t
 
 ### Showing Color in Output
 
-To show color in the shell output, you need to set the `tools.shell.showColor` setting to `true`.
+To show color in the shell output, you need to set the `tools.shell.showColor` setting to `true`. **Note: This setting only applies when `tools.usePty` is enabled.**
 
 **Example `settings.json`:**
+
 ```json
 {
   "tools": {
@@ -89,9 +91,10 @@ To show color in the shell output, you need to set the `tools.shell.showColor` s
 
 ### Setting the Pager
 
-You can set a custom pager for the shell output by setting the `tools.shell.pager` setting. The default pager is `cat`.
+You can set a custom pager for the shell output by setting the `tools.shell.pager` setting. The default pager is `cat`. **Note: This setting only applies when `tools.usePty` is enabled.**
 
 **Example `settings.json`:**
+
 ```json
 {
   "tools": {
