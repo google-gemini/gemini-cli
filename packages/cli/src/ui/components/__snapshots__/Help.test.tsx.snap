@@ -102,6 +102,108 @@ exports[`Help Component > Platform-specific behavior > renders correct shortcuts
 "
 `;
 
+exports[`Help Component > generates snapshots for all platforms > current-platform-darwin 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
+│                                                                                                  │
+│ Basics:                                                                                          │
+│ Add context: Use @ to specify files for context (e.g., @src/myFile.ts) to target specific files  │
+│ or folders.                                                                                      │
+│ Shell mode: Execute shell commands via ! (e.g., !npm run start) or use natural language (e.g.    │
+│ start server).                                                                                   │
+│                                                                                                  │
+│ Commands:                                                                                        │
+│  /test - A test command                                                                          │
+│  /parent - A parent command                                                                      │
+│    visible-child - A visible child command                                                       │
+│  ! - shell command                                                                               │
+│ [MCP] - Model Context Protocol command (from external servers)                                   │
+│                                                                                                  │
+│ Keyboard Shortcuts:                                                                              │
+│ Alt+Left/Right - Jump through words in the input                                                 │
+│ Ctrl+C - Quit application                                                                        │
+│ Ctrl+J - New line                                                                                │
+│ Ctrl+L - Clear the screen                                                                        │
+│ Ctrl+X / Meta+Enter - Open input in external editor                                              │
+│ Ctrl+Y - Toggle YOLO mode                                                                        │
+│ Enter - Send message                                                                             │
+│ Esc - Cancel operation / Clear input (double press)                                              │
+│ Shift+Tab - Toggle auto-accepting edits                                                          │
+│ Up/Down - Cycle through your prompt history                                                      │
+│                                                                                                  │
+│ For a full list of shortcuts, see docs/keyboard-shortcuts.md                                     │
+│                                                                                                  │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+"
+`;
+
+exports[`Help Component > generates snapshots for all platforms > current-platform-linux 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
+│                                                                                                  │
+│ Basics:                                                                                          │
+│ Add context: Use @ to specify files for context (e.g., @src/myFile.ts) to target specific files  │
+│ or folders.                                                                                      │
+│ Shell mode: Execute shell commands via ! (e.g., !npm run start) or use natural language (e.g.    │
+│ start server).                                                                                   │
+│                                                                                                  │
+│ Commands:                                                                                        │
+│  /test - A test command                                                                          │
+│  /parent - A parent command                                                                      │
+│    visible-child - A visible child command                                                       │
+│  ! - shell command                                                                               │
+│ [MCP] - Model Context Protocol command (from external servers)                                   │
+│                                                                                                  │
+│ Keyboard Shortcuts:                                                                              │
+│ Alt+Left/Right - Jump through words in the input                                                 │
+│ Ctrl+C - Quit application                                                                        │
+│ Ctrl+J - New line (Alt+Enter works for certain linux distros)                                    │
+│ Ctrl+L - Clear the screen                                                                        │
+│ Ctrl+X - Open input in external editor                                                           │
+│ Ctrl+Y - Toggle YOLO mode                                                                        │
+│ Enter - Send message                                                                             │
+│ Esc - Cancel operation / Clear input (double press)                                              │
+│ Shift+Tab - Toggle auto-accepting edits                                                          │
+│ Up/Down - Cycle through your prompt history                                                      │
+│                                                                                                  │
+│ For a full list of shortcuts, see docs/keyboard-shortcuts.md                                     │
+│                                                                                                  │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+"
+`;
+
+exports[`Help Component > generates snapshots for all platforms > current-platform-win32 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
+│                                                                                                  │
+│ Basics:                                                                                          │
+│ Add context: Use @ to specify files for context (e.g., @src/myFile.ts) to target specific files  │
+│ or folders.                                                                                      │
+│ Shell mode: Execute shell commands via ! (e.g., !npm run start) or use natural language (e.g.    │
+│ start server).                                                                                   │
+│                                                                                                  │
+│ Commands:                                                                                        │
+│  /test - A test command                                                                          │
+│  /parent - A parent command                                                                      │
+│    visible-child - A visible child command                                                       │
+│  ! - shell command                                                                               │
+│ [MCP] - Model Context Protocol command (from external servers)                                   │
+│                                                                                                  │
+│ Keyboard Shortcuts:                                                                              │
+│ Alt+Left/Right - Jump through words in the input                                                 │
+│ Ctrl+C - Quit application                                                                        │
+│ Ctrl+Enter - New line                                                                            │
+│ Ctrl+L - Clear the screen                                                                        │
+│ Ctrl+X - Open input in external editor                                                           │
+│ Ctrl+Y - Toggle YOLO mode                                                                        │
+│ Enter - Send message                                                                             │
+│ Esc - Cancel operation / Clear input (double press)                                              │
+│ Shift+Tab - Toggle auto-accepting edits                                                          │
+│ Up/Down - Cycle through your prompt history                                                      │
+│                                                                                                  │
+│ For a full list of shortcuts, see docs/keyboard-shortcuts.md                                     │
+│                                                                                                  │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+"
+`;
+
 exports[`Help Component > renders help component with current platform shortcuts > current-platform-linux 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
 │                                                                                                  │
