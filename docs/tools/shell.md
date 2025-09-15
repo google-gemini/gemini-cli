@@ -4,7 +4,7 @@ This document describes the `run_shell_command` tool for the Gemini CLI.
 
 ## Description
 
-Use `run_shell_command` to interact with the underlying system, run scripts, or perform command-line operations. `run_shell_command` executes a given shell command, including interactive commands that require user input (e.g., `vim`, `git rebase -i`).
+Use `run_shell_command` to interact with the underlying system, run scripts, or perform command-line operations. `run_shell_command` executes a given shell command, including interactive commands that require user input (e.g., `vim`, `git rebase -i`) if the `tools.usePty` setting is set to `true`.
 
 On Windows, commands are executed with `cmd.exe /c`. On other platforms, they are executed with `bash -c`.
 
