@@ -106,16 +106,26 @@ describe('XlwingsTool - REAL EXECUTION TESTS - ALL 67 OPERATIONS', () => {
         console.log('Create workbook success:', createResult.success);
         saveLLMOutput('debug_create_workbook', String(createResult.returnDisplay || createResult.llmContent), createResult.success);
 
+        // Verify create workbook succeeded before continuing
+        if (!createResult.success) {
+          throw new Error(`Failed to create workbook: ${createResult.returnDisplay || createResult.llmContent}`);
+        }
+
         // Step 2: Add a test worksheet
         console.log('\n=== STEP 2: Adding test worksheet ===');
         const addSheetParams = {
           op: 'add_sheet' as const,
           workbook: testWorkbookName,
-          sheet_name: testWorksheetName
+          new_sheet_name: testWorksheetName
         };
         const addSheetResult = await xlwingsTool['createInvocation'](addSheetParams).execute(new AbortController().signal);
         console.log('Add sheet success:', addSheetResult.success);
         saveLLMOutput('debug_add_sheet', String(addSheetResult.returnDisplay || addSheetResult.llmContent), addSheetResult.success);
+
+        // Verify add sheet succeeded before continuing
+        if (!addSheetResult.success) {
+          throw new Error(`Failed to add worksheet: ${addSheetResult.returnDisplay || addSheetResult.llmContent}`);
+        }
 
         // Step 3: Write test data to A1:J1
         console.log('\n=== STEP 3: Writing test data to A1:J1 ===');
@@ -129,6 +139,11 @@ describe('XlwingsTool - REAL EXECUTION TESTS - ALL 67 OPERATIONS', () => {
         const writeResult = await xlwingsTool['createInvocation'](writeParams).execute(new AbortController().signal);
         console.log('Write data success:', writeResult.success);
         saveLLMOutput('debug_write_data', String(writeResult.returnDisplay || writeResult.llmContent), writeResult.success);
+
+        // Verify write operation succeeded before continuing
+        if (!writeResult.success) {
+          throw new Error(`Failed to write data: ${writeResult.returnDisplay || writeResult.llmContent}`);
+        }
 
         // Step 4: Now test reading the exact same range that was problematic
         console.log('\n=== STEP 4: Reading A1:J1 data ===');
@@ -151,6 +166,11 @@ describe('XlwingsTool - REAL EXECUTION TESTS - ALL 67 OPERATIONS', () => {
 
         saveLLMOutput('debug_read_range_A1_J1', String(readResult.returnDisplay || readResult.llmContent), readResult.success);
 
+        // Verify read operation succeeded
+        if (!readResult.success) {
+          throw new Error(`Failed to read A1:J1 data: ${readResult.returnDisplay || readResult.llmContent}`);
+        }
+
         // Step 5: Also test reading a smaller range for comparison
         console.log('\n=== STEP 5: Reading A1:C1 for comparison ===');
         const readSmallParams = {
@@ -162,6 +182,11 @@ describe('XlwingsTool - REAL EXECUTION TESTS - ALL 67 OPERATIONS', () => {
         const readSmallResult = await xlwingsTool['createInvocation'](readSmallParams).execute(new AbortController().signal);
         console.log('Read small range success:', readSmallResult.success);
         saveLLMOutput('debug_read_range_A1_C1', String(readSmallResult.returnDisplay || readSmallResult.llmContent), readSmallResult.success);
+
+        // Verify small range read operation succeeded
+        if (!readSmallResult.success) {
+          throw new Error(`Failed to read A1:C1 data: ${readSmallResult.returnDisplay || readSmallResult.llmContent}`);
+        }
 
         // Clean up - close the test workbook
         try {
@@ -282,7 +307,7 @@ describe('XlwingsTool - REAL EXECUTION TESTS - ALL 67 OPERATIONS', () => {
 
     // 8. add_sheet
     it('should execute add_sheet operation', async () => {
-      const params = { op: 'add_sheet' as const, sheet_name: 'TestSheet' };
+      const params = { op: 'add_sheet' as const, new_sheet_name: 'TestSheet' };
       try {
         const invocation = xlwingsTool['createInvocation'](params);
         const result = await invocation.execute(new AbortController().signal);
@@ -366,7 +391,7 @@ describe('XlwingsTool - REAL EXECUTION TESTS - ALL 67 OPERATIONS', () => {
         const addSheetParams = {
           op: 'add_sheet' as const,
           workbook: '班级成绩统计.xlsx',
-          sheet_name: '年级成绩汇总表'
+          new_sheet_name: '年级成绩汇总表'
         };
         const addSheetInvocation = xlwingsTool['createInvocation'](addSheetParams);
         const addSheetResult = await addSheetInvocation.execute(new AbortController().signal);

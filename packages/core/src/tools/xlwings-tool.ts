@@ -776,23 +776,20 @@ interface SheetData {
   };
 }
 
-/**
- * Error context interface for template generation
- */
-interface ErrorContext {
-  errorMessage: string;
-  operation: string;
-  workbook?: string;
-  worksheet?: string;
-  range?: string;
-  result: XlwingsResult;
-  params: XlwingsParams;
-}
 
 /**
  * Excel interaction tool using xlwings for real-time Excel manipulation
  */
 export class XlwingsTool extends BasePythonTool<XlwingsParams, XlwingsResult> {
+  /**
+   * Escapes a file path for safe use in Python string literals
+   */
+  private escapePythonPath(path: string): string {
+    if (!path) return '';
+    // Replace single backslashes with double backslashes for Python string literals
+    return path.replace(/\\/g, '\\\\');
+  }
+
   constructor(config: Config) {
     super(
       'xlwings',
@@ -1393,9 +1390,11 @@ export class XlwingsTool extends BasePythonTool<XlwingsParams, XlwingsResult> {
 
   protected parseResult(pythonOutput: string, params: XlwingsParams): XlwingsResult {
     try {
+
       // Try to parse JSON output from Python script
       const lines = pythonOutput.trim().split('\n');
       const lastLine = lines[lines.length - 1];
+
       
       if (lastLine.startsWith('{') && lastLine.endsWith('}')) {
         const result = JSON.parse(lastLine);
@@ -2148,13 +2147,36 @@ export class XlwingsTool extends BasePythonTool<XlwingsParams, XlwingsResult> {
             if (features.length > 0) {
               llmContent += ` (${features.join(', ')})`;
             }
-            
+
             llmContent += `.`;
           }
         }
         } else {
-          // Use new helpful error response generator
-          llmContent = this.generateHelpfulErrorResponse(result, params);
+          // Handle structured error response directly from Python
+          if (result.error_type && result.error_message) {
+            // Use structured error from Python
+            llmContent = `Excel ${params.op} operation failed: ${result.error_message}`;
+
+            if (result.context) {
+              if (result.context.available_sheets && Array.isArray(result.context.available_sheets)) {
+                llmContent += `\n\nAvailable worksheets: ${result.context.available_sheets.join(', ')}`;
+              }
+              if (result.context.workbook) {
+                llmContent += `\nWorkbook: ${result.context.workbook}`;
+              }
+            }
+
+            if (result.suggested_actions && Array.isArray(result.suggested_actions) && result.suggested_actions.length > 0) {
+              llmContent += `\n\n**Suggested actions:**`;
+              for (const action of result.suggested_actions) {
+                llmContent += `\n• ${action}`;
+              }
+            }
+          } else {
+            // Fallback for old error format
+            const errorMessage = result.xlwings_error || (typeof result.error === 'string' ? result.error : result.error?.message) || 'Unknown error';
+            llmContent = `Excel ${params.op} operation failed: ${errorMessage}`;
+          }
         }
 
         return {
@@ -2188,14 +2210,18 @@ export class XlwingsTool extends BasePythonTool<XlwingsParams, XlwingsResult> {
   private buildPythonScript(params: XlwingsParams): string {
     const imports = [
       'import json',
-      'import sys', 
+      'import sys',
       'import os',
+      'import warnings',
       'from datetime import datetime',
+      '',
+      '# Suppress pandas FutureWarnings to keep JSON output clean',
+      'warnings.filterwarnings("ignore", category=FutureWarning)',
       '',
       'try:',
       '    import xlwings as xw',
       'except ImportError:',
-      '    print(json.dumps({"success": False, "operation": "' + params.op + '", "xlwings_error": "xlwings library is not installed. Please install it using: pip install xlwings"}))',
+      '    print(json.dumps({"success": False, "operation": "' + params.op + '", "error_type": "xlwings_not_installed", "error_message": "xlwings library is not installed", "context": {"required_library": "xlwings"}, "suggested_actions": ["Install xlwings using: pip install xlwings", "Ensure Python environment has the required dependencies", "Restart the application after installation"]}))',
       '    sys.exit(1)',
     ];
 
@@ -2275,68 +2301,104 @@ def get_excel_app(app_id=None):
     except:
         return xw.apps.active if xw.apps else None
 
-def get_workbook_smart(workbook_name=None, preferred_app=None):
+def get_workbook_smart(workbook_path=None, preferred_app=None):
     """
     Smart workbook finder that handles all scenarios intelligently:
-    1. If workbook is already open (by name or path), use it
-    2. If workbook_name is a path and file exists, open it
-    3. If workbook_name is just a name (no path), create new workbook with that name
+    1. If workbook is already open (by path), use it
+    2. If workbook_path exists as file, open it
+    3. If workbook_path doesn't exist, create new workbook and save to that path
 
     Args:
-        workbook_name: Workbook name or path to find/open/create
+        workbook_path: Absolute path to workbook file
         preferred_app: Preferred Excel app instance (optional)
 
     Returns:
         tuple: (workbook_object, app_instance, was_opened_by_us, was_created_by_us)
     """
     import os
-    
-    if not workbook_name:
+
+    if not workbook_path:
         # Return active workbook from preferred app or any app
         app = preferred_app or xw.apps.active if xw.apps else None
         if app and app.books:
             return app.books.active, app, False, False
         return None, None, False, False
+
     
     # Phase 1: Search across all open Excel instances
     all_apps = list(xw.apps) if xw.apps else []
     
     # Search in preferred app first
     if preferred_app and preferred_app in all_apps:
-        wb = _search_workbook_in_app(workbook_name, preferred_app)
+        wb = _search_workbook_in_app(workbook_path, preferred_app)
         if wb:
             return wb, preferred_app, False, False
-    
+
     # Search in all other apps
     for app in all_apps:
         if app != preferred_app:
-            wb = _search_workbook_in_app(workbook_name, app)
+            wb = _search_workbook_in_app(workbook_path, app)
             if wb:
                 return wb, app, False, False
-    
-    # Phase 2: Not found in any instance - smart decision making
-    # Resolve file path
-    file_path = _resolve_workbook_path(workbook_name)
 
+    # Phase 2: Not found in any instance - check if file exists
     # Choose Excel instance
     target_app = preferred_app if preferred_app else (all_apps[0] if all_apps else xw.App(visible=False))
 
-    # Smart logic: if it looks like a path and file exists, open it
-    if file_path and os.path.exists(file_path):
+    # If file exists, open it (but check if already open in target_app first)
+    if os.path.exists(workbook_path):
+        # Check if workbook is already open in target_app
+        wb = _search_workbook_in_app(workbook_path, target_app)
+        if wb:
+            return wb, target_app, False, False  # Already open, not opened by us
+
         try:
-            wb = target_app.books.open(file_path)
+            wb = target_app.books.open(workbook_path)
             return wb, target_app, True, False
         except Exception as e:
-            raise Exception(f"Failed to open workbook '{file_path}': {str(e)}")
+            result = {
+                "success": False,
+                "operation": "open_workbook",
+                "error_type": "workbook_open_failed",
+                "error_message": f"Failed to open workbook '{workbook_path}'",
+                "context": {
+                    "workbook_path": workbook_path,
+                    "error_details": str(e)
+                },
+                "suggested_actions": [
+                    "Check if the workbook file exists at the specified path",
+                    "Ensure you have permission to open the file",
+                    "Verify the file is not corrupted or password protected",
+                    "Close the file if it's open in another application"
+                ]
+            }
+            print(json.dumps(result))
+            exit()
 
-    # Smart logic: if no path or file doesn't exist, create new workbook (don't save automatically)
+    # File doesn't exist, create new workbook and save to path
     try:
         wb = target_app.books.add()
-        # Don't save automatically - let the calling operation decide when/where to save
-        # The workbook will have a temporary name like "Book1" until explicitly saved
+        wb.save(workbook_path)
         return wb, target_app, True, True
     except Exception as e:
-        raise Exception(f"Failed to create workbook '{workbook_name}': {str(e)}")
+        result = {
+            "success": False,
+            "operation": "create_workbook",
+            "error_type": "workbook_create_failed",
+            "error_message": f"Failed to create workbook '{workbook_path}'",
+            "context": {
+                "workbook_path": workbook_path,
+                "error_details": str(e)
+            },
+            "suggested_actions": [
+                "Check if you have write permission to the target directory",
+                "Ensure the target directory exists",
+                "Verify there's sufficient disk space",
+                "Close any conflicting applications that might lock the file"
+            ]
+        }
+        print(json.dumps(result))
+        exit()
 
 def _search_workbook_in_app(workbook_name, app):
     """Search for workbook in specific Excel app instance"""
@@ -2424,7 +2486,10 @@ def get_worksheet(wb, worksheet_name=None):
       '        result = {',
       `            "success": False,`,
       `            "operation": "${params.op}",`,
-      '            "xlwings_error": str(e)',
+      '            "error_type": "unexpected_error",',
+      '            "error_message": str(e),',
+      '            "context": {"operation": "' + params.op + '"},',
+      '            "suggested_actions": ["Check the operation parameters", "Verify Excel is running and accessible", "Try the operation again", "Contact support if the problem persists"]',
       '        }',
       '        print(json.dumps(result))',
       '',
@@ -2585,13 +2650,43 @@ def get_worksheet(wb, worksheet_name=None):
 # Connect to Excel
 app = get_excel_app(${appId || 'None'})
 if not app:
-    raise Exception("No Excel application found. Please open Excel first.")
+    result = {
+        "success": False,
+        "operation": "connect_excel",
+        "error_type": "excel_not_running",
+        "error_message": "No Excel application found. Please open Excel first.",
+        "context": {
+            "required_action": "open_excel"
+        },
+        "suggested_actions": [
+            "Open Microsoft Excel application",
+            "Create or open a workbook",
+            "Try the operation again"
+        ]
+    }
+    print(json.dumps(result))
+    exit()
 
 wb = get_workbook("${params.workbook || ''}", app)
 if not wb:
     wb = app.books.active if app.books else None
     if not wb:
-        raise Exception("No active workbook found in the Excel application")`;
+        result = {
+            "success": False,
+            "operation": "get_workbook",
+            "error_type": "no_active_workbook",
+            "error_message": "No active workbook found in the Excel application",
+            "context": {
+                "required_action": "open_workbook"
+            },
+            "suggested_actions": [
+                "Open or create a workbook in Excel",
+                "Use create_workbook() to create a new workbook",
+                "Specify a workbook name in the operation"
+            ]
+        }
+        print(json.dumps(result))
+        exit()`;
   }
 
   private generateAlertHandlingCode(params: XlwingsParams): string {
@@ -2620,7 +2715,7 @@ app.api.DisplayAlerts = original_alerts_setting`;
     const startRow = params.start_row || 1;
     const summaryMode = params.summary_mode || false;
     const summaryModePython = summaryMode ? 'True' : 'False';
-    
+
     return `${this.generateExcelConnectionCode(params)}
 
 ws = get_worksheet(wb, "${params.worksheet || ''}")
@@ -2696,9 +2791,14 @@ else:
     actual_range = f"{start_col_letter}{start_row_actual}:{end_col_letter}{end_row_actual}"
     read_range_obj = ws.range(actual_range)
 
-# Read the data
-raw_data = read_range_obj.value
-data = safe_convert_data(raw_data)
+# Read the data - use cell-by-cell reading to ensure 2D array format
+data = []
+for row_idx in range(read_range_obj.rows.count):
+    row_data = []
+    for col_idx in range(read_range_obj.columns.count):
+        cell = read_range_obj[row_idx, col_idx]
+        row_data.append(safe_convert_data(cell.value))
+    data.append(row_data)
 
 # Prepare progress information
 progress_info = {
@@ -2753,15 +2853,53 @@ print(json.dumps(result))`;
 # Connect to Excel
 app = xw.apps.active if xw.apps else None
 if not app:
-    raise Exception("No active Excel application found. Please open Excel first.")
+    result = {
+        "success": False,
+        "operation": "write_range",
+        "error_type": "excel_not_running",
+        "error_message": "No active Excel application found. Please open Excel first.",
+        "context": {
+            "required_action": "open_excel"
+        }
+    }
+    print(json.dumps(result))
+    exit()
 
 wb = get_workbook("${params.workbook || ''}")
 if not wb:
-    raise Exception("Could not find the specified workbook")
+    result = {
+        "success": False,
+        "operation": "write_range",
+        "error_type": "workbook_not_found",
+        "error_message": "Could not find the specified workbook",
+        "context": {
+            "workbook": "${params.workbook || ''}",
+            "required_action": "specify_workbook"
+        },
+        "suggested_actions": [
+            "Open the workbook in Excel first",
+            "Use create_workbook() to create a new workbook",
+            "Specify the exact workbook name"
+        ]
+    }
+    print(json.dumps(result))
+    exit()
 
 ws = get_worksheet(wb, "${params.worksheet || ''}")
 if not ws:
-    raise Exception("Could not find the specified worksheet")
+    result = {
+        "success": False,
+        "operation": "write_range",
+        "error_type": "worksheet_not_found",
+        "error_message": "Could not find the specified worksheet",
+        "context": {
+            "worksheet": "${params.worksheet || ''}",
+            "workbook": "${params.workbook || ''}",
+            "available_sheets": [sheet.name for sheet in wb.sheets]
+        }
+    }
+    print(json.dumps(result))
+    exit()
 
 # Write data
 data = ${JSON.stringify(params.data || [])}
@@ -2843,15 +2981,48 @@ print(json.dumps(result))`;
 # Connect to Excel
 app = xw.apps.active if xw.apps else None
 if not app:
-    raise Exception("No active Excel application found. Please open Excel first.")
+    result = {
+        "success": False,
+        "operation": "create_chart",
+        "error_type": "excel_not_running",
+        "error_message": "No active Excel application found. Please open Excel first.",
+        "context": {
+            "required_action": "open_excel"
+        }
+    }
+    print(json.dumps(result))
+    exit()
 
 wb = get_workbook("${params.workbook || ''}")
 if not wb:
-    raise Exception("Could not find the specified workbook")
+    result = {
+        "success": False,
+        "operation": "create_chart",
+        "error_type": "workbook_not_found",
+        "error_message": "Could not find the specified workbook",
+        "context": {
+            "workbook": "${params.workbook || ''}",
+            "required_action": "specify_workbook"
+        }
+    }
+    print(json.dumps(result))
+    exit()
 
 ws = get_worksheet(wb, "${params.worksheet || ''}")
 if not ws:
-    raise Exception("Could not find the specified worksheet")
+    result = {
+        "success": False,
+        "operation": "create_chart",
+        "error_type": "worksheet_not_found",
+        "error_message": "Could not find the specified worksheet",
+        "context": {
+            "worksheet": "${params.worksheet || ''}",
+            "workbook": "${params.workbook || ''}",
+            "available_sheets": [sheet.name for sheet in wb.sheets]
+        }
+    }
+    print(json.dumps(result))
+    exit()
 
 # Create chart
 chart_type = "${chartConfig.type || 'column'}"
@@ -2957,20 +3128,53 @@ print(json.dumps(result))`;
   private generateFormatLogic(params: XlwingsParams): string {
     // Convert JavaScript format object to Python dictionary string
     const formatPython = this.convertToPythonDict(params.format || {});
-    
+
     return `
 # Connect to Excel
 app = xw.apps.active if xw.apps else None
 if not app:
-    raise Exception("No active Excel application found. Please open Excel first.")
+    result = {
+        "success": False,
+        "operation": "format_range",
+        "error_type": "excel_not_running",
+        "error_message": "No active Excel application found. Please open Excel first.",
+        "context": {
+            "required_action": "open_excel"
+        }
+    }
+    print(json.dumps(result))
+    exit()
 
 wb = get_workbook("${params.workbook || ''}")
 if not wb:
-    raise Exception("Could not find the specified workbook")
+    result = {
+        "success": False,
+        "operation": "format_range",
+        "error_type": "workbook_not_found",
+        "error_message": "Could not find the specified workbook",
+        "context": {
+            "workbook": "${params.workbook || ''}",
+            "required_action": "specify_workbook"
+        }
+    }
+    print(json.dumps(result))
+    exit()
 
 ws = get_worksheet(wb, "${params.worksheet || ''}")
 if not ws:
-    raise Exception("Could not find the specified worksheet")
+    result = {
+        "success": False,
+        "operation": "format_range",
+        "error_type": "worksheet_not_found",
+        "error_message": "Could not find the specified worksheet",
+        "context": {
+            "worksheet": "${params.worksheet || ''}",
+            "workbook": "${params.workbook || ''}",
+            "available_sheets": [sheet.name for sheet in wb.sheets]
+        }
+    }
+    print(json.dumps(result))
+    exit()
 
 # Apply formatting
 range_str = "${params.range || 'A1'}"
@@ -3033,11 +3237,32 @@ print(json.dumps(result))`;
 # Connect to Excel
 app = xw.apps.active if xw.apps else None
 if not app:
-    raise Exception("No active Excel application found. Please open Excel first.")
+    result = {
+        "success": False,
+        "operation": "list_sheets",
+        "error_type": "excel_not_running",
+        "error_message": "No active Excel application found. Please open Excel first.",
+        "context": {
+            "required_action": "open_excel"
+        }
+    }
+    print(json.dumps(result))
+    exit()
 
 wb = get_workbook("${params.workbook || ''}")
 if not wb:
-    raise Exception("Could not find the specified workbook")
+    result = {
+        "success": False,
+        "operation": "list_sheets",
+        "error_type": "workbook_not_found",
+        "error_message": "Could not find the specified workbook",
+        "context": {
+            "workbook": "${params.workbook || ''}",
+            "required_action": "specify_workbook"
+        }
+    }
+    print(json.dumps(result))
+    exit()
 
 sheets = [(i, sheet.name) for i, sheet in enumerate(wb.sheets)]
 
@@ -3056,7 +3281,17 @@ print(json.dumps(result))`;
 # Get current selection
 app = xw.apps.active if xw.apps else None
 if not app:
-    raise Exception("No active Excel application found. Please open Excel first.")
+    result = {
+        "success": False,
+        "operation": "get_selection",
+        "error_type": "excel_not_running",
+        "error_message": "No active Excel application found. Please open Excel first.",
+        "context": {
+            "required_action": "open_excel"
+        }
+    }
+    print(json.dumps(result))
+    exit()
 
 selection = app.selection
 wb = xw.books.active
@@ -3077,7 +3312,17 @@ print(json.dumps(result))`;
 # Set selection
 app = xw.apps.active if xw.apps else None
 if not app:
-    raise Exception("No active Excel application found. Please open Excel first.")
+    result = {
+        "success": False,
+        "operation": "set_selection",
+        "error_type": "excel_not_running",
+        "error_message": "No active Excel application found. Please open Excel first.",
+        "context": {
+            "required_action": "open_excel"
+        }
+    }
+    print(json.dumps(result))
+    exit()
 
 wb = get_workbook("${params.workbook || ''}")
 if not wb:
@@ -3105,15 +3350,65 @@ print(json.dumps(result))`;
 # Set formula
 app = xw.apps.active if xw.apps else None
 if not app:
-    raise Exception("No active Excel application found. Please open Excel first.")
+    result = {
+        "success": False,
+        "operation": "formula_range",
+        "error_type": "excel_not_running",
+        "error_message": "No active Excel application found. Please open Excel first.",
+        "context": {
+            "required_action": "open_excel"
+        },
+        "suggested_actions": [
+            "Open Microsoft Excel application",
+            "Create or open a workbook",
+            "Try the operation again"
+        ]
+    }
+    print(json.dumps(result))
+    exit()
 
 wb = get_workbook("${params.workbook || ''}")
 if not wb:
-    raise Exception("Could not find the specified workbook")
+    result = {
+        "success": False,
+        "operation": "formula_range",
+        "error_type": "workbook_not_found",
+        "error_message": "Could not find the specified workbook",
+        "context": {
+            "workbook": "${params.workbook || ''}",
+            "required_action": "specify_workbook"
+        },
+        "suggested_actions": [
+            "Open the workbook in Excel first",
+            "Use create_workbook() to create a new workbook",
+            "Check the workbook name spelling",
+            "Use list_workbooks() to see available workbooks"
+        ]
+    }
+    print(json.dumps(result))
+    exit()
 
 ws = get_worksheet(wb, "${params.worksheet || ''}")
 if not ws:
-    raise Exception("Could not find the specified worksheet")
+    result = {
+        "success": False,
+        "operation": "formula_range",
+        "error_type": "worksheet_not_found",
+        "error_message": "Could not find the specified worksheet",
+        "context": {
+            "worksheet": "${params.worksheet || ''}",
+            "workbook": "${params.workbook || ''}",
+            "available_sheets": [sheet.name for sheet in wb.sheets]
+        },
+        "suggested_actions": [
+            "Use one of the available worksheets",
+            "Check the worksheet name spelling",
+            "Use list_sheets() to get exact worksheet names",
+            "Use add_sheet() to create a new worksheet"
+        ]
+    }
+    print(json.dumps(result))
+    exit()
 
 range_str = "${params.range || 'A1'}"
 formula = "${params.formula || ''}"
@@ -3139,15 +3434,65 @@ print(json.dumps(result))`;
 # Clear range
 app = xw.apps.active if xw.apps else None
 if not app:
-    raise Exception("No active Excel application found. Please open Excel first.")
+    result = {
+        "success": False,
+        "operation": "clear_range",
+        "error_type": "excel_not_running",
+        "error_message": "No active Excel application found. Please open Excel first.",
+        "context": {
+            "required_action": "open_excel"
+        },
+        "suggested_actions": [
+            "Open Microsoft Excel application",
+            "Create or open a workbook",
+            "Try the operation again"
+        ]
+    }
+    print(json.dumps(result))
+    exit()
 
 wb = get_workbook("${params.workbook || ''}")
 if not wb:
-    raise Exception("Could not find the specified workbook")
+    result = {
+        "success": False,
+        "operation": "clear_range",
+        "error_type": "workbook_not_found",
+        "error_message": "Could not find the specified workbook",
+        "context": {
+            "workbook": "${params.workbook || ''}",
+            "required_action": "specify_workbook"
+        },
+        "suggested_actions": [
+            "Open the workbook in Excel first",
+            "Use create_workbook() to create a new workbook",
+            "Check the workbook name spelling",
+            "Use list_workbooks() to see available workbooks"
+        ]
+    }
+    print(json.dumps(result))
+    exit()
 
 ws = get_worksheet(wb, "${params.worksheet || ''}")
 if not ws:
-    raise Exception("Could not find the specified worksheet")
+    result = {
+        "success": False,
+        "operation": "clear_range",
+        "error_type": "worksheet_not_found",
+        "error_message": "Could not find the specified worksheet",
+        "context": {
+            "worksheet": "${params.worksheet || ''}",
+            "workbook": "${params.workbook || ''}",
+            "available_sheets": [sheet.name for sheet in wb.sheets]
+        },
+        "suggested_actions": [
+            "Use one of the available worksheets",
+            "Check the worksheet name spelling",
+            "Use list_sheets() to get exact worksheet names",
+            "Use add_sheet() to create a new worksheet"
+        ]
+    }
+    print(json.dumps(result))
+    exit()
 
 range_str = "${params.range || 'A1'}"
 range_obj = ws.range(range_str)
@@ -3177,6 +3522,8 @@ print(json.dumps(result))`;
     const cutModePython = cutMode ? 'True' : 'False';
     const sourceWorkbook = params.copy_paste.source_workbook || params.workbook || '';
     const targetWorkbook = params.copy_paste.target_workbook || params.workbook || '';
+    const sourceWorkbookPath = this.escapePythonPath(sourceWorkbook);
+    const targetWorkbookPath = this.escapePythonPath(targetWorkbook);
     const alertHandling = this.generateAlertHandlingCode(params);
     const alertRestore = this.generateAlertRestoreCode(params);
 
@@ -3191,10 +3538,21 @@ cut_mode = ${cutModePython}
 try:
     # Phase 1: Find/open source workbook
     source_wb, source_app, source_opened_by_us, source_created_by_us = get_workbook_smart(
-        "${sourceWorkbook}"
+        "${sourceWorkbookPath}"
     )
     if not source_wb:
-        raise Exception(f"Could not find or open source workbook '${sourceWorkbook}'")
+        result = {
+            "success": False,
+            "operation": "copy_paste_range",
+            "error_type": "source_workbook_not_found",
+            "error_message": f"Could not find or open source workbook '${sourceWorkbookPath}'",
+            "context": {
+                "source_workbook": "${sourceWorkbookPath}",
+                "required_action": "check_source_workbook_path"
+            }
+        }
+        print(json.dumps(result))
+        exit()
 
     # Phase 2: Find/open target workbook (if cross-workbook operation)
     target_wb = None
@@ -3202,17 +3560,28 @@ try:
     target_opened_by_us = False
     target_created_by_us = False
     
-    if "${targetWorkbook}" and "${targetWorkbook}" != "${sourceWorkbook}":
+    if "${targetWorkbookPath}" and "${targetWorkbookPath}" != "${sourceWorkbookPath}":
         # Cross-workbook operation
         target_wb, target_app, target_opened_by_us, target_created_by_us = get_workbook_smart(
-            "${targetWorkbook}",
+            "${targetWorkbookPath}",
             preferred_app=source_app,  # Prefer same instance as source
             auto_open=True,
             create_if_missing=True  # Create target workbook if it doesn't exist
         )
         
         if not target_wb:
-            raise Exception(f"Could not find, open, or create target workbook '${targetWorkbook}'")
+            result = {
+                "success": False,
+                "operation": "copy_paste_range",
+                "error_type": "target_workbook_not_found",
+                "error_message": f"Could not find, open, or create target workbook '${targetWorkbookPath}'",
+                "context": {
+                    "target_workbook": "${targetWorkbookPath}",
+                    "required_action": "check_target_workbook_path"
+                }
+            }
+            print(json.dumps(result))
+            exit()
         
         copy_type = "cross_workbook"
     else:
@@ -3228,7 +3597,19 @@ try:
             try:
                 source_ws = source_wb.sheets[source_sheet_name]
             except KeyError:
-                raise Exception(f"Source worksheet '{source_sheet_name}' not found. Available: {[s.name for s in source_wb.sheets]}")
+                result = {
+                    "success": False,
+                    "operation": "copy_paste_range",
+                    "error_type": "source_worksheet_not_found",
+                    "error_message": f"Source worksheet '{source_sheet_name}' not found",
+                    "context": {
+                        "worksheet": source_sheet_name,
+                        "workbook": source_wb.name,
+                        "available_sheets": [s.name for s in source_wb.sheets]
+                    }
+                }
+                print(json.dumps(result))
+                exit()
         else:
             source_ws = get_worksheet(source_wb, "${params.worksheet || ''}")
             if not source_ws:
@@ -3237,7 +3618,18 @@ try:
         
         source_range = source_ws.range(source_cell_range)
     except Exception as e:
-        raise Exception(f"Error accessing source range '{source_range_str}': {str(e)}")
+        result = {
+            "success": False,
+            "operation": "copy_paste_range",
+            "error_type": "source_range_error",
+            "error_message": f"Error accessing source range '{source_range_str}'",
+            "context": {
+                "source_range": source_range_str,
+                "error_details": str(e)
+            }
+        }
+        print(json.dumps(result))
+        exit()
 
     # Phase 4: Parse destination range
     try:
@@ -3246,7 +3638,19 @@ try:
             try:
                 dest_ws = target_wb.sheets[dest_sheet_name]
             except KeyError:
-                raise Exception(f"Destination worksheet '{dest_sheet_name}' not found. Available: {[s.name for s in target_wb.sheets]}")
+                result = {
+                    "success": False,
+                    "operation": "copy_paste_range",
+                    "error_type": "destination_worksheet_not_found",
+                    "error_message": f"Destination worksheet '{dest_sheet_name}' not found",
+                    "context": {
+                        "worksheet": dest_sheet_name,
+                        "workbook": target_wb.name,
+                        "available_sheets": [s.name for s in target_wb.sheets]
+                    }
+                }
+                print(json.dumps(result))
+                exit()
         else:
             dest_ws = get_worksheet(target_wb, "${params.worksheet || ''}")
             if not dest_ws:
@@ -3255,7 +3659,18 @@ try:
         
         dest_range = dest_ws.range(dest_cell_range)
     except Exception as e:
-        raise Exception(f"Error accessing destination range '{dest_range_str}': {str(e)}")
+        result = {
+            "success": False,
+            "operation": "copy_paste_range",
+            "error_type": "destination_range_error",
+            "error_message": f"Error accessing destination range '{dest_range_str}'",
+            "context": {
+                "destination_range": dest_range_str,
+                "error_details": str(e)
+            }
+        }
+        print(json.dumps(result))
+        exit()
 
     # Phase 5: Detect cross-instance operation
     cross_instance = source_app != target_app
@@ -3270,7 +3685,6 @@ ${alertHandling}
         if cross_instance:
             # Cross-instance operation - use data reconstruction method
             method_used = "cross_instance_reconstruction"
-            print(f"Cross-instance copy detected: Source PID {source_app.pid if hasattr(source_app, 'pid') else 'unknown'}, Target PID {target_app.pid if hasattr(target_app, 'pid') else 'unknown'}")
             
             # Extract source data
             source_data = source_range.value
@@ -3497,15 +3911,65 @@ print(json.dumps(result))`;
 # Find and replace
 app = xw.apps.active if xw.apps else None
 if not app:
-    raise Exception("No active Excel application found. Please open Excel first.")
+    result = {
+        "success": False,
+        "operation": "replace_range",
+        "error_type": "excel_not_running",
+        "error_message": "No active Excel application found. Please open Excel first.",
+        "context": {
+            "required_action": "open_excel"
+        },
+        "suggested_actions": [
+            "Open Microsoft Excel application",
+            "Create or open a workbook",
+            "Try the operation again"
+        ]
+    }
+    print(json.dumps(result))
+    exit()
 
 wb = get_workbook("${params.workbook || ''}")
 if not wb:
-    raise Exception("Could not find the specified workbook")
+    result = {
+        "success": False,
+        "operation": "replace_range",
+        "error_type": "workbook_not_found",
+        "error_message": "Could not find the specified workbook",
+        "context": {
+            "workbook": "${params.workbook || ''}",
+            "required_action": "specify_workbook"
+        },
+        "suggested_actions": [
+            "Open the workbook in Excel first",
+            "Use create_workbook() to create a new workbook",
+            "Check the workbook name spelling",
+            "Use list_workbooks() to see available workbooks"
+        ]
+    }
+    print(json.dumps(result))
+    exit()
 
 ws = get_worksheet(wb, "${params.worksheet || ''}")
 if not ws:
-    raise Exception("Could not find the specified worksheet")
+    result = {
+        "success": False,
+        "operation": "replace_range",
+        "error_type": "worksheet_not_found",
+        "error_message": "Could not find the specified worksheet",
+        "context": {
+            "worksheet": "${params.worksheet || ''}",
+            "workbook": "${params.workbook || ''}",
+            "available_sheets": [sheet.name for sheet in wb.sheets]
+        },
+        "suggested_actions": [
+            "Use one of the available worksheets",
+            "Check the worksheet name spelling",
+            "Use list_sheets() to get exact worksheet names",
+            "Use add_sheet() to create a new worksheet"
+        ]
+    }
+    print(json.dumps(result))
+    exit()
 
 find_text = "${params.find_replace.find}"
 replace_text = "${params.find_replace.replace}"
@@ -3542,11 +4006,43 @@ print(json.dumps(result))`;
 # Add new sheet
 app = xw.apps.active if xw.apps else None
 if not app:
-    raise Exception("No active Excel application found. Please open Excel first.")
+    result = {
+        "success": False,
+        "operation": "add_sheet",
+        "error_type": "no_excel_application",
+        "error_message": "No active Excel application found. Please open Excel first.",
+        "context": {
+            "required": "active_excel_application"
+        },
+        "suggested_actions": [
+            "Open Excel application first",
+            "Ensure Excel is running and accessible",
+            "Try opening any workbook in Excel to activate the application",
+            "Restart Excel if it's not responding"
+        ]
+    }
+    print(json.dumps(result))
+    exit()
 
 wb = get_workbook("${params.workbook || ''}")
 if not wb:
-    raise Exception("Could not find the specified workbook")
+    result = {
+        "success": False,
+        "operation": "add_sheet",
+        "error_type": "workbook_not_found",
+        "error_message": "Could not find the specified workbook",
+        "context": {
+            "workbook": "${params.workbook || ''}"
+        },
+        "suggested_actions": [
+            "Check the workbook name spelling and ensure it's open in Excel",
+            "Open the workbook in Excel first, then try again",
+            "Use the exact workbook name as it appears in Excel",
+            "Verify the workbook is not protected or corrupted"
+        ]
+    }
+    print(json.dumps(result))
+    exit()
 
 sheet_name = "${params.new_sheet_name || 'NewSheet'}"
 
@@ -3585,11 +4081,45 @@ wb = get_workbook("${params.workbook || ''}", app)
 if not wb:
     # Get list of available workbooks for debugging
     available_workbooks = [book.name for book in app.books] if app.books else []
-    raise Exception(f"Could not find the specified workbook '${params.workbook || ''}'. Available workbooks: {available_workbooks}")
+    result = {
+        "success": False,
+        "operation": "alter_sheet",
+        "error_type": "workbook_not_found",
+        "error_message": f"Could not find the specified workbook '${params.workbook || ''}'",
+        "context": {
+            "workbook": "${params.workbook || ''}",
+            "available_workbooks": available_workbooks
+        },
+        "suggested_actions": [
+            f"Use one of the available workbooks: {', '.join(available_workbooks) if available_workbooks else 'None available'}",
+            "Check the workbook name spelling and ensure it's open in Excel",
+            "Open the workbook in Excel first, then try again",
+            "Use the exact workbook name as it appears in Excel"
+        ]
+    }
+    print(json.dumps(result))
+    exit()
 
 ws = get_worksheet(wb, "${params.worksheet || ''}")
 if not ws:
-    raise Exception("Could not find the specified worksheet")
+    result = {
+        "success": False,
+        "operation": "alter_sheet",
+        "error_type": "worksheet_not_found",
+        "error_message": "Could not find the specified worksheet",
+        "context": {
+            "worksheet": "${params.worksheet || ''}",
+            "workbook": wb.name if wb else "${params.workbook || ''}"
+        },
+        "suggested_actions": [
+            "Check the worksheet name spelling and capitalization",
+            "Use list_sheets() to get the exact worksheet names",
+            "Ensure the worksheet exists in the specified workbook",
+            "Example: alter_sheet(worksheet: 'Sheet1', sheet_alter: {new_name: 'NewName'})"
+        ]
+    }
+    print(json.dumps(result))
+    exit()
 
 original_name = ws.name
 changes_made = []
@@ -3602,7 +4132,25 @@ try:
         
         # Check if new name already exists
         if new_sheet_name in existing_names:
-            raise Exception(f"Sheet name '{new_sheet_name}' already exists. Available names: {existing_names}")
+            result = {
+                "success": False,
+                "operation": "alter_sheet",
+                "error_type": "sheet_name_exists",
+                "error_message": f"Sheet name '{new_sheet_name}' already exists",
+                "context": {
+                    "requested_name": new_sheet_name,
+                    "existing_names": existing_names,
+                    "workbook": wb.name
+                },
+                "suggested_actions": [
+                    f"Use a different name that doesn't exist: {', '.join(existing_names)}",
+                    "Choose a unique name for the worksheet",
+                    "Check if the target name is already in use",
+                    f"Example: alter_sheet(sheet_alter: {{new_name: '{new_sheet_name}_2'}})"
+                ]
+            }
+            print(json.dumps(result))
+            exit()
         
         ws.name = new_sheet_name
         changes_made.append(f"renamed to '{new_sheet_name}'")
@@ -3623,12 +4171,64 @@ try:
                 ws.api.Tab.Color = r + (g * 256) + (b * 256 * 256)
                 changes_made.append(f"tab color set to {tab_color}")
             except ValueError:
-                raise Exception(f"Invalid hex color format: {tab_color}. Use format #RRGGBB")
+                result = {
+                    "success": False,
+                    "operation": "alter_sheet",
+                    "error_type": "invalid_hex_color",
+                    "error_message": f"Invalid hex color format: {tab_color}. Use format #RRGGBB",
+                    "context": {
+                        "provided_color": tab_color,
+                        "expected_format": "#RRGGBB"
+                    },
+                    "suggested_actions": [
+                        "Use hex color format like #FF0000 for red",
+                        "Ensure the color starts with # and has 6 hex digits",
+                        "Example colors: #FF0000 (red), #00FF00 (green), #0000FF (blue)",
+                        "Use online color picker tools to get hex values"
+                    ]
+                }
+                print(json.dumps(result))
+                exit()
         else:
-            raise Exception(f"Invalid hex color format: {tab_color}. Use format #RRGGBB")
+            result = {
+                "success": False,
+                "operation": "alter_sheet",
+                "error_type": "invalid_hex_color",
+                "error_message": f"Invalid hex color format: {tab_color}. Use format #RRGGBB",
+                "context": {
+                    "provided_color": tab_color,
+                    "expected_format": "#RRGGBB"
+                },
+                "suggested_actions": [
+                    "Use hex color format like #FF0000 for red",
+                    "Ensure the color starts with # and has 6 hex digits",
+                    "Example colors: #FF0000 (red), #00FF00 (green), #0000FF (blue)",
+                    "Use online color picker tools to get hex values"
+                ]
+            }
+            print(json.dumps(result))
+            exit()
 
     if not changes_made:
-        raise Exception("No changes specified. Provide new_name and/or tab_color")
+        result = {
+            "success": False,
+            "operation": "alter_sheet",
+            "error_type": "no_changes_specified",
+            "error_message": "No changes specified. Provide new_name and/or tab_color",
+            "context": {
+                "sheet_name": ws.name,
+                "workbook": wb.name,
+                "available_properties": ["new_name", "tab_color"]
+            },
+            "suggested_actions": [
+                "Specify new_name to rename the worksheet",
+                "Specify tab_color to change the tab color",
+                "Example: alter_sheet(sheet_alter: {new_name: 'NewName', tab_color: '#FF0000'})",
+                "Provide at least one property to change"
+            ]
+        }
+        print(json.dumps(result))
+        exit()
 
     result = {
         "success": True,
@@ -3666,12 +4266,39 @@ wb = get_workbook("${params.workbook || ''}", app)
 if not wb:
     # Get list of available workbooks for debugging
     available_workbooks = [book.name for book in app.books] if app.books else []
-    raise Exception(f"Could not find the specified workbook '${params.workbook || ''}'. Available workbooks: {available_workbooks}")
+    result = {
+        "success": False,
+        "operation": "delete_sheet",
+        "error_type": "workbook_not_found",
+        "error_message": f"Could not find the specified workbook '${params.workbook || ''}'",
+        "context": {
+            "workbook": "${params.workbook || ''}",
+            "available_workbooks": available_workbooks
+        },
+        "suggested_actions": [
+            f"Use one of the available workbooks: {', '.join(available_workbooks) if available_workbooks else 'None available'}",
+            "Check the workbook name spelling and ensure it's open in Excel",
+            "Open the workbook in Excel first, then try again",
+            "Use the exact workbook name as it appears in Excel"
+        ]
+    }
+    print(json.dumps(result))
+    exit()
 ${alertHandling}
 # Check if worksheet is specified
 worksheet_name = "${params.worksheet || ''}"
 if not worksheet_name:
-    raise Exception("worksheet parameter is required for delete_sheet operation")
+    result = {
+        "success": False,
+        "operation": "delete_sheet",
+        "error_type": "missing_parameter",
+        "error_message": "worksheet parameter is required for delete_sheet operation",
+        "context": {
+            "required_parameter": "worksheet"
+        }
+    }
+    print(json.dumps(result))
+    exit()
 
 # Find the worksheet to delete
 try:
@@ -3679,11 +4306,47 @@ try:
     sheet_name_to_delete = ws.name
 except KeyError:
     available_sheets = [sheet.name for sheet in wb.sheets]
-    raise Exception(f"Worksheet '{worksheet_name}' not found. Available sheets: {available_sheets}")
+    result = {
+        "success": False,
+        "operation": "delete_sheet",
+        "error_type": "worksheet_not_found",
+        "error_message": f"Worksheet '{worksheet_name}' not found",
+        "context": {
+            "worksheet": worksheet_name,
+            "workbook": wb.name,
+            "available_sheets": available_sheets
+        },
+        "suggested_actions": [
+            f"Use one of the available worksheets: {', '.join(available_sheets)}",
+            "Check the worksheet name spelling and capitalization",
+            "Use list_sheets() to get the exact worksheet names",
+            f"Example: delete_sheet(worksheet: '{available_sheets[0] if available_sheets else 'Sheet1'}')"
+        ]
+    }
+    print(json.dumps(result))
+    exit()
 
 # Check if it's the only sheet (Excel doesn't allow deleting the last sheet)
 if len(wb.sheets) <= 1:
-    raise Exception("Cannot delete the only worksheet in the workbook. Excel requires at least one worksheet.")
+    result = {
+        "success": False,
+        "operation": "delete_sheet",
+        "error_type": "last_worksheet_error",
+        "error_message": "Cannot delete the only worksheet in the workbook. Excel requires at least one worksheet.",
+        "context": {
+            "workbook": wb.name,
+            "remaining_sheets": len(wb.sheets),
+            "sheet_to_delete": worksheet_name
+        },
+        "suggested_actions": [
+            "Create additional worksheets before deleting this one",
+            "Add a new sheet first using add_sheet() operation",
+            "Excel always requires at least one worksheet in a workbook",
+            "Consider copying data to another sheet instead of deleting"
+        ]
+    }
+    print(json.dumps(result))
+    exit()
 
 try:
     # Delete the worksheet
@@ -3716,16 +4379,38 @@ print(json.dumps(result))`;
     const newIndex = sheetMove?.new_index ?? -1;
     const position = sheetMove?.position || '';
     const referenceSheet = sheetMove?.reference_sheet || '';
-    
+
+    // Properly escape paths for Python
+    const sourceWorkbookPath = this.escapePythonPath(params.workbook || '');
+    const targetWorkbookPath = this.escapePythonPath(targetWorkbook);
+
     return `
 # Smart move sheet with multi-instance support
 # Phase 1: Find/open source workbook
 source_wb, source_app, source_opened_by_us, source_created_by_us = get_workbook_smart(
-    "${params.workbook || ''}"
+    "${sourceWorkbookPath}"
 )
 
 if not source_wb:
-    raise Exception(f"Could not find or open source workbook '${params.workbook || ''}'")
+    result = {
+        "success": False,
+        "operation": "move_sheet",
+        "error_type": "source_workbook_not_found",
+        "error_message": f"Could not find or open source workbook '${params.workbook || ''}'",
+        "context": {
+            "source_workbook": "${params.workbook || ''}",
+            "required_action": "check_source_workbook_path"
+        },
+        "suggested_actions": [
+            "Check if the source workbook file exists",
+            "Verify the workbook file path and name",
+            "Ensure the workbook is not corrupted",
+            "Use create_workbook() to create a new workbook if needed",
+            "Check file permissions"
+        ]
+    }
+    print(json.dumps(result))
+    exit()
 
 # Phase 2: Find/open target workbook (if cross-workbook move)
 target_wb = None
@@ -3733,18 +4418,54 @@ target_app = None
 target_opened_by_us = False
 target_created_by_us = False
 
-if "${targetWorkbook}":
+if "${targetWorkbookPath}":
     # Cross-workbook move
     target_wb, target_app, target_opened_by_us, target_created_by_us = get_workbook_smart(
-        "${targetWorkbook}",
+        "${targetWorkbookPath}",
         preferred_app=source_app  # Prefer same instance as source
     )
     
     if not target_wb:
-        raise Exception(f"Could not find, open, or create target workbook '${targetWorkbook}'")
+        result = {
+            "success": False,
+            "operation": "move_sheet",
+            "error_type": "target_workbook_not_found",
+            "error_message": f"Could not find, open, or create target workbook '${targetWorkbookPath}'",
+            "context": {
+                "target_workbook_path": "${targetWorkbookPath}",
+                "operation": "cross_workbook_move"
+            },
+            "suggested_actions": [
+                "Verify the target workbook path exists and is accessible",
+                "Ensure you have read/write permissions to the target file",
+                "Check if the target workbook is corrupted or in use by another process",
+                "Try using an absolute path instead of a relative path",
+                "Use create_workbook() first if you want to create a new target workbook"
+            ]
+        }
+        print(json.dumps(result))
+        exit()
     
     if target_wb.name == source_wb.name:
-        raise Exception("Target workbook cannot be the same as source workbook for cross-workbook moves")
+        result = {
+            "success": False,
+            "operation": "move_sheet",
+            "error_type": "same_workbook_error",
+            "error_message": "Target workbook cannot be the same as source workbook for cross-workbook moves",
+            "context": {
+                "source_workbook": source_wb.name,
+                "target_workbook": target_wb.name,
+                "operation": "cross_workbook_move"
+            },
+            "suggested_actions": [
+                "Use a different target workbook for cross-workbook moves",
+                "For same-workbook moves, omit the targetWorkbookPath parameter",
+                "Use move_sheet() without targetWorkbookPath to reorder within the same workbook",
+                "Create a new workbook with create_workbook() first, then use that as target"
+            ]
+        }
+        print(json.dumps(result))
+        exit()
     
     move_type = "cross_workbook"
 else:
@@ -3756,7 +4477,17 @@ else:
 # Phase 3: Find and validate the source worksheet
 worksheet_name = "${params.worksheet || ''}"
 if not worksheet_name:
-    raise Exception("worksheet parameter is required for move_sheet operation")
+    result = {
+        "success": False,
+        "operation": "move_sheet",
+        "error_type": "missing_parameter",
+        "error_message": "worksheet parameter is required for move_sheet operation",
+        "context": {
+            "required_parameter": "worksheet"
+        }
+    }
+    print(json.dumps(result))
+    exit()
 
 try:
     source_ws = source_wb.sheets[worksheet_name]
@@ -3778,7 +4509,25 @@ except KeyError:
         except:
             pass  # Ignore cleanup errors
     
-    raise Exception(f"Worksheet '{worksheet_name}' not found in source workbook. Available sheets: {available_sheets}")
+    result = {
+        "success": False,
+        "operation": "move_sheet",
+        "error_type": "worksheet_not_found",
+        "error_message": f"Worksheet '{worksheet_name}' not found in source workbook",
+        "context": {
+            "worksheet": worksheet_name,
+            "workbook": source_wb.name,
+            "available_sheets": available_sheets
+        },
+        "suggested_actions": [
+            f"Use one of the available worksheets: {', '.join(available_sheets)}",
+            "Check the worksheet name spelling and capitalization",
+            "Use list_sheets() to get the exact worksheet names",
+            f"Example: move_sheet(worksheet: '{available_sheets[0] if available_sheets else 'Sheet1'}')"
+        ]
+    }
+    print(json.dumps(result))
+    exit()
 
 # Phase 4: Perform the move operation
 try:
@@ -3789,7 +4538,6 @@ try:
         
         if cross_instance:
             # Cross-instance move: Use sheet reconstruction + delete method
-            print(f"Cross-instance move detected: Source PID {source_app.pid if hasattr(source_app, 'pid') else 'unknown'}, Target PID {target_app.pid if hasattr(target_app, 'pid') else 'unknown'}")
             
             # Step 1: Extract all data and properties from source sheet
             if source_ws.used_range:
@@ -3895,10 +4643,27 @@ try:
             
             # Step 8: Delete original sheet from source workbook
             if len(source_wb.sheets) <= 1:
-                raise Exception("Cannot move the only worksheet from source workbook")
+                result = {
+                    "success": False,
+                    "operation": "move_sheet",
+                    "error_type": "last_worksheet_error",
+                    "error_message": "Cannot move the only worksheet from source workbook",
+                    "context": {
+                        "source_workbook": source_wb.name,
+                        "remaining_sheets": len(source_wb.sheets),
+                        "operation": "cross_instance_move"
+                    },
+                    "suggested_actions": [
+                        "Create additional worksheets in the source workbook before moving",
+                        "Use copy_sheet() instead of move_sheet() to preserve the original",
+                        "Move worksheets from a workbook that has multiple sheets",
+                        "Consider merging data instead of moving entire worksheets"
+                    ]
+                }
+                print(json.dumps(result))
+                exit()
             source_ws.delete()
             
-            print(f"Cross-instance sheet move completed: '{moved_sheet_name}' moved to index 0")
             
         else:
             # Same instance cross-workbook move - use native Excel API
@@ -3907,7 +4672,25 @@ try:
             
             # Delete original sheet from source workbook
             if len(source_wb.sheets) <= 1:
-                raise Exception("Cannot move the only worksheet from source workbook")
+                result = {
+                    "success": False,
+                    "operation": "move_sheet",
+                    "error_type": "last_worksheet_error",
+                    "error_message": "Cannot move the only worksheet from source workbook",
+                    "context": {
+                        "source_workbook": source_wb.name,
+                        "remaining_sheets": len(source_wb.sheets),
+                        "operation": "same_instance_move"
+                    },
+                    "suggested_actions": [
+                        "Create additional worksheets in the source workbook before moving",
+                        "Use copy_sheet() instead of move_sheet() to preserve the original",
+                        "Move worksheets from a workbook that has multiple sheets",
+                        "Consider merging data instead of moving entire worksheets"
+                    ]
+                }
+                print(json.dumps(result))
+                exit()
             source_ws.delete()
         
         move_type = "cross_workbook"
@@ -3942,7 +4725,26 @@ try:
             new_pos = min(max(${newIndex}, 0), total_sheets - 1)
             
             if new_pos == original_index - 1:  # xlwings uses 1-based index
-                raise Exception(f"Sheet is already at index {new_pos}")
+                result = {
+                    "success": False,
+                    "operation": "move_sheet",
+                    "error_type": "no_change_needed",
+                    "error_message": f"Sheet is already at index {new_pos}",
+                    "context": {
+                        "worksheet": source_sheet_name,
+                        "current_index": new_pos,
+                        "requested_index": new_pos,
+                        "operation": "reorder_index"
+                    },
+                    "suggested_actions": [
+                        f"Sheet '{source_sheet_name}' is already at the requested position",
+                        "Use a different index to move the sheet to a new position",
+                        "Use list_sheets() to see current sheet order",
+                        "No action needed - sheet is already in the desired position"
+                    ]
+                }
+                print(json.dumps(result))
+                exit()
                 
             # Move worksheet to new position
             if new_pos < original_index - 1:
@@ -3983,10 +4785,46 @@ try:
                 
             except KeyError:
                 available_sheets = [sheet.name for sheet in source_wb.sheets if sheet.name != source_sheet_name]
-                raise Exception(f"Reference sheet '{referenceSheet}' not found. Available sheets: {available_sheets}")
-        
+                result = {
+                    "success": False,
+                    "operation": "move_sheet",
+                    "error_type": "reference_sheet_not_found",
+                    "error_message": f"Reference sheet '${referenceSheet}' not found",
+                    "context": {
+                        "reference_sheet": "${referenceSheet}",
+                        "position": "${position}",
+                        "workbook": source_wb.name,
+                        "available_sheets": available_sheets
+                    },
+                    "suggested_actions": [
+                        f"Use one of the available sheets as reference: {', '.join(available_sheets)}",
+                        "Check the reference sheet name spelling and capitalization",
+                        "Use list_sheets() to get the exact sheet names",
+                        f"Example: move_sheet(position: 'before', reference_sheet: '{available_sheets[0] if available_sheets else 'Sheet1'}')"
+                    ]
+                }
+                print(json.dumps(result))
+                exit()
+
         else:
-            raise Exception("For same-workbook moves, specify either new_index or (position + reference_sheet)")
+            result = {
+                "success": False,
+                "operation": "move_sheet",
+                "error_type": "missing_position_parameters",
+                "error_message": "For same-workbook moves, specify either new_index or (position + reference_sheet)",
+                "context": {
+                    "operation": "same_workbook_move",
+                    "required_parameters": ["new_index", "position + reference_sheet"]
+                },
+                "suggested_actions": [
+                    "Specify new_index to move to a specific position (e.g., new_index: 0)",
+                    "Or specify both position ('before'/'after') and reference_sheet",
+                    "Example: move_sheet(new_index: 2) or move_sheet(position: 'before', reference_sheet: 'Sheet2')",
+                    "Use list_sheets() to see current sheet order and names"
+                ]
+            }
+            print(json.dumps(result))
+            exit()
         
         result = {
             "success": True,
@@ -4028,7 +4866,7 @@ except Exception as e:
         "operation": "move_sheet",
         "sheet_name": source_sheet_name if 'source_sheet_name' in locals() else worksheet_name,
         "source_workbook": source_wb.name if 'source_wb' in locals() and source_wb else "${params.workbook || ''}",
-        "target_workbook": "${targetWorkbook}" if "${targetWorkbook}" else None,
+        "target_workbook": "${targetWorkbookPath}" if "${targetWorkbookPath}" else None,
         "error": str(e),
         "cleanup_performed": len(cleanup_workbooks) > 0,
         "cleanup_errors": cleanup_errors if cleanup_errors else None
@@ -4044,33 +4882,154 @@ print(json.dumps(result))`;
     const targetIndex = sheetCopy?.target_index ?? -1;
     const position = sheetCopy?.position || '';
     const referenceSheet = sheetCopy?.reference_sheet || '';
-    
+
+    // Properly escape paths for Python
+    const sourceWorkbookPath = this.escapePythonPath(params.workbook || '');
+    const targetWorkbookPath = this.escapePythonPath(targetWorkbook);
+
     return `
 # Smart copy sheet with multi-instance support
+
 # Phase 1: Find/open source workbook
 source_wb, source_app, source_opened_by_us, source_created_by_us = get_workbook_smart(
-    "${params.workbook || ''}"
+    "${sourceWorkbookPath}"
 )
 
 if not source_wb:
-    raise Exception(f"Could not find or open source workbook '${params.workbook || ''}'")
+    result = {
+        "success": False,
+        "operation": "copy_sheet",
+        "error_type": "source_workbook_not_found",
+        "error_message": f"Could not find or open source workbook '${sourceWorkbookPath}'",
+        "context": {
+            "source_workbook_path": "${sourceWorkbookPath}"
+        },
+        "suggested_actions": [
+            "Verify the source workbook path exists and is accessible",
+            "Ensure you have read permissions to the source file",
+            "Check if the source workbook is corrupted or in use by another process",
+            "Try using an absolute path instead of a relative path",
+            "Ensure the file extension is correct (.xlsx, .xls, etc.)"
+        ]
+    }
+    print(json.dumps(result))
+    exit()
 
-# Phase 2: Find/open target workbook (if cross-workbook copy)
+
+worksheet_name = "${params.worksheet || ''}"
+if not worksheet_name:
+    # Cleanup source if we opened it
+    if source_opened_by_us:
+        try:
+            source_wb.close()
+        except:
+            pass
+    # Return structured error instead of raising exception
+    result = {
+        "success": False,
+        "operation": "copy_sheet",
+        "error_type": "missing_parameter",
+        "error_message": "worksheet parameter is required for copy_sheet operation",
+        "context": {
+            "required_parameter": "worksheet"
+        },
+        "suggested_actions": [
+            "Specify the worksheet parameter with the name of the sheet to copy",
+            "Use list_sheets() to see available worksheets first",
+            "Example: copy_sheet(worksheet: 'Sheet1', sheet_copy: {new_name: 'Sheet1_Copy'})"
+        ]
+    }
+    print(json.dumps(result))
+    exit()
+
+
+# Use safe traversal method to find source worksheet
+source_ws = None
+for sheet in source_wb.sheets:
+    if sheet.name == worksheet_name:
+        source_ws = sheet
+        break
+
+if not source_ws:
+    # Worksheet not found - cleanup and return error immediately
+
+    available_sheets = [sheet.name for sheet in source_wb.sheets]
+
+    # Cleanup source workbook if we opened it
+    if source_opened_by_us:
+        try:
+            source_wb.close()
+        except:
+            pass
+
+
+    # Return structured error instead of raising exception
+    result = {
+        "success": False,
+        "operation": "copy_sheet",
+        "error_type": "worksheet_not_found",
+        "error_message": f"Worksheet '{worksheet_name}' not found in source workbook",
+        "context": {
+            "worksheet": worksheet_name,
+            "workbook": source_wb.name,
+            "available_sheets": available_sheets
+        },
+        "suggested_actions": [
+            f"Use one of the available worksheets: {', '.join(available_sheets)}",
+            "Check the worksheet name spelling and capitalization",
+            "Use list_sheets() to get the exact worksheet names",
+            f"Example: copy_sheet(worksheet: '{available_sheets[0] if available_sheets else 'Sheet1'}')"
+        ]
+    }
+    print(json.dumps(result))
+    exit()
+
+# Worksheet found - proceed with copy operation
+source_sheet_name = source_ws.name
+original_index = source_ws.index - 1  # Convert to 0-based
+
+
+# Phase 3: Open target workbook only after verifying source worksheet exists
 target_wb = None
 target_app = None
 target_opened_by_us = False
 target_created_by_us = False
 
-if "${targetWorkbook}":
+if "${targetWorkbookPath}":
     # Cross-workbook copy
     target_wb, target_app, target_opened_by_us, target_created_by_us = get_workbook_smart(
-        "${targetWorkbook}",
+        "${targetWorkbookPath}",
         preferred_app=source_app  # Prefer same instance as source
     )
-    
+
     if not target_wb:
-        raise Exception(f"Could not find, open, or create target workbook '${targetWorkbook}'")
-    
+        # Failed to open target - cleanup source if needed
+        if source_opened_by_us:
+            try:
+                source_wb.close()
+            except:
+                pass
+        result = {
+            "success": False,
+            "operation": "copy_sheet",
+            "error_type": "target_workbook_not_found",
+            "error_message": f"Could not find, open, or create target workbook '${targetWorkbookPath}'",
+            "context": {
+                "target_workbook_path": "${targetWorkbookPath}",
+                "operation": "cross_workbook_copy"
+            },
+            "suggested_actions": [
+                "Verify the target workbook path exists and is accessible",
+                "Ensure you have read/write permissions to the target file",
+                "Check if the target workbook is corrupted or in use by another process",
+                "Try using an absolute path instead of a relative path",
+                "Use create_workbook() first if you want to create a new target workbook"
+            ]
+        }
+        print(json.dumps(result))
+        exit()
+
+
     copy_type = "cross_workbook"
 else:
     # Same workbook copy
@@ -4078,33 +5037,8 @@ else:
     target_app = source_app
     copy_type = "same_workbook"
 
-# Phase 3: Find and copy the source worksheet
-worksheet_name = "${params.worksheet || ''}"
-if not worksheet_name:
-    raise Exception("worksheet parameter is required for copy_sheet operation")
-
-try:
-    source_ws = source_wb.sheets[worksheet_name]
-    source_sheet_name = source_ws.name
-    original_index = source_ws.index - 1  # Convert to 0-based
-except KeyError:
-    available_sheets = [sheet.name for sheet in source_wb.sheets]
-    # Clean up opened workbooks before failing
-    cleanup_workbooks = []
-    if source_opened_by_us or source_created_by_us:
-        cleanup_workbooks.append((source_wb, "source"))
-    if target_opened_by_us or target_created_by_us:
-        cleanup_workbooks.append((target_wb, "target"))
-    
-    for wb, wb_type in cleanup_workbooks:
-        try:
-            wb.close()
-        except:
-            pass  # Ignore cleanup errors
-    
-    raise Exception(f"Worksheet '{worksheet_name}' not found in source workbook. Available sheets: {available_sheets}")
-
 # Phase 4: Perform the copy operation
+
 copied_sheet_name = None
 final_index = None
 
@@ -4112,10 +5046,10 @@ try:
     if copy_type == "cross_workbook":
         # Check if source and target are in different Excel instances
         cross_instance = source_app != target_app
-        
+
+
         if cross_instance:
             # Cross-instance copy: Use complete sheet reconstruction method
-            print(f"Cross-instance copy detected: Source PID {source_app.pid if hasattr(source_app, 'pid') else 'unknown'}, Target PID {target_app.pid if hasattr(target_app, 'pid') else 'unknown'}")
             
             # Step 1: Extract all data from source sheet
             if source_ws.used_range:
@@ -4149,19 +5083,26 @@ try:
                 pass
             
             # Step 3: Create new sheet in target workbook
+
             copied_ws = target_wb.sheets.add()
             copied_sheet_name = source_sheet_info["name"]
-            
+
+
             # Generate unique name if needed
             existing_names = [sheet.name for sheet in target_wb.sheets if sheet != copied_ws]
+
+
             if copied_sheet_name in existing_names:
                 counter = 1
                 original_name = copied_sheet_name
                 while copied_sheet_name in existing_names:
                     copied_sheet_name = f"{original_name}_Copy{counter}"
                     counter += 1
-            
+
+
+
             copied_ws.name = copied_sheet_name
+
             
             # Step 4: Transfer data if exists
             if sheet_data is not None:
@@ -4221,7 +5162,6 @@ try:
                     pass
             
             final_index = copied_ws.index - 1  # Convert to 0-based
-            print(f"Cross-instance sheet reconstruction completed: '{copied_sheet_name}' at index {final_index}")
             
         else:
             # Same instance cross-workbook copy - use native Excel API
@@ -4239,17 +5179,24 @@ try:
     
     # Handle custom naming
     if "${newName}":
+
         new_sheet_name = "${newName}"
         existing_names = [sheet.name for sheet in target_wb.sheets if sheet.name != copied_sheet_name]
-        
+
+
         if new_sheet_name in existing_names:
+
             # Generate unique name
             counter = 1
             while f"{new_sheet_name}_{counter}" in existing_names:
                 counter += 1
             new_sheet_name = f"{new_sheet_name}_{counter}"
-        
+
+
+
         copied_ws.name = new_sheet_name
+
+
         copied_sheet_name = new_sheet_name
     
     # Handle positioning (move the copied sheet to desired position)
@@ -4291,9 +5238,78 @@ try:
                 
         except KeyError:
             available_sheets = [sheet.name for sheet in target_wb.sheets if sheet.name != copied_sheet_name]
-            raise Exception(f"Reference sheet '{referenceSheet}' not found. Available sheets: {available_sheets}")
+            result = {
+                "success": False,
+                "operation": "copy_sheet",
+                "error_type": "reference_sheet_not_found",
+                "error_message": f"Reference sheet '${referenceSheet}' not found",
+                "context": {
+                    "reference_sheet": "${referenceSheet}",
+                    "position": "${position}",
+                    "target_workbook": target_wb.name,
+                    "available_sheets": available_sheets
+                },
+                "suggested_actions": [
+                    f"Use one of the available sheets as reference: {', '.join(available_sheets)}",
+                    "Check the reference sheet name spelling and capitalization",
+                    "Use list_sheets() to get the exact sheet names in target workbook",
+                    f"Example: copy_sheet(position: 'before', reference_sheet: '{available_sheets[0] if available_sheets else 'Sheet1'}')"
+                ]
+            }
+            print(json.dumps(result))
+            exit()
     
-    # Phase 5: Prepare result with workbook status information
+    # Phase 5: Clean up workbooks and restore original state
+
+    # Phase 6.1: Collect workbook information BEFORE closing workbooks
+    target_sheets_after = [sheet.name for sheet in target_wb.sheets] if target_wb else []
+    target_sheets_count = len(target_wb.sheets) if target_wb else 0
+    source_workbook_name = source_wb.name if source_wb else ""
+    target_workbook_name = target_wb.name if target_wb else ""
+
+
+    # Save and close workbooks that we opened
+    # For copy operations, we need to save the target workbook if we opened it OR created it
+    if (target_created_by_us or target_opened_by_us) and target_wb and copy_type == "cross_workbook":
+        try:
+            target_wb.save()
+        except Exception as save_error:
+
+            # Save failed - this is a critical error, return failure immediately
+            result = {
+                "success": False,
+                "operation": "copy_sheet",
+                "error_type": "save_failed",
+                "error_message": f"Sheet copied successfully but failed to save target workbook: {str(save_error)}",
+                "context": {
+                    "target_workbook": target_wb.name if target_wb else "${targetWorkbookPath}",
+                    "save_error": str(save_error),
+                    "copied_sheet_name": copied_sheet_name if 'copied_sheet_name' in locals() else None
+                },
+                "suggested_actions": [
+                    "Check if you have write permissions to the target file",
+                    "Ensure the target file is not open in another application",
+                    "Verify there's sufficient disk space",
+                    "Try copying to a different location",
+                    "Check if the file path contains special characters"
+                ]
+            }
+            print(json.dumps(result))
+            exit()
+
+    if target_opened_by_us and target_wb and copy_type == "cross_workbook":
+        try:
+            target_wb.close()
+        except:
+            pass
+
+    if source_opened_by_us and source_wb:
+        try:
+            source_wb.close()
+        except:
+            pass
+
+    # Phase 7: Prepare result with collected workbook information
     if copy_type == "cross_workbook":
         result = {
             "success": True,
@@ -4301,12 +5317,12 @@ try:
             "copy_type": copy_type,
             "source_sheet_name": source_sheet_name,
             "copied_sheet_name": copied_sheet_name,
-            "source_workbook": source_wb.name,
-            "target_workbook": target_wb.name,
+            "source_workbook": source_workbook_name,
+            "target_workbook": target_workbook_name,
             "source_index": original_index,
             "target_index": final_index,
-            "target_sheets_after": [sheet.name for sheet in target_wb.sheets],
-            "target_sheets_count": len(target_wb.sheets),
+            "target_sheets_after": target_sheets_after,
+            "target_sheets_count": target_sheets_count,
             "workbook_status": {
                 "source_opened_by_operation": source_opened_by_us,
                 "source_created_by_operation": source_created_by_us,
@@ -4316,17 +5332,18 @@ try:
             }
         }
     else:  # same_workbook
+        sheets_after_with_index = [(i, sheet.name) for i, sheet in enumerate(target_wb.sheets)] if target_wb else []
         result = {
             "success": True,
             "operation": "copy_sheet",
             "copy_type": copy_type,
             "source_sheet_name": source_sheet_name,
             "copied_sheet_name": copied_sheet_name,
-            "workbook": source_wb.name,
+            "workbook": source_workbook_name,
             "source_index": original_index,
             "copied_index": final_index,
-            "sheets_after": [(i, sheet.name) for i, sheet in enumerate(target_wb.sheets)],
-            "total_sheets": len(target_wb.sheets),
+            "sheets_after": sheets_after_with_index,
+            "total_sheets": target_sheets_count,
             "workbook_status": {
                 "source_opened_by_operation": source_opened_by_us,
                 "source_created_by_operation": source_created_by_us
@@ -4358,11 +5375,12 @@ except Exception as e:
         "operation": "copy_sheet",
         "source_sheet_name": source_sheet_name if 'source_sheet_name' in locals() else worksheet_name,
         "source_workbook": source_wb.name if 'source_wb' in locals() and source_wb else "${params.workbook || ''}",
-        "target_workbook": "${targetWorkbook}" if "${targetWorkbook}" else None,
+        "target_workbook": "${targetWorkbookPath}" if "${targetWorkbookPath}" else None,
         "error": str(e),
         "cleanup_performed": len(cleanup_workbooks) > 0,
         "cleanup_errors": cleanup_errors if cleanup_errors else None
     }
+
 
 print(json.dumps(result))`;
   }
@@ -4383,28 +5401,104 @@ wb = get_workbook("${params.workbook || ''}", app)
 if not wb:
     # Get list of available workbooks for debugging
     available_workbooks = [book.name for book in app.books] if app.books else []
-    raise Exception(f"Could not find the specified workbook '${params.workbook || ''}'. Available workbooks: {available_workbooks}")
+    result = {
+        "success": False,
+        "operation": "add_comment",
+        "error_type": "workbook_not_found",
+        "error_message": f"Could not find the specified workbook '${params.workbook || ''}'",
+        "context": {
+            "workbook": "${params.workbook || ''}",
+            "available_workbooks": available_workbooks
+        },
+        "suggested_actions": [
+            f"Use one of the available workbooks: {', '.join(available_workbooks) if available_workbooks else 'None available'}",
+            "Check the workbook name spelling and ensure it's open in Excel",
+            "Open the workbook in Excel first, then try again",
+            "Use the exact workbook name as it appears in Excel"
+        ]
+    }
+    print(json.dumps(result))
+    exit()
 
 ws = get_worksheet(wb, "${params.worksheet || ''}")
 if not ws:
-    raise Exception("Could not find the specified worksheet")
+    result = {
+        "success": False,
+        "operation": "add_comment",
+        "error_type": "worksheet_not_found",
+        "error_message": "Could not find the specified worksheet",
+        "context": {
+            "worksheet": "${params.worksheet || ''}",
+            "workbook": wb.name if wb else "${params.workbook || ''}"
+        },
+        "suggested_actions": [
+            "Check the worksheet name spelling and capitalization",
+            "Use list_sheets() to get the exact worksheet names",
+            "Ensure the worksheet exists in the specified workbook",
+            "Example: add_comment(worksheet: 'Sheet1', range: 'A1', comment: {text: 'Comment'})"
+        ]
+    }
+    print(json.dumps(result))
+    exit()
 
 # Get target cell
 range_str = "${params.range || 'A1'}"
 if not range_str:
-    raise Exception("range parameter is required for add_comment operation")
+    result = {
+        "success": False,
+        "operation": "add_comment",
+        "error_type": "missing_parameter",
+        "error_message": "range parameter is required for add_comment operation",
+        "context": {
+            "required_parameter": "range"
+        }
+    }
+    print(json.dumps(result))
+    exit()
 
 try:
     cell = ws.range(range_str)
     
     # Check if it's a single cell
     if cell.rows.count > 1 or cell.columns.count > 1:
-        raise Exception("Comments can only be added to single cells, not ranges")
+        result = {
+            "success": False,
+            "operation": "add_comment",
+            "error_type": "invalid_range",
+            "error_message": "Comments can only be added to single cells, not ranges",
+            "context": {
+                "range": range_str,
+                "rows_count": cell.rows.count,
+                "columns_count": cell.columns.count
+            },
+            "suggested_actions": [
+                "Specify a single cell reference (e.g., 'A1')",
+                "Use individual cells if you need to add comments to multiple cells",
+                "Example: add_comment(range: 'A1', comment: {text: 'Comment text'})"
+            ]
+        }
+        print(json.dumps(result))
+        exit()
     
     # Add comment
     comment_text = "${commentText || ''}"
     if not comment_text:
-        raise Exception("comment.text is required for add_comment operation")
+        result = {
+            "success": False,
+            "operation": "add_comment",
+            "error_type": "missing_parameter",
+            "error_message": "comment.text is required for add_comment operation",
+            "context": {
+                "required_parameter": "comment.text"
+            },
+            "suggested_actions": [
+                "Specify the comment text in the comment parameter",
+                "Example: add_comment(range: 'A1', comment: {text: 'This is a comment'})",
+                "Check that the comment object has a text property"
+            ]
+        }
+        print(json.dumps(result))
+        exit()
     
     # Delete existing comment if any
     try:
@@ -4423,7 +5517,25 @@ try:
         try:
             cell.note.text = comment_text
         except Exception as e:
-            raise Exception(f"Failed to add comment using both COM API and note.text methods: {str(e)}")
+            result = {
+                "success": False,
+                "operation": "add_comment",
+                "error_type": "comment_add_failed",
+                "error_message": f"Failed to add comment using both COM API and note.text methods",
+                "context": {
+                    "range": range_str,
+                    "comment_text": comment_text,
+                    "error_details": str(e)
+                },
+                "suggested_actions": [
+                    "Check if the worksheet is protected",
+                    "Verify that comments are allowed in this workbook",
+                    "Try refreshing Excel and running the operation again",
+                    "Ensure the cell is not locked or protected"
+                ]
+            }
+            print(json.dumps(result))
+            exit()
     
     # Note: xlwings Note object only supports text property
     # Author and visibility are not supported in the current Note API
@@ -4455,8 +5567,8 @@ print(json.dumps(result))`;
   private generateEditCommentLogic(params: XlwingsParams): string {
     const comment = params.comment;
     const commentText = comment?.text || '';
-    // const author = comment?.author || '';
-    // const visible = comment?.visible;
+    const author = comment?.author || '';
+    const visible = comment?.visible;
     
     return `
 # Edit existing comment
@@ -4468,30 +5580,111 @@ wb = get_workbook("${params.workbook || ''}", app)
 if not wb:
     # Get list of available workbooks for debugging
     available_workbooks = [book.name for book in app.books] if app.books else []
-    raise Exception(f"Could not find the specified workbook '${params.workbook || ''}'. Available workbooks: {available_workbooks}")
+    result = {
+        "success": False,
+        "operation": "edit_comment",
+        "error_type": "workbook_not_found",
+        "error_message": f"Could not find the specified workbook '${params.workbook || ''}'",
+        "context": {
+            "workbook": "${params.workbook || ''}",
+            "available_workbooks": available_workbooks
+        },
+        "suggested_actions": [
+            f"Use one of the available workbooks: {', '.join(available_workbooks) if available_workbooks else 'None available'}",
+            "Check the workbook name spelling and ensure it's open in Excel",
+            "Open the workbook in Excel first, then try again",
+            "Use the exact workbook name as it appears in Excel"
+        ]
+    }
+    print(json.dumps(result))
+    exit()
 
 ws = get_worksheet(wb, "${params.worksheet || ''}")
 if not ws:
-    raise Exception("Could not find the specified worksheet")
+    result = {
+        "success": False,
+        "operation": "edit_comment",
+        "error_type": "worksheet_not_found",
+        "error_message": "Could not find the specified worksheet",
+        "context": {
+            "worksheet": "${params.worksheet || ''}",
+            "workbook": wb.name if wb else "${params.workbook || ''}"
+        },
+        "suggested_actions": [
+            "Check the worksheet name spelling and capitalization",
+            "Use list_sheets() to get the exact worksheet names",
+            "Ensure the worksheet exists in the specified workbook",
+            "Example: edit_comment(worksheet: 'Sheet1', range: 'A1', comment: {text: 'Updated comment'})"
+        ]
+    }
+    print(json.dumps(result))
+    exit()
 
 # Get target cell
 range_str = "${params.range || 'A1'}"
 if not range_str:
-    raise Exception("range parameter is required for edit_comment operation")
+    result = {
+        "success": False,
+        "operation": "edit_comment",
+        "error_type": "missing_parameter",
+        "error_message": "range parameter is required for edit_comment operation",
+        "context": {
+            "required_parameter": "range"
+        }
+    }
+    print(json.dumps(result))
+    exit()
 
 try:
     cell = ws.range(range_str)
     
     # Check if it's a single cell
     if cell.rows.count > 1 or cell.columns.count > 1:
-        raise Exception("Comments can only be edited on single cells, not ranges")
-    
+        result = {
+            "success": False,
+            "operation": "edit_comment",
+            "error_type": "invalid_range",
+            "error_message": "Comments can only be edited on single cells, not ranges",
+            "context": {
+                "range": range_str,
+                "rows_count": cell.rows.count,
+                "columns_count": cell.columns.count
+            },
+            "suggested_actions": [
+                "Specify a single cell reference (e.g., 'A1')",
+                "Use individual cells if you need to edit multiple comments",
+                "Example: edit_comment(range: 'A1', comment: {text: 'New comment text'})"
+            ]
+        }
+        print(json.dumps(result))
+        exit()
+
     # Check if comment exists using note property
     if not cell.note:
-        raise Exception(f"No comment found at {range_str}")
+        result = {
+            "success": False,
+            "operation": "edit_comment",
+            "error_type": "comment_not_found",
+            "error_message": f"No comment found at {range_str}",
+            "context": {
+                "range": range_str,
+                "cell_address": range_str
+            },
+            "suggested_actions": [
+                "First add a comment using add_comment() before editing",
+                "Check if the cell address is correct",
+                "Use list_comments() to see which cells have comments",
+                f"Example: add_comment(range: '{range_str}', comment: {{text: 'Comment text'}})"
+            ]
+        }
+        print(json.dumps(result))
+        exit()
 
     # Update comment text if provided
     comment_text = "${commentText}"
+    author = "${author}"
+    visible = ${visible !== undefined ? visible : 'None'}
+
     if comment_text:
         cell.note.text = comment_text
     
@@ -4539,27 +5732,104 @@ wb = get_workbook("${params.workbook || ''}", app)
 if not wb:
     # Get list of available workbooks for debugging
     available_workbooks = [book.name for book in app.books] if app.books else []
-    raise Exception(f"Could not find the specified workbook '${params.workbook || ''}'. Available workbooks: {available_workbooks}")
+    result = {
+        "success": False,
+        "operation": "delete_comment",
+        "error_type": "workbook_not_found",
+        "error_message": f"Could not find the specified workbook '${params.workbook || ''}'",
+        "context": {
+            "workbook": "${params.workbook || ''}",
+            "available_workbooks": available_workbooks
+        },
+        "suggested_actions": [
+            f"Use one of the available workbooks: {', '.join(available_workbooks) if available_workbooks else 'None available'}",
+            "Check the workbook name spelling and ensure it's open in Excel",
+            "Open the workbook in Excel first, then try again",
+            "Use the exact workbook name as it appears in Excel"
+        ]
+    }
+    print(json.dumps(result))
+    exit()
 
 ws = get_worksheet(wb, "${params.worksheet || ''}")
 if not ws:
-    raise Exception("Could not find the specified worksheet")
+    result = {
+        "success": False,
+        "operation": "delete_comment",
+        "error_type": "worksheet_not_found",
+        "error_message": "Could not find the specified worksheet",
+        "context": {
+            "worksheet": "${params.worksheet || ''}",
+            "workbook": wb.name if wb else "${params.workbook || ''}"
+        },
+        "suggested_actions": [
+            "Check the worksheet name spelling and capitalization",
+            "Use list_sheets() to get the exact worksheet names",
+            "Ensure the worksheet exists in the specified workbook",
+            "Example: delete_comment(worksheet: 'Sheet1', range: 'A1')"
+        ]
+    }
+    print(json.dumps(result))
+    exit()
 
 # Get target cell
 range_str = "${params.range || 'A1'}"
 if not range_str:
-    raise Exception("range parameter is required for delete_comment operation")
+    result = {
+        "success": False,
+        "operation": "delete_comment",
+        "error_type": "missing_parameter",
+        "error_message": "range parameter is required for delete_comment operation",
+        "context": {
+            "required_parameter": "range"
+        }
+    }
+    print(json.dumps(result))
+    exit()
 
 try:
     cell = ws.range(range_str)
     
     # Check if it's a single cell
     if cell.rows.count > 1 or cell.columns.count > 1:
-        raise Exception("Comments can only be deleted from single cells, not ranges")
-    
+        result = {
+            "success": False,
+            "operation": "delete_comment",
+            "error_type": "invalid_range",
+            "error_message": "Comments can only be deleted from single cells, not ranges",
+            "context": {
+                "range": range_str,
+                "rows_count": cell.rows.count,
+                "columns_count": cell.columns.count
+            },
+            "suggested_actions": [
+                "Specify a single cell reference (e.g., 'A1')",
+                "Use individual cells if you need to delete multiple comments",
+                "Example: delete_comment(range: 'A1')"
+            ]
+        }
+        print(json.dumps(result))
+        exit()
+
     # Check if comment exists using note property
     if not cell.note:
-        raise Exception(f"No comment found at {range_str}")
+        result = {
+            "success": False,
+            "operation": "delete_comment",
+            "error_type": "comment_not_found",
+            "error_message": f"No comment found at {range_str}",
+            "context": {
+                "range": range_str,
+                "cell_address": range_str
+            },
+            "suggested_actions": [
+                "Check if the cell address is correct",
+                "Use list_comments() to see which cells have comments",
+                "Verify that a comment exists at this location"
+            ]
+        }
+        print(json.dumps(result))
+        exit()
 
     # Store comment info before deletion
     comment_text = cell.note.text if cell.note else "No text"
@@ -4602,11 +5872,45 @@ wb = get_workbook("${params.workbook || ''}", app)
 if not wb:
     # Get list of available workbooks for debugging
     available_workbooks = [book.name for book in app.books] if app.books else []
-    raise Exception(f"Could not find the specified workbook '${params.workbook || ''}'. Available workbooks: {available_workbooks}")
+    result = {
+        "success": False,
+        "operation": "list_comments",
+        "error_type": "workbook_not_found",
+        "error_message": f"Could not find the specified workbook '${params.workbook || ''}'",
+        "context": {
+            "workbook": "${params.workbook || ''}",
+            "available_workbooks": available_workbooks
+        },
+        "suggested_actions": [
+            f"Use one of the available workbooks: {', '.join(available_workbooks) if available_workbooks else 'None available'}",
+            "Check the workbook name spelling and ensure it's open in Excel",
+            "Open the workbook in Excel first, then try again",
+            "Use the exact workbook name as it appears in Excel"
+        ]
+    }
+    print(json.dumps(result))
+    exit()
 
 ws = get_worksheet(wb, "${params.worksheet || ''}")
 if not ws:
-    raise Exception("Could not find the specified worksheet")
+    result = {
+        "success": False,
+        "operation": "list_comments",
+        "error_type": "worksheet_not_found",
+        "error_message": "Could not find the specified worksheet",
+        "context": {
+            "worksheet": "${params.worksheet || ''}",
+            "workbook": wb.name if wb else "${params.workbook || ''}"
+        },
+        "suggested_actions": [
+            "Check the worksheet name spelling and capitalization",
+            "Use list_sheets() to get the exact worksheet names",
+            "Ensure the worksheet exists in the specified workbook",
+            "Example: list_comments(worksheet: 'Sheet1')"
+        ]
+    }
+    print(json.dumps(result))
+    exit()
 
 try:
     comments = []
@@ -4674,17 +5978,61 @@ wb = get_workbook("${params.workbook || ''}", app)
 if not wb:
     # Get list of available workbooks for debugging
     available_workbooks = [book.name for book in app.books] if app.books else []
-    raise Exception(f"Could not find the specified workbook '${params.workbook || ''}'. Available workbooks: {available_workbooks}")
+    result = {
+        "success": False,
+        "operation": "merge_cells",
+        "error_type": "workbook_not_found",
+        "error_message": f"Could not find the specified workbook '${params.workbook || ''}'",
+        "context": {
+            "workbook": "${params.workbook || ''}",
+            "available_workbooks": available_workbooks
+        },
+        "suggested_actions": [
+            f"Use one of the available workbooks: {', '.join(available_workbooks) if available_workbooks else 'None available'}",
+            "Check the workbook name spelling and ensure it's open in Excel",
+            "Open the workbook in Excel first, then try again",
+            "Use the exact workbook name as it appears in Excel"
+        ]
+    }
+    print(json.dumps(result))
+    exit()
 
 ws = get_worksheet(wb, "${params.worksheet || ''}")
 if not ws:
-    raise Exception("Could not find the specified worksheet")
+    result = {
+        "success": False,
+        "operation": "merge_cells",
+        "error_type": "worksheet_not_found",
+        "error_message": "Could not find the specified worksheet",
+        "context": {
+            "worksheet": "${params.worksheet || ''}",
+            "workbook": wb.name if wb else "${params.workbook || ''}"
+        },
+        "suggested_actions": [
+            "Check the worksheet name spelling and capitalization",
+            "Use list_sheets() to get the exact worksheet names",
+            "Ensure the worksheet exists in the specified workbook",
+            "Example: merge_cells(worksheet: 'Sheet1', range: 'A1:C3')"
+        ]
+    }
+    print(json.dumps(result))
+    exit()
 ${alertHandling}
 
 # Get target range
 range_str = "${params.range || 'A1'}"
 if not range_str:
-    raise Exception("range parameter is required for merge_range operation")
+    result = {
+        "success": False,
+        "operation": "merge_range",
+        "error_type": "missing_parameter",
+        "error_message": "range parameter is required for merge_range operation",
+        "context": {
+            "required_parameter": "range"
+        }
+    }
+    print(json.dumps(result))
+    exit()
 
 try:
     range_obj = ws.range(range_str)
@@ -4771,17 +6119,66 @@ wb = get_workbook("${params.workbook || ''}", app)
 if not wb:
     # Get list of available workbooks for debugging
     available_workbooks = [book.name for book in app.books] if app.books else []
-    raise Exception(f"Could not find the specified workbook '${params.workbook || ''}'. Available workbooks: {available_workbooks}")
+    result = {
+        "success": False,
+        "operation": "unmerge_cells",
+        "error_type": "workbook_not_found",
+        "error_message": f"Could not find the specified workbook '${params.workbook || ''}'",
+        "context": {
+            "workbook": "${params.workbook || ''}",
+            "available_workbooks": available_workbooks
+        },
+        "suggested_actions": [
+            f"Use one of the available workbooks: {', '.join(available_workbooks) if available_workbooks else 'None available'}",
+            "Check the workbook name spelling and ensure it's open in Excel",
+            "Open the workbook in Excel first, then try again",
+            "Use the exact workbook name as it appears in Excel"
+        ]
+    }
+    print(json.dumps(result))
+    exit()
 
 ws = get_worksheet(wb, "${params.worksheet || ''}")
 if not ws:
-    raise Exception("Could not find the specified worksheet")
+    result = {
+        "success": False,
+        "operation": "unmerge_cells",
+        "error_type": "worksheet_not_found",
+        "error_message": "Could not find the specified worksheet",
+        "context": {
+            "worksheet": "${params.worksheet || ''}",
+            "workbook": wb.name if wb else "${params.workbook || ''}"
+        },
+        "suggested_actions": [
+            "Check the worksheet name spelling and capitalization",
+            "Use list_sheets() to get the exact worksheet names",
+            "Ensure the worksheet exists in the specified workbook",
+            "Example: unmerge_cells(worksheet: 'Sheet1', range: 'A1:C3')"
+        ]
+    }
+    print(json.dumps(result))
+    exit()
 ${alertHandling}
 
 # Get target range
 range_str = "${params.range || 'A1'}"
 if not range_str:
-    raise Exception("range parameter is required for unmerge_range operation")
+    result = {
+        "success": False,
+        "operation": "unmerge_range",
+        "error_type": "missing_parameter",
+        "error_message": "range parameter is required for unmerge_range operation",
+        "context": {
+            "required_parameter": "range"
+        },
+        "suggested_actions": [
+            "Specify a range parameter (e.g., 'A1:C3')",
+            "Use get_sheet_info() to identify merged cells first",
+            "Example: unmerge_range(range: 'A1:C3')"
+        ]
+    }
+    print(json.dumps(result))
+    exit()
 
 try:
     range_obj = ws.range(range_str)
@@ -4869,11 +6266,45 @@ wb = get_workbook("${params.workbook || ''}", app)
 if not wb:
     # Get list of available workbooks for debugging
     available_workbooks = [book.name for book in app.books] if app.books else []
-    raise Exception(f"Could not find the specified workbook '${params.workbook || ''}'. Available workbooks: {available_workbooks}")
+    result = {
+        "success": False,
+        "operation": "set_row_height",
+        "error_type": "workbook_not_found",
+        "error_message": f"Could not find the specified workbook '${params.workbook || ''}'",
+        "context": {
+            "workbook": "${params.workbook || ''}",
+            "available_workbooks": available_workbooks
+        },
+        "suggested_actions": [
+            f"Use one of the available workbooks: {', '.join(available_workbooks) if available_workbooks else 'None available'}",
+            "Check the workbook name spelling and ensure it's open in Excel",
+            "Open the workbook in Excel first, then try again",
+            "Use the exact workbook name as it appears in Excel"
+        ]
+    }
+    print(json.dumps(result))
+    exit()
 
 ws = get_worksheet(wb, "${params.worksheet || ''}")
 if not ws:
-    raise Exception("Could not find the specified worksheet")
+    result = {
+        "success": False,
+        "operation": "set_row_height",
+        "error_type": "worksheet_not_found",
+        "error_message": "Could not find the specified worksheet",
+        "context": {
+            "worksheet": "${params.worksheet || ''}",
+            "workbook": wb.name if wb else "${params.workbook || ''}"
+        },
+        "suggested_actions": [
+            "Check the worksheet name spelling and capitalization",
+            "Use list_sheets() to get the exact worksheet names",
+            "Ensure the worksheet exists in the specified workbook",
+            "Example: set_row_height(worksheet: 'Sheet1', sizing: {height: 20})"
+        ]
+    }
+    print(json.dumps(result))
+    exit()
 
 try:
     height_value = ${height}
@@ -4968,11 +6399,45 @@ wb = get_workbook("${params.workbook || ''}", app)
 if not wb:
     # Get list of available workbooks for debugging
     available_workbooks = [book.name for book in app.books] if app.books else []
-    raise Exception(f"Could not find the specified workbook '${params.workbook || ''}'. Available workbooks: {available_workbooks}")
+    result = {
+        "success": False,
+        "operation": "generic_operation",
+        "error_type": "workbook_not_found",
+        "error_message": f"Could not find the specified workbook '${params.workbook || ''}'",
+        "context": {
+            "workbook": "${params.workbook || ''}",
+            "available_workbooks": available_workbooks
+        },
+        "suggested_actions": [
+            f"Use one of the available workbooks: {', '.join(available_workbooks) if available_workbooks else 'None available'}",
+            "Check the workbook name spelling and ensure it's open in Excel",
+            "Open the workbook in Excel first, then try again",
+            "Use the exact workbook name as it appears in Excel"
+        ]
+    }
+    print(json.dumps(result))
+    exit()
 
 ws = get_worksheet(wb, "${params.worksheet || ''}")
 if not ws:
-    raise Exception("Could not find the specified worksheet")
+    result = {
+        "success": False,
+        "operation": "generic_operation",
+        "error_type": "worksheet_not_found",
+        "error_message": "Could not find the specified worksheet",
+        "context": {
+            "worksheet": "${params.worksheet || ''}",
+            "workbook": wb.name if wb else "${params.workbook || ''}"
+        },
+        "suggested_actions": [
+            "Check the worksheet name spelling and capitalization",
+            "Use list_sheets() to get the exact worksheet names",
+            "Ensure the worksheet exists in the specified workbook",
+            "Example: operation_name(worksheet: 'Sheet1')"
+        ]
+    }
+    print(json.dumps(result))
+    exit()
 
 try:
     width_value = ${width}
@@ -5088,11 +6553,45 @@ wb = get_workbook("${params.workbook || ''}", app)
 if not wb:
     # Get list of available workbooks for debugging
     available_workbooks = [book.name for book in app.books] if app.books else []
-    raise Exception(f"Could not find the specified workbook '${params.workbook || ''}'. Available workbooks: {available_workbooks}")
+    result = {
+        "success": False,
+        "operation": "generic_operation",
+        "error_type": "workbook_not_found",
+        "error_message": f"Could not find the specified workbook '${params.workbook || ''}'",
+        "context": {
+            "workbook": "${params.workbook || ''}",
+            "available_workbooks": available_workbooks
+        },
+        "suggested_actions": [
+            f"Use one of the available workbooks: {', '.join(available_workbooks) if available_workbooks else 'None available'}",
+            "Check the workbook name spelling and ensure it's open in Excel",
+            "Open the workbook in Excel first, then try again",
+            "Use the exact workbook name as it appears in Excel"
+        ]
+    }
+    print(json.dumps(result))
+    exit()
 
 ws = get_worksheet(wb, "${params.worksheet || ''}")
 if not ws:
-    raise Exception("Could not find the specified worksheet")
+    result = {
+        "success": False,
+        "operation": "generic_operation",
+        "error_type": "worksheet_not_found",
+        "error_message": "Could not find the specified worksheet",
+        "context": {
+            "worksheet": "${params.worksheet || ''}",
+            "workbook": wb.name if wb else "${params.workbook || ''}"
+        },
+        "suggested_actions": [
+            "Check the worksheet name spelling and capitalization",
+            "Use list_sheets() to get the exact worksheet names",
+            "Ensure the worksheet exists in the specified workbook",
+            "Example: operation_name(worksheet: 'Sheet1')"
+        ]
+    }
+    print(json.dumps(result))
+    exit()
 
 try:
     row_numbers = ${rowNumbers ? JSON.stringify(rowNumbers) : 'None'}
@@ -5172,11 +6671,45 @@ wb = get_workbook("${params.workbook || ''}", app)
 if not wb:
     # Get list of available workbooks for debugging
     available_workbooks = [book.name for book in app.books] if app.books else []
-    raise Exception(f"Could not find the specified workbook '${params.workbook || ''}'. Available workbooks: {available_workbooks}")
+    result = {
+        "success": False,
+        "operation": "generic_operation",
+        "error_type": "workbook_not_found",
+        "error_message": f"Could not find the specified workbook '${params.workbook || ''}'",
+        "context": {
+            "workbook": "${params.workbook || ''}",
+            "available_workbooks": available_workbooks
+        },
+        "suggested_actions": [
+            f"Use one of the available workbooks: {', '.join(available_workbooks) if available_workbooks else 'None available'}",
+            "Check the workbook name spelling and ensure it's open in Excel",
+            "Open the workbook in Excel first, then try again",
+            "Use the exact workbook name as it appears in Excel"
+        ]
+    }
+    print(json.dumps(result))
+    exit()
 
 ws = get_worksheet(wb, "${params.worksheet || ''}")
 if not ws:
-    raise Exception("Could not find the specified worksheet")
+    result = {
+        "success": False,
+        "operation": "generic_operation",
+        "error_type": "worksheet_not_found",
+        "error_message": "Could not find the specified worksheet",
+        "context": {
+            "worksheet": "${params.worksheet || ''}",
+            "workbook": wb.name if wb else "${params.workbook || ''}"
+        },
+        "suggested_actions": [
+            "Check the worksheet name spelling and capitalization",
+            "Use list_sheets() to get the exact worksheet names",
+            "Ensure the worksheet exists in the specified workbook",
+            "Example: operation_name(worksheet: 'Sheet1')"
+        ]
+    }
+    print(json.dumps(result))
+    exit()
 
 try:
     column_identifiers = ${columnIdentifiers ? JSON.stringify(columnIdentifiers) : 'None'}
@@ -5294,28 +6827,110 @@ wb = get_workbook("${params.workbook || ''}", app)
 if not wb:
     # Get list of available workbooks for debugging
     available_workbooks = [book.name for book in app.books] if app.books else []
-    raise Exception(f"Could not find the specified workbook '${params.workbook || ''}'. Available workbooks: {available_workbooks}")
+    result = {
+        "success": False,
+        "operation": "generic_operation",
+        "error_type": "workbook_not_found",
+        "error_message": f"Could not find the specified workbook '${params.workbook || ''}'",
+        "context": {
+            "workbook": "${params.workbook || ''}",
+            "available_workbooks": available_workbooks
+        },
+        "suggested_actions": [
+            f"Use one of the available workbooks: {', '.join(available_workbooks) if available_workbooks else 'None available'}",
+            "Check the workbook name spelling and ensure it's open in Excel",
+            "Open the workbook in Excel first, then try again",
+            "Use the exact workbook name as it appears in Excel"
+        ]
+    }
+    print(json.dumps(result))
+    exit()
 
 ws = get_worksheet(wb, "${params.worksheet || ''}")
 if not ws:
-    raise Exception("Could not find the specified worksheet")
+    result = {
+        "success": False,
+        "operation": "generic_operation",
+        "error_type": "worksheet_not_found",
+        "error_message": "Could not find the specified worksheet",
+        "context": {
+            "worksheet": "${params.worksheet || ''}",
+            "workbook": wb.name if wb else "${params.workbook || ''}"
+        },
+        "suggested_actions": [
+            "Check the worksheet name spelling and capitalization",
+            "Use list_sheets() to get the exact worksheet names",
+            "Ensure the worksheet exists in the specified workbook",
+            "Example: operation_name(worksheet: 'Sheet1')"
+        ]
+    }
+    print(json.dumps(result))
+    exit()
 
 # Get target range
 # Get single cell address (not range)
 cell_address = "${params.range || 'A1'}"
 if not cell_address:
-    raise Exception("cell address parameter is required for get_cell_info operation")
+    result = {
+        "success": False,
+        "operation": "get_cell_info",
+        "error_type": "missing_parameter",
+        "error_message": "cell address parameter is required for get_cell_info operation",
+        "context": {
+            "required_parameter": "range"
+        },
+        "suggested_actions": [
+            "Specify a cell address in the range parameter",
+            "Example: get_cell_info(range: 'A1')",
+            "Use a single cell reference like 'B5' or 'C10'"
+        ]
+    }
+    print(json.dumps(result))
+    exit()
 
 # Ensure it's a single cell, not a range
 if ':' in cell_address:
-    raise Exception("get_cell_info only supports single cell addresses, not ranges")
+    result = {
+        "success": False,
+        "operation": "get_cell_info",
+        "error_type": "invalid_range",
+        "error_message": "get_cell_info only supports single cell addresses, not ranges",
+        "context": {
+            "provided_range": cell_address,
+            "expected_format": "single_cell"
+        },
+        "suggested_actions": [
+            "Use a single cell address instead of a range",
+            f"Try using just the first cell: '{cell_address.split(':')[0]}'",
+            "Example: get_cell_info(range: 'A1') instead of get_cell_info(range: 'A1:B2')"
+        ]
+    }
+    print(json.dumps(result))
+    exit()
 
 try:
     cell_obj = ws.range(cell_address)
 
     # Ensure it's actually a single cell
     if cell_obj.size > 1:
-        raise Exception("get_cell_info only supports single cells")
+        result = {
+            "success": False,
+            "operation": "get_cell_info",
+            "error_type": "invalid_range",
+            "error_message": "get_cell_info only supports single cells",
+            "context": {
+                "provided_range": cell_address,
+                "cell_count": cell_obj.size,
+                "expected_cell_count": 1
+            },
+            "suggested_actions": [
+                "Use a single cell reference (e.g., 'A1')",
+                "Avoid ranges like 'A1:B2'",
+                "If you need info for multiple cells, call get_cell_info() for each cell individually"
+            ]
+        }
+        print(json.dumps(result))
+        exit()
 
     include_formatting = ${includeFormattingPython}
     include_formulas = ${includeFormulasPython}
@@ -5447,16 +7062,65 @@ wb = get_workbook("${params.workbook || ''}", app)
 if not wb:
     # Get list of available workbooks for debugging
     available_workbooks = [book.name for book in app.books] if app.books else []
-    raise Exception(f"Could not find the specified workbook '${params.workbook || ''}'. Available workbooks: {available_workbooks}")
+    result = {
+        "success": False,
+        "operation": "generic_operation",
+        "error_type": "workbook_not_found",
+        "error_message": f"Could not find the specified workbook '${params.workbook || ''}'",
+        "context": {
+            "workbook": "${params.workbook || ''}",
+            "available_workbooks": available_workbooks
+        },
+        "suggested_actions": [
+            f"Use one of the available workbooks: {', '.join(available_workbooks) if available_workbooks else 'None available'}",
+            "Check the workbook name spelling and ensure it's open in Excel",
+            "Open the workbook in Excel first, then try again",
+            "Use the exact workbook name as it appears in Excel"
+        ]
+    }
+    print(json.dumps(result))
+    exit()
 
 ws = get_worksheet(wb, "${params.worksheet || ''}")
 if not ws:
-    raise Exception("Could not find the specified worksheet")
+    result = {
+        "success": False,
+        "operation": "generic_operation",
+        "error_type": "worksheet_not_found",
+        "error_message": "Could not find the specified worksheet",
+        "context": {
+            "worksheet": "${params.worksheet || ''}",
+            "workbook": wb.name if wb else "${params.workbook || ''}"
+        },
+        "suggested_actions": [
+            "Check the worksheet name spelling and capitalization",
+            "Use list_sheets() to get the exact worksheet names",
+            "Ensure the worksheet exists in the specified workbook",
+            "Example: operation_name(worksheet: 'Sheet1')"
+        ]
+    }
+    print(json.dumps(result))
+    exit()
 
 # Get target range
 range_str = "${params.range || 'A1'}"
 if not range_str:
-    raise Exception("range parameter is required for insert_range operation")
+    result = {
+        "success": False,
+        "operation": "insert_range",
+        "error_type": "missing_parameter",
+        "error_message": "range parameter is required for insert_range operation",
+        "context": {
+            "required_parameter": "range"
+        },
+        "suggested_actions": [
+            "Specify a range parameter (e.g., 'A1:A5')",
+            "Example: insert_range(range: 'A1:A5', shift_direction: 'down')",
+            "Use cell addresses like 'A1' or ranges like 'A1:C3'"
+        ]
+    }
+    print(json.dumps(result))
+    exit()
 
 try:
     range_obj = ws.range(range_str)
@@ -5466,7 +7130,23 @@ try:
     # Validate shift direction
     valid_directions = ["down", "right", "up", "left"]
     if shift_direction not in valid_directions:
-        raise Exception(f"Invalid shift_direction: {shift_direction}. Must be one of: {valid_directions}")
+        result = {
+            "success": False,
+            "operation": "insert_range",
+            "error_type": "invalid_parameter",
+            "error_message": f"Invalid shift_direction: {shift_direction}. Must be one of: {valid_directions}",
+            "context": {
+                "provided_shift_direction": shift_direction,
+                "valid_directions": valid_directions
+            },
+            "suggested_actions": [
+                f"Use one of the valid shift directions: {', '.join(valid_directions)}",
+                "Example: insert_range(range: 'A1:A5', shift_direction: 'down')",
+                "Common choices: 'down' for inserting rows, 'right' for inserting columns"
+            ]
+        }
+        print(json.dumps(result))
+        exit()
     
     # Excel shift constants
     shift_constants = {
@@ -5547,17 +7227,66 @@ wb = get_workbook("${params.workbook || ''}", app)
 if not wb:
     # Get list of available workbooks for debugging
     available_workbooks = [book.name for book in app.books] if app.books else []
-    raise Exception(f"Could not find the specified workbook '${params.workbook || ''}'. Available workbooks: {available_workbooks}")
+    result = {
+        "success": False,
+        "operation": "generic_operation",
+        "error_type": "workbook_not_found",
+        "error_message": f"Could not find the specified workbook '${params.workbook || ''}'",
+        "context": {
+            "workbook": "${params.workbook || ''}",
+            "available_workbooks": available_workbooks
+        },
+        "suggested_actions": [
+            f"Use one of the available workbooks: {', '.join(available_workbooks) if available_workbooks else 'None available'}",
+            "Check the workbook name spelling and ensure it's open in Excel",
+            "Open the workbook in Excel first, then try again",
+            "Use the exact workbook name as it appears in Excel"
+        ]
+    }
+    print(json.dumps(result))
+    exit()
 
 ws = get_worksheet(wb, "${params.worksheet || ''}")
 if not ws:
-    raise Exception("Could not find the specified worksheet")
+    result = {
+        "success": False,
+        "operation": "generic_operation",
+        "error_type": "worksheet_not_found",
+        "error_message": "Could not find the specified worksheet",
+        "context": {
+            "worksheet": "${params.worksheet || ''}",
+            "workbook": wb.name if wb else "${params.workbook || ''}"
+        },
+        "suggested_actions": [
+            "Check the worksheet name spelling and capitalization",
+            "Use list_sheets() to get the exact worksheet names",
+            "Ensure the worksheet exists in the specified workbook",
+            "Example: operation_name(worksheet: 'Sheet1')"
+        ]
+    }
+    print(json.dumps(result))
+    exit()
 ${alertHandling}
 
 # Get target range
 range_str = "${params.range || 'A1'}"
 if not range_str:
-    raise Exception("range parameter is required for delete_range operation")
+    result = {
+        "success": False,
+        "operation": "delete_range",
+        "error_type": "missing_parameter",
+        "error_message": "range parameter is required for delete_range operation",
+        "context": {
+            "required_parameter": "range"
+        },
+        "suggested_actions": [
+            "Specify a range parameter (e.g., 'A1:A5')",
+            "Example: delete_range(range: 'A1:A5', shift_direction: 'up')",
+            "Use cell addresses like 'A1' or ranges like 'A1:C3'"
+        ]
+    }
+    print(json.dumps(result))
+    exit()
 
 try:
     range_obj = ws.range(range_str)
@@ -5567,7 +7296,23 @@ try:
     # Validate shift direction
     valid_directions = ["up", "left", "down", "right"]
     if shift_direction not in valid_directions:
-        raise Exception(f"Invalid shift_direction: {shift_direction}. Must be one of: {valid_directions}")
+        result = {
+            "success": False,
+            "operation": "delete_range",
+            "error_type": "invalid_parameter",
+            "error_message": f"Invalid shift_direction: {shift_direction}. Must be one of: {valid_directions}",
+            "context": {
+                "provided_shift_direction": shift_direction,
+                "valid_directions": valid_directions
+            },
+            "suggested_actions": [
+                f"Use one of the valid shift directions: {', '.join(valid_directions)}",
+                "Example: delete_range(range: 'A1:A5', shift_direction: 'up')",
+                "Common choices: 'up' for deleting rows, 'left' for deleting columns"
+            ]
+        }
+        print(json.dumps(result))
+        exit()
     
     # Excel shift constants for delete
     shift_constants = {
@@ -5650,16 +7395,65 @@ wb = get_workbook("${params.workbook || ''}", app)
 if not wb:
     # Get list of available workbooks for debugging
     available_workbooks = [book.name for book in app.books] if app.books else []
-    raise Exception(f"Could not find the specified workbook '${params.workbook || ''}'. Available workbooks: {available_workbooks}")
+    result = {
+        "success": False,
+        "operation": "generic_operation",
+        "error_type": "workbook_not_found",
+        "error_message": f"Could not find the specified workbook '${params.workbook || ''}'",
+        "context": {
+            "workbook": "${params.workbook || ''}",
+            "available_workbooks": available_workbooks
+        },
+        "suggested_actions": [
+            f"Use one of the available workbooks: {', '.join(available_workbooks) if available_workbooks else 'None available'}",
+            "Check the workbook name spelling and ensure it's open in Excel",
+            "Open the workbook in Excel first, then try again",
+            "Use the exact workbook name as it appears in Excel"
+        ]
+    }
+    print(json.dumps(result))
+    exit()
 
 ws = get_worksheet(wb, "${params.worksheet || ''}")
 if not ws:
-    raise Exception("Could not find the specified worksheet")
+    result = {
+        "success": False,
+        "operation": "generic_operation",
+        "error_type": "worksheet_not_found",
+        "error_message": "Could not find the specified worksheet",
+        "context": {
+            "worksheet": "${params.worksheet || ''}",
+            "workbook": wb.name if wb else "${params.workbook || ''}"
+        },
+        "suggested_actions": [
+            "Check the worksheet name spelling and capitalization",
+            "Use list_sheets() to get the exact worksheet names",
+            "Ensure the worksheet exists in the specified workbook",
+            "Example: operation_name(worksheet: 'Sheet1')"
+        ]
+    }
+    print(json.dumps(result))
+    exit()
 
 # Get target range
 range_str = "${params.range || ''}"
 if not range_str:
-    raise Exception("range parameter is required for sort_range operation")
+    result = {
+        "success": False,
+        "operation": "sort_range",
+        "error_type": "missing_parameter",
+        "error_message": "range parameter is required for sort_range operation",
+        "context": {
+            "required_parameter": "range"
+        },
+        "suggested_actions": [
+            "Specify a range parameter (e.g., 'A1:D10')",
+            "Example: sort_range(range: 'A1:D10', sort_columns: [{column: 'A', order: 'asc'}])",
+            "Use ranges that contain the data you want to sort"
+        ]
+    }
+    print(json.dumps(result))
+    exit()
 
 try:
     range_obj = ws.range(range_str)
@@ -5727,7 +7521,25 @@ try:
     # Read current data into pandas DataFrame
     data = range_obj.value
     if not data or len(data) == 0:
-        raise Exception("No data found in the specified range")
+        result = {
+            "success": False,
+            "operation": "sort_range",
+            "error_type": "no_data_found",
+            "error_message": "No data found in the specified range",
+            "context": {
+                "range": range_str,
+                "worksheet": ws.name,
+                "workbook": wb.name
+            },
+            "suggested_actions": [
+                "Ensure the range contains data to sort",
+                "Check if the range address is correct",
+                "Use get_range_info() to verify range contents",
+                "Make sure the range is not empty"
+            ]
+        }
+        print(json.dumps(result))
+        exit()
 
     # Convert to DataFrame
     df = pd.DataFrame(data)
@@ -5757,21 +7569,76 @@ try:
                 if 1 <= relative_col_num <= len(df.columns):
                     pandas_col = df.columns[relative_col_num - 1]
                 else:
-                    raise Exception(f"Sort column {col_spec} (position {relative_col_num}) is outside the range")
+                    result = {
+                        "success": False,
+                        "operation": "sort_range",
+                        "error_type": "sort_column_out_of_range",
+                        "error_message": f"Sort column {col_spec} (position {relative_col_num}) is outside the range",
+                        "context": {
+                            "column_spec": col_spec,
+                            "relative_position": relative_col_num,
+                            "range": range_str,
+                            "available_columns": len(df.columns)
+                        },
+                        "suggested_actions": [
+                            f"Use columns within the range (1 to {len(df.columns)})",
+                            "Check the column letter or number specification",
+                            "Ensure the sort column exists within the specified range",
+                            f"Available columns: {list(df.columns) if not df.empty else 'None'}"
+                        ]
+                    }
+                    print(json.dumps(result))
+                    exit()
             else:
                 # If it's a number, treat as 1-based column index
                 col_index = int(col_spec) - 1
                 if 0 <= col_index < len(df.columns):
                     pandas_col = df.columns[col_index]
                 else:
-                    raise Exception(f"Sort column {col_spec} is outside the range")
+                    result = {
+                        "success": False,
+                        "operation": "sort_range",
+                        "error_type": "sort_column_out_of_range",
+                        "error_message": f"Sort column {col_spec} is outside the range",
+                        "context": {
+                            "column_spec": col_spec,
+                            "column_index": col_index + 1,
+                            "range": range_str,
+                            "available_columns": len(df.columns)
+                        },
+                        "suggested_actions": [
+                            f"Use column numbers within the range (1 to {len(df.columns)})",
+                            "Check that the column number is valid",
+                            "Ensure the sort column exists within the specified range",
+                            f"Available columns: {list(df.columns) if not df.empty else 'None'}"
+                        ]
+                    }
+                    print(json.dumps(result))
+                    exit()
 
             sort_columns.append(pandas_col)
             sort_ascending.append(key.get('order', 'asc') == 'asc')
         else:
             # Horizontal sorting not commonly supported by pandas directly
             # Would need to transpose, sort, then transpose back
-            raise Exception("Horizontal sorting (by rows) is not yet supported")
+            result = {
+                "success": False,
+                "operation": "sort_range",
+                "error_type": "unsupported_operation",
+                "error_message": "Horizontal sorting (by rows) is not yet supported",
+                "context": {
+                    "orientation": orientation,
+                    "supported_orientation": "rows"
+                },
+                "suggested_actions": [
+                    "Use orientation: 'rows' to sort by columns",
+                    "Horizontal sorting (by rows) is not currently implemented",
+                    "Consider transposing your data to sort by columns instead",
+                    "Example: sort_range(orientation: 'rows', sort_columns: [{column: 'A', order: 'asc'}])"
+                ]
+            }
+            print(json.dumps(result))
+            exit()
 
     # Perform the sort
     if sort_columns:
@@ -5779,8 +7646,9 @@ try:
         for col in sort_columns:
             # Try to convert to numeric if possible
             try:
-                df[col] = pd.to_numeric(df[col], errors='ignore')
-            except:
+                df[col] = pd.to_numeric(df[col])
+            except (ValueError, TypeError):
+                # Keep original values if conversion fails
                 pass
 
         df_sorted = df.sort_values(by=sort_columns, ascending=sort_ascending, na_position='last')
@@ -5914,7 +7782,23 @@ print(json.dumps(result))`;
 # Save workbook
 app = xw.apps.active if xw.apps else None
 if not app:
-    raise Exception("No active Excel application found. Please open Excel first.")
+    result = {
+        "success": False,
+        "operation": "generic_operation",
+        "error_type": "no_excel_application",
+        "error_message": "No active Excel application found. Please open Excel first.",
+        "context": {
+            "required": "active_excel_application"
+        },
+        "suggested_actions": [
+            "Open Excel application first",
+            "Ensure Excel is running and accessible",
+            "Try opening any workbook in Excel to activate the application",
+            "Restart Excel if it's not responding"
+        ]
+    }
+    print(json.dumps(result))
+    exit()
 
 wb = get_workbook("${params.workbook || ''}")
 if not wb:
@@ -5946,7 +7830,23 @@ print(json.dumps(result))`;
 # Close workbook
 app = xw.apps.active if xw.apps else None
 if not app:
-    raise Exception("No active Excel application found. Please open Excel first.")
+    result = {
+        "success": False,
+        "operation": "generic_operation",
+        "error_type": "no_excel_application",
+        "error_message": "No active Excel application found. Please open Excel first.",
+        "context": {
+            "required": "active_excel_application"
+        },
+        "suggested_actions": [
+            "Open Excel application first",
+            "Ensure Excel is running and accessible",
+            "Try opening any workbook in Excel to activate the application",
+            "Restart Excel if it's not responding"
+        ]
+    }
+    print(json.dumps(result))
+    exit()
 
 wb = get_workbook("${params.workbook || ''}")
 if not wb:
@@ -5978,7 +7878,23 @@ print(json.dumps(result))`;
 # Connect to Excel
 app = xw.apps.active if xw.apps else None
 if not app:
-    raise Exception("No active Excel application found. Please open Excel first.")
+    result = {
+        "success": False,
+        "operation": "generic_operation",
+        "error_type": "no_excel_application",
+        "error_message": "No active Excel application found. Please open Excel first.",
+        "context": {
+            "required": "active_excel_application"
+        },
+        "suggested_actions": [
+            "Open Excel application first",
+            "Ensure Excel is running and accessible",
+            "Try opening any workbook in Excel to activate the application",
+            "Restart Excel if it's not responding"
+        ]
+    }
+    print(json.dumps(result))
+    exit()
 
 wb = get_workbook("${params.workbook || ''}")
 if not wb:
@@ -6021,7 +7937,23 @@ print(json.dumps(result))`;
 # Connect to Excel
 app = xw.apps.active if xw.apps else None
 if not app:
-    raise Exception("No active Excel application found. Please open Excel first.")
+    result = {
+        "success": False,
+        "operation": "generic_operation",
+        "error_type": "no_excel_application",
+        "error_message": "No active Excel application found. Please open Excel first.",
+        "context": {
+            "required": "active_excel_application"
+        },
+        "suggested_actions": [
+            "Open Excel application first",
+            "Ensure Excel is running and accessible",
+            "Try opening any workbook in Excel to activate the application",
+            "Restart Excel if it's not responding"
+        ]
+    }
+    print(json.dumps(result))
+    exit()
 
 wb = get_workbook("${params.workbook || ''}")
 if not wb:
@@ -6068,7 +8000,23 @@ print(json.dumps(result))`;
 # Connect to Excel
 app = xw.apps.active if xw.apps else None
 if not app:
-    raise Exception("No active Excel application found. Please open Excel first.")
+    result = {
+        "success": False,
+        "operation": "generic_operation",
+        "error_type": "no_excel_application",
+        "error_message": "No active Excel application found. Please open Excel first.",
+        "context": {
+            "required": "active_excel_application"
+        },
+        "suggested_actions": [
+            "Open Excel application first",
+            "Ensure Excel is running and accessible",
+            "Try opening any workbook in Excel to activate the application",
+            "Restart Excel if it's not responding"
+        ]
+    }
+    print(json.dumps(result))
+    exit()
 
 wb = get_workbook("${params.workbook || ''}")
 if not wb:
@@ -6116,7 +8064,23 @@ print(json.dumps(result))`;
 # Connect to Excel
 app = xw.apps.active if xw.apps else None
 if not app:
-    raise Exception("No active Excel application found. Please open Excel first.")
+    result = {
+        "success": False,
+        "operation": "generic_operation",
+        "error_type": "no_excel_application",
+        "error_message": "No active Excel application found. Please open Excel first.",
+        "context": {
+            "required": "active_excel_application"
+        },
+        "suggested_actions": [
+            "Open Excel application first",
+            "Ensure Excel is running and accessible",
+            "Try opening any workbook in Excel to activate the application",
+            "Restart Excel if it's not responding"
+        ]
+    }
+    print(json.dumps(result))
+    exit()
 
 wb = get_workbook("${params.workbook || ''}")
 if not wb:
@@ -6180,7 +8144,23 @@ print(json.dumps(result))`;
 # Connect to Excel
 app = xw.apps.active if xw.apps else None
 if not app:
-    raise Exception("No active Excel application found. Please open Excel first.")
+    result = {
+        "success": False,
+        "operation": "generic_operation",
+        "error_type": "no_excel_application",
+        "error_message": "No active Excel application found. Please open Excel first.",
+        "context": {
+            "required": "active_excel_application"
+        },
+        "suggested_actions": [
+            "Open Excel application first",
+            "Ensure Excel is running and accessible",
+            "Try opening any workbook in Excel to activate the application",
+            "Restart Excel if it's not responding"
+        ]
+    }
+    print(json.dumps(result))
+    exit()
 
 wb = get_workbook("${params.workbook || ''}")
 if not wb:
@@ -6242,7 +8222,23 @@ except Exception as e:
 # Connect to Excel
 app = xw.apps.active if xw.apps else None
 if not app:
-    raise Exception("No active Excel application found. Please open Excel first.")
+    result = {
+        "success": False,
+        "operation": "generic_operation",
+        "error_type": "no_excel_application",
+        "error_message": "No active Excel application found. Please open Excel first.",
+        "context": {
+            "required": "active_excel_application"
+        },
+        "suggested_actions": [
+            "Open Excel application first",
+            "Ensure Excel is running and accessible",
+            "Try opening any workbook in Excel to activate the application",
+            "Restart Excel if it's not responding"
+        ]
+    }
+    print(json.dumps(result))
+    exit()
 
 wb = get_workbook("${params.workbook || ''}")
 if not wb:
@@ -6286,7 +8282,23 @@ except Exception as e:
 # Connect to Excel
 app = xw.apps.active if xw.apps else None
 if not app:
-    raise Exception("No active Excel application found. Please open Excel first.")
+    result = {
+        "success": False,
+        "operation": "generic_operation",
+        "error_type": "no_excel_application",
+        "error_message": "No active Excel application found. Please open Excel first.",
+        "context": {
+            "required": "active_excel_application"
+        },
+        "suggested_actions": [
+            "Open Excel application first",
+            "Ensure Excel is running and accessible",
+            "Try opening any workbook in Excel to activate the application",
+            "Restart Excel if it's not responding"
+        ]
+    }
+    print(json.dumps(result))
+    exit()
 
 wb = get_workbook("${params.workbook || ''}")
 if not wb:
@@ -6300,7 +8312,24 @@ try:
     try:
         vba_module = vba_project.VBComponents("${moduleName}")
     except:
-        raise Exception(f"VBA module '${moduleName}' not found")
+        result = {
+            "success": False,
+            "operation": "vba_operation",
+            "error_type": "vba_module_not_found",
+            "error_message": f"VBA module '${moduleName}' not found",
+            "context": {
+                "module_name": "${moduleName}",
+                "workbook": wb.name if wb else "${params.workbook || ''}"
+            },
+            "suggested_actions": [
+                "Check the VBA module name spelling",
+                "Ensure the VBA module exists in the workbook",
+                "Use list_vba_modules() to see available modules",
+                "Verify that macros are enabled in the workbook"
+            ]
+        }
+        print(json.dumps(result))
+        exit()
     
     # Clear existing code
     vba_module.CodeModule.DeleteLines(1, vba_module.CodeModule.CountOfLines)
@@ -6336,7 +8365,23 @@ except Exception as e:
 # Connect to Excel
 app = xw.apps.active if xw.apps else None
 if not app:
-    raise Exception("No active Excel application found. Please open Excel first.")
+    result = {
+        "success": False,
+        "operation": "generic_operation",
+        "error_type": "no_excel_application",
+        "error_message": "No active Excel application found. Please open Excel first.",
+        "context": {
+            "required": "active_excel_application"
+        },
+        "suggested_actions": [
+            "Open Excel application first",
+            "Ensure Excel is running and accessible",
+            "Try opening any workbook in Excel to activate the application",
+            "Restart Excel if it's not responding"
+        ]
+    }
+    print(json.dumps(result))
+    exit()
 
 wb = get_workbook("${params.workbook || ''}")
 if not wb:
@@ -6384,7 +8429,23 @@ except Exception as e:
 # Connect to Excel
 app = xw.apps.active if xw.apps else None
 if not app:
-    raise Exception("No active Excel application found. Please open Excel first.")
+    result = {
+        "success": False,
+        "operation": "generic_operation",
+        "error_type": "no_excel_application",
+        "error_message": "No active Excel application found. Please open Excel first.",
+        "context": {
+            "required": "active_excel_application"
+        },
+        "suggested_actions": [
+            "Open Excel application first",
+            "Ensure Excel is running and accessible",
+            "Try opening any workbook in Excel to activate the application",
+            "Restart Excel if it's not responding"
+        ]
+    }
+    print(json.dumps(result))
+    exit()
 
 wb = get_workbook("${params.workbook || ''}")
 if not wb:
@@ -6411,7 +8472,24 @@ try:
         }
         print(json.dumps(result))
     except:
-        raise Exception(f"VBA module '${moduleName}' not found")
+        result = {
+            "success": False,
+            "operation": "vba_operation",
+            "error_type": "vba_module_not_found",
+            "error_message": f"VBA module '${moduleName}' not found",
+            "context": {
+                "module_name": "${moduleName}",
+                "workbook": wb.name if wb else "${params.workbook || ''}"
+            },
+            "suggested_actions": [
+                "Check the VBA module name spelling",
+                "Ensure the VBA module exists in the workbook",
+                "Use list_vba_modules() to see available modules",
+                "Verify that macros are enabled in the workbook"
+            ]
+        }
+        print(json.dumps(result))
+        exit()
     
 except Exception as e:
     if "Programmatic access to Visual Basic Project is not trusted" in str(e):
@@ -6438,7 +8516,23 @@ except Exception as e:
 # Connect to Excel
 app = xw.apps.active if xw.apps else None
 if not app:
-    raise Exception("No active Excel application found. Please open Excel first.")
+    result = {
+        "success": False,
+        "operation": "generic_operation",
+        "error_type": "no_excel_application",
+        "error_message": "No active Excel application found. Please open Excel first.",
+        "context": {
+            "required": "active_excel_application"
+        },
+        "suggested_actions": [
+            "Open Excel application first",
+            "Ensure Excel is running and accessible",
+            "Try opening any workbook in Excel to activate the application",
+            "Restart Excel if it's not responding"
+        ]
+    }
+    print(json.dumps(result))
+    exit()
 
 wb = get_workbook("${params.workbook || ''}")
 if not wb:
@@ -6457,7 +8551,25 @@ try:
             break
     
     if not chart:
-        raise Exception(f"Chart '${chartName}' not found")
+        result = {
+            "success": False,
+            "operation": "chart_operation",
+            "error_type": "chart_not_found",
+            "error_message": f"Chart '${chartName}' not found",
+            "context": {
+                "chart_name": "${chartName}",
+                "worksheet": ws.name if ws else "${params.worksheet || ''}",
+                "workbook": wb.name if wb else "${params.workbook || ''}"
+            },
+            "suggested_actions": [
+                "Check the chart name spelling",
+                "Ensure the chart exists in the specified worksheet",
+                "Use list_charts() to see available charts",
+                "Verify the chart is not hidden or deleted"
+            ]
+        }
+        print(json.dumps(result))
+        exit()
     
     # Update chart properties
     updated_properties = []
@@ -6545,7 +8657,23 @@ except Exception as e:
 # Connect to Excel
 app = xw.apps.active if xw.apps else None
 if not app:
-    raise Exception("No active Excel application found. Please open Excel first.")
+    result = {
+        "success": False,
+        "operation": "generic_operation",
+        "error_type": "no_excel_application",
+        "error_message": "No active Excel application found. Please open Excel first.",
+        "context": {
+            "required": "active_excel_application"
+        },
+        "suggested_actions": [
+            "Open Excel application first",
+            "Ensure Excel is running and accessible",
+            "Try opening any workbook in Excel to activate the application",
+            "Restart Excel if it's not responding"
+        ]
+    }
+    print(json.dumps(result))
+    exit()
 
 wb = get_workbook("${params.workbook || ''}")
 if not wb:
@@ -6564,7 +8692,25 @@ try:
             break
     
     if not chart:
-        raise Exception(f"Chart '${chartName}' not found")
+        result = {
+            "success": False,
+            "operation": "chart_operation",
+            "error_type": "chart_not_found",
+            "error_message": f"Chart '${chartName}' not found",
+            "context": {
+                "chart_name": "${chartName}",
+                "worksheet": ws.name if ws else "${params.worksheet || ''}",
+                "workbook": wb.name if wb else "${params.workbook || ''}"
+            },
+            "suggested_actions": [
+                "Check the chart name spelling",
+                "Ensure the chart exists in the specified worksheet",
+                "Use list_charts() to see available charts",
+                "Verify the chart is not hidden or deleted"
+            ]
+        }
+        print(json.dumps(result))
+        exit()
     
     # Delete the chart
     chart.delete()
@@ -6593,7 +8739,23 @@ except Exception as e:
 # Connect to Excel
 app = xw.apps.active if xw.apps else None
 if not app:
-    raise Exception("No active Excel application found. Please open Excel first.")
+    result = {
+        "success": False,
+        "operation": "generic_operation",
+        "error_type": "no_excel_application",
+        "error_message": "No active Excel application found. Please open Excel first.",
+        "context": {
+            "required": "active_excel_application"
+        },
+        "suggested_actions": [
+            "Open Excel application first",
+            "Ensure Excel is running and accessible",
+            "Try opening any workbook in Excel to activate the application",
+            "Restart Excel if it's not responding"
+        ]
+    }
+    print(json.dumps(result))
+    exit()
 
 wb = get_workbook("${params.workbook || ''}")
 if not wb:
@@ -6661,7 +8823,23 @@ except Exception as e:
 # Connect to Excel
 app = xw.apps.active if xw.apps else None
 if not app:
-    raise Exception("No active Excel application found. Please open Excel first.")
+    result = {
+        "success": False,
+        "operation": "generic_operation",
+        "error_type": "no_excel_application",
+        "error_message": "No active Excel application found. Please open Excel first.",
+        "context": {
+            "required": "active_excel_application"
+        },
+        "suggested_actions": [
+            "Open Excel application first",
+            "Ensure Excel is running and accessible",
+            "Try opening any workbook in Excel to activate the application",
+            "Restart Excel if it's not responding"
+        ]
+    }
+    print(json.dumps(result))
+    exit()
 
 wb = get_workbook("${params.workbook || ''}")
 if not wb:
@@ -6733,7 +8911,23 @@ except Exception as e:
 # Connect to Excel
 app = xw.apps.active if xw.apps else None
 if not app:
-    raise Exception("No active Excel application found. Please open Excel first.")
+    result = {
+        "success": False,
+        "operation": "generic_operation",
+        "error_type": "no_excel_application",
+        "error_message": "No active Excel application found. Please open Excel first.",
+        "context": {
+            "required": "active_excel_application"
+        },
+        "suggested_actions": [
+            "Open Excel application first",
+            "Ensure Excel is running and accessible",
+            "Try opening any workbook in Excel to activate the application",
+            "Restart Excel if it's not responding"
+        ]
+    }
+    print(json.dumps(result))
+    exit()
 
 wb = get_workbook("${params.workbook || ''}")
 if not wb:
@@ -6803,7 +8997,23 @@ except Exception as e:
 # Connect to Excel
 app = xw.apps.active if xw.apps else None
 if not app:
-    raise Exception("No active Excel application found. Please open Excel first.")
+    result = {
+        "success": False,
+        "operation": "generic_operation",
+        "error_type": "no_excel_application",
+        "error_message": "No active Excel application found. Please open Excel first.",
+        "context": {
+            "required": "active_excel_application"
+        },
+        "suggested_actions": [
+            "Open Excel application first",
+            "Ensure Excel is running and accessible",
+            "Try opening any workbook in Excel to activate the application",
+            "Restart Excel if it's not responding"
+        ]
+    }
+    print(json.dumps(result))
+    exit()
 
 wb = get_workbook("${params.workbook || ''}")
 if not wb:
@@ -6822,7 +9032,25 @@ try:
             break
     
     if not picture:
-        raise Exception(f"Image '${imageName}' not found")
+        result = {
+            "success": False,
+            "operation": "image_operation",
+            "error_type": "image_not_found",
+            "error_message": f"Image '${imageName}' not found",
+            "context": {
+                "image_name": "${imageName}",
+                "worksheet": ws.name if ws else "${params.worksheet || ''}",
+                "workbook": wb.name if wb else "${params.workbook || ''}"
+            },
+            "suggested_actions": [
+                "Check the image name spelling",
+                "Ensure the image exists in the specified worksheet",
+                "Use list_images() to see available images",
+                "Verify the image is not hidden or deleted"
+            ]
+        }
+        print(json.dumps(result))
+        exit()
     
     # Delete the picture
     picture.delete()
@@ -6859,7 +9087,23 @@ except Exception as e:
 # Connect to Excel
 app = xw.apps.active if xw.apps else None
 if not app:
-    raise Exception("No active Excel application found. Please open Excel first.")
+    result = {
+        "success": False,
+        "operation": "generic_operation",
+        "error_type": "no_excel_application",
+        "error_message": "No active Excel application found. Please open Excel first.",
+        "context": {
+            "required": "active_excel_application"
+        },
+        "suggested_actions": [
+            "Open Excel application first",
+            "Ensure Excel is running and accessible",
+            "Try opening any workbook in Excel to activate the application",
+            "Restart Excel if it's not responding"
+        ]
+    }
+    print(json.dumps(result))
+    exit()
 
 wb = get_workbook("${params.workbook || ''}")
 if not wb:
@@ -6878,7 +9122,25 @@ try:
             break
     
     if not picture:
-        raise Exception(f"Image '${imageName}' not found")
+        result = {
+            "success": False,
+            "operation": "image_operation",
+            "error_type": "image_not_found",
+            "error_message": f"Image '${imageName}' not found",
+            "context": {
+                "image_name": "${imageName}",
+                "worksheet": ws.name if ws else "${params.worksheet || ''}",
+                "workbook": wb.name if wb else "${params.workbook || ''}"
+            },
+            "suggested_actions": [
+                "Check the image name spelling",
+                "Ensure the image exists in the specified worksheet",
+                "Use list_images() to see available images",
+                "Verify the image is not hidden or deleted"
+            ]
+        }
+        print(json.dumps(result))
+        exit()
     
     # Store original dimensions
     original_width = picture.width
@@ -6926,7 +9188,23 @@ except Exception as e:
 # Connect to Excel
 app = xw.apps.active if xw.apps else None
 if not app:
-    raise Exception("No active Excel application found. Please open Excel first.")
+    result = {
+        "success": False,
+        "operation": "generic_operation",
+        "error_type": "no_excel_application",
+        "error_message": "No active Excel application found. Please open Excel first.",
+        "context": {
+            "required": "active_excel_application"
+        },
+        "suggested_actions": [
+            "Open Excel application first",
+            "Ensure Excel is running and accessible",
+            "Try opening any workbook in Excel to activate the application",
+            "Restart Excel if it's not responding"
+        ]
+    }
+    print(json.dumps(result))
+    exit()
 
 wb = get_workbook("${params.workbook || ''}")
 if not wb:
@@ -6945,7 +9223,25 @@ try:
             break
     
     if not picture:
-        raise Exception(f"Image '${imageName}' not found")
+        result = {
+            "success": False,
+            "operation": "image_operation",
+            "error_type": "image_not_found",
+            "error_message": f"Image '${imageName}' not found",
+            "context": {
+                "image_name": "${imageName}",
+                "worksheet": ws.name if ws else "${params.worksheet || ''}",
+                "workbook": wb.name if wb else "${params.workbook || ''}"
+            },
+            "suggested_actions": [
+                "Check the image name spelling",
+                "Ensure the image exists in the specified worksheet",
+                "Use list_images() to see available images",
+                "Verify the image is not hidden or deleted"
+            ]
+        }
+        print(json.dumps(result))
+        exit()
     
     # Get new position
     target_range = ws.range("${range}")
@@ -6992,7 +9288,23 @@ except Exception as e:
 # Connect to Excel
 app = xw.apps.active if xw.apps else None
 if not app:
-    raise Exception("No active Excel application found. Please open Excel first.")
+    result = {
+        "success": False,
+        "operation": "generic_operation",
+        "error_type": "no_excel_application",
+        "error_message": "No active Excel application found. Please open Excel first.",
+        "context": {
+            "required": "active_excel_application"
+        },
+        "suggested_actions": [
+            "Open Excel application first",
+            "Ensure Excel is running and accessible",
+            "Try opening any workbook in Excel to activate the application",
+            "Restart Excel if it's not responding"
+        ]
+    }
+    print(json.dumps(result))
+    exit()
 
 wb = get_workbook("${params.workbook || ''}")
 if not wb:
@@ -7075,7 +9387,23 @@ except Exception as e:
 # Connect to Excel
 app = xw.apps.active if xw.apps else None
 if not app:
-    raise Exception("No active Excel application found. Please open Excel first.")
+    result = {
+        "success": False,
+        "operation": "generic_operation",
+        "error_type": "no_excel_application",
+        "error_message": "No active Excel application found. Please open Excel first.",
+        "context": {
+            "required": "active_excel_application"
+        },
+        "suggested_actions": [
+            "Open Excel application first",
+            "Ensure Excel is running and accessible",
+            "Try opening any workbook in Excel to activate the application",
+            "Restart Excel if it's not responding"
+        ]
+    }
+    print(json.dumps(result))
+    exit()
 
 wb = get_workbook("${params.workbook || ''}")
 if not wb:
@@ -7102,7 +9430,25 @@ try:
             break
     
     if not chart:
-        raise Exception(f"Chart '${chartName}' not found")
+        result = {
+            "success": False,
+            "operation": "chart_operation",
+            "error_type": "chart_not_found",
+            "error_message": f"Chart '${chartName}' not found",
+            "context": {
+                "chart_name": "${chartName}",
+                "worksheet": ws.name if ws else "${params.worksheet || ''}",
+                "workbook": wb.name if wb else "${params.workbook || ''}"
+            },
+            "suggested_actions": [
+                "Check the chart name spelling",
+                "Ensure the chart exists in the specified worksheet",
+                "Use list_charts() to see available charts",
+                "Verify the chart is not hidden or deleted"
+            ]
+        }
+        print(json.dumps(result))
+        exit()
     
     # Export chart as image
     chart.api.Export(output_path)
@@ -7149,7 +9495,23 @@ except Exception as e:
 # Connect to Excel
 app = xw.apps.active if xw.apps else None
 if not app:
-    raise Exception("No active Excel application found. Please open Excel first.")
+    result = {
+        "success": False,
+        "operation": "generic_operation",
+        "error_type": "no_excel_application",
+        "error_message": "No active Excel application found. Please open Excel first.",
+        "context": {
+            "required": "active_excel_application"
+        },
+        "suggested_actions": [
+            "Open Excel application first",
+            "Ensure Excel is running and accessible",
+            "Try opening any workbook in Excel to activate the application",
+            "Restart Excel if it's not responding"
+        ]
+    }
+    print(json.dumps(result))
+    exit()
 
 wb = get_workbook("${params.workbook || ''}")
 if not wb:
@@ -7172,7 +9534,24 @@ try:
             ws = wb.sheets[target_worksheet]
             worksheets_to_search = [ws]
         except:
-            raise Exception(f"Worksheet '{target_worksheet}' not found")
+            result = {
+                "success": False,
+                "operation": "chart_operation",
+                "error_type": "target_worksheet_not_found",
+                "error_message": f"Worksheet '{target_worksheet}' not found",
+                "context": {
+                    "target_worksheet": target_worksheet,
+                    "workbook": wb.name if wb else "${params.workbook || ''}"
+                },
+                "suggested_actions": [
+                    "Check the target worksheet name spelling",
+                    "Ensure the target worksheet exists in the workbook",
+                    "Use list_sheets() to see available worksheets",
+                    "Create the target worksheet if it doesn't exist"
+                ]
+            }
+            print(json.dumps(result))
+            exit()
     else:
         # Search all worksheets
         worksheets_to_search = wb.sheets
@@ -7696,13 +10075,12 @@ try:
         "shape": {
             "name": shape_obj.Name,
             "type": "${shapeType}",
-            "left": ${left},
-            "top": ${top},
-            "width": ${width},
-            "height": ${height},
-            "text": "${text}"
-        },
-        "shape_created": True
+            "position": {"left": ${left}, "top": ${top}},
+            "size": {"width": ${width}, "height": ${height}},
+            "text": "${text}",
+            "rotation": 0,
+            "visible": True
+        }
     }
     print(json.dumps(result))
     
@@ -7762,10 +10140,15 @@ try:
         "operation": "create_textbox",
         "workbook": wb.name,
         "worksheet": ws.name,
-        "shape_name": textbox.Name,
-        "position": {"left": ${left}, "top": ${top}},
-        "size": {"width": ${width}, "height": ${height}},
-        "text": "${text}"
+        "shape": {
+            "name": textbox.Name,
+            "type": "textbox",
+            "position": {"left": ${left}, "top": ${top}},
+            "size": {"width": ${width}, "height": ${height}},
+            "text": "${text}",
+            "rotation": 0,
+            "visible": True
+        }
     }
     print(json.dumps(result))
     
@@ -8069,11 +10452,11 @@ except Exception as e:
             # Automatically find the shortest path between the connected shapes
             shape_obj.RerouteConnections()
 
-            print(f"Connected {shape_obj.Name} from {start_shape.Name} (site {start_site}) to {end_shape.Name} (site {end_site})")
+            pass
         else:
-            print(f"Warning: Could not find shapes to connect - start: ${connection.start_shape}, end: ${connection.end_shape}")
+            pass
     except Exception as conn_e:
-        print(f"Connection failed: {str(conn_e)}")`;
+        pass`;
   }
 
   private generateShapeStyleCode(shape: { style?: ShapeStyle }): string {
@@ -8083,21 +10466,21 @@ except Exception as e:
     const style = shape.style;
 
     if (style.fill_color) {
-      styleCode += `    # Set fill color\n    shape_obj.Fill.ForeColor.RGB = 0x${style.fill_color.replace('#', '')}\n`;
+      styleCode += `    # Set fill color\n    try:\n        shape_obj.Fill.ForeColor.RGB = 0x${style.fill_color.replace('#', '')}\n    except:\n        pass  # Fill color not supported for this shape type\n`;
     }
 
     if (style.border_color || style.border_width || style.border_style) {
       styleCode += `    # Set border properties\n`;
       if (style.border_color) {
-        styleCode += `    shape_obj.Line.ForeColor.RGB = 0x${style.border_color.replace('#', '')}\n`;
+        styleCode += `    try:\n        shape_obj.Line.ForeColor.RGB = 0x${style.border_color.replace('#', '')}\n    except:\n        pass  # Border color not supported\n`;
       }
       if (style.border_width) {
-        styleCode += `    shape_obj.Line.Weight = ${style.border_width}\n`;
+        styleCode += `    try:\n        shape_obj.Line.Weight = ${style.border_width}\n    except:\n        pass  # Border width not supported\n`;
       }
     }
 
     if (style.transparency) {
-      styleCode += `    # Set transparency\n    shape_obj.Fill.Transparency = ${style.transparency}\n`;
+      styleCode += `    # Set transparency\n    try:\n        shape_obj.Fill.Transparency = ${style.transparency}\n    except:\n        pass  # Transparency not supported\n`;
     }
 
     return styleCode;
@@ -8195,11 +10578,45 @@ wb = get_workbook("${params.workbook || ''}", app)
 if not wb:
     # Get list of available workbooks for debugging
     available_workbooks = [book.name for book in app.books] if app.books else []
-    raise Exception(f"Could not find workbook '${params.workbook || ''}'. Available workbooks: {available_workbooks}")
+    result = {
+        "success": False,
+        "operation": "generic_operation",
+        "error_type": "workbook_not_found",
+        "error_message": f"Could not find workbook '${params.workbook || ''}'",
+        "context": {
+            "workbook": "${params.workbook || ''}",
+            "available_workbooks": available_workbooks
+        },
+        "suggested_actions": [
+            f"Use one of the available workbooks: {', '.join(available_workbooks) if available_workbooks else 'None available'}",
+            "Check the workbook name spelling and ensure it's open in Excel",
+            "Open the workbook in Excel first, then try again",
+            "Use the exact workbook name as it appears in Excel"
+        ]
+    }
+    print(json.dumps(result))
+    exit()
 
 ws = get_worksheet(wb, "${params.worksheet || ''}")
 if not ws:
-    raise Exception("Could not find the specified worksheet")
+    result = {
+        "success": False,
+        "operation": "generic_operation",
+        "error_type": "worksheet_not_found",
+        "error_message": "Could not find the specified worksheet",
+        "context": {
+            "worksheet": "${params.worksheet || ''}",
+            "workbook": wb.name if wb else "${params.workbook || ''}"
+        },
+        "suggested_actions": [
+            "Check the worksheet name spelling and capitalization",
+            "Use list_sheets() to get the exact worksheet names",
+            "Ensure the worksheet exists in the specified workbook",
+            "Example: operation_name(worksheet: 'Sheet1')"
+        ]
+    }
+    print(json.dumps(result))
+    exit()
 
 try:
     # 1. Get used range information (reusing get_used_range logic)
@@ -8486,31 +10903,58 @@ print(json.dumps(result))`;
     const colCount = Math.min(visibleData[0]?.length || 0, maxCols);
     if (colCount === 0) return '';
 
-    let table = '| ';
-    // Headers
-    for (let col = 0; col < colCount; col++) {
-      table += `${String(visibleData[0][col]).replace(/\|/g, '\\|')} | `;
-    }
-    table += '\n| ';
-    
-    // Separator
-    for (let col = 0; col < colCount; col++) {
-      table += '--- | ';
-    }
-    table += '\n';
+    // Determine if we should treat first row as headers
+    const hasHeaders = data.length > 1 && this.detectHeaders(data[0]);
 
-    // Data rows (skip first if it's headers, but always show data if only one row)
-    const startRow = (data.length > 1 && this.detectHeaders(data[0])) ? 1 : 0;
-    for (let row = startRow; row < Math.min(data.length, startRow + 5); row++) {
-      table += '| ';
+    if (hasHeaders) {
+      // Create header row
+      let table = '| ';
       for (let col = 0; col < colCount; col++) {
-        const cellValue = visibleData[row]?.[col] ?? '';
-        table += `${String(cellValue).replace(/\|/g, '\\|')} | `;
+        table += `${String(visibleData[0][col]).replace(/\|/g, '\\|')} | `;
+      }
+      table += '\n| ';
+
+      // Separator
+      for (let col = 0; col < colCount; col++) {
+        table += '--- | ';
       }
       table += '\n';
-    }
 
-    return table;
+      // Data rows (skip header row)
+      for (let row = 1; row < Math.min(data.length, 6); row++) {
+        table += '| ';
+        for (let col = 0; col < colCount; col++) {
+          const cellValue = visibleData[row]?.[col] ?? '';
+          table += `${String(cellValue).replace(/\|/g, '\\|')} | `;
+        }
+        table += '\n';
+      }
+      return table;
+    } else {
+      // No headers - treat all rows as data with generic column headers
+      let table = '| ';
+      for (let col = 0; col < colCount; col++) {
+        table += `Col${col + 1} | `;
+      }
+      table += '\n| ';
+
+      // Separator
+      for (let col = 0; col < colCount; col++) {
+        table += '--- | ';
+      }
+      table += '\n';
+
+      // All rows are data rows
+      for (let row = 0; row < Math.min(data.length, 5); row++) {
+        table += '| ';
+        for (let col = 0; col < colCount; col++) {
+          const cellValue = visibleData[row]?.[col] ?? '';
+          table += `${String(cellValue).replace(/\|/g, '\\|')} | `;
+        }
+        table += '\n';
+      }
+      return table;
+    }
   }
 
   /**
@@ -8637,664 +11081,6 @@ print(json.dumps(result))`;
   }
 
   /**
-   * Generate helpful error response based on helpful_tool_error_response.webp best practices
-   */
-  private generateHelpfulErrorResponse(result: XlwingsResult, params: XlwingsParams): string {
-    const errorMessage = result.xlwings_error || (typeof result.error === 'string' ? result.error : result.error?.message) || 'Unknown error';
-    const errorType = this.identifyErrorType(errorMessage);
-    
-    return this.getErrorTemplate(errorType, {
-      errorMessage,
-      operation: result.operation || params.op,
-      workbook: params.workbook,
-      worksheet: params.worksheet,
-      range: params.range,
-      result,
-      params
-    });
-  }
-
-  /**
-   * Identify error type from error message
-   */
-  private identifyErrorType(errorMessage: string): string {
-    const msg = errorMessage.toLowerCase();
-
-    // Excel COM errors with specific error codes
-    if (msg.includes('-2147352567') || msg.includes('このブックを、ほかの開いているブック') || msg.includes('同じ名前で保存できません')) {
-      return 'duplicate_workbook_name';
-    }
-
-    if (msg.includes('-2147023170') || msg.includes('rpc サーバーを利用できません')) {
-      return 'excel_com_unavailable';
-    }
-
-    // Python/xlwings specific errors
-    if (msg.includes('xlwings library is not installed')) {
-      return 'xlwings_not_installed';
-    }
-
-    if (msg.includes('indentationerror') || msg.includes('expected an indented block')) {
-      return 'python_syntax_error';
-    }
-
-    // VBA access errors
-    if (msg.includes('プログラミングによる visual basic プロジェクトへのアクセスは信頼性に欠けます') ||
-        msg.includes('access to the vba project object model') ||
-        msg.includes('マクロが使用できないか、またはすべてのマクロが無効になっている可能性があります')) {
-      return 'vba_access_denied';
-    }
-
-    // Python attribute/variable errors
-    if (msg.includes('object has no attribute')) {
-      return 'python_attribute_error';
-    }
-
-    if (msg.includes('is not defined') || msg.includes('name \'') && msg.includes('\' is not defined')) {
-      return 'python_variable_error';
-    }
-
-    // Missing parameter errors
-    if (msg.includes('is required for') && msg.includes('operation')) {
-      return 'missing_parameter';
-    }
-
-    if (msg.includes('configuration is required') || msg.includes('parameter is required')) {
-      return 'missing_parameter';
-    }
-
-    // Chart specific errors
-    if (msg.includes('chart') && msg.includes('not found')) {
-      return 'chart_not_found';
-    }
-
-    // Data/range errors
-    if (msg.includes('workbook') && (msg.includes('not found') || msg.includes('could not find'))) {
-      return 'workbook_not_found';
-    }
-
-    if (msg.includes('worksheet') && (msg.includes('not found') || msg.includes('could not find'))) {
-      return 'worksheet_not_found';
-    }
-
-    if (msg.includes('permission') || msg.includes('sharing violation') ||
-        msg.includes('file is already open') || msg.includes('access denied')) {
-      return 'file_permission';
-    }
-
-    if (msg.includes('no active excel') || msg.includes('excel') && msg.includes('not found')) {
-      return 'excel_not_running';
-    }
-
-    if (msg.includes('invalid range') || msg.includes('range') && msg.includes('invalid')) {
-      return 'invalid_range';
-    }
-
-    if (msg.includes('sort column') && msg.includes('outside')) {
-      return 'sort_column_outside_range';
-    }
-
-    // Image specific errors
-    if (msg.includes('image') && msg.includes('not found')) {
-      return 'image_not_found';
-    }
-    if (msg.includes('image.path is required') || (msg.includes('image path') && msg.includes('required'))) {
-      return 'image_path_required';
-    }
-    if (msg.includes('image.name is required') || (msg.includes('image name') && msg.includes('required'))) {
-      return 'image_name_required';
-    }
-    if ((msg.includes('file not found') || (msg.includes('path') && msg.includes('not found'))) &&
-        (msg.includes('.jpg') || msg.includes('.png') || msg.includes('.gif') || msg.includes('.bmp'))) {
-      return 'image_file_not_found';
-    }
-
-    // File specific errors
-    if (msg.includes('file not found') || msg.includes('path') && msg.includes('not found')) {
-      return 'file_not_found';
-    }
-
-    return 'generic_error';
-  }
-
-  /**
-   * Get error template based on error type
-   */
-  private getErrorTemplate(errorType: string, context: ErrorContext): string {
-    switch (errorType) {
-      case 'duplicate_workbook_name':
-        return this.getDuplicateWorkbookNameTemplate(context);
-
-      case 'excel_com_unavailable':
-        return this.getExcelComUnavailableTemplate(context);
-
-      case 'xlwings_not_installed':
-        return this.getXlwingsNotInstalledTemplate(context);
-
-      case 'python_syntax_error':
-        return this.getPythonSyntaxErrorTemplate(context);
-
-      case 'vba_access_denied':
-        return this.getVbaAccessErrorTemplate(context);
-
-      case 'python_attribute_error':
-        return this.getPythonAttributeErrorTemplate(context);
-
-      case 'python_variable_error':
-        return this.getPythonVariableErrorTemplate(context);
-
-      case 'missing_parameter':
-        return this.handleMissingParameterError(context);
-
-      case 'chart_not_found':
-        return this.getChartNotFoundTemplate(context);
-
-      case 'file_not_found':
-        return this.getFileNotFoundTemplate(context);
-
-      case 'workbook_not_found':
-        return this.getWorkbookNotFoundTemplate(context);
-
-      case 'worksheet_not_found':
-        return this.getWorksheetNotFoundTemplate(context);
-
-      case 'file_permission':
-        return this.getFilePermissionTemplate(context);
-
-      case 'excel_not_running':
-        return this.getExcelNotRunningTemplate(context);
-
-      case 'invalid_range':
-        return this.getInvalidRangeTemplate(context);
-
-      case 'sort_column_outside_range':
-        return this.getSortColumnOutsideRangeTemplate(context);
-      case 'image_not_found':
-        return this.getImageNotFoundTemplate(context);
-      case 'image_path_required':
-        return this.getImagePathRequiredTemplate(context);
-      case 'image_name_required':
-        return this.getImageNameRequiredTemplate(context);
-      case 'image_file_not_found':
-        return this.getImageFileNotFoundTemplate(context);
-
-      default:
-        return this.getGenericErrorTemplate(context);
-    }
-  }
-
-  /**
-   * Template for workbook not found errors
-   */
-  private getWorkbookNotFoundTemplate(context: ErrorContext): string {
-    let response = `# Workbook Not Found: Invalid workbook name\n\n`;
-    response += `## Error Summary\n`;
-    response += `Your request to ${context.operation} failed because workbook \`${context.workbook || 'unknown'}\` is not currently open in Excel.\n\n`;
-    
-    // Try to extract available workbooks from error message
-    const availableWorkbooks = this.extractAvailableWorkbooks(context.errorMessage);
-    if (availableWorkbooks.length > 0) {
-      response += `## Available Workbooks\n`;
-      response += `Currently open:\n`;
-      availableWorkbooks.forEach((wb: string, index: number) => {
-        response += `- \`${wb}\`${index === 0 ? ' (active)' : ''}\n`;
-      });
-      response += `\n`;
-    }
-    
-    response += `## Resolving This Issue\n`;
-    response += `- Open the workbook: open_workbook(file_path: "C:\\\\path\\\\to\\\\'${context.workbook || 'YourFile.xlsx'}")\n`;
-    if (availableWorkbooks.length > 0) {
-      response += `- Use existing workbook: ${context.operation}(workbook: "${availableWorkbooks[0]}")\n`;
-    }
-    response += `- List all workbooks: list_workbooks()`;
-    
-    return response;
-  }
-
-  /**
-   * Template for worksheet not found errors  
-   */
-  private getWorksheetNotFoundTemplate(context: ErrorContext): string {
-    let response = `# Worksheet Not Found: Invalid worksheet name\n\n`;
-    response += `## Error Summary\n`;
-    response += `Your request to ${context.operation} failed because worksheet ${context.worksheet || 'unknown'} does not exist in the workbook.\n\n`;
-    
-    response += `## Resolving This Issue\n`;
-    response += `- List available worksheets: list_sheets(workbook: "${context.workbook || ''}")\n`;
-    response += `- Use active worksheet: ${context.operation}() (without worksheet parameter)\n`;
-    response += `- Create the worksheet: add_sheet(sheet_name: "${context.worksheet || 'NewSheet'}")`;
-    
-    return response;
-  }
-
-  /**
-   * Template for file permission/locking errors
-   */
-  private getFilePermissionTemplate(context: ErrorContext): string {
-    let response = `# File Access Denied: Permission or locking issue\n\n`;
-    response += `## Error Summary\n`;
-    response += `Your request to ${context.operation} failed because the file is locked or you don't have permission to access it.\n\n`;
-    
-    response += `## Common Causes\n`;
-    response += `- File is open in another Excel instance\n`;
-    response += `- File is being used by another application\n`;
-    response += `- Insufficient file permissions\n\n`;
-    
-    response += `## Resolving This Issue\n`;
-    response += `- Close other Excel instances: list_apps() then close manually\n`;
-    response += `- Release file locks: close_workbook(workbook: "${context.workbook || 'all'}")\n`;
-    response += `- Run Excel as administrator\n`;
-    response += `- Check file is not read-only`;
-    
-    return response;
-  }
-
-  /**
-   * Template for Excel not running errors
-   */
-  private getExcelNotRunningTemplate(context: ErrorContext): string {
-    let response = `# Excel Not Available: Application not running\n\n`;
-    response += `## Error Summary\n`;
-    response += `Your request to ${context.operation} failed because Microsoft Excel is not currently running or accessible.\n\n`;
-    
-    response += `## Resolving This Issue\n`;
-    response += `- Start Excel manually and open a workbook\n`;
-    response += `- Check running applications: list_apps()\n`;
-    response += `- Create new workbook: create_workbook(file_path: "C:\\\\path\\\\to\\\new.xlsx")\n`;
-    response += `- Open existing workbook: open_workbook(file_path: "C:\\\\path\\\\to\\\\existing.xlsx")`;
-    
-    return response;
-  }
-
-  /**
-   * Template for invalid range errors
-   */
-  private getInvalidRangeTemplate(context: ErrorContext): string {
-    let response = `# Invalid Range: Incorrect range format\n\n`;
-    response += `## Error Summary\n`;
-    response += `Your request to ${context.operation} failed because range ${context.range || 'unknown'} is not in a valid format.\n\n`;
-    
-    response += `## Valid Range Examples\n`;
-    response += `- Single cell: A1\n`;
-    response += `- Cell range: A1:C10\n`;
-    response += `- With sheet: Sheet1!A1:B5\n`;
-    response += `- Named range: DataRange\n\n`;
-    
-    response += `## Resolving This Issue\n`;
-    response += `- Check range format: use correct syntax like A1:C10\n`;
-    response += `- Analyze sheet first: get_sheet_info(worksheet: "${context.worksheet || ''}")\n`;
-    response += `- Use get_used_range: get_used_range() to find valid ranges`;
-    
-    return response;
-  }
-
-  /**
-   * Template for sort column outside range errors
-   */
-  private getSortColumnOutsideRangeTemplate(context: ErrorContext): string {
-    let response = `# Sort Column Invalid: Column outside data range\n\n`;
-    response += `## Error Summary\n`;
-    response += `Your sort request failed because the specified column is outside the data range.\n\n`;
-    
-    response += `## Resolving This Issue\n`;
-    response += `- Check available columns: get_sheet_info(worksheet: "${context.worksheet || ''}")\n`;
-    response += `- Use correct column reference (e.g., "A", "B", "C" for absolute, or 1, 2, 3 for relative)\n`;
-    response += `- Verify data range: get_used_range(worksheet: "${context.worksheet || ''}")`;
-    
-    return response;
-  }
-
-  /**
-   * Template for image not found error
-   */
-  private getImageNotFoundTemplate(context: ErrorContext): string {
-    let response = `# Image Not Found: Image does not exist\n\n`;
-    response += `## Error Summary\n`;
-    response += `The requested image could not be found in the worksheet.\n\n`;
-
-    response += `## Resolving This Issue\n`;
-    response += `- List available images: list_images(worksheet: "${context.worksheet || ''}")\n`;
-    response += `- Check image name spelling and case\n`;
-    response += `- Insert image first: insert_image(image: { path: "path/to/image.jpg", position: "A1" })`;
-
-    return response;
-  }
-  /**
-   * Template for image path required error
-   */
-  private getImagePathRequiredTemplate(_context: ErrorContext): string {
-    let response = `# Missing Parameter: Image path required\n\n`;
-    response += `## Error Summary\n`;
-    response += `The 'image.path' parameter is required for insert_image operation.\n\n`;
-
-    response += `## Resolving This Issue\n`;
-    response += `- Provide image file path: insert_image(image: { path: "C:\\path\\to\\image.jpg", position: "A1" })\n`;
-    response += `- Supported formats: .jpg, .png, .gif, .bmp\n`;
-    response += `- Use absolute path for best results`;
-
-    return response;
-  }
-  /**
-   * Template for image name required error
-   */
-  private getImageNameRequiredTemplate(context: ErrorContext): string {
-    let response = `# Missing Parameter: Image name required\n\n`;
-    response += `## Error Summary\n`;
-    response += `The 'image.name' parameter is required for this image operation.\n\n`;
-
-    response += `## Resolving This Issue\n`;
-    response += `- List available images: list_images(worksheet: "${context.worksheet || ''}")\n`;
-    response += `- Use exact image name from the list\n`;
-    response += `- Example: resize_image(image: { name: "Picture 1", width: 200, height: 150 })`;
-
-    return response;
-  }
-  /**
-   * Template for image file not found error
-   */
-  private getImageFileNotFoundTemplate(context: ErrorContext): string {
-    let response = `# File Not Found: Image file does not exist at ${context.worksheet}\n\n`;
-    response += `## Error Summary\n`;
-    response += `The specified image file could not be found on disk.\n\n`;
-
-    response += `## Resolving This Issue\n`;
-    response += `- Verify file path exists and is accessible\n`;
-    response += `- Check file permissions\n`;
-    response += `- Use absolute path: "C:\\Users\\YourName\\Pictures\\image.jpg"\n`;
-    response += `- Supported formats: .jpg, .png, .gif, .bmp`;
-
-    return response;
-  }
-
-  /**
-   * Template for duplicate workbook name error
-   */
-  private getDuplicateWorkbookNameTemplate(context: ErrorContext): string {
-    let response = `# Workbook Name Conflict: ${context.operation || 'create_workbook'}\n\n`;
-    response += `## Error Summary\n`;
-    response += `Excel cannot save this workbook because another workbook with the same name is already open.\n\n`;
-
-    response += `## Resolving This Issue\n`;
-    response += `- **Choose different name:** create_workbook(file_path: "C:\\\\path\\\\to\\\\unique_name.xlsx")\n`;
-    response += `- **Close conflicting workbook:** close_workbook(workbook: "${context.workbook || 'existing_name'}")\n`;
-    response += `- **List open workbooks:** list_workbooks() to see what's currently open`;
-
-    return response;
-  }
-
-  /**
-   * Template for Excel COM unavailable error
-   */
-  private getExcelComUnavailableTemplate(context: ErrorContext): string {
-    let response = `# Excel COM Server Unavailable: ${context.operation || 'Excel operation'}\n\n`;
-    response += `## Error Summary\n`;
-    response += `Excel's COM interface is not responding. This usually means Excel crashed or is locked up.\n\n`;
-
-    response += `## Resolving This Issue\n`;
-    response += `- **Restart Excel:** Close all Excel windows and reopen Excel\n`;
-    response += `- **Check processes:** Kill Excel.exe processes in Task Manager if needed\n`;
-    response += `- **Verify installation:** Ensure Office/Excel is properly installed\n`;
-    response += `- **Try again:** list_apps() to confirm Excel is running`;
-
-    return response;
-  }
-
-  /**
-   * Template for xlwings not installed error
-   */
-  private getXlwingsNotInstalledTemplate(context: ErrorContext): string {
-    let response = `# xlwings Library Missing: ${context.operation || 'Excel operation'}\n\n`;
-    response += `## Error Summary\n`;
-    response += `The xlwings Python library is not installed or not accessible.\n\n`;
-
-    response += `## Resolving This Issue\n`;
-    response += `- **Install xlwings:** pip install xlwings\n`;
-    response += `- **Check Python environment:** Ensure Python is in PATH\n`;
-    response += `- **Verify installation:** python -c "import xlwings; print('OK')"\n`;
-    response += `- **Alternative:** Use conda install xlwings if using Anaconda`;
-
-    return response;
-  }
-
-  /**
-   * Template for Python syntax errors
-   */
-  private getPythonSyntaxErrorTemplate(context: ErrorContext): string {
-    let response = `# Python Code Error: ${context.operation || 'Excel operation'}\n\n`;
-    response += `## Error Summary\n`;
-    response += `There's a Python syntax error in the generated xlwings code.\n\n`;
-
-    response += `## Resolving This Issue\n`;
-    response += `- **Check parameters:** Ensure all required parameters are provided correctly\n`;
-    response += `- **Avoid special characters:** Some parameter values may contain problematic characters\n`;
-    response += `- **Report issue:** This may be a bug in the tool's code generation\n`;
-    response += `- **Simplify request:** Try breaking down complex operations into smaller steps`;
-
-    return response;
-  }
-
-  /**
-   * Template for chart not found errors
-   */
-  private getChartNotFoundTemplate(context: ErrorContext): string {
-    let response = `# Chart Not Found: ${context.operation || 'chart operation'}\n\n`;
-    response += `## Error Summary\n`;
-    response += `The specified chart doesn't exist in the worksheet.\n\n`;
-
-    response += `## Resolving This Issue\n`;
-    response += `- **List existing charts:** list_charts(worksheet: "${context.worksheet || ''}")\n`;
-    response += `- **Create chart first:** create_chart() before trying to modify it\n`;
-    response += `- **Check chart name:** Ensure the chart name is spelled correctly\n`;
-    response += `- **Verify worksheet:** Make sure you're looking in the right worksheet`;
-
-    return response;
-  }
-
-  /**
-   * Template for missing parameter errors
-   */
-  private getMissingParameterTemplate(context: ErrorContext, paramName: string, operation: string): string {
-    let response = `# Missing Parameter: ${operation}\n\n`;
-    response += `## Error Summary\n`;
-    response += `The '${paramName}' parameter is required for this operation.\n\n`;
-
-    response += `## Resolving This Issue\n`;
-
-    switch (paramName) {
-      case 'worksheet':
-        response += `- **Specify worksheet:** ${operation}(worksheet: "Sheet1")\n`;
-        response += `- **List worksheets:** list_sheets() to see available sheets\n`;
-        response += `- **Use active sheet:** Remove worksheet parameter to use currently selected sheet`;
-        break;
-      case 'chart_config':
-        response += `- **Add chart config:** ${operation}(chart_config: {type: "column", data_range: "A1:B10"})\n`;
-        response += `- **Check data range:** Ensure data exists in the specified range\n`;
-        response += `- **Choose chart type:** Options: column, line, bar, pie, scatter, area`;
-        break;
-      case 'copy_paste':
-        response += `- **Add copy config:** ${operation}(copy_paste: {source_range: "A1:B2", destination_range: "D1:E2"})\n`;
-        response += `- **Specify ranges:** Both source and destination ranges are required\n`;
-        response += `- **Check range validity:** Ensure ranges exist and are properly formatted`;
-        break;
-      case 'find_replace':
-        response += `- **Add find/replace config:** ${operation}(find_replace: {find: "old_text", replace: "new_text"})\n`;
-        response += `- **Specify search terms:** Both find and replace values are required\n`;
-        response += `- **Consider options:** Set match_case or whole_words if needed`;
-        break;
-      case 'search':
-        response += `- **Add search config:** ${operation}(search: {term: "text_to_find", column: "ColumnName"})\n`;
-        response += `- **Search options:** Set formulas: true to search in formulas\n`;
-        response += `- **Auto-select:** Set auto_select: false to disable auto-selection`;
-        break;
-      case 'vba':
-        response += `- **Specify VBA config:** ${operation}(vba: {module_name: "Module1", code: "Sub Test()\\nEnd Sub"})\n`;
-        response += `- **List modules:** list_vba_modules() to see existing modules\n`;
-        response += `- **For macros:** Use vba: {macro_name: "MacroName"} to run existing macros`;
-        break;
-      case 'image':
-        response += `- **Specify image config:** ${operation}(image: {path: "C:\\\\path\\\\to\\\\image.jpg", name: "MyImage"})\n`;
-        response += `- **For positioning:** Add image: {position: "A1"} to specify cell location\n`;
-        response += `- **For sizing:** Add image: {width: 200, height: 150} for custom dimensions`;
-        break;
-      case 'range':
-        response += `- **Add range:** ${operation}(range: "A1:C10")\n`;
-        response += `- **Check format:** Use Excel range format like A1:B2 or A:A\n`;
-        response += `- **Get used range:** get_used_range() to find data boundaries`;
-        break;
-      case 'shape_config':
-        response += `- **Add shape config:** ${operation}(shape_config: {type: "rectangle", left: 100, top: 100, width: 200, height: 100})\n`;
-        response += `- **Choose shape type:** Options: rectangle, oval, line, arrow\n`;
-        response += `- **Set position:** Specify left, top, width, height coordinates`;
-        break;
-      default:
-        response += `- **Add ${paramName}:** ${operation}(${paramName}: "appropriate_value")\n`;
-        response += `- **Check documentation:** Review parameter requirements for ${operation}\n`;
-        response += `- **Verify syntax:** Ensure parameter name and value are correctly formatted`;
-    }
-
-    return response;
-  }
-
-  /**
-   * Template for Python attribute errors
-   */
-  private getPythonAttributeErrorTemplate(context: ErrorContext): string {
-    let response = `# Python Object Error: ${context.operation || 'Excel operation'}\n\n`;
-    response += `## Error Summary\n`;
-    response += `The Excel object doesn't have the expected attribute or method.\n\n`;
-
-    response += `## Resolving This Issue\n`;
-    response += `- **Check Excel version:** Some features require newer Excel versions\n`;
-    response += `- **Verify object type:** The operation may not be supported for this Excel object\n`;
-    response += `- **Try alternative:** Look for similar functionality with different method names\n`;
-    response += `- **Update xlwings:** pip install --upgrade xlwings for latest compatibility`;
-
-    return response;
-  }
-
-  /**
-   * Template for Python variable not defined errors
-   */
-  private getPythonVariableErrorTemplate(context: ErrorContext): string {
-    let response = `# Python Variable Error: ${context.operation || 'Excel operation'}\n\n`;
-    response += `## Error Summary\n`;
-    response += `A variable is referenced before being defined in the Python code.\n\n`;
-
-    response += `## Resolving This Issue\n`;
-    response += `- **Provide all parameters:** Ensure all required parameters are specified\n`;
-    response += `- **Check parameter names:** Variable names must match expected parameter keys\n`;
-    response += `- **Report bug:** This is likely a code generation issue that needs fixing\n`;
-    response += `- **Retry operation:** Try the operation again with complete parameters`;
-
-    return response;
-  }
-
-  /**
-   * Template for VBA access errors
-   */
-  private getVbaAccessErrorTemplate(context: ErrorContext): string {
-    let response = `# VBA Access Denied: ${context.operation || 'VBA operation'}\n\n`;
-    response += `## Error Summary\n`;
-    response += `Excel security settings prevent programmatic access to VBA projects.\n\n`;
-
-    response += `## Resolving This Issue\n`;
-    response += `- **Enable VBA access:** File → Options → Trust Center → Trust Center Settings → Macro Settings → Trust access to VBA project object model\n`;
-    response += `- **Check macro security:** Ensure macros are enabled for this workbook\n`;
-    response += `- **Run as administrator:** Try running Excel with administrator privileges\n`;
-    response += `- **Alternative approach:** Use Excel's built-in macro recording instead`;
-
-    return response;
-  }
-
-  /**
-   * Template for file not found errors
-   */
-  private getFileNotFoundTemplate(context: ErrorContext): string {
-    let response = `# File Not Found: ${context.operation || 'file operation'}\n\n`;
-    response += `## Error Summary\n`;
-    response += `The specified file path does not exist or is not accessible.\n\n`;
-
-    response += `## Resolving This Issue\n`;
-    response += `- **Check file path:** Verify the complete file path is correct\n`;
-    response += `- **Create directory:** Ensure the directory exists before creating the file\n`;
-    response += `- **Check permissions:** Make sure you have read/write access to the location\n`;
-    response += `- **Use absolute path:** Try using full path like C:\\\\path\\\\to\\\\file.xlsx`;
-
-    return response;
-  }
-
-  /**
-   * Handle missing parameter errors with specific guidance
-   */
-  private handleMissingParameterError(context: ErrorContext): string {
-    const errorMsg = context.errorMessage.toLowerCase();
-    const operation = context.operation || 'operation';
-
-    // Extract parameter name from error message
-    let paramName = 'parameter';
-    if (errorMsg.includes('worksheet parameter is required')) {
-      paramName = 'worksheet';
-    } else if (errorMsg.includes('chart configuration is required')) {
-      paramName = 'chart_config';
-    } else if (errorMsg.includes('copy/paste configuration is required')) {
-      paramName = 'copy_paste';
-    } else if (errorMsg.includes('Find and replace configuration is required')) {
-      paramName = 'find_replace';
-    } else if (errorMsg.includes('vba.module_name is required')) {
-      paramName = 'vba';
-    } else if (errorMsg.includes('vba.macro_name is required')) {
-      paramName = 'vba';
-    } else if (errorMsg.includes('image.path is required')) {
-      paramName = 'image';
-    } else if (errorMsg.includes('image.name is required')) {
-      paramName = 'image';
-    } else if (errorMsg.includes('search.term is required')) {
-      paramName = 'search';
-    } else if (errorMsg.includes('range is required')) {
-      paramName = 'range';
-    } else if (errorMsg.includes('shape configuration is required')) {
-      paramName = 'shape_config';
-    }
-
-    return this.getMissingParameterTemplate(context, paramName, operation);
-  }
-
-  /**
-   * Generic error template for unhandled cases
-   */
-  private getGenericErrorTemplate(context: ErrorContext): string {
-    let response = `# Operation Failed: ${context.operation || 'Excel operation'}\n\n`;
-    response += `## Error Summary\n`;
-    response += `${context.errorMessage}\n\n`;
-
-    response += `## Resolving This Issue\n`;
-    response += `- **Check error details:** Review the specific error message above\n`;
-    response += `- **Verify parameters:** Ensure all required parameters are provided correctly\n`;
-    response += `- **Check Excel state:** list_apps() and list_workbooks() to verify Excel is ready\n`;
-    response += `- **Try simpler operation:** Break down complex requests into smaller steps`;
-
-    return response;
-  }
-
-  /**
-   * Extract available workbooks from error message
-   */
-  private extractAvailableWorkbooks(errorMessage: string): string[] {
-    // Try to extract workbook names from error messages like:
-    // "Available workbooks: ['Book1', 'Book2']"
-    const match = errorMessage.match(/available workbooks[:\s]*\[([^\]]+)\]/i);
-    if (match) {
-      return match[1]
-        .split(',')
-        .map((name: string) => name.trim().replace(/['"]/g, ''))
-        .filter((name: string) => name.length > 0);
-    }
-    
-    return [];
-  }
-
-  /**
    * Generate success response for create_shape operation
    */
   private generateCreateShapeSuccessResponse(result: XlwingsResult, params: XlwingsParams): string {
@@ -9303,8 +11089,8 @@ print(json.dumps(result))`;
     response += `**Shape Details:**\n`;
     response += `- **Name:** ${result.shape?.name || 'Unknown'}\n`;
     response += `- **Type:** ${result.shape?.type || params.shape?.type || 'Unknown'}\n`;
-    response += `- **Position:** Left ${result.shape?.left || 'N/A'}, Top ${result.shape?.top || 'N/A'}\n`;
-    response += `- **Size:** ${result.shape?.width || 'N/A'} × ${result.shape?.height || 'N/A'} points\n`;
+    response += `- **Position:** Left ${result.shape?.position?.left || 'N/A'}, Top ${result.shape?.position?.top || 'N/A'}\n`;
+    response += `- **Size:** ${result.shape?.size?.width || 'N/A'} × ${result.shape?.size?.height || 'N/A'} points\n`;
 
     if (result.shape?.text && result.shape.text.trim()) {
       response += `- **Text:** "${result.shape.text}"\n`;
@@ -9332,10 +11118,16 @@ print(json.dumps(result))`;
       response += `- **Circle:** create_shape(shape_type: "oval", size: {width: 80, height: 80})\n`;
       response += `- **Text box:** create_textbox(text: "Your text here")`;
     } else {
-      shapes.forEach((shape: { name: string; type: string; left?: number; top?: number; width?: number; height?: number; text?: string; }, index: number) => {
+      shapes.forEach((shape: {
+        name: string;
+        type: string;
+        position?: { left?: number; top?: number };
+        size?: { width?: number; height?: number };
+        text?: string;
+      }, index: number) => {
         response += `**${index + 1}. ${shape.name || 'Unnamed'}** (${shape.type || 'Unknown type'})\n`;
-        response += `   - Position: ${shape.left || 'N/A'}, ${shape.top || 'N/A'}\n`;
-        response += `   - Size: ${shape.width || 'N/A'} × ${shape.height || 'N/A'}\n`;
+        response += `   - Position: ${shape.position?.left || 'N/A'}, ${shape.position?.top || 'N/A'}\n`;
+        response += `   - Size: ${shape.size?.width || 'N/A'} × ${shape.size?.height || 'N/A'}\n`;
         if (shape.text && shape.text.trim()) {
           response += `   - Text: "${shape.text}"\n`;
         }
@@ -9360,8 +11152,8 @@ print(json.dumps(result))`;
     response += `**Text Box Details:**\n`;
     response += `- **Name:** ${result.shape?.name || 'Unknown'}\n`;
     response += `- **Text:** "${result.shape?.text || params.shape?.text || ''}"\n`;
-    response += `- **Position:** Left ${result.shape?.left || 'N/A'}, Top ${result.shape?.top || 'N/A'}\n`;
-    response += `- **Size:** ${result.shape?.width || 'N/A'} × ${result.shape?.height || 'N/A'} points\n`;
+    response += `- **Position:** Left ${result.shape?.position?.left || 'N/A'}, Top ${result.shape?.position?.top || 'N/A'}\n`;
+    response += `- **Size:** ${result.shape?.size?.width || 'N/A'} × ${result.shape?.size?.height || 'N/A'} points\n`;
 
     response += `\n**Next actions:**\n`;
     response += `- **Edit text:** modify_shape(shape_name: "${result.shape?.name}", text: "New text")\n`;
