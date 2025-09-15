@@ -117,7 +117,7 @@ async function addMcpServer(
   const isExistingServer = !!mcpServers[name];
   if (isExistingServer) {
     console.log(
-      `MCP server "${name}" is already configured within ${settingsScope} settings.`,
+      `MCP server "${name}" is already configured within ${scope} settings.`,
     );
   }
 
