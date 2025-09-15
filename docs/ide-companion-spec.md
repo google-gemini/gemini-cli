@@ -109,6 +109,7 @@ The extension **MUST** register an `openDiff` tool on its MCP server.
     newContent: string;
   }
   ```
+
 - **Response (`CallToolResult`):** The tool **MUST** immediately return a `CallToolResult` to acknowledge the request and report whether the diff view was successfully opened.
   - On Success: If the diff view was opened successfully, the response **MUST** contain empty content (i.e., `content: []`).
   - On Failure: If an error prevented the diff view from opening, the response **MUST** have `isError: true` and include a `TextContent` block in the `content` array describing the error.
@@ -120,7 +121,7 @@ The extension **MUST** register an `openDiff` tool on its MCP server.
 The extension **MUST** register a `closeDiff` tool on its MCP server.
 
 - **Description:** This tool instructs the IDE to close an open diff view for a specific file.
-- **Request (`CloseDiffRequest`):**  The tool is invoked via a `tools/call` request. The `arguments` field within the request's `params` **MUST** be an `CloseDiffRequest` object.
+- **Request (`CloseDiffRequest`):** The tool is invoked via a `tools/call` request. The `arguments` field within the request's `params` **MUST** be an `CloseDiffRequest` object.
 
   ```typescript
   interface CloseDiffRequest {
@@ -128,6 +129,7 @@ The extension **MUST** register a `closeDiff` tool on its MCP server.
     filePath: string;
   }
   ```
+
 - **Response (`CallToolResult`):** The tool **MUST** return a `CallToolResult`.
   - On Success: If the diff view was closed successfully, the response **MUST** include a single **TextContent** block in the content array containing the file's final content before closing.
   - On Failure: If an error prevented the diff view from closing, the response **MUST** have `isError: true` and include a `TextContent` block in the `content` array describing the error.
@@ -140,10 +142,10 @@ When the user accepts the changes in a diff view (e.g., by clicking an "Apply" o
 
   ```typescript
   {
-     // The absolute path to the file that was diffed.
+    // The absolute path to the file that was diffed.
     filePath: string;
     // The full content of the file after acceptance.
-    content: string; 
+    content: string;
   }
   ```
 
