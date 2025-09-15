@@ -630,7 +630,7 @@ const App = ({
     } else if (key.shift && key.rightArrow) {
       const newIndex = Math.min(planHistory.length - 1, currentPlanIndex + 1);
       switchPlan(newIndex);
-      } else if (!key.ctrl && !key.meta && ['1', '2', '3', '4'].includes(input)) {
+    } else if (!key.ctrl && !key.meta && ['1', '2', '3', '4'].includes(input)) {
         const idx = Number(input) - 1;
         switchPlan(idx);
       } else if (
