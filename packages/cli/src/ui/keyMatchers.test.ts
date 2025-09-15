@@ -65,6 +65,8 @@ describe('keyMatchers', () => {
       key.name === 'tab',
     [Command.TOGGLE_SHELL_INPUT_FOCUS]: (key: Key) =>
       key.ctrl && key.name === 'f',
+    [Command.EXPAND_SUGGESTION]: (key: Key) => key.name === 'right',
+    [Command.COLLAPSE_SUGGESTION]: (key: Key) => key.name === 'left',
   };
 
   // Test data for each command with positive and negative test cases
