@@ -101,10 +101,14 @@ describe('Help Component', () => {
       expect(output).toContain('Ctrl+X - Open input in external editor');
     } else if (process.platform === 'darwin') {
       expect(output).toContain('Ctrl+J - New line');
-      expect(output).toContain('Ctrl+X / Meta+Enter - Open input in external editor');
+      expect(output).toContain(
+        'Ctrl+X / Meta+Enter - Open input in external editor',
+      );
     } else {
       // Linux and other platforms
-      expect(output).toContain('Ctrl+J - New line (Alt+Enter works for certain linux distros)');
+      expect(output).toContain(
+        'Ctrl+J - New line (Alt+Enter works for certain linux distros)',
+      );
       expect(output).toContain('Ctrl+X - Open input in external editor');
     }
   });
