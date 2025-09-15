@@ -397,16 +397,9 @@ class GrepToolInvocation extends BaseToolInvocation<
       rgArgs.push('--no-ignore-vcs');
     }
     // When respectGitIgnore is true, ripgrep will automatically respect .gitignore files by default
+    // We don't explicitly pass .gitignore files to let ripgrep handle its sophisticated discovery logic
 
     const ignoreFiles: string[] = [];
-
-    // Add .gitignore if enabled and exists (optional, for explicit control)
-    if (options.respectGitIgnore) {
-      const gitignorePath = path.join(searchPath, '.gitignore');
-      if (fs.existsSync(gitignorePath)) {
-        ignoreFiles.push(gitignorePath);
-      }
-    }
 
     // Add .geminiignore if enabled and exists
     // This is the main reason we need --ignore-file since ripgrep doesn't know about .geminiignore by default
