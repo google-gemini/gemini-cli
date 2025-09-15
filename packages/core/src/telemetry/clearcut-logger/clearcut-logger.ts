@@ -165,6 +165,7 @@ export class ClearcutLogger {
   private pendingFlush: boolean = false;
 
   private constructor(config: Config) {
+    
     this.config = config;
     this.events = new FixedDeque<LogEventEntry[]>(Array, MAX_EVENTS);
     this.promptId = config?.getSessionId() ?? '';
@@ -278,6 +279,29 @@ export class ClearcutLogger {
       },
     ];
 
+    if (this.config?.getDebugMode()) {
+      // Flatten the nested arrays of events into a single list of all event entries
+      const allEventEntries = request.flatMap(req => req.log_event).flat();
+
+      // Check if any event in the list is a 'START_SESSION' event
+      const containsStartSession = allEventEntries.some(eventEntry => {
+        try {
+          const parsedEvent = JSON.parse(eventEntry.source_extension_json);
+          return parsedEvent.event_name === EventNames.START_SESSION;
+        } catch (e) {
+          // A malformed event shouldn't crash the logger, so we'll ignore it.
+          return false;
+        }
+      });
+
+      if (containsStartSession) {
+        console.log(
+          'Clearcut request containing START_SESSION:',
+          safeJsonStringify(request),
+        );
+      }
+    }
+
     let result: LogResponse = {};
 
     try {
@@ -290,7 +314,10 @@ export class ClearcutLogger {
       });
 
       const responseBody = await response.text();
-
+      if (this.config?.getDebugMode()) {
+        console.log(`Clearcut Response Status: ${response.status}`);
+        console.log('Clearcut Response Body:', responseBody);
+      }
       if (response.status >= 200 && response.status < 300) {
         this.lastFlushTime = Date.now();
         const nextRequestWaitMs = Number(JSON.parse(responseBody)[0]);

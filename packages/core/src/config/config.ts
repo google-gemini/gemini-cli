@@ -419,6 +419,42 @@ export class Config {
   }
 
   /**
+   * Determines the initial authentication method based on environment variables
+   * and initializes the content generator. This should be called once during
+   * the main `initialize` process.
+   */
+  private async populateAuthType(): Promise<void> {
+    let initialAuthMethod = undefined;
+
+    // 1. Check for a Gemini API Key first (using bracket notation for type safety)
+    if (process.env['GEMINI_API_KEY']) {
+      initialAuthMethod = AuthType.USE_GEMINI;
+    } 
+    // 2. Else, check for Google Cloud / Vertex AI credentials
+    else if (process.env['GCLOUD_PROJECT']) {
+      initialAuthMethod = AuthType.LOGIN_WITH_GOOGLE;
+    }
+
+    // Reuse the existing pattern from `refreshAuth` to set up the generator
+    const newContentGeneratorConfig = createContentGeneratorConfig(
+      this,
+      initialAuthMethod,
+    );
+
+    this.contentGenerator = await createContentGenerator(
+      newContentGeneratorConfig,
+      this,
+      this.getSessionId(),
+    );
+
+    // Only assign to instance properties after successful initialization
+    this.contentGeneratorConfig = newContentGeneratorConfig;
+
+    // Initialize BaseLlmClient now that the ContentGenerator is available
+    this.baseLlmClient = new BaseLlmClient(this.contentGenerator, this);
+  }
+
+  /**
    * Must only be called once, throws if called again.
    */
   async initialize(): Promise<void> {
@@ -431,6 +467,8 @@ export class Config {
       await (await IdeClient.getInstance()).connect();
       logIdeConnection(this, new IdeConnectionEvent(IdeConnectionType.START));
     }
+    // Determine auth type and initialize the content generator
+    await this.populateAuthType();
 
     // Initialize centralized FileDiscoveryService
     this.getFileService();
