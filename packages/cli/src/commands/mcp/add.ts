@@ -126,7 +126,7 @@ async function addMcpServer(
   settings.setValue(settingsScope, 'mcpServers', mcpServers);
 
   if (isExistingServer) {
-    console.log(`MCP server "${name}" updated in ${settingsScope} settings.`);
+    console.log(`MCP server "${name}" updated in ${scope} settings.`);
   } else {
     console.log(
       `MCP server "${name}" added to ${settingsScope} settings. (${transport})`,
