@@ -4,14 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { CommandContext } from './types.js';
+import type { CommandContext } from '../commands/types.js';
 
 /**
  * Creates a UI context object with no-op functions.
  * Useful for non-interactive environments where UI operations
  * are not applicable.
  */
-export function createNoOpUI(): CommandContext['ui'] {
+export function createNonInteractiveUI(): CommandContext['ui'] {
   return {
     addItem: (_item, _timestamp) => 0,
     clear: () => {},

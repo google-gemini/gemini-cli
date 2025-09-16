@@ -5,19 +5,13 @@
  */
 
 import type { Config, ToolCallRequestInfo } from '@google/gemini-cli-core';
-import { CommandService } from './services/CommandService.js';
-import { FileCommandLoader } from './services/FileCommandLoader.js';
-import { type CommandContext } from './ui/commands/types.js';
 import { isSlashCommand } from './ui/utils/commandUtils.js';
-import type { SessionStatsState } from './ui/contexts/SessionContext.js';
 import type { LoadedSettings } from './config/settings.js';
-import { createNoOpUI } from './ui/commands/noOpUi.js';
 import {
   executeToolCall,
   shutdownTelemetry,
   isTelemetrySdkInitialized,
   GeminiEventType,
-  Logger,
   FatalInputError,
   promptIdContext,
   OutputFormat,
@@ -25,9 +19,9 @@ import {
   uiTelemetryService,
 } from '@google/gemini-cli-core';
 
-import type { Content, Part, PartListUnion } from '@google/genai';
-import { parseSlashCommand } from './utils/commands.js';
+import type { Content, Part } from '@google/genai';
 
+import { handleSlashCommand } from './nonInteractiveCliCommands.js';
 import { ConsolePatcher } from './ui/utils/ConsolePatcher.js';
 import { handleAtCommand } from './ui/hooks/atCommandProcessor.js';
 import {
@@ -36,89 +30,6 @@ import {
   handleCancellationError,
   handleMaxTurnsExceededError,
 } from './utils/errors.js';
-
-/**
- * Processes a slash command in a non-interactive environment.
- *
- * @returns A Promise that resolves to `PartListUnion` if a valid command is
- *   found and results in a prompt, or `undefined` otherwise.
- * @throws {FatalInputError} if the command requires user confirmation, which
- *   is not supported in non-interactive mode.
- */
-const handleSlashCommand = async (
-  rawQuery: string,
-  abortController: AbortController,
-  config: Config,
-  settings: LoadedSettings,
-): Promise<PartListUnion | undefined> => {
-  const trimmed = rawQuery.trim();
-  if (!trimmed.startsWith('/') && !trimmed.startsWith('?')) {
-    return;
-  }
-
-  // Only custom commands are supported for now.
-  const loaders = [new FileCommandLoader(config)];
-  const commandService = await CommandService.create(
-    loaders,
-    abortController.signal,
-  );
-  const commands = commandService.getCommands();
-
-  const { commandToExecute, args } = parseSlashCommand(rawQuery, commands);
-
-  if (commandToExecute) {
-    if (commandToExecute.action) {
-      // Not used by custom commands but may be in the future.
-      const sessionStats: SessionStatsState = {
-        sessionId: config?.getSessionId(),
-        sessionStartTime: new Date(),
-        metrics: uiTelemetryService.getMetrics(),
-        lastPromptTokenCount: 0,
-        promptCount: 1,
-      };
-
-      const logger = new Logger(config?.getSessionId() || '', config?.storage);
-
-      const context: CommandContext = {
-        services: {
-          config,
-          settings,
-          git: undefined,
-          logger,
-        },
-        ui: createNoOpUI(),
-        session: {
-          stats: sessionStats,
-          sessionShellAllowlist: new Set(),
-        },
-        invocation: {
-          raw: trimmed,
-          name: commandToExecute.name,
-          args,
-        },
-      };
-
-      const result = await commandToExecute.action(context, args);
-
-      if (result) {
-        switch (result.type) {
-          case 'submit_prompt':
-            return result.content;
-          case 'confirm_shell_commands':
-            throw new FatalInputError(
-              'Exiting due to a confirmation prompt requested by the command.',
-            );
-          default:
-            throw new FatalInputError(
-              'Exiting due to command result that is not supported in non-interactive mode.',
-            );
-        }
-      }
-    }
-  }
-
-  return;
-};
 
 export async function runNonInteractive(
   config: Config,
