@@ -44,6 +44,7 @@ export class MultiModelSystem {
   private config: Config;
   private initializedProviders: Map<string, BaseModelProvider> = new Map();
   private toolConfirmationHandler?: (details: ToolCallConfirmationDetails) => Promise<ToolConfirmationOutcome>;
+  private activeToolScheduler?: CoreToolScheduler;
   // Static mapping of model names to their tool call formats
   private static readonly MODEL_FORMATS: Record<string, 'openai' | 'harmony' | 'gemini' | 'qwen'> = {
     // Harmony format models (gpt-oss family)
@@ -480,11 +481,13 @@ export class MultiModelSystem {
             // Use CoreToolScheduler with confirmation support if handler is available
             if (this.toolConfirmationHandler) {
               toolResponse = await new Promise<ToolCallResponseInfo>((resolve, reject) => {
-                new CoreToolScheduler({
+                const scheduler = new CoreToolScheduler({
                   config: this.config,
                   getPreferredEditor: () => undefined,
                   onEditorClose: () => {},
                   onAllToolCallsComplete: async (completedToolCalls) => {
+                    // Clear reference when tool calls are complete
+                    this.activeToolScheduler = undefined;
                     resolve(completedToolCalls[0].response);
                   },
                   // Pass the confirmation handler from GUI
@@ -500,8 +503,12 @@ export class MultiModelSystem {
                       }
                     }
                   }
-                })
-                .schedule(requestInfo, signal)
+                });
+
+                // Save reference to active scheduler for approval mode changes
+                this.activeToolScheduler = scheduler;
+
+                scheduler.schedule(requestInfo, signal)
                 .catch(reject);
               });
             } else {
@@ -528,7 +535,8 @@ export class MultiModelSystem {
                 type: 'tool_response',
                 content: errorMessage,
                 toolCallId: requestInfo.callId,
-                toolName: requestInfo.name
+                toolName: requestInfo.name,
+                toolSuccess: false  // Indicate failure
               };
               
               // Continue with other tool calls instead of terminating
@@ -578,7 +586,9 @@ export class MultiModelSystem {
                   type: 'tool_response',
                   content: toolResponseContent,
                   toolCallId: requestInfo.callId,
-                  toolName: requestInfo.name
+                  toolName: requestInfo.name,
+                  toolSuccess: true,  // Indicate success
+                  toolResponseData: toolResponse.structuredData  // Include structured data
                 };
               }
             }
@@ -748,7 +758,18 @@ export class MultiModelSystem {
         approvalModeValue = ApprovalMode.DEFAULT;
         break;
     }
+
+    const previousMode = this.config.getApprovalMode();
     this.config.setApprovalMode(approvalModeValue);
+
+    // If we have an active tool scheduler and approval mode changed to more permissive,
+    // re-evaluate pending tools that might now be auto-approved
+    if (this.activeToolScheduler && approvalModeValue !== previousMode) {
+      const signal = new AbortController().signal;
+      this.activeToolScheduler.reevaluateAllPendingTools(signal).catch((error) => {
+        console.error('Error reevaluating pending tools after approval mode change:', error);
+      });
+    }
   }
 
   private getProviderKey(config: ModelProviderConfig): string {
