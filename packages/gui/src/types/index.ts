@@ -33,6 +33,7 @@ export interface UniversalMessage {
 
 export interface UniversalResponse {
   content: string;
+  llmContent?: string; // Tool response content for LLM display
   toolCalls?: ToolCall[];
   finishReason?: 'stop' | 'length' | 'tool_calls' | 'content_filter';
   usage?: {
@@ -55,11 +56,33 @@ export interface UniversalStreamEvent {
   toolCall?: ToolCall;
   toolCallId?: string;
   toolName?: string;
+  toolSuccess?: boolean;  // Added to indicate tool execution success/failure
+  toolResponseData?: ToolResponseData;  // Structured tool response data
   response?: UniversalResponse;
   compressionInfo?: CompressionInfo;
   error?: Error | string;
   role?: 'assistant' | 'user' | 'system';
   timestamp?: number;
+}
+
+export interface ToolResponseData {
+  operation: string;
+  summary: string;
+  details?: Record<string, unknown>;
+  metrics?: {
+    rowsAffected?: number;
+    columnsAffected?: number;
+    cellsAffected?: number;
+    duration?: number;
+  };
+  files?: {
+    input?: string[];
+    output?: string[];
+    created?: string[];
+    workbook?: string;
+    worksheet?: string;
+  };
+  nextActions?: string[];
 }
 
 export interface RoleDefinition {
@@ -129,6 +152,8 @@ export interface ChatMessage {
   timestamp: Date;
   toolCalls?: ToolCall[];
   error?: string;
+  toolSuccess?: boolean;  // Added to indicate tool execution success/failure
+  toolResponseData?: ToolResponseData;  // Structured tool response data
 }
 
 export interface ToolCall {
