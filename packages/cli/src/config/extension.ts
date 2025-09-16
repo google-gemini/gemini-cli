@@ -673,6 +673,7 @@ export async function updateExtension(
         type: extension.type,
         ref: extension.ref,
       },
+      false,
       cwd,
     );
 

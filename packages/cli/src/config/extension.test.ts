@@ -607,7 +607,7 @@ describe('installExtension', () => {
     mockQuestion.mockImplementation((_query, callback) => callback('y'));
 
     await expect(
-      installExtension({ source: sourceExtDir, type: 'local' }),
+      installExtension({ source: sourceExtDir, type: 'local' }, true),
     ).resolves.toBe('my-local-extension');
 
     expect(consoleInfoSpy).toHaveBeenCalledWith(
@@ -672,6 +672,24 @@ describe('installExtension', () => {
       expect.stringContaining('Do you want to continue? (y/n)'),
       expect.any(Function),
     );
+  });
+
+  it('should ignore consent flow if not required', async () => {
+    const sourceExtDir = createExtension({
+      extensionsDir: tempHomeDir,
+      name: 'my-local-extension',
+      version: '1.0.0',
+      mcpServers: {
+        'test-server': {
+          command: 'node',
+          args: ['server.js'],
+        },
+      },
+    });
+
+    await expect(
+      installExtension({ source: sourceExtDir, type: 'local' }, true),
+    ).resolves.toBe('my-local-extension');
   });
 });
 
