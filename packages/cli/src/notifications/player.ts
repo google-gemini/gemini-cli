@@ -66,7 +66,7 @@ export function playSound(soundPath: string): void {
     const child = spawn(command, args, { detached: true, stdio: 'ignore' });
 
     child.on('error', (err) => {
-      if (os.platform() === 'linux' && (err as any).code === 'ENOENT') {
+      if (os.platform() === 'linux' && (err as NodeJS.ErrnoException).code === 'ENOENT') {
         // Try aplay if paplay is not found
         const fallback = spawn('aplay', args, { detached: true, stdio: 'ignore' });
         fallback.on('error', (fallbackErr) => {
