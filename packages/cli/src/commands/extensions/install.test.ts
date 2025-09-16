@@ -42,7 +42,9 @@ describe('handleInstall', () => {
   beforeEach(() => {
     consoleLogSpy = vi.spyOn(console, 'log');
     consoleErrorSpy = vi.spyOn(console, 'error');
-    processSpy = vi.spyOn(process, 'exit').mockImplementation(() => undefined as never);
+    processSpy = vi
+      .spyOn(process, 'exit')
+      .mockImplementation(() => undefined as never);
   });
 
   afterEach(() => {
