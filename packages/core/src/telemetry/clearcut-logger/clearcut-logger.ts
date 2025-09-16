@@ -26,6 +26,7 @@ import type {
   ContentRetryFailureEvent,
   ExtensionInstallEvent,
   ToolOutputTruncatedEvent,
+  ExtensionUninstallEvent,
 } from '../types.js';
 import { EventMetadataKey } from './event-metadata-key.js';
 import type { Config } from '../../config/config.js';
@@ -48,6 +49,7 @@ export enum EventNames {
   FLASH_FALLBACK = 'flash_fallback',
   RIPGREP_FALLBACK = 'ripgrep_fallback',
   LOOP_DETECTED = 'loop_detected',
+  LOOP_DETECTION_DISABLED = 'loop_detection_disabled',
   NEXT_SPEAKER_CHECK = 'next_speaker_check',
   SLASH_COMMAND = 'slash_command',
   MALFORMED_JSON_RESPONSE = 'malformed_json_response',
@@ -59,6 +61,7 @@ export enum EventNames {
   CONTENT_RETRY = 'content_retry',
   CONTENT_RETRY_FAILURE = 'content_retry_failure',
   EXTENSION_INSTALL = 'extension_install',
+  EXTENSION_UNINSTALL = 'extension_uninstall',
   TOOL_OUTPUT_TRUNCATED = 'tool_output_truncated',
 }
 
@@ -655,6 +658,15 @@ export class ClearcutLogger {
     this.flushIfNeeded();
   }
 
+  logLoopDetectionDisabledEvent(): void {
+    const data: EventValue[] = [];
+
+    this.enqueueLogEvent(
+      this.createLogEvent(EventNames.LOOP_DETECTION_DISABLED, data),
+    );
+    this.flushIfNeeded();
+  }
+
   logNextSpeakerCheck(event: NextSpeakerCheckEvent): void {
     const data: EventValue[] = [
       {
@@ -859,6 +871,24 @@ export class ClearcutLogger {
 
     this.enqueueLogEvent(
       this.createLogEvent(EventNames.EXTENSION_INSTALL, data),
+    );
+    this.flushIfNeeded();
+  }
+
+  logExtensionUninstallEvent(event: ExtensionUninstallEvent): void {
+    const data: EventValue[] = [
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_EXTENSION_NAME,
+        value: event.extension_name,
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_EXTENSION_UNINSTALL_STATUS,
+        value: event.status,
+      },
+    ];
+
+    this.enqueueLogEvent(
+      this.createLogEvent(EventNames.EXTENSION_UNINSTALL, data),
     );
     this.flushIfNeeded();
   }
