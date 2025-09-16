@@ -26,7 +26,24 @@ export function initNotifications(config: Config): void {
     const loadedSettings = loadSettings(config.getProjectRoot());
     const notificationSettings = loadedSettings.merged.notifications;
     if (notificationSettings) {
-      currentSettings = notificationSettings as NotificationSettings;
+      currentSettings = {
+        enabled:
+          notificationSettings.enabled ?? DEFAULT_NOTIFICATION_SETTINGS.enabled,
+        events: {
+          inputRequired: {
+            ...DEFAULT_NOTIFICATION_SETTINGS.events.inputRequired,
+            ...notificationSettings.events?.inputRequired,
+          },
+          taskComplete: {
+            ...DEFAULT_NOTIFICATION_SETTINGS.events.taskComplete,
+            ...notificationSettings.events?.taskComplete,
+          },
+          idleAlert: {
+            ...DEFAULT_NOTIFICATION_SETTINGS.events.idleAlert,
+            ...notificationSettings.events?.idleAlert,
+          },
+        },
+      };
     }
   } catch (error) {
     console.error('Failed to load notification settings:', error);
