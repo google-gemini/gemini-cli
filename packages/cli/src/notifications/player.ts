@@ -6,60 +6,67 @@
 
 import { spawn } from 'child_process';
 import * as os from 'os';
+import * as fs from 'fs';
 
 /**
  * Plays a sound using platform-specific commands.
- * @param soundPath The path to the sound file, or a command string to execute.
- * @param isCommand If true, soundPath is treated as a direct command to execute.
+ * @param soundPath The path to the sound file or a system sound alias.
  */
-export function playSound(soundPath: string, isCommand: boolean = false): void {
+export function playSound(soundPath: string): void {
+  // On Windows, system sounds are identified by aliases, not file paths.
+  if (os.platform() !== 'win32' && !soundPath.startsWith('/') && !fs.existsSync(soundPath)) {
+    console.error(`Sound file not found: ${soundPath}`);
+    return;
+  }
+
   let command: string;
   const args: string[] = [];
 
-  if (isCommand) {
-    // Execute shell commands. WARNING: This can be a security risk if commands are from untrusted sources.
-    if (os.platform() === 'win32') {
+  switch (os.platform()) {
+    case 'darwin': // macOS
+      command = 'afplay';
+      args.push(soundPath);
+      break;
+    case 'linux': // Linux
+      command = 'paplay';
+      args.push(soundPath);
+      break;
+    case 'win32': // Windows
       command = 'powershell.exe';
-      args.push('-c', soundPath);
-    } else {
-      command = '/bin/sh';
-      args.push('-c', soundPath);
-    }
-  } else {
-    switch (os.platform()) {
-      case 'darwin': // macOS
-        command = 'afplay';
-        args.push(soundPath);
-        break;
-      case 'linux': // Linux
-        // Prefer paplay (PulseAudio) if available, otherwise aplay (ALSA)
-        command = 'paplay';
-        args.push(soundPath);
-        // Fallback to aplay if paplay fails or is not found
-        // This would typically be handled by trying paplay first and then aplay if it errors.
-        // For simplicity, we'll just use paplay for now.
-        break;
-      case 'win32': // Windows
-        command = 'powershell.exe';
+      // For system sounds, soundPath is an alias like 'SystemAsterisk'
+      if (soundPath.startsWith('System')) {
+        args.push(
+          '-c',
+          `(New-Object Media.SystemSounds).${soundPath}.Play();`,
+        );
+      } else {
         args.push(
           '-c',
           `(New-Object Media.SoundPlayer '${soundPath}').PlaySync();`,
         );
-        break;
-      default:
-        console.warn(`Audio notifications not supported on ${os.platform()}`);
-        return;
-    }
+      }
+      break;
+    default:
+      console.warn(`Audio notifications not supported on ${os.platform()}`);
+      return;
   }
 
   try {
     const child = spawn(command, args, { detached: true, stdio: 'ignore' });
 
     child.on('error', (err) => {
-      console.error(`Failed to play sound: ${err.message}`);
+      if (os.platform() === 'linux' && (err as any).code === 'ENOENT') {
+        // Try aplay if paplay is not found
+        const fallback = spawn('aplay', args, { detached: true, stdio: 'ignore' });
+        fallback.on('error', (fallbackErr) => {
+          console.error(`Failed to play sound with paplay and aplay: ${fallbackErr.message}`);
+        });
+        fallback.unref();
+      } else {
+        console.error(`Failed to play sound: ${err.message}`);
+      }
     });
-
-    child.unref(); // Allow the parent process to exit independently
+    child.unref();
   } catch (error) {
     if (error instanceof Error) {
       console.error(`Error spawning process: ${error.message}`);

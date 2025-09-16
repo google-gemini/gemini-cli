@@ -9,8 +9,8 @@
  */
 export interface NotificationEventSettings {
   enabled: boolean;
-  command: string; // Command to execute for the notification
-  customPath?: string; // Optional path for custom sound files (if command is a sound player)
+  sound: 'system' | 'custom';
+  customPath?: string; // Path to custom sound file, only if sound is 'custom'
   timeout?: number; // Optional timeout for idle alerts
 }
 
@@ -39,15 +39,15 @@ export const DEFAULT_NOTIFICATION_SETTINGS: NotificationSettings = {
   events: {
     inputRequired: {
       enabled: true,
-      command: 'system', // Placeholder for system default sound/command
+      sound: 'system',
     },
     taskComplete: {
       enabled: false,
-      command: 'system',
+      sound: 'system',
     },
     idleAlert: {
       enabled: true,
-      command: 'system',
+      sound: 'system',
       timeout: 60, // seconds
     },
   },

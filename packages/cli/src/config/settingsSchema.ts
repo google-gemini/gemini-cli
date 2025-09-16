@@ -13,6 +13,22 @@ import {
 } from '@google/gemini-cli-core';
 import { CustomTheme } from '../ui/themes/theme.js';
 
+export interface NotificationEventSettings {
+  enabled: boolean;
+  sound: 'system' | 'custom';
+  customPath?: string;
+  timeout?: number;
+}
+
+export interface NotificationSettings {
+  enabled: boolean;
+  events: {
+    inputRequired: NotificationEventSettings;
+    taskComplete: NotificationEventSettings;
+    idleAlert: NotificationEventSettings;
+  };
+}
+
 export interface SettingDefinition {
   type: 'boolean' | 'string' | 'number' | 'array' | 'object';
   label: string;
@@ -573,6 +589,15 @@ export const SETTINGS_SCHEMA = {
     description: 'Enable debug logging of keystrokes to the console.',
     showInDialog: true,
   },
+  notifications: {
+    type: 'object',
+    label: 'Notifications',
+    category: 'General',
+    requiresRestart: false,
+    default: undefined as NotificationSettings | undefined,
+    description: 'Audio notification settings.',
+    showInDialog: false,
+  },
 } as const;
 
 type InferSettings<T extends SettingsSchema> = {
@@ -580,7 +605,9 @@ type InferSettings<T extends SettingsSchema> = {
     ? InferSettings<T[K]['properties']>
     : T[K]['default'] extends boolean
       ? boolean
-      : T[K]['default'];
+      : T[K]['default'] extends infer U
+        ? U
+        : never;
 };
 
 export type Settings = InferSettings<typeof SETTINGS_SCHEMA>;

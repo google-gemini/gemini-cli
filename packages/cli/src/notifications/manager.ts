@@ -11,7 +11,7 @@ import {
   DEFAULT_NOTIFICATION_SETTINGS,
   NotificationEventSettings,
 } from './types.js';
-import { loadSettings, SettingScope } from '../../config/settings.js';
+import { loadSettings, SettingScope } from '../config/settings.js';
 import { Config } from '@google/gemini-cli-core';
 import * as os from 'os';
 
@@ -24,9 +24,9 @@ let currentSettings: NotificationSettings = DEFAULT_NOTIFICATION_SETTINGS;
 export function initNotifications(config: Config): void {
   try {
     const loadedSettings = loadSettings(config.getProjectRoot());
-    if (loadedSettings.merged.notifications) {
-      currentSettings = loadedSettings.merged
-        .notifications as NotificationSettings;
+    const notificationSettings = loadedSettings.merged.notifications;
+    if (notificationSettings) {
+      currentSettings = notificationSettings as NotificationSettings;
     }
   } catch (error) {
     console.error('Failed to load notification settings:', error);
@@ -42,11 +42,7 @@ export function initNotifications(config: Config): void {
 export function saveNotificationSettings(config: Config): void {
   try {
     const loadedSettings = loadSettings(config.getProjectRoot());
-    loadedSettings.setValue(
-      SettingScope.USER,
-      'notifications',
-      currentSettings,
-    );
+    loadedSettings.setValue(SettingScope.User, 'notifications', currentSettings);
   } catch (error) {
     console.error('Failed to save notification settings:', error);
   }
@@ -66,42 +62,38 @@ export function triggerNotification(eventType: NotificationEventType): void {
     return; // This specific event is disabled
   }
 
-  // Use the command directly if it's not a system sound
-  if (eventSettings.command !== 'system') {
-    playSound(eventSettings.command, true); // Treat as direct command
-  } else {
-    // Handle system sounds (platform-specific defaults)
-    let systemSoundPath: string | undefined;
+  let soundToPlay: string | undefined;
+
+  if (eventSettings.sound === 'custom' && eventSettings.customPath) {
+    soundToPlay = eventSettings.customPath;
+  } else if (eventSettings.sound === 'system') {
     switch (os.platform()) {
       case 'darwin':
-        systemSoundPath =
+        soundToPlay =
           eventType === 'inputRequired'
             ? '/System/Library/Sounds/Glass.aiff'
             : '/System/Library/Sounds/Pop.aiff';
         break;
       case 'linux':
-        systemSoundPath =
+        soundToPlay =
           eventType === 'inputRequired'
-            ? '/usr/share/sounds/freedesktop/stereo/dialog-warning.oga' // A more urgent sound for input required
-            : '/usr/share/sounds/freedesktop/stereo/message.oga'; // A general notification sound
+            ? '/usr/share/sounds/freedesktop/stereo/dialog-warning.oga'
+            : '/usr/share/sounds/freedesktop/stereo/message.oga';
         break;
       case 'win32':
-        systemSoundPath =
+        soundToPlay =
           eventType === 'inputRequired'
             ? 'SystemAsterisk'
             : 'SystemExclamation';
-        playSound(
-          `(New-Object Media.SystemSounds).${systemSoundPath}.Play()`,
-          true,
-        );
-        return;
+        break;
       default:
         console.warn(`Audio notifications not supported on ${os.platform()}`);
         return;
     }
-    if (systemSoundPath) {
-      playSound(systemSoundPath, false);
-    }
+  }
+
+  if (soundToPlay) {
+    playSound(soundToPlay);
   }
 }
 
