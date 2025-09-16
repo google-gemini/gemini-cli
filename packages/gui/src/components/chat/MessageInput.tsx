@@ -19,6 +19,8 @@ interface MessageInputRef {
 export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(({ disabled = false }, ref) => {
   const [message, setMessage] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const streamCleanupRef = useRef<(() => void) | null>(null);
   
   const { activeSessionId, updateSession } = useAppStore();
   const { isStreaming, isThinking, setStreaming, setThinking, setStreamingMessage, setError, setCompressionNotification } = useChatStore();
@@ -78,6 +80,9 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(({ di
       textareaRef.current.style.height = 'auto';
     }
 
+    // Create abort controller for this request
+    abortControllerRef.current = new AbortController();
+
     // Start thinking state first
     // console.log('[MessageInput] Setting thinking to true, current state:', { isThinking, isStreaming });
     setThinking(true);
@@ -101,13 +106,22 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(({ di
         content: userMessage.content,
         timestamp: userMessage.timestamp
       };
-      const stream = await multiModelService.sendMessage([newUserMessage]);
+      const { stream, cancel } = await multiModelService.sendMessage([newUserMessage]);
+
+      // Save the cancel function for stop button
+      streamCleanupRef.current = cancel;
 
       let assistantContent = '';
       let currentAssistantMessageId: string | null = null;
       let hasCreatedInitialMessage = false;
 
       for await (const event of stream) {
+        // Check if request was aborted
+        if (abortControllerRef.current?.signal.aborted) {
+          console.log('Stream processing aborted by user');
+          break;
+        }
+
         setThinking(false);
         
         if (event.type === 'content' || event.type === 'content_delta') {
@@ -208,8 +222,10 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(({ di
             const toolResponseMessage: ChatMessage = {
               id: `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}-tool-response`,
               role: 'tool',
-              content: event.response?.content || event.response?.llmContent || (event.response ? JSON.stringify(event.response, null, 2) : `Tool ${event.toolName} completed`),
-              timestamp: new Date()
+              content: event.content || `Tool ${event.toolName} completed`,
+              timestamp: new Date(),
+              toolSuccess: event.toolSuccess,  // Save success/failure status
+              toolResponseData: event.toolResponseData  // Save structured data
             };
             
             // Add tool response message immediately
@@ -330,10 +346,30 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(({ di
       setThinking(false);
       setStreaming(false);
       setStreamingMessage('');
+      // Clear abort controller and stream cleanup
+      abortControllerRef.current = null;
+      streamCleanupRef.current = null;
     }
   };
 
   const handleStopGeneration = () => {
+    console.log('User requested to stop generation');
+
+    // Cancel the current stream if active
+    if (streamCleanupRef.current) {
+      streamCleanupRef.current();
+      console.log('Cancelled current stream');
+      streamCleanupRef.current = null;
+    }
+
+    // Abort the current request if active (fallback)
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort('User cancelled request');
+      console.log('Aborted current stream request');
+      abortControllerRef.current = null;
+    }
+
+    // Reset UI states immediately
     setThinking(false);
     setStreaming(false);
     setStreamingMessage('');
@@ -382,6 +418,7 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(({ di
               variant="destructive"
               size="icon"
               onClick={handleStopGeneration}
+              disabled={false}
               className="h-10 w-10"
             >
               <StopCircle size={16} />
