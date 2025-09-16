@@ -45,7 +45,7 @@ vi.mock('./config/config.js', () => ({
     getSandbox: vi.fn(() => false),
     getQuestion: vi.fn(() => ''),
   } as unknown as Config),
-  parseArguments: vi.fn().mockResolvedValue({ sessionSummary: null }),
+  parseArguments: vi.fn().mockResolvedValue({}),
 }));
 
 vi.mock('read-package-up', () => ({
@@ -242,7 +242,6 @@ describe('gemini.tsx main function kitty protocol', () => {
       includeDirectories: undefined,
       screenReader: undefined,
       useSmartEdit: undefined,
-      sessionSummary: undefined,
       promptWords: undefined,
       outputFormat: undefined,
     });
