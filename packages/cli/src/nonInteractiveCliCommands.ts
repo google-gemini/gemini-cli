@@ -87,6 +87,12 @@ export const handleSlashCommand = async (
           case 'submit_prompt':
             return result.content;
           case 'confirm_shell_commands':
+            // This result indicates a command attempted to confirm shell commands.
+            // However note that currently, ShellTool is excluded in non-interactive
+            // mode unless 'YOLO mode' is active, so confirmation actually won't
+            // occur because of YOLO mode.
+            // This ensures that if a command *does* request confirmation (e.g.
+            // in the future with more granular permissions), it's handled appropriately.
             throw new FatalInputError(
               'Exiting due to a confirmation prompt requested by the command.',
             );
