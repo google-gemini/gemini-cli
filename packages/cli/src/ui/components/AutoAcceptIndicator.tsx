@@ -22,7 +22,7 @@ export const AutoAcceptIndicator: React.FC<AutoAcceptIndicatorProps> = ({
 
   switch (approvalMode) {
     case ApprovalMode.AUTO_EDIT:
-      textColor = theme.status.success;
+      textColor = theme.status.warning;
       textContent = 'accepting edits';
       subText = ' (shift + tab to toggle)';
       break;

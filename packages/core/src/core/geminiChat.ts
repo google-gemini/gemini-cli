@@ -19,10 +19,12 @@ import { toParts } from '../code_assist/converter.js';
 import { createUserContent } from '@google/genai';
 import { retryWithBackoff } from '../utils/retry.js';
 import type { Config } from '../config/config.js';
-import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
+import {
+  DEFAULT_GEMINI_FLASH_MODEL,
+  getEffectiveModel,
+} from '../config/models.js';
 import { hasCycleInSchema } from '../tools/tools.js';
 import type { StructuredError } from './turn.js';
-import type { CompletedToolCall } from './coreToolScheduler.js';
 import {
   logContentRetry,
   logContentRetryFailure,
@@ -77,6 +79,19 @@ function isValidResponse(response: GenerateContentResponse): boolean {
     return false;
   }
   return isValidContent(content);
+}
+
+export function isValidNonThoughtTextPart(part: Part): boolean {
+  return (
+    typeof part.text === 'string' &&
+    !part.thought &&
+    // Technically, the model should never generate parts that have text and
+    //  any of these but we don't trust them so check anyways.
+    !part.functionCall &&
+    !part.functionResponse &&
+    !part.inlineData &&
+    !part.fileData
+  );
 }
 
 function isValidContent(content: Content): boolean {
@@ -182,138 +197,6 @@ export class GeminiChat {
   setSystemInstruction(sysInstr: string) {
     this.generationConfig.systemInstruction = sysInstr;
   }
-  /**
-   * Sends a message to the model and returns the response.
-   *
-   * @remarks
-   * This method will wait for the previous message to be processed before
-   * sending the next message.
-   *
-   * @see {@link Chat#sendMessageStream} for streaming method.
-   * @param params - parameters for sending messages within a chat session.
-   * @returns The model's response.
-   *
-   * @example
-   * ```ts
-   * const chat = ai.chats.create({model: 'gemini-2.0-flash'});
-   * const response = await chat.sendMessage({
-   * message: 'Why is the sky blue?'
-   * });
-   * console.log(response.text);
-   * ```
-   */
-  async sendMessage(
-    params: SendMessageParameters,
-    prompt_id: string,
-  ): Promise<GenerateContentResponse> {
-    await this.sendPromise;
-    const userContent = createUserContent(params.message);
-
-    // Record user input - capture complete message with all parts (text, files, images, etc.)
-    // but skip recording function responses (tool call results) as they should be stored in tool call records
-    if (!isFunctionResponse(userContent)) {
-      const userMessage = Array.isArray(params.message)
-        ? params.message
-        : [params.message];
-      this.chatRecordingService.recordMessage({
-        type: 'user',
-        content: userMessage,
-      });
-    }
-    const requestContents = this.getHistory(true).concat(userContent);
-
-    let response: GenerateContentResponse;
-
-    try {
-      let currentAttemptModel: string | undefined;
-
-      const apiCall = () => {
-        const modelToUse = this.config.isInFallbackMode()
-          ? DEFAULT_GEMINI_FLASH_MODEL
-          : this.config.getModel();
-        currentAttemptModel = modelToUse;
-
-        // Prevent Flash model calls immediately after quota error
-        if (
-          this.config.getQuotaErrorOccurred() &&
-          modelToUse === DEFAULT_GEMINI_FLASH_MODEL
-        ) {
-          throw new Error(
-            'Please submit a new query to continue with the Flash model.',
-          );
-        }
-
-        return this.config.getContentGenerator().generateContent(
-          {
-            model: modelToUse,
-            contents: requestContents,
-            config: { ...this.generationConfig, ...params.config },
-          },
-          prompt_id,
-        );
-      };
-
-      const onPersistent429Callback = async (
-        authType?: string,
-        error?: unknown,
-      ) => {
-        if (!currentAttemptModel) return null;
-        return await handleFallback(
-          this.config,
-          currentAttemptModel,
-          authType,
-          error,
-        );
-      };
-
-      response = await retryWithBackoff(apiCall, {
-        shouldRetry: (error: unknown) => {
-          // Check for known error messages and codes.
-          if (error instanceof Error && error.message) {
-            if (isSchemaDepthError(error.message)) return false;
-            if (error.message.includes('429')) return true;
-            if (error.message.match(/5\d{2}/)) return true;
-          }
-          return false; // Don't retry other errors by default
-        },
-        onPersistent429: onPersistent429Callback,
-        authType: this.config.getContentGeneratorConfig()?.authType,
-      });
-
-      this.sendPromise = (async () => {
-        const outputContent = response.candidates?.[0]?.content;
-        const modelOutput = outputContent ? [outputContent] : [];
-
-        // Because the AFC input contains the entire curated chat history in
-        // addition to the new user input, we need to truncate the AFC history
-        // to deduplicate the existing chat history.
-        const fullAutomaticFunctionCallingHistory =
-          response.automaticFunctionCallingHistory;
-        const index = this.getHistory(true).length;
-        let automaticFunctionCallingHistory: Content[] = [];
-        if (fullAutomaticFunctionCallingHistory != null) {
-          automaticFunctionCallingHistory =
-            fullAutomaticFunctionCallingHistory.slice(index) ?? [];
-        }
-
-        this.recordHistory(
-          userContent,
-          modelOutput,
-          automaticFunctionCallingHistory,
-        );
-      })();
-      await this.sendPromise.catch((error) => {
-        // Resets sendPromise to avoid subsequent calls failing
-        this.sendPromise = Promise.resolve();
-        // Re-throw the error so the caller knows something went wrong.
-        throw error;
-      });
-      return response;
-    } catch (error) {
-      this.sendPromise = Promise.resolve();
-      throw error;
-    }
-  }
 
   /**
    * Sends a message to the model and returns the response in chunks.
@@ -338,6 +221,7 @@ export class GeminiChat {
    * ```
    */
   async sendMessageStream(
+    model: string,
     params: SendMessageParameters,
     prompt_id: string,
   ): Promise<AsyncGenerator<StreamEvent>> {
@@ -359,6 +243,7 @@ export class GeminiChat {
         : [params.message];
       const userMessageContent = partListUnionToString(toParts(userMessage));
       this.chatRecordingService.recordMessage({
+        model,
         type: 'user',
         content: userMessageContent,
       });
@@ -385,10 +270,10 @@ export class GeminiChat {
             }
 
             const stream = await self.makeApiCallAndProcessStream(
+              model,
               requestContents,
               params,
               prompt_id,
-              userContent,
             );
 
             for await (const chunk of stream) {
@@ -449,18 +334,16 @@ export class GeminiChat {
   }
 
   private async makeApiCallAndProcessStream(
+    model: string,
     requestContents: Content[],
     params: SendMessageParameters,
     prompt_id: string,
-    userContent: Content,
   ): Promise<AsyncGenerator<GenerateContentResponse>> {
-    let currentAttemptModel: string | undefined;
-
     const apiCall = () => {
-      const modelToUse = this.config.isInFallbackMode()
-        ? DEFAULT_GEMINI_FLASH_MODEL
-        : this.config.getModel();
-      currentAttemptModel = modelToUse;
+      const modelToUse = getEffectiveModel(
+        this.config.isInFallbackMode(),
+        model,
+      );
 
       if (
         this.config.getQuotaErrorOccurred() &&
@@ -484,15 +367,7 @@ export class GeminiChat {
     const onPersistent429Callback = async (
       authType?: string,
       error?: unknown,
-    ) => {
-      if (!currentAttemptModel) return null;
-      return await handleFallback(
-        this.config,
-        currentAttemptModel,
-        authType,
-        error,
-      );
-    };
+    ) => await handleFallback(this.config, model, authType, error);
 
     const streamResponse = await retryWithBackoff(apiCall, {
       shouldRetry: (error: unknown) => {
@@ -507,7 +382,7 @@ export class GeminiChat {
       authType: this.config.getContentGeneratorConfig()?.authType,
     });
 
-    return this.processStreamResponse(streamResponse, userContent);
+    return this.processStreamResponse(model, streamResponse);
   }
 
   /**
@@ -610,8 +485,8 @@ export class GeminiChat {
   }
 
   private async *processStreamResponse(
+    model: string,
     streamResponse: AsyncGenerator<GenerateContentResponse>,
-    userInput: Content,
   ): AsyncGenerator<GenerateContentResponse> {
     const modelResponseParts: Part[] = [];
     let hasReceivedAnyChunk = false;
@@ -636,8 +511,10 @@ export class GeminiChat {
           if (content.parts.some((part) => part.functionCall)) {
             hasToolCall = true;
           }
-          // Always add parts - thoughts will be filtered out later in recordHistory
-          modelResponseParts.push(...content.parts);
+
+          modelResponseParts.push(
+            ...content.parts.filter((part) => !part.thought),
+          );
         }
       } else {
         logInvalidChunk(
@@ -682,126 +559,35 @@ export class GeminiChat {
     // Record model response text from the collected parts
     if (modelResponseParts.length > 0) {
       const responseText = modelResponseParts
-        .filter((part) => part.text && !part.thought)
+        .filter((part) => part.text)
         .map((part) => part.text)
         .join('');
 
       if (responseText.trim()) {
         this.chatRecordingService.recordMessage({
+          model,
           type: 'gemini',
           content: responseText,
         });
       }
     }
 
-    // Bundle all streamed parts into a single Content object
-    const modelOutput: Content[] =
-      modelResponseParts.length > 0
-        ? [{ role: 'model', parts: modelResponseParts }]
-        : [];
-
-    // Pass the raw, bundled data to the new, robust recordHistory
-    this.recordHistory(userInput, modelOutput);
-  }
-
-  private recordHistory(
-    userInput: Content,
-    modelOutput: Content[],
-    automaticFunctionCallingHistory?: Content[],
-  ) {
-    // Part 1: Handle the user's turn.
-    if (
-      automaticFunctionCallingHistory &&
-      automaticFunctionCallingHistory.length > 0
-    ) {
-      this.history.push(
-        ...extractCuratedHistory(automaticFunctionCallingHistory),
-      );
-    } else {
+    // String thoughts and consolidate text parts.
+    const consolidatedParts: Part[] = [];
+    for (const part of modelResponseParts) {
+      const lastPart = consolidatedParts[consolidatedParts.length - 1];
       if (
-        this.history.length === 0 ||
-        this.history[this.history.length - 1] !== userInput
+        lastPart?.text &&
+        isValidNonThoughtTextPart(lastPart) &&
+        isValidNonThoughtTextPart(part)
       ) {
-        const lastTurn = this.history[this.history.length - 1];
-        // The only time we don't push is if it's the *exact same* object,
-        // which happens in streaming where we add it preemptively.
-        if (lastTurn !== userInput) {
-          if (lastTurn?.role === 'user') {
-            // This is an invalid sequence.
-            throw new Error('Cannot add a user turn after another user turn.');
-          }
-          this.history.push(userInput);
-        }
-      }
-    }
-
-    // Part 2: Process the model output into a final, consolidated list of turns.
-    const finalModelTurns: Content[] = [];
-    for (const content of modelOutput) {
-      // A. Preserve malformed content that has no 'parts' array.
-      if (!content.parts) {
-        finalModelTurns.push(content);
-        continue;
-      }
-
-      // B. Filter out 'thought' parts.
-      const visibleParts = content.parts.filter((part) => !part.thought);
-
-      const newTurn = { ...content, parts: visibleParts };
-      const lastTurnInFinal = finalModelTurns[finalModelTurns.length - 1];
-
-      // Consolidate this new turn with the PREVIOUS turn if they are adjacent model turns.
-      if (
-        lastTurnInFinal &&
-        lastTurnInFinal.role === 'model' &&
-        newTurn.role === 'model' &&
-        lastTurnInFinal.parts && // SAFETY CHECK: Ensure the destination has a parts array.
-        newTurn.parts
-      ) {
-        lastTurnInFinal.parts.push(...newTurn.parts);
+        lastPart.text += part.text;
       } else {
-        finalModelTurns.push(newTurn);
+        consolidatedParts.push(part);
       }
     }
 
-    // Part 3: Add the processed model turns to the history, with one final consolidation pass.
-    if (finalModelTurns.length > 0) {
-      // Re-consolidate parts within any turns that were merged in the previous step.
-      for (const turn of finalModelTurns) {
-        if (turn.parts && turn.parts.length > 1) {
-          const consolidatedParts: Part[] = [];
-          for (const part of turn.parts) {
-            const lastPart = consolidatedParts[consolidatedParts.length - 1];
-            if (
-              lastPart &&
-              // Ensure lastPart is a pure text part
-              typeof lastPart.text === 'string' &&
-              !lastPart.functionCall &&
-              !lastPart.functionResponse &&
-              !lastPart.inlineData &&
-              !lastPart.fileData &&
-              !lastPart.thought &&
-              // Ensure current part is a pure text part
-              typeof part.text === 'string' &&
-              !part.functionCall &&
-              !part.functionResponse &&
-              !part.inlineData &&
-              !part.fileData &&
-              !part.thought
-            ) {
-              lastPart.text += part.text;
-            } else {
-              consolidatedParts.push({ ...part });
-            }
-          }
-          turn.parts = consolidatedParts;
-        }
-      }
-      this.history.push(...finalModelTurns);
-    } else {
-      // If, after all processing, there's NO model output, add the placeholder.
-      this.history.push({ role: 'model', parts: [] });
-    }
+    this.history.push({ role: 'model', parts: consolidatedParts });
   }
 
   /**
@@ -809,30 +595,6 @@ export class GeminiChat {
    */
   getChatRecordingService(): ChatRecordingService {
     return this.chatRecordingService;
-  }
-
-  /**
-   * Records completed tool calls with full metadata.
-   * This is called by external components when tool calls complete, before sending responses to Gemini.
-   */
-  recordCompletedToolCalls(toolCalls: CompletedToolCall[]): void {
-    const toolCallRecords = toolCalls.map((call) => {
-      const resultDisplayRaw = call.response?.resultDisplay;
-      const resultDisplay =
-        typeof resultDisplayRaw === 'string' ? resultDisplayRaw : undefined;
-
-      return {
-        id: call.request.callId,
-        name: call.request.name,
-        args: call.request.args,
-        result: call.response?.responseParts || null,
-        status: call.status as 'error' | 'success' | 'cancelled',
-        timestamp: new Date().toISOString(),
-        resultDisplay,
-      };
-    });
-
-    this.chatRecordingService.recordToolCalls(toolCallRecords);
   }
 
   /**
