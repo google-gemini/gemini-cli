@@ -15,7 +15,11 @@ import dns from 'node:dns';
 import { spawn } from 'node:child_process';
 import { start_sandbox } from './utils/sandbox.js';
 import type { DnsResolutionOrder, LoadedSettings } from './config/settings.js';
-import { loadSettings, SettingScope } from './config/settings.js';
+import {
+  loadSettings,
+  migrateDeprecatedSettings,
+  SettingScope,
+} from './config/settings.js';
 import { themeManager } from './ui/themes/theme-manager.js';
 import { getStartupWarnings } from './utils/startupWarnings.js';
 import { getUserStartupWarnings } from './utils/userStartupWarnings.js';
@@ -34,7 +38,6 @@ import {
   logUserPrompt,
   AuthType,
   getOauthClient,
-  uiTelemetryService,
 } from '@google/gemini-cli-core';
 import {
   initializeApp,
@@ -48,7 +51,7 @@ import { checkForUpdates } from './ui/utils/updateCheck.js';
 import { handleAutoUpdate } from './utils/handleAutoUpdate.js';
 import { appEvents, AppEvent } from './utils/events.js';
 import { SettingsContext } from './ui/contexts/SettingsContext.js';
-import { writeFileSync } from 'node:fs';
+
 import { SessionStatsProvider } from './ui/contexts/SessionContext.js';
 import { VimModeProvider } from './ui/contexts/VimModeContext.js';
 import { KeypressProvider } from './ui/contexts/KeypressContext.js';
@@ -197,7 +200,7 @@ export async function startInteractiveUI(
 export async function main() {
   setupUnhandledRejectionHandler();
   const settings = loadSettings();
-
+  migrateDeprecatedSettings(settings);
   await cleanupCheckpoints();
 
   const argv = await parseArguments(settings.merged);
@@ -234,15 +237,6 @@ export async function main() {
 
     // Detect and enable Kitty keyboard protocol once at startup.
     kittyProtocolDetectionComplete = detectAndEnableKittyProtocol();
-  }
-  if (argv.sessionSummary) {
-    registerCleanup(() => {
-      const metrics = uiTelemetryService.getMetrics();
-      writeFileSync(
-        argv.sessionSummary!,
-        JSON.stringify({ sessionMetrics: metrics }, null, 2),
-      );
-    });
   }
 
   const consolePatcher = new ConsolePatcher({
