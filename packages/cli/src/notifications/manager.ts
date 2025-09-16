@@ -29,20 +29,20 @@ export function initNotifications(config: Config): void {
       currentSettings = {
         enabled:
           notificationSettings.enabled ?? DEFAULT_NOTIFICATION_SETTINGS.enabled,
-        events: {
-          inputRequired: {
-            ...DEFAULT_NOTIFICATION_SETTINGS.events.inputRequired,
-            ...notificationSettings.events?.inputRequired,
+        events: (
+          Object.keys(
+            DEFAULT_NOTIFICATION_SETTINGS.events,
+          ) as NotificationEventType[]
+        ).reduce(
+          (acc, key) => {
+            acc[key] = {
+              ...DEFAULT_NOTIFICATION_SETTINGS.events[key],
+              ...notificationSettings.events?.[key],
+            };
+            return acc;
           },
-          taskComplete: {
-            ...DEFAULT_NOTIFICATION_SETTINGS.events.taskComplete,
-            ...notificationSettings.events?.taskComplete,
-          },
-          idleAlert: {
-            ...DEFAULT_NOTIFICATION_SETTINGS.events.idleAlert,
-            ...notificationSettings.events?.idleAlert,
-          },
-        },
+          {} as typeof DEFAULT_NOTIFICATION_SETTINGS.events,
+        ),
       };
     }
   } catch (error) {
@@ -59,7 +59,11 @@ export function initNotifications(config: Config): void {
 export function saveNotificationSettings(config: Config): void {
   try {
     const loadedSettings = loadSettings(config.getProjectRoot());
-    loadedSettings.setValue(SettingScope.User, 'notifications', currentSettings);
+    loadedSettings.setValue(
+      SettingScope.User,
+      'notifications',
+      currentSettings,
+    );
   } catch (error) {
     console.error('Failed to save notification settings:', error);
   }
