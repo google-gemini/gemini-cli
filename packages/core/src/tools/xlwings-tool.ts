@@ -7,6 +7,7 @@
 import { BasePythonTool } from './base-python-tool.js';
 import type { ToolResult } from './tools.js';
 import type { Config } from '../config/config.js';
+import type { ToolResponseData } from '../providers/types.js';
 
 /**
  * JSON-serializable value type for Python conversion
@@ -125,7 +126,7 @@ interface XlwingsParams {
   // Sheet operations
   'add_sheet' | 'alter_sheet' | 'delete_sheet' | 'move_sheet' | 'copy_sheet' | 'list_sheets' | 
   // Workbook operations
-  'list_apps' | 
+  'list_apps' | 'show_excel' | 'hide_excel' |
   // Selection operations
   'get_selection' | 'set_selection' | 
   // Workbook operations
@@ -175,7 +176,10 @@ interface XlwingsParams {
     };
     borders?: boolean;
     number_format?: string;
-    alignment?: 'left' | 'center' | 'right';
+    alignment?: 'left' | 'center' | 'right' | {
+      horizontal?: 'left' | 'center' | 'right' | 'justify';
+      vertical?: 'top' | 'center' | 'bottom';
+    };
   };
   
   /** Formula to set (for formula operations) */
@@ -537,6 +541,9 @@ interface XlwingsResult extends ToolResult {
   file_created?: boolean;
   file_opened?: boolean;
   file_saved?: boolean;
+  structuredData?: ToolResponseData;  // Add structured response data
+
+  // Additional fields for operations - deleted_sheet_name, remaining_sheets are defined below
   file_closed?: boolean;
   file_path?: string;
   
@@ -808,7 +815,7 @@ export class XlwingsTool extends BasePythonTool<XlwingsParams, XlwingsResult> {
         properties: {
           op: {
             type: 'string',
-            enum: ['read_range', 'write_range', 'clear_range', 'formula_range', 'format_range', 'get_cell_info', 'insert_range', 'delete_range', 'copy_paste_range', 'replace_range', 'find_range', 'get_used_range', 'sort_range', 'merge_range', 'unmerge_range', 'get_sheet_info', 'set_row_height', 'set_column_width', 'get_row_height', 'get_column_width', 'add_comment', 'edit_comment', 'delete_comment', 'list_comments', 'create_chart', 'update_chart', 'delete_chart', 'list_charts', 'create_shape', 'create_textbox', 'list_shapes', 'modify_shape', 'delete_shape', 'move_shape', 'resize_shape', 'add_sheet', 'alter_sheet', 'delete_sheet', 'move_sheet', 'copy_sheet', 'list_workbooks', 'list_sheets', 'get_selection', 'set_selection', 'create_workbook', 'open_workbook', 'save_workbook', 'close_workbook', 'get_last_row', 'get_last_column', 'convert_data_types', 'add_vba_module', 'run_vba_macro', 'update_vba_code', 'list_vba_modules', 'delete_vba_module', 'insert_image', 'list_images', 'delete_image', 'resize_image', 'move_image', /* 'save_range_as_image', */ 'save_chart_as_image', 'list_apps', 'insert_row', 'insert_column', 'delete_row', 'delete_column'],
+            enum: ['read_range', 'write_range', 'clear_range', 'formula_range', 'format_range', 'get_cell_info', 'insert_range', 'delete_range', 'copy_paste_range', 'replace_range', 'find_range', 'get_used_range', 'sort_range', 'merge_range', 'unmerge_range', 'get_sheet_info', 'set_row_height', 'set_column_width', 'get_row_height', 'get_column_width', 'add_comment', 'edit_comment', 'delete_comment', 'list_comments', 'create_chart', 'update_chart', 'delete_chart', 'list_charts', 'create_shape', 'create_textbox', 'list_shapes', 'modify_shape', 'delete_shape', 'move_shape', 'resize_shape', 'add_sheet', 'alter_sheet', 'delete_sheet', 'move_sheet', 'copy_sheet', 'list_workbooks', 'list_sheets', 'get_selection', 'set_selection', 'create_workbook', 'open_workbook', 'save_workbook', 'close_workbook', 'get_last_row', 'get_last_column', 'convert_data_types', 'add_vba_module', 'run_vba_macro', 'update_vba_code', 'list_vba_modules', 'delete_vba_module', 'insert_image', 'list_images', 'delete_image', 'resize_image', 'move_image', /* 'save_range_as_image', */ 'save_chart_as_image', 'list_apps', 'insert_row', 'insert_column', 'delete_row', 'delete_column', 'show_excel', 'hide_excel'],
             description: 'Operation to perform. Key operations: get_sheet_info (recommended for table analysis), get_used_range (basic range info), get_cell_info (detailed single cell analysis), sort_range (use get_sheet_info first to identify data boundaries)'
           },
           workbook: {
@@ -853,10 +860,30 @@ export class XlwingsTool extends BasePythonTool<XlwingsParams, XlwingsResult> {
               fill: { type: 'object', description: 'Fill color' },
               borders: { type: 'boolean', description: 'Add borders' },
               number_format: { type: 'string', description: 'Number format' },
-              alignment: { 
-                type: 'string', 
-                enum: ['left', 'center', 'right'], 
-                description: 'Text alignment' 
+              alignment: {
+                oneOf: [
+                  {
+                    type: 'string',
+                    enum: ['left', 'center', 'right'],
+                    description: 'Simple horizontal alignment (legacy)'
+                  },
+                  {
+                    type: 'object',
+                    description: 'Detailed alignment settings',
+                    properties: {
+                      horizontal: {
+                        type: 'string',
+                        enum: ['left', 'center', 'right', 'justify'],
+                        description: 'Horizontal alignment'
+                      },
+                      vertical: {
+                        type: 'string',
+                        enum: ['top', 'center', 'bottom'],
+                        description: 'Vertical alignment'
+                      }
+                    }
+                  }
+                ]
               }
             }
           },
@@ -1408,8 +1435,11 @@ export class XlwingsTool extends BasePythonTool<XlwingsParams, XlwingsResult> {
         // Format the result for LLM consumption using helpful response patterns
         let llmContent = '';
         if (result.success) {
+          // Generate structured response data for frontend
+          result.structuredData = this.generateStructuredResponseData(result, params);
+
           // Check if this operation has optimized success response
-          const optimizedOps = ['get_sheet_info', 'sort_range', 'read_range', 'find_range', 'get_cell_info', 'create_shape', 'list_shapes', 'create_textbox'];
+          const optimizedOps = ['get_sheet_info', 'sort_range', 'read_range', 'find_range', 'get_cell_info', 'create_shape', 'list_shapes', 'create_textbox', 'write_range', 'format_range', 'delete_sheet', 'set_column_width', 'set_row_height'];
           if (optimizedOps.includes(result.operation || params.op)) {
             // Use new helpful success response generator
             llmContent = this.generateHelpfulSuccessResponse(result, params);
@@ -2614,6 +2644,10 @@ def get_worksheet(wb, worksheet_name=None):
         return this.generateDeleteCellsLogic(params);
       case 'list_apps':
         return this.generateListAppsLogic(params);
+      case 'show_excel':
+        return this.generateShowExcelLogic(params);
+      case 'hide_excel':
+        return this.generateHideExcelLogic(params);
       case 'insert_row':
         return this.generateInsertRowLogic(params);
       case 'insert_column':
@@ -3191,6 +3225,40 @@ if format_config.get('fill', {}).get('color'):
 
 if format_config.get('number_format'):
     range_obj.number_format = format_config['number_format']
+
+# Apply alignment if requested
+if format_config.get('alignment'):
+    alignment = format_config['alignment']
+    # Handle both string format (legacy) and object format (new)
+    if isinstance(alignment, str):
+        # Legacy string format - apply as horizontal alignment
+        if alignment == 'left':
+            range_obj.api.HorizontalAlignment = -4131  # xlLeft
+        elif alignment == 'center':
+            range_obj.api.HorizontalAlignment = -4108  # xlCenter
+        elif alignment == 'right':
+            range_obj.api.HorizontalAlignment = -4152  # xlRight
+    elif isinstance(alignment, dict):
+        # New object format - apply both horizontal and vertical
+        if alignment.get('horizontal'):
+            h_align = alignment['horizontal']
+            if h_align == 'left':
+                range_obj.api.HorizontalAlignment = -4131  # xlLeft
+            elif h_align == 'center':
+                range_obj.api.HorizontalAlignment = -4108  # xlCenter
+            elif h_align == 'right':
+                range_obj.api.HorizontalAlignment = -4152  # xlRight
+            elif h_align == 'justify':
+                range_obj.api.HorizontalAlignment = -4130  # xlJustify
+
+        if alignment.get('vertical'):
+            v_align = alignment['vertical']
+            if v_align == 'top':
+                range_obj.api.VerticalAlignment = -4160  # xlTop
+            elif v_align == 'center':
+                range_obj.api.VerticalAlignment = -4108  # xlCenter
+            elif v_align == 'bottom':
+                range_obj.api.VerticalAlignment = -4107  # xlBottom
 
 # Apply borders if requested
 if format_config.get('borders'):
@@ -4273,6 +4341,46 @@ print(json.dumps(result))`;
   }
 
   private generateMoveSheetLogic(params: XlwingsParams): string {
+    // Check if user passed top-level parameters incorrectly
+    interface TopLevelMoveParams {
+      target_workbook?: string;
+      new_index?: number;
+      position?: string;
+      reference_sheet?: string;
+    }
+
+    const typedParams = params as XlwingsParams & TopLevelMoveParams;
+    const hasTopLevelParams = typedParams.target_workbook ||
+                             typedParams.new_index !== undefined ||
+                             typedParams.position ||
+                             typedParams.reference_sheet;
+
+    if (hasTopLevelParams && !params.sheet_move) {
+      return `
+result = {
+    "success": False,
+    "operation": "move_sheet",
+    "error_type": "parameter_structure_error",
+    "error_message": "move_sheet operation requires parameters to be nested under 'sheet_move' object",
+    "context": {
+        "current_parameters": ${JSON.stringify(params)},
+        "required_structure": "sheet_move: { target_workbook?, new_index?, position?, reference_sheet? }"
+    },
+    "suggested_fix": {
+        "current_format": "{ workbook: '...', worksheet: '...', new_index: 0 }",
+        "correct_format": "{ workbook: '...', worksheet: '...', sheet_move: { new_index: 0 } }",
+        "examples": [
+            "For same-workbook reordering: { workbook: 'file.xlsx', worksheet: 'Sheet1', sheet_move: { new_index: 0 } }",
+            "For relative positioning: { workbook: 'file.xlsx', worksheet: 'Sheet1', sheet_move: { position: 'before', reference_sheet: 'Sheet2' } }",
+            "For cross-workbook move: { workbook: 'source.xlsx', worksheet: 'Sheet1', sheet_move: { target_workbook: 'target.xlsx', new_index: 0 } }"
+        ]
+    }
+}
+print(json.dumps(result))
+exit()
+`;
+    }
+
     const sheetMove = params.sheet_move;
     const targetWorkbook = sheetMove?.target_workbook || '';
     const newIndex = sheetMove?.new_index ?? -1;
@@ -10611,6 +10719,131 @@ print(json.dumps(result))`;
   }
 
   // =====================================================
+  // STRUCTURED RESPONSE GENERATION METHODS
+  // =====================================================
+  /**
+   * Generate structured response data for frontend display
+   */
+  private generateStructuredResponseData(result: XlwingsResult, params: XlwingsParams): ToolResponseData {
+    const operation = result.operation || params.op;
+
+    // Base structured data
+    const structuredData: ToolResponseData = {
+      operation: operation,
+      summary: this.generateOperationSummary(result, params),
+      details: {},
+      metrics: {},
+      files: {},
+      nextActions: []
+    };
+
+    // Add operation-specific metrics
+    if (result.cells_affected) {
+      structuredData.metrics!.cellsAffected = result.cells_affected;
+    }
+
+    if (result.data && Array.isArray(result.data)) {
+      const is2DArray = Array.isArray(result.data[0]);
+      if (is2DArray) {
+        structuredData.metrics!.rowsAffected = result.data.length;
+        structuredData.metrics!.columnsAffected = result.data[0]?.length || 0;
+      } else {
+        structuredData.metrics!.rowsAffected = 1;
+        structuredData.metrics!.columnsAffected = result.data.length;
+      }
+    }
+
+    // Add operation-specific details
+    if (result.workbook) structuredData.details!['workbook'] = result.workbook;
+    if (result.worksheet) structuredData.details!['worksheet'] = result.worksheet;
+    if (result.range) structuredData.details!['range'] = result.range;
+
+    // Add file information
+    if (result.file_path) {
+      if (result.file_created) {
+        structuredData.files!.created = [result.file_path];
+      } else if (result.file_opened) {
+        structuredData.files!.input = [result.file_path];
+      } else if (result.file_saved) {
+        structuredData.files!.output = [result.file_path];
+      }
+    }
+
+    // Add workbook and worksheet information
+    if (result.workbook) {
+      structuredData.files!.workbook = result.workbook;
+    }
+    if (result.worksheet) {
+      structuredData.files!.worksheet = result.worksheet;
+    }
+
+    // Add operation-specific next actions
+    this.addNextActions(structuredData, result, params);
+
+    return structuredData;
+  }
+
+  /**
+   * Generate concise operation summary
+   */
+  private generateOperationSummary(result: XlwingsResult, params: XlwingsParams): string {
+    const operation = result.operation || params.op;
+
+    switch (operation) {
+      case 'delete_sheet':
+        return `Deleted worksheet "${result.deleted_sheet_name}"`;
+      case 'read_range':
+        {
+          const rows = result.data?.length || 0;
+          const cols = Array.isArray(result.data?.[0]) ? result.data[0].length : (result.data?.length || 0);
+          return `Read ${rows} rows × ${cols} columns from ${result.range}`;
+        }
+      case 'format_range':
+        return `Applied formatting to ${result.cells_affected} cells`;
+      case 'write_range':
+        return `Wrote data to ${result.cells_affected} cells`;
+      case 'sort_range':
+        return `Sorted data in range ${result.range}`;
+      case 'get_sheet_info':
+        return `Analyzed worksheet "${result.worksheet}"`;
+      default:
+        return `${operation.replace(/_/g, ' ')} completed successfully`;
+    }
+  }
+
+  /**
+   * Add suggested next actions based on operation
+   */
+  private addNextActions(structuredData: ToolResponseData, result: XlwingsResult, params: XlwingsParams): void {
+    const operation = result.operation || params.op;
+
+    switch (operation) {
+      case 'read_range':
+        structuredData.nextActions = [
+          `Sort data: sort_range(range: "${result.range}")`,
+          `Analyze structure: get_sheet_info(worksheet: "${result.worksheet}")`
+        ];
+        break;
+      case 'delete_sheet':
+        if (result.remaining_sheets && result.remaining_sheets.length > 0) {
+          structuredData.nextActions = [
+            `Switch to: ${result.remaining_sheets[0]}`,
+            'Verify remaining data integrity'
+          ];
+        }
+        break;
+      case 'format_range':
+        structuredData.nextActions = [
+          'Save workbook to preserve formatting',
+          'Preview formatted output'
+        ];
+        break;
+      default:
+        break;
+    }
+  }
+
+  // =====================================================
   // HELPFUL RESPONSE GENERATION METHODS
   // =====================================================
 
@@ -10635,6 +10868,12 @@ print(json.dumps(result))`;
         return this.generateListShapesSuccessResponse(result, params);
       case 'create_textbox':
         return this.generateCreateTextboxSuccessResponse(result, params);
+      case 'write_range':
+        return this.generateWriteRangeSuccessResponse(result, params);
+      case 'format_range':
+        return this.generateFormatRangeSuccessResponse(result, params);
+      case 'delete_sheet':
+        return this.generateDeleteSheetSuccessResponse(result, params);
       default:
         // Fallback to existing logic for other operations
         return this.generateGenericSuccessResponse(result, params);
@@ -11058,6 +11297,271 @@ print(json.dumps(result))`;
     response += `- **Edit text:** modify_shape(shape_name: "${result.shape?.name}", text: "New text")\n`;
     response += `- **Move textbox:** move_shape(shape_name: "${result.shape?.name}", position: "C4")\n`;
     response += `- **List all shapes:** list_shapes()`;
+
+    return response;
+  }
+
+  private generateShowExcelLogic(params: XlwingsParams): string {
+    return `
+# Show Excel application
+try:
+    target_app = None
+    apps_info = []
+
+    app_id = ${params.app_id || 'None'}
+    workbook_name = "${params.workbook || ''}"
+
+    if app_id is not None:
+        # Try to find specific app by ID/PID
+        for app in xw.apps:
+            if hasattr(app, 'pid') and app.pid == app_id:
+                target_app = app
+                break
+
+        if not target_app:
+            result = {
+                "success": False,
+                "operation": "show_excel",
+                "error_type": "app_not_found",
+                "error_message": f"Excel application with ID {app_id} not found",
+                "context": {
+                    "app_id": app_id,
+                    "available_apps": [{"pid": app.pid, "visible": app.visible} for app in xw.apps]
+                }
+            }
+            print(json.dumps(result))
+            exit()
+    elif workbook_name:
+        # Use get_workbook_smart to find the app with this workbook
+        wb, app, opened_by_us, created_by_us = get_workbook_smart("${this.escapePythonPath(params.workbook || '')}")
+        if wb and app:
+            target_app = app
+        else:
+            result = {
+                "success": False,
+                "operation": "show_excel",
+                "error_type": "workbook_not_found",
+                "error_message": f"Could not find or access workbook '{workbook_name}'",
+                "context": {
+                    "workbook": workbook_name
+                }
+            }
+            print(json.dumps(result))
+            exit()
+    else:
+        # Show all Excel applications
+        if not xw.apps:
+            # No Excel apps running, create a new visible one
+            target_app = xw.App(visible=True)
+            apps_info.append({
+                "pid": target_app.pid,
+                "visible": True,
+                "action": "created_new"
+            })
+        else:
+            # Show all existing apps
+            for app in xw.apps:
+                app.visible = True
+                apps_info.append({
+                    "pid": app.pid,
+                    "visible": True,
+                    "action": "made_visible"
+                })
+
+    if target_app:
+        # Show specific app
+        target_app.visible = True
+        apps_info.append({
+            "pid": target_app.pid,
+            "visible": True,
+            "action": "made_visible"
+        })
+
+    result = {
+        "success": True,
+        "operation": "show_excel",
+        "apps_affected": len(apps_info),
+        "apps_info": apps_info,
+        "message": f"Made {len(apps_info)} Excel application(s) visible"
+    }
+    print(json.dumps(result))
+
+except Exception as e:
+    result = {
+        "success": False,
+        "operation": "show_excel",
+        "error_type": "show_failed",
+        "error_message": str(e)
+    }
+    print(json.dumps(result))`;
+  }
+
+  private generateHideExcelLogic(params: XlwingsParams): string {
+    return `
+# Hide Excel application
+try:
+    target_app = None
+    apps_info = []
+
+    app_id = ${params.app_id || 'None'}
+    workbook_name = "${params.workbook || ''}"
+
+    if app_id is not None:
+        # Try to find specific app by ID/PID
+        for app in xw.apps:
+            if hasattr(app, 'pid') and app.pid == app_id:
+                target_app = app
+                break
+
+        if not target_app:
+            result = {
+                "success": False,
+                "operation": "hide_excel",
+                "error_type": "app_not_found",
+                "error_message": f"Excel application with ID {app_id} not found",
+                "context": {
+                    "app_id": app_id,
+                    "available_apps": [{"pid": app.pid, "visible": app.visible} for app in xw.apps]
+                }
+            }
+            print(json.dumps(result))
+            exit()
+    elif workbook_name:
+        # Use get_workbook_smart to find the app with this workbook
+        wb, app, opened_by_us, created_by_us = get_workbook_smart("${this.escapePythonPath(params.workbook || '')}")
+        if wb and app:
+            target_app = app
+        else:
+            result = {
+                "success": False,
+                "operation": "hide_excel",
+                "error_type": "workbook_not_found",
+                "error_message": f"Could not find or access workbook '{workbook_name}'",
+                "context": {
+                    "workbook": workbook_name
+                }
+            }
+            print(json.dumps(result))
+            exit()
+    else:
+        # Hide all Excel applications
+        if not xw.apps:
+            result = {
+                "success": True,
+                "operation": "hide_excel",
+                "apps_affected": 0,
+                "apps_info": [],
+                "message": "No Excel applications running"
+            }
+            print(json.dumps(result))
+            exit()
+        else:
+            # Hide all existing apps
+            for app in xw.apps:
+                if app.visible:
+                    app.visible = False
+                    apps_info.append({
+                        "pid": app.pid,
+                        "visible": False,
+                        "action": "hidden"
+                    })
+                else:
+                    apps_info.append({
+                        "pid": app.pid,
+                        "visible": False,
+                        "action": "already_hidden"
+                    })
+
+    if target_app:
+        # Hide specific app
+        if target_app.visible:
+            target_app.visible = False
+            apps_info.append({
+                "pid": target_app.pid,
+                "visible": False,
+                "action": "hidden"
+            })
+        else:
+            apps_info.append({
+                "pid": target_app.pid,
+                "visible": False,
+                "action": "already_hidden"
+            })
+
+    result = {
+        "success": True,
+        "operation": "hide_excel",
+        "apps_affected": len([app for app in apps_info if app["action"] == "hidden"]),
+        "apps_info": apps_info,
+        "message": f"Processed {len(apps_info)} Excel application(s)"
+    }
+    print(json.dumps(result))
+
+except Exception as e:
+    result = {
+        "success": False,
+        "operation": "hide_excel",
+        "error_type": "hide_failed",
+        "error_message": str(e)
+    }
+    print(json.dumps(result))`;
+  }
+
+  /**
+   * Generate helpful success response for write_range operation
+   */
+  private generateWriteRangeSuccessResponse(result: XlwingsResult, params: XlwingsParams): string {
+    const rows = result.data?.length || 0;
+    const cols = Array.isArray(result.data?.[0]) ? result.data[0].length : (result.data?.length || 0);
+
+    let response = `✅ **Data written successfully**\n\n`;
+    response += `**Summary:**\n`;
+    response += `- Range: ${result.range}\n`;
+    response += `- Data size: ${rows} rows × ${cols} columns\n`;
+    if (result.cells_affected) {
+      response += `- Cells affected: ${result.cells_affected}\n`;
+    }
+
+    if (result.workbook) {
+      response += `- Workbook: ${result.workbook}\n`;
+    }
+    if (result.worksheet) {
+      response += `- Worksheet: ${result.worksheet}\n`;
+    }
+
+    return response;
+  }
+
+  /**
+   * Generate helpful success response for format_range operation
+   */
+  private generateFormatRangeSuccessResponse(result: XlwingsResult, params: XlwingsParams): string {
+    let response = `✅ **Formatting applied successfully**\n\n`;
+    response += `**Details:**\n`;
+    response += `- Range: ${result.range}\n`;
+    if (result.cells_affected) {
+      response += `- Cells formatted: ${result.cells_affected}\n`;
+    }
+
+    return response;
+  }
+
+  /**
+   * Generate helpful success response for delete_sheet operation
+   */
+  private generateDeleteSheetSuccessResponse(result: XlwingsResult, params: XlwingsParams): string {
+    let response = `✅ **Worksheet deleted successfully**\n\n`;
+
+    if (result.deleted_sheet_name) {
+      response += `**Deleted:** "${result.deleted_sheet_name}"\n\n`;
+    }
+
+    if (result.remaining_sheets && result.remaining_sheets.length > 0) {
+      response += `**Remaining worksheets (${result.remaining_sheets_count}):**\n`;
+      for (const sheet of result.remaining_sheets) {
+        response += `- ${sheet}\n`;
+      }
+    }
 
     return response;
   }
