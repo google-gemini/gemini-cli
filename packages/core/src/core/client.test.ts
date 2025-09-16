@@ -2320,39 +2320,6 @@ ${JSON.stringify(
       expect(mockCheckNextSpeaker).not.toHaveBeenCalled();
     });
 
-    it('should create linked abort signal and pass it to turn.run', async () => {
-      // Arrange
-      const mockStream = (async function* () {
-        yield { type: 'content', value: 'Hello' };
-      })();
-      mockTurnRunFn.mockReturnValue(mockStream);
-
-      const mockChat: Partial<GeminiChat> = {
-        addHistory: vi.fn(),
-        getHistory: vi.fn().mockReturnValue([]),
-      };
-      client['chat'] = mockChat as GeminiChat;
-
-      const originalSignal = new AbortController().signal;
-
-      // Act
-      const stream = client.sendMessageStream(
-        [{ text: 'Hi' }],
-        originalSignal,
-        'prompt-id-signal',
-      );
-      for await (const _ of stream) {
-        // consume stream
-      }
-
-      // Assert
-      expect(mockTurnRunFn).toHaveBeenCalledWith(
-        expect.any(String),
-        [{ text: 'Hi' }],
-        expect.not.objectContaining({ signal: originalSignal }),
-      );
-    });
-
     it('should abort linked signal when loop is detected', async () => {
       // Arrange
       vi.spyOn(client['loopDetector'], 'turnStarted').mockResolvedValue(false);
@@ -2360,11 +2327,14 @@ ${JSON.stringify(
         .mockReturnValueOnce(false)
         .mockReturnValueOnce(true);
 
-      const mockStream = (async function* () {
-        yield { type: 'content', value: 'First event' };
-        yield { type: 'content', value: 'Second event' };
-      })();
-      mockTurnRunFn.mockReturnValue(mockStream);
+      let capturedSignal: AbortSignal;
+      mockTurnRunFn.mockImplementation((model, request, signal) => {
+        capturedSignal = signal;
+        return (async function* () {
+          yield { type: 'content', value: 'First event' };
+          yield { type: 'content', value: 'Second event' };
+        })();
+      });
 
       const mockChat: Partial<GeminiChat> = {
         addHistory: vi.fn(),
@@ -2386,7 +2356,7 @@ ${JSON.stringify(
 
       // Assert
       expect(events).toContainEqual({ type: GeminiEventType.LoopDetected });
-      expect(client['loopDetector'].addAndCheck).toHaveBeenCalledTimes(2);
+      expect(capturedSignal!.aborted).toBe(true);
     });
   });
 
