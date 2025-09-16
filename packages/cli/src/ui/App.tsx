@@ -98,7 +98,9 @@ import { ShowMoreLines } from './components/ShowMoreLines.js';
 import { PrivacyNotice } from './privacy/PrivacyNotice.js';
 import { useSettingsCommand } from './hooks/useSettingsCommand.js';
 import { SettingsDialog } from './components/SettingsDialog.js';
+import { NotificationsSetup } from './components/notifications/NotificationsSetup.js';
 import { setUpdateHandler } from '../utils/handleAutoUpdate.js';
+import { startIdleTimer, stopIdleTimer } from '../../notifications/idleTimer.js';
 import { appEvents, AppEvent } from '../utils/events.js';
 import { isNarrowWidth } from './utils/isNarrowWidth.js';
 
@@ -267,6 +269,14 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
 
   const { isSettingsDialogOpen, openSettingsDialog, closeSettingsDialog } =
     useSettingsCommand();
+
+  const [isNotificationsSetupOpen, setIsNotificationsSetupOpen] = useState(false);
+  const openNotificationsSetup = useCallback(() => {
+    setIsNotificationsSetupOpen(true);
+  }, []);
+  const closeNotificationsSetup = useCallback(() => {
+    setIsNotificationsSetupOpen(false);
+  }, []);
 
   const { isFolderTrustDialogOpen, handleFolderTrustSelect, isRestarting } =
     useFolderTrust(settings, setIsTrustedFolder);
@@ -532,6 +542,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     setQuittingMessages,
     openPrivacyNotice,
     openSettingsDialog,
+    openNotificationsSetup,
     toggleVimEnabled,
     setIsProcessing,
     setGeminiMdFileCount,
@@ -574,6 +585,14 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     refreshStatic,
     () => cancelHandlerRef.current(),
   );
+
+  useEffect(() => {
+    if (streamingState === StreamingState.Idle) {
+      startIdleTimer();
+    } else {
+      stopIdleTimer();
+    }
+  }, [streamingState]);
 
   // Message queue for handling input during streaming
   const { messageQueue, addMessage, clearQueue, getQueuedMessagesText } =
@@ -1047,6 +1066,11 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
                 onRestartRequest={() => process.exit(0)}
               />
             </Box>
+          ) : isNotificationsSetupOpen ? (
+            <NotificationsSetup
+              config={config}
+              onComplete={closeNotificationsSetup}
+            />
           ) : isAuthenticating ? (
             <>
               <AuthInProgress
