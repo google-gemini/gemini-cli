@@ -1,4 +1,9 @@
-// Import types from core when available, otherwise define locally
+/**
+ * @license
+ * Copyright 2025 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 // import type { PresetTemplate } from '@google/gemini-cli-core';
 
 // Temporarily define core types locally until build issues are resolved
@@ -224,7 +229,7 @@ export interface ToolEditConfirmationDetails {
   title: string;
   onConfirm: (
     outcome: ToolConfirmationOutcome,
-    payload?: any,
+    payload?: ToolConfirmationPayload,
   ) => Promise<void>;
   fileName: string;
   filePath: string;
@@ -256,6 +261,12 @@ export interface ToolInfoConfirmationDetails {
   onConfirm: (outcome: ToolConfirmationOutcome) => Promise<void>;
   prompt: string;
   urls?: string[];
+}
+
+export interface ToolConfirmationPayload {
+  // used to override `modifiedProposedContent` for modifiable tools in the
+  // inline modify flow
+  newContent: string;
 }
 
 export type ToolCallConfirmationDetails =

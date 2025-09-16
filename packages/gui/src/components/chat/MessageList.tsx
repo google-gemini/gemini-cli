@@ -1,3 +1,9 @@
+/**
+ * @license
+ * Copyright 2025 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 import { useRef, useState, forwardRef, useImperativeHandle, useCallback, useEffect } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import type React from 'react';
@@ -7,7 +13,7 @@ import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 import rehypeHighlight from 'rehype-highlight';
 import { format } from 'date-fns';
-import { Bot, User, AlertCircle, ChevronDown, ChevronRight, BookTemplate, Play, CheckSquare } from 'lucide-react';
+import { Bot, User, AlertCircle, ChevronDown, ChevronRight, BookTemplate, Play, CheckSquare, Target, Brain, FileText, Activity, ListTodo } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { Card, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -16,6 +22,13 @@ import ToolConfirmationMessage from './ToolConfirmationMessage';
 import { multiModelService } from '@/services/multiModelService';
 import type { ChatMessage, ToolCallConfirmationDetails, ToolConfirmationOutcome, ToolCall } from '@/types';
 import 'katex/dist/katex.min.css';
+
+interface CodeComponentProps {
+  inline?: boolean;
+  className?: string;
+  children?: React.ReactNode;
+  [key: string]: any;
+}
 
 
 // React Markdown component props interface
@@ -38,6 +51,15 @@ interface ParsedThinkingContent {
   mainContent: string;
 }
 
+// State snapshot parsing for agent state tracking
+interface ParsedStateSnapshot {
+  overallGoal: string;
+  keyKnowledge: string[];
+  fileSystemState: string[];
+  recentActions: string[];
+  currentPlan: string[];
+}
+
 function parseThinkingContent(content: string): ParsedThinkingContent {
   const thinkingSections: string[] = [];
   const remainingContent = content;
@@ -56,6 +78,94 @@ function parseThinkingContent(content: string): ParsedThinkingContent {
   return {
     thinkingSections,
     mainContent
+  };
+}
+
+function parseStateSnapshot(content: string): ParsedStateSnapshot | null {
+  const stateSnapshotRegex = /<state_snapshot>([\s\S]*?)<\/state_snapshot>/;
+  const match = stateSnapshotRegex.exec(content);
+
+  if (!match) return null;
+
+  const xmlContent = match[1];
+
+  // Debug logging (can be removed in production)
+  // if (typeof console !== 'undefined') {
+  //   console.log('State snapshot XML content:', xmlContent);
+  // }
+
+  // Helper function to extract and clean list items
+  const extractListItems = (text: string): string[] => {
+    const lines = text.split('\n').map(line => line.trim()).filter(line => line.length > 0);
+    const items: string[] = [];
+
+    for (const line of lines) {
+      // Skip obvious comment lines
+      if (line.startsWith('<!--') || line.endsWith('-->')) continue;
+
+      if (line.startsWith('-') || line.startsWith('*')) {
+        // Explicit list items
+        items.push(line.replace(/^[-*]\s*/, '').trim());
+      } else if (!line.match(/^<\w+>/) && !line.match(/^<\/\w+>/)) {
+        // Non-XML content that looks like a list item
+        items.push(line);
+      }
+    }
+
+    return items;
+  };
+
+  // Helper function to extract and clean plan items (numbered, bulleted, or indented)
+  const extractPlanItems = (text: string): string[] => {
+    const lines = text.split('\n').map(line => line.trim()).filter(line => line.length > 0);
+    const items: string[] = [];
+
+    for (const line of lines) {
+      // Skip comment lines
+      if (line.startsWith('<!--') || line.endsWith('-->')) continue;
+
+      if (line.match(/^(\d+\.|[-*])\s/) || line.match(/^\s*\[/) || line.startsWith('*')) {
+        // Numbered list, bulleted list, or status items
+        items.push(line);
+      } else if (!line.match(/^<\w+>/) && !line.match(/^<\/\w+>/) && line.length > 0) {
+        // Other non-XML content
+        items.push(line);
+      }
+    }
+
+    return items;
+  };
+
+  // Extract overall_goal
+  const goalMatch = /<overall_goal>([\s\S]*?)<\/overall_goal>/.exec(xmlContent);
+  const overallGoal = goalMatch ? goalMatch[1].replace(/<!--[\s\S]*?-->/g, '').trim() : '';
+
+  // Extract key_knowledge items
+  const knowledgeMatch = /<key_knowledge>([\s\S]*?)<\/key_knowledge>/.exec(xmlContent);
+  const keyKnowledgeText = knowledgeMatch ? knowledgeMatch[1].replace(/<!--[\s\S]*?-->/g, '').trim() : '';
+  const keyKnowledge = extractListItems(keyKnowledgeText);
+
+  // Extract file_system_state items
+  const fileSystemMatch = /<file_system_state>([\s\S]*?)<\/file_system_state>/.exec(xmlContent);
+  const fileSystemText = fileSystemMatch ? fileSystemMatch[1].replace(/<!--[\s\S]*?-->/g, '').trim() : '';
+  const fileSystemState = extractListItems(fileSystemText);
+
+  // Extract recent_actions items
+  const actionsMatch = /<recent_actions>([\s\S]*?)<\/recent_actions>/.exec(xmlContent);
+  const actionsText = actionsMatch ? actionsMatch[1].replace(/<!--[\s\S]*?-->/g, '').trim() : '';
+  const recentActions = extractListItems(actionsText);
+
+  // Extract current_plan items (can be numbered or bulleted)
+  const planMatch = /<current_plan>([\s\S]*?)<\/current_plan>/.exec(xmlContent);
+  const planText = planMatch ? planMatch[1].replace(/<!--[\s\S]*?-->/g, '').trim() : '';
+  const currentPlan = extractPlanItems(planText);
+
+  return {
+    overallGoal,
+    keyKnowledge,
+    fileSystemState,
+    recentActions,
+    currentPlan
   };
 }
 
@@ -103,7 +213,7 @@ function parseToolResponse(message: ChatMessage): ParsedToolResponse | null {
       // Fallback for non-JSON Gemini format
       return {
         toolName: 'Function',
-        content: content,
+        content,
         format: 'gemini',
         success: message.toolSuccess,
         structuredData: message.toolResponseData
@@ -127,7 +237,7 @@ function parseToolResponse(message: ChatMessage): ParsedToolResponse | null {
       // Fallback for non-JSON Gemini format
       return {
         toolName: 'Function',
-        content: content,
+        content,
         format: 'gemini',
         success: message.toolSuccess,
         structuredData: message.toolResponseData
@@ -165,7 +275,7 @@ function parseToolResponse(message: ChatMessage): ParsedToolResponse | null {
     } catch {
       return {
         toolName: 'Tool',
-        content: content,
+        content,
         format: 'openai',
         success: message.toolSuccess,
         structuredData: message.toolResponseData
@@ -689,7 +799,7 @@ const ToolResponseDisplay: React.FC<{ toolResponse: ParsedToolResponse }> = ({ t
               <div className="pt-2 border-t border-border/30">
                 <div className="text-xs font-medium text-muted-foreground mb-2">Suggested next actions:</div>
                 <div className="space-y-1">
-                  {toolResponse.structuredData.nextActions.map((action, index) => (
+                  {toolResponse.structuredData.nextActions.map((action: string, index: number) => (
                     <div key={index} className="text-xs text-foreground/70 font-mono bg-background/30 rounded px-2 py-1">
                       {action}
                     </div>
@@ -772,6 +882,136 @@ const ToolResponseDisplay: React.FC<{ toolResponse: ParsedToolResponse }> = ({ t
   );
 };
 
+// Component to display state snapshot in a structured format
+const StateSnapshotDisplay: React.FC<{ stateSnapshot: ParsedStateSnapshot }> = ({ stateSnapshot }) => {
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
+
+  const toggleSection = (sectionName: string) => {
+    setExpandedSections(prev => {
+      const next = new Set(prev);
+      if (next.has(sectionName)) {
+        next.delete(sectionName);
+      } else {
+        next.add(sectionName);
+      }
+      return next;
+    });
+  };
+
+  const isExpanded = (sectionName: string) => expandedSections.has(sectionName);
+
+  const sections = [
+    {
+      key: 'overall_goal',
+      title: 'Overall Goal',
+      icon: <Target size={14} />,
+      content: stateSnapshot.overallGoal,
+      color: 'blue'
+    },
+    {
+      key: 'key_knowledge',
+      title: 'Key Knowledge',
+      icon: <Brain size={14} />,
+      content: stateSnapshot.keyKnowledge,
+      color: 'purple'
+    },
+    {
+      key: 'file_system_state',
+      title: 'File System State',
+      icon: <FileText size={14} />,
+      content: stateSnapshot.fileSystemState,
+      color: 'green'
+    },
+    {
+      key: 'recent_actions',
+      title: 'Recent Actions',
+      icon: <Activity size={14} />,
+      content: stateSnapshot.recentActions,
+      color: 'orange'
+    },
+    {
+      key: 'current_plan',
+      title: 'Current Plan',
+      icon: <ListTodo size={14} />,
+      content: stateSnapshot.currentPlan,
+      color: 'red'
+    }
+  ];
+
+  const getColorClasses = (color: string) => {
+    const colors = {
+      blue: 'border-blue-200/50 dark:border-blue-700/30 bg-blue-50/30 dark:bg-blue-900/10',
+      purple: 'border-purple-200/50 dark:border-purple-700/30 bg-purple-50/30 dark:bg-purple-900/10',
+      green: 'border-green-200/50 dark:border-green-700/30 bg-green-50/30 dark:bg-green-900/10',
+      orange: 'border-orange-200/50 dark:border-orange-700/30 bg-orange-50/30 dark:bg-orange-900/10',
+      red: 'border-red-200/50 dark:border-red-700/30 bg-red-50/30 dark:bg-red-900/10'
+    };
+    return colors[color as keyof typeof colors] || colors.blue;
+  };
+
+  return (
+    <div className="mb-3">
+      <div className="bg-gradient-to-r from-muted/30 to-muted/10 rounded-lg border border-border/50 overflow-hidden">
+        {/* State snapshot header */}
+        <div className="flex items-center justify-between p-3 bg-muted/40 border-b border-border/30">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1 text-xs font-bold text-foreground/80 border border-border/50 rounded px-2 py-1">
+              <Brain size={10} />
+              <span>State Snapshot</span>
+            </div>
+            <span className="text-xs text-muted-foreground font-medium">Agent Memory</span>
+          </div>
+        </div>
+
+        {/* Sections */}
+        <div className="p-3 space-y-2">
+          {sections.map((section) => {
+            const hasContent = Array.isArray(section.content) ? section.content.length > 0 : Boolean(section.content);
+            if (!hasContent) return null;
+
+            const expanded = isExpanded(section.key);
+
+            return (
+              <div key={section.key} className={cn("rounded-md border overflow-hidden", getColorClasses(section.color))}>
+                <button
+                  onClick={() => toggleSection(section.key)}
+                  className="w-full px-3 py-2 text-left flex items-center justify-between hover:bg-background/30 transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    {section.icon}
+                    <span className="font-medium text-sm text-foreground">{section.title}</span>
+                    {Array.isArray(section.content) && (
+                      <span className="text-xs text-muted-foreground">({section.content.length})</span>
+                    )}
+                  </div>
+                  {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                </button>
+
+                {expanded && (
+                  <div className="border-t border-border/20 bg-background/20 px-3 py-2">
+                    {Array.isArray(section.content) ? (
+                      <ul className="space-y-1">
+                        {section.content.map((item, index) => (
+                          <li key={index} className="text-sm text-foreground/80 flex items-start gap-2">
+                            <span className="text-muted-foreground mt-1">•</span>
+                            <span className="font-mono text-xs leading-relaxed">{item}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <div className="text-sm text-foreground/80 font-medium">{section.content}</div>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 interface MessageBubbleProps {
   message: ChatMessage;
   isStreaming?: boolean;
@@ -827,17 +1067,26 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isStreaming, onS
             ) : (
               <div>
                 {(() => {
-                  // Parse thinking content for assistant messages only
+                  // Parse thinking content for assistant messages and state snapshot for both user and assistant
                   if (message.role === 'assistant') {
                     const { thinkingSections, mainContent } = parseThinkingContent(message.content);
-                    
+                    const stateSnapshot = parseStateSnapshot(message.content);
+
+                    // Remove state_snapshot from main content if it exists
+                    const contentWithoutSnapshot = mainContent.replace(/<state_snapshot>[\s\S]*?<\/state_snapshot>/g, '').trim();
+
                     return (
                       <>
                         {/* Show thinking sections if they exist */}
                         <ThinkingSection thinkingSections={thinkingSections} />
-                        
+
+                        {/* Show state snapshot if it exists */}
+                        {stateSnapshot && (
+                          <StateSnapshotDisplay stateSnapshot={stateSnapshot} />
+                        )}
+
                         {/* Show main content */}
-                        {mainContent && (
+                        {contentWithoutSnapshot && (
                           <div className={cn(
                             "prose prose-sm max-w-none",
                             isUser ? "prose-invert" : "",
@@ -848,7 +1097,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isStreaming, onS
                               remarkPlugins={[remarkGfm, remarkMath]}
                               rehypePlugins={[rehypeKatex, rehypeHighlight]}
                               components={{
-                                code(props: any) {
+                                code(props: CodeComponentProps) {
                                   const { inline, className, children, ...rest } = props;
                                   const match = /language-(\w+)/.exec(className || '');
                                   const content = String(children).replace(/\n$/, '');
@@ -866,46 +1115,59 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isStreaming, onS
                                 },
                               }}
                             >
-                              {mainContent}
+                              {contentWithoutSnapshot}
                             </Markdown>
                           </div>
                         )}
                       </>
                     );
                   } else {
-                    // For non-assistant messages, render normally
+                    // For non-assistant messages, check for state_snapshot (from compression)
+                    const stateSnapshot = parseStateSnapshot(message.content);
+                    const contentWithoutSnapshot = message.content.replace(/<state_snapshot>[\s\S]*?<\/state_snapshot>/g, '').trim();
+
                     return (
-                      <div className={cn(
-                        "prose prose-sm max-w-none",
-                        isUser ? "prose-invert" : "",
-                        "prose-pre:bg-muted prose-pre:text-foreground",
-                        "prose-code:bg-muted prose-code:text-foreground prose-code:px-1 prose-code:rounded"
-                      )}>
-                        <Markdown
-                          remarkPlugins={[remarkGfm, remarkMath]}
-                          rehypePlugins={[rehypeKatex, rehypeHighlight]}
-                          components={{
-                            code(props: any) {
-                              const { inline, className, children, ...rest } = props;
-                              const match = /language-(\w+)/.exec(className || '');
-                              const content = String(children).replace(/\n$/, '');
-                              return !inline && match ? (
-                                <pre className="overflow-x-auto">
-                                  <code className={className} {...rest}>
-                                    {content}
-                                  </code>
-                                </pre>
-                              ) : (
-                                <code className={cn("px-1 py-0.5 rounded text-sm", className)} {...rest}>
-                                  {content}
-                                </code>
-                              );
-                            },
-                          }}
-                        >
-                          {message.content}
-                        </Markdown>
-                      </div>
+                      <>
+                        {/* Show state snapshot if it exists */}
+                        {stateSnapshot && (
+                          <StateSnapshotDisplay stateSnapshot={stateSnapshot} />
+                        )}
+
+                        {/* Show main content only if there's content left after removing state_snapshot */}
+                        {contentWithoutSnapshot && (
+                          <div className={cn(
+                            "prose prose-sm max-w-none",
+                            isUser ? "prose-invert" : "",
+                            "prose-pre:bg-muted prose-pre:text-foreground",
+                            "prose-code:bg-muted prose-code:text-foreground prose-code:px-1 prose-code:rounded"
+                          )}>
+                            <Markdown
+                              remarkPlugins={[remarkGfm, remarkMath]}
+                              rehypePlugins={[rehypeKatex, rehypeHighlight]}
+                              components={{
+                                code(props: CodeComponentProps) {
+                                  const { inline, className, children, ...rest } = props;
+                                  const match = /language-(\w+)/.exec(className || '');
+                                  const content = String(children).replace(/\n$/, '');
+                                  return !inline && match ? (
+                                    <pre className="overflow-x-auto">
+                                      <code className={className} {...rest}>
+                                        {content}
+                                      </code>
+                                    </pre>
+                                  ) : (
+                                    <code className={cn("px-1 py-0.5 rounded text-sm", className)} {...rest}>
+                                      {content}
+                                    </code>
+                                  );
+                                },
+                              }}
+                            >
+                              {contentWithoutSnapshot}
+                            </Markdown>
+                          </div>
+                        )}
+                      </>
                     );
                   }
                 })()}
