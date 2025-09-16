@@ -106,16 +106,33 @@ function getNodeMemoryArgs(config: Config): string[] {
 }
 
 async function relaunchWithAdditionalArgs(additionalArgs: string[]) {
-  const nodeArgs = [...additionalArgs, ...process.argv.slice(1)];
-  const newEnv = { ...process.env, GEMINI_CLI_NO_RELAUNCH: 'true' };
+  try {
+    const nodeArgs = [...additionalArgs, ...process.argv.slice(1)];
+    const newEnv = { ...process.env, GEMINI_CLI_NO_RELAUNCH: 'true' };
 
-  const child = spawn(process.execPath, nodeArgs, {
-    stdio: 'inherit',
-    env: newEnv,
-  });
+    // The parent process should not be reading from stdin while the child is running.
+    process.stdin.pause();
 
-  await new Promise((resolve) => child.on('close', resolve));
-  process.exit(0);
+    const child = spawn(process.execPath, nodeArgs, {
+      stdio: 'inherit',
+      env: newEnv,
+    });
+
+    await new Promise<void>((resolve, reject) => {
+      child.on('error', reject);
+      child.on('close', () => {
+        // Resume stdin before the parent process exits.
+        process.stdin.resume();
+        resolve();
+      });
+    });
+
+    process.exit(0);
+  } catch (error) {
+    process.stdin.resume();
+    console.error('Failed to relaunch CLI:', error);
+    process.exit(1);
+  }
 }
 
 import { runZedIntegration } from './zed-integration/zedIntegration.js';
