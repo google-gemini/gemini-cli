@@ -53,6 +53,7 @@ const createMockSettings = (
     },
     true,
     new Set(),
+    {},
   );
 
 describe('ThemeDialog Snapshots', () => {

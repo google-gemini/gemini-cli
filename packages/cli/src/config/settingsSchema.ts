@@ -1015,6 +1015,27 @@ export function getSettingsSchema(): SettingsSchemaType {
   return SETTINGS_SCHEMA;
 }
 
+export function getDefaultSettings(): Settings {
+  function getDefaultsFromSchema(schema: SettingsSchema): Settings {
+    const defaults: Record<string, unknown> = {};
+    for (const key in schema) {
+      if (!Object.hasOwn(schema, key)) continue;
+      const prop = schema[key];
+      if (prop.properties) {
+        const subDefaults = getDefaultsFromSchema(prop.properties);
+        if (Object.keys(subDefaults).length > 0) {
+          defaults[key] = subDefaults;
+        }
+      } else if (prop.default !== undefined) {
+        defaults[key] = prop.default;
+      }
+    }
+    return defaults as Settings;
+  }
+
+  return getDefaultsFromSchema(SETTINGS_SCHEMA) as Settings;
+}
+
 type InferSettings<T extends SettingsSchema> = {
   -readonly [K in keyof T]?: T[K] extends { properties: SettingsSchema }
     ? InferSettings<T[K]['properties']>
