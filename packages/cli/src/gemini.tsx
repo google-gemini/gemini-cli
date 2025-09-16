@@ -102,13 +102,6 @@ function getNodeMemoryArgs(config: Config): string[] {
 }
 
 async function relaunchWithAdditionalArgs(additionalArgs: string[]) {
-  // If stdin is in raw mode, we need to temporarily disable it so that the
-  // child process can take control of it.
-  const wasRaw = process.stdin.isRaw;
-  if (wasRaw) {
-    process.stdin.setRawMode(false);
-  }
-
   // The parent process should not be reading from stdin while the child is running.
   process.stdin.pause();
 
@@ -119,7 +112,6 @@ async function relaunchWithAdditionalArgs(additionalArgs: string[]) {
     const child = spawn(process.execPath, nodeArgs, {
       stdio: 'inherit',
       env: newEnv,
-      detached: true,
     });
 
     await new Promise<void>((resolve, reject) => {
@@ -133,14 +125,6 @@ async function relaunchWithAdditionalArgs(additionalArgs: string[]) {
 
     process.exit(0);
   } catch (error) {
-    // Restore stdin to its original state on failure.
-    if (wasRaw) {
-      try {
-        process.stdin.setRawMode(true);
-      } catch {
-        // Ignore errors, we are exiting anyway.
-      }
-    }
     process.stdin.resume();
     console.error('Failed to relaunch CLI:', error);
     process.exit(1);
