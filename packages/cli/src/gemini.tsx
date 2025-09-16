@@ -102,12 +102,12 @@ function getNodeMemoryArgs(config: Config): string[] {
 }
 
 async function relaunchWithAdditionalArgs(additionalArgs: string[]) {
-  // The parent process should not be reading from stdin while the child is running.
-  process.stdin.pause();
-
   try {
     const nodeArgs = [...additionalArgs, ...process.argv.slice(1)];
     const newEnv = { ...process.env, GEMINI_CLI_NO_RELAUNCH: 'true' };
+    
+    // The parent process should not be reading from stdin while the child is running.
+    process.stdin.pause();
 
     const child = spawn(process.execPath, nodeArgs, {
       stdio: 'inherit',
