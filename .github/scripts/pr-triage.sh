@@ -26,7 +26,27 @@ process_pr() {
     fi
 
     if [[ -z "${ISSUE_NUMBER}" ]]; then
-        echo "⚠️  No linked issue found for PR #${PR_NUMBER}, adding status/need-issue label"
+        echo "🔍 No closingIssuesReferences found, checking PR description for issue references..."
+        
+        # Fallback: Parse PR description for issue references
+        local PR_BODY
+        if PR_BODY=$(gh pr view "${PR_NUMBER}" --repo "${GITHUB_REPOSITORY}" --json body -q '.body' 2>/dev/null); then
+            # Look for issue references in various formats: #1234, [#1234], (#1234), etc.
+            local FOUND_ISSUE
+            if FOUND_ISSUE=$(echo "${PR_BODY}" | grep -oE '#[0-9]+' | head -1 | sed 's/#//'); then
+                # Verify the issue exists in this repository
+                if gh issue view "${FOUND_ISSUE}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
+                    echo "🔗 Found issue reference #${FOUND_ISSUE} in PR description"
+                    ISSUE_NUMBER="${FOUND_ISSUE}"
+                else
+                    echo "   ⚠️ Issue #${FOUND_ISSUE} referenced in PR description does not exist"
+                fi
+            fi
+        fi
+    fi
+
+    if [[ -z "${ISSUE_NUMBER}" ]]; then
+        echo "⚠️  No valid issue reference found for PR #${PR_NUMBER}, adding status/need-issue label"
         if ! gh pr edit "${PR_NUMBER}" --repo "${GITHUB_REPOSITORY}" --add-label "status/need-issue" 2>/dev/null; then
             echo "   ⚠️ Failed to add label (may already exist or have permission issues)"
         fi
