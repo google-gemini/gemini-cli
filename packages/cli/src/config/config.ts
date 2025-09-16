@@ -55,6 +55,7 @@ const logger = {
 };
 
 export interface CliArgs {
+  query: string | undefined;
   model: string | undefined;
   sandbox: boolean | string | undefined;
   sandboxImage: string | undefined;
@@ -82,7 +83,6 @@ export interface CliArgs {
   screenReader: boolean | undefined;
   useSmartEdit: boolean | undefined;
   sessionSummary: string | undefined;
-  promptWords: string[] | undefined;
   outputFormat: string | undefined;
 }
 
@@ -93,8 +93,13 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
     .usage(
       'Usage: gemini [options] [command]\n\nGemini CLI - Launch an interactive CLI, use -p/--prompt for non-interactive mode',
     )
-    .command('$0 [promptWords...]', 'Launch Gemini CLI', (yargsInstance) =>
+    .command('$0 [query..]', 'Launch Gemini CLI', (yargsInstance) =>
       yargsInstance
+        .positional('query', {
+          type: 'string',
+          description:
+            'Query to execute in interactive mode (e.g., @path ./file.md)',
+        })
         .option('model', {
           alias: 'm',
           type: 'string',
@@ -337,6 +342,28 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
     process.exit(0);
   }
 
+  // Normalize variadic positional to a single string
+  // Supports both:
+  //   gemini "@path ./file.md"        (quoted single token)
+  //   gemini @path ./file.md          (unquoted two tokens)
+  const q = Array.isArray((result as Record<string, unknown>)['query'])
+    ? ((result as Record<string, unknown>)['query'] as string[]).join(' ')
+    : ((result as Record<string, unknown>)['query'] as string);
+
+  // Validate that both positional and --prompt aren't used together
+  if (result['prompt'] && q) {
+    throw new Error(
+      'Cannot use both a positional prompt and the --prompt (-p) flag together',
+    );
+  }
+
+  // Map to interactive prompt only if no explicit prompt flags are set
+  if (q && !result['prompt'] && !result['promptInteractive']) {
+    result['promptInteractive'] = q;
+  }
+  // Keep CliArgs.query as a string for downstream typing
+  (result as Record<string, unknown>)['query'] = q || undefined;
+
   // The import format is now only controlled by settings.memoryImportFormat
   // We no longer accept it as a CLI argument
   return result as unknown as CliArgs;
@@ -458,7 +485,7 @@ export async function loadCliConfig(
 
   let mcpServers = mergeMcpServers(settings, activeExtensions);
   const question =
-    argv.promptInteractive || argv.prompt || (argv.promptWords || []).join(' ');
+    argv.promptInteractive || argv.prompt || '';
 
   // Determine approval mode with backward compatibility
   let approvalMode: ApprovalMode;

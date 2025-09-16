@@ -203,6 +203,25 @@ describe('parseArguments', () => {
     expect(argv.prompt).toBeUndefined();
   });
 
+  it('should convert positional query argument to promptInteractive', async () => {
+    process.argv = ['node', 'script.js', '@path ./file.md'];
+    const argv = await parseArguments({} as Settings);
+    expect(argv.query).toBe('@path ./file.md');
+    expect(argv.promptInteractive).toBe('@path ./file.md');
+    expect(argv.prompt).toBeUndefined();
+  });
+
+  it('maps unquoted positional @path + arg to promptInteractive', async () => {
+    // Simulate: gemini @path ./file.md
+    process.argv = ['node', 'script.js', '@path', './file.md'];
+    const argv = await parseArguments({} as Settings);
+    // After normalization, query is a single string
+    expect(argv.query).toBe('@path ./file.md');
+    // And it's mapped to interactive prompt when no -p/-i flags are set
+    expect(argv.promptInteractive).toBe('@path ./file.md');
+    expect(argv.prompt).toBeUndefined();
+  });
+
   it('should throw an error when both --yolo and --approval-mode are used together', async () => {
     process.argv = [
       'node',
@@ -2161,32 +2180,18 @@ describe('parseArguments with positional prompt', () => {
       'test prompt',
     ];
 
-    const mockExit = vi.spyOn(process, 'exit').mockImplementation(() => {
-      throw new Error('process.exit called');
-    });
-
-    const mockConsoleError = vi
-      .spyOn(console, 'error')
-      .mockImplementation(() => {});
-
     await expect(parseArguments({} as Settings)).rejects.toThrow(
-      'process.exit called',
+      'Cannot use both a positional prompt and the --prompt (-p) flag together',
     );
-
-    expect(mockConsoleError).toHaveBeenCalledWith(
-      expect.stringContaining(
-        'Cannot use both a positional prompt and the --prompt (-p) flag together',
-      ),
-    );
-
-    mockExit.mockRestore();
-    mockConsoleError.mockRestore();
   });
 
-  it('should correctly parse a positional prompt', async () => {
+  it('should correctly parse a positional prompt to query field', async () => {
     process.argv = ['node', 'script.js', 'positional', 'prompt'];
     const argv = await parseArguments({} as Settings);
-    expect(argv.promptWords).toEqual(['positional', 'prompt']);
+    expect(argv.query).toBe('positional prompt');
+    // Since no explicit prompt flags are set, query should map to promptInteractive
+    expect(argv.promptInteractive).toBe('positional prompt');
+    expect(argv.prompt).toBeUndefined();
   });
 
   it('should correctly parse a prompt from the --prompt flag', async () => {
