@@ -182,23 +182,25 @@ class MultiModelService {
 
   async sendMessage(
     messages: UniversalMessage[]
-  ): Promise<AsyncGenerator<UniversalStreamEvent>> {
+  ): Promise<{ stream: AsyncGenerator<UniversalStreamEvent>; cancel: () => void }> {
     if (!this.initialized) {
       throw new Error('MultiModelService not initialized');
     }
 
     const streamResponse = this.api.sendMessageStream(messages);
-    
+
     // Create our own async generator using real-time callbacks
+    let cleanup: (() => void) | null = null;
+
     async function* eventGenerator(): AsyncGenerator<UniversalStreamEvent> {
       const events: UniversalStreamEvent[] = [];
       let isComplete = false;
       let hasError = false;
       let eventIndex = 0;
       let resolveNext: (() => void) | null = null;
-      
+
       // Set up real-time callbacks
-      const cleanup = streamResponse.startStream(
+      cleanup = streamResponse.startStream(
         // onChunk callback
         (chunk) => {
           if (chunk.type === 'content_delta' && chunk.content) {
@@ -320,8 +322,13 @@ class MultiModelService {
         if (cleanup) cleanup();
       }
     }
-    
-    return eventGenerator();
+
+    return {
+      stream: eventGenerator(),
+      cancel: () => {
+        if (cleanup) cleanup();
+      }
+    };
   }
 
   async getAvailableModels(providerType?: ModelProviderType): Promise<Record<string, string[]>> {
