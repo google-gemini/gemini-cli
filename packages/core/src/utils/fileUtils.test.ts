@@ -970,6 +970,6 @@ describe('fileUtils', () => {
         'File size exceeds the 20MB limit',
       );
       expect(result.llmContent).toContain('File size exceeds the 20MB limit');
-    });
+    }, 15000); // Increase timeout to 15 seconds for large file test
   });
 });
