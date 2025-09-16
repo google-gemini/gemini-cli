@@ -112,24 +112,39 @@ async function relaunchWithAdditionalArgs(additionalArgs: string[]) {
   // The parent process should not be reading from stdin while the child is running.
   process.stdin.pause();
 
-  const nodeArgs = [...additionalArgs, ...process.argv.slice(1)];
-  const newEnv = { ...process.env, GEMINI_CLI_NO_RELAUNCH: 'true' };
+  try {
+    const nodeArgs = [...additionalArgs, ...process.argv.slice(1)];
+    const newEnv = { ...process.env, GEMINI_CLI_NO_RELAUNCH: 'true' };
 
-  const child = spawn(process.execPath, nodeArgs, {
-    stdio: 'inherit',
-    env: newEnv,
-    detached: true,
-  });
-
-  await new Promise<void>((resolve) => {
-    child.on('close', () => {
-      // Resume stdin before the parent process exits.
-      process.stdin.resume();
-      resolve();
+    const child = spawn(process.execPath, nodeArgs, {
+      stdio: 'inherit',
+      env: newEnv,
+      detached: true,
     });
-  });
 
-  process.exit(0);
+    await new Promise<void>((resolve, reject) => {
+      child.on('error', reject);
+      child.on('close', () => {
+        // Resume stdin before the parent process exits.
+        process.stdin.resume();
+        resolve();
+      });
+    });
+
+    process.exit(0);
+  } catch (error) {
+    // Restore stdin to its original state on failure.
+    if (wasRaw) {
+      try {
+        process.stdin.setRawMode(true);
+      } catch {
+        // Ignore errors, we are exiting anyway.
+      }
+    }
+    process.stdin.resume();
+    console.error('Failed to relaunch CLI:', error);
+    process.exit(1);
+  }
 }
 
 import { runZedIntegration } from './zed-integration/zedIntegration.js';
