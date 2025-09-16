@@ -103,7 +103,6 @@ import { useLoadingIndicator } from './hooks/useLoadingIndicator.js';
 import { measureElement } from 'ink';
 import { useTerminalSize } from './hooks/useTerminalSize.js';
 import { ShellExecutionService } from '@google/gemini-cli-core';
-import * as processUtils from '../utils/processUtils.js';
 
 vi.mock('../utils/processUtils.js', () => ({
   relaunchApp: vi.fn(),
@@ -608,28 +607,6 @@ describe('AppContainer State Management', () => {
         resizePtySpy.mock.calls[resizePtySpy.mock.calls.length - 1];
       // Check the height argument specifically
       expect(lastCall[2]).toBe(1);
-    });
-  });
-
-  describe('Relaunch Logic', () => {
-    it('calls relaunchApp when isRestarting is true', () => {
-      const relaunchApp = vi.spyOn(processUtils, 'relaunchApp');
-      mockedUseFolderTrust.mockReturnValue({
-        isFolderTrustDialogOpen: false,
-        handleFolderTrustSelect: vi.fn(),
-        isRestarting: true,
-      });
-
-      render(
-        <AppContainer
-          config={mockConfig}
-          settings={mockSettings}
-          version="1.0.0"
-          initializationResult={mockInitResult}
-        />,
-      );
-
-      expect(relaunchApp).toHaveBeenCalled();
     });
   });
 });

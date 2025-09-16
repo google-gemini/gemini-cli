@@ -8,6 +8,11 @@ import { renderWithProviders } from '../../test-utils/render.js';
 import { waitFor } from '@testing-library/react';
 import { vi } from 'vitest';
 import { FolderTrustDialog, FolderTrustChoice } from './FolderTrustDialog.js';
+import * as processUtils from '../../utils/processUtils.js';
+
+vi.mock('../../utils/processUtils.js', () => ({
+  relaunchApp: vi.fn(),
+}));
 
 const mockedExit = vi.hoisted(() => vi.fn());
 const mockedCwd = vi.hoisted(() => vi.fn());
@@ -70,6 +75,17 @@ describe('FolderTrustDialog', () => {
     );
 
     expect(lastFrame()).toContain(' Gemini CLI is restarting');
+  });
+
+  it('should call relaunchApp when isRestarting is true', async () => {
+    vi.useFakeTimers();
+    const relaunchApp = vi.spyOn(processUtils, 'relaunchApp');
+    renderWithProviders(
+      <FolderTrustDialog onSelect={vi.fn()} isRestarting={true} />,
+    );
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(relaunchApp).toHaveBeenCalled();
+    vi.useRealTimers();
   });
 
   it('should not call process.exit when "r" is pressed and isRestarting is false', async () => {

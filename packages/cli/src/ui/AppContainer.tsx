@@ -85,7 +85,6 @@ import { useSessionStats } from './contexts/SessionContext.js';
 import { useGitBranchName } from './hooks/useGitBranchName.js';
 import type { ExtensionUpdateState } from './state/extensions.js';
 import { checkForAllExtensionUpdates } from '../config/extension.js';
-import { relaunchApp } from '../utils/processUtils.js';
 
 const CTRL_EXIT_PROMPT_DURATION_MS = 1000;
 
@@ -772,15 +771,6 @@ Logging in with Google... Please restart Gemini CLI to continue.
       clearTimeout(handler);
     };
   }, [terminalWidth, refreshStatic]);
-
-  useEffect(() => {
-    const doRelaunch = async () => {
-      if (isRestarting) {
-        await relaunchApp();
-      }
-    };
-    doRelaunch();
-  }, [isRestarting]);
 
   useEffect(() => {
     const unsubscribe = ideContextStore.subscribe(setIdeContextState);

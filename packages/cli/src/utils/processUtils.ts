@@ -6,6 +6,9 @@
 
 import { runExitCleanup } from './cleanup.js';
 
+/**
+ * Exit code used to signal that the CLI should be relaunched.
+ */
 export const RELAUNCH_EXIT_CODE = 42;
 
 /**

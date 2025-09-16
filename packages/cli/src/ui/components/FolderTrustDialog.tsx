@@ -5,13 +5,14 @@
  */
 
 import { Box, Text } from 'ink';
-import type React from 'react';
+import React, { useEffect } from 'react';
 import { theme } from '../semantic-colors.js';
 import type { RadioSelectItem } from './shared/RadioButtonSelect.js';
 import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
 import { useKeypress } from '../hooks/useKeypress.js';
 import * as process from 'node:process';
 import * as path from 'node:path';
+import { relaunchApp } from '../../utils/processUtils.js';
 
 export enum FolderTrustChoice {
   TRUST_FOLDER = 'trust_folder',
@@ -28,6 +29,17 @@ export const FolderTrustDialog: React.FC<FolderTrustDialogProps> = ({
   onSelect,
   isRestarting,
 }) => {
+  useEffect(() => {
+    const doRelaunch = async () => {
+      if (isRestarting) {
+        setTimeout(async () => {
+          await relaunchApp();
+        }, 1000);
+      }
+    };
+    doRelaunch();
+  }, [isRestarting]);
+
   useKeypress(
     (key) => {
       if (key.name === 'escape') {
@@ -85,7 +97,7 @@ export const FolderTrustDialog: React.FC<FolderTrustDialogProps> = ({
       {isRestarting && (
         <Box marginLeft={1} marginTop={1}>
           <Text color={theme.status.warning}>
-            Gemini CLI is restarting to apply the trust changes.
+            Gemini CLI is restarting to apply the trust changes...
           </Text>
         </Box>
       )}
