@@ -38,7 +38,6 @@ import {
   logUserPrompt,
   AuthType,
   getOauthClient,
-  uiTelemetryService,
 } from '@google/gemini-cli-core';
 import {
   initializeApp,
@@ -52,7 +51,7 @@ import { checkForUpdates } from './ui/utils/updateCheck.js';
 import { handleAutoUpdate } from './utils/handleAutoUpdate.js';
 import { appEvents, AppEvent } from './utils/events.js';
 import { SettingsContext } from './ui/contexts/SettingsContext.js';
-import { writeFileSync } from 'node:fs';
+
 import { SessionStatsProvider } from './ui/contexts/SessionContext.js';
 import { VimModeProvider } from './ui/contexts/VimModeContext.js';
 import { KeypressProvider } from './ui/contexts/KeypressContext.js';
@@ -238,15 +237,6 @@ export async function main() {
 
     // Detect and enable Kitty keyboard protocol once at startup.
     kittyProtocolDetectionComplete = detectAndEnableKittyProtocol();
-  }
-  if (argv.sessionSummary) {
-    registerCleanup(() => {
-      const metrics = uiTelemetryService.getMetrics();
-      writeFileSync(
-        argv.sessionSummary!,
-        JSON.stringify({ sessionMetrics: metrics }, null, 2),
-      );
-    });
   }
 
   const consolePatcher = new ConsolePatcher({
