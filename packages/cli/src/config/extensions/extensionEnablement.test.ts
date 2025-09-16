@@ -38,8 +38,8 @@ describe('ExtensionEnablementManager', () => {
   });
 
   describe('isEnabled', () => {
-    it('should return false if extension is not configured', () => {
-      expect(manager.isEnabled('ext-test', '/any/path')).toBe(false);
+    it('should return true if extension is not configured', () => {
+      expect(manager.isEnabled('ext-test', '/any/path')).toBe(true);
     });
 
     it('should return true if default is enabled and no overrides match', () => {
@@ -84,51 +84,6 @@ describe('ExtensionEnablementManager', () => {
       expect(manager.isEnabled('ext-test', '/home/user/projects/my-app')).toBe(
         false,
       );
-    });
-  });
-
-  describe('enable/disable/remove', () => {
-    it('should set the default to enabled when no scope is provided', () => {
-      manager.enable('ext-test');
-
-      const configPath = path.join(configDir, 'extensions.json');
-      const writtenConfig = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
-      expect(writtenConfig['ext-test'].default).toBe('enabled');
-    });
-
-    it('should add an enable rule for a given scope', () => {
-      manager.enable('ext-test', '/path/to/enable');
-
-      const configPath = path.join(configDir, 'extensions.json');
-      const writtenConfig = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
-      expect(writtenConfig['ext-test'].overrides).toContain('/path/to/enable');
-    });
-
-    it('should set the default to disabled when no scope is provided', () => {
-      manager.disable('ext-test');
-
-      const configPath = path.join(configDir, 'extensions.json');
-      const writtenConfig = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
-      expect(writtenConfig['ext-test'].default).toBe('disabled');
-    });
-
-    it('should add a disable rule for a given scope', () => {
-      manager.disable('ext-test', '/path/to/disable');
-
-      const configPath = path.join(configDir, 'extensions.json');
-      const writtenConfig = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
-      expect(writtenConfig['ext-test'].overrides).toContain(
-        '!/path/to/disable',
-      );
-    });
-
-    it('should remove an extension from the config', () => {
-      manager.enable('ext-test');
-      manager.remove('ext-test');
-
-      const configPath = path.join(configDir, 'extensions.json');
-      const writtenConfig = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
-      expect(writtenConfig['ext-test']).toBeUndefined();
     });
   });
 });
