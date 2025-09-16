@@ -49,8 +49,8 @@ packages/core/dotnet-processor/bin/
 packages/core/dotnet-processor/obj/
 packages/core/temp/
 
-# Python embedded environment - ignore installed packages
-packages/python-3.13.7/Lib/
-packages/python-3.13.7/Scripts/
-packages/python-3.13.7/__pycache__/
-packages/python-3.13.7/get-pip.py
+# Python embedded environment - ignore all except specific files
+packages/python-3.13.7/
+!packages/python-3.13.7/xlwings32-0.33.15.dll
+!packages/python-3.13.7/xlwings64-0.33.15.dll
+!packages/python-3.13.7/pythonw.exe
