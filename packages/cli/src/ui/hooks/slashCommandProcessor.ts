@@ -33,6 +33,8 @@ import { CommandService } from '../../services/CommandService.js';
 import { BuiltinCommandLoader } from '../../services/BuiltinCommandLoader.js';
 import { FileCommandLoader } from '../../services/FileCommandLoader.js';
 import { McpPromptLoader } from '../../services/McpPromptLoader.js';
+import { parseSlashCommand } from '../../utils/commands.js';
+import type { ExtensionUpdateState } from '../state/extensions.js';
 
 interface SlashCommandProcessorActions {
   openAuthDialog: () => void;
@@ -43,6 +45,9 @@ interface SlashCommandProcessorActions {
   quit: (messages: HistoryItem[]) => void;
   setDebugMessage: (message: string) => void;
   toggleCorgiMode: () => void;
+  setExtensionsUpdateState: (
+    updateState: Map<string, ExtensionUpdateState>,
+  ) => void;
 }
 
 /**
@@ -59,6 +64,8 @@ export const useSlashCommandProcessor = (
   setIsProcessing: (isProcessing: boolean) => void,
   setGeminiMdFileCount: (count: number) => void,
   actions: SlashCommandProcessorActions,
+  extensionsUpdateState: Map<string, ExtensionUpdateState>,
+  isConfigInitialized: boolean,
 ) => {
   const session = useSessionStats();
   const [commands, setCommands] = useState<readonly SlashCommand[]>([]);
@@ -100,16 +107,17 @@ export const useSlashCommandProcessor = (
     return l;
   }, [config]);
 
-  const [pendingCompressionItem, setPendingCompressionItem] =
-    useState<HistoryItemWithoutId | null>(null);
+  const [pendingItem, setPendingItem] = useState<HistoryItemWithoutId | null>(
+    null,
+  );
 
   const pendingHistoryItems = useMemo(() => {
     const items: HistoryItemWithoutId[] = [];
-    if (pendingCompressionItem != null) {
-      items.push(pendingCompressionItem);
+    if (pendingItem != null) {
+      items.push(pendingItem);
     }
     return items;
-  }, [pendingCompressionItem]);
+  }, [pendingItem]);
 
   const addMessage = useCallback(
     (message: Message) => {
@@ -181,12 +189,14 @@ export const useSlashCommandProcessor = (
         },
         loadHistory,
         setDebugMessage: actions.setDebugMessage,
-        pendingItem: pendingCompressionItem,
-        setPendingItem: setPendingCompressionItem,
+        pendingItem,
+        setPendingItem,
         toggleCorgiMode: actions.toggleCorgiMode,
         toggleVimEnabled,
         setGeminiMdFileCount,
         reloadCommands,
+        extensionsUpdateState,
+        setExtensionsUpdateState: actions.setExtensionsUpdateState,
       },
       session: {
         stats: session.stats,
@@ -204,12 +214,13 @@ export const useSlashCommandProcessor = (
       refreshStatic,
       session.stats,
       actions,
-      pendingCompressionItem,
-      setPendingCompressionItem,
+      pendingItem,
+      setPendingItem,
       toggleVimEnabled,
       sessionShellAllowlist,
       setGeminiMdFileCount,
       reloadCommands,
+      extensionsUpdateState,
     ],
   );
 
@@ -255,7 +266,7 @@ export const useSlashCommandProcessor = (
     return () => {
       controller.abort();
     };
-  }, [config, reloadTrigger]);
+  }, [config, reloadTrigger, isConfigInitialized]);
 
   const handleSlashCommand = useCallback(
     async (
@@ -277,47 +288,13 @@ export const useSlashCommandProcessor = (
       const userMessageTimestamp = Date.now();
       addItem({ type: MessageType.USER, text: trimmed }, userMessageTimestamp);
 
-      const parts = trimmed.substring(1).trim().split(/\s+/);
-      const commandPath = parts.filter((p) => p); // The parts of the command, e.g., ['memory', 'add']
-
-      let currentCommands = commands;
-      let commandToExecute: SlashCommand | undefined;
-      let pathIndex = 0;
       let hasError = false;
-      const canonicalPath: string[] = [];
+      const {
+        commandToExecute,
+        args,
+        canonicalPath: resolvedCommandPath,
+      } = parseSlashCommand(trimmed, commands);
 
-      for (const part of commandPath) {
-        // TODO: For better performance and architectural clarity, this two-pass
-        // search could be replaced. A more optimal approach would be to
-        // pre-compute a single lookup map in `CommandService.ts` that resolves
-        // all name and alias conflicts during the initial loading phase. The
-        // processor would then perform a single, fast lookup on that map.
-
-        // First pass: check for an exact match on the primary command name.
-        let foundCommand = currentCommands.find((cmd) => cmd.name === part);
-
-        // Second pass: if no primary name matches, check for an alias.
-        if (!foundCommand) {
-          foundCommand = currentCommands.find((cmd) =>
-            cmd.altNames?.includes(part),
-          );
-        }
-
-        if (foundCommand) {
-          commandToExecute = foundCommand;
-          canonicalPath.push(foundCommand.name);
-          pathIndex++;
-          if (foundCommand.subCommands) {
-            currentCommands = foundCommand.subCommands;
-          } else {
-            break;
-          }
-        } else {
-          break;
-        }
-      }
-
-      const resolvedCommandPath = canonicalPath;
       const subcommand =
         resolvedCommandPath.length > 1
           ? resolvedCommandPath.slice(1).join(' ')
@@ -325,8 +302,6 @@ export const useSlashCommandProcessor = (
 
       try {
         if (commandToExecute) {
-          const args = parts.slice(pathIndex).join(' ');
-
           if (commandToExecute.action) {
             const fullCommandContext: CommandContext = {
               ...commandContext,

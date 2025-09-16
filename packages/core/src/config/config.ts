@@ -39,7 +39,9 @@ import {
   initializeTelemetry,
   DEFAULT_TELEMETRY_TARGET,
   DEFAULT_OTLP_ENDPOINT,
+  uiTelemetryService,
 } from '../telemetry/index.js';
+import { tokenLimit } from '../core/tokenLimits.js';
 import { StartSessionEvent } from '../telemetry/index.js';
 import {
   DEFAULT_GEMINI_EMBEDDING_MODEL,
@@ -47,29 +49,29 @@ import {
 } from './models.js';
 import { shouldAttemptBrowserLaunch } from '../utils/browser.js';
 import type { MCPOAuthConfig } from '../mcp/oauth-provider.js';
-import { IdeClient } from '../ide/ide-client.js';
-import { ideContext } from '../ide/ideContext.js';
+import { ideContextStore } from '../ide/ideContext.js';
 import type { FileSystemService } from '../services/fileSystemService.js';
 import { StandardFileSystemService } from '../services/fileSystemService.js';
 import {
   logCliConfiguration,
-  logIdeConnection,
   logRipgrepFallback,
 } from '../telemetry/loggers.js';
-import {
-  IdeConnectionEvent,
-  IdeConnectionType,
-  RipgrepFallbackEvent,
-} from '../telemetry/types.js';
+import { RipgrepFallbackEvent } from '../telemetry/types.js';
 import type { FallbackModelHandler } from '../fallback/types.js';
+import { ModelRouterService } from '../routing/modelRouterService.js';
+import { OutputFormat } from '../output/types.js';
 
 // Re-export OAuth config type
 export type { MCPOAuthConfig, AnyToolInvocation };
 import type { AnyToolInvocation } from '../tools/tools.js';
 import { WorkspaceContext } from '../utils/workspaceContext.js';
 import { Storage } from './storage.js';
+import type { ShellExecutionConfig } from '../services/shellExecutionService.js';
 import { FileExclusions } from '../utils/ignorePatterns.js';
 import type { EventEmitter } from 'node:events';
+import { MessageBus } from '../confirmation-bus/message-bus.js';
+import { PolicyEngine } from '../policy/policy-engine.js';
+import type { PolicyEngineConfig } from '../policy/types.js';
 import type { UserTierId } from '../code_assist/types.js';
 import { ProxyAgent, setGlobalDispatcher } from 'undici';
 
@@ -105,12 +107,20 @@ export interface TelemetrySettings {
   outfile?: string;
 }
 
+export interface OutputSettings {
+  format?: OutputFormat;
+}
+
 export interface GeminiCLIExtension {
   name: string;
   version: string;
   isActive: boolean;
   path: string;
+  source?: string;
+  type?: 'git' | 'local' | 'link';
+  ref?: string;
 }
+
 export interface FileFilteringOptions {
   respectGitIgnore: boolean;
   respectGeminiIgnore: boolean;
@@ -221,6 +231,7 @@ export interface ConfigParameters {
   useRipgrep?: boolean;
   shouldUseNodePtyShell?: boolean;
   skipNextSpeakerCheck?: boolean;
+  shellExecutionConfig?: ShellExecutionConfig;
   extensionManagement?: boolean;
   enablePromptCompletion?: boolean;
   truncateToolOutputThreshold?: number;
@@ -228,6 +239,9 @@ export interface ConfigParameters {
   enableToolOutputTruncation?: boolean;
   eventEmitter?: EventEmitter;
   useSmartEdit?: boolean;
+  policyEngineConfig?: PolicyEngineConfig;
+  output?: OutputSettings;
+  useModelRouter?: boolean;
 }
 
 export class Config {
@@ -260,6 +274,7 @@ export class Config {
   private readonly usageStatisticsEnabled: boolean;
   private geminiClient!: GeminiClient;
   private baseLlmClient!: BaseLlmClient;
+  private modelRouterService: ModelRouterService;
   private readonly fileFiltering: {
     respectGitIgnore: boolean;
     respectGeminiIgnore: boolean;
@@ -272,7 +287,7 @@ export class Config {
   private readonly proxy: string | undefined;
   private readonly cwd: string;
   private readonly bugCommand: BugCommandSettings | undefined;
-  private readonly model: string;
+  private model: string;
   private readonly extensionContextFilePaths: string[];
   private readonly noBrowser: boolean;
   private readonly folderTrustFeature: boolean;
@@ -300,6 +315,7 @@ export class Config {
   private readonly useRipgrep: boolean;
   private readonly shouldUseNodePtyShell: boolean;
   private readonly skipNextSpeakerCheck: boolean;
+  private shellExecutionConfig: ShellExecutionConfig;
   private readonly extensionManagement: boolean = true;
   private readonly enablePromptCompletion: boolean = false;
   private readonly truncateToolOutputThreshold: number;
@@ -310,6 +326,10 @@ export class Config {
   private readonly fileExclusions: FileExclusions;
   private readonly eventEmitter?: EventEmitter;
   private readonly useSmartEdit: boolean;
+  private readonly messageBus: MessageBus;
+  private readonly policyEngine: PolicyEngine;
+  private readonly outputSettings: OutputSettings;
+  private readonly useModelRouter: boolean;
 
   constructor(params: ConfigParameters) {
     this.sessionId = params.sessionId;
@@ -377,9 +397,15 @@ export class Config {
     this.chatCompression = params.chatCompression;
     this.interactive = params.interactive ?? false;
     this.trustedFolder = params.trustedFolder;
-    this.useRipgrep = params.useRipgrep ?? false;
+    this.useRipgrep = params.useRipgrep ?? true;
     this.shouldUseNodePtyShell = params.shouldUseNodePtyShell ?? false;
-    this.skipNextSpeakerCheck = params.skipNextSpeakerCheck ?? false;
+    this.skipNextSpeakerCheck = params.skipNextSpeakerCheck ?? true;
+    this.shellExecutionConfig = {
+      terminalWidth: params.shellExecutionConfig?.terminalWidth ?? 80,
+      terminalHeight: params.shellExecutionConfig?.terminalHeight ?? 24,
+      showColor: params.shellExecutionConfig?.showColor ?? false,
+      pager: params.shellExecutionConfig?.pager ?? 'cat',
+    };
     this.truncateToolOutputThreshold =
       params.truncateToolOutputThreshold ??
       DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD;
@@ -388,11 +414,17 @@ export class Config {
     this.enableToolOutputTruncation =
       params.enableToolOutputTruncation ?? false;
     this.useSmartEdit = params.useSmartEdit ?? true;
+    this.useModelRouter = params.useModelRouter ?? false;
     this.extensionManagement = params.extensionManagement ?? true;
     this.storage = new Storage(this.targetDir);
     this.enablePromptCompletion = params.enablePromptCompletion ?? false;
     this.fileExclusions = new FileExclusions(this);
     this.eventEmitter = params.eventEmitter;
+    this.policyEngine = new PolicyEngine(params.policyEngineConfig);
+    this.messageBus = new MessageBus(this.policyEngine);
+    this.outputSettings = {
+      format: params.output?.format ?? OutputFormat.TEXT,
+    };
 
     if (params.contextFileName) {
       setGeminiMdFilename(params.contextFileName);
@@ -406,6 +438,7 @@ export class Config {
       setGlobalDispatcher(new ProxyAgent(this.getProxy() as string));
     }
     this.geminiClient = new GeminiClient(this);
+    this.modelRouterService = new ModelRouterService(this);
   }
 
   /**
@@ -416,11 +449,6 @@ export class Config {
       throw Error('Config was already initialized');
     }
     this.initialized = true;
-
-    if (this.getIdeMode()) {
-      await (await IdeClient.getInstance()).connect();
-      logIdeConnection(this, new IdeConnectionEvent(IdeConnectionType.START));
-    }
 
     // Initialize centralized FileDiscoveryService
     this.getFileService();
@@ -505,13 +533,16 @@ export class Config {
   }
 
   getModel(): string {
-    return this.contentGeneratorConfig?.model || this.model;
+    return this.model;
   }
 
   setModel(newModel: string): void {
-    if (this.contentGeneratorConfig) {
-      this.contentGeneratorConfig.model = newModel;
+    // Do not allow Pro usage if the user is in fallback mode.
+    if (newModel.includes('pro') && this.isInFallbackMode()) {
+      return;
     }
+
+    this.model = newModel;
   }
 
   isInFallbackMode(): boolean {
@@ -681,6 +712,10 @@ export class Config {
     return this.geminiClient;
   }
 
+  getModelRouterService(): ModelRouterService {
+    return this.modelRouterService;
+  }
+
   getEnableRecursiveFileSearch(): boolean {
     return this.fileFiltering.enableRecursiveFileSearch;
   }
@@ -810,7 +845,7 @@ export class Config {
     // restarts in the more common path. If the user chooses to mark the folder
     // as untrusted, the CLI will restart and we will have the trust value
     // reloaded.
-    const context = ideContext.getIdeContext();
+    const context = ideContextStore.get();
     if (context?.workspaceState?.isTrusted !== undefined) {
       return context.workspaceState.isTrusted;
     }
@@ -856,6 +891,20 @@ export class Config {
     return this.skipNextSpeakerCheck;
   }
 
+  getShellExecutionConfig(): ShellExecutionConfig {
+    return this.shellExecutionConfig;
+  }
+
+  setShellExecutionConfig(config: ShellExecutionConfig): void {
+    this.shellExecutionConfig = {
+      terminalWidth:
+        config.terminalWidth ?? this.shellExecutionConfig.terminalWidth,
+      terminalHeight:
+        config.terminalHeight ?? this.shellExecutionConfig.terminalHeight,
+      showColor: config.showColor ?? this.shellExecutionConfig.showColor,
+      pager: config.pager ?? this.shellExecutionConfig.pager,
+    };
+  }
   getScreenReader(): boolean {
     return this.accessibility.screenReader ?? false;
   }
@@ -869,7 +918,12 @@ export class Config {
   }
 
   getTruncateToolOutputThreshold(): number {
-    return this.truncateToolOutputThreshold;
+    return Math.min(
+      // Estimate remaining context window in characters (1 token ~= 4 chars).
+      4 *
+        (tokenLimit(this.model) - uiTelemetryService.getLastPromptTokenCount()),
+      this.truncateToolOutputThreshold,
+    );
   }
 
   getTruncateToolOutputLines(): number {
@@ -878,6 +932,16 @@ export class Config {
 
   getUseSmartEdit(): boolean {
     return this.useSmartEdit;
+  }
+
+  getOutputFormat(): OutputFormat {
+    return this.outputSettings?.format
+      ? this.outputSettings.format
+      : OutputFormat.TEXT;
+  }
+
+  getUseModelRouter(): boolean {
+    return this.useModelRouter;
   }
 
   async getGitService(): Promise<GitService> {
@@ -890,6 +954,14 @@ export class Config {
 
   getFileExclusions(): FileExclusions {
     return this.fileExclusions;
+  }
+
+  getMessageBus(): MessageBus {
+    return this.messageBus;
+  }
+
+  getPolicyEngine(): PolicyEngine {
+    return this.policyEngine;
   }
 
   async createToolRegistry(): Promise<ToolRegistry> {
