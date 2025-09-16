@@ -11,23 +11,8 @@ import {
   AuthType,
   ChatCompressionSettings,
 } from '@google/gemini-cli-core';
+import { NotificationSettings } from '../notifications/types.js';
 import { CustomTheme } from '../ui/themes/theme.js';
-
-export interface NotificationEventSettings {
-  enabled: boolean;
-  sound: 'system' | 'custom';
-  customPath?: string;
-  timeout?: number;
-}
-
-export interface NotificationSettings {
-  enabled: boolean;
-  events: {
-    inputRequired: NotificationEventSettings;
-    taskComplete: NotificationEventSettings;
-    idleAlert: NotificationEventSettings;
-  };
-}
 
 export interface SettingDefinition {
   type: 'boolean' | 'string' | 'number' | 'array' | 'object';
