@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, type MockInstance } from 'vitest';
 import { handleInstall, installCommand } from './install.js';
 import yargs from 'yargs';
 
@@ -35,17 +35,19 @@ describe('extensions install command', () => {
 });
 
 describe('handleInstall', () => {
-  const consoleLogSpy = vi.spyOn(console, 'log');
-  const consoleErrorSpy = vi.spyOn(console, 'error');
-  const processSpy = vi
-    .spyOn(process, 'exit')
-    .mockImplementation(() => undefined as never);
+  let consoleLogSpy: MockInstance;
+  let consoleErrorSpy: MockInstance;
+  let processSpy: MockInstance;
+
+  beforeEach(() => {
+    consoleLogSpy = vi.spyOn(console, 'log');
+    consoleErrorSpy = vi.spyOn(console, 'error');
+    processSpy = vi.spyOn(process, 'exit').mockImplementation(() => undefined as never);
+  });
 
   afterEach(() => {
     mockInstallExtension.mockClear();
-    consoleLogSpy.mockClear();
-    consoleErrorSpy.mockClear();
-    processSpy.mockClear();
+    vi.resetAllMocks();
   });
 
   it('should install an extension from a http source', async () => {
