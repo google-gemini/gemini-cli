@@ -104,10 +104,6 @@ import { measureElement } from 'ink';
 import { useTerminalSize } from './hooks/useTerminalSize.js';
 import { ShellExecutionService } from '@google/gemini-cli-core';
 
-vi.mock('../utils/processUtils.js', () => ({
-  relaunchApp: vi.fn(),
-}));
-
 describe('AppContainer State Management', () => {
   let mockConfig: Config;
   let mockSettings: LoadedSettings;
