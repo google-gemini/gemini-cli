@@ -149,6 +149,7 @@ export async function runNonInteractive(
         const subAgentTool = new SolutionPlannerTool(config);
         const subAgentInput: SolutionPlannerInput = {
           user_objective: input,
+          include_file_content: includeFileContent === 'true',
         };
 
         const invocation = subAgentTool.build(subAgentInput);
