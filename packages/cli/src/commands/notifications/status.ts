@@ -17,19 +17,20 @@ export const statusCommand: CommandModule = {
     let statusMessage = 'Current Notification Settings:\n';
     statusMessage += `  Global Enabled: ${settings.enabled}\n`;
     statusMessage += '  Event Triggers:\n';
-    for (const key in settings.events) {
-      const eventType = key as NotificationEventType;
-      const eventSettings = settings.events[eventType];
-      statusMessage += `    - ${eventType}:\n`;
-      statusMessage += `        Enabled: ${eventSettings.enabled}\n`;
-      statusMessage += `        Sound: ${eventSettings.sound}\n`;
-      if (eventSettings.sound === 'custom' && eventSettings.customPath) {
-        statusMessage += `        Custom Path: ${eventSettings.customPath}\n`;
-      }
-      if (eventType === 'idleAlert' && 'timeout' in eventSettings) {
-        statusMessage += `        Timeout: ${eventSettings.timeout} seconds\n`;
-      }
-    }
+    (Object.keys(settings.events) as NotificationEventType[]).forEach(
+      (eventType) => {
+        const eventSettings = settings.events[eventType];
+        statusMessage += `    - ${eventType}:\n`;
+        statusMessage += `        Enabled: ${eventSettings.enabled}\n`;
+        statusMessage += `        Sound: ${eventSettings.sound}\n`;
+        if (eventSettings.sound === 'custom' && eventSettings.customPath) {
+          statusMessage += `        Custom Path: ${eventSettings.customPath}\n`;
+        }
+        if (eventType === 'idleAlert' && 'timeout' in eventSettings) {
+          statusMessage += `        Timeout: ${eventSettings.timeout} seconds\n`;
+        }
+      },
+    );
     console.log(statusMessage);
   },
 };

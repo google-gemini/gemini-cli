@@ -51,8 +51,7 @@ const statusCommand: SlashCommand = {
     let statusMessage = 'Current Notification Settings:\n';
     statusMessage += `  Global Enabled: ${settings.enabled}\n`;
     statusMessage += '  Event Triggers:\n';
-    for (const key in settings.events) {
-      const eventType = key as NotificationEventType;
+    (Object.keys(settings.events) as NotificationEventType[]).forEach(eventType => {
       const eventSettings = settings.events[eventType];
       statusMessage += `    - ${eventType}:\n`;
       statusMessage += `        Enabled: ${eventSettings.enabled}\n`;
@@ -63,7 +62,7 @@ const statusCommand: SlashCommand = {
       if (eventType === 'idleAlert' && 'timeout' in eventSettings) {
         statusMessage += `        Timeout: ${eventSettings.timeout} seconds\n`;
       }
-    }
+    });
 
     return { type: 'message', content: statusMessage };
   },
