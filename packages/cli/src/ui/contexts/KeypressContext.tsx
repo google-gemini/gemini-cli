@@ -84,6 +84,7 @@ export interface Key {
   paste: boolean;
   sequence: string;
   kittyProtocol?: boolean;
+  scroll?: boolean;
 }
 
 export type KeypressHandler = (key: Key) => void;
@@ -358,6 +359,36 @@ export function KeypressProvider({
                 paste: false,
                 sequence: buffer.slice(0, m[0].length),
                 kittyProtocol: true,
+              },
+              length: m[0].length,
+            };
+          }
+        }
+
+        if (terminator === 'u') {
+          let name: string | null = null;
+          let scroll = false;
+          switch (keyCode) {
+            case 64:
+              name = 'up';
+              scroll = true;
+              break;
+            case 65:
+              name = 'down';
+              scroll = true;
+              break;
+          }
+          if (name) {
+            return {
+              key: {
+                name,
+                ctrl,
+                meta: alt,
+                shift,
+                paste: false,
+                sequence: buffer.slice(0, m[0].length),
+                kittyProtocol: true,
+                scroll,
               },
               length: m[0].length,
             };

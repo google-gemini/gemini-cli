@@ -418,6 +418,25 @@ const SETTINGS_SCHEMA = {
         requiresRestart: false,
         default: false,
         description: 'Use the entire width of the terminal for output.',
+      },
+      useInkScrolling: {
+        type: 'boolean',
+        label: 'Use Ink Scrolling',
+        category: 'UI',
+        requiresRestart: false,
+        default: true,
+        description:
+          'Use custom scrolling behavior in the Ink rendering library.',
+        showInDialog: true,
+      },
+      useAlternateBuffer: {
+        type: 'boolean',
+        label: 'Use Alternate Screen Buffer',
+        category: 'UI',
+        requiresRestart: true,
+        default: false,
+        description:
+          'Use an alternate screen buffer for the UI, preserving shell history.',
         showInDialog: true,
       },
       customWittyPhrases: {

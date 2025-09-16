@@ -259,6 +259,7 @@ const renderDiffContent = (
         ) {
           acc.push(
             <Box key={`gap-${index}`}>
+              {/* XXX switch back to a proper border. */}
               <Text wrap="truncate" color={semanticTheme.text.secondary}>
                 {'═'.repeat(terminalWidth)}
               </Text>

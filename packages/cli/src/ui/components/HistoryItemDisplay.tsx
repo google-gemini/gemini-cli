@@ -57,7 +57,15 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
   const itemForDisplay = useMemo(() => escapeAnsiCtrlCodes(item), [item]);
 
   return (
-    <Box flexDirection="column" key={itemForDisplay.id}>
+    <Box
+      flexDirection="column"
+      key={itemForDisplay.id}
+      maxHeight={availableTerminalHeight}
+      width={terminalWidth}
+      overflowY="scroll"
+      overflowX="hidden"
+      scrollTop={Number.MAX_SAFE_INTEGER}
+    >
       {/* Render standard message types */}
       {itemForDisplay.type === 'user' && (
         <UserMessage text={itemForDisplay.text} />

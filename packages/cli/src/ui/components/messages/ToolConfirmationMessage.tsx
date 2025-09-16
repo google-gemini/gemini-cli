@@ -213,7 +213,7 @@ export const ToolConfirmationMessage: React.FC<
         <Box paddingX={1} marginLeft={1}>
           <MaxSizedBox
             maxHeight={bodyContentHeight}
-            maxWidth={Math.max(childWidth - 4, 1)}
+            maxWidth={Math.max(childWidth, 1)}
           >
             <Box>
               <Text color={theme.text.link}>{executionProps.command}</Text>
@@ -248,7 +248,7 @@ export const ToolConfirmationMessage: React.FC<
     });
 
     bodyContent = (
-      <Box flexDirection="column" paddingX={1} marginLeft={1}>
+      <Box flexDirection="column" paddingLeft={1} marginLeft={1}>
         <Text color={theme.text.link}>
           <RenderInline text={infoProps.prompt} />
         </Text>
@@ -302,18 +302,33 @@ export const ToolConfirmationMessage: React.FC<
   }
 
   return (
-    <Box flexDirection="column" padding={1} width={childWidth}>
+    <Box
+      flexDirection="column"
+      paddingLeft={1}
+      paddingRight={1}
+      paddingTop={0}
+      paddingBottom={1}
+      width={childWidth}
+    >
       {/* Body Content (Diff Renderer or Command Info) */}
       {/* No separate context display here anymore for edits */}
-      <Box flexGrow={1} flexShrink={1} overflow="hidden" marginBottom={1}>
+      <Box
+        flexGrow={1}
+        flexShrink={1}
+        overflow="hidden"
+        marginBottom={1}
+        borderStyle="round"
+        borderLeft={false}
+        borderRight={false}
+        borderColor={theme.border.default}
+        paddingLeft={1}
+      >
         {bodyContent}
       </Box>
 
       {/* Confirmation Question */}
       <Box marginBottom={1} flexShrink={0}>
-        <Text color={theme.text.primary} wrap="truncate">
-          {question}
-        </Text>
+        <Text color={theme.text.primary}>{question}</Text>
       </Box>
 
       {/* Select Input for Options */}

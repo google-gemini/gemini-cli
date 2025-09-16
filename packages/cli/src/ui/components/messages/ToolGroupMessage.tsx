@@ -58,8 +58,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
         : theme.border.default;
 
   const staticHeight = /* border */ 2 + /* marginBottom */ 1;
-  // This is a bit of a magic number, but it accounts for the border and
-  // marginLeft.
+  // This is a bit of a magic number.
   const innerWidth = terminalWidth - 4;
 
   // only prompt for tool approval on the first 'confirming' tool in the list
@@ -101,7 +100,6 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
         hasPending && (!isShellCommand || !isEmbeddedShellFocused)
       }
       borderColor={borderColor}
-      gap={1}
     >
       {toolCalls.map((tool) => {
         const isConfirming = toolAwaitingApproval?.callId === tool.callId;

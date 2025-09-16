@@ -50,7 +50,9 @@ import { setMaxSizedBoxDebugging } from './ui/components/shared/MaxSizedBox.js';
 import { runZedIntegration } from './zed-integration/zedIntegration.js';
 import { cleanupExpiredSessions } from './utils/sessionCleanup.js';
 import { validateNonInteractiveAuth } from './validateNonInterActiveAuth.js';
-import { detectAndEnableKittyProtocol } from './ui/utils/kittyProtocolDetector.js';
+import {
+  detectAndEnableKittyProtocol,
+} from './ui/utils/kittyProtocolDetector.js';
 import { checkForUpdates } from './ui/utils/updateCheck.js';
 import { handleAutoUpdate } from './utils/handleAutoUpdate.js';
 import { appEvents, AppEvent } from './utils/events.js';
@@ -164,6 +166,8 @@ export async function startInteractiveUI(
   const version = await getCliVersion();
   setWindowTitle(basename(workspaceRoot), settings);
 
+  process.stdout.write('\x1b[?7l');
+
   // Create wrapper component to use hooks inside render
   const AppWrapper = () => {
     const kittyProtocolStatus = useKittyKeyboardProtocol();
@@ -201,6 +205,7 @@ export async function startInteractiveUI(
     {
       exitOnCtrlC: false,
       isScreenReaderEnabled: config.getScreenReader(),
+      alternateBuffer: settings.merged.ui?.useAlternateBuffer
     },
   );
 

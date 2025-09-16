@@ -4,12 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { Fragment, useEffect, useId } from 'react';
+import React, { Fragment, useContext, useEffect, useId } from 'react';
 import { Box, Text } from 'ink';
 import stringWidth from 'string-width';
 import { theme } from '../../semantic-colors.js';
 import { toCodePoints } from '../../utils/textUtils.js';
 import { useOverflowActions } from '../../contexts/OverflowContext.js';
+import { SettingsContext } from '../../contexts/SettingsContext.js';
 
 let enableDebugLog = false;
 
@@ -57,46 +58,29 @@ interface MaxSizedBoxProps {
   additionalHiddenLinesCount?: number;
 }
 
-/**
- * A React component that constrains the size of its children and provides
- * content-aware truncation when the content exceeds the specified `maxHeight`.
- *
- * `MaxSizedBox` requires a specific structure for its children to correctly
- * measure and render the content:
- *
- * 1.  **Direct children must be `<Box>` elements.** Each `<Box>` represents a
- *     single row of content.
- * 2.  **Row `<Box>` elements must contain only `<Text>` elements.** These
- *     `<Text>` elements can be nested and there are no restrictions to Text
- *     element styling other than that non-wrapping text elements must be
- *     before wrapping text elements.
- *
- * **Constraints:**
- * - **Box Properties:** Custom properties on the child `<Box>` elements are
- *   ignored. In debug mode, runtime checks will report errors for any
- *   unsupported properties.
- * - **Text Wrapping:** Within a single row, `<Text>` elements with no wrapping
- *   (e.g., headers, labels) must appear before any `<Text>` elements that wrap.
- * - **Element Types:** Runtime checks will warn if unsupported element types
- *   are used as children.
- *
- * @example
- * <MaxSizedBox maxWidth={80} maxHeight={10}>
- *   <Box>
- *     <Text>This is the first line.</Text>
- *   </Box>
- *   <Box>
- *     <Text color="cyan" wrap="truncate">Non-wrapping Header: </Text>
- *     <Text>This is the rest of the line which will wrap if it's too long.</Text>
- *   </Box>
- *   <Box>
- *     <Text>
- *       Line 3 with <Text color="yellow">nested styled text</Text> inside of it.
- *     </Text>
- *   </Box>
- * </MaxSizedBox>
- */
-export const MaxSizedBox: React.FC<MaxSizedBoxProps> = ({
+const WithInkScrolling: React.FC<MaxSizedBoxProps> = ({
+  children,
+  maxWidth,
+  maxHeight,
+  overflowDirection = 'top',
+}) => (
+  <Box
+    maxHeight={maxHeight}
+    flexShrink={1}
+    flexGrow={1}
+    width={maxWidth}
+    flexDirection="column"
+    overflowY="scroll"
+    overflowX="hidden"
+    scrollTop={overflowDirection === 'top' ? Number.MAX_SAFE_INTEGER : 0}
+  >
+    <Box flexShrink={0} paddingRight={1} flexDirection="column">
+      {children}
+    </Box>
+  </Box>
+);
+
+const WithoutInkScrolling: React.FC<MaxSizedBoxProps> = ({
   children,
   maxWidth,
   maxHeight,
@@ -187,18 +171,67 @@ export const MaxSizedBox: React.FC<MaxSizedBoxProps> = ({
     <Box flexDirection="column" width={maxWidth} flexShrink={0}>
       {totalHiddenLines > 0 && overflowDirection === 'top' && (
         <Text color={theme.text.secondary} wrap="truncate">
-          ... first {totalHiddenLines} line{totalHiddenLines === 1 ? '' : 's'}{' '}
+          ... first {totalHiddenLines} line{totalHiddenLines === 1 ? '' : 's'}
           hidden ...
         </Text>
       )}
       {visibleLines}
       {totalHiddenLines > 0 && overflowDirection === 'bottom' && (
         <Text color={theme.text.secondary} wrap="truncate">
-          ... last {totalHiddenLines} line{totalHiddenLines === 1 ? '' : 's'}{' '}
+          ... last {totalHiddenLines} line{totalHiddenLines === 1 ? '' : 's'}
           hidden ...
         </Text>
       )}
     </Box>
+  );
+};
+
+/**
+ * A React component that constrains the size of its children and provides
+ * content-aware truncation when the content exceeds the specified `maxHeight`.
+ *
+ * `MaxSizedBox` requires a specific structure for its children to correctly
+ * measure and render the content:
+ *
+ * 1.  **Direct children must be `<Box>` elements.** Each `<Box>` represents a
+ *     single row of content.
+ * 2.  **Row `<Box>` elements must contain only `<Text>` elements.** These
+ *     `<Text>` elements can be nested and there are no restrictions to Text
+ *     element styling other than that non-wrapping text elements must be
+ *     before wrapping text elements.
+ *
+ * **Constraints:**
+ * - **Box Properties:** Custom properties on the child `<Box>` elements are
+ *   ignored. In debug mode, runtime checks will report errors for any
+ *   unsupported properties.
+ * - **Text Wrapping:** Within a single row, `<Text>` elements with no wrapping
+ *   (e.g., headers, labels) must appear before any `<Text>` elements that wrap.
+ * - **Element Types:** Runtime checks will warn if unsupported element types
+ *   are used as children.
+ *
+ * @example
+ * <MaxSizedBox maxWidth={80} maxHeight={10}>
+ *   <Box>
+ *     <Text>This is the first line.</Text>
+ *   </Box>
+ *   <Box>
+ *     <Text color="cyan" wrap="truncate">Non-wrapping Header: </Text>
+ *     <Text>This is the rest of the line which will wrap if it's too long.</Text>
+ *   </Box>
+ *   <Box>
+ *     <Text>
+ *       Line 3 with <Text color="yellow">nested styled text</Text> inside of it.
+ *     </Text>
+ *   </Box>
+ * </MaxSizedBox>
+ */
+export const MaxSizedBox: React.FC<MaxSizedBoxProps> = (props) => {
+  const settings = useContext(SettingsContext)!;
+
+  return settings.merged.ui?.useInkScrolling !== false ? (
+    <WithInkScrolling {...props} />
+  ) : (
+    <WithoutInkScrolling {...props} />
   );
 };
 

@@ -19,7 +19,6 @@ interface GeminiMessageProps {
 
 export const GeminiMessage: React.FC<GeminiMessageProps> = ({
   text,
-  isPending,
   availableTerminalHeight,
   terminalWidth,
 }) => {
@@ -33,13 +32,18 @@ export const GeminiMessage: React.FC<GeminiMessageProps> = ({
           {prefix}
         </Text>
       </Box>
-      <Box flexGrow={1} flexDirection="column">
-        <MarkdownDisplay
-          text={text}
-          isPending={isPending}
-          availableTerminalHeight={availableTerminalHeight}
-          terminalWidth={terminalWidth}
-        />
+      <Box
+        flexGrow={1}
+        flexShrink={1}
+        flexDirection="column"
+        overflow-x="hidden"
+        overflowY="scroll"
+        scrollTop={Number.MAX_SAFE_INTEGER}
+        maxHeight={availableTerminalHeight}
+      >
+        <Box flexShrink={0} flexDirection="column">
+          <MarkdownDisplay text={text} terminalWidth={terminalWidth} />
+        </Box>
       </Box>
     </Box>
   );

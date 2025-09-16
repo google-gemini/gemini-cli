@@ -105,14 +105,7 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
       )
     : undefined;
 
-  // Long tool call response in MarkdownDisplay doesn't respect availableTerminalHeight properly,
-  // we're forcing it to not render as markdown when the response is too long, it will fallback
-  // to render as plain text, which is contained within the terminal using MaxSizedBox
-  if (availableHeight) {
-    renderOutputAsMarkdown = false;
-  }
-
-  const childWidth = terminalWidth - 3; // account for padding.
+  const childWidth = terminalWidth - 2;
   if (typeof resultDisplay === 'string') {
     if (resultDisplay.length > MAXIMUM_RESULT_DISPLAY_CHARACTERS) {
       // Truncate the result display to fit within the available width.
@@ -120,8 +113,9 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
         '...' + resultDisplay.slice(-MAXIMUM_RESULT_DISPLAY_CHARACTERS);
     }
   }
+  // The outer box should not actually scroll unless something has gone very wrong.
   return (
-    <Box paddingX={1} paddingY={0} flexDirection="column">
+    <Box paddingX={1} paddingY={0} flexDirection="column" overflow="scroll" maxHeight={availableTerminalHeight}>
       <Box minHeight={1}>
         <ToolStatusIndicator status={status} name={name} />
         <ToolInfo
@@ -140,14 +134,20 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
         {emphasis === 'high' && <TrailingIndicator />}
       </Box>
       {resultDisplay && (
-        <Box paddingLeft={STATUS_INDICATOR_WIDTH} width="100%" marginTop={1}>
+        <Box
+          width="100%"
+          borderStyle="round"
+          borderColor={theme.border.default}
+          paddingX={1}
+          borderLeft={false}
+          borderRight={false}
+          flexDirection="column"
+        >
           <Box flexDirection="column">
             {typeof resultDisplay === 'string' && renderOutputAsMarkdown ? (
               <Box flexDirection="column">
                 <MarkdownDisplay
                   text={resultDisplay}
-                  isPending={false}
-                  availableTerminalHeight={availableHeight}
                   terminalWidth={childWidth}
                 />
               </Box>
@@ -264,10 +264,7 @@ const ToolInfo: React.FC<ToolInfo> = ({
   }, [emphasis]);
   return (
     <Box>
-      <Text
-        wrap="truncate-end"
-        strikethrough={status === ToolCallStatus.Canceled}
-      >
+      <Text strikethrough={status === ToolCallStatus.Canceled}>
         <Text color={nameColor} bold>
           {name}
         </Text>{' '}
@@ -278,8 +275,5 @@ const ToolInfo: React.FC<ToolInfo> = ({
 };
 
 const TrailingIndicator: React.FC = () => (
-  <Text color={theme.text.primary} wrap="truncate">
-    {' '}
-    ←
-  </Text>
+  <Text color={theme.text.primary}> ←</Text>
 );
