@@ -93,7 +93,8 @@
     "yargs": "^17.7.2"
   },
   "dependencies": {
-    "simple-git": "^3.28.0"
+    "simple-git": "^3.28.0",
+    "yoga-layout": "^3.2.1"
   },
   "optionalDependencies": {
     "@lydell/node-pty": "1.1.0",
