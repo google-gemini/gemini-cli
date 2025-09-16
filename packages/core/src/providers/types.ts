@@ -67,9 +67,31 @@ export interface UniversalStreamEvent {
   toolCall?: ToolCall;
   toolCallId?: string;
   toolName?: string;
+  toolSuccess?: boolean;  // Added to indicate tool execution success/failure
+  toolResponseData?: ToolResponseData;  // Structured tool response data
   response?: UniversalResponse;
   error?: Error;
   compressionInfo?: CompressionInfo;
+}
+
+export interface ToolResponseData {
+  operation: string;
+  summary: string;
+  details?: Record<string, unknown>;
+  metrics?: {
+    rowsAffected?: number;
+    columnsAffected?: number;
+    cellsAffected?: number;
+    duration?: number;
+  };
+  files?: {
+    input?: string[];
+    output?: string[];
+    created?: string[];
+    workbook?: string;
+    worksheet?: string;
+  };
+  nextActions?: string[];
 }
 
 export interface CompressionInfo {
