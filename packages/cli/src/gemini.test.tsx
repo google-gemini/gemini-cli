@@ -45,7 +45,7 @@ vi.mock('./config/config.js', () => ({
     getSandbox: vi.fn(() => false),
     getQuestion: vi.fn(() => ''),
   } as unknown as Config),
-  parseArguments: vi.fn().mockResolvedValue({ sessionSummary: null }),
+  parseArguments: vi.fn().mockResolvedValue({}),
 }));
 
 vi.mock('read-package-up', () => ({
@@ -174,6 +174,15 @@ describe('gemini.tsx main function kitty protocol', () => {
       (process.stdin as any).setRawMode = vi.fn();
     }
     setRawModeSpy = vi.spyOn(process.stdin, 'setRawMode');
+
+    Object.defineProperty(process.stdin, 'isTTY', {
+      value: true,
+      configurable: true,
+    });
+    Object.defineProperty(process.stdin, 'isRaw', {
+      value: false,
+      configurable: true,
+    });
   });
 
   it('should call setRawMode and detectAndEnableKittyProtocol when isInteractive is true', async () => {
@@ -233,7 +242,6 @@ describe('gemini.tsx main function kitty protocol', () => {
       includeDirectories: undefined,
       screenReader: undefined,
       useSmartEdit: undefined,
-      sessionSummary: undefined,
       promptWords: undefined,
       outputFormat: undefined,
     });
