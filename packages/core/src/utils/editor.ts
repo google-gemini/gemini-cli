@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { execSync, spawn } from 'node:child_process';
+import { execSync, spawn, spawnSync } from 'node:child_process';
 
 export type EditorType =
   | 'vscode'
@@ -173,25 +173,31 @@ export async function openDiff(
   }
 
   try {
-    return new Promise<void>((resolve, reject) => {
-      const isTerminalEditor = ['vim', 'emacs', 'neovim'].includes(editor);
+    const isTerminalEditor = ['vim', 'emacs', 'neovim'].includes(editor);
 
+    if (isTerminalEditor) {
+      try {
+        const result = spawnSync(diffCommand.command, diffCommand.args, {
+          stdio: 'inherit',
+        });
+        if (result.error) {
+          throw result.error;
+        }
+        if (result.status !== 0) {
+          throw new Error(`${editor} exited with code ${result.status}`);
+        }
+      } finally {
+        onEditorClose();
+      }
+      return;
+    }
+
+    return new Promise<void>((resolve, reject) => {
       const childProcess = spawn(diffCommand.command, diffCommand.args, {
         stdio: 'inherit',
       });
 
-      const onFinally = () => {
-        if (isTerminalEditor) {
-          try {
-            onEditorClose();
-          } catch (e) {
-            console.error('Error in onEditorClose callback:', e);
-          }
-        }
-      };
-
       childProcess.on('close', (code) => {
-        onFinally();
         if (code === 0) {
           resolve();
         } else {
@@ -200,7 +206,6 @@ export async function openDiff(
       });
 
       childProcess.on('error', (error) => {
-        onFinally();
         reject(error);
       });
     });
