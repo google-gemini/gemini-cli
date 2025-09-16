@@ -14,6 +14,7 @@ import {
   stripShellWrapper,
 } from './shell-utils.js';
 import type { Config } from '../config/config.js';
+import { ApprovalMode } from '../config/config.js';
 
 const mockPlatform = vi.hoisted(() => vi.fn());
 const mockHomedir = vi.hoisted(() => vi.fn());
@@ -42,6 +43,7 @@ beforeEach(() => {
     getCoreTools: () => [],
     getExcludeTools: () => [],
     getAllowedTools: () => [],
+    getApprovalMode: () => ApprovalMode.DEFAULT,
   } as unknown as Config;
 });
 
@@ -255,6 +257,107 @@ describe('checkCommandPermissions', () => {
       );
       expect(result.allAllowed).toBe(false);
       expect(result.disallowedCommands).toEqual(['rm -rf /']);
+    });
+  });
+
+  describe('command substitution behavior by approval mode', () => {
+    describe('in DEFAULT approval mode', () => {
+      beforeEach(() => {
+        config.getApprovalMode = () => ApprovalMode.DEFAULT;
+      });
+
+      it('should block command substitution using $(...)', () => {
+        const result = checkCommandPermissions('echo $(pwd)', config);
+        expect(result.allAllowed).toBe(false);
+        expect(result.disallowedCommands).toEqual(['echo $(pwd)']);
+        expect(result.blockReason).toContain('Command substitution');
+        expect(result.isHardDenial).toBe(true);
+      });
+
+      it('should block command substitution using backticks', () => {
+        const result = checkCommandPermissions('echo `pwd`', config);
+        expect(result.allAllowed).toBe(false);
+        expect(result.disallowedCommands).toEqual(['echo `pwd`']);
+        expect(result.blockReason).toContain('Command substitution');
+        expect(result.isHardDenial).toBe(true);
+      });
+
+      it('should block process substitution using <(...)', () => {
+        const result = checkCommandPermissions('diff <(ls) <(ls -a)', config);
+        expect(result.allAllowed).toBe(false);
+        expect(result.disallowedCommands).toEqual(['diff <(ls) <(ls -a)']);
+        expect(result.blockReason).toContain('Command substitution');
+        expect(result.isHardDenial).toBe(true);
+      });
+    });
+
+    describe('in AUTO_EDIT approval mode', () => {
+      beforeEach(() => {
+        config.getApprovalMode = () => ApprovalMode.AUTO_EDIT;
+      });
+
+      it('should block command substitution using $(...)', () => {
+        const result = checkCommandPermissions('echo $(pwd)', config);
+        expect(result.allAllowed).toBe(false);
+        expect(result.disallowedCommands).toEqual(['echo $(pwd)']);
+        expect(result.blockReason).toContain('Command substitution');
+        expect(result.isHardDenial).toBe(true);
+      });
+
+      it('should block command substitution using backticks', () => {
+        const result = checkCommandPermissions('echo `pwd`', config);
+        expect(result.allAllowed).toBe(false);
+        expect(result.disallowedCommands).toEqual(['echo `pwd`']);
+        expect(result.blockReason).toContain('Command substitution');
+        expect(result.isHardDenial).toBe(true);
+      });
+    });
+
+    describe('in YOLO approval mode', () => {
+      beforeEach(() => {
+        config.getApprovalMode = () => ApprovalMode.YOLO;
+      });
+
+      it('should allow command substitution using $(...)', () => {
+        const result = checkCommandPermissions('echo $(pwd)', config);
+        expect(result.allAllowed).toBe(true);
+        expect(result.disallowedCommands).toEqual([]);
+      });
+
+      it('should allow command substitution using backticks', () => {
+        const result = checkCommandPermissions('echo `pwd`', config);
+        expect(result.allAllowed).toBe(true);
+        expect(result.disallowedCommands).toEqual([]);
+      });
+
+      it('should allow process substitution using <(...)', () => {
+        const result = checkCommandPermissions('diff <(ls) <(ls -a)', config);
+        expect(result.allAllowed).toBe(true);
+        expect(result.disallowedCommands).toEqual([]);
+      });
+
+      it('should allow complex command substitution with variable expansion', () => {
+        const result = checkCommandPermissions('echo $(date) && ls $HOME', config);
+        expect(result.allAllowed).toBe(true);
+        expect(result.disallowedCommands).toEqual([]);
+      });
+
+      it('should still respect other security constraints (blocked commands)', () => {
+        config.getExcludeTools = () => ['ShellTool(rm)'];
+        const result = checkCommandPermissions('rm $(find . -name "*.tmp")', config);
+        expect(result.allAllowed).toBe(false);
+        expect(result.disallowedCommands).toEqual(['rm $(find . -name "*.tmp")']);
+        expect(result.blockReason).toContain('is blocked by configuration');
+        expect(result.isHardDenial).toBe(true);
+      });
+
+      it('should still respect allowlists when command substitution is allowed', () => {
+        config.getCoreTools = () => ['ShellTool(echo)'];
+        const result = checkCommandPermissions('echo $(pwd) && git status', config);
+        expect(result.allAllowed).toBe(false);
+        expect(result.disallowedCommands).toEqual(['git status']);
+        expect(result.blockReason).toContain('not in the allowed commands list');
+      });
     });
   });
 });
