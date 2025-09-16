@@ -150,7 +150,7 @@ describe('parseAndFormatApiError', () => {
       'You have reached your daily gemini-2.5-pro quota limit',
     );
     expect(result).toContain(
-      'upgrade to a Gemini Code Assist Standard or Enterprise plan',
+      'upgrade to get higher limits',
     );
   });
 
@@ -231,7 +231,7 @@ describe('parseAndFormatApiError', () => {
       'We appreciate you for choosing Gemini Code Assist and the Gemini CLI',
     );
     expect(result).not.toContain(
-      'upgrade to a Gemini Code Assist Standard or Enterprise plan',
+      'upgrade to get higher limits',
     );
   });
 
@@ -255,7 +255,7 @@ describe('parseAndFormatApiError', () => {
       'We appreciate you for choosing Gemini Code Assist and the Gemini CLI',
     );
     expect(result).not.toContain(
-      'upgrade to a Gemini Code Assist Standard or Enterprise plan',
+      'upgrade to get higher limits',
     );
   });
 
@@ -287,10 +287,10 @@ describe('parseAndFormatApiError', () => {
       'You have reached your daily gemini-2.5-preview-pro quota limit',
     );
     expect(result25).toContain(
-      'upgrade to a Gemini Code Assist Standard or Enterprise plan',
+      'upgrade to get higher limits',
     );
     expect(resultPreview).toContain(
-      'upgrade to a Gemini Code Assist Standard or Enterprise plan',
+      'upgrade to get higher limits',
     );
   });
 
@@ -350,7 +350,7 @@ describe('parseAndFormatApiError', () => {
       'We appreciate you for choosing Gemini Code Assist and the Gemini CLI',
     );
     expect(result).not.toContain(
-      'upgrade to a Gemini Code Assist Standard or Enterprise plan',
+      'upgrade to get higher limits',
     );
   });
 
@@ -369,7 +369,7 @@ describe('parseAndFormatApiError', () => {
       'We appreciate you for choosing Gemini Code Assist and the Gemini CLI',
     );
     expect(result).not.toContain(
-      'upgrade to a Gemini Code Assist Standard or Enterprise plan',
+      'upgrade to get higher limits',
     );
   });
 });
