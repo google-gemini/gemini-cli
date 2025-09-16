@@ -214,6 +214,7 @@ describe('gemini.tsx main function kitty protocol', () => {
         ui: {},
       },
       setValue: vi.fn(),
+      forScope: () => ({ settings: {}, originalSettings: {}, path: '' }),
     } as never);
     vi.mocked(parseArguments).mockResolvedValue({
       model: undefined,

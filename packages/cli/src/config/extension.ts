@@ -27,6 +27,7 @@ import { isWorkspaceTrusted } from './trustedFolders.js';
 import { resolveEnvVarsInObject } from '../utils/envVarResolver.js';
 import { randomUUID } from 'node:crypto';
 import { ExtensionUpdateState } from '../ui/state/extensions.js';
+import { ExtensionEnablementManager } from './extensions/extensionEnablement.js';
 
 export const EXTENSIONS_DIRECTORY_NAME = path.join(GEMINI_DIR, 'extensions');
 
@@ -140,7 +141,6 @@ export function loadExtensions(
   workspaceDir: string = process.cwd(),
 ): Extension[] {
   const settings = loadSettings(workspaceDir).merged;
-  const disabledExtensions = settings.extensions?.disabled ?? [];
   const allExtensions = [...loadUserExtensions()];
 
   if (
@@ -152,10 +152,14 @@ export function loadExtensions(
   }
 
   const uniqueExtensions = new Map<string, Extension>();
+  const manager = new ExtensionEnablementManager(
+    ExtensionStorage.getUserExtensionsDir(),
+  );
+
   for (const extension of allExtensions) {
     if (
       !uniqueExtensions.has(extension.config.name) &&
-      !disabledExtensions.includes(extension.config.name)
+      manager.isEnabled(extension.config.name, workspaceDir)
     ) {
       uniqueExtensions.set(extension.config.name, extension);
     }
@@ -198,9 +202,6 @@ export function loadExtensionsFromDir(dir: string): Extension[] {
 
 export function loadExtension(extensionDir: string): Extension | null {
   if (!fs.statSync(extensionDir).isDirectory()) {
-    console.error(
-      `Warning: unexpected file ${extensionDir} in extensions directory.`,
-    );
     return null;
   }
 
@@ -284,7 +285,7 @@ function getContextFileNames(config: ExtensionConfig): string[] {
 
 /**
  * Returns an annotated list of extensions. If an extension is listed in enabledExtensionNames, it will be active.
- * If enabledExtensionNames is empty, an extension is active unless it is in list of disabled extensions in settings.
+ * If enabledExtensionNames is empty, an extension is active unless it is disabled.
  * @param extensions The base list of extensions.
  * @param enabledExtensionNames The names of explicitly enabled extensions.
  * @param workspaceDir The current workspace directory.
@@ -294,16 +295,16 @@ export function annotateActiveExtensions(
   enabledExtensionNames: string[],
   workspaceDir: string,
 ): GeminiCLIExtension[] {
-  const settings = loadSettings(workspaceDir).merged;
-  const disabledExtensions = settings.extensions?.disabled ?? [];
+  const manager = new ExtensionEnablementManager(
+    ExtensionStorage.getUserExtensionsDir(),
+  );
 
   const annotatedExtensions: GeminiCLIExtension[] = [];
-
   if (enabledExtensionNames.length === 0) {
     return extensions.map((extension) => ({
       name: extension.config.name,
       version: extension.config.version,
-      isActive: !disabledExtensions.includes(extension.config.name),
+      isActive: manager.isEnabled(extension.config.name, workspaceDir),
       path: extension.path,
       source: extension.installMetadata?.source,
       type: extension.installMetadata?.type,
@@ -526,6 +527,7 @@ export async function installExtension(
       ),
     );
 
+    enableExtension(newExtensionConfig!.name, SettingScope.User);
     return newExtensionConfig!.name;
   } catch (error) {
     // Attempt to load config from the source path even if installation fails
@@ -581,11 +583,10 @@ export async function uninstallExtension(
   ) {
     throw new Error(`Extension "${extensionName}" not found.`);
   }
-  removeFromDisabledExtensions(
-    extensionName,
-    [SettingScope.User, SettingScope.Workspace],
-    cwd,
+  const manager = new ExtensionEnablementManager(
+    ExtensionStorage.getUserExtensionsDir(),
   );
+  manager.remove(extensionName);
   const storage = new ExtensionStorage(extensionName);
 
   await fs.promises.rm(storage.getExtensionDir(), {
@@ -710,45 +711,27 @@ export function disableExtension(
   if (scope === SettingScope.System || scope === SettingScope.SystemDefaults) {
     throw new Error('System and SystemDefaults scopes are not supported.');
   }
-  const settings = loadSettings(cwd);
-  const settingsFile = settings.forScope(scope);
-  const extensionSettings = settingsFile.settings.extensions || {
-    disabled: [],
-  };
-  const disabledExtensions = extensionSettings.disabled || [];
-  if (!disabledExtensions.includes(name)) {
-    disabledExtensions.push(name);
-    extensionSettings.disabled = disabledExtensions;
-    settings.setValue(scope, 'extensions', extensionSettings);
-  }
+
+  const manager = new ExtensionEnablementManager(
+    ExtensionStorage.getUserExtensionsDir(),
+  );
+  const scopePath = scope === SettingScope.Workspace ? cwd : os.homedir();
+  manager.disable(name, true, scopePath);
 }
 
-export function enableExtension(name: string, scopes: SettingScope[]) {
-  removeFromDisabledExtensions(name, scopes);
-}
-
-/**
- * Removes an extension from the list of disabled extensions.
- * @param name The name of the extension to remove.
- * @param scope The scopes to remove the name from.
- */
-function removeFromDisabledExtensions(
+export function enableExtension(
   name: string,
-  scopes: SettingScope[],
+  scope: SettingScope,
   cwd: string = process.cwd(),
 ) {
-  const settings = loadSettings(cwd);
-  for (const scope of scopes) {
-    const settingsFile = settings.forScope(scope);
-    const extensionSettings = settingsFile.settings.extensions || {
-      disabled: [],
-    };
-    const disabledExtensions = extensionSettings.disabled || [];
-    extensionSettings.disabled = disabledExtensions.filter(
-      (extension) => extension !== name,
-    );
-    settings.setValue(scope, 'extensions', extensionSettings);
+  if (scope === SettingScope.System || scope === SettingScope.SystemDefaults) {
+    throw new Error('System and SystemDefaults scopes are not supported.');
   }
+  const manager = new ExtensionEnablementManager(
+    ExtensionStorage.getUserExtensionsDir(),
+  );
+  const scopePath = scope === SettingScope.Workspace ? cwd : os.homedir();
+  manager.enable(name, true, scopePath);
 }
 
 export async function updateAllUpdatableExtensions(
