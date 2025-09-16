@@ -7,16 +7,28 @@
 import { spawn } from 'child_process';
 import * as os from 'os';
 import * as fs from 'fs';
+import * as path from 'path';
 
 /**
  * Plays a sound using platform-specific commands.
  * @param soundPath The path to the sound file or a system sound alias.
  */
 export function playSound(soundPath: string): void {
-  // On Windows, system sounds are identified by aliases, not file paths.
-  if (os.platform() !== 'win32' && !soundPath.startsWith('/') && !fs.existsSync(soundPath)) {
-    console.error(`Sound file not found: ${soundPath}`);
-    return;
+  const isWindows = os.platform() === 'win32';
+  const isSystemSound =
+    isWindows &&
+    ['SystemAsterisk', 'SystemExclamation'].includes(soundPath);
+
+  // Validate file path if it's not a Windows system sound
+  if (!isSystemSound) {
+    const absolutePath = path.isAbsolute(soundPath)
+      ? soundPath
+      : path.resolve(soundPath);
+    if (!fs.existsSync(absolutePath)) {
+      console.error(`Sound file not found: ${absolutePath}`);
+      return;
+    }
+    soundPath = absolutePath;
   }
 
   let command: string;
@@ -33,8 +45,7 @@ export function playSound(soundPath: string): void {
       break;
     case 'win32': // Windows
       command = 'powershell.exe';
-      // For system sounds, soundPath is an alias like 'SystemAsterisk'
-      if (soundPath.startsWith('System')) {
+      if (isSystemSound) {
         args.push(
           '-c',
           `(New-Object Media.SystemSounds).${soundPath}.Play();`,
