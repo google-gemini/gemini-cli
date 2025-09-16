@@ -58,6 +58,7 @@ describe('EditTool', () => {
   let rootDir: string;
   let mockConfig: Config;
   let geminiClient: any;
+  let baseLlmClient: any;
 
   beforeEach(() => {
     vi.restoreAllMocks();
@@ -69,8 +70,13 @@ describe('EditTool', () => {
       generateJson: mockGenerateJson, // mockGenerateJson is already defined and hoisted
     };
 
+    baseLlmClient = {
+      generateJson: vi.fn(),
+    };
+
     mockConfig = {
       getGeminiClient: vi.fn().mockReturnValue(geminiClient),
+      getBaseLlmClient: vi.fn().mockReturnValue(baseLlmClient),
       getTargetDir: () => rootDir,
       getApprovalMode: vi.fn(),
       setApprovalMode: vi.fn(),
@@ -424,11 +430,12 @@ describe('EditTool', () => {
       // Set a specific mock for this test case
       let mockCalled = false;
       mockEnsureCorrectEdit.mockImplementationOnce(
-        async (_, content, p, client) => {
+        async (_, content, p, client, baseClient) => {
           mockCalled = true;
           expect(content).toBe(originalContent);
           expect(p).toBe(params);
           expect(client).toBe(geminiClient);
+          expect(baseClient).toBe(baseLlmClient);
           return {
             params: {
               file_path: filePath,
