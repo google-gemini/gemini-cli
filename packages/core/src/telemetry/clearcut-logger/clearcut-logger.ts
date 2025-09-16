@@ -27,6 +27,7 @@ import type {
   ExtensionInstallEvent,
   ToolOutputTruncatedEvent,
   ExtensionUninstallEvent,
+  ModelRoutingEvent,
 } from '../types.js';
 import { EventMetadataKey } from './event-metadata-key.js';
 import type { Config } from '../../config/config.js';
@@ -63,6 +64,7 @@ export enum EventNames {
   EXTENSION_INSTALL = 'extension_install',
   EXTENSION_UNINSTALL = 'extension_uninstall',
   TOOL_OUTPUT_TRUNCATED = 'tool_output_truncated',
+  MODEL_ROUTING = 'model_routing',
 }
 
 export interface LogResponse {
@@ -923,6 +925,37 @@ export class ClearcutLogger {
     this.enqueueLogEvent(
       this.createLogEvent(EventNames.TOOL_OUTPUT_TRUNCATED, data),
     );
+    this.flushIfNeeded();
+  }
+
+  logModelRoutingEvent(event: ModelRoutingEvent): void {
+    const data: EventValue[] = [
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_ROUTING_DECISION,
+        value: event.decision_model,
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_ROUTING_DECISION_SOURCE,
+        value: event.decision_source,
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_ROUTING_LATENCY_MS,
+        value: event.routing_latency_ms.toString(),
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_ROUTING_FAILURE,
+        value: event.failed.toString(),
+      },
+    ];
+
+    if (event.error_message) {
+      data.push({
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_ROUTING_FAILURE_REASON,
+        value: event.error_message,
+      });
+    }
+
+    this.enqueueLogEvent(this.createLogEvent(EventNames.MODEL_ROUTING, data));
     this.flushIfNeeded();
   }
 
