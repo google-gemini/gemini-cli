@@ -5,7 +5,7 @@
  */
 
 import type { AnyToolInvocation } from '../index.js';
-import type { Config } from '../config/config.js';
+import { type Config, ApprovalMode } from '../config/config.js';
 import os from 'node:os';
 import { quote } from 'shell-quote';
 import { doesToolInvocationMatch } from './tool-utils.js';
@@ -313,7 +313,7 @@ export function checkCommandPermissions(
   isHardDenial?: boolean;
 } {
   // Disallow command substitution for security.
-  if (detectCommandSubstitution(command)) {
+  if (config.getApprovalMode() !== ApprovalMode.YOLO && detectCommandSubstitution(command)) {
     return {
       allAllowed: false,
       disallowedCommands: [command],
