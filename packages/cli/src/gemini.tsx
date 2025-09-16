@@ -102,15 +102,33 @@ function getNodeMemoryArgs(config: Config): string[] {
 }
 
 async function relaunchWithAdditionalArgs(additionalArgs: string[]) {
+  // If stdin is in raw mode, we need to temporarily disable it so that the
+  // child process can take control of it.
+  const wasRaw = process.stdin.isRaw;
+  if (wasRaw) {
+    process.stdin.setRawMode(false);
+  }
+
+  // The parent process should not be reading from stdin while the child is running.
+  process.stdin.pause();
+
   const nodeArgs = [...additionalArgs, ...process.argv.slice(1)];
   const newEnv = { ...process.env, GEMINI_CLI_NO_RELAUNCH: 'true' };
 
   const child = spawn(process.execPath, nodeArgs, {
     stdio: 'inherit',
     env: newEnv,
+    detached: true,
   });
 
-  await new Promise((resolve) => child.on('close', resolve));
+  await new Promise<void>((resolve) => {
+    child.on('close', () => {
+      // Resume stdin before the parent process exits.
+      process.stdin.resume();
+      resolve();
+    });
+  });
+
   process.exit(0);
 }
 
