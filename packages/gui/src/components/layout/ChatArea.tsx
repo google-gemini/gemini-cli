@@ -1,4 +1,4 @@
-import { useRef, forwardRef, useImperativeHandle } from 'react';
+import { useRef, forwardRef, useImperativeHandle, useEffect } from 'react';
 import { MessageList } from '@/components/chat/MessageList';
 import { MessageInput } from '@/components/chat/MessageInput';
 import { EmptyState } from '@/components/chat/EmptyState';
@@ -37,6 +37,29 @@ export const ChatArea = forwardRef<ChatAreaHandle, ChatAreaProps>(({ onTemplateR
   }));
 
   const activeSession = sessions.find(session => session.id === activeSessionId);
+
+  // Auto-scroll when active session changes or new messages are added
+  useEffect(() => {
+    if (activeSession && messageListRef.current) {
+      // Delay to ensure DOM has updated
+      const timeoutId = setTimeout(() => {
+        messageListRef.current?.scrollToBottom();
+      }, 100);
+
+      return () => clearTimeout(timeoutId);
+    }
+  }, [activeSession?.messages?.length, activeSessionId]);
+
+  // Auto-scroll when streaming or thinking state changes
+  useEffect(() => {
+    if ((isStreaming || isThinking) && messageListRef.current) {
+      const timeoutId = setTimeout(() => {
+        messageListRef.current?.scrollToBottom();
+      }, 100);
+
+      return () => clearTimeout(timeoutId);
+    }
+  }, [isStreaming, isThinking]);
 
 
 
