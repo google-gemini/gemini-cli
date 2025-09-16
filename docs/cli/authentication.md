@@ -171,3 +171,6 @@ following authentication methods if available:
       - Ensure the `GOOGLE_CLOUD_PROJECT` and `GOOGLE_CLOUD_LOCATION` environment variables are set.
 
 If none of these environment variables are set in a non-interactive session, the CLI will exit with an error.
+
+For comprehensive guidance on using Gemini CLI programmatically and in
+automation workflows, see the [Headless Mode Guide](./headless.md).
