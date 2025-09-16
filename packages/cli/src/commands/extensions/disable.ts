@@ -36,10 +36,25 @@ export const disableCommand: CommandModule = {
         type: 'string',
       })
       .option('scope', {
-        describe: 'The scope to disable the extenison in.',
+        describe:
+          'The scope to disable the extenison in (values: "user", "workspace").',
         type: 'string',
         default: SettingScope.User,
-        choices: [SettingScope.User, SettingScope.Workspace],
+      })
+      .coerce('scope', (arg?: string): SettingScope | undefined => {
+        if (arg === undefined) {
+          return undefined;
+        }
+        const lowerArg = arg.toLowerCase();
+        if (lowerArg === 'user') {
+          return SettingScope.User;
+        }
+        if (lowerArg === 'workspace') {
+          return SettingScope.Workspace;
+        }
+        throw new Error(
+          `Invalid scope "${arg}". Please use "user" or "workspace".`,
+        );
       })
       .check((_argv) => true),
   handler: async (argv) => {

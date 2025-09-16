@@ -20,7 +20,11 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
 import { simpleGit } from 'simple-git';
-import { SettingScope, loadSettings } from '../config/settings.js';
+import {
+  type Settings,
+  SettingScope,
+  loadSettings,
+} from '../config/settings.js';
 import { getErrorMessage } from '../utils/errors.js';
 import { recursivelyHydrateStrings } from './extensions/variables.js';
 import { isWorkspaceTrusted } from './trustedFolders.js';
@@ -29,6 +33,9 @@ import { randomUUID } from 'node:crypto';
 import { ExtensionUpdateState } from '../ui/state/extensions.js';
 
 export const EXTENSIONS_DIRECTORY_NAME = path.join(GEMINI_DIR, 'extensions');
+
+export const WORKSPACE_EXTENSION_OVERRIDES_FILENAME =
+  'workspace-extension-overrides.json';
 
 export const EXTENSIONS_CONFIG_FILENAME = 'gemini-extension.json';
 export const INSTALL_METADATA_FILENAME = '.gemini-extension-install.json';
@@ -105,8 +112,48 @@ async function copyExtension(
   await fs.promises.cp(source, destination, { recursive: true });
 }
 
+function getWorkspaceExtensionOverridesPath(): string {
+  const storage = new Storage(os.homedir());
+  return path.join(
+    storage.getGeminiDir(),
+    WORKSPACE_EXTENSION_OVERRIDES_FILENAME,
+  );
+}
+
+function readWorkspaceExtensionOverrides(): Record<string, string[]> {
+  const overridesPath = getWorkspaceExtensionOverridesPath();
+  if (!fs.existsSync(overridesPath)) {
+    return {};
+  }
+  try {
+    const content = fs.readFileSync(overridesPath, 'utf-8');
+    return JSON.parse(content);
+  } catch (e) {
+    console.error(
+      `Warning: could not parse workspace extension overrides file: ${getErrorMessage(e)}`,
+    );
+    return {};
+  }
+}
+
+export function overrideExtensionForWorkspace(
+  name: string,
+  workspaceDir: string,
+) {
+  const overrides = readWorkspaceExtensionOverrides();
+  if (!overrides[name]) {
+    overrides[name] = [];
+  }
+  if (!overrides[name].includes(workspaceDir)) {
+    overrides[name].push(workspaceDir);
+  }
+  const overridesPath = getWorkspaceExtensionOverridesPath();
+  fs.writeFileSync(overridesPath, JSON.stringify(overrides, null, 2));
+}
+
 export async function performWorkspaceExtensionMigration(
   extensions: Extension[],
+  workspaceDir: string = process.cwd(),
 ): Promise<string[]> {
   const failedInstallNames: string[] = [];
 
@@ -116,13 +163,37 @@ export async function performWorkspaceExtensionMigration(
         source: extension.path,
         type: 'local',
       };
-      await installExtension(installMetadata);
+      await installExtension(installMetadata, workspaceDir);
+      // Disable the extension at the user level and override it for this workspace.
+      disableExtension(extension.config.name, SettingScope.User, workspaceDir);
+      overrideExtensionForWorkspace(extension.config.name, workspaceDir);
     } catch (_) {
       failedInstallNames.push(extension.config.name);
     }
   }
   return failedInstallNames;
 }
+
+const isExtensionEnabled = (
+  name: string,
+  settings: Settings,
+  workspaceDir: string,
+): boolean => {
+  const isDisabled = settings.extensions?.disabled?.includes(name);
+
+  if (!isDisabled) {
+    return true;
+  }
+
+  // It is disabled, check for override.
+  const overrides = readWorkspaceExtensionOverrides();
+  const workspaceOverrides = overrides[name];
+  if (workspaceOverrides && workspaceOverrides.includes(workspaceDir)) {
+    return true;
+  }
+
+  return false;
+};
 
 function getClearcutLogger(cwd: string) {
   const config = new Config({
@@ -138,9 +209,10 @@ function getClearcutLogger(cwd: string) {
 
 export function loadExtensions(
   workspaceDir: string = process.cwd(),
+  includeDisabled: boolean = false,
 ): Extension[] {
   const settings = loadSettings(workspaceDir).merged;
-  const disabledExtensions = settings.extensions?.disabled ?? [];
+
   const allExtensions = [...loadUserExtensions()];
 
   if (
@@ -153,10 +225,10 @@ export function loadExtensions(
 
   const uniqueExtensions = new Map<string, Extension>();
   for (const extension of allExtensions) {
-    if (
-      !uniqueExtensions.has(extension.config.name) &&
-      !disabledExtensions.includes(extension.config.name)
-    ) {
+    const shouldInclude = includeDisabled
+      ? true
+      : isExtensionEnabled(extension.config.name, settings, workspaceDir);
+    if (!uniqueExtensions.has(extension.config.name) && shouldInclude) {
       uniqueExtensions.set(extension.config.name, extension);
     }
   }
@@ -295,15 +367,18 @@ export function annotateActiveExtensions(
   workspaceDir: string,
 ): GeminiCLIExtension[] {
   const settings = loadSettings(workspaceDir).merged;
-  const disabledExtensions = settings.extensions?.disabled ?? [];
-
   const annotatedExtensions: GeminiCLIExtension[] = [];
-
   if (enabledExtensionNames.length === 0) {
+    // An extension is always enabled if it is in the list of explicitly enabled extensions.
+    // If not, we treat it as enabled IFF it is NOT in the disabled extensions list.
     return extensions.map((extension) => ({
       name: extension.config.name,
       version: extension.config.version,
-      isActive: !disabledExtensions.includes(extension.config.name),
+      isActive: isExtensionEnabled(
+        extension.config.name,
+        settings,
+        workspaceDir,
+      ),
       path: extension.path,
       source: extension.installMetadata?.source,
       type: extension.installMetadata?.type,
@@ -702,6 +777,27 @@ export async function updateExtension(
   }
 }
 
+function removeWorkspaceOverride(name: string, workspaceDir: string) {
+  const overrides = readWorkspaceExtensionOverrides();
+  const workspaceOverrides = overrides[name];
+  if (!workspaceOverrides) {
+    return;
+  }
+
+  const updatedOverrides = workspaceOverrides.filter(
+    (dir) => dir !== workspaceDir,
+  );
+
+  if (updatedOverrides.length === 0) {
+    delete overrides[name];
+  } else {
+    overrides[name] = updatedOverrides;
+  }
+
+  const overridesPath = getWorkspaceExtensionOverridesPath();
+  fs.writeFileSync(overridesPath, JSON.stringify(overrides, null, 2));
+}
+
 export function disableExtension(
   name: string,
   scope: SettingScope,
@@ -710,6 +806,12 @@ export function disableExtension(
   if (scope === SettingScope.System || scope === SettingScope.SystemDefaults) {
     throw new Error('System and SystemDefaults scopes are not supported.');
   }
+
+  // If disabling for a workspace, first remove any override that might be active.
+  if (scope === SettingScope.Workspace) {
+    removeWorkspaceOverride(name, cwd);
+  }
+
   const settings = loadSettings(cwd);
   const settingsFile = settings.forScope(scope);
   const extensionSettings = settingsFile.settings.extensions || {
@@ -723,8 +825,12 @@ export function disableExtension(
   }
 }
 
-export function enableExtension(name: string, scopes: SettingScope[]) {
-  removeFromDisabledExtensions(name, scopes);
+export function enableExtension(
+  name: string,
+  scopes: SettingScope[],
+  cwd: string = process.cwd(),
+) {
+  removeFromDisabledExtensions(name, scopes, cwd);
 }
 
 /**
@@ -840,9 +946,7 @@ export async function checkForExtensionUpdate(
     }
   } catch (error) {
     console.error(
-      `Failed to check for updates for extension "${
-        extension.name
-      }": ${getErrorMessage(error)}`,
+      `Failed to check for updates for extension "${extension.name}": ${getErrorMessage(error)}`,
     );
     return ExtensionUpdateState.ERROR;
   }
