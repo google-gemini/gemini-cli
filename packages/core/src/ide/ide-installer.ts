@@ -119,9 +119,23 @@ class VsCodeInstaller implements IdeInstaller {
       };
     }
 
-    const command = `"${commandPath}" --install-extension google.gemini-cli-vscode-ide-companion --force`;
     try {
-      child_process.execSync(command, { stdio: 'pipe' });
+      const result = child_process.spawnSync(
+        commandPath,
+        [
+          '--install-extension',
+          'google.gemini-cli-vscode-ide-companion',
+          '--force',
+        ],
+        { stdio: 'pipe' },
+      );
+
+      if (result.status !== 0) {
+        throw new Error(
+          `Failed to install extension: ${result.stderr?.toString()}`,
+        );
+      }
+
       return {
         success: true,
         message: `${this.ideInfo.displayName} companion extension was installed successfully.`,
