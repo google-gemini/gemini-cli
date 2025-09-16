@@ -916,7 +916,7 @@ export class CoreToolScheduler {
                 resultDisplay: toolResult.returnDisplay,
                 error: undefined,
                 errorType: undefined,
-                structuredData: structuredData,
+                structuredData,
               };
               this.setStatusInternal(callId, 'success', successResponse);
             } else {
