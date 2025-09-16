@@ -591,8 +591,15 @@ export const useGeminiStream = (
   );
 
   const handleChatCompressionEvent = useCallback(
-    (eventValue: ServerGeminiChatCompressedEvent['value']) =>
-      addItem(
+    (
+      eventValue: ServerGeminiChatCompressedEvent['value'],
+      userMessageTimestamp: number,
+    ) => {
+      if (pendingHistoryItemRef.current) {
+        addItem(pendingHistoryItemRef.current, userMessageTimestamp);
+        setPendingHistoryItem(null);
+      }
+      return addItem(
         {
           type: 'info',
           text:
@@ -602,8 +609,9 @@ export const useGeminiStream = (
             `${eventValue?.newTokenCount ?? 'unknown'} tokens).`,
         },
         Date.now(),
-      ),
-    [addItem, config],
+      );
+    },
+    [addItem, config, pendingHistoryItemRef, setPendingHistoryItem],
   );
 
   const handleMaxSessionTurnsEvent = useCallback(
@@ -683,7 +691,7 @@ export const useGeminiStream = (
             handleErrorEvent(event.value, userMessageTimestamp);
             break;
           case ServerGeminiEventType.ChatCompressed:
-            handleChatCompressionEvent(event.value);
+            handleChatCompressionEvent(event.value, userMessageTimestamp);
             break;
           case ServerGeminiEventType.ToolCallConfirmation:
           case ServerGeminiEventType.ToolCallResponse:
