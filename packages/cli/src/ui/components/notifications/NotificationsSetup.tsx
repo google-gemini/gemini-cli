@@ -42,11 +42,10 @@ export const NotificationsSetup: React.FC<NotificationsSetupProps> = ({ config, 
     const newSettings = { ...settings };
     newSettings.events[eventType].enabled = value;
     setSettings(newSettings);
-    // Move to the next step
-    if (eventType === 'inputRequired') {
-      setStep('taskComplete');
-    } else if (eventType === 'taskComplete') {
-      setStep('idleAlert');
+    const orderedEventTypes: NotificationEventType[] = ['inputRequired', 'taskComplete', 'idleAlert'];
+    const currentIndex = orderedEventTypes.indexOf(eventType as NotificationEventType);
+    if (currentIndex !== -1 && currentIndex < orderedEventTypes.length - 1) {
+      setStep(orderedEventTypes[currentIndex + 1]);
     } else {
       setStep('done');
       onComplete();
