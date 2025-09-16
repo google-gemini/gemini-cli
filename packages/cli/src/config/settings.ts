@@ -30,6 +30,7 @@ import {
 import { resolveEnvVarsInObject } from '../utils/envVarResolver.js';
 import { customDeepMerge } from '../utils/deepMerge.js';
 import { updateSettingsFilePreservingFormat } from '../utils/commentJson.js';
+import { disableExtension } from './extension.js';
 
 function getMergeStrategyForPath(path: string[]): MergeStrategy | undefined {
   let current: SettingDefinition | undefined = undefined;
@@ -54,7 +55,7 @@ export const USER_SETTINGS_PATH = Storage.getGlobalSettingsPath();
 export const USER_SETTINGS_DIR = path.dirname(USER_SETTINGS_PATH);
 export const DEFAULT_EXCLUDED_ENV_VARS = ['DEBUG', 'DEBUG_MODE'];
 
-const MIGRATE_V2_OVERWRITE = false;
+const MIGRATE_V2_OVERWRITE = true;
 
 const MIGRATION_MAP: Record<string, string> = {
   accessibility: 'ui.accessibility',
@@ -705,6 +706,31 @@ export function loadSettings(
     isTrusted,
     migratedInMemorScopes,
   );
+}
+
+export function migrateDeprecatedSettings(
+  loadedSettings: LoadedSettings,
+  workspaceDir: string = process.cwd(),
+): void {
+  const processScope = (scope: SettingScope) => {
+    const settings = loadedSettings.forScope(scope).settings;
+    if (settings.extensions?.disabled) {
+      console.log(
+        `Migrating deprecated extensions.disabled settings from ${scope} settings...`,
+      );
+      for (const extension of settings.extensions.disabled ?? []) {
+        disableExtension(extension, scope, workspaceDir);
+      }
+
+      const newExtensionsValue = { ...settings.extensions };
+      newExtensionsValue.disabled = undefined;
+
+      loadedSettings.setValue(scope, 'extensions', newExtensionsValue);
+    }
+  };
+
+  processScope(SettingScope.User);
+  processScope(SettingScope.Workspace);
 }
 
 export function saveSettings(settingsFile: SettingsFile): void {
