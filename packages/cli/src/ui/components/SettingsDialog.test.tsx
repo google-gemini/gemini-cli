@@ -327,6 +327,8 @@ describe('SettingsDialog', () => {
 
   describe('Settings Toggling', () => {
     it('should toggle setting with Enter key', async () => {
+      vi.mocked(saveModifiedSettings).mockClear();
+
       const settings = createMockSettings();
       const onSelect = vi.fn();
       const component = (
@@ -342,6 +344,14 @@ describe('SettingsDialog', () => {
       await wait();
       stdin.write(TerminalKeys.ENTER as string);
       await wait();
+
+      // Wait for the mock to be called with more generous timeout for Windows
+      await waitFor(
+        () => {
+          expect(vi.mocked(saveModifiedSettings)).toHaveBeenCalled();
+        },
+        { timeout: 1000 },
+      );
 
       expect(vi.mocked(saveModifiedSettings)).toHaveBeenCalledWith(
         new Set<string>(['general.disableAutoUpdate']),
@@ -400,6 +410,8 @@ describe('SettingsDialog', () => {
       } as unknown as SettingsSchemaType;
 
       it('toggles enum values with the enter key', async () => {
+        vi.mocked(saveModifiedSettings).mockClear();
+
         vi.mocked(getSettingsSchema).mockReturnValue(FAKE_SCHEMA);
         const settings = createMockSettings();
         const onSelect = vi.fn();
@@ -416,6 +428,12 @@ describe('SettingsDialog', () => {
         await wait();
         stdin.write(TerminalKeys.ENTER as string);
         await wait();
+        await waitFor(
+          () => {
+            expect(vi.mocked(saveModifiedSettings)).toHaveBeenCalled();
+          },
+          { timeout: 1000 },
+        );
 
         expect(vi.mocked(saveModifiedSettings)).toHaveBeenCalledWith(
           new Set<string>(['ui.theme']),
@@ -432,6 +450,7 @@ describe('SettingsDialog', () => {
       });
 
       it('loops back when reaching the end of an enum', async () => {
+        vi.mocked(saveModifiedSettings).mockClear();
         vi.mocked(getSettingsSchema).mockReturnValue(FAKE_SCHEMA);
         const settings = createMockSettings();
         settings.setValue(SettingScope.User, 'ui.theme', StringEnum.BAZ);
@@ -449,6 +468,12 @@ describe('SettingsDialog', () => {
         await wait();
         stdin.write(TerminalKeys.ENTER as string);
         await wait();
+        await waitFor(
+          () => {
+            expect(vi.mocked(saveModifiedSettings)).toHaveBeenCalled();
+          },
+          { timeout: 1000 },
+        );
 
         expect(vi.mocked(saveModifiedSettings)).toHaveBeenCalledWith(
           new Set<string>(['ui.theme']),
