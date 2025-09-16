@@ -14,12 +14,10 @@ interface EnableArgs {
   scope?: SettingScope;
 }
 
-export async function handleEnable(args: EnableArgs) {
+export function handleEnable(args: EnableArgs) {
   try {
-    const scopes = args.scope
-      ? [args.scope]
-      : [SettingScope.User, SettingScope.Workspace];
-    enableExtension(args.name, scopes);
+    const scope = args.scope ? args.scope : SettingScope.User;
+    enableExtension(args.name, scope);
     if (args.scope) {
       console.log(
         `Extension "${args.name}" successfully enabled for scope "${args.scope}".`,
@@ -50,8 +48,8 @@ export const enableCommand: CommandModule = {
         choices: [SettingScope.User, SettingScope.Workspace],
       })
       .check((_argv) => true),
-  handler: async (argv) => {
-    await handleEnable({
+  handler: (argv) => {
+    handleEnable({
       name: argv['name'] as string,
       scope: argv['scope'] as SettingScope,
     });
