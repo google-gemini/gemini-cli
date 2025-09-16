@@ -3,27 +3,46 @@ name: 'Eval'
 on:
   workflow_dispatch:
 
+defaults:
+  run:
+    shell: 'bash'
+
+permissions:
+  contents: 'read'
+  id-token: 'write'
+  packages: 'read'
+
 jobs:
   eval:
     name: 'Eval'
+    if: >-
+      github.repository == 'google-gemini/gemini-cli'
     runs-on: 'ubuntu-latest'
-    strategy:
-      matrix:
-        node-version:
-          - '20.x'
-          - '22.x'
-          - '24.x'
+    container:
+      image: 'ghcr.io/google-gemini/gemini-cli-swe-agent-eval@sha256:cd5edc4afd2245c1f575e791c0859b3c084a86bb3bd9a6762296da5162b35a8f'
+      credentials:
+        username: '${{ github.actor }}'
+        password: '${{ secrets.GITHUB_TOKEN }}'
+      env:
+        GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+        DEFAULT_VERTEXAI_PROJECT: '${{ vars.GOOGLE_CLOUD_PROJECT }}'
+        GOOGLE_CLOUD_PROJECT: '${{ vars.GOOGLE_CLOUD_PROJECT }}'
+        GEMINI_API_KEY: '${{ secrets.EVAL_GEMINI_API_KEY }}'
+        GCLI_LOCAL_FILE_TELEMETRY: 'True'
+        EVAL_GCS_BUCKET: '${{ vars.EVAL_GCS_ARTIFACTS_BUCKET }}'
     steps:
-      - name: 'Set up Node.js ${{ matrix.node-version }}'
-        uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions/setup-node@v4
+      - name: 'Authenticate to Google Cloud'
+        id: 'auth'
+        uses: 'google-github-actions/auth@v2' # ratchet:exclude
         with:
-          node-version: '${{ matrix.node-version }}'
-          cache: 'npm'
+          project_id: '${{ vars.GOOGLE_CLOUD_PROJECT }}'
+          workload_identity_provider: '${{ vars.GCP_WIF_PROVIDER }}'
+          service_account: '${{ vars.SERVICE_ACCOUNT_EMAIL }}'
+          token_format: 'access_token'
+          access_token_scopes: 'https://www.googleapis.com/auth/cloud-platform'
 
-      - name: 'Set up Python'
-        uses: 'actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065' # ratchet:actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      - name: 'Install and configure Poetry'
-        uses: 'snok/install-poetry@76e04a911780d5b312d89783f7b1cd627778900a' # ratchet:snok/install-poetry@v1
+      - name: 'Run evaluation'
+        working-directory: '/app'
+        run: |
+          poetry run exp_run --experiment-mode=on-demand --branch-or-commit=${{ github.ref_name }} --model-name=gemini-2.5-pro --dataset=swebench_verified --concurrency=15
+          poetry run python agent_prototypes/scripts/parse_gcli_logs_experiment.py --experiment_dir=experiments/adhoc/gcli_temp_exp --gcs-bucket="${EVAL_GCS_BUCKET}" --gcs-path=gh_action_artifacts
