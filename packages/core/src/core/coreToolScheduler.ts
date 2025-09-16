@@ -412,8 +412,8 @@ export class CoreToolScheduler {
                 },
               ],
               resultDisplay,
-              error: undefined,
-              errorType: undefined,
+              error: new Error(`Tool call cancelled by user. ${auxiliaryData}`),
+              errorType: ToolErrorType.USER_CANCELLED,
             },
             durationMs,
             outcome,
@@ -896,11 +896,8 @@ export class CoreToolScheduler {
           .execute(signal, liveOutputCallback)
           .then(async (toolResult: ToolResult) => {
             if (signal.aborted) {
-              this.setStatusInternal(
-                callId,
-                'cancelled',
-                'User cancelled tool execution.',
-              );
+              // Create a cancellation response to maintain function call/response count balance
+              this.setStatusInternal(callId, 'cancelled', 'Stop and wait for user\'s next instruction.');
               return;
             }
 
@@ -910,12 +907,16 @@ export class CoreToolScheduler {
                 callId,
                 toolResult.llmContent,
               );
+              // Extract structured data if available (e.g., from xlwings tool)
+              const structuredData = toolResult.structuredData;
+
               const successResponse: ToolCallResponseInfo = {
                 callId,
                 responseParts: response,
                 resultDisplay: toolResult.returnDisplay,
                 error: undefined,
                 errorType: undefined,
+                structuredData: structuredData,
               };
               this.setStatusInternal(callId, 'success', successResponse);
             } else {
@@ -1023,5 +1024,39 @@ export class CoreToolScheduler {
         );
       }
     }
+  }
+
+  /**
+   * Re-evaluate all pending tool confirmations when approval mode changes
+   */
+  async reevaluateAllPendingTools(signal: AbortSignal): Promise<void> {
+    const pendingTools = this.toolCalls.filter(
+      (call) => call.status === 'awaiting_approval'
+    ) as WaitingToolCall[];
+
+    for (const pendingTool of pendingTools) {
+      try {
+        const allowedTools = this.config.getAllowedTools() || [];
+        const shouldAutoApprove =
+          this.config.getApprovalMode() === ApprovalMode.YOLO ||
+          doesToolInvocationMatch(pendingTool.request.name, pendingTool.invocation, allowedTools);
+
+        if (shouldAutoApprove) {
+          this.setToolCallOutcome(
+            pendingTool.request.callId,
+            ToolConfirmationOutcome.ProceedAlways,
+          );
+          this.setStatusInternal(pendingTool.request.callId, 'scheduled');
+        }
+      } catch (error) {
+        console.error(
+          `Error reevaluating tool ${pendingTool.request.callId}:`,
+          error,
+        );
+      }
+    }
+
+    // Attempt to execute any newly scheduled calls
+    this.attemptExecutionOfScheduledCalls(signal);
   }
 }
