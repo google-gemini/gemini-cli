@@ -18,6 +18,7 @@ import type {
   ToolResultDisplay,
 } from '../tools/tools.js';
 import type { ToolErrorType } from '../tools/tool-error.js';
+import type { ToolResponseData } from '../providers/types.js';
 import { getResponseText } from '../utils/partUtils.js';
 import { reportError } from '../utils/errorReporting.js';
 import {
@@ -79,6 +80,7 @@ export interface ToolCallResponseInfo {
   resultDisplay: ToolResultDisplay | undefined;
   error: Error | undefined;
   errorType: ToolErrorType | undefined;
+  structuredData?: ToolResponseData;
 }
 
 export interface ServerToolCallConfirmationDetails {
