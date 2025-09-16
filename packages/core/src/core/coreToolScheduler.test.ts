@@ -188,6 +188,7 @@ describe('CoreToolScheduler', () => {
       getTruncateToolOutputLines: () => DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
       getToolRegistry: () => mockToolRegistry,
       getUseSmartEdit: () => false,
+      getUseModelRouter: () => false,
       getGeminiClient: () => null, // No client needed for these tests
     } as unknown as Config;
 
@@ -223,6 +224,7 @@ describe('CoreToolScheduler', () => {
       const mockConfig = {
         getToolRegistry: () => mockToolRegistry,
         getUseSmartEdit: () => false,
+        getUseModelRouter: () => false,
         getGeminiClient: () => null, // No client needed for these tests
       } as unknown as Config;
       const mockToolRegistry = {
@@ -299,6 +301,7 @@ describe('CoreToolScheduler with payload', () => {
       getTruncateToolOutputLines: () => DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
       getToolRegistry: () => mockToolRegistry,
       getUseSmartEdit: () => false,
+      getUseModelRouter: () => false,
       getGeminiClient: () => null, // No client needed for these tests
     } as unknown as Config;
 
@@ -618,6 +621,7 @@ describe('CoreToolScheduler edit cancellation', () => {
       },
       getToolRegistry: () => mockToolRegistry,
       getUseSmartEdit: () => false,
+      getUseModelRouter: () => false,
       getGeminiClient: () => null, // No client needed for these tests
     } as unknown as Config;
 
@@ -721,6 +725,7 @@ describe('CoreToolScheduler YOLO mode', () => {
         DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
       getTruncateToolOutputLines: () => DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
       getUseSmartEdit: () => false,
+      getUseModelRouter: () => false,
       getGeminiClient: () => null, // No client needed for these tests
     } as unknown as Config;
 
@@ -827,6 +832,7 @@ describe('CoreToolScheduler request queueing', () => {
       getTruncateToolOutputLines: () => DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
       getToolRegistry: () => mockToolRegistry,
       getUseSmartEdit: () => false,
+      getUseModelRouter: () => false,
       getGeminiClient: () => null, // No client needed for these tests
     } as unknown as Config;
 
@@ -957,6 +963,7 @@ describe('CoreToolScheduler request queueing', () => {
         DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
       getTruncateToolOutputLines: () => DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
       getUseSmartEdit: () => false,
+      getUseModelRouter: () => false,
       getGeminiClient: () => null, // No client needed for these tests
     } as unknown as Config;
 
@@ -1054,6 +1061,7 @@ describe('CoreToolScheduler request queueing', () => {
       getTruncateToolOutputLines: () => DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
       getToolRegistry: () => mockToolRegistry,
       getUseSmartEdit: () => false,
+      getUseModelRouter: () => false,
       getGeminiClient: () => null, // No client needed for these tests
     } as unknown as Config;
 
@@ -1125,6 +1133,7 @@ describe('CoreToolScheduler request queueing', () => {
         DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
       getTruncateToolOutputLines: () => DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
       getUseSmartEdit: () => false,
+      getUseModelRouter: () => false,
       getGeminiClient: () => null, // No client needed for these tests
     } as unknown as Config;
 
