@@ -596,7 +596,7 @@ describe('extension tests', () => {
       mockQuestion.mockImplementation((_query, callback) => callback('y'));
 
       await expect(
-        installExtension({ source: sourceExtDir, type: 'local' }),
+        installExtension({ source: sourceExtDir, type: 'local' }, true),
       ).resolves.toBe('my-local-extension');
 
       expect(consoleInfoSpy).toHaveBeenCalledWith(
@@ -629,7 +629,7 @@ describe('extension tests', () => {
       mockQuestion.mockImplementation((_query, callback) => callback('y'));
 
       await expect(
-        installExtension({ source: sourceExtDir, type: 'local' }),
+        installExtension({ source: sourceExtDir, type: 'local' }, true),
       ).resolves.toBe('my-local-extension');
 
       expect(mockQuestion).toHaveBeenCalledWith(
@@ -654,7 +654,7 @@ describe('extension tests', () => {
       mockQuestion.mockImplementation((_query, callback) => callback('n'));
 
       await expect(
-        installExtension({ source: sourceExtDir, type: 'local' }),
+        installExtension({ source: sourceExtDir, type: 'local' }, true),
       ).rejects.toThrow('Installation cancelled by user.');
 
       expect(mockQuestion).toHaveBeenCalledWith(
@@ -677,7 +677,7 @@ describe('extension tests', () => {
       });
 
       await expect(
-        installExtension({ source: sourceExtDir, type: 'local' }, true),
+        installExtension({ source: sourceExtDir, type: 'local' }, false),
       ).resolves.toBe('my-local-extension');
     });
   });
