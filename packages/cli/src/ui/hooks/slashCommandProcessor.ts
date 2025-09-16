@@ -33,7 +33,7 @@ import { CommandService } from '../../services/CommandService.js';
 import { BuiltinCommandLoader } from '../../services/BuiltinCommandLoader.js';
 import { FileCommandLoader } from '../../services/FileCommandLoader.js';
 import { McpPromptLoader } from '../../services/McpPromptLoader.js';
-import { initNotifications } from '../../notifications/manager.js';
+import { initNotifications, triggerNotification } from '../../notifications/manager.js';
 
 /**
  * Hook to define and process slash commands (e.g., /help, /clear).
@@ -53,6 +53,7 @@ export const useSlashCommandProcessor = (
   setQuittingMessages: (message: HistoryItem[]) => void,
   openPrivacyNotice: () => void,
   openSettingsDialog: () => void,
+  openNotificationsSetup: () => void,
   toggleVimEnabled: () => Promise<boolean>,
   setIsProcessing: (isProcessing: boolean) => void,
   setGeminiMdFileCount: (count: number) => void,
@@ -387,6 +388,9 @@ export const useSlashCommandProcessor = (
                     case 'settings':
                       openSettingsDialog();
                       return { type: 'handled' };
+                    case 'notifications-setup':
+                      openNotificationsSetup();
+                      return { type: 'handled' };
                     case 'help':
                       return { type: 'handled' };
                     default: {
@@ -420,6 +424,7 @@ export const useSlashCommandProcessor = (
                     content: result.content,
                   };
                 case 'confirm_shell_commands': {
+                  triggerNotification('inputRequired');
                   const { outcome, approvedCommands } = await new Promise<{
                     outcome: ToolConfirmationOutcome;
                     approvedCommands?: string[];
@@ -460,6 +465,7 @@ export const useSlashCommandProcessor = (
                   );
                 }
                 case 'confirm_action': {
+                  triggerNotification('inputRequired');
                   const { confirmed } = await new Promise<{
                     confirmed: boolean;
                   }>((resolve) => {
@@ -547,6 +553,7 @@ export const useSlashCommandProcessor = (
           logSlashCommand(config, event);
         }
         setIsProcessing(false);
+        triggerNotification('taskComplete');
       }
     },
     [
@@ -561,6 +568,7 @@ export const useSlashCommandProcessor = (
       openEditorDialog,
       setQuittingMessages,
       openSettingsDialog,
+      openNotificationsSetup,
       setShellConfirmationRequest,
       setSessionShellAllowlist,
       setIsProcessing,
