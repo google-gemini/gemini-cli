@@ -4,7 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { Content, GenerateContentConfig, Part } from '@google/genai';
+import type {
+  Content,
+  GenerateContentConfig,
+  Part,
+  EmbedContentParameters,
+} from '@google/genai';
 import type { Config } from '../config/config.js';
 import type { ContentGenerator } from './contentGenerator.js';
 import { getResponseText } from '../utils/partUtils.js';
@@ -154,6 +159,41 @@ export class BaseLlmClient {
         `Failed to generate JSON content: ${getErrorMessage(error)}`,
       );
     }
+  }
+
+  async generateEmbedding(texts: string[]): Promise<number[][]> {
+    if (!texts || texts.length === 0) {
+      return [];
+    }
+    const embedModelParams: EmbedContentParameters = {
+      model: this.config.getEmbeddingModel(),
+      contents: texts,
+    };
+
+    const embedContentResponse =
+      await this.contentGenerator.embedContent(embedModelParams);
+    if (
+      !embedContentResponse.embeddings ||
+      embedContentResponse.embeddings.length === 0
+    ) {
+      throw new Error('No embeddings found in API response.');
+    }
+
+    if (embedContentResponse.embeddings.length !== texts.length) {
+      throw new Error(
+        `API returned a mismatched number of embeddings. Expected ${texts.length}, got ${embedContentResponse.embeddings.length}.`,
+      );
+    }
+
+    return embedContentResponse.embeddings.map((embedding, index) => {
+      const values = embedding.values;
+      if (!values || values.length === 0) {
+        throw new Error(
+          `API returned an empty embedding for input text at index ${index}: "${texts[index]}"`,
+        );
+      }
+      return values;
+    });
   }
 
   private cleanJsonResponse(text: string, model: string): string {

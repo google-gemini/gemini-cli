@@ -9,7 +9,7 @@ import { type ColorsTheme, Theme } from './theme.js';
 const ayuDarkColors: ColorsTheme = {
   type: 'dark',
   Background: '#0b0e14',
-  Foreground: '#bfbdb6',
+  Foreground: '#aeaca6',
   LightBlue: '#59C2FF',
   AccentBlue: '#39BAE6',
   AccentPurple: '#D2A6FF',

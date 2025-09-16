@@ -164,6 +164,7 @@ class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
         currentContent,
         params,
         this.config.getGeminiClient(),
+        this.config.getBaseLlmClient(),
         abortSignal,
       );
       finalOldString = correctedEdit.params.old_string;
