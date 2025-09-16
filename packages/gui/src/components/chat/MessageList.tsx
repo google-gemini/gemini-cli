@@ -1,4 +1,4 @@
-import { useRef, useState, forwardRef, useImperativeHandle, useCallback } from 'react';
+import { useRef, useState, forwardRef, useImperativeHandle, useCallback, useEffect } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import type React from 'react';
 import Markdown from 'react-markdown';
@@ -7,7 +7,7 @@ import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 import rehypeHighlight from 'rehype-highlight';
 import { format } from 'date-fns';
-import { Bot, User, AlertCircle, ChevronDown, ChevronRight, BookTemplate } from 'lucide-react';
+import { Bot, User, AlertCircle, ChevronDown, ChevronRight, BookTemplate, Play, CheckSquare } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { Card, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -28,6 +28,8 @@ interface ParsedToolResponse {
   content: string;
   format: 'harmony' | 'openai' | 'gemini' | 'qwen' | 'unknown';
   toolCallId?: string;
+  success?: boolean;
+  structuredData?: import('@/types').ToolResponseData;
 }
 
 // Think tag parsing for reasoning models
@@ -70,13 +72,17 @@ function parseToolResponse(message: ChatMessage): ParsedToolResponse | null {
         toolName,
         content: parsedMessage.result || messageContent.trim(),
         format: 'harmony',
-        toolCallId: parsedMessage.tool_call_id
+        toolCallId: parsedMessage.tool_call_id,
+        success: message.toolSuccess,
+        structuredData: message.toolResponseData
       };
     } catch {
       return {
         toolName: harmonyMatch[1],
         content: harmonyMatch[2].trim(),
-        format: 'harmony'
+        format: 'harmony',
+        success: message.toolSuccess,
+        structuredData: message.toolResponseData
       };
     }
   }
@@ -89,7 +95,8 @@ function parseToolResponse(message: ChatMessage): ParsedToolResponse | null {
         return {
           toolName: jsonContent.__gemini_function_response.name || 'Function',
           content: jsonContent.__gemini_function_response.response?.output || JSON.stringify(jsonContent.__gemini_function_response.response, null, 2),
-          format: 'gemini'
+          format: 'gemini',
+          success: message.toolSuccess
         };
       }
     } catch {
@@ -97,7 +104,9 @@ function parseToolResponse(message: ChatMessage): ParsedToolResponse | null {
       return {
         toolName: 'Function',
         content: content,
-        format: 'gemini'
+        format: 'gemini',
+        success: message.toolSuccess,
+        structuredData: message.toolResponseData
       };
     }
   }
@@ -110,7 +119,8 @@ function parseToolResponse(message: ChatMessage): ParsedToolResponse | null {
         return {
           toolName: jsonContent.functionResponse.name || 'Function',
           content: JSON.stringify(jsonContent.functionResponse.response, null, 2),
-          format: 'gemini'
+          format: 'gemini',
+          success: message.toolSuccess
         };
       }
     } catch {
@@ -118,7 +128,9 @@ function parseToolResponse(message: ChatMessage): ParsedToolResponse | null {
       return {
         toolName: 'Function',
         content: content,
-        format: 'gemini'
+        format: 'gemini',
+        success: message.toolSuccess,
+        structuredData: message.toolResponseData
       };
     }
   }
@@ -130,7 +142,8 @@ function parseToolResponse(message: ChatMessage): ParsedToolResponse | null {
     return {
       toolName: 'Qwen Tool', // Qwen format doesn't include tool name in response
       content: toolContent.trim(),
-      format: 'qwen'
+      format: 'qwen',
+      success: message.toolSuccess
     };
   }
 
@@ -145,13 +158,17 @@ function parseToolResponse(message: ChatMessage): ParsedToolResponse | null {
         toolName: jsonContent.name || 'Tool',
         content: jsonContent.result || jsonContent.output || content,
         format: 'openai',
-        toolCallId: jsonContent.tool_call_id
+        toolCallId: jsonContent.tool_call_id,
+        success: message.toolSuccess,  // Get success status from message
+        structuredData: message.toolResponseData  // Get structured data from message
       };
     } catch {
       return {
         toolName: 'Tool',
         content: content,
-        format: 'openai'
+        format: 'openai',
+        success: message.toolSuccess,
+        structuredData: message.toolResponseData
       };
     }
   }
@@ -250,6 +267,50 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(({
       });
     }
   }, []);
+
+  // Auto-scroll when messages change (new user message, new assistant response)
+  useEffect(() => {
+    // Small delay to ensure DOM has updated with new content
+    const timeoutId = setTimeout(() => {
+      scrollToBottom(true);
+    }, 100);
+
+    return () => clearTimeout(timeoutId);
+  }, [messages.length, scrollToBottom]);
+
+  // Auto-scroll when streaming content updates
+  useEffect(() => {
+    if (isStreaming && streamingContent) {
+      // More frequent updates during streaming for smoother experience
+      const timeoutId = setTimeout(() => {
+        scrollToBottom(true);
+      }, 50);
+
+      return () => clearTimeout(timeoutId);
+    }
+  }, [isStreaming, streamingContent, scrollToBottom]);
+
+  // Auto-scroll when tool confirmation appears
+  useEffect(() => {
+    if (toolConfirmation) {
+      const timeoutId = setTimeout(() => {
+        scrollToBottom(true);
+      }, 100);
+
+      return () => clearTimeout(timeoutId);
+    }
+  }, [toolConfirmation, scrollToBottom]);
+
+  // Auto-scroll when thinking indicator appears
+  useEffect(() => {
+    if (isThinking) {
+      const timeoutId = setTimeout(() => {
+        scrollToBottom(true);
+      }, 100);
+
+      return () => clearTimeout(timeoutId);
+    }
+  }, [isThinking, scrollToBottom]);
 
   return (
     <div
@@ -372,69 +433,141 @@ const ThinkingSection: React.FC<{ thinkingSections: string[] }> = ({ thinkingSec
 const ToolCallDisplay: React.FC<{ toolCall: ToolCall }> = ({ toolCall }) => {
   const [isExpanded, setIsExpanded] = useState(false);
 
-  const formatArguments = (args: Record<string, unknown>, truncate = true) => {
-    if (!args || typeof args !== 'object') return '';
-    
+  // Get key parameters for compact display
+  const getKeyParameters = (args: Record<string, unknown>) => {
+    if (!args || typeof args !== 'object') return [];
+
     const entries = Object.entries(args);
-    if (entries.length === 0) return '';
-    
-    if (truncate) {
-      // Show abbreviated version
-      const limitedEntries = entries.slice(0, 3);
-      const formatted = limitedEntries.map(([key, value]) => {
-        if (typeof value === 'string' && value.length > 30) {
-          return `${key}: "${value.slice(0, 27)}..."`;
-        }
-        return `${key}: ${JSON.stringify(value)}`;
-      }).join(', ');
-      
-      const hasMore = entries.length > 3;
-      return hasMore ? `${formatted}, ...` : formatted;
-    } else {
-      // Show full version
-      return entries.map(([key, value]) => `${key}: ${JSON.stringify(value)}`).join(', ');
-    }
+    // Prioritize important parameters
+    const priorityKeys = ['op', 'operation', 'range', 'workbook', 'worksheet', 'data'];
+    const sortedEntries = entries.sort(([a], [b]) => {
+      const aIndex = priorityKeys.indexOf(a);
+      const bIndex = priorityKeys.indexOf(b);
+      if (aIndex === -1 && bIndex === -1) return 0;
+      if (aIndex === -1) return 1;
+      if (bIndex === -1) return -1;
+      return aIndex - bIndex;
+    });
+
+    return sortedEntries;
   };
 
-  const hasComplexArgs = toolCall.arguments && Object.keys(toolCall.arguments).length > 3;
-  const hasLongValues = toolCall.arguments && Object.values(toolCall.arguments).some(
-    (value: unknown) => typeof value === 'string' && value.length > 30
+  const formatValueForDisplay = (value: unknown): string => {
+    if (typeof value === 'string') {
+      if (value.length > 40) {
+        return `"${value.slice(0, 37)}..."`;
+      }
+      return `"${value}"`;
+    }
+    if (Array.isArray(value)) {
+      if (value.length > 3) {
+        return `[${value.slice(0, 3).map(v => typeof v === 'string' ? `"${v}"` : String(v)).join(', ')}, ...] (${value.length} items)`;
+      }
+      return JSON.stringify(value);
+    }
+    if (typeof value === 'object' && value !== null) {
+      const keys = Object.keys(value);
+      if (keys.length > 2) {
+        return `{${keys.slice(0, 2).join(', ')}, ...} (${keys.length} props)`;
+      }
+      return JSON.stringify(value);
+    }
+    return String(value);
+  };
+
+  const keyParams = getKeyParameters(toolCall.arguments || {});
+  const hasParams = keyParams.length > 0;
+
+  // Filter out op/operation for determining expand condition since they're shown in header
+  const nonOpParams = keyParams.filter(([key]) => key !== 'op' && key !== 'operation');
+  const shouldShowExpand = nonOpParams.length > 1 || keyParams.some(([, value]) =>
+    typeof value === 'string' && value.length > 40 ||
+    Array.isArray(value) && value.length > 3 ||
+    typeof value === 'object' && value !== null && Object.keys(value).length > 2
   );
-  const shouldShowExpand = hasComplexArgs || hasLongValues;
 
   return (
-    <div className="mb-2 last:mb-0">
-      <div className="bg-muted/50 rounded-lg overflow-hidden">
-        <div className="flex items-center">
-          <div className="flex-1 text-xs font-mono bg-muted rounded px-2 py-1">
-            {toolCall.name}({formatArguments(toolCall.arguments, !isExpanded)})
+    <div className="mb-3 last:mb-0">
+      <div className="bg-muted/20 rounded-lg border border-blue-200/50 dark:border-blue-700/30 overflow-hidden">
+        {/* Tool call header with tool name and operation */}
+        <div className="flex items-center justify-between p-3 bg-muted/30 border-b border-border/30">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1 text-xs font-bold text-foreground/80 border border-border/50 rounded px-2 py-1">
+              <Play size={10} />
+              <span>Call</span>
+            </div>
+            <span className="font-bold text-base text-foreground">{toolCall.name}</span>
+            {(Boolean((toolCall.arguments as Record<string, unknown>)?.op || (toolCall.arguments as Record<string, unknown>)?.operation)) && (
+              <span className="font-mono text-base font-bold text-foreground/70">
+                {String((toolCall.arguments as Record<string, unknown>).op || (toolCall.arguments as Record<string, unknown>).operation)}
+              </span>
+            )}
           </div>
           {shouldShowExpand && (
             <button
               onClick={() => setIsExpanded(!isExpanded)}
-              className="px-2 py-1 text-muted-foreground hover:text-foreground transition-colors"
+              className="px-2 py-1 text-muted-foreground hover:text-foreground transition-colors rounded hover:bg-background/50"
               title={isExpanded ? "Show less" : "Show all parameters"}
             >
-              {isExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+              {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
             </button>
           )}
         </div>
-        
-        {isExpanded && toolCall.arguments && (
-          <div className="border-t border-border/50 bg-background/50 px-2 py-1">
-            <div className="text-xs font-mono">
-              <div className="text-muted-foreground mb-1">Full parameters:</div>
-              <pre className="whitespace-pre-wrap text-foreground">
-                {JSON.stringify(toolCall.arguments, null, 2)}
-              </pre>
-            </div>
+
+        {/* Parameters display */}
+        {hasParams && (
+          <div className="px-3 pb-3 pt-2">
+            {isExpanded ? (
+              // Expanded view - show all parameters with horizontal alignment
+              <div className="space-y-3">
+                <div className="text-xs font-medium text-muted-foreground">Parameters:</div>
+                <div className="space-y-2">
+                  {keyParams.map(([key, value]) => (
+                    <div key={key} className="flex items-center gap-3">
+                      <div className="text-xs font-medium text-blue-600 dark:text-blue-400 w-20 flex-shrink-0">
+                        {key}:
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        {typeof value === 'object' && value !== null ? (
+                          <pre className="text-xs bg-background/50 rounded px-3 py-2 whitespace-pre-wrap font-mono text-foreground/80 overflow-x-auto border">
+                            {JSON.stringify(value, null, 2)}
+                          </pre>
+                        ) : (
+                          <div className="text-xs text-foreground/90 break-words font-mono bg-background/30 rounded px-2 py-1">
+                            {String(value)}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              // Compact view - show key parameters inline (excluding op since it's in header)
+              <div className="flex flex-wrap gap-2 items-center">
+                {keyParams
+                  .filter(([key]) => key !== 'op' && key !== 'operation')
+                  .slice(0, 2)
+                  .map(([key, value]) => (
+                    <div key={key} className="flex items-center gap-1 text-xs">
+                      <span className="font-medium text-blue-600 dark:text-blue-400">{key}:</span>
+                      <span className="text-foreground/80 font-mono">{formatValueForDisplay(value)}</span>
+                    </div>
+                  ))}
+                {keyParams.filter(([key]) => key !== 'op' && key !== 'operation').length > 2 && (
+                  <span className="text-xs text-muted-foreground">
+                    +{keyParams.filter(([key]) => key !== 'op' && key !== 'operation').length - 2} more
+                  </span>
+                )}
+              </div>
+            )}
           </div>
         )}
       </div>
-      
+
       {toolCall.result && (
-        <div className="text-xs mt-1 pl-2 border-l-2 border-border">
-          {toolCall.result}
+        <div className="text-xs mt-2 pl-3 border-l-2 border-border text-muted-foreground">
+          <span className="font-medium">Result:</span> {toolCall.result}
         </div>
       )}
     </div>
@@ -445,21 +578,6 @@ const ToolCallDisplay: React.FC<{ toolCall: ToolCall }> = ({ toolCall }) => {
 const ToolResponseDisplay: React.FC<{ toolResponse: ParsedToolResponse }> = ({ toolResponse }) => {
   const [isExpanded, setIsExpanded] = useState(false);
 
-  const formatColors = {
-    harmony: 'bg-purple-50 border-purple-200 text-purple-800 dark:bg-purple-950 dark:border-purple-800 dark:text-purple-200',
-    openai: 'bg-emerald-50 border-emerald-200 text-emerald-800 dark:bg-emerald-950 dark:border-emerald-800 dark:text-emerald-200',
-    gemini: 'bg-sky-50 border-sky-200 text-sky-800 dark:bg-sky-950 dark:border-sky-800 dark:text-sky-200',
-    qwen: 'bg-amber-50 border-amber-200 text-amber-800 dark:bg-amber-950 dark:border-amber-800 dark:text-amber-200',
-    unknown: 'bg-slate-50 border-slate-200 text-slate-700 dark:bg-slate-900 dark:border-slate-700 dark:text-slate-300'
-  };
-  
-  const formatLabels = {
-    harmony: 'Tool',
-    openai: 'Tool',
-    gemini: 'Tool',
-    qwen: 'Tool',
-    unknown: 'Tool'
-  };
 
   // Check if content is long enough to warrant collapsing
   const isLongContent = toolResponse.content.length > 200;
@@ -470,32 +588,184 @@ const ToolResponseDisplay: React.FC<{ toolResponse: ParsedToolResponse }> = ({ t
     ? toolResponse.content.slice(0, 150) + '...'
     : toolResponse.content;
 
+  // Use structured data if available for better display
+  if (toolResponse.structuredData) {
+    const getResultStatusColor = (success?: boolean) => {
+      if (success === true) {
+        return "text-emerald-600 dark:text-emerald-400";
+      } else if (success === false) {
+        return "text-red-600 dark:text-red-400";
+      }
+      return "text-muted-foreground";
+    };
+
+    const getResultStatusText = (success?: boolean) => {
+      if (success === true) {
+        return "✅ Success";
+      } else if (success === false) {
+        return "❌ Failed";
+      }
+      return "✅ Completed";
+    };
+
+    return (
+      <div className="mb-3 last:mb-0">
+        <div className="bg-muted/20 rounded-lg border border-green-200/50 dark:border-green-700/30 overflow-hidden">
+          {/* Tool response header - similar to tool call design */}
+          <div className="flex items-center justify-between p-3 bg-muted/30 border-b border-border/30">
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-1 text-xs font-bold text-foreground/80 border border-border/50 rounded px-2 py-1">
+                <CheckSquare size={10} />
+                <span>Result</span>
+              </div>
+              <span className="font-bold text-base text-foreground">{toolResponse.toolName}</span>
+              {toolResponse.structuredData.operation && (
+                <span className="font-mono text-base font-bold text-foreground/70">
+                  {toolResponse.structuredData.operation}
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <span className={cn("text-xs font-medium", getResultStatusColor(toolResponse.success))}>
+                {getResultStatusText(toolResponse.success)}
+              </span>
+              {toolResponse.toolCallId && (
+                <span className="font-mono text-xs opacity-50">#{toolResponse.toolCallId.slice(-6)}</span>
+              )}
+            </div>
+          </div>
+
+          {/* Content area */}
+          <div className="px-3 pb-3 pt-2 space-y-3">
+            {/* Operation summary */}
+            <div className="text-sm font-medium text-foreground">
+              {toolResponse.structuredData.summary}
+            </div>
+
+            {/* Metrics in compact format */}
+            {toolResponse.structuredData.metrics && Object.keys(toolResponse.structuredData.metrics).length > 0 && (
+              <div className="flex flex-wrap gap-3 text-xs">
+                {toolResponse.structuredData.metrics.rowsAffected && (
+                  <div className="flex items-center gap-1">
+                    <span className="font-medium text-blue-600 dark:text-blue-400">Rows:</span>
+                    <span className="text-foreground/80 font-mono">{toolResponse.structuredData.metrics.rowsAffected}</span>
+                  </div>
+                )}
+                {toolResponse.structuredData.metrics.columnsAffected && (
+                  <div className="flex items-center gap-1">
+                    <span className="font-medium text-blue-600 dark:text-blue-400">Columns:</span>
+                    <span className="text-foreground/80 font-mono">{toolResponse.structuredData.metrics.columnsAffected}</span>
+                  </div>
+                )}
+                {toolResponse.structuredData.metrics.cellsAffected && (
+                  <div className="flex items-center gap-1">
+                    <span className="font-medium text-blue-600 dark:text-blue-400">Cells:</span>
+                    <span className="text-foreground/80 font-mono">{toolResponse.structuredData.metrics.cellsAffected}</span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Files in compact format */}
+            {toolResponse.structuredData.files && Object.keys(toolResponse.structuredData.files).length > 0 && (
+              <div className="space-y-1">
+                {toolResponse.structuredData.files.workbook && (
+                  <div className="flex items-center gap-1 text-xs">
+                    <span className="font-medium text-blue-600 dark:text-blue-400">File:</span>
+                    <span className="text-foreground/80 font-mono truncate">{toolResponse.structuredData.files.workbook}</span>
+                  </div>
+                )}
+                {toolResponse.structuredData.files.worksheet && (
+                  <div className="flex items-center gap-1 text-xs">
+                    <span className="font-medium text-blue-600 dark:text-blue-400">Sheet:</span>
+                    <span className="text-foreground/80 font-mono">{toolResponse.structuredData.files.worksheet}</span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Next actions */}
+            {toolResponse.structuredData.nextActions && toolResponse.structuredData.nextActions.length > 0 && (
+              <div className="pt-2 border-t border-border/30">
+                <div className="text-xs font-medium text-muted-foreground mb-2">Suggested next actions:</div>
+                <div className="space-y-1">
+                  {toolResponse.structuredData.nextActions.map((action, index) => (
+                    <div key={index} className="text-xs text-foreground/70 font-mono bg-background/30 rounded px-2 py-1">
+                      {action}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Fallback to enhanced display for unstructured responses
+  const extractOperationFromContent = (content: string): string | null => {
+    // Try to extract operation from common patterns
+    const operationMatch = content.match(/Excel (\w+) operation/i) ||
+                          content.match(/(\w+) completed successfully/i) ||
+                          content.match(/execution completed/i);
+    if (operationMatch) {
+      return operationMatch[1] || 'execution';
+    }
+    return null;
+  };
+
+  const operation = extractOperationFromContent(toolResponse.content);
+
   return (
     <div className="flex justify-center">
-      <div className={cn("border rounded-lg overflow-hidden text-sm max-w-2xl", formatColors[toolResponse.format])}>
-        <div className="px-3 py-2">
-          <div className="font-semibold text-xs mb-1 flex items-center gap-2">
-            <span>{formatLabels[toolResponse.format]}</span>
-            <span className="font-mono text-xs opacity-70">{toolResponse.toolName}</span>
+      <div className="bg-muted/20 rounded-lg border border-green-200/50 dark:border-green-700/30 overflow-hidden max-w-3xl">
+        {/* Enhanced tool response header */}
+        <div className="flex items-center justify-between p-3 bg-muted/30 border-b border-border/30">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1 text-xs font-bold text-foreground/80 border border-border/50 rounded px-2 py-1">
+              <CheckSquare size={10} />
+              <span>Result</span>
+            </div>
+            <span className="font-bold text-base text-foreground">{toolResponse.toolName}</span>
+            {operation && (
+              <span className="font-mono text-base font-bold text-foreground/70">
+                {operation}
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <span className={cn("text-xs font-medium",
+              toolResponse.success === true ? "text-emerald-600 dark:text-emerald-400" :
+              toolResponse.success === false ? "text-red-600 dark:text-red-400" : "text-muted-foreground")}>
+              {toolResponse.success === true ? "✅ Success" :
+               toolResponse.success === false ? "❌ Failed" : "✅ Completed"}
+            </span>
             {toolResponse.toolCallId && (
               <span className="font-mono text-xs opacity-50">#{toolResponse.toolCallId.slice(-6)}</span>
             )}
             {shouldShowExpand && (
               <button
                 onClick={() => setIsExpanded(!isExpanded)}
-                className="ml-auto px-1 py-0.5 text-muted-foreground hover:text-foreground transition-colors"
+                className="px-2 py-1 text-muted-foreground hover:text-foreground transition-colors rounded hover:bg-background/50"
                 title={isExpanded ? "Show less" : "Show full response"}
               >
-                {isExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
               </button>
             )}
           </div>
-          <Markdown 
-            remarkPlugins={[remarkGfm]} 
-            rehypePlugins={[rehypeHighlight]}
-          >
-            {previewContent}
-          </Markdown>
+        </div>
+
+        {/* Content area */}
+        <div className="px-3 pb-3 pt-2">
+          <div className="text-sm">
+            <Markdown
+              remarkPlugins={[remarkGfm]}
+              rehypePlugins={[rehypeHighlight]}
+            >
+              {previewContent}
+            </Markdown>
+          </div>
         </div>
       </div>
     </div>
