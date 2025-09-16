@@ -261,7 +261,7 @@ export class IdeClient {
             const errorMessage =
               textPart?.text ?? `Tool 'openDiff' reported an error.`;
             logger.debug(
-              `request for ${filePath} failed with isError:`,
+              `Request for openDiff ${filePath} failed with isError:`,
               errorMessage,
             );
             this.diffResponses.delete(filePath);
@@ -269,7 +269,7 @@ export class IdeClient {
           }
         })
         .catch((err) => {
-          logger.debug(`request for ${filePath} failed:`, err);
+          logger.debug(`Request for openDiff ${filePath} failed:`, err);
           this.diffResponses.delete(filePath);
           reject(err);
         });
