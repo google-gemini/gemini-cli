@@ -159,7 +159,7 @@ export class MultiModelSystem {
       // Standard OpenAI format for other models
       return {
         role: 'tool',
-        content: content,
+        content,
         tool_call_id: toolCallId,
         name: toolName,
         timestamp: new Date()
@@ -1041,7 +1041,12 @@ export class MultiModelSystem {
 
       // Get compression summary using provider directly (avoid recursion and tools)
       const response = await provider.sendCompressionMessage(compressionMessages, new AbortController().signal);
-      const summary = response.content;
+
+      // Extract only the state_snapshot part from the response
+      const stateSnapshotMatch = response.content.match(/<state_snapshot>([\s\S]*?)<\/state_snapshot>/);
+      const summary = stateSnapshotMatch
+        ? `<state_snapshot>${stateSnapshotMatch[1]}</state_snapshot>`
+        : response.content; // fallback to full content if no state_snapshot found
 
       // Create new compressed history - DO NOT preserve old system messages
       // Let enhanceMessagesWithRole generate fresh system messages with current role/tools
