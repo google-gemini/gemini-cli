@@ -14,8 +14,7 @@ const setupCommand: SlashCommand = {
   description: 'Interactive setup for notification preferences',
   kind: CommandKind.BUILT_IN,
   action: (context: CommandContext, args: string): SlashCommandActionReturn => {
-    // For now, a basic prompt. Full interactive setup would be more complex.
-    return { type: 'message', content: 'Interactive setup for notifications is not yet fully implemented. Please use /notifications status to view current settings.' };
+    return { type: 'dialog', dialog: 'notifications-setup' };
   },
 };
 
