@@ -8,8 +8,15 @@ import type { Content } from '@google/genai';
 import { createHash } from 'node:crypto';
 import type { ServerGeminiStreamEvent } from '../core/turn.js';
 import { GeminiEventType } from '../core/turn.js';
-import { logLoopDetected } from '../telemetry/loggers.js';
-import { LoopDetectedEvent, LoopType } from '../telemetry/types.js';
+import {
+  logLoopDetected,
+  logLoopDetectionDisabled,
+} from '../telemetry/loggers.js';
+import {
+  LoopDetectedEvent,
+  LoopDetectionDisabledEvent,
+  LoopType,
+} from '../telemetry/types.js';
 import type { Config } from '../config/config.js';
 import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/config.js';
 import {
@@ -97,6 +104,10 @@ export class LoopDetectionService {
    */
   disableForSession(): void {
     this.disabledForSession = true;
+    logLoopDetectionDisabled(
+      this.config,
+      new LoopDetectionDisabledEvent(this.promptId),
+    );
   }
 
   private getToolCallKey(toolCall: { name: string; args: object }): string {
