@@ -5,7 +5,7 @@
  */
 
 import type { CommandModule } from 'yargs';
-import { setGlobalNotificationsEnabled } from '../../notifications/manager.js';
+import { initNotifications, setGlobalNotificationsEnabled } from '../../notifications/manager.js';
 import { getConfig } from '../../config/config.js';
 
 export const disableCommand: CommandModule = {
@@ -13,6 +13,7 @@ export const disableCommand: CommandModule = {
   describe: 'Disable all notifications',
   handler: async () => {
     const config = await getConfig();
+    initNotifications(config);
     setGlobalNotificationsEnabled(false, config);
     console.log('All audio notifications have been disabled.');
   },
