@@ -527,10 +527,7 @@ export async function installExtension(
       ),
     );
 
-    const manager = ExtensionEnablementManager.getInstance(
-      ExtensionStorage.getUserExtensionsDir(),
-    );
-    manager.enable(newExtensionConfig!.name);
+    enableExtension(newExtensionConfig!.name, SettingScope.User);
     return newExtensionConfig!.name;
   } catch (error) {
     // Attempt to load config from the source path even if installation fails
@@ -718,8 +715,8 @@ export function disableExtension(
   const manager = ExtensionEnablementManager.getInstance(
     ExtensionStorage.getUserExtensionsDir(),
   );
-  const scopePath = scope === SettingScope.Workspace ? cwd : undefined;
-  manager.disable(name, scopePath);
+  const scopePath = scope === SettingScope.Workspace ? cwd : os.homedir();
+  manager.disable(name, true, scopePath);
 }
 
 export function enableExtension(
@@ -733,8 +730,8 @@ export function enableExtension(
   const manager = ExtensionEnablementManager.getInstance(
     ExtensionStorage.getUserExtensionsDir(),
   );
-  const scopePath = scope === SettingScope.Workspace ? cwd : undefined;
-  manager.enable(name, scopePath);
+  const scopePath = scope === SettingScope.Workspace ? cwd : os.homedir();
+  manager.enable(name, true, scopePath);
 }
 
 export async function updateAllUpdatableExtensions(

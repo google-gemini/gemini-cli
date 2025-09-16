@@ -7,10 +7,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-export type ExtensionEnablementState = 'enabled' | 'disabled';
-
 export interface ExtensionEnablementConfig {
-  default: ExtensionEnablementState;
   overrides: string[];
 }
 
@@ -63,27 +60,19 @@ export class ExtensionEnablementManager {
   isEnabled(extensionName: string, currentPath: string): boolean {
     const config = this.readConfig();
     const extensionConfig = config[extensionName];
-    console.error(extensionName);
-    console.error(extensionConfig);
-    console.error(this.configFilePath);
-    if (!extensionConfig) {
-      // If not configured, assume the extension is enabled by default.
-      return true;
-    }
+    // Extensions are enabled by default.
+    let enabled = true;
 
-    let status: ExtensionEnablementState = extensionConfig.default;
-
-    for (const rule of extensionConfig.overrides) {
+    for (const rule of extensionConfig?.overrides ?? []) {
       const isDisableRule = rule.startsWith('!');
       const globPattern = isDisableRule ? rule.substring(1) : rule;
       const regex = globToRegex(globPattern);
-
       if (regex.test(currentPath)) {
-        status = isDisableRule ? 'disabled' : 'enabled';
+        enabled = !isDisableRule;
       }
     }
 
-    return status === 'enabled';
+    return enabled;
   }
 
   readConfig(): AllExtensionsEnablementConfig {
@@ -108,37 +97,62 @@ export class ExtensionEnablementManager {
     fs.writeFileSync(this.configFilePath, JSON.stringify(config, null, 2));
   }
 
-  enable(extensionName: string, scopePath?: string): void {
+  enable(
+    extensionName: string,
+    includeSubdirs: boolean,
+    scopePath: string,
+  ): void {
     const config = this.readConfig();
     if (!config[extensionName]) {
-      config[extensionName] = { default: 'disabled', overrides: [] };
+      config[extensionName] = { overrides: [] };
     }
 
-    if (scopePath) {
-      config[extensionName].overrides = config[extensionName].overrides.filter(
-        (rule) => rule !== scopePath && rule !== `!${scopePath}`,
-      );
-      config[extensionName].overrides.push(scopePath);
-    } else {
-      config[extensionName].default = 'enabled';
+    const pathWithGlob = `${scopePath}*`;
+    const pathWithoutGlob = scopePath;
+
+    const newPath = includeSubdirs ? pathWithGlob : pathWithoutGlob;
+    const conflictingPath = includeSubdirs ? pathWithoutGlob : pathWithGlob;
+
+    config[extensionName].overrides = config[extensionName].overrides.filter(
+      (rule) =>
+        rule !== conflictingPath &&
+        rule !== `!${conflictingPath}` &&
+        rule !== `!${newPath}`,
+    );
+
+    if (!config[extensionName].overrides.includes(newPath)) {
+      config[extensionName].overrides.push(newPath);
     }
 
     this.writeConfig(config);
   }
 
-  disable(extensionName: string, scopePath?: string): void {
+  disable(
+    extensionName: string,
+    includeSubdirs: boolean,
+    scopePath: string,
+  ): void {
     const config = this.readConfig();
     if (!config[extensionName]) {
-      config[extensionName] = { default: 'enabled', overrides: [] };
+      config[extensionName] = { overrides: [] };
     }
 
-    if (scopePath) {
-      config[extensionName].overrides = config[extensionName].overrides.filter(
-        (rule) => rule !== scopePath && rule !== `!${scopePath}`,
-      );
-      config[extensionName].overrides.push(`!${scopePath}`);
-    } else {
-      config[extensionName].default = 'disabled';
+    const pathWithGlob = `${scopePath}*`;
+    const pathWithoutGlob = scopePath;
+
+    const targetPath = includeSubdirs ? pathWithGlob : pathWithoutGlob;
+    const newRule = `!${targetPath}`;
+    const conflictingPath = includeSubdirs ? pathWithoutGlob : pathWithGlob;
+
+    config[extensionName].overrides = config[extensionName].overrides.filter(
+      (rule) =>
+        rule !== conflictingPath &&
+        rule !== `!${conflictingPath}` &&
+        rule !== targetPath,
+    );
+
+    if (!config[extensionName].overrides.includes(newRule)) {
+      config[extensionName].overrides.push(newRule);
     }
 
     this.writeConfig(config);

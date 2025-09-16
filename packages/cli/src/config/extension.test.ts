@@ -122,7 +122,7 @@ describe('extension tests', () => {
       path.join(os.tmpdir(), 'gemini-cli-test-home-'),
     );
     tempWorkspaceDir = fs.mkdtempSync(
-      path.join(os.tmpdir(), 'gemini-cli-test-workspace-'),
+      path.join(tempHomeDir, 'gemini-cli-test-workspace-'),
     );
     userExtensionsDir = path.join(tempHomeDir, EXTENSIONS_DIRECTORY_NAME);
     fs.mkdirSync(userExtensionsDir, { recursive: true });
@@ -213,12 +213,16 @@ describe('extension tests', () => {
         name: 'enabled-extension',
         version: '2.0.0',
       });
-      disableExtension('disabled-extension', SettingScope.User, tempHomeDir);
+      disableExtension(
+        'disabled-extension',
+        SettingScope.User,
+        tempWorkspaceDir,
+      );
       const extensions = loadExtensions();
       const activeExtensions = annotateActiveExtensions(
         extensions,
         [],
-        tempHomeDir,
+        tempWorkspaceDir,
       ).filter((e) => e.isActive);
       expect(activeExtensions).toHaveLength(1);
       expect(activeExtensions[0].name).toBe('enabled-extension');
@@ -1166,14 +1170,18 @@ describe('extension tests', () => {
     });
 
     it('should disable an extension at the workspace scope', () => {
-      disableExtension('my-extension', SettingScope.Workspace);
+      disableExtension(
+        'my-extension',
+        SettingScope.Workspace,
+        tempWorkspaceDir,
+      );
       expect(
         isEnabled({
           name: 'my-extension',
           parentPath: tempHomeDir,
           enabledForPath: tempHomeDir,
         }),
-      ).toBe(false);
+      ).toBe(true);
       expect(
         isEnabled({
           name: 'my-extension',
