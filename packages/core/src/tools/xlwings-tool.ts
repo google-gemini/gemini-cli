@@ -160,6 +160,8 @@ interface XlwingsParams {
     data_range?: string;
     categories_range?: string;
     position?: string; // Where to place the chart
+    series_names?: string[]; // Custom series names to override automatic header detection
+    series_ranges?: string[]; // Individual series data ranges for fine-grained control
   };
   
   /** Formatting options */
@@ -849,7 +851,17 @@ export class XlwingsTool extends BasePythonTool<XlwingsParams, XlwingsResult> {
               y_axis_title: { type: 'string', description: 'Y-axis title' },
               data_range: { type: 'string', description: 'Data range for chart' },
               categories_range: { type: 'string', description: 'Categories range for chart' },
-              position: { type: 'string', description: 'Chart position (e.g., "D1")' }
+              position: { type: 'string', description: 'Chart position (e.g., "D1")' },
+              series_names: {
+                type: 'array',
+                items: { type: 'string' },
+                description: 'Custom series names to override automatic header detection'
+              },
+              series_ranges: {
+                type: 'array',
+                items: { type: 'string' },
+                description: 'Individual series data ranges for fine-grained control'
+              }
             }
           },
           format: {
@@ -3068,7 +3080,74 @@ position = "${chartConfig.position || 'D1'}"
 chart_name = "${params.chart?.name || ''}"
 
 chart = ws.charts.add()
+
+# Set source data with proper series configuration
 chart.set_source_data(ws.range(data_range))
+
+# Configure series names properly using Excel API
+try:
+    # Ensure series names are taken from headers
+    chart.api.SetSourceData(ws.range(data_range).api, 1)  # xlColumns = 1 for series in columns
+    chart.api.PlotBy = 1  # xlColumns = 1, ensures column headers are used as series names
+
+    # Force refresh of series names from headers
+    data_range_obj = ws.range(data_range)
+    series_collection = chart.api[1].SeriesCollection()
+    for i in range(1, series_collection.Count + 1):
+        try:
+            series = series_collection(i)
+            # Get the header value from the data range for this series
+            if data_range_obj.shape[0] > 1 and data_range_obj.shape[1] > 1:
+                # Multi-column data, use column headers (skip first column if it contains categories)
+                header_row = data_range_obj.rows(1)
+                categories_range = "${chartConfig.categories_range || ''}"
+                col_index = i if categories_range else i + 1  # Adjust for categories column
+                if col_index <= header_row.shape[1]:
+                    header_value = header_row.cells(1, col_index).value
+                    if header_value and str(header_value).strip():
+                        series.Name = str(header_value).strip()
+        except Exception as series_error:
+            pass
+
+except Exception as series_config_error:
+    # Fallback to basic configuration if advanced configuration fails
+    pass
+
+# Apply custom series names if provided
+${chartConfig?.series_names && chartConfig.series_names.length > 0 ? `
+try:
+    series_names = ${JSON.stringify(chartConfig.series_names)}
+    # Use correct xlwings API access pattern
+    series_collection = chart.api[1].SeriesCollection()
+    for i, series_name in enumerate(series_names, 1):
+        if i <= series_collection.Count and series_name.strip():
+            series_collection(i).Name = series_name.strip()
+except Exception as custom_series_error:
+    pass
+` : ''}
+
+# Apply individual series ranges if provided
+${chartConfig?.series_ranges && chartConfig.series_ranges.length > 0 ? `
+try:
+    series_ranges = ${JSON.stringify(chartConfig.series_ranges)}
+
+    # Clear existing series and create new ones with specified ranges
+    series_collection = chart.api[1].SeriesCollection()
+    while series_collection.Count > 0:
+        series_collection(1).Delete()
+
+    # Add series with individual ranges
+    for i, series_range in enumerate(series_ranges):
+        if series_range.strip():
+            new_series = series_collection.NewSeries()
+            new_series.Values = ws.range(series_range.strip()).api
+            # Set categories for the first series if categories_range is provided
+            if i == 0 and categories_range:
+                new_series.XValues = ws.range(categories_range).api
+
+except Exception as individual_series_error:
+    pass
+` : ''}
 
 # Set chart type mapping
 chart_types = {
@@ -8599,9 +8678,88 @@ try:
     ${chartConfig?.data_range ? `
     # Update data range
     chart.set_source_data(ws.range("${chartConfig.data_range}"))
+
+    # Reconfigure series names after updating data range
+    try:
+        chart.api.SetSourceData(ws.range("${chartConfig.data_range}").api, 1)  # xlColumns = 1 for series in columns
+        chart.api.PlotBy = 1  # xlColumns = 1, ensures column headers are used as series names
+
+        # Update series names from new data range headers
+        data_range_obj = ws.range("${chartConfig.data_range}")
+        for i in range(1, chart.api.SeriesCollection().Count + 1):
+            try:
+                series = chart.api.SeriesCollection(i)
+                if data_range_obj.shape[0] > 1 and data_range_obj.shape[1] > 1:
+                    header_row = data_range_obj.rows(1)
+                    categories_range = "${chartConfig.categories_range || ''}"
+                    col_index = i if categories_range else i + 1
+                    if col_index <= header_row.shape[1]:
+                        header_value = header_row.cells(1, col_index).value
+                        if header_value and str(header_value).strip():
+                            series.Name = str(header_value).strip()
+            except:
+                pass
+    except:
+        pass
+
     updated_properties.append("data_range")
     ` : ''}
-    
+
+    ${chartConfig?.categories_range ? `
+    # Update categories range only
+    try:
+        if chart.api.SeriesCollection().Count > 0:
+            chart.api.SeriesCollection(1).XValues = ws.range("${chartConfig.categories_range}").api
+            updated_properties.append("categories_range")
+    except:
+        pass
+    ` : ''}
+
+    ${chartConfig?.series_names && chartConfig.series_names.length > 0 ?
+    `# Update series names using correct xlwings chart API access
+    try:
+        series_names = ${JSON.stringify(chartConfig.series_names)}
+
+        # Use the correct API access pattern from xlwings GitHub issue #1259
+        series_collection = chart.api[1].SeriesCollection()
+        series_count = series_collection.Count
+
+        # Update each series name
+        for i, series_name in enumerate(series_names):
+            if i < series_count and series_name and series_name.strip():
+                series_index = i + 1  # Excel is 1-indexed
+                series = series_collection(series_index)
+                series.Name = series_name.strip()
+
+        updated_properties.append("series_names")
+
+    except Exception as series_name_error:
+        pass`
+    : ''}
+
+    ${chartConfig?.series_ranges && chartConfig.series_ranges.length > 0 ? `
+    # Update individual series ranges
+    try:
+        series_ranges = ${JSON.stringify(chartConfig.series_ranges)}
+        # Remove existing series except the first one
+        while chart.api.SeriesCollection().Count > len(series_ranges):
+            chart.api.SeriesCollection(chart.api.SeriesCollection().Count).Delete()
+
+        # Update or add series with new ranges
+        for i, series_range in enumerate(series_ranges, 1):
+            if series_range.strip():
+                if i <= chart.api.SeriesCollection().Count:
+                    # Update existing series
+                    chart.api.SeriesCollection(i).Values = ws.range(series_range.strip()).api
+                else:
+                    # Add new series
+                    new_series = chart.api.SeriesCollection().NewSeries()
+                    new_series.Values = ws.range(series_range.strip()).api
+        updated_properties.append("series_ranges")
+    except Exception as series_range_error:
+        pass
+    ` : ''}
+
     ${chartConfig?.position ? `
     # Update position
     chart.left = ws.range("${chartConfig.position}").left
@@ -10729,7 +10887,7 @@ print(json.dumps(result))`;
 
     // Base structured data
     const structuredData: ToolResponseData = {
-      operation: operation,
+      operation,
       summary: this.generateOperationSummary(result, params),
       details: {},
       metrics: {},
@@ -11510,7 +11668,7 @@ except Exception as e:
   /**
    * Generate helpful success response for write_range operation
    */
-  private generateWriteRangeSuccessResponse(result: XlwingsResult, params: XlwingsParams): string {
+  private generateWriteRangeSuccessResponse(result: XlwingsResult, _params: XlwingsParams): string {
     const rows = result.data?.length || 0;
     const cols = Array.isArray(result.data?.[0]) ? result.data[0].length : (result.data?.length || 0);
 
@@ -11535,7 +11693,7 @@ except Exception as e:
   /**
    * Generate helpful success response for format_range operation
    */
-  private generateFormatRangeSuccessResponse(result: XlwingsResult, params: XlwingsParams): string {
+  private generateFormatRangeSuccessResponse(result: XlwingsResult, _params: XlwingsParams): string {
     let response = `✅ **Formatting applied successfully**\n\n`;
     response += `**Details:**\n`;
     response += `- Range: ${result.range}\n`;
@@ -11549,7 +11707,7 @@ except Exception as e:
   /**
    * Generate helpful success response for delete_sheet operation
    */
-  private generateDeleteSheetSuccessResponse(result: XlwingsResult, params: XlwingsParams): string {
+  private generateDeleteSheetSuccessResponse(result: XlwingsResult, _params: XlwingsParams): string {
     let response = `✅ **Worksheet deleted successfully**\n\n`;
 
     if (result.deleted_sheet_name) {
