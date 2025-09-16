@@ -277,28 +277,7 @@ export class ClearcutLogger {
         log_event: eventsToSend,
       },
     ];
-    if (this.config) {
-      // Flatten the nested arrays of events into a single list of all event entries
-      const allEventEntries = request.flatMap(req => req.log_event).flat();
 
-      // Check if any event in the list is a 'START_SESSION' event
-      const containsStartSession = allEventEntries.some(eventEntry => {
-        try {
-          const parsedEvent = JSON.parse(eventEntry.source_extension_json);
-          return parsedEvent.event_name === EventNames.START_SESSION;
-        } catch (e) {
-          // A malformed event shouldn't crash the logger, so we'll ignore it.
-          return false;
-        }
-      });
-
-      if (containsStartSession) {
-        console.log(
-          'Clearcut request containing START_SESSION:',
-          safeJsonStringify(request),
-        );
-      }
-    }
     let result: LogResponse = {};
 
     try {
