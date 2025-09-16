@@ -27,6 +27,7 @@ import { isWorkspaceTrusted } from './trustedFolders.js';
 import { resolveEnvVarsInObject } from '../utils/envVarResolver.js';
 import { randomUUID } from 'node:crypto';
 import { ExtensionUpdateState } from '../ui/state/extensions.js';
+import type { LoadExtensionContext } from './extensions/variableSchema.js';
 
 export const EXTENSIONS_DIRECTORY_NAME = path.join(GEMINI_DIR, 'extensions');
 
@@ -188,7 +189,7 @@ export function loadExtensionsFromDir(dir: string): Extension[] {
   for (const subdir of fs.readdirSync(extensionsDir)) {
     const extensionDir = path.join(extensionsDir, subdir);
 
-    const extension = loadExtension(extensionDir, dir);
+    const extension = loadExtension({ extensionDir, workspaceDir: dir });
     if (extension != null) {
       extensions.push(extension);
     }
@@ -196,10 +197,8 @@ export function loadExtensionsFromDir(dir: string): Extension[] {
   return extensions;
 }
 
-export function loadExtension(
-  extensionDir: string,
-  workspaceDir: string,
-): Extension | null {
+export function loadExtension(context: LoadExtensionContext): Extension | null {
+  const { extensionDir, workspaceDir } = context;
   if (!fs.statSync(extensionDir).isDirectory()) {
     console.error(
       `Warning: unexpected file ${extensionDir} in extensions directory.`,
@@ -458,7 +457,10 @@ export async function installExtension(
     }
 
     try {
-      newExtensionConfig = await loadExtensionConfig(localSourcePath);
+      newExtensionConfig = await loadExtensionConfig({
+        extensionDir: localSourcePath,
+        workspaceDir: cwd,
+      });
       if (!newExtensionConfig) {
         throw new Error(
           `Invalid extension at ${installMetadata.source}. Please make sure it has a valid gemini-extension.json file.`,
@@ -532,7 +534,10 @@ export async function installExtension(
     // Attempt to load config from the source path even if installation fails
     // to get the name and version for logging.
     if (!newExtensionConfig && localSourcePath) {
-      newExtensionConfig = await loadExtensionConfig(localSourcePath);
+      newExtensionConfig = await loadExtensionConfig({
+        extensionDir: localSourcePath,
+        workspaceDir: cwd,
+      });
     }
     logger?.logExtensionInstallEvent(
       new ExtensionInstallEvent(
@@ -547,9 +552,9 @@ export async function installExtension(
 }
 
 export async function loadExtensionConfig(
-  extensionDir: string,
-  workspaceDir: string = process.cwd(),
+  context: LoadExtensionContext,
 ): Promise<ExtensionConfig | null> {
+  const { extensionDir, workspaceDir } = context;
   const configFilePath = path.join(extensionDir, EXTENSIONS_CONFIG_FILENAME);
   if (!fs.existsSync(configFilePath)) {
     return null;
@@ -679,10 +684,10 @@ export async function updateExtension(
     );
 
     const updatedExtensionStorage = new ExtensionStorage(extension.name);
-    const updatedExtension = loadExtension(
-      updatedExtensionStorage.getExtensionDir(),
-      cwd,
-    );
+    const updatedExtension = loadExtension({
+      extensionDir: updatedExtensionStorage.getExtensionDir(),
+      workspaceDir: cwd,
+    });
     if (!updatedExtension) {
       setExtensionUpdateState(ExtensionUpdateState.ERROR);
       throw new Error('Updated extension not found after installation.');
