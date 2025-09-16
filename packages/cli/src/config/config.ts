@@ -81,7 +81,6 @@ export interface CliArgs {
   includeDirectories: string[] | undefined;
   screenReader: boolean | undefined;
   useSmartEdit: boolean | undefined;
-  sessionSummary: string | undefined;
   promptWords: string[] | undefined;
   outputFormat: string | undefined;
 }
@@ -231,10 +230,6 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
           type: 'boolean',
           description: 'Enable screen reader mode for accessibility.',
           default: false,
-        })
-        .option('session-summary', {
-          type: 'string',
-          description: 'File to write session summary to.',
         })
         .option('output-format', {
           type: 'string',
@@ -607,6 +602,7 @@ export async function loadCliConfig(
       ),
       logPrompts: argv.telemetryLogPrompts ?? settings.telemetry?.logPrompts,
       outfile: argv.telemetryOutfile ?? settings.telemetry?.outfile,
+      useCollector: settings.telemetry?.useCollector,
     },
     usageStatisticsEnabled: settings.privacy?.usageStatisticsEnabled ?? true,
     fileFiltering: settings.context?.fileFiltering,
