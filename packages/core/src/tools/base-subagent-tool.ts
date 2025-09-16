@@ -34,7 +34,10 @@ import type {
   OutputConfig,
   PromptConfig,
 } from '../core/subagent.js';
-import { DEFAULT_GEMINI_MODEL, DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
+import {
+  DEFAULT_GEMINI_MODEL,
+  DEFAULT_GEMINI_FLASH_MODEL,
+} from '../config/models.js';
 import { ToolErrorType } from './tool-error.js';
 import { WebFetchTool } from './web-fetch.js';
 
@@ -97,7 +100,7 @@ export abstract class BaseSubAgentInvocation<
       new ReadManyFilesTool(this.config),
     ];
     if (process.env['GEMINI_SUBAGENT_ADD_WEB_TOOL']) {
-      required_tools.push(new WebFetchTool(this.config))
+      required_tools.push(new WebFetchTool(this.config));
     }
     return required_tools;
   }
@@ -105,9 +108,9 @@ export abstract class BaseSubAgentInvocation<
   private getSubagentModel(): string {
     const model = process.env['GEMINI_SUBAGENT_MODEL'];
     if (model) {
-      if([DEFAULT_GEMINI_FLASH_MODEL, DEFAULT_GEMINI_MODEL].includes(model)) {
+      if ([DEFAULT_GEMINI_FLASH_MODEL, DEFAULT_GEMINI_MODEL].includes(model)) {
         return model;
-      } 
+      }
       throw new Error(`Invalid subagent model: ${model}`);
     }
     return DEFAULT_GEMINI_MODEL;
