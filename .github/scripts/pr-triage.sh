@@ -26,22 +26,22 @@ process_pr() {
         return 1
     fi
 
-    # Look for issue references using multiple patterns
+    # Look for issue references using multiple patterns (most specific to least specific)
     local ISSUE_NUMBER=""
 
-    # Pattern 1: Direct reference like #123
-    if [[ -z "${ISSUE_NUMBER}" ]]; then
-        ISSUE_NUMBER=$(echo "${PR_BODY}" | grep -oE '#[0-9]+' | head -1 | sed 's/#//' 2>/dev/null || echo "")
-    fi
-
-    # Pattern 2: Closes/Fixes/Resolves patterns (case-insensitive)
+    # Pattern 1: Closes/Fixes/Resolves patterns (case-insensitive) - MOST SPECIFIC
     if [[ -z "${ISSUE_NUMBER}" ]]; then
         ISSUE_NUMBER=$(echo "${PR_BODY}" | grep -iE '(closes?|fixes?|resolves?) #[0-9]+' | grep -oE '#[0-9]+' | head -1 | sed 's/#//' 2>/dev/null || echo "")
     fi
 
-    # Fallback: Try GitHub's closingIssuesReferences as final option
+    # Pattern 2: GitHub's closingIssuesReferences API - MEDIUM SPECIFICITY
     if [[ -z "${ISSUE_NUMBER}" ]]; then
         ISSUE_NUMBER=$(gh pr view "${PR_NUMBER}" --repo "${GITHUB_REPOSITORY}" --json closingIssuesReferences -q '.closingIssuesReferences.nodes[0].number' 2>/dev/null || echo "")
+    fi
+
+    # Pattern 3: Direct reference like #123 - LEAST SPECIFIC (fallback)
+    if [[ -z "${ISSUE_NUMBER}" ]]; then
+        ISSUE_NUMBER=$(echo "${PR_BODY}" | grep -oE '#[0-9]+' | head -1 | sed 's/#//' 2>/dev/null || echo "")
     fi
 
     if [[ -z "${ISSUE_NUMBER}" ]]; then
