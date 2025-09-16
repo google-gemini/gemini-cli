@@ -188,6 +188,50 @@ Design for a good user experience - Provide clear, minimal, and non-blocking UI 
 
 Only write high-value comments if at all. Avoid talking to the user through comments.
 
+## Internationalization (i18n)
+
+This project uses i18next for internationalization. When working with styled text in UI components, use the `renderStyledText` utility instead of React's Trans component (which is incompatible with Ink).
+
+### Basic Usage
+
+```typescript
+import { useTranslation } from '../i18n';
+import { renderStyledText } from '../ui/utils/styledText';
+
+const { t } = useTranslation();
+
+// Simple translation
+<Text>{t('dialogs.settings.title')}</Text>
+
+// Styled text with placeholders
+{renderStyledText(
+  t('basics.addContext'), // "Add context: Use {symbol} to specify files"
+  {
+    symbol: <Text bold color={theme.text.accent}>@</Text>,
+    example: <Text bold color={theme.text.accent}>@src/file.ts</Text>
+  },
+  theme.text.primary
+)}
+```
+
+### Translation Keys
+
+Use semantic complete keys with placeholders for styled elements:
+
+```json
+{
+  "basics": {
+    "addContext": "Add context: Use {symbol} to specify files (e.g., {example})"
+  }
+}
+```
+
+### Why renderStyledText?
+
+- **Ink Compatible**: Works reliably in terminal environments (Trans component does not)
+- **Semantic Complete**: Translators see full sentences, not fragmented pieces
+- **Flexible Styling**: Insert any React components as placeholders
+
 ## General style requirements
 
 Use hyphens instead of underscores in flag names (e.g. `my-flag` instead of `my_flag`).
