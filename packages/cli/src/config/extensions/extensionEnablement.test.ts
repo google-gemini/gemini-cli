@@ -27,7 +27,7 @@ describe('ExtensionEnablementManager', () => {
   beforeEach(() => {
     testDir = createTestDir();
     configDir = path.join(testDir.path, '.gemini');
-    manager = ExtensionEnablementManager.getInstance(configDir);
+    manager = new ExtensionEnablementManager(configDir);
   });
 
   afterEach(() => {

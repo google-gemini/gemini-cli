@@ -152,7 +152,7 @@ export function loadExtensions(
   }
 
   const uniqueExtensions = new Map<string, Extension>();
-  const manager = ExtensionEnablementManager.getInstance(
+  const manager = new ExtensionEnablementManager(
     ExtensionStorage.getUserExtensionsDir(),
   );
 
@@ -295,7 +295,7 @@ export function annotateActiveExtensions(
   enabledExtensionNames: string[],
   workspaceDir: string,
 ): GeminiCLIExtension[] {
-  const manager = ExtensionEnablementManager.getInstance(
+  const manager = new ExtensionEnablementManager(
     ExtensionStorage.getUserExtensionsDir(),
   );
 
@@ -583,7 +583,7 @@ export async function uninstallExtension(
   ) {
     throw new Error(`Extension "${extensionName}" not found.`);
   }
-  const manager = ExtensionEnablementManager.getInstance(
+  const manager = new ExtensionEnablementManager(
     ExtensionStorage.getUserExtensionsDir(),
   );
   manager.remove(extensionName);
@@ -712,7 +712,7 @@ export function disableExtension(
     throw new Error('System and SystemDefaults scopes are not supported.');
   }
 
-  const manager = ExtensionEnablementManager.getInstance(
+  const manager = new ExtensionEnablementManager(
     ExtensionStorage.getUserExtensionsDir(),
   );
   const scopePath = scope === SettingScope.Workspace ? cwd : os.homedir();
@@ -727,7 +727,7 @@ export function enableExtension(
   if (scope === SettingScope.System || scope === SettingScope.SystemDefaults) {
     throw new Error('System and SystemDefaults scopes are not supported.');
   }
-  const manager = ExtensionEnablementManager.getInstance(
+  const manager = new ExtensionEnablementManager(
     ExtensionStorage.getUserExtensionsDir(),
   );
   const scopePath = scope === SettingScope.Workspace ? cwd : os.homedir();

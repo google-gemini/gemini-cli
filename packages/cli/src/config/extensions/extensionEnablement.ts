@@ -39,22 +39,12 @@ function globToRegex(glob: string): RegExp {
  * @returns True if the extension is enabled, false otherwise.
  */
 export class ExtensionEnablementManager {
-  private static instance: ExtensionEnablementManager;
   private configFilePath: string;
   private configDir: string;
 
-  private constructor(configDir: string) {
+  constructor(configDir: string) {
     this.configDir = configDir;
     this.configFilePath = path.join(configDir, 'extension-enablement.json');
-  }
-
-  static getInstance(configDir: string): ExtensionEnablementManager {
-    if (!ExtensionEnablementManager.instance) {
-      ExtensionEnablementManager.instance = new ExtensionEnablementManager(
-        configDir,
-      );
-    }
-    return ExtensionEnablementManager.instance;
   }
 
   isEnabled(extensionName: string, currentPath: string): boolean {

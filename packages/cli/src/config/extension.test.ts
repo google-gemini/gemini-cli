@@ -1163,7 +1163,7 @@ describe('extension tests', () => {
       expect(
         isEnabled({
           name: 'my-extension',
-          parentPath: tempHomeDir,
+          configDir: userExtensionsDir,
           enabledForPath: tempWorkspaceDir,
         }),
       ).toBe(false);
@@ -1178,14 +1178,14 @@ describe('extension tests', () => {
       expect(
         isEnabled({
           name: 'my-extension',
-          parentPath: tempHomeDir,
+          configDir: userExtensionsDir,
           enabledForPath: tempHomeDir,
         }),
       ).toBe(true);
       expect(
         isEnabled({
           name: 'my-extension',
-          parentPath: tempHomeDir,
+          configDir: userExtensionsDir,
           enabledForPath: tempWorkspaceDir,
         }),
       ).toBe(false);
@@ -1197,7 +1197,7 @@ describe('extension tests', () => {
       expect(
         isEnabled({
           name: 'my-extension',
-          parentPath: tempHomeDir,
+          configDir: userExtensionsDir,
           enabledForPath: tempWorkspaceDir,
         }),
       ).toBe(false);
@@ -1294,9 +1294,9 @@ function createExtension({
 
 function isEnabled(options: {
   name: string;
-  parentPath: string;
+  configDir: string;
   enabledForPath: string;
 }) {
-  const manager = ExtensionEnablementManager.getInstance(options.parentPath);
+  const manager = new ExtensionEnablementManager(options.configDir);
   return manager.isEnabled(options.name, options.enabledForPath);
 }
