@@ -34,7 +34,7 @@ import type {
   OutputConfig,
   PromptConfig,
 } from '../core/subagent.js';
-import { DEFAULT_GEMINI_MODEL } from '../config/models.js';
+import { DEFAULT_GEMINI_MODEL, DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
 import { ToolErrorType } from './tool-error.js';
 
 export abstract class BaseSubAgentInvocation<
@@ -97,6 +97,17 @@ export abstract class BaseSubAgentInvocation<
     ];
   }
 
+  private getSubagentModel(): string {
+    const model = process.env['GEMINI_SUBAGENT_MODEL'];
+    if (model) {
+      if([DEFAULT_GEMINI_FLASH_MODEL, DEFAULT_GEMINI_MODEL].includes(model)) {
+        return model;
+      } 
+      throw new Error(`Invalid subagent model: ${model}`);
+    }
+    return DEFAULT_GEMINI_MODEL;
+  }
+
   async execute(): Promise<ToolResult> {
     // Fast Fail if the required tools are missing
     const toolRegistry = this.config.getToolRegistry();
@@ -112,7 +123,7 @@ export abstract class BaseSubAgentInvocation<
       }
     }
     const modelConfig: ModelConfig = {
-      model: DEFAULT_GEMINI_MODEL, // Uses pro for reasoning
+      model: this.getSubagentModel(), // Uses pro for reasoning
       temp: 0.1,
       top_p: 0.95,
     };
