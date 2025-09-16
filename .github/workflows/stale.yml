@@ -8,7 +8,13 @@ on:
 
 jobs:
   stale:
-    runs-on: 'ubuntu-latest'
+    strategy:
+      fail-fast: false
+      matrix:
+        runner:
+          - 'ubuntu-latest' # GitHub-hosted
+          - 'self-hosted' # GHA on GCP runners
+    runs-on: '${{ matrix.runner }}'
     if: |-
       ${{ github.repository == 'google-gemini/gemini-cli' }}
     permissions:
