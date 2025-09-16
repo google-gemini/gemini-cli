@@ -4,22 +4,26 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useMemo } from 'react';
-import { Box } from 'ink';
-import { IndividualToolCallDisplay, ToolCallStatus } from '../../types.js';
+import type React from 'react';
+import { useMemo } from 'react';
+import { Box, Text } from 'ink';
+import type { IndividualToolCallDisplay } from '../../types.js';
+import { ToolCallStatus } from '../../types.js';
 import { ToolMessage } from './ToolMessage.js';
 import { ToolConfirmationMessage } from './ToolConfirmationMessage.js';
-import { Colors } from '../../colors.js';
-import { Config } from '@google/gemini-cli-core';
+import { theme } from '../../semantic-colors.js';
 import { SHELL_COMMAND_NAME } from '../../constants.js';
+import { useConfig } from '../../contexts/ConfigContext.js';
 
 interface ToolGroupMessageProps {
   groupId: number;
   toolCalls: IndividualToolCallDisplay[];
   availableTerminalHeight?: number;
   terminalWidth: number;
-  config?: Config;
   isFocused?: boolean;
+  activeShellPtyId?: number | null;
+  shellFocused?: boolean;
+  onShellInputSubmit?: (input: string) => void;
 }
 
 // Main component renders the border and maps the tools using ToolMessage
@@ -27,15 +31,27 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
   toolCalls,
   availableTerminalHeight,
   terminalWidth,
-  config,
   isFocused = true,
+  activeShellPtyId,
+  shellFocused,
 }) => {
+  const isShellFocused =
+    shellFocused &&
+    toolCalls.some(
+      (t) =>
+        t.ptyId === activeShellPtyId && t.status === ToolCallStatus.Executing,
+    );
+
   const hasPending = !toolCalls.every(
     (t) => t.status === ToolCallStatus.Success,
   );
+
+  const config = useConfig();
   const isShellCommand = toolCalls.some((t) => t.name === SHELL_COMMAND_NAME);
   const borderColor =
-    hasPending || isShellCommand ? Colors.AccentYellow : Colors.Gray;
+    hasPending || isShellCommand || isShellFocused
+      ? theme.status.warning
+      : theme.border.default;
 
   const staticHeight = /* border */ 2 + /* marginBottom */ 1;
   // This is a bit of a magic number, but it accounts for the border and
@@ -80,6 +96,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
       marginLeft={1}
       borderDimColor={hasPending}
       borderColor={borderColor}
+      gap={1}
     >
       {toolCalls.map((tool) => {
         const isConfirming = toolAwaitingApproval?.callId === tool.callId;
@@ -87,12 +104,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
           <Box key={tool.callId} flexDirection="column" minHeight={1}>
             <Box flexDirection="row" alignItems="center">
               <ToolMessage
-                callId={tool.callId}
-                name={tool.name}
-                description={tool.description}
-                resultDisplay={tool.resultDisplay}
-                status={tool.status}
-                confirmationDetails={tool.confirmationDetails}
+                {...tool}
                 availableTerminalHeight={availableTerminalHeightPerToolMessage}
                 terminalWidth={innerWidth}
                 emphasis={
@@ -102,7 +114,9 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
                       ? 'low'
                       : 'medium'
                 }
-                renderOutputAsMarkdown={tool.renderOutputAsMarkdown}
+                activeShellPtyId={activeShellPtyId}
+                shellFocused={shellFocused}
+                config={config}
               />
             </Box>
             {tool.status === ToolCallStatus.Confirming &&
@@ -118,6 +132,13 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
                   terminalWidth={innerWidth}
                 />
               )}
+            {tool.outputFile && (
+              <Box marginX={1}>
+                <Text color={theme.text.primary}>
+                  Output too long and was saved to: {tool.outputFile}
+                </Text>
+              </Box>
+            )}
           </Box>
         );
       })}

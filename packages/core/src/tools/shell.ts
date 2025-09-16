@@ -4,28 +4,33 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import fs from 'fs';
-import path from 'path';
-import os from 'os';
-import crypto from 'crypto';
-import { Config } from '../config/config.js';
-import {
-  BaseDeclarativeTool,
-  BaseToolInvocation,
+import fs from 'node:fs';
+import path from 'node:path';
+import os, { EOL } from 'node:os';
+import crypto from 'node:crypto';
+import type { Config } from '../config/config.js';
+import { ToolErrorType } from './tool-error.js';
+import type {
   ToolInvocation,
   ToolResult,
   ToolCallConfirmationDetails,
   ToolExecuteConfirmationDetails,
+} from './tools.js';
+import {
+  BaseDeclarativeTool,
+  BaseToolInvocation,
   ToolConfirmationOutcome,
   Kind,
 } from './tools.js';
 import { getErrorMessage } from '../utils/errors.js';
 import { summarizeToolOutput } from '../utils/summarizer.js';
-import {
-  ShellExecutionService,
+import type {
+  ShellExecutionConfig,
   ShellOutputEvent,
 } from '../services/shellExecutionService.js';
+import { ShellExecutionService } from '../services/shellExecutionService.js';
 import { formatMemoryUsage } from '../utils/formatters.js';
+import type { AnsiOutput } from '../utils/terminalSerializer.js';
 import {
   getCommandRoots,
   isCommandAllowed,
@@ -40,7 +45,7 @@ export interface ShellToolParams {
   directory?: string;
 }
 
-class ShellToolInvocation extends BaseToolInvocation<
+export class ShellToolInvocation extends BaseToolInvocation<
   ShellToolParams,
   ToolResult
 > {
@@ -76,7 +81,7 @@ class ShellToolInvocation extends BaseToolInvocation<
     );
 
     if (commandsToConfirm.length === 0) {
-      return false; // already approved and whitelisted
+      return false; // already approved and allowlisted
     }
 
     const confirmationDetails: ToolExecuteConfirmationDetails = {
@@ -95,9 +100,9 @@ class ShellToolInvocation extends BaseToolInvocation<
 
   async execute(
     signal: AbortSignal,
-    updateOutput?: (output: string) => void,
-    terminalColumns?: number,
-    terminalRows?: number,
+    updateOutput?: (output: string | AnsiOutput) => void,
+    shellExecutionConfig?: ShellExecutionConfig,
+    setPidCallback?: (pid: number) => void,
   ): Promise<ToolResult> {
     const strippedCommand = stripShellWrapper(this.params.command);
 
@@ -125,65 +130,62 @@ class ShellToolInvocation extends BaseToolInvocation<
             return `{ ${command} }; __code=$?; pgrep -g 0 >${tempFilePath} 2>&1; exit $__code;`;
           })();
 
-      const cwd = path.resolve(
-        this.config.getTargetDir(),
-        this.params.directory || '',
-      );
+      const cwd = this.params.directory || this.config.getTargetDir();
 
-      let cumulativeOutput = '';
+      let cumulativeOutput: string | AnsiOutput = '';
       let lastUpdateTime = Date.now();
       let isBinaryStream = false;
 
-      const { result: resultPromise } = await ShellExecutionService.execute(
-        commandToExecute,
-        cwd,
-        (event: ShellOutputEvent) => {
-          if (!updateOutput) {
-            return;
-          }
-
-          let currentDisplayOutput = '';
-          let shouldUpdate = false;
-
-          switch (event.type) {
-            case 'data':
-              if (isBinaryStream) break;
-              cumulativeOutput = event.chunk;
-              currentDisplayOutput = cumulativeOutput;
-              if (Date.now() - lastUpdateTime > OUTPUT_UPDATE_INTERVAL_MS) {
-                shouldUpdate = true;
-              }
-              break;
-            case 'binary_detected':
-              isBinaryStream = true;
-              currentDisplayOutput =
-                '[Binary output detected. Halting stream...]';
-              shouldUpdate = true;
-              break;
-            case 'binary_progress':
-              isBinaryStream = true;
-              currentDisplayOutput = `[Receiving binary output... ${formatMemoryUsage(
-                event.bytesReceived,
-              )} received]`;
-              if (Date.now() - lastUpdateTime > OUTPUT_UPDATE_INTERVAL_MS) {
-                shouldUpdate = true;
-              }
-              break;
-            default: {
-              throw new Error('An unhandled ShellOutputEvent was found.');
+      const { result: resultPromise, pid } =
+        await ShellExecutionService.execute(
+          commandToExecute,
+          cwd,
+          (event: ShellOutputEvent) => {
+            if (!updateOutput) {
+              return;
             }
-          }
 
-          if (shouldUpdate) {
-            updateOutput(currentDisplayOutput);
-            lastUpdateTime = Date.now();
-          }
-        },
-        signal,
-        this.config.getShouldUseNodePtyShell(),
-        terminalColumns,
-        terminalRows,
-      );
+            let shouldUpdate = false;
+
+            switch (event.type) {
+              case 'data':
+                if (isBinaryStream) break;
+                cumulativeOutput = event.chunk;
+                shouldUpdate = true;
+                break;
+              case 'binary_detected':
+                isBinaryStream = true;
+                cumulativeOutput =
+                  '[Binary output detected. Halting stream...]';
+                shouldUpdate = true;
+                break;
+              case 'binary_progress':
+                isBinaryStream = true;
+                cumulativeOutput = `[Receiving binary output... ${formatMemoryUsage(
+                  event.bytesReceived,
+                )} received]`;
+                if (Date.now() - lastUpdateTime > OUTPUT_UPDATE_INTERVAL_MS) {
+                  shouldUpdate = true;
+                }
+                break;
+              default: {
+                throw new Error('An unhandled ShellOutputEvent was found.');
+              }
+            }
+
+            if (shouldUpdate) {
+              updateOutput(cumulativeOutput);
+              lastUpdateTime = Date.now();
+            }
+          },
+          signal,
+          this.config.getShouldUseNodePtyShell(),
+          shellExecutionConfig ?? {},
+        );
+
+      if (pid && setPidCallback) {
+        setPidCallback(pid);
+      }
 
       const result = await resultPromise;
 
@@ -192,7 +194,7 @@ class ShellToolInvocation extends BaseToolInvocation<
         if (fs.existsSync(tempFilePath)) {
           const pgrepLines = fs
             .readFileSync(tempFilePath, 'utf8')
-            .split('\n')
+            .split(EOL)
             .filter(Boolean);
           for (const line of pgrepLines) {
             if (!/^\d+$/.test(line)) {
@@ -263,6 +265,14 @@ class ShellToolInvocation extends BaseToolInvocation<
       }
 
       const summarizeConfig = this.config.getSummarizeToolOutputConfig();
+      const executionError = result.error
+        ? {
+            error: {
+              message: result.error.message,
+              type: ToolErrorType.SHELL_EXECUTE_ERROR,
+            },
+          }
+        : {};
       if (summarizeConfig && summarizeConfig[ShellTool.Name]) {
         const summary = await summarizeToolOutput(
           llmContent,
@@ -273,12 +283,14 @@ class ShellToolInvocation extends BaseToolInvocation<
         return {
           llmContent: summary,
           returnDisplay: returnDisplayMessage,
+          ...executionError,
         };
       }
 
       return {
         llmContent,
         returnDisplay: returnDisplayMessage,
+        ...executionError,
       };
     } finally {
       if (fs.existsSync(tempFilePath)) {
@@ -346,7 +358,7 @@ export class ShellTool extends BaseDeclarativeTool<
           directory: {
             type: 'string',
             description:
-              '(OPTIONAL) Directory to run the command in, if not the project root directory. Must be relative to the project root directory and must already exist.',
+              '(OPTIONAL) The absolute path of the directory to run the command in. If not provided, the project root directory is used. Must be a directory within the workspace and must already exist.',
           },
         },
         required: ['command'],
@@ -376,20 +388,16 @@ export class ShellTool extends BaseDeclarativeTool<
       return 'Could not identify command root to obtain permission from user.';
     }
     if (params.directory) {
-      if (path.isAbsolute(params.directory)) {
-        return 'Directory cannot be absolute. Please refer to workspace directories by their name.';
+      if (!path.isAbsolute(params.directory)) {
+        return 'Directory must be an absolute path.';
       }
       const workspaceDirs = this.config.getWorkspaceContext().getDirectories();
-      const matchingDirs = workspaceDirs.filter(
-        (dir) => path.basename(dir) === params.directory,
+      const isWithinWorkspace = workspaceDirs.some((wsDir) =>
+        params.directory!.startsWith(wsDir),
       );
 
-      if (matchingDirs.length === 0) {
-        return `Directory '${params.directory}' is not a registered workspace directory.`;
-      }
-
-      if (matchingDirs.length > 1) {
-        return `Directory name '${params.directory}' is ambiguous as it matches multiple workspace directories.`;
+      if (!isWithinWorkspace) {
+        return `Directory '${params.directory}' is not within any of the registered workspace directories.`;
       }
     }
     return null;

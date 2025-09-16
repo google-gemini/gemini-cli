@@ -4,13 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { DetectedIde, getIdeInfo } from '@google/gemini-cli-core';
+import type { DetectedIde } from '@google/gemini-cli-core';
+import { getIdeInfo } from '@google/gemini-cli-core';
 import { Box, Text } from 'ink';
-import {
-  RadioButtonSelect,
-  RadioSelectItem,
-} from './components/shared/RadioButtonSelect.js';
+import type { RadioSelectItem } from './components/shared/RadioButtonSelect.js';
+import { RadioButtonSelect } from './components/shared/RadioButtonSelect.js';
 import { useKeypress } from './hooks/useKeypress.js';
+import { theme } from './semantic-colors.js';
 
 export type IdeIntegrationNudgeResult = {
   userSelection: 'yes' | 'no' | 'dismiss';
@@ -80,17 +80,17 @@ export function IdeIntegrationNudge({
     <Box
       flexDirection="column"
       borderStyle="round"
-      borderColor="yellow"
+      borderColor={theme.status.warning}
       padding={1}
       width="100%"
       marginLeft={1}
     >
       <Box marginBottom={1} flexDirection="column">
         <Text>
-          <Text color="yellow">{'> '}</Text>
-          {`Do you want to connect ${ideName ?? 'your'} editor to Gemini CLI?`}
+          <Text color={theme.status.warning}>{'> '}</Text>
+          {`Do you want to connect ${ideName ?? 'your editor'} to Gemini CLI?`}
         </Text>
-        <Text dimColor>{installText}</Text>
+        <Text color={theme.text.secondary}>{installText}</Text>
       </Box>
       <RadioButtonSelect items={OPTIONS} onSelect={onComplete} />
     </Box>

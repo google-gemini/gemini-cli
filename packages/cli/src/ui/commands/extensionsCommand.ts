@@ -5,42 +5,121 @@
  */
 
 import {
+  updateExtensionByName,
+  updateAllUpdatableExtensions,
+  type ExtensionUpdateInfo,
+} from '../../config/extension.js';
+import { getErrorMessage } from '../../utils/errors.js';
+import { MessageType } from '../types.js';
+import {
   type CommandContext,
   type SlashCommand,
   CommandKind,
 } from './types.js';
-import { MessageType } from '../types.js';
 
-export const extensionsCommand: SlashCommand = {
-  name: 'extensions',
-  description: 'list active extensions',
-  kind: CommandKind.BUILT_IN,
-  action: async (context: CommandContext): Promise<void> => {
-    const activeExtensions = context.services.config
-      ?.getExtensions()
-      .filter((ext) => ext.isActive);
-    if (!activeExtensions || activeExtensions.length === 0) {
+async function listAction(context: CommandContext) {
+  context.ui.addItem(
+    {
+      type: MessageType.EXTENSIONS_LIST,
+    },
+    Date.now(),
+  );
+}
+
+async function updateAction(context: CommandContext, args: string) {
+  const updateArgs = args.split(' ').filter((value) => value.length > 0);
+  const all = updateArgs.length === 1 && updateArgs[0] === '--all';
+  const names = all ? undefined : updateArgs;
+  let updateInfos: ExtensionUpdateInfo[] = [];
+
+  if (!all && names?.length === 0) {
+    context.ui.addItem(
+      {
+        type: MessageType.ERROR,
+        text: 'Usage: /extensions update <extension-names>|--all',
+      },
+      Date.now(),
+    );
+    return;
+  }
+
+  try {
+    context.ui.setPendingItem({
+      type: MessageType.EXTENSIONS_LIST,
+    });
+    if (all) {
+      updateInfos = await updateAllUpdatableExtensions(
+        context.services.config!.getWorkingDir(),
+        context.services.config!.getExtensions(),
+        context.ui.extensionsUpdateState,
+        context.ui.setExtensionsUpdateState,
+      );
+    } else if (names?.length) {
+      for (const name of names) {
+        updateInfos.push(
+          await updateExtensionByName(
+            name,
+            context.services.config!.getWorkingDir(),
+            context.services.config!.getExtensions(),
+            (updateState) => {
+              const newState = new Map(context.ui.extensionsUpdateState);
+              newState.set(name, updateState);
+              context.ui.setExtensionsUpdateState(newState);
+            },
+          ),
+        );
+      }
+    }
+
+    if (updateInfos.length === 0) {
       context.ui.addItem(
         {
           type: MessageType.INFO,
-          text: 'No active extensions.',
+          text: 'No extensions to update.',
         },
         Date.now(),
       );
       return;
     }
-
-    const extensionLines = activeExtensions.map(
-      (ext) => `  - \u001b[36m${ext.name} (v${ext.version})\u001b[0m`,
-    );
-    const message = `Active extensions:\n\n${extensionLines.join('\n')}\n`;
-
+  } catch (error) {
     context.ui.addItem(
       {
-        type: MessageType.INFO,
-        text: message,
+        type: MessageType.ERROR,
+        text: getErrorMessage(error),
       },
       Date.now(),
     );
-  },
+  } finally {
+    context.ui.addItem(
+      {
+        type: MessageType.EXTENSIONS_LIST,
+      },
+      Date.now(),
+    );
+    context.ui.setPendingItem(null);
+  }
+}
+
+const listExtensionsCommand: SlashCommand = {
+  name: 'list',
+  description: 'List active extensions',
+  kind: CommandKind.BUILT_IN,
+  action: listAction,
+};
+
+const updateExtensionsCommand: SlashCommand = {
+  name: 'update',
+  description: 'Update extensions. Usage: update <extension-names>|--all',
+  kind: CommandKind.BUILT_IN,
+  action: updateAction,
+};
+
+export const extensionsCommand: SlashCommand = {
+  name: 'extensions',
+  description: 'Manage extensions',
+  kind: CommandKind.BUILT_IN,
+  subCommands: [listExtensionsCommand, updateExtensionsCommand],
+  action: (context, args) =>
+    // Default to list if no subcommand is provided
+    listExtensionsCommand.action!(context, args),
 };

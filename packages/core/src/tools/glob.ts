@@ -4,18 +4,16 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import fs from 'fs';
-import path from 'path';
+import fs from 'node:fs';
+import path from 'node:path';
 import { glob, escape } from 'glob';
-import {
-  BaseDeclarativeTool,
-  BaseToolInvocation,
-  Kind,
-  ToolInvocation,
-  ToolResult,
-} from './tools.js';
+import type { ToolInvocation, ToolResult } from './tools.js';
+import { BaseDeclarativeTool, BaseToolInvocation, Kind } from './tools.js';
 import { shortenPath, makeRelative } from '../utils/paths.js';
-import { Config } from '../config/config.js';
+import {
+  type Config,
+  DEFAULT_FILE_FILTERING_OPTIONS,
+} from '../config/config.js';
 import { ToolErrorType } from './tool-error.js';
 
 // Subset of 'Path' interface provided by 'glob' that we can implement for testing
@@ -77,6 +75,11 @@ export interface GlobToolParams {
    * Whether to respect .gitignore patterns (optional, defaults to true)
    */
   respect_git_ignore?: boolean;
+
+  /**
+   * Whether to respect .geminiignore patterns (optional, defaults to true)
+   */
+  respect_gemini_ignore?: boolean;
 }
 
 class GlobToolInvocation extends BaseToolInvocation<
@@ -133,14 +136,10 @@ class GlobToolInvocation extends BaseToolInvocation<
       }
 
       // Get centralized file discovery service
-      const respectGitIgnore =
-        this.params.respect_git_ignore ??
-        this.config.getFileFilteringRespectGitIgnore();
       const fileDiscovery = this.config.getFileService();
 
       // Collect entries from all search directories
-      let allEntries: GlobPath[] = [];
-
+      const allEntries: GlobPath[] = [];
       for (const searchDir of searchDirectories) {
         let pattern = this.params.pattern;
         const fullPath = path.join(searchDir, pattern);
@@ -155,38 +154,37 @@ class GlobToolInvocation extends BaseToolInvocation<
           stat: true,
           nocase: !this.params.case_sensitive,
           dot: true,
-          ignore: ['**/node_modules/**', '**/.git/**'],
+          ignore: this.config.getFileExclusions().getGlobExcludes(),
           follow: false,
           signal,
         })) as GlobPath[];
 
-        allEntries = allEntries.concat(entries);
+        allEntries.push(...entries);
       }
 
-      const entries = allEntries;
+      const relativePaths = allEntries.map((p) =>
+        path.relative(this.config.getTargetDir(), p.fullpath()),
+      );
 
-      // Apply git-aware filtering if enabled and in git repository
-      let filteredEntries = entries;
-      let gitIgnoredCount = 0;
-
-      if (respectGitIgnore) {
-        const relativePaths = entries.map((p) =>
-          path.relative(this.config.getTargetDir(), p.fullpath()),
-        );
-        const filteredRelativePaths = fileDiscovery.filterFiles(relativePaths, {
-          respectGitIgnore,
+      const { filteredPaths, gitIgnoredCount, geminiIgnoredCount } =
+        fileDiscovery.filterFilesWithReport(relativePaths, {
+          respectGitIgnore:
+            this.params?.respect_git_ignore ??
+            this.config.getFileFilteringOptions().respectGitIgnore ??
+            DEFAULT_FILE_FILTERING_OPTIONS.respectGitIgnore,
+          respectGeminiIgnore:
+            this.params?.respect_gemini_ignore ??
+            this.config.getFileFilteringOptions().respectGeminiIgnore ??
+            DEFAULT_FILE_FILTERING_OPTIONS.respectGeminiIgnore,
         });
-        const filteredAbsolutePaths = new Set(
-          filteredRelativePaths.map((p) =>
-            path.resolve(this.config.getTargetDir(), p),
-          ),
-        );
 
-        filteredEntries = entries.filter((entry) =>
-          filteredAbsolutePaths.has(entry.fullpath()),
-        );
-        gitIgnoredCount = entries.length - filteredEntries.length;
-      }
+      const filteredAbsolutePaths = new Set(
+        filteredPaths.map((p) => path.resolve(this.config.getTargetDir(), p)),
+      );
+
+      const filteredEntries = allEntries.filter((entry) =>
+        filteredAbsolutePaths.has(entry.fullpath()),
+      );
 
       if (!filteredEntries || filteredEntries.length === 0) {
         let message = `No files found matching pattern "${this.params.pattern}"`;
@@ -197,6 +195,9 @@ class GlobToolInvocation extends BaseToolInvocation<
         }
         if (gitIgnoredCount > 0) {
           message += ` (${gitIgnoredCount} files were git-ignored)`;
+        }
+        if (geminiIgnoredCount > 0) {
+          message += ` (${geminiIgnoredCount} files were gemini-ignored)`;
         }
         return {
           llmContent: message,
@@ -229,6 +230,9 @@ class GlobToolInvocation extends BaseToolInvocation<
       }
       if (gitIgnoredCount > 0) {
         resultMessage += ` (${gitIgnoredCount} additional files were git-ignored)`;
+      }
+      if (geminiIgnoredCount > 0) {
+        resultMessage += ` (${geminiIgnoredCount} additional files were gemini-ignored)`;
       }
       resultMessage += `, sorted by modification time (newest first):\n${fileListDescription}`;
 
@@ -285,6 +289,11 @@ export class GlobTool extends BaseDeclarativeTool<GlobToolParams, ToolResult> {
           respect_git_ignore: {
             description:
               'Optional: Whether to respect .gitignore patterns when finding files. Only available in git repositories. Defaults to true.',
+            type: 'boolean',
+          },
+          respect_gemini_ignore: {
+            description:
+              'Optional: Whether to respect .geminiignore patterns when finding files. Defaults to true.',
             type: 'boolean',
           },
         },
