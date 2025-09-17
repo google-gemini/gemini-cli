@@ -16,6 +16,7 @@ import type {
   TrackedCompletedToolCall,
   TrackedExecutingToolCall,
   TrackedCancelledToolCall,
+  TrackedWaitingToolCall,
 } from './useReactToolScheduler.js';
 import { useReactToolScheduler } from './useReactToolScheduler.js';
 import type {
@@ -29,6 +30,7 @@ import {
   AuthType,
   GeminiEventType as ServerGeminiEventType,
   ToolErrorType,
+  ToolConfirmationOutcome,
 } from '@google/gemini-cli-core';
 import type { Part, PartListUnion } from '@google/genai';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
@@ -208,6 +210,7 @@ describe('useGeminiStream', () => {
         .fn()
         .mockReturnValue(contentGeneratorConfig),
       getUseSmartEdit: () => false,
+      getUseModelRouter: () => false,
     } as unknown as Config;
     mockOnDebugMessage = vi.fn();
     mockHandleSlashCommand = vi.fn().mockResolvedValue(false);
@@ -1337,6 +1340,458 @@ describe('useGeminiStream', () => {
           'gemini-2.5-flash',
         );
       });
+    });
+  });
+
+  describe('handleApprovalModeChange', () => {
+    it('should auto-approve all pending tool calls when switching to YOLO mode', async () => {
+      const mockOnConfirm = vi.fn().mockResolvedValue(undefined);
+      const awaitingApprovalToolCalls: TrackedToolCall[] = [
+        {
+          request: {
+            callId: 'call1',
+            name: 'replace',
+            args: { old_string: 'old', new_string: 'new' },
+            isClientInitiated: false,
+            prompt_id: 'prompt-id-1',
+          },
+          status: 'awaiting_approval',
+          responseSubmittedToGemini: false,
+          confirmationDetails: {
+            onConfirm: mockOnConfirm,
+            onCancel: vi.fn(),
+            message: 'Replace text?',
+            displayedText: 'Replace old with new',
+          },
+          tool: {
+            name: 'replace',
+            displayName: 'replace',
+            description: 'Replace text',
+            build: vi.fn(),
+          } as any,
+          invocation: {
+            getDescription: () => 'Mock description',
+          } as unknown as AnyToolInvocation,
+        } as TrackedWaitingToolCall,
+        {
+          request: {
+            callId: 'call2',
+            name: 'read_file',
+            args: { path: '/test/file.txt' },
+            isClientInitiated: false,
+            prompt_id: 'prompt-id-1',
+          },
+          status: 'awaiting_approval',
+          responseSubmittedToGemini: false,
+          confirmationDetails: {
+            onConfirm: mockOnConfirm,
+            onCancel: vi.fn(),
+            message: 'Read file?',
+            displayedText: 'Read /test/file.txt',
+          },
+          tool: {
+            name: 'read_file',
+            displayName: 'read_file',
+            description: 'Read file',
+            build: vi.fn(),
+          } as any,
+          invocation: {
+            getDescription: () => 'Mock description',
+          } as unknown as AnyToolInvocation,
+        } as TrackedWaitingToolCall,
+      ];
+
+      const { result } = renderTestHook(awaitingApprovalToolCalls);
+
+      await act(async () => {
+        await result.current.handleApprovalModeChange(ApprovalMode.YOLO);
+      });
+
+      // Both tool calls should be auto-approved
+      expect(mockOnConfirm).toHaveBeenCalledTimes(2);
+      expect(mockOnConfirm).toHaveBeenNthCalledWith(
+        1,
+        ToolConfirmationOutcome.ProceedOnce,
+      );
+      expect(mockOnConfirm).toHaveBeenNthCalledWith(
+        2,
+        ToolConfirmationOutcome.ProceedOnce,
+      );
+    });
+
+    it('should only auto-approve edit tools when switching to AUTO_EDIT mode', async () => {
+      const mockOnConfirmReplace = vi.fn().mockResolvedValue(undefined);
+      const mockOnConfirmWrite = vi.fn().mockResolvedValue(undefined);
+      const mockOnConfirmRead = vi.fn().mockResolvedValue(undefined);
+
+      const awaitingApprovalToolCalls: TrackedToolCall[] = [
+        {
+          request: {
+            callId: 'call1',
+            name: 'replace',
+            args: { old_string: 'old', new_string: 'new' },
+            isClientInitiated: false,
+            prompt_id: 'prompt-id-1',
+          },
+          status: 'awaiting_approval',
+          responseSubmittedToGemini: false,
+          confirmationDetails: {
+            onConfirm: mockOnConfirmReplace,
+            onCancel: vi.fn(),
+            message: 'Replace text?',
+            displayedText: 'Replace old with new',
+          },
+          tool: {
+            name: 'replace',
+            displayName: 'replace',
+            description: 'Replace text',
+            build: vi.fn(),
+          } as any,
+          invocation: {
+            getDescription: () => 'Mock description',
+          } as unknown as AnyToolInvocation,
+        } as TrackedWaitingToolCall,
+        {
+          request: {
+            callId: 'call2',
+            name: 'write_file',
+            args: { path: '/test/new.txt', content: 'content' },
+            isClientInitiated: false,
+            prompt_id: 'prompt-id-1',
+          },
+          status: 'awaiting_approval',
+          responseSubmittedToGemini: false,
+          confirmationDetails: {
+            onConfirm: mockOnConfirmWrite,
+            onCancel: vi.fn(),
+            message: 'Write file?',
+            displayedText: 'Write to /test/new.txt',
+          },
+          tool: {
+            name: 'write_file',
+            displayName: 'write_file',
+            description: 'Write file',
+            build: vi.fn(),
+          } as any,
+          invocation: {
+            getDescription: () => 'Mock description',
+          } as unknown as AnyToolInvocation,
+        } as TrackedWaitingToolCall,
+        {
+          request: {
+            callId: 'call3',
+            name: 'read_file',
+            args: { path: '/test/file.txt' },
+            isClientInitiated: false,
+            prompt_id: 'prompt-id-1',
+          },
+          status: 'awaiting_approval',
+          responseSubmittedToGemini: false,
+          confirmationDetails: {
+            onConfirm: mockOnConfirmRead,
+            onCancel: vi.fn(),
+            message: 'Read file?',
+            displayedText: 'Read /test/file.txt',
+          },
+          tool: {
+            name: 'read_file',
+            displayName: 'read_file',
+            description: 'Read file',
+            build: vi.fn(),
+          } as any,
+          invocation: {
+            getDescription: () => 'Mock description',
+          } as unknown as AnyToolInvocation,
+        } as TrackedWaitingToolCall,
+      ];
+
+      const { result } = renderTestHook(awaitingApprovalToolCalls);
+
+      await act(async () => {
+        await result.current.handleApprovalModeChange(ApprovalMode.AUTO_EDIT);
+      });
+
+      // Only replace and write_file should be auto-approved
+      expect(mockOnConfirmReplace).toHaveBeenCalledTimes(1);
+      expect(mockOnConfirmReplace).toHaveBeenCalledWith(
+        ToolConfirmationOutcome.ProceedOnce,
+      );
+      expect(mockOnConfirmWrite).toHaveBeenCalledTimes(1);
+      expect(mockOnConfirmWrite).toHaveBeenCalledWith(
+        ToolConfirmationOutcome.ProceedOnce,
+      );
+
+      // read_file should not be auto-approved
+      expect(mockOnConfirmRead).not.toHaveBeenCalled();
+    });
+
+    it('should not auto-approve any tools when switching to REQUIRE_CONFIRMATION mode', async () => {
+      const mockOnConfirm = vi.fn().mockResolvedValue(undefined);
+      const awaitingApprovalToolCalls: TrackedToolCall[] = [
+        {
+          request: {
+            callId: 'call1',
+            name: 'replace',
+            args: { old_string: 'old', new_string: 'new' },
+            isClientInitiated: false,
+            prompt_id: 'prompt-id-1',
+          },
+          status: 'awaiting_approval',
+          responseSubmittedToGemini: false,
+          confirmationDetails: {
+            onConfirm: mockOnConfirm,
+            onCancel: vi.fn(),
+            message: 'Replace text?',
+            displayedText: 'Replace old with new',
+          },
+          tool: {
+            name: 'replace',
+            displayName: 'replace',
+            description: 'Replace text',
+            build: vi.fn(),
+          } as any,
+          invocation: {
+            getDescription: () => 'Mock description',
+          } as unknown as AnyToolInvocation,
+        } as TrackedWaitingToolCall,
+      ];
+
+      const { result } = renderTestHook(awaitingApprovalToolCalls);
+
+      await act(async () => {
+        await result.current.handleApprovalModeChange(
+          ApprovalMode.REQUIRE_CONFIRMATION,
+        );
+      });
+
+      // No tools should be auto-approved
+      expect(mockOnConfirm).not.toHaveBeenCalled();
+    });
+
+    it('should handle errors gracefully when auto-approving tool calls', async () => {
+      const consoleSpy = vi
+        .spyOn(console, 'error')
+        .mockImplementation(() => {});
+      const mockOnConfirmSuccess = vi.fn().mockResolvedValue(undefined);
+      const mockOnConfirmError = vi
+        .fn()
+        .mockRejectedValue(new Error('Approval failed'));
+
+      const awaitingApprovalToolCalls: TrackedToolCall[] = [
+        {
+          request: {
+            callId: 'call1',
+            name: 'replace',
+            args: { old_string: 'old', new_string: 'new' },
+            isClientInitiated: false,
+            prompt_id: 'prompt-id-1',
+          },
+          status: 'awaiting_approval',
+          responseSubmittedToGemini: false,
+          confirmationDetails: {
+            onConfirm: mockOnConfirmSuccess,
+            onCancel: vi.fn(),
+            message: 'Replace text?',
+            displayedText: 'Replace old with new',
+          },
+          tool: {
+            name: 'replace',
+            displayName: 'replace',
+            description: 'Replace text',
+            build: vi.fn(),
+          } as any,
+          invocation: {
+            getDescription: () => 'Mock description',
+          } as unknown as AnyToolInvocation,
+        } as TrackedWaitingToolCall,
+        {
+          request: {
+            callId: 'call2',
+            name: 'write_file',
+            args: { path: '/test/file.txt', content: 'content' },
+            isClientInitiated: false,
+            prompt_id: 'prompt-id-1',
+          },
+          status: 'awaiting_approval',
+          responseSubmittedToGemini: false,
+          confirmationDetails: {
+            onConfirm: mockOnConfirmError,
+            onCancel: vi.fn(),
+            message: 'Write file?',
+            displayedText: 'Write to /test/file.txt',
+          },
+          tool: {
+            name: 'write_file',
+            displayName: 'write_file',
+            description: 'Write file',
+            build: vi.fn(),
+          } as any,
+          invocation: {
+            getDescription: () => 'Mock description',
+          } as unknown as AnyToolInvocation,
+        } as TrackedWaitingToolCall,
+      ];
+
+      const { result } = renderTestHook(awaitingApprovalToolCalls);
+
+      await act(async () => {
+        await result.current.handleApprovalModeChange(ApprovalMode.YOLO);
+      });
+
+      // Both confirmation methods should be called
+      expect(mockOnConfirmSuccess).toHaveBeenCalledTimes(1);
+      expect(mockOnConfirmError).toHaveBeenCalledTimes(1);
+
+      // Error should be logged
+      expect(consoleSpy).toHaveBeenCalledWith(
+        'Failed to auto-approve tool call call2:',
+        expect.any(Error),
+      );
+
+      consoleSpy.mockRestore();
+    });
+
+    it('should skip tool calls without confirmationDetails', async () => {
+      const awaitingApprovalToolCalls: TrackedToolCall[] = [
+        {
+          request: {
+            callId: 'call1',
+            name: 'replace',
+            args: { old_string: 'old', new_string: 'new' },
+            isClientInitiated: false,
+            prompt_id: 'prompt-id-1',
+          },
+          status: 'awaiting_approval',
+          responseSubmittedToGemini: false,
+          // No confirmationDetails
+          tool: {
+            name: 'replace',
+            displayName: 'replace',
+            description: 'Replace text',
+            build: vi.fn(),
+          } as any,
+          invocation: {
+            getDescription: () => 'Mock description',
+          } as unknown as AnyToolInvocation,
+        } as TrackedWaitingToolCall,
+      ];
+
+      const { result } = renderTestHook(awaitingApprovalToolCalls);
+
+      // Should not throw an error
+      await act(async () => {
+        await result.current.handleApprovalModeChange(ApprovalMode.YOLO);
+      });
+    });
+
+    it('should skip tool calls without onConfirm method in confirmationDetails', async () => {
+      const awaitingApprovalToolCalls: TrackedToolCall[] = [
+        {
+          request: {
+            callId: 'call1',
+            name: 'replace',
+            args: { old_string: 'old', new_string: 'new' },
+            isClientInitiated: false,
+            prompt_id: 'prompt-id-1',
+          },
+          status: 'awaiting_approval',
+          responseSubmittedToGemini: false,
+          confirmationDetails: {
+            onCancel: vi.fn(),
+            message: 'Replace text?',
+            displayedText: 'Replace old with new',
+            // No onConfirm method
+          } as any,
+          tool: {
+            name: 'replace',
+            displayName: 'replace',
+            description: 'Replace text',
+            build: vi.fn(),
+          } as any,
+          invocation: {
+            getDescription: () => 'Mock description',
+          } as unknown as AnyToolInvocation,
+        } as TrackedWaitingToolCall,
+      ];
+
+      const { result } = renderTestHook(awaitingApprovalToolCalls);
+
+      // Should not throw an error
+      await act(async () => {
+        await result.current.handleApprovalModeChange(ApprovalMode.YOLO);
+      });
+    });
+
+    it('should only process tool calls with awaiting_approval status', async () => {
+      const mockOnConfirmAwaiting = vi.fn().mockResolvedValue(undefined);
+      const mockOnConfirmExecuting = vi.fn().mockResolvedValue(undefined);
+
+      const mixedStatusToolCalls: TrackedToolCall[] = [
+        {
+          request: {
+            callId: 'call1',
+            name: 'replace',
+            args: { old_string: 'old', new_string: 'new' },
+            isClientInitiated: false,
+            prompt_id: 'prompt-id-1',
+          },
+          status: 'awaiting_approval',
+          responseSubmittedToGemini: false,
+          confirmationDetails: {
+            onConfirm: mockOnConfirmAwaiting,
+            onCancel: vi.fn(),
+            message: 'Replace text?',
+            displayedText: 'Replace old with new',
+          },
+          tool: {
+            name: 'replace',
+            displayName: 'replace',
+            description: 'Replace text',
+            build: vi.fn(),
+          } as any,
+          invocation: {
+            getDescription: () => 'Mock description',
+          } as unknown as AnyToolInvocation,
+        } as TrackedWaitingToolCall,
+        {
+          request: {
+            callId: 'call2',
+            name: 'write_file',
+            args: { path: '/test/file.txt', content: 'content' },
+            isClientInitiated: false,
+            prompt_id: 'prompt-id-1',
+          },
+          status: 'executing',
+          responseSubmittedToGemini: false,
+          confirmationDetails: {
+            onConfirm: mockOnConfirmExecuting,
+            onCancel: vi.fn(),
+            message: 'Write file?',
+            displayedText: 'Write to /test/file.txt',
+          },
+          tool: {
+            name: 'write_file',
+            displayName: 'write_file',
+            description: 'Write file',
+            build: vi.fn(),
+          } as any,
+          invocation: {
+            getDescription: () => 'Mock description',
+          } as unknown as AnyToolInvocation,
+          startTime: Date.now(),
+          liveOutput: 'Writing...',
+        } as TrackedExecutingToolCall,
+      ];
+
+      const { result } = renderTestHook(mixedStatusToolCalls);
+
+      await act(async () => {
+        await result.current.handleApprovalModeChange(ApprovalMode.YOLO);
+      });
+
+      // Only the awaiting_approval tool should be processed
+      expect(mockOnConfirmAwaiting).toHaveBeenCalledTimes(1);
+      expect(mockOnConfirmExecuting).not.toHaveBeenCalled();
     });
   });
 
