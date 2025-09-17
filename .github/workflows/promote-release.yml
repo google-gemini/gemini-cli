@@ -57,6 +57,11 @@ jobs:
       - name: 'Install Dependencies'
         run: 'npm ci'
 
+      - name: 'Print Inputs'
+        shell: 'bash'
+        run: |-
+          echo "${{ toJSON(inputs) }}"
+
       - name: 'Calculate Versions and SHAs'
         id: 'versions'
         env:
