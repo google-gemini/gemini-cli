@@ -13,6 +13,7 @@ export enum ToolErrorType {
   UNKNOWN = 'unknown',
   UNHANDLED_EXCEPTION = 'unhandled_exception',
   TOOL_NOT_REGISTERED = 'tool_not_registered',
+  TOOL_NOT_AVAILABLE = 'tool_not_available',
   EXECUTION_FAILED = 'execution_failed',
   USER_CANCELLED = 'user_cancelled',
 
