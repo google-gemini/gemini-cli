@@ -78,7 +78,6 @@ export interface UIState {
   ctrlCPressedOnce: boolean;
   ctrlDPressedOnce: boolean;
   showEscapePrompt: boolean;
-  isFocused: boolean;
   elapsedTime: number;
   currentLoadingPhrase: string;
   historyRemountKey: number;
