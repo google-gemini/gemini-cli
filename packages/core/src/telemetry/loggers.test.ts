@@ -32,6 +32,7 @@ import {
   EVENT_MALFORMED_JSON_RESPONSE,
   EVENT_FILE_OPERATION,
   EVENT_RIPGREP_FALLBACK,
+  EVENT_MODEL_ROUTING,
 } from './constants.js';
 import {
   logApiRequest,
@@ -45,6 +46,7 @@ import {
   logFileOperation,
   logRipgrepFallback,
   logToolOutputTruncated,
+  logModelRouting,
 } from './loggers.js';
 import { ToolCallDecision } from './tool-call-decision.js';
 import {
@@ -59,6 +61,7 @@ import {
   makeChatCompressionEvent,
   FileOperationEvent,
   ToolOutputTruncatedEvent,
+  ModelRoutingEvent,
 } from './types.js';
 import * as metrics from './metrics.js';
 import { FileOperation } from './metrics.js';
@@ -1039,6 +1042,70 @@ describe('loggers', () => {
           lines: 10,
         },
       });
+    });
+  });
+
+  describe('logModelRouting', () => {
+    const mockConfig = {
+      getSessionId: () => 'test-session-id',
+      getUsageStatisticsEnabled: () => true,
+    } as unknown as Config;
+
+    beforeEach(() => {
+      vi.spyOn(ClearcutLogger.prototype, 'logModelRoutingEvent');
+      vi.spyOn(metrics, 'recordModelRoutingMetrics');
+    });
+
+    it('should log the event to Clearcut and OTEL, and record metrics', () => {
+      const event = new ModelRoutingEvent(
+        'gemini-pro',
+        'default',
+        100,
+        'test-reason',
+        false,
+        undefined,
+      );
+
+      logModelRouting(mockConfig, event);
+
+      expect(
+        ClearcutLogger.prototype.logModelRoutingEvent,
+      ).toHaveBeenCalledWith(event);
+
+      expect(mockLogger.emit).toHaveBeenCalledWith({
+        body: 'Model routing decision. Model: gemini-pro, Source: default',
+        attributes: {
+          'session.id': 'test-session-id',
+          'user.email': 'test-user@example.com',
+          ...event,
+          'event.name': EVENT_MODEL_ROUTING,
+        },
+      });
+
+      expect(metrics.recordModelRoutingMetrics).toHaveBeenCalledWith(
+        mockConfig,
+        event,
+      );
+    });
+
+    it('should only log to Clearcut if OTEL SDK is not initialized', () => {
+      vi.spyOn(sdk, 'isTelemetrySdkInitialized').mockReturnValue(false);
+      const event = new ModelRoutingEvent(
+        'gemini-pro',
+        'default',
+        100,
+        'test-reason',
+        false,
+        undefined,
+      );
+
+      logModelRouting(mockConfig, event);
+
+      expect(
+        ClearcutLogger.prototype.logModelRoutingEvent,
+      ).toHaveBeenCalledWith(event);
+      expect(mockLogger.emit).not.toHaveBeenCalled();
+      expect(metrics.recordModelRoutingMetrics).not.toHaveBeenCalled();
     });
   });
 });
