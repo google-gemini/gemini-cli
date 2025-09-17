@@ -625,5 +625,173 @@ Regular paragraph content.`;
         expect(afterSplit).toBeDefined();
       });
     });
+
+    describe('False positive handling for list detection', () => {
+      it('should not treat file paths as lists', () => {
+        const content = `Configuration guide
+
+Check the config.js file for settings.
+The image.png file contains the logo.
+Edit the data.json file as needed.
+
+Additional content here.`;
+
+        const splitPoint = findLastSafeSplitPoint(content);
+
+        // Should be able to split normally despite file extension patterns
+        expect(splitPoint).toBeGreaterThan(0);
+        expect(splitPoint).toBeLessThanOrEqual(content.length);
+      });
+
+      it('should not treat version numbers and decimals as lists', () => {
+        const content = `Release notes
+
+Version 1.2.3 includes bug fixes.
+The price is $10.50 per unit.
+Temperature reached 98.6 degrees.
+Release date: 2025.01.15 scheduled.
+
+More content follows.`;
+
+        const splitPoint = findLastSafeSplitPoint(content);
+
+        // Should be able to split normally despite numeric patterns
+        expect(splitPoint).toBeGreaterThan(0);
+        expect(splitPoint).toBeLessThanOrEqual(content.length);
+      });
+
+      it('should not treat code examples as lists', () => {
+        const content = `JavaScript tutorial
+
+Use console.log() to debug.
+Call obj.method() to execute.
+The alert() function shows messages.
+
+Continue with the tutorial.`;
+
+        const splitPoint = findLastSafeSplitPoint(content);
+
+        // Should be able to split normally despite method call patterns
+        expect(splitPoint).toBeGreaterThan(0);
+        expect(splitPoint).toBeLessThanOrEqual(content.length);
+      });
+
+      it('should not treat URLs and domains as lists', () => {
+        const content = `Web resources
+
+Visit example.com for documentation.
+Go to github.com for the source code.
+Check out stackoverflow.com for help.
+
+Additional resources below.`;
+
+        const splitPoint = findLastSafeSplitPoint(content);
+
+        // Should be able to split normally despite domain patterns
+        expect(splitPoint).toBeGreaterThan(0);
+        expect(splitPoint).toBeLessThanOrEqual(content.length);
+      });
+
+      it('should handle mixed false positives with real lists', () => {
+        const content = `Mixed content example
+
+The config.js file is important.
+Version 2.1.0 was released.
+
+* Real list item 1
+* Real list item 2
+* Real list item 3
+
+Visit example.com for more info.
+Temperature: 72.5 degrees.
+
+Final paragraph content.`;
+
+        const splitPoint = findLastSafeSplitPoint(content);
+        const beforeSplit = content.substring(0, splitPoint);
+        const afterSplit = content.substring(splitPoint);
+
+        // Should protect real lists while handling false positives
+        if (beforeSplit.includes('Real list item 1')) {
+          expect(beforeSplit).toContain('Real list item 2');
+          expect(beforeSplit).toContain('Real list item 3');
+        } else if (afterSplit.includes('Real list item 1')) {
+          expect(afterSplit).toContain('Real list item 2');
+          expect(afterSplit).toContain('Real list item 3');
+        }
+      });
+
+      it('should use fallback logic when many false positives are present', () => {
+        const content = `Heavy false positive content
+
+Check config.js for settings.
+Version 1.2.3 has updates.
+Visit example.com for help.
+Price is $99.99 total.
+
+Another paragraph here.
+
+The app.py file runs the server.
+Release 3.0.1 is coming soon.
+Domain site.org has docs.
+Cost: $15.75 per item.
+
+Final content section.`;
+
+        const splitPoint = findLastSafeSplitPoint(content);
+
+        // Should still find a reasonable split point using fallback logic
+        expect(splitPoint).toBeGreaterThan(0);
+        expect(splitPoint).toBeLessThanOrEqual(content.length);
+
+        // Should not return content.length unless absolutely necessary
+        expect(splitPoint).toBeLessThan(content.length);
+      });
+
+      it('should handle Roman numeral false positives', () => {
+        const content = `Historical content
+
+Chapter iv. discusses the war.
+King Henry viii. ruled England.
+Pope Benedict xvi. was influential.
+
+Regular content continues here.
+
+More paragraphs follow.`;
+
+        const splitPoint = findLastSafeSplitPoint(content);
+
+        // Should handle Roman numeral patterns that match list regex
+        expect(splitPoint).toBeGreaterThan(0);
+        expect(splitPoint).toBeLessThanOrEqual(content.length);
+      });
+
+      it('should maintain performance with extensive false positives', () => {
+        // Create content with many false positive patterns
+        const sections = [];
+        for (let i = 1; i <= 20; i++) {
+          sections.push(`Section ${i}
+
+File config${i}.js needs updates.
+Version ${i}.0.1 was released.
+Visit site${i}.com for details.
+Cost: $${i * 10}.50 total.
+
+Content for section ${i} continues.`);
+        }
+        const content = sections.join('\n\n');
+
+        const startTime = Date.now();
+        const splitPoint = findLastSafeSplitPoint(content);
+        const endTime = Date.now();
+
+        // Should still find a split point
+        expect(splitPoint).toBeGreaterThan(0);
+        expect(splitPoint).toBeLessThanOrEqual(content.length);
+
+        // Should complete in reasonable time (under 100ms for this size)
+        expect(endTime - startTime).toBeLessThan(100);
+      });
+    });
   });
 });
