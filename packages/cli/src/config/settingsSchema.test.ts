@@ -24,6 +24,7 @@ describe('SettingsSchema', () => {
         'telemetry',
         'model',
         'context',
+        'events',
         'tools',
         'mcp',
         'security',
@@ -329,6 +330,15 @@ describe('SettingsSchema', () => {
       expect(
         getSettingsSchema().experimental.properties.useModelRouter.default,
       ).toBe(false);
+    });
+
+    it('should have events setting in schema', () => {
+      expect(getSettingsSchema().events).toBeDefined();
+      expect(getSettingsSchema().events.type).toBe('array');
+      expect(getSettingsSchema().events.category).toBe('UI');
+      expect(getSettingsSchema().events.default).toEqual([]);
+      expect(getSettingsSchema().events.requiresRestart).toBe(false);
+      expect(getSettingsSchema().events.showInDialog).toBe(false);
     });
   });
 });
