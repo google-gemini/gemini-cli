@@ -1,4 +1,4 @@
-description = "Find relevant documentation and output GitHub URLs."
+description = "Find relevantdocumentation and output GitHub URLs."
 
 prompt = """
 ## Mission: Find Relevant Documentation
