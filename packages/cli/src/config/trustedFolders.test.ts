@@ -276,6 +276,23 @@ describe('isWorkspaceTrusted', () => {
       TrustLevel.TRUST_FOLDER;
     expect(isWorkspaceTrusted(mockSettings)).toBe(true);
   });
+
+  it('defaults to untrusted when feature disabled and GEMINI_SAFE_TRUST_DEFAULT=1', () => {
+    mockCwd = '/home/user/other';
+    const settings: Settings = {
+      security: {
+        folderTrust: {
+          featureEnabled: false,
+        },
+      },
+    } as unknown as Settings;
+    vi.stubEnv('GEMINI_SAFE_TRUST_DEFAULT', '1');
+    try {
+      expect(isWorkspaceTrusted(settings)).toBe(false);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
 });
 
 describe('isWorkspaceTrusted with IDE override', () => {
