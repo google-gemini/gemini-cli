@@ -1,4 +1,4 @@
-steps:
+steps: 
   # Step 1: Install root dependencies (includes workspaces)
   - name: 'us-west1-docker.pkg.dev/gemini-code-dev/gemini-code-containers/gemini-code-builder'
     id: 'Install Dependencies'
