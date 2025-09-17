@@ -237,7 +237,6 @@ describe('Gemini Client (client.ts)', () => {
       generateContent: mockGenerateContentFn,
       generateContentStream: vi.fn(),
       countTokens: vi.fn().mockResolvedValue({ totalTokens: 100 }),
-      embedContent: vi.fn(),
       batchEmbedContents: vi.fn(),
     } as unknown as ContentGenerator;
 
@@ -290,11 +289,18 @@ describe('Gemini Client (client.ts)', () => {
       getChatCompression: vi.fn().mockReturnValue(undefined),
       getSkipNextSpeakerCheck: vi.fn().mockReturnValue(false),
       getUseSmartEdit: vi.fn().mockReturnValue(false),
+      getUseModelRouter: vi.fn().mockReturnValue(false),
       getProjectRoot: vi.fn().mockReturnValue('/test/project/root'),
       storage: {
         getProjectTempDir: vi.fn().mockReturnValue('/test/temp'),
       },
       getContentGenerator: vi.fn().mockReturnValue(mockContentGenerator),
+      getBaseLlmClient: vi.fn().mockReturnValue({
+        generateJson: vi.fn().mockResolvedValue({
+          next_speaker: 'user',
+          reasoning: 'test',
+        }),
+      }),
     } as unknown as Config;
 
     client = new GeminiClient(mockConfig);
@@ -304,192 +310,6 @@ describe('Gemini Client (client.ts)', () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
-  });
-
-  describe('generateEmbedding', () => {
-    const texts = ['hello world', 'goodbye world'];
-    const testEmbeddingModel = 'test-embedding-model';
-
-    it('should call embedContent with correct parameters and return embeddings', async () => {
-      const mockEmbeddings = [
-        [0.1, 0.2, 0.3],
-        [0.4, 0.5, 0.6],
-      ];
-      vi.mocked(mockContentGenerator.embedContent).mockResolvedValue({
-        embeddings: [
-          { values: mockEmbeddings[0] },
-          { values: mockEmbeddings[1] },
-        ],
-      });
-
-      const result = await client.generateEmbedding(texts);
-
-      expect(mockContentGenerator.embedContent).toHaveBeenCalledTimes(1);
-      expect(mockContentGenerator.embedContent).toHaveBeenCalledWith({
-        model: testEmbeddingModel,
-        contents: texts,
-      });
-      expect(result).toEqual(mockEmbeddings);
-    });
-
-    it('should return an empty array if an empty array is passed', async () => {
-      const result = await client.generateEmbedding([]);
-      expect(result).toEqual([]);
-      expect(mockContentGenerator.embedContent).not.toHaveBeenCalled();
-    });
-
-    it('should throw an error if API response has no embeddings array', async () => {
-      vi.mocked(mockContentGenerator.embedContent).mockResolvedValue({});
-
-      await expect(client.generateEmbedding(texts)).rejects.toThrow(
-        'No embeddings found in API response.',
-      );
-    });
-
-    it('should throw an error if API response has an empty embeddings array', async () => {
-      vi.mocked(mockContentGenerator.embedContent).mockResolvedValue({
-        embeddings: [],
-      });
-
-      await expect(client.generateEmbedding(texts)).rejects.toThrow(
-        'No embeddings found in API response.',
-      );
-    });
-
-    it('should throw an error if API returns a mismatched number of embeddings', async () => {
-      vi.mocked(mockContentGenerator.embedContent).mockResolvedValue({
-        embeddings: [{ values: [1, 2, 3] }], // Only one for two texts
-      });
-
-      await expect(client.generateEmbedding(texts)).rejects.toThrow(
-        'API returned a mismatched number of embeddings. Expected 2, got 1.',
-      );
-    });
-
-    it('should throw an error if any embedding has nullish values', async () => {
-      vi.mocked(mockContentGenerator.embedContent).mockResolvedValue({
-        embeddings: [{ values: [1, 2, 3] }, { values: undefined }], // Second one is bad
-      });
-
-      await expect(client.generateEmbedding(texts)).rejects.toThrow(
-        'API returned an empty embedding for input text at index 1: "goodbye world"',
-      );
-    });
-
-    it('should throw an error if any embedding has an empty values array', async () => {
-      vi.mocked(mockContentGenerator.embedContent).mockResolvedValue({
-        embeddings: [{ values: [] }, { values: [1, 2, 3] }], // First one is bad
-      });
-
-      await expect(client.generateEmbedding(texts)).rejects.toThrow(
-        'API returned an empty embedding for input text at index 0: "hello world"',
-      );
-    });
-
-    it('should propagate errors from the API call', async () => {
-      vi.mocked(mockContentGenerator.embedContent).mockRejectedValue(
-        new Error('API Failure'),
-      );
-
-      await expect(client.generateEmbedding(texts)).rejects.toThrow(
-        'API Failure',
-      );
-    });
-  });
-
-  describe('generateJson', () => {
-    it('should call generateContent with the correct parameters', async () => {
-      const contents = [{ role: 'user', parts: [{ text: 'hello' }] }];
-      const schema = { type: 'string' };
-      const abortSignal = new AbortController().signal;
-
-      vi.mocked(mockContentGenerator.countTokens).mockResolvedValue({
-        totalTokens: 1,
-      });
-
-      await client.generateJson(
-        contents,
-        schema,
-        abortSignal,
-        DEFAULT_GEMINI_FLASH_MODEL,
-      );
-
-      expect(mockContentGenerator.generateContent).toHaveBeenCalledWith(
-        {
-          model: DEFAULT_GEMINI_FLASH_MODEL,
-          config: {
-            abortSignal,
-            systemInstruction: getCoreSystemPrompt(''),
-            temperature: 0,
-            topP: 1,
-            responseJsonSchema: schema,
-            responseMimeType: 'application/json',
-          },
-          contents,
-        },
-        'test-session-id',
-      );
-    });
-
-    it('should allow overriding model and config', async () => {
-      const contents: Content[] = [
-        { role: 'user', parts: [{ text: 'hello' }] },
-      ];
-      const schema = { type: 'string' };
-      const abortSignal = new AbortController().signal;
-      const customModel = 'custom-json-model';
-      const customConfig = { temperature: 0.9, topK: 20 };
-
-      vi.mocked(mockContentGenerator.countTokens).mockResolvedValue({
-        totalTokens: 1,
-      });
-
-      await client.generateJson(
-        contents,
-        schema,
-        abortSignal,
-        customModel,
-        customConfig,
-      );
-
-      expect(mockContentGenerator.generateContent).toHaveBeenCalledWith(
-        {
-          model: customModel,
-          config: {
-            abortSignal,
-            systemInstruction: getCoreSystemPrompt(''),
-            temperature: 0.9,
-            topP: 1, // from default
-            topK: 20,
-            responseJsonSchema: schema,
-            responseMimeType: 'application/json',
-          },
-          contents,
-        },
-        'test-session-id',
-      );
-    });
-
-    it('should use the Flash model when fallback mode is active', async () => {
-      const contents = [{ role: 'user', parts: [{ text: 'hello' }] }];
-      const schema = { type: 'string' };
-      const abortSignal = new AbortController().signal;
-      const requestedModel = 'gemini-2.5-pro'; // A non-flash model
-
-      // Mock config to be in fallback mode
-      // We access the mock via the client instance which holds the mocked config
-      vi.spyOn(client['config'], 'isInFallbackMode').mockReturnValue(true);
-
-      await client.generateJson(contents, schema, abortSignal, requestedModel);
-
-      // Assert that the Flash model was used, not the requested model
-      expect(mockContentGenerator.generateContent).toHaveBeenCalledWith(
-        expect.objectContaining({
-          model: DEFAULT_GEMINI_FLASH_MODEL,
-        }),
-        'test-session-id',
-      );
-    });
   });
 
   describe('addHistory', () => {
@@ -2404,6 +2224,45 @@ ${JSON.stringify(
 
       // Assert
       expect(mockCheckNextSpeaker).not.toHaveBeenCalled();
+    });
+
+    it('should abort linked signal when loop is detected', async () => {
+      // Arrange
+      vi.spyOn(client['loopDetector'], 'turnStarted').mockResolvedValue(false);
+      vi.spyOn(client['loopDetector'], 'addAndCheck')
+        .mockReturnValueOnce(false)
+        .mockReturnValueOnce(true);
+
+      let capturedSignal: AbortSignal;
+      mockTurnRunFn.mockImplementation((model, request, signal) => {
+        capturedSignal = signal;
+        return (async function* () {
+          yield { type: 'content', value: 'First event' };
+          yield { type: 'content', value: 'Second event' };
+        })();
+      });
+
+      const mockChat: Partial<GeminiChat> = {
+        addHistory: vi.fn(),
+        getHistory: vi.fn().mockReturnValue([]),
+      };
+      client['chat'] = mockChat as GeminiChat;
+
+      // Act
+      const stream = client.sendMessageStream(
+        [{ text: 'Hi' }],
+        new AbortController().signal,
+        'prompt-id-loop',
+      );
+
+      const events = [];
+      for await (const event of stream) {
+        events.push(event);
+      }
+
+      // Assert
+      expect(events).toContainEqual({ type: GeminiEventType.LoopDetected });
+      expect(capturedSignal!.aborted).toBe(true);
     });
   });
 
