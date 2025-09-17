@@ -18,6 +18,14 @@ on:
         required: false
         type: 'string'
         default: 'main'
+      stable_version_override:
+        description: 'Manually override the stable version number.'
+        required: false
+        type: 'string'
+      preview_version_override:
+        description: 'Manually override the preview version number.'
+        required: false
+        type: 'string'
 
 jobs:
   calculate-versions:
@@ -49,18 +57,29 @@ jobs:
       - name: 'Install Dependencies'
         run: 'npm ci'
 
+      - name: 'Print Inputs'
+        shell: 'bash'
+        run: |-
+          echo "${{ toJSON(inputs) }}"
+
       - name: 'Calculate Versions and SHAs'
         id: 'versions'
         env:
           GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
         run: |
           set -e
-          STABLE_JSON=$(node scripts/get-release-version.js --type=stable)
-          PREVIEW_JSON=$(node scripts/get-release-version.js --type=preview)
+          STABLE_JSON=$(node scripts/get-release-version.js --type=stable ${{ github.event.inputs.stable_version_override && format('--stable_version_override={0}', github.event.inputs.stable_version_override) || '' }})
+          PREVIEW_JSON=$(node scripts/get-release-version.js --type=preview ${{ github.event.inputs.preview_version_override && format('--preview_version_override={0}', github.event.inputs.preview_version_override) || '' }})
           NIGHTLY_JSON=$(node scripts/get-release-version.js --type=nightly)
+          echo "STABLE_JSON_COMMAND=node scripts/get-release-version.js --type=stable ${{ github.event.inputs.stable_version_override && format('--stable_version_override={0}', github.event.inputs.stable_version_override) || '' }}"
+          echo "PREVIEW_JSON_COMMAND=node scripts/get-release-version.js --type=preview ${{ github.event.inputs.preview_version_override && format('--preview_version_override={0}', github.event.inputs.preview_version_override) || '' }}"
+          echo "NIGHTLY_JSON_COMMAND=node scripts/get-release-version.js --type=nightly"
+          echo "STABLE_JSON: ${STABLE_JSON}"
+          echo "PREVIEW_JSON: ${PREVIEW_JSON}"
+          echo "NIGHTLY_JSON: ${NIGHTLY_JSON}"
           echo "STABLE_VERSION=$(echo "${STABLE_JSON}" | jq -r .releaseVersion)" >> "${GITHUB_OUTPUT}"
           # shellcheck disable=SC1083
-          echo "STABLE_SHA=$(git rev-parse "$(echo "${STABLE_JSON}" | jq -r .previousReleaseTag)"^{commit})" >> "${GITHUB_OUTPUT}"
+          echo "STABLE_SHA=$(git rev-parse "$(echo "${PREVIEW_JSON}" | jq -r .previousReleaseTag)"^{commit})" >> "${GITHUB_OUTPUT}"
           echo "PREVIOUS_STABLE_TAG=$(echo "${STABLE_JSON}" | jq -r .previousReleaseTag)" >> "${GITHUB_OUTPUT}"
           echo "PREVIEW_VERSION=$(echo "${PREVIEW_JSON}" | jq -r .releaseVersion)" >> "${GITHUB_OUTPUT}"
           # shellcheck disable=SC1083
@@ -74,21 +93,22 @@ jobs:
 
       - name: 'Display Pending Updates'
         run: |
-          echo "Pending Changes:"
-          echo "  Nightly: ${{ steps.versions.outputs.PREVIOUS_NIGHTLY_TAG }} -> ${{ steps.versions.outputs.NEXT_NIGHTLY_VERSION }}"
-          echo "  Preview: ${{ steps.versions.outputs.PREVIOUS_PREVIEW_TAG }} -> ${{ steps.versions.outputs.PREVIEW_VERSION }}"
-          echo "  Stable:  ${{ steps.versions.outputs.PREVIOUS_STABLE_TAG }} -> ${{ steps.versions.outputs.STABLE_VERSION }}"
+          echo "Pending Changes, Next Versions:"
+          echo "  Nightly: ${{ steps.versions.outputs.NEXT_NIGHTLY_VERSION }}"
+          echo "  Preview: ${{ steps.versions.outputs.PREVIEW_VERSION }}"
+          echo "  Stable: ${{ steps.versions.outputs.STABLE_VERSION }}"
           echo ""
           echo "Relevant SHAs:"
-          echo "  Current (Stable):  ${{ steps.versions.outputs.STABLE_SHA }}"
-          echo "  Current (Preview): ${{ steps.versions.outputs.PREVIEW_SHA }}"
-          echo "  Next (to be promoted): ${{ steps.versions.outputs.NEXT_SHA }}"
+          echo "  Stable: Will be cut from:  : ${{ steps.versions.outputs.STABLE_SHA }} / ${{ steps.versions.outputs.PREVIOUS_STABLE_TAG }}"
+          echo "  Preview will be cut from:  : ${{ steps.versions.outputs.PREVIEW_SHA }} (${{ github.event.inputs.ref }})". Users last saw preview as: ${{ steps.versions.outputs.PREVIOUS_PREVIEW_TAG }}
+          echo "  Nightly will be udpated in : ${{ steps.versions.outputs.NEXT_SHA }} (${{ github.event.inputs.ref }}). Previous nightly tag: ${{ steps.versions.outputs.PREVIOUS_NIGHTLY_TAG }}"
 
   test:
     name: 'Test ${{ matrix.channel }}'
     needs: 'calculate-versions'
     runs-on: 'ubuntu-latest'
     strategy:
+      fail-fast: false
       matrix:
         include:
           - channel: 'stable'
@@ -127,27 +147,14 @@ jobs:
           gemini_api_key: '${{ secrets.GEMINI_API_KEY }}'
           working-directory: './release'
 
-  publish:
-    name: 'Publish ${{ matrix.channel }}'
+  publish-preview:
+    name: 'Publish preview'
     needs: ['calculate-versions', 'test']
     runs-on: 'ubuntu-latest'
     permissions:
       contents: 'write'
       packages: 'write'
-    strategy:
-      matrix:
-        include:
-          - channel: 'stable'
-            version: '${{ needs.calculate-versions.outputs.STABLE_VERSION }}'
-            sha: '${{ needs.calculate-versions.outputs.STABLE_SHA }}'
-            npm-tag: 'latest'
-            previous-tag: '${{ needs.calculate-versions.outputs.PREVIOUS_STABLE_TAG }}'
-          - channel: 'preview'
-            version: '${{ needs.calculate-versions.outputs.PREVIEW_VERSION }}'
-            sha: '${{ needs.calculate-versions.outputs.PREVIEW_SHA }}'
-            npm-tag: 'preview'
-            previous-tag: '${{ needs.calculate-versions.outputs.PREVIOUS_PREVIEW_TAG }}'
-
+      issues: 'write'
     steps:
       - name: 'Checkout Ref'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
@@ -157,7 +164,7 @@ jobs:
       - name: 'Checkout correct SHA'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
         with:
-          ref: '${{ matrix.sha }}'
+          ref: '${{ needs.calculate-versions.outputs.PREVIEW_SHA }}'
           path: 'release'
           fetch-depth: 0
 
@@ -174,23 +181,92 @@ jobs:
       - name: 'Publish Release'
         uses: './.github/actions/publish-release'
         with:
-          release-version: '${{ matrix.version }}'
-          release-tag: 'v${{ matrix.version }}'
-          npm-tag: '${{ matrix.npm-tag }}'
+          release-version: '${{ needs.calculate-versions.outputs.PREVIEW_VERSION }}'
+          release-tag: 'v${{ needs.calculate-versions.outputs.PREVIEW_VERSION }}'
+          npm-tag: 'preview'
           wombat-token-core: '${{ secrets.WOMBAT_TOKEN_CORE }}'
           wombat-token-cli: '${{ secrets.WOMBAT_TOKEN_CLI }}'
           github-token: '${{ secrets.GITHUB_TOKEN }}'
           dry-run: '${{ github.event.inputs.dry_run }}'
-          previous-tag: '${{ matrix.previous-tag }}'
+          previous-tag: '${{ needs.calculate-versions.outputs.PREVIOUS_PREVIEW_TAG }}'
           working-directory: './release'
+
+      - name: 'Create Issue on Failure'
+        if: '${{ failure() && github.event.inputs.dry_run == false }}'
+        env:
+          GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+          RELEASE_TAG: 'v${{ needs.calculate-versions.outputs.PREVIEW_VERSION }}'
+          DETAILS_URL: '${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}'
+        run: |
+          gh issue create \
+            --title 'Promote Release Failed for ${RELEASE_TAG} on $(date +'%Y-%m-%d')' \
+            --body 'The promote-release workflow failed during preview publish. See the full run for details: ${DETAILS_URL}' \
+            --label 'kind/bug,release-failure,priority/p0'
+
+  publish-stable:
+    name: 'Publish stable'
+    needs: ['calculate-versions', 'test', 'publish-preview']
+    runs-on: 'ubuntu-latest'
+    permissions:
+      contents: 'write'
+      packages: 'write'
+      issues: 'write'
+    steps:
+      - name: 'Checkout Ref'
+        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
+        with:
+          ref: '${{ github.event.inputs.ref }}'
+
+      - name: 'Checkout correct SHA'
+        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
+        with:
+          ref: '${{ needs.calculate-versions.outputs.STABLE_SHA }}'
+          path: 'release'
+          fetch-depth: 0
+
+      - name: 'Setup Node.js'
+        uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020'
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+
+      - name: 'Install Dependencies'
+        working-directory: './release'
+        run: 'npm ci'
+
+      - name: 'Publish Release'
+        uses: './.github/actions/publish-release'
+        with:
+          release-version: '${{ needs.calculate-versions.outputs.STABLE_VERSION }}'
+          release-tag: 'v${{ needs.calculate-versions.outputs.STABLE_VERSION }}'
+          npm-tag: 'latest'
+          wombat-token-core: '${{ secrets.WOMBAT_TOKEN_CORE }}'
+          wombat-token-cli: '${{ secrets.WOMBAT_TOKEN_CLI }}'
+          github-token: '${{ secrets.GITHUB_TOKEN }}'
+          dry-run: '${{ github.event.inputs.dry_run }}'
+          previous-tag: '${{ needs.calculate-versions.outputs.PREVIOUS_STABLE_TAG }}'
+          working-directory: './release'
+
+      - name: 'Create Issue on Failure'
+        if: '${{ failure() && github.event.inputs.dry_run == false }}'
+        env:
+          GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+          RELEASE_TAG: 'v${{ needs.calculate-versions.outputs.STABLE_VERSION }}'
+          DETAILS_URL: '${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}'
+        run: |
+          gh issue create \
+            --title 'Promote Release Failed for ${RELEASE_TAG} on $(date +'%Y-%m-%d')' \
+            --body 'The promote-release workflow failed during stable publish. See the full run for details: ${DETAILS_URL}' \
+            --label 'kind/bug,release-failure,priority/p0'
 
   nightly-pr:
     name: 'Create Nightly PR'
-    needs: ['calculate-versions', 'test']
+    needs: ['publish-stable', 'calculate-versions']
     runs-on: 'ubuntu-latest'
     permissions:
       contents: 'write'
       pull-requests: 'write'
+      issues: 'write'
     steps:
       - name: 'Checkout Ref'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
@@ -208,8 +284,8 @@ jobs:
 
       - name: 'Configure Git User'
         run: |-
-          git config user.name "gemini-cli-robot"
-          git config user.email "gemini-cli-robot@google.com"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
       - name: 'Create and switch to a new branch'
         id: 'release_branch'
@@ -255,3 +331,15 @@ jobs:
             --head "${BRANCH_NAME}" \
             --fill
           gh pr merge --auto --squash
+
+      - name: 'Create Issue on Failure'
+        if: '${{ failure() && github.event.inputs.dry_run == false }}'
+        env:
+          GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+          RELEASE_TAG: 'v${{ needs.calculate-versions.outputs.NEXT_NIGHTLY_VERSION }}'
+          DETAILS_URL: '${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}'
+        run: |
+          gh issue create \
+            --title 'Promote Release Failed for ${RELEASE_TAG} on $(date +'%Y-%m-%d')' \
+            --body 'The promote-release workflow failed during nightly PR creation. See the full run for details: ${DETAILS_URL}' \
+            --label 'kind/bug,release-failure,priority/p0'
