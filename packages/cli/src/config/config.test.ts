@@ -7,7 +7,13 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { ShellTool, EditTool, WriteFileTool } from '@google/gemini-cli-core';
+import {
+  ShellTool,
+  EditTool,
+  WriteFileTool,
+  DEFAULT_GEMINI_MODEL,
+  DEFAULT_GEMINI_MODEL_AUTO,
+} from '@google/gemini-cli-core';
 import { loadCliConfig, parseArguments, type CliArgs } from './config.js';
 import type { Settings } from './settings.js';
 import type { Extension } from './extension.js';
@@ -1484,6 +1490,97 @@ describe('loadCliConfig model selection', () => {
   });
 });
 
+describe('loadCliConfig model selection with model router', () => {
+  it('should use auto model when useModelRouter is true and no model is provided', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments({} as Settings);
+    const config = await loadCliConfig(
+      {
+        experimental: {
+          useModelRouter: true,
+        },
+      },
+      [],
+      'test-session',
+      argv,
+    );
+
+    expect(config.getModel()).toBe(DEFAULT_GEMINI_MODEL_AUTO);
+  });
+
+  it('should use default model when useModelRouter is false and no model is provided', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments({} as Settings);
+    const config = await loadCliConfig(
+      {
+        experimental: {
+          useModelRouter: false,
+        },
+      },
+      [],
+      'test-session',
+      argv,
+    );
+
+    expect(config.getModel()).toBe(DEFAULT_GEMINI_MODEL);
+  });
+
+  it('should prioritize argv over useModelRouter', async () => {
+    process.argv = ['node', 'script.js', '--model', 'gemini-from-argv'];
+    const argv = await parseArguments({} as Settings);
+    const config = await loadCliConfig(
+      {
+        experimental: {
+          useModelRouter: true,
+        },
+      },
+      [],
+      'test-session',
+      argv,
+    );
+
+    expect(config.getModel()).toBe('gemini-from-argv');
+  });
+
+  it('should prioritize settings over useModelRouter', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments({} as Settings);
+    const config = await loadCliConfig(
+      {
+        experimental: {
+          useModelRouter: true,
+        },
+        model: {
+          name: 'gemini-from-settings',
+        },
+      },
+      [],
+      'test-session',
+      argv,
+    );
+
+    expect(config.getModel()).toBe('gemini-from-settings');
+  });
+
+  it('should prioritize environment variable over useModelRouter', async () => {
+    process.argv = ['node', 'script.js'];
+    vi.stubEnv('GEMINI_MODEL', 'gemini-from-env');
+    const argv = await parseArguments({} as Settings);
+    const config = await loadCliConfig(
+      {
+        experimental: {
+          useModelRouter: true,
+        },
+      },
+      [],
+      'test-session',
+      argv,
+    );
+
+    expect(config.getModel()).toBe('gemini-from-env');
+  });
+});
+
 describe('loadCliConfig folderTrust', () => {
   const originalArgv = process.argv;
 
@@ -1645,15 +1742,23 @@ describe('loadCliConfig useRipgrep', () => {
     vi.restoreAllMocks();
   });
 
-  it('should be false by default when useRipgrep is not set in settings', async () => {
+  it('should be true by default when useRipgrep is not set in settings', async () => {
     process.argv = ['node', 'script.js'];
     const argv = await parseArguments({} as Settings);
     const settings: Settings = {};
     const config = await loadCliConfig(settings, [], 'test-session', argv);
+    expect(config.getUseRipgrep()).toBe(true);
+  });
+
+  it('should be false when useRipgrep is set to false in settings', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments({} as Settings);
+    const settings: Settings = { tools: { useRipgrep: false } };
+    const config = await loadCliConfig(settings, [], 'test-session', argv);
     expect(config.getUseRipgrep()).toBe(false);
   });
 
-  it('should be true when useRipgrep is set to true in settings', async () => {
+  it('should be true when useRipgrep is explicitly set to true in settings', async () => {
     process.argv = ['node', 'script.js'];
     const argv = await parseArguments({} as Settings);
     const settings: Settings = { tools: { useRipgrep: true } };
@@ -1661,12 +1766,30 @@ describe('loadCliConfig useRipgrep', () => {
     expect(config.getUseRipgrep()).toBe(true);
   });
 
-  it('should be false when useRipgrep is explicitly set to false in settings', async () => {
-    process.argv = ['node', 'script.js'];
-    const argv = await parseArguments({} as Settings);
-    const settings: Settings = { tools: { useRipgrep: false } };
-    const config = await loadCliConfig(settings, [], 'test-session', argv);
-    expect(config.getUseRipgrep()).toBe(false);
+  describe('loadCliConfig useModelRouter', () => {
+    it('should be false by default when useModelRouter is not set in settings', async () => {
+      process.argv = ['node', 'script.js'];
+      const argv = await parseArguments({} as Settings);
+      const settings: Settings = {};
+      const config = await loadCliConfig(settings, [], 'test-session', argv);
+      expect(config.getUseModelRouter()).toBe(false);
+    });
+
+    it('should be true when useModelRouter is set to true in settings', async () => {
+      process.argv = ['node', 'script.js'];
+      const argv = await parseArguments({} as Settings);
+      const settings: Settings = { experimental: { useModelRouter: true } };
+      const config = await loadCliConfig(settings, [], 'test-session', argv);
+      expect(config.getUseModelRouter()).toBe(true);
+    });
+
+    it('should be false when useModelRouter is explicitly set to false in settings', async () => {
+      process.argv = ['node', 'script.js'];
+      const argv = await parseArguments({} as Settings);
+      const settings: Settings = { experimental: { useModelRouter: false } };
+      const config = await loadCliConfig(settings, [], 'test-session', argv);
+      expect(config.getUseModelRouter()).toBe(false);
+    });
   });
 });
 
@@ -1970,6 +2093,55 @@ describe('loadCliConfig fileFiltering', () => {
       expect(getter(config)).toBe(value);
     },
   );
+});
+
+describe('Output Format Configuration', () => {
+  const originalArgv = process.argv;
+
+  afterEach(() => {
+    process.argv = originalArgv;
+    vi.restoreAllMocks();
+  });
+
+  it('should default to text format when no setting or flag is provided', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments({} as Settings);
+    const config = await loadCliConfig(
+      {} as Settings,
+      [],
+      'test-session',
+      argv,
+    );
+    expect(config.getOutputFormat()).toBe(ServerConfig.OutputFormat.TEXT);
+  });
+
+  it('should use the format from settings when no flag is provided', async () => {
+    process.argv = ['node', 'script.js'];
+    const settings: Settings = { output: { format: 'json' } };
+    const argv = await parseArguments(settings);
+    const config = await loadCliConfig(settings, [], 'test-session', argv);
+    expect(config.getOutputFormat()).toBe(ServerConfig.OutputFormat.JSON);
+  });
+
+  it('should use the format from the flag when provided', async () => {
+    process.argv = ['node', 'script.js', '--output-format', 'json'];
+    const argv = await parseArguments({} as Settings);
+    const config = await loadCliConfig(
+      {} as Settings,
+      [],
+      'test-session',
+      argv,
+    );
+    expect(config.getOutputFormat()).toBe(ServerConfig.OutputFormat.JSON);
+  });
+
+  it('should prioritize the flag over the setting', async () => {
+    process.argv = ['node', 'script.js', '--output-format', 'text'];
+    const settings: Settings = { output: { format: 'json' } };
+    const argv = await parseArguments(settings);
+    const config = await loadCliConfig(settings, [], 'test-session', argv);
+    expect(config.getOutputFormat()).toBe(ServerConfig.OutputFormat.TEXT);
+  });
 });
 
 describe('parseArguments with positional prompt', () => {

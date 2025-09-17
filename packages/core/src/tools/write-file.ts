@@ -35,7 +35,7 @@ import type {
   ModifiableDeclarativeTool,
   ModifyContext,
 } from './modifiable-tool.js';
-import { IdeClient, IDEConnectionStatus } from '../ide/ide-client.js';
+import { IdeClient } from '../ide/ide-client.js';
 import { logFileOperation } from '../telemetry/loggers.js';
 import { FileOperationEvent } from '../telemetry/types.js';
 import { FileOperation } from '../telemetry/metrics.js';
@@ -121,6 +121,7 @@ export async function getCorrectedFileContent(
         file_path: filePath,
       },
       config.getGeminiClient(),
+      config.getBaseLlmClient(),
       abortSignal,
     );
     correctedContent = correctedParams.new_string;
@@ -128,7 +129,7 @@ export async function getCorrectedFileContent(
     // This implies new file (ENOENT)
     correctedContent = await ensureCorrectFileContent(
       proposedContent,
-      config.getGeminiClient(),
+      config.getBaseLlmClient(),
       abortSignal,
     );
   }
@@ -195,8 +196,7 @@ class WriteFileToolInvocation extends BaseToolInvocation<
 
     const ideClient = await IdeClient.getInstance();
     const ideConfirmation =
-      this.config.getIdeMode() &&
-      ideClient.getConnectionStatus().status === IDEConnectionStatus.Connected
+      this.config.getIdeMode() && ideClient.isDiffingEnabled()
         ? ideClient.openDiff(this.params.file_path, correctedContent)
         : undefined;
 
