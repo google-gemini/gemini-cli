@@ -86,20 +86,26 @@ function getNightlyVersion() {
 }
 
 function getStableVersion() {
-  const { latestVersion } = getAndVerifyTags('preview', 'v*-preview*');
+  const { latestVersion, latestTag } = getAndVerifyTags(
+    'preview',
+    'v*-preview*',
+  );
   return {
     releaseVersion: latestVersion.replace(/-preview.*/, ''),
     npmTag: 'latest',
-    previousReleaseTag: getLatestTag('v*-preview*'),
+    previousReleaseTag: latestTag,
   };
 }
 
 function getPreviewVersion() {
-  const { latestVersion } = getAndVerifyTags('nightly', 'v*-nightly*');
+  const { latestVersion, latestTag } = getAndVerifyTags(
+    'nightly',
+    'v*-nightly*',
+  );
   return {
     releaseVersion: latestVersion.replace(/-nightly.*/, '') + '-preview',
     npmTag: 'preview',
-    previousReleaseTag: getLatestTag('v*-preview*'),
+    previousReleaseTag: latestTag,
   };
 }
 
