@@ -53,7 +53,7 @@ export function playSound(soundPath: string): void {
       } else {
         args.push(
           '-c',
-          `(New-Object Media.SoundPlayer '${soundPath}').PlaySync();`,
+          `(New-Object Media.SoundPlayer '${soundPath.replace(/'/g, "''")}').PlaySync();`,
         );
       }
       break;
