@@ -1676,16 +1676,12 @@ describe('XlwingsTool - REAL EXECUTION TESTS - ALL 67 OPERATIONS', () => {
         }
       };
 
-      try {
-        const invocation = xlwingsTool['createInvocation'](params);
-        const result = await invocation.execute(new AbortController().signal);
-        saveLLMOutput('create_curved_connector', String(result.returnDisplay || result.llmContent), result.success);
+      const invocation = xlwingsTool['createInvocation'](params);
+      const result = await invocation.execute(new AbortController().signal);
+      saveLLMOutput('create_curved_connector', String(result.returnDisplay || result.llmContent), result.success);
 
-        expect(result).toBeDefined();
-        expect(typeof result.success).toBe('boolean');
-      } catch (error) {
-        throw error;
-      }
+      expect(result).toBeDefined();
+      expect(typeof result.success).toBe('boolean');
     }, 15000);
   });
 });

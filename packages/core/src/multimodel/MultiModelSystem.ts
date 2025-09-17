@@ -235,7 +235,7 @@ export class MultiModelSystem {
     const MAX_DUPLICATE_CALLS = this.config.getMaxSessionTurns() >= 0 ? this.config.getMaxSessionTurns() : 20;
     
     // Track tool call history for duplicate detection
-    const toolCallHistory: Array<{ name: string; args: any; timestamp: number }> = [];
+    const toolCallHistory: Array<{ name: string; args: Record<string, unknown>; timestamp: number }> = [];
     let duplicateCount = 0;
 
     while (true) {

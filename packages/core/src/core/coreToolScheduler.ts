@@ -901,7 +901,7 @@ export class CoreToolScheduler {
               return;
             }
 
-            if (toolResult.error === undefined) {
+            if (!toolResult.error) {
               const response = convertToFunctionResponse(
                 toolName,
                 callId,
@@ -921,11 +921,13 @@ export class CoreToolScheduler {
               this.setStatusInternal(callId, 'success', successResponse);
             } else {
               // It is a failure
-              const error = new Error(toolResult.error.message);
+              const errorMessage = toolResult.error?.message || 'Tool execution failed';
+              const errorType = toolResult.error?.type || ToolErrorType.UNKNOWN;
+              const error = new Error(errorMessage);
               const errorResponse = createErrorResponse(
                 scheduledCall.request,
                 error,
-                toolResult.error.type,
+                errorType,
               );
               this.setStatusInternal(callId, 'error', errorResponse);
             }

@@ -51,6 +51,3 @@ packages/core/temp/
 
 # Python embedded environment - ignore all except specific files
 packages/python-3.13.7/
-!packages/python-3.13.7/xlwings32-0.33.15.dll
-!packages/python-3.13.7/xlwings64-0.33.15.dll
-!packages/python-3.13.7/pythonw.exe
