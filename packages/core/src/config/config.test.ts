@@ -94,6 +94,9 @@ vi.mock('../telemetry/index.js', async (importOriginal) => {
   return {
     ...actual,
     initializeTelemetry: vi.fn(),
+    uiTelemetryService: {
+      getLastPromptTokenCount: vi.fn(),
+    },
   };
 });
 
@@ -123,8 +126,13 @@ vi.mock('../ide/ide-client.js', () => ({
 }));
 
 import { BaseLlmClient } from '../core/baseLlmClient.js';
+import { tokenLimit } from '../core/tokenLimits.js';
+import { uiTelemetryService } from '../telemetry/index.js';
 
 vi.mock('../core/baseLlmClient.js');
+vi.mock('../core/tokenLimits.js', () => ({
+  tokenLimit: vi.fn(),
+}));
 
 describe('Server Config (config.ts)', () => {
   const MODEL = 'gemini-pro';
@@ -355,6 +363,33 @@ describe('Server Config (config.ts)', () => {
     expect(config.getTelemetryEnabled()).toBe(TELEMETRY_SETTINGS.enabled);
   });
 
+  it('Config constructor should set telemetry useCollector to true when provided', () => {
+    const paramsWithTelemetry: ConfigParameters = {
+      ...baseParams,
+      telemetry: { enabled: true, useCollector: true },
+    };
+    const config = new Config(paramsWithTelemetry);
+    expect(config.getTelemetryUseCollector()).toBe(true);
+  });
+
+  it('Config constructor should set telemetry useCollector to false when provided', () => {
+    const paramsWithTelemetry: ConfigParameters = {
+      ...baseParams,
+      telemetry: { enabled: true, useCollector: false },
+    };
+    const config = new Config(paramsWithTelemetry);
+    expect(config.getTelemetryUseCollector()).toBe(false);
+  });
+
+  it('Config constructor should default telemetry useCollector to false if not provided', () => {
+    const paramsWithTelemetry: ConfigParameters = {
+      ...baseParams,
+      telemetry: { enabled: true },
+    };
+    const config = new Config(paramsWithTelemetry);
+    expect(config.getTelemetryUseCollector()).toBe(false);
+  });
+
   it('should have a getFileService method that returns FileDiscoveryService', () => {
     const config = new Config(baseParams);
     const fileService = config.getFileService();
@@ -387,7 +422,7 @@ describe('Server Config (config.ts)', () => {
         ...baseParams,
         usageStatisticsEnabled: true,
       });
-      await config.initialize();
+      await config.refreshAuth(AuthType.USE_GEMINI);
 
       expect(
         ClearcutLogger.prototype.logStartSessionEvent,
@@ -523,6 +558,31 @@ describe('Server Config (config.ts)', () => {
     });
   });
 
+  describe('UseModelRouter Configuration', () => {
+    it('should default useModelRouter to false when not provided', () => {
+      const config = new Config(baseParams);
+      expect(config.getUseModelRouter()).toBe(false);
+    });
+
+    it('should set useModelRouter to true when provided as true', () => {
+      const paramsWithModelRouter: ConfigParameters = {
+        ...baseParams,
+        useModelRouter: true,
+      };
+      const config = new Config(paramsWithModelRouter);
+      expect(config.getUseModelRouter()).toBe(true);
+    });
+
+    it('should set useModelRouter to false when explicitly provided as false', () => {
+      const paramsWithModelRouter: ConfigParameters = {
+        ...baseParams,
+        useModelRouter: false,
+      };
+      const config = new Config(paramsWithModelRouter);
+      expect(config.getUseModelRouter()).toBe(false);
+    });
+  });
+
   describe('createToolRegistry', () => {
     it('should register a tool if coreTools contains an argument-specific pattern', async () => {
       const params: ConfigParameters = {
@@ -634,6 +694,57 @@ describe('Server Config (config.ts)', () => {
         ).mock.calls.some((call) => call[0] instanceof vi.mocked(ShellTool));
         expect(wasShellToolRegistered).toBe(true);
       });
+    });
+  });
+
+  describe('getTruncateToolOutputThreshold', () => {
+    beforeEach(() => {
+      vi.clearAllMocks();
+    });
+
+    it('should return the calculated threshold when it is smaller than the default', () => {
+      const config = new Config(baseParams);
+      vi.mocked(tokenLimit).mockReturnValue(32000);
+      vi.mocked(uiTelemetryService.getLastPromptTokenCount).mockReturnValue(
+        1000,
+      );
+      // 4 * (32000 - 1000) = 4 * 31000 = 124000
+      // default is 4_000_000
+      expect(config.getTruncateToolOutputThreshold()).toBe(124000);
+    });
+
+    it('should return the default threshold when the calculated value is larger', () => {
+      const config = new Config(baseParams);
+      vi.mocked(tokenLimit).mockReturnValue(2_000_000);
+      vi.mocked(uiTelemetryService.getLastPromptTokenCount).mockReturnValue(
+        500_000,
+      );
+      // 4 * (2_000_000 - 500_000) = 4 * 1_500_000 = 6_000_000
+      // default is 4_000_000
+      expect(config.getTruncateToolOutputThreshold()).toBe(4_000_000);
+    });
+
+    it('should use a custom truncateToolOutputThreshold if provided', () => {
+      const customParams = {
+        ...baseParams,
+        truncateToolOutputThreshold: 50000,
+      };
+      const config = new Config(customParams);
+      vi.mocked(tokenLimit).mockReturnValue(8000);
+      vi.mocked(uiTelemetryService.getLastPromptTokenCount).mockReturnValue(
+        2000,
+      );
+      // 4 * (8000 - 2000) = 4 * 6000 = 24000
+      // custom threshold is 50000
+      expect(config.getTruncateToolOutputThreshold()).toBe(24000);
+
+      vi.mocked(tokenLimit).mockReturnValue(32000);
+      vi.mocked(uiTelemetryService.getLastPromptTokenCount).mockReturnValue(
+        1000,
+      );
+      // 4 * (32000 - 1000) = 124000
+      // custom threshold is 50000
+      expect(config.getTruncateToolOutputThreshold()).toBe(50000);
     });
   });
 });

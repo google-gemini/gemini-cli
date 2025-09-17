@@ -350,6 +350,9 @@ export enum EventMetadataKey {
   // Logs the status of the extension install.
   GEMINI_CLI_EXTENSION_INSTALL_STATUS = 88,
 
+  // Logs the status of the extension uninstall
+  GEMINI_CLI_EXTENSION_UNINSTALL_STATUS = 96,
+
   // ==========================================================================
   // Tool Output Truncated Event Keys
   // ===========================================================================
@@ -365,4 +368,25 @@ export enum EventMetadataKey {
 
   // Logs the number of lines the tool output was truncated to.
   GEMINI_CLI_TOOL_OUTPUT_TRUNCATED_LINES = 92,
+
+  // ==========================================================================
+  // Model Router Event Keys
+  // ==========================================================================
+
+  // Logs the outcome of a model routing decision (e.g., which route/model was
+  // selected).
+  GEMINI_CLI_ROUTING_DECISION = 97,
+
+  // Logs an event when the model router fails to make a decision or the chosen
+  // route fails.
+  GEMINI_CLI_ROUTING_FAILURE = 98,
+
+  // Logs the latency in milliseconds for the router to make a decision.
+  GEMINI_CLI_ROUTING_LATENCY_MS = 99,
+
+  // Logs a specific reason for a routing failure.
+  GEMINI_CLI_ROUTING_FAILURE_REASON = 100,
+
+  // Logs the source of the decision.
+  GEMINI_CLI_ROUTING_DECISION_SOURCE = 101,
 }

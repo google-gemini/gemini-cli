@@ -26,6 +26,8 @@ import type {
   ContentRetryFailureEvent,
   ExtensionInstallEvent,
   ToolOutputTruncatedEvent,
+  ExtensionUninstallEvent,
+  ModelRoutingEvent,
 } from '../types.js';
 import { EventMetadataKey } from './event-metadata-key.js';
 import type { Config } from '../../config/config.js';
@@ -48,6 +50,7 @@ export enum EventNames {
   FLASH_FALLBACK = 'flash_fallback',
   RIPGREP_FALLBACK = 'ripgrep_fallback',
   LOOP_DETECTED = 'loop_detected',
+  LOOP_DETECTION_DISABLED = 'loop_detection_disabled',
   NEXT_SPEAKER_CHECK = 'next_speaker_check',
   SLASH_COMMAND = 'slash_command',
   MALFORMED_JSON_RESPONSE = 'malformed_json_response',
@@ -59,7 +62,9 @@ export enum EventNames {
   CONTENT_RETRY = 'content_retry',
   CONTENT_RETRY_FAILURE = 'content_retry_failure',
   EXTENSION_INSTALL = 'extension_install',
+  EXTENSION_UNINSTALL = 'extension_uninstall',
   TOOL_OUTPUT_TRUNCATED = 'tool_output_truncated',
+  MODEL_ROUTING = 'model_routing',
 }
 
 export interface LogResponse {
@@ -655,6 +660,15 @@ export class ClearcutLogger {
     this.flushIfNeeded();
   }
 
+  logLoopDetectionDisabledEvent(): void {
+    const data: EventValue[] = [];
+
+    this.enqueueLogEvent(
+      this.createLogEvent(EventNames.LOOP_DETECTION_DISABLED, data),
+    );
+    this.flushIfNeeded();
+  }
+
   logNextSpeakerCheck(event: NextSpeakerCheckEvent): void {
     const data: EventValue[] = [
       {
@@ -863,6 +877,24 @@ export class ClearcutLogger {
     this.flushIfNeeded();
   }
 
+  logExtensionUninstallEvent(event: ExtensionUninstallEvent): void {
+    const data: EventValue[] = [
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_EXTENSION_NAME,
+        value: event.extension_name,
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_EXTENSION_UNINSTALL_STATUS,
+        value: event.status,
+      },
+    ];
+
+    this.enqueueLogEvent(
+      this.createLogEvent(EventNames.EXTENSION_UNINSTALL, data),
+    );
+    this.flushIfNeeded();
+  }
+
   logToolOutputTruncatedEvent(event: ToolOutputTruncatedEvent): void {
     const data: EventValue[] = [
       {
@@ -893,6 +925,37 @@ export class ClearcutLogger {
     this.enqueueLogEvent(
       this.createLogEvent(EventNames.TOOL_OUTPUT_TRUNCATED, data),
     );
+    this.flushIfNeeded();
+  }
+
+  logModelRoutingEvent(event: ModelRoutingEvent): void {
+    const data: EventValue[] = [
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_ROUTING_DECISION,
+        value: event.decision_model,
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_ROUTING_DECISION_SOURCE,
+        value: event.decision_source,
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_ROUTING_LATENCY_MS,
+        value: event.routing_latency_ms.toString(),
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_ROUTING_FAILURE,
+        value: event.failed.toString(),
+      },
+    ];
+
+    if (event.error_message) {
+      data.push({
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_ROUTING_FAILURE_REASON,
+        value: event.error_message,
+      });
+    }
+
+    this.enqueueLogEvent(this.createLogEvent(EventNames.MODEL_ROUTING, data));
     this.flushIfNeeded();
   }
 
@@ -945,7 +1008,10 @@ export class ClearcutLogger {
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_USER_SETTINGS,
         value: safeJsonStringify([
-          { smart_edit_enabled: this.config?.getUseSmartEdit() ?? false },
+          {
+            smart_edit_enabled: this.config?.getUseSmartEdit() ?? false,
+            model_router_enabled: this.config?.getUseModelRouter() ?? false,
+          },
         ]),
       },
     ];
