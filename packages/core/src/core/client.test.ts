@@ -16,7 +16,7 @@ import {
 
 import type { Content, GenerateContentResponse, Part } from '@google/genai';
 import {
-  findIndexAfterFraction,
+  findCompressSplitPoint,
   isThinkingDefault,
   isThinkingSupported,
   GeminiClient,
@@ -125,7 +125,7 @@ async function fromAsync<T>(promise: AsyncGenerator<T>): Promise<readonly T[]> {
   return results;
 }
 
-describe('findIndexAfterFraction', () => {
+describe('findCompressSplitPoint', () => {
   const history: Content[] = [
     { role: 'user', parts: [{ text: 'This is the first message.' }] }, // JSON length: 66
     { role: 'model', parts: [{ text: 'This is the second message.' }] }, // JSON length: 68
@@ -136,24 +136,24 @@ describe('findIndexAfterFraction', () => {
   // Total length: 333
 
   it('should throw an error for non-positive numbers', () => {
-    expect(() => findIndexAfterFraction(history, 0)).toThrow(
+    expect(() => findCompressSplitPoint(history, 0)).toThrow(
       'Fraction must be between 0 and 1',
     );
   });
 
   it('should throw an error for a fraction greater than or equal to 1', () => {
-    expect(() => findIndexAfterFraction(history, 1)).toThrow(
+    expect(() => findCompressSplitPoint(history, 1)).toThrow(
       'Fraction must be between 0 and 1',
     );
   });
 
   it('should handle a fraction in the middle', () => {
-    // 333 * 0.5 = 166.5
+    // 333 * 0.2 = 66.6
     // 0: 66
     // 1: 66 + 68 = 134
     // 2: 134 + 66 = 200
     // 200 >= 166.5, so index is 3
-    expect(findIndexAfterFraction(history, 0.5)).toBe(3);
+    expect(findCompressSplitPoint(history, 0.5)).toBe(3);
   });
 
   it('should handle a fraction that results in the last index', () => {
@@ -162,15 +162,15 @@ describe('findIndexAfterFraction', () => {
     // 3: 200 + 68 = 268
     // 4: 268 + 65 = 333
     // 333 >= 299.7, so index is 5
-    expect(findIndexAfterFraction(history, 0.9)).toBe(5);
+    expect(findCompressSplitPoint(history, 0.9)).toBe(5);
   });
 
   it('should handle an empty history', () => {
-    expect(findIndexAfterFraction([], 0.5)).toBe(0);
+    expect(findCompressSplitPoint([], 0.5)).toBe(0);
   });
 
   it('should handle a history with only one item', () => {
-    expect(findIndexAfterFraction(history.slice(0, 1), 0.5)).toBe(1);
+    expect(findCompressSplitPoint(history.slice(0, 1), 0.5)).toBe(1);
   });
 
   it('should handle history with weird parts', () => {
@@ -179,7 +179,26 @@ describe('findIndexAfterFraction', () => {
       { role: 'model', parts: [{ fileData: { fileUri: 'derp' } }] },
       { role: 'user', parts: [{ text: 'Message 2' }] },
     ];
-    expect(findIndexAfterFraction(historyWithEmptyParts, 0.5)).toBe(2);
+    expect(findCompressSplitPoint(historyWithEmptyParts, 0.5)).toBe(2);
+  });
+
+  it('should not return splitpoints following function calls', () => {
+    const historyWithEmptyParts: Content[] = [
+      { role: 'user', parts: [{ text: 'A very long message 1' }] },
+      { role: 'model', parts: [{ functionCall: {} }] },
+      { role: 'user', parts: [{ functionResponse: {} }] },
+    ];
+    // It does not return 2 because it follows a function call
+    expect(findCompressSplitPoint(historyWithEmptyParts, 0.5)).toBe(3);
+  });
+
+  it('can return model splitpoint', () => {
+    const historyWithEmptyParts: Content[] = [
+      { role: 'user', parts: [{ text: 'A very long message 1' }] },
+      { role: 'model', parts: [{}] },
+      { role: 'user', parts: [{}] },
+    ];
+    expect(findCompressSplitPoint(historyWithEmptyParts, 0.5)).toBe(1);
   });
 });
 

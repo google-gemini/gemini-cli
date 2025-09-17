@@ -62,37 +62,43 @@ export function isThinkingDefault(model: string) {
   return model.startsWith('gemini-2.5') || model === DEFAULT_GEMINI_MODEL_AUTO;
 }
 
+function isValidSplitAfterPoint(content: Content): boolean {
+  return !content.parts?.some((part) => !!part.functionCall);
+}
+
 /**
- * Returns the index of the content after the fraction of the total characters in the history.
+ * Returns the index of the oldest content we should keep when compressing.
+ * Guarenteed to not split a function call and response pair.
+ * Will return a split point after the given fraction of total character count
+ * if there is one. Otherwise will return the last valid split point.
  *
  * Exported for testing purposes.
  */
-export function findIndexAfterFraction(
-  history: Content[],
+export function findCompressSplitPoint(
+  contents: Content[],
   fraction: number,
 ): number {
   if (fraction <= 0 || fraction >= 1) {
     throw new Error('Fraction must be between 0 and 1');
   }
 
-  const contentLengths = history.map(
-    (content) => JSON.stringify(content).length,
-  );
+  const charCounts = contents.map((content) => JSON.stringify(content).length);
+  const totalCharCount = charCounts.reduce((a, b) => a + b, 0);
+  const targetCharCount = totalCharCount * fraction;
 
-  const totalCharacters = contentLengths.reduce(
-    (sum, length) => sum + length,
-    0,
-  );
-  const targetCharacters = totalCharacters * fraction;
-
-  let charactersSoFar = 0;
-  for (let i = 0; i < contentLengths.length; i++) {
-    if (charactersSoFar >= targetCharacters) {
-      return i;
+  let lastSplitpoint = 0; // 0 is always a valid splitpoint (compress nothing)
+  let cumulativeCharCount = 0;
+  for (let i = 0; i < contents.length; i++) {
+    cumulativeCharCount += charCounts[i];
+    if (isValidSplitAfterPoint(contents[i])) {
+      lastSplitpoint = i + 1;
+      if (cumulativeCharCount >= targetCharCount) {
+        break;
+      }
     }
-    charactersSoFar += contentLengths[i];
   }
-  return contentLengths.length;
+  // No splitpoints after targetCharCount so just return the last one.
+  return lastSplitpoint;
 }
 
 const MAX_TURNS = 100;
@@ -696,21 +702,21 @@ export class GeminiClient {
       }
     }
 
-    let compressBeforeIndex = findIndexAfterFraction(
+    let compressSplitPoint = findCompressSplitPoint(
       curatedHistory,
       1 - COMPRESSION_PRESERVE_THRESHOLD,
     );
     // Find the first user message after the index. This is the start of the next turn.
     while (
-      compressBeforeIndex < curatedHistory.length &&
-      (curatedHistory[compressBeforeIndex]?.role === 'model' ||
-        isFunctionResponse(curatedHistory[compressBeforeIndex]))
+      compressSplitPoint < curatedHistory.length &&
+      (curatedHistory[compressSplitPoint]?.role === 'model' ||
+        isFunctionResponse(curatedHistory[compressSplitPoint]))
     ) {
-      compressBeforeIndex++;
+      compressSplitPoint++;
     }
 
-    const historyToCompress = curatedHistory.slice(0, compressBeforeIndex);
-    const historyToKeep = curatedHistory.slice(compressBeforeIndex);
+    const historyToCompress = curatedHistory.slice(0, compressSplitPoint);
+    const historyToKeep = curatedHistory.slice(compressSplitPoint);
 
     const summaryResponse = await this.config
       .getContentGenerator()
