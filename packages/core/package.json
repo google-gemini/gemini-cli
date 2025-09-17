@@ -10,6 +10,7 @@
   "main": "dist/index.js",
   "scripts": {
     "build": "node ../../scripts/build_package.js",
+    "build:tests": "node ../../scripts/build_package.js --tests",
     "lint": "eslint . --ext .ts,.tsx",
     "format": "prettier --write .",
     "test": "vitest run",

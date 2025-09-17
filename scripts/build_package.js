@@ -26,8 +26,12 @@ if (!process.cwd().includes('packages')) {
   process.exit(1);
 }
 
+const useTestConfig = process.argv.includes('--tests');
+
 // build typescript files
-execSync('tsc --build', { stdio: 'inherit' });
+execSync(`tsc --build ${useTestConfig ? 'tsconfig.test.json' : ''}`, {
+  stdio: 'inherit',
+});
 
 // copy .{md,json} files
 execSync('node ../../scripts/copy_files.js', { stdio: 'inherit' });
