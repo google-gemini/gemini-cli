@@ -15,6 +15,7 @@ import dns from 'node:dns';
 import { spawn } from 'node:child_process';
 import { start_sandbox } from './utils/sandbox.js';
 import type { DnsResolutionOrder, LoadedSettings } from './config/settings.js';
+import { RELAUNCH_EXIT_CODE } from './utils/processUtils.js';
 import {
   loadSettings,
   migrateDeprecatedSettings,
@@ -105,17 +106,50 @@ function getNodeMemoryArgs(config: Config): string[] {
   return [];
 }
 
-async function relaunchWithAdditionalArgs(additionalArgs: string[]) {
-  const nodeArgs = [...additionalArgs, ...process.argv.slice(1)];
-  const newEnv = { ...process.env, GEMINI_CLI_NO_RELAUNCH: 'true' };
+async function relaunchOnExitCode(runner: () => Promise<number>) {
+  while (true) {
+    try {
+      const exitCode = await runner();
 
-  const child = spawn(process.execPath, nodeArgs, {
-    stdio: 'inherit',
-    env: newEnv,
-  });
+      if (exitCode !== RELAUNCH_EXIT_CODE) {
+        process.exit(exitCode);
+      }
+    } catch (error) {
+      process.stdin.resume();
+      console.error('Fatal error: Failed to relaunch the CLI process.', error);
+      process.exit(1);
+    }
+  }
+}
 
-  await new Promise((resolve) => child.on('close', resolve));
-  process.exit(0);
+async function relaunchAppInChildProcess(additionalArgs: string[]) {
+  if (process.env['GEMINI_CLI_NO_RELAUNCH']) {
+    return;
+  }
+
+  const runner = () => {
+    const nodeArgs = [...additionalArgs, ...process.argv.slice(1)];
+    const newEnv = { ...process.env, GEMINI_CLI_NO_RELAUNCH: 'true' };
+
+    // The parent process should not be reading from stdin while the child is running.
+    process.stdin.pause();
+
+    const child = spawn(process.execPath, nodeArgs, {
+      stdio: 'inherit',
+      env: newEnv,
+    });
+
+    return new Promise<number>((resolve, reject) => {
+      child.on('error', reject);
+      child.on('close', (code) => {
+        // Resume stdin before the parent process exits.
+        process.stdin.resume();
+        resolve(code ?? 1);
+      });
+    });
+  };
+
+  await relaunchOnExitCode(runner);
 }
 
 import { runZedIntegration } from './zed-integration/zedIntegration.js';
@@ -339,15 +373,14 @@ export async function main() {
 
       const sandboxArgs = injectStdinIntoArgs(process.argv, stdinData);
 
-      await start_sandbox(sandboxConfig, memoryArgs, config, sandboxArgs);
+      await relaunchOnExitCode(() =>
+        start_sandbox(sandboxConfig, memoryArgs, config, sandboxArgs),
+      );
       process.exit(0);
     } else {
-      // Not in a sandbox and not entering one, so relaunch with additional
-      // arguments to control memory usage if needed.
-      if (memoryArgs.length > 0) {
-        await relaunchWithAdditionalArgs(memoryArgs);
-        process.exit(0);
-      }
+      // Relaunch app so we always have a child process that can be internally
+      // restarted if needed.
+      await relaunchAppInChildProcess(memoryArgs);
     }
   }
 

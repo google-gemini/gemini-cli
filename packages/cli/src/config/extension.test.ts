@@ -677,7 +677,7 @@ describe('extension tests', () => {
       mockQuestion.mockImplementation((_query, callback) => callback('y'));
 
       await expect(
-        installExtension({ source: sourceExtDir, type: 'local' }),
+        installExtension({ source: sourceExtDir, type: 'local' }, true),
       ).resolves.toBe('my-local-extension');
 
       expect(consoleInfoSpy).toHaveBeenCalledWith(
@@ -710,7 +710,7 @@ describe('extension tests', () => {
       mockQuestion.mockImplementation((_query, callback) => callback('y'));
 
       await expect(
-        installExtension({ source: sourceExtDir, type: 'local' }),
+        installExtension({ source: sourceExtDir, type: 'local' }, true),
       ).resolves.toBe('my-local-extension');
 
       expect(mockQuestion).toHaveBeenCalledWith(
@@ -735,7 +735,7 @@ describe('extension tests', () => {
       mockQuestion.mockImplementation((_query, callback) => callback('n'));
 
       await expect(
-        installExtension({ source: sourceExtDir, type: 'local' }),
+        installExtension({ source: sourceExtDir, type: 'local' }, true),
       ).rejects.toThrow('Installation cancelled by user.');
 
       expect(mockQuestion).toHaveBeenCalledWith(
@@ -768,6 +768,24 @@ describe('extension tests', () => {
         autoUpdate: true,
       });
       fs.rmSync(targetExtDir, { recursive: true, force: true });
+    });
+
+    it('should ignore consent flow if not required', async () => {
+      const sourceExtDir = createExtension({
+        extensionsDir: tempHomeDir,
+        name: 'my-local-extension',
+        version: '1.0.0',
+        mcpServers: {
+          'test-server': {
+            command: 'node',
+            args: ['server.js'],
+          },
+        },
+      });
+
+      await expect(
+        installExtension({ source: sourceExtDir, type: 'local' }, false),
+      ).resolves.toBe('my-local-extension');
     });
   });
 
@@ -850,7 +868,10 @@ describe('extension tests', () => {
         });
 
         const failed = await performWorkspaceExtensionMigration([
-          loadExtension(ext1Path)!,
+          loadExtension({
+            extensionDir: ext1Path,
+            workspaceDir: tempWorkspaceDir,
+          })!,
         ]);
 
         expect(failed).toEqual(['ext1']);
@@ -864,7 +885,12 @@ describe('extension tests', () => {
           version: '1.0.0',
         });
 
-        await performWorkspaceExtensionMigration([loadExtension(ext1Path)!]);
+        await performWorkspaceExtensionMigration([
+          loadExtension({
+            extensionDir: ext1Path,
+            workspaceDir: tempWorkspaceDir,
+          })!,
+        ]);
 
         const userExtensionsDir = path.join(
           tempHomeDir,
@@ -882,7 +908,12 @@ describe('extension tests', () => {
           version: '1.0.0',
         });
 
-        await performWorkspaceExtensionMigration([loadExtension(ext1Path)!]);
+        await performWorkspaceExtensionMigration([
+          loadExtension({
+            extensionDir: ext1Path,
+            workspaceDir: tempWorkspaceDir,
+          })!,
+        ]);
         const extensions = loadExtensions();
 
         expect(extensions).toEqual([]);
@@ -901,8 +932,14 @@ describe('extension tests', () => {
         version: '1.0.0',
       });
       const extensionsToMigrate: Extension[] = [
-        loadExtension(ext1Path)!,
-        loadExtension(ext2Path)!,
+        loadExtension({
+          extensionDir: ext1Path,
+          workspaceDir: tempWorkspaceDir,
+        })!,
+        loadExtension({
+          extensionDir: ext2Path,
+          workspaceDir: tempWorkspaceDir,
+        })!,
       ];
       const failed =
         await performWorkspaceExtensionMigration(extensionsToMigrate);
@@ -935,7 +972,10 @@ describe('extension tests', () => {
       });
 
       const extensions: Extension[] = [
-        loadExtension(ext1Path)!,
+        loadExtension({
+          extensionDir: ext1Path,
+          workspaceDir: tempWorkspaceDir,
+        })!,
         {
           path: '/ext/path/1',
           config: { name: 'ext2', version: '1.0.0' },

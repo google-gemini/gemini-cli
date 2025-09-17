@@ -6,7 +6,6 @@
 
 import type { GeminiCLIExtension } from '@google/gemini-cli-core';
 import * as fs from 'node:fs';
-import { simpleGit } from 'simple-git';
 import { getErrorMessage } from '../../utils/errors.js';
 import { ExtensionUpdateState } from '../../ui/state/extensions.js';
 import { type Dispatch, type SetStateAction } from 'react';
@@ -15,8 +14,10 @@ import {
   installExtension,
   uninstallExtension,
   loadExtension,
+  loadInstallMetadata,
   ExtensionStorage,
 } from '../extension.js';
+import { checkForExtensionUpdate } from './github.js';
 
 export interface ExtensionUpdateInfo {
   name: string;
@@ -34,13 +35,15 @@ export async function updateExtension(
     return undefined;
   }
   setExtensionUpdateState(ExtensionUpdateState.UPDATING);
-  if (!extension.type) {
+  const installMetadata = loadInstallMetadata(extension.path);
+
+  if (!installMetadata?.type) {
     setExtensionUpdateState(ExtensionUpdateState.ERROR);
     throw new Error(
       `Extension ${extension.name} cannot be updated, type is unknown.`,
     );
   }
-  if (extension.type === 'link') {
+  if (installMetadata?.type === 'link') {
     setExtensionUpdateState(ExtensionUpdateState.UP_TO_DATE);
     throw new Error(`Extension is linked so does not need to be updated`);
   }
@@ -50,21 +53,13 @@ export async function updateExtension(
   try {
     await copyExtension(extension.path, tempDir);
     await uninstallExtension(extension.name, cwd);
-    await installExtension(
-      {
-        source: extension.source!,
-        type: extension.type,
-        ref: extension.ref,
-        autoUpdate: extension.autoUpdate,
-      },
-      cwd,
-      true,
-    );
+    await installExtension(installMetadata, false, cwd);
 
     const updatedExtensionStorage = new ExtensionStorage(extension.name);
-    const updatedExtension = loadExtension(
-      updatedExtensionStorage.getExtensionDir(),
-    );
+    const updatedExtension = loadExtension({
+      extensionDir: updatedExtensionStorage.getExtensionDir(),
+      workspaceDir: cwd,
+    });
     if (!updatedExtension) {
       setExtensionUpdateState(ExtensionUpdateState.ERROR);
       throw new Error('Updated extension not found after installation.');
@@ -137,78 +132,28 @@ export async function checkForAllExtensionUpdates(
   for (const extension of extensions) {
     const initialState = extensionsUpdateState.get(extension.name);
     if (initialState === undefined) {
-      await checkForExtensionUpdate(extension, (updatedState) => {
+      if (!extension.installMetadata) {
         setExtensionsUpdateState((prev) => {
           extensionsUpdateState = new Map(prev);
-          extensionsUpdateState.set(extension.name, updatedState);
+          extensionsUpdateState.set(
+            extension.name,
+            ExtensionUpdateState.NOT_UPDATABLE,
+          );
           return extensionsUpdateState;
         });
-      });
+        continue;
+      }
+      await checkForExtensionUpdate(
+        extension.installMetadata,
+        (updatedState) => {
+          setExtensionsUpdateState((prev) => {
+            extensionsUpdateState = new Map(prev);
+            extensionsUpdateState.set(extension.name, updatedState);
+            return extensionsUpdateState;
+          });
+        },
+      );
     }
   }
   return extensionsUpdateState;
-}
-
-export async function checkForExtensionUpdate(
-  extension: GeminiCLIExtension,
-  setExtensionUpdateState: (updateState: ExtensionUpdateState) => void,
-): Promise<void> {
-  setExtensionUpdateState(ExtensionUpdateState.CHECKING_FOR_UPDATES);
-
-  if (extension.type !== 'git') {
-    setExtensionUpdateState(ExtensionUpdateState.NOT_UPDATABLE);
-    return;
-  }
-
-  try {
-    const git = simpleGit(extension.path);
-    const remotes = await git.getRemotes(true);
-    if (remotes.length === 0) {
-      console.error('No git remotes found.');
-      setExtensionUpdateState(ExtensionUpdateState.ERROR);
-      return;
-    }
-    const remoteUrl = remotes[0].refs.fetch;
-    if (!remoteUrl) {
-      console.error(`No fetch URL found for git remote ${remotes[0].name}.`);
-      setExtensionUpdateState(ExtensionUpdateState.ERROR);
-      return;
-    }
-
-    // Determine the ref to check on the remote.
-    const refToCheck = extension.ref || 'HEAD';
-
-    const lsRemoteOutput = await git.listRemote([remoteUrl, refToCheck]);
-
-    if (typeof lsRemoteOutput !== 'string' || lsRemoteOutput.trim() === '') {
-      console.error(`Git ref ${refToCheck} not found.`);
-      setExtensionUpdateState(ExtensionUpdateState.ERROR);
-      return;
-    }
-
-    const remoteHash = lsRemoteOutput.split('\t')[0];
-    const localHash = await git.revparse(['HEAD']);
-
-    if (!remoteHash) {
-      console.error(
-        `Unable to parse hash from git ls-remote output "${lsRemoteOutput}"`,
-      );
-      setExtensionUpdateState(ExtensionUpdateState.ERROR);
-      return;
-    } else if (remoteHash === localHash) {
-      setExtensionUpdateState(ExtensionUpdateState.UP_TO_DATE);
-      return;
-    } else {
-      setExtensionUpdateState(ExtensionUpdateState.UPDATE_AVAILABLE);
-      return;
-    }
-  } catch (error) {
-    console.error(
-      `Failed to check for updates for extension "${
-        extension.name
-      }": ${getErrorMessage(error)}`,
-    );
-    setExtensionUpdateState(ExtensionUpdateState.ERROR);
-    return;
-  }
 }

@@ -7,6 +7,7 @@
 import type {
   MCPServerConfig,
   GeminiCLIExtension,
+  ExtensionInstallMetadata,
 } from '@google/gemini-cli-core';
 import {
   GEMINI_DIR,
@@ -19,13 +20,17 @@ import {
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
-import { simpleGit } from 'simple-git';
-import { SettingScope, loadSettings } from './settings.js';
+import { SettingScope, loadSettings } from '../config/settings.js';
 import { getErrorMessage } from '../utils/errors.js';
 import { recursivelyHydrateStrings } from './extensions/variables.js';
 import { isWorkspaceTrusted } from './trustedFolders.js';
 import { resolveEnvVarsInObject } from '../utils/envVarResolver.js';
 import { randomUUID } from 'node:crypto';
+import {
+  cloneFromGit,
+  downloadFromGitHubRelease,
+} from './extensions/github.js';
+import type { LoadExtensionContext } from './extensions/variableSchema.js';
 import { ExtensionEnablementManager } from './extensions/extensionEnablement.js';
 
 export const EXTENSIONS_DIRECTORY_NAME = path.join(GEMINI_DIR, 'extensions');
@@ -48,11 +53,10 @@ export interface ExtensionConfig {
   excludeTools?: string[];
 }
 
-export interface ExtensionInstallMetadata {
-  source: string;
-  type: 'git' | 'local' | 'link';
-  ref?: string;
-  autoUpdate?: boolean;
+export interface ExtensionUpdateInfo {
+  name: string;
+  originalVersion: string;
+  updatedVersion: string;
 }
 
 export class ExtensionStorage {
@@ -186,7 +190,7 @@ export function loadExtensionsFromDir(dir: string): Extension[] {
   for (const subdir of fs.readdirSync(extensionsDir)) {
     const extensionDir = path.join(extensionsDir, subdir);
 
-    const extension = loadExtension(extensionDir);
+    const extension = loadExtension({ extensionDir, workspaceDir: dir });
     if (extension != null) {
       extensions.push(extension);
     }
@@ -194,7 +198,8 @@ export function loadExtensionsFromDir(dir: string): Extension[] {
   return extensions;
 }
 
-export function loadExtension(extensionDir: string): Extension | null {
+export function loadExtension(context: LoadExtensionContext): Extension | null {
+  const { extensionDir, workspaceDir } = context;
   if (!fs.statSync(extensionDir).isDirectory()) {
     return null;
   }
@@ -221,6 +226,7 @@ export function loadExtension(extensionDir: string): Extension | null {
     const configContent = fs.readFileSync(configFilePath, 'utf-8');
     let config = recursivelyHydrateStrings(JSON.parse(configContent), {
       extensionPath: extensionDir,
+      workspacePath: workspaceDir,
       '/': path.sep,
       pathSeparator: path.sep,
     }) as unknown as ExtensionConfig;
@@ -255,7 +261,7 @@ export function loadExtension(extensionDir: string): Extension | null {
   }
 }
 
-function loadInstallMetadata(
+export function loadInstallMetadata(
   extensionDir: string,
 ): ExtensionInstallMetadata | undefined {
   const metadataFilePath = path.join(extensionDir, INSTALL_METADATA_FILENAME);
@@ -292,7 +298,6 @@ export function annotateActiveExtensions(
   const manager = new ExtensionEnablementManager(
     ExtensionStorage.getUserExtensionsDir(),
   );
-
   const annotatedExtensions: GeminiCLIExtension[] = [];
   if (enabledExtensionNames.length === 0) {
     return extensions.map((extension) => ({
@@ -300,10 +305,7 @@ export function annotateActiveExtensions(
       version: extension.config.version,
       isActive: manager.isEnabled(extension.config.name, workspaceDir),
       path: extension.path,
-      source: extension.installMetadata?.source,
-      type: extension.installMetadata?.type,
-      ref: extension.installMetadata?.ref,
-      autoUpdate: extension.installMetadata?.autoUpdate ?? false,
+      installMetadata: extension.installMetadata,
     }));
   }
 
@@ -320,10 +322,7 @@ export function annotateActiveExtensions(
       version: extension.config.version,
       isActive: false,
       path: extension.path,
-      source: extension.installMetadata?.source,
-      type: extension.installMetadata?.type,
-      ref: extension.installMetadata?.ref,
-      autoUpdate: extension.installMetadata?.autoUpdate ?? false,
+      installMetadata: extension.installMetadata,
     }));
   }
 
@@ -342,7 +341,7 @@ export function annotateActiveExtensions(
       version: extension.config.version,
       isActive,
       path: extension.path,
-      autoUpdate: extension.installMetadata?.autoUpdate ?? false,
+      installMetadata: extension.installMetadata,
     });
   }
 
@@ -351,43 +350,6 @@ export function annotateActiveExtensions(
   }
 
   return annotatedExtensions;
-}
-
-/**
- * Clones a Git repository to a specified local path.
- * @param installMetadata The metadata for the extension to install.
- * @param destination The destination path to clone the repository to.
- */
-async function cloneFromGit(
-  installMetadata: ExtensionInstallMetadata,
-  destination: string,
-): Promise<void> {
-  try {
-    const git = simpleGit(destination);
-    await git.clone(installMetadata.source, './', ['--depth', '1']);
-
-    const remotes = await git.getRemotes(true);
-    if (remotes.length === 0) {
-      throw new Error(
-        `Unable to find any remotes for repo ${installMetadata.source}`,
-      );
-    }
-
-    const refToFetch = installMetadata.ref || 'HEAD';
-
-    await git.fetch(remotes[0].name, refToFetch);
-
-    // After fetching, checkout FETCH_HEAD to get the content of the fetched ref.
-    // This results in a detached HEAD state, which is fine for this purpose.
-    await git.checkout('FETCH_HEAD');
-  } catch (error) {
-    throw new Error(
-      `Failed to clone Git repository from ${installMetadata.source}`,
-      {
-        cause: error,
-      },
-    );
-  }
 }
 
 /**
@@ -412,8 +374,8 @@ async function promptForContinuation(prompt: string): Promise<boolean> {
 
 export async function installExtension(
   installMetadata: ExtensionInstallMetadata,
+  askConsent: boolean = false,
   cwd: string = process.cwd(),
-  isUpdate: boolean = false,
 ): Promise<string> {
   const logger = getClearcutLogger(cwd);
   let newExtensionConfig: ExtensionConfig | null = null;
@@ -439,9 +401,22 @@ export async function installExtension(
 
     let tempDir: string | undefined;
 
-    if (installMetadata.type === 'git') {
+    if (
+      installMetadata.type === 'git' ||
+      installMetadata.type === 'github-release'
+    ) {
       tempDir = await ExtensionStorage.createTmpDir();
-      await cloneFromGit(installMetadata, tempDir);
+      try {
+        const tagName = await downloadFromGitHubRelease(
+          installMetadata,
+          tempDir,
+        );
+        updateExtensionVersion(tempDir, tagName);
+        installMetadata.type = 'github-release';
+      } catch (_error) {
+        await cloneFromGit(installMetadata, tempDir);
+        installMetadata.type = 'git';
+      }
       localSourcePath = tempDir;
     } else if (
       installMetadata.type === 'local' ||
@@ -453,7 +428,10 @@ export async function installExtension(
     }
 
     try {
-      newExtensionConfig = await loadExtensionConfig(localSourcePath);
+      newExtensionConfig = await loadExtensionConfig({
+        extensionDir: localSourcePath,
+        workspaceDir: cwd,
+      });
       if (!newExtensionConfig) {
         throw new Error(
           `Invalid extension at ${installMetadata.source}. Please make sure it has a valid gemini-extension.json file.`,
@@ -474,36 +452,16 @@ export async function installExtension(
           `Extension "${newExtensionName}" is already installed. Please uninstall it first.`,
         );
       }
-
-      const mcpServerEntries = Object.entries(
-        newExtensionConfig.mcpServers || {},
-      );
-      if (mcpServerEntries.length) {
-        console.info('This extension will run the following MCP servers: ');
-        for (const [key, mcpServer] of mcpServerEntries) {
-          const isLocal = !!mcpServer.command;
-          console.info(
-            `  * ${key} (${isLocal ? 'local' : 'remote'}): ${mcpServer.description}`,
-          );
-        }
-        console.info(
-          'The extension will append info to your gemini.md context',
-        );
-
-        // Only prompt for new installs.
-        if (!isUpdate) {
-          const shouldContinue = await promptForContinuation(
-            'Do you want to continue? (y/n): ',
-          );
-          if (!shouldContinue) {
-            throw new Error('Installation cancelled by user.');
-          }
-        }
+      if (askConsent) {
+        await requestConsent(newExtensionConfig);
       }
-
       await fs.promises.mkdir(destinationPath, { recursive: true });
 
-      if (installMetadata.type === 'local' || installMetadata.type === 'git') {
+      if (
+        installMetadata.type === 'local' ||
+        installMetadata.type === 'git' ||
+        installMetadata.type === 'github-release'
+      ) {
         await copyExtension(localSourcePath, destinationPath);
       }
 
@@ -534,7 +492,10 @@ export async function installExtension(
     // Attempt to load config from the source path even if installation fails
     // to get the name and version for logging.
     if (!newExtensionConfig && localSourcePath) {
-      newExtensionConfig = await loadExtensionConfig(localSourcePath);
+      newExtensionConfig = await loadExtensionConfig({
+        extensionDir: localSourcePath,
+        workspaceDir: cwd,
+      });
     }
     logger?.logExtensionInstallEvent(
       new ExtensionInstallEvent(
@@ -548,9 +509,46 @@ export async function installExtension(
   }
 }
 
-export async function loadExtensionConfig(
+async function updateExtensionVersion(
   extensionDir: string,
+  extensionVersion: string,
+) {
+  const configFilePath = path.join(extensionDir, EXTENSIONS_CONFIG_FILENAME);
+  if (fs.existsSync(configFilePath)) {
+    const configContent = await fs.promises.readFile(configFilePath, 'utf-8');
+    const config = JSON.parse(configContent);
+    config.version = extensionVersion;
+    await fs.promises.writeFile(
+      configFilePath,
+      JSON.stringify(config, null, 2),
+    );
+  }
+}
+async function requestConsent(extensionConfig: ExtensionConfig) {
+  const mcpServerEntries = Object.entries(extensionConfig.mcpServers || {});
+  if (mcpServerEntries.length) {
+    console.info('This extension will run the following MCP servers: ');
+    for (const [key, mcpServer] of mcpServerEntries) {
+      const isLocal = !!mcpServer.command;
+      console.info(
+        `  * ${key} (${isLocal ? 'local' : 'remote'}): ${mcpServer.description}`,
+      );
+    }
+    console.info('The extension will append info to your gemini.md context');
+
+    const shouldContinue = await promptForContinuation(
+      'Do you want to continue? (y/n): ',
+    );
+    if (!shouldContinue) {
+      throw new Error('Installation cancelled by user.');
+    }
+  }
+}
+
+export async function loadExtensionConfig(
+  context: LoadExtensionContext,
 ): Promise<ExtensionConfig | null> {
+  const { extensionDir, workspaceDir } = context;
   const configFilePath = path.join(extensionDir, EXTENSIONS_CONFIG_FILENAME);
   if (!fs.existsSync(configFilePath)) {
     return null;
@@ -559,6 +557,7 @@ export async function loadExtensionConfig(
     const configContent = fs.readFileSync(configFilePath, 'utf-8');
     const config = recursivelyHydrateStrings(JSON.parse(configContent), {
       extensionPath: extensionDir,
+      workspacePath: workspaceDir,
       '/': path.sep,
       pathSeparator: path.sep,
     }) as unknown as ExtensionConfig;
