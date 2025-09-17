@@ -95,7 +95,7 @@ jobs:
           echo ""
           echo "Relevant SHAs:"
           echo "  Stable: Will be cut from:  : ${{ steps.versions.outputs.STABLE_SHA }} / ${{ steps.versions.outputs.PREVIOUS_STABLE_TAG }}"
-          echo "  Preview will be cut from:  : ${{ steps.versions.outputs.PREVIEW_SHA }} (${{ github.event.inputs.ref }})". Users last saw preview as: ${{ steps.versions.outputs.PREVIOUS_STABLE_TAG }}
+          echo "  Preview will be cut from:  : ${{ steps.versions.outputs.PREVIEW_SHA }} (${{ github.event.inputs.ref }})". Users last saw preview as: ${{ steps.versions.outputs.PREVIOUS_PREVIEW_TAG }}
           echo "  Nightly will be udpated in : ${{ steps.versions.outputs.NEXT_SHA }} (${{ github.event.inputs.ref }}). Previous nightly tag: ${{ steps.versions.outputs.PREVIOUS_NIGHTLY_TAG }}"
 
   test:
