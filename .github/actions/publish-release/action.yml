@@ -19,7 +19,7 @@ inputs:
     required: true
   dry-run:
     description: 'Whether to run in dry-run mode.'
-    type: 'boolean'
+    type: 'string'
     required: true
   release-tag:
     description: 'The release tag for the release (e.g., v0.1.11).'
@@ -112,11 +112,11 @@ runs:
 
     - name: '🔗 Install latest core package'
       working-directory: '${{ inputs.working-directory }}'
-      if: '${{ inputs.dry-run == false }}'
+      if: '${{ inputs.dry-run == ''false'' }}'
       shell: 'bash'
       run: |
         npm install "@google/gemini-cli-core@${{ inputs.release-version }}" \
-        --prefix=packages/cli \
+        --workspace="@google/gemini-cli" \
         --save-exact
 
     - name: '📦 Publish @google/gemini-cli'
@@ -138,7 +138,7 @@ runs:
 
     - name: '🎉 Create GitHub Release'
       working-directory: '${{ inputs.working-directory }}'
-      if: '${{ inputs.dry-run == false }}'
+      if: '${{ inputs.dry-run == ''false'' }}'
       env:
         GITHUB_TOKEN: '${{ inputs.github-token }}'
       shell: 'bash'
