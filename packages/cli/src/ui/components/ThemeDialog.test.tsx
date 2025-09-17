@@ -21,10 +21,12 @@ const createMockSettings = (
   new LoadedSettings(
     {
       settings: { ui: { customThemes: {} }, ...systemSettings },
+      originalSettings: { ui: { customThemes: {} }, ...systemSettings },
       path: '/system/settings.json',
     },
     {
       settings: {},
+      originalSettings: {},
       path: '/system/system-defaults.json',
     },
     {
@@ -32,10 +34,18 @@ const createMockSettings = (
         ui: { customThemes: {} },
         ...userSettings,
       },
+      originalSettings: {
+        ui: { customThemes: {} },
+        ...userSettings,
+      },
       path: '/user/settings.json',
     },
     {
       settings: {
+        ui: { customThemes: {} },
+        ...workspaceSettings,
+      },
+      originalSettings: {
         ui: { customThemes: {} },
         ...workspaceSettings,
       },

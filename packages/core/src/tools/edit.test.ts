@@ -10,15 +10,11 @@ const mockEnsureCorrectEdit = vi.hoisted(() => vi.fn());
 const mockGenerateJson = vi.hoisted(() => vi.fn());
 const mockOpenDiff = vi.hoisted(() => vi.fn());
 
-import { IdeClient, IDEConnectionStatus } from '../ide/ide-client.js';
+import { IdeClient } from '../ide/ide-client.js';
 
 vi.mock('../ide/ide-client.js', () => ({
   IdeClient: {
     getInstance: vi.fn(),
-  },
-  IDEConnectionStatus: {
-    Connected: 'connected',
-    Disconnected: 'disconnected',
   },
 }));
 
@@ -62,6 +58,7 @@ describe('EditTool', () => {
   let rootDir: string;
   let mockConfig: Config;
   let geminiClient: any;
+  let baseLlmClient: any;
 
   beforeEach(() => {
     vi.restoreAllMocks();
@@ -73,8 +70,13 @@ describe('EditTool', () => {
       generateJson: mockGenerateJson, // mockGenerateJson is already defined and hoisted
     };
 
+    baseLlmClient = {
+      generateJson: vi.fn(),
+    };
+
     mockConfig = {
       getGeminiClient: vi.fn().mockReturnValue(geminiClient),
+      getBaseLlmClient: vi.fn().mockReturnValue(baseLlmClient),
       getTargetDir: () => rootDir,
       getApprovalMode: vi.fn(),
       setApprovalMode: vi.fn(),
@@ -197,6 +199,86 @@ describe('EditTool', () => {
       expect(applyReplacement('hello world', '', 'new', false)).toBe(
         'hello world',
       );
+    });
+
+    it('should treat $ literally and not as replacement pattern', () => {
+      const current = "price is $100 and pattern end is ' '";
+      const oldStr = 'price is $100';
+      const newStr = 'price is $200';
+      const result = applyReplacement(current, oldStr, newStr, false);
+      expect(result).toBe("price is $200 and pattern end is ' '");
+    });
+
+    it("should treat $' literally and not as a replacement pattern", () => {
+      const current = 'foo';
+      const oldStr = 'foo';
+      const newStr = "bar$'baz";
+      const result = applyReplacement(current, oldStr, newStr, false);
+      expect(result).toBe("bar$'baz");
+    });
+
+    it('should treat $& literally and not as a replacement pattern', () => {
+      const current = 'hello world';
+      const oldStr = 'hello';
+      const newStr = '$&-replacement';
+      const result = applyReplacement(current, oldStr, newStr, false);
+      expect(result).toBe('$&-replacement world');
+    });
+
+    it('should treat $` literally and not as a replacement pattern', () => {
+      const current = 'prefix-middle-suffix';
+      const oldStr = 'middle';
+      const newStr = 'new$`content';
+      const result = applyReplacement(current, oldStr, newStr, false);
+      expect(result).toBe('prefix-new$`content-suffix');
+    });
+
+    it('should treat $1, $2 capture groups literally', () => {
+      const current = 'test string';
+      const oldStr = 'test';
+      const newStr = '$1$2replacement';
+      const result = applyReplacement(current, oldStr, newStr, false);
+      expect(result).toBe('$1$2replacement string');
+    });
+
+    it('should use replaceAll for normal strings without problematic $ sequences', () => {
+      const current = 'normal text replacement';
+      const oldStr = 'text';
+      const newStr = 'string';
+      const result = applyReplacement(current, oldStr, newStr, false);
+      expect(result).toBe('normal string replacement');
+    });
+
+    it('should handle multiple occurrences with problematic $ sequences', () => {
+      const current = 'foo bar foo baz';
+      const oldStr = 'foo';
+      const newStr = "test$'end";
+      const result = applyReplacement(current, oldStr, newStr, false);
+      expect(result).toBe("test$'end bar test$'end baz");
+    });
+
+    it('should handle complex regex patterns with $ at end', () => {
+      const current = "| select('match', '^[sv]d[a-z]$')";
+      const oldStr = "'^[sv]d[a-z]$'";
+      const newStr = "'^[sv]d[a-z]$' # updated";
+      const result = applyReplacement(current, oldStr, newStr, false);
+      expect(result).toBe("| select('match', '^[sv]d[a-z]$' # updated)");
+    });
+
+    it('should handle empty replacement with problematic $ in newString', () => {
+      const current = 'test content';
+      const oldStr = 'nothing';
+      const newStr = "replacement$'text";
+      const result = applyReplacement(current, oldStr, newStr, false);
+      expect(result).toBe('test content'); // No replacement because oldStr not found
+    });
+
+    it('should handle $$ (escaped dollar) correctly', () => {
+      const current = 'price value';
+      const oldStr = 'value';
+      const newStr = '$$100';
+      const result = applyReplacement(current, oldStr, newStr, false);
+      expect(result).toBe('price $$100');
     });
   });
 
@@ -348,11 +430,12 @@ describe('EditTool', () => {
       // Set a specific mock for this test case
       let mockCalled = false;
       mockEnsureCorrectEdit.mockImplementationOnce(
-        async (_, content, p, client) => {
+        async (_, content, p, client, baseClient) => {
           mockCalled = true;
           expect(content).toBe(originalContent);
           expect(p).toBe(params);
           expect(client).toBe(geminiClient);
+          expect(baseClient).toBe(baseLlmClient);
           return {
             params: {
               file_path: filePath,
@@ -896,9 +979,7 @@ describe('EditTool', () => {
       filePath = path.join(rootDir, testFile);
       ideClient = {
         openDiff: vi.fn(),
-        getConnectionStatus: vi.fn().mockReturnValue({
-          status: IDEConnectionStatus.Connected,
-        }),
+        isDiffingEnabled: vi.fn().mockReturnValue(true),
       };
       vi.mocked(IdeClient.getInstance).mockResolvedValue(ideClient);
       (mockConfig as any).getIdeMode = () => true;

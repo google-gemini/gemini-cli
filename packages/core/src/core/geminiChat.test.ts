@@ -8,7 +8,6 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type {
   Content,
   GenerateContentConfig,
-  Part,
   GenerateContentResponse,
 } from '@google/genai';
 import type { ContentGenerator } from '../core/contentGenerator.js';
@@ -169,6 +168,7 @@ describe('GeminiChat', () => {
       // 2. Action & Assert: The stream processing should complete without throwing an error
       // because the presence of a tool call makes the empty final chunk acceptable.
       const stream = await chat.sendMessageStream(
+        'test-model',
         { message: 'test message' },
         'prompt-id-tool-call-empty-end',
       );
@@ -220,6 +220,7 @@ describe('GeminiChat', () => {
 
       // 2. Action & Assert: The stream should fail because there's no finish reason.
       const stream = await chat.sendMessageStream(
+        'test-model',
         { message: 'test message' },
         'prompt-id-no-finish-empty-end',
       );
@@ -265,6 +266,7 @@ describe('GeminiChat', () => {
 
       // 2. Action & Assert: The stream should complete without throwing an error.
       const stream = await chat.sendMessageStream(
+        'test-model',
         { message: 'test message' },
         'prompt-id-valid-then-invalid-end',
       );
@@ -282,66 +284,6 @@ describe('GeminiChat', () => {
       const modelTurn = history[1]!;
       expect(modelTurn?.parts?.length).toBe(1);
       expect(modelTurn?.parts![0]!.text).toBe('Initial valid content...');
-    });
-    it('should not consolidate text into a part that also contains a functionCall', async () => {
-      // 1. Mock the API to stream a malformed part followed by a valid text part.
-      const multiChunkStream = (async function* () {
-        // This malformed part has both text and a functionCall.
-        yield {
-          candidates: [
-            {
-              content: {
-                role: 'model',
-                parts: [
-                  {
-                    text: 'Some text',
-                    functionCall: { name: 'do_stuff', args: {} },
-                  },
-                ],
-              },
-            },
-          ],
-        } as unknown as GenerateContentResponse;
-        // This valid text part should NOT be merged into the malformed one.
-        yield {
-          candidates: [
-            {
-              content: {
-                role: 'model',
-                parts: [{ text: ' that should not be merged.' }],
-              },
-            },
-          ],
-        } as unknown as GenerateContentResponse;
-      })();
-
-      vi.mocked(mockContentGenerator.generateContentStream).mockResolvedValue(
-        multiChunkStream,
-      );
-
-      // 2. Action: Send a message and consume the stream.
-      const stream = await chat.sendMessageStream(
-        { message: 'test message' },
-        'prompt-id-malformed-chunk',
-      );
-      for await (const _ of stream) {
-        // Consume the stream to trigger history recording.
-      }
-
-      // 3. Assert: Check that the final history was not incorrectly consolidated.
-      const history = chat.getHistory();
-
-      expect(history.length).toBe(2);
-      const modelTurn = history[1]!;
-
-      // CRUCIAL ASSERTION: There should be two separate parts.
-      // The old, non-strict logic would incorrectly merge them, resulting in one part.
-      expect(modelTurn?.parts?.length).toBe(2);
-
-      // Verify the contents of each part.
-      expect(modelTurn?.parts![0]!.text).toBe('Some text');
-      expect(modelTurn?.parts![0]!.functionCall).toBeDefined();
-      expect(modelTurn?.parts![1]!.text).toBe(' that should not be merged.');
     });
 
     it('should consolidate subsequent text chunks after receiving an empty text chunk', async () => {
@@ -371,6 +313,7 @@ describe('GeminiChat', () => {
 
       // 2. Action: Send a message and consume the stream.
       const stream = await chat.sendMessageStream(
+        'test-model',
         { message: 'test message' },
         'prompt-id-empty-chunk-consolidation',
       );
@@ -428,6 +371,7 @@ describe('GeminiChat', () => {
 
       // 2. Action: Send a message and consume the stream.
       const stream = await chat.sendMessageStream(
+        'test-model',
         { message: 'test message' },
         'prompt-id-multi-chunk',
       );
@@ -475,6 +419,7 @@ describe('GeminiChat', () => {
 
       // 2. Action: Send a message and fully consume the stream to trigger history recording.
       const stream = await chat.sendMessageStream(
+        'test-model',
         { message: 'test message' },
         'prompt-id-mixed-chunk',
       );
@@ -537,6 +482,7 @@ describe('GeminiChat', () => {
 
       // 3. Action: Send the function response back to the model and consume the stream.
       const stream = await chat.sendMessageStream(
+        'test-model',
         {
           message: {
             functionResponse: {
@@ -588,17 +534,23 @@ describe('GeminiChat', () => {
       );
 
       const stream = await chat.sendMessageStream(
+        'test-model',
         { message: 'hello' },
         'prompt-id-1',
       );
       for await (const _ of stream) {
-        // consume stream to trigger internal logic
+        // consume stream
       }
 
       expect(mockContentGenerator.generateContentStream).toHaveBeenCalledWith(
         {
-          model: 'gemini-pro',
-          contents: [{ role: 'user', parts: [{ text: 'hello' }] }],
+          model: 'test-model',
+          contents: [
+            {
+              role: 'user',
+              parts: [{ text: 'hello' }],
+            },
+          ],
           config: {},
         },
         'prompt-id-1',
@@ -606,151 +558,6 @@ describe('GeminiChat', () => {
     });
   });
 
-  describe('recordHistory', () => {
-    const userInput: Content = {
-      role: 'user',
-      parts: [{ text: 'User input' }],
-    };
-
-    it('should consolidate all consecutive model turns into a single turn', () => {
-      const userInput: Content = {
-        role: 'user',
-        parts: [{ text: 'User input' }],
-      };
-      // This simulates a multi-part model response with different part types.
-      const modelOutput: Content[] = [
-        { role: 'model', parts: [{ text: 'Thinking...' }] },
-        {
-          role: 'model',
-          parts: [{ functionCall: { name: 'do_stuff', args: {} } }],
-        },
-      ];
-
-      // @ts-expect-error Accessing private method for testing
-      chat.recordHistory(userInput, modelOutput);
-      const history = chat.getHistory();
-
-      // The history should contain the user's turn and ONE consolidated model turn.
-      // The old code would fail here, resulting in a length of 3.
-      //expect(history).toBe([]);
-      expect(history.length).toBe(2);
-
-      const modelTurn = history[1]!;
-      expect(modelTurn.role).toBe('model');
-
-      // The consolidated turn should contain both the text part and the functionCall part.
-      expect(modelTurn?.parts?.length).toBe(2);
-      expect(modelTurn?.parts![0]!.text).toBe('Thinking...');
-      expect(modelTurn?.parts![1]!.functionCall).toBeDefined();
-    });
-
-    it('should add a placeholder model turn when a tool call is followed by an empty response', () => {
-      // 1. Setup: A history where the model has just made a function call.
-      const initialHistory: Content[] = [
-        { role: 'user', parts: [{ text: 'Initial prompt' }] },
-        {
-          role: 'model',
-          parts: [{ functionCall: { name: 'test_tool', args: {} } }],
-        },
-      ];
-      chat.setHistory(initialHistory);
-
-      // 2. Action: The user provides the tool's response, and the model's
-      // final output is empty (e.g., just a thought, which gets filtered out).
-      const functionResponse: Content = {
-        role: 'user',
-        parts: [{ functionResponse: { name: 'test_tool', response: {} } }],
-      };
-      const emptyModelOutput: Content[] = [];
-
-      // @ts-expect-error Accessing private method for testing
-      chat.recordHistory(functionResponse, emptyModelOutput, [
-        functionResponse,
-      ]);
-
-      // 3. Assert: The history should now have four valid, alternating turns.
-      const history = chat.getHistory();
-      expect(history.length).toBe(4);
-
-      // The final turn must be the empty model placeholder.
-      const lastTurn = history[3]!;
-      expect(lastTurn.role).toBe('model');
-      expect(lastTurn?.parts?.length).toBe(0);
-
-      // The second-to-last turn must be the function response we provided.
-      const secondToLastTurn = history[2]!;
-      expect(secondToLastTurn.role).toBe('user');
-      expect(secondToLastTurn?.parts![0]!.functionResponse).toBeDefined();
-    });
-
-    it('should add user input and a single model output to history', () => {
-      const modelOutput: Content[] = [
-        { role: 'model', parts: [{ text: 'Model output' }] },
-      ];
-      // @ts-expect-error Accessing private method for testing
-      chat.recordHistory(userInput, modelOutput);
-      const history = chat.getHistory();
-      expect(history.length).toBe(2);
-      expect(history[0]).toEqual(userInput);
-      expect(history[1]).toEqual(modelOutput[0]);
-    });
-
-    it('should consolidate adjacent text parts from multiple content objects', () => {
-      const modelOutput: Content[] = [
-        { role: 'model', parts: [{ text: 'Part 1.' }] },
-        { role: 'model', parts: [{ text: ' Part 2.' }] },
-        { role: 'model', parts: [{ text: ' Part 3.' }] },
-      ];
-      // @ts-expect-error Accessing private method for testing
-      chat.recordHistory(userInput, modelOutput);
-      const history = chat.getHistory();
-      expect(history.length).toBe(2);
-      expect(history[1]!.role).toBe('model');
-      expect(history[1]!.parts).toEqual([{ text: 'Part 1. Part 2. Part 3.' }]);
-    });
-
-    it('should add an empty placeholder turn if modelOutput is empty', () => {
-      // This simulates receiving a pre-filtered, thought-only response.
-      const emptyModelOutput: Content[] = [];
-      // @ts-expect-error Accessing private method for testing
-      chat.recordHistory(userInput, emptyModelOutput);
-      const history = chat.getHistory();
-      expect(history.length).toBe(2);
-      expect(history[0]).toEqual(userInput);
-      expect(history[1]!.role).toBe('model');
-      expect(history[1]!.parts).toEqual([]);
-    });
-
-    it('should preserve model outputs with undefined or empty parts arrays', () => {
-      const malformedOutput: Content[] = [
-        { role: 'model', parts: [{ text: 'Text part' }] },
-        { role: 'model', parts: undefined as unknown as Part[] },
-        { role: 'model', parts: [] },
-      ];
-      // @ts-expect-error Accessing private method for testing
-      chat.recordHistory(userInput, malformedOutput);
-      const history = chat.getHistory();
-      expect(history.length).toBe(4); // userInput + 3 model turns
-      expect(history[1]!.parts).toEqual([{ text: 'Text part' }]);
-      expect(history[2]!.parts).toBeUndefined();
-      expect(history[3]!.parts).toEqual([]);
-    });
-
-    it('should not consolidate content with different roles', () => {
-      const mixedOutput: Content[] = [
-        { role: 'model', parts: [{ text: 'Model 1' }] },
-        { role: 'user', parts: [{ text: 'Unexpected User' }] },
-        { role: 'model', parts: [{ text: 'Model 2' }] },
-      ];
-      // @ts-expect-error Accessing private method for testing
-      chat.recordHistory(userInput, mixedOutput);
-      const history = chat.getHistory();
-      expect(history.length).toBe(4); // userInput, model1, unexpected_user, model2
-      expect(history[1]).toEqual(mixedOutput[0]);
-      expect(history[2]).toEqual(mixedOutput[1]);
-      expect(history[3]).toEqual(mixedOutput[2]);
-    });
-  });
   describe('addHistory', () => {
     it('should add a new content item to the history', () => {
       const newContent: Content = {
@@ -809,6 +616,7 @@ describe('GeminiChat', () => {
 
       // ACT: Send a message and collect all events from the stream.
       const stream = await chat.sendMessageStream(
+        'test-model',
         { message: 'test' },
         'prompt-id-yield-retry',
       );
@@ -849,6 +657,7 @@ describe('GeminiChat', () => {
         );
 
       const stream = await chat.sendMessageStream(
+        'test-model',
         { message: 'test' },
         'prompt-id-retry-success',
       );
@@ -909,6 +718,7 @@ describe('GeminiChat', () => {
       );
 
       const stream = await chat.sendMessageStream(
+        'test-model',
         { message: 'test' },
         'prompt-id-retry-fail',
       );
@@ -964,6 +774,7 @@ describe('GeminiChat', () => {
 
     // 3. Send a new message
     const stream = await chat.sendMessageStream(
+      'test-model',
       { message: 'Second question' },
       'prompt-id-retry-existing',
     );
@@ -1034,6 +845,7 @@ describe('GeminiChat', () => {
 
     // 2. Call the method and consume the stream.
     const stream = await chat.sendMessageStream(
+      'test-model',
       { message: 'test empty stream' },
       'prompt-id-empty-stream',
     );
@@ -1113,6 +925,7 @@ describe('GeminiChat', () => {
 
     // 3. Start the first stream and consume only the first chunk to pause it
     const firstStream = await chat.sendMessageStream(
+      'test-model',
       { message: 'first' },
       'prompt-1',
     );
@@ -1121,6 +934,7 @@ describe('GeminiChat', () => {
 
     // 4. While the first stream is paused, start the second call. It will block.
     const secondStreamPromise = chat.sendMessageStream(
+      'test-model',
       { message: 'second' },
       'prompt-2',
     );
@@ -1180,6 +994,7 @@ describe('GeminiChat', () => {
       );
 
       const stream = await chat.sendMessageStream(
+        'test-model',
         { message: 'test' },
         'prompt-id-res3',
       );
@@ -1234,12 +1049,9 @@ describe('GeminiChat', () => {
     });
 
     it('should call handleFallback with the specific failed model and retry if handler returns true', async () => {
-      const FAILED_MODEL = 'gemini-2.5-pro';
-      vi.mocked(mockConfig.getModel).mockReturnValue(FAILED_MODEL);
       const authType = AuthType.LOGIN_WITH_GOOGLE;
       vi.mocked(mockConfig.getContentGeneratorConfig).mockReturnValue({
         authType,
-        model: FAILED_MODEL,
       });
 
       const isInFallbackModeSpy = vi.spyOn(mockConfig, 'isInFallbackMode');
@@ -1267,6 +1079,7 @@ describe('GeminiChat', () => {
       });
 
       const stream = await chat.sendMessageStream(
+        'test-model',
         { message: 'trigger 429' },
         'prompt-id-fb1',
       );
@@ -1282,7 +1095,7 @@ describe('GeminiChat', () => {
       expect(mockHandleFallback).toHaveBeenCalledTimes(1);
       expect(mockHandleFallback).toHaveBeenCalledWith(
         mockConfig,
-        FAILED_MODEL,
+        'test-model',
         authType,
         error429,
       );
@@ -1300,6 +1113,7 @@ describe('GeminiChat', () => {
       mockHandleFallback.mockResolvedValue(false);
 
       const stream = await chat.sendMessageStream(
+        'test-model',
         { message: 'test stop' },
         'prompt-id-fb2',
       );
@@ -1357,6 +1171,7 @@ describe('GeminiChat', () => {
 
     // Send a message and consume the stream
     const stream = await chat.sendMessageStream(
+      'test-model',
       { message: 'test' },
       'prompt-id-discard-test',
     );

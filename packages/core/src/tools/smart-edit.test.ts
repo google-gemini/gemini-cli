@@ -10,15 +10,11 @@ const mockFixLLMEditWithInstruction = vi.hoisted(() => vi.fn());
 const mockGenerateJson = vi.hoisted(() => vi.fn());
 const mockOpenDiff = vi.hoisted(() => vi.fn());
 
-import { IdeClient, IDEConnectionStatus } from '../ide/ide-client.js';
+import { IdeClient } from '../ide/ide-client.js';
 
 vi.mock('../ide/ide-client.js', () => ({
   IdeClient: {
     getInstance: vi.fn(),
-  },
-  IDEConnectionStatus: {
-    Connected: 'connected',
-    Disconnected: 'disconnected',
   },
 }));
 
@@ -46,11 +42,11 @@ import {
   type Mock,
 } from 'vitest';
 import {
-  applyReplacement,
   SmartEditTool,
   type EditToolParams,
   calculateReplacement,
 } from './smart-edit.js';
+import { applyReplacement } from './edit.js';
 import { type FileDiff, ToolConfirmationOutcome } from './tools.js';
 import { ToolErrorType } from './tool-error.js';
 import path from 'node:path';
@@ -175,6 +171,22 @@ describe('SmartEditTool', () => {
       expect(applyReplacement('hello old world old', 'old', 'new', false)).toBe(
         'hello new world new',
       );
+    });
+
+    it('should treat $ literally and not as replacement pattern', () => {
+      const current = 'regex end is $ and more';
+      const oldStr = 'regex end is $';
+      const newStr = 'regex end is $ and correct';
+      const result = applyReplacement(current, oldStr, newStr, false);
+      expect(result).toBe('regex end is $ and correct and more');
+    });
+
+    it("should treat $' literally and not as a replacement pattern", () => {
+      const current = 'foo';
+      const oldStr = 'foo';
+      const newStr = "bar$'baz";
+      const result = applyReplacement(current, oldStr, newStr, false);
+      expect(result).toBe("bar$'baz");
     });
   });
 
@@ -461,9 +473,7 @@ describe('SmartEditTool', () => {
       filePath = path.join(rootDir, testFile);
       ideClient = {
         openDiff: vi.fn(),
-        getConnectionStatus: vi.fn().mockReturnValue({
-          status: IDEConnectionStatus.Connected,
-        }),
+        isDiffingEnabled: vi.fn().mockReturnValue(true),
       };
       vi.mocked(IdeClient.getInstance).mockResolvedValue(ideClient);
       (mockConfig as any).getIdeMode = () => true;
