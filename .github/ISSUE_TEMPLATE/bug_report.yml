@@ -32,7 +32,7 @@ body:
     attributes:
       label: 'Client information'
       description: 'Please paste the full text from the `/about` command run from Gemini CLI. Also include which platform (macOS, Windows, Linux).'
-      value: |-
+      value: |- 
         <details>
         <summary>Client Information</summary>
 
