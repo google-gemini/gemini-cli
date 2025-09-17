@@ -106,11 +106,28 @@ function getNodeMemoryArgs(config: Config): string[] {
   return [];
 }
 
+async function relaunchOnExitCode(runner: () => Promise<number>) {
+  while (true) {
+    try {
+      const exitCode = await runner();
+
+      if (exitCode !== RELAUNCH_EXIT_CODE) {
+        process.exit(exitCode);
+      }
+    } catch (error) {
+      process.stdin.resume();
+      console.error('Fatal error: Failed to relaunch the CLI process.', error);
+      process.exit(1);
+    }
+  }
+}
+
 async function relaunchAppInChildProcess(additionalArgs: string[]) {
   if (process.env['GEMINI_CLI_NO_RELAUNCH']) {
     return;
   }
-  while (true) {
+
+  const runner = () => {
     const nodeArgs = [...additionalArgs, ...process.argv.slice(1)];
     const newEnv = { ...process.env, GEMINI_CLI_NO_RELAUNCH: 'true' };
 
@@ -122,25 +139,17 @@ async function relaunchAppInChildProcess(additionalArgs: string[]) {
       env: newEnv,
     });
 
-    try {
-      const exitCode = await new Promise<number>((resolve, reject) => {
-        child.on('error', reject);
-        child.on('close', (code) => {
-          // Resume stdin before the parent process exits.
-          process.stdin.resume();
-          resolve(code ?? 1);
-        });
+    return new Promise<number>((resolve, reject) => {
+      child.on('error', reject);
+      child.on('close', (code) => {
+        // Resume stdin before the parent process exits.
+        process.stdin.resume();
+        resolve(code ?? 1);
       });
+    });
+  };
 
-      if (exitCode !== RELAUNCH_EXIT_CODE) {
-        process.exit(exitCode);
-      }
-    } catch (error) {
-      process.stdin.resume();
-      console.error('Fatal error: Failed to relaunch the CLI process.', error);
-      process.exit(1);
-    }
-  }
+  await relaunchOnExitCode(runner);
 }
 
 import { runZedIntegration } from './zed-integration/zedIntegration.js';
@@ -364,7 +373,9 @@ export async function main() {
 
       const sandboxArgs = injectStdinIntoArgs(process.argv, stdinData);
 
-      await start_sandbox(sandboxConfig, memoryArgs, config, sandboxArgs);
+      await relaunchOnExitCode(() =>
+        start_sandbox(sandboxConfig, memoryArgs, config, sandboxArgs),
+      );
       process.exit(0);
     } else {
       // Relaunch app so we always have a child process that can be internally
