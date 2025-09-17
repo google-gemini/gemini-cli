@@ -529,7 +529,7 @@ export class GeminiChat {
       // Record token usage if this chunk has usageMetadata
       if (chunk.usageMetadata) {
         this.chatRecordingService.recordMessageTokens(chunk.usageMetadata);
-        if (chunk.usageMetadata.promptTokenCount) {
+        if (chunk.usageMetadata.promptTokenCount !== undefined) {
           uiTelemetryService.setLastPromptTokenCount(
             chunk.usageMetadata.promptTokenCount,
           );
