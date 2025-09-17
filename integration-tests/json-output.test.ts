@@ -55,19 +55,22 @@ describe('JSON output', () => {
 
     expect(thrown).toBeDefined();
     const message = (thrown as Error).message;
-    
+
     // Use a regex to find the first complete JSON object in the string
     const jsonMatch = message.match(/{[\s\S]*}/);
-    
+
     // Fail if no JSON-like text was found
-    expect(jsonMatch, 'Expected to find a JSON object in the error output').toBeTruthy();
+    expect(
+      jsonMatch,
+      'Expected to find a JSON object in the error output',
+    ).toBeTruthy();
 
     let payload;
     try {
       // Parse the matched JSON string
       payload = JSON.parse(jsonMatch![0]);
     } catch (parseError) {
-      console.error("Failed to parse the following JSON:", jsonMatch![0]);
+      console.error('Failed to parse the following JSON:', jsonMatch![0]);
       throw new Error(
         `Test failed: Could not parse JSON from error message. Details: ${parseError}`,
       );
