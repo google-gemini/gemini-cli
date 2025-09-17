@@ -1,4 +1,4 @@
-{
+{ 
   "typescript.tsserver.experimental.enableProjectDiagnostics": true,
   "editor.tabSize": 2,
   "editor.rulers": [80],
