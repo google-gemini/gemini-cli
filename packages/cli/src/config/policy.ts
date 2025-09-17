@@ -172,7 +172,7 @@ export function createPolicyEngineConfig(
     rules.push({
       toolName: EditTool.Name,
       decision: PolicyDecision.ALLOW,
-      priority: 10,
+      priority: 15, // Higher than write tools (10) to override ASK_USER
     });
   }
 

@@ -131,7 +131,6 @@ describe('Policy Engine Integration Tests', () => {
             trust: true,
           },
         },
-        useSmartEdit: true, // Should deny 'replace' tool
       };
 
       const config = createPolicyEngineConfig(settings, ApprovalMode.DEFAULT);
@@ -146,8 +145,8 @@ describe('Policy Engine Integration Tests', () => {
       // But glob is explicitly excluded, so it should be denied
       expect(engine.check({ name: 'glob' })).toBe(PolicyDecision.DENY);
 
-      // Replace should be denied due to useSmartEdit
-      expect(engine.check({ name: 'replace' })).toBe(PolicyDecision.DENY);
+      // Replace should ask user (normal write tool behavior)
+      expect(engine.check({ name: 'replace' })).toBe(PolicyDecision.ASK_USER);
 
       // Explicitly allowed tools
       expect(engine.check({ name: 'custom-tool' })).toBe(PolicyDecision.ALLOW);
@@ -201,8 +200,8 @@ describe('Policy Engine Integration Tests', () => {
       const config = createPolicyEngineConfig(settings, ApprovalMode.AUTO_EDIT);
       const engine = new PolicyEngine(config);
 
-      // Edit tool should be allowed
-      expect(engine.check({ name: 'edit' })).toBe(PolicyDecision.ALLOW);
+      // Edit tool should be allowed (EditTool.Name = 'replace')
+      expect(engine.check({ name: 'replace' })).toBe(PolicyDecision.ALLOW);
 
       // Other tools should follow normal rules
       expect(engine.check({ name: 'run_shell_command' })).toBe(
