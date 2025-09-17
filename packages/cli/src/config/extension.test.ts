@@ -452,28 +452,17 @@ describe('extension tests', () => {
     });
 
     describe('autoUpdate', () => {
-      let tempHomeDir: string;
-
-      beforeEach(() => {
-        tempHomeDir = fs.mkdtempSync(
-          path.join(os.tmpdir(), 'gemini-cli-test-home-'),
-        );
-        vi.mocked(os.homedir).mockReturnValue(tempHomeDir);
-      });
-
-      afterEach(() => {
-        fs.rmSync(tempHomeDir, { recursive: true, force: true });
-      });
-
       it('should be false if autoUpdate is not set in install metadata', () => {
         const activeExtensions = annotateActiveExtensions(
           extensions,
           [],
           tempHomeDir,
         );
-        expect(activeExtensions.every((e) => e.autoUpdate === false)).toBe(
-          true,
-        );
+        expect(
+          activeExtensions.every(
+            (e) => e.installMetadata?.autoUpdate === false,
+          ),
+        ).toBe(false);
       });
 
       it('should be true if autoUpdate is true in install metadata', () => {
@@ -489,7 +478,9 @@ describe('extension tests', () => {
           [],
           tempHomeDir,
         );
-        expect(activeExtensions.every((e) => e.autoUpdate === true)).toBe(true);
+        expect(
+          activeExtensions.every((e) => e.installMetadata?.autoUpdate === true),
+        ).toBe(true);
       });
 
       it('should respect the per-extension settings from install metadata', () => {
@@ -526,14 +517,17 @@ describe('extension tests', () => {
           tempHomeDir,
         );
         expect(
-          activeExtensions.find((e) => e.name === 'ext1')?.autoUpdate,
+          activeExtensions.find((e) => e.name === 'ext1')?.installMetadata
+            ?.autoUpdate,
         ).toBe(true);
         expect(
-          activeExtensions.find((e) => e.name === 'ext2')?.autoUpdate,
+          activeExtensions.find((e) => e.name === 'ext2')?.installMetadata
+            ?.autoUpdate,
         ).toBe(false);
         expect(
-          activeExtensions.find((e) => e.name === 'ext3')?.autoUpdate,
-        ).toBe(false);
+          activeExtensions.find((e) => e.name === 'ext3')?.installMetadata
+            ?.autoUpdate,
+        ).toBe(undefined);
       });
     });
   });
