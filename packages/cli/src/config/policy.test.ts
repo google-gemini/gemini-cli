@@ -20,6 +20,7 @@ describe('createPolicyEngineConfig', () => {
       { toolName: 'run_shell_command', decision: 'ask_user', priority: 10 },
       { toolName: 'write_file', decision: 'ask_user', priority: 10 },
       { toolName: 'web_fetch', decision: 'ask_user', priority: 10 },
+      { toolName: 'google_web_search', decision: 'ask_user', priority: 10 },
     ]);
   });
 
@@ -180,10 +181,10 @@ describe('createPolicyEngineConfig', () => {
     const settings: Settings = {};
     const config = createPolicyEngineConfig(settings, ApprovalMode.AUTO_EDIT);
     const rule = config.rules?.find(
-      (r) => r.toolName === 'edit' && r.decision === PolicyDecision.ALLOW,
+      (r) => r.toolName === 'replace' && r.decision === PolicyDecision.ALLOW,
     );
     expect(rule).toBeDefined();
-    expect(rule?.priority).toBe(10);
+    expect(rule?.priority).toBe(15);
   });
 
   it('should prioritize exclude over allow', () => {
@@ -428,7 +429,6 @@ describe('createPolicyEngineConfig', () => {
       'list_directory',
       'read_file',
       'read_many_files',
-      'google_web_search',
     ];
     for (const tool of readOnlyTools) {
       const rule = config.rules?.find(
@@ -470,9 +470,9 @@ describe('createPolicyEngineConfig', () => {
     );
     expect(autoEditConfig.defaultDecision).toBe(PolicyDecision.ASK_USER);
     const editRule = autoEditConfig.rules?.find(
-      (r) => r.toolName === 'edit' && r.decision === PolicyDecision.ALLOW,
+      (r) => r.toolName === 'replace' && r.decision === PolicyDecision.ALLOW,
     );
     expect(editRule).toBeDefined();
-    expect(editRule?.priority).toBe(10);
+    expect(editRule?.priority).toBe(15);
   });
 });
