@@ -13,6 +13,11 @@ on:
         required: false
         type: 'boolean'
         default: false
+      ref:
+        description: 'The branch, tag, or SHA to release from.'
+        required: false
+        type: 'string'
+        default: 'main'
 
 jobs:
   calculate-versions:
@@ -26,12 +31,14 @@ jobs:
       PREVIEW_SHA: '${{ steps.versions.outputs.PREVIEW_SHA }}'
       PREVIOUS_PREVIEW_TAG: '${{ steps.versions.outputs.PREVIOUS_PREVIEW_TAG }}'
       NEXT_NIGHTLY_VERSION: '${{ steps.versions.outputs.NEXT_NIGHTLY_VERSION }}'
+      PREVIOUS_NIGHTLY_TAG: '${{ steps.versions.outputs.PREVIOUS_NIGHTLY_TAG }}'
 
     steps:
       - name: 'Checkout'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
         with:
           fetch-depth: 0
+          fetch-tags: true
 
       - name: 'Setup Node.js'
         uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020'
@@ -57,13 +64,72 @@ jobs:
           echo "PREVIOUS_STABLE_TAG=$(echo "${STABLE_JSON}" | jq -r .previousReleaseTag)" >> "${GITHUB_OUTPUT}"
           echo "PREVIEW_VERSION=$(echo "${PREVIEW_JSON}" | jq -r .releaseVersion)" >> "${GITHUB_OUTPUT}"
           # shellcheck disable=SC1083
-          echo "PREVIEW_SHA=$(git rev-parse "$(echo "${PREVIEW_JSON}" | jq -r .previousReleaseTag)"^{commit})" >> "${GITHUB_OUTPUT}"
+          echo "PREVIEW_SHA=$(git rev-parse '${{ github.event.inputs.ref }}'^{commit})" >> "${GITHUB_OUTPUT}"
           echo "PREVIOUS_PREVIEW_TAG=$(echo "${PREVIEW_JSON}" | jq -r .previousReleaseTag)" >> "${GITHUB_OUTPUT}"
           echo "NEXT_NIGHTLY_VERSION=$(echo "${NIGHTLY_JSON}" | jq -r .releaseVersion)" >> "${GITHUB_OUTPUT}"
+          echo "PREVIOUS_NIGHTLY_TAG=$(echo "${NIGHTLY_JSON}" | jq -r .previousReleaseTag)" >> "${GITHUB_OUTPUT}"
+          CURRENT_NIGHTLY_TAG=$(git describe --tags --abbrev=0 --match="*nightly*")
+          echo "CURRENT_NIGHTLY_TAG=${CURRENT_NIGHTLY_TAG}" >> "${GITHUB_OUTPUT}"
+          echo "NEXT_SHA=$(git rev-parse HEAD)" >> "${GITHUB_OUTPUT}"
 
-  promote:
-    name: 'Promote to ${{ matrix.channel }}'
+      - name: 'Display Pending Updates'
+        run: |
+          echo "Pending Changes:"
+          echo "  Nightly: ${{ steps.versions.outputs.PREVIOUS_NIGHTLY_TAG }} -> ${{ steps.versions.outputs.NEXT_NIGHTLY_VERSION }}"
+          echo "  Preview: ${{ steps.versions.outputs.PREVIOUS_PREVIEW_TAG }} -> ${{ steps.versions.outputs.PREVIEW_VERSION }}"
+          echo "  Stable:  ${{ steps.versions.outputs.PREVIOUS_STABLE_TAG }} -> ${{ steps.versions.outputs.STABLE_VERSION }}"
+          echo ""
+          echo "Relevant SHAs:"
+          echo "  Current (Stable):  ${{ steps.versions.outputs.STABLE_SHA }}"
+          echo "  Current (Preview): ${{ steps.versions.outputs.PREVIEW_SHA }}"
+          echo "  Next (to be promoted): ${{ steps.versions.outputs.NEXT_SHA }}"
+
+  test:
+    name: 'Test ${{ matrix.channel }}'
     needs: 'calculate-versions'
+    runs-on: 'ubuntu-latest'
+    strategy:
+      matrix:
+        include:
+          - channel: 'stable'
+            sha: '${{ needs.calculate-versions.outputs.STABLE_SHA }}'
+          - channel: 'preview'
+            sha: '${{ needs.calculate-versions.outputs.PREVIEW_SHA }}'
+          - channel: 'nightly'
+            sha: '${{ github.event.inputs.ref }}'
+    steps:
+      - name: 'Checkout Ref'
+        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
+        with:
+          ref: '${{ github.event.inputs.ref }}'
+
+      - name: 'Checkout correct SHA'
+        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
+        with:
+          ref: '${{ matrix.sha }}'
+          path: 'release'
+          fetch-depth: 0
+
+      - name: 'Setup Node.js'
+        uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020'
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+
+      - name: 'Install Dependencies'
+        working-directory: './release'
+        run: 'npm ci'
+
+      - name: 'Run Tests'
+        uses: './.github/actions/run-tests'
+        with:
+          force_skip_tests: '${{ github.event.inputs.force_skip_tests }}'
+          gemini_api_key: '${{ secrets.GEMINI_API_KEY }}'
+          working-directory: './release'
+
+  publish:
+    name: 'Publish ${{ matrix.channel }}'
+    needs: ['calculate-versions', 'test']
     runs-on: 'ubuntu-latest'
     permissions:
       contents: 'write'
@@ -83,16 +149,17 @@ jobs:
             previous-tag: '${{ needs.calculate-versions.outputs.PREVIOUS_PREVIEW_TAG }}'
 
     steps:
-      - name: 'Checkout main'
+      - name: 'Checkout Ref'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
         with:
-          ref: 'main'
+          ref: '${{ github.event.inputs.ref }}'
 
       - name: 'Checkout correct SHA'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
         with:
           ref: '${{ matrix.sha }}'
           path: 'release'
+          fetch-depth: 0
 
       - name: 'Setup Node.js'
         uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020'
@@ -103,12 +170,6 @@ jobs:
       - name: 'Install Dependencies'
         working-directory: './release'
         run: 'npm ci'
-
-      - name: 'Run Tests'
-        uses: './.github/actions/run-tests'
-        with:
-          force_skip_tests: '${{ github.event.inputs.force_skip_tests }}'
-          gemini_api_key: '${{ secrets.GEMINI_API_KEY }}'
 
       - name: 'Publish Release'
         uses: './.github/actions/publish-release'
@@ -125,16 +186,16 @@ jobs:
 
   nightly-pr:
     name: 'Create Nightly PR'
-    needs: 'calculate-versions'
+    needs: ['calculate-versions', 'test']
     runs-on: 'ubuntu-latest'
     permissions:
       contents: 'write'
       pull-requests: 'write'
     steps:
-      - name: 'Checkout main'
+      - name: 'Checkout Ref'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
         with:
-          ref: 'main'
+          ref: '${{ github.event.inputs.ref }}'
 
       - name: 'Setup Node.js'
         uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020'
@@ -165,7 +226,13 @@ jobs:
           BRANCH_NAME: '${{ steps.release_branch.outputs.BRANCH_NAME }}'
           DRY_RUN: '${{ github.event.inputs.dry_run }}'
         run: |-
-          git add package.json npm-shrinkwrap.json packages/*/package.json
+          git add package.json packages/*/package.json
+          if [ -f npm-shrinkwrap.json ]; then
+            git add npm-shrinkwrap.json
+          fi
+          if [ -f package-lock.json ]; then
+            git add package-lock.json
+          fi
           git commit -m "chore(release): bump version to ${{ needs.calculate-versions.outputs.NEXT_NIGHTLY_VERSION }}"
           if [[ "${DRY_RUN}" == "false" ]]; then
             echo "Pushing release branch to remote..."
