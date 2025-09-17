@@ -146,4 +146,3 @@ runs:
           --notes-start-tag "${{ inputs.previous-tag }}" \
           --generate-notes
       shell: 'bash'
-
