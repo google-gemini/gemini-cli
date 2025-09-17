@@ -24,7 +24,10 @@ import { keyMatchers, Command } from '../keyMatchers.js';
 import type { CommandContext, SlashCommand } from '../commands/types.js';
 import type { Config } from '@google/gemini-cli-core';
 import { ApprovalMode } from '@google/gemini-cli-core';
-import { parseInputForHighlighting } from '../utils/highlight.js';
+import {
+  parseInputForHighlighting,
+  buildSegmentsForVisualSlice,
+} from '../utils/highlight.js';
 import {
   clipboardHasImage,
   saveClipboardImage,
@@ -51,6 +54,31 @@ export interface InputPromptProps {
   vimHandleInput?: (key: Key) => boolean;
   isShellFocused?: boolean;
 }
+
+// The input content, input container, and input suggestions list may have different widths
+export const calculatePromptWidths = (terminalWidth: number) => {
+  const widthFraction = 0.9;
+  const FRAME_PADDING_AND_BORDER = 4; // Border (2) + padding (2)
+  const PROMPT_PREFIX_WIDTH = 2; // '> ' or '! '
+  const MIN_CONTENT_WIDTH = 2;
+
+  const innerContentWidth =
+    Math.floor(terminalWidth * widthFraction) -
+    FRAME_PADDING_AND_BORDER -
+    PROMPT_PREFIX_WIDTH;
+
+  const inputWidth = Math.max(MIN_CONTENT_WIDTH, innerContentWidth);
+  const FRAME_OVERHEAD = FRAME_PADDING_AND_BORDER + PROMPT_PREFIX_WIDTH;
+  const containerWidth = inputWidth + FRAME_OVERHEAD;
+  const suggestionsWidth = Math.max(20, Math.floor(terminalWidth * 1.0));
+
+  return {
+    inputWidth,
+    containerWidth,
+    suggestionsWidth,
+    frameOverhead: FRAME_OVERHEAD,
+  } as const;
+};
 
 export const InputPrompt: React.FC<InputPromptProps> = ({
   buffer,
@@ -854,64 +882,79 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           ) : (
             linesToRender
               .map((lineText, visualIdxInRenderedSet) => {
-                const tokens = parseInputForHighlighting(
-                  lineText,
-                  visualIdxInRenderedSet,
-                );
+                const absoluteVisualIdx =
+                  scrollVisualRow + visualIdxInRenderedSet;
+                const mapEntry = buffer.visualToLogicalMap[absoluteVisualIdx];
                 const cursorVisualRow =
                   cursorVisualRowAbsolute - scrollVisualRow;
                 const isOnCursorLine =
                   focus && visualIdxInRenderedSet === cursorVisualRow;
 
                 const renderedLine: React.ReactNode[] = [];
-                let charCount = 0;
 
-                tokens.forEach((token, tokenIdx) => {
-                  let display = token.text;
+                const [logicalLineIdx, logicalStartCol] = mapEntry;
+                const logicalLine = buffer.lines[logicalLineIdx] || '';
+                const tokens = parseInputForHighlighting(
+                  logicalLine,
+                  logicalLineIdx,
+                );
+
+                const visualStart = logicalStartCol;
+                const visualEnd = logicalStartCol + cpLen(lineText);
+                const segments = buildSegmentsForVisualSlice(
+                  tokens,
+                  visualStart,
+                  visualEnd,
+                );
+
+                let charCount = 0;
+                segments.forEach((seg, segIdx) => {
+                  const segLen = cpLen(seg.text);
+                  let display = seg.text;
+
                   if (isOnCursorLine) {
                     const relativeVisualColForHighlight =
                       cursorVisualColAbsolute;
-                    const tokenStart = charCount;
-                    const tokenEnd = tokenStart + cpLen(token.text);
-
+                    const segStart = charCount;
+                    const segEnd = segStart + segLen;
                     if (
-                      relativeVisualColForHighlight >= tokenStart &&
-                      relativeVisualColForHighlight < tokenEnd
+                      relativeVisualColForHighlight >= segStart &&
+                      relativeVisualColForHighlight < segEnd
                     ) {
                       const charToHighlight = cpSlice(
-                        token.text,
-                        relativeVisualColForHighlight - tokenStart,
-                        relativeVisualColForHighlight - tokenStart + 1,
+                        seg.text,
+                        relativeVisualColForHighlight - segStart,
+                        relativeVisualColForHighlight - segStart + 1,
                       );
                       const highlighted = chalk.inverse(charToHighlight);
                       display =
                         cpSlice(
-                          token.text,
+                          seg.text,
                           0,
-                          relativeVisualColForHighlight - tokenStart,
+                          relativeVisualColForHighlight - segStart,
                         ) +
                         highlighted +
                         cpSlice(
-                          token.text,
-                          relativeVisualColForHighlight - tokenStart + 1,
+                          seg.text,
+                          relativeVisualColForHighlight - segStart + 1,
                         );
                     }
-                    charCount = tokenEnd;
+                    charCount = segEnd;
                   }
 
                   const color =
-                    token.type === 'command' || token.type === 'file'
+                    seg.type === 'command' || seg.type === 'file'
                       ? theme.text.accent
                       : theme.text.primary;
 
                   renderedLine.push(
-                    <Text key={`token-${tokenIdx}`} color={color}>
+                    <Text key={`token-${segIdx}`} color={color}>
                       {display}
                     </Text>,
                   );
                 });
-                const currentLineGhost = isOnCursorLine ? inlineGhost : '';
 
+                const currentLineGhost = isOnCursorLine ? inlineGhost : '';
                 if (
                   isOnCursorLine &&
                   cursorVisualColAbsolute === cpLen(lineText)

@@ -56,6 +56,7 @@ import { useSlashCommandProcessor } from './hooks/slashCommandProcessor.js';
 import { useVimMode } from './contexts/VimModeContext.js';
 import { useConsoleMessages } from './hooks/useConsoleMessages.js';
 import { useTerminalSize } from './hooks/useTerminalSize.js';
+import { calculatePromptWidths } from './components/InputPrompt.js';
 import { useStdin, useStdout } from 'ink';
 import ansiEscapes from 'ansi-escapes';
 import * as fs from 'node:fs';
@@ -227,12 +228,12 @@ export const AppContainer = (props: AppContainerProps) => {
     registerCleanup(consolePatcher.cleanup);
   }, [handleNewMessage, config]);
 
-  const widthFraction = 0.9;
-  const inputWidth = Math.max(
-    20,
-    Math.floor(terminalWidth * widthFraction) - 3,
-  );
-  const suggestionsWidth = Math.max(20, Math.floor(terminalWidth * 1.0));
+  // Derive widths for InputPrompt using shared helper
+  const { inputWidth, suggestionsWidth } = useMemo(() => {
+    const { inputWidth, suggestionsWidth } =
+      calculatePromptWidths(terminalWidth);
+    return { inputWidth, suggestionsWidth };
+  }, [terminalWidth]);
   const mainAreaWidth = Math.floor(terminalWidth * 0.9);
   const staticAreaMaxItemHeight = Math.max(terminalHeight * 4, 100);
 

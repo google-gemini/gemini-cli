@@ -50,6 +50,11 @@ vi.mock('./DetailedMessagesDisplay.js', () => ({
 
 vi.mock('./InputPrompt.js', () => ({
   InputPrompt: () => <Text>InputPrompt</Text>,
+  calculatePromptWidths: vi.fn(() => ({
+    inputWidth: 80,
+    suggestionsWidth: 40,
+    containerWidth: 84,
+  })),
 }));
 
 vi.mock('./Footer.js', () => ({
