@@ -532,6 +532,14 @@ export enum Kind {
   Other = 'other',
 }
 
+// Function kinds that have side effects
+export const MUTATOR_KINDS: Kind[] = [
+  Kind.Edit,
+  Kind.Delete,
+  Kind.Move,
+  Kind.Execute,
+] as const;
+
 export interface ToolLocation {
   // Absolute path to the file
   path: string;
