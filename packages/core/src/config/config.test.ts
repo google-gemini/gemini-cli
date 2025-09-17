@@ -422,7 +422,7 @@ describe('Server Config (config.ts)', () => {
         ...baseParams,
         usageStatisticsEnabled: true,
       });
-      await config.initialize();
+      await config.refreshAuth(AuthType.USE_GEMINI);
 
       expect(
         ClearcutLogger.prototype.logStartSessionEvent,

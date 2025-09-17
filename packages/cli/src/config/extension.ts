@@ -27,6 +27,7 @@ import { isWorkspaceTrusted } from './trustedFolders.js';
 import { resolveEnvVarsInObject } from '../utils/envVarResolver.js';
 import { randomUUID } from 'node:crypto';
 import { ExtensionUpdateState } from '../ui/state/extensions.js';
+import type { LoadExtensionContext } from './extensions/variableSchema.js';
 import { ExtensionEnablementManager } from './extensions/extensionEnablement.js';
 
 export const EXTENSIONS_DIRECTORY_NAME = path.join(GEMINI_DIR, 'extensions');
@@ -192,7 +193,7 @@ export function loadExtensionsFromDir(dir: string): Extension[] {
   for (const subdir of fs.readdirSync(extensionsDir)) {
     const extensionDir = path.join(extensionsDir, subdir);
 
-    const extension = loadExtension(extensionDir);
+    const extension = loadExtension({ extensionDir, workspaceDir: dir });
     if (extension != null) {
       extensions.push(extension);
     }
@@ -200,7 +201,8 @@ export function loadExtensionsFromDir(dir: string): Extension[] {
   return extensions;
 }
 
-export function loadExtension(extensionDir: string): Extension | null {
+export function loadExtension(context: LoadExtensionContext): Extension | null {
+  const { extensionDir, workspaceDir } = context;
   if (!fs.statSync(extensionDir).isDirectory()) {
     return null;
   }
@@ -227,6 +229,7 @@ export function loadExtension(extensionDir: string): Extension | null {
     const configContent = fs.readFileSync(configFilePath, 'utf-8');
     let config = recursivelyHydrateStrings(JSON.parse(configContent), {
       extensionPath: extensionDir,
+      workspacePath: workspaceDir,
       '/': path.sep,
       pathSeparator: path.sep,
     }) as unknown as ExtensionConfig;
@@ -415,6 +418,7 @@ async function promptForContinuation(prompt: string): Promise<boolean> {
 
 export async function installExtension(
   installMetadata: ExtensionInstallMetadata,
+  askConsent: boolean = false,
   cwd: string = process.cwd(),
 ): Promise<string> {
   const logger = getClearcutLogger(cwd);
@@ -455,7 +459,10 @@ export async function installExtension(
     }
 
     try {
-      newExtensionConfig = await loadExtensionConfig(localSourcePath);
+      newExtensionConfig = await loadExtensionConfig({
+        extensionDir: localSourcePath,
+        workspaceDir: cwd,
+      });
       if (!newExtensionConfig) {
         throw new Error(
           `Invalid extension at ${installMetadata.source}. Please make sure it has a valid gemini-extension.json file.`,
@@ -476,30 +483,9 @@ export async function installExtension(
           `Extension "${newExtensionName}" is already installed. Please uninstall it first.`,
         );
       }
-
-      const mcpServerEntries = Object.entries(
-        newExtensionConfig.mcpServers || {},
-      );
-      if (mcpServerEntries.length) {
-        console.info('This extension will run the following MCP servers: ');
-        for (const [key, mcpServer] of mcpServerEntries) {
-          const isLocal = !!mcpServer.command;
-          console.info(
-            `  * ${key} (${isLocal ? 'local' : 'remote'}): ${mcpServer.description}`,
-          );
-        }
-        console.info(
-          'The extension will append info to your gemini.md context',
-        );
-
-        const shouldContinue = await promptForContinuation(
-          'Do you want to continue? (y/n): ',
-        );
-        if (!shouldContinue) {
-          throw new Error('Installation cancelled by user.');
-        }
+      if (askConsent) {
+        await requestConsent(newExtensionConfig);
       }
-
       await fs.promises.mkdir(destinationPath, { recursive: true });
 
       if (installMetadata.type === 'local' || installMetadata.type === 'git') {
@@ -533,7 +519,10 @@ export async function installExtension(
     // Attempt to load config from the source path even if installation fails
     // to get the name and version for logging.
     if (!newExtensionConfig && localSourcePath) {
-      newExtensionConfig = await loadExtensionConfig(localSourcePath);
+      newExtensionConfig = await loadExtensionConfig({
+        extensionDir: localSourcePath,
+        workspaceDir: cwd,
+      });
     }
     logger?.logExtensionInstallEvent(
       new ExtensionInstallEvent(
@@ -547,9 +536,31 @@ export async function installExtension(
   }
 }
 
+async function requestConsent(extensionConfig: ExtensionConfig) {
+  const mcpServerEntries = Object.entries(extensionConfig.mcpServers || {});
+  if (mcpServerEntries.length) {
+    console.info('This extension will run the following MCP servers: ');
+    for (const [key, mcpServer] of mcpServerEntries) {
+      const isLocal = !!mcpServer.command;
+      console.info(
+        `  * ${key} (${isLocal ? 'local' : 'remote'}): ${mcpServer.description}`,
+      );
+    }
+    console.info('The extension will append info to your gemini.md context');
+
+    const shouldContinue = await promptForContinuation(
+      'Do you want to continue? (y/n): ',
+    );
+    if (!shouldContinue) {
+      throw new Error('Installation cancelled by user.');
+    }
+  }
+}
+
 export async function loadExtensionConfig(
-  extensionDir: string,
+  context: LoadExtensionContext,
 ): Promise<ExtensionConfig | null> {
+  const { extensionDir, workspaceDir } = context;
   const configFilePath = path.join(extensionDir, EXTENSIONS_CONFIG_FILENAME);
   if (!fs.existsSync(configFilePath)) {
     return null;
@@ -558,6 +569,7 @@ export async function loadExtensionConfig(
     const configContent = fs.readFileSync(configFilePath, 'utf-8');
     const config = recursivelyHydrateStrings(JSON.parse(configContent), {
       extensionPath: extensionDir,
+      workspacePath: workspaceDir,
       '/': path.sep,
       pathSeparator: path.sep,
     }) as unknown as ExtensionConfig;
@@ -673,13 +685,15 @@ export async function updateExtension(
         type: extension.type,
         ref: extension.ref,
       },
+      false,
       cwd,
     );
 
     const updatedExtensionStorage = new ExtensionStorage(extension.name);
-    const updatedExtension = loadExtension(
-      updatedExtensionStorage.getExtensionDir(),
-    );
+    const updatedExtension = loadExtension({
+      extensionDir: updatedExtensionStorage.getExtensionDir(),
+      workspaceDir: cwd,
+    });
     if (!updatedExtension) {
       setExtensionUpdateState(ExtensionUpdateState.ERROR);
       throw new Error('Updated extension not found after installation.');
