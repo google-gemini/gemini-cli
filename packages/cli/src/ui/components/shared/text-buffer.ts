@@ -1992,11 +1992,11 @@ export function useTextBuffer({
       preferredCol,
       selectionAnchor,
 
-    allVisualLines: visualLines,
-    viewportVisualLines: renderedVisualLines,
-    visualCursor,
-    visualScrollRow,
-    visualToLogicalMap,
+      allVisualLines: visualLines,
+      viewportVisualLines: renderedVisualLines,
+      visualCursor,
+      visualScrollRow,
+      visualToLogicalMap,
 
       setText,
       insert,
