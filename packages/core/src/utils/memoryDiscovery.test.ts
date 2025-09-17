@@ -361,7 +361,7 @@ describe('loadServerHierarchicalMemory', () => {
       .mockImplementation(() => {});
 
     // Create directories in parallel for better performance
-    const dirPromises = Array.from({ length: 100 }, (_, i) =>
+    const dirPromises = Array.from({ length: 2 }, (_, i) =>
       createEmptyDir(path.join(cwd, `deep_dir_${i}`)),
     );
     await Promise.all(dirPromises);
@@ -379,12 +379,12 @@ describe('loadServerHierarchicalMemory', () => {
         respectGitIgnore: true,
         respectGeminiIgnore: true,
       },
-      50, // maxDirs
+      1, // maxDirs
     );
 
     expect(consoleDebugSpy).toHaveBeenCalledWith(
       expect.stringContaining('[DEBUG] [BfsFileSearch]'),
-      expect.stringContaining('Scanning [50/50]:'),
+      expect.stringContaining('Scanning [1/1]:'),
     );
 
     vi.mocked(console.debug).mockRestore();

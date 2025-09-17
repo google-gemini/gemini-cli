@@ -960,32 +960,9 @@ describe('fileUtils', () => {
 
       // Spy on fs.promises.stat to return a large file size
       const statSpy = vi.spyOn(fs.promises, 'stat').mockResolvedValueOnce({
-        dev: 0,
-        ino: 0,
-        mode: 0,
-        nlink: 0,
-        uid: 0,
-        gid: 0,
-        rdev: 0,
         size: 21 * 1024 * 1024,
-        blksize: 4096,
-        blocks: 8,
-        atimeMs: Date.now(),
-        mtimeMs: Date.now(),
-        ctimeMs: Date.now(),
-        birthtimeMs: Date.now(),
-        atime: new Date(),
-        mtime: new Date(),
-        ctime: new Date(),
-        birthtime: new Date(),
         isDirectory: () => false,
-        isFile: () => true,
-        isBlockDevice: () => false,
-        isCharacterDevice: () => false,
-        isFIFO: () => false,
-        isSocket: () => false,
-        isSymbolicLink: () => false,
-      });
+      } as fs.Stats);
 
       try {
         const result = await processSingleFileContent(
