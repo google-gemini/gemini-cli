@@ -36,12 +36,114 @@ This function aims to find an *intelligent* or "safe" index within the provided 
 */
 
 /**
+ * Normalizes leading whitespace to count indentation (1 tab = 4 spaces)
+ */
+const getIndentationLevel = (line: string): number => {
+  let indent = 0;
+  for (const char of line) {
+    if (char === ' ') {
+      indent++;
+    } else if (char === '\t') {
+      indent += 4;
+    } else {
+      break;
+    }
+  }
+  return indent;
+};
+
+/**
+ * Checks if a given character index is inside an indented code block (4+ spaces/1+ tabs)
+ * @param content The full string content.
+ * @param indexToTest The character index to test.
+ * @returns True if the index is inside an indented code block, false otherwise.
+ */
+const isIndexInsideIndentedCodeBlock = (
+  content: string,
+  indexToTest: number,
+): boolean => {
+  const lines = content.split('\n');
+  let currentPos = 0;
+  let targetLineIndex = -1;
+
+  // Find which line contains the index
+  for (let i = 0; i < lines.length; i++) {
+    const lineEndPos = currentPos + lines[i].length;
+    if (indexToTest >= currentPos && indexToTest <= lineEndPos) {
+      targetLineIndex = i;
+      break;
+    }
+    currentPos = lineEndPos + 1; // +1 for the newline character
+  }
+
+  if (targetLineIndex === -1) {
+    return false;
+  }
+
+  // Check if the target line itself is indented 4+ spaces
+  const targetLine = lines[targetLineIndex];
+  const targetIndent = getIndentationLevel(targetLine);
+
+  // If the line is not indented enough, it's not in an indented code block
+  if (targetIndent < 4 && targetLine.trim() !== '') {
+    return false;
+  }
+
+  // Look backwards to find the start of a potential indented code block
+  let codeBlockStart = targetLineIndex;
+  for (let i = targetLineIndex - 1; i >= 0; i--) {
+    const line = lines[i];
+    const indent = getIndentationLevel(line);
+
+    // If we hit a line with <4 spaces that's not blank, we've found the start boundary
+    if (line.trim() !== '' && indent < 4) {
+      codeBlockStart = i + 1;
+      break;
+    }
+
+    // If this line is indented 4+, continue looking backwards
+    if (indent >= 4) {
+      codeBlockStart = i;
+    }
+  }
+
+  // Look forwards to find the end of the indented code block
+  let codeBlockEnd = targetLineIndex;
+  for (let i = targetLineIndex + 1; i < lines.length; i++) {
+    const line = lines[i];
+    const indent = getIndentationLevel(line);
+
+    // If we hit a line with <4 spaces that's not blank, we've found the end boundary
+    if (line.trim() !== '' && indent < 4) {
+      codeBlockEnd = i - 1;
+      break;
+    }
+
+    // If this line is indented 4+ or blank, continue the block
+    if (indent >= 4 || line.trim() === '') {
+      codeBlockEnd = i;
+    }
+  }
+
+  // Check if we actually have a valid indented code block
+  // (at least one non-blank line with 4+ spaces)
+  for (let i = codeBlockStart; i <= codeBlockEnd; i++) {
+    const line = lines[i];
+    if (line.trim() !== '' && getIndentationLevel(line) >= 4) {
+      return true; // Found at least one properly indented code line
+    }
+  }
+
+  return false;
+};
+
+/**
  * Checks if a given character index within a string is inside a fenced (```) code block.
  * @param content The full string content.
  * @param indexToTest The character index to test.
  * @returns True if the index is inside a code block's content, false otherwise.
  */
-const isIndexInsideCodeBlock = (
+const isIndexInsideFencedCodeBlock = (
   content: string,
   indexToTest: number,
 ): boolean => {
@@ -59,17 +161,88 @@ const isIndexInsideCodeBlock = (
 };
 
 /**
- * Finds the starting index of the code block that encloses the given index.
- * Returns -1 if the index is not inside a code block.
+ * Checks if a given character index within a string is inside any type of code block.
+ * @param content The full string content.
+ * @param indexToTest The character index to test.
+ * @returns True if the index is inside a code block's content, false otherwise.
+ */
+const isIndexInsideCodeBlock = (
+  content: string,
+  indexToTest: number,
+): boolean =>
+  isIndexInsideFencedCodeBlock(content, indexToTest) ||
+  isIndexInsideIndentedCodeBlock(content, indexToTest);
+
+/**
+ * Finds the starting index of an indented code block that contains the given index.
  * @param content The markdown content.
  * @param index The index to check.
- * @returns Start index of the enclosing code block or -1.
+ * @returns Start index of the enclosing indented code block or -1.
  */
-const findEnclosingCodeBlockStart = (
+const findEnclosingIndentedCodeBlockStart = (
   content: string,
   index: number,
 ): number => {
-  if (!isIndexInsideCodeBlock(content, index)) {
+  if (!isIndexInsideIndentedCodeBlock(content, index)) {
+    return -1;
+  }
+
+  const lines = content.split('\n');
+  let currentPos = 0;
+  let targetLineIndex = -1;
+
+  // Find which line contains the index
+  for (let i = 0; i < lines.length; i++) {
+    const lineEndPos = currentPos + lines[i].length;
+    if (index >= currentPos && index <= lineEndPos) {
+      targetLineIndex = i;
+      break;
+    }
+    currentPos = lineEndPos + 1; // +1 for the newline character
+  }
+
+  if (targetLineIndex === -1) {
+    return -1;
+  }
+
+  // Look backwards to find the start of the indented code block
+  let codeBlockStart = targetLineIndex;
+  for (let i = targetLineIndex - 1; i >= 0; i--) {
+    const line = lines[i];
+    const indent = getIndentationLevel(line);
+
+    // If we hit a line with <4 spaces that's not blank, we've found the start boundary
+    if (line.trim() !== '' && indent < 4) {
+      codeBlockStart = i + 1;
+      break;
+    }
+
+    // If this line is indented 4+, continue looking backwards
+    if (indent >= 4) {
+      codeBlockStart = i;
+    }
+  }
+
+  // Convert line index back to character index
+  let charIndex = 0;
+  for (let i = 0; i < codeBlockStart; i++) {
+    charIndex += lines[i].length + 1; // +1 for newline
+  }
+
+  return charIndex;
+};
+
+/**
+ * Finds the starting index of a fenced code block that contains the given index.
+ * @param content The markdown content.
+ * @param index The index to check.
+ * @returns Start index of the enclosing fenced code block or -1.
+ */
+const findEnclosingFencedCodeBlockStart = (
+  content: string,
+  index: number,
+): number => {
+  if (!isIndexInsideFencedCodeBlock(content, index)) {
     return -1;
   }
   let currentSearchPos = 0;
@@ -88,6 +261,31 @@ const findEnclosingCodeBlockStart = (
     currentSearchPos = blockEndIndex + 3;
   }
   return -1;
+};
+
+/**
+ * Finds the starting index of the code block that encloses the given index.
+ * Returns -1 if the index is not inside a code block.
+ * @param content The markdown content.
+ * @param index The index to check.
+ * @returns Start index of the enclosing code block or -1.
+ */
+const findEnclosingCodeBlockStart = (
+  content: string,
+  index: number,
+): number => {
+  if (!isIndexInsideCodeBlock(content, index)) {
+    return -1;
+  }
+
+  // Check for fenced code block first (they take precedence)
+  const fencedStart = findEnclosingFencedCodeBlockStart(content, index);
+  if (fencedStart !== -1) {
+    return fencedStart;
+  }
+
+  // Check for indented code block
+  return findEnclosingIndentedCodeBlockStart(content, index);
 };
 
 /**

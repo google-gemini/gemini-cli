@@ -276,6 +276,97 @@ Select a number.`;
           content.indexOf('```javascript'),
         );
       });
+
+      it('should not split inside indented code blocks (4 spaces)', () => {
+        const content =
+          'Text before\n\n    function example() {\n        return "code";\n    }\n\nText after';
+        const splitPoint = findLastSafeSplitPoint(content);
+
+        // Should split before or after the indented code block, not inside it
+        const beforeSplit = content.substring(0, splitPoint);
+        const afterSplit = content.substring(splitPoint);
+
+        // If the split includes any indented code, it should include all of it
+        if (beforeSplit.includes('function example')) {
+          expect(beforeSplit).toContain('return "code"');
+          expect(beforeSplit).toContain('    }');
+        } else if (afterSplit.includes('function example')) {
+          expect(afterSplit).toContain('return "code"');
+          expect(afterSplit).toContain('    }');
+        }
+      });
+
+      it('should not split inside indented code blocks (tabs)', () => {
+        const content =
+          'Text before\n\n\tconst data = {\n\t\tkey: "value"\n\t};\n\nText after';
+        const splitPoint = findLastSafeSplitPoint(content);
+
+        // Should split before or after the indented code block, not inside it
+        const beforeSplit = content.substring(0, splitPoint);
+        const afterSplit = content.substring(splitPoint);
+
+        // If the split includes any indented code, it should include all of it
+        if (beforeSplit.includes('const data')) {
+          expect(beforeSplit).toContain('key: "value"');
+          expect(beforeSplit).toContain('\t};');
+        } else if (afterSplit.includes('const data')) {
+          expect(afterSplit).toContain('key: "value"');
+          expect(afterSplit).toContain('\t};');
+        }
+      });
+
+      it('should handle mixed indented and fenced code blocks', () => {
+        const content =
+          'Text\n\n    // indented code\n    const x = 1;\n\nBetween\n\n```\nfenced code\n```\n\nEnd';
+        const splitPoint = findLastSafeSplitPoint(content);
+
+        const beforeSplit = content.substring(0, splitPoint);
+
+        // Ensure code block integrity is maintained for both types
+        if (beforeSplit.includes('// indented code')) {
+          expect(beforeSplit).toContain('const x = 1;');
+        }
+        if (beforeSplit.includes('fenced code')) {
+          expect(beforeSplit).toContain('```'); // should have closing fence
+        }
+      });
+
+      it('should handle indented code blocks with blank lines', () => {
+        const content =
+          'Text\n\n    function test() {\n\n        return true;\n    }\n\nAfter';
+        const splitPoint = findLastSafeSplitPoint(content);
+
+        const beforeSplit = content.substring(0, splitPoint);
+        const afterSplit = content.substring(splitPoint);
+
+        // Blank lines within indented code should not break the block
+        if (beforeSplit.includes('function test')) {
+          expect(beforeSplit).toContain('return true;');
+          expect(beforeSplit).toContain('    }');
+        } else if (afterSplit.includes('function test')) {
+          expect(afterSplit).toContain('return true;');
+          expect(afterSplit).toContain('    }');
+        }
+      });
+
+      it('should not treat insufficient indentation as code blocks', () => {
+        const content =
+          'Text\n\n  // only 2 spaces - not a code block\n  const x = 1;\n\nMore text\n\nEnd';
+        const splitPoint = findLastSafeSplitPoint(content);
+
+        // Should be able to split normally since 2 spaces don't make a code block
+        expect(splitPoint).toBeGreaterThan(0);
+        expect(splitPoint).toBeLessThanOrEqual(content.length);
+      });
+
+      it('should handle indented code at end of content', () => {
+        const content =
+          'Text before\n\n    function example() {\n        return "end code";\n    }';
+        const splitPoint = findLastSafeSplitPoint(content);
+
+        // Should split before the indented code block when it's at the end
+        expect(splitPoint).toBeLessThanOrEqual(content.indexOf('    function'));
+      });
     });
 
     describe('Edge cases and combinations', () => {
