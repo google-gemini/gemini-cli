@@ -14,6 +14,7 @@ import type { Config } from '../config/config.js';
 
 export class ModelProviderFactory {
   private static providers: Map<string, BaseModelProvider> = new Map();
+  private static currentProviderType: ModelProviderType | null = null;
 
   static create(config: ModelProviderConfig, configInstance?: Config): BaseModelProvider {
     const key = `${config.type}-${config.model}-${config.baseUrl || 'default'}`;
@@ -26,8 +27,13 @@ export class ModelProviderFactory {
     if (this.providers.has(key)) {
       const existingProvider = this.providers.get(key)!;
       existingProvider.updateConfig(config);
+      // Update current provider type even when using cached provider
+      this.currentProviderType = config.type;
       return existingProvider;
     }
+
+    // Update current provider type
+    this.currentProviderType = config.type;
 
     let provider: BaseModelProvider;
 
@@ -78,6 +84,10 @@ export class ModelProviderFactory {
       ModelProviderType.OPENAI,
       ModelProviderType.LM_STUDIO
     ];
+  }
+
+  static getCurrentProviderType(): ModelProviderType | null {
+    return this.currentProviderType;
   }
 
   static validateConfig(config: ModelProviderConfig): void {
