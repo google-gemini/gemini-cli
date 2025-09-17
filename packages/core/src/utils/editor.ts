@@ -153,7 +153,17 @@ export function getCustomEditorFromEnv(): string | null {
   }
 
   // Extract the command name (handle full paths and arguments)
-  const cmdWithPath = editorCmd.split(' ')[0];
+  // We need to be careful about paths with spaces - split by space but handle quoted paths
+  let cmdWithPath: string;
+
+  if (editorCmd.startsWith('"') && editorCmd.includes('" ')) {
+    // Handle quoted paths like "C:\Program Files\VS Code\bin\code.exe" --wait
+    const quoteEnd = editorCmd.indexOf('"', 1);
+    cmdWithPath = editorCmd.substring(1, quoteEnd);
+  } else {
+    // Simple case: split by first space
+    cmdWithPath = editorCmd.split(' ')[0];
+  }
 
   // Use Node.js path.basename() which handles all platforms correctly
   const cmd = path.basename(cmdWithPath);

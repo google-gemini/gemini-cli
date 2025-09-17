@@ -16,8 +16,8 @@ import { spawn } from 'node:child_process';
 import { RELAUNCH_EXIT_CODE } from './utils/processUtils.js';
 import { start_sandbox } from './utils/sandbox.js';
 import type { DnsResolutionOrder, LoadedSettings } from './config/settings.js';
+import type { Config } from './config/settings';
 import {
-  Config,
   loadSettings,
   migrateDeprecatedSettings,
   SettingScope,

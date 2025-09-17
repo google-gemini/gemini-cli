@@ -110,6 +110,27 @@ const COMPRESSION_TOKEN_THRESHOLD = 0.7;
  */
 const COMPRESSION_PRESERVE_THRESHOLD = 0.3;
 
+/**
+ * Get the output token limit for a given model.
+ * This is used to ensure compression doesn't exceed API limits.
+ */
+function getModelOutputLimit(model: string): number {
+  // Extract model name without version for matching
+  const modelName = model.toLowerCase().split('/').pop()?.split('-')[0] || '';
+
+  // Gemini model output limits (conservative estimates)
+  if (modelName.includes('gemini') || modelName.includes('palm')) {
+    if (model.includes('1.5') || model.includes('pro')) {
+      return 8192; // Conservative estimate for Pro models
+    } else if (model.includes('1.0') || model.includes('flash')) {
+      return 4096; // Conservative estimate for Flash models
+    }
+  }
+
+  // Default fallback
+  return 4096;
+}
+
 export class GeminiClient {
   private chat?: GeminiChat;
   private readonly generateContentConfig: GenerateContentConfig = {
@@ -650,7 +671,22 @@ export class GeminiClient {
         : configModel;
 
     // Check if the model needs to be a fallback
+    const originalModel = model;
     model = getEffectiveModel(this.config.isInFallbackMode(), model);
+
+    // If model changed due to fallback, check if current context exceeds new model's limit
+    if (model !== originalModel) {
+      const currentTokenCount = await this.getContentGeneratorOrFail().countTokens({
+        model: originalModel, // Use original model for counting to avoid errors
+        contents: this.getChat().getHistory(true),
+      });
+
+      if (currentTokenCount.totalTokens && currentTokenCount.totalTokens > tokenLimit(model) * 0.9) {
+        // Context is too large for the new model, force compression
+        console.warn(`Model switched from ${originalModel} to ${model}, but context (${currentTokenCount.totalTokens}) exceeds new model's limit. Forcing compression.`);
+        return this.tryCompressChat(prompt_id, true, request); // Force compression
+      }
+    }
 
     const curatedHistory = this.getChat().getHistory(true);
 
@@ -718,6 +754,14 @@ export class GeminiClient {
     const historyToCompress = curatedHistory.slice(0, compressBeforeIndex);
     const historyToKeep = curatedHistory.slice(compressBeforeIndex);
 
+    // Calculate appropriate maxOutputTokens for compression
+    // Use a reasonable fraction of the model's output limit to avoid exceeding API limits
+    const modelOutputLimit = getModelOutputLimit(model);
+    const maxOutputTokensForCompression = Math.min(
+      Math.floor(modelOutputLimit * 0.8), // Use 80% of model's output limit
+      32000 // Cap at 32k tokens to be safe
+    );
+
     const summaryResponse = await this.config
       .getContentGenerator()
       .generateContent(
@@ -736,6 +780,7 @@ export class GeminiClient {
           ],
           config: {
             systemInstruction: { text: getCompressionPrompt() },
+            maxOutputTokens: maxOutputTokensForCompression,
           },
         },
         prompt_id,
