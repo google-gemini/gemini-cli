@@ -1,4 +1,4 @@
-# Welcome to Gemini CLI documentation
+# Welcome to Gemini CLI  documentation
 
 This documentation provides a comprehensive guide to installing, using, and developing Gemini CLI. This tool lets you interact with Gemini models through a command-line interface.
 
