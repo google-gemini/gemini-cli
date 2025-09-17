@@ -28,6 +28,7 @@ import {
   EVENT_CONTENT_RETRY_FAILURE,
   EVENT_FILE_OPERATION,
   EVENT_RIPGREP_FALLBACK,
+  EVENT_MODEL_ROUTING,
 } from './constants.js';
 import type {
   ApiErrorEvent,
@@ -41,6 +42,7 @@ import type {
   FlashFallbackEvent,
   NextSpeakerCheckEvent,
   LoopDetectedEvent,
+  LoopDetectionDisabledEvent,
   SlashCommandEvent,
   ConversationFinishedEvent,
   KittySequenceOverflowEvent,
@@ -51,6 +53,7 @@ import type {
   ContentRetryFailureEvent,
   RipgrepFallbackEvent,
   ToolOutputTruncatedEvent,
+  ModelRoutingEvent,
 } from './types.js';
 import {
   recordApiErrorMetrics,
@@ -62,6 +65,7 @@ import {
   recordInvalidChunk,
   recordContentRetry,
   recordContentRetryFailure,
+  recordModelRoutingMetrics,
 } from './metrics.js';
 import { isTelemetrySdkInitialized } from './sdk.js';
 import type { UiEvent } from './uiTelemetry.js';
@@ -441,6 +445,13 @@ export function logLoopDetected(
   logger.emit(logRecord);
 }
 
+export function logLoopDetectionDisabled(
+  config: Config,
+  _event: LoopDetectionDisabledEvent,
+): void {
+  ClearcutLogger.getInstance(config)?.logLoopDetectionDisabledEvent();
+}
+
 export function logNextSpeakerCheck(
   config: Config,
   event: NextSpeakerCheckEvent,
@@ -657,4 +668,26 @@ export function logContentRetryFailure(
   };
   logger.emit(logRecord);
   recordContentRetryFailure(config);
+}
+
+export function logModelRouting(
+  config: Config,
+  event: ModelRoutingEvent,
+): void {
+  ClearcutLogger.getInstance(config)?.logModelRoutingEvent(event);
+  if (!isTelemetrySdkInitialized()) return;
+
+  const attributes: LogAttributes = {
+    ...getCommonAttributes(config),
+    ...event,
+    'event.name': EVENT_MODEL_ROUTING,
+  };
+
+  const logger = logs.getLogger(SERVICE_NAME);
+  const logRecord: LogRecord = {
+    body: `Model routing decision. Model: ${event.decision_model}, Source: ${event.decision_source}`,
+    attributes,
+  };
+  logger.emit(logRecord);
+  recordModelRoutingMetrics(config, event);
 }

@@ -313,6 +313,18 @@ export class LoopDetectedEvent implements BaseTelemetryEvent {
   }
 }
 
+export class LoopDetectionDisabledEvent implements BaseTelemetryEvent {
+  'event.name': 'loop_detection_disabled';
+  'event.timestamp': string;
+  prompt_id: string;
+
+  constructor(prompt_id: string) {
+    this['event.name'] = 'loop_detection_disabled';
+    this['event.timestamp'] = new Date().toISOString();
+    this.prompt_id = prompt_id;
+  }
+}
+
 export class NextSpeakerCheckEvent implements BaseTelemetryEvent {
   'event.name': 'next_speaker_check';
   'event.timestamp': string;
@@ -514,6 +526,35 @@ export class ContentRetryFailureEvent implements BaseTelemetryEvent {
   }
 }
 
+export class ModelRoutingEvent implements BaseTelemetryEvent {
+  'event.name': 'model_routing';
+  'event.timestamp': string;
+  decision_model: string;
+  decision_source: string;
+  routing_latency_ms: number;
+  reasoning?: string;
+  failed: boolean;
+  error_message?: string;
+
+  constructor(
+    decision_model: string,
+    decision_source: string,
+    routing_latency_ms: number,
+    reasoning: string | undefined,
+    failed: boolean,
+    error_message: string | undefined,
+  ) {
+    this['event.name'] = 'model_routing';
+    this['event.timestamp'] = new Date().toISOString();
+    this.decision_model = decision_model;
+    this.decision_source = decision_source;
+    this.routing_latency_ms = routing_latency_ms;
+    this.reasoning = reasoning;
+    this.failed = failed;
+    this.error_message = error_message;
+  }
+}
+
 export type TelemetryEvent =
   | StartSessionEvent
   | EndSessionEvent
@@ -524,6 +565,7 @@ export type TelemetryEvent =
   | ApiResponseEvent
   | FlashFallbackEvent
   | LoopDetectedEvent
+  | LoopDetectionDisabledEvent
   | NextSpeakerCheckEvent
   | KittySequenceOverflowEvent
   | MalformedJsonResponseEvent
@@ -536,6 +578,7 @@ export type TelemetryEvent =
   | ContentRetryFailureEvent
   | ExtensionInstallEvent
   | ExtensionUninstallEvent
+  | ModelRoutingEvent
   | ToolOutputTruncatedEvent;
 
 export class ExtensionInstallEvent implements BaseTelemetryEvent {

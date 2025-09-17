@@ -19,8 +19,11 @@ import {
   METRIC_INVALID_CHUNK_COUNT,
   METRIC_CONTENT_RETRY_COUNT,
   METRIC_CONTENT_RETRY_FAILURE_COUNT,
+  METRIC_MODEL_ROUTING_LATENCY,
+  METRIC_MODEL_ROUTING_FAILURE_COUNT,
 } from './constants.js';
 import type { Config } from '../config/config.js';
+import type { ModelRoutingEvent } from './types.js';
 
 export enum FileOperation {
   CREATE = 'create',
@@ -39,6 +42,8 @@ let chatCompressionCounter: Counter | undefined;
 let invalidChunkCounter: Counter | undefined;
 let contentRetryCounter: Counter | undefined;
 let contentRetryFailureCounter: Counter | undefined;
+let modelRoutingLatencyHistogram: Histogram | undefined;
+let modelRoutingFailureCounter: Counter | undefined;
 let isMetricsInitialized = false;
 
 function getCommonAttributes(config: Config): Attributes {
@@ -107,6 +112,21 @@ export function initializeMetrics(config: Config): void {
     METRIC_CONTENT_RETRY_FAILURE_COUNT,
     {
       description: 'Counts occurrences of all content retries failing.',
+      valueType: ValueType.INT,
+    },
+  );
+  modelRoutingLatencyHistogram = meter.createHistogram(
+    METRIC_MODEL_ROUTING_LATENCY,
+    {
+      description: 'Latency of model routing decisions in milliseconds.',
+      unit: 'ms',
+      valueType: ValueType.INT,
+    },
+  );
+  modelRoutingFailureCounter = meter.createCounter(
+    METRIC_MODEL_ROUTING_FAILURE_COUNT,
+    {
+      description: 'Counts model routing failures.',
       valueType: ValueType.INT,
     },
   );
@@ -265,4 +285,30 @@ export function recordContentRetry(config: Config): void {
 export function recordContentRetryFailure(config: Config): void {
   if (!contentRetryFailureCounter || !isMetricsInitialized) return;
   contentRetryFailureCounter.add(1, getCommonAttributes(config));
+}
+
+export function recordModelRoutingMetrics(
+  config: Config,
+  event: ModelRoutingEvent,
+): void {
+  if (
+    !modelRoutingLatencyHistogram ||
+    !modelRoutingFailureCounter ||
+    !isMetricsInitialized
+  )
+    return;
+
+  modelRoutingLatencyHistogram.record(event.routing_latency_ms, {
+    ...getCommonAttributes(config),
+    'routing.decision_model': event.decision_model,
+    'routing.decision_source': event.decision_source,
+  });
+
+  if (event.failed) {
+    modelRoutingFailureCounter.add(1, {
+      ...getCommonAttributes(config),
+      'routing.decision_source': event.decision_source,
+      'routing.error_message': event.error_message,
+    });
+  }
 }

@@ -43,11 +43,9 @@ import { ideContextStore } from '../ide/ideContext.js';
 import {
   logChatCompression,
   logNextSpeakerCheck,
-  logMalformedJsonResponse,
 } from '../telemetry/loggers.js';
 import {
   makeChatCompressionEvent,
-  MalformedJsonResponseEvent,
   NextSpeakerCheckEvent,
 } from '../telemetry/types.js';
 import type { IdeContext, File } from '../ide/types.js';
@@ -565,126 +563,6 @@ export class GeminiClient {
       }
     }
     return turn;
-  }
-
-  async generateJson(
-    contents: Content[],
-    schema: Record<string, unknown>,
-    abortSignal: AbortSignal,
-    model: string,
-    config: GenerateContentConfig = {},
-  ): Promise<Record<string, unknown>> {
-    let currentAttemptModel: string = model;
-
-    try {
-      const userMemory = this.config.getUserMemory();
-      const systemInstruction = getCoreSystemPrompt(userMemory);
-      const requestConfig = {
-        abortSignal,
-        ...this.generateContentConfig,
-        ...config,
-      };
-
-      const apiCall = () => {
-        const modelToUse = this.config.isInFallbackMode()
-          ? DEFAULT_GEMINI_FLASH_MODEL
-          : model;
-        currentAttemptModel = modelToUse;
-
-        return this.getContentGeneratorOrFail().generateContent(
-          {
-            model: modelToUse,
-            config: {
-              ...requestConfig,
-              systemInstruction,
-              responseJsonSchema: schema,
-              responseMimeType: 'application/json',
-            },
-            contents,
-          },
-          this.lastPromptId,
-        );
-      };
-
-      const onPersistent429Callback = async (
-        authType?: string,
-        error?: unknown,
-      ) =>
-        // Pass the captured model to the centralized handler.
-        await handleFallback(this.config, currentAttemptModel, authType, error);
-
-      const result = await retryWithBackoff(apiCall, {
-        onPersistent429: onPersistent429Callback,
-        authType: this.config.getContentGeneratorConfig()?.authType,
-      });
-
-      let text = getResponseText(result);
-      if (!text) {
-        const error = new Error(
-          'API returned an empty response for generateJson.',
-        );
-        await reportError(
-          error,
-          'Error in generateJson: API returned an empty response.',
-          contents,
-          'generateJson-empty-response',
-        );
-        throw error;
-      }
-
-      const prefix = '```json';
-      const suffix = '```';
-      if (text.startsWith(prefix) && text.endsWith(suffix)) {
-        logMalformedJsonResponse(
-          this.config,
-          new MalformedJsonResponseEvent(currentAttemptModel),
-        );
-        text = text
-          .substring(prefix.length, text.length - suffix.length)
-          .trim();
-      }
-
-      try {
-        return JSON.parse(text);
-      } catch (parseError) {
-        await reportError(
-          parseError,
-          'Failed to parse JSON response from generateJson.',
-          {
-            responseTextFailedToParse: text,
-            originalRequestContents: contents,
-          },
-          'generateJson-parse',
-        );
-        throw new Error(
-          `Failed to parse API response as JSON: ${getErrorMessage(
-            parseError,
-          )}`,
-        );
-      }
-    } catch (error) {
-      if (abortSignal.aborted) {
-        throw error;
-      }
-
-      // Avoid double reporting for the empty response case handled above
-      if (
-        error instanceof Error &&
-        error.message === 'API returned an empty response for generateJson.'
-      ) {
-        throw error;
-      }
-
-      await reportError(
-        error,
-        'Error generating JSON content via API.',
-        contents,
-        'generateJson-api',
-      );
-      throw new Error(
-        `Failed to generate JSON content: ${getErrorMessage(error)}`,
-      );
-    }
   }
 
   async generateContent(

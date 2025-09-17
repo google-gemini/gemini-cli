@@ -16,7 +16,11 @@ import { spawn } from 'node:child_process';
 import { RELAUNCH_EXIT_CODE } from './utils/processUtils.js';
 import { start_sandbox } from './utils/sandbox.js';
 import type { DnsResolutionOrder, LoadedSettings } from './config/settings.js';
-import { loadSettings, SettingScope } from './config/settings.js';
+import {
+  loadSettings,
+  migrateDeprecatedSettings,
+  SettingScope,
+} from './config/settings.js';
 import { themeManager } from './ui/themes/theme-manager.js';
 import { getStartupWarnings } from './utils/startupWarnings.js';
 import { getUserStartupWarnings } from './utils/userStartupWarnings.js';
@@ -35,7 +39,6 @@ import {
   logUserPrompt,
   AuthType,
   getOauthClient,
-  uiTelemetryService,
 } from '@google/gemini-cli-core';
 import {
   initializeApp,
@@ -49,7 +52,7 @@ import { checkForUpdates } from './ui/utils/updateCheck.js';
 import { handleAutoUpdate } from './utils/handleAutoUpdate.js';
 import { appEvents, AppEvent } from './utils/events.js';
 import { SettingsContext } from './ui/contexts/SettingsContext.js';
-import { writeFileSync } from 'node:fs';
+
 import { SessionStatsProvider } from './ui/contexts/SessionContext.js';
 import { VimModeProvider } from './ui/contexts/VimModeContext.js';
 import { KeypressProvider } from './ui/contexts/KeypressContext.js';
@@ -103,6 +106,7 @@ function getNodeMemoryArgs(config: Config): string[] {
   return [];
 }
 
+
 // Constants for restart functionality
 const MAX_RESTARTS = 10;
 
@@ -112,6 +116,7 @@ async function relaunchAppInChildProcess(additionalArgs: string[] = []) {
   while (restartCount < MAX_RESTARTS) {
     const nodeArgs = [...additionalArgs, ...process.argv.slice(1)];
     const newEnv = { ...process.env, GEMINI_CLI_NO_RELAUNCH: 'true' };
+
 
     const child = spawn(process.execPath, nodeArgs, {
       stdio: 'inherit',
@@ -145,6 +150,7 @@ async function relaunchAppInChildProcess(additionalArgs: string[] = []) {
   // If we've exceeded max restarts, exit with error
   console.error(`Maximum restart attempts (${MAX_RESTARTS}) exceeded. Exiting.`);
   process.exit(1);
+
 }
 
 import { runZedIntegration } from './zed-integration/zedIntegration.js';
@@ -229,7 +235,7 @@ export async function startInteractiveUI(
 export async function main() {
   setupUnhandledRejectionHandler();
   const settings = loadSettings();
-
+  migrateDeprecatedSettings(settings);
   await cleanupCheckpoints();
 
   const argv = await parseArguments(settings.merged);
@@ -241,9 +247,17 @@ export async function main() {
     argv,
   );
 
+  // Check for invalid input combinations early to prevent crashes
+  if (argv.promptInteractive && !process.stdin.isTTY) {
+    console.error(
+      'Error: The --prompt-interactive flag cannot be used when input is piped from stdin.',
+    );
+    process.exit(1);
+  }
+
   const wasRaw = process.stdin.isRaw;
   let kittyProtocolDetectionComplete: Promise<boolean> | undefined;
-  if (config.isInteractive() && !wasRaw) {
+  if (config.isInteractive() && !wasRaw && process.stdin.isTTY) {
     // Set this as early as possible to avoid spurious characters from
     // input showing up in the output.
     process.stdin.setRawMode(true);
@@ -259,15 +273,6 @@ export async function main() {
     // Detect and enable Kitty keyboard protocol once at startup.
     kittyProtocolDetectionComplete = detectAndEnableKittyProtocol();
   }
-  if (argv.sessionSummary) {
-    registerCleanup(() => {
-      const metrics = uiTelemetryService.getMetrics();
-      writeFileSync(
-        argv.sessionSummary!,
-        JSON.stringify({ sessionMetrics: metrics }, null, 2),
-      );
-    });
-  }
 
   const consolePatcher = new ConsolePatcher({
     stderr: true,
@@ -279,13 +284,6 @@ export async function main() {
   dns.setDefaultResultOrder(
     validateDnsResolutionOrder(settings.merged.advanced?.dnsResolutionOrder),
   );
-
-  if (argv.promptInteractive && !process.stdin.isTTY) {
-    console.error(
-      'Error: The --prompt-interactive flag is not supported when piping input from stdin.',
-    );
-    process.exit(1);
-  }
 
   if (config.getListExtensions()) {
     console.log('Installed extensions:');
