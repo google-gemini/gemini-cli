@@ -12,6 +12,7 @@
       ],
       "dependencies": {
         "@joshua.litt/get-ripgrep": "^0.0.2",
+        "@types/comment-json": "^2.4.1",
         "comment-json": "^4.2.5",
         "simple-git": "^3.28.0"
       },
@@ -3798,6 +3799,15 @@
       "integrity": "sha512-PpbaE2XWLaWYboXD6k70TcXO/OdOyyRFq5TVpmlUELNxdkkmXU9fkImNosmXU1DtsNrqdUgWd/nJQYXgwmtdXQ==",
       "dev": true,
       "license": "MIT"
+    },
+    "node_modules/@types/comment-json": {
+      "version": "2.4.1",
+      "resolved": "https://registry.npmjs.org/@types/comment-json/-/comment-json-2.4.1.tgz",
+      "integrity": "sha512-1JMxFOHxKTmUd9j5o3C+Yg9RzUWjSZLUWnil6H4zxdEABGRuxVL2HxO4pCL450uSbkK7VChcbtcZd1FbZTxnDQ==",
+      "license": "MIT",
+      "dependencies": {
+        "comment-json": "*"
+      }
     },
     "node_modules/@types/configstore": {
       "version": "6.0.2",

@@ -16,12 +16,11 @@ import { spawn } from 'node:child_process';
 import { RELAUNCH_EXIT_CODE } from './utils/processUtils.js';
 import { start_sandbox } from './utils/sandbox.js';
 import type { DnsResolutionOrder, LoadedSettings } from './config/settings.js';
-import type { Config } from './config/settings';
 import {
   loadSettings,
   migrateDeprecatedSettings,
   SettingScope,
-} from './config/settings';
+} from './config/settings.js';
 import { themeManager } from './ui/themes/theme-manager.js';
 import { getStartupWarnings } from './utils/startupWarnings.js';
 import { getUserStartupWarnings } from './utils/userStartupWarnings.js';
