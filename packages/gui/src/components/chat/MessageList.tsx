@@ -9,8 +9,6 @@ import { useVirtualizer } from '@tanstack/react-virtual';
 import type React from 'react';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import remarkMath from 'remark-math';
-import rehypeKatex from 'rehype-katex';
 import rehypeHighlight from 'rehype-highlight';
 import { format } from 'date-fns';
 import { Bot, User, AlertCircle, ChevronDown, ChevronRight, BookTemplate, Play, CheckSquare, Target, Brain, FileText, Activity, ListTodo } from 'lucide-react';
@@ -18,17 +16,12 @@ import { cn } from '@/utils/cn';
 import { Card, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { TypingIndicator } from './TypingIndicator';
+import { MarkdownRenderer } from './MarkdownRenderer';
 import ToolConfirmationMessage from './ToolConfirmationMessage';
 import { multiModelService } from '@/services/multiModelService';
 import type { ChatMessage, ToolCallConfirmationDetails, ToolConfirmationOutcome, ToolCall } from '@/types';
 import 'katex/dist/katex.min.css';
 
-interface CodeComponentProps {
-  inline?: boolean;
-  className?: string;
-  children?: React.ReactNode;
-  [key: string]: any;
-}
 
 
 // React Markdown component props interface
@@ -940,31 +933,31 @@ const StateSnapshotDisplay: React.FC<{ stateSnapshot: ParsedStateSnapshot }> = (
 
   const getColorClasses = (color: string) => {
     const colors = {
-      blue: 'border-blue-200/50 dark:border-blue-700/30 bg-blue-50/30 dark:bg-blue-900/10',
-      purple: 'border-purple-200/50 dark:border-purple-700/30 bg-purple-50/30 dark:bg-purple-900/10',
-      green: 'border-green-200/50 dark:border-green-700/30 bg-green-50/30 dark:bg-green-900/10',
-      orange: 'border-orange-200/50 dark:border-orange-700/30 bg-orange-50/30 dark:bg-orange-900/10',
-      red: 'border-red-200/50 dark:border-red-700/30 bg-red-50/30 dark:bg-red-900/10'
+      blue: 'border-border/60 bg-muted/30',
+      purple: 'border-border/60 bg-muted/30',
+      green: 'border-border/60 bg-muted/30',
+      orange: 'border-border/60 bg-muted/30',
+      red: 'border-border/60 bg-muted/30'
     };
     return colors[color as keyof typeof colors] || colors.blue;
   };
 
   return (
     <div className="mb-3">
-      <div className="bg-gradient-to-r from-muted/30 to-muted/10 rounded-lg border border-border/50 overflow-hidden">
+      <div className="bg-card rounded-lg border border-border shadow-sm overflow-hidden">
         {/* State snapshot header */}
-        <div className="flex items-center justify-between p-3 bg-muted/40 border-b border-border/30">
+        <div className="flex items-center justify-between p-4 bg-muted/50 border-b border-border">
           <div className="flex items-center gap-3">
-            <div className="flex items-center gap-1 text-xs font-bold text-foreground/80 border border-border/50 rounded px-2 py-1">
-              <Brain size={10} />
+            <div className="flex items-center gap-2 text-xs font-medium text-foreground/90 bg-secondary/50 border border-border rounded-md px-3 py-1.5">
+              <Brain size={12} />
               <span>State Snapshot</span>
             </div>
-            <span className="text-xs text-muted-foreground font-medium">Agent Memory</span>
+            <span className="text-sm text-muted-foreground font-medium">Agent Memory</span>
           </div>
         </div>
 
         {/* Sections */}
-        <div className="p-3 space-y-2">
+        <div className="p-4 space-y-3">
           {sections.map((section) => {
             const hasContent = Array.isArray(section.content) ? section.content.length > 0 : Boolean(section.content);
             if (!hasContent) return null;
@@ -972,34 +965,40 @@ const StateSnapshotDisplay: React.FC<{ stateSnapshot: ParsedStateSnapshot }> = (
             const expanded = isExpanded(section.key);
 
             return (
-              <div key={section.key} className={cn("rounded-md border overflow-hidden", getColorClasses(section.color))}>
+              <div key={section.key} className={cn("rounded-md border overflow-hidden bg-card shadow-sm", getColorClasses(section.color))}>
                 <button
                   onClick={() => toggleSection(section.key)}
-                  className="w-full px-3 py-2 text-left flex items-center justify-between hover:bg-background/30 transition-colors"
+                  className="w-full px-4 py-3 text-left flex items-center justify-between hover:bg-muted/40 transition-colors"
                 >
                   <div className="flex items-center gap-2">
-                    {section.icon}
+                    <div className="text-muted-foreground">
+                      {section.icon}
+                    </div>
                     <span className="font-medium text-sm text-foreground">{section.title}</span>
                     {Array.isArray(section.content) && (
-                      <span className="text-xs text-muted-foreground">({section.content.length})</span>
+                      <span className="text-xs text-muted-foreground bg-secondary/50 px-2 py-0.5 rounded-full">
+                        {section.content.length}
+                      </span>
                     )}
                   </div>
-                  {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                  <div className="text-muted-foreground">
+                    {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                  </div>
                 </button>
 
                 {expanded && (
-                  <div className="border-t border-border/20 bg-background/20 px-3 py-2">
+                  <div className="border-t border-border bg-muted/20 px-4 py-3">
                     {Array.isArray(section.content) ? (
-                      <ul className="space-y-1">
+                      <ul className="space-y-2">
                         {section.content.map((item, index) => (
-                          <li key={index} className="text-sm text-foreground/80 flex items-start gap-2">
-                            <span className="text-muted-foreground mt-1">•</span>
-                            <span className="font-mono text-xs leading-relaxed">{item}</span>
+                          <li key={index} className="text-sm text-foreground/90 flex items-start gap-3">
+                            <span className="text-muted-foreground mt-0.5 text-xs">•</span>
+                            <span className="font-mono text-xs leading-relaxed flex-1">{item}</span>
                           </li>
                         ))}
                       </ul>
                     ) : (
-                      <div className="text-sm text-foreground/80 font-medium">{section.content}</div>
+                      <div className="text-sm text-foreground/90 font-medium">{section.content}</div>
                     )}
                   </div>
                 )}
@@ -1087,37 +1086,11 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isStreaming, onS
 
                         {/* Show main content */}
                         {contentWithoutSnapshot && (
-                          <div className={cn(
-                            "prose prose-sm max-w-none",
-                            isUser ? "prose-invert" : "",
-                            "prose-pre:bg-muted prose-pre:text-foreground",
-                            "prose-code:bg-muted prose-code:text-foreground prose-code:px-1 prose-code:rounded"
-                          )}>
-                            <Markdown
-                              remarkPlugins={[remarkGfm, remarkMath]}
-                              rehypePlugins={[rehypeKatex, rehypeHighlight]}
-                              components={{
-                                code(props: CodeComponentProps) {
-                                  const { inline, className, children, ...rest } = props;
-                                  const match = /language-(\w+)/.exec(className || '');
-                                  const content = String(children).replace(/\n$/, '');
-                                  return !inline && match ? (
-                                    <pre className="overflow-x-auto">
-                                      <code className={className} {...rest}>
-                                        {content}
-                                      </code>
-                                    </pre>
-                                  ) : (
-                                    <code className={cn("px-1 py-0.5 rounded text-sm", className)} {...rest}>
-                                      {content}
-                                    </code>
-                                  );
-                                },
-                              }}
-                            >
-                              {contentWithoutSnapshot}
-                            </Markdown>
-                          </div>
+                          <MarkdownRenderer
+                            content={contentWithoutSnapshot}
+                            className="px-3 py-2"
+                            isUserMessage={false}
+                          />
                         )}
                       </>
                     );
@@ -1135,37 +1108,11 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isStreaming, onS
 
                         {/* Show main content only if there's content left after removing state_snapshot */}
                         {contentWithoutSnapshot && (
-                          <div className={cn(
-                            "prose prose-sm max-w-none",
-                            isUser ? "prose-invert" : "",
-                            "prose-pre:bg-muted prose-pre:text-foreground",
-                            "prose-code:bg-muted prose-code:text-foreground prose-code:px-1 prose-code:rounded"
-                          )}>
-                            <Markdown
-                              remarkPlugins={[remarkGfm, remarkMath]}
-                              rehypePlugins={[rehypeKatex, rehypeHighlight]}
-                              components={{
-                                code(props: CodeComponentProps) {
-                                  const { inline, className, children, ...rest } = props;
-                                  const match = /language-(\w+)/.exec(className || '');
-                                  const content = String(children).replace(/\n$/, '');
-                                  return !inline && match ? (
-                                    <pre className="overflow-x-auto">
-                                      <code className={className} {...rest}>
-                                        {content}
-                                      </code>
-                                    </pre>
-                                  ) : (
-                                    <code className={cn("px-1 py-0.5 rounded text-sm", className)} {...rest}>
-                                      {content}
-                                    </code>
-                                  );
-                                },
-                              }}
-                            >
-                              {contentWithoutSnapshot}
-                            </Markdown>
-                          </div>
+                          <MarkdownRenderer
+                            content={contentWithoutSnapshot}
+                            className="px-3 py-2"
+                            isUserMessage={isUser}
+                          />
                         )}
                       </>
                     );
