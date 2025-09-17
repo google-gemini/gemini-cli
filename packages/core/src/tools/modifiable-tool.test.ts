@@ -13,7 +13,7 @@ import {
   modifyWithEditor,
   isModifiableDeclarativeTool,
 } from './modifiable-tool.js';
-import type { EditorType } from '../utils/editor.js';
+import { DEFAULT_GUI_EDITOR } from '../utils/editor.js';
 import fs from 'node:fs';
 import fsp from 'node:fs/promises';
 import os from 'node:os';
@@ -94,7 +94,7 @@ describe('modifyWithEditor', () => {
       const result = await modifyWithEditor(
         mockParams,
         mockModifyContext,
-        'vscode' as EditorType,
+        DEFAULT_GUI_EDITOR,
         abortSignal,
         vi.fn(),
       );
@@ -149,7 +149,7 @@ describe('modifyWithEditor', () => {
       await modifyWithEditor(
         mockParams,
         mockModifyContext,
-        'vscode' as EditorType,
+        DEFAULT_GUI_EDITOR,
         abortSignal,
         vi.fn(),
       );
@@ -167,7 +167,7 @@ describe('modifyWithEditor', () => {
       await modifyWithEditor(
         mockParams,
         mockModifyContext,
-        'vscode' as EditorType,
+        DEFAULT_GUI_EDITOR,
         abortSignal,
         vi.fn(),
       );
@@ -186,7 +186,7 @@ describe('modifyWithEditor', () => {
     const result = await modifyWithEditor(
       mockParams,
       mockModifyContext,
-      'vscode' as EditorType,
+      DEFAULT_GUI_EDITOR,
       abortSignal,
       vi.fn(),
     );
@@ -215,7 +215,7 @@ describe('modifyWithEditor', () => {
     const result = await modifyWithEditor(
       mockParams,
       mockModifyContext,
-      'vscode' as EditorType,
+      DEFAULT_GUI_EDITOR,
       abortSignal,
       vi.fn(),
     );
@@ -246,7 +246,7 @@ describe('modifyWithEditor', () => {
       modifyWithEditor(
         mockParams,
         mockModifyContext,
-        'vscode' as EditorType,
+        DEFAULT_GUI_EDITOR,
         abortSignal,
         vi.fn(),
       ),
@@ -273,7 +273,7 @@ describe('modifyWithEditor', () => {
     await modifyWithEditor(
       mockParams,
       mockModifyContext,
-      'vscode' as EditorType,
+      DEFAULT_GUI_EDITOR,
       abortSignal,
       vi.fn(),
     );
@@ -297,7 +297,7 @@ describe('modifyWithEditor', () => {
     await modifyWithEditor(
       mockParams,
       mockModifyContext,
-      'vscode' as EditorType,
+      DEFAULT_GUI_EDITOR,
       abortSignal,
       vi.fn(),
     );
@@ -319,7 +319,7 @@ describe('modifyWithEditor', () => {
     await modifyWithEditor(
       mockParams,
       mockModifyContext,
-      'vscode' as EditorType,
+      DEFAULT_GUI_EDITOR,
       abortSignal,
       vi.fn(),
     );
