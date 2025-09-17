@@ -1,4 +1,4 @@
-description = "Go back to main and clean up the branch."
+description = "Go back to main and clean up the branch." 
 
 prompt = """
 I'm done with the work on this branch, and I'm ready to go back to main and clean up.
