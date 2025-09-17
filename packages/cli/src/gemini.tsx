@@ -107,9 +107,12 @@ function getNodeMemoryArgs(config: Config): string[] {
 }
 
 async function relaunchAppInChildProcess(additionalArgs: string[]) {
+  if (process.env['GEMINI_CLI_NO_RELAUNCH']) {
+    return;
+  }
   while (true) {
     const nodeArgs = [...additionalArgs, ...process.argv.slice(1)];
-      const newEnv = { ...process.env, GEMINI_CLI_NO_RELAUNCH: 'true' };
+    const newEnv = { ...process.env, GEMINI_CLI_NO_RELAUNCH: 'true' };
 
     // The parent process should not be reading from stdin while the child is running.
     process.stdin.pause();
@@ -122,13 +125,18 @@ async function relaunchAppInChildProcess(additionalArgs: string[]) {
     try {
       const exitCode = await new Promise<number>((resolve, reject) => {
         child.on('error', reject);
-        child.on('close', (code) => resolve(code ?? 1));
+        child.on('close', (code) => {
+          // Resume stdin before the parent process exits.
+          process.stdin.resume();
+          resolve(code ?? 1);
+        });
       });
 
       if (exitCode !== RELAUNCH_EXIT_CODE) {
         process.exit(exitCode);
       }
     } catch (error) {
+      process.stdin.resume();
       console.error('Fatal error: Failed to relaunch the CLI process.', error);
       process.exit(1);
     }
@@ -359,12 +367,9 @@ export async function main() {
       await start_sandbox(sandboxConfig, memoryArgs, config, sandboxArgs);
       process.exit(0);
     } else {
-      // Not in a sandbox and not entering one, so relaunch with additional
-      // arguments to control memory usage if needed.
-      if (memoryArgs.length > 0) {
-        await relaunchAppInChildProcess(memoryArgs);
-        // Note: relaunchAppInChildProcess never returns, so this line is unreachable
-      }
+      // Relaunch app so we always have a child process that can be internally
+      // restarted if needed.
+      await relaunchAppInChildProcess(memoryArgs);
     }
   }
 
