@@ -33,6 +33,7 @@ vi.mock('ink', async (importOriginal) => {
   return {
     ...actual,
     useStdout: () => ({ stdout: mockStdout }),
+    measureElement: vi.fn(),
   };
 });
 
@@ -49,14 +50,6 @@ function TestContextConsumer() {
 vi.mock('./App.js', () => ({
   App: TestContextConsumer,
 }));
-
-vi.mock('ink', async (importOriginal) => {
-  const original = await importOriginal<typeof import('ink')>();
-  return {
-    ...original,
-    measureElement: vi.fn(),
-  };
-});
 
 vi.mock('./hooks/useQuotaAndFallback.js');
 vi.mock('./hooks/useHistoryManager.js');
@@ -957,7 +950,7 @@ describe('AppContainer State Management', () => {
       // Arrange: Simulate a small terminal and a large footer
       mockedUseTerminalSize.mockReturnValue({ columns: 80, rows: 5 });
       mockedMeasureElement.mockReturnValue({ width: 80, height: 10 }); // Footer is taller than the screen
-      
+
       mockedUseGeminiStream.mockReturnValue({
         streamingState: 'idle',
         submitQuery: vi.fn(),
