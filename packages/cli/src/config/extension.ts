@@ -307,7 +307,7 @@ export function annotateActiveExtensions(
       version: extension.config.version,
       isActive: manager.isEnabled(extension.config.name, workspaceDir),
       path: extension.path,
-      installMetadata: loadInstallMetadata(extension.path),
+      installMetadata: extension.installMetadata,
     }));
   }
 
@@ -324,7 +324,7 @@ export function annotateActiveExtensions(
       version: extension.config.version,
       isActive: false,
       path: extension.path,
-      installMetadata: loadInstallMetadata(extension.path),
+      installMetadata: extension.installMetadata,
     }));
   }
 
@@ -343,7 +343,7 @@ export function annotateActiveExtensions(
       version: extension.config.version,
       isActive,
       path: extension.path,
-      installMetadata: loadInstallMetadata(extension.path),
+      installMetadata: extension.installMetadata,
     });
   }
 
