@@ -454,7 +454,7 @@ describe('GeminiChat', () => {
         'This is the visible text that should not be lost.',
       );
     });
-    it('should add a placeholder model turn when a tool call is followed by an empty stream response', async () => {
+    it('should throw an error when a tool call is followed by an empty stream response', async () => {
       // 1. Setup: A history where the model has just made a function call.
       const initialHistory: Content[] = [
         {
@@ -503,23 +503,15 @@ describe('GeminiChat', () => {
         },
         'prompt-id-stream-1',
       );
-      for await (const _ of stream) {
-        // This loop consumes the stream to trigger the internal logic.
-      }
 
-      // 4. Assert: The history should now have four valid, alternating turns.
-      const history = chat.getHistory();
-      expect(history.length).toBe(4);
-
-      // The final turn must be the empty model placeholder.
-      const lastTurn = history[3]!;
-      expect(lastTurn.role).toBe('model');
-      expect(lastTurn?.parts?.length).toBe(0);
-
-      // The second-to-last turn must be the function response we sent.
-      const secondToLastTurn = history[2]!;
-      expect(secondToLastTurn.role).toBe('user');
-      expect(secondToLastTurn?.parts![0]!.functionResponse).toBeDefined();
+      // 4. Assert: The stream processing should throw an EmptyStreamError.
+      await expect(
+        (async () => {
+          for await (const _ of stream) {
+            // This loop consumes the stream to trigger the internal logic.
+          }
+        })(),
+      ).rejects.toThrow(EmptyStreamError);
     });
 
     it('should call generateContentStream with the correct parameters', async () => {
