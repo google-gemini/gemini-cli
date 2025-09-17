@@ -23,6 +23,8 @@ import { UserAccountManager } from '../utils/userAccountManager.js';
 import { AuthType } from '../core/contentGenerator.js';
 import readline from 'node:readline';
 import { Storage } from '../config/storage.js';
+import { OAuthCredentialStorage } from './oauth-credential-storage.js';
+import { FORCE_ENCRYPTED_FILE_ENV_VAR } from '../mcp/token-storage/index.js';
 
 const userAccountManager = new UserAccountManager();
 
@@ -63,6 +65,10 @@ export interface OauthWebLogin {
 
 const oauthClientPromises = new Map<AuthType, Promise<OAuth2Client>>();
 
+function getUseEncryptedStorageFlag() {
+  return process.env[FORCE_ENCRYPTED_FILE_ENV_VAR] === 'true';
+}
+
 async function initOauthClient(
   authType: AuthType,
   config: Config,
@@ -74,6 +80,7 @@ async function initOauthClient(
       proxy: config.getProxy(),
     },
   });
+  const useEncryptedStorage = getUseEncryptedStorageFlag();
 
   if (
     process.env['GOOGLE_GENAI_USE_GCA'] &&
@@ -87,7 +94,11 @@ async function initOauthClient(
   }
 
   client.on('tokens', async (tokens: Credentials) => {
-    await cacheCredentials(tokens);
+    if (useEncryptedStorage) {
+      await OAuthCredentialStorage.saveCredentials(tokens);
+    } else {
+      await cacheCredentials(tokens);
+    }
   });
 
   // If there are cached creds on disk, they always take precedence
@@ -419,6 +430,16 @@ export function getAvailablePort(): Promise<number> {
 }
 
 async function loadCachedCredentials(client: OAuth2Client): Promise<boolean> {
+  const useEncryptedStorage = getUseEncryptedStorageFlag();
+  if (useEncryptedStorage) {
+    const credentials = await OAuthCredentialStorage.loadCredentials();
+    if (credentials) {
+      client.setCredentials(credentials);
+      return true;
+    }
+    return false;
+  }
+
   const pathsToTry = [
     Storage.getOAuthCredsPath(),
     process.env['GOOGLE_APPLICATION_CREDENTIALS'],
@@ -470,7 +491,12 @@ export function clearOauthClientCache() {
 
 export async function clearCachedCredentialFile() {
   try {
-    await fs.rm(Storage.getOAuthCredsPath(), { force: true });
+    const useEncryptedStorage = getUseEncryptedStorageFlag();
+    if (useEncryptedStorage) {
+      await OAuthCredentialStorage.clearCredentials();
+    } else {
+      await fs.rm(Storage.getOAuthCredsPath(), { force: true });
+    }
     // Clear the Google Account ID cache when credentials are cleared
     await userAccountManager.clearCachedGoogleAccount();
     // Clear the in-memory OAuth client cache to force re-authentication

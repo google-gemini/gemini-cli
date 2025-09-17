@@ -19,7 +19,7 @@ inputs:
     required: true
   dry-run:
     description: 'Whether to run in dry-run mode.'
-    type: 'boolean'
+    type: 'string'
     required: true
   release-tag:
     description: 'The release tag for the release (e.g., v0.1.11).'
@@ -35,14 +35,19 @@ inputs:
 runs:
   using: 'composite'
   steps:
-    - name: 'Configure Git User'
+    - name: '📝 Print Inputs'
+      shell: 'bash'
+      run: |
+        echo "${{ toJSON(inputs) }}"
+
+    - name: '👤 Configure Git User'
       working-directory: '${{ inputs.working-directory }}'
       shell: 'bash'
-      run: |-
+      run: |
         git config user.name "gemini-cli-robot"
         git config user.email "gemini-cli-robot@google.com"
 
-    - name: 'Create and switch to a release branch'
+    - name: '🌿 Create and switch to a release branch'
       working-directory: '${{ inputs.working-directory }}'
       id: 'release_branch'
       shell: 'bash'
@@ -51,20 +56,27 @@ runs:
         git switch -c "${BRANCH_NAME}"
         echo "BRANCH_NAME=${BRANCH_NAME}" >> "${GITHUB_OUTPUT}"
 
-    - name: 'Update package versions'
+    - name: '⬆️ Update package versions'
       working-directory: '${{ inputs.working-directory }}'
       shell: 'bash'
-      run: 'npm run release:version "${{ inputs.release-version }}"'
+      run: |
+        npm run release:version "${{ inputs.release-version }}"
 
-    - name: 'Commit and Conditionally Push package versions'
+    - name: '💾 Commit and Conditionally Push package versions'
       working-directory: '${{ inputs.working-directory }}'
       shell: 'bash'
       env:
         BRANCH_NAME: '${{ steps.release_branch.outputs.BRANCH_NAME }}'
         DRY_RUN: '${{ inputs.dry-run }}'
         RELEASE_TAG: '${{ inputs.release-tag }}'
-      run: |-
-        git add package.json npm-shrinkwrap.json packages/*/package.json
+      run: |
+        git add package.json packages/*/package.json
+        if [ -f npm-shrinkwrap.json ]; then
+          git add npm-shrinkwrap.json
+        fi
+        if [ -f package-lock.json ]; then
+          git add package-lock.json
+        fi
         git commit -m "chore(release): ${RELEASE_TAG}"
         if [[ "${DRY_RUN}" == "false" ]]; then
           echo "Pushing release branch to remote..."
@@ -73,12 +85,12 @@ runs:
           echo "Dry run enabled. Skipping push."
         fi
 
-    - name: 'Build and Prepare Packages'
+    - name: '🛠️ Build and Prepare Packages'
       working-directory: '${{ inputs.working-directory }}'
-      run: |-
+      shell: 'bash'
+      run: |
         npm run build:packages
         npm run prepare:package
-      shell: 'bash'
 
     - name: 'Configure npm for publishing'
       uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020'
@@ -87,66 +99,53 @@ runs:
         registry-url: 'https://wombat-dressing-room.appspot.com'
         scope: '@google'
 
-    - name: 'Publish @google/gemini-cli-core'
+    - name: '📦 Publish @google/gemini-cli-core'
       working-directory: '${{ inputs.working-directory }}'
       env:
         NODE_AUTH_TOKEN: '${{ inputs.wombat-token-core }}'
-      run: |-
+      shell: 'bash'
+      run: |
         npm publish \
           --dry-run="${{ inputs.dry-run }}" \
           --workspace="@google/gemini-cli-core" \
           --tag="${{ inputs.npm-tag }}"
-      shell: 'bash'
 
-    - name: 'Install latest core package'
+    - name: '🔗 Install latest core package'
       working-directory: '${{ inputs.working-directory }}'
-      if: '${{ inputs.dry-run == false }}'
-      run: |-
+      if: "${{ inputs.dry-run == 'false' }}"
+      shell: 'bash'
+      run: |
         npm install "@google/gemini-cli-core@${{ inputs.release-version }}" \
         --workspace="@google/gemini-cli" \
         --save-exact
-      shell: 'bash'
 
-    - name: 'Publish @google/gemini-cli'
+    - name: '📦 Publish @google/gemini-cli'
       working-directory: '${{ inputs.working-directory }}'
       env:
         NODE_AUTH_TOKEN: '${{ inputs.wombat-token-cli }}'
-      run: |-
+      shell: 'bash'
+      run: |
         npm publish \
           --dry-run="${{ inputs.dry-run }}" \
           --workspace="@google/gemini-cli" \
           --tag="${{ inputs.npm-tag }}"
-      shell: 'bash'
 
-    - name: 'Bundle'
+    - name: '🎁 Bundle'
       working-directory: '${{ inputs.working-directory }}'
-      run: 'npm run bundle'
       shell: 'bash'
+      run: |
+        npm run bundle
 
-    - name: 'Create GitHub Release'
+    - name: '🎉 Create GitHub Release'
       working-directory: '${{ inputs.working-directory }}'
-      if: '${{ inputs.dry-run == false }}'
+      if: "${{ inputs.dry-run == 'false' }}"
       env:
         GITHUB_TOKEN: '${{ inputs.github-token }}'
-      run: |-
+      shell: 'bash'
+      run: |
         gh release create "${{ inputs.release-tag }}" \
           bundle/gemini.js \
           --target "${{ steps.release_branch.outputs.BRANCH_NAME }}" \
           --title "Release ${{ inputs.release-tag }}" \
           --notes-start-tag "${{ inputs.previous-tag }}" \
           --generate-notes
-      shell: 'bash'
-
-    - name: 'Create Issue on Failure'
-      if: |-
-        ${{ failure() }}
-      env:
-        GITHUB_TOKEN: '${{ inputs.github-token }}'
-        RELEASE_TAG: '${{ inputs.release-tag }} || "N/A"'
-        DETAILS_URL: '${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}'
-      run: |-
-        gh issue create \
-          --title "Release Failed for ${RELEASE_TAG} on $(date +'%Y-%m-%d')" \
-          --body "The release workflow failed. See the full run for details: ${DETAILS_URL}" \
-          --label "kind/bug,release-failure,priority/p0"
-      shell: 'bash'
