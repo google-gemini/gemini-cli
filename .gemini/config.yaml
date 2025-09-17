@@ -1,4 +1,4 @@
-# Config for the Gemini Pull Request Review Bot.
+# Config for the Gemini Pull Request Review Bot. 
 # https://github.com/marketplace/gemini-code-assist
 have_fun: false
 code_review:
