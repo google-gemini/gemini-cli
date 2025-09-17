@@ -98,8 +98,7 @@ runs:
       env:
         NODE_AUTH_TOKEN: '${{ inputs.wombat-token-core }}'
       run: |
-        node ../../scripts/publish-or-tag.js \
-          @google/gemini-cli-core \
+node ${{ github.workspace }}/scripts/publish-or-tag.js \
           ${{ inputs.release-version }} \
           ${{ inputs.npm-tag }} \
           ${{ inputs.dry-run }}
