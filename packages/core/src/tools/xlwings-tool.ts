@@ -7,6 +7,7 @@
 import { BasePythonTool } from './base-python-tool.js';
 import { BaseToolInvocation } from './tools.js';
 import type { ToolResult, ToolInvocation, ToolCallConfirmationDetails } from './tools.js';
+import type { ToolConfirmationOutcome } from './tools.js';
 import type { Config } from '../config/config.js';
 import type { ToolResponseData } from '../providers/types.js';
 
@@ -116,6 +117,8 @@ interface XlwingsParams {
   'get_cell_info' | 'insert_range' | 'delete_range' |
   'copy_paste_range' | 'replace_range' | 'find_range' | 'get_used_range' | 'sort_range' |
   'merge_range' | 'unmerge_range' | 'get_sheet_info' |
+  // Filter operations
+  'add_filter' | 'remove_filter' | 'get_filter_info' |
   // Row/Column size operations
   'set_row_height' | 'set_column_width' | 'get_row_height' | 'get_column_width' |
   // Comment operations
@@ -547,6 +550,28 @@ interface XlwingsParams {
     /** For workbook PDF: sheets to exclude */
     exclude_sheets?: string[];
   };
+
+  /** Filter configuration */
+  filter?: {
+    /** Filter criteria for each column */
+    criteria?: Array<{
+      /** Column name or index to filter */
+      column: string | number;
+      /** Filter condition type */
+      condition: 'equals' | 'not_equals' | 'contains' | 'not_contains' | 'starts_with' | 'ends_with' |
+                 'greater_than' | 'less_than' | 'greater_equal' | 'less_equal' | 'between' | 'custom';
+      /** Filter value(s) */
+      value?: string | number | Date | Array<string | number>;
+      /** For 'between' condition: second value */
+      value2?: string | number | Date;
+      /** Custom filter formula (for 'custom' condition) */
+      formula?: string;
+    }>;
+    /** Whether to include header row in filter range */
+    include_header?: boolean;
+    /** Specific range to apply filter to (if not specified, uses current selection or used range) */
+    filter_range?: string;
+  };
 }
 
 /**
@@ -704,6 +729,7 @@ interface XlwingsResult extends ToolResult {
     search_term?: string;
     search_formulas?: boolean;
     total_matches?: number;
+    searched_worksheets?: string[];
     matches?: Array<{
       worksheet: string;
       address: string;
@@ -722,6 +748,23 @@ interface XlwingsResult extends ToolResult {
   sort_operations?: {
     sort_criteria?: SortCriteria[];
     rows_affected?: number;
+  };
+
+  // Filter operations
+  filter_operations?: {
+    filter_applied?: boolean;
+    filter_removed?: boolean;
+    filter_range?: string;
+    total_rows?: number;
+    visible_rows?: number;
+    hidden_rows?: number;
+    criteria?: Array<{
+      column: string | number;
+      condition: string;
+      value?: unknown;
+      value2?: unknown;
+    }>;
+    has_autofilter?: boolean;
   };
 
   // Sheet operation results
@@ -913,6 +956,14 @@ export class XlwingsTool extends BasePythonTool<XlwingsParams, XlwingsResult> {
   }
 
   /**
+   * Safely formats a string value for Python code, handling Unicode characters correctly
+   */
+  private formatPythonString(value: string): string {
+    if (!value) return '""';
+    return JSON.stringify(value);
+  }
+
+  /**
    * Converts a hex color (e.g., "#FFA500") to RGB tuple for xlwings rgb_to_int function
    */
   private convertHexToRGBTuple(hexColor: string): string {
@@ -942,7 +993,7 @@ export class XlwingsTool extends BasePythonTool<XlwingsParams, XlwingsResult> {
             type: 'string',
             enum: ['read_range', 'write_range', 'clear_range', 'formula_range', 'format_range', 'get_cell_info', 'insert_range', 'delete_range', 'copy_paste_range', 'replace_range', 'find_range', 'get_used_range', 'sort_range', 'merge_range', 'unmerge_range', 
               'get_sheet_info', 'set_row_height', 'set_column_width', 'get_row_height', 'get_column_width', 'add_comment', 'edit_comment', 'delete_comment', 'list_comments', 'create_chart', 'update_chart', 'delete_chart', 'list_charts', 'create_shape', 
-              'create_textbox', 'list_shapes', 'modify_shape', 'delete_shape', 'move_shape', 'resize_shape', 'add_sheet', 'alter_sheet', 'delete_sheet', 'move_sheet', 'copy_sheet', 'list_workbooks', 'list_sheets', 'get_selection', 'set_selection', 'create_workbook', 
+              'create_textbox', 'list_shapes', 'modify_shape', 'delete_shape', 'move_shape', 'resize_shape', 'add_sheet', 'alter_sheet', 'delete_sheet', 'move_sheet', 'copy_sheet', 'list_workbooks', 'list_sheets', 'get_selection', 'set_selection', 'create_workbook', 'add_filter', 'remove_filter', 'get_filter_info', 
               'open_workbook', 'save_workbook', 'close_workbook', 'get_last_row', 'get_last_column', 'convert_data_types', 'add_vba_module', 'run_vba_macro', 'update_vba_code', 'list_vba_modules', 'delete_vba_module', 'insert_image', 'list_images', 'delete_image', 
               'resize_image', 'move_image', /* 'save_range_as_image', */ 'save_chart_as_image', 'export_workbook_to_pdf', 'export_worksheet_to_pdf', 'list_apps', 'insert_row', 'insert_column', 'delete_row', 'delete_column', 'show_excel', 'hide_excel'],
             description: 'Operation to perform. Key operations: get_sheet_info (recommended for table analysis), get_used_range (basic range info), get_cell_info (detailed single cell analysis), sort_range (use get_sheet_info first to identify data boundaries)'
@@ -952,7 +1003,7 @@ export class XlwingsTool extends BasePythonTool<XlwingsParams, XlwingsResult> {
             description: 'Target workbook name (uses active workbook if not specified)'
           },
           worksheet: {
-            type: 'string', 
+            type: ['string', 'null'],
             description: 'Target worksheet name (uses active worksheet if not specified)'
           },
           range: {
@@ -1949,7 +2000,16 @@ export class XlwingsTool extends BasePythonTool<XlwingsParams, XlwingsResult> {
           if (result.operation === 'find_range') {
             llmContent += ` Search for "${result.search_operations?.search_term}" completed.`;
             if ((result.search_operations?.total_matches || 0) === 0) {
-              llmContent += ` No matches found.`;
+              llmContent += ` No matches found for "${result.search_operations?.search_term}".`;
+
+              // Add search range information
+              const searchedWorksheets = result.search_operations?.searched_worksheets || [];
+              if (searchedWorksheets.length > 0) {
+                llmContent += `\n\n**Search Details:**\n`;
+                llmContent += `- Search term: "${result.search_operations?.search_term}"\n`;
+                llmContent += `- Searched worksheets: ${searchedWorksheets.join(', ')}\n`;
+                llmContent += `- Search formulas: ${result.search_operations?.search_formulas ? 'Yes' : 'No'}\n`;
+              }
             } else if ((result.search_operations?.total_matches || 0) === 1) {
               const match = result.search_operations?.matches?.[0];
               if (match) {
@@ -2529,16 +2589,18 @@ def get_excel_app(app_id=None):
     except:
         return xw.apps.active if xw.apps else None
 
-def get_workbook_smart(workbook_path=None, preferred_app=None):
+def get_workbook_smart(workbook_path=None, preferred_app=None, create_if_not_exist=False):
     """
     Smart workbook finder that handles all scenarios intelligently:
     1. If workbook is already open (by path), use it
     2. If workbook_path exists as file, open it
-    3. If workbook_path doesn't exist, create new workbook and save to that path
+    3. If workbook_path doesn't exist and create_if_not_exist=True, create new workbook and save to that path
+    4. If workbook_path doesn't exist and create_if_not_exist=False, ask user for confirmation
 
     Args:
         workbook_path: Absolute path to workbook file
         preferred_app: Preferred Excel app instance (optional)
+        create_if_not_exist: Whether to automatically create workbook if not exists (default: False)
 
     Returns:
         tuple: (workbook_object, app_instance, was_opened_by_us, was_created_by_us)
@@ -2603,7 +2665,28 @@ def get_workbook_smart(workbook_path=None, preferred_app=None):
             print(json.dumps(result))
             exit()
 
-    # File doesn't exist, create new workbook and save to path
+    # File doesn't exist - check if we should create it
+    if not create_if_not_exist:
+        # Ask user for confirmation
+        result = {
+            "success": False,
+            "operation": "workbook_not_found",
+            "error_type": "workbook_not_exist",
+            "error_message": f"Target workbook '{workbook_path}' does not exist.",
+            "context": {
+                "workbook_path": workbook_path,
+                "file_exists": False
+            },
+            "suggested_actions": [
+                "Create the target workbook if it doesn't exist",
+                "Verify the workbook path is correct",
+                "Check if the workbook is in a different location"
+            ]
+        }
+        print(json.dumps(result))
+        exit()
+
+    # File doesn't exist but we have permission to create it
     try:
         wb = target_app.books.add()
         wb.save(workbook_path)
@@ -2866,6 +2949,12 @@ def get_worksheet(wb, worksheet_name=None):
         return this.generateMoveShapeLogic(params);
       case 'resize_shape':
         return this.generateResizeShapeLogic(params);
+      case 'add_filter':
+        return this.generateAddFilterLogic(params);
+      case 'remove_filter':
+        return this.generateRemoveFilterLogic(params);
+      case 'get_filter_info':
+        return this.generateGetFilterInfoLogic(params);
       default:
         return 'raise ValueError(f"Unsupported operation: {op}")';
     }
@@ -2930,12 +3019,12 @@ app.api.DisplayAlerts = original_alerts_setting`;
 
     return `${this.generateExcelConnectionCode(params)}
 
-ws = get_worksheet(wb, "${params.worksheet || ''}")
+ws = get_worksheet(wb, ${this.formatPythonString(params.worksheet || '')})
 if not ws:
     ws = wb.sheets.active
 
 # First, determine the full data range to get total statistics
-range_str = "${params.range || ''}"
+range_str = ${this.formatPythonString(params.range || '')}
 if range_str:
     if ':' in range_str and range_str.count(':') == 1 and not any(c.isdigit() for c in range_str):
         # Full column range like A:A
@@ -3075,7 +3164,7 @@ if not wb:
         "error_type": "workbook_not_found",
         "error_message": "Could not find the specified workbook",
         "context": {
-            "workbook": "${params.workbook || ''}",
+            "workbook": ${this.formatPythonString(params.workbook || '')},
             "required_action": "specify_workbook"
         },
         "suggested_actions": [
@@ -3087,7 +3176,7 @@ if not wb:
     print(json.dumps(result))
     exit()
 
-ws = get_worksheet(wb, "${params.worksheet || ''}")
+ws = get_worksheet(wb, ${this.formatPythonString(params.worksheet || '')})
 if not ws:
     result = {
         "success": False,
@@ -3095,8 +3184,8 @@ if not ws:
         "error_type": "worksheet_not_found",
         "error_message": "Could not find the specified worksheet",
         "context": {
-            "worksheet": "${params.worksheet || ''}",
-            "workbook": "${params.workbook || ''}",
+            "worksheet": ${this.formatPythonString(params.worksheet || '')},
+            "workbook": ${this.formatPythonString(params.workbook || '')},
             "available_sheets": [sheet.name for sheet in wb.sheets]
         }
     }
@@ -3105,7 +3194,7 @@ if not ws:
 
 # Write data
 data = ${JSON.stringify(params.data || [])}
-range_str = "${params.range || 'A1'}"
+range_str = ${this.formatPythonString(params.range || 'A1')}
 
 if data:
     # Check if range is a single cell (e.g., "A1", "B2") or a range (e.g., "A1:C10")
@@ -3234,14 +3323,14 @@ if not wb:
         "error_type": "workbook_not_found",
         "error_message": "Could not find the specified workbook",
         "context": {
-            "workbook": "${params.workbook || ''}",
+            "workbook": ${this.formatPythonString(params.workbook || '')},
             "required_action": "specify_workbook"
         }
     }
     print(json.dumps(result))
     exit()
 
-ws = get_worksheet(wb, "${params.worksheet || ''}")
+ws = get_worksheet(wb, ${this.formatPythonString(params.worksheet || '')})
 if not ws:
     result = {
         "success": False,
@@ -3249,8 +3338,8 @@ if not ws:
         "error_type": "worksheet_not_found",
         "error_message": "Could not find the specified worksheet",
         "context": {
-            "worksheet": "${params.worksheet || ''}",
-            "workbook": "${params.workbook || ''}",
+            "worksheet": ${this.formatPythonString(params.worksheet || '')},
+            "workbook": ${this.formatPythonString(params.workbook || '')},
             "available_sheets": [sheet.name for sheet in wb.sheets]
         }
     }
@@ -3445,14 +3534,14 @@ if not wb:
         "error_type": "workbook_not_found",
         "error_message": "Could not find the specified workbook",
         "context": {
-            "workbook": "${params.workbook || ''}",
+            "workbook": ${this.formatPythonString(params.workbook || '')},
             "required_action": "specify_workbook"
         }
     }
     print(json.dumps(result))
     exit()
 
-ws = get_worksheet(wb, "${params.worksheet || ''}")
+ws = get_worksheet(wb, ${this.formatPythonString(params.worksheet || '')})
 if not ws:
     result = {
         "success": False,
@@ -3460,8 +3549,8 @@ if not ws:
         "error_type": "worksheet_not_found",
         "error_message": "Could not find the specified worksheet",
         "context": {
-            "worksheet": "${params.worksheet || ''}",
-            "workbook": "${params.workbook || ''}",
+            "worksheet": ${this.formatPythonString(params.worksheet || '')},
+            "workbook": ${this.formatPythonString(params.workbook || '')},
             "available_sheets": [sheet.name for sheet in wb.sheets]
         }
     }
@@ -3469,7 +3558,7 @@ if not ws:
     exit()
 
 # Apply formatting
-range_str = "${params.range || 'A1'}"
+range_str = ${this.formatPythonString(params.range || 'A1')}
 range_obj = ws.range(range_str)
 
 format_config = ${formatPython}
@@ -3573,7 +3662,7 @@ if not wb:
         "error_type": "workbook_not_found",
         "error_message": "Could not find the specified workbook",
         "context": {
-            "workbook": "${params.workbook || ''}",
+            "workbook": ${this.formatPythonString(params.workbook || '')},
             "required_action": "specify_workbook"
         }
     }
@@ -3624,11 +3713,14 @@ wb, app_used, opened_by_us, created_by_us = get_workbook_smart("${this.escapePyt
 if not wb:
     wb = xw.books.active
 
-ws = get_worksheet(wb, "${params.worksheet || ''}")
+ws = get_worksheet(wb, ${this.formatPythonString(params.worksheet || '')})
 if not ws:
     ws = wb.sheets.active
 
-range_str = "${params.range || 'A1'}"
+# Activate the worksheet first before selecting a range
+ws.activate()
+
+range_str = ${this.formatPythonString(params.range || 'A1')}
 ws.range(range_str).select()
 
 result = {
@@ -3656,7 +3748,7 @@ if not wb:
         "error_type": "workbook_not_found",
         "error_message": "Could not find the specified workbook",
         "context": {
-            "workbook": "${params.workbook || ''}",
+            "workbook": ${this.formatPythonString(params.workbook || '')},
             "required_action": "specify_workbook"
         },
         "suggested_actions": [
@@ -3669,7 +3761,7 @@ if not wb:
     print(json.dumps(result))
     exit()
 
-ws = get_worksheet(wb, "${params.worksheet || ''}")
+ws = get_worksheet(wb, ${this.formatPythonString(params.worksheet || '')})
 if not ws:
     result = {
         "success": False,
@@ -3677,8 +3769,8 @@ if not ws:
         "error_type": "worksheet_not_found",
         "error_message": "Could not find the specified worksheet",
         "context": {
-            "worksheet": "${params.worksheet || ''}",
-            "workbook": "${params.workbook || ''}",
+            "worksheet": ${this.formatPythonString(params.worksheet || '')},
+            "workbook": ${this.formatPythonString(params.workbook || '')},
             "available_sheets": [sheet.name for sheet in wb.sheets]
         },
         "suggested_actions": [
@@ -3691,7 +3783,7 @@ if not ws:
     print(json.dumps(result))
     exit()
 
-range_str = "${params.range || 'A1'}"
+range_str = ${this.formatPythonString(params.range || 'A1')}
 formula = "${params.formula || ''}"
 
 if not formula:
@@ -3727,7 +3819,7 @@ if not wb:
         "error_type": "workbook_not_found",
         "error_message": "Could not find the specified workbook",
         "context": {
-            "workbook": "${params.workbook || ''}",
+            "workbook": ${this.formatPythonString(params.workbook || '')},
             "required_action": "specify_workbook"
         },
         "suggested_actions": [
@@ -3740,7 +3832,7 @@ if not wb:
     print(json.dumps(result))
     exit()
 
-ws = get_worksheet(wb, "${params.worksheet || ''}")
+ws = get_worksheet(wb, ${this.formatPythonString(params.worksheet || '')})
 if not ws:
     result = {
         "success": False,
@@ -3748,8 +3840,8 @@ if not ws:
         "error_type": "worksheet_not_found",
         "error_message": "Could not find the specified worksheet",
         "context": {
-            "worksheet": "${params.worksheet || ''}",
-            "workbook": "${params.workbook || ''}",
+            "worksheet": ${this.formatPythonString(params.worksheet || '')},
+            "workbook": ${this.formatPythonString(params.workbook || '')},
             "available_sheets": [sheet.name for sheet in wb.sheets]
         },
         "suggested_actions": [
@@ -3762,7 +3854,7 @@ if not ws:
     print(json.dumps(result))
     exit()
 
-range_str = "${params.range || 'A1'}"
+range_str = ${this.formatPythonString(params.range || 'A1')}
 range_obj = ws.range(range_str)
 range_obj.clear()
 
@@ -4189,7 +4281,7 @@ if not wb:
         "error_type": "workbook_not_found",
         "error_message": "Could not find the specified workbook",
         "context": {
-            "workbook": "${params.workbook || ''}",
+            "workbook": ${this.formatPythonString(params.workbook || '')},
             "required_action": "specify_workbook"
         },
         "suggested_actions": [
@@ -4202,7 +4294,7 @@ if not wb:
     print(json.dumps(result))
     exit()
 
-ws = get_worksheet(wb, "${params.worksheet || ''}")
+ws = get_worksheet(wb, ${this.formatPythonString(params.worksheet || '')})
 if not ws:
     result = {
         "success": False,
@@ -4210,8 +4302,8 @@ if not ws:
         "error_type": "worksheet_not_found",
         "error_message": "Could not find the specified worksheet",
         "context": {
-            "worksheet": "${params.worksheet || ''}",
-            "workbook": "${params.workbook || ''}",
+            "worksheet": ${this.formatPythonString(params.worksheet || '')},
+            "workbook": ${this.formatPythonString(params.workbook || '')},
             "available_sheets": [sheet.name for sheet in wb.sheets]
         },
         "suggested_actions": [
@@ -4226,7 +4318,7 @@ if not ws:
 
 find_text = "${params.find_replace.find}"
 replace_text = "${params.find_replace.replace}"
-range_str = "${params.range || ''}"
+range_str = ${this.formatPythonString(params.range || '')}
 
 if range_str:
     search_range = ws.range(range_str)
@@ -4326,7 +4418,7 @@ if not wb:
         "error_type": "workbook_not_found",
         "error_message": f"Could not find the specified workbook '${params.workbook || ''}'",
         "context": {
-            "workbook": "${params.workbook || ''}",
+            "workbook": ${this.formatPythonString(params.workbook || '')},
             "available_workbooks": available_workbooks
         },
         "suggested_actions": [
@@ -4339,7 +4431,7 @@ if not wb:
     print(json.dumps(result))
     exit()
 
-ws = get_worksheet(wb, "${params.worksheet || ''}")
+ws = get_worksheet(wb, ${this.formatPythonString(params.worksheet || '')})
 if not ws:
     result = {
         "success": False,
@@ -4347,7 +4439,7 @@ if not ws:
         "error_type": "worksheet_not_found",
         "error_message": "Could not find the specified worksheet",
         "context": {
-            "worksheet": "${params.worksheet || ''}",
+            "worksheet": ${this.formatPythonString(params.worksheet || '')},
             "workbook": wb.name if wb else "${params.workbook || ''}"
         },
         "suggested_actions": [
@@ -4517,7 +4609,7 @@ if not wb:
         "error_type": "workbook_not_found",
         "error_message": f"Could not find the specified workbook '${params.workbook || ''}'",
         "context": {
-            "workbook": "${params.workbook || ''}",
+            "workbook": ${this.formatPythonString(params.workbook || '')},
             "available_workbooks": available_workbooks
         },
         "suggested_actions": [
@@ -5718,7 +5810,7 @@ if not wb:
         "error_type": "workbook_not_found",
         "error_message": f"Could not find the specified workbook '${params.workbook || ''}'",
         "context": {
-            "workbook": "${params.workbook || ''}",
+            "workbook": ${this.formatPythonString(params.workbook || '')},
             "available_workbooks": available_workbooks
         },
         "suggested_actions": [
@@ -5731,7 +5823,7 @@ if not wb:
     print(json.dumps(result))
     exit()
 
-ws = get_worksheet(wb, "${params.worksheet || ''}")
+ws = get_worksheet(wb, ${this.formatPythonString(params.worksheet || '')})
 if not ws:
     result = {
         "success": False,
@@ -5739,7 +5831,7 @@ if not ws:
         "error_type": "worksheet_not_found",
         "error_message": "Could not find the specified worksheet",
         "context": {
-            "worksheet": "${params.worksheet || ''}",
+            "worksheet": ${this.formatPythonString(params.worksheet || '')},
             "workbook": wb.name if wb else "${params.workbook || ''}"
         },
         "suggested_actions": [
@@ -5753,7 +5845,7 @@ if not ws:
     exit()
 
 # Get target cell
-range_str = "${params.range || 'A1'}"
+range_str = ${this.formatPythonString(params.range || 'A1')}
 if not range_str:
     result = {
         "success": False,
@@ -5897,7 +5989,7 @@ if not wb:
         "error_type": "workbook_not_found",
         "error_message": f"Could not find the specified workbook '${params.workbook || ''}'",
         "context": {
-            "workbook": "${params.workbook || ''}",
+            "workbook": ${this.formatPythonString(params.workbook || '')},
             "available_workbooks": available_workbooks
         },
         "suggested_actions": [
@@ -5910,7 +6002,7 @@ if not wb:
     print(json.dumps(result))
     exit()
 
-ws = get_worksheet(wb, "${params.worksheet || ''}")
+ws = get_worksheet(wb, ${this.formatPythonString(params.worksheet || '')})
 if not ws:
     result = {
         "success": False,
@@ -5918,7 +6010,7 @@ if not ws:
         "error_type": "worksheet_not_found",
         "error_message": "Could not find the specified worksheet",
         "context": {
-            "worksheet": "${params.worksheet || ''}",
+            "worksheet": ${this.formatPythonString(params.worksheet || '')},
             "workbook": wb.name if wb else "${params.workbook || ''}"
         },
         "suggested_actions": [
@@ -5932,7 +6024,7 @@ if not ws:
     exit()
 
 # Get target cell
-range_str = "${params.range || 'A1'}"
+range_str = ${this.formatPythonString(params.range || 'A1')}
 if not range_str:
     result = {
         "success": False,
@@ -6049,7 +6141,7 @@ if not wb:
         "error_type": "workbook_not_found",
         "error_message": f"Could not find the specified workbook '${params.workbook || ''}'",
         "context": {
-            "workbook": "${params.workbook || ''}",
+            "workbook": ${this.formatPythonString(params.workbook || '')},
             "available_workbooks": available_workbooks
         },
         "suggested_actions": [
@@ -6062,7 +6154,7 @@ if not wb:
     print(json.dumps(result))
     exit()
 
-ws = get_worksheet(wb, "${params.worksheet || ''}")
+ws = get_worksheet(wb, ${this.formatPythonString(params.worksheet || '')})
 if not ws:
     result = {
         "success": False,
@@ -6070,7 +6162,7 @@ if not ws:
         "error_type": "worksheet_not_found",
         "error_message": "Could not find the specified worksheet",
         "context": {
-            "worksheet": "${params.worksheet || ''}",
+            "worksheet": ${this.formatPythonString(params.worksheet || '')},
             "workbook": wb.name if wb else "${params.workbook || ''}"
         },
         "suggested_actions": [
@@ -6084,7 +6176,7 @@ if not ws:
     exit()
 
 # Get target cell
-range_str = "${params.range || 'A1'}"
+range_str = ${this.formatPythonString(params.range || 'A1')}
 if not range_str:
     result = {
         "success": False,
@@ -6189,7 +6281,7 @@ if not wb:
         "error_type": "workbook_not_found",
         "error_message": f"Could not find the specified workbook '${params.workbook || ''}'",
         "context": {
-            "workbook": "${params.workbook || ''}",
+            "workbook": ${this.formatPythonString(params.workbook || '')},
             "available_workbooks": available_workbooks
         },
         "suggested_actions": [
@@ -6202,7 +6294,7 @@ if not wb:
     print(json.dumps(result))
     exit()
 
-ws = get_worksheet(wb, "${params.worksheet || ''}")
+ws = get_worksheet(wb, ${this.formatPythonString(params.worksheet || '')})
 if not ws:
     result = {
         "success": False,
@@ -6210,7 +6302,7 @@ if not ws:
         "error_type": "worksheet_not_found",
         "error_message": "Could not find the specified worksheet",
         "context": {
-            "worksheet": "${params.worksheet || ''}",
+            "worksheet": ${this.formatPythonString(params.worksheet || '')},
             "workbook": wb.name if wb else "${params.workbook || ''}"
         },
         "suggested_actions": [
@@ -6295,7 +6387,7 @@ if not wb:
         "error_type": "workbook_not_found",
         "error_message": f"Could not find the specified workbook '${params.workbook || ''}'",
         "context": {
-            "workbook": "${params.workbook || ''}",
+            "workbook": ${this.formatPythonString(params.workbook || '')},
             "available_workbooks": available_workbooks
         },
         "suggested_actions": [
@@ -6308,7 +6400,7 @@ if not wb:
     print(json.dumps(result))
     exit()
 
-ws = get_worksheet(wb, "${params.worksheet || ''}")
+ws = get_worksheet(wb, ${this.formatPythonString(params.worksheet || '')})
 if not ws:
     result = {
         "success": False,
@@ -6316,7 +6408,7 @@ if not ws:
         "error_type": "worksheet_not_found",
         "error_message": "Could not find the specified worksheet",
         "context": {
-            "worksheet": "${params.worksheet || ''}",
+            "worksheet": ${this.formatPythonString(params.worksheet || '')},
             "workbook": wb.name if wb else "${params.workbook || ''}"
         },
         "suggested_actions": [
@@ -6331,7 +6423,7 @@ if not ws:
 ${alertHandling}
 
 # Get target range
-range_str = "${params.range || 'A1'}"
+range_str = ${this.formatPythonString(params.range || 'A1')}
 if not range_str:
     result = {
         "success": False,
@@ -6436,7 +6528,7 @@ if not wb:
         "error_type": "workbook_not_found",
         "error_message": f"Could not find the specified workbook '${params.workbook || ''}'",
         "context": {
-            "workbook": "${params.workbook || ''}",
+            "workbook": ${this.formatPythonString(params.workbook || '')},
             "available_workbooks": available_workbooks
         },
         "suggested_actions": [
@@ -6449,7 +6541,7 @@ if not wb:
     print(json.dumps(result))
     exit()
 
-ws = get_worksheet(wb, "${params.worksheet || ''}")
+ws = get_worksheet(wb, ${this.formatPythonString(params.worksheet || '')})
 if not ws:
     result = {
         "success": False,
@@ -6457,7 +6549,7 @@ if not ws:
         "error_type": "worksheet_not_found",
         "error_message": "Could not find the specified worksheet",
         "context": {
-            "worksheet": "${params.worksheet || ''}",
+            "worksheet": ${this.formatPythonString(params.worksheet || '')},
             "workbook": wb.name if wb else "${params.workbook || ''}"
         },
         "suggested_actions": [
@@ -6472,7 +6564,7 @@ if not ws:
 ${alertHandling}
 
 # Get target range
-range_str = "${params.range || 'A1'}"
+range_str = ${this.formatPythonString(params.range || 'A1')}
 if not range_str:
     result = {
         "success": False,
@@ -6583,7 +6675,7 @@ if not wb:
         "error_type": "workbook_not_found",
         "error_message": f"Could not find the specified workbook '${params.workbook || ''}'",
         "context": {
-            "workbook": "${params.workbook || ''}",
+            "workbook": ${this.formatPythonString(params.workbook || '')},
             "available_workbooks": available_workbooks
         },
         "suggested_actions": [
@@ -6596,7 +6688,7 @@ if not wb:
     print(json.dumps(result))
     exit()
 
-ws = get_worksheet(wb, "${params.worksheet || ''}")
+ws = get_worksheet(wb, ${this.formatPythonString(params.worksheet || '')})
 if not ws:
     result = {
         "success": False,
@@ -6604,7 +6696,7 @@ if not ws:
         "error_type": "worksheet_not_found",
         "error_message": "Could not find the specified worksheet",
         "context": {
-            "worksheet": "${params.worksheet || ''}",
+            "worksheet": ${this.formatPythonString(params.worksheet || '')},
             "workbook": wb.name if wb else "${params.workbook || ''}"
         },
         "suggested_actions": [
@@ -6647,7 +6739,7 @@ try:
         }
     else:
         # Use range parameter or default to current selection
-        range_str = "${params.range || ''}"
+        range_str = ${this.formatPythonString(params.range || '')}
         if not range_str:
             # Get current selection or default to A1
             try:
@@ -6716,7 +6808,7 @@ if not wb:
         "error_type": "workbook_not_found",
         "error_message": f"Could not find the specified workbook '${params.workbook || ''}'",
         "context": {
-            "workbook": "${params.workbook || ''}",
+            "workbook": ${this.formatPythonString(params.workbook || '')},
             "available_workbooks": available_workbooks
         },
         "suggested_actions": [
@@ -6729,7 +6821,7 @@ if not wb:
     print(json.dumps(result))
     exit()
 
-ws = get_worksheet(wb, "${params.worksheet || ''}")
+ws = get_worksheet(wb, ${this.formatPythonString(params.worksheet || '')})
 if not ws:
     result = {
         "success": False,
@@ -6737,7 +6829,7 @@ if not ws:
         "error_type": "worksheet_not_found",
         "error_message": "Could not find the specified worksheet",
         "context": {
-            "worksheet": "${params.worksheet || ''}",
+            "worksheet": ${this.formatPythonString(params.worksheet || '')},
             "workbook": wb.name if wb else "${params.workbook || ''}"
         },
         "suggested_actions": [
@@ -6797,7 +6889,7 @@ try:
         }
     else:
         # Use range parameter or default to current selection
-        range_str = "${params.range || ''}"
+        range_str = ${this.formatPythonString(params.range || '')}
         if not range_str:
             # Get current selection or default to A1
             try:
@@ -6870,7 +6962,7 @@ if not wb:
         "error_type": "workbook_not_found",
         "error_message": f"Could not find the specified workbook '${params.workbook || ''}'",
         "context": {
-            "workbook": "${params.workbook || ''}",
+            "workbook": ${this.formatPythonString(params.workbook || '')},
             "available_workbooks": available_workbooks
         },
         "suggested_actions": [
@@ -6883,7 +6975,7 @@ if not wb:
     print(json.dumps(result))
     exit()
 
-ws = get_worksheet(wb, "${params.worksheet || ''}")
+ws = get_worksheet(wb, ${this.formatPythonString(params.worksheet || '')})
 if not ws:
     result = {
         "success": False,
@@ -6891,7 +6983,7 @@ if not ws:
         "error_type": "worksheet_not_found",
         "error_message": "Could not find the specified worksheet",
         "context": {
-            "worksheet": "${params.worksheet || ''}",
+            "worksheet": ${this.formatPythonString(params.worksheet || '')},
             "workbook": wb.name if wb else "${params.workbook || ''}"
         },
         "suggested_actions": [
@@ -6927,7 +7019,7 @@ try:
         }
     else:
         # Use range parameter or default to current selection
-        range_str = "${params.range || ''}"
+        range_str = ${this.formatPythonString(params.range || '')}
         if not range_str:
             # Get current selection or default to A1
             try:
@@ -6988,7 +7080,7 @@ if not wb:
         "error_type": "workbook_not_found",
         "error_message": f"Could not find the specified workbook '${params.workbook || ''}'",
         "context": {
-            "workbook": "${params.workbook || ''}",
+            "workbook": ${this.formatPythonString(params.workbook || '')},
             "available_workbooks": available_workbooks
         },
         "suggested_actions": [
@@ -7001,7 +7093,7 @@ if not wb:
     print(json.dumps(result))
     exit()
 
-ws = get_worksheet(wb, "${params.worksheet || ''}")
+ws = get_worksheet(wb, ${this.formatPythonString(params.worksheet || '')})
 if not ws:
     result = {
         "success": False,
@@ -7009,7 +7101,7 @@ if not ws:
         "error_type": "worksheet_not_found",
         "error_message": "Could not find the specified worksheet",
         "context": {
-            "worksheet": "${params.worksheet || ''}",
+            "worksheet": ${this.formatPythonString(params.worksheet || '')},
             "workbook": wb.name if wb else "${params.workbook || ''}"
         },
         "suggested_actions": [
@@ -7074,7 +7166,7 @@ try:
         }
     else:
         # Use range parameter or default to current selection
-        range_str = "${params.range || ''}"
+        range_str = ${this.formatPythonString(params.range || '')}
         if not range_str:
             # Get current selection or default to A1
             try:
@@ -7144,7 +7236,7 @@ if not wb:
         "error_type": "workbook_not_found",
         "error_message": f"Could not find the specified workbook '${params.workbook || ''}'",
         "context": {
-            "workbook": "${params.workbook || ''}",
+            "workbook": ${this.formatPythonString(params.workbook || '')},
             "available_workbooks": available_workbooks
         },
         "suggested_actions": [
@@ -7157,7 +7249,7 @@ if not wb:
     print(json.dumps(result))
     exit()
 
-ws = get_worksheet(wb, "${params.worksheet || ''}")
+ws = get_worksheet(wb, ${this.formatPythonString(params.worksheet || '')})
 if not ws:
     result = {
         "success": False,
@@ -7165,7 +7257,7 @@ if not ws:
         "error_type": "worksheet_not_found",
         "error_message": "Could not find the specified worksheet",
         "context": {
-            "worksheet": "${params.worksheet || ''}",
+            "worksheet": ${this.formatPythonString(params.worksheet || '')},
             "workbook": wb.name if wb else "${params.workbook || ''}"
         },
         "suggested_actions": [
@@ -7379,7 +7471,7 @@ if not wb:
         "error_type": "workbook_not_found",
         "error_message": f"Could not find the specified workbook '${params.workbook || ''}'",
         "context": {
-            "workbook": "${params.workbook || ''}",
+            "workbook": ${this.formatPythonString(params.workbook || '')},
             "available_workbooks": available_workbooks
         },
         "suggested_actions": [
@@ -7392,7 +7484,7 @@ if not wb:
     print(json.dumps(result))
     exit()
 
-ws = get_worksheet(wb, "${params.worksheet || ''}")
+ws = get_worksheet(wb, ${this.formatPythonString(params.worksheet || '')})
 if not ws:
     result = {
         "success": False,
@@ -7400,7 +7492,7 @@ if not ws:
         "error_type": "worksheet_not_found",
         "error_message": "Could not find the specified worksheet",
         "context": {
-            "worksheet": "${params.worksheet || ''}",
+            "worksheet": ${this.formatPythonString(params.worksheet || '')},
             "workbook": wb.name if wb else "${params.workbook || ''}"
         },
         "suggested_actions": [
@@ -7414,7 +7506,7 @@ if not ws:
     exit()
 
 # Get target range
-range_str = "${params.range || 'A1'}"
+range_str = ${this.formatPythonString(params.range || 'A1')}
 if not range_str:
     result = {
         "success": False,
@@ -7544,7 +7636,7 @@ if not wb:
         "error_type": "workbook_not_found",
         "error_message": f"Could not find the specified workbook '${params.workbook || ''}'",
         "context": {
-            "workbook": "${params.workbook || ''}",
+            "workbook": ${this.formatPythonString(params.workbook || '')},
             "available_workbooks": available_workbooks
         },
         "suggested_actions": [
@@ -7557,7 +7649,7 @@ if not wb:
     print(json.dumps(result))
     exit()
 
-ws = get_worksheet(wb, "${params.worksheet || ''}")
+ws = get_worksheet(wb, ${this.formatPythonString(params.worksheet || '')})
 if not ws:
     result = {
         "success": False,
@@ -7565,7 +7657,7 @@ if not ws:
         "error_type": "worksheet_not_found",
         "error_message": "Could not find the specified worksheet",
         "context": {
-            "worksheet": "${params.worksheet || ''}",
+            "worksheet": ${this.formatPythonString(params.worksheet || '')},
             "workbook": wb.name if wb else "${params.workbook || ''}"
         },
         "suggested_actions": [
@@ -7580,7 +7672,7 @@ if not ws:
 ${alertHandling}
 
 # Get target range
-range_str = "${params.range || 'A1'}"
+range_str = ${this.formatPythonString(params.range || 'A1')}
 if not range_str:
     result = {
         "success": False,
@@ -7712,7 +7804,7 @@ if not wb:
         "error_type": "workbook_not_found",
         "error_message": f"Could not find the specified workbook '${params.workbook || ''}'",
         "context": {
-            "workbook": "${params.workbook || ''}",
+            "workbook": ${this.formatPythonString(params.workbook || '')},
             "available_workbooks": available_workbooks
         },
         "suggested_actions": [
@@ -7725,7 +7817,7 @@ if not wb:
     print(json.dumps(result))
     exit()
 
-ws = get_worksheet(wb, "${params.worksheet || ''}")
+ws = get_worksheet(wb, ${this.formatPythonString(params.worksheet || '')})
 if not ws:
     result = {
         "success": False,
@@ -7733,7 +7825,7 @@ if not ws:
         "error_type": "worksheet_not_found",
         "error_message": "Could not find the specified worksheet",
         "context": {
-            "worksheet": "${params.worksheet || ''}",
+            "worksheet": ${this.formatPythonString(params.worksheet || '')},
             "workbook": wb.name if wb else "${params.workbook || ''}"
         },
         "suggested_actions": [
@@ -7747,7 +7839,7 @@ if not ws:
     exit()
 
 # Get target range
-range_str = "${params.range || ''}"
+range_str = ${this.formatPythonString(params.range || '')}
 if not range_str:
     result = {
         "success": False,
@@ -8221,7 +8313,7 @@ wb, app_used, opened_by_us, created_by_us = get_workbook_smart("${this.escapePyt
 if not wb:
     wb = xw.books.active
 
-ws = get_worksheet(wb, "${params.worksheet || ''}")
+ws = get_worksheet(wb, ${this.formatPythonString(params.worksheet || '')})
 if not ws:
     ws = wb.sheets.active
 
@@ -8282,7 +8374,7 @@ wb, app_used, opened_by_us, created_by_us = get_workbook_smart("${this.escapePyt
 if not wb:
     wb = xw.books.active
 
-ws = get_worksheet(wb, "${params.worksheet || ''}")
+ws = get_worksheet(wb, ${this.formatPythonString(params.worksheet || '')})
 if not ws:
     ws = wb.sheets.active
 
@@ -8347,7 +8439,7 @@ wb, app_used, opened_by_us, created_by_us = get_workbook_smart("${this.escapePyt
 if not wb:
     wb = xw.books.active
 
-ws = get_worksheet(wb, "${params.worksheet || ''}")
+ws = get_worksheet(wb, ${this.formatPythonString(params.worksheet || '')})
 if not ws:
     ws = wb.sheets.active
 
@@ -8413,12 +8505,12 @@ wb, app_used, opened_by_us, created_by_us = get_workbook_smart("${this.escapePyt
 if not wb:
     wb = xw.books.active
 
-ws = get_worksheet(wb, "${params.worksheet || ''}")
+ws = get_worksheet(wb, ${this.formatPythonString(params.worksheet || '')})
 if not ws:
     ws = wb.sheets.active
 
 # Get range to convert
-range_str = "${params.range || ''}"
+range_str = ${this.formatPythonString(params.range || '')}
 if range_str:
     range_obj = ws.range(range_str)
 else:
@@ -8881,7 +8973,7 @@ wb, app_used, opened_by_us, created_by_us = get_workbook_smart("${this.escapePyt
 if not wb:
     wb = xw.books.active
 
-ws = get_worksheet(wb, "${params.worksheet || ''}")
+ws = get_worksheet(wb, ${this.formatPythonString(params.worksheet || '')})
 if not ws:
     ws = wb.sheets.active
 
@@ -9104,7 +9196,7 @@ wb, app_used, opened_by_us, created_by_us = get_workbook_smart("${this.escapePyt
 if not wb:
     wb = xw.books.active
 
-ws = get_worksheet(wb, "${params.worksheet || ''}")
+ws = get_worksheet(wb, ${this.formatPythonString(params.worksheet || '')})
 if not ws:
     ws = wb.sheets.active
 
@@ -9188,7 +9280,7 @@ wb, app_used, opened_by_us, created_by_us = get_workbook_smart("${this.escapePyt
 if not wb:
     wb = xw.books.active
 
-ws = get_worksheet(wb, "${params.worksheet || ''}")
+ws = get_worksheet(wb, ${this.formatPythonString(params.worksheet || '')})
 if not ws:
     ws = wb.sheets.active
 
@@ -9272,7 +9364,7 @@ wb, app_used, opened_by_us, created_by_us = get_workbook_smart("${this.escapePyt
 if not wb:
     wb = xw.books.active
 
-ws = get_worksheet(wb, "${params.worksheet || ''}")
+ws = get_worksheet(wb, ${this.formatPythonString(params.worksheet || '')})
 if not ws:
     ws = wb.sheets.active
 
@@ -9365,7 +9457,7 @@ wb, app_used, opened_by_us, created_by_us = get_workbook_smart("${this.escapePyt
 if not wb:
     wb = xw.books.active
 
-ws = get_worksheet(wb, "${params.worksheet || ''}")
+ws = get_worksheet(wb, ${this.formatPythonString(params.worksheet || '')})
 if not ws:
     ws = wb.sheets.active
 
@@ -9451,7 +9543,7 @@ wb, app_used, opened_by_us, created_by_us = get_workbook_smart("${this.escapePyt
 if not wb:
     wb = xw.books.active
 
-ws = get_worksheet(wb, "${params.worksheet || ''}")
+ws = get_worksheet(wb, ${this.formatPythonString(params.worksheet || '')})
 if not ws:
     ws = wb.sheets.active
 
@@ -9543,7 +9635,7 @@ wb, app_used, opened_by_us, created_by_us = get_workbook_smart("${this.escapePyt
 if not wb:
     wb = xw.books.active
 
-ws = get_worksheet(wb, "${params.worksheet || ''}")
+ws = get_worksheet(wb, ${this.formatPythonString(params.worksheet || '')})
 if not ws:
     ws = wb.sheets.active
 
@@ -9649,7 +9741,7 @@ wb, app_used, opened_by_us, created_by_us = get_workbook_smart("${this.escapePyt
 if not wb:
     wb = xw.books.active
 
-ws = get_worksheet(wb, "${params.worksheet || ''}")
+ws = get_worksheet(wb, ${this.formatPythonString(params.worksheet || '')})
 if not ws:
     ws = wb.sheets.active
 
@@ -9754,7 +9846,7 @@ wb, app_used, opened_by_us, created_by_us = get_workbook_smart("${this.escapePyt
 if not wb:
     wb = xw.books.active
 
-ws = get_worksheet(wb, "${params.worksheet || ''}")
+ws = get_worksheet(wb, ${this.formatPythonString(params.worksheet || '')})
 if not ws:
     ws = wb.sheets.active
 
@@ -9856,7 +9948,7 @@ wb, app_used, opened_by_us, created_by_us = get_workbook_smart("${this.escapePyt
 if not wb:
     wb = xw.books.active
 
-ws = get_worksheet(wb, "${params.worksheet || ''}")
+ws = get_worksheet(wb, ${this.formatPythonString(params.worksheet || '')})
 if not ws:
     ws = wb.sheets.active
 
@@ -9967,13 +10059,14 @@ wb, app_used, opened_by_us, created_by_us = get_workbook_smart("${this.escapePyt
 if not wb:
     wb = xw.books.active
 
-search_term = "${searchTerm}"
+search_term = ${this.formatPythonString(searchTerm)}
 search_column = ${searchColumn ? (typeof searchColumn === 'string' ? `"${searchColumn}"` : searchColumn) : 'None'}
 search_formulas = ${searchFormulasPython}
 auto_select = ${autoSelectPython}
-target_worksheet = "${targetWorksheet}"
+target_worksheet = ${this.formatPythonString(targetWorksheet)}
 
 matches = []
+searched_worksheets = []
 
 try:
     # Determine which worksheets to search
@@ -10008,31 +10101,22 @@ try:
     
     # Search through worksheets
     for ws in worksheets_to_search:
+        searched_worksheets.append(ws.name)
         try:
             # Get used range
             used_range = ws.used_range
             if not used_range:
                 continue
                 
-            # Get data and formulas
-            data = used_range.value
-            formulas = used_range.formula
-            
-            # Ensure data is 2D
-            if not isinstance(data, list):
-                data = [[data]]
-            elif data and not isinstance(data[0], list):
-                data = [data]
-                
-            # Ensure formulas is 2D  
-            if not isinstance(formulas, list):
-                formulas = [[formulas]]
-            elif formulas and not isinstance(formulas[0], list):
-                formulas = [formulas]
-            
-            # Get column headers (first row) for reference
-            headers = data[0] if data else []
-            
+            # Get range dimensions for iteration
+            range_rows = used_range.rows.count
+            range_cols = used_range.columns.count
+
+            # Get first row as headers for column name search
+            first_row_range = ws.range((used_range.row, used_range.column), (used_range.row, used_range.column + range_cols - 1))
+            headers = [str(cell or "") for cell in first_row_range.value] if range_cols > 1 else [str(first_row_range.value or "")]
+
+
             # Determine search columns
             search_cols = []
             if search_column is not None:
@@ -10051,33 +10135,50 @@ try:
             else:
                 # Search all columns
                 search_cols = list(range(len(headers))) if headers else []
-            
-            # Search through data
-            for row_idx, row_data in enumerate(data):
-                if not isinstance(row_data, list):
-                    row_data = [row_data]
-                    
-                formula_row = formulas[row_idx] if row_idx < len(formulas) else [None] * len(row_data)
-                if not isinstance(formula_row, list):
-                    formula_row = [formula_row]
-                
+
+            # Iterate through each cell individually
+            for row_idx in range(range_rows):
                 for col_idx in search_cols:
-                    if col_idx >= len(row_data):
+                    if col_idx >= range_cols:
                         continue
-                        
-                    cell_value = str(row_data[col_idx] or "").lower()
-                    cell_formula = str(formula_row[col_idx] or "").lower() if col_idx < len(formula_row) else ""
+
+                    # Calculate actual Excel row/col (1-based)
+                    excel_row = used_range.row + row_idx
+                    excel_col = used_range.column + col_idx
+
+                    # Get individual cell
+                    cell = ws.range((excel_row, excel_col))
+                    cell_value = str(cell.value or "").lower()
+                    cell_formula = str(cell.formula or "").lower()
+
                     search_lower = search_term.lower()
-                    
+
                     # Check if search term matches value or formula
-                    value_match = search_lower in cell_value
-                    formula_match = search_formulas and search_lower in cell_formula
-                    
+                    value_match = False
+                    formula_match = False
+
+                    if cell_value.strip():  # Only check non-empty cells
+                        # For exact matches or when cell contains the full search term
+                        exact_match = search_lower == cell_value
+                        contains_match = search_lower in cell_value
+
+                        if exact_match or contains_match:
+                            # Additional check: avoid matching single characters in longer strings
+                            # unless the search term is reasonably long or matches exactly
+                            if len(search_term) >= 2 or exact_match:
+                                value_match = True
+
+
+                    if search_formulas and cell_formula.strip():
+                        formula_exact = search_lower == cell_formula
+                        formula_contains = search_lower in cell_formula
+
+
+                        if formula_exact or formula_contains:
+                            if len(search_term) >= 2 or formula_exact:
+                                formula_match = True
+
                     if value_match or formula_match:
-                        # Calculate Excel address
-                        excel_row = row_idx + used_range.row
-                        excel_col = col_idx + used_range.column
-                        
                         # Convert to Excel address (A1 notation)
                         col_letter = ''
                         temp_col = excel_col
@@ -10085,27 +10186,31 @@ try:
                             temp_col -= 1
                             col_letter = chr(65 + temp_col % 26) + col_letter
                             temp_col //= 26
-                        
+
                         address = f"{col_letter}{excel_row}"
-                        
-                        # Get the entire row data for context
+
+                        # Get the entire row data for context by reading the whole row
+                        row_range = ws.range((excel_row, used_range.column), (excel_row, used_range.column + range_cols - 1))
+                        row_values = [str(cell or "") for cell in row_range.value] if range_cols > 1 else [str(row_range.value or "")]
+
                         row_context = {}
                         for i, header in enumerate(headers):
-                            if i < len(row_data):
-                                row_context[header or f"Col{i+1}"] = row_data[i]
-                        
+                            if i < len(row_values):
+                                row_context[header or f"Col{i+1}"] = row_values[i]
+
                         match_info = {
                             "worksheet": ws.name,
                             "address": address,
                             "row": excel_row,
                             "column": excel_col,
                             "column_name": headers[col_idx] if col_idx < len(headers) else f"Col{col_idx+1}",
-                            "matched_value": row_data[col_idx],
-                            "matched_formula": formula_row[col_idx] if col_idx < len(formula_row) else None,
+                            "matched_value": str(cell.value or ""),
+                            "matched_formula": str(cell.formula or ""),
                             "match_type": "formula" if formula_match else "value",
                             "row_data": row_context
                         }
                         matches.append(match_info)
+
         
         except Exception as ws_error:
             # Continue with next worksheet if current one fails
@@ -10123,6 +10228,7 @@ try:
         target_ws.range(match["address"]).select()
         selected_address = f"{match['worksheet']}!{match['address']}"
     
+
     result = {
         "success": True,
         "operation": "find_range",
@@ -10132,6 +10238,7 @@ try:
             "search_formulas": search_formulas,
             "total_matches": len(matches),
             "matches": matches,
+            "searched_worksheets": searched_worksheets,
             "auto_selected": selected_address if auto_select and len(matches) == 1 else None
         }
     }
@@ -10223,7 +10330,7 @@ except Exception as e:
     
     return `${this.generateExcelConnectionCode(params)}
 
-ws = get_worksheet(wb, "${params.worksheet || ''}")
+ws = get_worksheet(wb, ${this.formatPythonString(params.worksheet || '')})
 if not ws:
     ws = wb.sheets.active
 
@@ -10269,7 +10376,7 @@ except Exception as e:
     
     return `${this.generateExcelConnectionCode(params)}
 
-ws = get_worksheet(wb, "${params.worksheet || ''}")
+ws = get_worksheet(wb, ${this.formatPythonString(params.worksheet || '')})
 if not ws:
     ws = wb.sheets.active
 
@@ -10320,7 +10427,7 @@ except Exception as e:
     
     return `${this.generateExcelConnectionCode(params)}
 
-ws = get_worksheet(wb, "${params.worksheet || ''}")
+ws = get_worksheet(wb, ${this.formatPythonString(params.worksheet || '')})
 if not ws:
     ws = wb.sheets.active
 
@@ -10365,7 +10472,7 @@ except Exception as e:
     
     return `${this.generateExcelConnectionCode(params)}
 
-ws = get_worksheet(wb, "${params.worksheet || ''}")
+ws = get_worksheet(wb, ${this.formatPythonString(params.worksheet || '')})
 if not ws:
     ws = wb.sheets.active
 
@@ -10431,7 +10538,7 @@ except Exception as e:
 
     return `${this.generateExcelConnectionCode(params)}
 
-ws = get_worksheet(wb, "${params.worksheet || ''}")
+ws = get_worksheet(wb, ${this.formatPythonString(params.worksheet || '')})
 if not ws:
     ws = wb.sheets.active
 
@@ -10583,7 +10690,7 @@ except Exception as e:
 
     return `${this.generateExcelConnectionCode(params)}
 
-ws = get_worksheet(wb, "${params.worksheet || ''}")
+ws = get_worksheet(wb, ${this.formatPythonString(params.worksheet || '')})
 if not ws:
     ws = wb.sheets.active
 
@@ -10639,7 +10746,7 @@ except Exception as e:
   private generateListShapesLogic(params: XlwingsParams): string {
     return `${this.generateExcelConnectionCode(params)}
 
-ws = get_worksheet(wb, "${params.worksheet || ''}")
+ws = get_worksheet(wb, ${this.formatPythonString(params.worksheet || '')})
 if not ws:
     ws = wb.sheets.active
 
@@ -10691,7 +10798,7 @@ except Exception as e:
 
     return `${this.generateExcelConnectionCode(params)}
 
-ws = get_worksheet(wb, "${params.worksheet || ''}")
+ws = get_worksheet(wb, ${this.formatPythonString(params.worksheet || '')})
 if not ws:
     ws = wb.sheets.active
 
@@ -10746,7 +10853,7 @@ except Exception as e:
 
     return `${this.generateExcelConnectionCode(params)}
 
-ws = get_worksheet(wb, "${params.worksheet || ''}")
+ws = get_worksheet(wb, ${this.formatPythonString(params.worksheet || '')})
 if not ws:
     ws = wb.sheets.active
 
@@ -10790,7 +10897,7 @@ except Exception as e:
 
     return `${this.generateExcelConnectionCode(params)}
 
-ws = get_worksheet(wb, "${params.worksheet || ''}")
+ws = get_worksheet(wb, ${this.formatPythonString(params.worksheet || '')})
 if not ws:
     ws = wb.sheets.active
 
@@ -10843,7 +10950,7 @@ except Exception as e:
 
     return `${this.generateExcelConnectionCode(params)}
 
-ws = get_worksheet(wb, "${params.worksheet || ''}")
+ws = get_worksheet(wb, ${this.formatPythonString(params.worksheet || '')})
 if not ws:
     ws = wb.sheets.active
 
@@ -11126,7 +11233,7 @@ if not wb:
         "error_type": "workbook_not_found",
         "error_message": f"Could not find workbook '${params.workbook || ''}'",
         "context": {
-            "workbook": "${params.workbook || ''}",
+            "workbook": ${this.formatPythonString(params.workbook || '')},
             "available_workbooks": available_workbooks
         },
         "suggested_actions": [
@@ -11139,7 +11246,7 @@ if not wb:
     print(json.dumps(result))
     exit()
 
-ws = get_worksheet(wb, "${params.worksheet || ''}")
+ws = get_worksheet(wb, ${this.formatPythonString(params.worksheet || '')})
 if not ws:
     result = {
         "success": False,
@@ -11147,7 +11254,7 @@ if not ws:
         "error_type": "worksheet_not_found",
         "error_message": "Could not find the specified worksheet",
         "context": {
-            "worksheet": "${params.worksheet || ''}",
+            "worksheet": ${this.formatPythonString(params.worksheet || '')},
             "workbook": wb.name if wb else "${params.workbook || ''}"
         },
         "suggested_actions": [
@@ -11339,6 +11446,14 @@ print(json.dumps(result))`;
         return `Wrote data to ${result.cells_affected} cells`;
       case 'sort_range':
         return `Sorted data in range ${result.range}`;
+      case 'add_filter':
+        return `Applied filter to ${result.filter_operations?.filter_range || 'selected range'}. Showing ${result.filter_operations?.visible_rows || 0}/${result.filter_operations?.total_rows || 0} rows`;
+      case 'remove_filter':
+        return `Removed filter from ${result.filter_operations?.filter_range || 'worksheet'}`;
+      case 'get_filter_info':
+        return result.filter_operations?.has_autofilter
+          ? `AutoFilter active on ${result.filter_operations.filter_range}. ${result.filter_operations.visible_rows}/${result.filter_operations.total_rows} rows visible`
+          : 'No active filters on worksheet';
       case 'get_sheet_info':
         return `Analyzed worksheet "${result.worksheet}"`;
       default:
@@ -11411,6 +11526,12 @@ print(json.dumps(result))`;
         return this.generateFormatRangeSuccessResponse(result, params);
       case 'delete_sheet':
         return this.generateDeleteSheetSuccessResponse(result, params);
+      case 'add_filter':
+        return this.generateAddFilterSuccessResponse(result, params);
+      case 'remove_filter':
+        return this.generateRemoveFilterSuccessResponse(result, params);
+      case 'get_filter_info':
+        return this.generateGetFilterInfoSuccessResponse(result, params);
       default:
         // Fallback to existing logic for other operations
         return this.generateGenericSuccessResponse(result, params);
@@ -11728,20 +11849,34 @@ print(json.dumps(result))`;
    */
   private generateFindRangeSuccessResponse(result: XlwingsResult, _params: XlwingsParams): string {
     let response = '';
-    
-    if (result.find_replace_operations?.found_addresses && result.find_replace_operations.found_addresses.length > 0) {
-      response = `Found **${result.find_replace_operations.found_addresses.length} matches** for search criteria.`;
-      response += `\n\n**Found at:** ${result.find_replace_operations.found_addresses.slice(0, 5).join(', ')}`;
-      
-      if (result.find_replace_operations.found_addresses.length > 5) {
-        response += ` and ${result.find_replace_operations.found_addresses.length - 5} more locations`;
+
+    // Use search_operations data structure (returned by Python code) instead of find_replace_operations
+    if (result.search_operations?.matches && result.search_operations.matches.length > 0) {
+      response = `Found **${result.search_operations.matches.length} matches** for search criteria.`;
+
+      const addresses = result.search_operations.matches.map(match => `${match.worksheet}!${match.address}`);
+      response += `\n\n**Found at:** ${addresses.slice(0, 5).join(', ')}`;
+
+      if (result.search_operations.matches.length > 5) {
+        response += ` and ${result.search_operations.matches.length - 5} more locations`;
       }
     } else {
-      response = `No matches found for the search criteria.`;
+      response = `No matches found for "${result.search_operations?.search_term}".`;
+
+      // Add search range information
+      const searchedWorksheets = result.search_operations?.searched_worksheets || [];
+      if (searchedWorksheets.length > 0) {
+        response += `\n\n**Search Details:**\n`;
+        response += `- Search term: "${result.search_operations?.search_term}"\n`;
+        response += `- Searched worksheets: ${searchedWorksheets.join(', ')}\n`;
+        response += `- Search formulas: ${result.search_operations?.search_formulas ? 'Yes' : 'No'}\n`;
+      }
     }
     
     response += `\n\n## Next actions:\n`;
-    response += `- **Read found data:** read_range(range: "${result.find_replace_operations?.found_addresses?.[0] || 'A1'}")\n`;
+    const firstMatch = result.search_operations?.matches?.[0];
+    const defaultRange = firstMatch ? `${firstMatch.worksheet}!${firstMatch.address}` : 'A1';
+    response += `- **Read found data:** read_range(range: "${defaultRange}")\n`;
     response += `- **Expand search:** Try different search terms or use get_sheet_info() to analyze data structure`;
     
     return response;
@@ -12290,7 +12425,7 @@ if not wb:
         print(json.dumps(result))
         exit()
 
-ws = get_worksheet(wb, "${params.worksheet || ''}")
+ws = get_worksheet(wb, ${this.formatPythonString(params.worksheet || '')})
 if not ws:
     ws = wb.sheets.active
     if not ws:
@@ -12352,6 +12487,312 @@ except Exception as e:
     print(json.dumps(result))`;
   }
 
+  private generateAddFilterLogic(params: XlwingsParams): string {
+    const filterConfig = params.filter;
+    const includeHeader = filterConfig?.include_header !== false; // Default true
+    const filterRange = filterConfig?.filter_range || '';
+    const criteria = filterConfig?.criteria || [];
+
+    return `
+# Connect to Excel
+app = xw.apps.active if xw.apps else None
+if not app:
+    app = xw.App(visible=False)
+
+wb, app_used, opened_by_us, created_by_us = get_workbook_smart("${this.escapePythonPath(params.workbook || '')}", app)
+if not wb:
+    wb = xw.books.active
+
+ws = get_worksheet(wb, ${this.formatPythonString(params.worksheet || '')})
+if not ws:
+    ws = wb.sheets.active
+
+try:
+    # Determine filter range
+    if "${filterRange}":
+        filter_range = ws.range("${filterRange}")
+    else:
+        # Use used range if no specific range provided
+        filter_range = ws.used_range
+
+    # Enable AutoFilter
+    filter_range.api.AutoFilter()
+
+    # Apply filter criteria if provided
+    criteria_applied = []
+    ${criteria.map((criterion, index) => `
+    # Filter criterion ${index + 1}
+    column_${index} = ${typeof criterion.column === 'string' ? `"${criterion.column}"` : criterion.column}
+    condition_${index} = "${criterion.condition}"
+    value_${index} = ${this.formatPythonString(String(criterion.value || ''))}
+
+    # Convert column name to index if needed
+    if isinstance(column_${index}, str):
+        headers = [str(cell.value or "") for cell in filter_range.rows(1)]
+        try:
+            col_index_${index} = headers.index(column_${index}) + 1
+        except ValueError:
+            col_index_${index} = 1  # Default to first column
+    else:
+        col_index_${index} = column_${index}
+
+    # Apply filter based on condition
+    if condition_${index} == "equals":
+        filter_range.api.AutoFilter(Field=col_index_${index}, Criteria1=value_${index})
+        criteria_applied.append({"column": column_${index}, "condition": condition_${index}, "value": value_${index}})
+    elif condition_${index} == "contains":
+        filter_range.api.AutoFilter(Field=col_index_${index}, Criteria1=f"*{value_${index}}*")
+        criteria_applied.append({"column": column_${index}, "condition": condition_${index}, "value": value_${index}})
+    elif condition_${index} == "greater_than":
+        filter_range.api.AutoFilter(Field=col_index_${index}, Criteria1=f">{value_${index}}")
+        criteria_applied.append({"column": column_${index}, "condition": condition_${index}, "value": value_${index}})
+    elif condition_${index} == "less_than":
+        filter_range.api.AutoFilter(Field=col_index_${index}, Criteria1=f"<{value_${index}}")
+        criteria_applied.append({"column": column_${index}, "condition": condition_${index}, "value": value_${index}})
+    `).join('')}
+
+    # Count visible/hidden rows
+    total_rows = filter_range.rows.count
+    visible_rows = 0
+    hidden_rows = 0
+
+    for row in filter_range.rows:
+        if row.api.Hidden:
+            hidden_rows += 1
+        else:
+            visible_rows += 1
+
+    result = {
+        "success": True,
+        "operation": "add_filter",
+        "workbook": wb.name,
+        "worksheet": ws.name,
+        "filter_operations": {
+            "filter_applied": True,
+            "filter_range": filter_range.address,
+            "total_rows": total_rows,
+            "visible_rows": visible_rows,
+            "hidden_rows": hidden_rows,
+            "criteria": criteria_applied,
+            "has_autofilter": True
+        }
+    }
+
+except Exception as e:
+    result = {
+        "success": False,
+        "operation": "add_filter",
+        "workbook": wb.name if 'wb' in locals() else None,
+        "worksheet": ws.name if 'ws' in locals() else None,
+        "error": str(e)
+    }
+
+print(json.dumps(result))`;
+  }
+
+  private generateRemoveFilterLogic(params: XlwingsParams): string {
+    return `
+# Connect to Excel
+app = xw.apps.active if xw.apps else None
+if not app:
+    app = xw.App(visible=False)
+
+wb, app_used, opened_by_us, created_by_us = get_workbook_smart("${this.escapePythonPath(params.workbook || '')}", app)
+if not wb:
+    wb = xw.books.active
+
+ws = get_worksheet(wb, ${this.formatPythonString(params.worksheet || '')})
+if not ws:
+    ws = wb.sheets.active
+
+try:
+    # Check if AutoFilter is currently applied
+    has_autofilter = False
+    filter_range_address = None
+
+    try:
+        if ws.api.AutoFilterMode:
+            has_autofilter = True
+            if ws.api.AutoFilter:
+                filter_range_address = ws.api.AutoFilter.Range.Address
+    except:
+        pass
+
+    # Remove AutoFilter
+    if has_autofilter:
+        ws.api.AutoFilterMode = False
+        filter_removed = True
+    else:
+        filter_removed = False
+
+    result = {
+        "success": True,
+        "operation": "remove_filter",
+        "workbook": wb.name,
+        "worksheet": ws.name,
+        "filter_operations": {
+            "filter_removed": filter_removed,
+            "filter_range": filter_range_address,
+            "has_autofilter": False
+        }
+    }
+
+except Exception as e:
+    result = {
+        "success": False,
+        "operation": "remove_filter",
+        "workbook": wb.name if 'wb' in locals() else None,
+        "worksheet": ws.name if 'ws' in locals() else None,
+        "error": str(e)
+    }
+
+print(json.dumps(result))`;
+  }
+
+  private generateGetFilterInfoLogic(params: XlwingsParams): string {
+    return `
+# Connect to Excel
+app = xw.apps.active if xw.apps else None
+if not app:
+    app = xw.App(visible=False)
+
+wb, app_used, opened_by_us, created_by_us = get_workbook_smart("${this.escapePythonPath(params.workbook || '')}", app)
+if not wb:
+    wb = xw.books.active
+
+ws = get_worksheet(wb, ${this.formatPythonString(params.worksheet || '')})
+if not ws:
+    ws = wb.sheets.active
+
+try:
+    # Check AutoFilter status
+    has_autofilter = False
+    filter_range_address = None
+    total_rows = 0
+    visible_rows = 0
+    hidden_rows = 0
+    criteria = []
+
+    try:
+        if ws.api.AutoFilterMode:
+            has_autofilter = True
+            if ws.api.AutoFilter:
+                filter_range_address = ws.api.AutoFilter.Range.Address
+                filter_range = ws.range(filter_range_address)
+
+                # Count rows
+                total_rows = filter_range.rows.count
+
+                for row in filter_range.rows:
+                    if row.api.Hidden:
+                        hidden_rows += 1
+                    else:
+                        visible_rows += 1
+
+                # Try to get filter criteria (this is complex in xlwings/Excel API)
+                # For now, we'll just indicate that filters are active
+    except:
+        pass
+
+    result = {
+        "success": True,
+        "operation": "get_filter_info",
+        "workbook": wb.name,
+        "worksheet": ws.name,
+        "filter_operations": {
+            "has_autofilter": has_autofilter,
+            "filter_range": filter_range_address,
+            "total_rows": total_rows,
+            "visible_rows": visible_rows,
+            "hidden_rows": hidden_rows,
+            "criteria": criteria
+        }
+    }
+
+except Exception as e:
+    result = {
+        "success": False,
+        "operation": "get_filter_info",
+        "workbook": wb.name if 'wb' in locals() else None,
+        "worksheet": ws.name if 'ws' in locals() else None,
+        "error": str(e)
+    }
+
+print(json.dumps(result))`;
+  }
+
+  private generateAddFilterSuccessResponse(result: XlwingsResult, params: XlwingsParams): string {
+    const filterOps = result.filter_operations;
+    if (!filterOps || !filterOps.filter_applied) {
+      return 'Filter operation failed or no criteria provided.';
+    }
+
+    let response = `✅ **Filter Applied Successfully**\n\n`;
+    response += `**Range:** ${filterOps.filter_range}\n`;
+    response += `**Results:** ${filterOps.visible_rows}/${filterOps.total_rows} rows visible`;
+
+    if (filterOps.hidden_rows && filterOps.hidden_rows > 0) {
+      response += ` (${filterOps.hidden_rows} rows hidden)`;
+    }
+
+    if (filterOps.criteria && filterOps.criteria.length > 0) {
+      response += `\n\n**Applied Criteria:**\n`;
+      filterOps.criteria.forEach((criterion, index) => {
+        response += `${index + 1}. **${criterion.column}** ${criterion.condition} "${criterion.value}"\n`;
+      });
+    }
+
+    return response;
+  }
+
+  private generateRemoveFilterSuccessResponse(result: XlwingsResult, _params: XlwingsParams): string {
+    const filterOps = result.filter_operations;
+
+    let response = `✅ **Filter Removal**\n\n`;
+
+    if (filterOps?.filter_removed) {
+      response += `AutoFilter has been removed from the worksheet.\n`;
+      if (filterOps.filter_range) {
+        response += `**Previously filtered range:** ${filterOps.filter_range}\n`;
+      }
+      response += `All rows are now visible.`;
+    } else {
+      response += `No active filters were found to remove on this worksheet.`;
+    }
+
+    return response;
+  }
+
+  private generateGetFilterInfoSuccessResponse(result: XlwingsResult, _params: XlwingsParams): string {
+    const filterOps = result.filter_operations;
+
+    let response = `📊 **Filter Status**\n\n`;
+
+    if (filterOps?.has_autofilter) {
+      response += `**Status:** AutoFilter is **active**\n`;
+      response += `**Range:** ${filterOps.filter_range}\n`;
+      response += `**Rows:** ${filterOps.visible_rows}/${filterOps.total_rows} visible`;
+
+      if (filterOps.hidden_rows && filterOps.hidden_rows > 0) {
+        response += ` (${filterOps.hidden_rows} hidden)`;
+      }
+
+      if (filterOps.criteria && filterOps.criteria.length > 0) {
+        response += `\n\n**Active Criteria:**\n`;
+        filterOps.criteria.forEach((criterion, index) => {
+          response += `${index + 1}. **${criterion.column}** ${criterion.condition} "${criterion.value}"\n`;
+        });
+      } else {
+        response += `\n\n*AutoFilter is enabled but no specific criteria are currently applied.*`;
+      }
+    } else {
+      response += `**Status:** No AutoFilter active on this worksheet\n`;
+      response += `All rows are visible by default.`;
+    }
+
+    return response;
+  }
+
   protected override createInvocation(params: XlwingsParams): ToolInvocation<XlwingsParams, XlwingsResult> {
     return new XlwingsInvocation(this, params);
   }
@@ -12370,7 +12811,7 @@ class XlwingsInvocation extends BaseToolInvocation<XlwingsParams, XlwingsResult>
   }
 
   override async shouldConfirmExecute(
-    abortSignal: AbortSignal,
+    _abortSignal: AbortSignal,
   ): Promise<ToolCallConfirmationDetails | false> {
     // Define safe operations that don't need approval
     const safeOperations = new Set([
@@ -12383,7 +12824,10 @@ class XlwingsInvocation extends BaseToolInvocation<XlwingsParams, XlwingsResult>
       'list_comments', 'list_vba_modules', 'list_apps',
 
       // Selection operations
-      'get_selection',
+      'get_selection', 'set_selection',
+
+      // Filter operations (read-only)
+      'get_filter_info',
 
       // Non-destructive display operations
       'show_excel', 'hide_excel'
@@ -12394,14 +12838,22 @@ class XlwingsInvocation extends BaseToolInvocation<XlwingsParams, XlwingsResult>
       return false; // No confirmation needed for safe operations
     }
 
-    // For destructive operations, delegate to the BasePythonTool's logic
-    const basePythonInvocation = this.tool['createInvocation'](this.params);
-    return basePythonInvocation.shouldConfirmExecute(abortSignal);
+    // For destructive operations, require confirmation
+    return {
+      type: 'exec',
+      title: `Confirm Excel Operation: ${this.params.op}`,
+      command: this.getDescription(),
+      rootCommand: `xlwings_${this.params.op}`,
+      onConfirm: async (_outcome: ToolConfirmationOutcome) => {
+        // No special action needed on confirmation
+      },
+    };
   }
 
   async execute(signal: AbortSignal, updateOutput?: (output: string) => void): Promise<XlwingsResult> {
-    // Delegate to the BasePythonTool's execution logic
-    const basePythonInvocation = this.tool['createInvocation'](this.params);
+    // Call the parent class's createInvocation method to get a BasePythonToolInvocation
+    // We can't use this.tool.createInvocation() because that would create another XlwingsInvocation (recursion)
+    const basePythonInvocation = Object.getPrototypeOf(Object.getPrototypeOf(this.tool)).createInvocation.call(this.tool, this.params);
     return basePythonInvocation.execute(signal, updateOutput);
   }
 }
