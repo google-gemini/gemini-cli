@@ -5,6 +5,7 @@
  */
 
 import { execSync, spawn, spawnSync } from 'node:child_process';
+import * as path from 'node:path';
 
 export type EditorType =
   | 'vscode'
@@ -90,9 +91,9 @@ function checkMacOSAppExists(cmd: string): boolean {
 
   const possiblePaths = macApps[cmd];
   if (possiblePaths) {
-    return possiblePaths.some(path => {
+    return possiblePaths.some(appPath => {
       try {
-        execSync(`test -x "${path}"`, { stdio: 'ignore' });
+        execSync(`test -x "${appPath}"`, { stdio: 'ignore' });
         return true;
       } catch {
         return false;
@@ -153,10 +154,28 @@ export function getCustomEditorFromEnv(): string | null {
 
   // Extract the command name (handle full paths and arguments)
   const cmdWithPath = editorCmd.split(' ')[0];
-  const pathParts = cmdWithPath.split(/[/\\]/);
-  const cmd = pathParts[pathParts.length - 1];
 
-  return cmd || null;
+  // Use Node.js path.basename() which handles all platforms correctly
+  const cmd = path.basename(cmdWithPath);
+
+  // If cmd is empty or just a directory, return null
+  return cmd && cmd.trim() ? cmd : null;
+}
+
+/**
+ * Get the full custom editor command including potential arguments.
+ * This is used when we need the complete command for execution.
+ */
+export function getCustomEditorCommand(): string | null {
+  // Check VISUAL first (preferred for visual editors), then EDITOR
+  const editorCmd = process.env['VISUAL'] || process.env['EDITOR'];
+
+  // Return null if no environment variable is set or if it's just a default system editor
+  if (!editorCmd || editorCmd === 'notepad.exe') {
+    return null;
+  }
+
+  return editorCmd.trim();
 }
 
 export function allowEditorTypeInSandbox(editor: EditorType): boolean {
@@ -292,9 +311,21 @@ export function getDiffCommand(
       }
       return null;
     case 'custom':
-      // For custom editors, try to detect from environment
+      // For custom editors, try to get the full command from environment
       const customCmd = getCustomEditorFromEnv();
       if (customCmd) {
+        // Check if this is a known editor that supports diff
+        if (customCmd === 'code' || customCmd === 'code-insiders') {
+          return { command: customCmd, args: ['--wait', '--diff', oldPath, newPath] };
+        } else if (customCmd === 'cursor') {
+          return { command: customCmd, args: ['--wait', '--diff', oldPath, newPath] };
+        } else if (customCmd === 'vim' || customCmd === 'nvim') {
+          return {
+            command: customCmd,
+            args: ['-d', oldPath, newPath],
+          };
+        }
+        // Fallback: just open the file for editing
         return { command: customCmd, args: [oldPath] };
       }
       return null;
