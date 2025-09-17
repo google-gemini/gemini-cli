@@ -19,6 +19,8 @@ import {
   openDiff,
   allowEditorTypeInSandbox,
   isEditorAvailable,
+  getCustomEditorFromEnv,
+  detectBestEditor,
   type EditorType,
 } from './editor.js';
 import { execSync, spawn, spawnSync } from 'node:child_process';
@@ -72,6 +74,10 @@ describe('editor utils', () => {
       { editor: 'neovim', commands: ['nvim'], win32Commands: ['nvim'] },
       { editor: 'zed', commands: ['zed', 'zeditor'], win32Commands: ['zed'] },
       { editor: 'emacs', commands: ['emacs'], win32Commands: ['emacs.exe'] },
+      { editor: 'vscode-insiders', commands: ['code-insiders'], win32Commands: ['code-insiders.cmd'] },
+      { editor: 'pycharm', commands: ['pycharm'], win32Commands: ['pycharm.exe'] },
+      { editor: 'sublime', commands: ['subl'], win32Commands: ['subl.exe'] },
+      { editor: 'nano', commands: ['nano'], win32Commands: ['nano.exe'] },
     ];
 
     for (const { editor, commands, win32Commands } of testCases) {
@@ -540,6 +546,134 @@ describe('editor utils', () => {
       (execSync as Mock).mockReturnValue(Buffer.from('/usr/bin/nvim'));
       vi.stubEnv('SANDBOX', 'sandbox');
       expect(isEditorAvailable('neovim')).toBe(true);
+    });
+  });
+
+  describe('getCustomEditorFromEnv', () => {
+    afterEach(() => {
+      vi.unstubAllEnvs();
+    });
+
+    it('should return null when no EDITOR or VISUAL is set', () => {
+      expect(getCustomEditorFromEnv()).toBeNull();
+    });
+
+    it('should prioritize VISUAL over EDITOR', () => {
+      vi.stubEnv('VISUAL', '/usr/bin/vim');
+      vi.stubEnv('EDITOR', '/usr/bin/nano');
+      expect(getCustomEditorFromEnv()).toBe('vim');
+    });
+
+    it('should use EDITOR when VISUAL is not set', () => {
+      vi.stubEnv('EDITOR', '/usr/bin/emacs');
+      expect(getCustomEditorFromEnv()).toBe('emacs');
+    });
+
+    it('should extract command name from full path', () => {
+      vi.stubEnv('EDITOR', '/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code');
+      expect(getCustomEditorFromEnv()).toBe('code');
+    });
+
+    it('should handle Windows paths', () => {
+      vi.stubEnv('EDITOR', 'C:\\Program Files\\Microsoft VS Code\\bin\\code.cmd');
+      expect(getCustomEditorFromEnv()).toBe('code.cmd');
+    });
+
+    it('should handle commands with arguments', () => {
+      vi.stubEnv('EDITOR', 'vim -n');
+      expect(getCustomEditorFromEnv()).toBe('vim');
+    });
+  });
+
+  describe('detectBestEditor', () => {
+    beforeEach(() => {
+      vi.unstubAllEnvs();
+      (execSync as Mock).mockImplementation(() => {
+        throw new Error('Command not found');
+      });
+    });
+
+    afterEach(() => {
+      vi.unstubAllEnvs();
+    });
+
+    it('should prioritize custom editor from environment', () => {
+      vi.stubEnv('EDITOR', '/usr/bin/custom-editor');
+      (execSync as Mock).mockReturnValue(Buffer.from('/usr/bin/custom-editor'));
+      expect(detectBestEditor()).toBe('custom');
+    });
+
+    it('should return cursor as first preference when available', () => {
+      (execSync as Mock).mockImplementation((cmd: string) => {
+        if (cmd.includes('cursor')) {
+          return Buffer.from('/usr/bin/cursor');
+        }
+        throw new Error('Command not found');
+      });
+      expect(detectBestEditor()).toBe('cursor');
+    });
+
+    it('should fallback through preference order', () => {
+      (execSync as Mock).mockImplementation((cmd: string) => {
+        if (cmd.includes('nano')) {
+          return Buffer.from('/usr/bin/nano');
+        }
+        throw new Error('Command not found');
+      });
+      expect(detectBestEditor()).toBe('nano');
+    });
+
+    it('should return null when no editors are available', () => {
+      expect(detectBestEditor()).toBeNull();
+    });
+
+    it('should respect sandbox restrictions', () => {
+      vi.stubEnv('SANDBOX', 'sandbox');
+      (execSync as Mock).mockReturnValue(Buffer.from('/usr/bin/code'));
+
+      // GUI editors should not be available in sandbox
+      expect(detectBestEditor()).not.toBe('vscode');
+
+      // Terminal editors should be available in sandbox
+      (execSync as Mock).mockImplementation((cmd: string) => {
+        if (cmd.includes('vim')) {
+          return Buffer.from('/usr/bin/vim');
+        }
+        throw new Error('Command not found');
+      });
+      expect(detectBestEditor()).toBe('vim');
+    });
+  });
+
+  describe('new editor types', () => {
+    beforeEach(() => {
+      (execSync as Mock).mockImplementation(() => {
+        throw new Error('Command not found');
+      });
+    });
+
+    it('should support vscode-insiders', () => {
+      (execSync as Mock).mockReturnValue(Buffer.from('/usr/bin/code-insiders'));
+      expect(checkHasEditorType('vscode-insiders')).toBe(true);
+      expect(allowEditorTypeInSandbox('vscode-insiders')).toBe(false); // GUI editor
+    });
+
+    it('should support pycharm', () => {
+      (execSync as Mock).mockReturnValue(Buffer.from('/usr/bin/pycharm'));
+      expect(checkHasEditorType('pycharm')).toBe(true);
+      expect(allowEditorTypeInSandbox('pycharm')).toBe(false); // GUI editor
+    });
+
+    it('should support sublime', () => {
+      (execSync as Mock).mockReturnValue(Buffer.from('/usr/bin/subl'));
+      expect(checkHasEditorType('sublime')).toBe(true);
+      expect(allowEditorTypeInSandbox('sublime')).toBe(false); // GUI editor
+    });
+
+    it('should support nano', () => {
+      (execSync as Mock).mockReturnValue(Buffer.from('/usr/bin/nano'));
+      expect(checkHasEditorType('nano')).toBe(true);
+      expect(allowEditorTypeInSandbox('nano')).toBe(true); // Terminal editor
     });
   });
 });

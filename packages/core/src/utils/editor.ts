@@ -14,7 +14,12 @@ export type EditorType =
   | 'vim'
   | 'neovim'
   | 'zed'
-  | 'emacs';
+  | 'emacs'
+  | 'vscode-insiders'
+  | 'pycharm'
+  | 'sublime'
+  | 'nano'
+  | 'custom';
 
 function isValidEditorType(editor: string): editor is EditorType {
   return [
@@ -26,6 +31,11 @@ function isValidEditorType(editor: string): editor is EditorType {
     'neovim',
     'zed',
     'emacs',
+    'vscode-insiders',
+    'pycharm',
+    'sublime',
+    'nano',
+    'custom',
   ].includes(editor);
 }
 
@@ -42,8 +52,55 @@ function commandExists(cmd: string): boolean {
     );
     return true;
   } catch {
+    // On macOS, also check common installation locations outside PATH
+    if (process.platform === 'darwin') {
+      return checkMacOSAppExists(cmd);
+    }
     return false;
   }
+}
+
+/**
+ * Check for macOS applications that might not be in PATH.
+ */
+function checkMacOSAppExists(cmd: string): boolean {
+  // Map common editor commands to their macOS application paths
+  const macApps: Record<string, string[]> = {
+    'code': [
+      '/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code',
+      '/usr/local/bin/code',
+    ],
+    'cursor': [
+      '/Applications/Cursor.app/Contents/Resources/app/bin/cursor',
+      '/usr/local/bin/cursor',
+    ],
+    'zed': [
+      '/Applications/Zed.app/Contents/MacOS/zed',
+      '/usr/local/bin/zed',
+    ],
+    'pycharm': [
+      '/Applications/PyCharm.app/Contents/MacOS/pycharm',
+      '/usr/local/bin/pycharm',
+    ],
+    'subl': [
+      '/Applications/Sublime Text.app/Contents/SharedSupport/bin/subl',
+      '/usr/local/bin/subl',
+    ],
+  };
+
+  const possiblePaths = macApps[cmd];
+  if (possiblePaths) {
+    return possiblePaths.some(path => {
+      try {
+        execSync(`test -x "${path}"`, { stdio: 'ignore' });
+        return true;
+      } catch {
+        return false;
+      }
+    });
+  }
+
+  return false;
 }
 
 /**
@@ -62,22 +119,83 @@ const editorCommands: Record<
   neovim: { win32: ['nvim'], default: ['nvim'] },
   zed: { win32: ['zed'], default: ['zed', 'zeditor'] },
   emacs: { win32: ['emacs.exe'], default: ['emacs'] },
+  'vscode-insiders': { win32: ['code-insiders.cmd'], default: ['code-insiders'] },
+  pycharm: { win32: ['pycharm.exe'], default: ['pycharm'] },
+  sublime: { win32: ['subl.exe'], default: ['subl'] },
+  nano: { win32: ['nano.exe'], default: ['nano'] },
+  custom: { win32: [], default: [] }, // Will be determined from EDITOR/VISUAL env vars
 };
 
 export function checkHasEditorType(editor: EditorType): boolean {
+  // Special handling for custom editor from environment variables
+  if (editor === 'custom') {
+    const customEditor = getCustomEditorFromEnv();
+    return customEditor !== null && commandExists(customEditor);
+  }
+
   const commandConfig = editorCommands[editor];
   const commands =
     process.platform === 'win32' ? commandConfig.win32 : commandConfig.default;
   return commands.some((cmd) => commandExists(cmd));
 }
 
+/**
+ * Get custom editor command from EDITOR/VISUAL environment variables.
+ */
+export function getCustomEditorFromEnv(): string | null {
+  // Check VISUAL first (preferred for visual editors), then EDITOR
+  const editorCmd = process.env['VISUAL'] || process.env['EDITOR'];
+  if (editorCmd) {
+    // Extract the command name (handle full paths and arguments)
+    const cmd = editorCmd.split(' ')[0].split('/').pop()?.split('\\').pop();
+    return cmd || null;
+  }
+  return null;
+}
+
 export function allowEditorTypeInSandbox(editor: EditorType): boolean {
   const notUsingSandbox = !process.env['SANDBOX'];
-  if (['vscode', 'vscodium', 'windsurf', 'cursor', 'zed'].includes(editor)) {
+  // GUI-based editors that might have security implications in sandbox
+  if (['vscode', 'vscodium', 'windsurf', 'cursor', 'zed', 'vscode-insiders', 'pycharm', 'sublime'].includes(editor)) {
     return notUsingSandbox;
   }
-  // For terminal-based editors like vim and emacs, allow in sandbox.
+  // For terminal-based editors and custom editors, allow in sandbox
   return true;
+}
+
+/**
+ * Detect the best available editor from environment variables and common editors.
+ */
+export function detectBestEditor(): EditorType | null {
+  // First, try to detect from EDITOR/VISUAL environment variables
+  const customEditor = getCustomEditorFromEnv();
+  if (customEditor && commandExists(customEditor)) {
+    return 'custom';
+  }
+
+  // Then try known editors in order of preference
+  const preferredEditors: EditorType[] = [
+    'cursor',        // Most popular in this environment
+    'vscode',
+    'vscode-insiders',
+    'zed',
+    'windsurf',
+    'vscodium',
+    'pycharm',
+    'sublime',
+    'vim',
+    'neovim',
+    'emacs',
+    'nano',
+  ];
+
+  for (const editor of preferredEditors) {
+    if (checkHasEditorType(editor) && allowEditorTypeInSandbox(editor)) {
+      return editor;
+    }
+  }
+
+  return null;
 }
 
 /**
@@ -114,8 +232,15 @@ export function getDiffCommand(
     case 'vscodium':
     case 'windsurf':
     case 'cursor':
+    case 'vscode-insiders':
     case 'zed':
       return { command, args: ['--wait', '--diff', oldPath, newPath] };
+    case 'pycharm':
+      // PyCharm diff command
+      return { command, args: ['diff', oldPath, newPath] };
+    case 'sublime':
+      // Sublime Text diff command
+      return { command, args: ['--new-window', '--command', 'diff_files', `{"files": ["${oldPath}", "${newPath}"]}`] };
     case 'vim':
     case 'neovim':
       return {
@@ -150,6 +275,23 @@ export function getDiffCommand(
         command: 'emacs',
         args: ['--eval', `(ediff "${oldPath}" "${newPath}")`],
       };
+    case 'nano':
+      // Nano doesn't have built-in diff support, fall back to vimdiff
+      const vimCmd = process.platform === 'win32' ? 'vim' : 'vim';
+      if (commandExists(vimCmd)) {
+        return {
+          command: vimCmd,
+          args: ['-d', oldPath, newPath],
+        };
+      }
+      return null;
+    case 'custom':
+      // For custom editors, try to detect from environment
+      const customCmd = getCustomEditorFromEnv();
+      if (customCmd) {
+        return { command: customCmd, args: [oldPath] };
+      }
+      return null;
     default:
       return null;
   }
@@ -173,7 +315,7 @@ export async function openDiff(
   }
 
   try {
-    const isTerminalEditor = ['vim', 'emacs', 'neovim'].includes(editor);
+    const isTerminalEditor = ['vim', 'emacs', 'neovim', 'nano'].includes(editor);
 
     if (isTerminalEditor) {
       try {
