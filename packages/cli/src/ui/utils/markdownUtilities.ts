@@ -114,7 +114,7 @@ const isWithinList = (content: string, index: number): boolean => {
 };
 
 /**
- * Checks if the content before a position ends with a header
+ * Checks if the content before a position ends with a header (ATX or Setext style)
  */
 const endsWithHeader = (content: string, index: number): boolean => {
   const beforeContent = content
@@ -122,7 +122,20 @@ const endsWithHeader = (content: string, index: number): boolean => {
     .trim();
   const lines = beforeContent.split('\n');
   const lastLine = lines[lines.length - 1];
-  return /^#{1,6}\s+/.test(lastLine);
+
+  // Check ATX-style headers (# ## ### etc.)
+  if (/^#{1,6}\s+/.test(lastLine)) {
+    return true;
+  }
+
+  // Check Setext-style headers (underlined with = or -)
+  if (/^[ ]{0,3}(=+|-+)[ ]*$/.test(lastLine) && lines.length > 1) {
+    // Ensure there's actual header text above the underline
+    const headerText = lines[lines.length - 2]?.trim();
+    return Boolean(headerText && headerText.length > 0);
+  }
+
+  return false;
 };
 
 /**

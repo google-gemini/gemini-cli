@@ -200,6 +200,49 @@ Select a number.`;
         // Should not split right after the formatted header
         expect(splitPoint).not.toBe(content.indexOf('Content'));
       });
+
+      it('should not split immediately after Setext H1 headers (underlined with =)', () => {
+        const content =
+          'Before\n\nMain Title\n==========\n\nContent here\n\nMore content';
+        const splitPoint = findLastSafeSplitPoint(content);
+
+        // Should not split right after "Main Title\n==========\n\n"
+        expect(splitPoint).not.toBe(content.indexOf('Content'));
+      });
+
+      it('should not split immediately after Setext H2 headers (underlined with -)', () => {
+        const content =
+          'Before\n\nSubtitle\n--------\n\nContent here\n\nMore content';
+        const splitPoint = findLastSafeSplitPoint(content);
+
+        // Should not split right after "Subtitle\n--------\n\n"
+        expect(splitPoint).not.toBe(content.indexOf('Content'));
+      });
+
+      it('should handle Setext headers with indentation and trailing spaces', () => {
+        const content =
+          'Before\n\nHeader Text\n   ===   \n\nContent here\n\nMore content';
+        const splitPoint = findLastSafeSplitPoint(content);
+
+        // Should not split right after the indented Setext header
+        expect(splitPoint).not.toBe(content.indexOf('Content'));
+      });
+
+      it('should not treat isolated underlines as headers', () => {
+        const content = 'Text\n\n==========\n\nContent\n\nMore';
+        const splitPoint = findLastSafeSplitPoint(content);
+
+        // Should be able to split normally since there's no header text above the underline
+        expect(splitPoint).toBeGreaterThan(0);
+      });
+
+      it('should handle mixed ATX and Setext headers', () => {
+        const content = `Text\n\n# ATX Header\n\nSetext Header\n=============\n\nContent\n\nMore`;
+        const splitPoint = findLastSafeSplitPoint(content);
+
+        // Should not split right after either header type
+        expect(splitPoint).not.toBe(content.indexOf('Content'));
+      });
     });
 
     describe('Code block integration', () => {
