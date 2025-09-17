@@ -117,8 +117,12 @@ export interface GeminiCLIExtension {
   version: string;
   isActive: boolean;
   path: string;
-  source?: string;
-  type?: 'git' | 'local' | 'link';
+  installMetadata?: ExtensionInstallMetadata;
+}
+
+export interface ExtensionInstallMetadata {
+  source: string;
+  type: 'git' | 'local' | 'link' | 'github-release';
   ref?: string;
 }
 
