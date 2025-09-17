@@ -459,7 +459,6 @@ export class Config {
     }
     this.promptRegistry = new PromptRegistry();
     this.toolRegistry = await this.createToolRegistry();
-    logCliConfiguration(this, new StartSessionEvent(this, this.toolRegistry));
 
     await this.geminiClient.initialize();
   }
@@ -496,6 +495,9 @@ export class Config {
 
     // Reset the session flag since we're explicitly changing auth and using default model
     this.inFallbackMode = false;
+
+    // Logging the cli configuration here as the auth related configuration params would have been loaded by this point
+    logCliConfiguration(this, new StartSessionEvent(this, this.toolRegistry));
   }
 
   getUserTier(): UserTierId | undefined {
