@@ -184,41 +184,70 @@ class BasePythonToolInvocation<
       // Get requirements for this execution
       const requirements = this.requirements;
 
-      // Install requirements if specified
+      // Check and install requirements if specified
       if (requirements.length > 0) {
-        if (updateOutput) {
-          updateOutput(`Installing Python packages: ${requirements.join(', ')}...\\n`);
+        // First check which packages are missing
+        const missingPackages: string[] = [];
+
+        for (const requirement of requirements) {
+          try {
+            const checkCommand = `"${embeddedPythonPath}" -c "import ${requirement.split('[')[0].replace('-', '_')}; print('installed')"`;
+            const { result: checkPromise } = await ShellExecutionService.execute(
+              checkCommand,
+              this.config.getTargetDir(),
+              () => {},
+              signal,
+              false,
+            );
+            const checkResult = await checkPromise;
+
+            if (checkResult.exitCode !== 0 || !checkResult.output.includes('installed')) {
+              missingPackages.push(requirement);
+            }
+          } catch {
+            // If check fails, assume package is missing
+            missingPackages.push(requirement);
+          }
         }
 
-        try {
-          const installCommand = `"${embeddedPythonPath}" -m pip install ${requirements.join(' ')} --quiet`;
-          const workingDir = this.config.getTargetDir();
+        // Only install missing packages
+        if (missingPackages.length > 0) {
+          if (updateOutput) {
+            updateOutput(`Installing missing Python packages: ${missingPackages.join(', ')}...\\n`);
+          }
 
-          const { result: installPromise } = await ShellExecutionService.execute(
-            installCommand,
-            workingDir,
-            () => {},
-            signal,
-            false,
-          );
+          try {
+            const installCommand = `"${embeddedPythonPath}" -m pip install ${missingPackages.join(' ')} --quiet`;
+            const workingDir = this.config.getTargetDir();
 
-          const installResult = await installPromise;
+            const { result: installPromise } = await ShellExecutionService.execute(
+              installCommand,
+              workingDir,
+              () => {},
+              signal,
+              false,
+            );
 
-          if (installResult.exitCode !== 0) {
+            const installResult = await installPromise;
+
+            if (installResult.exitCode !== 0) {
+              return {
+                llmContent: `Failed to install Python requirements: ${installResult.output}`,
+                returnDisplay: `❌ Failed to install Python requirements`,
+              } as TResult;
+            }
+
+            if (updateOutput) {
+              updateOutput(`✅ Packages installed successfully\\n\\n`);
+            }
+          } catch (installError) {
             return {
-              llmContent: `Failed to install Python requirements: ${installResult.output}`,
+              llmContent: `Failed to install Python requirements: ${getErrorMessage(installError)}`,
               returnDisplay: `❌ Failed to install Python requirements`,
             } as TResult;
           }
-
-          if (updateOutput) {
-            updateOutput(`✅ Packages installed successfully\\n\\n`);
-          }
-        } catch (installError) {
-          return {
-            llmContent: `Failed to install Python requirements: ${getErrorMessage(installError)}`,
-            returnDisplay: `❌ Failed to install Python requirements`,
-          } as TResult;
+        } else if (updateOutput) {
+          updateOutput(`✅ All required packages already installed\\n\\n`);
         }
       }
 
@@ -231,8 +260,50 @@ class BasePythonToolInvocation<
       const operation = (this.params as any)?.op || 'unknown';
       const scriptPath = path.join(tempDir, `${this.tool.name}_${operation}_${timestamp}.py`);
       
-      // Write Python code to temporary file with UTF-8 encoding
-      const codeWithEncoding = `# -*- coding: utf-8 -*-\nimport sys\nimport io\nsys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')\nsys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')\n${pythonCode}`;
+      // Write Python code to temporary file with UTF-8 encoding and Base64 output wrapper
+      const codeWithEncoding = `# -*- coding: utf-8 -*-
+import sys
+import io
+import base64
+import json
+# Force UTF-8 for internal processing
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
+
+# Capture the original print function
+_original_print = print
+_output_lines = []
+
+# Override print to capture output
+def print(*args, **kwargs):
+    # Convert args to string and capture
+    line = ' '.join(str(arg) for arg in args)
+    if kwargs.get('end', '\\n') == '\\n':
+        line += '\\n'
+    _output_lines.append(line)
+
+# Execute the main tool code
+try:
+${pythonCode.split('\n').map(line => '    ' + line).join('\n')}
+except Exception as e:
+    import traceback
+    error_output = f"Error: {str(e)}\\n{traceback.format_exc()}"
+    _output_lines.append(error_output)
+
+# Restore original print
+print = _original_print
+
+# Combine all captured output
+final_output = ''.join(_output_lines)
+
+# Output result with Base64 encoding to handle Chinese characters
+if final_output.strip():
+    # Encode as Base64 to avoid any encoding issues with Chinese characters
+    encoded = base64.b64encode(final_output.encode('utf-8')).decode('ascii')
+    print(f"__TOOL_RESULT_BASE64__{encoded}__END__")
+else:
+    print("__TOOL_RESULT_BASE64____END__")
+`;
       await fs.promises.writeFile(scriptPath, codeWithEncoding, 'utf-8');
 
       // Prepare execution command with UTF-8 environment settings
@@ -267,9 +338,30 @@ class BasePythonToolInvocation<
       //   console.warn('Failed to delete temporary Python script:', cleanupError);
       // }
       console.log('DEBUG: Temporary Python script saved at:', scriptPath);
-      
+
+      // Parse output - check for Base64 encoded result to handle Chinese characters
+      let finalOutput = result.output.trim();
+
+      // Check for Base64 encoded result marker
+      const base64Match = finalOutput.match(/__TOOL_RESULT_BASE64__([A-Za-z0-9+/=]*)__END__/);
+      if (base64Match) {
+        try {
+          // Decode Base64 result if present
+          const base64Data = base64Match[1];
+          if (base64Data) {
+            finalOutput = Buffer.from(base64Data, 'base64').toString('utf-8');
+          } else {
+            finalOutput = '';
+          }
+        } catch (decodeError) {
+          console.warn('Failed to decode Base64 result:', decodeError);
+          // Fall back to raw output
+          finalOutput = result.output.trim();
+        }
+      }
+
       // Parse the Python output into the expected tool result format
-      return this.tool['parseResult'](result.output, this.params);
+      return this.tool['parseResult'](finalOutput, this.params);
       
     } catch (error) {
       const errorMessage = getErrorMessage(error);
