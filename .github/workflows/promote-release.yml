@@ -66,7 +66,6 @@ jobs:
           STABLE_JSON=$(node scripts/get-release-version.js --type=stable ${{ github.event.inputs.stable_version_override && format('--stable_version_override={0}', github.event.inputs.stable_version_override) || '' }})
           echo "PREVIEW_JSON command: node scripts/get-release-version.js --type=preview ${{ github.event.inputs.preview_version_override && format('--preview_version_override={0}', github.event.inputs.preview_version_override) || '' }}"
           PREVIEW_JSON=$(node scripts/get-release-version.js --type=preview ${{ github.event.inputs.preview_version_override && format('--preview_version_override={0}', github.event.inputs.preview_version_override) || '' }})
-          echo "PREVIEW_JSON: ${PREVIEW_JSON}"
           NIGHTLY_JSON=$(node scripts/get-release-version.js --type=nightly)
           echo "STABLE_VERSION=$(echo "${STABLE_JSON}" | jq -r .releaseVersion)" >> "${GITHUB_OUTPUT}"
           # shellcheck disable=SC1083
@@ -84,15 +83,15 @@ jobs:
 
       - name: 'Display Pending Updates'
         run: |
-          echo "Pending Changes:"
-          echo "  Nightly (${{ steps.versions.outputs.PREVIOUS_NIGHTLY_TAG }}): ${{ steps.versions.outputs.PREVIOUS_NIGHTLY_TAG }} -> ${{ steps.versions.outputs.NEXT_NIGHTLY_VERSION }}"
-          echo "  Preview: ${{ steps.versions.outputs.PREVIOUS_PREVIEW_TAG }} -> ${{ steps.versions.outputs.PREVIEW_VERSION }}"
-          echo "  Stable:  ${{ steps.versions.outputs.PREVIOUS_STABLE_TAG }} -> ${{ steps.versions.outputs.STABLE_VERSION }}"
+          echo "Pending Changes, Next Versions:"
+          echo "  Nightly: ${{ steps.versions.outputs.NEXT_NIGHTLY_VERSION }}"
+          echo "  Preview: ${{ steps.versions.outputs.PREVIEW_VERSION }}"
+          echo "  Stable: ${{ steps.versions.outputs.STABLE_VERSION }}"
           echo ""
           echo "Relevant SHAs:"
-          echo "  Current (Stable):  ${{ steps.versions.outputs.STABLE_SHA }}"
-          echo "  Current (Preview): ${{ steps.versions.outputs.PREVIEW_SHA }}"
-          echo "  Next (to be promoted): ${{ steps.versions.outputs.NEXT_SHA }}"
+          echo "  Stable: Will be cut from:  : ${{ steps.versions.outputs.STABLE_SHA }} / ${{ steps.versions.outputs.PREVIOUS_STABLE_TAG }}"
+          echo "  Preview will be cut from:  : ${{ steps.versions.outputs.PREVIEW_SHA }} (${{ github.event.inputs.ref }})"
+          echo "  Nightly will be udpated in : ${{ steps.versions.outputs.NEXT_SHA }} (${{ github.event.inputs.ref }}). Previous nightly tag: ${{ steps.versions.outputs.PREVIOUS_NIGHTLY_TAG }}"
 
   test:
     name: 'Test ${{ matrix.channel }}'
