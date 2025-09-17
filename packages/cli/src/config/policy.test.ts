@@ -155,18 +155,6 @@ describe('createPolicyEngineConfig', () => {
     expect(excludedRule?.priority).toBe(195);
   });
 
-  it('should deny replace tool if useSmartEdit is true', () => {
-    const settings: Settings = {
-      useSmartEdit: true,
-    };
-    const config = createPolicyEngineConfig(settings, ApprovalMode.DEFAULT);
-    const rule = config.rules?.find(
-      (r) => r.toolName === 'replace' && r.decision === PolicyDecision.DENY,
-    );
-    expect(rule).toBeDefined();
-    expect(rule?.priority).toBe(200);
-  });
-
   it('should allow read-only tools if autoAccept is true', () => {
     const settings: Settings = {
       tools: { autoAccept: true },

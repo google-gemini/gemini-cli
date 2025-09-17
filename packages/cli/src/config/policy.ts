@@ -9,18 +9,32 @@ import {
   PolicyDecision,
   type PolicyRule,
   ApprovalMode,
+  // Read-only tools
+  GlobTool,
+  GrepTool,
+  LSTool,
+  ReadFileTool,
+  ReadManyFilesTool,
+  RipGrepTool,
+  // Write tools
+  EditTool,
+  MemoryTool,
+  ShellTool,
+  WriteFileTool,
+  WebFetchTool,
+  WebSearchTool,
 } from '@google/gemini-cli-core';
 import type { Settings } from './settings.js';
 
 // READ_ONLY_TOOLS is a list of built-in tools that do not modify the user's
 // files or system state.
 const READ_ONLY_TOOLS = new Set([
-  'glob',
-  'search_file_content',
-  'list_directory',
-  'read_file',
-  'read_many_files',
-  'google_web_search',
+  GlobTool.Name,
+  GrepTool.Name,
+  RipGrepTool.Name,
+  LSTool.Name,
+  ReadFileTool.Name,
+  ReadManyFilesTool.Name,
 ]);
 
 // WRITE_TOOLS is a list of built-in tools that can modify the user's files or
@@ -30,11 +44,12 @@ const READ_ONLY_TOOLS = new Set([
 // any tool that isn't read only will require a confirmation unless altered by
 // config and policy.
 const WRITE_TOOLS = new Set([
-  'replace',
-  'save_memory',
-  'run_shell_command',
-  'write_file',
-  'web_fetch',
+  EditTool.Name,
+  MemoryTool.Name,
+  ShellTool.Name,
+  WriteFileTool.Name,
+  WebFetchTool.Name,
+  WebSearchTool.Name,
 ]);
 
 export function createPolicyEngineConfig(
@@ -124,15 +139,6 @@ export function createPolicyEngineConfig(
     }
   }
 
-  // If smart edit is enabled, deny the replace tool.
-  if (settings.useSmartEdit) {
-    rules.push({
-      toolName: 'replace',
-      decision: PolicyDecision.DENY,
-      priority: 200,
-    });
-  }
-
   // If auto-accept is enabled, allow all read-only tools.
   // Priority: 50
   if (settings.tools?.autoAccept) {
@@ -164,7 +170,7 @@ export function createPolicyEngineConfig(
     });
   } else if (approvalMode === ApprovalMode.AUTO_EDIT) {
     rules.push({
-      toolName: 'edit',
+      toolName: EditTool.Name,
       decision: PolicyDecision.ALLOW,
       priority: 10,
     });
