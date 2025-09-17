@@ -743,7 +743,10 @@ describe('extension tests', () => {
         });
 
         const failed = await performWorkspaceExtensionMigration([
-          loadExtension(ext1Path)!,
+          loadExtension({
+            extensionDir: ext1Path,
+            workspaceDir: tempWorkspaceDir,
+          })!,
         ]);
 
         expect(failed).toEqual(['ext1']);
@@ -757,7 +760,12 @@ describe('extension tests', () => {
           version: '1.0.0',
         });
 
-        await performWorkspaceExtensionMigration([loadExtension(ext1Path)!]);
+        await performWorkspaceExtensionMigration([
+          loadExtension({
+            extensionDir: ext1Path,
+            workspaceDir: tempWorkspaceDir,
+          })!,
+        ]);
 
         const userExtensionsDir = path.join(
           tempHomeDir,
@@ -775,7 +783,12 @@ describe('extension tests', () => {
           version: '1.0.0',
         });
 
-        await performWorkspaceExtensionMigration([loadExtension(ext1Path)!]);
+        await performWorkspaceExtensionMigration([
+          loadExtension({
+            extensionDir: ext1Path,
+            workspaceDir: tempWorkspaceDir,
+          })!,
+        ]);
         const extensions = loadExtensions();
 
         expect(extensions).toEqual([]);
@@ -794,8 +807,14 @@ describe('extension tests', () => {
         version: '1.0.0',
       });
       const extensionsToMigrate: Extension[] = [
-        loadExtension(ext1Path)!,
-        loadExtension(ext2Path)!,
+        loadExtension({
+          extensionDir: ext1Path,
+          workspaceDir: tempWorkspaceDir,
+        })!,
+        loadExtension({
+          extensionDir: ext2Path,
+          workspaceDir: tempWorkspaceDir,
+        })!,
       ];
       const failed =
         await performWorkspaceExtensionMigration(extensionsToMigrate);
@@ -828,7 +847,10 @@ describe('extension tests', () => {
       });
 
       const extensions: Extension[] = [
-        loadExtension(ext1Path)!,
+        loadExtension({
+          extensionDir: ext1Path,
+          workspaceDir: tempWorkspaceDir,
+        })!,
         {
           path: '/ext/path/1',
           config: { name: 'ext2', version: '1.0.0' },
@@ -869,7 +891,12 @@ describe('extension tests', () => {
       });
       mockGit.getRemotes.mockResolvedValue([{ name: 'origin' }]);
       const extension = annotateActiveExtensions(
-        [loadExtension(targetExtDir)!],
+        [
+          loadExtension({
+            extensionDir: targetExtDir,
+            workspaceDir: tempWorkspaceDir,
+          })!,
+        ],
         [],
         process.cwd(),
       )[0];
@@ -920,7 +947,12 @@ describe('extension tests', () => {
       const setExtensionUpdateState = vi.fn();
 
       const extension = annotateActiveExtensions(
-        [loadExtension(extensionDir)!],
+        [
+          loadExtension({
+            extensionDir,
+            workspaceDir: tempWorkspaceDir,
+          })!,
+        ],
         [],
         process.cwd(),
       )[0];
@@ -951,7 +983,12 @@ describe('extension tests', () => {
 
       const setExtensionUpdateState = vi.fn();
       const extension = annotateActiveExtensions(
-        [loadExtension(extensionDir)!],
+        [
+          loadExtension({
+            extensionDir,
+            workspaceDir: tempWorkspaceDir,
+          })!,
+        ],
         [],
         process.cwd(),
       )[0];
@@ -980,7 +1017,12 @@ describe('extension tests', () => {
         },
       });
       const extension = annotateActiveExtensions(
-        [loadExtension(extensionDir)!],
+        [
+          loadExtension({
+            extensionDir,
+            workspaceDir: tempWorkspaceDir,
+          })!,
+        ],
         [],
         process.cwd(),
       )[0];
@@ -1007,7 +1049,12 @@ describe('extension tests', () => {
         },
       });
       const extension = annotateActiveExtensions(
-        [loadExtension(extensionDir)!],
+        [
+          loadExtension({
+            extensionDir,
+            workspaceDir: tempWorkspaceDir,
+          })!,
+        ],
         [],
         process.cwd(),
       )[0];
@@ -1031,7 +1078,12 @@ describe('extension tests', () => {
         installMetadata: { source: '/local/path', type: 'local' },
       });
       const extension = annotateActiveExtensions(
-        [loadExtension(extensionDir)!],
+        [
+          loadExtension({
+            extensionDir,
+            workspaceDir: tempWorkspaceDir,
+          })!,
+        ],
         [],
         process.cwd(),
       )[0];
@@ -1052,7 +1104,12 @@ describe('extension tests', () => {
         },
       });
       const extension = annotateActiveExtensions(
-        [loadExtension(extensionDir)!],
+        [
+          loadExtension({
+            extensionDir,
+            workspaceDir: tempWorkspaceDir,
+          })!,
+        ],
         [],
         process.cwd(),
       )[0];
@@ -1077,7 +1134,12 @@ describe('extension tests', () => {
         },
       });
       const extension = annotateActiveExtensions(
-        [loadExtension(extensionDir)!],
+        [
+          loadExtension({
+            extensionDir,
+            workspaceDir: tempWorkspaceDir,
+          })!,
+        ],
         [],
         process.cwd(),
       )[0];
@@ -1103,7 +1165,12 @@ describe('extension tests', () => {
         },
       });
       const extension = annotateActiveExtensions(
-        [loadExtension(extensionDir)!],
+        [
+          loadExtension({
+            extensionDir,
+            workspaceDir: tempWorkspaceDir,
+          })!,
+        ],
         [],
         process.cwd(),
       )[0];
@@ -1125,7 +1192,12 @@ describe('extension tests', () => {
         version: '1.0.0',
       });
       const extension = annotateActiveExtensions(
-        [loadExtension(extensionDir)!],
+        [
+          loadExtension({
+            extensionDir,
+            workspaceDir: tempWorkspaceDir,
+          })!,
+        ],
         [],
         process.cwd(),
       )[0];
@@ -1145,7 +1217,12 @@ describe('extension tests', () => {
         },
       });
       const extension = annotateActiveExtensions(
-        [loadExtension(extensionDir)!],
+        [
+          loadExtension({
+            extensionDir,
+            workspaceDir: tempWorkspaceDir,
+          })!,
+        ],
         [],
         process.cwd(),
       )[0];
