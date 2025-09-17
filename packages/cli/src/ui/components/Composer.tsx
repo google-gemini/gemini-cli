@@ -5,12 +5,13 @@
  */
 
 import { Box, Text } from 'ink';
+import { useMemo } from 'react';
 import { LoadingIndicator } from './LoadingIndicator.js';
 import { ContextSummaryDisplay } from './ContextSummaryDisplay.js';
 import { AutoAcceptIndicator } from './AutoAcceptIndicator.js';
 import { ShellModeIndicator } from './ShellModeIndicator.js';
 import { DetailedMessagesDisplay } from './DetailedMessagesDisplay.js';
-import { InputPrompt } from './InputPrompt.js';
+import { InputPrompt, calculatePromptWidths } from './InputPrompt.js';
 import { Footer, type FooterProps } from './Footer.js';
 import { ShowMoreLines } from './ShowMoreLines.js';
 import { OverflowProvider } from '../contexts/OverflowContext.js';
@@ -38,6 +39,12 @@ export const Composer = () => {
   const debugConsoleMaxHeight = Math.floor(Math.max(terminalWidth * 0.2, 5));
 
   const { contextFileNames, showAutoAcceptIndicator } = uiState;
+
+  // Use the container width of InputPrompt for width of DetailedMessagesDisplay
+  const { containerWidth } = useMemo(
+    () => calculatePromptWidths(uiState.terminalWidth),
+    [uiState.terminalWidth],
+  );
 
   // Build footer props from context values
   const footerProps: Omit<FooterProps, 'vimMode'> = {
@@ -163,7 +170,7 @@ export const Composer = () => {
               maxHeight={
                 uiState.constrainHeight ? debugConsoleMaxHeight : undefined
               }
-              width={uiState.inputWidth}
+              width={containerWidth}
             />
             <ShowMoreLines constrainHeight={uiState.constrainHeight} />
           </Box>
