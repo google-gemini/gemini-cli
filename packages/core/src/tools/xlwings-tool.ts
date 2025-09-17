@@ -5,7 +5,8 @@
  */
 
 import { BasePythonTool } from './base-python-tool.js';
-import type { ToolResult } from './tools.js';
+import { BaseToolInvocation } from './tools.js';
+import type { ToolResult, ToolInvocation, ToolCallConfirmationDetails } from './tools.js';
 import type { Config } from '../config/config.js';
 import type { ToolResponseData } from '../providers/types.js';
 
@@ -136,7 +137,9 @@ interface XlwingsParams {
   // Image operations
   'insert_image' | 'list_images' | 'delete_image' |   'resize_image' | 'move_image' | /* 'save_range_as_image' | */ 'save_chart_as_image' |   
   // Row/Column operations
-  'insert_row' | 'insert_column' | 'delete_row' | 'delete_column'| 'get_last_row' | 'get_last_column' ;
+  'insert_row' | 'insert_column' | 'delete_row' | 'delete_column'| 'get_last_row' | 'get_last_column' |
+  // PDF export operations
+  'export_workbook_to_pdf' | 'export_worksheet_to_pdf';
   
   /** Target workbook name (optional - uses active if not specified) */
   workbook?: string;
@@ -500,6 +503,14 @@ interface XlwingsParams {
       start_connection_site?: number;
       /** Connection site index on end shape (0-based) */
       end_connection_site?: number;
+      /** Arrow style at the beginning of the connector */
+      begin_arrow_style?: 'none' | 'arrow' | 'stealth' | 'diamond' | 'oval';
+      /** Arrow style at the end of the connector */
+      end_arrow_style?: 'none' | 'arrow' | 'stealth' | 'diamond' | 'oval';
+      /** Size of the beginning arrow */
+      begin_arrow_size?: 'small' | 'medium' | 'large';
+      /** Size of the ending arrow */
+      end_arrow_size?: 'small' | 'medium' | 'large';
     };
     /** Shape movement settings (for move_shape operations) */
     move?: {
@@ -522,6 +533,20 @@ interface XlwingsParams {
                'bottom_left' | 'bottom_center' | 'bottom_right';
     };
   };
+
+  /** PDF export configuration */
+  pdf?: {
+    /** Output PDF file path */
+    path?: string;
+    /** PDF quality: 'standard' or 'minimum' */
+    quality?: 'standard' | 'minimum';
+    /** Open PDF file after creation */
+    show?: boolean;
+    /** For workbook PDF: sheets to include */
+    include_sheets?: string[];
+    /** For workbook PDF: sheets to exclude */
+    exclude_sheets?: string[];
+  };
 }
 
 /**
@@ -540,19 +565,56 @@ interface XlwingsResult extends ToolResult {
   chart_created?: boolean;
   cells_affected?: number;
   xlwings_error?: string; // Renamed to avoid conflict with ToolResult.error
-  file_created?: boolean;
-  file_opened?: boolean;
-  file_saved?: boolean;
   structuredData?: ToolResponseData;  // Add structured response data
 
-  // Additional fields for operations - deleted_sheet_name, remaining_sheets are defined below
-  file_closed?: boolean;
-  file_path?: string;
-  
+  // File operation results
+  file?: {
+    created?: boolean;
+    opened?: boolean;
+    saved?: boolean;
+    closed?: boolean;
+    path?: string;
+    size?: number;
+    locked?: boolean;
+  };
+
+  // PDF export results
+  pdf?: {
+    created: boolean;
+    path: string;
+    opened?: boolean;
+    quality?: string;
+    sheets_included?: string[];
+    file_size?: number;
+  };
+
   // Image operation results
-  image_name?: string;
-  image_path?: string;
-  image_deleted?: boolean;
+  image?: {
+    name?: string;
+    path?: string;
+    deleted?: boolean;
+    inserted?: boolean;
+    resized?: boolean;
+    moved?: boolean;
+    dimensions?: {
+      original_width?: number;
+      original_height?: number;
+      new_width?: number;
+      new_height?: number;
+    };
+    position?: {
+      original_left?: number;
+      original_top?: number;
+      new_left?: number;
+      new_top?: number;
+    };
+    output?: {
+      path?: string;
+      size?: number;
+    };
+  };
+
+  // List of images (for list operations)
   images?: Array<{
     name: string;
     width?: number;
@@ -561,129 +623,171 @@ interface XlwingsResult extends ToolResult {
     top?: number;
   }>;
   total_images?: number;
-  original_width?: number;
-  original_height?: number;
-  new_width?: number;
-  new_height?: number;
-  original_left?: number;
-  original_top?: number;
-  new_position?: string;
-  output_path?: string;
-  file_size?: number;
-  
-  // Chart operation results  
-  chart_name?: string;
-  chart_type?: string;
-  position?: string;
+
+  // Chart operation results
+  chart?: {
+    name?: string;
+    type?: string;
+    created?: boolean;
+    updated?: boolean;
+    deleted?: boolean;
+    position?: string;
+    updated_properties?: string[];
+    title?: string;
+    x_axis_title?: string;
+    y_axis_title?: string;
+    data_range?: string;
+    categories_range?: string;
+  };
+
+  // List of charts (for list operations)
   charts?: Array<{
     name: string;
     chart_type: string;
     title?: string;
   }>;
   total_charts?: number;
-  updated_properties?: string[];
-  chart_deleted?: boolean;
   
-  // VBA operation results
-  module_name?: string;
-  action?: string;
-  code_lines?: number;
-  macro_name?: string;
-  macro_result?: unknown;
-  modules?: Array<{
-    name: string;
-    code_lines: number;
-  }>;
-  total_modules?: number;
-  deleted?: boolean;
+  // VBA operations
+  vba_operations?: {
+    module_name?: string;
+    action?: string;
+    code_lines?: number;
+    macro_name?: string;
+    macro_result?: unknown;
+    modules?: Array<{
+      name: string;
+      code_lines: number;
+    }>;
+    total_modules?: number;
+    module_deleted?: boolean;
+  };
   
-  // Other operation results
-  last_row?: number;
-  last_column?: number;
-  used_range?: string;
-  column?: string;
-  formula?: string;
-  find_text?: string;
-  replace_text?: string;
-  source_range?: string;
-  destination_range?: string;
-  values_only?: boolean;
-  source_worksheet?: string;
-  destination_worksheet?: string;
-  copy_method?: string;
-  new_sheet_name?: string;
-  total_cells?: number;
-  converted_cells?: number;
+  // Range and navigation operations
+  range_operations?: {
+    last_row?: number;
+    last_column?: number;
+    used_range?: string;
+    column?: string;
+  };
+
+  // Formula operations
+  formula_operations?: {
+    formula?: string;
+  };
+
+  // Find and replace operations
+  find_replace_operations?: {
+    find_text?: string;
+    replace_text?: string;
+    found_addresses?: string[];
+  };
+
+  // Copy and paste operations
+  copy_paste_operations?: {
+    source_range?: string;
+    destination_range?: string;
+    values_only?: boolean;
+    source_worksheet?: string;
+    destination_worksheet?: string;
+    copy_method?: string;
+  };
+
+  // Data conversion operations
+  data_conversion?: {
+    total_cells?: number;
+    converted_cells?: number;
+  };
   
-  // Search operation results
-  search_term?: string;
-  search_formulas?: boolean;
-  total_matches?: number;
-  matches?: Array<{
-    worksheet: string;
-    address: string;
-    row: number;
-    column: number;
-    column_name: string;
-    matched_value: unknown;
-    matched_formula?: string;
-    match_type: 'value' | 'formula';
-    row_data: Record<string, unknown>;
-  }>;
-  auto_selected?: string;
+  // Search operations
+  search_operations?: {
+    search_term?: string;
+    search_formulas?: boolean;
+    total_matches?: number;
+    matches?: Array<{
+      worksheet: string;
+      address: string;
+      row: number;
+      column: number;
+      column_name: string;
+      matched_value: unknown;
+      matched_formula?: string;
+      match_type: 'value' | 'formula';
+      row_data: Record<string, unknown>;
+    }>;
+    auto_selected?: string;
+  };
 
-  // Sort operation results
-  sort_criteria?: SortCriteria[];
-  rows_affected?: number;
+  // Sort operations
+  sort_operations?: {
+    sort_criteria?: SortCriteria[];
+    rows_affected?: number;
+  };
 
-  // Find operation results
-  found_addresses?: string[];
-
-  // Additional fields found in code
-  changes_made?: string[];
-  original_sheet_name?: string;
-  current_sheet_name?: string;
-  deleted_sheet_name?: string;
-  remaining_sheets?: string[];
-  remaining_sheets_count?: number;
-  sheet_name?: string;
-  move_type?: string;
-  source_workbook?: string;
-  target_workbook?: string;
-  source_sheets_remaining?: string[];
-  original_index?: number;
-  new_index?: number;
-  sheets_after?: Array<[number, string]>;
-  source_sheet_name?: string;
-  copy_type?: string;
-  copied_sheet_name?: string;
-  target_index?: number;
-  target_sheets_after?: string[];
-  target_sheets_count?: number;
-  copied_index?: number;
-  total_sheets?: number;
-  rows_inserted?: number;
-  columns_inserted?: number;
-  rows_deleted?: number;
-  columns_deleted?: number;
-  comments?: Array<{
-    address: string;
-    text: string;
-    author: string;
+  // Sheet operation results
+  sheet?: {
+    name?: string;
+    created?: boolean;
+    deleted?: boolean;
+    renamed?: boolean;
+    moved?: boolean;
+    copied?: boolean;
     visible?: boolean;
-  }>;
-  total_comments?: number;
-  merge_type?: string;
-  content_centered?: boolean;
-  cells_unmerged?: number;
-  unmerged_ranges?: string[];
-  auto_fit?: boolean;
-  total_rows?: number;
-  height_set?: number;
-  rows_processed?: number[];
-  total_columns?: number;
-  width_set?: number;
-  columns_processed?: string[];
+    original_name?: string;
+    new_name?: string;
+    deleted_name?: string;
+    original_index?: number;
+    new_index?: number;
+    changes_made?: string[];
+    move_type?: string;
+    copy_type?: string;
+    source_workbook?: string;
+    target_workbook?: string;
+    copied_sheet_name?: string;
+    target_index?: number;
+  };
+
+  // Workbook state after operations
+  workbook_state?: {
+    remaining_sheets?: string[];
+    remaining_sheets_count?: number;
+    source_sheets_remaining?: string[];
+    target_sheets_after?: string[];
+    target_sheets_count?: number;
+    sheets_after?: Array<[number, string]>;
+    total_sheets?: number;
+  };
+  // Table structure operations
+  table_structure?: {
+    rows_inserted?: number;
+    columns_inserted?: number;
+    rows_deleted?: number;
+    columns_deleted?: number;
+    total_rows?: number;
+    total_columns?: number;
+    height_set?: number;
+    width_set?: number;
+    rows_processed?: number[];
+    columns_processed?: string[];
+    auto_fit?: boolean;
+  };
+  // Comments operations
+  comments_info?: {
+    comments?: Array<{
+      address: string;
+      text: string;
+      author: string;
+      visible?: boolean;
+    }>;
+    total_comments?: number;
+  };
+  // Merge/unmerge operations
+  merge_operations?: {
+    merge_type?: string;
+    content_centered?: boolean;
+    cells_unmerged?: number;
+    unmerged_ranges?: string[];
+  };
   row_heights?: RowHeightInfo[];
   column_widths?: ColumnWidthInfo[];
   info_included?: {
@@ -693,11 +797,14 @@ interface XlwingsResult extends ToolResult {
     comments?: boolean;
   };
   cells?: CellInfo[];
-  cells_inserted?: number;
-  shift_direction?: string;
-  insertions_completed?: number;
-  total_requested?: number;
-  cells_deleted?: number;
+  // Cell operations
+  cell_operations?: {
+    cells_inserted?: number;
+    cells_deleted?: number;
+    shift_direction?: string;
+    insertions_completed?: number;
+    total_requested?: number;
+  };
   original_range_size?: {
     rows: number;
     columns: number;
@@ -805,6 +912,22 @@ export class XlwingsTool extends BasePythonTool<XlwingsParams, XlwingsResult> {
     return path.replace(/\\/g, '\\\\');
   }
 
+  /**
+   * Converts a hex color (e.g., "#FFA500") to RGB tuple for xlwings rgb_to_int function
+   */
+  private convertHexToRGBTuple(hexColor: string): string {
+    // Remove the # if present
+    const hex = hexColor.replace('#', '');
+
+    // Parse RGB components
+    const r = parseInt(hex.substring(0, 2), 16);
+    const g = parseInt(hex.substring(2, 4), 16);
+    const b = parseInt(hex.substring(4, 6), 16);
+
+    // Return as Python tuple string for rgb_to_int function
+    return `(${r}, ${g}, ${b})`;
+  }
+
   constructor(config: Config) {
     super(
       'xlwings',
@@ -817,7 +940,11 @@ export class XlwingsTool extends BasePythonTool<XlwingsParams, XlwingsResult> {
         properties: {
           op: {
             type: 'string',
-            enum: ['read_range', 'write_range', 'clear_range', 'formula_range', 'format_range', 'get_cell_info', 'insert_range', 'delete_range', 'copy_paste_range', 'replace_range', 'find_range', 'get_used_range', 'sort_range', 'merge_range', 'unmerge_range', 'get_sheet_info', 'set_row_height', 'set_column_width', 'get_row_height', 'get_column_width', 'add_comment', 'edit_comment', 'delete_comment', 'list_comments', 'create_chart', 'update_chart', 'delete_chart', 'list_charts', 'create_shape', 'create_textbox', 'list_shapes', 'modify_shape', 'delete_shape', 'move_shape', 'resize_shape', 'add_sheet', 'alter_sheet', 'delete_sheet', 'move_sheet', 'copy_sheet', 'list_workbooks', 'list_sheets', 'get_selection', 'set_selection', 'create_workbook', 'open_workbook', 'save_workbook', 'close_workbook', 'get_last_row', 'get_last_column', 'convert_data_types', 'add_vba_module', 'run_vba_macro', 'update_vba_code', 'list_vba_modules', 'delete_vba_module', 'insert_image', 'list_images', 'delete_image', 'resize_image', 'move_image', /* 'save_range_as_image', */ 'save_chart_as_image', 'list_apps', 'insert_row', 'insert_column', 'delete_row', 'delete_column', 'show_excel', 'hide_excel'],
+            enum: ['read_range', 'write_range', 'clear_range', 'formula_range', 'format_range', 'get_cell_info', 'insert_range', 'delete_range', 'copy_paste_range', 'replace_range', 'find_range', 'get_used_range', 'sort_range', 'merge_range', 'unmerge_range', 
+              'get_sheet_info', 'set_row_height', 'set_column_width', 'get_row_height', 'get_column_width', 'add_comment', 'edit_comment', 'delete_comment', 'list_comments', 'create_chart', 'update_chart', 'delete_chart', 'list_charts', 'create_shape', 
+              'create_textbox', 'list_shapes', 'modify_shape', 'delete_shape', 'move_shape', 'resize_shape', 'add_sheet', 'alter_sheet', 'delete_sheet', 'move_sheet', 'copy_sheet', 'list_workbooks', 'list_sheets', 'get_selection', 'set_selection', 'create_workbook', 
+              'open_workbook', 'save_workbook', 'close_workbook', 'get_last_row', 'get_last_column', 'convert_data_types', 'add_vba_module', 'run_vba_macro', 'update_vba_code', 'list_vba_modules', 'delete_vba_module', 'insert_image', 'list_images', 'delete_image', 
+              'resize_image', 'move_image', /* 'save_range_as_image', */ 'save_chart_as_image', 'export_workbook_to_pdf', 'export_worksheet_to_pdf', 'list_apps', 'insert_row', 'insert_column', 'delete_row', 'delete_column', 'show_excel', 'hide_excel'],
             description: 'Operation to perform. Key operations: get_sheet_info (recommended for table analysis), get_used_range (basic range info), get_cell_info (detailed single cell analysis), sort_range (use get_sheet_info first to identify data boundaries)'
           },
           workbook: {
@@ -1375,6 +1502,26 @@ export class XlwingsTool extends BasePythonTool<XlwingsParams, XlwingsResult> {
                   end_connection_site: {
                     type: 'number',
                     description: 'Connection site index on end shape (0-based)'
+                  },
+                  begin_arrow_style: {
+                    type: 'string',
+                    enum: ['none', 'arrow', 'stealth', 'diamond', 'oval'],
+                    description: 'Arrow style at the beginning of the connector'
+                  },
+                  end_arrow_style: {
+                    type: 'string',
+                    enum: ['none', 'arrow', 'stealth', 'diamond', 'oval'],
+                    description: 'Arrow style at the end of the connector'
+                  },
+                  begin_arrow_size: {
+                    type: 'string',
+                    enum: ['small', 'medium', 'large'],
+                    description: 'Size of the beginning arrow'
+                  },
+                  end_arrow_size: {
+                    type: 'string',
+                    enum: ['small', 'medium', 'large'],
+                    description: 'Size of the ending arrow'
                   }
                 }
               },
@@ -1451,7 +1598,7 @@ export class XlwingsTool extends BasePythonTool<XlwingsParams, XlwingsResult> {
           result.structuredData = this.generateStructuredResponseData(result, params);
 
           // Check if this operation has optimized success response
-          const optimizedOps = ['get_sheet_info', 'sort_range', 'read_range', 'find_range', 'get_cell_info', 'create_shape', 'list_shapes', 'create_textbox', 'write_range', 'format_range', 'delete_sheet', 'set_column_width', 'set_row_height'];
+          const optimizedOps = ['get_sheet_info', 'sort_range', 'read_range', 'find_range', 'get_cell_info', 'create_shape', 'list_shapes', 'create_textbox', 'modify_shape', 'write_range', 'format_range', 'delete_sheet', 'set_column_width', 'set_row_height'];
           if (optimizedOps.includes(result.operation || params.op)) {
             // Use new helpful success response generator
             llmContent = this.generateHelpfulSuccessResponse(result, params);
@@ -1526,19 +1673,19 @@ export class XlwingsTool extends BasePythonTool<XlwingsParams, XlwingsResult> {
             }
           }
           
-          if (result.chart_created) {
-            const chartType = result.chart_type || 'chart';
-            const position = result.position ? ` at position ${result.position}` : '';
-            const chartName = result.chart_name ? ` (${result.chart_name})` : '';
+          if (result.chart?.created) {
+            const chartType = result.chart.type || 'chart';
+            const position = result.chart.position ? ` at position ${result.chart.position}` : '';
+            const chartName = result.chart.name ? ` (${result.chart.name})` : '';
             llmContent += ` ${chartType.charAt(0).toUpperCase() + chartType.slice(1)} chart created successfully${position}${chartName}.`;
           }
-          
-          if (result.updated_properties && Array.isArray(result.updated_properties)) {
-            llmContent += ` Chart "${result.chart_name}" updated. Properties changed: ${result.updated_properties.join(', ')}.`;
+
+          if (result.chart?.updated && result.chart.updated_properties && Array.isArray(result.chart.updated_properties)) {
+            llmContent += ` Chart "${result.chart.name}" updated. Properties changed: ${result.chart.updated_properties.join(', ')}.`;
           }
-          
-          if (result.chart_deleted) {
-            llmContent += ` Chart "${result.chart_name}" deleted successfully.`;
+
+          if (result.chart?.deleted) {
+            llmContent += ` Chart "${result.chart.name}" deleted successfully.`;
           }
           
           if (result.charts && Array.isArray(result.charts)) {
@@ -1579,46 +1726,72 @@ export class XlwingsTool extends BasePythonTool<XlwingsParams, XlwingsResult> {
             }
           }
           
-          if (result.file_created) {
-            llmContent += ` New workbook created at: ${result.file_path}. File is locked by Excel/xlwings - use close_workbook to release the lock.`;
+          if (result.file?.created) {
+            llmContent += ` New workbook created at: ${result.file.path}. File is locked by Excel/xlwings - use close_workbook to release the lock.`;
           }
-          
-          if (result.file_opened) {
-            llmContent += ` Workbook opened from: ${result.file_path}. File is now locked by Excel/xlwings - use close_workbook to release the lock.`;
+
+          if (result.file?.opened) {
+            llmContent += ` Workbook opened from: ${result.file.path}. File is now locked by Excel/xlwings - use close_workbook to release the lock.`;
           }
-          
-          if (result.file_saved) {
-            llmContent += ` Workbook saved to: ${result.file_path}.`;
+
+          if (result.file?.saved) {
+            llmContent += ` Workbook saved to: ${result.file.path}.`;
           }
-          
-          if (result.file_closed) {
+
+          if (result.file?.closed) {
             llmContent += ` Workbook closed successfully. File lock released for other tools to access.`;
           }
-          
-          if (result.last_row) {
-            llmContent += ` Last row with data in column ${result.column} is row ${result.last_row}.`;
+
+          // PDF export results
+          if (result.pdf && result.pdf.created) {
+            const pdfInfo = result.pdf;
+            const sizeKB = pdfInfo.file_size ? ` (${(pdfInfo.file_size / 1024).toFixed(1)} KB)` : '';
+
+            if (result.operation === 'export_workbook_to_pdf') {
+              llmContent += ` PDF created from workbook "${result.workbook}"${sizeKB}: ${pdfInfo.path}`;
+              if (pdfInfo.sheets_included && pdfInfo.sheets_included.length > 0) {
+                if (pdfInfo.sheets_included.length === 1) {
+                  llmContent += ` [Sheet: ${pdfInfo.sheets_included[0]}]`;
+                } else {
+                  llmContent += ` [${pdfInfo.sheets_included.length} sheets included]`;
+                }
+              }
+            } else if (result.operation === 'export_worksheet_to_pdf') {
+              llmContent += ` PDF created from worksheet "${result.worksheet}"${sizeKB}: ${pdfInfo.path}`;
+            }
+
+            if (pdfInfo.opened) {
+              llmContent += ` (PDF opened automatically)`;
+            }
+            if (pdfInfo.quality === 'minimum') {
+              llmContent += ` [Compressed quality]`;
+            }
           }
           
-          if (result.used_range) {
-            llmContent += ` Used range is ${result.used_range} (${result.last_row} rows, ${result.last_column} columns).`;
+          if (result.range_operations?.last_row) {
+            llmContent += ` Last row with data in column ${result.range_operations?.column} is row ${result.range_operations.last_row}.`;
+          }
+          
+          if (result.range_operations?.used_range) {
+            llmContent += ` Used range is ${result.range_operations.used_range} (${result.range_operations?.last_row} rows, ${result.range_operations?.last_column} columns).`;
           }
           
           if (result.selection) {
             llmContent += ` Current selection is ${result.selection}.`;
           }
           
-          if (result.formula) {
-            llmContent += ` Formula set: ${result.formula} in range ${result.range}.`;
+          if (result.formula_operations?.formula) {
+            llmContent += ` Formula set: ${result.formula_operations.formula} in range ${result.range}.`;
           }
           
           if (result.find_text && result.replace_text) {
             llmContent += ` Find & Replace: "${result.find_text}" → "${result.replace_text}" (${result.cells_affected || 0} cells changed).`;
           }
           
-          if (result.source_range && result.destination_range) {
-            const copyMode = result.values_only ? 'values only' : 'full content';
-            const sourceInfo = result.source_worksheet ? `${result.source_worksheet}!${result.source_range.split('!').pop()}` : result.source_range;
-            const destInfo = result.destination_worksheet ? `${result.destination_worksheet}!${result.destination_range.split('!').pop()}` : result.destination_range;
+          if (result.copy_paste_operations?.source_range && result.copy_paste_operations?.destination_range) {
+            const copyMode = result.copy_paste_operations?.values_only ? 'values only' : 'full content';
+            const sourceInfo = result.copy_paste_operations?.source_worksheet ? `${result.copy_paste_operations.source_worksheet}!${result.copy_paste_operations.source_range.split('!').pop()}` : result.copy_paste_operations.source_range;
+            const destInfo = result.copy_paste_operations?.destination_worksheet ? `${result.copy_paste_operations.destination_worksheet}!${result.copy_paste_operations.destination_range.split('!').pop()}` : result.copy_paste_operations.destination_range;
             
             if (result.cut_mode) {
               llmContent += ` Cut ${copyMode} from ${sourceInfo} to ${destInfo}`;
@@ -1647,55 +1820,55 @@ export class XlwingsTool extends BasePythonTool<XlwingsParams, XlwingsResult> {
             llmContent += '.';
           }
           
-          if (result.new_sheet_name) {
-            llmContent += ` New worksheet "${result.new_sheet_name}" added.`;
+          if (result.sheet?.name && result.sheet?.created) {
+            llmContent += ` New worksheet "${result.sheet.name}" added.`;
           }
           
-          if (result.operation === 'alter_sheet' && result.changes_made && Array.isArray(result.changes_made)) {
-            const originalName = result.original_sheet_name || 'sheet';
-            const currentName = result.current_sheet_name || originalName;
+          if (result.operation === 'alter_sheet' && result.sheet?.changes_made && Array.isArray(result.sheet.changes_made)) {
+            const originalName = result.sheet.original_name || result.sheet.name || 'sheet';
+            const currentName = result.sheet.new_name || result.sheet.name || originalName;
             llmContent += ` Worksheet "${originalName}"`;
             if (originalName !== currentName) {
               llmContent += ` (now "${currentName}")`;
             }
-            llmContent += ` modified: ${result.changes_made.join(', ')}.`;
+            llmContent += ` modified: ${result.sheet.changes_made.join(', ')}.`;
           }
           
-          if (result.operation === 'delete_sheet' && result.deleted_sheet_name) {
-            llmContent += ` Worksheet "${result.deleted_sheet_name}" deleted.`;
-            if (result.remaining_sheets && Array.isArray(result.remaining_sheets)) {
-              llmContent += ` Remaining sheets: ${result.remaining_sheets.join(', ')} (${result.remaining_sheets_count} total).`;
+          if (result.operation === 'delete_sheet' && result.sheet?.deleted) {
+            llmContent += ` Worksheet "${result.sheet.deleted_name || result.sheet.name}" deleted.`;
+            if (result.workbook_state?.remaining_sheets && Array.isArray(result.workbook_state.remaining_sheets)) {
+              llmContent += ` Remaining sheets: ${result.workbook_state.remaining_sheets.join(', ')} (${result.workbook_state.remaining_sheets_count} total).`;
             }
           }
-          
-          if (result.operation === 'move_sheet' && result.sheet_name) {
-            if (result.move_type === 'cross_workbook') {
-              llmContent += ` Worksheet "${result.sheet_name}" moved from "${result.source_workbook}" to "${result.target_workbook}".`;
+
+          if (result.operation === 'move_sheet' && result.sheet?.moved) {
+            if (result.sheet.move_type === 'cross_workbook') {
+              llmContent += ` Worksheet "${result.sheet.name}" moved from "${result.sheet.source_workbook}" to "${result.sheet.target_workbook}".`;
               if (result.source_sheets_remaining && Array.isArray(result.source_sheets_remaining)) {
                 llmContent += ` Source workbook remaining sheets: ${result.source_sheets_remaining.join(', ')}.`;
               }
-            } else if (result.move_type === 'reorder_index' || result.move_type === 'reorder_position') {
-              llmContent += ` Worksheet "${result.sheet_name}" moved from index ${result.original_index} to index ${result.new_index} in "${result.workbook}".`;
+            } else if (result.sheet.move_type === 'reorder_index' || result.sheet.move_type === 'reorder_position') {
+              llmContent += ` Worksheet "${result.sheet.name}" moved from index ${result.sheet.original_index} to index ${result.sheet.new_index} in "${result.workbook}".`;
               if (result.sheets_after && Array.isArray(result.sheets_after)) {
                 llmContent += ` New order: ${result.sheets_after.map(([i, name]: [number, string]) => `${i}: ${name}`).join(', ')}.`;
               }
             }
           }
-          
-          if (result.operation === 'copy_sheet' && result.source_sheet_name) {
-            if (result.copy_type === 'cross_workbook') {
-              llmContent += ` Worksheet "${result.source_sheet_name}" copied from "${result.source_workbook}" to "${result.target_workbook}"`;
-              if (result.copied_sheet_name !== result.source_sheet_name) {
-                llmContent += ` as "${result.copied_sheet_name}"`;
+
+          if (result.operation === 'copy_sheet' && result.sheet?.copied) {
+            if (result.sheet.copy_type === 'cross_workbook') {
+              llmContent += ` Worksheet "${result.sheet.original_name || result.sheet.name}" copied from "${result.sheet.source_workbook || result.workbook}" to "${result.sheet.target_workbook || result.workbook}"`;
+              if (result.sheet.name && result.sheet.name !== result.sheet.original_name) {
+                llmContent += ` as "${result.sheet.name}"`;
               }
               llmContent += ` at index ${result.target_index}.`;
               if (result.target_sheets_after && Array.isArray(result.target_sheets_after)) {
                 llmContent += ` Target workbook now has ${result.target_sheets_count} sheets: ${result.target_sheets_after.join(', ')}.`;
               }
             } else if (result.copy_type === 'same_workbook') {
-              llmContent += ` Worksheet "${result.source_sheet_name}" copied to "${result.copied_sheet_name}" at index ${result.copied_index} in "${result.workbook}".`;
+              llmContent += ` Worksheet "${result.source_sheet_name}" copied to "${result.sheet?.name}" at index ${result.copied_index} in "${result.workbook}".`;
               if (result.sheets_after && Array.isArray(result.sheets_after)) {
-                llmContent += ` Workbook now has ${result.total_sheets} sheets: ${result.sheets_after.map(([i, name]: [number, string]) => `${i}: ${name}`).join(', ')}.`;
+                llmContent += ` Workbook now has ${result.workbook_state?.total_sheets} sheets: ${result.workbook_state?.sheets_after?.map(([i, name]: [number, string]) => `${i}: ${name}`).join(', ')}.`;
               }
             }
           }
@@ -1704,32 +1877,32 @@ export class XlwingsTool extends BasePythonTool<XlwingsParams, XlwingsResult> {
             llmContent += ` Data type conversion completed: ${result.converted_cells} out of ${result.total_cells} cells converted to proper numeric types.`;
           }
           
-          if (result.module_name && result.action) {
-            llmContent += ` VBA module "${result.module_name}" ${result.action} with ${result.code_lines} lines of code.`;
+          if (result.vba_operations?.module_name && result.vba_operations?.action) {
+            llmContent += ` VBA module "${result.vba_operations.module_name}" ${result.vba_operations.action} with ${result.vba_operations.code_lines} lines of code.`;
           }
           
-          if (result.macro_name && result.operation === 'run_vba_macro') {
-            const macroResult = result.macro_result !== null ? ` Result: ${result.macro_result}` : '';
-            llmContent += ` VBA macro "${result.macro_name}" executed successfully.${macroResult}`;
+          if (result.vba_operations?.macro_name && result.operation === 'run_vba_macro') {
+            const macroResult = result.vba_operations?.macro_result !== null ? ` Result: ${result.vba_operations.macro_result}` : '';
+            llmContent += ` VBA macro "${result.vba_operations.macro_name}" executed successfully.${macroResult}`;
           }
           
-          if (result.modules && result.total_modules !== undefined) {
-            llmContent += ` Found ${result.total_modules} VBA modules:\n`;
-            for (const module of result.modules) {
+          if (result.vba_operations?.modules && result.vba_operations?.total_modules !== undefined) {
+            llmContent += ` Found ${result.vba_operations.total_modules} VBA modules:\n`;
+            for (const module of result.vba_operations.modules) {
               llmContent += ` - ${module.name} (${module.code_lines} lines)\n`;
             }
           }
           
-          if (result.deleted && result.module_name) {
-            llmContent += ` VBA module "${result.module_name}" deleted successfully.`;
+          if (result.vba_operations?.module_deleted && result.vba_operations?.module_name) {
+            llmContent += ` VBA module "${result.vba_operations.module_name}" deleted successfully.`;
           }
           
           // Image operation results
-          if (result.image_name && result.operation === 'insert_image') {
+          if (result.image?.inserted && result.operation === 'insert_image') {
             const position = result.position ? ` at position ${result.position}` : '';
-            llmContent += ` Image "${result.image_name}" inserted successfully${position} from ${result.image_path}.`;
+            llmContent += ` Image "${result.image.name}" inserted successfully${position} from ${result.image.path}.`;
           }
-          
+
           if (result.images && Array.isArray(result.images)) {
             llmContent += ` Found ${result.total_images} images in ${result.worksheet}:\n`;
             for (const image of result.images) {
@@ -1738,48 +1911,52 @@ export class XlwingsTool extends BasePythonTool<XlwingsParams, XlwingsResult> {
               llmContent += ` - ${image.name}${size}${position}\n`;
             }
           }
-          
-          if (result.image_deleted) {
-            llmContent += ` Image "${result.image_name}" deleted successfully.`;
+
+          if (result.image?.deleted) {
+            llmContent += ` Image "${result.image.name}" deleted successfully.`;
           }
-          
-          if (result.operation === 'resize_image' && result.image_name) {
-            const originalSize = result.original_width && result.original_height ? 
-              ` Original size: ${result.original_width}×${result.original_height}.` : '';
-            const newSize = result.new_width && result.new_height ? 
-              ` New size: ${result.new_width}×${result.new_height}.` : '';
-            llmContent += ` Image "${result.image_name}" resized successfully.${originalSize}${newSize}`;
+
+          if (result.operation === 'resize_image' && result.image?.resized) {
+            const originalSize = result.image.dimensions?.original_width && result.image.dimensions?.original_height ?
+              ` Original size: ${result.image.dimensions.original_width}×${result.image.dimensions.original_height}.` : '';
+            const newSize = result.image.dimensions?.new_width && result.image.dimensions?.new_height ?
+              ` New size: ${result.image.dimensions.new_width}×${result.image.dimensions.new_height}.` : '';
+            llmContent += ` Image "${result.image.name}" resized successfully.${originalSize}${newSize}`;
           }
-          
-          if (result.operation === 'move_image' && result.image_name) {
-            const originalPos = result.original_left !== undefined && result.original_top !== undefined ? 
-              ` Original position: (${result.original_left}, ${result.original_top}).` : '';
-            const newPos = result.new_position ? ` New position: ${result.new_position}.` : '';
-            llmContent += ` Image "${result.image_name}" moved successfully.${originalPos}${newPos}`;
+
+          if (result.operation === 'move_image' && result.image?.moved) {
+            const originalPos = result.image.position?.original_left !== undefined && result.image.position?.original_top !== undefined ?
+              ` Original position: (${result.image.position.original_left}, ${result.image.position.original_top}).` : '';
+            const newPos = result.image.position?.new_left !== undefined && result.image.position?.new_top !== undefined ?
+              ` New position: (${result.image.position.new_left}, ${result.image.position.new_top}).` : '';
+            llmContent += ` Image "${result.image.name}" moved successfully.${originalPos}${newPos}`;
           }
           
           // TODO: Implement when Pillow library is available
-          /* if (result.operation === 'save_range_as_image' && result.file_created) {
-            const fileSize = result.file_size ? ` (${(result.file_size / 1024).toFixed(1)} KB)` : '';
+          /* if (result.operation === 'save_range_as_image' && result.file?.created) {
+            const fileSize = result.file.size ? ` (${(result.file.size / 1024).toFixed(1)} KB)` : '';
             llmContent += ` Range ${result.range} saved as image to ${result.output_path}${fileSize}.`;
           } */
-          
-          if (result.operation === 'save_chart_as_image' && result.file_created) {
-            const fileSize = result.file_size ? ` (${(result.file_size / 1024).toFixed(1)} KB)` : '';
-            llmContent += ` Chart "${result.chart_name}" saved as image to ${result.output_path}${fileSize}.`;
+
+          if (result.operation === 'save_chart_as_image' && result.file?.created) {
+            const fileSize = result.file.size ? ` (${(result.file.size / 1024).toFixed(1)} KB)` : '';
+            // chart_name is kept as a separate field for save_chart_as_image since it's an input parameter
+            const chartName = result.chart_name || 'chart';
+            llmContent += ` Chart "${chartName}" saved as image to ${result.output_path}${fileSize}.`;
           }
           
           // Search operation results
           if (result.operation === 'find_range') {
-            llmContent += ` Search for "${result.search_term}" completed.`;
-            if (result.total_matches === 0) {
+            llmContent += ` Search for "${result.search_operations?.search_term}" completed.`;
+            if ((result.search_operations?.total_matches || 0) === 0) {
               llmContent += ` No matches found.`;
-            } else if (result.total_matches === 1) {
-              const match = result.matches[0];
-              llmContent += ` Found 1 match in worksheet "${match.worksheet}" at ${match.address}.`;
-              if (result.auto_selected) {
-                llmContent += ` Automatically switched to worksheet and selected the cell.`;
-              }
+            } else if ((result.search_operations?.total_matches || 0) === 1) {
+              const match = result.search_operations?.matches?.[0];
+              if (match) {
+                llmContent += ` Found 1 match in worksheet "${match.worksheet}" at ${match.address}.`;
+                if (result.search_operations?.auto_selected) {
+                  llmContent += ` Automatically switched to worksheet and selected the cell.`;
+                }
               llmContent += `\n\n**Match Details:**\n`;
               llmContent += `- Location: ${match.worksheet}!${match.address}\n`;
               llmContent += `- Column: ${match.column_name}\n`;
@@ -1791,13 +1968,16 @@ export class XlwingsTool extends BasePythonTool<XlwingsParams, XlwingsResult> {
               for (const [key, value] of Object.entries(match.row_data)) {
                 llmContent += `- ${key}: ${value}\n`;
               }
-            } else {
-              llmContent += ` Found ${result.total_matches} matches:`;
-              for (const match of result.matches.slice(0, 10)) { // Show first 10 matches
-                llmContent += `\n- ${match.worksheet}!${match.address} (${match.column_name}): ${match.matched_value}`;
               }
-              if (result.total_matches > 10) {
-                llmContent += `\n... and ${result.total_matches - 10} more matches.`;
+            } else {
+              llmContent += ` Found ${result.search_operations?.total_matches} matches:`;
+              if (result.search_operations?.matches) {
+                for (const match of result.search_operations.matches.slice(0, 10)) { // Show first 10 matches
+                  llmContent += `\n- ${match.worksheet}!${match.address} (${match.column_name}): ${match.matched_value}`;
+                }
+                if ((result.search_operations?.total_matches || 0) > 10) {
+                  llmContent += `\n... and ${(result.search_operations?.total_matches || 0) - 10} more matches.`;
+                }
               }
             }
           }
@@ -1835,20 +2015,20 @@ export class XlwingsTool extends BasePythonTool<XlwingsParams, XlwingsResult> {
           }
           
           // Row/Column insertion/deletion results
-          if (result.operation === 'insert_row' && result.rows_inserted) {
-            llmContent += ` ${result.rows_inserted} row(s) inserted at position ${result.position}.`;
+          if (result.operation === 'insert_row' && result.table_structure?.rows_inserted) {
+            llmContent += ` ${result.table_structure.rows_inserted} row(s) inserted at position ${result.position}.`;
           }
           
-          if (result.operation === 'insert_column' && result.columns_inserted) {
-            llmContent += ` ${result.columns_inserted} column(s) inserted at position ${result.position}.`;
+          if (result.operation === 'insert_column' && result.table_structure?.columns_inserted) {
+            llmContent += ` ${result.table_structure.columns_inserted} column(s) inserted at position ${result.position}.`;
           }
           
-          if (result.operation === 'delete_row' && result.rows_deleted) {
-            llmContent += ` ${result.rows_deleted} row(s) deleted starting from position ${result.position}.`;
+          if (result.operation === 'delete_row' && result.table_structure?.rows_deleted) {
+            llmContent += ` ${result.table_structure.rows_deleted} row(s) deleted starting from position ${result.position}.`;
           }
           
-          if (result.operation === 'delete_column' && result.columns_deleted) {
-            llmContent += ` ${result.columns_deleted} column(s) deleted starting from position ${result.position}.`;
+          if (result.operation === 'delete_column' && result.table_structure?.columns_deleted) {
+            llmContent += ` ${result.table_structure.columns_deleted} column(s) deleted starting from position ${result.position}.`;
           }
           
           // Comment operation results
@@ -1877,16 +2057,16 @@ export class XlwingsTool extends BasePythonTool<XlwingsParams, XlwingsResult> {
           }
           
           if (result.operation === 'list_comments') {
-            if (result.total_comments === 0) {
+            if ((result.comments_info?.total_comments || 0) === 0) {
               llmContent += ` No comments found in worksheet "${result.worksheet}".`;
             } else {
-              llmContent += ` Found ${result.total_comments} comment(s) in worksheet "${result.worksheet}":`;
-              if (result.comments && Array.isArray(result.comments)) {
-                for (const comment of result.comments.slice(0, 5)) { // Show first 5 comments
+              llmContent += ` Found ${result.comments_info?.total_comments} comment(s) in worksheet "${result.worksheet}":`;
+              if (result.comments_info?.comments && Array.isArray(result.comments_info.comments)) {
+                for (const comment of result.comments_info.comments.slice(0, 5)) { // Show first 5 comments
                   llmContent += `\n  • ${comment.address}: "${comment.text}" (by ${comment.author})`;
                 }
-                if (result.total_comments > 5) {
-                  llmContent += `\n  ... and ${result.total_comments - 5} more comments.`;
+                if ((result.comments_info.total_comments || 0) > 5) {
+                  llmContent += `\n  ... and ${(result.comments_info.total_comments || 0) - 5} more comments.`;
                 }
               }
             }
@@ -1895,20 +2075,20 @@ export class XlwingsTool extends BasePythonTool<XlwingsParams, XlwingsResult> {
           // Merge operation results
           if (result.operation === 'merge_range') {
             llmContent += ` Cells merged in range ${result.range}`;
-            if (result.merge_type) {
-              llmContent += ` (${result.merge_type} merge)`;
+            if (result.merge_operations?.merge_type) {
+              llmContent += ` (${result.merge_operations.merge_type} merge)`;
             }
-            if (result.content_centered) {
+            if (result.merge_operations?.content_centered) {
               llmContent += ` with content centered`;
             }
             llmContent += `.`;
           }
           
           if (result.operation === 'unmerge_range') {
-            if (result.cells_unmerged === 0) {
+            if ((result.merge_operations?.cells_unmerged || 0) === 0) {
               llmContent += ` No merged cells found in range ${result.range}.`;
             } else {
-              llmContent += ` ${result.cells_unmerged} merged cell area(s) unmerged in range ${result.range}`;
+              llmContent += ` ${result.merge_operations?.cells_unmerged} merged cell area(s) unmerged in range ${result.range}`;
               if (result.unmerged_ranges && Array.isArray(result.unmerged_ranges)) {
                 if (result.unmerged_ranges.length <= 3) {
                   llmContent += `: ${result.unmerged_ranges.join(', ')}`;
@@ -2045,22 +2225,22 @@ export class XlwingsTool extends BasePythonTool<XlwingsParams, XlwingsResult> {
           }
           
           if (result.operation === 'insert_range') {
-            llmContent += ` Inserted ${result.cells_inserted} cell(s) in range ${result.range}`;
-            llmContent += ` with ${result.shift_direction} shift direction`;
-            if (result.insertions_completed !== result.total_requested / result.cells_inserted) {
-              llmContent += ` (${result.insertions_completed} of ${result.total_requested / result.cells_inserted} insertions completed)`;
+            llmContent += ` Inserted ${result.cell_operations?.cells_inserted} cell(s) in range ${result.range}`;
+            llmContent += ` with ${result.cell_operations?.shift_direction} shift direction`;
+            if ((result.cell_operations?.insertions_completed || 0) !== (result.cell_operations?.total_requested || 0) / (result.cell_operations?.cells_inserted || 1)) {
+              llmContent += ` (${result.cell_operations?.insertions_completed} of ${(result.cell_operations?.total_requested || 0) / (result.cell_operations?.cells_inserted || 1)} insertions completed)`;
             }
             llmContent += `.`;
           }
           
           if (result.operation === 'delete_range') {
-            llmContent += ` Deleted ${result.cells_deleted} cell(s) from range ${result.range}`;
-            llmContent += ` with ${result.shift_direction} shift direction`;
+            llmContent += ` Deleted ${result.cell_operations?.cells_deleted} cell(s) from range ${result.range}`;
+            llmContent += ` with ${result.cell_operations?.shift_direction} shift direction`;
             if (result.original_range_size) {
               llmContent += ` (original range: ${result.original_range_size.rows}*${result.original_range_size.columns})`;
             }
-            if (result.deletions_completed !== result.total_requested / result.cells_deleted) {
-              llmContent += ` (${result.deletions_completed} of ${result.total_requested / result.cells_deleted} deletions completed)`;
+            if ((result.deletions_completed || 0) !== (result.cell_operations?.total_requested || 0) / (result.cell_operations?.cells_deleted || 1)) {
+              llmContent += ` (${result.deletions_completed} of ${(result.cell_operations?.total_requested || 0) / (result.cell_operations?.cells_deleted || 1)} deletions completed)`;
             }
             llmContent += `.`;
           }
@@ -2166,9 +2346,9 @@ export class XlwingsTool extends BasePythonTool<XlwingsParams, XlwingsResult> {
               llmContent += ` by ${result.orientation === 'rows' ? 'columns' : 'rows'}`;
             }
             
-            if (result.sort_criteria && Array.isArray(result.sort_criteria)) {
+            if (result.sort_operations?.sort_criteria && Array.isArray(result.sort_operations.sort_criteria)) {
               llmContent += ` using criteria:`;
-              for (const criteria of result.sort_criteria.slice(0, 3)) {
+              for (const criteria of result.sort_operations.sort_criteria.slice(0, 3)) {
                 if (result.orientation === 'rows') {
                   llmContent += ` Column ${criteria.column} (${criteria.order})`;
                 } else {
@@ -2182,8 +2362,8 @@ export class XlwingsTool extends BasePythonTool<XlwingsParams, XlwingsResult> {
               // Remove trailing comma
               llmContent = llmContent.slice(0, -1);
               
-              if (result.sort_criteria.length > 3) {
-                llmContent += ` and ${result.sort_criteria.length - 3} more criteria`;
+              if (result.sort_operations.sort_criteria.length > 3) {
+                llmContent += ` and ${result.sort_operations.sort_criteria.length - 3} more criteria`;
               }
             }
             
@@ -2589,6 +2769,10 @@ def get_worksheet(wb, worksheet_name=None):
         return this.generateSaveWorkbookLogic(params);
       case 'close_workbook':
         return this.generateCloseWorkbookLogic(params);
+      case 'export_workbook_to_pdf':
+        return this.generateExportWorkbookToPdfLogic(params);
+      case 'export_worksheet_to_pdf':
+        return this.generateExportWorksheetToPdfLogic(params);
       case 'get_last_row':
         return this.generateGetLastRowLogic(params);
       case 'get_last_column':
@@ -3206,10 +3390,12 @@ result = {
     "operation": "create_chart",
     "workbook": wb.name,
     "worksheet": ws.name,
-    "chart_created": True,
-    "chart_name": final_chart_name,
-    "chart_type": chart_type,
-    "position": position
+    "chart": {
+        "created": True,
+        "name": final_chart_name,
+        "type": chart_type,
+        "position": position
+    }
 }
 print(json.dumps(result))`;
   }
@@ -3519,7 +3705,9 @@ result = {
     "workbook": wb.name,
     "worksheet": ws.name,
     "range": range_str,
-    "formula": formula
+    "formula_operations": {
+        "formula": formula
+    }
 }
 print(json.dumps(result))`;
   }
@@ -4059,8 +4247,10 @@ result = {
     "operation": "replace_range",
     "workbook": wb.name,
     "worksheet": ws.name,
-    "find_text": find_text,
-    "replace_text": replace_text,
+    "find_replace_operations": {
+        "find_text": find_text,
+        "replace_text": replace_text
+    },
     "cells_affected": cells_changed
 }
 print(json.dumps(result))`;
@@ -4107,7 +4297,10 @@ result = {
     "success": True,
     "operation": "add_sheet",
     "workbook": wb.name,
-    "new_sheet_name": sheet_name
+    "sheet": {
+        "name": sheet_name,
+        "created": True
+    }
 }
 print(json.dumps(result))`;
   }
@@ -4280,18 +4473,24 @@ try:
         "success": True,
         "operation": "alter_sheet",
         "workbook": wb.name,
-        "original_sheet_name": original_name,
-        "current_sheet_name": ws.name,
-        "changes_made": changes_made,
-        "tab_color": "${tabColor}" if "${tabColor}" else None
+        "sheet": {
+            "name": ws.name,
+            "original_name": original_name,
+            "new_name": ws.name if ws.name != original_name else None,
+            "renamed": ws.name != original_name,
+            "changes_made": changes_made,
+            "tab_color": "${tabColor}" if "${tabColor}" else None
+        }
     }
     
 except Exception as e:
     result = {
         "success": False,
-        "operation": "alter_sheet", 
+        "operation": "alter_sheet",
         "workbook": wb.name if 'wb' in locals() else None,
-        "original_sheet_name": original_name if 'original_name' in locals() else None,
+        "sheet": {
+            "original_name": original_name if 'original_name' in locals() else None
+        },
         "error": str(e)
     }
 
@@ -4402,7 +4601,11 @@ try:
         "success": True,
         "operation": "delete_sheet",
         "workbook": wb.name,
-        "deleted_sheet_name": sheet_name_to_delete,
+        "sheet": {
+            "name": sheet_name_to_delete,
+            "deleted_name": sheet_name_to_delete,
+            "deleted": True
+        },
         "remaining_sheets": [sheet.name for sheet in wb.sheets],
         "remaining_sheets_count": len(wb.sheets)
     }
@@ -4785,11 +4988,15 @@ try:
             "success": True,
             "operation": "move_sheet",
             "move_type": move_type,
-            "sheet_name": source_sheet_name,
-            "source_workbook": source_wb.name,
-            "target_workbook": target_wb.name,
-            "original_index": original_index,
-            "new_index": 0,
+            "sheet": {
+                "name": source_sheet_name,
+                "moved": True,
+                "move_type": "cross_workbook",
+                "source_workbook": source_wb.name,
+                "target_workbook": target_wb.name,
+                "original_index": original_index,
+                "new_index": 0
+            },
             "source_sheets_remaining": [sheet.name for sheet in source_wb.sheets],
             "target_sheets_after": [sheet.name for sheet in target_wb.sheets],
             "workbook_status": {
@@ -4914,12 +5121,16 @@ try:
         
         result = {
             "success": True,
-            "operation": "move_sheet", 
+            "operation": "move_sheet",
             "move_type": move_type,
-            "sheet_name": source_sheet_name,
+            "sheet": {
+                "name": source_sheet_name,
+                "moved": True,
+                "move_type": move_type,
+                "original_index": original_index - 1,  # Convert to 0-based
+                "new_index": final_index
+            },
             "workbook": source_wb.name,
-            "original_index": original_index - 1,  # Convert to 0-based
-            "new_index": final_index,
             "sheets_after": [(i, sheet.name) for i, sheet in enumerate(source_wb.sheets)],
             "workbook_status": {
                 "source_opened_by_operation": source_opened_by_us,
@@ -4950,7 +5161,9 @@ except Exception as e:
     result = {
         "success": False,
         "operation": "move_sheet",
-        "sheet_name": source_sheet_name if 'source_sheet_name' in locals() else worksheet_name,
+        "sheet": {
+            "name": source_sheet_name if 'source_sheet_name' in locals() else worksheet_name
+        },
         "source_workbook": source_wb.name if 'source_wb' in locals() and source_wb else "${params.workbook || ''}",
         "target_workbook": "${targetWorkbookPath}" if "${targetWorkbookPath}" else None,
         "error": str(e),
@@ -5401,10 +5614,15 @@ try:
             "success": True,
             "operation": "copy_sheet",
             "copy_type": copy_type,
+            "sheet": {
+                "name": copied_sheet_name,
+                "original_name": source_sheet_name,
+                "copied": True,
+                "copy_type": "cross_workbook",
+                "source_workbook": source_workbook_name,
+                "target_workbook": target_workbook_name
+            },
             "source_sheet_name": source_sheet_name,
-            "copied_sheet_name": copied_sheet_name,
-            "source_workbook": source_workbook_name,
-            "target_workbook": target_workbook_name,
             "source_index": original_index,
             "target_index": final_index,
             "target_sheets_after": target_sheets_after,
@@ -5423,8 +5641,13 @@ try:
             "success": True,
             "operation": "copy_sheet",
             "copy_type": copy_type,
+            "sheet": {
+                "name": copied_sheet_name,
+                "original_name": source_sheet_name,
+                "copied": True,
+                "copy_type": "same_workbook"
+            },
             "source_sheet_name": source_sheet_name,
-            "copied_sheet_name": copied_sheet_name,
             "workbook": source_workbook_name,
             "source_index": original_index,
             "copied_index": final_index,
@@ -5459,7 +5682,9 @@ except Exception as e:
     result = {
         "success": False,
         "operation": "copy_sheet",
-        "source_sheet_name": source_sheet_name if 'source_sheet_name' in locals() else worksheet_name,
+        "sheet": {
+            "original_name": source_sheet_name if 'source_sheet_name' in locals() else worksheet_name
+        },
         "source_workbook": source_wb.name if 'source_wb' in locals() and source_wb else "${params.workbook || ''}",
         "target_workbook": "${targetWorkbookPath}" if "${targetWorkbookPath}" else None,
         "error": str(e),
@@ -7820,10 +8045,13 @@ if ${visiblePython}:
 
 result = {
     "success": True,
-    "operation": "create_workbook", 
+    "operation": "create_workbook",
     "workbook": wb.name,
-    "file_created": True,
-    "file_path": saved_path
+    "file": {
+        "created": True,
+        "path": saved_path,
+        "locked": True
+    }
 }
 print(json.dumps(result))`;
   }
@@ -7855,8 +8083,11 @@ result = {
     "success": True,
     "operation": "open_workbook",
     "workbook": wb.name,
-    "file_opened": True,
-    "file_path": file_path
+    "file": {
+        "opened": True,
+        "path": file_path,
+        "locked": True
+    }
 }
 print(json.dumps(result))`;
   }
@@ -7902,8 +8133,10 @@ result = {
     "success": True,
     "operation": "save_workbook",
     "workbook": wb.name,
-    "file_saved": True,
-    "file_path": saved_path
+    "file": {
+        "saved": True,
+        "path": saved_path
+    }
 }
 print(json.dumps(result))`;
   }
@@ -7954,7 +8187,9 @@ result = {
     "success": True,
     "operation": "close_workbook",
     "workbook": workbook_name,
-    "file_closed": True
+    "file": {
+        "closed": True
+    }
 }
 print(json.dumps(result))`;
   }
@@ -8012,8 +8247,10 @@ result = {
     "operation": "get_last_row",
     "workbook": wb.name,
     "worksheet": ws.name,
-    "column": column,
-    "last_row": last_row
+    "range_operations": {
+        "column": column,
+        "last_row": last_row
+    }
 }
 print(json.dumps(result))`;
   }
@@ -8074,9 +8311,11 @@ result = {
     "operation": "get_last_column",
     "workbook": wb.name,
     "worksheet": ws.name,
-    "row": row,
-    "last_column": last_col,
-    "last_column_letter": last_col_letter
+    "range_operations": {
+        "last_column": last_col,
+        "last_column_letter": last_col_letter
+    },
+    "row": row
 }
 print(json.dumps(result))`;
   }
@@ -8137,10 +8376,12 @@ result = {
     "operation": "get_used_range",
     "workbook": wb.name,
     "worksheet": ws.name,
-    "used_range": range_address,
-    "last_row": last_row,
-    "last_column": last_col,
-    "last_column_letter": last_col_letter
+    "range_operations": {
+        "used_range": range_address,
+        "last_row": last_row,
+        "last_column": last_col,
+        "last_column_letter": last_col_letter
+    }
 }
 print(json.dumps(result))`;
   }
@@ -8216,8 +8457,10 @@ result = {
     "workbook": wb.name,
     "worksheet": ws.name,
     "range": range_obj.address,
-    "total_cells": total_cells,
-    "converted_cells": converted_cells
+    "data_conversion": {
+        "total_cells": total_cells,
+        "converted_cells": converted_cells
+    }
 }
 print(json.dumps(result))`;
   }
@@ -8282,9 +8525,11 @@ try:
         "success": True,
         "operation": "add_vba_module",
         "workbook": wb.name,
-        "module_name": "${moduleName}",
-        "action": action,
-        "code_lines": vba_module.CodeModule.CountOfLines
+        "vba_operations": {
+            "module_name": "${moduleName}",
+            "action": action,
+            "code_lines": vba_module.CodeModule.CountOfLines
+        }
     }
     print(json.dumps(result))
     
@@ -8346,8 +8591,10 @@ try:
         "success": True,
         "operation": "run_vba_macro",
         "workbook": wb.name,
-        "macro_name": "${macroName}",
-        "macro_result": safe_convert_data(result_value) if result_value is not None else None
+        "vba_operations": {
+            "macro_name": "${macroName}",
+            "macro_result": safe_convert_data(result_value) if result_value is not None else None
+        }
     }
     print(json.dumps(result))
     
@@ -8403,8 +8650,10 @@ try:
             "operation": "vba_operation",
             "error_type": "vba_module_not_found",
             "error_message": f"VBA module '${moduleName}' not found",
+            "vba_operations": {
+                "module_name": "${moduleName}"
+            },
             "context": {
-                "module_name": "${moduleName}",
                 "workbook": wb.name if wb else "${params.workbook || ''}"
             },
             "suggested_actions": [
@@ -8428,8 +8677,11 @@ try:
         "success": True,
         "operation": "update_vba_code",
         "workbook": wb.name,
-        "module_name": "${moduleName}",
-        "code_lines": vba_module.CodeModule.CountOfLines
+        "vba_operations": {
+            "module_name": "${moduleName}",
+            "action": "updated",
+            "code_lines": vba_module.CodeModule.CountOfLines
+        }
     }
     print(json.dumps(result))
     
@@ -8490,8 +8742,10 @@ try:
         "success": True,
         "operation": "list_vba_modules",
         "workbook": wb.name,
-        "modules": modules,
-        "total_modules": len(modules)
+        "vba_operations": {
+            "modules": modules,
+            "total_modules": len(modules)
+        }
     }
     print(json.dumps(result))
     
@@ -8553,8 +8807,9 @@ try:
             "success": True,
             "operation": "delete_vba_module",
             "workbook": wb.name,
-            "module_name": "${moduleName}",
-            "deleted": True
+            "vba_operations": {
+                "module_deleted": True
+            }
         }
         print(json.dumps(result))
     except:
@@ -8563,8 +8818,10 @@ try:
             "operation": "vba_operation",
             "error_type": "vba_module_not_found",
             "error_message": f"VBA module '${moduleName}' not found",
+            "vba_operations": {
+                "module_name": "${moduleName}"
+            },
             "context": {
-                "module_name": "${moduleName}",
                 "workbook": wb.name if wb else "${params.workbook || ''}"
             },
             "suggested_actions": [
@@ -8797,8 +9054,11 @@ try:
         "operation": "update_chart",
         "workbook": wb.name,
         "worksheet": ws.name,
-        "chart_name": "${chartName}",
-        "updated_properties": updated_properties
+        "chart": {
+            "updated": True,
+            "name": "${chartName}",
+            "updated_properties": updated_properties
+        }
     }
     print(json.dumps(result))
     
@@ -8885,8 +9145,10 @@ try:
         "operation": "delete_chart",
         "workbook": wb.name,
         "worksheet": ws.name,
-        "chart_name": "${chartName}",
-        "chart_deleted": True
+        "chart": {
+            "deleted": True,
+            "name": "${chartName}"
+        }
     }
     print(json.dumps(result))
     
@@ -9054,11 +9316,16 @@ try:
         "operation": "insert_image",
         "workbook": wb.name,
         "worksheet": ws.name,
-        "image_name": final_name,
-        "image_path": image_path,
-        "position": "${range}",
-        "width": picture.width,
-        "height": picture.height
+        "image": {
+            "name": final_name,
+            "path": image_path,
+            "inserted": True,
+            "dimensions": {
+                "new_width": picture.width,
+                "new_height": picture.height
+            }
+        },
+        "position": "${range}"
     }
     print(json.dumps(result))
     
@@ -9225,8 +9492,10 @@ try:
         "operation": "delete_image",
         "workbook": wb.name,
         "worksheet": ws.name,
-        "image_name": "${imageName}",
-        "image_deleted": True
+        "image": {
+            "name": "${imageName}",
+            "deleted": True
+        }
     }
     print(json.dumps(result))
     
@@ -9320,11 +9589,16 @@ try:
         "operation": "resize_image",
         "workbook": wb.name,
         "worksheet": ws.name,
-        "image_name": "${imageName}",
-        "original_width": original_width,
-        "original_height": original_height,
-        "new_width": picture.width,
-        "new_height": picture.height
+        "image": {
+            "name": "${imageName}",
+            "resized": True,
+            "dimensions": {
+                "original_width": original_width,
+                "original_height": original_height,
+                "new_width": picture.width,
+                "new_height": picture.height
+            }
+        }
     }
     print(json.dumps(result))
     
@@ -9339,14 +9613,14 @@ except Exception as e:
 
   private generateMoveImageLogic(params: XlwingsParams): string {
     const imageName = params.image?.name || '';
-    const range = params.range || '';
-    
+    const position = params.image?.position || '';
+
     if (!imageName) {
       return 'raise ValueError("image.name is required for move_image operation")';
     }
-    
-    if (!range) {
-      return 'raise ValueError("range is required for move_image operation")';
+
+    if (!position) {
+      return 'raise ValueError("image.position is required for move_image operation")';
     }
     
     return `
@@ -9409,10 +9683,10 @@ try:
         exit()
     
     # Get new position
-    target_range = ws.range("${range}")
+    target_range = ws.range("${position}")
     original_left = picture.left
     original_top = picture.top
-    
+
     # Move image
     picture.left = target_range.left
     picture.top = target_range.top
@@ -9422,12 +9696,17 @@ try:
         "operation": "move_image",
         "workbook": wb.name,
         "worksheet": ws.name,
-        "image_name": "${imageName}",
-        "new_position": "${range}",
-        "original_left": original_left,
-        "original_top": original_top,
-        "new_left": picture.left,
-        "new_top": picture.top
+        "image": {
+            "name": "${imageName}",
+            "moved": True,
+            "position": {
+                "original_left": original_left,
+                "original_top": original_top,
+                "new_left": picture.left,
+                "new_top": picture.top
+            }
+        },
+        "position": "${position}"
     }
     print(json.dumps(result))
     
@@ -9522,8 +9801,11 @@ try:
         "worksheet": ws.name,
         "range": "${range}",
         "output_path": output_path,
-        "file_created": file_created,
-        "file_size": file_size
+        "file": {
+            "created": file_created,
+            "path": output_path,
+            "size": file_size
+        }
     }
     print(json.dumps(result))
     
@@ -9629,8 +9911,11 @@ try:
         "worksheet": ws.name,
         "chart_name": "${chartName}",
         "output_path": output_path,
-        "file_created": file_created,
-        "file_size": file_size
+        "file": {
+            "created": file_created,
+            "path": output_path,
+            "size": file_size
+        }
     }
     print(json.dumps(result))
     
@@ -9842,11 +10127,13 @@ try:
         "success": True,
         "operation": "find_range",
         "workbook": wb.name,
-        "search_term": search_term,
-        "search_formulas": search_formulas,
-        "total_matches": len(matches),
-        "matches": matches,
-        "auto_selected": selected_address if auto_select and len(matches) == 1 else None
+        "search_operations": {
+            "search_term": search_term,
+            "search_formulas": search_formulas,
+            "total_matches": len(matches),
+            "matches": matches,
+            "auto_selected": selected_address if auto_select and len(matches) == 1 else None
+        }
     }
     print(json.dumps(result))
     
@@ -10202,20 +10489,20 @@ try:
     if shape_type in connector_type_mapping:
         # Use AddConnector method for connector shapes
         shape_obj = ws.api.Shapes.AddConnector(
-            Type=connector_type_mapping[shape_type],
-            BeginX=${left},
-            BeginY=${top},
-            EndX=${left + width},
-            EndY=${top + height}
+            connector_type_mapping[shape_type],
+            float(${left}),
+            float(${top}),
+            float(${left + width}),
+            float(${top + height})
         )
     elif shape_type in shape_type_mapping:
         # Use AddShape method for regular shapes
         shape_obj = ws.api.Shapes.AddShape(
-            Type=shape_type_mapping[shape_type],
-            Left=${left},
-            Top=${top},
-            Width=${width},
-            Height=${height}
+            shape_type_mapping[shape_type],
+            float(${left}),
+            float(${top}),
+            float(${width}),
+            float(${height})
         )
     else:
         raise ValueError(f"Unsupported shape type: {shape_type}. Supported types: {list(shape_type_mapping.keys()) + list(connector_type_mapping.keys())}")
@@ -10225,13 +10512,34 @@ try:
 
     # Add text if provided
     if "${text}":
-        shape_obj.TextFrame2.TextRange.Text = "${text}"
+        try:
+            # Try TextFrame2 first (preferred for newer Excel versions)
+            if hasattr(shape_obj, 'TextFrame2') and shape_obj.TextFrame2:
+                shape_obj.TextFrame2.TextRange.Text = "${text}"
+            # Fallback to TextFrame for older Excel or shape types that don't support TextFrame2
+            elif hasattr(shape_obj, 'TextFrame') and shape_obj.TextFrame:
+                shape_obj.TextFrame.Characters().Text = "${text}"
+        except Exception as text_error:
+            print(f"Warning: Could not set text for shape: {text_error}")
+            # Continue without failing the entire shape creation
 
     ${this.generateConnectionLogic(shape)}
 
     ${this.generateShapeStyleCode(shape)}
     ${this.generateShapeTextFormatCode(shape)}
     
+    # Collect arrow status for connectors
+    arrow_status = {}
+    if hasattr(shape_obj, 'Line') and "${shapeType}" in ['straight_connector', 'elbow_connector', 'curved_connector']:
+        try:
+            arrow_status = {
+                "has_line_property": True,
+                "begin_arrow_style": getattr(shape_obj.Line, 'BeginArrowheadStyle', None),
+                "end_arrow_style": getattr(shape_obj.Line, 'EndArrowheadStyle', None)
+            }
+        except Exception as arrow_e:
+            arrow_status = {"error": str(arrow_e)}
+
     result = {
         "success": True,
         "operation": "create_shape",
@@ -10244,7 +10552,9 @@ try:
             "size": {"width": ${width}, "height": ${height}},
             "text": "${text}",
             "rotation": 0,
-            "visible": True
+            "visible": True${shape.connection ? `,
+            "connection": ${JSON.stringify(shape.connection)}` : ''},
+            "arrow_status": arrow_status
         }
     }
     print(json.dumps(result))
@@ -10403,7 +10713,18 @@ try:
         "operation": "modify_shape",
         "workbook": wb.name,
         "worksheet": ws.name,
-        "shape_name": "${shapeName}",
+        "shape": {
+            "name": "${shapeName}",
+            "type": getattr(target_shape, 'Type', 'Unknown'),
+            "position": {
+                "left": getattr(target_shape, 'Left', 0),
+                "top": getattr(target_shape, 'Top', 0)
+            },
+            "size": {
+                "width": getattr(target_shape, 'Width', 0),
+                "height": getattr(target_shape, 'Height', 0)
+            }
+        },
         "modifications_applied": True
     }
     print(json.dumps(result))
@@ -10580,7 +10901,7 @@ except Exception as e:
     print(json.dumps(result))`;
   }
 
-  private generateConnectionLogic(shape: { connection?: { start_shape?: string, end_shape?: string, start_connection_site?: number, end_connection_site?: number }, type?: string }): string {
+  private generateConnectionLogic(shape: { connection?: { start_shape?: string, end_shape?: string, start_connection_site?: number, end_connection_site?: number, begin_arrow_style?: 'none' | 'arrow' | 'stealth' | 'diamond' | 'oval', end_arrow_style?: 'none' | 'arrow' | 'stealth' | 'diamond' | 'oval', begin_arrow_size?: 'small' | 'medium' | 'large', end_arrow_size?: 'small' | 'medium' | 'large' }, type?: string }): string {
     if (!shape.connection || !shape.connection.start_shape || !shape.connection.end_shape) {
       return '';
     }
@@ -10614,6 +10935,47 @@ except Exception as e:
             shape_obj.ConnectorFormat.BeginConnect(ConnectedShape=start_shape, ConnectionSite=start_site)
             shape_obj.ConnectorFormat.EndConnect(ConnectedShape=end_shape, ConnectionSite=end_site)
 
+            # Set arrow styles if specified - use Line property for connectors
+            if hasattr(shape_obj, 'Line'):
+                # Arrow style constants for MsoArrowheadStyle
+                arrow_style_map = {
+                    'none': 1,      # msoArrowheadNone
+                    'arrow': 2,     # msoArrowheadTriangle
+                    'stealth': 4,   # msoArrowheadStealth
+                    'diamond': 5,   # msoArrowheadDiamond
+                    'oval': 6       # msoArrowheadOval
+                }
+
+                arrow_length_map = {
+                    'small': 1,     # msoArrowheadShort
+                    'medium': 2,    # msoArrowheadMedium
+                    'large': 3      # msoArrowheadLong
+                }
+
+                arrow_width_map = {
+                    'small': 1,     # msoArrowheadNarrow
+                    'medium': 2,    # msoArrowheadMedium
+                    'large': 3      # msoArrowheadWide
+                }
+
+                # Set begin arrow style
+${connection.begin_arrow_style ? `                if "${connection.begin_arrow_style}" in arrow_style_map:
+                    shape_obj.Line.BeginArrowheadStyle = arrow_style_map["${connection.begin_arrow_style}"]` : ''}
+
+                # Set end arrow style
+${connection.end_arrow_style ? `                if "${connection.end_arrow_style}" in arrow_style_map:
+                    shape_obj.Line.EndArrowheadStyle = arrow_style_map["${connection.end_arrow_style}"]` : ''}
+
+                # Set begin arrow size
+${connection.begin_arrow_size ? `                if "${connection.begin_arrow_size}" in arrow_length_map:
+                    shape_obj.Line.BeginArrowheadLength = arrow_length_map["${connection.begin_arrow_size}"]
+                    shape_obj.Line.BeginArrowheadWidth = arrow_width_map["${connection.begin_arrow_size}"]` : ''}
+
+                # Set end arrow size
+${connection.end_arrow_size ? `                if "${connection.end_arrow_size}" in arrow_length_map:
+                    shape_obj.Line.EndArrowheadLength = arrow_length_map["${connection.end_arrow_size}"]
+                    shape_obj.Line.EndArrowheadWidth = arrow_width_map["${connection.end_arrow_size}"]` : ''}
+
             # Automatically find the shortest path between the connected shapes
             shape_obj.RerouteConnections()
 
@@ -10631,21 +10993,23 @@ except Exception as e:
     const style = shape.style;
 
     if (style.fill_color) {
-      styleCode += `    # Set fill color\n    try:\n        shape_obj.Fill.ForeColor.RGB = 0x${style.fill_color.replace('#', '')}\n    except:\n        pass  # Fill color not supported for this shape type\n`;
+      const rgbTuple = this.convertHexToRGBTuple(style.fill_color);
+      styleCode += `    # Set fill color using xlwings rgb_to_int\n    try:\n        from xlwings.utils import rgb_to_int\n        shape_obj.api.Fill.ForeColor.RGB = rgb_to_int(${rgbTuple})\n    except Exception as e:\n        print(f"Fill color error: {e}")  # Debug fill color issues\n`;
     }
 
     if (style.border_color || style.border_width || style.border_style) {
       styleCode += `    # Set border properties\n`;
       if (style.border_color) {
-        styleCode += `    try:\n        shape_obj.Line.ForeColor.RGB = 0x${style.border_color.replace('#', '')}\n    except:\n        pass  # Border color not supported\n`;
+        const rgbTuple = this.convertHexToRGBTuple(style.border_color);
+        styleCode += `    try:\n        from xlwings.utils import rgb_to_int\n        shape_obj.api.Line.ForeColor.RGB = rgb_to_int(${rgbTuple})\n    except Exception as e:\n        print(f"Border color error: {e}")  # Debug border color issues\n`;
       }
       if (style.border_width) {
-        styleCode += `    try:\n        shape_obj.Line.Weight = ${style.border_width}\n    except:\n        pass  # Border width not supported\n`;
+        styleCode += `    try:\n        shape_obj.api.Line.Weight = ${style.border_width}\n    except Exception as e:\n        print(f"Border width error: {e}")  # Debug border width issues\n`;
       }
     }
 
     if (style.transparency) {
-      styleCode += `    # Set transparency\n    try:\n        shape_obj.Fill.Transparency = ${style.transparency}\n    except:\n        pass  # Transparency not supported\n`;
+      styleCode += `    # Set transparency\n    try:\n        shape_obj.api.Fill.Transparency = ${style.transparency}\n    except Exception as e:\n        print(f"Transparency error: {e}")  # Debug transparency issues\n`;
     }
 
     return styleCode;
@@ -10657,53 +11021,66 @@ except Exception as e:
     let formatCode = '';
     const textFormat = shape.text_format;
 
+    formatCode += `    # Apply text formatting with error handling\n`;
+    formatCode += `    try:\n`;
+
     if (textFormat.font) {
-      formatCode += `    # Set font properties\n`;
+      formatCode += `        # Set font properties\n`;
       const font = textFormat.font;
       if (font.name) {
-        formatCode += `    shape_obj.TextFrame2.TextRange.Font.Name = "${font.name}"\n`;
+        formatCode += `        if hasattr(shape_obj, 'TextFrame2') and shape_obj.TextFrame2:\n`;
+        formatCode += `            shape_obj.TextFrame2.TextRange.Font.Name = "${font.name}"\n`;
       }
       if (font.size) {
-        formatCode += `    shape_obj.TextFrame2.TextRange.Font.Size = ${font.size}\n`;
+        formatCode += `        if hasattr(shape_obj, 'TextFrame2') and shape_obj.TextFrame2:\n`;
+        formatCode += `            shape_obj.TextFrame2.TextRange.Font.Size = ${font.size}\n`;
       }
       if (font.bold) {
-        formatCode += `    shape_obj.TextFrame2.TextRange.Font.Bold = ${font.bold ? 'True' : 'False'}\n`;
+        formatCode += `        if hasattr(shape_obj, 'TextFrame2') and shape_obj.TextFrame2:\n`;
+        formatCode += `            shape_obj.TextFrame2.TextRange.Font.Bold = ${font.bold ? 'True' : 'False'}\n`;
       }
       if (font.italic) {
-        formatCode += `    shape_obj.TextFrame2.TextRange.Font.Italic = ${font.italic ? 'True' : 'False'}\n`;
+        formatCode += `        if hasattr(shape_obj, 'TextFrame2') and shape_obj.TextFrame2:\n`;
+        formatCode += `            shape_obj.TextFrame2.TextRange.Font.Italic = ${font.italic ? 'True' : 'False'}\n`;
       }
       if (font.color) {
-        formatCode += `    shape_obj.TextFrame2.TextRange.Font.Fill.ForeColor.RGB = 0x${font.color.replace('#', '')}\n`;
+        formatCode += `        if hasattr(shape_obj, 'TextFrame2') and shape_obj.TextFrame2:\n`;
+        formatCode += `            shape_obj.TextFrame2.TextRange.Font.Fill.ForeColor.RGB = 0x${font.color.replace('#', '')}\n`;
       }
     }
 
     if (textFormat.alignment) {
-      formatCode += `    # Set text alignment\n`;
+      formatCode += `        # Set text alignment\n`;
       const alignment = textFormat.alignment;
       if (alignment.horizontal) {
         const alignmentMap: Record<string, string> = {
           'left': 'xlHAlignLeft',
-          'center': 'xlHAlignCenter', 
+          'center': 'xlHAlignCenter',
           'right': 'xlHAlignRight',
           'justify': 'xlHAlignJustify'
         };
         const horizontalAlignment = alignmentMap[alignment.horizontal as string] || 'xlHAlignCenter';
         const alignmentValue = horizontalAlignment.replace('xlHAlign', '');
         const alignmentMap2 = {'Left': 1, 'Center': 2, 'Right': 3, 'Justify': 4};
-        formatCode += `    shape_obj.TextFrame2.TextRange.ParagraphFormat.Alignment = ${alignmentMap2[alignmentValue as keyof typeof alignmentMap2] || 2}\n`;
+        formatCode += `        if hasattr(shape_obj, 'TextFrame2') and shape_obj.TextFrame2:\n`;
+        formatCode += `            shape_obj.TextFrame2.TextRange.ParagraphFormat.Alignment = ${alignmentMap2[alignmentValue as keyof typeof alignmentMap2] || 2}\n`;
       }
       if (alignment.vertical) {
-        const vAlignmentMap: Record<string, string> = {
-          'top': 'xlVAlignTop',
-          'middle': 'xlVAlignCenter',
-          'bottom': 'xlVAlignBottom'
+        // Use correct VerticalAnchor constants for Excel COM API
+        const vAlignmentMap: Record<string, number> = {
+          'top': 1,     // msoAnchorTop
+          'middle': 3,  // msoAnchorMiddle
+          'bottom': 4   // msoAnchorBottom
         };
-        const verticalAlignment = vAlignmentMap[alignment.vertical as string] || 'xlVAlignCenter';
-        const vAlignmentValue = verticalAlignment.replace('xlVAlign', '');
-        const vAlignmentMap2 = {'Top': 1, 'Center': 2, 'Bottom': 3};
-        formatCode += `    shape_obj.TextFrame2.VerticalAnchor = ${vAlignmentMap2[vAlignmentValue as keyof typeof vAlignmentMap2] || 2}\n`;
+        const verticalValue = vAlignmentMap[alignment.vertical as string] || 3;
+        formatCode += `        if hasattr(shape_obj, 'TextFrame2') and shape_obj.TextFrame2:\n`;
+        formatCode += `            shape_obj.TextFrame2.VerticalAnchor = ${verticalValue}\n`;
       }
     }
+
+    formatCode += `    except Exception as format_error:\n`;
+    formatCode += `        print(f"Warning: Text formatting failed: {format_error}")\n`;
+    formatCode += `        # Continue without failing the shape creation\n`;
 
     return formatCode;
   }
@@ -10917,13 +11294,13 @@ print(json.dumps(result))`;
     if (result.range) structuredData.details!['range'] = result.range;
 
     // Add file information
-    if (result.file_path) {
-      if (result.file_created) {
-        structuredData.files!.created = [result.file_path];
-      } else if (result.file_opened) {
-        structuredData.files!.input = [result.file_path];
-      } else if (result.file_saved) {
-        structuredData.files!.output = [result.file_path];
+    if (result.file?.path) {
+      if (result.file.created) {
+        structuredData.files!.created = [result.file.path];
+      } else if (result.file.opened) {
+        structuredData.files!.input = [result.file.path];
+      } else if (result.file.saved) {
+        structuredData.files!.output = [result.file.path];
       }
     }
 
@@ -10949,7 +11326,7 @@ print(json.dumps(result))`;
 
     switch (operation) {
       case 'delete_sheet':
-        return `Deleted worksheet "${result.deleted_sheet_name}"`;
+        return `Deleted worksheet "${result.sheet?.deleted_name || result.sheet?.name}"`;
       case 'read_range':
         {
           const rows = result.data?.length || 0;
@@ -10983,9 +11360,9 @@ print(json.dumps(result))`;
         ];
         break;
       case 'delete_sheet':
-        if (result.remaining_sheets && result.remaining_sheets.length > 0) {
+        if (result.workbook_state?.remaining_sheets && result.workbook_state.remaining_sheets.length > 0) {
           structuredData.nextActions = [
-            `Switch to: ${result.remaining_sheets[0]}`,
+            `Switch to: ${result.workbook_state.remaining_sheets[0]}`,
             'Verify remaining data integrity'
           ];
         }
@@ -11026,6 +11403,8 @@ print(json.dumps(result))`;
         return this.generateListShapesSuccessResponse(result, params);
       case 'create_textbox':
         return this.generateCreateTextboxSuccessResponse(result, params);
+      case 'modify_shape':
+        return this.generateModifyShapeSuccessResponse(result, params);
       case 'write_range':
         return this.generateWriteRangeSuccessResponse(result, params);
       case 'format_range':
@@ -11290,14 +11669,14 @@ print(json.dumps(result))`;
    * Generate helpful success response for sort_range operation
    */
   private generateSortRangeSuccessResponse(result: XlwingsResult, params: XlwingsParams): string {
-    let response = `Sorted **${result.rows_affected || 'data'}** by specified criteria.`;
+    let response = `Sorted **${result.sort_operations?.rows_affected || 'data'}** by specified criteria.`;
     
     if (result.range) {
       response += `\n\n**Range sorted:** ${result.range}`;
     }
     
-    if (result.sort_criteria && result.sort_criteria.length > 0) {
-      response += `\n**Sort criteria:** ${result.sort_criteria.slice(0, 3).map((c: SortCriteria) => `${c.column} (${c.order})`).join(', ')}`;
+    if (result.sort_operations?.sort_criteria && result.sort_operations.sort_criteria.length > 0) {
+      response += `\n**Sort criteria:** ${result.sort_operations.sort_criteria.slice(0, 3).map((c: SortCriteria) => `${c.column} (${c.order})`).join(', ')}`;
     }
     
     response += `\n\n## Next actions:\n`;
@@ -11350,19 +11729,19 @@ print(json.dumps(result))`;
   private generateFindRangeSuccessResponse(result: XlwingsResult, _params: XlwingsParams): string {
     let response = '';
     
-    if (result.found_addresses && result.found_addresses.length > 0) {
-      response = `Found **${result.found_addresses.length} matches** for search criteria.`;
-      response += `\n\n**Found at:** ${result.found_addresses.slice(0, 5).join(', ')}`;
+    if (result.find_replace_operations?.found_addresses && result.find_replace_operations.found_addresses.length > 0) {
+      response = `Found **${result.find_replace_operations.found_addresses.length} matches** for search criteria.`;
+      response += `\n\n**Found at:** ${result.find_replace_operations.found_addresses.slice(0, 5).join(', ')}`;
       
-      if (result.found_addresses.length > 5) {
-        response += ` and ${result.found_addresses.length - 5} more locations`;
+      if (result.find_replace_operations.found_addresses.length > 5) {
+        response += ` and ${result.find_replace_operations.found_addresses.length - 5} more locations`;
       }
     } else {
       response = `No matches found for the search criteria.`;
     }
     
     response += `\n\n## Next actions:\n`;
-    response += `- **Read found data:** read_range(range: "${result.found_addresses?.[0] || 'A1'}")\n`;
+    response += `- **Read found data:** read_range(range: "${result.find_replace_operations?.found_addresses?.[0] || 'A1'}")\n`;
     response += `- **Expand search:** Try different search terms or use get_sheet_info() to analyze data structure`;
     
     return response;
@@ -11455,6 +11834,46 @@ print(json.dumps(result))`;
     response += `- **Edit text:** modify_shape(shape_name: "${result.shape?.name}", text: "New text")\n`;
     response += `- **Move textbox:** move_shape(shape_name: "${result.shape?.name}", position: "C4")\n`;
     response += `- **List all shapes:** list_shapes()`;
+
+    return response;
+  }
+
+  /**
+   * Generate success response for modify_shape operation
+   */
+  private generateModifyShapeSuccessResponse(result: XlwingsResult, params: XlwingsParams): string {
+    let response = `✅ **Shape modified successfully!**\n\n`;
+
+    response += `**Shape Details:**\n`;
+    response += `- **Name:** ${result.shape?.name || params.shape?.name || 'Unknown'}\n`;
+    response += `- **Workbook:** ${result.workbook || 'Unknown'}\n`;
+    response += `- **Worksheet:** ${result.worksheet || 'Unknown'}\n`;
+
+    // Show what modifications were applied
+    if (params.shape?.style?.fill_color) {
+      response += `- **Fill Color:** Changed to ${params.shape.style.fill_color}\n`;
+    }
+    if (params.shape?.style?.border_color) {
+      response += `- **Border Color:** Changed to ${params.shape.style.border_color}\n`;
+    }
+    if (params.shape?.style?.border_width) {
+      response += `- **Border Width:** Changed to ${params.shape.style.border_width} points\n`;
+    }
+    if (params.shape?.style?.transparency) {
+      response += `- **Transparency:** Changed to ${params.shape.style.transparency}\n`;
+    }
+    if (params.shape?.text !== undefined) {
+      response += `- **Text:** Changed to "${params.shape.text}"\n`;
+    }
+    if (params.shape?.rotation !== undefined) {
+      response += `- **Rotation:** Changed to ${params.shape.rotation}°\n`;
+    }
+
+    response += `\n**Next actions:**\n`;
+    response += `- **List all shapes:** list_shapes(worksheet: "${result.worksheet}")\n`;
+    response += `- **Move shape:** move_shape(shape_name: "${result.shape?.name || params.shape?.name}", position: "D5")\n`;
+    response += `- **Resize shape:** resize_shape(shape_name: "${result.shape?.name || params.shape?.name}", width: 100, height: 50)\n`;
+    response += `- **Delete shape:** delete_shape(shape_name: "${result.shape?.name || params.shape?.name}")`;
 
     return response;
   }
@@ -11710,17 +12129,279 @@ except Exception as e:
   private generateDeleteSheetSuccessResponse(result: XlwingsResult, _params: XlwingsParams): string {
     let response = `✅ **Worksheet deleted successfully**\n\n`;
 
-    if (result.deleted_sheet_name) {
-      response += `**Deleted:** "${result.deleted_sheet_name}"\n\n`;
+    if (result.sheet?.deleted_name || result.sheet?.name) {
+      response += `**Deleted:** "${result.sheet?.deleted_name || result.sheet?.name}"\n\n`;
     }
 
-    if (result.remaining_sheets && result.remaining_sheets.length > 0) {
-      response += `**Remaining worksheets (${result.remaining_sheets_count}):**\n`;
-      for (const sheet of result.remaining_sheets) {
+    if (result.workbook_state?.remaining_sheets && result.workbook_state.remaining_sheets.length > 0) {
+      response += `**Remaining worksheets (${result.workbook_state.remaining_sheets_count}):**\n`;
+      for (const sheet of result.workbook_state.remaining_sheets) {
         response += `- ${sheet}\n`;
       }
     }
 
     return response;
+  }
+
+  private generateExportWorkbookToPdfLogic(params: XlwingsParams): string {
+    const pdfConfig = params.pdf || {};
+    const outputPath = pdfConfig.path || 'output.pdf';
+    const quality = pdfConfig.quality || 'standard';
+    const show = pdfConfig.show !== undefined ? pdfConfig.show : false;
+
+    return `
+# Connect to Excel
+app = xw.apps.active if xw.apps else None
+if not app:
+    result = {
+        "success": False,
+        "operation": "export_workbook_to_pdf",
+        "error_type": "no_excel_application",
+        "error_message": "No active Excel application found. Please open Excel first.",
+        "context": {
+            "required": "active_excel_application"
+        }
+    }
+    print(json.dumps(result))
+    exit()
+
+wb, app_used, opened_by_us, created_by_us = get_workbook_smart("${this.escapePythonPath(params.workbook || '')}")
+if not wb:
+    wb = xw.books.active
+    if not wb:
+        result = {
+            "success": False,
+            "operation": "export_workbook_to_pdf",
+            "error_type": "no_active_workbook",
+            "error_message": "No workbook specified and no active workbook found"
+        }
+        print(json.dumps(result))
+        exit()
+
+try:
+    import os
+
+    # Prepare output path
+    output_path = "${this.escapePythonPath(outputPath)}"
+    if not output_path.lower().endswith('.pdf'):
+        output_path = output_path + '.pdf'
+
+    # Make path absolute if relative
+    if not os.path.isabs(output_path):
+        output_path = os.path.abspath(output_path)
+
+    # Prepare export parameters
+    export_params = {
+        "path": output_path,
+        "quality": "${quality}",
+        "show": ${show ? 'True' : 'False'}
+    }
+
+    ${pdfConfig.include_sheets && pdfConfig.include_sheets.length > 0 ? `
+    # Include specific sheets
+    include_sheets = ${JSON.stringify(pdfConfig.include_sheets)}
+    export_params["include"] = include_sheets
+    ` : ''}
+
+    ${pdfConfig.exclude_sheets && pdfConfig.exclude_sheets.length > 0 ? `
+    # Exclude specific sheets
+    exclude_sheets = ${JSON.stringify(pdfConfig.exclude_sheets)}
+    export_params["exclude"] = exclude_sheets
+    ` : ''}
+
+    # Export to PDF
+    wb.to_pdf(**export_params)
+
+    # Get file size if created
+    file_size = None
+    if os.path.exists(output_path):
+        file_size = os.path.getsize(output_path)
+
+    # Prepare sheets list for response
+    sheets_list = [sheet.name for sheet in wb.sheets]
+
+    ${pdfConfig.include_sheets && pdfConfig.include_sheets.length > 0 ? `
+    # Filter to included sheets
+    sheets_exported = [s for s in sheets_list if s in include_sheets]
+    ` : pdfConfig.exclude_sheets && pdfConfig.exclude_sheets.length > 0 ? `
+    # Filter out excluded sheets
+    sheets_exported = [s for s in sheets_list if s not in exclude_sheets]
+    ` : `
+    # All sheets exported
+    sheets_exported = sheets_list
+    `}
+
+    result = {
+        "success": True,
+        "operation": "export_workbook_to_pdf",
+        "workbook": wb.name,
+        "pdf": {
+            "created": True,
+            "path": output_path,
+            "opened": ${show ? 'True' : 'False'},
+            "quality": "${quality}",
+            "sheets_included": sheets_exported,
+            "file_size": file_size
+        }
+    }
+    print(json.dumps(result))
+
+except Exception as e:
+    result = {
+        "success": False,
+        "operation": "export_workbook_to_pdf",
+        "xlwings_error": str(e)
+    }
+    print(json.dumps(result))`;
+  }
+
+  private generateExportWorksheetToPdfLogic(params: XlwingsParams): string {
+    const pdfConfig = params.pdf || {};
+    const outputPath = pdfConfig.path || 'output.pdf';
+    const quality = pdfConfig.quality || 'standard';
+    const show = pdfConfig.show !== undefined ? pdfConfig.show : false;
+
+    return `
+# Connect to Excel
+app = xw.apps.active if xw.apps else None
+if not app:
+    result = {
+        "success": False,
+        "operation": "export_worksheet_to_pdf",
+        "error_type": "no_excel_application",
+        "error_message": "No active Excel application found. Please open Excel first.",
+        "context": {
+            "required": "active_excel_application"
+        }
+    }
+    print(json.dumps(result))
+    exit()
+
+wb, app_used, opened_by_us, created_by_us = get_workbook_smart("${this.escapePythonPath(params.workbook || '')}")
+if not wb:
+    wb = xw.books.active
+    if not wb:
+        result = {
+            "success": False,
+            "operation": "export_worksheet_to_pdf",
+            "error_type": "no_active_workbook",
+            "error_message": "No workbook specified and no active workbook found"
+        }
+        print(json.dumps(result))
+        exit()
+
+ws = get_worksheet(wb, "${params.worksheet || ''}")
+if not ws:
+    ws = wb.sheets.active
+    if not ws:
+        result = {
+            "success": False,
+            "operation": "export_worksheet_to_pdf",
+            "error_type": "no_active_worksheet",
+            "error_message": "No worksheet specified and no active worksheet found"
+        }
+        print(json.dumps(result))
+        exit()
+
+try:
+    import os
+
+    # Prepare output path
+    output_path = "${this.escapePythonPath(outputPath)}"
+    if not output_path.lower().endswith('.pdf'):
+        output_path = output_path + '.pdf'
+
+    # Make path absolute if relative
+    if not os.path.isabs(output_path):
+        output_path = os.path.abspath(output_path)
+
+    # Export worksheet to PDF
+    ws.to_pdf(
+        path=output_path,
+        quality="${quality}",
+        show=${show ? 'True' : 'False'}
+    )
+
+    # Get file size if created
+    file_size = None
+    if os.path.exists(output_path):
+        file_size = os.path.getsize(output_path)
+
+    result = {
+        "success": True,
+        "operation": "export_worksheet_to_pdf",
+        "workbook": wb.name,
+        "worksheet": ws.name,
+        "pdf": {
+            "created": True,
+            "path": output_path,
+            "opened": ${show ? 'True' : 'False'},
+            "quality": "${quality}",
+            "sheets_included": [ws.name],
+            "file_size": file_size
+        }
+    }
+    print(json.dumps(result))
+
+except Exception as e:
+    result = {
+        "success": False,
+        "operation": "export_worksheet_to_pdf",
+        "xlwings_error": str(e)
+    }
+    print(json.dumps(result))`;
+  }
+
+  protected override createInvocation(params: XlwingsParams): ToolInvocation<XlwingsParams, XlwingsResult> {
+    return new XlwingsInvocation(this, params);
+  }
+}
+
+class XlwingsInvocation extends BaseToolInvocation<XlwingsParams, XlwingsResult> {
+  constructor(
+    private readonly tool: XlwingsTool,
+    params: XlwingsParams,
+  ) {
+    super(params);
+  }
+
+  getDescription(): string {
+    return `Excel ${this.params.op} operation`;
+  }
+
+  override async shouldConfirmExecute(
+    abortSignal: AbortSignal,
+  ): Promise<ToolCallConfirmationDetails | false> {
+    // Define safe operations that don't need approval
+    const safeOperations = new Set([
+      // Read operations
+      'read_range', 'get_sheet_info', 'get_cell_info', 'get_used_range', 'find_range',
+      'get_row_height', 'get_column_width', 'get_last_row', 'get_last_column',
+
+      // List operations
+      'list_sheets', 'list_workbooks', 'list_charts', 'list_shapes', 'list_images',
+      'list_comments', 'list_vba_modules', 'list_apps',
+
+      // Selection operations
+      'get_selection',
+
+      // Non-destructive display operations
+      'show_excel', 'hide_excel'
+    ]);
+
+    // Check if this operation is considered safe
+    if (safeOperations.has(this.params.op)) {
+      return false; // No confirmation needed for safe operations
+    }
+
+    // For destructive operations, delegate to the BasePythonTool's logic
+    const basePythonInvocation = this.tool['createInvocation'](this.params);
+    return basePythonInvocation.shouldConfirmExecute(abortSignal);
+  }
+
+  async execute(signal: AbortSignal, updateOutput?: (output: string) => void): Promise<XlwingsResult> {
+    // Delegate to the BasePythonTool's execution logic
+    const basePythonInvocation = this.tool['createInvocation'](this.params);
+    return basePythonInvocation.execute(signal, updateOutput);
   }
 }
