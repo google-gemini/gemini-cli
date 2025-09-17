@@ -15,6 +15,11 @@ on:
         required: false
         type: 'boolean'
         default: false
+      ref:
+        description: 'The branch, tag, or SHA to release from.'
+        required: false
+        type: 'string'
+        default: 'main'
 
 jobs:
   release:
@@ -23,6 +28,7 @@ jobs:
       - name: 'Checkout'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
         with:
+          ref: '${{ github.event.inputs.ref }}'
           fetch-depth: 0
 
       - name: 'Setup Node.js'
