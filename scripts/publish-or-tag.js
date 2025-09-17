@@ -8,35 +8,53 @@ import { execSync } from 'node:child_process';
 
 export function publishOrTag(packageName, version, tag, dryRun) {
   if (!packageName || !version || !tag) {
-    console.error('Usage: node scripts/publish-or-tag.js <package-name> <version> <tag> [--dry-run]');
+    console.error(
+      'Usage: node scripts/publish-or-tag.js <package-name> <version> <tag> [--dry-run]',
+    );
     process.exit(1);
   }
 
   try {
-    const versions = JSON.parse(execSync(`npm view ${packageName} versions --json`).toString());
+    const versions = JSON.parse(
+      execSync(`npm view ${packageName} versions --json`).toString(),
+    );
     if (versions.includes(version)) {
-      console.log(`Version ${version} of ${packageName} already exists. Updating tag ${tag}.`);
+      console.log(
+        `Version ${version} of ${packageName} already exists. Updating tag ${tag}.`,
+      );
       if (!dryRun) {
         execSync(`npm dist-tag add ${packageName}@${version} ${tag}`);
       } else {
-        console.log(`Dry run: would have run 'npm dist-tag add ${packageName}@${version} ${tag}'`);
+        console.log(
+          `Dry run: would have run 'npm dist-tag add ${packageName}@${version} ${tag}'`,
+        );
       }
     } else {
-      console.log(`Version ${version} of ${packageName} does not exist. Publishing.`);
+      console.log(
+        `Version ${version} of ${packageName} does not exist. Publishing.`,
+      );
       const dryRunFlag = dryRun ? '--dry-run' : '';
       try {
-        execSync(`npm publish --workspace=${packageName} --tag=${tag} ${dryRunFlag}`);
+        execSync(
+          `npm publish --workspace=${packageName} --tag=${tag} ${dryRunFlag}`,
+        );
       } catch (error) {
         // npm publish throws an error if the version already exists, even with --force.
         // This can happen in a race condition where another process publishes the same version.
         // If the version exists, we can safely ignore the error and update the tag.
-        const versions = JSON.parse(execSync(`npm view ${packageName} versions --json`).toString());
+        const versions = JSON.parse(
+          execSync(`npm view ${packageName} versions --json`).toString(),
+        );
         if (versions.includes(version)) {
-          console.log(`Version ${version} of ${packageName} was published by another process. Updating tag ${tag}.`);
+          console.log(
+            `Version ${version} of ${packageName} was published by another process. Updating tag ${tag}.`,
+          );
           if (!dryRun) {
             execSync(`npm dist-tag add ${packageName}@${version} ${tag}`);
           } else {
-            console.log(`Dry run: would have run 'npm dist-tag add ${packageName}@${version} ${tag}'`);
+            console.log(
+              `Dry run: would have run 'npm dist-tag add ${packageName}@${version} ${tag}'`,
+            );
           }
         } else {
           throw error;
@@ -44,7 +62,10 @@ export function publishOrTag(packageName, version, tag, dryRun) {
       }
     }
   } catch (error) {
-    console.error('Error checking package version or publishing:', error.message);
+    console.error(
+      'Error checking package version or publishing:',
+      error.message,
+    );
     process.exit(1);
   }
 }

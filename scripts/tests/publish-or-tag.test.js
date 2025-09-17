@@ -21,9 +21,15 @@ describe('publish-or-tag', () => {
 
     publishOrTag('@google/gemini-cli', '1.0.1', 'latest', false);
 
-    expect(execSync).toHaveBeenCalledWith('npm view @google/gemini-cli versions --json');
-    expect(execSync).toHaveBeenCalledWith('npm dist-tag add @google/gemini-cli@1.0.1 latest');
-    expect(execSync).not.toHaveBeenCalledWith(expect.stringContaining('npm publish'));
+    expect(execSync).toHaveBeenCalledWith(
+      'npm view @google/gemini-cli versions --json',
+    );
+    expect(execSync).toHaveBeenCalledWith(
+      'npm dist-tag add @google/gemini-cli@1.0.1 latest',
+    );
+    expect(execSync).not.toHaveBeenCalledWith(
+      expect.stringContaining('npm publish'),
+    );
   });
 
   it('should publish the package if the version does not exist', () => {
@@ -32,9 +38,15 @@ describe('publish-or-tag', () => {
 
     publishOrTag('@google/gemini-cli', '1.0.1', 'latest', false);
 
-    expect(execSync).toHaveBeenCalledWith('npm view @google/gemini-cli versions --json');
-    expect(execSync).toHaveBeenCalledWith('npm publish --workspace=@google/gemini-cli --tag=latest ');
-    expect(execSync).not.toHaveBeenCalledWith(expect.stringContaining('npm dist-tag add'));
+    expect(execSync).toHaveBeenCalledWith(
+      'npm view @google/gemini-cli versions --json',
+    );
+    expect(execSync).toHaveBeenCalledWith(
+      'npm publish --workspace=@google/gemini-cli --tag=latest ',
+    );
+    expect(execSync).not.toHaveBeenCalledWith(
+      expect.stringContaining('npm dist-tag add'),
+    );
   });
 
   it('should handle race conditions where another process publishes the version', () => {
@@ -49,13 +61,21 @@ describe('publish-or-tag', () => {
 
     publishOrTag('@google/gemini-cli', '1.0.1', 'latest', false);
 
-    expect(execSync).toHaveBeenCalledWith('npm view @google/gemini-cli versions --json');
-    expect(execSync).toHaveBeenCalledWith('npm publish --workspace=@google/gemini-cli --tag=latest ');
-    expect(execSync).toHaveBeenCalledWith('npm dist-tag add @google/gemini-cli@1.0.1 latest');
+    expect(execSync).toHaveBeenCalledWith(
+      'npm view @google/gemini-cli versions --json',
+    );
+    expect(execSync).toHaveBeenCalledWith(
+      'npm publish --workspace=@google/gemini-cli --tag=latest ',
+    );
+    expect(execSync).toHaveBeenCalledWith(
+      'npm dist-tag add @google/gemini-cli@1.0.1 latest',
+    );
   });
 
   it('should exit with an error if required arguments are missing', () => {
-    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const consoleError = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
     const processExit = vi.spyOn(process, 'exit').mockImplementation(() => {
       throw new Error('process.exit');
     });
@@ -65,7 +85,7 @@ describe('publish-or-tag', () => {
     }).toThrow('process.exit');
 
     expect(consoleError).toHaveBeenCalledWith(
-      'Usage: node scripts/publish-or-tag.js <package-name> <version> <tag> [--dry-run]'
+      'Usage: node scripts/publish-or-tag.js <package-name> <version> <tag> [--dry-run]',
     );
     expect(processExit).toHaveBeenCalledWith(1);
   });
