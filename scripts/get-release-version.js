@@ -85,14 +85,32 @@ function getNightlyVersion() {
   };
 }
 
+function validateVersion(version, format, name) {
+  const versionRegex = {
+    'X.Y.Z': /^\d+\.\d+\.\d+$/,
+    'X.Y.Z-preview.N': /^\d+\.\d+\.\d+-preview\.\d+$/,
+  };
+
+  if (!versionRegex[format] || !versionRegex[format].test(version)) {
+    throw new Error(
+      `Invalid ${name}: ${version}. Must be in ${format} format.`,
+    );
+  }
+}
+
 function getStableVersion(args) {
   const { latestVersion: latestPreviewVersion } = getAndVerifyTags(
     'preview',
     'v*-preview*',
   );
-  const releaseVersion =
-    args.stable_version_override?.replace(/^v/, '') ||
-    latestPreviewVersion.replace(/-preview.*/, '');
+  let releaseVersion;
+  if (args.stable_version_override) {
+    const overrideVersion = args.stable_version_override.replace(/^v/, '');
+    validateVersion(overrideVersion, 'X.Y.Z', 'stable_version_override');
+    releaseVersion = overrideVersion;
+  } else {
+    releaseVersion = latestPreviewVersion.replace(/-preview.*/, '');
+  }
 
   const { latestTag: previousStableTag } = getAndVerifyTags(
     'latest',
@@ -111,9 +129,19 @@ function getPreviewVersion(args) {
     'nightly',
     'v*-nightly*',
   );
-  const releaseVersion =
-    args.preview_version_override?.replace(/^v/, '') ||
-    latestNightlyVersion.replace(/-nightly.*/, '') + '-preview.0';
+  let releaseVersion;
+  if (args.preview_version_override) {
+    const overrideVersion = args.preview_version_override.replace(/^v/, '');
+    validateVersion(
+      overrideVersion,
+      'X.Y.Z-preview.N',
+      'preview_version_override',
+    );
+    releaseVersion = overrideVersion;
+  } else {
+    releaseVersion =
+      latestNightlyVersion.replace(/-nightly.*/, '') + '-preview.0';
+  }
 
   const { latestTag: previousPreviewTag } = getAndVerifyTags(
     'preview',

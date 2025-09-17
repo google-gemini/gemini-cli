@@ -78,9 +78,9 @@ describe('getVersion', () => {
       vi.mocked(execSync).mockImplementation(mockExecSync);
       const result = getVersion({
         type: 'preview',
-        preview_version_override: '4.5.6-preview',
+        preview_version_override: '4.5.6-preview.0',
       });
-      expect(result.releaseVersion).toBe('4.5.6-preview');
+      expect(result.releaseVersion).toBe('4.5.6-preview.0');
       expect(result.npmTag).toBe('preview');
       expect(result.previousReleaseTag).toBe('v0.5.0-preview-2');
     });
@@ -109,6 +109,44 @@ describe('getVersion', () => {
       expect(result.releaseVersion).toBe('0.5.1-preview-2');
       expect(result.npmTag).toBe('preview');
       expect(result.previousReleaseTag).toBe('v0.5.0-preview-2');
+    });
+  });
+
+  describe('Failure Path - Invalid Overrides', () => {
+    it('should throw an error for an invalid stable_version_override', () => {
+      vi.mocked(execSync).mockImplementation(mockExecSync);
+      expect(() =>
+        getVersion({
+          type: 'stable',
+          stable_version_override: '1.2.3-beta',
+        }),
+      ).toThrow(
+        'Invalid stable_version_override: 1.2.3-beta. Must be in X.Y.Z format.',
+      );
+    });
+
+    it('should throw an error for an invalid preview_version_override format', () => {
+      vi.mocked(execSync).mockImplementation(mockExecSync);
+      expect(() =>
+        getVersion({
+          type: 'preview',
+          preview_version_override: '4.5.6-preview', // Missing .N
+        }),
+      ).toThrow(
+        'Invalid preview_version_override: 4.5.6-preview. Must be in X.Y.Z-preview.N format.',
+      );
+    });
+
+    it('should throw an error for another invalid preview_version_override format', () => {
+      vi.mocked(execSync).mockImplementation(mockExecSync);
+      expect(() =>
+        getVersion({
+          type: 'preview',
+          preview_version_override: '4.5.6',
+        }),
+      ).toThrow(
+        'Invalid preview_version_override: 4.5.6. Must be in X.Y.Z-preview.N format.',
+      );
     });
   });
 
