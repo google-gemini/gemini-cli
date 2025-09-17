@@ -12,7 +12,14 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { DetectedIde } from './detect-ide.js';
 
-vi.mock('child_process');
+vi.mock('node:child_process', async (importOriginal) => {
+  const actual = (await importOriginal()) as typeof child_process;
+  return {
+    ...actual,
+    execSync: vi.fn(),
+    spawnSync: vi.fn(() => ({ status: 0 })),
+  };
+});
 vi.mock('fs');
 vi.mock('os');
 
@@ -97,8 +104,13 @@ describe('ide-installer', () => {
           platform: 'linux',
         });
         await installer.install();
-        expect(child_process.execSync).toHaveBeenCalledWith(
-          '"code" --install-extension google.gemini-cli-vscode-ide-companion --force',
+        expect(child_process.spawnSync).toHaveBeenCalledWith(
+          'code',
+          [
+            '--install-extension',
+            'google.gemini-cli-vscode-ide-companion',
+            '--force',
+          ],
           { stdio: 'pipe' },
         );
       });
