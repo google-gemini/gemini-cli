@@ -555,6 +555,9 @@ describe('editor utils', () => {
     });
 
     it('should return null when no EDITOR or VISUAL is set', () => {
+      // Mock an empty environment (clear any default Windows EDITOR)
+      vi.stubEnv('EDITOR', undefined);
+      vi.stubEnv('VISUAL', undefined);
       expect(getCustomEditorFromEnv()).toBeNull();
     });
 
@@ -655,19 +658,40 @@ describe('editor utils', () => {
     it('should support vscode-insiders', () => {
       (execSync as Mock).mockReturnValue(Buffer.from('/usr/bin/code-insiders'));
       expect(checkHasEditorType('vscode-insiders')).toBe(true);
-      expect(allowEditorTypeInSandbox('vscode-insiders')).toBe(false); // GUI editor
+
+      // Test in sandbox mode (should be blocked)
+      vi.stubEnv('SANDBOX', 'sandbox');
+      expect(allowEditorTypeInSandbox('vscode-insiders')).toBe(false); // GUI editor - not allowed in sandbox
+      vi.unstubAllEnvs();
+
+      // Test outside sandbox mode (should be allowed)
+      expect(allowEditorTypeInSandbox('vscode-insiders')).toBe(true); // GUI editor - allowed outside sandbox
     });
 
     it('should support pycharm', () => {
       (execSync as Mock).mockReturnValue(Buffer.from('/usr/bin/pycharm'));
       expect(checkHasEditorType('pycharm')).toBe(true);
-      expect(allowEditorTypeInSandbox('pycharm')).toBe(false); // GUI editor
+
+      // Test in sandbox mode (should be blocked)
+      vi.stubEnv('SANDBOX', 'sandbox');
+      expect(allowEditorTypeInSandbox('pycharm')).toBe(false); // GUI editor - not allowed in sandbox
+      vi.unstubAllEnvs();
+
+      // Test outside sandbox mode (should be allowed)
+      expect(allowEditorTypeInSandbox('pycharm')).toBe(true); // GUI editor - allowed outside sandbox
     });
 
     it('should support sublime', () => {
       (execSync as Mock).mockReturnValue(Buffer.from('/usr/bin/subl'));
       expect(checkHasEditorType('sublime')).toBe(true);
-      expect(allowEditorTypeInSandbox('sublime')).toBe(false); // GUI editor
+
+      // Test in sandbox mode (should be blocked)
+      vi.stubEnv('SANDBOX', 'sandbox');
+      expect(allowEditorTypeInSandbox('sublime')).toBe(false); // GUI editor - not allowed in sandbox
+      vi.unstubAllEnvs();
+
+      // Test outside sandbox mode (should be allowed)
+      expect(allowEditorTypeInSandbox('sublime')).toBe(true); // GUI editor - allowed outside sandbox
     });
 
     it('should support nano', () => {

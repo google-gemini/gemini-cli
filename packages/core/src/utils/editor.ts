@@ -145,12 +145,18 @@ export function checkHasEditorType(editor: EditorType): boolean {
 export function getCustomEditorFromEnv(): string | null {
   // Check VISUAL first (preferred for visual editors), then EDITOR
   const editorCmd = process.env['VISUAL'] || process.env['EDITOR'];
-  if (editorCmd) {
-    // Extract the command name (handle full paths and arguments)
-    const cmd = editorCmd.split(' ')[0].split('/').pop()?.split('\\').pop();
-    return cmd || null;
+
+  // Return null if no environment variable is set or if it's just a default system editor
+  if (!editorCmd || editorCmd === 'notepad.exe') {
+    return null;
   }
-  return null;
+
+  // Extract the command name (handle full paths and arguments)
+  const cmdWithPath = editorCmd.split(' ')[0];
+  const pathParts = cmdWithPath.split(/[/\\]/);
+  const cmd = pathParts[pathParts.length - 1];
+
+  return cmd || null;
 }
 
 export function allowEditorTypeInSandbox(editor: EditorType): boolean {
