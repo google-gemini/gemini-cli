@@ -26,17 +26,13 @@ process_pr() {
         return 1
     fi
 
-    # Look for issue references using reliable text parsing
+    # Look for issue references using explicit keyword patterns only
     local ISSUE_NUMBER=""
 
-    # Pattern 1: Closes/Fixes/Resolves patterns (case-insensitive) - Most explicit
+    # Only detect explicit closing keywords to avoid false positives
+    # Matches: "Closes #123", "Fixes #456", "Resolves #789" (case-insensitive)
     if [[ -z "${ISSUE_NUMBER}" ]]; then
         ISSUE_NUMBER=$(echo "${PR_BODY}" | grep -iE '(closes?|fixes?|resolves?) #[0-9]+' | grep -oE '#[0-9]+' | head -1 | sed 's/#//' 2>/dev/null || echo "")
-    fi
-
-    # Pattern 2: Direct reference patterns like "#123"
-    if [[ -z "${ISSUE_NUMBER}" ]]; then
-        ISSUE_NUMBER=$(echo "${PR_BODY}" | grep -oE '#[0-9]+' | head -1 | sed 's/#//' 2>/dev/null || echo "")
     fi
 
 
