@@ -26,7 +26,7 @@ process_pr() {
         return 1
     fi
 
-    # Look for issue references using two reliable patterns
+    # Look for issue references using reliable text parsing
     local ISSUE_NUMBER=""
 
     # Pattern 1: Closes/Fixes/Resolves patterns (case-insensitive) - Most explicit
@@ -34,9 +34,9 @@ process_pr() {
         ISSUE_NUMBER=$(echo "${PR_BODY}" | grep -iE '(closes?|fixes?|resolves?) #[0-9]+' | grep -oE '#[0-9]+' | head -1 | sed 's/#//' 2>/dev/null || echo "")
     fi
 
-    # Pattern 2: GitHub's closingIssuesReferences API - Fallback for GitHub linking
+    # Pattern 2: Direct reference patterns like "#123"
     if [[ -z "${ISSUE_NUMBER}" ]]; then
-        ISSUE_NUMBER=$(gh pr view "${PR_NUMBER}" --repo "${GITHUB_REPOSITORY}" --json closingIssuesReferences -q '.closingIssuesReferences.nodes[0].number' 2>/dev/null || echo "")
+        ISSUE_NUMBER=$(echo "${PR_BODY}" | grep -oE '#[0-9]+' | head -1 | sed 's/#//' 2>/dev/null || echo "")
     fi
 
 
