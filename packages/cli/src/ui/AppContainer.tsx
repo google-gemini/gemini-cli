@@ -1209,7 +1209,9 @@ Logging in with Google... Please restart Gemini CLI to continue.
               startupWarnings: props.startupWarnings || [],
             }}
           >
-            <App />
+            <FocusContext.Provider value={isFocused}>
+              <App />
+            </FocusContext.Provider>
           </AppContext.Provider>
         </ConfigContext.Provider>
       </UIActionsContext.Provider>
