@@ -154,6 +154,7 @@ jobs:
     permissions:
       contents: 'write'
       packages: 'write'
+      issues: 'write'
     steps:
       - name: 'Checkout Ref'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
@@ -190,6 +191,18 @@ jobs:
           previous-tag: '${{ needs.calculate-versions.outputs.PREVIOUS_PREVIEW_TAG }}'
           working-directory: './release'
 
+      - name: 'Create Issue on Failure'
+        if: '${{ failure() && github.event.inputs.dry_run == false }}'
+        env:
+          GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+          RELEASE_TAG: 'v${{ needs.calculate-versions.outputs.PREVIEW_VERSION }}'
+          DETAILS_URL: '${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}'
+        run: |
+          gh issue create \
+            --title 'Promote Release Failed for ${RELEASE_TAG} on $(date +'%Y-%m-%d')' \
+            --body 'The promote-release workflow failed during preview publish. See the full run for details: ${DETAILS_URL}' \
+            --label 'kind/bug,release-failure,priority/p0'
+
   publish-stable:
     name: 'Publish stable'
     needs: ['calculate-versions', 'test', 'publish-preview']
@@ -197,6 +210,7 @@ jobs:
     permissions:
       contents: 'write'
       packages: 'write'
+      issues: 'write'
     steps:
       - name: 'Checkout Ref'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
@@ -233,6 +247,18 @@ jobs:
           previous-tag: '${{ needs.calculate-versions.outputs.PREVIOUS_STABLE_TAG }}'
           working-directory: './release'
 
+      - name: 'Create Issue on Failure'
+        if: '${{ failure() && github.event.inputs.dry_run == false }}'
+        env:
+          GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+          RELEASE_TAG: 'v${{ needs.calculate-versions.outputs.STABLE_VERSION }}'
+          DETAILS_URL: '${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}'
+        run: |
+          gh issue create \
+            --title 'Promote Release Failed for ${RELEASE_TAG} on $(date +'%Y-%m-%d')' \
+            --body 'The promote-release workflow failed during stable publish. See the full run for details: ${DETAILS_URL}' \
+            --label 'kind/bug,release-failure,priority/p0'
+
   nightly-pr:
     name: 'Create Nightly PR'
     needs: ['calculate-versions', 'test']
@@ -240,6 +266,7 @@ jobs:
     permissions:
       contents: 'write'
       pull-requests: 'write'
+      issues: 'write'
     steps:
       - name: 'Checkout Ref'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
@@ -257,8 +284,8 @@ jobs:
 
       - name: 'Configure Git User'
         run: |-
-          git config user.name "gemini-cli-robot"
-          git config user.email "gemini-cli-robot@google.com"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
       - name: 'Create and switch to a new branch'
         id: 'release_branch'
@@ -304,3 +331,15 @@ jobs:
             --head "${BRANCH_NAME}" \
             --fill
           gh pr merge --auto --squash
+
+      - name: 'Create Issue on Failure'
+        if: '${{ failure() && github.event.inputs.dry_run == false }}'
+        env:
+          GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+          RELEASE_TAG: 'v${{ needs.calculate-versions.outputs.NEXT_NIGHTLY_VERSION }}'
+          DETAILS_URL: '${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}'
+        run: |
+          gh issue create \
+            --title 'Promote Release Failed for ${RELEASE_TAG} on $(date +'%Y-%m-%d')' \
+            --body 'The promote-release workflow failed during nightly PR creation. See the full run for details: ${DETAILS_URL}' \
+            --label 'kind/bug,release-failure,priority/p0'
