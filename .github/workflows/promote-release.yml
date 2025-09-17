@@ -89,6 +89,7 @@ jobs:
     needs: 'calculate-versions'
     runs-on: 'ubuntu-latest'
     strategy:
+      fail-fast: false
       matrix:
         include:
           - channel: 'stable'
@@ -127,27 +128,13 @@ jobs:
           gemini_api_key: '${{ secrets.GEMINI_API_KEY }}'
           working-directory: './release'
 
-  publish:
-    name: 'Publish ${{ matrix.channel }}'
+  publish-preview:
+    name: 'Publish preview'
     needs: ['calculate-versions', 'test']
     runs-on: 'ubuntu-latest'
     permissions:
       contents: 'write'
       packages: 'write'
-    strategy:
-      matrix:
-        include:
-          - channel: 'stable'
-            version: '${{ needs.calculate-versions.outputs.STABLE_VERSION }}'
-            sha: '${{ needs.calculate-versions.outputs.STABLE_SHA }}'
-            npm-tag: 'latest'
-            previous-tag: '${{ needs.calculate-versions.outputs.PREVIOUS_STABLE_TAG }}'
-          - channel: 'preview'
-            version: '${{ needs.calculate-versions.outputs.PREVIEW_VERSION }}'
-            sha: '${{ needs.calculate-versions.outputs.PREVIEW_SHA }}'
-            npm-tag: 'preview'
-            previous-tag: '${{ needs.calculate-versions.outputs.PREVIOUS_PREVIEW_TAG }}'
-
     steps:
       - name: 'Checkout Ref'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
@@ -157,7 +144,7 @@ jobs:
       - name: 'Checkout correct SHA'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
         with:
-          ref: '${{ matrix.sha }}'
+          ref: '${{ needs.calculate-versions.outputs.PREVIEW_SHA }}'
           path: 'release'
           fetch-depth: 0
 
@@ -174,14 +161,57 @@ jobs:
       - name: 'Publish Release'
         uses: './.github/actions/publish-release'
         with:
-          release-version: '${{ matrix.version }}'
-          release-tag: 'v${{ matrix.version }}'
-          npm-tag: '${{ matrix.npm-tag }}'
+          release-version: '${{ needs.calculate-versions.outputs.PREVIEW_VERSION }}'
+          release-tag: 'v${{ needs.calculate-versions.outputs.PREVIEW_VERSION }}'
+          npm-tag: 'preview'
           wombat-token-core: '${{ secrets.WOMBAT_TOKEN_CORE }}'
           wombat-token-cli: '${{ secrets.WOMBAT_TOKEN_CLI }}'
           github-token: '${{ secrets.GITHUB_TOKEN }}'
           dry-run: '${{ github.event.inputs.dry_run }}'
-          previous-tag: '${{ matrix.previous-tag }}'
+          previous-tag: '${{ needs.calculate-versions.outputs.PREVIOUS_PREVIEW_TAG }}'
+          working-directory: './release'
+
+  publish-stable:
+    name: 'Publish stable'
+    needs: ['calculate-versions', 'test', 'publish-preview']
+    runs-on: 'ubuntu-latest'
+    permissions:
+      contents: 'write'
+      packages: 'write'
+    steps:
+      - name: 'Checkout Ref'
+        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
+        with:
+          ref: '${{ github.event.inputs.ref }}'
+
+      - name: 'Checkout correct SHA'
+        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
+        with:
+          ref: '${{ needs.calculate-versions.outputs.STABLE_SHA }}'
+          path: 'release'
+          fetch-depth: 0
+
+      - name: 'Setup Node.js'
+        uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020'
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+
+      - name: 'Install Dependencies'
+        working-directory: './release'
+        run: 'npm ci'
+
+      - name: 'Publish Release'
+        uses: './.github/actions/publish-release'
+        with:
+          release-version: '${{ needs.calculate-versions.outputs.STABLE_VERSION }}'
+          release-tag: 'v${{ needs.calculate-versions.outputs.STABLE_VERSION }}'
+          npm-tag: 'latest'
+          wombat-token-core: '${{ secrets.WOMBAT_TOKEN_CORE }}'
+          wombat-token-cli: '${{ secrets.WOMBAT_TOKEN_CLI }}'
+          github-token: '${{ secrets.GITHUB_TOKEN }}'
+          dry-run: '${{ github.event.inputs.dry_run }}'
+          previous-tag: '${{ needs.calculate-versions.outputs.PREVIOUS_STABLE_TAG }}'
           working-directory: './release'
 
   nightly-pr:
