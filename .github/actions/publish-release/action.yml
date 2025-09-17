@@ -97,11 +97,12 @@ runs:
       working-directory: '${{ inputs.working-directory }}'
       env:
         NODE_AUTH_TOKEN: '${{ inputs.wombat-token-core }}'
-      run: |-
-        npm publish \
-          --dry-run="${{ inputs.dry-run }}" \
-          --workspace="@google/gemini-cli-core" \
-          --tag="${{ inputs.npm-tag }}"
+      run: |
+        node ../../scripts/publish-or-tag.js \
+          @google/gemini-cli-core \
+          ${{ inputs.release-version }} \
+          ${{ inputs.npm-tag }} \
+          ${{ inputs.dry-run }}
       shell: 'bash'
 
     - name: 'Install latest core package'
@@ -117,11 +118,12 @@ runs:
       working-directory: '${{ inputs.working-directory }}'
       env:
         NODE_AUTH_TOKEN: '${{ inputs.wombat-token-cli }}'
-      run: |-
-        npm publish \
-          --dry-run="${{ inputs.dry-run }}" \
-          --workspace="@google/gemini-cli" \
-          --tag="${{ inputs.npm-tag }}"
+      run: |
+        node ../../scripts/publish-or-tag.js \
+          @google/gemini-cli \
+          ${{ inputs.release-version }} \
+          ${{ inputs.npm-tag }} \
+          ${{ inputs.dry-run }}
       shell: 'bash'
 
     - name: 'Bundle'

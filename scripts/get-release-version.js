@@ -103,7 +103,7 @@ function getPreviewVersion() {
     'v*-nightly*',
   );
   return {
-    releaseVersion: latestVersion.replace(/-nightly.*/, '') + '-preview',
+    releaseVersion: latestVersion.replace(/-nightly.*/, '') + '-preview.0',
     npmTag: 'preview',
     previousReleaseTag: latestTag,
   };

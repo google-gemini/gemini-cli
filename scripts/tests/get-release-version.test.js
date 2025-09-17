@@ -58,7 +58,7 @@ describe('getVersion', () => {
     it('should calculate the next preview version from the latest nightly', () => {
       vi.mocked(execSync).mockImplementation(mockExecSync);
       const result = getVersion({ type: 'preview' });
-      expect(result.releaseVersion).toBe('0.6.0-preview');
+      expect(result.releaseVersion).toBe('0.6.0-preview.0');
       expect(result.npmTag).toBe('preview');
       expect(result.previousReleaseTag).toBe(
         'v0.6.0-nightly.20250910.a31830a3',
