@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { execSync, spawn, spawnSync } from 'node:child_process';
+import { execSync, spawn } from 'node:child_process';
 
 export type EditorType =
   | 'vscode'
@@ -169,30 +169,12 @@ export async function openDiff(
   const diffCommand = getDiffCommand(oldPath, newPath, editor);
   if (!diffCommand) {
     console.error('No diff tool available. Install a supported editor.');
+    onEditorClose();
     return;
   }
 
   try {
-    const isTerminalEditor = ['vim', 'emacs', 'neovim'].includes(editor);
-
-    if (isTerminalEditor) {
-      try {
-        const result = spawnSync(diffCommand.command, diffCommand.args, {
-          stdio: 'inherit',
-        });
-        if (result.error) {
-          throw result.error;
-        }
-        if (result.status !== 0) {
-          throw new Error(`${editor} exited with code ${result.status}`);
-        }
-      } finally {
-        onEditorClose();
-      }
-      return;
-    }
-
-    return new Promise<void>((resolve, reject) => {
+    await new Promise<void>((resolve, reject) => {
       const childProcess = spawn(diffCommand.command, diffCommand.args, {
         stdio: 'inherit',
       });
@@ -211,6 +193,7 @@ export async function openDiff(
     });
   } catch (error) {
     console.error(error);
-    throw error;
+  } finally {
+    onEditorClose();
   }
 }

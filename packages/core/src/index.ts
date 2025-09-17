@@ -6,6 +6,7 @@
 
 // Export config
 export * from './config/config.js';
+export * from './config/models.js';
 export * from './output/types.js';
 export * from './output/json-formatter.js';
 
@@ -53,6 +54,8 @@ export * from './utils/workspaceContext.js';
 export * from './utils/ignorePatterns.js';
 export * from './utils/partUtils.js';
 export * from './utils/promptIdContext.js';
+export * from './utils/textUtils.js';
+export * from './utils/terminalSerializer.js';
 
 // Export services
 export * from './services/fileDiscoveryService.js';

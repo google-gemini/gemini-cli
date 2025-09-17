@@ -45,6 +45,9 @@ function applyUpdates(
   const result = current;
 
   for (const key of Object.getOwnPropertyNames(updates)) {
+    if (key === '__proto__' || key === 'constructor' || key === 'prototype') {
+      continue;
+    }
     const value = updates[key];
     if (
       typeof value === 'object' &&
