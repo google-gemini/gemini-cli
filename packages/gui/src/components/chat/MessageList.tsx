@@ -7,9 +7,6 @@
 import { useRef, useState, forwardRef, useImperativeHandle, useCallback, useEffect } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import type React from 'react';
-import Markdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
-import rehypeHighlight from 'rehype-highlight';
 import { format } from 'date-fns';
 import { Bot, User, AlertCircle, ChevronDown, ChevronRight, BookTemplate, Play, CheckSquare, Target, Brain, FileText, Activity, ListTodo } from 'lucide-react';
 import { cn } from '@/utils/cn';
@@ -20,12 +17,10 @@ import { MarkdownRenderer } from './MarkdownRenderer';
 import ToolConfirmationMessage from './ToolConfirmationMessage';
 import { multiModelService } from '@/services/multiModelService';
 import type { ChatMessage, ToolCallConfirmationDetails, ToolConfirmationOutcome, ToolCall } from '@/types';
-import 'katex/dist/katex.min.css';
 
 
 
 // React Markdown component props interface
-// Note: Using any here due to react-markdown's complex internal types
 // The actual props we use are type-safe within the function
 
 // Tool response format detection and parsing
@@ -81,11 +76,6 @@ function parseStateSnapshot(content: string): ParsedStateSnapshot | null {
   if (!match) return null;
 
   const xmlContent = match[1];
-
-  // Debug logging (can be removed in production)
-  // if (typeof console !== 'undefined') {
-  //   console.log('State snapshot XML content:', xmlContent);
-  // }
 
   // Helper function to extract and clean list items
   const extractListItems = (text: string): string[] => {
@@ -862,12 +852,10 @@ const ToolResponseDisplay: React.FC<{ toolResponse: ParsedToolResponse }> = ({ t
         {/* Content area */}
         <div className="px-3 pb-3 pt-2">
           <div className="text-sm">
-            <Markdown
-              remarkPlugins={[remarkGfm]}
-              rehypePlugins={[rehypeHighlight]}
-            >
-              {previewContent}
-            </Markdown>
+            <MarkdownRenderer
+              content={previewContent}
+              className=""
+            />
           </div>
         </div>
       </div>
@@ -1029,9 +1017,10 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isStreaming, onS
     return (
       <div className="flex justify-center">
         <div className="bg-muted rounded-lg px-3 py-2 text-sm text-muted-foreground max-w-2xl">
-          <Markdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight]}>
-            {message.content}
-          </Markdown>
+          <MarkdownRenderer
+            content={message.content}
+            className=""
+          />
         </div>
       </div>
     );
