@@ -108,7 +108,7 @@ function getNodeMemoryArgs(config: Config): string[] {
 
 
 // Constants for restart functionality
-const MAX_RESTARTS = 10;
+const MAX_RESTARTS = parseInt(process.env.GEMINI_CLI_MAX_RESTARTS || '10', 10);
 
 async function relaunchAppInChildProcess(additionalArgs: string[] = []) {
   let restartCount = 0;
@@ -117,13 +117,12 @@ async function relaunchAppInChildProcess(additionalArgs: string[] = []) {
     const nodeArgs = [...additionalArgs, ...process.argv.slice(1)];
     const newEnv = { ...process.env, GEMINI_CLI_NO_RELAUNCH: 'true' };
 
-
-    const child = spawn(process.execPath, nodeArgs, {
-      stdio: 'inherit',
-      env: newEnv,
-    });
-
     try {
+      const child = spawn(process.execPath, nodeArgs, {
+        stdio: 'inherit',
+        env: newEnv,
+      });
+
       const exitCode = await new Promise<number>((resolve, reject) => {
         child.on('error', reject);
         child.on('close', (code) => {
