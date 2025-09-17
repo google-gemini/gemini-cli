@@ -14,12 +14,17 @@ interface MarkdownRendererProps {
 }
 
 interface ParsedContent {
-  type: 'paragraph' | 'header' | 'list' | 'code' | 'separator' | 'conclusion' | 'formula';
+  type: 'paragraph' | 'header' | 'list' | 'code' | 'separator' | 'conclusion' | 'formula' | 'table';
   content: string;
   level?: number;
   language?: string;
   isNumbered?: boolean;
   children?: ParsedContent[];
+  tableData?: {
+    headers: string[];
+    rows: string[][];
+    alignment?: Array<('left' | 'center' | 'right')>;
+  };
 }
 
 export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
@@ -35,6 +40,10 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
     let codeLanguage = '';
     let inCodeBlock = false;
     let numberedListCounter = 1; // Track numbered list counter
+    let inTable = false;
+    let tableHeaders: string[] = [];
+    let tableRows: string[][] = [];
+    let tableAlignment: Array<('left' | 'center' | 'right')> = [];
 
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
@@ -62,6 +71,71 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
 
       if (inCodeBlock) {
         currentCodeBlock.push(line);
+        continue;
+      }
+
+      // Check if line is a table row
+      if (trimmed.startsWith('|') && trimmed.endsWith('|')) {
+        const cells = trimmed.slice(1, -1).split('|').map(cell => cell.trim());
+
+        // Check if this is a separator line (e.g., |---|---|---|)
+        if (cells.every(cell => /^[-:\s]+$/.test(cell))) {
+          // This is a separator line, determine alignment
+          tableAlignment = cells.map(cell => {
+            if (cell.startsWith(':') && cell.endsWith(':')) return 'center';
+            if (cell.endsWith(':')) return 'right';
+            return 'left';
+          });
+          inTable = true;
+          continue;
+        }
+
+        // If we haven't seen headers yet and not in table, this is a header row
+        if (!inTable && tableHeaders.length === 0) {
+          tableHeaders = cells;
+          continue;
+        }
+
+        // Otherwise it's a data row
+        if (inTable) {
+          tableRows.push(cells);
+          continue;
+        }
+      } else if (inTable && trimmed !== '') {
+        // End of table, save it and continue processing this line
+        if (tableHeaders.length > 0) {
+          parsed.push({
+            type: 'table',
+            content: '',
+            tableData: {
+              headers: tableHeaders,
+              rows: tableRows,
+              alignment: tableAlignment.length > 0 ? tableAlignment : undefined
+            }
+          });
+        }
+        inTable = false;
+        tableHeaders = [];
+        tableRows = [];
+        tableAlignment = [];
+        // Don't continue, process this line normally
+      } else if (inTable && trimmed === '') {
+        // Empty line ends table
+        if (tableHeaders.length > 0) {
+          parsed.push({
+            type: 'table',
+            content: '',
+            tableData: {
+              headers: tableHeaders,
+              rows: tableRows,
+              alignment: tableAlignment.length > 0 ? tableAlignment : undefined
+            }
+          });
+        }
+        inTable = false;
+        tableHeaders = [];
+        tableRows = [];
+        tableAlignment = [];
         continue;
       }
 
@@ -141,6 +215,19 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
       }
     }
 
+    // Handle any remaining table at the end of content
+    if (inTable && tableHeaders.length > 0) {
+      parsed.push({
+        type: 'table',
+        content: '',
+        tableData: {
+          headers: tableHeaders,
+          rows: tableRows,
+          alignment: tableAlignment.length > 0 ? tableAlignment : undefined
+        }
+      });
+    }
+
     return parsed;
   };
 
@@ -152,31 +239,33 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
 
       switch (item.type) {
         case 'header':
-          const level = Math.min(item.level || 1, 6);
-          const headerClassName = cn(
-            "font-bold mt-6 mb-4",
-            item.level === 1 && "text-lg",
-            item.level === 2 && "text-base",
-            item.level === 3 && "text-sm",
-            // Theme-aware text colors
-            isUserMessage ? "text-primary-foreground" : "text-foreground"
-          );
+          {
+            const level = Math.min(item.level || 1, 6);
+            const headerClassName = cn(
+              "font-bold mt-6 mb-4",
+              item.level === 1 && "text-lg",
+              item.level === 2 && "text-base",
+              item.level === 3 && "text-sm",
+              // Theme-aware text colors
+              isUserMessage ? "text-primary-foreground" : "text-foreground"
+            );
 
-          switch (level) {
-            case 1:
-              return <h1 key={key} className={headerClassName}>{item.content}</h1>;
-            case 2:
-              return <h2 key={key} className={headerClassName}>{item.content}</h2>;
-            case 3:
-              return <h3 key={key} className={headerClassName}>{item.content}</h3>;
-            case 4:
-              return <h4 key={key} className={headerClassName}>{item.content}</h4>;
-            case 5:
-              return <h5 key={key} className={headerClassName}>{item.content}</h5>;
-            case 6:
-              return <h6 key={key} className={headerClassName}>{item.content}</h6>;
-            default:
-              return <h2 key={key} className={headerClassName}>{item.content}</h2>;
+            switch (level) {
+              case 1:
+                return <h1 key={key} className={headerClassName}>{item.content}</h1>;
+              case 2:
+                return <h2 key={key} className={headerClassName}>{item.content}</h2>;
+              case 3:
+                return <h3 key={key} className={headerClassName}>{item.content}</h3>;
+              case 4:
+                return <h4 key={key} className={headerClassName}>{item.content}</h4>;
+              case 5:
+                return <h5 key={key} className={headerClassName}>{item.content}</h5>;
+              case 6:
+                return <h6 key={key} className={headerClassName}>{item.content}</h6>;
+              default:
+                return <h2 key={key} className={headerClassName}>{item.content}</h2>;
+            }
           }
 
         case 'separator':
@@ -205,39 +294,41 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
           );
 
         case 'list':
-          const listNumber = item.isNumbered ? numberedCounter : null;
-          if (item.isNumbered) {
-            numberedCounter++;
-          }
-
-          // Reset counter on new sections
-          if (index === 0 || (index > 0 && items[index - 1].type !== 'list')) {
+          {
+            const listNumber = item.isNumbered ? numberedCounter : null;
             if (item.isNumbered) {
-              numberedCounter = 2; // Next number after this one
+              numberedCounter++;
             }
-          }
-
-          const indentLevel = item.level || 1;
-          const paddingLeft = `${indentLevel * 24}px`; // 24px per level
-
-          return (
-            <div key={key} className="my-2" style={{ paddingLeft }}>
-              <div className="flex items-start gap-3">
-                <span className={cn(
-                  "mt-1 flex-shrink-0",
-                  isUserMessage ? "text-primary-foreground/70" : "text-foreground/70"
-                )}>
-                  {item.isNumbered ? `${listNumber || 1}.` : '•'}
-                </span>
-                <span className={cn(
-                  "leading-6",
-                  isUserMessage ? "text-primary-foreground/90" : "text-foreground/90"
-                )}>
-                  {renderInlineFormatting(item.content)}
-                </span>
+  
+            // Reset counter on new sections
+            if (index === 0 || (index > 0 && items[index - 1].type !== 'list')) {
+              if (item.isNumbered) {
+                numberedCounter = 2; // Next number after this one
+              }
+            }
+  
+            const indentLevel = item.level || 1;
+            const paddingLeft = `${indentLevel * 24}px`; // 24px per level
+  
+            return (
+              <div key={key} className="my-2" style={{ paddingLeft }}>
+                <div className="flex items-start gap-3">
+                  <span className={cn(
+                    "mt-1 flex-shrink-0",
+                    isUserMessage ? "text-primary-foreground/70" : "text-foreground/70"
+                  )}>
+                    {item.isNumbered ? `${listNumber || 1}.` : '•'}
+                  </span>
+                  <span className={cn(
+                    "leading-6",
+                    isUserMessage ? "text-primary-foreground/90" : "text-foreground/90"
+                  )}>
+                    {renderInlineFormatting(item.content)}
+                  </span>
+                </div>
               </div>
-            </div>
-          );
+            );
+          }
 
         case 'conclusion':
           return (
@@ -263,6 +354,58 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
             </div>
           );
 
+        case 'table':
+          {
+            if (!item.tableData) return null;
+  
+            const { headers, rows, alignment } = item.tableData;
+  
+            return (
+              <div key={key} className="my-4 overflow-x-auto">
+                <table className="min-w-full border-collapse">
+                  <thead>
+                    <tr className="border-b-2 border-border">
+                      {headers.map((header, idx) => (
+                        <th
+                          key={idx}
+                          className={cn(
+                            "px-4 py-2 font-semibold",
+                            alignment?.[idx] === 'center' && "text-center",
+                            alignment?.[idx] === 'right' && "text-right",
+                            (!alignment || alignment[idx] === 'left') && "text-left",
+                            isUserMessage ? "text-primary-foreground" : "text-foreground"
+                          )}
+                        >
+                          {renderInlineFormatting(header)}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows.map((row, rowIdx) => (
+                      <tr key={rowIdx} className="border-b border-border hover:bg-muted/50 transition-colors">
+                        {row.map((cell, cellIdx) => (
+                          <td
+                            key={cellIdx}
+                            className={cn(
+                              "px-4 py-2",
+                              alignment?.[cellIdx] === 'center' && "text-center",
+                              alignment?.[cellIdx] === 'right' && "text-right",
+                              (!alignment || alignment[cellIdx] === 'left') && "text-left",
+                              isUserMessage ? "text-primary-foreground/90" : "text-foreground/90"
+                            )}
+                          >
+                            {renderInlineFormatting(cell || '')}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            );
+          }
+
         case 'paragraph':
         default:
           return (
@@ -278,22 +421,44 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
   };
 
   const renderInlineFormatting = (text: string) => {
-    // Handle bold text
-    const parts = text.split(/(\*\*[^*]+\*\*)/g);
-    return parts.map((part, index) => {
-      if (part.startsWith('**') && part.endsWith('**')) {
+    // First handle line breaks - both <br> tags and Markdown-style (two spaces at end of line)
+    // Replace two or more spaces at the end of a line with <br>
+    let processedText = text.replace(/  +$/gm, '<br>');
+    // Also handle explicit <br> or <br/> tags
+    processedText = processedText.replace(/<br\s*\/?>/gi, '<br>');
+
+    // Split by <br> to handle line breaks
+    const lines = processedText.split('<br>');
+
+    return lines.map((line, lineIndex) => {
+      // Handle bold text within each line
+      const parts = line.split(/(\*\*[^*]+\*\*)/g);
+      const formattedParts = parts.map((part, partIndex) => {
+        if (part.startsWith('**') && part.endsWith('**')) {
+          return (
+            <strong key={`${lineIndex}-${partIndex}`} className={cn(
+              "font-bold",
+              isUserMessage ? "text-primary-foreground" : "text-foreground"
+            )}>
+              {part.slice(2, -2)}
+            </strong>
+          );
+        }
+        return <span key={`${lineIndex}-${partIndex}`} className={cn(
+          isUserMessage ? "text-primary-foreground" : "text-foreground"
+        )}>{part}</span>;
+      });
+
+      // Add line break after each line except the last
+      if (lineIndex < lines.length - 1) {
         return (
-          <strong key={index} className={cn(
-            "font-bold",
-            isUserMessage ? "text-primary-foreground" : "text-foreground"
-          )}>
-            {part.slice(2, -2)}
-          </strong>
+          <React.Fragment key={lineIndex}>
+            {formattedParts}
+            <br />
+          </React.Fragment>
         );
       }
-      return <span key={index} className={cn(
-        isUserMessage ? "text-primary-foreground" : "text-foreground"
-      )}>{part}</span>;
+      return <React.Fragment key={lineIndex}>{formattedParts}</React.Fragment>;
     });
   };
 
