@@ -462,7 +462,7 @@ export function SettingsDialog({
   useKeypress(
     (key) => {
       const { name, ctrl } = key;
-      if (name === 'tab') {
+      if (name === 'tab' && showScopeSelection) {
         setFocusSection((prev) => (prev === 'settings' ? 'scope' : 'settings'));
       }
       if (focusSection === 'settings') {
@@ -751,7 +751,8 @@ export function SettingsDialog({
       height="100%"
     >
       <Box flexDirection="column" flexGrow={1}>
-        <Text bold color={theme.text.link}>
+        <Text bold={focusSection === 'settings'} wrap="truncate">
+          {focusSection === 'settings' ? '> ' : '  '}
           {t('settings.title')}
         </Text>
         <Box height={1} />
@@ -875,6 +876,7 @@ export function SettingsDialog({
 
         <Box height={1} />
 
+        {/* Scope Selection - conditionally visible based on height constraints */}
         {showScopeSelection && (
           <Box marginTop={1} flexDirection="column">
             <Text bold={focusSection === 'scope'} wrap="truncate">
@@ -893,7 +895,10 @@ export function SettingsDialog({
         )}
 
         <Box height={1} />
-        <Text color={theme.text.secondary}>{t('settings.instructions')}</Text>
+        <Text color={theme.text.secondary}>
+          {t('settings.instructions')}
+          {showScopeSelection ? t('settings.tabToChangeFocus') : ''}
+        </Text>
         {showRestartPrompt && (
           <Text color={theme.status.warning}>
             {t('settings.restartPrompt')}

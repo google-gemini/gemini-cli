@@ -13,7 +13,6 @@ import {
   INSTALL_METADATA_FILENAME,
   annotateActiveExtensions,
   checkForAllExtensionUpdates,
-  checkForExtensionUpdate,
   disableExtension,
   enableExtension,
   installExtension,
@@ -23,7 +22,6 @@ import {
   uninstallExtension,
   updateExtension,
   type Extension,
-  type ExtensionInstallMetadata,
 } from './extension.js';
 import {
   GEMINI_DIR,
@@ -32,6 +30,7 @@ import {
   ClearcutLogger,
   type Config,
   ExtensionUninstallEvent,
+  type ExtensionInstallMetadata,
 } from '@google/gemini-cli-core';
 import { execSync } from 'node:child_process';
 import { SettingScope } from './settings.js';
@@ -596,7 +595,7 @@ describe('extension tests', () => {
       mockQuestion.mockImplementation((_query, callback) => callback('y'));
 
       await expect(
-        installExtension({ source: sourceExtDir, type: 'local' }),
+        installExtension({ source: sourceExtDir, type: 'local' }, true),
       ).resolves.toBe('my-local-extension');
 
       expect(consoleInfoSpy).toHaveBeenCalledWith(
@@ -629,7 +628,7 @@ describe('extension tests', () => {
       mockQuestion.mockImplementation((_query, callback) => callback('y'));
 
       await expect(
-        installExtension({ source: sourceExtDir, type: 'local' }),
+        installExtension({ source: sourceExtDir, type: 'local' }, true),
       ).resolves.toBe('my-local-extension');
 
       expect(mockQuestion).toHaveBeenCalledWith(
@@ -654,13 +653,31 @@ describe('extension tests', () => {
       mockQuestion.mockImplementation((_query, callback) => callback('n'));
 
       await expect(
-        installExtension({ source: sourceExtDir, type: 'local' }),
+        installExtension({ source: sourceExtDir, type: 'local' }, true),
       ).rejects.toThrow('Installation cancelled by user.');
 
       expect(mockQuestion).toHaveBeenCalledWith(
         expect.stringContaining('Do you want to continue? (y/n)'),
         expect.any(Function),
       );
+    });
+
+    it('should ignore consent flow if not required', async () => {
+      const sourceExtDir = createExtension({
+        extensionsDir: tempHomeDir,
+        name: 'my-local-extension',
+        version: '1.0.0',
+        mcpServers: {
+          'test-server': {
+            command: 'node',
+            args: ['server.js'],
+          },
+        },
+      });
+
+      await expect(
+        installExtension({ source: sourceExtDir, type: 'local' }, false),
+      ).resolves.toBe('my-local-extension');
     });
   });
 
@@ -1118,118 +1135,6 @@ describe('extension tests', () => {
 
       const results = await checkForAllExtensionUpdates([extension], () => {});
       const result = results.get('error-extension');
-      expect(result).toBe(ExtensionUpdateState.ERROR);
-    });
-  });
-
-  describe('checkForExtensionUpdate', () => {
-    it('should return UpdateAvailable for a git extension with updates', async () => {
-      const extensionDir = createExtension({
-        extensionsDir: userExtensionsDir,
-        name: 'test-extension',
-        version: '1.0.0',
-        installMetadata: {
-          source: 'https://some.git/repo',
-          type: 'git',
-        },
-      });
-      const extension = annotateActiveExtensions(
-        [
-          loadExtension({
-            extensionDir,
-            workspaceDir: tempWorkspaceDir,
-          })!,
-        ],
-        [],
-        process.cwd(),
-      )[0];
-
-      mockGit.getRemotes.mockResolvedValue([
-        { name: 'origin', refs: { fetch: 'https://some.git/repo' } },
-      ]);
-      mockGit.listRemote.mockResolvedValue('remoteHash	HEAD');
-      mockGit.revparse.mockResolvedValue('localHash');
-
-      const result = await checkForExtensionUpdate(extension);
-      expect(result).toBe(ExtensionUpdateState.UPDATE_AVAILABLE);
-    });
-
-    it('should return UpToDate for a git extension with no updates', async () => {
-      const extensionDir = createExtension({
-        extensionsDir: userExtensionsDir,
-        name: 'test-extension',
-        version: '1.0.0',
-        installMetadata: {
-          source: 'https://some.git/repo',
-          type: 'git',
-        },
-      });
-      const extension = annotateActiveExtensions(
-        [
-          loadExtension({
-            extensionDir,
-            workspaceDir: tempWorkspaceDir,
-          })!,
-        ],
-        [],
-        process.cwd(),
-      )[0];
-
-      mockGit.getRemotes.mockResolvedValue([
-        { name: 'origin', refs: { fetch: 'https://some.git/repo' } },
-      ]);
-      mockGit.listRemote.mockResolvedValue('sameHash	HEAD');
-      mockGit.revparse.mockResolvedValue('sameHash');
-
-      const result = await checkForExtensionUpdate(extension);
-      expect(result).toBe(ExtensionUpdateState.UP_TO_DATE);
-    });
-
-    it('should return NotUpdatable for a non-git extension', async () => {
-      const extensionDir = createExtension({
-        extensionsDir: userExtensionsDir,
-        name: 'local-extension',
-        version: '1.0.0',
-      });
-      const extension = annotateActiveExtensions(
-        [
-          loadExtension({
-            extensionDir,
-            workspaceDir: tempWorkspaceDir,
-          })!,
-        ],
-        [],
-        process.cwd(),
-      )[0];
-
-      const result = await checkForExtensionUpdate(extension);
-      expect(result).toBe(ExtensionUpdateState.NOT_UPDATABLE);
-    });
-
-    it('should return Error when git check fails', async () => {
-      const extensionDir = createExtension({
-        extensionsDir: userExtensionsDir,
-        name: 'error-extension',
-        version: '1.0.0',
-        installMetadata: {
-          source: 'https://some.git/repo',
-          type: 'git',
-        },
-      });
-      const extension = annotateActiveExtensions(
-        [
-          loadExtension({
-            extensionDir,
-            workspaceDir: tempWorkspaceDir,
-          })!,
-        ],
-        [],
-        process.cwd(),
-      )[0];
-
-      mockGit.getRemotes.mockRejectedValue(new Error('Git error'));
-
-      const result = await checkForExtensionUpdate(extension);
       expect(result).toBe(ExtensionUpdateState.ERROR);
     });
   });
