@@ -85,7 +85,7 @@ jobs:
       - name: 'Display Pending Updates'
         run: |
           echo "Pending Changes:"
-          echo "  Nightly: ${{ steps.versions.outputs.PREVIOUS_NIGHTLY_TAG }} -> ${{ steps.versions.outputs.NEXT_NIGHTLY_VERSION }}"
+          echo "  Nightly (${{ steps.versions.outputs.PREVIOUS_NIGHTLY_TAG }}): ${{ steps.versions.outputs.PREVIOUS_NIGHTLY_TAG }} -> ${{ steps.versions.outputs.NEXT_NIGHTLY_VERSION }}"
           echo "  Preview: ${{ steps.versions.outputs.PREVIOUS_PREVIEW_TAG }} -> ${{ steps.versions.outputs.PREVIEW_VERSION }}"
           echo "  Stable:  ${{ steps.versions.outputs.PREVIOUS_STABLE_TAG }} -> ${{ steps.versions.outputs.STABLE_VERSION }}"
           echo ""
