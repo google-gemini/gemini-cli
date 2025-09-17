@@ -86,26 +86,44 @@ function getNightlyVersion() {
 }
 
 function getStableVersion(args) {
-  const { latestTag } = getAndVerifyTags('preview', 'v*-preview*');
+  const { latestVersion: latestPreviewVersion } = getAndVerifyTags(
+    'preview',
+    'v*-preview*',
+  );
   const releaseVersion =
     args.stable_version_override?.replace(/^v/, '') ||
-    getVersionFromNPM('preview').replace(/-preview.*/, '');
+    latestPreviewVersion.replace(/-preview.*/, '');
+
+  const { latestTag: previousStableTag } = getAndVerifyTags(
+    'latest',
+    'v[0-9].[0-9].[0-9]',
+  );
+
   return {
     releaseVersion,
     npmTag: 'latest',
-    previousReleaseTag: latestTag,
+    previousReleaseTag: previousStableTag,
   };
 }
 
 function getPreviewVersion(args) {
-  const { latestTag } = getAndVerifyTags('nightly', 'v*-nightly*');
+  const { latestVersion: latestNightlyVersion } = getAndVerifyTags(
+    'nightly',
+    'v*-nightly*',
+  );
   const releaseVersion =
     args.preview_version_override?.replace(/^v/, '') ||
-    getVersionFromNPM('nightly').replace(/-nightly.*/, '') + '-preview.0';
+    latestNightlyVersion.replace(/-nightly.*/, '') + '-preview.0';
+
+  const { latestTag: previousPreviewTag } = getAndVerifyTags(
+    'preview',
+    'v*-preview*',
+  );
+
   return {
     releaseVersion,
     npmTag: 'preview',
-    previousReleaseTag: latestTag,
+    previousReleaseTag: previousPreviewTag,
   };
 }
 

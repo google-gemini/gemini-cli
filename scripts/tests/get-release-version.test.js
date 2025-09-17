@@ -52,7 +52,7 @@ describe('getVersion', () => {
       const result = getVersion({ type: 'stable' });
       expect(result.releaseVersion).toBe('0.5.0');
       expect(result.npmTag).toBe('latest');
-      expect(result.previousReleaseTag).toBe('v0.5.0-preview-2');
+      expect(result.previousReleaseTag).toBe('v0.4.1');
     });
 
     it('should use the override version for stable if provided', () => {
@@ -63,7 +63,7 @@ describe('getVersion', () => {
       });
       expect(result.releaseVersion).toBe('1.2.3');
       expect(result.npmTag).toBe('latest');
-      expect(result.previousReleaseTag).toBe('v0.5.0-preview-2');
+      expect(result.previousReleaseTag).toBe('v0.4.1');
     });
 
     it('should calculate the next preview version from the latest nightly', () => {
@@ -71,9 +71,7 @@ describe('getVersion', () => {
       const result = getVersion({ type: 'preview' });
       expect(result.releaseVersion).toBe('0.6.0-preview.0');
       expect(result.npmTag).toBe('preview');
-      expect(result.previousReleaseTag).toBe(
-        'v0.6.0-nightly.20250910.a31830a3',
-      );
+      expect(result.previousReleaseTag).toBe('v0.5.0-preview-2');
     });
 
     it('should use the override version for preview if provided', () => {
@@ -84,9 +82,7 @@ describe('getVersion', () => {
       });
       expect(result.releaseVersion).toBe('4.5.6-preview');
       expect(result.npmTag).toBe('preview');
-      expect(result.previousReleaseTag).toBe(
-        'v0.6.0-nightly.20250910.a31830a3',
-      );
+      expect(result.previousReleaseTag).toBe('v0.5.0-preview-2');
     });
 
     it('should calculate the next nightly version from the latest nightly', () => {
