@@ -191,7 +191,7 @@ export class IDEServer {
               );
               clearInterval(keepAlive);
             }
-          }, 60000); // 60 sec
+          }, 30000); // 30 sec
 
           transport.onclose = () => {
             clearInterval(keepAlive);

@@ -35,6 +35,10 @@ inputs:
 runs:
   using: 'composite'
   steps:
+    - name: 'Print Inputs'
+      shell: 'bash'
+      run: 'echo "${{ toJSON(inputs) }}"'
+
     - name: 'Configure Git User'
       working-directory: '${{ inputs.working-directory }}'
       shell: 'bash'
@@ -64,7 +68,13 @@ runs:
         DRY_RUN: '${{ inputs.dry-run }}'
         RELEASE_TAG: '${{ inputs.release-tag }}'
       run: |-
-        git add package.json npm-shrinkwrap.json packages/*/package.json
+        git add package.json packages/*/package.json
+        if [ -f npm-shrinkwrap.json ]; then
+          git add npm-shrinkwrap.json
+        fi
+        if [ -f package-lock.json ]; then
+          git add package-lock.json
+        fi
         git commit -m "chore(release): ${RELEASE_TAG}"
         if [[ "${DRY_RUN}" == "false" ]]; then
           echo "Pushing release branch to remote..."
@@ -135,18 +145,4 @@ runs:
           --title "Release ${{ inputs.release-tag }}" \
           --notes-start-tag "${{ inputs.previous-tag }}" \
           --generate-notes
-      shell: 'bash'
-
-    - name: 'Create Issue on Failure'
-      if: |-
-        ${{ failure() }}
-      env:
-        GITHUB_TOKEN: '${{ inputs.github-token }}'
-        RELEASE_TAG: '${{ inputs.release-tag }} || "N/A"'
-        DETAILS_URL: '${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}'
-      run: |-
-        gh issue create \
-          --title "Release Failed for ${RELEASE_TAG} on $(date +'%Y-%m-%d')" \
-          --body "The release workflow failed. See the full run for details: ${DETAILS_URL}" \
-          --label "kind/bug,release-failure,priority/p0"
       shell: 'bash'
