@@ -1,0 +1,32 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      # ดึงซอร์สโค้ดจาก repo
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ตั้งค่า Node.js (ถ้าใช้ Node)
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # ติดตั้ง dependencies
+      - name: Install dependencies
+        run: npm install
+
+      # รันการทดสอบ
+      - name: Run tests
+        run: npm test
