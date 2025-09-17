@@ -124,7 +124,7 @@ export interface ExtensionInstallMetadata {
   source: string;
   type: 'git' | 'local' | 'link' | 'github-release';
   ref?: string;
-  autoUpdate: boolean;
+  autoUpdate?: boolean;
 }
 
 export interface FileFilteringOptions {

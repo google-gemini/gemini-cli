@@ -115,7 +115,14 @@ describe('useExtensionUpdates', () => {
       {
         name: 'test-extension',
         type: 'git',
-        autoUpdate: false,
+        version: '1.0.0',
+        path: '/some/path',
+        isActive: true,
+        installMetadata: {
+          type: 'git',
+          source: 'https://some/repo',
+          autoUpdate: false,
+        },
       },
     ];
     const addItem = vi.fn();
@@ -159,7 +166,7 @@ describe('useExtensionUpdates', () => {
       },
     });
     const extension = annotateActiveExtensions(
-      [loadExtension(extensionDir)!],
+      [loadExtension({ extensionDir, workspaceDir: tempHomeDir })!],
       [],
       tempHomeDir,
     )[0];

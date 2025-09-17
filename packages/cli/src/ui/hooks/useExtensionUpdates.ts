@@ -38,7 +38,7 @@ export const useExtensionUpdates = (
       ) {
         continue;
       }
-      if (extension.autoUpdate) {
+      if (extension.installMetadata?.autoUpdate) {
         updateExtension(extension, cwd, currentState, (newState) => {
           setExtensionsUpdateState((prev) => {
             const finalState = new Map(prev);

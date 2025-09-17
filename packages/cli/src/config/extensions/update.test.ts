@@ -15,8 +15,7 @@ import {
   loadExtension,
 } from '../extension.js';
 import { checkForAllExtensionUpdates, updateExtension } from './update.js';
-import { checkForExtensionUpdate } from './github.js';
-import { GEMINI_DIR, type GeminiCLIExtension } from '@google/gemini-cli-core';
+import { GEMINI_DIR } from '@google/gemini-cli-core';
 import { isWorkspaceTrusted } from '../trustedFolders.js';
 import { ExtensionUpdateState } from '../../ui/state/extensions.js';
 import { createExtension } from '../../test-utils/createExtension.js';
@@ -130,7 +129,12 @@ describe('update tests', () => {
       });
       mockGit.getRemotes.mockResolvedValue([{ name: 'origin' }]);
       const extension = annotateActiveExtensions(
-        [loadExtension(targetExtDir)!],
+        [
+          loadExtension({
+            extensionDir: targetExtDir,
+            workspaceDir: tempWorkspaceDir,
+          })!,
+        ],
         [],
         process.cwd(),
       )[0];
@@ -407,152 +411,6 @@ describe('update tests', () => {
       );
       const result = results.get('error-extension');
       expect(result).toBe(ExtensionUpdateState.ERROR);
-    });
-  });
-
-  describe('checkForExtensionUpdate', () => {
-    it('should return UpdateAvailable for a git extension with updates', async () => {
-      const extensionDir = createExtension({
-        extensionsDir: userExtensionsDir,
-        name: 'test-extension',
-        version: '1.0.0',
-        installMetadata: {
-          source: 'https://some.git/repo',
-          type: 'git',
-        },
-      });
-      const extension = annotateActiveExtensions(
-        [
-          loadExtension({
-            extensionDir,
-            workspaceDir: tempWorkspaceDir,
-          })!,
-        ],
-        [],
-        process.cwd(),
-      )[0];
-
-      mockGit.getRemotes.mockResolvedValue([
-        { name: 'origin', refs: { fetch: 'https://some.git/repo' } },
-      ]);
-      mockGit.listRemote.mockResolvedValue('remoteHash	HEAD');
-      mockGit.revparse.mockResolvedValue('localHash');
-
-      let state: ExtensionUpdateState | undefined = undefined;
-      await checkForExtensionUpdate(
-        extension,
-        (newState) => (state = newState),
-      );
-      expect(state).toBe(ExtensionUpdateState.UPDATE_AVAILABLE);
-    });
-
-    it('should return UpToDate for a git extension with no updates', async () => {
-      const extensionDir = createExtension({
-        extensionsDir: userExtensionsDir,
-        name: 'test-extension',
-        version: '1.0.0',
-        installMetadata: {
-          source: 'https://some.git/repo',
-          type: 'git',
-        },
-      });
-      const extension = annotateActiveExtensions(
-        [
-          loadExtension({
-            extensionDir,
-            workspaceDir: tempWorkspaceDir,
-          })!,
-        ],
-        [],
-        process.cwd(),
-      )[0];
-
-      mockGit.getRemotes.mockResolvedValue([
-        { name: 'origin', refs: { fetch: 'https://some.git/repo' } },
-      ]);
-      mockGit.listRemote.mockResolvedValue('sameHash	HEAD');
-      mockGit.revparse.mockResolvedValue('sameHash');
-
-      let state: ExtensionUpdateState | undefined = undefined;
-      await checkForExtensionUpdate(
-        extension,
-        (newState) => (state = newState),
-      );
-      expect(state).toBe(ExtensionUpdateState.UP_TO_DATE);
-    });
-
-    it('should return NotUpdatable for a non-git extension', async () => {
-      const extensionDir = createExtension({
-        extensionsDir: userExtensionsDir,
-        name: 'local-extension',
-        version: '1.0.0',
-      });
-      const extension = annotateActiveExtensions(
-        [
-          loadExtension({
-            extensionDir,
-            workspaceDir: tempWorkspaceDir,
-          })!,
-        ],
-        [],
-        process.cwd(),
-      )[0];
-
-      let state: ExtensionUpdateState | undefined = undefined;
-      await checkForExtensionUpdate(
-        extension,
-        (newState) => (state = newState),
-      );
-      expect(state).toBe(ExtensionUpdateState.NOT_UPDATABLE);
-    });
-
-    it('should return Error when git check fails', async () => {
-      const extensionDir = createExtension({
-        extensionsDir: userExtensionsDir,
-        name: 'error-extension',
-        version: '1.0.0',
-        installMetadata: {
-          source: 'https://some.git/repo',
-          type: 'git',
-        },
-      });
-      const extension = annotateActiveExtensions(
-        [
-          loadExtension({
-            extensionDir,
-            workspaceDir: tempWorkspaceDir,
-          })!,
-        ],
-        [],
-        process.cwd(),
-      )[0];
-
-      mockGit.getRemotes.mockRejectedValue(new Error('Git error'));
-
-      let state: ExtensionUpdateState | undefined = undefined;
-      await checkForExtensionUpdate(
-        extension,
-        (newState) => (state = newState),
-      );
-      expect(state).toBe(ExtensionUpdateState.ERROR);
-    });
-
-    it('should set state to ERROR when no git remotes are found', async () => {
-      const extension = {
-        name: 'test-extension',
-        type: 'git',
-      };
-      const setExtensionUpdateState = vi.fn();
-      mockGit.getRemotes.mockResolvedValue([]);
-
-      await checkForExtensionUpdate(
-        extension as GeminiCLIExtension,
-        setExtensionUpdateState,
-      );
-
-      expect(setExtensionUpdateState).toHaveBeenCalledWith(
-        ExtensionUpdateState.ERROR,
-      );
     });
   });
 });

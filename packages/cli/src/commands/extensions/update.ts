@@ -13,9 +13,9 @@ import {
   updateAllUpdatableExtensions,
   type ExtensionUpdateInfo,
   checkForAllExtensionUpdates,
-  checkForExtensionUpdate,
   updateExtension,
 } from '../../config/extensions/update.js';
+import { checkForExtensionUpdate } from '../../config/extensions/github.js';
 import { getErrorMessage } from '../../utils/errors.js';
 import { ExtensionUpdateState } from '../../ui/state/extensions.js';
 
@@ -66,7 +66,13 @@ export async function handleUpdate(args: UpdateArgs) {
         return;
       }
       let updateState: ExtensionUpdateState | undefined;
-      await checkForExtensionUpdate(extension, (newState) => {
+      if (!extension.installMetadata) {
+        console.log(
+          `Unable to install extension "${args.name}" due to missing install metadata`,
+        );
+        return;
+      }
+      await checkForExtensionUpdate(extension.installMetadata, (newState) => {
         updateState = newState;
       });
       if (updateState !== ExtensionUpdateState.UPDATE_AVAILABLE) {

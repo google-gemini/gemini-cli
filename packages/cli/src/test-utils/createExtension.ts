@@ -9,9 +9,11 @@ import * as path from 'node:path';
 import {
   EXTENSIONS_CONFIG_FILENAME,
   INSTALL_METADATA_FILENAME,
-  type ExtensionInstallMetadata,
 } from '../config/extension.js';
-import { type MCPServerConfig } from '@google/gemini-cli-core';
+import {
+  type MCPServerConfig,
+  type ExtensionInstallMetadata,
+} from '@google/gemini-cli-core';
 
 export function createExtension({
   extensionsDir = 'extensions-dir',

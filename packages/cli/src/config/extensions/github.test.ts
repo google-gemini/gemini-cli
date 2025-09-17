@@ -125,7 +125,11 @@ describe('git extension helpers', () => {
         type: 'local',
         source: '',
       };
-      const result = await checkForExtensionUpdate(installMetadata);
+      let result: ExtensionUpdateState | undefined = undefined;
+      await checkForExtensionUpdate(
+        installMetadata,
+        (newState) => (result = newState),
+      );
       expect(result).toBe(ExtensionUpdateState.NOT_UPDATABLE);
     });
 
@@ -135,7 +139,11 @@ describe('git extension helpers', () => {
         source: '',
       };
       mockGit.getRemotes.mockResolvedValue([]);
-      const result = await checkForExtensionUpdate(installMetadata);
+      let result: ExtensionUpdateState | undefined = undefined;
+      await checkForExtensionUpdate(
+        installMetadata,
+        (newState) => (result = newState),
+      );
       expect(result).toBe(ExtensionUpdateState.ERROR);
     });
 
@@ -150,7 +158,11 @@ describe('git extension helpers', () => {
       mockGit.listRemote.mockResolvedValue('remote-hash\tHEAD');
       mockGit.revparse.mockResolvedValue('local-hash');
 
-      const result = await checkForExtensionUpdate(installMetadata);
+      let result: ExtensionUpdateState | undefined = undefined;
+      await checkForExtensionUpdate(
+        installMetadata,
+        (newState) => (result = newState),
+      );
       expect(result).toBe(ExtensionUpdateState.UPDATE_AVAILABLE);
     });
 
@@ -165,7 +177,11 @@ describe('git extension helpers', () => {
       mockGit.listRemote.mockResolvedValue('same-hash\tHEAD');
       mockGit.revparse.mockResolvedValue('same-hash');
 
-      const result = await checkForExtensionUpdate(installMetadata);
+      let result: ExtensionUpdateState | undefined = undefined;
+      await checkForExtensionUpdate(
+        installMetadata,
+        (newState) => (result = newState),
+      );
       expect(result).toBe(ExtensionUpdateState.UP_TO_DATE);
     });
 
@@ -175,7 +191,12 @@ describe('git extension helpers', () => {
         source: '/ext',
       };
       mockGit.getRemotes.mockRejectedValue(new Error('git error'));
-      const result = await checkForExtensionUpdate(installMetadata);
+
+      let result: ExtensionUpdateState | undefined = undefined;
+      await checkForExtensionUpdate(
+        installMetadata,
+        (newState) => (result = newState),
+      );
       expect(result).toBe(ExtensionUpdateState.ERROR);
     });
   });
