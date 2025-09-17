@@ -392,8 +392,11 @@ export const findLastSafeSplitPoint = (content: string) => {
       if (!wouldBreakStructure) {
         return potentialSplitPoint;
       }
-      // Remember this as a fallback option if we don't find a better split
-      lastValidSplitPoint = potentialSplitPoint;
+      // Only remember as fallback if it doesn't break list structure
+      // Breaking list structure is worse than not splitting at all for streaming
+      if (!isWithinList(content, potentialSplitPoint)) {
+        lastValidSplitPoint = potentialSplitPoint;
+      }
     }
 
     // If potentialSplitPoint was inside a code block or list,

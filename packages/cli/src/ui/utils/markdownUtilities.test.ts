@@ -793,5 +793,150 @@ Content for section ${i} continues.`);
         expect(endTime - startTime).toBeLessThan(100);
       });
     });
+
+    describe('Regression test for list truncation bug', () => {
+      it('should NOT truncate numbered lists (original PR 8418 bug)', () => {
+        const content = `Here are 5 programming languages:
+
+1. Python
+2. JavaScript
+3. Java
+4. C++
+5. Rust
+
+Each language has its own strengths and use cases.`;
+
+        const splitPoint = findLastSafeSplitPoint(content);
+        console.log(`\n=== REGRESSION DEBUG ===`);
+        console.log(`Content length: ${content.length}`);
+        console.log(`Split point: ${splitPoint}`);
+        console.log(
+          `Split percentage: ${((splitPoint / content.length) * 100).toFixed(1)}%`,
+        );
+
+        if (splitPoint < content.length) {
+          const beforeSplit = content.substring(0, splitPoint);
+          const afterSplit = content.substring(splitPoint);
+
+          console.log(`Before split (${beforeSplit.length} chars):`);
+          console.log(JSON.stringify(beforeSplit));
+          console.log(`After split (${afterSplit.length} chars):`);
+          console.log(JSON.stringify(afterSplit));
+
+          // Check what's happening with the list items
+          const beforeItems = [
+            '1. Python',
+            '2. JavaScript',
+            '3. Java',
+            '4. C++',
+            '5. Rust',
+          ];
+          const beforeHasItems = beforeItems.filter((item) =>
+            beforeSplit.includes(item),
+          );
+          const afterHasItems = beforeItems.filter((item) =>
+            afterSplit.includes(item),
+          );
+
+          console.log(`Before split has items: [${beforeHasItems.join(', ')}]`);
+          console.log(`After split has items: [${afterHasItems.join(', ')}]`);
+
+          // If list is split, ALL items must be together
+          if (beforeSplit.includes('1. Python')) {
+            expect(beforeSplit).toContain('2. JavaScript');
+            expect(beforeSplit).toContain('3. Java');
+            expect(beforeSplit).toContain('4. C++');
+            expect(beforeSplit).toContain('5. Rust');
+          } else if (afterSplit.includes('1. Python')) {
+            expect(afterSplit).toContain('2. JavaScript');
+            expect(afterSplit).toContain('3. Java');
+            expect(afterSplit).toContain('4. C++');
+            expect(afterSplit).toContain('5. Rust');
+          }
+        } else {
+          console.log('No split - content kept as single piece');
+        }
+        console.log(`=========================\n`);
+      });
+
+      it('should preserve list integrity when splitting after headers', () => {
+        const content = `# Programming Languages
+
+Here are some popular options:
+
+1. Python - Great for beginners
+2. JavaScript - Essential for web development
+3. Java - Enterprise applications
+4. C++ - System programming
+5. Rust - Memory safety
+
+Choose based on your goals.`;
+
+        const splitPoint = findLastSafeSplitPoint(content);
+
+        if (splitPoint < content.length) {
+          const beforeSplit = content.substring(0, splitPoint);
+          const afterSplit = content.substring(splitPoint);
+
+          // Debug the actual split behavior
+          console.log('HEADER + LIST DEBUGGING:');
+          console.log('Split point:', splitPoint);
+          console.log(
+            'Split after header?',
+            beforeSplit.includes('# Programming Languages'),
+          );
+          console.log('Before split:', JSON.stringify(beforeSplit));
+
+          // If ANY list item is in a split part, ALL must be there
+          if (beforeSplit.includes('1. Python')) {
+            expect(beforeSplit).toContain('2. JavaScript');
+            expect(beforeSplit).toContain('5. Rust');
+          } else if (afterSplit.includes('1. Python')) {
+            expect(afterSplit).toContain('2. JavaScript');
+            expect(afterSplit).toContain('5. Rust');
+          }
+        }
+      });
+
+      it('should handle streaming content with partial lists (the ACTUAL regression case)', () => {
+        // Simulate streaming content that would cause the original truncation
+        const streamingContent = `Here are 5 programming languages:
+
+1. Python
+`;
+        console.log('\n=== STREAMING SIMULATION ===');
+        console.log('Streaming content (partial list):');
+        console.log(JSON.stringify(streamingContent));
+
+        const splitPoint = findLastSafeSplitPoint(streamingContent);
+        console.log(
+          `Split point: ${splitPoint} (${splitPoint === streamingContent.length ? 'NO SPLIT' : 'SPLIT'})`,
+        );
+
+        if (splitPoint < streamingContent.length) {
+          const beforeSplit = streamingContent.substring(0, splitPoint);
+          const afterSplit = streamingContent.substring(splitPoint);
+          console.log('Before split:', JSON.stringify(beforeSplit));
+          console.log('After split:', JSON.stringify(afterSplit));
+
+          // This is the problem! If we split here, "1. Python" gets committed to static history
+          // and subsequent list items get lost because they arrive in later streaming chunks
+          if (beforeSplit.includes('1. Python')) {
+            console.log(
+              '🚨 PROBLEM: Partial list in before split - this will cause truncation!',
+            );
+          }
+        } else {
+          console.log(
+            '✅ No split - content kept together (correct for streaming)',
+          );
+        }
+        console.log('=============================\n');
+
+        // For streaming scenarios with partial lists, we should NOT split
+        // This test verifies the function correctly avoids splitting partial lists
+        expect(splitPoint).toBe(streamingContent.length);
+      });
+    });
   });
 });
