@@ -297,7 +297,12 @@ describe('parseArguments', () => {
   });
 
   it('should support comma-separated values for --allowed-tools', async () => {
-    process.argv = ['node', 'script.js', '--allowed-tools', 'read_file,ShellTool(git status)'];
+    process.argv = [
+      'node',
+      'script.js',
+      '--allowed-tools',
+      'read_file,ShellTool(git status)',
+    ];
     const argv = await parseArguments({} as Settings);
     expect(argv.allowedTools).toEqual(['read_file', 'ShellTool(git status)']);
   });
