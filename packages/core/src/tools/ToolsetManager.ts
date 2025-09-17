@@ -25,6 +25,8 @@ import { WebTool } from './web-tool.js';
 import { TodoTool } from './todo-tool.js';
 import { PythonEmbeddedTool } from './python-embedded-tool.js';
 import { XlwingsTool } from './xlwings-tool.js';
+import { MarkItDownTool } from './markitdown-tool.js';
+import { GeminiSearchTool } from './gemini-search-tool.js';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type ToolClass = any;
@@ -42,7 +44,8 @@ const ROLE_TOOLSET_MAP: Record<string, ToolClass[]> = {
     ReadManyFilesTool,
     MemoryTool,
     PythonEmbeddedTool,
-    XlwingsTool
+    XlwingsTool,
+    MarkItDownTool
   ],
   office_assistant: [
     LSTool,
@@ -52,22 +55,26 @@ const ROLE_TOOLSET_MAP: Record<string, ToolClass[]> = {
     ShellTool,
     WebTool,
     XlwingsTool,
+    MarkItDownTool,
     PDFTool,
     ZipTool,
     TodoTool,
     MemoryTool,
-    PythonEmbeddedTool
+    PythonEmbeddedTool,
+    GeminiSearchTool
   ],
   translator: [
     ReadFileTool,
     WriteFileTool,
     EditTool,
+    GeminiSearchTool,
     // WebSearchTool
   ],
   creative_writer: [
     ReadFileTool,
     WriteFileTool,
     EditTool,
+    GeminiSearchTool,
     // WebSearchTool
   ],
   data_analyst: [
@@ -76,8 +83,10 @@ const ROLE_TOOLSET_MAP: Record<string, ToolClass[]> = {
     EditTool,
     ShellTool,
     RipGrepTool,
+    GeminiSearchTool,
     // WebSearchTool,
-    XlwingsTool
+    XlwingsTool,
+    MarkItDownTool
   ]
 };
 
