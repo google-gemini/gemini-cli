@@ -2,6 +2,21 @@
 
 Learn how to enable and setup OpenTelemetry for Gemini CLI.
 
+- [Observability with OpenTelemetry](#observability-with-opentelemetry)
+  - [Key Benefits](#key-benefits)
+  - [OpenTelemetry Integration](#opentelemetry-integration)
+  - [Configuration](#configuration)
+  - [Google Cloud Telemetry](#google-cloud-telemetry)
+    - [Prerequisites](#prerequisites)
+    - [Direct Export (Recommended)](#direct-export-recommended)
+    - [Collector-Based Export (Advanced)](#collector-based-export-advanced)
+  - [Local Telemetry](#local-telemetry)
+    - [File-based Output (Recommended)](#file-based-output-recommended)
+    - [Collector-Based Export (Advanced)](#collector-based-export-advanced-1)
+  - [Logs and Metrics](#logs-and-metrics)
+    - [Logs](#logs)
+    - [Metrics](#metrics)
+
 ## Key Benefits
 
 - **🔍 Usage Analytics**: Understand interaction patterns and feature adoption
@@ -30,21 +45,6 @@ observability framework — Gemini CLI's observability system provides:
   instrumentation
 
 [OpenTelemetry]: https://opentelemetry.io/
-
-- [Observability with OpenTelemetry](#observability-with-opentelemetry)
-  - [Key Benefits](#key-benefits)
-  - [OpenTelemetry Integration](#opentelemetry-integration)
-  - [Configuration](#configuration)
-  - [Google Cloud Telemetry](#google-cloud-telemetry)
-    - [Prerequisites](#prerequisites)
-    - [Direct Export (Recommended)](#direct-export-recommended)
-    - [Collector-Based Export (Advanced)](#collector-based-export-advanced)
-  - [Local Telemetry](#local-telemetry)
-    - [File-based Output (Recommended)](#file-based-output-recommended)
-    - [Collector-Based Export (Advanced)](#collector-based-export-advanced-1)
-  - [Logs and Metrics](#logs-and-metrics)
-    - [Logs](#logs)
-    - [Metrics](#metrics)
 
 ## Configuration
 
