@@ -31,5 +31,6 @@ describe('processUtils', () => {
     it('should exit with RELAUNCH_EXIT_CODE', () => {
       expect(() => relaunchApp()).toThrow('process.exit(42) called');
     });
+
   });
 });

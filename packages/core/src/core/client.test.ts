@@ -15,7 +15,6 @@ import {
 } from 'vitest';
 
 import type { Content, GenerateContentResponse, Part } from '@google/genai';
-import { createUserContent } from '@google/genai';
 import {
   findIndexAfterFraction,
   isThinkingDefault,
@@ -399,12 +398,8 @@ describe('Gemini Client (client.ts)', () => {
         vi.mocked(mockContentGenerator.countTokens).mockResolvedValue({
           totalTokens: 1000,
         });
-        await client.tryCompressChat('prompt-id-4', false, [
-          { text: 'request' },
-        ]); // Fails
-        const result = await client.tryCompressChat('prompt-id-4', true, [
-          { text: 'request' },
-        ]);
+        await client.tryCompressChat('prompt-id-4', false); // Fails
+        const result = await client.tryCompressChat('prompt-id-4', true);
 
         expect(result).toEqual({
           compressionStatus: CompressionStatus.COMPRESSED,
@@ -418,9 +413,7 @@ describe('Gemini Client (client.ts)', () => {
         vi.mocked(mockContentGenerator.countTokens).mockResolvedValue({
           totalTokens: 1000,
         });
-        const result = await client.tryCompressChat('prompt-id-4', false, [
-          { text: 'request' },
-        ]);
+        const result = await client.tryCompressChat('prompt-id-4', false);
 
         expect(result).toEqual({
           compressionStatus:
@@ -432,9 +425,7 @@ describe('Gemini Client (client.ts)', () => {
 
       it('does not manipulate the source chat', async () => {
         const { client, mockChat } = setup();
-        await client.tryCompressChat('prompt-id-4', false, [
-          { text: 'request' },
-        ]);
+        await client.tryCompressChat('prompt-id-4', false);
 
         expect(client['chat']).toBe(mockChat); // a new chat session was not created
       });
@@ -457,7 +448,6 @@ describe('Gemini Client (client.ts)', () => {
         const { compressionStatus } = await client.tryCompressChat(
           'prompt-id-4',
           false,
-          [{ text: 'what is your wisdom?' }],
         );
 
         expect(compressionStatus).toBe(
@@ -470,13 +460,9 @@ describe('Gemini Client (client.ts)', () => {
 
       it('will not attempt to compress context after a failure', async () => {
         const { client } = setup();
-        await client.tryCompressChat('prompt-id-4', false, [
-          { text: 'request' },
-        ]);
+        await client.tryCompressChat('prompt-id-4', false);
 
-        const result = await client.tryCompressChat('prompt-id-5', false, [
-          { text: 'request' },
-        ]);
+        const result = await client.tryCompressChat('prompt-id-5', false);
 
         // it counts tokens for {original, compressed} and then never again
         expect(mockContentGenerator.countTokens).toHaveBeenCalledTimes(2);
@@ -499,9 +485,7 @@ describe('Gemini Client (client.ts)', () => {
       });
 
       const initialChat = client.getChat();
-      const result = await client.tryCompressChat('prompt-id-2', false, [
-        { text: '...history...' },
-      ]);
+      const result = await client.tryCompressChat('prompt-id-2', false);
       const newChat = client.getChat();
 
       expect(tokenLimit).toHaveBeenCalled();
@@ -546,9 +530,7 @@ describe('Gemini Client (client.ts)', () => {
         ],
       } as unknown as GenerateContentResponse);
 
-      await client.tryCompressChat('prompt-id-3', false, [
-        { text: '...history...' },
-      ]);
+      await client.tryCompressChat('prompt-id-3', false);
 
       expect(
         ClearcutLogger.prototype.logChatCompressionEvent,
@@ -592,9 +574,7 @@ describe('Gemini Client (client.ts)', () => {
       } as unknown as GenerateContentResponse);
 
       const initialChat = client.getChat();
-      const result = await client.tryCompressChat('prompt-id-3', false, [
-        { text: '...history...' },
-      ]);
+      const result = await client.tryCompressChat('prompt-id-3', false);
       const newChat = client.getChat();
 
       expect(tokenLimit).toHaveBeenCalled();
@@ -653,9 +633,7 @@ describe('Gemini Client (client.ts)', () => {
       } as unknown as GenerateContentResponse);
 
       const initialChat = client.getChat();
-      const result = await client.tryCompressChat('prompt-id-3', false, [
-        { text: '...history...' },
-      ]);
+      const result = await client.tryCompressChat('prompt-id-3', false);
       const newChat = client.getChat();
 
       expect(tokenLimit).toHaveBeenCalled();
@@ -675,7 +653,7 @@ describe('Gemini Client (client.ts)', () => {
       // 3. compressed summary message
       // 4. standard canned user summary message
       // 5. The last user message (not the last 3 because that would start with a function response)
-      expect(newChat.getHistory().length).toEqual(6);
+      expect(newChat.getHistory().length).toEqual(5);
     });
 
     it('should always trigger summarization when force is true, regardless of token count', async () => {
@@ -703,9 +681,7 @@ describe('Gemini Client (client.ts)', () => {
       } as unknown as GenerateContentResponse);
 
       const initialChat = client.getChat();
-      const result = await client.tryCompressChat('prompt-id-1', false, [
-        { text: '...history...' },
-      ]); // force = true
+      const result = await client.tryCompressChat('prompt-id-1', false); // force = true
       const newChat = client.getChat();
 
       expect(mockGenerateContentFn).toHaveBeenCalled();
@@ -750,17 +726,12 @@ describe('Gemini Client (client.ts)', () => {
       client['chat'] = mockChat;
       client['startChat'] = vi.fn().mockResolvedValue(mockChat);
 
-      const request = [{ text: 'Long conversation' }];
-      const result = await client.tryCompressChat(
-        'prompt-id-4',
-        false,
-        request,
-      );
+      const result = await client.tryCompressChat('prompt-id-4', false);
 
       expect(mockContentGenerator.countTokens).toHaveBeenCalledTimes(2);
       expect(mockContentGenerator.countTokens).toHaveBeenNthCalledWith(1, {
         model: firstCurrentModel,
-        contents: [...mockChatHistory, createUserContent(request)],
+        contents: [...mockChatHistory],
       });
       expect(mockContentGenerator.countTokens).toHaveBeenNthCalledWith(2, {
         model: secondCurrentModel,

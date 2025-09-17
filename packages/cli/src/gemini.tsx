@@ -16,6 +16,7 @@ import { spawn } from 'node:child_process';
 import { RELAUNCH_EXIT_CODE } from './utils/processUtils.js';
 import { start_sandbox } from './utils/sandbox.js';
 import type { DnsResolutionOrder, LoadedSettings } from './config/settings.js';
+import { RELAUNCH_EXIT_CODE } from './utils/processUtils.js';
 import {
   loadSettings,
   migrateDeprecatedSettings,
@@ -114,6 +115,7 @@ async function relaunchAppInChildProcess(additionalArgs: string[] = []) {
   let restartCount = 0;
   
   while (restartCount < MAX_RESTARTS) {
+
     const nodeArgs = [...additionalArgs, ...process.argv.slice(1)];
     const newEnv = { ...process.env, GEMINI_CLI_NO_RELAUNCH: 'true' };
 
@@ -149,6 +151,7 @@ async function relaunchAppInChildProcess(additionalArgs: string[] = []) {
   // If we've exceeded max restarts, exit with error
   console.error(`Maximum restart attempts (${MAX_RESTARTS}) exceeded. Exiting.`);
   process.exit(1);
+
 
 }
 
@@ -373,13 +376,17 @@ export async function main() {
 
       const sandboxArgs = injectStdinIntoArgs(process.argv, stdinData);
 
-      await start_sandbox(sandboxConfig, memoryArgs, config, sandboxArgs);
+      await relaunchOnExitCode(() =>
+        start_sandbox(sandboxConfig, memoryArgs, config, sandboxArgs),
+      );
       process.exit(0);
     } else {
+
       // Not in a sandbox and not entering one, so relaunch with additional
       // arguments to control memory usage if needed.
       await relaunchAppInChildProcess(memoryArgs);
       // Note: relaunchAppInChildProcess never returns, so this line is unreachable
+
     }
   }
 

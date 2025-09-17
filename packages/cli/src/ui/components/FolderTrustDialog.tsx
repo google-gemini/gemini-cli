@@ -13,6 +13,7 @@ import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
 import { useKeypress } from '../hooks/useKeypress.js';
 import * as process from 'node:process';
 import * as path from 'node:path';
+
 import { clearTerminal } from '../utils/terminalSetup.js';
 import { relaunchApp } from '../../utils/processUtils.js';
 
@@ -31,6 +32,17 @@ export const FolderTrustDialog: React.FC<FolderTrustDialogProps> = ({
   onSelect,
   isRestarting,
 }) => {
+  useEffect(() => {
+    const doRelaunch = async () => {
+      if (isRestarting) {
+        setTimeout(async () => {
+          await relaunchApp();
+        }, 250);
+      }
+    };
+    doRelaunch();
+  }, [isRestarting]);
+
   useKeypress(
     (key) => {
       if (key.name === 'escape') {
@@ -53,7 +65,6 @@ export const FolderTrustDialog: React.FC<FolderTrustDialogProps> = ({
     }
     return undefined;
   }, [isRestarting]);
-
 
   const dirName = path.basename(process.cwd());
   const parentFolder = path.basename(path.dirname(process.cwd()));
@@ -103,7 +114,9 @@ export const FolderTrustDialog: React.FC<FolderTrustDialogProps> = ({
       {isRestarting && (
         <Box marginLeft={1} marginTop={1}>
           <Text color={theme.status.warning}>
+
             Gemini CLI is restarting to apply changes...
+
           </Text>
         </Box>
       )}

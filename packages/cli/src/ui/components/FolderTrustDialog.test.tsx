@@ -7,7 +7,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderWithProviders } from '../../test-utils/render.js';
 import { FolderTrustDialog, FolderTrustChoice } from './FolderTrustDialog.js';
+
 import { waitFor } from '@testing-library/react';
+
 
 // Mock process.exit and process.cwd
 const mockedExit = vi.fn();
@@ -43,6 +45,7 @@ describe('FolderTrustDialog', () => {
       <FolderTrustDialog onSelect={vi.fn()} isRestarting={true} />,
     );
 
+
     expect(lastFrame()).toContain(
       'Gemini CLI is restarting to apply changes...',
     );
@@ -58,6 +61,7 @@ describe('FolderTrustDialog', () => {
     await waitFor(() => {
       expect(mockedExit).not.toHaveBeenCalled();
     });
+
   });
 
   it('should call onSelect when escape is pressed', async () => {
