@@ -105,7 +105,7 @@ export async function cleanupExpiredSessions(
           'code' in error &&
           error.code === 'ENOENT'
         ) {
-          result.deleted++;
+          // File already deleted, do nothing.
         } else {
           // Log error directly to console
           const sessionId =
