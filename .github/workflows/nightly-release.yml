@@ -15,14 +15,22 @@ on:
         required: false
         type: 'boolean'
         default: false
+      ref:
+        description: 'The branch, tag, or SHA to release from.'
+        required: false
+        type: 'string'
+        default: 'main'
 
 jobs:
   release:
     runs-on: 'ubuntu-latest'
+    permissions:
+      issues: 'write'
     steps:
       - name: 'Checkout'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
         with:
+          ref: '${{ github.event.inputs.ref }}'
           fetch-depth: 0
 
       - name: 'Setup Node.js'
@@ -62,3 +70,15 @@ jobs:
           github-token: '${{ secrets.GITHUB_TOKEN }}'
           dry-run: '${{ github.event.inputs.dry_run }}'
           previous-tag: '${{ steps.nightly_version.outputs.PREVIOUS_TAG }}'
+
+      - name: 'Create Issue on Failure'
+        if: '${{ failure() && github.event.inputs.dry_run == false }}'
+        env:
+          GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+          RELEASE_TAG: '${{ steps.nightly_version.outputs.RELEASE_TAG }}'
+          DETAILS_URL: '${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}'
+        run: |
+          gh issue create \
+            --title 'Nightly Release Failed for ${RELEASE_TAG} on $(date +'%Y-%m-%d')' \
+            --body 'The nightly-release workflow failed. See the full run for details: ${DETAILS_URL}' \
+            --label 'kind/bug,release-failure,priority/p0'
