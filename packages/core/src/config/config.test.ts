@@ -363,6 +363,33 @@ describe('Server Config (config.ts)', () => {
     expect(config.getTelemetryEnabled()).toBe(TELEMETRY_SETTINGS.enabled);
   });
 
+  it('Config constructor should set telemetry useCollector to true when provided', () => {
+    const paramsWithTelemetry: ConfigParameters = {
+      ...baseParams,
+      telemetry: { enabled: true, useCollector: true },
+    };
+    const config = new Config(paramsWithTelemetry);
+    expect(config.getTelemetryUseCollector()).toBe(true);
+  });
+
+  it('Config constructor should set telemetry useCollector to false when provided', () => {
+    const paramsWithTelemetry: ConfigParameters = {
+      ...baseParams,
+      telemetry: { enabled: true, useCollector: false },
+    };
+    const config = new Config(paramsWithTelemetry);
+    expect(config.getTelemetryUseCollector()).toBe(false);
+  });
+
+  it('Config constructor should default telemetry useCollector to false if not provided', () => {
+    const paramsWithTelemetry: ConfigParameters = {
+      ...baseParams,
+      telemetry: { enabled: true },
+    };
+    const config = new Config(paramsWithTelemetry);
+    expect(config.getTelemetryUseCollector()).toBe(false);
+  });
+
   it('should have a getFileService method that returns FileDiscoveryService', () => {
     const config = new Config(baseParams);
     const fileService = config.getFileService();
