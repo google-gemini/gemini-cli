@@ -23,7 +23,11 @@ import { EventMetadataKey } from './event-metadata-key.js';
 import { makeFakeConfig } from '../../test-utils/config.js';
 import { http, HttpResponse } from 'msw';
 import { server } from '../../mocks/msw.js';
-import { UserPromptEvent, makeChatCompressionEvent } from '../types.js';
+import {
+  UserPromptEvent,
+  makeChatCompressionEvent,
+  ModelRoutingEvent,
+} from '../types.js';
 import { GIT_COMMIT_INFO, CLI_VERSION } from '../../generated/git-commit.js';
 import { UserAccountManager } from '../../utils/userAccountManager.js';
 import { InstallationManager } from '../../utils/installationManager.js';
@@ -209,7 +213,9 @@ describe('ClearcutLogger', () => {
       const cli_version = CLI_VERSION;
       const git_commit_hash = GIT_COMMIT_INFO;
       const prompt_id = 'my-prompt-123';
-      const user_settings = safeJsonStringify([{ smart_edit_enabled: true }]);
+      const user_settings = safeJsonStringify([
+        { smart_edit_enabled: true, model_router_enabled: false },
+      ]);
 
       // Setup logger with expected values
       const { logger, loggerConfig } = setup({
@@ -293,11 +299,13 @@ describe('ClearcutLogger', () => {
       });
     });
 
-    it('logs the value of config.useSmartEdit', () => {
-      const user_settings = safeJsonStringify([{ smart_edit_enabled: true }]);
+    it('logs the value of config.useSmartEdit and config.useModelRouter', () => {
+      const user_settings = safeJsonStringify([
+        { smart_edit_enabled: true, model_router_enabled: true },
+      ]);
 
       const { logger } = setup({
-        config: { useSmartEdit: true },
+        config: { useSmartEdit: true, useModelRouter: true },
       });
 
       vi.stubEnv('TERM_PROGRAM', 'vscode');
@@ -593,6 +601,80 @@ describe('ClearcutLogger', () => {
         getEvents(logger!)[0][0].source_extension_json,
       ) as { event_id: string };
       expect(firstRequeuedEvent.event_id).toBe('failed_5');
+    });
+  });
+
+  describe('logModelRoutingEvent', () => {
+    it('logs a successful routing event', () => {
+      const { logger } = setup();
+      const event = new ModelRoutingEvent(
+        'gemini-pro',
+        'default-strategy',
+        123,
+        'some reasoning',
+        false,
+        undefined,
+      );
+
+      logger?.logModelRoutingEvent(event);
+
+      const events = getEvents(logger!);
+      expect(events.length).toBe(1);
+      expect(events[0]).toHaveEventName(EventNames.MODEL_ROUTING);
+      expect(events[0]).toHaveMetadataValue([
+        EventMetadataKey.GEMINI_CLI_ROUTING_DECISION,
+        'gemini-pro',
+      ]);
+      expect(events[0]).toHaveMetadataValue([
+        EventMetadataKey.GEMINI_CLI_ROUTING_DECISION_SOURCE,
+        'default-strategy',
+      ]);
+      expect(events[0]).toHaveMetadataValue([
+        EventMetadataKey.GEMINI_CLI_ROUTING_LATENCY_MS,
+        '123',
+      ]);
+      expect(events[0]).toHaveMetadataValue([
+        EventMetadataKey.GEMINI_CLI_ROUTING_FAILURE,
+        'false',
+      ]);
+    });
+
+    it('logs a failed routing event with a reason', () => {
+      const { logger } = setup();
+      const event = new ModelRoutingEvent(
+        'gemini-pro',
+        'router-exception',
+        234,
+        'some reasoning',
+        true,
+        'Something went wrong',
+      );
+
+      logger?.logModelRoutingEvent(event);
+
+      const events = getEvents(logger!);
+      expect(events.length).toBe(1);
+      expect(events[0]).toHaveEventName(EventNames.MODEL_ROUTING);
+      expect(events[0]).toHaveMetadataValue([
+        EventMetadataKey.GEMINI_CLI_ROUTING_DECISION,
+        'gemini-pro',
+      ]);
+      expect(events[0]).toHaveMetadataValue([
+        EventMetadataKey.GEMINI_CLI_ROUTING_DECISION_SOURCE,
+        'router-exception',
+      ]);
+      expect(events[0]).toHaveMetadataValue([
+        EventMetadataKey.GEMINI_CLI_ROUTING_LATENCY_MS,
+        '234',
+      ]);
+      expect(events[0]).toHaveMetadataValue([
+        EventMetadataKey.GEMINI_CLI_ROUTING_FAILURE,
+        'true',
+      ]);
+      expect(events[0]).toHaveMetadataValue([
+        EventMetadataKey.GEMINI_CLI_ROUTING_FAILURE_REASON,
+        'Something went wrong',
+      ]);
     });
   });
 });

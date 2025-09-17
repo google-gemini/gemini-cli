@@ -14,6 +14,8 @@ import { CompositeStrategy } from './strategies/compositeStrategy.js';
 import { FallbackStrategy } from './strategies/fallbackStrategy.js';
 import { OverrideStrategy } from './strategies/overrideStrategy.js';
 import { ClassifierStrategy } from './strategies/classifierStrategy.js';
+import { logModelRouting } from '../telemetry/loggers.js';
+import { ModelRoutingEvent } from '../telemetry/types.js';
 
 vi.mock('../config/config.js');
 vi.mock('../core/baseLlmClient.js');
@@ -22,6 +24,8 @@ vi.mock('./strategies/compositeStrategy.js');
 vi.mock('./strategies/fallbackStrategy.js');
 vi.mock('./strategies/overrideStrategy.js');
 vi.mock('./strategies/classifierStrategy.js');
+vi.mock('../telemetry/loggers.js');
+vi.mock('../telemetry/types.js');
 
 describe('ModelRouterService', () => {
   let service: ModelRouterService;
@@ -78,15 +82,16 @@ describe('ModelRouterService', () => {
   });
 
   describe('route()', () => {
+    const strategyDecision: RoutingDecision = {
+      model: 'strategy-chosen-model',
+      metadata: {
+        source: 'test-router/fallback',
+        latencyMs: 10,
+        reasoning: 'Strategy reasoning',
+      },
+    };
+
     it('should delegate routing to the composite strategy', async () => {
-      const strategyDecision: RoutingDecision = {
-        model: 'strategy-chosen-model',
-        metadata: {
-          source: 'test-router/fallback',
-          latencyMs: 10,
-          reasoning: 'Strategy reasoning',
-        },
-      };
       const strategySpy = vi
         .spyOn(mockCompositeStrategy, 'route')
         .mockResolvedValue(strategyDecision);
@@ -99,6 +104,48 @@ describe('ModelRouterService', () => {
         mockBaseLlmClient,
       );
       expect(decision).toEqual(strategyDecision);
+    });
+
+    it('should log a telemetry event on a successful decision', async () => {
+      vi.spyOn(mockCompositeStrategy, 'route').mockResolvedValue(
+        strategyDecision,
+      );
+
+      await service.route(mockContext);
+
+      expect(ModelRoutingEvent).toHaveBeenCalledWith(
+        'strategy-chosen-model',
+        'test-router/fallback',
+        10,
+        'Strategy reasoning',
+        false,
+        undefined,
+      );
+      expect(logModelRouting).toHaveBeenCalledWith(
+        mockConfig,
+        expect.any(ModelRoutingEvent),
+      );
+    });
+
+    it('should log a telemetry event and re-throw on a failed decision', async () => {
+      const testError = new Error('Strategy failed');
+      vi.spyOn(mockCompositeStrategy, 'route').mockRejectedValue(testError);
+      vi.spyOn(mockConfig, 'getModel').mockReturnValue('default-model');
+
+      await expect(service.route(mockContext)).rejects.toThrow(testError);
+
+      expect(ModelRoutingEvent).toHaveBeenCalledWith(
+        'default-model',
+        'router-exception',
+        expect.any(Number),
+        'An exception occurred during routing.',
+        true,
+        'Strategy failed',
+      );
+      expect(logModelRouting).toHaveBeenCalledWith(
+        mockConfig,
+        expect.any(ModelRoutingEvent),
+      );
     });
   });
 });
