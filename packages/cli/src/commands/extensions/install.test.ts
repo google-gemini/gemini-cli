@@ -99,6 +99,18 @@ describe('handleInstall', () => {
     expect(processSpy).toHaveBeenCalledWith(1);
   });
 
+  it('should install an extension from a sso source', async () => {
+    mockInstallExtension.mockResolvedValue('sso-extension');
+
+    await handleInstall({
+      source: 'sso://google.com',
+    });
+
+    expect(consoleLogSpy).toHaveBeenCalledWith(
+      'Extension "sso-extension" installed successfully and enabled.',
+    );
+  });
+
   it('should install an extension from a local path', async () => {
     mockInstallExtension.mockResolvedValue('local-extension');
 
