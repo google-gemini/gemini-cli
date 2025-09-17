@@ -51,7 +51,30 @@ The Gemini CLI uses the `mcpServers` configuration in your `settings.json` file 
 
 ### Configure the MCP server in settings.json
 
-You can configure MCP servers at the global level in the `~/.gemini/settings.json` file or in your project's root directory, create or open the `.gemini/settings.json` file. Within the file, add the `mcpServers` configuration block.
+You can configure MCP servers in your `settings.json` file in two main ways: through the top-level `mcpServers` object for specific server definitions, and through the `mcp` object for global settings that control server discovery and execution.
+
+#### Global MCP Settings (`mcp`)
+
+The `mcp` object in your `settings.json` allows you to define global rules for all MCP servers.
+
+- **`mcp.serverCommand`** (string): A global command to start an MCP server.
+- **`mcp.allowed`** (array of strings): A list of MCP server names to allow. If this is set, only servers from this list (matching the keys in the `mcpServers` object) will be connected to.
+- **`mcp.excluded`** (array of strings): A list of MCP server names to exclude. Servers in this list will not be connected to.
+
+**Example:**
+
+```json
+{
+  "mcp": {
+    "allowed": ["my-trusted-server"],
+    "excluded": ["experimental-server"]
+  }
+}
+```
+
+#### Server-Specific Configuration (`mcpServers`)
+
+The `mcpServers` object is where you define each individual MCP server you want the CLI to connect to.
 
 ### Configuration Structure
 
@@ -92,7 +115,7 @@ Each server configuration supports the following properties:
 - **`cwd`** (string): Working directory for Stdio transport
 - **`timeout`** (number): Request timeout in milliseconds (default: 600,000ms = 10 minutes)
 - **`trust`** (boolean): When `true`, bypasses all tool call confirmations for this server (default: `false`)
-- **`includeTools`** (string[]): List of tool names to include from this MCP server. When specified, only the tools listed here will be available from this server (whitelist behavior). If not specified, all tools from the server are enabled by default.
+- **`includeTools`** (string[]): List of tool names to include from this MCP server. When specified, only the tools listed here will be available from this server (allowlist behavior). If not specified, all tools from the server are enabled by default.
 - **`excludeTools`** (string[]): List of tool names to exclude from this MCP server. Tools listed here will not be available to the model, even if they are exposed by the server. **Note:** `excludeTools` takes precedence over `includeTools` - if a tool is in both lists, it will be excluded.
 
 ### OAuth Support for Remote MCP Servers
@@ -169,6 +192,7 @@ Use the `/mcp auth` command to manage OAuth authentication:
 - **`scopes`** (string[]): Required OAuth scopes
 - **`redirectUri`** (string): Custom redirect URI (defaults to `http://localhost:7777/oauth/callback`)
 - **`tokenParamName`** (string): Query parameter name for tokens in SSE URLs
+- **`audiences`** (string[]): Audiences the token is valid for
 
 #### Token Management
 
@@ -571,6 +595,56 @@ The MCP integration tracks several states:
 
 This comprehensive integration makes MCP servers a powerful way to extend the Gemini CLI's capabilities while maintaining security, reliability, and ease of use.
 
+## Returning Rich Content from Tools
+
+MCP tools are not limited to returning simple text. You can return rich, multi-part content, including text, images, audio, and other binary data in a single tool response. This allows you to build powerful tools that can provide diverse information to the model in a single turn.
+
+All data returned from the tool is processed and sent to the model as context for its next generation, enabling it to reason about or summarize the provided information.
+
+### How It Works
+
+To return rich content, your tool's response must adhere to the MCP specification for a [`CallToolResult`](https://modelcontextprotocol.io/specification/2025-06-18/server/tools#tool-result). The `content` field of the result should be an array of `ContentBlock` objects. The Gemini CLI will correctly process this array, separating text from binary data and packaging it for the model.
+
+You can mix and match different content block types in the `content` array. The supported block types include:
+
+- `text`
+- `image`
+- `audio`
+- `resource` (embedded content)
+- `resource_link`
+
+### Example: Returning Text and an Image
+
+Here is an example of a valid JSON response from an MCP tool that returns both a text description and an image:
+
+```json
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "Here is the logo you requested."
+    },
+    {
+      "type": "image",
+      "data": "BASE64_ENCODED_IMAGE_DATA_HERE",
+      "mimeType": "image/png"
+    },
+    {
+      "type": "text",
+      "text": "The logo was created in 2025."
+    }
+  ]
+}
+```
+
+When the Gemini CLI receives this response, it will:
+
+1.  Extract all the text and combine it into a single `functionResponse` part for the model.
+2.  Present the image data as a separate `inlineData` part.
+3.  Provide a clean, user-friendly summary in the CLI, indicating that both text and an image were received.
+
+This enables you to build sophisticated tools that can provide rich, multi-modal context to the Gemini model.
+
 ## MCP Prompts as Slash Commands
 
 In addition to tools, MCP servers can expose predefined prompts that can be executed as slash commands within the Gemini CLI. This allows you to create shortcuts for common or complex queries that can be easily invoked by name.
@@ -616,9 +690,13 @@ await server.connect(transport);
 This can be included in `settings.json` under `mcpServers` with:
 
 ```json
-"nodeServer": {
-  "command": "node",
-  "args": ["filename.ts"],
+{
+  "mcpServers": {
+    "nodeServer": {
+      "command": "node",
+      "args": ["filename.ts"]
+    }
+  }
 }
 ```
 
@@ -637,3 +715,114 @@ or, using positional arguments:
 ```
 
 When you run this command, the Gemini CLI executes the `prompts/get` method on the MCP server with the provided arguments. The server is responsible for substituting the arguments into the prompt template and returning the final prompt text. The CLI then sends this prompt to the model for execution. This provides a convenient way to automate and share common workflows.
+
+## Managing MCP Servers with `gemini mcp`
+
+While you can always configure MCP servers by manually editing your `settings.json` file, the Gemini CLI provides a convenient set of commands to manage your server configurations programmatically. These commands streamline the process of adding, listing, and removing MCP servers without needing to directly edit JSON files.
+
+### Adding a Server (`gemini mcp add`)
+
+The `add` command configures a new MCP server in your `settings.json`. Based on the scope (`-s, --scope`), it will be added to either the user config `~/.gemini/settings.json` or the project config `.gemini/settings.json` file.
+
+**Command:**
+
+```bash
+gemini mcp add [options] <name> <commandOrUrl> [args...]
+```
+
+- `<name>`: A unique name for the server.
+- `<commandOrUrl>`: The command to execute (for `stdio`) or the URL (for `http`/`sse`).
+- `[args...]`: Optional arguments for a `stdio` command.
+
+**Options (Flags):**
+
+- `-s, --scope`: Configuration scope (user or project). [default: "project"]
+- `-t, --transport`: Transport type (stdio, sse, http). [default: "stdio"]
+- `-e, --env`: Set environment variables (e.g. -e KEY=value).
+- `-H, --header`: Set HTTP headers for SSE and HTTP transports (e.g. -H "X-Api-Key: abc123" -H "Authorization: Bearer abc123").
+- `--timeout`: Set connection timeout in milliseconds.
+- `--trust`: Trust the server (bypass all tool call confirmation prompts).
+- `--description`: Set the description for the server.
+- `--include-tools`: A comma-separated list of tools to include.
+- `--exclude-tools`: A comma-separated list of tools to exclude.
+
+#### Adding an stdio server
+
+This is the default transport for running local servers.
+
+```bash
+# Basic syntax
+gemini mcp add <name> <command> [args...]
+
+# Example: Adding a local server
+gemini mcp add my-stdio-server -e API_KEY=123 /path/to/server arg1 arg2 arg3
+
+# Example: Adding a local python server
+gemini mcp add python-server python server.py --port 8080
+```
+
+#### Adding an HTTP server
+
+This transport is for servers that use the streamable HTTP transport.
+
+```bash
+# Basic syntax
+gemini mcp add --transport http <name> <url>
+
+# Example: Adding an HTTP server
+gemini mcp add --transport http http-server https://api.example.com/mcp/
+
+# Example: Adding an HTTP server with an authentication header
+gemini mcp add --transport http secure-http https://api.example.com/mcp/ --header "Authorization: Bearer abc123"
+```
+
+#### Adding an SSE server
+
+This transport is for servers that use Server-Sent Events (SSE).
+
+```bash
+# Basic syntax
+gemini mcp add --transport sse <name> <url>
+
+# Example: Adding an SSE server
+gemini mcp add --transport sse sse-server https://api.example.com/sse/
+
+# Example: Adding an SSE server with an authentication header
+gemini mcp add --transport sse secure-sse https://api.example.com/sse/ --header "Authorization: Bearer abc123"
+```
+
+### Listing Servers (`gemini mcp list`)
+
+To view all MCP servers currently configured, use the `list` command. It displays each server's name, configuration details, and connection status.
+
+**Command:**
+
+```bash
+gemini mcp list
+```
+
+**Example Output:**
+
+```sh
+✓ stdio-server: command: python3 server.py (stdio) - Connected
+✓ http-server: https://api.example.com/mcp (http) - Connected
+✗ sse-server: https://api.example.com/sse (sse) - Disconnected
+```
+
+### Removing a Server (`gemini mcp remove`)
+
+To delete a server from your configuration, use the `remove` command with the server's name.
+
+**Command:**
+
+```bash
+gemini mcp remove <name>
+```
+
+**Example:**
+
+```bash
+gemini mcp remove my-server
+```
+
+This will find and delete the "my-server" entry from the `mcpServers` object in the appropriate `settings.json` file based on the scope (`-s, --scope`).

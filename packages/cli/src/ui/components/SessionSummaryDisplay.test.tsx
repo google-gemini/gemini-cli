@@ -8,7 +8,7 @@ import { render } from 'ink-testing-library';
 import { describe, it, expect, vi } from 'vitest';
 import { SessionSummaryDisplay } from './SessionSummaryDisplay.js';
 import * as SessionContext from '../contexts/SessionContext.js';
-import { SessionMetrics } from '../contexts/SessionContext.js';
+import type { SessionMetrics } from '../contexts/SessionContext.js';
 
 vi.mock('../contexts/SessionContext.js', async (importOriginal) => {
   const actual = await importOriginal<typeof SessionContext>();
@@ -59,6 +59,10 @@ describe('<SessionSummaryDisplay />', () => {
         totalDurationMs: 0,
         totalDecisions: { accept: 0, reject: 0, modify: 0 },
         byName: {},
+      },
+      files: {
+        totalLinesAdded: 42,
+        totalLinesRemoved: 15,
       },
     };
 

@@ -4,17 +4,19 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { vi, describe, it, expect, beforeEach, Mock } from 'vitest';
+import type { Mock } from 'vitest';
+import { vi, describe, it, expect, beforeEach } from 'vitest';
 import { memoryCommand } from './memoryCommand.js';
-import { type CommandContext, SlashCommand } from './types.js';
+import type { SlashCommand, type CommandContext } from './types.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
 import { MessageType } from '../types.js';
-import { LoadedSettings } from '../../config/settings.js';
+import type { LoadedSettings } from '../../config/settings.js';
 import {
   getErrorMessage,
   loadServerHierarchicalMemory,
   type FileDiscoveryService,
 } from '@google/gemini-cli-core';
+import type { LoadServerHierarchicalMemoryResponse } from '@google/gemini-cli-core/index.js';
 
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const original =
@@ -161,10 +163,15 @@ describe('memoryCommand', () => {
         getDebugMode: () => false,
         getFileService: () => ({}) as FileDiscoveryService,
         getExtensionContextFilePaths: () => [],
+        shouldLoadMemoryFromIncludeDirectories: () => false,
+        getWorkspaceContext: () => ({
+          getDirectories: () => [],
+        }),
         getFileFilteringOptions: () => ({
           ignore: [],
           include: [],
         }),
+        getFolderTrust: () => false,
       };
 
       mockContext = createMockCommandContext({
@@ -183,7 +190,7 @@ describe('memoryCommand', () => {
     it('should display success message when memory is refreshed with content', async () => {
       if (!refreshCommand.action) throw new Error('Command has no action');
 
-      const refreshResult = {
+      const refreshResult: LoadServerHierarchicalMemoryResponse = {
         memoryContent: 'new memory content',
         fileCount: 2,
       };

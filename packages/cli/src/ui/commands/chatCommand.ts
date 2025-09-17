@@ -4,15 +4,22 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import * as fsPromises from 'fs/promises';
-import {
+import * as fsPromises from 'node:fs/promises';
+import React from 'react';
+import { Text } from 'ink';
+import { theme } from '../semantic-colors.js';
+import type {
   CommandContext,
   SlashCommand,
   MessageActionReturn,
-  CommandKind,
+  SlashCommandActionReturn,
 } from './types.js';
-import path from 'path';
-import { HistoryItemWithoutId, MessageType } from '../types.js';
+import { CommandKind } from './types.js';
+import { decodeTagName } from '@google/gemini-cli-core';
+import path from 'node:path';
+import type { HistoryItemWithoutId } from '../types.js';
+import { MessageType } from '../types.js';
+import type { Content } from '@google/genai';
 
 interface ChatDetail {
   name: string;
@@ -23,7 +30,8 @@ const getSavedChatTags = async (
   context: CommandContext,
   mtSortDesc: boolean,
 ): Promise<ChatDetail[]> => {
-  const geminiDir = context.services.config?.getProjectTempDir();
+  const cfg = context.services.config;
+  const geminiDir = cfg?.storage?.getProjectTempDir();
   if (!geminiDir) {
     return [];
   }
@@ -37,8 +45,9 @@ const getSavedChatTags = async (
       if (file.startsWith(file_head) && file.endsWith(file_tail)) {
         const filePath = path.join(geminiDir, file);
         const stats = await fsPromises.stat(filePath);
+        const tagName = file.slice(file_head.length, -file_tail.length);
         chatDetails.push({
-          name: file.slice(file_head.length, -file_tail.length),
+          name: decodeTagName(tagName),
           mtime: stats.mtime,
         });
       }
@@ -96,7 +105,7 @@ const saveCommand: SlashCommand = {
   description:
     'Save the current conversation as a checkpoint. Usage: /chat save <tag>',
   kind: CommandKind.BUILT_IN,
-  action: async (context, args): Promise<MessageActionReturn> => {
+  action: async (context, args): Promise<SlashCommandActionReturn | void> => {
     const tag = args.trim();
     if (!tag) {
       return {
@@ -108,6 +117,26 @@ const saveCommand: SlashCommand = {
 
     const { logger, config } = context.services;
     await logger.initialize();
+
+    if (!context.overwriteConfirmed) {
+      const exists = await logger.checkpointExists(tag);
+      if (exists) {
+        return {
+          type: 'confirm_action',
+          prompt: React.createElement(
+            Text,
+            null,
+            'A checkpoint with the tag ',
+            React.createElement(Text, { color: theme.text.accent }, tag),
+            ' already exists. Do you want to overwrite it?',
+          ),
+          originalInvocation: {
+            raw: context.invocation?.raw || `/chat save ${tag}`,
+          },
+        };
+      }
+    }
+
     const chat = await config?.getGeminiClient()?.getChat();
     if (!chat) {
       return {
@@ -118,12 +147,12 @@ const saveCommand: SlashCommand = {
     }
 
     const history = chat.getHistory();
-    if (history.length > 0) {
+    if (history.length > 2) {
       await logger.saveCheckpoint(history, tag);
       return {
         type: 'message',
         messageType: 'info',
-        content: `Conversation checkpoint saved with tag: ${tag}.`,
+        content: `Conversation checkpoint saved with tag: ${decodeTagName(tag)}.`,
       };
     } else {
       return {
@@ -159,7 +188,7 @@ const resumeCommand: SlashCommand = {
       return {
         type: 'message',
         messageType: 'info',
-        content: `No saved checkpoint found with tag: ${tag}.`,
+        content: `No saved checkpoint found with tag: ${decodeTagName(tag)}.`,
       };
     }
 
@@ -228,13 +257,13 @@ const deleteCommand: SlashCommand = {
       return {
         type: 'message',
         messageType: 'info',
-        content: `Conversation checkpoint '${tag}' has been deleted.`,
+        content: `Conversation checkpoint '${decodeTagName(tag)}' has been deleted.`,
       };
     } else {
       return {
         type: 'message',
         messageType: 'error',
-        content: `Error: No checkpoint found with tag '${tag}'.`,
+        content: `Error: No checkpoint found with tag '${decodeTagName(tag)}'.`,
       };
     }
   },
@@ -246,9 +275,96 @@ const deleteCommand: SlashCommand = {
   },
 };
 
+export function serializeHistoryToMarkdown(history: Content[]): string {
+  return history
+    .map((item) => {
+      const text =
+        item.parts
+          ?.filter((m) => !!m.text)
+          .map((m) => m.text)
+          .join('') || '';
+      return `**${item.role}**:\n\n${text}`;
+    })
+    .join('\n\n---\n\n');
+}
+
+const shareCommand: SlashCommand = {
+  name: 'share',
+  description:
+    'Share the current conversation to a markdown or json file. Usage: /chat share <file>',
+  kind: CommandKind.BUILT_IN,
+  action: async (context, args): Promise<MessageActionReturn> => {
+    let filePathArg = args.trim();
+    if (!filePathArg) {
+      filePathArg = `gemini-conversation-${Date.now()}.json`;
+    }
+
+    const filePath = path.resolve(filePathArg);
+    const extension = path.extname(filePath);
+    if (extension !== '.md' && extension !== '.json') {
+      return {
+        type: 'message',
+        messageType: 'error',
+        content: 'Invalid file format. Only .md and .json are supported.',
+      };
+    }
+
+    const chat = await context.services.config?.getGeminiClient()?.getChat();
+    if (!chat) {
+      return {
+        type: 'message',
+        messageType: 'error',
+        content: 'No chat client available to share conversation.',
+      };
+    }
+
+    const history = chat.getHistory();
+
+    // An empty conversation has two hidden messages that setup the context for
+    // the chat. Thus, to check whether a conversation has been started, we
+    // can't check for length 0.
+    if (history.length <= 2) {
+      return {
+        type: 'message',
+        messageType: 'info',
+        content: 'No conversation found to share.',
+      };
+    }
+
+    let content = '';
+    if (extension === '.json') {
+      content = JSON.stringify(history, null, 2);
+    } else {
+      content = serializeHistoryToMarkdown(history);
+    }
+
+    try {
+      await fsPromises.writeFile(filePath, content);
+      return {
+        type: 'message',
+        messageType: 'info',
+        content: `Conversation shared to ${filePath}`,
+      };
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      return {
+        type: 'message',
+        messageType: 'error',
+        content: `Error sharing conversation: ${errorMessage}`,
+      };
+    }
+  },
+};
+
 export const chatCommand: SlashCommand = {
   name: 'chat',
   description: 'Manage conversation history.',
   kind: CommandKind.BUILT_IN,
-  subCommands: [listCommand, saveCommand, resumeCommand, deleteCommand],
+  subCommands: [
+    listCommand,
+    saveCommand,
+    resumeCommand,
+    deleteCommand,
+    shareCommand,
+  ],
 };

@@ -12,8 +12,10 @@ import type {
   Context,
   Histogram,
 } from '@opentelemetry/api';
-import { Config } from '../config/config.js';
+import type { Config } from '../config/config.js';
 import { FileOperation } from './metrics.js';
+import { makeFakeConfig } from '../test-utils/config.js';
+import { ModelRoutingEvent } from './types.js';
 
 const mockCounterAddFn: Mock<
   (value: number, attributes?: Attributes, context?: Context) => void
@@ -28,18 +30,18 @@ const mockCreateHistogramFn: Mock<
   (name: string, options?: unknown) => Histogram
 > = vi.fn();
 
-const mockCounterInstance = {
+const mockCounterInstance: Counter = {
   add: mockCounterAddFn,
-} as unknown as Counter;
+} as Partial<Counter> as Counter;
 
-const mockHistogramInstance = {
+const mockHistogramInstance: Histogram = {
   record: mockHistogramRecordFn,
-} as unknown as Histogram;
+} as Partial<Histogram> as Histogram;
 
-const mockMeterInstance = {
+const mockMeterInstance: Meter = {
   createCounter: mockCreateCounterFn.mockReturnValue(mockCounterInstance),
   createHistogram: mockCreateHistogramFn.mockReturnValue(mockHistogramInstance),
-} as unknown as Meter;
+} as Partial<Meter> as Meter;
 
 function originalOtelMockFactory() {
   return {
@@ -49,15 +51,20 @@ function originalOtelMockFactory() {
     ValueType: {
       INT: 1,
     },
+    diag: {
+      setLogger: vi.fn(),
+    },
   };
 }
 
-vi.mock('@opentelemetry/api', originalOtelMockFactory);
+vi.mock('@opentelemetry/api');
 
 describe('Telemetry Metrics', () => {
   let initializeMetricsModule: typeof import('./metrics.js').initializeMetrics;
   let recordTokenUsageMetricsModule: typeof import('./metrics.js').recordTokenUsageMetrics;
   let recordFileOperationMetricModule: typeof import('./metrics.js').recordFileOperationMetric;
+  let recordChatCompressionMetricsModule: typeof import('./metrics.js').recordChatCompressionMetrics;
+  let recordModelRoutingMetricsModule: typeof import('./metrics.js').recordModelRoutingMetrics;
 
   beforeEach(async () => {
     vi.resetModules();
@@ -71,6 +78,9 @@ describe('Telemetry Metrics', () => {
     initializeMetricsModule = metricsJsModule.initializeMetrics;
     recordTokenUsageMetricsModule = metricsJsModule.recordTokenUsageMetrics;
     recordFileOperationMetricModule = metricsJsModule.recordFileOperationMetric;
+    recordChatCompressionMetricsModule =
+      metricsJsModule.recordChatCompressionMetrics;
+    recordModelRoutingMetricsModule = metricsJsModule.recordModelRoutingMetrics;
 
     const otelApiModule = await import('@opentelemetry/api');
 
@@ -83,6 +93,35 @@ describe('Telemetry Metrics', () => {
     (otelApiModule.metrics.getMeter as Mock).mockReturnValue(mockMeterInstance);
     mockCreateCounterFn.mockReturnValue(mockCounterInstance);
     mockCreateHistogramFn.mockReturnValue(mockHistogramInstance);
+  });
+
+  describe('recordChatCompressionMetrics', () => {
+    it('does not record metrics if not initialized', () => {
+      const lol = makeFakeConfig({});
+
+      recordChatCompressionMetricsModule(lol, {
+        tokens_after: 100,
+        tokens_before: 200,
+      });
+
+      expect(mockCounterAddFn).not.toHaveBeenCalled();
+    });
+
+    it('records token compression with the correct attributes', () => {
+      const config = makeFakeConfig({});
+      initializeMetricsModule(config);
+
+      recordChatCompressionMetricsModule(config, {
+        tokens_after: 100,
+        tokens_before: 200,
+      });
+
+      expect(mockCounterAddFn).toHaveBeenCalledWith(1, {
+        'session.id': 'test-session-id',
+        tokens_after: 100,
+        tokens_before: 200,
+      });
+    });
   });
 
   describe('recordTokenUsageMetrics', () => {
@@ -219,6 +258,131 @@ describe('Telemetry Metrics', () => {
         'session.id': 'test-session-id',
         operation: FileOperation.UPDATE,
         mimetype: 'application/javascript',
+      });
+    });
+
+    it('should record file operation without diffStat', () => {
+      initializeMetricsModule(mockConfig);
+      mockCounterAddFn.mockClear();
+
+      recordFileOperationMetricModule(
+        mockConfig,
+        FileOperation.UPDATE,
+        undefined,
+        undefined,
+        undefined,
+      );
+
+      expect(mockCounterAddFn).toHaveBeenCalledWith(1, {
+        'session.id': 'test-session-id',
+        operation: FileOperation.UPDATE,
+      });
+    });
+
+    it('should record minimal file operation when optional parameters are undefined', () => {
+      initializeMetricsModule(mockConfig);
+      mockCounterAddFn.mockClear();
+
+      recordFileOperationMetricModule(
+        mockConfig,
+        FileOperation.UPDATE,
+        10,
+        'text/plain',
+        'txt',
+        undefined,
+      );
+
+      expect(mockCounterAddFn).toHaveBeenCalledWith(1, {
+        'session.id': 'test-session-id',
+        operation: FileOperation.UPDATE,
+        lines: 10,
+        mimetype: 'text/plain',
+        extension: 'txt',
+      });
+    });
+
+    it('should not include diffStat attributes when diffStat is not provided', () => {
+      initializeMetricsModule(mockConfig);
+      mockCounterAddFn.mockClear();
+
+      recordFileOperationMetricModule(
+        mockConfig,
+        FileOperation.UPDATE,
+        undefined,
+        undefined,
+        undefined,
+      );
+
+      expect(mockCounterAddFn).toHaveBeenCalledWith(1, {
+        'session.id': 'test-session-id',
+        operation: FileOperation.UPDATE,
+      });
+    });
+  });
+
+  describe('recordModelRoutingMetrics', () => {
+    const mockConfig = {
+      getSessionId: () => 'test-session-id',
+    } as unknown as Config;
+
+    it('should not record metrics if not initialized', () => {
+      const event = new ModelRoutingEvent(
+        'gemini-pro',
+        'default',
+        100,
+        'test-reason',
+        false,
+        undefined,
+      );
+      recordModelRoutingMetricsModule(mockConfig, event);
+      expect(mockHistogramRecordFn).not.toHaveBeenCalled();
+      expect(mockCounterAddFn).not.toHaveBeenCalled();
+    });
+
+    it('should record latency for a successful routing decision', () => {
+      initializeMetricsModule(mockConfig);
+      const event = new ModelRoutingEvent(
+        'gemini-pro',
+        'default',
+        150,
+        'test-reason',
+        false,
+        undefined,
+      );
+      recordModelRoutingMetricsModule(mockConfig, event);
+
+      expect(mockHistogramRecordFn).toHaveBeenCalledWith(150, {
+        'session.id': 'test-session-id',
+        'routing.decision_model': 'gemini-pro',
+        'routing.decision_source': 'default',
+      });
+      // The session counter is called once on init
+      expect(mockCounterAddFn).toHaveBeenCalledTimes(1);
+    });
+
+    it('should record latency and failure for a failed routing decision', () => {
+      initializeMetricsModule(mockConfig);
+      const event = new ModelRoutingEvent(
+        'gemini-pro',
+        'classifier',
+        200,
+        'test-reason',
+        true,
+        'test-error',
+      );
+      recordModelRoutingMetricsModule(mockConfig, event);
+
+      expect(mockHistogramRecordFn).toHaveBeenCalledWith(200, {
+        'session.id': 'test-session-id',
+        'routing.decision_model': 'gemini-pro',
+        'routing.decision_source': 'classifier',
+      });
+
+      expect(mockCounterAddFn).toHaveBeenCalledTimes(2);
+      expect(mockCounterAddFn).toHaveBeenNthCalledWith(2, 1, {
+        'session.id': 'test-session-id',
+        'routing.decision_source': 'classifier',
+        'routing.error_message': 'test-error',
       });
     });
   });

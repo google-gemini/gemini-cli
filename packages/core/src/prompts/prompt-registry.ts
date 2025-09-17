@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { DiscoveredMCPPrompt } from '../tools/mcp-client.js';
+import type { DiscoveredMCPPrompt } from '../tools/mcp-client.js';
 
 export class PromptRegistry {
   private prompts: Map<string, DiscoveredMCPPrompt> = new Map();
@@ -52,5 +52,23 @@ export class PromptRegistry {
       }
     }
     return serverPrompts.sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  /**
+   * Clears all the prompts from the registry.
+   */
+  clear(): void {
+    this.prompts.clear();
+  }
+
+  /**
+   * Removes all prompts from a specific server.
+   */
+  removePromptsByServer(serverName: string): void {
+    for (const [name, prompt] of this.prompts.entries()) {
+      if (prompt.serverName === serverName) {
+        this.prompts.delete(name);
+      }
+    }
   }
 }

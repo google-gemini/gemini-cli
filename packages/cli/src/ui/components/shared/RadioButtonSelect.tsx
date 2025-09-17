@@ -4,9 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useEffect, useState, useRef } from 'react';
-import { Text, Box, useInput } from 'ink';
-import { Colors } from '../../colors.js';
+import type React from 'react';
+import { useEffect, useState, useRef } from 'react';
+import { Text, Box } from 'ink';
+import { theme } from '../../semantic-colors.js';
+import { useKeypress } from '../../hooks/useKeypress.js';
 
 /**
  * Represents a single option for the RadioButtonSelect.
@@ -54,7 +56,7 @@ export function RadioButtonSelect<T>({
   initialIndex = 0,
   onSelect,
   onHighlight,
-  isFocused,
+  isFocused = true,
   showScrollArrows = false,
   maxItemsToShow = 10,
   showNumbers = true,
@@ -63,7 +65,6 @@ export function RadioButtonSelect<T>({
   const [scrollOffset, setScrollOffset] = useState(0);
   const [numberInput, setNumberInput] = useState('');
   const numberInputTimer = useRef<NodeJS.Timeout | null>(null);
-
   useEffect(() => {
     const newScrollOffset = Math.max(
       0,
@@ -85,9 +86,10 @@ export function RadioButtonSelect<T>({
     [],
   );
 
-  useInput(
-    (input, key) => {
-      const isNumeric = showNumbers && /^[0-9]$/.test(input);
+  useKeypress(
+    (key) => {
+      const { sequence, name } = key;
+      const isNumeric = showNumbers && /^[0-9]$/.test(sequence);
 
       // Any key press that is not a digit should clear the number input buffer.
       if (!isNumeric && numberInputTimer.current) {
@@ -95,21 +97,21 @@ export function RadioButtonSelect<T>({
         setNumberInput('');
       }
 
-      if (input === 'k' || key.upArrow) {
+      if (name === 'k' || name === 'up') {
         const newIndex = activeIndex > 0 ? activeIndex - 1 : items.length - 1;
         setActiveIndex(newIndex);
         onHighlight?.(items[newIndex]!.value);
         return;
       }
 
-      if (input === 'j' || key.downArrow) {
+      if (name === 'j' || name === 'down') {
         const newIndex = activeIndex < items.length - 1 ? activeIndex + 1 : 0;
         setActiveIndex(newIndex);
         onHighlight?.(items[newIndex]!.value);
         return;
       }
 
-      if (key.return) {
+      if (name === 'return') {
         onSelect(items[activeIndex]!.value);
         return;
       }
@@ -120,7 +122,7 @@ export function RadioButtonSelect<T>({
           clearTimeout(numberInputTimer.current);
         }
 
-        const newNumberInput = numberInput + input;
+        const newNumberInput = numberInput + sequence;
         setNumberInput(newNumberInput);
 
         const targetIndex = Number.parseInt(newNumberInput, 10) - 1;
@@ -154,7 +156,7 @@ export function RadioButtonSelect<T>({
         }
       }
     },
-    { isActive: isFocused && items.length > 0 },
+    { isActive: !!(isFocused && items.length > 0) },
   );
 
   const visibleItems = items.slice(scrollOffset, scrollOffset + maxItemsToShow);
@@ -162,7 +164,9 @@ export function RadioButtonSelect<T>({
   return (
     <Box flexDirection="column">
       {showScrollArrows && (
-        <Text color={scrollOffset > 0 ? Colors.Foreground : Colors.Gray}>
+        <Text
+          color={scrollOffset > 0 ? theme.text.primary : theme.text.secondary}
+        >
           ▲
         </Text>
       )}
@@ -170,18 +174,18 @@ export function RadioButtonSelect<T>({
         const itemIndex = scrollOffset + index;
         const isSelected = activeIndex === itemIndex;
 
-        let textColor = Colors.Foreground;
-        let numberColor = Colors.Foreground;
+        let textColor = theme.text.primary;
+        let numberColor = theme.text.primary;
         if (isSelected) {
-          textColor = Colors.AccentGreen;
-          numberColor = Colors.AccentGreen;
+          textColor = theme.status.success;
+          numberColor = theme.status.success;
         } else if (item.disabled) {
-          textColor = Colors.Gray;
-          numberColor = Colors.Gray;
+          textColor = theme.text.secondary;
+          numberColor = theme.text.secondary;
         }
 
         if (!showNumbers) {
-          numberColor = Colors.Gray;
+          numberColor = theme.text.secondary;
         }
 
         const numberColumnWidth = String(items.length).length;
@@ -192,7 +196,10 @@ export function RadioButtonSelect<T>({
         return (
           <Box key={item.label} alignItems="center">
             <Box minWidth={2} flexShrink={0}>
-              <Text color={isSelected ? Colors.AccentGreen : Colors.Foreground}>
+              <Text
+                color={isSelected ? theme.status.success : theme.text.primary}
+                aria-hidden
+              >
                 {isSelected ? '●' : ' '}
               </Text>
             </Box>
@@ -200,13 +207,16 @@ export function RadioButtonSelect<T>({
               marginRight={1}
               flexShrink={0}
               minWidth={itemNumberText.length}
+              aria-state={{ checked: isSelected }}
             >
               <Text color={numberColor}>{itemNumberText}</Text>
             </Box>
             {item.themeNameDisplay && item.themeTypeDisplay ? (
               <Text color={textColor} wrap="truncate">
                 {item.themeNameDisplay}{' '}
-                <Text color={Colors.Gray}>{item.themeTypeDisplay}</Text>
+                <Text color={theme.text.secondary}>
+                  {item.themeTypeDisplay}
+                </Text>
               </Text>
             ) : (
               <Text color={textColor} wrap="truncate">
@@ -220,8 +230,8 @@ export function RadioButtonSelect<T>({
         <Text
           color={
             scrollOffset + maxItemsToShow < items.length
-              ? Colors.Foreground
-              : Colors.Gray
+              ? theme.text.primary
+              : theme.text.secondary
           }
         >
           ▼

@@ -19,29 +19,78 @@ import process from 'node:process';
 import { isGitRepository } from '../utils/gitUtils.js';
 import { MemoryTool, GEMINI_CONFIG_DIR } from '../tools/memoryTool.js';
 
+export function resolvePathFromEnv(envVar?: string): {
+  isSwitch: boolean;
+  value: string | null;
+  isDisabled: boolean;
+} {
+  // Handle the case where the environment variable is not set, empty, or just whitespace.
+  const trimmedEnvVar = envVar?.trim();
+  if (!trimmedEnvVar) {
+    return { isSwitch: false, value: null, isDisabled: false };
+  }
+
+  const lowerEnvVar = trimmedEnvVar.toLowerCase();
+  // Check if the input is a common boolean-like string.
+  if (['0', 'false', '1', 'true'].includes(lowerEnvVar)) {
+    // If so, identify it as a "switch" and return its value.
+    const isDisabled = ['0', 'false'].includes(lowerEnvVar);
+    return { isSwitch: true, value: lowerEnvVar, isDisabled };
+  }
+
+  // If it's not a switch, treat it as a potential file path.
+  let customPath = trimmedEnvVar;
+
+  // Safely expand the tilde (~) character to the user's home directory.
+  if (customPath.startsWith('~/') || customPath === '~') {
+    try {
+      const home = os.homedir(); // This is the call that can throw an error.
+      if (customPath === '~') {
+        customPath = home;
+      } else {
+        customPath = path.join(home, customPath.slice(2));
+      }
+    } catch (error) {
+      // If os.homedir() fails, we catch the error instead of crashing.
+      console.warn(
+        `Could not resolve home directory for path: ${trimmedEnvVar}`,
+        error,
+      );
+      // Return null to indicate the path resolution failed.
+      return { isSwitch: false, value: null, isDisabled: false };
+    }
+  }
+
+  // Return it as a non-switch with the fully resolved absolute path.
+  return {
+    isSwitch: false,
+    value: path.resolve(customPath),
+    isDisabled: false,
+  };
+}
+
 export function getCoreSystemPrompt(userMemory?: string): string {
-  // if GEMINI_SYSTEM_MD is set (and not 0|false), override system prompt from file
-  // default path is .gemini/system.md but can be modified via custom path in GEMINI_SYSTEM_MD
+  // A flag to indicate whether the system prompt override is active.
   let systemMdEnabled = false;
+  // The default path for the system prompt file. This can be overridden.
   let systemMdPath = path.resolve(path.join(GEMINI_CONFIG_DIR, 'system.md'));
-  const systemMdVar = process.env.GEMINI_SYSTEM_MD;
-  if (systemMdVar) {
-    const systemMdVarLower = systemMdVar.toLowerCase();
-    if (!['0', 'false'].includes(systemMdVarLower)) {
-      systemMdEnabled = true; // enable system prompt override
-      if (!['1', 'true'].includes(systemMdVarLower)) {
-        let customPath = systemMdVar;
-        if (customPath.startsWith('~/')) {
-          customPath = path.join(os.homedir(), customPath.slice(2));
-        } else if (customPath === '~') {
-          customPath = os.homedir();
-        }
-        systemMdPath = path.resolve(customPath); // use custom path from GEMINI_SYSTEM_MD
-      }
-      // require file to exist when override is enabled
-      if (!fs.existsSync(systemMdPath)) {
-        throw new Error(`missing system prompt file '${systemMdPath}'`);
-      }
+  // Resolve the environment variable to get either a path or a switch value.
+  const systemMdResolution = resolvePathFromEnv(
+    process.env['GEMINI_SYSTEM_MD'],
+  );
+
+  // Proceed only if the environment variable is set and is not disabled.
+  if (systemMdResolution.value && !systemMdResolution.isDisabled) {
+    systemMdEnabled = true;
+
+    // We update systemMdPath to this new custom path.
+    if (!systemMdResolution.isSwitch) {
+      systemMdPath = systemMdResolution.value;
+    }
+
+    // require file to exist when override is enabled
+    if (!fs.existsSync(systemMdPath)) {
+      throw new Error(`missing system prompt file '${systemMdPath}'`);
     }
   }
   const basePrompt = systemMdEnabled
@@ -112,7 +161,7 @@ When requested to perform tasks like fixing bugs, adding features, refactoring, 
 - **Command Execution:** Use the '${ShellTool.Name}' tool for running shell commands, remembering the safety rule to explain modifying commands first.
 - **Background Processes:** Use background processes (via \`&\`) for commands that are unlikely to stop on their own, e.g. \`node server.js &\`. If unsure, ask the user.
 - **Interactive Commands:** Try to avoid shell commands that are likely to require user interaction (e.g. \`git rebase -i\`). Use non-interactive versions of commands (e.g. \`npm init -y\` instead of \`npm init\`) when available, and otherwise remind the user that interactive shell commands are not supported and may cause hangs until canceled by the user.
-- **Remembering Facts:** Use the '${MemoryTool.Name}' tool to remember specific, *user-related* facts or preferences when the user explicitly asks, or when they state a clear, concise piece of information that would help personalize or streamline *your future interactions with them* (e.g., preferred coding style, common project paths they use, personal tool aliases). This tool is for user-specific information that should persist across sessions. Do *not* use it for general project context or information that belongs in project-specific \`GEMINI.md\` files. If unsure whether to save something, you can ask the user, "Should I remember that for you?"
+- **Remembering Facts:** Use the '${MemoryTool.Name}' tool to remember specific, *user-related* facts or preferences when the user explicitly asks, or when they state a clear, concise piece of information that would help personalize or streamline *your future interactions with them* (e.g., preferred coding style, common project paths they use, personal tool aliases). This tool is for user-specific information that should persist across sessions. Do *not* use it for general project context or information. If unsure whether to save something, you can ask the user, "Should I remember that for you?"
 - **Respect User Confirmations:** Most tool calls (also denoted as 'function calls') will first require confirmation from the user, where they will either approve or cancel the function call. If a user cancels a function call, respect their choice and do _not_ try to make the function call again. It is okay to request the tool call again _only_ if the user requests that same tool call on a subsequent prompt. When a user cancels a function call, assume best intentions from the user and consider inquiring if they prefer any alternative paths forward.
 
 ## Interaction Details
@@ -121,8 +170,8 @@ When requested to perform tasks like fixing bugs, adding features, refactoring, 
 
 ${(function () {
   // Determine sandbox status based on environment variables
-  const isSandboxExec = process.env.SANDBOX === 'sandbox-exec';
-  const isGenericSandbox = !!process.env.SANDBOX; // Check if SANDBOX is set to any non-empty value
+  const isSandboxExec = process.env['SANDBOX'] === 'sandbox-exec';
+  const isGenericSandbox = !!process.env['SANDBOX']; // Check if SANDBOX is set to any non-empty value
 
   if (isSandboxExec) {
     return `
@@ -266,25 +315,19 @@ Your core function is efficient and safe assistance. Balance extreme conciseness
 `.trim();
 
   // if GEMINI_WRITE_SYSTEM_MD is set (and not 0|false), write base system prompt to file
-  const writeSystemMdVar = process.env.GEMINI_WRITE_SYSTEM_MD;
-  if (writeSystemMdVar) {
-    const writeSystemMdVarLower = writeSystemMdVar.toLowerCase();
-    if (!['0', 'false'].includes(writeSystemMdVarLower)) {
-      if (['1', 'true'].includes(writeSystemMdVarLower)) {
-        fs.mkdirSync(path.dirname(systemMdPath), { recursive: true });
-        fs.writeFileSync(systemMdPath, basePrompt); // write to default path, can be modified via GEMINI_SYSTEM_MD
-      } else {
-        let customPath = writeSystemMdVar;
-        if (customPath.startsWith('~/')) {
-          customPath = path.join(os.homedir(), customPath.slice(2));
-        } else if (customPath === '~') {
-          customPath = os.homedir();
-        }
-        const resolvedPath = path.resolve(customPath);
-        fs.mkdirSync(path.dirname(resolvedPath), { recursive: true });
-        fs.writeFileSync(resolvedPath, basePrompt); // write to custom path from GEMINI_WRITE_SYSTEM_MD
-      }
-    }
+  const writeSystemMdResolution = resolvePathFromEnv(
+    process.env['GEMINI_WRITE_SYSTEM_MD'],
+  );
+
+  // Check if the feature is enabled. This proceeds only if the environment
+  // variable is set and is not explicitly '0' or 'false'.
+  if (writeSystemMdResolution.value && !writeSystemMdResolution.isDisabled) {
+    const writePath = writeSystemMdResolution.isSwitch
+      ? systemMdPath
+      : writeSystemMdResolution.value;
+
+    fs.mkdirSync(path.dirname(writePath), { recursive: true });
+    fs.writeFileSync(writePath, basePrompt);
   }
 
   const memorySuffix =

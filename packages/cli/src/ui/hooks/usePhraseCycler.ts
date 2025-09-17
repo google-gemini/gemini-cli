@@ -38,13 +38,11 @@ export const WITTY_LOADING_PHRASES = [
   'Defragmenting memories... both RAM and personal...',
   'Rebooting the humor module...',
   'Caching the essentials (mostly cat memes)...',
-  'Running sudo make me a sandwich...',
   'Optimizing for ludicrous speed',
   "Swapping bits... don't tell the bytes...",
   'Garbage collecting... be right back...',
   'Assembling the interwebs...',
   'Converting coffee into code...',
-  'Pushing to production (and hoping for the best)...',
   'Updating the syntax for reality...',
   'Rewiring the synapses...',
   'Looking for a misplaced semicolon...',
@@ -66,12 +64,10 @@ export const WITTY_LOADING_PHRASES = [
   "Just a moment, I'm tuning the algorithms...",
   'Warp speed engaged...',
   'Mining for more Dilithium crystals...',
-  "I'm Giving Her all she's got Captain!",
   "Don't panic...",
   'Following the white rabbit...',
   'The truth is in here... somewhere...',
   'Blowing on the cartridge...',
-  'Looking for the princess in another castle...',
   'Loading... Do a barrel roll!',
   'Waiting for the respawn...',
   'Finishing the Kessel Run in less than 12 parsecs...',
@@ -102,7 +98,7 @@ export const WITTY_LOADING_PHRASES = [
   'Why did the computer go to therapy? It had too many bytes...',
   "Why don't programmers like nature? It has too many bugs...",
   'Why do programmers prefer dark mode? Because light attracts bugs...',
-  'Why did the developer go broke? Because he used up all his cache...',
+  'Why did the developer go broke? Because they used up all their cache...',
   "What can you do with a broken pencil? Nothing, it's pointless...",
   'Applying percussive maintenance...',
   'Searching for the correct USB orientation...',
@@ -139,6 +135,7 @@ export const WITTY_LOADING_PHRASES = [
   "It's not a bug, it's a feature... of this loading screen.",
   'Have you tried turning it off and on again? (The loading screen, not me.)',
   'Constructing additional pylons...',
+  'New line? That’s Ctrl+J.',
 ];
 
 export const PHRASE_CHANGE_INTERVAL_MS = 15000;
@@ -149,9 +146,18 @@ export const PHRASE_CHANGE_INTERVAL_MS = 15000;
  * @param isWaiting Whether to show a specific waiting phrase.
  * @returns The current loading phrase.
  */
-export const usePhraseCycler = (isActive: boolean, isWaiting: boolean) => {
+export const usePhraseCycler = (
+  isActive: boolean,
+  isWaiting: boolean,
+  customPhrases?: string[],
+) => {
+  const loadingPhrases =
+    customPhrases && customPhrases.length > 0
+      ? customPhrases
+      : WITTY_LOADING_PHRASES;
+
   const [currentLoadingPhrase, setCurrentLoadingPhrase] = useState(
-    WITTY_LOADING_PHRASES[0],
+    loadingPhrases[0],
   );
   const phraseIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -168,16 +174,14 @@ export const usePhraseCycler = (isActive: boolean, isWaiting: boolean) => {
       }
       // Select an initial random phrase
       const initialRandomIndex = Math.floor(
-        Math.random() * WITTY_LOADING_PHRASES.length,
+        Math.random() * loadingPhrases.length,
       );
-      setCurrentLoadingPhrase(WITTY_LOADING_PHRASES[initialRandomIndex]);
+      setCurrentLoadingPhrase(loadingPhrases[initialRandomIndex]);
 
       phraseIntervalRef.current = setInterval(() => {
         // Select a new random phrase
-        const randomIndex = Math.floor(
-          Math.random() * WITTY_LOADING_PHRASES.length,
-        );
-        setCurrentLoadingPhrase(WITTY_LOADING_PHRASES[randomIndex]);
+        const randomIndex = Math.floor(Math.random() * loadingPhrases.length);
+        setCurrentLoadingPhrase(loadingPhrases[randomIndex]);
       }, PHRASE_CHANGE_INTERVAL_MS);
     } else {
       // Idle or other states, clear the phrase interval
@@ -186,7 +190,7 @@ export const usePhraseCycler = (isActive: boolean, isWaiting: boolean) => {
         clearInterval(phraseIntervalRef.current);
         phraseIntervalRef.current = null;
       }
-      setCurrentLoadingPhrase(WITTY_LOADING_PHRASES[0]);
+      setCurrentLoadingPhrase(loadingPhrases[0]);
     }
 
     return () => {
@@ -195,7 +199,7 @@ export const usePhraseCycler = (isActive: boolean, isWaiting: boolean) => {
         phraseIntervalRef.current = null;
       }
     };
-  }, [isActive, isWaiting]);
+  }, [isActive, isWaiting, loadingPhrases]);
 
   return currentLoadingPhrase;
 };

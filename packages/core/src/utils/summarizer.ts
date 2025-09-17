@@ -4,14 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { ToolResult } from '../tools/tools.js';
-import {
+import type { ToolResult } from '../tools/tools.js';
+import type {
   Content,
   GenerateContentConfig,
   GenerateContentResponse,
 } from '@google/genai';
-import { GeminiClient } from '../core/client.js';
-import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
+import type { GeminiClient } from '../core/client.js';
+import { DEFAULT_GEMINI_FLASH_LITE_MODEL } from '../config/models.js';
 import { getResponseText, partToString } from './partUtils.js';
 
 /**
@@ -86,7 +86,7 @@ export async function summarizeToolOutput(
       contents,
       toolOutputSummarizerConfig,
       abortSignal,
-      DEFAULT_GEMINI_FLASH_MODEL,
+      DEFAULT_GEMINI_FLASH_LITE_MODEL,
     )) as unknown as GenerateContentResponse;
     return getResponseText(parsedResponse) || textToSummarize;
   } catch (error) {

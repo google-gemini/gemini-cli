@@ -15,13 +15,12 @@ import { DefaultLight } from './default-light.js';
 import { DefaultDark } from './default.js';
 import { ShadesOfPurple } from './shades-of-purple.js';
 import { XCode } from './xcode.js';
-import {
-  Theme,
-  ThemeType,
-  CustomTheme,
-  createCustomTheme,
-  validateCustomTheme,
-} from './theme.js';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import * as os from 'node:os';
+import type { Theme, ThemeType, CustomTheme } from './theme.js';
+import { createCustomTheme, validateCustomTheme } from './theme.js';
+import type { SemanticColors } from './semantic-tokens.js';
 import { ANSI } from './ansi.js';
 import { ANSILight } from './ansi-light.js';
 import { NoColorTheme } from './no-color.js';
@@ -124,14 +123,34 @@ class ThemeManager {
    * @returns The active theme.
    */
   getActiveTheme(): Theme {
-    if (process.env.NO_COLOR) {
+    if (process.env['NO_COLOR']) {
       return NoColorTheme;
     }
-    // Ensure the active theme is always valid (fall back to default if not)
-    if (!this.activeTheme || !this.findThemeByName(this.activeTheme.name)) {
-      this.activeTheme = DEFAULT_THEME;
+
+    if (this.activeTheme) {
+      const isBuiltIn = this.availableThemes.some(
+        (t) => t.name === this.activeTheme.name,
+      );
+      const isCustom = [...this.customThemes.values()].includes(
+        this.activeTheme,
+      );
+
+      if (isBuiltIn || isCustom) {
+        return this.activeTheme;
+      }
     }
+
+    // Fallback to default if no active theme or if it's no longer valid.
+    this.activeTheme = DEFAULT_THEME;
     return this.activeTheme;
+  }
+
+  /**
+   * Gets the semantic colors for the active theme.
+   * @returns The semantic colors.
+   */
+  getSemanticColors(): SemanticColors {
+    return this.getActiveTheme().semanticColors;
   }
 
   /**
@@ -206,6 +225,73 @@ class ThemeManager {
     return this.findThemeByName(themeName);
   }
 
+  private isPath(themeName: string): boolean {
+    return (
+      themeName.endsWith('.json') ||
+      themeName.startsWith('.') ||
+      path.isAbsolute(themeName)
+    );
+  }
+
+  private loadThemeFromFile(themePath: string): Theme | undefined {
+    try {
+      // realpathSync resolves the path and throws if it doesn't exist.
+      const canonicalPath = fs.realpathSync(path.resolve(themePath));
+
+      // 1. Check cache using the canonical path.
+      if (this.customThemes.has(canonicalPath)) {
+        return this.customThemes.get(canonicalPath);
+      }
+
+      // 2. Perform security check.
+      const homeDir = path.resolve(os.homedir());
+      if (!canonicalPath.startsWith(homeDir)) {
+        console.warn(
+          `Theme file at "${themePath}" is outside your home directory. ` +
+            `Only load themes from trusted sources.`,
+        );
+        return undefined;
+      }
+
+      // 3. Read, parse, and validate the theme file.
+      const themeContent = fs.readFileSync(canonicalPath, 'utf-8');
+      const customThemeConfig = JSON.parse(themeContent) as CustomTheme;
+
+      const validation = validateCustomTheme(customThemeConfig);
+      if (!validation.isValid) {
+        console.warn(
+          `Invalid custom theme from file "${themePath}": ${validation.error}`,
+        );
+        return undefined;
+      }
+
+      if (validation.warning) {
+        console.warn(`Theme from "${themePath}": ${validation.warning}`);
+      }
+
+      // 4. Create and cache the theme.
+      const themeWithDefaults: CustomTheme = {
+        ...DEFAULT_THEME.colors,
+        ...customThemeConfig,
+        name: customThemeConfig.name || canonicalPath,
+        type: 'custom',
+      };
+
+      const theme = createCustomTheme(themeWithDefaults);
+      this.customThemes.set(canonicalPath, theme); // Cache by canonical path
+      return theme;
+    } catch (error) {
+      // Any error in the process (file not found, bad JSON, etc.) is caught here.
+      // We can return undefined silently for file-not-found, and warn for others.
+      if (
+        !(error instanceof Error && 'code' in error && error.code === 'ENOENT')
+      ) {
+        console.warn(`Could not load theme from file "${themePath}":`, error);
+      }
+      return undefined;
+    }
+  }
+
   findThemeByName(themeName: string | undefined): Theme | undefined {
     if (!themeName) {
       return DEFAULT_THEME;
@@ -219,8 +305,18 @@ class ThemeManager {
       return builtInTheme;
     }
 
-    // Then check custom themes
-    return this.customThemes.get(themeName);
+    // Then check custom themes that have been loaded from settings, or file paths
+    if (this.isPath(themeName)) {
+      return this.loadThemeFromFile(themeName);
+    }
+
+    if (this.customThemes.has(themeName)) {
+      return this.customThemes.get(themeName);
+    }
+
+    // If it's not a built-in, not in cache, and not a valid file path,
+    // it's not a valid theme.
+    return undefined;
   }
 }
 

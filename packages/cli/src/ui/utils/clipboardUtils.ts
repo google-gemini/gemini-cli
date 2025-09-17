@@ -4,40 +4,35 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { exec } from 'child_process';
-import { promisify } from 'util';
-import * as fs from 'fs/promises';
-import * as path from 'path';
+import * as fs from 'node:fs/promises';
+import * as path from 'node:path';
+import { spawnAsync } from '@google/gemini-cli-core';
 import { quote } from 'shell-quote';
 
-const execAsync = promisify(exec);
-
 /**
- * Checks if the system clipboard contains an image (macOS only for now)
+ * Checks if the system clipboard contains an image (macOS and Windows)
  * @returns true if clipboard contains an image
  */
 export async function clipboardHasImage(): Promise<boolean> {
   try {
     if (process.platform === 'darwin') {
       // macOS: Use osascript to check clipboard type
-      const { stdout } = await execAsync(
-        `osascript -e 'clipboard info' 2>/dev/null | grep -qE "«class PNGf»|TIFF picture|JPEG picture|GIF picture|«class JPEG»|«class TIFF»" && echo "true" || echo "false"`,
-        { shell: '/bin/bash' },
-      );
-      const result = stdout.trim() === 'true';
-      return result;
+      const { stdout } = await spawnAsync('osascript', ['-e', 'clipboard info']);
+      const imageRegex =
+        /«class PNGf»|TIFF picture|JPEG picture|GIF picture|«class JPEG»|«class TIFF»/;
+      return imageRegex.test(stdout);
     } else if (process.platform === 'win32') {
       // Windows: Use PowerShell to check clipboard for image
-      const { stdout } = await execAsync(
-        `powershell -command "Add-Type -AssemblyName System.Windows.Forms; if ([System.Windows.Forms.Clipboard]::ContainsImage()) { Write-Output 'true' } else { Write-Output 'false' }"`,
-      );
-      const result = stdout.trim() === 'true';
-      return result;
+      const { stdout } = await spawnAsync('powershell', [
+        '-command',
+        'Add-Type -AssemblyName System.Windows.Forms; if ([System.Windows.Forms.Clipboard]::ContainsImage()) { Write-Output "true" } else { Write-Output "false" }',
+      ]);
+      return stdout.trim() === 'true';
     } else {
       // Other platforms not supported yet
       return false;
     }
-  } catch (_error) {
+  } catch {
     return false;
   }
 }
@@ -114,10 +109,11 @@ async function cleanupFile(filePath: string): Promise<void> {
 
 // Helper function to execute command and handle result
 async function executeCommandAndHandleResult(
-  command: string,
   tempFilePath: string,
+  command: string,
+  args: string[],
 ): Promise<string | null> {
-  const { stdout } = await execAsync(command);
+  const { stdout } = await spawnAsync(command, args);
 
   if (stdout.trim() === 'success') {
     return tempFilePath;
@@ -151,26 +147,26 @@ async function saveMacOSClipboardImage(
       tempDir,
       `clipboard-${timestamp}.${format.extension}`,
     );
-    const quotedPath = quote([tempFilePath]);
 
     const script = `
       try
         set imageData to the clipboard as «class ${format.class}»
-        set fileRef to open for access POSIX file ${quotedPath} with write permission
+        set fileRef to open for access POSIX file "${tempFilePath}" with write permission
         write imageData to fileRef
         close access fileRef
         return "success"
       on error errMsg
         try
-          close access POSIX file ${quotedPath}
+          close access POSIX file "${tempFilePath}"
         end try
         return "error"
       end try
     `;
 
     const result = await executeCommandAndHandleResult(
-      `osascript -e '${script}'`,
       tempFilePath,
+      'osascript',
+      ['-e', script],
     );
 
     if (result) {
@@ -187,13 +183,13 @@ async function saveWindowsClipboardImage(
   timestamp: number,
 ): Promise<string | null> {
   const tempFilePath = path.join(tempDir, `clipboard-${timestamp}.png`);
-  const quotedPath = quote([tempFilePath]);
 
-  const powershellScript = 
-        `Add-Type -AssemblyName System.Windows.Forms; Add-Type -AssemblyName System.Drawing; if ([System.Windows.Forms.Clipboard]::ContainsImage()) { $image = [System.Windows.Forms.Clipboard]::GetImage(); $image.Save(${quotedPath}, [System.Drawing.Imaging.ImageFormat]::Png); Write-Output 'success' } else { Write-Output 'error' }`;
+  const powershellScript =
+        `Add-Type -AssemblyName System.Windows.Forms; Add-Type -AssemblyName System.Drawing; if ([System.Windows.Forms.Clipboard]::ContainsImage()) { $image = [System.Windows.Forms.Clipboard]::GetImage(); $image.Save('${tempFilePath}', [System.Drawing.Imaging.ImageFormat]::Png); Write-Output 'success' } else { Write-Output 'error' }`;
   return await executeCommandAndHandleResult(
-    `powershell -command "${powershellScript}"`,
     tempFilePath,
+    'powershell',
+    ['-command', powershellScript],
   );
 }
 

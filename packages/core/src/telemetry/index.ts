@@ -19,6 +19,11 @@ export {
   isTelemetrySdkInitialized,
 } from './sdk.js';
 export {
+  GcpTraceExporter,
+  GcpMetricExporter,
+  GcpLogExporter,
+} from './gcp-exporters.js';
+export {
   logCliConfiguration,
   logUserPrompt,
   logToolCall,
@@ -27,19 +32,30 @@ export {
   logApiResponse,
   logFlashFallback,
   logSlashCommand,
+  logConversationFinishedEvent,
+  logKittySequenceOverflow,
+  logChatCompression,
+  logToolOutputTruncated,
 } from './loggers.js';
+export type { SlashCommandEvent, ChatCompressionEvent } from './types.js';
 export {
-  StartSessionEvent,
+  SlashCommandStatus,
   EndSessionEvent,
   UserPromptEvent,
-  ToolCallEvent,
   ApiRequestEvent,
   ApiErrorEvent,
   ApiResponseEvent,
-  TelemetryEvent,
   FlashFallbackEvent,
-  SlashCommandEvent,
+  StartSessionEvent,
+  ToolCallEvent,
+  ConversationFinishedEvent,
+  KittySequenceOverflowEvent,
+  ToolOutputTruncatedEvent,
 } from './types.js';
+export { makeSlashCommandEvent, makeChatCompressionEvent } from './types.js';
+export type { TelemetryEvent } from './types.js';
 export { SpanStatusCode, ValueType } from '@opentelemetry/api';
 export { SemanticAttributes } from '@opentelemetry/semantic-conventions';
 export * from './uiTelemetry.js';
+export { HighWaterMarkTracker } from './high-water-mark-tracker.js';
+export { RateLimiter } from './rate-limiter.js';

@@ -17,9 +17,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { copyFileSync, existsSync, mkdirSync } from 'fs';
-import { dirname, join, basename } from 'path';
-import { fileURLToPath } from 'url';
+import { copyFileSync, existsSync, mkdirSync } from 'node:fs';
+import { dirname, join, basename } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { glob } from 'glob';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -34,14 +34,6 @@ if (!existsSync(bundleDir)) {
 // Find and copy all .sb files from packages to the root of the bundle directory
 const sbFiles = glob.sync('packages/**/*.sb', { cwd: root });
 for (const file of sbFiles) {
-  copyFileSync(join(root, file), join(bundleDir, basename(file)));
-}
-
-// Find and copy all .vsix files from packages to the root of the bundle directory
-const vsixFiles = glob.sync('packages/vscode-ide-companion/*.vsix', {
-  cwd: root,
-});
-for (const file of vsixFiles) {
   copyFileSync(join(root, file), join(bundleDir, basename(file)));
 }
 

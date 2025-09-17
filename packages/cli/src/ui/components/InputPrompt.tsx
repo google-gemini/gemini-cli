@@ -4,28 +4,34 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useCallback, useEffect, useState } from 'react';
+import type React from 'react';
+import { useCallback, useEffect, useState, useRef } from 'react';
 import { Box, Text } from 'ink';
-import { Colors } from '../colors.js';
-import { SuggestionsDisplay } from './SuggestionsDisplay.js';
+import { SuggestionsDisplay, MAX_WIDTH } from './SuggestionsDisplay.js';
+import { theme } from '../semantic-colors.js';
 import { useInputHistory } from '../hooks/useInputHistory.js';
-import { TextBuffer } from './shared/text-buffer.js';
-import { cpSlice, cpLen } from '../utils/textUtils.js';
+import type { TextBuffer } from './shared/text-buffer.js';
+import { logicalPosToOffset } from './shared/text-buffer.js';
+import { cpSlice, cpLen, toCodePoints } from '../utils/textUtils.js';
 import chalk from 'chalk';
 import stringWidth from 'string-width';
 import { useShellHistory } from '../hooks/useShellHistory.js';
-import { useCompletion } from '../hooks/useCompletion.js';
-import { useKeypress, Key } from '../hooks/useKeypress.js';
-import { isAtCommand, isSlashCommand } from '../utils/commandUtils.js';
-import { CommandContext, SlashCommand } from '../commands/types.js';
-import { Config } from '@google/gemini-cli-core';
+import { useReverseSearchCompletion } from '../hooks/useReverseSearchCompletion.js';
+import { useCommandCompletion } from '../hooks/useCommandCompletion.js';
+import type { Key } from '../hooks/useKeypress.js';
+import { useKeypress } from '../hooks/useKeypress.js';
+import { keyMatchers, Command } from '../keyMatchers.js';
+import type { CommandContext, SlashCommand } from '../commands/types.js';
+import type { Config } from '@google/gemini-cli-core';
+import { ApprovalMode } from '@google/gemini-cli-core';
+import { parseInputForHighlighting } from '../utils/highlight.js';
 import {
   clipboardHasImage,
   saveClipboardImage,
   cleanupOldClipboardImages,
 } from '../utils/clipboardUtils.js';
-import * as path from 'path';
-
+import * as path from 'node:path';
+import { SCREEN_READER_USER_PREFIX } from '../textConstants.js';
 export interface InputPromptProps {
   buffer: TextBuffer;
   onSubmit: (value: string) => void;
@@ -40,7 +46,10 @@ export interface InputPromptProps {
   suggestionsWidth: number;
   shellModeActive: boolean;
   setShellModeActive: (value: boolean) => void;
+  approvalMode: ApprovalMode;
+  onEscapePromptChange?: (showPrompt: boolean) => void;
   vimHandleInput?: (key: Key) => boolean;
+  isShellFocused?: boolean;
 }
 
 export const InputPrompt: React.FC<InputPromptProps> = ({
@@ -57,21 +66,94 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   suggestionsWidth,
   shellModeActive,
   setShellModeActive,
+  approvalMode,
+  onEscapePromptChange,
   vimHandleInput,
+  isShellFocused,
 }) => {
   const [justNavigatedHistory, setJustNavigatedHistory] = useState(false);
+  const [escPressCount, setEscPressCount] = useState(0);
+  const [showEscapePrompt, setShowEscapePrompt] = useState(false);
+  const escapeTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const [recentPasteTime, setRecentPasteTime] = useState<number | null>(null);
+  const pasteTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  const completion = useCompletion(
+  const [dirs, setDirs] = useState<readonly string[]>(
+    config.getWorkspaceContext().getDirectories(),
+  );
+  const dirsChanged = config.getWorkspaceContext().getDirectories();
+  useEffect(() => {
+    if (dirs.length !== dirsChanged.length) {
+      setDirs(dirsChanged);
+    }
+  }, [dirs.length, dirsChanged]);
+  const [reverseSearchActive, setReverseSearchActive] = useState(false);
+  const [commandSearchActive, setCommandSearchActive] = useState(false);
+  const [textBeforeReverseSearch, setTextBeforeReverseSearch] = useState('');
+  const [cursorPosition, setCursorPosition] = useState<[number, number]>([
+    0, 0,
+  ]);
+  const [expandedSuggestionIndex, setExpandedSuggestionIndex] =
+    useState<number>(-1);
+  const shellHistory = useShellHistory(config.getProjectRoot());
+  const shellHistoryData = shellHistory.history;
+
+  const completion = useCommandCompletion(
     buffer,
+    dirs,
     config.getTargetDir(),
-    isAtCommand(buffer.text) || isSlashCommand(buffer.text),
     slashCommands,
     commandContext,
+    reverseSearchActive,
     config,
   );
 
+  const reverseSearchCompletion = useReverseSearchCompletion(
+    buffer,
+    shellHistoryData,
+    reverseSearchActive,
+  );
+
+  const commandSearchCompletion = useReverseSearchCompletion(
+    buffer,
+    userMessages,
+    commandSearchActive,
+  );
+
   const resetCompletionState = completion.resetCompletionState;
-  const shellHistory = useShellHistory(config.getProjectRoot());
+  const resetReverseSearchCompletionState =
+    reverseSearchCompletion.resetCompletionState;
+  const resetCommandSearchCompletionState =
+    commandSearchCompletion.resetCompletionState;
+
+  const resetEscapeState = useCallback(() => {
+    if (escapeTimerRef.current) {
+      clearTimeout(escapeTimerRef.current);
+      escapeTimerRef.current = null;
+    }
+    setEscPressCount(0);
+    setShowEscapePrompt(false);
+  }, []);
+
+  // Notify parent component about escape prompt state changes
+  useEffect(() => {
+    if (onEscapePromptChange) {
+      onEscapePromptChange(showEscapePrompt);
+    }
+  }, [showEscapePrompt, onEscapePromptChange]);
+
+  // Clear escape prompt timer on unmount
+  useEffect(
+    () => () => {
+      if (escapeTimerRef.current) {
+        clearTimeout(escapeTimerRef.current);
+      }
+      if (pasteTimeoutRef.current) {
+        clearTimeout(pasteTimeoutRef.current);
+      }
+    },
+    [],
+  );
 
   const handleSubmitAndClear = useCallback(
     (submittedValue: string) => {
@@ -83,8 +165,16 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       buffer.setText('');
       onSubmit(submittedValue);
       resetCompletionState();
+      resetReverseSearchCompletionState();
     },
-    [onSubmit, buffer, resetCompletionState, shellModeActive, shellHistory],
+    [
+      onSubmit,
+      buffer,
+      resetCompletionState,
+      shellModeActive,
+      shellHistory,
+      resetReverseSearchCompletionState,
+    ],
   );
 
   const customSetTextAndResetCompletionSignal = useCallback(
@@ -109,6 +199,9 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   useEffect(() => {
     if (justNavigatedHistory) {
       resetCompletionState();
+      resetReverseSearchCompletionState();
+      resetCommandSearchCompletionState();
+      setExpandedSuggestionIndex(-1);
       setJustNavigatedHistory(false);
     }
   }, [
@@ -116,6 +209,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     buffer.text,
     resetCompletionState,
     setJustNavigatedHistory,
+    resetReverseSearchCompletionState,
+    resetCommandSearchCompletionState,
   ]);
 
   const completionSuggestions = completion.suggestions;
@@ -243,8 +338,35 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         return;
       }
 
+      if (key.paste) {
+        // Record paste time to prevent accidental auto-submission
+        setRecentPasteTime(Date.now());
+
+        // Clear any existing paste timeout
+        if (pasteTimeoutRef.current) {
+          clearTimeout(pasteTimeoutRef.current);
+        }
+
+        // Clear the paste protection after a safe delay
+        pasteTimeoutRef.current = setTimeout(() => {
+          setRecentPasteTime(null);
+          pasteTimeoutRef.current = null;
+        }, 500);
+
+        // Ensure we never accidentally interpret paste as regular input.
+        buffer.handleInput(key);
+        return;
+      }
+
       if (vimHandleInput && vimHandleInput(key)) {
         return;
+      }
+
+      // Reset ESC count and hide prompt on any non-ESC key
+      if (key.name !== 'escape') {
+        if (escPressCount > 0 || showEscapePrompt) {
+          resetEscapeState();
+        }
       }
 
       if (
@@ -257,42 +379,174 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         return;
       }
 
-      if (key.name === 'escape') {
+      if (keyMatchers[Command.ESCAPE](key)) {
+        const cancelSearch = (
+          setActive: (active: boolean) => void,
+          resetCompletion: () => void,
+        ) => {
+          setActive(false);
+          resetCompletion();
+          buffer.setText(textBeforeReverseSearch);
+          const offset = logicalPosToOffset(
+            buffer.lines,
+            cursorPosition[0],
+            cursorPosition[1],
+          );
+          buffer.moveToOffset(offset);
+          setExpandedSuggestionIndex(-1);
+        };
+
+        if (reverseSearchActive) {
+          cancelSearch(
+            setReverseSearchActive,
+            reverseSearchCompletion.resetCompletionState,
+          );
+          return;
+        }
+        if (commandSearchActive) {
+          cancelSearch(
+            setCommandSearchActive,
+            commandSearchCompletion.resetCompletionState,
+          );
+          return;
+        }
+
         if (shellModeActive) {
           setShellModeActive(false);
+          resetEscapeState();
           return;
         }
 
         if (completion.showSuggestions) {
           completion.resetCompletionState();
+          setExpandedSuggestionIndex(-1);
+          resetEscapeState();
           return;
         }
+
+        // Handle double ESC for clearing input
+        if (escPressCount === 0) {
+          if (buffer.text === '') {
+            return;
+          }
+          setEscPressCount(1);
+          setShowEscapePrompt(true);
+          if (escapeTimerRef.current) {
+            clearTimeout(escapeTimerRef.current);
+          }
+          escapeTimerRef.current = setTimeout(() => {
+            resetEscapeState();
+          }, 500);
+        } else {
+          // clear input and immediately reset state
+          buffer.setText('');
+          resetCompletionState();
+          resetEscapeState();
+        }
+        return;
       }
 
-      if (key.ctrl && key.name === 'l') {
+      if (shellModeActive && keyMatchers[Command.REVERSE_SEARCH](key)) {
+        setReverseSearchActive(true);
+        setTextBeforeReverseSearch(buffer.text);
+        setCursorPosition(buffer.cursor);
+        return;
+      }
+
+      if (keyMatchers[Command.CLEAR_SCREEN](key)) {
         onClearScreen();
         return;
       }
 
+      if (reverseSearchActive || commandSearchActive) {
+        const isCommandSearch = commandSearchActive;
+
+        const sc = isCommandSearch
+          ? commandSearchCompletion
+          : reverseSearchCompletion;
+
+        const {
+          activeSuggestionIndex,
+          navigateUp,
+          navigateDown,
+          showSuggestions,
+          suggestions,
+        } = sc;
+        const setActive = isCommandSearch
+          ? setCommandSearchActive
+          : setReverseSearchActive;
+        const resetState = sc.resetCompletionState;
+
+        if (showSuggestions) {
+          if (keyMatchers[Command.NAVIGATION_UP](key)) {
+            navigateUp();
+            return;
+          }
+          if (keyMatchers[Command.NAVIGATION_DOWN](key)) {
+            navigateDown();
+            return;
+          }
+          if (keyMatchers[Command.COLLAPSE_SUGGESTION](key)) {
+            if (suggestions[activeSuggestionIndex].value.length >= MAX_WIDTH) {
+              setExpandedSuggestionIndex(-1);
+              return;
+            }
+          }
+          if (keyMatchers[Command.EXPAND_SUGGESTION](key)) {
+            if (suggestions[activeSuggestionIndex].value.length >= MAX_WIDTH) {
+              setExpandedSuggestionIndex(activeSuggestionIndex);
+              return;
+            }
+          }
+          if (keyMatchers[Command.ACCEPT_SUGGESTION_REVERSE_SEARCH](key)) {
+            sc.handleAutocomplete(activeSuggestionIndex);
+            resetState();
+            setActive(false);
+            return;
+          }
+        }
+
+        if (keyMatchers[Command.SUBMIT_REVERSE_SEARCH](key)) {
+          const textToSubmit =
+            showSuggestions && activeSuggestionIndex > -1
+              ? suggestions[activeSuggestionIndex].value
+              : buffer.text;
+          handleSubmitAndClear(textToSubmit);
+          resetState();
+          setActive(false);
+          return;
+        }
+
+        // Prevent up/down from falling through to regular history navigation
+        if (
+          keyMatchers[Command.NAVIGATION_UP](key) ||
+          keyMatchers[Command.NAVIGATION_DOWN](key)
+        ) {
+          return;
+        }
+      }
+
       // If the command is a perfect match, pressing enter should execute it.
-      if (completion.isPerfectMatch && key.name === 'return') {
+      if (completion.isPerfectMatch && keyMatchers[Command.RETURN](key)) {
         handleSubmitAndClear(buffer.text);
         return;
       }
 
       if (completion.showSuggestions) {
         if (completion.suggestions.length > 1) {
-          if (key.name === 'up' || (key.ctrl && key.name === 'p')) {
+          if (keyMatchers[Command.COMPLETION_UP](key)) {
             completion.navigateUp();
+            setExpandedSuggestionIndex(-1); // Reset expansion when navigating
             return;
           }
-          if (key.name === 'down' || (key.ctrl && key.name === 'n')) {
+          if (keyMatchers[Command.COMPLETION_DOWN](key)) {
             completion.navigateDown();
+            setExpandedSuggestionIndex(-1); // Reset expansion when navigating
             return;
           }
         }
 
-        if (key.name === 'tab' || (key.name === 'return' && !key.ctrl)) {
+        if (keyMatchers[Command.ACCEPT_SUGGESTION](key)) {
           if (completion.suggestions.length > 0) {
             const targetIndex =
               completion.activeSuggestionIndex === -1
@@ -300,24 +554,42 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
                 : completion.activeSuggestionIndex;
             if (targetIndex < completion.suggestions.length) {
               completion.handleAutocomplete(targetIndex);
+              setExpandedSuggestionIndex(-1); // Reset expansion after selection
             }
           }
           return;
         }
       }
 
+      // Handle Tab key for ghost text acceptance
+      if (
+        key.name === 'tab' &&
+        !completion.showSuggestions &&
+        completion.promptCompletion.text
+      ) {
+        completion.promptCompletion.accept();
+        return;
+      }
+
       if (!shellModeActive) {
-        if (key.ctrl && key.name === 'p') {
+        if (keyMatchers[Command.REVERSE_SEARCH](key)) {
+          setCommandSearchActive(true);
+          setTextBeforeReverseSearch(buffer.text);
+          setCursorPosition(buffer.cursor);
+          return;
+        }
+
+        if (keyMatchers[Command.HISTORY_UP](key)) {
           inputHistory.navigateUp();
           return;
         }
-        if (key.ctrl && key.name === 'n') {
+        if (keyMatchers[Command.HISTORY_DOWN](key)) {
           inputHistory.navigateDown();
           return;
         }
         // Handle arrow-up/down for history on single-line or at edges
         if (
-          key.name === 'up' &&
+          keyMatchers[Command.NAVIGATION_UP](key) &&
           (buffer.allVisualLines.length === 1 ||
             (buffer.visualCursor[0] === 0 && buffer.visualScrollRow === 0))
         ) {
@@ -325,7 +597,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           return;
         }
         if (
-          key.name === 'down' &&
+          keyMatchers[Command.NAVIGATION_DOWN](key) &&
           (buffer.allVisualLines.length === 1 ||
             buffer.visualCursor[0] === buffer.allVisualLines.length - 1)
         ) {
@@ -334,20 +606,26 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         }
       } else {
         // Shell History Navigation
-        if (key.name === 'up') {
+        if (keyMatchers[Command.NAVIGATION_UP](key)) {
           const prevCommand = shellHistory.getPreviousCommand();
           if (prevCommand !== null) buffer.setText(prevCommand);
           return;
         }
-        if (key.name === 'down') {
+        if (keyMatchers[Command.NAVIGATION_DOWN](key)) {
           const nextCommand = shellHistory.getNextCommand();
           if (nextCommand !== null) buffer.setText(nextCommand);
           return;
         }
       }
 
-      if (key.name === 'return' && !key.ctrl && !key.meta && !key.paste) {
+      if (keyMatchers[Command.SUBMIT](key)) {
         if (buffer.text.trim()) {
+          // Check if a paste operation occurred recently to prevent accidental auto-submission
+          if (recentPasteTime !== null) {
+            // Paste occurred recently, ignore this submit to prevent auto-execution
+            return;
+          }
+
           const [row, col] = buffer.cursor;
           const line = buffer.lines[row];
           const charBefore = col > 0 ? cpSlice(line, col - 1, col) : '';
@@ -362,59 +640,70 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       }
 
       // Newline insertion
-      if (key.name === 'return' && (key.ctrl || key.meta || key.paste)) {
+      if (keyMatchers[Command.NEWLINE](key)) {
         buffer.newline();
         return;
       }
 
       // Ctrl+A (Home) / Ctrl+E (End)
-      if (key.ctrl && key.name === 'a') {
+      if (keyMatchers[Command.HOME](key)) {
         buffer.move('home');
         return;
       }
-      if (key.ctrl && key.name === 'e') {
+      if (keyMatchers[Command.END](key)) {
         buffer.move('end');
-        buffer.moveToOffset(cpLen(buffer.text));
         return;
       }
       // Ctrl+C (Clear input)
-      if (key.ctrl && key.name === 'c') {
+      if (keyMatchers[Command.CLEAR_INPUT](key)) {
         if (buffer.text.length > 0) {
           buffer.setText('');
           resetCompletionState();
-          return;
         }
         return;
       }
 
       // Kill line commands
-      if (key.ctrl && key.name === 'k') {
+      if (keyMatchers[Command.KILL_LINE_RIGHT](key)) {
         buffer.killLineRight();
         return;
       }
-      if (key.ctrl && key.name === 'u') {
+      if (keyMatchers[Command.KILL_LINE_LEFT](key)) {
         buffer.killLineLeft();
         return;
       }
 
+      if (keyMatchers[Command.DELETE_WORD_BACKWARD](key)) {
+        buffer.deleteWordLeft();
+        return;
+      }
+
       // External editor
-      const isCtrlX = key.ctrl && (key.name === 'x' || key.sequence === '\x18');
-      if (isCtrlX) {
+      if (keyMatchers[Command.OPEN_EXTERNAL_EDITOR](key)) {
         buffer.openInExternalEditor();
         return;
       }
 
-      // Ctrl+V for clipboard image paste (or Alt+V on Windows)
-      if (
-        (key.ctrl && key.name === 'v') ||
-        (process.platform === 'win32' && key.meta && key.name === 'v')
-      ) {
+      // Ctrl+V for clipboard image paste
+      if (keyMatchers[Command.PASTE_CLIPBOARD_IMAGE](key)) {
         handleClipboardImage();
         return;
       }
 
       // Fall back to the text buffer's default input handling for all other keys
       buffer.handleInput(key);
+
+      // Clear ghost text when user types regular characters (not navigation/control keys)
+      if (
+        completion.promptCompletion.text &&
+        key.sequence &&
+        key.sequence.length === 1 &&
+        !key.ctrl &&
+        !key.meta
+      ) {
+        completion.promptCompletion.clear();
+        setExpandedSuggestionIndex(-1);
+      }
     },
     [
       focus,
@@ -426,90 +715,343 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       inputHistory,
       handleSubmitAndClear,
       shellHistory,
+      reverseSearchCompletion,
       handleClipboardImage,
       resetCompletionState,
+      escPressCount,
+      showEscapePrompt,
+      resetEscapeState,
       vimHandleInput,
+      reverseSearchActive,
+      textBeforeReverseSearch,
+      cursorPosition,
+      recentPasteTime,
+      commandSearchActive,
+      commandSearchCompletion,
     ],
   );
 
-  useKeypress(handleInput, { isActive: true });
+  useKeypress(handleInput, {
+    isActive: !isShellFocused,
+  });
 
   const linesToRender = buffer.viewportVisualLines;
   const [cursorVisualRowAbsolute, cursorVisualColAbsolute] =
     buffer.visualCursor;
   const scrollVisualRow = buffer.visualScrollRow;
 
+  const getGhostTextLines = useCallback(() => {
+    if (
+      !completion.promptCompletion.text ||
+      !buffer.text ||
+      !completion.promptCompletion.text.startsWith(buffer.text)
+    ) {
+      return { inlineGhost: '', additionalLines: [] };
+    }
+
+    const ghostSuffix = completion.promptCompletion.text.slice(
+      buffer.text.length,
+    );
+    if (!ghostSuffix) {
+      return { inlineGhost: '', additionalLines: [] };
+    }
+
+    const currentLogicalLine = buffer.lines[buffer.cursor[0]] || '';
+    const cursorCol = buffer.cursor[1];
+
+    const textBeforeCursor = cpSlice(currentLogicalLine, 0, cursorCol);
+    const usedWidth = stringWidth(textBeforeCursor);
+    const remainingWidth = Math.max(0, inputWidth - usedWidth);
+
+    const ghostTextLinesRaw = ghostSuffix.split('\n');
+    const firstLineRaw = ghostTextLinesRaw.shift() || '';
+
+    let inlineGhost = '';
+    let remainingFirstLine = '';
+
+    if (stringWidth(firstLineRaw) <= remainingWidth) {
+      inlineGhost = firstLineRaw;
+    } else {
+      const words = firstLineRaw.split(' ');
+      let currentLine = '';
+      let wordIdx = 0;
+      for (const word of words) {
+        const prospectiveLine = currentLine ? `${currentLine} ${word}` : word;
+        if (stringWidth(prospectiveLine) > remainingWidth) {
+          break;
+        }
+        currentLine = prospectiveLine;
+        wordIdx++;
+      }
+      inlineGhost = currentLine;
+      if (words.length > wordIdx) {
+        remainingFirstLine = words.slice(wordIdx).join(' ');
+      }
+    }
+
+    const linesToWrap = [];
+    if (remainingFirstLine) {
+      linesToWrap.push(remainingFirstLine);
+    }
+    linesToWrap.push(...ghostTextLinesRaw);
+    const remainingGhostText = linesToWrap.join('\n');
+
+    const additionalLines: string[] = [];
+    if (remainingGhostText) {
+      const textLines = remainingGhostText.split('\n');
+      for (const textLine of textLines) {
+        const words = textLine.split(' ');
+        let currentLine = '';
+
+        for (const word of words) {
+          const prospectiveLine = currentLine ? `${currentLine} ${word}` : word;
+          const prospectiveWidth = stringWidth(prospectiveLine);
+
+          if (prospectiveWidth > inputWidth) {
+            if (currentLine) {
+              additionalLines.push(currentLine);
+            }
+
+            let wordToProcess = word;
+            while (stringWidth(wordToProcess) > inputWidth) {
+              let part = '';
+              const wordCP = toCodePoints(wordToProcess);
+              let partWidth = 0;
+              let splitIndex = 0;
+              for (let i = 0; i < wordCP.length; i++) {
+                const char = wordCP[i];
+                const charWidth = stringWidth(char);
+                if (partWidth + charWidth > inputWidth) {
+                  break;
+                }
+                part += char;
+                partWidth += charWidth;
+                splitIndex = i + 1;
+              }
+              additionalLines.push(part);
+              wordToProcess = cpSlice(wordToProcess, splitIndex);
+            }
+            currentLine = wordToProcess;
+          } else {
+            currentLine = prospectiveLine;
+          }
+        }
+        if (currentLine) {
+          additionalLines.push(currentLine);
+        }
+      }
+    }
+
+    return { inlineGhost, additionalLines };
+  }, [
+    completion.promptCompletion.text,
+    buffer.text,
+    buffer.lines,
+    buffer.cursor,
+    inputWidth,
+  ]);
+
+  const { inlineGhost, additionalLines } = getGhostTextLines();
+  const getActiveCompletion = () => {
+    if (commandSearchActive) return commandSearchCompletion;
+    if (reverseSearchActive) return reverseSearchCompletion;
+    return completion;
+  };
+
+  const activeCompletion = getActiveCompletion();
+  const shouldShowSuggestions = activeCompletion.showSuggestions;
+
+  const showAutoAcceptStyling =
+    !shellModeActive && approvalMode === ApprovalMode.AUTO_EDIT;
+  const showYoloStyling =
+    !shellModeActive && approvalMode === ApprovalMode.YOLO;
+
+  let statusColor: string | undefined;
+  let statusText = '';
+  if (shellModeActive) {
+    statusColor = theme.ui.symbol;
+    statusText = 'Shell mode';
+  } else if (showYoloStyling) {
+    statusColor = theme.status.error;
+    statusText = 'YOLO mode';
+  } else if (showAutoAcceptStyling) {
+    statusColor = theme.status.warning;
+    statusText = 'Accepting edits';
+  }
+
   return (
     <>
       <Box
         borderStyle="round"
-        borderColor={shellModeActive ? Colors.AccentYellow : Colors.AccentBlue}
+        borderColor={
+          statusColor ?? (focus ? theme.border.focused : theme.border.default)
+        }
         paddingX={1}
       >
         <Text
-          color={shellModeActive ? Colors.AccentYellow : Colors.AccentPurple}
+          color={statusColor ?? theme.text.accent}
+          aria-label={statusText || undefined}
         >
-          {shellModeActive ? '! ' : '> '}
+          {shellModeActive ? (
+            reverseSearchActive ? (
+              <Text
+                color={theme.text.link}
+                aria-label={SCREEN_READER_USER_PREFIX}
+              >
+                (r:){' '}
+              </Text>
+            ) : (
+              '!'
+            )
+          ) : commandSearchActive ? (
+            <Text color={theme.text.accent}>(r:) </Text>
+          ) : showYoloStyling ? (
+            '*'
+          ) : (
+            '>'
+          )}{' '}
         </Text>
         <Box flexGrow={1} flexDirection="column">
           {buffer.text.length === 0 && placeholder ? (
             focus ? (
               <Text>
                 {chalk.inverse(placeholder.slice(0, 1))}
-                <Text color={Colors.Gray}>{placeholder.slice(1)}</Text>
+                <Text color={theme.text.secondary}>{placeholder.slice(1)}</Text>
               </Text>
             ) : (
-              <Text color={Colors.Gray}>{placeholder}</Text>
+              <Text color={theme.text.secondary}>{placeholder}</Text>
             )
           ) : (
-            linesToRender.map((lineText, visualIdxInRenderedSet) => {
-              const cursorVisualRow = cursorVisualRowAbsolute - scrollVisualRow;
-              let display = cpSlice(lineText, 0, inputWidth);
-              const currentVisualWidth = stringWidth(display);
-              if (currentVisualWidth < inputWidth) {
-                display = display + ' '.repeat(inputWidth - currentVisualWidth);
-              }
+            linesToRender
+              .map((lineText, visualIdxInRenderedSet) => {
+                const tokens = parseInputForHighlighting(
+                  lineText,
+                  visualIdxInRenderedSet,
+                );
+                const cursorVisualRow =
+                  cursorVisualRowAbsolute - scrollVisualRow;
+                const isOnCursorLine =
+                  focus && visualIdxInRenderedSet === cursorVisualRow;
 
-              if (focus && visualIdxInRenderedSet === cursorVisualRow) {
-                const relativeVisualColForHighlight = cursorVisualColAbsolute;
+                const renderedLine: React.ReactNode[] = [];
+                let charCount = 0;
 
-                if (relativeVisualColForHighlight >= 0) {
-                  if (relativeVisualColForHighlight < cpLen(display)) {
-                    const charToHighlight =
-                      cpSlice(
-                        display,
-                        relativeVisualColForHighlight,
-                        relativeVisualColForHighlight + 1,
-                      ) || ' ';
-                    const highlighted = chalk.inverse(charToHighlight);
-                    display =
-                      cpSlice(display, 0, relativeVisualColForHighlight) +
-                      highlighted +
-                      cpSlice(display, relativeVisualColForHighlight + 1);
-                  } else if (
-                    relativeVisualColForHighlight === cpLen(display) &&
-                    cpLen(display) === inputWidth
-                  ) {
-                    display = display + chalk.inverse(' ');
+                tokens.forEach((token, tokenIdx) => {
+                  let display = token.text;
+                  if (isOnCursorLine) {
+                    const relativeVisualColForHighlight =
+                      cursorVisualColAbsolute;
+                    const tokenStart = charCount;
+                    const tokenEnd = tokenStart + cpLen(token.text);
+
+                    if (
+                      relativeVisualColForHighlight >= tokenStart &&
+                      relativeVisualColForHighlight < tokenEnd
+                    ) {
+                      const charToHighlight = cpSlice(
+                        token.text,
+                        relativeVisualColForHighlight - tokenStart,
+                        relativeVisualColForHighlight - tokenStart + 1,
+                      );
+                      const highlighted = chalk.inverse(charToHighlight);
+                      display =
+                        cpSlice(
+                          token.text,
+                          0,
+                          relativeVisualColForHighlight - tokenStart,
+                        ) +
+                        highlighted +
+                        cpSlice(
+                          token.text,
+                          relativeVisualColForHighlight - tokenStart + 1,
+                        );
+                    }
+                    charCount = tokenEnd;
+                  }
+
+                  const color =
+                    token.type === 'command' || token.type === 'file'
+                      ? theme.text.accent
+                      : theme.text.primary;
+
+                  renderedLine.push(
+                    <Text key={`token-${tokenIdx}`} color={color}>
+                      {display}
+                    </Text>,
+                  );
+                });
+                const currentLineGhost = isOnCursorLine ? inlineGhost : '';
+
+                if (
+                  isOnCursorLine &&
+                  cursorVisualColAbsolute === cpLen(lineText)
+                ) {
+                  if (!currentLineGhost) {
+                    renderedLine.push(
+                      <Text key={`cursor-end-${cursorVisualColAbsolute}`}>
+                        {chalk.inverse(' ')}
+                      </Text>,
+                    );
                   }
                 }
-              }
-              return (
-                <Text key={`line-${visualIdxInRenderedSet}`}>{display}</Text>
-              );
-            })
+
+                const showCursorBeforeGhost =
+                  focus &&
+                  isOnCursorLine &&
+                  cursorVisualColAbsolute === cpLen(lineText) &&
+                  currentLineGhost;
+
+                return (
+                  <Box key={`line-${visualIdxInRenderedSet}`} height={1}>
+                    <Text>
+                      {renderedLine}
+                      {showCursorBeforeGhost && chalk.inverse(' ')}
+                      {currentLineGhost && (
+                        <Text color={theme.text.secondary}>
+                          {currentLineGhost}
+                        </Text>
+                      )}
+                    </Text>
+                  </Box>
+                );
+              })
+              .concat(
+                additionalLines.map((ghostLine, index) => {
+                  const padding = Math.max(
+                    0,
+                    inputWidth - stringWidth(ghostLine),
+                  );
+                  return (
+                    <Text
+                      key={`ghost-line-${index}`}
+                      color={theme.text.secondary}
+                    >
+                      {ghostLine}
+                      {' '.repeat(padding)}
+                    </Text>
+                  );
+                }),
+              )
           )}
         </Box>
       </Box>
-      {completion.showSuggestions && (
-        <Box>
+      {shouldShowSuggestions && (
+        <Box paddingRight={2}>
           <SuggestionsDisplay
-            suggestions={completion.suggestions}
-            activeIndex={completion.activeSuggestionIndex}
-            isLoading={completion.isLoadingSuggestions}
+            suggestions={activeCompletion.suggestions}
+            activeIndex={activeCompletion.activeSuggestionIndex}
+            isLoading={activeCompletion.isLoadingSuggestions}
             width={suggestionsWidth}
-            scrollOffset={completion.visibleStartIndex}
+            scrollOffset={activeCompletion.visibleStartIndex}
             userInput={buffer.text}
+            mode={
+              buffer.text.startsWith('/') &&
+              !reverseSearchActive &&
+              !commandSearchActive
+                ? 'slash'
+                : 'reverse'
+            }
+            expandedIndex={expandedSuggestionIndex}
           />
         </Box>
       )}
