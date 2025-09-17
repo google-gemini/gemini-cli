@@ -261,7 +261,7 @@ jobs:
 
   nightly-pr:
     name: 'Create Nightly PR'
-    needs: ['calculate-versions', 'test']
+    needs: ['publish-stable', 'calculate-versions']
     runs-on: 'ubuntu-latest'
     permissions:
       contents: 'write'
