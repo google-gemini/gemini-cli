@@ -13,6 +13,8 @@ describe('detectIde', () => {
 
   afterEach(() => {
     vi.unstubAllEnvs();
+    // Ensure CURSOR_TRACE_ID is cleared to prevent interference
+    vi.stubEnv('CURSOR_TRACE_ID', '');
   });
 
   it('should return undefined if TERM_PROGRAM is not vscode', () => {

@@ -13,6 +13,7 @@ import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
 import { useKeypress } from '../hooks/useKeypress.js';
 import * as process from 'node:process';
 import * as path from 'node:path';
+import { clearTerminal } from '../utils/terminalSetup.js';
 import { relaunchApp } from '../../utils/processUtils.js';
 
 export enum FolderTrustChoice {
@@ -43,8 +44,8 @@ export const FolderTrustDialog: React.FC<FolderTrustDialogProps> = ({
     if (isRestarting) {
       // Clear the terminal and restart after a short delay
       const timer = setTimeout(() => {
-        // Clear the terminal
-        process.stdout.write('\x1b[2J\x1b[0f');
+        // Clear the terminal (cross-platform compatible)
+        clearTerminal();
         relaunchApp();
       }, 1000); // 1 second delay to let users read the message
 

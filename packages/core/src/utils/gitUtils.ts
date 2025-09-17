@@ -8,33 +8,17 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 
 /**
- * Checks if a directory is within a git repository
+ * Checks if a directory is the root of a git repository
  * @param directory The directory to check
- * @returns true if the directory is in a git repository, false otherwise
+ * @returns true if the directory contains a .git folder/file, false otherwise
  */
 export function isGitRepository(directory: string): boolean {
   try {
-    let currentDir = path.resolve(directory);
+    const resolvedDir = path.resolve(directory);
+    const gitDir = path.join(resolvedDir, '.git');
 
-    while (true) {
-      const gitDir = path.join(currentDir, '.git');
-
-      // Check if .git exists (either as directory or file for worktrees)
-      if (fs.existsSync(gitDir)) {
-        return true;
-      }
-
-      const parentDir = path.dirname(currentDir);
-
-      // If we've reached the root directory, stop searching
-      if (parentDir === currentDir) {
-        break;
-      }
-
-      currentDir = parentDir;
-    }
-
-    return false;
+    // Check if .git exists directly in this directory (either as directory or file for worktrees)
+    return fs.existsSync(gitDir);
   } catch (_error) {
     // If any filesystem error occurs, assume not a git repo
     return false;
@@ -42,7 +26,7 @@ export function isGitRepository(directory: string): boolean {
 }
 
 /**
- * Finds the root directory of a git repository
+ * Finds the root directory of a git repository by walking up the directory tree
  * @param directory Starting directory to search from
  * @returns The git repository root path, or null if not in a git repository
  */

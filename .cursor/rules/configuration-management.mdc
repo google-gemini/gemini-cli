@@ -1,0 +1,539 @@
+---
+alwaysApply: false
+description: Best practices for configuration management and environment handling
+globs: packages/cli/src/**/*.ts,packages/cli/src/**/*.tsx
+---
+
+# Configuration Management Best Practices
+
+## Core Principles
+
+### 1. Use Hierarchical Configuration Sources
+**Why**: Provides flexibility and allows different environments to override defaults.
+
+**Pattern**:
+```typescript
+// ✅ GOOD: Hierarchical configuration loading
+export interface AppConfig {
+  database: {
+    host: string;
+    port: number;
+    name: string;
+  };
+  api: {
+    port: number;
+    timeout: number;
+  };
+  logging: {
+    level: 'debug' | 'info' | 'warn' | 'error';
+    file?: string;
+  };
+}
+
+export function loadConfiguration(): AppConfig {
+  // 1. Start with defaults
+  const config: AppConfig = getDefaultConfig();
+
+  // 2. Override with config file
+  const fileConfig = loadConfigFromFile();
+  if (fileConfig) {
+    deepMerge(config, fileConfig);
+  }
+
+  // 3. Override with environment variables
+  const envConfig = loadConfigFromEnvironment();
+  deepMerge(config, envConfig);
+
+  // 4. Override with command line arguments
+  const cliConfig = loadConfigFromCLI();
+  deepMerge(config, cliConfig);
+
+  return config;
+}
+```
+
+### 2. Validate Configuration Early
+**Why**: Catches configuration errors immediately rather than during runtime.
+
+**Pattern**:
+```typescript
+// ✅ GOOD: Configuration validation with detailed errors
+import { z } from 'zod';
+
+const configSchema = z.object({
+  database: z.object({
+    host: z.string().min(1, 'Database host is required'),
+    port: z.number().int().min(1).max(65535),
+    name: z.string().min(1, 'Database name is required'),
+    password: z.string().min(8, 'Database password must be at least 8 characters')
+  }),
+  api: z.object({
+    port: z.number().int().min(1).max(65535),
+    timeout: z.number().int().min(1000).max(30000)
+  }),
+  logging: z.object({
+    level: z.enum(['debug', 'info', 'warn', 'error']),
+    file: z.string().optional()
+  })
+});
+
+export function validateConfiguration(config: unknown): AppConfig {
+  try {
+    return configSchema.parse(config);
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      const issues = error.issues.map(issue =>
+        `${issue.path.join('.')}: ${issue.message}`
+      ).join('\n');
+
+      throw new ConfigurationError(
+        `Configuration validation failed:\n${issues}`
+      );
+    }
+    throw error;
+  }
+}
+```
+
+### 3. Use Environment-Specific Configurations
+**Why**: Different environments (development, staging, production) have different requirements.
+
+**Pattern**:
+```typescript
+// ✅ GOOD: Environment-aware configuration
+export function getEnvironmentConfig(): Partial<AppConfig> {
+  const nodeEnv = process.env.NODE_ENV || 'development';
+
+  switch (nodeEnv) {
+    case 'production':
+      return {
+        database: {
+          host: process.env.DB_HOST || 'localhost',
+          port: parseInt(process.env.DB_PORT || '5432'),
+          name: process.env.DB_NAME || 'prod_db'
+        },
+        logging: {
+          level: 'warn',
+          file: '/var/log/app/app.log'
+        }
+      };
+
+    case 'staging':
+      return {
+        database: {
+          host: process.env.DB_HOST || 'staging-db.example.com',
+          port: parseInt(process.env.DB_PORT || '5432'),
+          name: process.env.DB_NAME || 'staging_db'
+        },
+        logging: {
+          level: 'info',
+          file: '/var/log/app/staging.log'
+        }
+      };
+
+    default: // development
+      return {
+        database: {
+          host: process.env.DB_HOST || 'localhost',
+          port: parseInt(process.env.DB_PORT || '5432'),
+          name: process.env.DB_NAME || 'dev_db'
+        },
+        logging: {
+          level: 'debug'
+        }
+      };
+  }
+}
+```
+
+## Environment Variable Handling
+
+### Type-Safe Environment Variables
+```typescript
+// ✅ GOOD: Type-safe environment variable parsing
+function parseEnvVar<T>(
+  name: string,
+  parser: (value: string) => T,
+  defaultValue?: T
+): T {
+  const value = process.env[name];
+
+  if (value === undefined) {
+    if (defaultValue !== undefined) {
+      return defaultValue;
+    }
+    throw new ConfigurationError(`Environment variable ${name} is required`);
+  }
+
+  try {
+    return parser(value);
+  } catch (error) {
+    throw new ConfigurationError(
+      `Invalid value for ${name}: ${value}. ${error.message}`
+    );
+  }
+}
+
+// Usage
+const config = {
+  port: parseEnvVar('PORT', parseInt, 3000),
+  host: parseEnvVar('HOST', String, 'localhost'),
+  debug: parseEnvVar('DEBUG', value => value === 'true', false),
+  timeout: parseEnvVar('TIMEOUT', parseInt, 5000)
+};
+```
+
+### Environment Variable Naming Conventions
+```typescript
+// ✅ GOOD: Consistent naming patterns
+const envVars = {
+  // Database
+  DB_HOST: 'DB_HOST',
+  DB_PORT: 'DB_PORT',
+  DB_NAME: 'DB_NAME',
+  DB_PASSWORD: 'DB_PASSWORD',
+
+  // API
+  API_PORT: 'API_PORT',
+  API_TIMEOUT: 'API_TIMEOUT',
+
+  // Logging
+  LOG_LEVEL: 'LOG_LEVEL',
+  LOG_FILE: 'LOG_FILE',
+
+  // Security
+  JWT_SECRET: 'JWT_SECRET',
+  ENCRYPTION_KEY: 'ENCRYPTION_KEY'
+};
+
+// ✅ GOOD: Grouped environment variable loading
+function loadDatabaseConfig(): DatabaseConfig {
+  return {
+    host: process.env[envVars.DB_HOST] || 'localhost',
+    port: parseInt(process.env[envVars.DB_PORT] || '5432'),
+    name: process.env[envVars.DB_NAME] || 'app_db',
+    password: process.env[envVars.DB_PASSWORD]
+  };
+}
+```
+
+## Configuration File Management
+
+### Multiple Format Support
+```typescript
+// ✅ GOOD: Support multiple configuration formats
+export async function loadConfigFromFile(
+  configPath?: string
+): Promise<Partial<AppConfig> | null> {
+  const paths = [
+    configPath,
+    './config.json',
+    './config.js',
+    './config.ts',
+    './.env',
+    './.env.local'
+  ].filter(Boolean) as string[];
+
+  for (const path of paths) {
+    try {
+      if (path.endsWith('.json')) {
+        const content = await fs.readFile(path, 'utf8');
+        return JSON.parse(content);
+      }
+
+      if (path.endsWith('.js') || path.endsWith('.ts')) {
+        const configModule = await import(path);
+        return configModule.default || configModule;
+      }
+
+      if (path.startsWith('.env')) {
+        return loadFromEnvFile(path);
+      }
+    } catch (error) {
+      // Continue to next path
+      console.debug(`Failed to load config from ${path}:`, error);
+    }
+  }
+
+  return null;
+}
+```
+
+### Configuration Hot Reloading
+```typescript
+// ✅ GOOD: Configuration hot reloading
+export class ConfigurationManager {
+  private config: AppConfig;
+  private watcher?: fs.FSWatcher;
+  private onChange?: (config: AppConfig) => void;
+
+  constructor(initialConfig: AppConfig) {
+    this.config = initialConfig;
+  }
+
+  async watchConfigFile(configPath: string): Promise<void> {
+    this.watcher = fs.watch(configPath, { persistent: false });
+
+    for await (const event of this.watcher) {
+      if (event.eventType === 'change') {
+        try {
+          const newConfig = await loadConfigFromFile(configPath);
+          if (newConfig) {
+            this.config = { ...this.config, ...newConfig };
+            this.onChange?.(this.config);
+          }
+        } catch (error) {
+          console.error('Failed to reload configuration:', error);
+        }
+      }
+    }
+  }
+
+  onConfigChange(callback: (config: AppConfig) => void): void {
+    this.onChange = callback;
+  }
+
+  getConfig(): AppConfig {
+    return { ...this.config };
+  }
+
+  async close(): Promise<void> {
+    await this.watcher?.close();
+  }
+}
+```
+
+## Command Line Argument Handling
+
+### Structured CLI Configuration
+```typescript
+// ✅ GOOD: Type-safe command line argument parsing
+import { Command } from 'commander';
+
+export interface CLIConfig {
+  port?: number;
+  host?: string;
+  config?: string;
+  verbose?: boolean;
+}
+
+export function parseCLIArgs(): CLIConfig {
+  const program = new Command();
+
+  program
+    .name('myapp')
+    .description('My application')
+    .version('1.0.0');
+
+  program
+    .option('-p, --port <number>', 'server port', parseInt)
+    .option('-h, --host <string>', 'server host')
+    .option('-c, --config <path>', 'configuration file path')
+    .option('-v, --verbose', 'enable verbose logging');
+
+  program.parse();
+
+  return program.opts<CLIConfig>();
+}
+```
+
+### Configuration Precedence Documentation
+```typescript
+// ✅ GOOD: Document configuration precedence clearly
+/**
+ * Configuration Loading Order (highest precedence first):
+ *
+ * 1. Command Line Arguments (--port, --host, etc.)
+ * 2. Environment Variables (PORT, HOST, etc.)
+ * 3. Configuration File (config.json, .env, etc.)
+ * 4. Environment-Specific Defaults (production, staging, development)
+ * 5. Global Defaults
+ *
+ * Each level can override values from lower levels.
+ * Use this order to provide flexibility for different deployment scenarios.
+ */
+export function loadConfiguration(): AppConfig {
+  // Implementation follows documented precedence
+}
+```
+
+## Secret Management
+
+### Secure Secret Handling
+```typescript
+// ✅ GOOD: Secure secret management
+export class SecretManager {
+  private secrets: Map<string, string> = new Map();
+
+  async loadSecrets(): Promise<void> {
+    // Load from secure sources (not plain environment variables)
+    const secretFiles = [
+      '/run/secrets/db_password',
+      '/etc/myapp/secrets.json'
+    ];
+
+    for (const file of secretFiles) {
+      try {
+        if (file.endsWith('.json')) {
+          const content = await fs.readFile(file, 'utf8');
+          const secrets = JSON.parse(content);
+          Object.entries(secrets).forEach(([key, value]) => {
+            this.secrets.set(key, value as string);
+          });
+        } else {
+          const value = await fs.readFile(file, 'utf8');
+          const key = path.basename(file);
+          this.secrets.set(key, value.trim());
+        }
+      } catch (error) {
+        // Log but don't fail - secrets might be optional
+        console.warn(`Failed to load secret from ${file}:`, error);
+      }
+    }
+  }
+
+  getSecret(key: string): string | undefined {
+    return this.secrets.get(key);
+  }
+
+  getRequiredSecret(key: string): string {
+    const secret = this.secrets.get(key);
+    if (!secret) {
+      throw new ConfigurationError(`Required secret '${key}' not found`);
+    }
+    return secret;
+  }
+}
+```
+
+### Secret Validation
+```typescript
+// ✅ GOOD: Secret validation without logging values
+export function validateSecrets(secrets: Record<string, string>): void {
+  const requiredSecrets = ['JWT_SECRET', 'DB_PASSWORD', 'ENCRYPTION_KEY'];
+
+  const missingSecrets = requiredSecrets.filter(key => !secrets[key]);
+
+  if (missingSecrets.length > 0) {
+    throw new ConfigurationError(
+      `Missing required secrets: ${missingSecrets.join(', ')}`
+    );
+  }
+
+  // Validate secret strength without exposing values
+  if (secrets.JWT_SECRET && secrets.JWT_SECRET.length < 32) {
+    throw new ConfigurationError('JWT_SECRET must be at least 32 characters long');
+  }
+
+  if (secrets.ENCRYPTION_KEY && secrets.ENCRYPTION_KEY.length < 16) {
+    throw new ConfigurationError('ENCRYPTION_KEY must be at least 16 characters long');
+  }
+}
+```
+
+## Configuration Testing
+
+### Configuration Testing Patterns
+```typescript
+// ✅ GOOD: Comprehensive configuration testing
+describe('Configuration Management', () => {
+  describe('loadConfiguration', () => {
+    it('should load default configuration', () => {
+      const config = loadConfiguration();
+      expect(config.api.port).toBe(3000);
+      expect(config.database.host).toBe('localhost');
+    });
+
+    it('should override defaults with environment variables', () => {
+      vi.stubEnv('API_PORT', '8080');
+      vi.stubEnv('DB_HOST', 'prod-db.example.com');
+
+      const config = loadConfiguration();
+
+      expect(config.api.port).toBe(8080);
+      expect(config.database.host).toBe('prod-db.example.com');
+    });
+
+    it('should validate configuration and throw on invalid values', () => {
+      vi.stubEnv('API_PORT', 'invalid');
+
+      expect(() => loadConfiguration()).toThrow(ConfigurationError);
+    });
+
+    it('should support different environments', () => {
+      vi.stubEnv('NODE_ENV', 'production');
+
+      const config = loadConfiguration();
+
+      expect(config.logging.level).toBe('warn');
+      expect(config.database.name).toBe('prod_db');
+    });
+  });
+
+  describe('Secret Management', () => {
+    it('should load secrets from secure files', async () => {
+      const secretManager = new SecretManager();
+      await secretManager.loadSecrets();
+
+      expect(secretManager.getSecret('db_password')).toBeDefined();
+      expect(secretManager.getSecret('jwt_secret')).toBeDefined();
+    });
+
+    it('should throw on missing required secrets', () => {
+      const secretManager = new SecretManager();
+
+      expect(() => secretManager.getRequiredSecret('missing_secret'))
+        .toThrow('Required secret \'missing_secret\' not found');
+    });
+
+    it('should validate secret strength', () => {
+      const weakSecrets = { JWT_SECRET: 'weak' };
+
+      expect(() => validateSecrets(weakSecrets))
+        .toThrow('JWT_SECRET must be at least 32 characters long');
+    });
+  });
+});
+```
+
+## Configuration Documentation
+
+### Configuration Schema Documentation
+```typescript
+// ✅ GOOD: Document configuration options
+/**
+ * Application Configuration Schema
+ *
+ * ## Database Configuration
+ * - `database.host`: Database server hostname or IP address
+ *   - Type: string
+ *   - Default: "localhost"
+ *   - Environment: DB_HOST
+ *
+ * - `database.port`: Database server port number
+ *   - Type: number
+ *   - Default: 5432
+ *   - Environment: DB_PORT
+ *   - Range: 1-65535
+ *
+ * ## API Configuration
+ * - `api.port`: HTTP server port number
+ *   - Type: number
+ *   - Default: 3000
+ *   - Environment: API_PORT
+ *   - CLI: --port <number>
+ *
+ * - `api.timeout`: Request timeout in milliseconds
+ *   - Type: number
+ *   - Default: 5000
+ *   - Environment: API_TIMEOUT
+ *   - Range: 1000-30000
+ */
+export interface AppConfig {
+  // ... configuration interface
+}
+```
+
+## Related Files
+- [packages/cli/src/utils/processUtils.ts](mdc:packages/cli/src/utils/processUtils.ts)
+- [packages/cli/src/gemini.tsx](mdc:packages/cli/src/gemini.tsx)

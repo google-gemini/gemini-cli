@@ -1,0 +1,141 @@
+---
+alwaysApply: false
+description: Guidelines for terminal operations and cross-platform compatibility
+globs: packages/cli/src/**/*.ts,packages/cli/src/**/*.tsx
+---
+
+# Terminal Utilities and Cross-Platform Compatibility
+
+## Core Principles
+
+### 1. Never Inline Terminal Commands
+**Why**: Ensures consistency and maintainability across the codebase.
+
+**Pattern**:
+```typescript
+// ✅ GOOD: Use shared utilities
+import { clearTerminal } from '../utils/terminalSetup.js';
+
+clearTerminal();
+
+// ❌ AVOID: Inline ANSI escape sequences
+process.stdout.write('\x1b[2J\x1b[0f'); // Windows only
+process.stdout.write('\x1b[2J\x1b[H');  // Unix only
+```
+
+### 2. Always Detect Platform Differences
+**Why**: Windows and Unix-like systems handle terminals differently.
+
+**Pattern**:
+```typescript
+// ✅ GOOD: Platform-aware implementation
+export function clearTerminal(): void {
+  if (process.platform === 'win32') {
+    process.stdout.write('\x1b[2J\x1b[0f'); // Windows
+  } else {
+    process.stdout.write('\x1b[2J\x1b[H');  // Unix-like
+  }
+}
+
+// ✅ GOOD: Platform detection for file paths
+const configPath = process.platform === 'win32'
+  ? path.join(process.env.APPDATA, 'AppName')
+  : path.join(os.homedir(), '.config', 'appname');
+```
+
+### 3. Handle Terminal Detection Properly
+**Why**: Different terminal emulators have different capabilities.
+
+**Pattern**:
+```typescript
+// ✅ GOOD: Comprehensive terminal detection
+async function detectTerminal(): Promise<string | null> {
+  const termProgram = process.env['TERM_PROGRAM'];
+
+  // Check specific terminals first
+  if (process.env['CURSOR_TRACE_ID']) return 'cursor';
+  if (process.env['VSCODE_GIT_IPC_HANDLE']) return 'vscode';
+
+  // Fallback to parent process detection
+  if (os.platform() !== 'win32') {
+    try {
+      const { stdout } = await execAsync('ps -o comm= -p $PPID');
+      const parentName = stdout.trim();
+      // Parse parent process name
+    } catch (error) {
+      console.debug('Parent process detection failed:', error);
+    }
+  }
+
+  return null;
+}
+```
+
+## ANSI Escape Sequences Reference
+
+### Common Sequences
+```typescript
+// Clear screen and move cursor to home
+'\x1b[2J\x1b[H'     // Unix-like systems
+'\x1b[2J\x1b[0f'    // Windows Command Prompt
+
+// Cursor positioning
+'\x1b[H'            // Move to home position (1,1)
+'\x1b[0f'           // Move to top-left (Windows alternative)
+
+// Text formatting
+'\x1b[0m'           // Reset all formatting
+'\x1b[1m'           // Bold
+'\x1b[31m'          // Red text
+'\x1b[32m'          // Green text
+```
+
+### Terminal Clearing Best Practices
+
+```typescript
+// ✅ GOOD: Comprehensive clearing with fallback
+export function clearTerminal(): void {
+  try {
+    if (process.platform === 'win32') {
+      process.stdout.write('\x1b[2J\x1b[0f');
+    } else {
+      process.stdout.write('\x1b[2J\x1b[H');
+    }
+  } catch (error) {
+    // Fallback: Use system commands if ANSI fails
+    console.clear();
+  }
+}
+```
+
+## Testing Terminal Operations
+
+```typescript
+// ✅ GOOD: Mock terminal operations for testing
+const mockStdout = vi.fn();
+vi.spyOn(process.stdout, 'write').mockImplementation(mockStdout);
+
+clearTerminal();
+expect(mockStdout).toHaveBeenCalledWith(
+  process.platform === 'win32' ? '\x1b[2J\x1b[0f' : '\x1b[2J\x1b[H'
+);
+```
+
+## Error Handling
+
+```typescript
+// ✅ GOOD: Handle terminal write failures
+export function safeTerminalWrite(data: string): boolean {
+  try {
+    process.stdout.write(data);
+    return true;
+  } catch (error) {
+    console.warn('Terminal write failed:', error);
+    return false;
+  }
+}
+```
+
+## Related Files
+- [packages/cli/src/ui/utils/terminalSetup.ts](mdc:packages/cli/src/ui/utils/terminalSetup.ts)
+- [packages/cli/src/ui/components/FolderTrustDialog.tsx](mdc:packages/cli/src/ui/components/FolderTrustDialog.tsx)

@@ -1,0 +1,274 @@
+---
+alwaysApply: false
+description: Comprehensive error handling patterns and best practices
+globs: packages/cli/src/**/*.ts,packages/cli/src/**/*.tsx
+---
+
+# Error Handling Patterns and Best Practices
+
+## Core Principles
+
+### 1. Always Use Structured Error Handling
+**Why**: Provides clear error paths and prevents silent failures.
+
+**Pattern**:
+```typescript
+// ✅ GOOD: Structured error handling with specific error types
+try {
+  const result = await riskyOperation();
+  return result;
+} catch (error) {
+  if (error instanceof ValidationError) {
+    console.error('Validation failed:', error.message);
+    process.exit(1);
+  } else if (error instanceof NetworkError) {
+    console.error('Network error:', error.message);
+    process.exit(1);
+  } else {
+    console.error('Unexpected error:', error);
+    process.exit(1);
+  }
+}
+
+// ❌ AVOID: Generic catch-all without context
+try {
+  await riskyOperation();
+} catch (error) {
+  console.log('Something went wrong');
+}
+```
+
+### 2. Implement Graceful Degradation
+**Why**: Application should fail gracefully rather than crash completely.
+
+**Pattern**:
+```typescript
+// ✅ GOOD: Graceful degradation with fallbacks
+export async function loadConfiguration(): Promise<Config> {
+  try {
+    // Try primary configuration source
+    return await loadFromFile();
+  } catch (error) {
+    console.warn('Failed to load config file, using defaults:', error);
+
+    try {
+      // Try secondary source
+      return await loadFromEnvironment();
+    } catch (envError) {
+      console.warn('Failed to load environment config, using hardcoded defaults:', envError);
+
+      // Final fallback
+      return getDefaultConfig();
+    }
+  }
+}
+```
+
+### 3. Use Appropriate Exit Codes
+**Why**: Communicate error types to calling processes and scripts.
+
+**Pattern**:
+```typescript
+// ✅ GOOD: Meaningful exit codes
+export const EXIT_CODES = {
+  SUCCESS: 0,
+  GENERAL_ERROR: 1,
+  CONFIG_ERROR: 2,
+  NETWORK_ERROR: 3,
+  VALIDATION_ERROR: 4,
+  RELAUNCH_CODE: 42, // Special code for restarts
+} as const;
+
+// Usage
+if (configError) {
+  console.error('Configuration error:', details);
+  process.exit(EXIT_CODES.CONFIG_ERROR);
+}
+```
+
+## Async Error Handling
+
+### Promises with Error Boundaries
+```typescript
+// ✅ GOOD: Proper async error handling
+async function processWithTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number
+): Promise<T> {
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    setTimeout(() => reject(new Error('Operation timed out')), timeoutMs);
+  });
+
+  return Promise.race([promise, timeoutPromise]);
+}
+
+// Usage
+try {
+  const result = await processWithTimeout(apiCall(), 5000);
+  return result;
+} catch (error) {
+  if (error.message === 'Operation timed out') {
+    console.error('Request timed out, retrying...');
+    return retryOperation();
+  }
+  throw error;
+}
+```
+
+### Child Process Error Handling
+```typescript
+// ✅ GOOD: Comprehensive child process error handling
+async function spawnWithErrorHandling(
+  command: string,
+  args: string[]
+): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const child = spawn(command, args, {
+      stdio: 'inherit',
+      env: process.env
+    });
+
+    let hasExited = false;
+
+    child.on('error', (error) => {
+      if (!hasExited) {
+        hasExited = true;
+        reject(new Error(`Failed to spawn process: ${error.message}`));
+      }
+    });
+
+    child.on('close', (code) => {
+      if (!hasExited) {
+        hasExited = true;
+        resolve(code ?? 1);
+      }
+    });
+  });
+}
+```
+
+## Logging Best Practices
+
+### Structured Logging
+```typescript
+// ✅ GOOD: Structured error logging
+interface ErrorContext {
+  operation: string;
+  timestamp: string;
+  userId?: string;
+  sessionId?: string;
+  metadata?: Record<string, unknown>;
+}
+
+function logError(error: Error, context: ErrorContext): void {
+  const logEntry = {
+    level: 'error',
+    message: error.message,
+    stack: error.stack,
+    ...context,
+    timestamp: new Date().toISOString()
+  };
+
+  console.error(JSON.stringify(logEntry, null, 2));
+}
+
+// Usage
+try {
+  await riskyOperation();
+} catch (error) {
+  logError(error, {
+    operation: 'user_authentication',
+    userId: currentUser?.id,
+    sessionId: session.id
+  });
+}
+```
+
+### Error Recovery Patterns
+```typescript
+// ✅ GOOD: Error recovery with exponential backoff
+async function retryWithBackoff<T>(
+  operation: () => Promise<T>,
+  maxRetries: number = 3,
+  baseDelay: number = 1000
+): Promise<T> {
+  let lastError: Error;
+
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      return await operation();
+    } catch (error) {
+      lastError = error as Error;
+      console.warn(`Attempt ${attempt + 1} failed:`, error);
+
+      if (attempt < maxRetries - 1) {
+        const delay = baseDelay * Math.pow(2, attempt);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+  }
+
+  throw lastError!;
+}
+```
+
+## Testing Error Scenarios
+
+### Error Testing Patterns
+```typescript
+// ✅ GOOD: Test error conditions thoroughly
+describe('Error Handling', () => {
+  it('should handle network timeouts gracefully', async () => {
+    // Mock network timeout
+    vi.spyOn(global, 'fetch').mockRejectedValue(new Error('Network timeout'));
+
+    await expect(operation()).rejects.toThrow('Network timeout');
+  });
+
+  it('should retry failed operations', async () => {
+    const mockOperation = vi.fn()
+      .mockRejectedValueOnce(new Error('Temporary failure'))
+      .mockResolvedValueOnce('success');
+
+    const result = await retryWithBackoff(mockOperation, 2);
+    expect(result).toBe('success');
+    expect(mockOperation).toHaveBeenCalledTimes(2);
+  });
+
+  it('should provide meaningful error messages', async () => {
+    const error = new ValidationError('Invalid input format');
+    expect(error.message).toContain('Invalid input format');
+    expect(error.name).toBe('ValidationError');
+  });
+});
+```
+
+## Custom Error Classes
+
+```typescript
+// ✅ GOOD: Custom error classes for better error handling
+export class ValidationError extends Error {
+  constructor(message: string, public field?: string) {
+    super(message);
+    this.name = 'ValidationError';
+  }
+}
+
+export class NetworkError extends Error {
+  constructor(message: string, public statusCode?: number) {
+    super(message);
+    this.name = 'NetworkError';
+  }
+}
+
+export class ConfigurationError extends Error {
+  constructor(message: string, public configPath?: string) {
+    super(message);
+    this.name = 'ConfigurationError';
+  }
+}
+```
+
+## Related Files
+- [packages/cli/src/utils/processUtils.ts](mdc:packages/cli/src/utils/processUtils.ts)
+- [packages/cli/src/gemini.tsx](mdc:packages/cli/src/gemini.tsx)

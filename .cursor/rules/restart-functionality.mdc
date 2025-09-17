@@ -1,0 +1,103 @@
+---
+alwaysApply: false
+description: Best practices for implementing restart functionality and preventing infinite loops
+globs: packages/cli/src/**/*.ts
+---
+
+# Restart Functionality Best Practices
+
+## Core Principles
+
+### 1. Always Implement Restart Limits
+**Why**: Prevents infinite restart loops that can consume system resources.
+
+**Pattern**:
+```typescript
+// ✅ GOOD: Always use restart counters
+const MAX_RESTARTS = 10;
+let restartCount = 0;
+
+while (restartCount < MAX_RESTARTS) {
+  // Restart logic here
+  restartCount++;
+  console.log(`Restarting (attempt ${restartCount}/${MAX_RESTARTS})...`);
+}
+
+// ❌ AVOID: Infinite loops without limits
+while (true) {
+  // This can cause infinite restarts
+}
+```
+
+### 2. Use Dedicated Exit Codes
+**Why**: Clear communication between parent and child processes.
+
+**Pattern**:
+```typescript
+// ✅ GOOD: Use dedicated exit codes
+export const RELAUNCH_EXIT_CODE = 42;
+
+export function relaunchApp(): void {
+  process.exit(RELAUNCH_EXIT_CODE);
+}
+
+// In restart loop:
+if (exitCode !== RELAUNCH_EXIT_CODE) {
+  process.exit(exitCode); // Normal exit
+}
+// Continue loop for restart
+```
+
+### 3. Implement Graceful Degradation
+**Why**: Handle failures without crashing the entire application.
+
+**Pattern**:
+```typescript
+// ✅ GOOD: Graceful error handling
+try {
+  const child = spawn(process.execPath, nodeArgs, options);
+  const exitCode = await new Promise<number>((resolve) => {
+    child.on('close', (code) => resolve(code ?? 1));
+    child.on('error', () => resolve(1));
+  });
+
+  if (exitCode !== RELAUNCH_EXIT_CODE) {
+    process.exit(exitCode);
+  }
+} catch (error) {
+  console.error('Restart failed:', error);
+  process.exit(1);
+}
+```
+
+## Configuration Options
+
+### Environment Variables
+```typescript
+// ✅ GOOD: Make restart limits configurable
+const MAX_RESTARTS = parseInt(process.env.GEMINI_CLI_MAX_RESTARTS || '10', 10);
+```
+
+### Logging Best Practices
+```typescript
+// ✅ GOOD: Comprehensive logging
+console.log(`Restarting application (attempt ${restartCount}/${MAX_RESTARTS})...`);
+console.error(`Maximum restart attempts (${MAX_RESTARTS}) exceeded. Exiting.`);
+
+// ❌ AVOID: Silent failures
+// Don't restart without logging
+```
+
+## Testing Requirements
+
+Always test these scenarios:
+- Normal exit (no restart)
+- Successful restart
+- Maximum restart limit exceeded
+- Spawn errors during restart
+- Environment variable configuration
+
+## Related Files
+- [packages/cli/src/utils/processUtils.ts](mdc:packages/cli/src/utils/processUtils.ts)
+- [packages/cli/src/gemini.tsx](mdc:packages/cli/src/gemini.tsx)
+- [packages/cli/src/integration/restart.test.ts](mdc:packages/cli/src/integration/restart.test.ts)

@@ -93,6 +93,8 @@
     "yargs": "^17.7.2"
   },
   "dependencies": {
+    "@joshua.litt/get-ripgrep": "^0.0.2",
+    "comment-json": "^4.2.5",
     "simple-git": "^3.28.0"
   },
   "optionalDependencies": {

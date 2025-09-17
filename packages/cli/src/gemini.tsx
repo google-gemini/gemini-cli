@@ -103,8 +103,13 @@ function getNodeMemoryArgs(config: Config): string[] {
   return [];
 }
 
+// Constants for restart functionality
+const MAX_RESTARTS = 10;
+
 async function relaunchAppInChildProcess(additionalArgs: string[] = []) {
-  while (true) {
+  let restartCount = 0;
+  
+  while (restartCount < MAX_RESTARTS) {
     const nodeArgs = [...additionalArgs, ...process.argv.slice(1)];
     const newEnv = { ...process.env, GEMINI_CLI_NO_RELAUNCH: 'true' };
 
@@ -126,12 +131,20 @@ async function relaunchAppInChildProcess(additionalArgs: string[] = []) {
         process.exit(exitCode);
       }
       // If exitCode === RELAUNCH_EXIT_CODE, continue the loop to relaunch.
+      restartCount++;
+      console.log(`Restarting CLI (attempt ${restartCount}/${MAX_RESTARTS})...`);
     } catch (error) {
       // This will catch errors from spawn, e.g., if the process cannot be created.
       console.error('Fatal error: Failed to relaunch the CLI process.', error);
+      console.error('Additional args:', additionalArgs);
+      console.error('Node args:', nodeArgs);
       process.exit(1);
     }
   }
+  
+  // If we've exceeded max restarts, exit with error
+  console.error(`Maximum restart attempts (${MAX_RESTARTS}) exceeded. Exiting.`);
+  process.exit(1);
 }
 
 import { runZedIntegration } from './zed-integration/zedIntegration.js';
