@@ -314,7 +314,7 @@ describe('Composer', () => {
       // The component should render but return null for empty queue
       // This test verifies that the component receives the correct prop
       const output = lastFrame();
-      expect(output).toContain('Settings'); // Basic component rendering check
+      expect(output).toContain('InputPrompt'); // Verify basic Composer rendering
     });
   });
 
