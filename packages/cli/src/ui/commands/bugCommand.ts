@@ -47,15 +47,15 @@ export const bugCommand: SlashCommand = {
       if (history && history.length > 0) {
         const last = history[history.length - 1];
         const prev = history.length > 1 ? history[history.length - 2] : null;
-        const extractText = (parts?: { text?: string }[]) =>
+        const extractText = (parts?: Array<{ text?: string }>) =>
           (parts || [])
             .map((p) => (typeof p?.text === 'string' ? p.text : ''))
             .join('');
         if (last?.role === 'model') {
-          lastResponse = extractText(last.parts as unknown as { text?: string }[]);
-          if (prev?.role === 'user') lastPrompt = extractText(prev.parts as unknown as { text?: string }[]);
+          lastResponse = extractText(last.parts as unknown as Array<{ text?: string }>);
+          if (prev?.role === 'user') lastPrompt = extractText(prev.parts as unknown as Array<{ text?: string }>);
         } else if (last?.role === 'user') {
-          lastPrompt = extractText(last.parts as unknown as { text?: string }[]);
+          lastPrompt = extractText(last.parts as unknown as Array<{ text?: string }>);
         }
       }
     } catch (_) {

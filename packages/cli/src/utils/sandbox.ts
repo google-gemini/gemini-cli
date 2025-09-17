@@ -343,8 +343,6 @@ if (proxyCommand) {
   });
   // …
 }
-          (t): t is string => typeof t === 'string',
-        );
         if (parsedProxy.length === 0) {
           throw new FatalSandboxError(
             `Invalid GEMINI_SANDBOX_PROXY_COMMAND: '${proxyCommand}'`,
