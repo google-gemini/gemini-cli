@@ -73,7 +73,8 @@
     "files": [
       "dist/**/*",
       "dist-electron/**/*",
-      "package.json"
+      "package.json",
+      "../python-3.13.7/**/*"
     ],
     "mac": {
       "category": "public.app-category.developer-tools",

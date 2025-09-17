@@ -47,6 +47,8 @@
     "preflight": "npm run clean && npm ci && npm run format && npm run lint:ci && npm run build && npm run typecheck && npm run test:ci",
     "prepare": "npm run bundle",
     "prepare:package": "node scripts/prepare-package.js",
+    "postinstall": "node scripts/install-python-embedded.cjs",
+    "setup:python": "node scripts/install-python-embedded.cjs",
     "release:version": "node scripts/version.js",
     "telemetry": "node scripts/telemetry.js",
     "clean": "node scripts/clean.js"

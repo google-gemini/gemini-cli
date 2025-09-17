@@ -45,6 +45,8 @@ brew install gemini-cli
 - Node.js version 20 or higher
 - macOS, Linux, or Windows
 
+> **Note**: For Excel integration features (xlwings), Python 3.13.7 embedded environment is automatically installed during `npm install` on Windows. Manual installation may be required on other platforms.
+
 ## Release Cadence and Tags
 
 See [Releases](./docs/releases.md) for more details.
