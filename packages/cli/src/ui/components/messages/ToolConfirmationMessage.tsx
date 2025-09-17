@@ -308,7 +308,6 @@ export const ToolConfirmationMessage: React.FC<
       paddingRight={1}
       paddingTop={0}
       paddingBottom={1}
-      width={childWidth}
     >
       {/* Body Content (Diff Renderer or Command Info) */}
       {/* No separate context display here anymore for edits */}
@@ -321,7 +320,6 @@ export const ToolConfirmationMessage: React.FC<
         borderLeft={false}
         borderRight={false}
         borderColor={theme.border.default}
-        paddingLeft={1}
       >
         {bodyContent}
       </Box>

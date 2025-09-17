@@ -84,7 +84,6 @@ export interface Key {
   paste: boolean;
   sequence: string;
   kittyProtocol?: boolean;
-  scroll?: boolean;
 }
 
 export type KeypressHandler = (key: Key) => void;
@@ -209,6 +208,53 @@ export function KeypressProvider({
     const parseKittyPrefix = (
       buffer: string,
     ): { key: Key; length: number } | null => {
+      // SGR Mouse Events: ESC [ < button ; x ; y M
+      if (buffer.startsWith(`${ESC}[<`)) {
+        const mIndex = buffer.indexOf('M');
+        if (mIndex === -1) {
+          return null; // Incomplete sequence
+        }
+
+        const sequence = buffer.substring(0, mIndex + 1);
+        const firstSemicolon = sequence.indexOf(';');
+        if (firstSemicolon === -1) {
+          return null; // Malformed
+        }
+
+        // Button code is between '<' (index 2) and the first semicolon
+        const buttonCodeStr = sequence.substring(3, firstSemicolon);
+        const buttonCode = parseInt(buttonCodeStr, 10);
+
+        if (isNaN(buttonCode)) {
+          return null; // Malformed
+        }
+
+        let name: string | null = null;
+        if (buttonCode === 64) {
+          name = 'mouse-scroll-up';
+        } else if (buttonCode === 65) {
+          name = 'mouse-scroll-down';
+        }
+
+        if (name) {
+          return {
+            key: {
+              name,
+              ctrl: false,
+              meta: false,
+              shift: false,
+              paste: false,
+              sequence,
+              kittyProtocol: true,
+            },
+            length: sequence.length,
+          };
+        }
+        // It's a different mouse event that we don't handle, so we return
+        // null to let other parsing logic attempt to handle it or discard it.
+        return null;
+      }
+
       // In older terminals ESC [ Z was used as Cursor Backward Tabulation (CBT)
       // In newer terminals the same functionality of key combination for moving
       // backward through focusable elements is Shift+Tab, hence we will
@@ -359,36 +405,6 @@ export function KeypressProvider({
                 paste: false,
                 sequence: buffer.slice(0, m[0].length),
                 kittyProtocol: true,
-              },
-              length: m[0].length,
-            };
-          }
-        }
-
-        if (terminator === 'u') {
-          let name: string | null = null;
-          let scroll = false;
-          switch (keyCode) {
-            case 64:
-              name = 'up';
-              scroll = true;
-              break;
-            case 65:
-              name = 'down';
-              scroll = true;
-              break;
-          }
-          if (name) {
-            return {
-              key: {
-                name,
-                ctrl,
-                meta: alt,
-                shift,
-                paste: false,
-                sequence: buffer.slice(0, m[0].length),
-                kittyProtocol: true,
-                scroll,
               },
               length: m[0].length,
             };

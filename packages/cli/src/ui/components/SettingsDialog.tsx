@@ -461,7 +461,7 @@ export function SettingsDialog({
 
   useKeypress(
     (key) => {
-      const { name, ctrl } = key;
+      const { name, ctrl, shift } = key;
       if (name === 'tab' && showScopeSelection) {
         setFocusSection((prev) => (prev === 'settings' ? 'scope' : 'settings'));
       }
@@ -556,7 +556,7 @@ export function SettingsDialog({
           // Block other keys while editing
           return;
         }
-        if (name === 'up' || name === 'k') {
+        if ((name === 'up' && !shift) || name === 'k') {
           // If editing, commit first
           if (editingKey) {
             commitEdit(editingKey);
@@ -572,7 +572,7 @@ export function SettingsDialog({
           } else if (newIndex < scrollOffset) {
             setScrollOffset(newIndex);
           }
-        } else if (name === 'down' || name === 'j') {
+        } else if ((name === 'down' && !shift)|| name === 'j') {
           // If editing, commit first
           if (editingKey) {
             commitEdit(editingKey);

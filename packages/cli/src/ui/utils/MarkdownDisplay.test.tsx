@@ -11,7 +11,6 @@ import { renderWithProviders } from '../../test-utils/render.js';
 
 describe('<MarkdownDisplay />', () => {
   const baseProps = {
-    isPending: false,
     terminalWidth: 80,
     availableTerminalHeight: 40,
   };
@@ -76,7 +75,7 @@ describe('<MarkdownDisplay />', () => {
     it('handles unclosed (pending) code blocks', () => {
       const text = '```typescript\nlet y = 2;'.replace(/\n/g, eol);
       const { lastFrame } = renderWithProviders(
-        <MarkdownDisplay {...baseProps} text={text} isPending={true} />,
+        <MarkdownDisplay {...baseProps} text={text} />,
       );
       expect(lastFrame()).toMatchSnapshot();
     });

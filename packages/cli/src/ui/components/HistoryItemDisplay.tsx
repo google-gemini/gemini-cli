@@ -86,7 +86,6 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
       {itemForDisplay.type === 'gemini_content' && (
         <GeminiMessageContent
           text={itemForDisplay.text}
-          isPending={isPending}
           availableTerminalHeight={
             availableTerminalHeightGemini ?? availableTerminalHeight
           }

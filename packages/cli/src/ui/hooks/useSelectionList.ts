@@ -318,7 +318,7 @@ export function useSelectionList<T>({
   const itemsLength = items.length;
   const handleKeypress = useCallback(
     (key: Key) => {
-      const { sequence, name } = key;
+      const { sequence, name, shift } = key;
       const isNumeric = showNumbers && /^[0-9]$/.test(sequence);
 
       // Clear number input buffer on non-numeric key press
@@ -327,12 +327,12 @@ export function useSelectionList<T>({
         numberInputRef.current = '';
       }
 
-      if (name === 'k' || name === 'up') {
+      if (name === 'k' || (name === 'up' && !shift)) {
         dispatch({ type: 'MOVE_UP' });
         return;
       }
 
-      if (name === 'j' || name === 'down') {
+      if (name === 'j' || (name === 'down' && !shift)) {
         dispatch({ type: 'MOVE_DOWN' });
         return;
       }

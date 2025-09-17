@@ -324,9 +324,11 @@ export const AppContainer = (props: AppContainerProps) => {
   }, [historyManager.history, logger]);
 
   const refreshStatic = useCallback(() => {
-    stdout.write(ansiEscapes.clearTerminal);
+    if (settings.merged.ui?.useInkScrolling === false) {
+      stdout.write(ansiEscapes.clearTerminal);
+    }
     setHistoryRemountKey((prev) => prev + 1);
-  }, [setHistoryRemountKey, stdout]);
+  }, [setHistoryRemountKey, stdout, settings]);
 
   const {
     isThemeDialogOpen,

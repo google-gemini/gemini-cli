@@ -39,7 +39,6 @@ export const ToolsList: React.FC<ToolsListProps> = ({
               <MarkdownDisplay
                 terminalWidth={terminalWidth}
                 text={tool.description}
-                isPending={false}
               />
             )}
           </Box>

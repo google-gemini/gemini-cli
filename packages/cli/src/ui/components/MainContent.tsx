@@ -11,6 +11,8 @@ import { OverflowProvider } from '../contexts/OverflowContext.js';
 import { useUIState } from '../contexts/UIStateContext.js';
 import { useAppContext } from '../contexts/AppContext.js';
 import { AppHeader } from './AppHeader.js';
+import { useSettings } from '../contexts/SettingsContext.js';
+import { Scrollable } from './shared/Scrollable.js';
 
 // Limit Gemini messages to a very high number of lines to mitigate performance
 // issues in the worst case if we somehow get an enormous response from Gemini.
@@ -20,39 +22,33 @@ const MAX_GEMINI_MESSAGE_LINES = 65536;
 
 export const MainContent = () => {
   const { version } = useAppContext();
+  const settings = useSettings();
   const uiState = useUIState();
   const {
     pendingHistoryItems,
     mainAreaWidth,
     staticAreaMaxItemHeight,
     availableTerminalHeight,
+    terminalWidth,
   } = uiState;
 
-  return (
-    <>
-      <Static
-        key={uiState.historyRemountKey}
-        items={[
-          <AppHeader key="app-header" version={version} />,
-          ...uiState.history.map((h) => (
-            <HistoryItemDisplay
-              terminalWidth={mainAreaWidth}
-              availableTerminalHeight={staticAreaMaxItemHeight}
-              availableTerminalHeightGemini={MAX_GEMINI_MESSAGE_LINES}
-              key={h.id}
-              item={h}
-              isPending={false}
-              commands={uiState.slashCommands}
-            />
-          )),
-        ]}
-      >
-        {(item) => item}
-      </Static>
-      <OverflowProvider>
-        <Box flexDirection="column" width={mainAreaWidth}>
-          {pendingHistoryItems.map((item, i) => (
-            <HistoryItemDisplay
+  const historyItems = uiState.history.map((h) => (
+    <HistoryItemDisplay
+      terminalWidth={mainAreaWidth}
+      availableTerminalHeight={staticAreaMaxItemHeight}
+      availableTerminalHeightGemini={MAX_GEMINI_MESSAGE_LINES}
+      key={h.id}
+      item={h}
+      isPending={false}
+      commands={uiState.slashCommands}
+    />
+  ));
+
+  const pendingItems = (
+    <OverflowProvider>
+      <Box flexDirection="column">
+        {pendingHistoryItems.map((item, i) => (
+          <HistoryItemDisplay
               key={i}
               availableTerminalHeight={
                 uiState.constrainHeight ? availableTerminalHeight : undefined
@@ -63,11 +59,40 @@ export const MainContent = () => {
               isFocused={!uiState.isEditorDialogOpen}
               activeShellPtyId={uiState.activePtyId}
               embeddedShellFocused={uiState.embeddedShellFocused}
-            />
-          ))}
-          <ShowMoreLines constrainHeight={uiState.constrainHeight} />
-        </Box>
-      </OverflowProvider>
+          />
+        ))}
+        <ShowMoreLines constrainHeight={uiState.constrainHeight} />
+      </Box>
+    </OverflowProvider>
+  );
+
+  if (settings.merged.ui?.useAlternateBuffer) {
+    return (
+      <Scrollable
+        maxHeight={availableTerminalHeight}
+        width={terminalWidth}
+        hasFocus={true}
+        scrollToBottom={true}
+      >
+        <AppHeader key="app-header" version={version} />
+        {historyItems}
+        {pendingItems}
+      </Scrollable>
+    );
+  }
+
+  return (
+    <>
+      <Static
+        key={uiState.historyRemountKey}
+        items={[
+          <AppHeader key="app-header" version={version} />,
+          ...historyItems,
+        ]}
+      >
+        {(item) => item}
+      </Static>
+      {pendingItems}
     </>
   );
 };
