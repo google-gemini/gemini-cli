@@ -2110,6 +2110,7 @@ export function useTextBuffer({
       vimMoveToLastLine,
       vimMoveToLine,
       vimEscapeInsertMode,
+      visualToLogicalMap,
     ],
   );
   return returnValue;
