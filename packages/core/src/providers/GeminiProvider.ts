@@ -677,7 +677,7 @@ export class GeminiProvider extends BaseModelProvider {
         if (parts.length > 0) {
           contents.push({
             role: 'model',
-            parts: parts
+            parts
           });
         }
         
