@@ -4,7 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { exec, execSync, spawn, type ChildProcess } from 'node:child_process';
+import {
+  exec,
+  execSync,
+  spawn,
+  type ChildProcess,
+  execFileSync,
+} from 'node:child_process';
 import os from 'node:os';
 import path from 'node:path';
 import fs from 'node:fs';
@@ -381,21 +387,22 @@ export async function start_sandbox(
         );
         if (isCustomProjectSandbox) {
           console.error(`using ${projectSandboxDockerfile} for sandbox`);
-          buildArgs.push('-f', path.resolve(projectSandboxDockerfile), '-i', image);
+          buildArgs.push(
+            '-f',
+            path.resolve(projectSandboxDockerfile),
+            '-i',
+            image,
+          );
         }
         // Use execFileSync to avoid shell interpretation, set cwd for directory
-        require('child_process').execFileSync(
-          'node',
-          ['scripts/build_sandbox.js', ...buildArgs],
-          {
-            stdio: 'inherit',
-            cwd: gcRoot,
-            env: {
-              ...process.env,
-              GEMINI_SANDBOX: config.command, // in case sandbox is enabled via flags (see config.ts under cli package)
-            },
+        execFileSync('node', ['scripts/build_sandbox.js', ...buildArgs], {
+          stdio: 'inherit',
+          cwd: gcRoot,
+          env: {
+            ...process.env,
+            GEMINI_SANDBOX: config.command, // in case sandbox is enabled via flags (see config.ts under cli package)
           },
-        );
+        });
       }
     }
 

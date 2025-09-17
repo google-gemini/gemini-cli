@@ -51,6 +51,8 @@ export {
   ConversationFinishedEvent,
   KittySequenceOverflowEvent,
   ToolOutputTruncatedEvent,
+  ExtensionInstallEvent,
+  ExtensionUninstallEvent,
 } from './types.js';
 export { makeSlashCommandEvent, makeChatCompressionEvent } from './types.js';
 export type { TelemetryEvent } from './types.js';
