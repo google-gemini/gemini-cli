@@ -64,12 +64,14 @@ jobs:
         run: |
           set -e
           STABLE_JSON=$(node scripts/get-release-version.js --type=stable ${{ github.event.inputs.stable_version_override && format('--stable_version_override={0}', github.event.inputs.stable_version_override) || '' }})
-          echo "PREVIEW_JSON command: node scripts/get-release-version.js --type=preview ${{ github.event.inputs.preview_version_override && format('--preview_version_override={0}', github.event.inputs.preview_version_override) || '' }}"
           PREVIEW_JSON=$(node scripts/get-release-version.js --type=preview ${{ github.event.inputs.preview_version_override && format('--preview_version_override={0}', github.event.inputs.preview_version_override) || '' }})
           NIGHTLY_JSON=$(node scripts/get-release-version.js --type=nightly)
+          echo "STABLE_JSON: ${STABLE_JSON}"
+          echo "PREVIEW_JSON: ${PREVIEW_JSON}"
+          echo "NIGHTLY_JSON: ${NIGHTLY_JSON}"
           echo "STABLE_VERSION=$(echo "${STABLE_JSON}" | jq -r .releaseVersion)" >> "${GITHUB_OUTPUT}"
           # shellcheck disable=SC1083
-          echo "STABLE_SHA=$(git rev-parse "$(echo "${STABLE_JSON}" | jq -r .previousReleaseTag)"^{commit})" >> "${GITHUB_OUTPUT}"
+          echo "STABLE_SHA=$(git rev-parse "$(echo "${PREVIEW_JSON}" | jq -r .previousReleaseTag)"^{commit})" >> "${GITHUB_OUTPUT}"
           echo "PREVIOUS_STABLE_TAG=$(echo "${STABLE_JSON}" | jq -r .previousReleaseTag)" >> "${GITHUB_OUTPUT}"
           echo "PREVIEW_VERSION=$(echo "${PREVIEW_JSON}" | jq -r .releaseVersion)" >> "${GITHUB_OUTPUT}"
           # shellcheck disable=SC1083
@@ -90,7 +92,7 @@ jobs:
           echo ""
           echo "Relevant SHAs:"
           echo "  Stable: Will be cut from:  : ${{ steps.versions.outputs.STABLE_SHA }} / ${{ steps.versions.outputs.PREVIOUS_STABLE_TAG }}"
-          echo "  Preview will be cut from:  : ${{ steps.versions.outputs.PREVIEW_SHA }} (${{ github.event.inputs.ref }})"
+          echo "  Preview will be cut from:  : ${{ steps.versions.outputs.PREVIEW_SHA }} (${{ github.event.inputs.ref }})". Users last saw preview as: ${{ steps.versions.outputs.PREVIOUS_STABLE_TAG }}
           echo "  Nightly will be udpated in : ${{ steps.versions.outputs.NEXT_SHA }} (${{ github.event.inputs.ref }}). Previous nightly tag: ${{ steps.versions.outputs.PREVIOUS_NIGHTLY_TAG }}"
 
   test:
