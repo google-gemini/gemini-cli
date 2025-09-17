@@ -1,5 +1,5 @@
 # Package Overview
-
+ 
 This monorepo contains two main packages: `@google/gemini-cli` and `@google/gemini-cli-core`.
 
 ## `@google/gemini-cli`
