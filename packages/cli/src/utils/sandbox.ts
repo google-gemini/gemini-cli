@@ -188,7 +188,7 @@ export async function start_sandbox(
   nodeArgs: string[] = [],
   cliConfig?: Config,
   cliArgs: string[] = [],
-) {
+): Promise<number> {
   const patcher = new ConsolePatcher({
     debugMode: cliConfig?.getDebugMode() || !!process.env['DEBUG'],
     stderr: true,
@@ -339,11 +339,17 @@ export async function start_sandbox(
         );
       }
       // spawn child and let it inherit stdio
+      process.stdin.pause();
       sandboxProcess = spawn(config.command, args, {
         stdio: 'inherit',
       });
-      await new Promise((resolve) => sandboxProcess?.on('close', resolve));
-      return;
+      return new Promise((resolve, reject) => {
+        sandboxProcess?.on('error', reject);
+        sandboxProcess?.on('close', (code) => {
+          process.stdin.resume();
+          resolve(code ?? 1);
+        });
+      });
     }
 
     console.error(`hopping into sandbox (command: ${config.command}) ...`);
@@ -793,22 +799,25 @@ export async function start_sandbox(
     }
 
     // spawn child and let it inherit stdio
+    process.stdin.pause();
     sandboxProcess = spawn(config.command, args, {
       stdio: 'inherit',
     });
 
-    sandboxProcess.on('error', (err) => {
-      console.error('Sandbox process error:', err);
-    });
+    return new Promise<number>((resolve, reject) => {
+      sandboxProcess.on('error', (err) => {
+        console.error('Sandbox process error:', err);
+        reject(err);
+      });
 
-    await new Promise<void>((resolve) => {
       sandboxProcess?.on('close', (code, signal) => {
-        if (code !== 0) {
+        process.stdin.resume();
+        if (code !== 0 && code !== null) {
           console.log(
             `Sandbox process exited with code: ${code}, signal: ${signal}`,
           );
         }
-        resolve();
+        resolve(code ?? 1);
       });
     });
   } finally {
