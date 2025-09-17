@@ -119,7 +119,7 @@ describe('commentJson', () => {
       fs.writeFileSync(testFilePath, complexContent, 'utf-8');
 
       updateSettingsFilePreservingFormat(testFilePath, {
-        model: 'gemini-2.5-flash`',
+        model: 'gemini-2.5-flash',
         mcpServers: {
           context7: {
             headers: {
