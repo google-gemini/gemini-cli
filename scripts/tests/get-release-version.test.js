@@ -55,10 +55,34 @@ describe('getVersion', () => {
       expect(result.previousReleaseTag).toBe('v0.5.0-preview-2');
     });
 
+    it('should use the override version for stable if provided', () => {
+      vi.mocked(execSync).mockImplementation(mockExecSync);
+      const result = getVersion({
+        type: 'stable',
+        stable_version_override: '1.2.3',
+      });
+      expect(result.releaseVersion).toBe('1.2.3');
+      expect(result.npmTag).toBe('latest');
+      expect(result.previousReleaseTag).toBe('v0.5.0-preview-2');
+    });
+
     it('should calculate the next preview version from the latest nightly', () => {
       vi.mocked(execSync).mockImplementation(mockExecSync);
       const result = getVersion({ type: 'preview' });
       expect(result.releaseVersion).toBe('0.6.0-preview.0');
+      expect(result.npmTag).toBe('preview');
+      expect(result.previousReleaseTag).toBe(
+        'v0.6.0-nightly.20250910.a31830a3',
+      );
+    });
+
+    it('should use the override version for preview if provided', () => {
+      vi.mocked(execSync).mockImplementation(mockExecSync);
+      const result = getVersion({
+        type: 'preview',
+        preview_version_override: '4.5.6-preview',
+      });
+      expect(result.releaseVersion).toBe('4.5.6-preview');
       expect(result.npmTag).toBe('preview');
       expect(result.previousReleaseTag).toBe(
         'v0.6.0-nightly.20250910.a31830a3',

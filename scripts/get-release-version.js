@@ -85,25 +85,25 @@ function getNightlyVersion() {
   };
 }
 
-function getStableVersion() {
-  const { latestVersion, latestTag } = getAndVerifyTags(
-    'preview',
-    'v*-preview*',
-  );
+function getStableVersion(args) {
+  const { latestTag } = getAndVerifyTags('preview', 'v*-preview*');
+  const releaseVersion =
+    args.stable_version_override?.replace(/^v/, '') ||
+    getVersionFromNPM('preview').replace(/-preview.*/, '');
   return {
-    releaseVersion: latestVersion.replace(/-preview.*/, ''),
+    releaseVersion,
     npmTag: 'latest',
     previousReleaseTag: latestTag,
   };
 }
 
-function getPreviewVersion() {
-  const { latestVersion, latestTag } = getAndVerifyTags(
-    'nightly',
-    'v*-nightly*',
-  );
+function getPreviewVersion(args) {
+  const { latestTag } = getAndVerifyTags('nightly', 'v*-nightly*');
+  const releaseVersion =
+    args.preview_version_override?.replace(/^v/, '') ||
+    getVersionFromNPM('nightly').replace(/-nightly.*/, '') + '-preview.0';
   return {
-    releaseVersion: latestVersion.replace(/-nightly.*/, '') + '-preview.0',
+    releaseVersion,
     npmTag: 'preview',
     previousReleaseTag: latestTag,
   };
@@ -144,10 +144,10 @@ export function getVersion(options = {}) {
       versionData = getNightlyVersion();
       break;
     case 'stable':
-      versionData = getStableVersion();
+      versionData = getStableVersion(args);
       break;
     case 'preview':
-      versionData = getPreviewVersion();
+      versionData = getPreviewVersion(args);
       break;
     case 'patch':
       versionData = getPatchVersion(args['patch-from']);
