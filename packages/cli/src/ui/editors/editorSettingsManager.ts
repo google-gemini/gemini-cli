@@ -25,6 +25,11 @@ export const EDITOR_DISPLAY_NAMES: Record<EditorType, string> = {
   vscodium: 'VSCodium',
   windsurf: 'Windsurf',
   zed: 'Zed',
+  'vscode-insiders': 'VS Code Insiders',
+  pycharm: 'PyCharm',
+  sublime: 'Sublime Text',
+  nano: 'Nano',
+  custom: 'Custom Editor',
 };
 
 class EditorSettingsManager {

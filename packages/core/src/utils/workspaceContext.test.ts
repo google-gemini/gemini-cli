@@ -92,7 +92,8 @@ describe('WorkspaceContext with real filesystem', () => {
         fs.symlinkSync(realDir, symlinkDir, 'dir');
       } catch (error) {
         // Skip test if symlinks can't be created (e.g., on Windows without admin privileges)
-        if (error.code === 'EPERM' || error.code === 'EACCES') {
+        if (error && typeof error === 'object' && 'code' in error &&
+            (error.code === 'EPERM' || error.code === 'EACCES')) {
           console.warn('Skipping symlink test due to insufficient permissions');
           return;
         }
@@ -182,7 +183,8 @@ describe('WorkspaceContext with real filesystem', () => {
             fs.symlinkSync(realDir, symlinkDir, 'dir');
           } catch (error) {
             // Skip tests if symlinks can't be created (e.g., on Windows without admin privileges)
-            if (error.code === 'EPERM' || error.code === 'EACCES') {
+            if (error && typeof error === 'object' && 'code' in error &&
+                (error.code === 'EPERM' || error.code === 'EACCES')) {
               console.warn('Skipping symlink tests due to insufficient permissions');
               symlinkDir = realDir; // Use real directory instead of symlink
             } else {
@@ -226,7 +228,8 @@ describe('WorkspaceContext with real filesystem', () => {
             fs.symlinkSync(realDir, symlinkDir, 'dir');
           } catch (error) {
             // Skip tests if symlinks can't be created (e.g., on Windows without admin privileges)
-            if (error.code === 'EPERM' || error.code === 'EACCES') {
+            if (error && typeof error === 'object' && 'code' in error &&
+                (error.code === 'EPERM' || error.code === 'EACCES')) {
               console.warn('Skipping symlink tests due to insufficient permissions');
               // For tests that expect symlinks to be rejected, we need to handle this differently
               symlinkDir = realDir; // Use real directory for now
@@ -280,7 +283,8 @@ describe('WorkspaceContext with real filesystem', () => {
           fs.symlinkSync(realFile, symlinkFile, 'file');
         } catch (error) {
           // Skip test if symlinks can't be created (e.g., on Windows without admin privileges)
-          if (error.code === 'EPERM' || error.code === 'EACCES') {
+          if (error && typeof error === 'object' && 'code' in error &&
+              (error.code === 'EPERM' || error.code === 'EACCES')) {
             console.warn('Skipping file symlink test due to insufficient permissions');
             return;
           }
@@ -300,7 +304,8 @@ describe('WorkspaceContext with real filesystem', () => {
           fs.symlinkSync(realFile, symlinkFile, 'file');
         } catch (error) {
           // Skip test if symlinks can't be created (e.g., on Windows without admin privileges)
-          if (error.code === 'EPERM' || error.code === 'EACCES') {
+          if (error && typeof error === 'object' && 'code' in error &&
+              (error.code === 'EPERM' || error.code === 'EACCES')) {
             console.warn('Skipping non-existent file symlink test due to insufficient permissions');
             return;
           }
@@ -323,7 +328,8 @@ describe('WorkspaceContext with real filesystem', () => {
           fs.symlinkSync(linkA, linkB, 'dir');
         } catch (error) {
           // Skip test if symlinks can't be created (e.g., on Windows without admin privileges)
-          if (error.code === 'EPERM' || error.code === 'EACCES') {
+          if (error && typeof error === 'object' && 'code' in error &&
+              (error.code === 'EPERM' || error.code === 'EACCES')) {
             console.warn('Skipping circular symlink test due to insufficient permissions');
             return;
           }

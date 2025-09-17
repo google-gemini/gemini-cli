@@ -17,10 +17,11 @@ import { RELAUNCH_EXIT_CODE } from './utils/processUtils.js';
 import { start_sandbox } from './utils/sandbox.js';
 import type { DnsResolutionOrder, LoadedSettings } from './config/settings.js';
 import {
+  Config,
   loadSettings,
   migrateDeprecatedSettings,
   SettingScope,
-} from './config/settings.js';
+} from './config/settings';
 import { themeManager } from './ui/themes/theme-manager.js';
 import { getStartupWarnings } from './utils/startupWarnings.js';
 import { getUserStartupWarnings } from './utils/userStartupWarnings.js';
@@ -108,7 +109,7 @@ function getNodeMemoryArgs(config: Config): string[] {
 
 
 // Constants for restart functionality
-const MAX_RESTARTS = parseInt(process.env.GEMINI_CLI_MAX_RESTARTS || '10', 10);
+const MAX_RESTARTS = parseInt(process.env['GEMINI_CLI_MAX_RESTARTS'] || '10', 10);
 
 async function relaunchAppInChildProcess(additionalArgs: string[] = []) {
   let restartCount = 0;

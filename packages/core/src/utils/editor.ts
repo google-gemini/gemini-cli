@@ -300,7 +300,7 @@ export function getDiffCommand(
         command: 'emacs',
         args: ['--eval', `(ediff "${oldPath}" "${newPath}")`],
       };
-    case 'nano':
+    case 'nano': {
       // Nano doesn't have built-in diff support, fall back to vimdiff
       const vimCmd = process.platform === 'win32' ? 'vim' : 'vim';
       if (commandExists(vimCmd)) {
@@ -310,7 +310,8 @@ export function getDiffCommand(
         };
       }
       return null;
-    case 'custom':
+    }
+    case 'custom': {
       // For custom editors, try to get the full command from environment
       const customCmd = getCustomEditorFromEnv();
       if (customCmd) {
@@ -329,6 +330,7 @@ export function getDiffCommand(
         return { command: customCmd, args: [oldPath] };
       }
       return null;
+    }
     default:
       return null;
   }
