@@ -22,7 +22,6 @@ import { ConsolePatcher } from './ui/utils/ConsolePatcher.js';
 import { handleAtCommand } from './ui/hooks/atCommandProcessor.js';
 import {
   handleError,
-  handleToolError,
   handleCancellationError,
   handleMaxTurnsExceededError,
 } from './utils/errors.js';
@@ -117,18 +116,28 @@ export async function runNonInteractive(
             );
 
             if (toolResponse.error) {
-              handleToolError(
-                requestInfo.name,
-                toolResponse.error,
-                config,
-                toolResponse.errorType || 'TOOL_EXECUTION_ERROR',
-                typeof toolResponse.resultDisplay === 'string'
-                  ? toolResponse.resultDisplay
-                  : undefined,
-              );
-            }
+              // Instead of terminating with handleToolError, use existing response parts
+              // if available, or create error response parts so the agent can recover and continue
+              if (toolResponse.responseParts && toolResponse.responseParts.length > 0) {
+                toolResponseParts.push(...toolResponse.responseParts);
+              } else {
+                const errorMessage = `Error executing tool ${requestInfo.name}: ${
+                  typeof toolResponse.resultDisplay === 'string'
+                    ? toolResponse.resultDisplay
+                    : toolResponse.error.message
+                }`;
 
-            if (toolResponse.responseParts) {
+                toolResponseParts.push({
+                  functionResponse: {
+                    id: requestInfo.callId,
+                    name: requestInfo.name,
+                    response: {
+                      error: errorMessage,
+                    },
+                  },
+                });
+              }
+            } else if (toolResponse.responseParts) {
               toolResponseParts.push(...toolResponse.responseParts);
             }
           }
