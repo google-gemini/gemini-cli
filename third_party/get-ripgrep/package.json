@@ -32,9 +32,8 @@
   },
   "devDependencies": {
     "@types/fs-extra": "^11.0.4",
-    "@types/jest": "^29.5.14",
     "@types/node": "^22.13.0",
-    "jest": "^29.7.0",
+    "vitest": "^3.1.1",
     "prettier": "^3.4.2",
     "typescript": "^5.7.3"
   },
