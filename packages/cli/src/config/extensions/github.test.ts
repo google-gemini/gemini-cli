@@ -251,7 +251,7 @@ describe('git extension helpers', () => {
     it('should fail on a GitHub SSH URL', () => {
       const source = 'git@github.com:owner/repo.git';
       expect(() => parseGitHubRepoForReleases(source)).toThrow(
-        'Invalid GitHub repository source: git@github.com:owner/repo.git. Github releases extensions are not supported with ssh uris, you must use an https uri with a personal access token.',
+        'GitHub release-based extensions are not supported for SSH. You must use an HTTPS URI with a personal access token to download releases from private repositories. You can set your personal access token in the GITHUB_TOKEN environment variable and install the extension via SSH.',
       );
     });
 

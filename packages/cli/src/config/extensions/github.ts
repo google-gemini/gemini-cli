@@ -92,15 +92,10 @@ export function parseGitHubRepoForReleases(source: string): {
 
   if (owner.startsWith('git@github.com')) {
     throw new Error(
-      `Invalid GitHub repository source: ${source}. Github releases extensions are not supported with ssh uris, you must use an https uri with a personal access token.`,
+      `GitHub release-based extensions are not supported for SSH. You must use an HTTPS URI with a personal access token to download releases from private repositories. You can set your personal access token in the GITHUB_TOKEN environment variable and install the extension via SSH.`,
     );
   }
 
-  if (!owner || !repo) {
-    throw new Error(
-      `Invalid GitHub repository source: ${source}. Expected "owner/repo" or a github repo uri.`,
-    );
-  }
   return { owner, repo };
 }
 
