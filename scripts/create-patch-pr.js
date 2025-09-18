@@ -116,8 +116,8 @@ function getLatestTag(channel) {
   console.log(`Fetching latest tag for channel: ${channel}...`);
   const pattern =
     channel === 'stable'
-      ? '\'(contains("nightly") or contains("preview")) | not\''
-      : '\'(contains("preview"))\'';
+      ? '(contains("nightly") or contains("preview")) | not'
+      : '(contains("preview"))';
   const command = `gh release list --limit 30 --json tagName | jq -r '[.[] | select(.tagName | ${pattern})] | .[0].tagName'`;
   try {
     return execSync(command).toString().trim();
