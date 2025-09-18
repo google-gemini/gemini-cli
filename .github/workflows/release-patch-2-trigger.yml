@@ -44,9 +44,13 @@ jobs:
             }
 
             const isDryRun = body.includes('[DRY RUN]');
+
+            // Extract base version and channel from hotfix branch name
+            // e.g., hotfix/v0.5.3/cherry-pick-abc -> v0.5.3
             const version = headRef.split('/')[1];
             const channel = version.includes('preview') ? 'preview' : 'stable';
-            const ref = `release/${version}`;
+            const releaseRef = `release/${version}`;
+
             const workflow_id = context.eventName === 'pull_request'
               ? 'release-patch-3-release.yml'
               : '${{ github.event.inputs.workflow_id }}';
@@ -55,11 +59,10 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               workflow_id: workflow_id,
-              ref: 'mk-patch-releases',
+              ref: 'main',
               inputs: {
                 type: channel,
                 dry_run: isDryRun.toString(),
-                version: version,
-                release_ref: ref
+                release_ref: releaseRef
               }
             })
