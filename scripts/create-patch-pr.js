@@ -59,6 +59,27 @@ async function main() {
     console.log(`Release branch ${releaseBranch} already exists.`);
   }
 
+  // Check if hotfix branch already exists
+  if (branchExists(hotfixBranch)) {
+    console.log(`Hotfix branch ${hotfixBranch} already exists.`);
+
+    // Check if the existing branch already has this commit
+    const hasCommit = run(
+      `git branch --contains ${commit} | grep ${hotfixBranch}`,
+      dryRun,
+      false,
+    );
+    if (hasCommit) {
+      console.log(`Branch ${hotfixBranch} already contains commit ${commit}.`);
+      return { existingBranch: hotfixBranch, hasCommit: true };
+    } else {
+      console.log(
+        `Branch ${hotfixBranch} exists but doesn't contain commit ${commit}.`,
+      );
+      return { existingBranch: hotfixBranch, hasCommit: false };
+    }
+  }
+
   // Create the hotfix branch from the release branch.
   console.log(
     `Creating hotfix branch ${hotfixBranch} from ${releaseBranch}...`,
@@ -82,15 +103,23 @@ async function main() {
   if (dryRun) {
     prBody += '\n\n**[DRY RUN]**';
   }
-  run(
-    `gh pr create --base ${releaseBranch} --head ${hotfixBranch} --title "${prTitle}" --body "${prBody}"`,
-    dryRun,
-  );
+  const prCommand = `gh pr create --base ${releaseBranch} --head ${hotfixBranch} --title "${prTitle}" --body "${prBody}"`;
+  run(prCommand, dryRun);
 
   console.log('Patch process completed successfully!');
+
+  if (dryRun) {
+    console.log('\n--- Dry Run Summary ---');
+    console.log(`Release Branch: ${releaseBranch}`);
+    console.log(`Hotfix Branch: ${hotfixBranch}`);
+    console.log(`Pull Request Command: ${prCommand}`);
+    console.log('---------------------');
+  }
+
+  return { newBranch: hotfixBranch, created: true };
 }
 
-function run(command, dryRun = false) {
+function run(command, dryRun = false, throwOnError = true) {
   console.log(`> ${command}`);
   if (dryRun) {
     return;
@@ -99,7 +128,10 @@ function run(command, dryRun = false) {
     return execSync(command).toString().trim();
   } catch (err) {
     console.error(`Command failed: ${command}`);
-    throw err;
+    if (throwOnError) {
+      throw err;
+    }
+    return null;
   }
 }
 
@@ -116,8 +148,8 @@ function getLatestTag(channel) {
   console.log(`Fetching latest tag for channel: ${channel}...`);
   const pattern =
     channel === 'stable'
-      ? '\'(contains("nightly") or contains("preview")) | not\''
-      : '\'(contains("preview"))\'';
+      ? '(contains("nightly") or contains("preview")) | not'
+      : '(contains("preview"))';
   const command = `gh release list --limit 30 --json tagName | jq -r '[.[] | select(.tagName | ${pattern})] | .[0].tagName'`;
   try {
     return execSync(command).toString().trim();
