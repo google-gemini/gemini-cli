@@ -87,7 +87,6 @@ async function getIdeStatusMessageWithFiles(ideClient: IdeClient): Promise<{
   content: string;
 }> {
   const connection = ideClient.getConnectionStatus();
-  const ideInfo = ideClient.getCurrentIde();
   switch (connection.status) {
     case IDEConnectionStatus.Connected: {
       let content = `🟢 Connected to ${ideClient.getDetectedIdeDisplayName()}`;
