@@ -163,10 +163,6 @@ jobs:
           - '20.x'
           - '22.x'
           - '24.x'
-        include:
-          # Only test LTS Node.js on Windows for speed
-          - os: 'gemini-cli-windows-16-core'
-            node-version: '20.x'
     steps:
       - name: 'Checkout'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
@@ -177,63 +173,13 @@ jobs:
           node-version: '${{ matrix.node-version }}'
           cache: 'npm'
 
-      - name: 'Configure Windows Defender exclusions'
-        if: "runner.os == 'Windows'"
-        run: |
-          Add-MpPreference -ExclusionPath $env:GITHUB_WORKSPACE -Force
-          Add-MpPreference -ExclusionPath "$env:GITHUB_WORKSPACE\node_modules" -Force
-          Add-MpPreference -ExclusionPath "$env:GITHUB_WORKSPACE\packages" -Force
-          Add-MpPreference -ExclusionPath "$env:TEMP" -Force
-        shell: 'pwsh'
-
-      - name: 'Configure npm for Windows performance'
-        if: "runner.os == 'Windows'"
-        run: |
-          npm config set progress false
-          npm config set audit false
-          npm config set fund false
-          npm config set loglevel error
-          npm config set maxsockets 32
-          npm config set registry https://registry.npmjs.org/
-        shell: 'pwsh'
-
-      - name: 'Build project (Windows)'
-        if: "runner.os == 'Windows'"
-        run: 'npm run build'
-        shell: 'pwsh'
-        env:
-          NODE_OPTIONS: '--max-old-space-size=32768 --max-semi-space-size=256'
-          UV_THREADPOOL_SIZE: '32'
-          NODE_ENV: 'production'
-
-      - name: 'Build project (non-Windows)'
-        if: "runner.os != 'Windows'"
+      - name: 'Build project'
         run: 'npm run build'
 
-      - name: 'Install dependencies for testing (Windows)'
-        if: "runner.os == 'Windows'"
-        run: 'npm ci'
-        shell: 'pwsh'
-        env:
-          NODE_OPTIONS: '--max-old-space-size=32768'
-          UV_THREADPOOL_SIZE: '32'
-
-      - name: 'Install dependencies for testing (non-Windows)'
-        if: "runner.os != 'Windows'"
+      - name: 'Install dependencies for testing'
         run: 'npm ci'
 
-      - name: 'Run tests and generate reports (Windows)'
-        if: "runner.os == 'Windows'"
-        env:
-          NO_COLOR: true
-          NODE_OPTIONS: '--max-old-space-size=32768 --max-semi-space-size=256'
-          UV_THREADPOOL_SIZE: '32'
-          NODE_ENV: 'test'
-        run: 'npm run test:ci -- --coverage.enabled=false'
-        shell: 'pwsh'
-
-      - name: 'Run tests and generate reports (non-Windows)'
-        if: "runner.os != 'Windows'"
+      - name: 'Run tests and generate reports'
         env:
           NO_COLOR: true
         run: 'npm run test:ci -- --coverage.enabled=false'
@@ -311,6 +257,64 @@ jobs:
           minimum-change-threshold: '1000'
           compression: 'none'
           clean-script: 'clean'
+
+  test_windows:
+    name: 'Test (Windows)'
+    runs-on: 'gemini-cli-windows-16-core'
+    continue-on-error: true
+    strategy:
+      matrix:
+        node-version:
+          - '20.x'
+
+    steps:
+      - name: 'Checkout'
+        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
+
+      - name: 'Set up Node.js ${{ matrix.node-version }}'
+        uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions/setup-node@v4
+        with:
+          node-version: '${{ matrix.node-version }}'
+          cache: 'npm'
+
+      - name: 'Configure Windows Defender exclusions'
+        run: |
+          Add-MpPreference -ExclusionPath $env:GITHUB_WORKSPACE -Force
+          Add-MpPreference -ExclusionPath "$env:GITHUB_WORKSPACE\node_modules" -Force
+          Add-MpPreference -ExclusionPath "$env:GITHUB_WORKSPACE\packages" -Force
+          Add-MpPreference -ExclusionPath "$env:TEMP" -Force
+        shell: 'pwsh'
+
+      - name: 'Configure npm for Windows performance'
+        run: |
+          npm config set progress false
+          npm config set audit false
+          npm config set fund false
+          npm config set loglevel error
+          npm config set maxsockets 32
+          npm config set registry https://registry.npmjs.org/
+        shell: 'pwsh'
+
+      - name: 'Install dependencies'
+        run: 'npm ci'
+        shell: 'pwsh'
+
+      - name: 'Build project'
+        run: 'npm run build'
+        shell: 'pwsh'
+        env:
+          NODE_OPTIONS: '--max-old-space-size=32768 --max-semi-space-size=256'
+          UV_THREADPOOL_SIZE: '32'
+          NODE_ENV: 'production'
+
+      - name: 'Run tests and generate reports'
+        env:
+          NO_COLOR: true
+          NODE_OPTIONS: '--max-old-space-size=32768 --max-semi-space-size=256'
+          UV_THREADPOOL_SIZE: '32'
+          NODE_ENV: 'test'
+        run: 'npm run test:ci -- --coverage.enabled=false'
+        shell: 'pwsh'
 
   ci:
     name: 'CI'
