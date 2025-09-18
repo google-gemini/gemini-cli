@@ -66,24 +66,76 @@ jobs:
           permission-contents: 'write'
 
       - name: 'Create Patch for Stable'
+        id: 'create_patch_stable'
         if: "github.event.inputs.channel == 'stable'"
         env:
           GH_TOKEN: '${{ steps.generate_token.outputs.token }}'
-        run: 'node scripts/create-patch-pr.js --commit=${{ github.event.inputs.commit }} --channel=stable --dry-run=${{ github.event.inputs.dry_run }}'
+        continue-on-error: true
+        run: |
+          node scripts/create-patch-pr.js --commit=${{ github.event.inputs.commit }} --channel=stable --dry-run=${{ github.event.inputs.dry_run }} > patch_output.log 2>&1
+          echo "EXIT_CODE=$?" >> "$GITHUB_OUTPUT"
+          cat patch_output.log
 
       - name: 'Create Patch for Preview'
-        id: 'create_patch'
+        id: 'create_patch_preview'
+        if: "github.event.inputs.channel != 'stable'"
         env:
           GH_TOKEN: '${{ steps.generate_token.outputs.token }}'
-        run: 'node scripts/create-patch-pr.js --commit=${{ github.event.inputs.commit }} --channel=${{ github.event.inputs.channel }} --dry-run=${{ github.event.inputs.dry_run }}'
+        continue-on-error: true
+        run: |
+          node scripts/create-patch-pr.js --commit=${{ github.event.inputs.commit }} --channel=${{ github.event.inputs.channel }} --dry-run=${{ github.event.inputs.dry_run }} > patch_output.log 2>&1
+          echo "EXIT_CODE=$?" >> "$GITHUB_OUTPUT"
+          cat patch_output.log
 
       - name: 'Comment on Original PR'
         if: '!inputs.dry_run && inputs.original_pr'
         env:
           GH_TOKEN: '${{ steps.generate_token.outputs.token }}'
         run: |
-          gh pr comment ${{ github.event.inputs.original_pr }} --body "🚀 Patch PR created!
+          # Determine which step ran based on channel
+          if [ "${{ github.event.inputs.channel }}" = "stable" ]; then
+            EXIT_CODE="${{ steps.create_patch_stable.outputs.EXIT_CODE }}"
+          else
+            EXIT_CODE="${{ steps.create_patch_preview.outputs.EXIT_CODE }}"
+          fi
 
-          The patch release PR for this change has been created. Please review and approve it to complete the patch release:
+          # Check if patch output exists and contains branch info
+          if [ -f patch_output.log ]; then
+            if grep -q "already exists" patch_output.log && grep -q "already contains commit" patch_output.log; then
+              # Branch exists and has the commit
+              BRANCH=$(grep "Hotfix branch" patch_output.log | grep "already exists" | sed 's/.*Hotfix branch \(.*\) already exists.*/\1/')
+              gh pr comment ${{ github.event.inputs.original_pr }} --body "ℹ️ Patch branch already exists!
 
-          View all patch PRs: https://github.com/${{ github.repository }}/pulls?q=is%3Apr+is%3Aopen+label%3Apatch"
+              The commit is already included in the existing patch branch: \`$BRANCH\`
+
+              Check if there's already a PR for this patch: https://github.com/${{ github.repository }}/pulls?q=is%3Apr+is%3Aopen+head%3A$BRANCH"
+
+            elif grep -q "already exists" patch_output.log; then
+              # Branch exists but doesn't have the commit
+              BRANCH=$(grep "Hotfix branch" patch_output.log | grep "already exists" | sed 's/.*Hotfix branch \(.*\) already exists.*/\1/')
+              gh pr comment ${{ github.event.inputs.original_pr }} --body "⚠️ Patch branch exists but needs update!
+
+              A patch branch \`$BRANCH\` exists but doesn't contain this commit. You may need to manually handle this conflict.
+
+              View the existing branch: https://github.com/${{ github.repository }}/tree/$BRANCH"
+
+            elif [ "$EXIT_CODE" = "0" ]; then
+              # Success - new branch created
+              gh pr comment ${{ github.event.inputs.original_pr }} --body "🚀 Patch PR created!
+
+              The patch release PR for this change has been created. Please review and approve it to complete the patch release:
+
+              View all patch PRs: https://github.com/${{ github.repository }}/pulls?q=is%3Apr+is%3Aopen+label%3Apatch"
+            else
+              # Other error
+              gh pr comment ${{ github.event.inputs.original_pr }} --body "❌ Patch creation failed!
+
+              There was an error creating the patch. Please check the workflow logs for details:
+              https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            fi
+          else
+            gh pr comment ${{ github.event.inputs.original_pr }} --body "❌ Patch creation failed!
+
+            No output was generated. Please check the workflow logs:
+            https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          fi
