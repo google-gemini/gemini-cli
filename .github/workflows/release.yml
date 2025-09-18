@@ -174,7 +174,7 @@ jobs:
 
       - name: 'Create GitHub Release and Tag'
         if: |-
-          ${{ steps.vars.outputs.is_dry_run == 'false' }}
+          ${{ steps.vars.outputs.is_dry_run == 'false' && steps.vars.outputs.is_nightly == 'false' && steps.vars.outputs.is_preview == 'false' }}
         env:
           GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
           RELEASE_BRANCH: '${{ steps.release_branch.outputs.BRANCH_NAME }}'
@@ -187,6 +187,23 @@ jobs:
             --title "Release ${RELEASE_TAG}" \
             --notes-start-tag "$PREVIOUS_TAG" \
             --generate-notes
+
+      - name: 'Create GitHub Pre-release and Tag'
+        if: |-
+          ${{ steps.vars.outputs.is_dry_run == 'false' && (steps.vars.outputs.is_nightly == 'true' || steps.vars.outputs.is_preview == 'true') }}
+        env:
+          GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+          RELEASE_BRANCH: '${{ steps.release_branch.outputs.BRANCH_NAME }}'
+          RELEASE_TAG: '${{ steps.version.outputs.RELEASE_TAG }}'
+          PREVIOUS_TAG: '${{ steps.version.outputs.PREVIOUS_TAG }}'
+        run: |-
+          gh release create "${RELEASE_TAG}" \
+            bundle/gemini.js \
+            --target "$RELEASE_BRANCH" \
+            --title "Release ${RELEASE_TAG}" \
+            --notes-start-tag "$PREVIOUS_TAG" \
+            --generate-notes \
+            --prerelease
 
       - name: 'Create Issue on Failure'
         if: |-
