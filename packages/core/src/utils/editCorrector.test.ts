@@ -9,6 +9,7 @@ import type { Mock } from 'vitest';
 import { vi, describe, it, expect, beforeEach, type Mocked } from 'vitest';
 import * as fs from 'node:fs';
 import { EditTool } from '../tools/edit.js';
+import type { BaseLlmClient } from '../core/baseLlmClient.js';
 
 // MOCKS
 let callCount = 0;
@@ -28,10 +29,9 @@ vi.mock('../core/client.js', () => ({
     this: any,
     _config: Config,
   ) {
-    this.generateJson = (...params: any[]) => mockGenerateJson(...params); // Corrected: use mockGenerateJson
-    this.startChat = (...params: any[]) => mockStartChat(...params); // Corrected: use mockStartChat
+    this.startChat = (...params: any[]) => mockStartChat(...params);
     this.sendMessageStream = (...params: any[]) =>
-      mockSendMessageStream(...params); // Corrected: use mockSendMessageStream
+      mockSendMessageStream(...params);
     return this;
   }),
 }));
@@ -154,6 +154,7 @@ describe('editCorrector', () => {
 
   describe('ensureCorrectEdit', () => {
     let mockGeminiClientInstance: Mocked<GeminiClient>;
+    let mockBaseLlmClientInstance: Mocked<BaseLlmClient>;
     let mockToolRegistry: Mocked<ToolRegistry>;
     let mockConfigInstance: Config;
     const abortSignal = new AbortController().signal;
@@ -233,6 +234,9 @@ describe('editCorrector', () => {
         mockConfigInstance,
       ) as Mocked<GeminiClient>;
       mockGeminiClientInstance.getHistory = vi.fn().mockResolvedValue([]);
+      mockBaseLlmClientInstance = {
+        generateJson: mockGenerateJson,
+      } as unknown as Mocked<BaseLlmClient>;
       resetEditCorrectorCaches_TEST_ONLY();
     });
 
@@ -252,6 +256,7 @@ describe('editCorrector', () => {
           currentContent,
           originalParams,
           mockGeminiClientInstance,
+          mockBaseLlmClientInstance,
           abortSignal,
         );
         expect(mockGenerateJson).toHaveBeenCalledTimes(1);
@@ -271,6 +276,7 @@ describe('editCorrector', () => {
           currentContent,
           originalParams,
           mockGeminiClientInstance,
+          mockBaseLlmClientInstance,
           abortSignal,
         );
         expect(mockGenerateJson).toHaveBeenCalledTimes(0);
@@ -293,6 +299,7 @@ describe('editCorrector', () => {
           currentContent,
           originalParams,
           mockGeminiClientInstance,
+          mockBaseLlmClientInstance,
           abortSignal,
         );
         expect(mockGenerateJson).toHaveBeenCalledTimes(1);
@@ -312,6 +319,7 @@ describe('editCorrector', () => {
           currentContent,
           originalParams,
           mockGeminiClientInstance,
+          mockBaseLlmClientInstance,
           abortSignal,
         );
         expect(mockGenerateJson).toHaveBeenCalledTimes(0);
@@ -335,6 +343,7 @@ describe('editCorrector', () => {
           currentContent,
           originalParams,
           mockGeminiClientInstance,
+          mockBaseLlmClientInstance,
           abortSignal,
         );
         expect(mockGenerateJson).toHaveBeenCalledTimes(1);
@@ -354,6 +363,7 @@ describe('editCorrector', () => {
           currentContent,
           originalParams,
           mockGeminiClientInstance,
+          mockBaseLlmClientInstance,
           abortSignal,
         );
         expect(mockGenerateJson).toHaveBeenCalledTimes(0);
@@ -373,6 +383,7 @@ describe('editCorrector', () => {
           currentContent,
           originalParams,
           mockGeminiClientInstance,
+          mockBaseLlmClientInstance,
           abortSignal,
         );
         expect(mockGenerateJson).toHaveBeenCalledTimes(0);
@@ -397,6 +408,7 @@ describe('editCorrector', () => {
           currentContent,
           originalParams,
           mockGeminiClientInstance,
+          mockBaseLlmClientInstance,
           abortSignal,
         );
         expect(mockGenerateJson).toHaveBeenCalledTimes(1);
@@ -420,6 +432,7 @@ describe('editCorrector', () => {
           currentContent,
           originalParams,
           mockGeminiClientInstance,
+          mockBaseLlmClientInstance,
           abortSignal,
         );
         expect(mockGenerateJson).toHaveBeenCalledTimes(2);
@@ -441,6 +454,7 @@ describe('editCorrector', () => {
           currentContent,
           originalParams,
           mockGeminiClientInstance,
+          mockBaseLlmClientInstance,
           abortSignal,
         );
         expect(mockGenerateJson).toHaveBeenCalledTimes(1);
@@ -464,6 +478,7 @@ describe('editCorrector', () => {
           currentContent,
           originalParams,
           mockGeminiClientInstance,
+          mockBaseLlmClientInstance,
           abortSignal,
         );
         expect(mockGenerateJson).toHaveBeenCalledTimes(1);
@@ -486,6 +501,7 @@ describe('editCorrector', () => {
           currentContent,
           originalParams,
           mockGeminiClientInstance,
+          mockBaseLlmClientInstance,
           abortSignal,
         );
         expect(mockGenerateJson).toHaveBeenCalledTimes(1);
@@ -505,6 +521,7 @@ describe('editCorrector', () => {
           currentContent,
           originalParams,
           mockGeminiClientInstance,
+          mockBaseLlmClientInstance,
           abortSignal,
         );
         expect(mockGenerateJson).toHaveBeenCalledTimes(0);
@@ -529,6 +546,7 @@ describe('editCorrector', () => {
           currentContent,
           originalParams,
           mockGeminiClientInstance,
+          mockBaseLlmClientInstance,
           abortSignal,
         );
         expect(mockGenerateJson).toHaveBeenCalledTimes(2);
@@ -585,6 +603,7 @@ describe('editCorrector', () => {
           currentContent,
           originalParams,
           mockGeminiClientInstance,
+          mockBaseLlmClientInstance,
           abortSignal,
         );
 
@@ -595,65 +614,10 @@ describe('editCorrector', () => {
   });
 
   describe('ensureCorrectFileContent', () => {
-    let mockGeminiClientInstance: Mocked<GeminiClient>;
-    let mockToolRegistry: Mocked<ToolRegistry>;
-    let mockConfigInstance: Config;
+    let mockBaseLlmClientInstance: Mocked<BaseLlmClient>;
     const abortSignal = new AbortController().signal;
 
     beforeEach(() => {
-      mockToolRegistry = new ToolRegistry({} as Config) as Mocked<ToolRegistry>;
-      const configParams = {
-        apiKey: 'test-api-key',
-        model: 'test-model',
-        sandbox: false as boolean | string,
-        targetDir: '/test',
-        debugMode: false,
-        question: undefined as string | undefined,
-        fullContext: false,
-        coreTools: undefined as string[] | undefined,
-        toolDiscoveryCommand: undefined as string | undefined,
-        toolCallCommand: undefined as string | undefined,
-        mcpServerCommand: undefined as string | undefined,
-        mcpServers: undefined as Record<string, any> | undefined,
-        userAgent: 'test-agent',
-        userMemory: '',
-        geminiMdFileCount: 0,
-        alwaysSkipModificationConfirmation: false,
-      };
-      mockConfigInstance = {
-        ...configParams,
-        getApiKey: vi.fn(() => configParams.apiKey),
-        getModel: vi.fn(() => configParams.model),
-        getSandbox: vi.fn(() => configParams.sandbox),
-        getTargetDir: vi.fn(() => configParams.targetDir),
-        getToolRegistry: vi.fn(() => mockToolRegistry),
-        getDebugMode: vi.fn(() => configParams.debugMode),
-        getQuestion: vi.fn(() => configParams.question),
-        getFullContext: vi.fn(() => configParams.fullContext),
-        getCoreTools: vi.fn(() => configParams.coreTools),
-        getToolDiscoveryCommand: vi.fn(() => configParams.toolDiscoveryCommand),
-        getToolCallCommand: vi.fn(() => configParams.toolCallCommand),
-        getMcpServerCommand: vi.fn(() => configParams.mcpServerCommand),
-        getMcpServers: vi.fn(() => configParams.mcpServers),
-        getUserAgent: vi.fn(() => configParams.userAgent),
-        getUserMemory: vi.fn(() => configParams.userMemory),
-        setUserMemory: vi.fn((mem: string) => {
-          configParams.userMemory = mem;
-        }),
-        getGeminiMdFileCount: vi.fn(() => configParams.geminiMdFileCount),
-        setGeminiMdFileCount: vi.fn((count: number) => {
-          configParams.geminiMdFileCount = count;
-        }),
-        getAlwaysSkipModificationConfirmation: vi.fn(
-          () => configParams.alwaysSkipModificationConfirmation,
-        ),
-        setAlwaysSkipModificationConfirmation: vi.fn((skip: boolean) => {
-          configParams.alwaysSkipModificationConfirmation = skip;
-        }),
-        getQuotaErrorOccurred: vi.fn().mockReturnValue(false),
-        setQuotaErrorOccurred: vi.fn(),
-      } as unknown as Config;
-
       callCount = 0;
       mockResponses.length = 0;
       mockGenerateJson = vi
@@ -667,12 +631,10 @@ describe('editCorrector', () => {
           if (response === undefined) return Promise.resolve({});
           return Promise.resolve(response);
         });
-      mockStartChat = vi.fn();
-      mockSendMessageStream = vi.fn();
 
-      mockGeminiClientInstance = new GeminiClient(
-        mockConfigInstance,
-      ) as Mocked<GeminiClient>;
+      mockBaseLlmClientInstance = {
+        generateJson: mockGenerateJson,
+      } as unknown as Mocked<BaseLlmClient>;
       resetEditCorrectorCaches_TEST_ONLY();
     });
 
@@ -680,7 +642,7 @@ describe('editCorrector', () => {
       const content = 'This is normal content without escaping issues';
       const result = await ensureCorrectFileContent(
         content,
-        mockGeminiClientInstance,
+        mockBaseLlmClientInstance,
         abortSignal,
       );
       expect(result).toBe(content);
@@ -696,7 +658,7 @@ describe('editCorrector', () => {
 
       const result = await ensureCorrectFileContent(
         content,
-        mockGeminiClientInstance,
+        mockBaseLlmClientInstance,
         abortSignal,
       );
 
@@ -716,7 +678,7 @@ describe('editCorrector', () => {
 
       const result = await ensureCorrectFileContent(
         content,
-        mockGeminiClientInstance,
+        mockBaseLlmClientInstance,
         abortSignal,
       );
 
@@ -731,7 +693,7 @@ describe('editCorrector', () => {
 
       const result = await ensureCorrectFileContent(
         content,
-        mockGeminiClientInstance,
+        mockBaseLlmClientInstance,
         abortSignal,
       );
 
@@ -751,7 +713,7 @@ describe('editCorrector', () => {
 
       const result = await ensureCorrectFileContent(
         content,
-        mockGeminiClientInstance,
+        mockBaseLlmClientInstance,
         abortSignal,
       );
 
