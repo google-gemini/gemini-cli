@@ -88,10 +88,14 @@ export function parseGitHubRepo(source: string): {
       `Invalid GitHub repository source: ${source}. Expected "owner/repo" or a github repo uri.`,
     );
   }
-
-  // SSH uris when parsed come through in the first path segment
-  const owner = parts[0].replace('git@github.com:', '');
+  const owner = parts[0];
   const repo = parts[1].replace('.git', '');
+
+  if (owner.startsWith('git@github.com')) {
+    throw new Error(
+      `Invalid GitHub repository source: ${source}. Github releases extensions are not supported with ssh uris, you must use an https uri with a personal access token.`,
+    );
+  }
 
   if (!owner || !repo) {
     throw new Error(

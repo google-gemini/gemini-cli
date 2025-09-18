@@ -248,11 +248,11 @@ describe('git extension helpers', () => {
       expect(repo).toBe('repo');
     });
 
-    it('should parse owner and repo from a full GitHub sso URL', () => {
+    it('should fail on a GitHub SSH URL', () => {
       const source = 'git@github.com:owner/repo.git';
-      const { owner, repo } = parseGitHubRepo(source);
-      expect(owner).toBe('owner');
-      expect(repo).toBe('repo');
+      expect(() => parseGitHubRepo(source)).toThrow(
+        'Invalid GitHub repository source: git@github.com:owner/repo.git. Github releases extensions are not supported with ssh uris, you must use an https uri with a personal access token.',
+      );
     });
 
     it('should parse owner and repo from a shorthand string', () => {
