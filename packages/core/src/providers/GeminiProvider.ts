@@ -74,8 +74,8 @@ export class GeminiProvider extends BaseModelProvider {
    * Initialize GoogleGenAI client with proper credentials or OAuth client
    */
   private async initializeGoogleAI(): Promise<void> {
-    // Return if already initialized
-    if (this.isInitialized && (this.googleAI || this.codeAssistServer)) {
+    // Return early if already properly initialized - avoid unnecessary reinit
+    if ((this.googleAI || this.codeAssistServer) && this.isInitialized) {
       return;
     }
 
@@ -84,9 +84,9 @@ export class GeminiProvider extends BaseModelProvider {
       return this.initializationPromise;
     }
 
-    // Start initialization
+    // Start initialization only if really needed
     this.initializationPromise = this.performInitialization();
-    
+
     try {
       await this.initializationPromise;
       this.isInitialized = true;
