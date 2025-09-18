@@ -48,7 +48,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
 
   const config = useConfig();
   const isShellCommand = toolCalls.some(
-    (t) => t.name === SHELL_COMMAND_NAME || SHELL_NAME,
+    (t) => t.name === SHELL_COMMAND_NAME || t.name === SHELL_NAME,
   );
   const borderColor =
     isShellCommand || isShellFocused
