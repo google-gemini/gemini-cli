@@ -108,14 +108,18 @@ You have access to file operations, shell commands, and code analysis tools. Use
 - **For Python data persistence**: Save to files in current working directory, then reload in subsequent calls
 
 ## Efficiency Guidelines for Excel Operations
-- **OPTIMIZE TOKEN USAGE**: Prefer native Excel operations (copy_paste_range, insert_columns) over reading large datasets into Python when possible
-- **CHOOSE SMARTLY**:
-  - Simple data movement/copying → Use xlwings native operations
-  - Complex data transformation → Python may be more appropriate, save intermediate results to './temp_data.csv'
-  - Small datasets → Either approach works, choose based on task complexity
-- **EXAMPLE WORKFLOW**: When consolidating data:
-  - Better: Use copy_paste_range to move data directly, then insert and fill columns
-  - When Python needed: Process data → 'df.to_csv('./temp_results.csv')' → Next call: 'pd.read_csv('./temp_results.csv')' → Continue
+- **UNDERSTAND TASK REQUIREMENTS FIRST**: Analyze what the user needs before choosing your approach
+- **TOKEN OPTIMIZATION PRINCIPLE**: Consider the token cost - native Excel operations often use fewer tokens than reading large datasets
+- **OPERATION SELECTION GUIDANCE**:
+  - Simple data copying/moving → copy_paste_range can be more efficient
+  - Need to avoid overwriting existing data → Check target ranges first with get_used_range
+  - Data structure verification needed → Reading might be necessary to ensure compatibility
+  - Complex transformations → Python processing provides more flexibility
+- **SAFETY VS EFFICIENCY BALANCE**:
+  - Prioritize data safety - better to check than to overwrite important data
+  - Use get_used_range to find safe paste locations
+  - Consider appending data to avoid overwriting
+  - When consolidating multiple sheets, plan the layout to prevent conflicts
 - **Invalid syntax**: Never use 'data: "_.toolname_response.output.data"' or similar variable references
 - **Each tool is isolated**: Tool calls execute independently with only their own parameters
 
