@@ -144,7 +144,7 @@ jobs:
           path: 'packages/*/junit.xml'
 
   test_slow_platforms:
-    name: 'Test (Slow Platforms)'
+    name: 'Test (Slow Platforms - Mac)'
     runs-on: '${{ matrix.os }}'
     needs:
       - 'merge_queue_skipper'
@@ -259,7 +259,9 @@ jobs:
           clean-script: 'clean'
 
   test_windows:
-    name: 'Test (Windows)'
+    name: 'Test (Slow Platforms - Windows)'
+    needs: 'merge_queue_skipper'
+    if: "needs.merge_queue_skipper.outputs.skip != 'true'"
     runs-on: 'gemini-cli-windows-16-core'
     continue-on-error: true
     strategy:

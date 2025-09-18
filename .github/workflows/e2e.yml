@@ -127,7 +127,7 @@ jobs:
           npx vitest run --root ./integration-tests
 
   e2e_slow_platforms:
-    name: 'E2E Test (${{ matrix.os }})'
+    name: 'E2E Test (Slow Platforms - Mac)'
     needs:
       - 'merge_queue_skipper'
       - 'build'
@@ -190,7 +190,7 @@ jobs:
         run: 'npx vitest run --root ./integration-tests'
 
   e2e_windows:
-    name: 'E2E Test (Windows)'
+    name: 'E2E Test (Slow Platforms - Windows)'
     if: "needs.merge_queue_skipper.outputs.skip != 'true'"
     needs:
       - 'merge_queue_skipper'
