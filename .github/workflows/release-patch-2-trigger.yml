@@ -55,7 +55,7 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               workflow_id: workflow_id,
-              ref: 'mk-patch-releases',
+              ref: 'main',
               inputs: {
                 type: channel,
                 dry_run: isDryRun.toString(),
