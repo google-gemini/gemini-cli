@@ -122,6 +122,9 @@ jobs:
           NO_COLOR: true
         run: 'npm run test:ci'
 
+      - name: 'Wait for file system sync'
+        run: 'sleep 2'
+
       - name: 'Publish Test Report (for non-forks)'
         if: |-
           ${{ always() && (github.event.pull_request.head.repo.full_name == github.repository) }}
@@ -181,6 +184,9 @@ jobs:
         env:
           NO_COLOR: true
         run: 'npm run test:ci -- --coverage.enabled=false'
+
+      - name: 'Wait for file system sync'
+        run: 'sleep 2'
 
       - name: 'Publish Test Report (for non-forks)'
         if: |-
