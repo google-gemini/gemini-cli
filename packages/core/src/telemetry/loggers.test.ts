@@ -33,6 +33,8 @@ import {
   EVENT_FILE_OPERATION,
   EVENT_RIPGREP_FALLBACK,
   EVENT_MODEL_ROUTING,
+  EVENT_EXTENSION_ENABLE,
+  EVENT_EXTENSION_UNINSTALL,
 } from './constants.js';
 import {
   logApiRequest,
@@ -47,6 +49,8 @@ import {
   logRipgrepFallback,
   logToolOutputTruncated,
   logModelRouting,
+  logExtensionEnable,
+  logExtensionUninstall,
 } from './loggers.js';
 import { ToolCallDecision } from './tool-call-decision.js';
 import {
@@ -62,11 +66,13 @@ import {
   FileOperationEvent,
   ToolOutputTruncatedEvent,
   ModelRoutingEvent,
+  ExtensionEnableEvent,
+  ExtensionUninstallEvent,
 } from './types.js';
 import * as metrics from './metrics.js';
 import { FileOperation } from './metrics.js';
 import * as sdk from './sdk.js';
-import { vi, describe, beforeEach, it, expect } from 'vitest';
+import { vi, describe, beforeEach, it, expect, afterEach } from 'vitest';
 import type { GenerateContentResponseUsageMetadata } from '@google/genai';
 import * as uiTelemetry from './uiTelemetry.js';
 import { makeFakeConfig } from '../test-utils/config.js';
@@ -1106,6 +1112,80 @@ describe('loggers', () => {
       ).toHaveBeenCalledWith(event);
       expect(mockLogger.emit).not.toHaveBeenCalled();
       expect(metrics.recordModelRoutingMetrics).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('logExtensionUninstall', () => {
+    const mockConfig = {
+      getSessionId: () => 'test-session-id',
+      getUsageStatisticsEnabled: () => true,
+    } as unknown as Config;
+
+    beforeEach(() => {
+      vi.spyOn(ClearcutLogger.prototype, 'logExtensionUninstallEvent');
+    });
+
+    afterEach(() => {
+      vi.resetAllMocks();
+    });
+
+    it('should log extension uninstall event', () => {
+      const event = new ExtensionUninstallEvent('vscode', 'success');
+
+      logExtensionUninstall(mockConfig, event);
+
+      expect(
+        ClearcutLogger.prototype.logExtensionUninstallEvent,
+      ).toHaveBeenCalledWith(event);
+
+      expect(mockLogger.emit).toHaveBeenCalledWith({
+        body: 'Uninstalled extension vscode',
+        attributes: {
+          'session.id': 'test-session-id',
+          'user.email': 'test-user@example.com',
+          'event.name': EVENT_EXTENSION_UNINSTALL,
+          'event.timestamp': '2025-01-01T00:00:00.000Z',
+          extension_name: 'vscode',
+          status: 'success',
+        },
+      });
+    });
+  });
+
+  describe('logExtensionEnable', () => {
+    const mockConfig = {
+      getSessionId: () => 'test-session-id',
+      getUsageStatisticsEnabled: () => true,
+    } as unknown as Config;
+
+    beforeEach(() => {
+      vi.spyOn(ClearcutLogger.prototype, 'logExtensionEnableEvent');
+    });
+
+    afterEach(() => {
+      vi.resetAllMocks();
+    });
+
+    it('should log extension enable event', () => {
+      const event = new ExtensionEnableEvent('vscode', 'user');
+
+      logExtensionEnable(mockConfig, event);
+
+      expect(
+        ClearcutLogger.prototype.logExtensionEnableEvent,
+      ).toHaveBeenCalledWith(event);
+
+      expect(mockLogger.emit).toHaveBeenCalledWith({
+        body: 'Enabled extension vscode',
+        attributes: {
+          'session.id': 'test-session-id',
+          'user.email': 'test-user@example.com',
+          'event.name': EVENT_EXTENSION_ENABLE,
+          'event.timestamp': '2025-01-01T00:00:00.000Z',
+          extension_name: 'vscode',
+          settingScope: 'user',
+        },
+      });
     });
   });
 });
