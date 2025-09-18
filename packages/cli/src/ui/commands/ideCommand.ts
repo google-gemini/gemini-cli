@@ -32,11 +32,12 @@ function getIdeStatusMessage(ideClient: IdeClient): {
   content: string;
 } {
   const connection = ideClient.getConnectionStatus();
+  const ideInfo = ideClient.getCurrentIde();
   switch (connection.status) {
     case IDEConnectionStatus.Connected:
       return {
         messageType: 'info',
-        content: `🟢 Connected to ${ideClient.getDetectedIdeDisplayName()}`,
+        content: `🟢 Connected to ${ideInfo?.displayName}`,
       };
     case IDEConnectionStatus.Connecting:
       return {
@@ -87,9 +88,10 @@ async function getIdeStatusMessageWithFiles(ideClient: IdeClient): Promise<{
   content: string;
 }> {
   const connection = ideClient.getConnectionStatus();
+  const ideInfo = ideClient.getCurrentIde();
   switch (connection.status) {
     case IDEConnectionStatus.Connected: {
-      let content = `🟢 Connected to ${ideClient.getDetectedIdeDisplayName()}`;
+      let content = `🟢 Connected to ${ideInfo?.displayName}`;
       const context = ideContextStore.get();
       const openFiles = context?.workspaceState?.openFiles;
       if (openFiles && openFiles.length > 0) {
@@ -135,7 +137,7 @@ async function setIdeModeAndSyncConnection(
 export const ideCommand = async (): Promise<SlashCommand> => {
   const ideClient = await IdeClient.getInstance();
   const currentIDE = ideClient.getCurrentIde();
-  if (!currentIDE || !ideClient.getDetectedIdeDisplayName()) {
+  if (!currentIDE) {
     return {
       name: 'ide',
       description: 'manage IDE integration',
@@ -173,7 +175,7 @@ export const ideCommand = async (): Promise<SlashCommand> => {
 
   const installCommand: SlashCommand = {
     name: 'install',
-    description: `install required IDE companion for ${ideClient.getDetectedIdeDisplayName()}`,
+    description: `install required IDE companion for ${currentIDE.displayName}`,
     kind: CommandKind.BUILT_IN,
     action: async (context) => {
       const installer = getIdeInstaller(currentIDE);
@@ -181,7 +183,7 @@ export const ideCommand = async (): Promise<SlashCommand> => {
         context.ui.addItem(
           {
             type: 'error',
-            text: `No installer is available for ${ideClient.getDetectedIdeDisplayName()}. Please install the '${GEMINI_CLI_COMPANION_EXTENSION_NAME}' extension manually from the marketplace.`,
+            text: `No installer is available for ${currentIDE.displayName}. Please install the '${GEMINI_CLI_COMPANION_EXTENSION_NAME}' extension manually from the marketplace.`,
           },
           Date.now(),
         );
