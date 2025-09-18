@@ -60,8 +60,7 @@ export const NotificationsSetup: React.FC<NotificationsSetupProps> = ({ settings
 
   const handleEventEnable = (eventType: NotificationEventType, value: boolean) => {
     updateNotificationEventSettings(eventType, { enabled: value }, settings);
-    const newSettings = getNotificationSettings();
-    setCurrentSettings(newSettings);
+    setCurrentSettings(getNotificationSettings());
 
     if (value && os.platform() !== 'win32') { // Only check for non-Windows OS
       const systemSoundPath = getSystemSoundPath(eventType);
@@ -87,9 +86,7 @@ export const NotificationsSetup: React.FC<NotificationsSetupProps> = ({ settings
 
     if (response === 'disable') {
       updateNotificationEventSettings(currentEventType, { enabled: false }, settings);
-      const newSettings = { ...currentSettings };
-      newSettings.events[currentEventType].enabled = false;
-      setCurrentSettings(newSettings);
+      setCurrentSettings(getNotificationSettings());
     } else if (response === 'custom') {
       // TODO: Implement custom sound path input
       console.log('Custom sound path input not yet implemented.');
