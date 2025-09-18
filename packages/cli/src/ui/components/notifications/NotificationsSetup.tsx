@@ -17,7 +17,7 @@ import {
   setGlobalNotificationsEnabled,
   updateNotificationEventSettings,
 } from '../../../notifications/manager.js';
-import { Config } from '@google/gemini-cli-core';
+import { LoadedSettings } from '../../../config/settings.js';
 import { NotificationEventType } from '../../../notifications/types.js';
 
 const getSystemSoundPath = (eventType: NotificationEventType): string | undefined => {
@@ -39,18 +39,18 @@ const getSystemSoundPath = (eventType: NotificationEventType): string | undefine
 };
 
 interface NotificationsSetupProps {
-  config: Config;
+  settings: LoadedSettings;
   onComplete: () => void;
 }
 
-export const NotificationsSetup: React.FC<NotificationsSetupProps> = ({ config, onComplete }) => {
-  const [settings, setSettings] = useState(getNotificationSettings());
+export const NotificationsSetup: React.FC<NotificationsSetupProps> = ({ settings, onComplete }) => {
+  const [currentSettings, setCurrentSettings] = useState(getNotificationSettings());
   const [step, setStep] = useState('global'); // 'global', 'inputRequired', 'taskComplete', 'idleAlert', 'done', 'soundWarning'
   const [currentEventType, setCurrentEventType] = useState<NotificationEventType | null>(null); // To keep track of which event triggered the warning
 
   const handleGlobalEnable = (value: boolean) => {
-    setGlobalNotificationsEnabled(value, config);
-    setSettings({ ...settings, enabled: value });
+    setGlobalNotificationsEnabled(value, settings);
+    setCurrentSettings({ ...currentSettings, enabled: value });
     if (value) {
       setStep('inputRequired');
     } else {
@@ -59,10 +59,10 @@ export const NotificationsSetup: React.FC<NotificationsSetupProps> = ({ config, 
   };
 
   const handleEventEnable = (eventType: NotificationEventType, value: boolean) => {
-    updateNotificationEventSettings(eventType, { enabled: value }, config);
-    const newSettings = { ...settings };
+    updateNotificationEventSettings(eventType, { enabled: value }, settings);
+    const newSettings = { ...currentSettings };
     newSettings.events[eventType].enabled = value;
-    setSettings(newSettings);
+    setCurrentSettings(newSettings);
 
     if (value && os.platform() !== 'win32') { // Only check for non-Windows OS
       const systemSoundPath = getSystemSoundPath(eventType);
@@ -87,10 +87,10 @@ export const NotificationsSetup: React.FC<NotificationsSetupProps> = ({ config, 
     if (!currentEventType) return;
 
     if (response === 'disable') {
-      updateNotificationEventSettings(currentEventType, { enabled: false }, config);
-      const newSettings = { ...settings };
+      updateNotificationEventSettings(currentEventType, { enabled: false }, settings);
+      const newSettings = { ...currentSettings };
       newSettings.events[currentEventType].enabled = false;
-      setSettings(newSettings);
+      setCurrentSettings(newSettings);
     } else if (response === 'custom') {
       // TODO: Implement custom sound path input
       console.log('Custom sound path input not yet implemented.');
@@ -155,7 +155,7 @@ export const NotificationsSetup: React.FC<NotificationsSetupProps> = ({ config, 
       <Box flexDirection="column" padding={1}>
         <Text bold color="red">Warning: System Sound Not Found!</Text>
         <Box marginTop={1}>
-          <Text>The default system sound for "{currentEventType}" was not found on your system:</Text>
+          <Text>The default system sound for &quot;{currentEventType}&quot; was not found on your system:</Text>
           <Text>{getSystemSoundPath(currentEventType!)}</Text>
         </Box>
         <Box marginTop={1}>
@@ -180,7 +180,7 @@ export const NotificationsSetup: React.FC<NotificationsSetupProps> = ({ config, 
     <Box flexDirection="column" padding={1}>
       <Text bold>Audio Notification Setup</Text>
       <Box marginTop={1}>
-        <Text>Enable notification for "{eventType}"?</Text>
+        <Text>Enable notification for &quot;{eventType}&quot;?</Text>
       </Box>
       <RadioButtonSelect
         items={eventOptions}
