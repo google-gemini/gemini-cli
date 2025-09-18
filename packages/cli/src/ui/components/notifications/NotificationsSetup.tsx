@@ -50,7 +50,7 @@ export const NotificationsSetup: React.FC<NotificationsSetupProps> = ({ settings
 
   const handleGlobalEnable = (value: boolean) => {
     setGlobalNotificationsEnabled(value, settings);
-    setCurrentSettings({ ...currentSettings, enabled: value });
+    setCurrentSettings(getNotificationSettings());
     if (value) {
       setStep('inputRequired');
     } else {
@@ -60,8 +60,7 @@ export const NotificationsSetup: React.FC<NotificationsSetupProps> = ({ settings
 
   const handleEventEnable = (eventType: NotificationEventType, value: boolean) => {
     updateNotificationEventSettings(eventType, { enabled: value }, settings);
-    const newSettings = { ...currentSettings };
-    newSettings.events[eventType].enabled = value;
+    const newSettings = getNotificationSettings();
     setCurrentSettings(newSettings);
 
     if (value && os.platform() !== 'win32') { // Only check for non-Windows OS
