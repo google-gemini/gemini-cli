@@ -14,7 +14,7 @@ import {
 import { LoadedSettings, SettingScope } from '../config/settings.js';
 import * as os from 'os';
 
-let currentSettings: NotificationSettings = DEFAULT_NOTIFICATION_SETTINGS;
+let currentSettings: NotificationSettings = JSON.parse(JSON.stringify(DEFAULT_NOTIFICATION_SETTINGS));
 
 /**
  * Initializes the notification manager by loading settings.
@@ -44,12 +44,12 @@ export function initNotifications(settings: LoadedSettings): void {
       };
     } else {
       // Reset to default if settings are not present in the config.
-      currentSettings = DEFAULT_NOTIFICATION_SETTINGS;
+      currentSettings = JSON.parse(JSON.stringify(DEFAULT_NOTIFICATION_SETTINGS));
     }
   } catch (error) {
     console.error('Failed to load notification settings:', error);
     // Fallback to default settings on error
-    currentSettings = DEFAULT_NOTIFICATION_SETTINGS;
+    currentSettings = JSON.parse(JSON.stringify(DEFAULT_NOTIFICATION_SETTINGS));
   }
 }
 
