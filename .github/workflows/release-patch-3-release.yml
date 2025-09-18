@@ -15,10 +15,11 @@ on:
         required: true
         type: 'boolean'
         default: true
-      version:
-        description: 'The version to release.'
-        required: true
-        type: 'string'
+      force_skip_tests:
+        description: 'Select to skip the "Run Tests" step in testing. Prod releases should run tests'
+        required: false
+        type: 'boolean'
+        default: false
       release_ref:
         description: 'The branch, tag, or SHA to release from.'
         required: true
@@ -35,7 +36,14 @@ jobs:
       - name: 'Checkout'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
         with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: 'Checkout Release Code'
+        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
+        with:
           ref: '${{ github.event.inputs.release_ref }}'
+          path: 'release'
           fetch-depth: 0
 
       - name: 'Setup Node.js'
@@ -45,24 +53,49 @@ jobs:
           cache: 'npm'
 
       - name: 'Install Dependencies'
+        working-directory: './release'
         run: |-
           npm ci
 
+      - name: 'Print Inputs'
+        shell: 'bash'
+        run: |-
+          echo "${{ toJSON(inputs) }}"
+
       - name: 'Get Patch Version'
         id: 'patch_version'
+        env:
+          GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
         run: |
-          echo "RELEASE_TAG=${{ github.event.inputs.version }}" >> "${GITHUB_OUTPUT}"
-          echo "RELEASE_VERSION=${{ github.event.inputs.version }}" >> "${GITHUB_OUTPUT}"
-          echo "NPM_TAG=${{ github.event.inputs.type }}" >> "${GITHUB_OUTPUT}"
+          # Use the existing get-release-version.js script to calculate patch version
+          # Run from main checkout which has full git history and access to npm
+          PATCH_JSON=$(node scripts/get-release-version.js --type=patch --patch-from=${{ github.event.inputs.type }})
+          echo "Patch version calculation result: ${PATCH_JSON}"
+
+          RELEASE_VERSION=$(echo "${PATCH_JSON}" | jq -r .releaseVersion)
+          RELEASE_TAG=$(echo "${PATCH_JSON}" | jq -r .releaseTag)
+          NPM_TAG=$(echo "${PATCH_JSON}" | jq -r .npmTag)
+          PREVIOUS_TAG=$(echo "${PATCH_JSON}" | jq -r .previousReleaseTag)
+
+          echo "RELEASE_VERSION=${RELEASE_VERSION}" >> "${GITHUB_OUTPUT}"
+          echo "RELEASE_TAG=${RELEASE_TAG}" >> "${GITHUB_OUTPUT}"
+          echo "NPM_TAG=${NPM_TAG}" >> "${GITHUB_OUTPUT}"
+          echo "PREVIOUS_TAG=${PREVIOUS_TAG}" >> "${GITHUB_OUTPUT}"
 
       - name: 'Print Calculated Version'
         run: |-
-          echo "Calculated version: ${{ steps.patch_version.outputs.RELEASE_VERSION }}"
+          echo "Patch Release Summary:"
+          echo "  Release Version: ${{ steps.patch_version.outputs.RELEASE_VERSION }}"
+          echo "  Release Tag: ${{ steps.patch_version.outputs.RELEASE_TAG }}"
+          echo "  NPM Tag: ${{ steps.patch_version.outputs.NPM_TAG }}"
+          echo "  Previous Tag: ${{ steps.patch_version.outputs.PREVIOUS_TAG }}"
 
       - name: 'Run Tests'
         uses: './.github/actions/run-tests'
         with:
+          force_skip_tests: '${{ github.event.inputs.force_skip_tests }}'
           gemini_api_key: '${{ secrets.GEMINI_API_KEY }}'
+          working-directory: './release'
 
       - name: 'Publish Release'
         uses: './.github/actions/publish-release'
@@ -74,7 +107,8 @@ jobs:
           wombat-token-cli: '${{ secrets.WOMBAT_TOKEN_CLI }}'
           github-token: '${{ secrets.GITHUB_TOKEN }}'
           dry-run: '${{ github.event.inputs.dry_run }}'
-          previous-tag: '${{ steps.patch_version.outputs.RELEASE_TAG }}'
+          previous-tag: '${{ steps.patch_version.outputs.PREVIOUS_TAG }}'
+          working-directory: './release'
 
       - name: 'Create Issue on Failure'
         if: '${{ failure() && github.event.inputs.dry_run == false }}'
