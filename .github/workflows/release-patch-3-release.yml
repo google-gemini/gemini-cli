@@ -53,11 +53,11 @@ jobs:
 
       - name: 'Get Patch Version'
         id: 'patch_version'
-        working-directory: './release'
         env:
           GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
         run: |
           # Use the existing get-release-version.js script to calculate patch version
+          # Run from main checkout which has full git history and access to npm
           PATCH_JSON=$(node scripts/get-release-version.js --type=patch --patch-from=${{ github.event.inputs.type }})
           echo "Patch version calculation result: ${PATCH_JSON}"
 
