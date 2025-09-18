@@ -176,9 +176,6 @@ jobs:
         with:
           node-version: '${{ matrix.node-version }}'
           cache: 'npm'
-          cache-dependency-path: |
-            package-lock.json
-            packages/*/package-lock.json
 
       - name: 'Configure npm for Windows performance'
         if: "runner.os == 'Windows'"
