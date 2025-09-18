@@ -7,6 +7,10 @@ on:
 jobs:
   slash-command:
     runs-on: 'ubuntu-latest'
+    permissions:
+      contents: 'write'
+      pull-requests: 'write'
+      actions: 'write'
     steps:
       - name: 'Slash Command Dispatch'
         id: 'slash_command'
