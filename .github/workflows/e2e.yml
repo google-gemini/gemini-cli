@@ -208,6 +208,12 @@ jobs:
         shell: 'pwsh'
         run: 'npx vitest run --root ./integration-tests'
 
+      - name: 'Fix rollup optional dependencies on macOS'
+        if: "runner.os == 'macOS'"
+        run: |
+          npm cache clean --force
+          npm install --no-save @rollup/rollup-darwin-arm64 || true
+
       - name: 'Run E2E tests (non-Windows)'
         if: "runner.os != 'Windows'"
         env:
