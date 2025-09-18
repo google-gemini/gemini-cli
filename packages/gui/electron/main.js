@@ -703,20 +703,52 @@ ipcMain.handle('multimodel-send-message-stream', async (event, messages, streamI
       return { success: true, totalContent: fullContent }
       
     } catch (streamError) {
+      console.error('[Main] Stream error occurred:', streamError)
+
+      // Format error message with more detail
+      let errorMessage = streamError.message || 'Unknown error occurred'
+
+      // Add additional context for specific error types
+      if (errorMessage.includes('GOOGLE_CLOUD_PROJECT')) {
+        errorMessage = `Authentication Error: ${errorMessage}\n\nFor Workspace GCA users, you need to set the GOOGLE_CLOUD_PROJECT environment variable before starting the application.\n\nPlease restart the application with:\nset GOOGLE_CLOUD_PROJECT=your-project-id`
+      }
+
       // Send error through IPC events
       const errorData = {
         streamId,
         type: 'error',
-        error: streamError.message,
+        error: errorMessage,
         timestamp: Date.now()
       }
-      
+
       event.sender.send('multimodel-stream-error', errorData)
       throw streamError
     }
     
   } catch (error) {
-    console.error('Failed to send streaming message:', error)
+    console.error('[Main] Failed to send streaming message:', error)
+
+    // Format error message with context
+    let errorMessage = error.message || 'Failed to send message'
+
+    // Add additional context for specific error types
+    if (errorMessage.includes('GOOGLE_CLOUD_PROJECT')) {
+      errorMessage = `Authentication Error: ${errorMessage}\n\nFor Workspace GCA users, you need to set the GOOGLE_CLOUD_PROJECT environment variable before starting the application.\n\nPlease restart the application with:\nset GOOGLE_CLOUD_PROJECT=your-project-id`
+    } else if (errorMessage.includes('Failed to initialize')) {
+      errorMessage = `Initialization Error: ${errorMessage}\n\nPlease check your authentication settings and try again.`
+    }
+
+    // Send error through IPC if we have a streamId
+    if (streamId) {
+      const errorData = {
+        streamId,
+        type: 'error',
+        error: errorMessage,
+        timestamp: Date.now()
+      }
+      event.sender.send('multimodel-stream-error', errorData)
+    }
+
     throw error
   }
 })

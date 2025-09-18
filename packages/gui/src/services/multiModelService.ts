@@ -113,7 +113,7 @@ class MultiModelService {
   private setupConfirmationListener(): void {
     if (this.api.onToolConfirmationRequest) {
       this.api.onToolConfirmationRequest(async (_, data) => {
-        console.log('Received tool confirmation request from main process:', data);
+        console.log(' from main process:', data);
         
         if (this.confirmationCallback) {
           try {
