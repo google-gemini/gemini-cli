@@ -13,6 +13,7 @@ import * as https from 'node:https';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { execSync } from 'node:child_process';
+import type { K } from 'vitest/dist/chunks/reporters.d.BFLkQcL6.js';
 
 function getGitHubToken(): string | undefined {
   return process.env['GITHUB_TOKEN'];
@@ -74,19 +75,28 @@ export async function cloneFromGit(
   }
 }
 
-function parseGitHubRepo(source: string): { owner: string; repo: string } {
-  // The source should be "owner/repo" or a full GitHub URL.
-  const parts = source.split('/');
-  if (!source.includes('://') && parts.length !== 2) {
+export function parseGitHubRepo(source: string): {
+  owner: string;
+  repo: string;
+} {
+  // Default to a github repo path, so `source` can be just an org/repo
+  const parsedUrl = URL.parse(source, 'https://github.com');
+  // The pathname should be "/owner/repo".
+  const parts = parsedUrl?.pathname.substring(1).split('/');
+  if (parts?.length !== 2) {
     throw new Error(
-      `Invalid GitHub repository source: ${source}. Expected "owner/repo".`,
+      `Invalid GitHub repository source: ${source}. Expected "owner/repo" or a github repo uri.`,
     );
   }
-  const owner = parts.at(-2);
-  const repo = parts.at(-1)?.replace('.git', '');
+
+  // SSH uris when parsed come through in the first path segment
+  const owner = parts[0].replace('git@github.com:', '');
+  const repo = parts[1].replace('.git', '');
 
   if (!owner || !repo) {
-    throw new Error(`Invalid GitHub repository source: ${source}`);
+    throw new Error(
+      `Invalid GitHub repository source: ${source}. Expected "owner/repo" or a github repo uri.`,
+    );
   }
   return { owner, repo };
 }
