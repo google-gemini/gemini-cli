@@ -143,6 +143,8 @@ export const useShellCommandProcessor = (
           const activeTheme = themeManager.getActiveTheme();
           const shellExecutionConfig = {
             ...config.getShellExecutionConfig(),
+            terminalWidth,
+            terminalHeight,
             defaultFg: activeTheme.colors.Foreground,
             defaultBg: activeTheme.colors.Background,
           };
@@ -158,14 +160,14 @@ export const useShellCommandProcessor = (
                   if (isBinaryStream) break;
                   // PTY provides the full screen state, so we just replace.
                   // Child process provides chunks, so we append.
-                  if (
+                  if (config.getShouldUseNodePtyShell()) {
+                    cumulativeStdout = event.chunk;
+                    shouldUpdate = true;
+                  } else if (
                     typeof event.chunk === 'string' &&
                     typeof cumulativeStdout === 'string'
                   ) {
                     cumulativeStdout += event.chunk;
-                  } else {
-                    cumulativeStdout = event.chunk;
-                    shouldUpdate = true;
                   }
                   break;
                 case 'binary_detected':
