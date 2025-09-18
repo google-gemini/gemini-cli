@@ -1,4 +1,5 @@
 name: 'Push to docker'
+description: 'Builds packages and pushes a docker image to GHCR'
 
 inputs:
   github-actor:
