@@ -151,24 +151,6 @@ vi.mock('../../utils/settingsUtils.js', async () => {
 // const originalConsoleError = console.error;
 
 describe('SettingsDialog', () => {
-  // Helper to wait for UI state changes after React batched updates
-  const waitForUIUpdate = async (
-    lastFrame: () => string | undefined,
-    expectedContent: string,
-    timeoutMs = 1000,
-  ) => {
-    const start = Date.now();
-    while (Date.now() - start < timeoutMs) {
-      const frame = lastFrame();
-      if (frame && frame.includes(expectedContent)) {
-        return;
-      }
-      await new Promise((resolve) => setTimeout(resolve, 10));
-    }
-    // Final assertion for clear error message
-    expect(lastFrame()).toContain(expectedContent);
-  };
-
   // Simple delay function for remaining tests that need gradual migration
   const wait = (ms = 50) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -191,6 +173,8 @@ describe('SettingsDialog', () => {
         if (result !== false) {
           return;
         }
+        // Predicate ran without throwing, but returned false. Clear any stale error.
+        lastError = undefined;
       } catch (e) {
         lastError = e;
       }
@@ -388,13 +372,17 @@ describe('SettingsDialog', () => {
       const { stdin, unmount, lastFrame } = render(component);
 
       // Wait for initial render and verify we're on Vim Mode (first setting)
-      await waitForUIUpdate(lastFrame, '● Vim Mode');
+      await waitFor(() => {
+        expect(lastFrame()).toContain('● Vim Mode');
+      });
 
       // Navigate to Disable Auto Update setting and verify we're there
       act(() => {
         stdin.write(TerminalKeys.DOWN_ARROW as string);
       });
-      await waitForUIUpdate(lastFrame, '● Disable Auto Update');
+      await waitFor(() => {
+        expect(lastFrame()).toContain('● Disable Auto Update');
+      });
 
       // Toggle the setting
       act(() => {
@@ -624,7 +612,10 @@ describe('SettingsDialog', () => {
       );
 
       // Wait for initial render
-      await waitForUIUpdate(lastFrame, 'Vim Mode');
+      await waitFor(() => {
+        const frame = lastFrame();
+        expect(frame).toContain('Vim Mode');
+      });
 
       // The UI should show the settings section is active and scope section is inactive
       expect(lastFrame()).toContain('● Vim Mode'); // Settings section active
@@ -694,7 +685,9 @@ describe('SettingsDialog', () => {
       );
 
       // Wait for initial render
-      await waitForUIUpdate(lastFrame, 'Hide Window Title');
+      await waitFor(() => {
+        expect(lastFrame()).toContain('Hide Window Title');
+      });
 
       // Verify the dialog is rendered properly
       expect(lastFrame()).toContain('Settings');
@@ -1042,7 +1035,10 @@ describe('SettingsDialog', () => {
       );
 
       // Wait for initial render
-      await waitForUIUpdate(lastFrame, 'Vim Mode');
+      await waitFor(() => {
+        const frame = lastFrame();
+        expect(frame).toContain('Vim Mode');
+      });
 
       // Verify initial state: settings section active, scope section inactive
       expect(lastFrame()).toContain('● Vim Mode'); // Settings section active
@@ -1102,7 +1098,10 @@ describe('SettingsDialog', () => {
       );
 
       // Wait for initial render
-      await waitForUIUpdate(lastFrame, 'Vim Mode');
+      await waitFor(() => {
+        const frame = lastFrame();
+        expect(frame).toContain('Vim Mode');
+      });
 
       // Verify the complete UI is rendered with all necessary sections
       expect(lastFrame()).toContain('Settings'); // Title
