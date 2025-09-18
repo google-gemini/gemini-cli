@@ -25,6 +25,7 @@ import type {
   InvalidChunkEvent,
   ContentRetryEvent,
   ContentRetryFailureEvent,
+  ExtensionEnableEvent,
   ExtensionInstallEvent,
   ToolOutputTruncatedEvent,
   ExtensionUninstallEvent,
@@ -63,6 +64,7 @@ export enum EventNames {
   INVALID_CHUNK = 'invalid_chunk',
   CONTENT_RETRY = 'content_retry',
   CONTENT_RETRY_FAILURE = 'content_retry_failure',
+  EXTENSION_ENABLE = 'extension_enable',
   EXTENSION_INSTALL = 'extension_install',
   EXTENSION_UNINSTALL = 'extension_uninstall',
   TOOL_OUTPUT_TRUNCATED = 'tool_output_truncated',
@@ -993,6 +995,25 @@ export class ClearcutLogger {
     }
 
     this.enqueueLogEvent(this.createLogEvent(EventNames.MODEL_ROUTING, data));
+    this.flushIfNeeded();
+  }
+
+  logExtensionEnableEvent(event: ExtensionEnableEvent): void {
+    const data: EventValue[] = [
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_EXTENSION_NAME,
+        value: event.extension_name,
+      },
+      {
+        gemini_cli_key:
+          EventMetadataKey.GEMINI_CLI_EXTENSION_ENABLE_SETTING_SCOPE,
+        value: event.setting_scope,
+      },
+    ];
+
+    this.enqueueLogEvent(
+      this.createLogEvent(EventNames.EXTENSION_ENABLE, data),
+    );
     this.flushIfNeeded();
   }
 
