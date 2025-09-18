@@ -232,8 +232,8 @@ export const useSlashCommandProcessor = (
   useEffect(() => {
     const controller = new AbortController();
     const load = async () => {
-      if (config) {
-        initNotifications(config);
+      if (settings) {
+        initNotifications(settings);
       }
       const loaders = [
         new McpPromptLoader(config),
@@ -252,7 +252,7 @@ export const useSlashCommandProcessor = (
     return () => {
       controller.abort();
     };
-  }, [config, reloadTrigger]);
+  }, [config, reloadTrigger, settings]);
 
   const handleSlashCommand = useCallback(
     async (
