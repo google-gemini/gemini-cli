@@ -4,8 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { triggerNotification } from './manager.js';
-import { getNotificationSettings } from './manager.js';
+import { triggerNotification, getNotificationSettings } from './manager.js';
 
 let idleTimer: NodeJS.Timeout | undefined;
 
