@@ -20,7 +20,6 @@ describe('createPolicyEngineConfig', () => {
       { toolName: 'run_shell_command', decision: 'ask_user', priority: 10 },
       { toolName: 'write_file', decision: 'ask_user', priority: 10 },
       { toolName: 'web_fetch', decision: 'ask_user', priority: 10 },
-      { toolName: 'google_web_search', decision: 'ask_user', priority: 10 },
     ]);
   });
 

@@ -35,6 +35,7 @@ const READ_ONLY_TOOLS = new Set([
   LSTool.Name,
   ReadFileTool.Name,
   ReadManyFilesTool.Name,
+  WebSearchTool.Name,
 ]);
 
 // WRITE_TOOLS is a list of built-in tools that can modify the user's files or
@@ -49,7 +50,6 @@ const WRITE_TOOLS = new Set([
   ShellTool.Name,
   WriteFileTool.Name,
   WebFetchTool.Name,
-  WebSearchTool.Name,
 ]);
 
 export function createPolicyEngineConfig(
