@@ -21,6 +21,7 @@ import {
 import path from 'node:path';
 import type {
   CommandContext,
+  OpenDialogActionReturn,
   SlashCommand,
   SlashCommandActionReturn,
 } from './types.js';
@@ -69,7 +70,7 @@ function formatFileList(openFiles: File[]): string {
       const isDuplicate = (basenameCounts.get(basename) || 0) > 1;
       const parentDir = path.basename(path.dirname(file.path));
       const displayName = isDuplicate
-        ? `${basename} (/${parentDir})`
+        ? `${basename} (/${parentDir})` 
         : basename;
 
       return `  - ${displayName}${file.isActive ? ' (active)' : ''}`;
@@ -135,23 +136,10 @@ async function setIdeModeAndSyncConnection(
 export const ideCommand = async (): Promise<SlashCommand> => {
   const ideClient = await IdeClient.getInstance();
   const currentIDE = ideClient.getCurrentIde();
-  if (!currentIDE || !ideClient.getDetectedIdeDisplayName()) {
-    return {
-      name: 'ide',
-      description: 'manage IDE integration',
-      kind: CommandKind.BUILT_IN,
-      action: (): SlashCommandActionReturn =>
-        ({
-          type: 'message',
-          messageType: 'error',
-          content: `IDE integration is not supported in your current environment. To use this feature, run Gemini CLI in one of these supported IDEs: VS Code or VS Code forks.`,
-        }) as const,
-    };
-  }
 
   const ideSlashCommand: SlashCommand = {
     name: 'ide',
-    description: 'manage IDE integration',
+    description: 'manage IDE integration and editor preference',
     kind: CommandKind.BUILT_IN,
     subCommands: [],
   };
@@ -161,6 +149,14 @@ export const ideCommand = async (): Promise<SlashCommand> => {
     description: 'check status of IDE integration',
     kind: CommandKind.BUILT_IN,
     action: async (): Promise<SlashCommandActionReturn> => {
+      if (!currentIDE || !ideClient.getDetectedIdeDisplayName()) {
+        return {
+          type: 'message',
+          messageType: 'error',
+          content: `IDE integration is not supported in your current environment. To use this feature, run Gemini CLI in one of these supported IDEs: VS Code or VS Code forks.`,
+        } as const;
+      }
+
       const { messageType, content } =
         await getIdeStatusMessageWithFiles(ideClient);
       return {
@@ -173,9 +169,20 @@ export const ideCommand = async (): Promise<SlashCommand> => {
 
   const installCommand: SlashCommand = {
     name: 'install',
-    description: `install required IDE companion for ${ideClient.getDetectedIdeDisplayName()}`,
+    description: `install required IDE companion`,
     kind: CommandKind.BUILT_IN,
-    action: async (context) => {
+    action: async (context: CommandContext) => {
+      if (!currentIDE || !ideClient.getDetectedIdeDisplayName()) {
+        context.ui.addItem(
+          {
+            type: 'error',
+            text: `IDE integration is not supported in your current environment. To use this feature, run Gemini CLI in one of these supported IDEs: VS Code or VS Code forks.`,
+          },
+          Date.now(),
+        );
+        return;
+      }
+
       const installer = getIdeInstaller(currentIDE);
       if (!installer) {
         context.ui.addItem(
@@ -249,6 +256,17 @@ export const ideCommand = async (): Promise<SlashCommand> => {
     description: 'enable IDE integration',
     kind: CommandKind.BUILT_IN,
     action: async (context: CommandContext) => {
+      if (!currentIDE || !ideClient.getDetectedIdeDisplayName()) {
+        context.ui.addItem(
+          {
+            type: 'error',
+            text: `IDE integration is not supported in your current environment. To use this feature, run Gemini CLI in one of these supported IDEs: VS Code or VS Code forks.`,
+          },
+          Date.now(),
+        );
+        return;
+      }
+
       context.services.settings.setValue(
         SettingScope.User,
         'ide.enabled',
@@ -271,6 +289,17 @@ export const ideCommand = async (): Promise<SlashCommand> => {
     description: 'disable IDE integration',
     kind: CommandKind.BUILT_IN,
     action: async (context: CommandContext) => {
+      if (!currentIDE || !ideClient.getDetectedIdeDisplayName()) {
+        context.ui.addItem(
+          {
+            type: 'error',
+            text: `IDE integration is not supported in your current environment. To use this feature, run Gemini CLI in one of these supported IDEs: VS Code or VS Code forks.`,
+          },
+          Date.now(),
+        );
+        return;
+      }
+
       context.services.settings.setValue(
         SettingScope.User,
         'ide.enabled',
@@ -288,6 +317,16 @@ export const ideCommand = async (): Promise<SlashCommand> => {
     },
   };
 
+  const preferenceCommand: SlashCommand = {
+    name: 'preference',
+    description: 'set external editor preference',
+    kind: CommandKind.BUILT_IN,
+    action: (): OpenDialogActionReturn => ({
+      type: 'dialog',
+      dialog: 'editor',
+    }),
+  };
+
   const { status } = ideClient.getConnectionStatus();
   const isConnected = status === IDEConnectionStatus.Connected;
 
@@ -300,6 +339,7 @@ export const ideCommand = async (): Promise<SlashCommand> => {
       installCommand,
     ];
   }
+  ideSlashCommand.subCommands.push(preferenceCommand);
 
   return ideSlashCommand;
 };
