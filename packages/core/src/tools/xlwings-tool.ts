@@ -1003,7 +1003,7 @@ export class XlwingsTool extends BasePythonTool<XlwingsParams, XlwingsResult> {
             description: 'Target workbook name (uses active workbook if not specified)'
           },
           worksheet: {
-            type: ['string', 'null'],
+            oneOf: [{ type: 'string' }, { type: 'null' }],
             description: 'Target worksheet name (uses active worksheet if not specified)'
           },
           range: {
@@ -1346,6 +1346,51 @@ export class XlwingsTool extends BasePythonTool<XlwingsParams, XlwingsResult> {
           count: {
             type: 'number',
             description: 'Number of rows/columns to insert or delete (default: 1)'
+          },
+          filter: {
+            type: 'object',
+            description: 'Filter configuration for filter operations',
+            properties: {
+              criteria: {
+                type: 'array',
+                description: 'Filter criteria for each column',
+                items: {
+                  type: 'object',
+                  properties: {
+                    column: {
+                      oneOf: [{ type: 'string' }, { type: 'number' }],
+                      description: 'Column name or index to filter'
+                    },
+                    condition: {
+                      type: 'string',
+                      enum: ['equals', 'not_equals', 'contains', 'not_contains', 'starts_with', 'ends_with',
+                             'greater_than', 'less_than', 'greater_equal', 'less_equal', 'between', 'custom'],
+                      description: 'Filter condition type'
+                    },
+                    value: {
+                      oneOf: [{ type: 'string' }, { type: 'number' }],
+                      description: 'Filter value (use value2 for between condition)'
+                    },
+                    value2: {
+                      oneOf: [{ type: 'string' }, { type: 'number' }],
+                      description: 'Second value for between condition'
+                    },
+                    formula: {
+                      type: 'string',
+                      description: 'Custom filter formula (for custom condition)'
+                    }
+                  }
+                }
+              },
+              include_header: {
+                type: 'boolean',
+                description: 'Whether to include header row in filter range (default: true)'
+              },
+              filter_range: {
+                type: 'string',
+                description: 'Optional specific range to apply filter (e.g., "A1:D10")'
+              }
+            }
           },
           shape: {
             type: 'object',
@@ -11815,22 +11860,56 @@ print(json.dumps(result))`;
     let response = '';
 
     if (Array.isArray(data)) {
-      const rowCount = Array.isArray(data[0]) ? data.length : 1;
-      const colCount = Array.isArray(data[0]) ? data[0].length : data.length;
+      const is2DArray = Array.isArray(data[0]);
+      const rowCount = is2DArray ? data.length : 1;
+      const colCount = is2DArray ? (data[0] as unknown[]).length : data.length;
 
-      response = `Read **${rowCount} rows × ${colCount} columns** from ${result.range || params.range}.`;
+      response = `Read **${rowCount} rows × ${colCount} columns** from ${result.range || params.range}.\n\n`;
 
-      // Show preview if reasonable size
-      if (rowCount <= 10 && colCount <= 10) {
-        response += `\n\n**Data preview:**\n`;
-        // Check if data is in simple array format and convert to CellInfo format if needed
-        try {
-          // formatDataAsTable now handles both simple arrays and CellInfo format
-          response += this.formatDataAsTable(data, 10);
-        } catch (error) {
-          // Fallback: use simple array format
-          response += this.formatDataAsTable(data, 10);
-          console.error('Error formatting data preview:', error);
+      // Always include the actual data content for LLM
+      response += '**Data Content:**\n';
+
+      // Format as markdown table if reasonable size
+      if (rowCount <= 50 && colCount <= 20) {
+        // Create markdown table headers
+        response += '| ';
+        for (let col = 0; col < colCount; col++) {
+          response += `Col${col + 1} | `;
+        }
+        response += '\n| ';
+        for (let col = 0; col < colCount; col++) {
+          response += '--- | ';
+        }
+        response += '\n';
+
+        // Add data rows
+        for (let row = 0; row < Math.min(rowCount, 50); row++) {
+          response += '| ';
+          for (let col = 0; col < colCount; col++) {
+            let cellValue;
+            if (is2DArray) {
+              cellValue = (data[row] as unknown[])?.[col] ?? '';
+            } else {
+              // For 1D array (single row), use the column index directly
+              cellValue = data[col] ?? '';
+            }
+            response += `${String(cellValue).replace(/\|/g, '\\|')} | `;
+          }
+          response += '\n';
+        }
+
+        if (rowCount > 50) {
+          response += `\n... (showing first 50 rows of ${rowCount} total rows)\n`;
+        }
+      } else {
+        // Too large for table, show as text
+        response += 'Data preview (first few rows):\n';
+        for (let i = 0; i < Math.min(rowCount, 10); i++) {
+          const rowData = is2DArray ? data[i] : data;
+          response += `Row ${i + 1}: ${JSON.stringify(rowData)}\n`;
+        }
+        if (rowCount > 10) {
+          response += `... (showing first 10 rows of ${rowCount} total rows)\n`;
         }
       }
     } else {
@@ -12489,7 +12568,6 @@ except Exception as e:
 
   private generateAddFilterLogic(params: XlwingsParams): string {
     const filterConfig = params.filter;
-    const includeHeader = filterConfig?.include_header !== false; // Default true
     const filterRange = filterConfig?.filter_range || '';
     const criteria = filterConfig?.criteria || [];
 
@@ -12721,7 +12799,7 @@ except Exception as e:
 print(json.dumps(result))`;
   }
 
-  private generateAddFilterSuccessResponse(result: XlwingsResult, params: XlwingsParams): string {
+  private generateAddFilterSuccessResponse(result: XlwingsResult, _params: XlwingsParams): string {
     const filterOps = result.filter_operations;
     if (!filterOps || !filterOps.filter_applied) {
       return 'Filter operation failed or no criteria provided.';
