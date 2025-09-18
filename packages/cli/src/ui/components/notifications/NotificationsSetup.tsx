@@ -5,7 +5,7 @@
  */
 
 import React, { useState } from 'react';
-import { Box, Text } from 'ink';
+import { Box, Text, useInput } from 'ink';
 import * as os from 'os';
 import * as fs from 'fs';
 import {
@@ -45,8 +45,21 @@ interface NotificationsSetupProps {
 
 export const NotificationsSetup: React.FC<NotificationsSetupProps> = ({ settings, onComplete }) => {
   const [currentSettings, setCurrentSettings] = useState(getNotificationSettings());
-  const [step, setStep] = useState('global'); // 'global', 'inputRequired', 'taskComplete', 'idleAlert', 'done', 'soundWarning'
+  const [step, setStep] = useState('global'); // 'global', 'inputRequired', 'taskComplete', 'idleAlert', 'customSoundPath', 'done', 'soundWarning'
   const [currentEventType, setCurrentEventType] = useState<NotificationEventType | null>(null); // To keep track of which event triggered the warning
+  const [customSoundPathInput, setCustomSoundPathInput] = useState('');
+
+  useInput((input, key) => {
+    if (step === 'customSoundPath') {
+      if (key.return) {
+        handleCustomSoundPath(customSoundPathInput);
+      } else if (key.backspace || key.delete) {
+        setCustomSoundPathInput(customSoundPathInput.slice(0, -1));
+      } else if (!key.meta && !key.ctrl) {
+        setCustomSoundPathInput(customSoundPathInput + input);
+      }
+    }
+  });
 
   const handleGlobalEnable = (value: boolean) => {
     setGlobalNotificationsEnabled(value, settings);
@@ -62,12 +75,18 @@ export const NotificationsSetup: React.FC<NotificationsSetupProps> = ({ settings
     updateNotificationEventSettings(eventType, { enabled: value }, settings);
     setCurrentSettings(getNotificationSettings());
 
-    if (value && os.platform() !== 'win32') { // Only check for non-Windows OS
-      const systemSoundPath = getSystemSoundPath(eventType);
-      if (systemSoundPath && !fs.existsSync(systemSoundPath)) {
+    if (value) {
+      if (os.platform() !== 'win32') {
+        const systemSoundPath = getSystemSoundPath(eventType);
+        if (systemSoundPath && !fs.existsSync(systemSoundPath)) {
+          setCurrentEventType(eventType);
+          setStep('soundWarning');
+          return; // Stop here and show warning
+        }
+      } else {
+        setStep('customSoundPath');
         setCurrentEventType(eventType);
-        setStep('soundWarning');
-        return; // Stop here and show warning
+        return;
       }
     }
 
@@ -88,11 +107,28 @@ export const NotificationsSetup: React.FC<NotificationsSetupProps> = ({ settings
       updateNotificationEventSettings(currentEventType, { enabled: false }, settings);
       setCurrentSettings(getNotificationSettings());
     } else if (response === 'custom') {
-      // TODO: Implement custom sound path input
-      console.log('Custom sound path input not yet implemented.');
+      setStep('customSoundPath');
+      return;
     }
 
     // Move to the next step after handling the warning
+    const orderedEventTypes: NotificationEventType[] = ['inputRequired', 'taskComplete', 'idleAlert'];
+    const currentIndex = orderedEventTypes.indexOf(currentEventType);
+    if (currentIndex !== -1 && currentIndex < orderedEventTypes.length - 1) {
+      setStep(orderedEventTypes[currentIndex + 1]);
+    } else {
+      setStep('done');
+      onComplete();
+    }
+    setCurrentEventType(null); // Clear the current event type
+  };
+
+  const handleCustomSoundPath = (path: string) => {
+    if (!currentEventType) return;
+
+    updateNotificationEventSettings(currentEventType, { sound: 'custom', customPath: path }, settings);
+    setCurrentSettings(getNotificationSettings());
+
     const orderedEventTypes: NotificationEventType[] = ['inputRequired', 'taskComplete', 'idleAlert'];
     const currentIndex = orderedEventTypes.indexOf(currentEventType);
     if (currentIndex !== -1 && currentIndex < orderedEventTypes.length - 1) {
@@ -166,6 +202,20 @@ export const NotificationsSetup: React.FC<NotificationsSetupProps> = ({ settings
           onSelect={handleSoundWarningResponse}
           isFocused
         />
+      </Box>
+    );
+  }
+
+  if (step === 'customSoundPath') {
+    return (
+      <Box flexDirection="column" padding={1}>
+        <Text bold>Audio Notification Setup</Text>
+        <Box marginTop={1}>
+          <Text>Enter the path to your custom sound file for &quot;{currentEventType}&quot;:</Text>
+        </Box>
+        <Box>
+          <Text>{customSoundPathInput}</Text>
+        </Box>
       </Box>
     );
   }
