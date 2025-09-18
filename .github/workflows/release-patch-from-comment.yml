@@ -51,7 +51,7 @@ jobs:
             })
 
       - name: 'Comment on Failure'
-        if: "steps.pr_status.outputs.STATE != 'MERGED'"
+        if: "steps.slash_command.outputs.dispatched == 'true' && steps.pr_status.outputs.STATE != 'MERGED'"
         uses: 'peter-evans/create-or-update-comment@67dcc547d311b736a8e6c5c236542148a47adc3d'
         with:
           issue-number: '${{ github.event.issue.number }}'
