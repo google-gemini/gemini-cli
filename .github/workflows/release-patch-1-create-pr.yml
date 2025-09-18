@@ -1,4 +1,4 @@
-name: 'Create Patch PR'
+name: 'Release: Patch (1) Create PR'
 
 on:
   workflow_dispatch:
@@ -19,6 +19,11 @@ on:
         required: false
         type: 'boolean'
         default: false
+      ref:
+        description: 'The branch, tag, or SHA to test from.'
+        required: false
+        type: 'string'
+        default: 'main'
 
 jobs:
   create-patch:
@@ -30,6 +35,7 @@ jobs:
       - name: 'Checkout'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
         with:
+          ref: '${{ github.event.inputs.ref }}'
           fetch-depth: 0
 
       - name: 'Setup Node.js'
