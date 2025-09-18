@@ -59,6 +59,30 @@ async function main() {
     console.log(`Release branch ${releaseBranch} already exists.`);
   }
 
+  // Check if hotfix branch already exists
+  if (branchExists(hotfixBranch)) {
+    console.log(`Hotfix branch ${hotfixBranch} already exists.`);
+
+    // Check if there's already a PR for this branch
+    try {
+      const prInfo = execSync(`gh pr list --head ${hotfixBranch} --json number,url --jq '.[0] // empty'`).toString().trim();
+      if (prInfo && prInfo !== 'null' && prInfo !== '') {
+        const pr = JSON.parse(prInfo);
+        console.log(`Found existing PR #${pr.number}: ${pr.url}`);
+        console.log(`Hotfix branch ${hotfixBranch} already has an open PR.`);
+        return { existingBranch: hotfixBranch, existingPR: pr };
+      } else {
+        console.log(`Hotfix branch ${hotfixBranch} exists but has no open PR.`);
+        console.log(`You may need to delete the branch and run this command again.`);
+        return { existingBranch: hotfixBranch };
+      }
+    } catch (err) {
+      console.error(`Error checking for existing PR: ${err.message}`);
+      console.log(`Hotfix branch ${hotfixBranch} already exists.`);
+      return { existingBranch: hotfixBranch };
+    }
+  }
+
   // Create the hotfix branch from the release branch.
   console.log(
     `Creating hotfix branch ${hotfixBranch} from ${releaseBranch}...`,
@@ -94,9 +118,11 @@ async function main() {
     console.log(`Pull Request Command: ${prCommand}`);
     console.log('---------------------');
   }
+
+  return { newBranch: hotfixBranch, created: true };
 }
 
-function run(command, dryRun = false) {
+function run(command, dryRun = false, throwOnError = true) {
   console.log(`> ${command}`);
   if (dryRun) {
     return;
@@ -105,7 +131,10 @@ function run(command, dryRun = false) {
     return execSync(command).toString().trim();
   } catch (err) {
     console.error(`Command failed: ${command}`);
-    throw err;
+    if (throwOnError) {
+      throw err;
+    }
+    return null;
   }
 }
 
