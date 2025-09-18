@@ -401,7 +401,6 @@ jobs:
 
     permissions:
       contents: 'read'
-      id-token: 'read'
       packages: 'write'
 
     if: |-
