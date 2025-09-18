@@ -119,7 +119,7 @@ Settings are organized into categories. All settings should be placed within the
 
 - **`ui.showCitations`** (boolean):
   - **Description:** Show citations for generated text in the chat.
-  - **Default:** `false`
+  - **Default:** `true`
 
 - **`ui.accessibility.disableLoadingPhrases`** (boolean):
   - **Description:** Disable loading phrases for accessibility.
