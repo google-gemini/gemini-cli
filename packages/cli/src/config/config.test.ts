@@ -2128,7 +2128,7 @@ describe('Output format', () => {
     expect(config.getOutputFormat()).toBe(OutputFormat.JSON);
   });
 
-  it('should fall back to TEXT for invalid format', async () => {
+  it('should error on invalid --output-format argument', async () => {
     process.argv = ['node', 'script.js', '--output-format', 'yaml'];
     const mockExit = vi.spyOn(process, 'exit').mockImplementation(() => {
       throw new Error('process.exit called');
