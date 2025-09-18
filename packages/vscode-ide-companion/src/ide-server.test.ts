@@ -9,6 +9,7 @@ import type * as vscode from 'vscode';
 import * as fs from 'node:fs/promises';
 import type * as os from 'node:os';
 import * as path from 'node:path';
+import * as http from 'node:http';
 import { IDEServer } from './ide-server.js';
 import type { DiffManager } from './diff-manager.js';
 
@@ -457,6 +458,33 @@ describe('IDEServer', () => {
   });
 });
 
+const request = (
+  port: string,
+  options: http.RequestOptions,
+  body?: string,
+): Promise<http.IncomingMessage> => {
+  return new Promise((resolve, reject) => {
+    const req = http.request(
+      {
+        hostname: '127.0.0.1',
+        port,
+        ...options,
+      },
+      (res) => {
+        res.resume(); // Consume response data to free up memory
+        resolve(res);
+      },
+    );
+    req.on('error', (err) => {
+      reject(err);
+    });
+    if (body) {
+      req.write(body);
+    }
+    req.end();
+  });
+};
+
 describe('IDEServer HTTP endpoints', () => {
   let ideServer: IDEServer;
   let mockContext: vscode.ExtensionContext;
@@ -484,53 +512,49 @@ describe('IDEServer HTTP endpoints', () => {
   });
 
   it('should deny requests with an origin header', async () => {
-    const response = await fetch(`http://127.0.0.1:${port}/mcp`, {
+    const response = await fetch(`http://localhost:${port}/mcp`, {
       method: 'POST',
       headers: {
+        Host: `localhost:${port}`,
         Origin: 'https://evil.com',
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({}),
-    });
-    expect(response.status).toBe(403);
-  });
-
-  it('should allow requests without an origin header', async () => {
-    const response = await fetch(`http://127.0.0.1:${port}/mcp`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
       body: JSON.stringify({ jsonrpc: '2.0', method: 'initialize' }),
     });
-    // We expect a 400 here because we are not sending a valid MCP request,
-    // but it's not a CORS error, which is what we are testing.
-    expect(response.status).toBe(400);
+    expect(response.status).toBe(403);
   });
 
   it('should deny requests with an invalid host header', async () => {
-    const response = await fetch(`http://127.0.0.1:${port}/mcp`, {
-      method: 'POST',
-      headers: {
-        Host: 'evil.com',
-        'Content-Type': 'application/json',
+    const response = await request(
+      port,
+      {
+        path: '/mcp',
+        method: 'POST',
+        headers: {
+          Host: 'evil.com',
+          'Content-Type': 'application/json',
+        },
       },
-      body: JSON.stringify({}),
-    });
-    expect(response.status).toBe(403);
+      JSON.stringify({ jsonrpc: '2.0', method: 'initialize' }),
+    );
+    expect(response.statusCode).toBe(403);
   });
 
   it('should allow requests with a valid host header', async () => {
-    const response = await fetch(`http://127.0.0.1:${port}/mcp`, {
-      method: 'POST',
-      headers: {
-        Host: `127.0.0.1:${port}`,
-        'Content-Type': 'application/json',
+    const response = await request(
+      port,
+      {
+        path: '/mcp',
+        method: 'POST',
+        headers: {
+          Host: `localhost:${port}`,
+          'Content-Type': 'application/json',
+        },
       },
-      body: JSON.stringify({ jsonrpc: '2.0', method: 'initialize' }),
-    });
+      JSON.stringify({ jsonrpc: '2.0', method: 'initialize' }),
+    );
     // We expect a 400 here because we are not sending a valid MCP request,
     // but it's not a host error, which is what we are testing.
-    expect(response.status).toBe(400);
+    expect(response.statusCode).toBe(400);
   });
 });
