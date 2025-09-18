@@ -462,8 +462,8 @@ const request = (
   port: string,
   options: http.RequestOptions,
   body?: string,
-): Promise<http.IncomingMessage> => {
-  return new Promise((resolve, reject) => {
+): Promise<http.IncomingMessage> =>
+  new Promise((resolve, reject) => {
     const req = http.request(
       {
         hostname: '127.0.0.1',
@@ -481,7 +481,6 @@ const request = (
     }
     req.end();
   });
-};
 
 describe('IDEServer HTTP endpoints', () => {
   let ideServer: IDEServer;
@@ -510,16 +509,20 @@ describe('IDEServer HTTP endpoints', () => {
   });
 
   it('should deny requests with an origin header', async () => {
-    const response = await fetch(`http://localhost:${port}/mcp`, {
-      method: 'POST',
-      headers: {
-        Host: `localhost:${port}`,
-        Origin: 'https://evil.com',
-        'Content-Type': 'application/json',
+    const response = await request(
+      port,
+      {
+        path: '/mcp',
+        method: 'POST',
+        headers: {
+          Host: `localhost:${port}`,
+          Origin: 'https://evil.com',
+          'Content-Type': 'application/json',
+        },
       },
-      body: JSON.stringify({ jsonrpc: '2.0', method: 'initialize' }),
-    });
-    expect(response.status).toBe(403);
+      JSON.stringify({ jsonrpc: '2.0', method: 'initialize' }),
+    );
+    expect(response.statusCode).toBe(403);
   });
 
   it('should deny requests with an invalid host header', async () => {
