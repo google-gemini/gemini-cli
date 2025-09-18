@@ -408,6 +408,7 @@ export async function installExtension(
       installMetadata.type === 'github-release'
     ) {
       tempDir = await ExtensionStorage.createTmpDir();
+      await cloneFromGit(installMetadata, tempDir)
       try {
         const tagName = await downloadFromGitHubRelease(
           installMetadata,
@@ -416,7 +417,6 @@ export async function installExtension(
         updateExtensionVersion(tempDir, tagName);
         installMetadata.type = 'github-release';
       } catch (_error) {
-        await cloneFromGit(installMetadata, tempDir);
         installMetadata.type = 'git';
       }
       localSourcePath = tempDir;
