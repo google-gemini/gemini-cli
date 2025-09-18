@@ -13,9 +13,9 @@ const setupCommand: SlashCommand = {
   name: 'setup',
   description: 'Interactive setup for notification preferences',
   kind: CommandKind.BUILT_IN,
-  action: (context: CommandContext, args: string): SlashCommandActionReturn => {
-    return { type: 'dialog', dialog: 'notifications-setup' };
-  },
+  action: (context: CommandContext, args: string): SlashCommandActionReturn => (
+    { type: 'dialog', dialog: 'notifications-setup' }
+  ),
 };
 
 const testCommand: SlashCommand = {
@@ -24,7 +24,7 @@ const testCommand: SlashCommand = {
   kind: CommandKind.BUILT_IN,
   action: (context: CommandContext, args: string): SlashCommandActionReturn => {
     const message = testNotifications();
-    return { type: 'message', content: message };
+    return { type: 'message', content: message, messageType: 'info' };
   },
 };
 
@@ -33,11 +33,11 @@ const disableCommand: SlashCommand = {
   description: 'Disable all notifications',
   kind: CommandKind.BUILT_IN,
   action: (context: CommandContext, args: string): SlashCommandActionReturn => {
-    if (!context.services.config) {
-      return { type: 'message', content: 'Cannot disable notifications: Configuration service is not available.', messageType: 'error' };
+    if (!context.services.settings) {
+      return { type: 'message', content: 'Cannot disable notifications: Settings service is not available.', messageType: 'error' };
     }
-    setGlobalNotificationsEnabled(false, context.services.config);
-    return { type: 'message', content: 'All audio notifications have been disabled.' };
+    setGlobalNotificationsEnabled(false, context.services.settings);
+    return { type: 'message', content: 'All audio notifications have been disabled.', messageType: 'info' };
   },
 };
 
@@ -64,7 +64,7 @@ const statusCommand: SlashCommand = {
       }
     });
 
-    return { type: 'message', content: statusMessage };
+    return { type: 'message', content: statusMessage, messageType: 'info'};
   },
 };
 
@@ -76,8 +76,8 @@ export const notificationsCommand: SlashCommand = {
   action: (context: CommandContext, args: string): SlashCommandActionReturn => {
     // If no subcommand is provided, show help or default to status
     if (!args || args.trim() === '') {
-      return { type: 'message', content: 'Please provide a subcommand for /notifications: setup, test, disable, or status.' };
+      return { type: 'message', content: 'Please provide a subcommand for /notifications: setup, test, disable, or status.', messageType: 'info' };
     }
-    return { type: 'message', content: 'Unknown subcommand for /notifications. Use setup, test, disable, or status.' };
+    return { type: 'message', content: 'Unknown subcommand for /notifications. Use setup, test, disable, or status.', messageType: 'error'};
   },
 };
