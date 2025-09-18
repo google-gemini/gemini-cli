@@ -573,17 +573,18 @@ export async function loadExtensionConfig(
 }
 
 export async function uninstallExtension(
-  extensionName: string,
+  extensionIdentifier: string,
   cwd: string = process.cwd(),
 ): Promise<void> {
   const logger = getClearcutLogger(cwd);
   const installedExtensions = loadUserExtensions();
-  if (
-    !installedExtensions.some(
-      (installed) => installed.config.name === extensionName,
-    )
-  ) {
-    throw new Error(`Extension "${extensionName}" not found.`);
+  const extensionName = installedExtensions.find(
+    (installed) =>
+      installed.config.name === extensionIdentifier ||
+      installed.installMetadata?.source === extensionIdentifier,
+  )?.config.name;
+  if (!extensionName) {
+    throw new Error(`Extension not found.`);
   }
   const manager = new ExtensionEnablementManager(
     ExtensionStorage.getUserExtensionsDir(),
