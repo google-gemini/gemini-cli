@@ -7,8 +7,8 @@ on:
 jobs:
   slash-command:
     runs-on: 'ubuntu-latest'
-    # Only run if the comment is from a human user (not a bot)
-    if: "!endsWith(github.event.comment.user.login, '[bot]')"
+    # Only run if the comment is from a human user (not automated)
+    if: "github.event.comment.user.type == 'User' && github.event.comment.user.login != 'github-actions[bot]'"
     permissions:
       contents: 'write'
       pull-requests: 'write'
@@ -31,7 +31,7 @@ jobs:
             dry_run=false
 
       - name: 'Acknowledge Patch Command'
-        if: "contains(github.event.comment.body, '/patch')"
+        if: "startsWith(github.event.comment.body, '/patch')"
         uses: 'peter-evans/create-or-update-comment@67dcc547d311b736a8e6c5c236542148a47adc3d'
         with:
           issue-number: '${{ github.event.issue.number }}'
@@ -42,6 +42,7 @@ jobs:
 
       - name: 'Get PR Status'
         id: 'pr_status'
+        if: "steps.slash_command.outputs.dispatched == 'true'"
         env:
           GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
         run: |
