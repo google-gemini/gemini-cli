@@ -5,20 +5,27 @@ inputs:
   force_skip_tests:
     description: 'Whether to force skip the tests.'
     required: false
-    default: 'false'
+    type: 'boolean'
+    default: false
   gemini_api_key:
     description: 'The API key for running integration tests.'
     required: true
+  working-directory:
+    description: 'The working directory to run the tests in.'
+    required: false
+    default: '.'
 
 runs:
   using: 'composite'
   steps:
     - name: 'Run Tests'
-      if: "inputs.force_skip_tests != 'true'"
+      if: '${{ !inputs.force_skip_tests }}'
       env:
         GEMINI_API_KEY: '${{ inputs.gemini_api_key }}'
+      working-directory: '${{ inputs.working-directory }}'
       run: |-
-        npm run preflight
+        npm run build
+        npm run test:ci
         npm run test:integration:sandbox:none
         npm run test:integration:sandbox:docker
       shell: 'bash'
