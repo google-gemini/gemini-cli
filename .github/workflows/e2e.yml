@@ -191,7 +191,7 @@ jobs:
 
   e2e_windows:
     name: 'E2E Test (Windows)'
-    if: "needs.merge_queue_skipper.outputs.should_skip != 'true'"
+    if: "needs.merge_queue_skipper.outputs.skip != 'true'"
     needs:
       - 'merge_queue_skipper'
     runs-on: 'gemini-cli-windows-16-core'
