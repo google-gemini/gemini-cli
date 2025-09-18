@@ -83,8 +83,7 @@ import { useAutoAcceptIndicator } from './hooks/useAutoAcceptIndicator.js';
 import { useWorkspaceMigration } from './hooks/useWorkspaceMigration.js';
 import { useSessionStats } from './contexts/SessionContext.js';
 import { useGitBranchName } from './hooks/useGitBranchName.js';
-import type { ExtensionUpdateState } from './state/extensions.js';
-import { checkForAllExtensionUpdates } from '../config/extension.js';
+import { useExtensionUpdates } from './hooks/useExtensionUpdates.js';
 
 const CTRL_EXIT_PROMPT_DURATION_MS = 1000;
 
@@ -145,9 +144,14 @@ export const AppContainer = (props: AppContainerProps) => {
   const [isTrustedFolder, setIsTrustedFolder] = useState<boolean | undefined>(
     config.isTrustedFolder(),
   );
-  const [extensionsUpdateState, setExtensionsUpdateState] = useState(
-    new Map<string, ExtensionUpdateState>(),
-  );
+
+  const extensions = config.getExtensions();
+  const { extensionsUpdateState, setExtensionsUpdateState } =
+    useExtensionUpdates(
+      extensions,
+      historyManager.addItem,
+      config.getWorkingDir(),
+    );
 
   // Helper to determine the effective model, considering the fallback state.
   const getEffectiveModel = useCallback(() => {
@@ -1191,11 +1195,6 @@ Logging in with Google... Please restart Gemini CLI to continue.
       handleProQuotaChoice,
     ],
   );
-
-  const extensions = config.getExtensions();
-  useEffect(() => {
-    checkForAllExtensionUpdates(extensions, setExtensionsUpdateState);
-  }, [extensions, setExtensionsUpdateState]);
 
   return (
     <UIStateContext.Provider value={uiState}>
