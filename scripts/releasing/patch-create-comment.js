@@ -58,8 +58,14 @@ async function main() {
       type: 'boolean',
       default: false,
     })
-    .example('$0 --original-pr 8655 --exit-code 0 --commit abc1234 --channel preview --repository google-gemini/gemini-cli --test', 'Test success comment')
-    .example('$0 --original-pr 8655 --exit-code 1 --commit abc1234 --channel stable --repository google-gemini/gemini-cli --test', 'Test failure comment')
+    .example(
+      '$0 --original-pr 8655 --exit-code 0 --commit abc1234 --channel preview --repository google-gemini/gemini-cli --test',
+      'Test success comment',
+    )
+    .example(
+      '$0 --original-pr 8655 --exit-code 1 --commit abc1234 --channel stable --repository google-gemini/gemini-cli --test',
+      'Test failure comment',
+    )
     .help()
     .alias('help', 'h').argv;
 
@@ -76,11 +82,16 @@ async function main() {
 
   // Get inputs from CLI args or environment
   const originalPr = argv.originalPr || process.env.ORIGINAL_PR;
-  const exitCode = argv.exitCode !== undefined ? argv.exitCode : parseInt(process.env.EXIT_CODE || '1');
-  const outputLog = argv.outputLog || process.env.OUTPUT_LOG || 'patch_output.log';
+  const exitCode =
+    argv.exitCode !== undefined
+      ? argv.exitCode
+      : parseInt(process.env.EXIT_CODE || '1');
+  const outputLog =
+    argv.outputLog || process.env.OUTPUT_LOG || 'patch_output.log';
   const commit = argv.commit || process.env.COMMIT;
   const channel = argv.channel || process.env.CHANNEL;
-  const repository = argv.repository || process.env.REPOSITORY || 'google-gemini/gemini-cli';
+  const repository =
+    argv.repository || process.env.REPOSITORY || 'google-gemini/gemini-cli';
   const runId = argv.runId || process.env.GITHUB_RUN_ID || '0';
 
   if (!originalPr) {
@@ -88,7 +99,9 @@ async function main() {
     return;
   }
 
-  console.log(`Analyzing patch creation result for PR ${originalPr} (exit code: ${exitCode})`);
+  console.log(
+    `Analyzing patch creation result for PR ${originalPr} (exit code: ${exitCode})`,
+  );
 
   const [owner, repo] = repository.split('/');
   const npmTag = channel === 'stable' ? 'latest' : 'preview';
@@ -140,7 +153,6 @@ A patch PR for this change already exists: [#${prNumber}](${prUrl}).
 **🔗 Links:**
 - [View existing patch PR #${prNumber}](${prUrl})`;
     }
-
   } else if (logContent.includes('exists but has no open PR')) {
     // Branch exists but no PR
     const branchMatch = logContent.match(/Hotfix branch (.*) already exists/);
@@ -159,7 +171,6 @@ A patch branch [\`${branch}\`](https://github.com/${repository}/tree/${branch}) 
 **🔗 Links:**
 - [View branch on GitHub](https://github.com/${repository}/tree/${branch})`;
     }
-
   } else if (exitCode === 0) {
     // Success - extract branch info
     const branchMatch = logContent.match(/Creating hotfix branch (.*) from/);
@@ -186,7 +197,6 @@ A patch branch [\`${branch}\`](https://github.com/${repository}/tree/${branch}) 
 
 **🔗 Track Progress:**
 - [View hotfix PR #${mockPrNumber}](${mockPrUrl})`;
-
       } else if (github) {
         // Find the actual PR for the new branch
         try {
@@ -194,7 +204,7 @@ A patch branch [\`${branch}\`](https://github.com/${repository}/tree/${branch}) 
             owner,
             repo,
             head: `${owner}:${branch}`,
-            state: 'open'
+            state: 'open',
           });
 
           if (prList.data.length > 0) {
@@ -239,7 +249,6 @@ The patch release PR for this change has been created.
         }
       }
     }
-
   } else {
     // Failure
     commentBody = `❌ **Patch creation failed!**
@@ -275,7 +284,7 @@ No output was generated during patch creation.
       owner,
       repo,
       issue_number: parseInt(originalPr),
-      body: commentBody
+      body: commentBody,
     });
 
     console.log(`Successfully commented on PR ${originalPr}`);

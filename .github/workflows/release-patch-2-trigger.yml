@@ -36,7 +36,7 @@ jobs:
       - name: 'Checkout'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
         with:
-          ref: '${{ github.event.inputs.workflow_ref || ''main'' }}'
+          ref: "${{ github.event.inputs.workflow_ref || 'main' }}"
           fetch-depth: 1
 
       - name: 'Setup Node.js'
@@ -51,8 +51,8 @@ jobs:
       - name: 'Trigger Patch Release'
         env:
           GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
-          HEAD_REF: '${{ github.event_name == ''pull_request'' && github.event.pull_request.head.ref || github.event.inputs.ref }}'
-          PR_BODY: '${{ github.event_name == ''pull_request'' && github.event.pull_request.body || '''' }}'
+          HEAD_REF: "${{ github.event_name == 'pull_request' && github.event.pull_request.head.ref || github.event.inputs.ref }}"
+          PR_BODY: "${{ github.event_name == 'pull_request' && github.event.pull_request.body || '' }}"
           WORKFLOW_ID: '${{ github.event.inputs.workflow_id }}'
           GITHUB_REPOSITORY_OWNER: '${{ github.repository_owner }}'
           GITHUB_REPOSITORY_NAME: '${{ github.event.repository.name }}'

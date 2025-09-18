@@ -53,8 +53,14 @@ async function main() {
       type: 'boolean',
       default: false,
     })
-    .example('$0 --original-pr 8655 --success --release-version "0.5.4" --channel stable --test', 'Test success comment')
-    .example('$0 --original-pr 8655 --no-success --channel preview --test', 'Test failure comment')
+    .example(
+      '$0 --original-pr 8655 --success --release-version "0.5.4" --channel stable --test',
+      'Test success comment',
+    )
+    .example(
+      '$0 --original-pr 8655 --no-success --channel preview --test',
+      'Test failure comment',
+    )
     .help()
     .alias('help', 'h').argv;
 
@@ -76,10 +82,17 @@ async function main() {
 
   // Get inputs from CLI args or environment
   const originalPr = argv.originalPr || process.env.ORIGINAL_PR;
-  const success = argv.success !== undefined ? argv.success : (process.env.SUCCESS === 'true');
+  const success =
+    argv.success !== undefined ? argv.success : process.env.SUCCESS === 'true';
   const releaseVersion = argv.releaseVersion || process.env.RELEASE_VERSION;
-  const releaseTag = argv.releaseTag || process.env.RELEASE_TAG || (releaseVersion ? `v${releaseVersion}` : null);
-  const npmTag = argv.npmTag || process.env.NPM_TAG || (argv.channel === 'stable' ? 'latest' : 'preview');
+  const releaseTag =
+    argv.releaseTag ||
+    process.env.RELEASE_TAG ||
+    (releaseVersion ? `v${releaseVersion}` : null);
+  const npmTag =
+    argv.npmTag ||
+    process.env.NPM_TAG ||
+    (argv.channel === 'stable' ? 'latest' : 'preview');
   const channel = argv.channel || process.env.CHANNEL || 'stable';
   const dryRun = argv.dryRun || process.env.DRY_RUN === 'true';
   const runId = process.env.GITHUB_RUN_ID || '12345678';
@@ -95,7 +108,9 @@ async function main() {
     return;
   }
 
-  console.log(`Commenting on original PR ${originalPr} with ${success ? 'success' : 'failure'} status`);
+  console.log(
+    `Commenting on original PR ${originalPr} with ${success ? 'success' : 'failure'} status`,
+  );
 
   if (testMode) {
     console.log('\n🧪 TEST MODE - No API calls will be made');
@@ -141,11 +156,15 @@ Another patch release completed while this one was in progress, causing a versio
 - **Channel**: \`${channel}\`
 - **Issue**: Version numbers are no longer sequential due to concurrent releases
 
-**📊 Current State:**${currentReleaseVersion ? `
+**📊 Current State:**${
+      currentReleaseVersion
+        ? `
 - **Latest ${channel} version**: \`${currentPreviousTag?.replace(/^v/, '') || 'unknown'}\`
 - **Next patch should be**: \`${currentReleaseVersion}\`
-- **New release tag**: \`${currentReleaseTag || 'unknown'}\`` : `
-- **Status**: Version information updated since this release started`}
+- **New release tag**: \`${currentReleaseTag || 'unknown'}\``
+        : `
+- **Status**: Version information updated since this release started`
+    }
 
 **🔄 Next Steps:**
 1. **Request a new patch** - The version calculation will now be correct
@@ -186,7 +205,7 @@ Multiple patch releases can't run simultaneously. When they do, the second one i
       owner: repo.owner,
       repo: repo.repo,
       issue_number: parseInt(originalPr),
-      body: commentBody
+      body: commentBody,
     });
 
     console.log(`Successfully commented on PR ${originalPr}`);

@@ -17,7 +17,8 @@ import { hideBin } from 'yargs/helpers';
 async function main() {
   const argv = await yargs(hideBin(process.argv))
     .option('head-ref', {
-      description: 'The hotfix branch name (e.g., hotfix/v0.5.3/preview/cherry-pick-abc1234)',
+      description:
+        'The hotfix branch name (e.g., hotfix/v0.5.3/preview/cherry-pick-abc1234)',
       type: 'string',
       demandOption: !process.env.GITHUB_ACTIONS,
     })
@@ -36,8 +37,14 @@ async function main() {
       type: 'boolean',
       default: false,
     })
-    .example('$0 --head-ref "hotfix/v0.5.3/preview/cherry-pick-abc1234" --test', 'Test channel detection logic')
-    .example('$0 --head-ref "hotfix/v0.5.3/stable/cherry-pick-abc1234" --dry-run', 'Test with GitHub API in dry-run mode')
+    .example(
+      '$0 --head-ref "hotfix/v0.5.3/preview/cherry-pick-abc1234" --test',
+      'Test channel detection logic',
+    )
+    .example(
+      '$0 --head-ref "hotfix/v0.5.3/stable/cherry-pick-abc1234" --dry-run',
+      'Test with GitHub API in dry-run mode',
+    )
     .help()
     .alias('help', 'h').argv;
 
@@ -67,7 +74,9 @@ async function main() {
   const isDryRun = argv.dryRun || body.includes('[DRY RUN]');
 
   if (!headRef) {
-    throw new Error('head-ref is required. Use --head-ref or set HEAD_REF environment variable.');
+    throw new Error(
+      'head-ref is required. Use --head-ref or set HEAD_REF environment variable.',
+    );
   }
 
   console.log(`Processing patch trigger for branch: ${headRef}`);
@@ -89,13 +98,16 @@ async function main() {
 
   // Validate channel
   if (channel !== 'stable' && channel !== 'preview') {
-    throw new Error(`Invalid channel: ${channel}. Must be 'stable' or 'preview'.`);
+    throw new Error(
+      `Invalid channel: ${channel}. Must be 'stable' or 'preview'.`,
+    );
   }
 
   const releaseRef = `release/${version}`;
-  const workflowId = context.eventName === 'pull_request'
-    ? 'release-patch-3-release.yml'
-    : process.env.WORKFLOW_ID || 'release-patch-3-release.yml';
+  const workflowId =
+    context.eventName === 'pull_request'
+      ? 'release-patch-3-release.yml'
+      : process.env.WORKFLOW_ID || 'release-patch-3-release.yml';
 
   console.log(`Detected channel: ${channel}, version: ${version}`);
   console.log(`Release ref: ${releaseRef}`);
@@ -106,7 +118,9 @@ async function main() {
     console.log('\n🧪 TEST MODE - No API calls will be made');
     console.log('\n📋 Parsed Results:');
     console.log(`  - Branch: ${headRef}`);
-    console.log(`  - Channel: ${channel} → npm tag: ${channel === 'stable' ? 'latest' : 'preview'}`);
+    console.log(
+      `  - Channel: ${channel} → npm tag: ${channel === 'stable' ? 'latest' : 'preview'}`,
+    );
     console.log(`  - Version: ${version}`);
     console.log(`  - Release ref: ${releaseRef}`);
     console.log(`  - Workflow: ${workflowId}`);
@@ -156,15 +170,15 @@ async function main() {
         type: channel,
         dry_run: isDryRun.toString(),
         release_ref: releaseRef,
-        original_pr: originalPr ? originalPr.toString() : ''
-      }
+        original_pr: originalPr ? originalPr.toString() : '',
+      },
     });
   } else {
     console.log('✅ Would trigger workflow with inputs:', {
       type: channel,
       dry_run: isDryRun.toString(),
       release_ref: releaseRef,
-      original_pr: originalPr ? originalPr.toString() : ''
+      original_pr: originalPr ? originalPr.toString() : '',
     });
   }
 
@@ -191,7 +205,7 @@ async function main() {
         owner: context.repo.owner,
         repo: context.repo.repo,
         issue_number: originalPr,
-        body: commentBody
+        body: commentBody,
       });
     } else {
       console.log('✅ Would post comment:', commentBody);
