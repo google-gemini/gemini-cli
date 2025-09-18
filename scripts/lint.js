@@ -48,7 +48,7 @@ const platformArch = getPlatformArch();
  *   check: string;
  *   installer: string;
  *   run: string;
- * }} Linter
+ * }}
  */
 
 /**
@@ -100,7 +100,8 @@ const LINTERS = {
 function runCommand(command, stdio = 'inherit') {
   try {
     const env = { ...process.env };
-    env.PATH = `${TEMP_DIR}/actionlint:${TEMP_DIR}/shellcheck:${env.PATH}`;
+    const nodeBin = join(process.cwd(), 'node_modules', '.bin');
+    env.PATH = `${nodeBin}:${TEMP_DIR}/actionlint:${TEMP_DIR}/shellcheck:${env.PATH}`;
     if (process.platform === 'darwin') {
       env.PATH = `${env.PATH}:${process.env.HOME}/Library/Python/3.12/bin`;
     } else if (process.platform === 'linux') {
@@ -113,7 +114,7 @@ function runCommand(command, stdio = 'inherit') {
   }
 }
 
-function setupLinters() {
+export function setupLinters() {
   console.log('Setting up linters...');
   rmSync(TEMP_DIR, { recursive: true, force: true });
   mkdirSync(TEMP_DIR, { recursive: true });
@@ -133,29 +134,72 @@ function setupLinters() {
   console.log('All required linters are available.');
 }
 
-function runLinters() {
+export function runESLint() {
   console.log('\nRunning ESLint...');
   if (!runCommand('npm run lint:ci')) {
     process.exit(1);
   }
+}
 
+export function runActionlint() {
   console.log('\nRunning actionlint...');
   if (!runCommand(LINTERS.actionlint.run)) {
     process.exit(1);
   }
+}
 
+export function runShellcheck() {
   console.log('\nRunning shellcheck...');
   if (!runCommand(LINTERS.shellcheck.run)) {
     process.exit(1);
   }
+}
 
+export function runYamllint() {
   console.log('\nRunning yamllint...');
   if (!runCommand(LINTERS.yamllint.run)) {
     process.exit(1);
   }
-
-  console.log('\nAll linting checks passed!');
 }
 
-setupLinters();
-runLinters();
+export function runPrettier() {
+  console.log('\nRunning Prettier...');
+  if (!runCommand('prettier --check .')) {
+    process.exit(1);
+  }
+}
+
+function main() {
+  const args = process.argv.slice(2);
+
+  if (args.includes('--setup')) {
+    setupLinters();
+  }
+  if (args.includes('--eslint')) {
+    runESLint();
+  }
+  if (args.includes('--actionlint')) {
+    runActionlint();
+  }
+  if (args.includes('--shellcheck')) {
+    runShellcheck();
+  }
+  if (args.includes('--yamllint')) {
+    runYamllint();
+  }
+  if (args.includes('--prettier')) {
+    runPrettier();
+  }
+
+  if (args.length === 0) {
+    setupLinters();
+    runESLint();
+    runActionlint();
+    runShellcheck();
+    runYamllint();
+    runPrettier();
+    console.log('\nAll linting checks passed!');
+  }
+}
+
+main();
