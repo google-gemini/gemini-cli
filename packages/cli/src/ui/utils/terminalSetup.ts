@@ -288,6 +288,26 @@ async function configureWindsurf(): Promise<TerminalSetupResult> {
 }
 
 /**
+ * Clears the terminal screen in a cross-platform manner.
+ *
+ * This function uses ANSI escape sequences to clear the terminal screen
+ * and move the cursor to the home position. It handles differences between
+ * Windows and Unix-like systems.
+ *
+ * @example
+ * clearTerminal();
+ */
+export function clearTerminal(): void {
+  if (process.platform === 'win32') {
+    // Windows: Clear screen and move cursor to top-left
+    process.stdout.write('\x1b[2J\x1b[0f');
+  } else {
+    // Unix-like systems: Clear screen and move cursor to home
+    process.stdout.write('\x1b[2J\x1b[H');
+  }
+}
+
+/**
  * Main terminal setup function that detects and configures the current terminal.
  *
  * This function:

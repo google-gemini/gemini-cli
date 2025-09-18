@@ -14,6 +14,7 @@ import v8 from 'node:v8';
 import os from 'node:os';
 import dns from 'node:dns';
 import { spawn } from 'node:child_process';
+import { RELAUNCH_EXIT_CODE } from './utils/processUtils.js';
 import { start_sandbox } from './utils/sandbox.js';
 import type { DnsResolutionOrder, LoadedSettings } from './config/settings.js';
 import { RELAUNCH_EXIT_CODE } from './utils/processUtils.js';
@@ -107,50 +108,52 @@ function getNodeMemoryArgs(config: Config): string[] {
   return [];
 }
 
-async function relaunchOnExitCode(runner: () => Promise<number>) {
-  while (true) {
+
+// Constants for restart functionality
+const MAX_RESTARTS = parseInt(process.env['GEMINI_CLI_MAX_RESTARTS'] || '10', 10);
+
+async function relaunchAppInChildProcess(additionalArgs: string[] = []) {
+  let restartCount = 0;
+  
+  while (restartCount < MAX_RESTARTS) {
+
+    const nodeArgs = [...additionalArgs, ...process.argv.slice(1)];
+    const newEnv = { ...process.env, GEMINI_CLI_NO_RELAUNCH: 'true' };
+
     try {
-      const exitCode = await runner();
+      const child = spawn(process.execPath, nodeArgs, {
+        stdio: 'inherit',
+        env: newEnv,
+      });
+
+      const exitCode = await new Promise<number>((resolve, reject) => {
+        child.on('error', reject);
+        child.on('close', (code) => {
+          // A null code indicates an abnormal termination.
+          resolve(code ?? 1);
+        });
+      });
 
       if (exitCode !== RELAUNCH_EXIT_CODE) {
         process.exit(exitCode);
       }
+      // If exitCode === RELAUNCH_EXIT_CODE, continue the loop to relaunch.
+      restartCount++;
+      console.log(`Restarting CLI (attempt ${restartCount}/${MAX_RESTARTS})...`);
     } catch (error) {
-      process.stdin.resume();
+      // This will catch errors from spawn, e.g., if the process cannot be created.
       console.error('Fatal error: Failed to relaunch the CLI process.', error);
+      console.error('Additional args:', additionalArgs);
+      console.error('Node args:', nodeArgs);
       process.exit(1);
     }
   }
-}
+  
+  // If we've exceeded max restarts, exit with error
+  console.error(`Maximum restart attempts (${MAX_RESTARTS}) exceeded. Exiting.`);
+  process.exit(1);
 
-async function relaunchAppInChildProcess(additionalArgs: string[]) {
-  if (process.env['GEMINI_CLI_NO_RELAUNCH']) {
-    return;
-  }
 
-  const runner = () => {
-    const nodeArgs = [...additionalArgs, ...process.argv.slice(1)];
-    const newEnv = { ...process.env, GEMINI_CLI_NO_RELAUNCH: 'true' };
-
-    // The parent process should not be reading from stdin while the child is running.
-    process.stdin.pause();
-
-    const child = spawn(process.execPath, nodeArgs, {
-      stdio: 'inherit',
-      env: newEnv,
-    });
-
-    return new Promise<number>((resolve, reject) => {
-      child.on('error', reject);
-      child.on('close', (code) => {
-        // Resume stdin before the parent process exits.
-        process.stdin.resume();
-        resolve(code ?? 1);
-      });
-    });
-  };
-
-  await relaunchOnExitCode(runner);
 }
 
 import { runZedIntegration } from './zed-integration/zedIntegration.js';
@@ -388,9 +391,12 @@ export async function main() {
       );
       process.exit(0);
     } else {
-      // Relaunch app so we always have a child process that can be internally
-      // restarted if needed.
+
+      // Not in a sandbox and not entering one, so relaunch with additional
+      // arguments to control memory usage if needed.
       await relaunchAppInChildProcess(memoryArgs);
+      // Note: relaunchAppInChildProcess never returns, so this line is unreachable
+
     }
   }
 

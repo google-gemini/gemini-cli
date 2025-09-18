@@ -12,9 +12,10 @@ import { runExitCleanup } from './cleanup.js';
 export const RELAUNCH_EXIT_CODE = 42;
 
 /**
- * Exits the process with a special code to signal that the parent process should relaunch it.
+
+ * Relaunches the application by exiting with a special code.
  */
-export async function relaunchApp(): Promise<void> {
-  await runExitCleanup();
+export function relaunchApp(): void {
+
   process.exit(RELAUNCH_EXIT_CODE);
 }

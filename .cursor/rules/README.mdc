@@ -1,0 +1,200 @@
+---
+alwaysApply: true
+description: Master index of all Cursor rules for this project
+---
+
+# Gemini CLI Cursor Rules Index
+
+This directory contains comprehensive Cursor rules that establish best practices, patterns, and guidelines for the Gemini CLI codebase. These rules are designed to ensure consistency, maintainability, and high code quality across all development activities.
+
+## 📋 Available Rules
+
+### 🔄 [Restart Functionality](mdc:restart-functionality.mdc)
+**Purpose**: Best practices for implementing restart functionality and preventing infinite loops
+**Applies to**: `packages/cli/src/**/*.ts`
+**Key Topics**:
+- Restart counter implementation
+- Exit code management
+- Graceful degradation
+- Configuration options
+- Testing requirements
+
+### 🖥️ [Terminal Utilities](mdc:terminal-utilities.mdc)
+**Purpose**: Guidelines for terminal operations and cross-platform compatibility
+**Applies to**: `packages/cli/src/**/*.ts`, `packages/cli/src/**/*.tsx`
+**Key Topics**:
+- Shared terminal utilities
+- Cross-platform terminal clearing
+- ANSI escape sequences
+- Terminal detection
+- Testing terminal operations
+
+### 🚨 [Error Handling Patterns](mdc:error-handling-patterns.mdc)
+**Purpose**: Comprehensive error handling patterns and best practices
+**Applies to**: `packages/cli/src/**/*.ts`, `packages/cli/src/**/*.tsx`
+**Key Topics**:
+- Structured error handling
+- Graceful degradation
+- Appropriate exit codes
+- Async error handling
+- Logging best practices
+- Custom error classes
+
+### 🌐 [Cross-Platform Compatibility](mdc:cross-platform-compatibility.mdc)
+**Purpose**: Guidelines for cross-platform development and compatibility
+**Applies to**: `packages/cli/src/**/*.ts`, `packages/cli/src/**/*.tsx`
+**Key Topics**:
+- Platform detection
+- File permissions
+- Terminal commands
+- File system operations
+- Process signals
+- Environment variables
+- Testing cross-platform code
+
+### 🧪 [Testing Best Practices](mdc:testing-best-practices.mdc)
+**Purpose**: Comprehensive testing guidelines and patterns
+**Applies to**: `packages/*/src/**/*.test.ts`, `packages/*/src/**/*.test.tsx`
+**Key Topics**:
+- Test behavior vs implementation
+- AAA (Arrange-Act-Assert) pattern
+- Mocking strategies
+- Async testing
+- Integration testing
+- Performance testing
+- Test utilities and helpers
+
+### ⚙️ [Configuration Management](mdc:configuration-management.mdc)
+**Purpose**: Best practices for configuration management and environment handling
+**Applies to**: `packages/cli/src/**/*.ts`, `packages/cli/src/**/*.tsx`
+**Key Topics**:
+- Hierarchical configuration
+- Configuration validation
+- Environment-specific configs
+- Environment variables
+- Configuration files
+- Secret management
+- CLI arguments
+- Configuration testing
+
+## 🎯 Rule Categories
+
+### **Always Applied Rules**
+- `README.mdc` - This index file (always available for reference)
+
+### **Contextual Rules**
+All other rules are contextual and will be suggested based on:
+- File patterns (globs)
+- Manual activation via description search
+- Specific file types or directories
+
+## 🔍 How to Use These Rules
+
+### **Automatic Application**
+Rules with `alwaysApply: true` are automatically available in relevant contexts.
+
+### **Manual Activation**
+Search for rules by their description when you need specific guidance:
+- "restart functionality" → Shows restart patterns
+- "terminal utilities" → Shows terminal handling best practices
+- "error handling" → Shows error management patterns
+- "cross-platform" → Shows platform compatibility guidelines
+- "testing best practices" → Shows comprehensive testing guidance
+- "configuration management" → Shows config handling patterns
+
+### **File-Specific Rules**
+Rules with glob patterns automatically apply when working in matching files:
+- `packages/cli/src/**/*.ts` → All TypeScript files in CLI package
+- `packages/*/src/**/*.test.ts` → All test files across packages
+
+## 📚 Rule Structure
+
+Each rule follows a consistent structure:
+
+1. **Purpose Statement** - Clear description of what the rule covers
+2. **Core Principles** - Fundamental guidelines and patterns
+3. **Code Examples** - ✅ Good patterns and ❌ anti-patterns
+4. **Testing Guidance** - How to test implementations
+5. **Related Files** - Links to relevant codebase files
+
+## 🚀 Best Practices Established
+
+These rules establish comprehensive best practices for:
+
+### **Code Quality**
+- Consistent error handling patterns
+- Proper separation of concerns
+- Cross-platform compatibility
+- Type safety and validation
+
+### **Testing Strategy**
+- Behavior-focused testing
+- Comprehensive mock strategies
+- Integration and E2E testing patterns
+- Performance and reliability testing
+
+### **Configuration Management**
+- Hierarchical configuration loading
+- Environment-specific handling
+- Secure secret management
+- Configuration validation and documentation
+
+### **Terminal & System Integration**
+- Cross-platform terminal operations
+- Proper signal handling
+- File system operations
+- Process management
+
+### **Restart & Recovery**
+- Safe restart mechanisms
+- Resource cleanup
+- Graceful degradation
+- Recovery patterns
+
+## 🔧 Implementation Notes
+
+### **Rule Priority**
+When multiple rules apply to the same code:
+1. **Specific rules** take precedence over general rules
+2. **Security rules** take precedence over performance rules
+3. **Error handling** takes precedence over convenience
+
+### **Rule Updates**
+Rules should be updated when:
+- New patterns emerge in the codebase
+- Best practices evolve
+- New requirements are identified
+- Code review feedback suggests improvements
+
+### **Rule Validation**
+Rules are validated against:
+- Existing codebase patterns
+- Industry best practices
+- Performance requirements
+- Security standards
+- Testing coverage goals
+
+## 📖 Contributing to Rules
+
+When adding new rules or updating existing ones:
+
+1. **Follow the established format** - Use the same structure as existing rules
+2. **Include comprehensive examples** - Show both good and bad patterns
+3. **Add testing guidance** - Include how to test rule implementations
+4. **Link to related files** - Reference actual codebase files where applicable
+5. **Document rationale** - Explain why patterns are recommended
+
+## 🎯 Quick Reference
+
+| Concern | Rule to Use | Key Pattern |
+|---------|-------------|-------------|
+| Restart Logic | Restart Functionality | `MAX_RESTARTS` counter |
+| Terminal Ops | Terminal Utilities | `clearTerminal()` utility |
+| Error Handling | Error Handling Patterns | Structured try/catch with exit codes |
+| Cross-Platform | Cross-Platform Compatibility | `process.platform` checks |
+| Testing | Testing Best Practices | AAA pattern with mocks |
+| Configuration | Configuration Management | Hierarchical loading with validation |
+
+---
+
+**Remember**: These rules are living guidelines that should evolve with your codebase. Use them as a foundation for consistent, maintainable, and high-quality code development.

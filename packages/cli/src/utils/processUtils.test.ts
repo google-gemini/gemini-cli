@@ -4,19 +4,33 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+
+// Mock process.exit to throw instead of actually exiting
+const originalExit = process.exit;
+beforeEach(() => {
+  process.exit = vi.fn((code?: number | string) => {
+    throw new Error(`process.exit(${code}) called`);
+  });
+});
+
+afterEach(() => {
+  process.exit = originalExit;
+});
+
 import { RELAUNCH_EXIT_CODE, relaunchApp } from './processUtils.js';
-import * as cleanup from './cleanup.js';
 
 describe('processUtils', () => {
-  const processExit = vi
-    .spyOn(process, 'exit')
-    .mockReturnValue(undefined as never);
-  const runExitCleanup = vi.spyOn(cleanup, 'runExitCleanup');
+  describe('RELAUNCH_EXIT_CODE', () => {
+    it('should have the correct exit code value', () => {
+      expect(RELAUNCH_EXIT_CODE).toBe(42);
+    });
+  });
 
-  it('should run cleanup and exit with the relaunch code', async () => {
-    await relaunchApp();
-    expect(runExitCleanup).toHaveBeenCalledTimes(1);
-    expect(processExit).toHaveBeenCalledWith(RELAUNCH_EXIT_CODE);
+  describe('relaunchApp', () => {
+    it('should exit with RELAUNCH_EXIT_CODE', () => {
+      expect(() => relaunchApp()).toThrow('process.exit(42) called');
+    });
+
   });
 });

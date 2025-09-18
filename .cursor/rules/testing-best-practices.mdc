@@ -1,0 +1,463 @@
+---
+alwaysApply: false
+description: Comprehensive testing guidelines and patterns
+globs: packages/*/src/**/*.test.ts,packages/*/src/**/*.test.tsx
+---
+
+# Testing Best Practices and Patterns
+
+## Core Principles
+
+### 1. Test Behavior, Not Implementation
+**Why**: Tests should be resilient to refactoring and focus on what the code does, not how it does it.
+
+**Pattern**:
+```typescript
+// ✅ GOOD: Test behavior and outcomes
+describe('UserAuthentication', () => {
+  it('should allow valid login credentials', async () => {
+    const result = await authenticateUser('valid@example.com', 'password123');
+    expect(result.success).toBe(true);
+    expect(result.user).toHaveProperty('id');
+    expect(result.token).toBeDefined();
+  });
+
+  it('should reject invalid credentials', async () => {
+    const result = await authenticateUser('invalid@example.com', 'wrong');
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('Invalid credentials');
+  });
+});
+
+// ❌ AVOID: Testing implementation details
+it('should call database with correct SQL query', () => {
+  const spy = vi.spyOn(database, 'query');
+  authenticateUser('user@example.com', 'password');
+  expect(spy).toHaveBeenCalledWith('SELECT * FROM users WHERE email = ?');
+});
+```
+
+### 2. Use Descriptive Test Names
+**Why**: Test names should clearly communicate what behavior is being tested.
+
+**Pattern**:
+```typescript
+// ✅ GOOD: Clear, descriptive test names
+describe('Password Reset Flow', () => {
+  it('should send reset email to valid user email', async () => {
+    // Test implementation
+  });
+
+  it('should not send reset email to non-existent user', async () => {
+    // Test implementation
+  });
+
+  it('should expire reset token after 24 hours', async () => {
+    // Test implementation
+  });
+
+  it('should prevent reuse of reset token after successful reset', async () => {
+    // Test implementation
+  });
+});
+
+// ❌ AVOID: Vague or implementation-focused names
+it('should work', () => {});
+it('should call sendEmail', () => {});
+it('should return true', () => {});
+```
+
+### 3. Structure Tests with AAA Pattern
+**Why**: Clear test structure improves readability and maintainability.
+
+**Pattern**:
+```typescript
+// ✅ GOOD: Arrange-Act-Assert pattern
+it('should calculate total price with tax', () => {
+  // Arrange: Set up test data and mocks
+  const items = [
+    { price: 10, quantity: 2 },
+    { price: 5, quantity: 1 }
+  ];
+  const taxRate = 0.08;
+  const calculator = new PriceCalculator(taxRate);
+
+  // Act: Execute the code under test
+  const result = calculator.calculateTotal(items);
+
+  // Assert: Verify the expected outcome
+  expect(result.subtotal).toBe(25);
+  expect(result.tax).toBe(2);
+  expect(result.total).toBe(27);
+});
+```
+
+## Mocking and Test Isolation
+
+### Comprehensive Mocking Strategy
+```typescript
+// ✅ GOOD: Proper mocking setup
+describe('API Client', () => {
+  let mockFetch: vi.MockedFunction<typeof fetch>;
+
+  beforeEach(() => {
+    mockFetch = vi.fn();
+    vi.stubGlobal('fetch', mockFetch);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('should handle successful API responses', async () => {
+    // Arrange
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve({ data: 'test' })
+    });
+
+    // Act
+    const result = await apiClient.getData();
+
+    // Assert
+    expect(result).toEqual({ data: 'test' });
+    expect(mockFetch).toHaveBeenCalledWith('/api/data');
+  });
+
+  it('should retry on network failures', async () => {
+    // Arrange
+    mockFetch
+      .mockRejectedValueOnce(new Error('Network error'))
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ data: 'retry success' })
+      });
+
+    // Act
+    const result = await apiClient.getData();
+
+    // Assert
+    expect(result).toEqual({ data: 'retry success' });
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+  });
+});
+```
+
+### Environment and Dependency Mocking
+```typescript
+// ✅ GOOD: Mock external dependencies
+vi.mock('../utils/fileSystem', () => ({
+  readFile: vi.fn(),
+  writeFile: vi.fn(),
+  exists: vi.fn()
+}));
+
+vi.mock('../utils/network', () => ({
+  httpGet: vi.fn(),
+  httpPost: vi.fn()
+}));
+```
+
+## Test Organization and Coverage
+
+### Test File Structure
+```typescript
+// ✅ GOOD: Organized test file structure
+describe('UserService', () => {
+  describe('User Creation', () => {
+    it('should create user with valid data', () => {});
+    it('should validate email format', () => {});
+    it('should hash password before storage', () => {});
+    it('should prevent duplicate email registration', () => {});
+  });
+
+  describe('User Authentication', () => {
+    it('should authenticate valid credentials', () => {});
+    it('should reject invalid password', () => {});
+    it('should handle non-existent user', () => {});
+    it('should lock account after failed attempts', () => {});
+  });
+
+  describe('Password Management', () => {
+    it('should update password with valid current password', () => {});
+    it('should reject password update with wrong current password', () => {});
+    it('should enforce password complexity requirements', () => {});
+  });
+});
+```
+
+### Edge Case and Error Testing
+```typescript
+// ✅ GOOD: Comprehensive edge case coverage
+describe('Data Validation', () => {
+  describe('Email Validation', () => {
+    const validEmails = [
+      'user@example.com',
+      'user.name+tag@example.co.uk',
+      'user@localhost'
+    ];
+
+    const invalidEmails = [
+      '',
+      'invalid',
+      '@example.com',
+      'user@',
+      'user@@example.com'
+    ];
+
+    it.each(validEmails)('should accept valid email: %s', (email) => {
+      expect(validateEmail(email)).toBe(true);
+    });
+
+    it.each(invalidEmails)('should reject invalid email: %s', (email) => {
+      expect(validateEmail(email)).toBe(false);
+    });
+  });
+
+  describe('Error Conditions', () => {
+    it('should handle null input gracefully', () => {
+      expect(() => validateEmail(null)).not.toThrow();
+      expect(validateEmail(null)).toBe(false);
+    });
+
+    it('should handle undefined input gracefully', () => {
+      expect(() => validateEmail(undefined)).not.toThrow();
+      expect(validateEmail(undefined)).toBe(false);
+    });
+
+    it('should handle extremely long input', () => {
+      const longEmail = 'a'.repeat(1000) + '@example.com';
+      expect(validateEmail(longEmail)).toBe(false);
+    });
+  });
+});
+```
+
+## Async Testing Patterns
+
+### Promise and Async/Await Testing
+```typescript
+// ✅ GOOD: Proper async testing
+it('should resolve with correct data', async () => {
+  const result = await fetchUserData(userId);
+  expect(result).toHaveProperty('id', userId);
+  expect(result).toHaveProperty('name');
+});
+
+it('should reject with appropriate error', async () => {
+  await expect(fetchUserData(invalidId)).rejects.toThrow('User not found');
+});
+
+// ✅ GOOD: Testing timeouts
+it('should complete within timeout', async () => {
+  const startTime = Date.now();
+  await performLongOperation();
+  const duration = Date.now() - startTime;
+  expect(duration).toBeLessThan(5000); // 5 seconds
+});
+```
+
+### Timer and Scheduling Testing
+```typescript
+// ✅ GOOD: Testing setTimeout/setInterval
+it('should execute callback after delay', async () => {
+  vi.useFakeTimers();
+  const callback = vi.fn();
+
+  startDelayedOperation(callback);
+
+  expect(callback).not.toHaveBeenCalled();
+
+  vi.advanceTimersByTime(1000);
+
+  expect(callback).toHaveBeenCalledTimes(1);
+
+  vi.useRealTimers();
+});
+```
+
+## Integration and E2E Testing
+
+### API Integration Testing
+```typescript
+// ✅ GOOD: API integration test structure
+describe('User API Integration', () => {
+  let server: Server;
+  let baseUrl: string;
+
+  beforeAll(async () => {
+    server = await startTestServer();
+    baseUrl = server.url;
+  });
+
+  afterAll(async () => {
+    await server.close();
+  });
+
+  beforeEach(() => {
+    // Reset database or mock data
+  });
+
+  it('should create and retrieve user', async () => {
+    // Create user
+    const createResponse = await fetch(`${baseUrl}/users`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'John Doe', email: 'john@example.com' })
+    });
+
+    expect(createResponse.status).toBe(201);
+    const createdUser = await createResponse.json();
+
+    // Retrieve user
+    const getResponse = await fetch(`${baseUrl}/users/${createdUser.id}`);
+    expect(getResponse.status).toBe(200);
+    const retrievedUser = await getResponse.json();
+
+    expect(retrievedUser.name).toBe('John Doe');
+    expect(retrievedUser.email).toBe('john@example.com');
+  });
+});
+```
+
+## Test Utilities and Helpers
+
+### Custom Test Matchers
+```typescript
+// ✅ GOOD: Custom matchers for common assertions
+expect.extend({
+  toBeValidUUID(received) {
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    const pass = uuidRegex.test(received);
+
+    return {
+      message: () => `expected ${received} to be a valid UUID`,
+      pass
+    };
+  },
+
+  toBeValidEmail(received) {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const pass = emailRegex.test(received);
+
+    return {
+      message: () => `expected ${received} to be a valid email`,
+      pass
+    };
+  }
+});
+
+// Usage
+expect(user.id).toBeValidUUID();
+expect(user.email).toBeValidEmail();
+```
+
+### Test Data Factories
+```typescript
+// ✅ GOOD: Test data factories
+function createTestUser(overrides: Partial<User> = {}): User {
+  return {
+    id: faker.string.uuid(),
+    name: faker.person.fullName(),
+    email: faker.internet.email(),
+    createdAt: new Date(),
+    ...overrides
+  };
+}
+
+function createTestPost(overrides: Partial<Post> = {}): Post {
+  return {
+    id: faker.string.uuid(),
+    title: faker.lorem.sentence(),
+    content: faker.lorem.paragraphs(),
+    authorId: faker.string.uuid(),
+    createdAt: new Date(),
+    ...overrides
+  };
+}
+
+// Usage
+const user = createTestUser({ name: 'Test User' });
+const post = createTestPost({ authorId: user.id });
+```
+
+## Performance and Reliability Testing
+
+### Load Testing Patterns
+```typescript
+// ✅ GOOD: Basic load testing
+it('should handle multiple concurrent requests', async () => {
+  const numberOfRequests = 100;
+  const promises = Array.from({ length: numberOfRequests }, () =>
+    apiClient.getData()
+  );
+
+  const startTime = Date.now();
+  const results = await Promise.all(promises);
+  const duration = Date.now() - startTime;
+
+  expect(results).toHaveLength(numberOfRequests);
+  expect(duration).toBeLessThan(5000); // Complete within 5 seconds
+});
+```
+
+### Memory Leak Testing
+```typescript
+// ✅ GOOD: Memory leak detection
+describe('Memory Management', () => {
+  it('should not have memory leaks during repeated operations', async () => {
+    const initialMemory = process.memoryUsage().heapUsed;
+
+    // Perform operation multiple times
+    for (let i = 0; i < 1000; i++) {
+      await performOperation();
+    }
+
+    const finalMemory = process.memoryUsage().heapUsed;
+    const memoryIncrease = finalMemory - initialMemory;
+
+    // Allow some memory increase but not excessive
+    expect(memoryIncrease).toBeLessThan(10 * 1024 * 1024); // 10MB
+  });
+});
+```
+
+## Test Configuration and Setup
+
+### Global Test Setup
+```typescript
+// ✅ GOOD: Comprehensive test setup
+// vitest.config.ts or jest.config.js
+export default {
+  test: {
+    globals: true,
+    environment: 'node',
+    setupFiles: ['./test/setup.ts'],
+    globalSetup: './test/globalSetup.ts'
+  }
+};
+
+// test/setup.ts
+import { beforeAll, afterAll, beforeEach, afterEach } from 'vitest';
+
+beforeAll(() => {
+  // Global setup
+});
+
+afterAll(() => {
+  // Global cleanup
+});
+
+beforeEach(() => {
+  // Per-test setup
+  vi.clearAllMocks();
+});
+
+afterEach(() => {
+  // Per-test cleanup
+});
+```
+
+## Related Files
+- [packages/cli/src/integration/restart.test.ts](mdc:packages/cli/src/integration/restart.test.ts)
+- [packages/cli/src/ui/components/FolderTrustDialog.test.tsx](mdc:packages/cli/src/ui/components/FolderTrustDialog.test.tsx)

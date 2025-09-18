@@ -39,6 +39,29 @@ export const bugCommand: SlashCommand = {
     const memoryUsage = formatMemoryUsage(process.memoryUsage().rss);
     const ideClient = await getIdeClientName(context);
 
+    // Attempt to include last prompt and response (if available)
+    let lastPrompt = '';
+    let lastResponse = '';
+    try {
+      const history = context.services.config?.getGeminiClient()?.getHistory();
+      if (history && history.length > 0) {
+        const last = history[history.length - 1];
+        const prev = history.length > 1 ? history[history.length - 2] : null;
+        const extractText = (parts?: Array<{ text?: string }>) =>
+          (parts || [])
+            .map((p) => (typeof p?.text === 'string' ? p.text : ''))
+            .join('');
+        if (last?.role === 'model') {
+          lastResponse = extractText(last.parts as unknown as Array<{ text?: string }>);
+          if (prev?.role === 'user') lastPrompt = extractText(prev.parts as unknown as Array<{ text?: string }>);
+        } else if (last?.role === 'user') {
+          lastPrompt = extractText(last.parts as unknown as Array<{ text?: string }>);
+        }
+      }
+    } catch (_) {
+      // best-effort only
+    }
+
     let info = `
 * **CLI Version:** ${cliVersion}
 * **Git Commit:** ${GIT_COMMIT_INFO}
@@ -50,6 +73,12 @@ export const bugCommand: SlashCommand = {
 `;
     if (ideClient) {
       info += `* **IDE Client:** ${ideClient}\n`;
+    }
+    if (lastPrompt) {
+      info += `* **Last Prompt:**\n\n${lastPrompt}\n\n`;
+    }
+    if (lastResponse) {
+      info += `* **Last Response:**\n\n${lastResponse}\n`;
     }
 
     let bugReportUrl =

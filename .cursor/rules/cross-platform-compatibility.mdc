@@ -1,0 +1,328 @@
+---
+alwaysApply: false
+description: Guidelines for cross-platform development and compatibility
+globs: packages/cli/src/**/*.ts,packages/cli/src/**/*.tsx
+---
+
+# Cross-Platform Compatibility Guidelines
+
+## Core Principles
+
+### 1. Always Use Platform Detection
+**Why**: Windows, macOS, and Linux have different file systems, path separators, and system APIs.
+
+**Pattern**:
+```typescript
+// ✅ GOOD: Platform-aware path handling
+import * as path from 'node:path';
+import * as os from 'node:os';
+
+const configPath = process.platform === 'win32'
+  ? path.join(process.env.APPDATA || '', 'AppName', 'config.json')
+  : path.join(os.homedir(), '.config', 'appname', 'config.json');
+
+// ✅ GOOD: Platform-aware executable detection
+const executableName = process.platform === 'win32'
+  ? 'command.exe'
+  : 'command';
+
+// ✅ GOOD: Platform-aware environment variables
+const pathSeparator = process.platform === 'win32' ? ';' : ':';
+const pathVar = process.env.PATH?.split(pathSeparator) || [];
+```
+
+### 2. Handle File Permissions Differently
+**Why**: Permission models vary significantly between platforms.
+
+**Pattern**:
+```typescript
+// ✅ GOOD: Cross-platform permission handling
+async function ensureDirectoryExists(dirPath: string): Promise<void> {
+  try {
+    await fs.mkdir(dirPath, { recursive: true });
+
+    // Set appropriate permissions based on platform
+    if (process.platform !== 'win32') {
+      await fs.chmod(dirPath, 0o755); // rwxr-xr-x
+    }
+  } catch (error) {
+    if (error.code === 'EEXIST') {
+      // Directory already exists, check permissions
+      const stats = await fs.stat(dirPath);
+      if (process.platform !== 'win32' && !(stats.mode & 0o755)) {
+        await fs.chmod(dirPath, 0o755);
+      }
+    } else {
+      throw error;
+    }
+  }
+}
+```
+
+### 3. Use Platform-Specific Terminal Commands
+**Why**: Terminal commands and capabilities differ between platforms.
+
+**Pattern**:
+```typescript
+// ✅ GOOD: Platform-aware terminal commands
+export function getPlatformClearCommand(): string {
+  switch (process.platform) {
+    case 'win32':
+      return 'cls';
+    case 'darwin':
+    case 'linux':
+    default:
+      return 'clear';
+  }
+}
+
+// ✅ GOOD: Platform-aware process spawning
+const spawnOptions = {
+  stdio: 'inherit',
+  shell: process.platform === 'win32',
+  env: {
+    ...process.env,
+    // Platform-specific environment variables
+    ...(process.platform === 'win32' && {
+      FORCE_COLOR: '1' // Enable colors in Windows
+    })
+  }
+};
+```
+
+## File System Operations
+
+### Path Normalization
+```typescript
+// ✅ GOOD: Always normalize paths
+export function normalizePath(filePath: string): string {
+  // Convert Windows backslashes to forward slashes for internal use
+  const normalized = path.normalize(filePath);
+
+  // Ensure consistent path separators for cross-platform compatibility
+  if (process.platform === 'win32') {
+    return normalized.replace(/\\/g, '/');
+  }
+
+  return normalized;
+}
+
+// ✅ GOOD: Safe path joining
+export function safeJoinPath(...segments: string[]): string {
+  // Filter out empty segments and normalize
+  const validSegments = segments.filter(segment => segment && segment.trim());
+  const joined = path.join(...validSegments);
+
+  // Ensure the path is absolute and normalized
+  return path.resolve(joined);
+}
+```
+
+### File Watching Compatibility
+```typescript
+// ✅ GOOD: Cross-platform file watching
+import { watch } from 'node:fs/promises';
+
+export async function watchFileCrossPlatform(
+  filePath: string,
+  callback: (event: string) => void
+): Promise<() => void> {
+  try {
+    const watcher = watch(filePath, { persistent: false });
+
+    for await (const event of watcher) {
+      // Normalize event types across platforms
+      const normalizedEvent = event.eventType === 'change' ? 'modify' : event.eventType;
+      callback(normalizedEvent);
+    }
+  } catch (error) {
+    if (process.platform === 'win32') {
+      // Fallback for Windows file watching issues
+      console.warn('File watching may be unreliable on Windows:', error);
+    }
+    throw error;
+  }
+
+  // Return cleanup function
+  return () => {
+    // Cleanup logic here
+  };
+}
+```
+
+## Process and Signal Handling
+
+### Signal Compatibility
+```typescript
+// ✅ GOOD: Cross-platform signal handling
+const SIGNALS = {
+  SIGINT: 'SIGINT',
+  SIGTERM: 'SIGTERM',
+  ...(process.platform === 'win32' && {
+    // Windows doesn't support SIGUSR1/SIGUSR2
+    SIGHUP: 'SIGHUP'
+  })
+};
+
+export function setupSignalHandlers(): void {
+  Object.values(SIGNALS).forEach(signal => {
+    process.on(signal, () => {
+      console.log(`Received ${signal}, shutting down gracefully...`);
+      cleanupAndExit();
+    });
+  });
+}
+```
+
+### Child Process Management
+```typescript
+// ✅ GOOD: Cross-platform child process spawning
+export async function spawnCrossPlatform(
+  command: string,
+  args: string[] = [],
+  options: SpawnOptions = {}
+): Promise<ChildProcess> {
+  const spawnOptions: SpawnOptions = {
+    stdio: 'inherit',
+    shell: process.platform === 'win32', // Use shell on Windows
+    env: {
+      ...process.env,
+      // Ensure consistent environment
+      FORCE_COLOR: process.env.FORCE_COLOR || '1'
+    },
+    ...options
+  };
+
+  // Handle Windows executable extensions
+  const finalCommand = process.platform === 'win32' && !command.includes('.exe')
+    ? `${command}.exe`
+    : command;
+
+  return spawn(finalCommand, args, spawnOptions);
+}
+```
+
+## Environment and Configuration
+
+### Environment Variable Handling
+```typescript
+// ✅ GOOD: Cross-platform environment variables
+export function getEnvironmentVariable(name: string): string | undefined {
+  // Handle case sensitivity on Windows
+  if (process.platform === 'win32') {
+    // Windows environment variables are case-insensitive
+    const upperName = name.toUpperCase();
+    return process.env[upperName] || process.env[name];
+  }
+
+  return process.env[name];
+}
+
+// ✅ GOOD: Path environment variable handling
+export function getPathArray(): string[] {
+  const pathVar = process.env.PATH || process.env.Path || '';
+  const separator = process.platform === 'win32' ? ';' : ':';
+  return pathVar.split(separator).filter(p => p.trim());
+}
+```
+
+## Testing Cross-Platform Code
+
+### Platform-Specific Tests
+```typescript
+// ✅ GOOD: Platform-specific test conditions
+describe('Cross-Platform Compatibility', () => {
+  describe('when on Windows', () => {
+    beforeEach(() => {
+      vi.stubGlobal('process', {
+        ...process,
+        platform: 'win32'
+      });
+    });
+
+    it('should use Windows path separators', () => {
+      const path = normalizePath('C:\\Users\\test\\file.txt');
+      expect(path).toBe('C:/Users/test/file.txt');
+    });
+  });
+
+  describe('when on Unix-like systems', () => {
+    beforeEach(() => {
+      vi.stubGlobal('process', {
+        ...process,
+        platform: 'linux'
+      });
+    });
+
+    it('should preserve Unix path separators', () => {
+      const path = normalizePath('/home/user/file.txt');
+      expect(path).toBe('/home/user/file.txt');
+    });
+  });
+});
+```
+
+### Mocking Platform Differences
+```typescript
+// ✅ GOOD: Mock platform for testing
+const mockWindowsPlatform = {
+  process: {
+    ...process,
+    platform: 'win32' as NodeJS.Platform,
+    env: {
+      APPDATA: 'C:\\Users\\Test\\AppData\\Roaming',
+      ...process.env
+    }
+  },
+  os: {
+    homedir: () => 'C:\\Users\\Test'
+  }
+};
+
+const mockUnixPlatform = {
+  process: {
+    ...process,
+    platform: 'linux' as NodeJS.Platform,
+    env: {
+      HOME: '/home/test',
+      ...process.env
+    }
+  },
+  os: {
+    homedir: () => '/home/test'
+  }
+};
+```
+
+## Common Pitfalls to Avoid
+
+### ❌ Windows Path Issues
+```typescript
+// DON'T: Assume forward slashes work everywhere
+const badPath = 'C:/Users/file.txt'; // Breaks on Windows with some APIs
+
+// DON'T: Hardcode backslashes
+const badPath2 = 'C:\\Users\\file.txt'; // Breaks on Unix systems
+```
+
+### ❌ Environment Variable Case Sensitivity
+```typescript
+// DON'T: Assume case sensitivity
+const badEnv = process.env.USERNAME; // Undefined on Windows (use USERNAME)
+
+// DON'T: Use Unix-only variables on Windows
+const badEnv2 = process.env.HOME; // May be undefined on Windows
+```
+
+### ❌ Signal Differences
+```typescript
+// DON'T: Use Unix-only signals on Windows
+process.on('SIGUSR1', handler); // Not available on Windows
+
+// DON'T: Assume signal behavior is identical
+process.on('SIGHUP', handler); // Different behavior across platforms
+```
+
+## Related Files
+- [packages/cli/src/ui/utils/terminalSetup.ts](mdc:packages/cli/src/ui/utils/terminalSetup.ts)
+- [packages/cli/src/utils/processUtils.ts](mdc:packages/cli/src/utils/processUtils.ts)

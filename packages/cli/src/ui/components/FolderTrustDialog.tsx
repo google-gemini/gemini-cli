@@ -13,6 +13,8 @@ import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
 import { useKeypress } from '../hooks/useKeypress.js';
 import * as process from 'node:process';
 import * as path from 'node:path';
+
+import { clearTerminal } from '../utils/terminalSetup.js';
 import { relaunchApp } from '../../utils/processUtils.js';
 
 export enum FolderTrustChoice {
@@ -49,6 +51,20 @@ export const FolderTrustDialog: React.FC<FolderTrustDialogProps> = ({
     },
     { isActive: !isRestarting },
   );
+
+  useEffect(() => {
+    if (isRestarting) {
+      // Clear the terminal and restart after a short delay
+      const timer = setTimeout(() => {
+        // Clear the terminal (cross-platform compatible)
+        clearTerminal();
+        relaunchApp();
+      }, 1000); // 1 second delay to let users read the message
+
+      return () => clearTimeout(timer);
+    }
+    return undefined;
+  }, [isRestarting]);
 
   const dirName = path.basename(process.cwd());
   const parentFolder = path.basename(path.dirname(process.cwd()));
@@ -98,7 +114,9 @@ export const FolderTrustDialog: React.FC<FolderTrustDialogProps> = ({
       {isRestarting && (
         <Box marginLeft={1} marginTop={1}>
           <Text color={theme.status.warning}>
-            Gemini CLI is restarting to apply the trust changes...
+
+            Gemini CLI is restarting to apply changes...
+
           </Text>
         </Box>
       )}

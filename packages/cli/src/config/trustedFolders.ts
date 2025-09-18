@@ -10,7 +10,6 @@ import { homedir } from 'node:os';
 import {
   getErrorMessage,
   isWithinRoot,
-  ideContextStore,
 } from '@google/gemini-cli-core';
 import type { Settings } from './settings.js';
 import stripJsonComments from 'strip-json-comments';
@@ -166,7 +165,13 @@ export function isFolderTrustEnabled(settings: Settings): boolean {
   return folderTrustSetting;
 }
 
-function getWorkspaceTrustFromLocalConfig(): boolean | undefined {
+export function isWorkspaceTrusted(settings: Settings): boolean | undefined {
+  if (!isFolderTrustEnabled(settings)) {
+    // If the folder trust feature isn't explicitly enabled, default behavior is
+    // backward compatible (trusted) unless hardened default is requested via env.
+    // Set GEMINI_SAFE_TRUST_DEFAULT=1 to default to untrusted.
+    return process.env['GEMINI_SAFE_TRUST_DEFAULT'] === '1' ? false : true;
+  }
   const folders = loadTrustedFolders();
 
   if (folders.errors.length > 0) {
@@ -178,18 +183,4 @@ function getWorkspaceTrustFromLocalConfig(): boolean | undefined {
   }
 
   return folders.isPathTrusted(process.cwd());
-}
-
-export function isWorkspaceTrusted(settings: Settings): boolean | undefined {
-  if (!isFolderTrustEnabled(settings)) {
-    return true;
-  }
-
-  const ideTrust = ideContextStore.get()?.workspaceState?.isTrusted;
-  if (ideTrust !== undefined) {
-    return ideTrust;
-  }
-
-  // Fall back to the local user configuration
-  return getWorkspaceTrustFromLocalConfig();
 }
