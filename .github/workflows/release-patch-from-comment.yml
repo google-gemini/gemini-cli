@@ -7,6 +7,8 @@ on:
 jobs:
   slash-command:
     runs-on: 'ubuntu-latest'
+    # Only run if the comment is from a human user (not a bot)
+    if: "!endsWith(github.event.comment.user.login, '[bot]')"
     permissions:
       contents: 'write'
       pull-requests: 'write'
