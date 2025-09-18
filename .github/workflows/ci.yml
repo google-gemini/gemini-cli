@@ -159,11 +159,14 @@ jobs:
       matrix:
         os:
           - 'macos-latest'
-          - 'gemini-cli-windows-16-core'
         node-version:
           - '20.x'
           - '22.x'
           - '24.x'
+        include:
+          # Only test LTS Node.js on Windows for speed
+          - os: 'gemini-cli-windows-16-core'
+            node-version: '20.x'
     steps:
       - name: 'Checkout'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
@@ -173,17 +176,34 @@ jobs:
         with:
           node-version: '${{ matrix.node-version }}'
           cache: 'npm'
+          cache-dependency-path: |
+            package-lock.json
+            packages/*/package-lock.json
+
+      - name: 'Configure npm for Windows performance'
+        if: runner.os == 'Windows'
+        run: |
+          npm config set progress false
+          npm config set audit false
+          npm config set fund false
+          npm config set loglevel error
+          npm config set maxsockets 1
+          npm config set registry https://registry.npmjs.org/
+        shell: pwsh
 
       - name: 'Build project'
         run: 'npm run build'
+        shell: ${{ runner.os == 'Windows' && 'pwsh' || 'bash' }}
 
       - name: 'Install dependencies for testing'
         run: 'npm ci'
+        shell: ${{ runner.os == 'Windows' && 'pwsh' || 'bash' }}
 
       - name: 'Run tests and generate reports'
         env:
           NO_COLOR: true
         run: 'npm run test:ci -- --coverage.enabled=false'
+        shell: ${{ runner.os == 'Windows' && 'pwsh' || 'bash' }}
 
       - name: 'Wait for file system sync'
         run: 'sleep 2'
