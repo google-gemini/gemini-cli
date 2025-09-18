@@ -45,10 +45,11 @@ runs:
         GH_TOKEN: '${{ steps.generate_token.outputs.token }}'
       shell: 'bash'
       run: |
-        gh pr create \
+        set -e
+        PR_URL=$(gh pr create \
           --title "${{ inputs.pr-title }}" \
           --body "${{ inputs.pr-body }}" \
           --base "${{ inputs.base-branch }}" \
           --head "${{ inputs.branch-name }}" \
-          --fill
-        gh pr merge --auto --squash
+          --fill)
+        gh pr merge "$PR_URL" --auto --squash
