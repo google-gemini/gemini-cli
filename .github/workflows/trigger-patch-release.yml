@@ -55,10 +55,11 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               workflow_id: workflow_id,
-              ref: ref,
+              ref: 'mk-patch-releases',
               inputs: {
                 type: channel,
                 dry_run: isDryRun.toString(),
-                version: version
+                version: version,
+                release_ref: ref
               }
             })

@@ -19,33 +19,23 @@ on:
         description: 'The version to release.'
         required: true
         type: 'string'
-      force_skip_tests:
-        description: 'Select to skip the "Run Tests" step in testing. Prod releases should run tests'
-        required: false
-        type: 'boolean'
-        default: false
+      release_ref:
+        description: 'The branch, tag, or SHA to release from.'
+        required: true
+        type: 'string'
 
 jobs:
   release:
     runs-on: 'ubuntu-latest'
-    environment:
-      name: 'production-release'
-      url: '${{ github.server_url }}/${{ github.repository }}/releases/tag/${{ steps.version.outputs.RELEASE_TAG }}'
-    if: |-
-      ${{ github.repository == 'google-gemini/gemini-cli' }}
     permissions:
       contents: 'write'
       packages: 'write'
-      id-token: 'write'
-      issues: 'write' # For creating issues on failure
-    outputs:
-      RELEASE_TAG: '${{ steps.version.outputs.RELEASE_TAG }}'
-
+      issues: 'write'
     steps:
       - name: 'Checkout'
-        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
+        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
         with:
-          ref: '${{ github.event.inputs.ref || github.sha }}'
+          ref: '${{ github.event.inputs.release_ref }}'
           fetch-depth: 0
 
       - name: 'Setup Node.js'
