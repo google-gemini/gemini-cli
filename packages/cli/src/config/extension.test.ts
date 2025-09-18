@@ -708,7 +708,7 @@ describe('extension tests', () => {
       ).resolves.toBe('my-local-extension');
 
       expect(mockQuestion).toHaveBeenCalledWith(
-        expect.stringContaining('Do you want to continue? (y/n)'),
+        expect.stringContaining('Do you want to continue? (Y/n)'),
         expect.any(Function),
       );
     });
@@ -733,7 +733,32 @@ describe('extension tests', () => {
       ).rejects.toThrow('Installation cancelled by user.');
 
       expect(mockQuestion).toHaveBeenCalledWith(
-        expect.stringContaining('Do you want to continue? (y/n)'),
+        expect.stringContaining('Do you want to continue? (Y/n)'),
+        expect.any(Function),
+      );
+    });
+
+    it('should continue installation if user presses Enter (defaults to accept) for local extension with mcp servers', async () => {
+      const sourceExtDir = createExtension({
+        extensionsDir: tempHomeDir,
+        name: 'my-local-extension',
+        version: '1.0.0',
+        mcpServers: {
+          'test-server': {
+            command: 'node',
+            args: ['server.js'],
+          },
+        },
+      });
+
+      mockQuestion.mockImplementation((_query, callback) => callback(''));
+
+      await expect(
+        installExtension({ source: sourceExtDir, type: 'local' }, true),
+      ).resolves.toBe('my-local-extension');
+
+      expect(mockQuestion).toHaveBeenCalledWith(
+        expect.stringContaining('Do you want to continue? (Y/n)'),
         expect.any(Function),
       );
     });
