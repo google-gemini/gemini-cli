@@ -53,9 +53,35 @@ jobs:
       - name: 'Dispatch if Merged'
         if: "steps.pr_status.outputs.STATE == 'MERGED'"
         uses: 'actions/github-script@00f12e3e20659f42342b1c0226afda7f7c042325'
+        env:
+          COMMENT_BODY: '${{ github.event.comment.body }}'
         with:
           script: |
-            const args = ${{ fromJSON(steps.slash_command.outputs.command-arguments || '{}') }};
+            // Parse the comment body directly to extract channel
+            const commentBody = process.env.COMMENT_BODY;
+            console.log('Comment body:', commentBody);
+
+            let channel = 'stable';  // default
+
+            // Parse different formats:
+            // /patch channel=preview
+            // /patch --channel preview
+            // /patch preview
+            if (commentBody.includes('channel=preview')) {
+              channel = 'preview';
+            } else if (commentBody.includes('--channel preview')) {
+              channel = 'preview';
+            } else if (commentBody.trim() === '/patch preview') {
+              channel = 'preview';
+            }
+
+            // Validate channel
+            if (channel !== 'stable' && channel !== 'preview') {
+              throw new Error(`Invalid channel: ${channel}. Must be 'stable' or 'preview'.`);
+            }
+
+            console.log('Detected channel:', channel);
+
             github.rest.actions.createWorkflowDispatch({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -63,8 +89,8 @@ jobs:
               ref: 'main',
               inputs: {
                 commit: '${{ steps.pr_status.outputs.MERGE_COMMIT_SHA }}',
-                channel: args.channel || 'stable',
-                dry_run: args.dry_run || 'false',
+                channel: channel,
+                dry_run: 'false',
                 original_pr: '${{ github.event.issue.number }}'
               }
             })

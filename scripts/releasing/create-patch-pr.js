@@ -46,7 +46,7 @@ async function main() {
   console.log(`Found latest tag for ${channel}: ${latestTag}`);
 
   const releaseBranch = `release/${latestTag}`;
-  const hotfixBranch = `hotfix/${latestTag}/cherry-pick-${commit.substring(0, 7)}`;
+  const hotfixBranch = `hotfix/${latestTag}/${channel}/cherry-pick-${commit.substring(0, 7)}`;
 
   // Create the release branch from the tag if it doesn't exist.
   if (!branchExists(releaseBranch)) {
