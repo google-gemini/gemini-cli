@@ -82,12 +82,18 @@ async function main() {
   if (dryRun) {
     prBody += '\n\n**[DRY RUN]**';
   }
-  run(
-    `gh pr create --base ${releaseBranch} --head ${hotfixBranch} --title "${prTitle}" --body "${prBody}"`,
-    dryRun,
-  );
+  const prCommand = `gh pr create --base ${releaseBranch} --head ${hotfixBranch} --title "${prTitle}" --body "${prBody}"`;
+  run(prCommand, dryRun);
 
   console.log('Patch process completed successfully!');
+
+  if (dryRun) {
+    console.log('\n--- Dry Run Summary ---');
+    console.log(`Release Branch: ${releaseBranch}`);
+    console.log(`Hotfix Branch: ${hotfixBranch}`);
+    console.log(`Pull Request Command: ${prCommand}`);
+    console.log('---------------------');
+  }
 }
 
 function run(command, dryRun = false) {
@@ -116,8 +122,8 @@ function getLatestTag(channel) {
   console.log(`Fetching latest tag for channel: ${channel}...`);
   const pattern =
     channel === 'stable'
-      ? '\'(contains("nightly") or contains("preview")) | not\''
-      : '\'(contains("preview"))\'';
+      ? '(contains("nightly") or contains("preview")) | not'
+      : '(contains("preview"))';
   const command = `gh release list --limit 30 --json tagName | jq -r '[.[] | select(.tagName | ${pattern})] | .[0].tagName'`;
   try {
     return execSync(command).toString().trim();
