@@ -29,6 +29,8 @@ export interface UIActions {
     scope: SettingScope,
   ) => void;
   exitEditorDialog: () => void;
+  handleIdeIntegrationAction: (action: string) => Promise<void>;
+  exitIdeIntegrationDialog: () => void;
   exitPrivacyNotice: () => void;
   closeSettingsDialog: () => void;
   setShellModeActive: (value: boolean) => void;

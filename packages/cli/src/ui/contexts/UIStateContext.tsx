@@ -45,6 +45,7 @@ export interface UIState {
   isAuthDialogOpen: boolean;
   editorError: string | null;
   isEditorDialogOpen: boolean;
+  isIdeIntegrationDialogOpen: boolean;
   showPrivacyNotice: boolean;
   corgiMode: boolean;
   debugMessage: string;

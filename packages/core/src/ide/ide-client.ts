@@ -402,7 +402,7 @@ export class IdeClient {
     this.diffResponses.clear();
     this.setState(
       IDEConnectionStatus.Disconnected,
-      'IDE integration disabled. To enable it again, run /ide enable.',
+      'IDE integration disabled. To enable it again, run /ide integration.',
     );
     this.client?.close();
   }

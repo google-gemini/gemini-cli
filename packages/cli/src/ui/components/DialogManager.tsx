@@ -15,6 +15,7 @@ import { SettingsDialog } from './SettingsDialog.js';
 import { AuthInProgress } from '../auth/AuthInProgress.js';
 import { AuthDialog } from '../auth/AuthDialog.js';
 import { EditorSettingsDialog } from './EditorSettingsDialog.js';
+import { IdeIntegrationDialog } from './IdeIntegrationDialog.js';
 import { PrivacyNotice } from '../privacy/PrivacyNotice.js';
 import { WorkspaceMigrationDialog } from './WorkspaceMigrationDialog.js';
 import { ProQuotaDialog } from './ProQuotaDialog.js';
@@ -174,6 +175,16 @@ export const DialogManager = () => {
           onSelect={uiActions.handleEditorSelect}
           settings={settings}
           onExit={uiActions.exitEditorDialog}
+        />
+      </Box>
+    );
+  }
+  if (uiState.isIdeIntegrationDialogOpen) {
+    return (
+      <Box flexDirection="column">
+        <IdeIntegrationDialog
+          onAction={uiActions.handleIdeIntegrationAction}
+          onExit={uiActions.exitIdeIntegrationDialog}
         />
       </Box>
     );
