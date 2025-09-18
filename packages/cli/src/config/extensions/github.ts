@@ -13,7 +13,6 @@ import * as https from 'node:https';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { execSync } from 'node:child_process';
-import type { K } from 'vitest/dist/chunks/reporters.d.BFLkQcL6.js';
 
 function getGitHubToken(): string | undefined {
   return process.env['GITHUB_TOKEN'];
