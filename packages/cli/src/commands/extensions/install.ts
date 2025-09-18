@@ -5,10 +5,8 @@
  */
 
 import type { CommandModule } from 'yargs';
-import {
-  installExtension,
-  type ExtensionInstallMetadata,
-} from '../../config/extension.js';
+import { installExtension } from '../../config/extension.js';
+import type { ExtensionInstallMetadata } from '@google/gemini-cli-core';
 
 import { getErrorMessage } from '../../utils/errors.js';
 
@@ -27,7 +25,8 @@ export async function handleInstall(args: InstallArgs) {
       if (
         source.startsWith('http://') ||
         source.startsWith('https://') ||
-        source.startsWith('git@')
+        source.startsWith('git@') ||
+        source.startsWith('sso://')
       ) {
         installMetadata = {
           source,
