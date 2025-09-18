@@ -24,6 +24,10 @@ on:
         description: 'The branch, tag, or SHA to release from.'
         required: true
         type: 'string'
+      original_pr:
+        description: 'The original PR number to comment back on.'
+        required: false
+        type: 'string'
 
 jobs:
   release:
@@ -121,3 +125,37 @@ jobs:
             --title 'Patch Release Failed for ${RELEASE_TAG} on $(date +'%Y-%m-%d')' \
             --body 'The patch-release workflow failed. See the full run for details: ${DETAILS_URL}' \
             --label 'kind/bug,release-failure,priority/p0'
+
+      - name: 'Comment Success on Original PR'
+        if: '${{ success() && github.event.inputs.original_pr }}'
+        env:
+          GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+          ORIGINAL_PR: '${{ github.event.inputs.original_pr }}'
+          SUCCESS: 'true'
+          RELEASE_VERSION: '${{ steps.patch_version.outputs.RELEASE_VERSION }}'
+          RELEASE_TAG: '${{ steps.patch_version.outputs.RELEASE_TAG }}'
+          NPM_TAG: '${{ steps.patch_version.outputs.NPM_TAG }}'
+          CHANNEL: '${{ github.event.inputs.type }}'
+          DRY_RUN: '${{ github.event.inputs.dry_run }}'
+          GITHUB_RUN_ID: '${{ github.run_id }}'
+          GITHUB_REPOSITORY_OWNER: '${{ github.repository_owner }}'
+          GITHUB_REPOSITORY_NAME: '${{ github.event.repository.name }}'
+        run: |
+          node scripts/patch-comment.js
+
+      - name: 'Comment Failure on Original PR'
+        if: '${{ failure() && github.event.inputs.original_pr }}'
+        env:
+          GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+          ORIGINAL_PR: '${{ github.event.inputs.original_pr }}'
+          SUCCESS: 'false'
+          RELEASE_VERSION: '${{ steps.patch_version.outputs.RELEASE_VERSION }}'
+          RELEASE_TAG: '${{ steps.patch_version.outputs.RELEASE_TAG }}'
+          NPM_TAG: '${{ steps.patch_version.outputs.NPM_TAG }}'
+          CHANNEL: '${{ github.event.inputs.type }}'
+          DRY_RUN: '${{ github.event.inputs.dry_run }}'
+          GITHUB_RUN_ID: '${{ github.run_id }}'
+          GITHUB_REPOSITORY_OWNER: '${{ github.repository_owner }}'
+          GITHUB_REPOSITORY_NAME: '${{ github.event.repository.name }}'
+        run: |
+          node scripts/patch-comment.js

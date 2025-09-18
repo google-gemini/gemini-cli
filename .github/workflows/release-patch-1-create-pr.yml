@@ -65,20 +65,8 @@ jobs:
           permission-pull-requests: 'write'
           permission-contents: 'write'
 
-      - name: 'Create Patch for Stable'
-        id: 'create_patch_stable'
-        if: "github.event.inputs.channel == 'stable'"
-        env:
-          GH_TOKEN: '${{ steps.generate_token.outputs.token }}'
-        continue-on-error: true
-        run: |
-          node scripts/create-patch-pr.js --commit=${{ github.event.inputs.commit }} --channel=stable --dry-run=${{ github.event.inputs.dry_run }} > patch_output.log 2>&1
-          echo "EXIT_CODE=$?" >> "$GITHUB_OUTPUT"
-          cat patch_output.log
-
-      - name: 'Create Patch for Preview'
-        id: 'create_patch_preview'
-        if: "github.event.inputs.channel != 'stable'"
+      - name: 'Create Patch'
+        id: 'create_patch'
         env:
           GH_TOKEN: '${{ steps.generate_token.outputs.token }}'
         continue-on-error: true
@@ -92,12 +80,8 @@ jobs:
         env:
           GH_TOKEN: '${{ steps.generate_token.outputs.token }}'
         run: |
-          # Determine which step ran based on channel
-          if [ "${{ github.event.inputs.channel }}" = "stable" ]; then
-            EXIT_CODE="${{ steps.create_patch_stable.outputs.EXIT_CODE }}"
-          else
-            EXIT_CODE="${{ steps.create_patch_preview.outputs.EXIT_CODE }}"
-          fi
+          # Get the exit code from the unified create patch step
+          EXIT_CODE="${{ steps.create_patch.outputs.EXIT_CODE }}"
 
           # Check if patch output exists and contains branch info
           if [ -f patch_output.log ]; then
@@ -122,7 +106,21 @@ jobs:
               if [ -n "$PR_INFO" ]; then
                 PR_NUMBER=$(echo "$PR_INFO" | jq -r '.number')
                 PR_URL=$(echo "$PR_INFO" | jq -r '.url')
-                gh pr comment ${{ github.event.inputs.original_pr }} --body "🚀 Patch PR created! The patch release PR has been created: [#$PR_NUMBER]($PR_URL). Please review and approve this PR to complete the patch release."
+                gh pr comment ${{ github.event.inputs.original_pr }} --body "🚀 **Patch PR Created!**
+
+                **📋 Patch Details:**
+                - **Channel**: \`${{ github.event.inputs.channel }}\` → will publish to npm tag \`$([ \"${{ github.event.inputs.channel }}\" = \"stable\" ] && echo \"latest\" || echo \"preview\")\`
+                - **Commit**: \`${{ github.event.inputs.commit }}\`
+                - **Hotfix Branch**: [\`$BRANCH\`](https://github.com/${{ github.repository }}/tree/$BRANCH)
+                - **Hotfix PR**: [#$PR_NUMBER]($PR_URL)
+
+                **📝 Next Steps:**
+                1. Review and approve the hotfix PR: [#$PR_NUMBER]($PR_URL)
+                2. Once merged, the patch release will automatically trigger
+                3. You'll receive updates here when the release completes
+
+                **🔗 Track Progress:**
+                - [View hotfix PR #$PR_NUMBER]($PR_URL)"
               else
                 # Fallback if we can't find the specific PR
                 gh pr comment ${{ github.event.inputs.original_pr }} --body "🚀 Patch PR created! The patch release PR for this change has been created. Please review and approve it: [View all patch PRs](https://github.com/${{ github.repository }}/pulls?q=is%3Apr+is%3Aopen+label%3Apatch)"

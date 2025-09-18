@@ -34,6 +34,12 @@ async function main() {
 
   const { commit, channel, dryRun } = argv;
 
+  // Validate channel
+  if (channel !== 'stable' && channel !== 'preview') {
+    console.error(`Error: Invalid channel '${channel}'. Must be 'stable' or 'preview'.`);
+    process.exit(1);
+  }
+
   console.log(`Starting patch process for commit: ${commit}`);
   console.log(`Targeting channel: ${channel}`);
   if (dryRun) {
@@ -46,7 +52,7 @@ async function main() {
   console.log(`Found latest tag for ${channel}: ${latestTag}`);
 
   const releaseBranch = `release/${latestTag}`;
-  const hotfixBranch = `hotfix/${latestTag}/cherry-pick-${commit.substring(0, 7)}`;
+  const hotfixBranch = `hotfix/${latestTag}/${channel}/cherry-pick-${commit.substring(0, 7)}`;
 
   // Create the release branch from the tag if it doesn't exist.
   if (!branchExists(releaseBranch)) {
