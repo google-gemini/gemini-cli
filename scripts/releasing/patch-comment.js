@@ -24,7 +24,6 @@ async function main() {
     .option('success', {
       description: 'Whether the release succeeded',
       type: 'boolean',
-      default: true,
     })
     .option('release-version', {
       description: 'The release version (e.g., 0.5.4)',
@@ -84,6 +83,12 @@ async function main() {
   const channel = argv.channel || process.env.CHANNEL || 'stable';
   const dryRun = argv.dryRun || process.env.DRY_RUN === 'true';
   const runId = process.env.GITHUB_RUN_ID || '12345678';
+  const raceConditionFailure = process.env.RACE_CONDITION_FAILURE === 'true';
+
+  // Current version info for race condition failures
+  const currentReleaseVersion = process.env.CURRENT_RELEASE_VERSION;
+  const currentReleaseTag = process.env.CURRENT_RELEASE_TAG;
+  const currentPreviousTag = process.env.CURRENT_PREVIOUS_TAG;
 
   if (!originalPr) {
     console.log('No original PR specified, skipping comment');
@@ -125,6 +130,33 @@ async function main() {
 **🔗 Links:**
 - [GitHub Release](https://github.com/${repo.owner}/${repo.repo}/releases/tag/${releaseTag})
 - [Workflow Run](https://github.com/${repo.owner}/${repo.repo}/actions/runs/${runId})`;
+  } else if (raceConditionFailure) {
+    commentBody = `⚠️ **Patch Release Cancelled - Concurrent Release Detected**
+
+**🚦 What Happened:**
+Another patch release completed while this one was in progress, causing a version conflict.
+
+**📋 Details:**
+- **Originally planned**: \`${releaseVersion || 'Unknown'}\`
+- **Channel**: \`${channel}\`
+- **Issue**: Version numbers are no longer sequential due to concurrent releases
+
+**📊 Current State:**${currentReleaseVersion ? `
+- **Latest ${channel} version**: \`${currentPreviousTag?.replace(/^v/, '') || 'unknown'}\`
+- **Next patch should be**: \`${currentReleaseVersion}\`
+- **New release tag**: \`${currentReleaseTag || 'unknown'}\`` : `
+- **Status**: Version information updated since this release started`}
+
+**🔄 Next Steps:**
+1. **Request a new patch** - The version calculation will now be correct
+2. No action needed on your part - simply request the patch again
+3. The system detected this automatically to prevent invalid releases
+
+**💡 Why This Happens:**
+Multiple patch releases can't run simultaneously. When they do, the second one is automatically cancelled to maintain version consistency.
+
+**🔗 Details:**
+- [View cancelled workflow run](https://github.com/${repo.owner}/${repo.repo}/actions/runs/${runId})`;
   } else {
     commentBody = `❌ **Patch Release Failed!**
 

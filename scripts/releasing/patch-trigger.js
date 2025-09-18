@@ -119,38 +119,22 @@ async function main() {
   let originalPr = null;
   if (!testMode && github) {
     try {
-      console.log('Looking for original PR...');
-      const recentPRs = await github.rest.pulls.list({
-        owner: context.repo.owner,
-        repo: context.repo.repo,
-        state: 'all',
+      console.log('Looking for original PR using search...');
+      // Use GitHub search to find the PR with a comment referencing the hotfix branch.
+      // This is much more efficient than listing PRs and their comments.
+      const query = `repo:${context.repo.owner}/${context.repo.repo} is:pr is:all in:comments "Patch PR Created" "${headRef}"`;
+      const searchResults = await github.rest.search.issuesAndPullRequests({
+        q: query,
         sort: 'updated',
-        direction: 'desc',
-        per_page: 50
+        order: 'desc',
+        per_page: 1,
       });
 
-      // Look for PR that has a comment mentioning this hotfix branch
-      for (const pr of recentPRs.data) {
-        try {
-          const comments = await github.rest.issues.listComments({
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            issue_number: pr.number
-          });
-
-          const patchComment = comments.data.find(comment =>
-            comment.body.includes('Patch PR Created') &&
-            comment.body.includes(headRef)
-          );
-
-          if (patchComment) {
-            originalPr = pr.number;
-            console.log(`Found original PR: ${originalPr}`);
-            break;
-          }
-        } catch (_e) {
-          // Skip errors for individual PRs
-        }
+      if (searchResults.data.items.length > 0) {
+        originalPr = searchResults.data.items[0].number;
+        console.log(`Found original PR: #${originalPr}`);
+      } else {
+        console.log('Could not find a matching original PR via search.');
       }
     } catch (e) {
       console.log('Could not determine original PR:', e.message);

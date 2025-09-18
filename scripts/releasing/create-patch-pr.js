@@ -34,12 +34,6 @@ async function main() {
 
   const { commit, channel, dryRun } = argv;
 
-  // Validate channel
-  if (channel !== 'stable' && channel !== 'preview') {
-    console.error(`Error: Invalid channel '${channel}'. Must be 'stable' or 'preview'.`);
-    process.exit(1);
-  }
-
   console.log(`Starting patch process for commit: ${commit}`);
   console.log(`Targeting channel: ${channel}`);
   if (dryRun) {
