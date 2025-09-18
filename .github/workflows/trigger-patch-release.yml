@@ -39,7 +39,7 @@ jobs:
               body = context.payload.pull_request.body;
               headRef = context.payload.pull_request.head.ref;
             } else { // workflow_dispatch
-              body = '${{ github.event.inputs.dry_run }}' ? '[DRY RUN]' : '';
+              body = ${{ github.event.inputs.dry_run }} ? '[DRY RUN]' : '';
               headRef = '${{ github.event.inputs.ref }}';
             }
 
