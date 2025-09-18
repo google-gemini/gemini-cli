@@ -970,7 +970,7 @@ export class ClearcutLogger {
       {
         gemini_cli_key:
           EventMetadataKey.GEMINI_CLI_EXTENSION_ENABLE_SETTING_SCOPE,
-        value: event.settingScope,
+        value: event.setting_scope,
       },
     ];
 

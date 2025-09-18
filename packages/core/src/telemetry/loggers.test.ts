@@ -1183,7 +1183,7 @@ describe('loggers', () => {
           'event.name': EVENT_EXTENSION_ENABLE,
           'event.timestamp': '2025-01-01T00:00:00.000Z',
           extension_name: 'vscode',
-          settingScope: 'user',
+          setting_scope: 'user',
         },
       });
     });
