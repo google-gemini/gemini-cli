@@ -6,7 +6,10 @@
 
 import { simpleGit } from 'simple-git';
 import { getErrorMessage } from '../../utils/errors.js';
-import type { ExtensionInstallMetadata } from '@google/gemini-cli-core';
+import type {
+  ExtensionInstallMetadata,
+  GeminiCLIExtension,
+} from '@google/gemini-cli-core';
 import { ExtensionUpdateState } from '../../ui/state/extensions.js';
 import * as os from 'node:os';
 import * as https from 'node:https';
@@ -102,20 +105,22 @@ async function fetchFromGithub(
 }
 
 export async function checkForExtensionUpdate(
-  installMetadata: ExtensionInstallMetadata,
+  extension: GeminiCLIExtension,
   setExtensionUpdateState: (updateState: ExtensionUpdateState) => void,
 ): Promise<void> {
   setExtensionUpdateState(ExtensionUpdateState.CHECKING_FOR_UPDATES);
+  const installMetadata = extension.installMetadata;
   if (
-    installMetadata.type !== 'git' &&
-    installMetadata.type !== 'github-release'
+    !installMetadata ||
+    (installMetadata.type !== 'git' &&
+      installMetadata.type !== 'github-release')
   ) {
     setExtensionUpdateState(ExtensionUpdateState.NOT_UPDATABLE);
     return;
   }
   try {
     if (installMetadata.type === 'git') {
-      const git = simpleGit(installMetadata.source);
+      const git = simpleGit(extension.path);
       const remotes = await git.getRemotes(true);
       if (remotes.length === 0) {
         console.error('No git remotes found.');
@@ -159,6 +164,7 @@ export async function checkForExtensionUpdate(
     } else {
       const { source, ref } = installMetadata;
       if (!source) {
+        console.error(`No "source" provided for extension.`);
         setExtensionUpdateState(ExtensionUpdateState.ERROR);
         return;
       }

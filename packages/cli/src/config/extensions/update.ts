@@ -143,16 +143,13 @@ export async function checkForAllExtensionUpdates(
         });
         continue;
       }
-      await checkForExtensionUpdate(
-        extension.installMetadata,
-        (updatedState) => {
-          setExtensionsUpdateState((prev) => {
-            extensionsUpdateState = new Map(prev);
-            extensionsUpdateState.set(extension.name, updatedState);
-            return extensionsUpdateState;
-          });
-        },
-      );
+      await checkForExtensionUpdate(extension, (updatedState) => {
+        setExtensionsUpdateState((prev) => {
+          extensionsUpdateState = new Map(prev);
+          extensionsUpdateState.set(extension.name, updatedState);
+          return extensionsUpdateState;
+        });
+      });
     }
   }
   return extensionsUpdateState;

@@ -13,7 +13,7 @@ import {
 import { simpleGit, type SimpleGit } from 'simple-git';
 import { ExtensionUpdateState } from '../../ui/state/extensions.js';
 import type * as os from 'node:os';
-import type { ExtensionInstallMetadata } from '@google/gemini-cli-core';
+import type { GeminiCLIExtension } from '@google/gemini-cli-core';
 
 const mockPlatform = vi.hoisted(() => vi.fn());
 const mockArch = vi.hoisted(() => vi.fn());
@@ -121,36 +121,54 @@ describe('git extension helpers', () => {
     });
 
     it('should return NOT_UPDATABLE for non-git extensions', async () => {
-      const installMetadata: ExtensionInstallMetadata = {
-        type: 'local',
-        source: '',
+      const extension: GeminiCLIExtension = {
+        name: 'test',
+        path: '/ext',
+        version: '1.0.0',
+        isActive: true,
+        installMetadata: {
+          type: 'local',
+          source: '',
+        },
       };
       let result: ExtensionUpdateState | undefined = undefined;
       await checkForExtensionUpdate(
-        installMetadata,
+        extension,
         (newState) => (result = newState),
       );
       expect(result).toBe(ExtensionUpdateState.NOT_UPDATABLE);
     });
 
     it('should return ERROR if no remotes found', async () => {
-      const installMetadata: ExtensionInstallMetadata = {
-        type: 'git',
-        source: '',
+      const extension: GeminiCLIExtension = {
+        name: 'test',
+        path: '/ext',
+        version: '1.0.0',
+        isActive: true,
+        installMetadata: {
+          type: 'git',
+          source: '',
+        },
       };
       mockGit.getRemotes.mockResolvedValue([]);
       let result: ExtensionUpdateState | undefined = undefined;
       await checkForExtensionUpdate(
-        installMetadata,
+        extension,
         (newState) => (result = newState),
       );
       expect(result).toBe(ExtensionUpdateState.ERROR);
     });
 
     it('should return UPDATE_AVAILABLE when remote hash is different', async () => {
-      const installMetadata: ExtensionInstallMetadata = {
-        type: 'git',
-        source: '/ext',
+      const extension: GeminiCLIExtension = {
+        name: 'test',
+        path: '/ext',
+        version: '1.0.0',
+        isActive: true,
+        installMetadata: {
+          type: 'git',
+          source: 'my/ext',
+        },
       };
       mockGit.getRemotes.mockResolvedValue([
         { name: 'origin', refs: { fetch: 'http://my-repo.com' } },
@@ -160,16 +178,22 @@ describe('git extension helpers', () => {
 
       let result: ExtensionUpdateState | undefined = undefined;
       await checkForExtensionUpdate(
-        installMetadata,
+        extension,
         (newState) => (result = newState),
       );
       expect(result).toBe(ExtensionUpdateState.UPDATE_AVAILABLE);
     });
 
     it('should return UP_TO_DATE when remote and local hashes are the same', async () => {
-      const installMetadata: ExtensionInstallMetadata = {
-        type: 'git',
-        source: '/ext',
+      const extension: GeminiCLIExtension = {
+        name: 'test',
+        path: '/ext',
+        version: '1.0.0',
+        isActive: true,
+        installMetadata: {
+          type: 'git',
+          source: 'my/ext',
+        },
       };
       mockGit.getRemotes.mockResolvedValue([
         { name: 'origin', refs: { fetch: 'http://my-repo.com' } },
@@ -179,22 +203,28 @@ describe('git extension helpers', () => {
 
       let result: ExtensionUpdateState | undefined = undefined;
       await checkForExtensionUpdate(
-        installMetadata,
+        extension,
         (newState) => (result = newState),
       );
       expect(result).toBe(ExtensionUpdateState.UP_TO_DATE);
     });
 
     it('should return ERROR on git error', async () => {
-      const installMetadata: ExtensionInstallMetadata = {
-        type: 'git',
-        source: '/ext',
+      const extension: GeminiCLIExtension = {
+        name: 'test',
+        path: '/ext',
+        version: '1.0.0',
+        isActive: true,
+        installMetadata: {
+          type: 'git',
+          source: 'my/ext',
+        },
       };
       mockGit.getRemotes.mockRejectedValue(new Error('git error'));
 
       let result: ExtensionUpdateState | undefined = undefined;
       await checkForExtensionUpdate(
-        installMetadata,
+        extension,
         (newState) => (result = newState),
       );
       expect(result).toBe(ExtensionUpdateState.ERROR);

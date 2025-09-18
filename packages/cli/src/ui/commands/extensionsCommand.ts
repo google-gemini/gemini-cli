@@ -10,6 +10,7 @@ import {
   updateExtension,
 } from '../../config/extensions/update.js';
 import { getErrorMessage } from '../../utils/errors.js';
+import { ExtensionUpdateState } from '../state/extensions.js';
 import { MessageType } from '../types.js';
 import {
   type CommandContext,
@@ -74,7 +75,8 @@ async function updateAction(context: CommandContext, args: string) {
         const updateInfo = await updateExtension(
           extension,
           workingDir,
-          context.ui.extensionsUpdateState.get(extension.name)!,
+          context.ui.extensionsUpdateState.get(extension.name) ??
+            ExtensionUpdateState.UNKNOWN,
           (updateState) => {
             context.ui.setExtensionsUpdateState((prev) => {
               const newState = new Map(prev);

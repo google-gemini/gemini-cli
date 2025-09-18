@@ -72,7 +72,7 @@ export async function handleUpdate(args: UpdateArgs) {
         );
         return;
       }
-      await checkForExtensionUpdate(extension.installMetadata, (newState) => {
+      await checkForExtensionUpdate(extension, (newState) => {
         updateState = newState;
       });
       if (updateState !== ExtensionUpdateState.UPDATE_AVAILABLE) {
