@@ -203,9 +203,9 @@ Settings are organized into categories. All settings should be placed within the
   - **Description:** Sandbox execution environment (can be a boolean or a path string).
   - **Default:** `undefined`
 
-- **`tools.usePty`** (boolean):
-  - **Description:** Use node-pty for shell command execution. Fallback to child_process still applies.
-  - **Default:** `false`
+- **`tools.shell.enableInteractiveShell`** (boolean):
+
+  Use `node-pty` for an interactive shell experience. Fallback to `child_process` still applies. Defaults to `false`.
 
 - **`tools.core`** (array of strings):
   - **Description:** This can be used to restrict the set of built-in tools [with an allowlist](./enterprise.md#restricting-tool-access). See [Built-in Tools](../core/tools-api.md#built-in-tools) for a list of core tools. The match semantics are the same as `tools.allowed`.

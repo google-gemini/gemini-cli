@@ -107,7 +107,7 @@ const MIGRATION_MAP: Record<string, string> = {
   preferredEditor: 'general.preferredEditor',
   sandbox: 'tools.sandbox',
   selectedAuthType: 'security.auth.selectedType',
-  shouldUseNodePtyShell: 'tools.usePty',
+  shouldUseNodePtyShell: 'tools.shell.enableInteractiveShell',
   shellPager: 'tools.shell.pager',
   shellShowColor: 'tools.shell.showColor',
   skipNextSpeakerCheck: 'model.skipNextSpeakerCheck',
