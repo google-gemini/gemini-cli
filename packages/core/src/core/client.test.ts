@@ -42,6 +42,7 @@ import { tokenLimit } from './tokenLimits.js';
 import { ideContextStore } from '../ide/ideContext.js';
 import { ClearcutLogger } from '../telemetry/clearcut-logger/clearcut-logger.js';
 import type { ModelRouterService } from '../routing/modelRouterService.js';
+import { uiTelemetryService } from '../telemetry/uiTelemetry.js';
 
 // Mock fs module to prevent actual file system operations during tests
 const mockFileSystem = new Map<string, string>();
@@ -111,6 +112,11 @@ vi.mock('../telemetry/index.js', () => ({
   logApiError: vi.fn(),
 }));
 vi.mock('../ide/ideContext.js');
+vi.mock('../telemetry/uiTelemetry.js', () => ({
+  uiTelemetryService: {
+    setLastPromptTokenCount: vi.fn(),
+  },
+}));
 
 /**
  * Array.fromAsync ponyfill, which will be available in es 2024.
@@ -243,6 +249,7 @@ describe('Gemini Client (client.ts)', () => {
   let mockGenerateContentFn: Mock;
   beforeEach(async () => {
     vi.resetAllMocks();
+    vi.mocked(uiTelemetryService.setLastPromptTokenCount).mockClear();
 
     mockGenerateContentFn = vi.fn().mockResolvedValue({
       candidates: [{ content: { parts: [{ text: '{"key": "value"}' }] } }],
@@ -440,6 +447,12 @@ describe('Gemini Client (client.ts)', () => {
           newTokenCount: 5000,
           originalTokenCount: 1000,
         });
+        expect(uiTelemetryService.setLastPromptTokenCount).toHaveBeenCalledWith(
+          5000,
+        );
+        expect(
+          uiTelemetryService.setLastPromptTokenCount,
+        ).toHaveBeenCalledTimes(1);
       });
 
       it('does not manipulate the source chat', async () => {
@@ -558,6 +571,12 @@ describe('Gemini Client (client.ts)', () => {
           tokens_before: originalTokenCount,
           tokens_after: newTokenCount,
         }),
+      );
+      expect(uiTelemetryService.setLastPromptTokenCount).toHaveBeenCalledWith(
+        newTokenCount,
+      );
+      expect(uiTelemetryService.setLastPromptTokenCount).toHaveBeenCalledTimes(
+        1,
       );
     });
 
