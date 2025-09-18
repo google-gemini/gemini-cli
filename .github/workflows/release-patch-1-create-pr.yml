@@ -1,4 +1,4 @@
-name: 'Create Patch PR'
+name: 'Release: Patch (1) Create PR'
 
 on:
   workflow_dispatch:
@@ -19,6 +19,11 @@ on:
         required: false
         type: 'boolean'
         default: false
+      ref:
+        description: 'The branch, tag, or SHA to test from.'
+        required: false
+        type: 'string'
+        default: 'main'
 
 jobs:
   create-patch:
@@ -30,6 +35,7 @@ jobs:
       - name: 'Checkout'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
         with:
+          ref: '${{ github.event.inputs.ref }}'
           fetch-depth: 0
 
       - name: 'Setup Node.js'
@@ -46,13 +52,22 @@ jobs:
           git config user.name "gemini-cli-robot"
           git config user.email "gemini-cli-robot@google.com"
 
+      - name: 'Generate GitHub App Token'
+        id: 'generate_token'
+        uses: 'actions/create-github-app-token@a8d616148505b5069dccd32f177bb87d7f39123b'
+        with:
+          app-id: '${{ secrets.APP_ID }}'
+          private-key: '${{ secrets.PRIVATE_KEY }}'
+          permission-pull-requests: 'write'
+          permission-contents: 'write'
+
       - name: 'Create Patch for Stable'
         if: "github.event.inputs.channel == 'stable'"
         env:
-          GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+          GH_TOKEN: '${{ steps.generate_token.outputs.token }}'
         run: 'node scripts/create-patch-pr.js --commit=${{ github.event.inputs.commit }} --channel=stable --dry-run=${{ github.event.inputs.dry_run }}'
 
       - name: 'Create Patch for Preview'
         env:
-          GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+          GH_TOKEN: '${{ steps.generate_token.outputs.token }}'
         run: 'node scripts/create-patch-pr.js --commit=${{ github.event.inputs.commit }} --channel=${{ github.event.inputs.channel }} --dry-run=${{ github.event.inputs.dry_run }}'
