@@ -55,7 +55,7 @@ function verifyVSCode(
     command: string;
   },
 ): IdeInfo {
-  if (ide !== IDE_DEFINITIONS.vscode) {
+  if (ide.name !== IDE_DEFINITIONS.vscode.name) {
     return ide;
   }
   if (ideProcessInfo.command.toLowerCase().includes('code')) {

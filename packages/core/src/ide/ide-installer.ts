@@ -151,9 +151,9 @@ export function getIdeInstaller(
   ide: IdeInfo,
   platform = process.platform,
 ): IdeInstaller | null {
-  switch (ide) {
-    case IDE_DEFINITIONS.vscode:
-    case IDE_DEFINITIONS.firebasestudio:
+  switch (ide.name) {
+    case IDE_DEFINITIONS.vscode.name:
+    case IDE_DEFINITIONS.firebasestudio.name:
       return new VsCodeInstaller(ide, platform);
     default:
       return null;

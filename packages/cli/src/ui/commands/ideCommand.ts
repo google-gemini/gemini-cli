@@ -32,12 +32,11 @@ function getIdeStatusMessage(ideClient: IdeClient): {
   content: string;
 } {
   const connection = ideClient.getConnectionStatus();
-  const ideInfo = ideClient.getCurrentIde();
   switch (connection.status) {
     case IDEConnectionStatus.Connected:
       return {
         messageType: 'info',
-        content: `🟢 Connected to ${ideInfo?.displayName}`,
+        content: `🟢 Connected to ${ideClient.getDetectedIdeDisplayName()}`,
       };
     case IDEConnectionStatus.Connecting:
       return {
@@ -91,7 +90,7 @@ async function getIdeStatusMessageWithFiles(ideClient: IdeClient): Promise<{
   const ideInfo = ideClient.getCurrentIde();
   switch (connection.status) {
     case IDEConnectionStatus.Connected: {
-      let content = `🟢 Connected to ${ideInfo?.displayName}`;
+      let content = `🟢 Connected to ${ideClient.getDetectedIdeDisplayName()}`;
       const context = ideContextStore.get();
       const openFiles = context?.workspaceState?.openFiles;
       if (openFiles && openFiles.length > 0) {
@@ -175,7 +174,7 @@ export const ideCommand = async (): Promise<SlashCommand> => {
 
   const installCommand: SlashCommand = {
     name: 'install',
-    description: `install required IDE companion for ${currentIDE.displayName}`,
+    description: `install required IDE companion for ${ideClient.getDetectedIdeDisplayName()}`,
     kind: CommandKind.BUILT_IN,
     action: async (context) => {
       const installer = getIdeInstaller(currentIDE);
@@ -183,7 +182,7 @@ export const ideCommand = async (): Promise<SlashCommand> => {
         context.ui.addItem(
           {
             type: 'error',
-            text: `No installer is available for ${currentIDE.displayName}. Please install the '${GEMINI_CLI_COMPANION_EXTENSION_NAME}' extension manually from the marketplace.`,
+            text: `No installer is available for ${ideClient.getDetectedIdeDisplayName()}. Please install the '${GEMINI_CLI_COMPANION_EXTENSION_NAME}' extension manually from the marketplace.`,
           },
           Date.now(),
         );
