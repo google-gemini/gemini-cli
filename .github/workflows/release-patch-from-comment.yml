@@ -29,7 +29,7 @@ jobs:
             dry_run=false
 
       - name: 'Acknowledge Patch Command'
-        if: "steps.slash_command.outputs.dispatched == 'true'"
+        if: "contains(github.event.comment.body, '/patch')"
         uses: 'peter-evans/create-or-update-comment@67dcc547d311b736a8e6c5c236542148a47adc3d'
         with:
           issue-number: '${{ github.event.issue.number }}'
@@ -52,7 +52,8 @@ jobs:
         uses: 'actions/github-script@00f12e3e20659f42342b1c0226afda7f7c042325'
         with:
           script: |
-            const args = JSON.parse('${{ steps.slash_command.outputs.command-arguments }}');
+            const argsStr = '${{ steps.slash_command.outputs.command-arguments }}';
+            const args = argsStr ? JSON.parse(argsStr) : {};
             github.rest.actions.createWorkflowDispatch({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -60,8 +61,8 @@ jobs:
               ref: 'main',
               inputs: {
                 commit: '${{ steps.pr_status.outputs.MERGE_COMMIT_SHA }}',
-                channel: args.channel,
-                dry_run: args.dry_run
+                channel: args.channel || 'stable',
+                dry_run: args.dry_run || 'false'
               }
             })
 
