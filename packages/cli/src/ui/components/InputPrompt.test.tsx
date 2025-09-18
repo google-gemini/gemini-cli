@@ -113,6 +113,7 @@ describe('InputPrompt', () => {
         mockBuffer.cursor = [0, newText.length];
         mockBuffer.viewportVisualLines = [newText];
         mockBuffer.allVisualLines = [newText];
+        mockBuffer.visualToLogicalMap = [[0, 0]];
       }),
       replaceRangeByOffset: vi.fn(),
       viewportVisualLines: [''],
@@ -138,6 +139,7 @@ describe('InputPrompt', () => {
       replaceRange: vi.fn(),
       deleteWordLeft: vi.fn(),
       deleteWordRight: vi.fn(),
+      visualToLogicalMap: [[0, 0]],
     } as unknown as TextBuffer;
 
     mockShellHistory = {
@@ -1344,6 +1346,12 @@ describe('InputPrompt', () => {
       mockBuffer.viewportVisualLines = text.split('\n');
       mockBuffer.allVisualLines = text.split('\n');
       mockBuffer.visualCursor = [2, 5]; // cursor at the end of "world"
+      // Provide a visual-to-logical mapping for each visual line
+      mockBuffer.visualToLogicalMap = [
+        [0, 0], // 'hello' starts at col 0 of logical line 0
+        [1, 0], // '' (blank) is logical line 1, col 0
+        [2, 0], // 'world' is logical line 2, col 0
+      ];
 
       const { stdout, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
