@@ -82,12 +82,18 @@ async function main() {
   if (dryRun) {
     prBody += '\n\n**[DRY RUN]**';
   }
-  run(
-    `gh pr create --base ${releaseBranch} --head ${hotfixBranch} --title "${prTitle}" --body "${prBody}"`,
-    dryRun,
-  );
+  const prCommand = `gh pr create --base ${releaseBranch} --head ${hotfixBranch} --title "${prTitle}" --body "${prBody}"`;
+  run(prCommand, dryRun);
 
   console.log('Patch process completed successfully!');
+
+  if (dryRun) {
+    console.log('\n--- Dry Run Summary ---');
+    console.log(`Release Branch: ${releaseBranch}`);
+    console.log(`Hotfix Branch: ${hotfixBranch}`);
+    console.log(`Pull Request Command: ${prCommand}`);
+    console.log('---------------------');
+  }
 }
 
 function run(command, dryRun = false) {
