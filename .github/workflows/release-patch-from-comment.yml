@@ -42,7 +42,7 @@ jobs:
 
       - name: 'Get PR Status'
         id: 'pr_status'
-        if: "steps.slash_command.outputs.dispatched == 'true'"
+        if: "startsWith(github.event.comment.body, '/patch')"
         env:
           GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
         run: |
@@ -71,7 +71,7 @@ jobs:
             })
 
       - name: 'Comment on Failure'
-        if: "steps.slash_command.outputs.dispatched == 'true' && steps.pr_status.outputs.STATE != 'MERGED'"
+        if: "startsWith(github.event.comment.body, '/patch') && steps.pr_status.outputs.STATE != 'MERGED'"
         uses: 'peter-evans/create-or-update-comment@67dcc547d311b736a8e6c5c236542148a47adc3d'
         with:
           issue-number: '${{ github.event.issue.number }}'
