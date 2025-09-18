@@ -85,6 +85,7 @@ import { useAutoAcceptIndicator } from './hooks/useAutoAcceptIndicator.js';
 import { useWorkspaceMigration } from './hooks/useWorkspaceMigration.js';
 import { useSessionStats } from './contexts/SessionContext.js';
 import { useGitBranchName } from './hooks/useGitBranchName.js';
+import { FocusContext } from './contexts/FocusContext.js';
 import type { ExtensionUpdateState } from './state/extensions.js';
 import { checkForAllExtensionUpdates } from '../config/extension.js';
 
@@ -1210,7 +1211,9 @@ Logging in with Google... Please restart Gemini CLI to continue.
               startupWarnings: props.startupWarnings || [],
             }}
           >
-            <App />
+            <FocusContext.Provider value={isFocused}>
+              <App />
+            </FocusContext.Provider>
           </AppContext.Provider>
         </ConfigContext.Provider>
       </UIActionsContext.Provider>
