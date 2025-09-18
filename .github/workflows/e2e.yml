@@ -98,7 +98,11 @@ jobs:
           SANDBOX: '${{ matrix.sandbox }}'
           VERBOSE: 'true'
         shell: 'bash'
-        run: 'npm run "test:integration:${SANDBOX}"'
+        run: |
+          if [[ "${{ matrix.sandbox }}" == "sandbox:docker" ]]; then
+            npm run build:sandbox
+          fi
+          npx vitest run --root ./integration-tests
 
   e2e_slow_platforms:
     name: 'E2E Test (${{ matrix.os }})'
@@ -152,7 +156,7 @@ jobs:
           SANDBOX: 'sandbox:none'
           VERBOSE: 'true'
         shell: 'bash'
-        run: 'npm run "test:integration:${SANDBOX}"'
+        run: 'npx vitest run --root ./integration-tests'
 
   e2e:
     name: 'E2E'
