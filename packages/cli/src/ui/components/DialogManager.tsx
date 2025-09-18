@@ -18,6 +18,7 @@ import { EditorSettingsDialog } from './EditorSettingsDialog.js';
 import { PrivacyNotice } from '../privacy/PrivacyNotice.js';
 import { WorkspaceMigrationDialog } from './WorkspaceMigrationDialog.js';
 import { ProQuotaDialog } from './ProQuotaDialog.js';
+import { ModelDialog } from './ModelDialog.js';
 import { theme } from '../semantic-colors.js';
 import { useUIState } from '../contexts/UIStateContext.js';
 import { useUIActions } from '../contexts/UIActionsContext.js';
@@ -140,6 +141,9 @@ export const DialogManager = () => {
         />
       </Box>
     );
+  }
+  if (uiState.isModelDialogOpen) {
+    return <ModelDialog onClose={uiActions.closeModelDialog} />;
   }
   if (uiState.isAuthenticating) {
     return (
