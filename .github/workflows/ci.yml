@@ -226,6 +226,43 @@ jobs:
           git ls-files | grep -E '\.(yaml|yml)' | xargs yamllint --format github
 
   #
+  # Lint: Sensitive Keywords
+  #
+  lint_sensitive_keywords:
+    name: 'Lint (Sensitive Keywords)'
+    runs-on: 'ubuntu-latest'
+    steps:
+      - name: 'Checkout'
+        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
+        with:
+          fetch-depth: 0 # Full history is needed to diff against base branch
+      - name: 'Warn on sensitive keywords in changed code'
+        run: |
+          git diff --unified=0 "origin/${{ github.base_ref }}"..HEAD | awk '
+            /^\+\+\+ b\/(.*)/ {
+              current_file = substr($2, 3)
+            }
+            /^@@ -[0-9,]+ \+([0-9,]+) @@/ {
+              line_info = $3
+              split(line_info, parts, ",")
+              current_line = substr(parts[1], 2)
+              current_line--
+            }
+            /^\+/ {
+              current_line++
+              if (match($0, /gemini-[0-9]/) && \
+                  !($0 ~ /gemini-2\.5-/) && \
+                  !($0 ~ /gemini-2\.0-/) && \
+                  !($0 ~ /gemini-1\.5-/) && \
+                  !($0 ~ /gemini-1\.0-/) \
+              ) {
+                keyword = substr($0, RSTART, RLENGTH)
+                print "::warning file=" current_file ",line=" current_line "::Found sensitive keyword: " "\x27" keyword "\x27" ". Please double check this code is appropriate to submit."
+              }
+            }
+          '
+
+  #
   # Lint: All
   #
   # This is a virtual job that other jobs depend on to wait for all linters to
@@ -238,6 +275,7 @@ jobs:
       - 'lint_javascript'
       - 'lint_shell'
       - 'lint_yaml'
+      - 'lint_sensitive_keywords'
     runs-on: 'ubuntu-latest'
     steps:
       - run: |-
