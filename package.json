@@ -80,6 +80,7 @@
     "eslint-plugin-react-hooks": "^5.2.0",
     "glob": "^10.4.5",
     "globals": "^16.0.0",
+    "google-artifactregistry-auth": "^3.4.0",
     "json": "^11.0.0",
     "memfs": "^4.17.2",
     "mnemonist": "^0.40.3",

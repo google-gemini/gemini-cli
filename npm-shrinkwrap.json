@@ -34,6 +34,7 @@
         "eslint-plugin-react-hooks": "^5.2.0",
         "glob": "^10.4.5",
         "globals": "^16.0.0",
+        "google-artifactregistry-auth": "^3.4.0",
         "json": "^11.0.0",
         "memfs": "^4.17.2",
         "mnemonist": "^0.40.3",
@@ -8978,6 +8979,20 @@
       },
       "funding": {
         "url": "https://github.com/sponsors/sindresorhus"
+      }
+    },
+    "node_modules/google-artifactregistry-auth": {
+      "version": "3.4.0",
+      "resolved": "https://registry.npmjs.org/google-artifactregistry-auth/-/google-artifactregistry-auth-3.4.0.tgz",
+      "integrity": "sha512-Z2EmP7gbKtTmK5k846tfF7dQqeU2vREIcfCI79FKRTAdkbUZ/BFGJwwTvC2ss0vYSySvK7h6I1JsqBFqIXABBg==",
+      "dev": true,
+      "license": "Apache-2.0",
+      "dependencies": {
+        "google-auth-library": "^9.14.0",
+        "yargs": "^17.1.1"
+      },
+      "bin": {
+        "artifactregistry-auth": "src/main.js"
       }
     },
     "node_modules/google-auth-library": {
