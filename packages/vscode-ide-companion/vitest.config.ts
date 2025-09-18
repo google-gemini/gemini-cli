@@ -33,13 +33,19 @@ export default defineConfig({
         ['json-summary', { outputFile: 'coverage-summary.json' }],
       ],
     },
-    minThreads: 8,
-    maxThreads: 16,
-  },
-  // This is the important part to fix the CI error.
-  // It tells Vitest to process these dependencies from source,
-  // allowing it to resolve the necessary modules in the monorepo.
-  deps: {
-    inline: [/@google\/gemini-cli-core/],
+    poolOptions: {
+      threads: {
+        minThreads: 8,
+        maxThreads: 16,
+      },
+    },
+    // This is the important part to fix the CI error.
+    // It tells Vitest to process these dependencies from source,
+    // allowing it to resolve the necessary modules in the monorepo.
+    server: {
+      deps: {
+        inline: [/@google\/gemini-cli-core/],
+      },
+    },
   },
 });

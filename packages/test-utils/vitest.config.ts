@@ -13,7 +13,11 @@ export default defineConfig({
     outputFile: {
       junit: 'junit.xml',
     },
-    minThreads: 8,
-    maxThreads: 16,
+    poolOptions: {
+      threads: {
+        minThreads: 8,
+        maxThreads: 16,
+      },
+    },
   },
 });
