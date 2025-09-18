@@ -1,4 +1,4 @@
-name: 'Trigger Patch Release'
+name: 'Release: Patch (2) Trigger'
 
 on:
   pull_request:
@@ -14,7 +14,7 @@ on:
         description: 'The workflow to trigger. Defaults to patch-release.yml'
         required: false
         type: 'string'
-        default: 'patch-release.yml'
+        default: 'release-patch-3-release.yml'
       dry_run:
         description: 'Whether this is a dry run.'
         required: false
@@ -48,7 +48,7 @@ jobs:
             const channel = version.includes('preview') ? 'preview' : 'stable';
             const ref = `release/${version}`;
             const workflow_id = context.eventName === 'pull_request'
-              ? 'patch-release.yml'
+              ? 'release-patch-3-release.yml'
               : '${{ github.event.inputs.workflow_id }}';
 
             github.rest.actions.createWorkflowDispatch({

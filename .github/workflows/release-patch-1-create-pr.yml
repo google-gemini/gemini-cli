@@ -1,4 +1,4 @@
-name: 'Create Patch PR'
+name: 'Release: Patch (1) Create PR'
 
 on:
   workflow_dispatch:
