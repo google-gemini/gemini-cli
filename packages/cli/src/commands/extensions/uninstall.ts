@@ -9,13 +9,13 @@ import { uninstallExtension } from '../../config/extension.js';
 import { getErrorMessage } from '../../utils/errors.js';
 
 interface UninstallArgs {
-  identifier: string; // can be extension name or source URL.
+  name: string; // can be extension name or source URL.
 }
 
 export async function handleUninstall(args: UninstallArgs) {
   try {
-    await uninstallExtension(args.identifier);
-    console.log(`Extension "${args.identifier}" successfully uninstalled.`);
+    await uninstallExtension(args.name);
+    console.log(`Extension "${args.name}" successfully uninstalled.`);
   } catch (error) {
     console.error(getErrorMessage(error));
     process.exit(1);
@@ -23,25 +23,25 @@ export async function handleUninstall(args: UninstallArgs) {
 }
 
 export const uninstallCommand: CommandModule = {
-  command: 'uninstall <identifier>',
+  command: 'uninstall <name>',
   describe: 'Uninstalls an extension.',
   builder: (yargs) =>
     yargs
-      .positional('identifier', {
-        describe: 'The identifier of the extension to uninstall.',
+      .positional('name', {
+        describe: 'The name or source path of the extension to uninstall.',
         type: 'string',
       })
       .check((argv) => {
-        if (!argv.identifier) {
+        if (!argv.name) {
           throw new Error(
-            'Please include the identifier of the extension to uninstall as a positional argument.',
+            'Please include the name of the extension to uninstall as a positional argument.',
           );
         }
         return true;
       }),
   handler: async (argv) => {
     await handleUninstall({
-      identifier: argv['identifier'] as string,
+      name: argv['name'] as string,
     });
   },
 };

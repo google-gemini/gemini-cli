@@ -580,8 +580,10 @@ export async function uninstallExtension(
   const installedExtensions = loadUserExtensions();
   const extensionName = installedExtensions.find(
     (installed) =>
-      installed.config.name === extensionIdentifier ||
-      installed.installMetadata?.source === extensionIdentifier,
+      installed.config.name.toLowerCase() ===
+        extensionIdentifier.toLowerCase() ||
+      installed.installMetadata?.source.toLowerCase() ===
+        extensionIdentifier.toLowerCase(),
   )?.config.name;
   if (!extensionName) {
     throw new Error(`Extension not found.`);
