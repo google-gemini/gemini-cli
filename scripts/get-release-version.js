@@ -85,27 +85,73 @@ function getNightlyVersion() {
   };
 }
 
-function getStableVersion() {
-  const { latestVersion, latestTag } = getAndVerifyTags(
+function validateVersion(version, format, name) {
+  const versionRegex = {
+    'X.Y.Z': /^\d+\.\d+\.\d+$/,
+    'X.Y.Z-preview.N': /^\d+\.\d+\.\d+-preview\.\d+$/,
+  };
+
+  if (!versionRegex[format] || !versionRegex[format].test(version)) {
+    throw new Error(
+      `Invalid ${name}: ${version}. Must be in ${format} format.`,
+    );
+  }
+}
+
+function getStableVersion(args) {
+  const { latestVersion: latestPreviewVersion } = getAndVerifyTags(
     'preview',
     'v*-preview*',
   );
+  let releaseVersion;
+  if (args.stable_version_override) {
+    const overrideVersion = args.stable_version_override.replace(/^v/, '');
+    validateVersion(overrideVersion, 'X.Y.Z', 'stable_version_override');
+    releaseVersion = overrideVersion;
+  } else {
+    releaseVersion = latestPreviewVersion.replace(/-preview.*/, '');
+  }
+
+  const { latestTag: previousStableTag } = getAndVerifyTags(
+    'latest',
+    'v[0-9].[0-9].[0-9]',
+  );
+
   return {
-    releaseVersion: latestVersion.replace(/-preview.*/, ''),
+    releaseVersion,
     npmTag: 'latest',
-    previousReleaseTag: latestTag,
+    previousReleaseTag: previousStableTag,
   };
 }
 
-function getPreviewVersion() {
-  const { latestVersion, latestTag } = getAndVerifyTags(
+function getPreviewVersion(args) {
+  const { latestVersion: latestNightlyVersion } = getAndVerifyTags(
     'nightly',
     'v*-nightly*',
   );
+  let releaseVersion;
+  if (args.preview_version_override) {
+    const overrideVersion = args.preview_version_override.replace(/^v/, '');
+    validateVersion(
+      overrideVersion,
+      'X.Y.Z-preview.N',
+      'preview_version_override',
+    );
+    releaseVersion = overrideVersion;
+  } else {
+    releaseVersion =
+      latestNightlyVersion.replace(/-nightly.*/, '') + '-preview.0';
+  }
+
+  const { latestTag: previousPreviewTag } = getAndVerifyTags(
+    'preview',
+    'v*-preview*',
+  );
+
   return {
-    releaseVersion: latestVersion.replace(/-nightly.*/, '') + '-preview',
+    releaseVersion,
     npmTag: 'preview',
-    previousReleaseTag: latestTag,
+    previousReleaseTag: previousPreviewTag,
   };
 }
 
@@ -144,10 +190,10 @@ export function getVersion(options = {}) {
       versionData = getNightlyVersion();
       break;
     case 'stable':
-      versionData = getStableVersion();
+      versionData = getStableVersion(args);
       break;
     case 'preview':
-      versionData = getPreviewVersion();
+      versionData = getPreviewVersion(args);
       break;
     case 'patch':
       versionData = getPatchVersion(args['patch-from']);

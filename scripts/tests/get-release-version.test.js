@@ -52,17 +52,37 @@ describe('getVersion', () => {
       const result = getVersion({ type: 'stable' });
       expect(result.releaseVersion).toBe('0.5.0');
       expect(result.npmTag).toBe('latest');
-      expect(result.previousReleaseTag).toBe('v0.5.0-preview-2');
+      expect(result.previousReleaseTag).toBe('v0.4.1');
+    });
+
+    it('should use the override version for stable if provided', () => {
+      vi.mocked(execSync).mockImplementation(mockExecSync);
+      const result = getVersion({
+        type: 'stable',
+        stable_version_override: '1.2.3',
+      });
+      expect(result.releaseVersion).toBe('1.2.3');
+      expect(result.npmTag).toBe('latest');
+      expect(result.previousReleaseTag).toBe('v0.4.1');
     });
 
     it('should calculate the next preview version from the latest nightly', () => {
       vi.mocked(execSync).mockImplementation(mockExecSync);
       const result = getVersion({ type: 'preview' });
-      expect(result.releaseVersion).toBe('0.6.0-preview');
+      expect(result.releaseVersion).toBe('0.6.0-preview.0');
       expect(result.npmTag).toBe('preview');
-      expect(result.previousReleaseTag).toBe(
-        'v0.6.0-nightly.20250910.a31830a3',
-      );
+      expect(result.previousReleaseTag).toBe('v0.5.0-preview-2');
+    });
+
+    it('should use the override version for preview if provided', () => {
+      vi.mocked(execSync).mockImplementation(mockExecSync);
+      const result = getVersion({
+        type: 'preview',
+        preview_version_override: '4.5.6-preview.0',
+      });
+      expect(result.releaseVersion).toBe('4.5.6-preview.0');
+      expect(result.npmTag).toBe('preview');
+      expect(result.previousReleaseTag).toBe('v0.5.0-preview-2');
     });
 
     it('should calculate the next nightly version from the latest nightly', () => {
@@ -89,6 +109,44 @@ describe('getVersion', () => {
       expect(result.releaseVersion).toBe('0.5.1-preview-2');
       expect(result.npmTag).toBe('preview');
       expect(result.previousReleaseTag).toBe('v0.5.0-preview-2');
+    });
+  });
+
+  describe('Failure Path - Invalid Overrides', () => {
+    it('should throw an error for an invalid stable_version_override', () => {
+      vi.mocked(execSync).mockImplementation(mockExecSync);
+      expect(() =>
+        getVersion({
+          type: 'stable',
+          stable_version_override: '1.2.3-beta',
+        }),
+      ).toThrow(
+        'Invalid stable_version_override: 1.2.3-beta. Must be in X.Y.Z format.',
+      );
+    });
+
+    it('should throw an error for an invalid preview_version_override format', () => {
+      vi.mocked(execSync).mockImplementation(mockExecSync);
+      expect(() =>
+        getVersion({
+          type: 'preview',
+          preview_version_override: '4.5.6-preview', // Missing .N
+        }),
+      ).toThrow(
+        'Invalid preview_version_override: 4.5.6-preview. Must be in X.Y.Z-preview.N format.',
+      );
+    });
+
+    it('should throw an error for another invalid preview_version_override format', () => {
+      vi.mocked(execSync).mockImplementation(mockExecSync);
+      expect(() =>
+        getVersion({
+          type: 'preview',
+          preview_version_override: '4.5.6',
+        }),
+      ).toThrow(
+        'Invalid preview_version_override: 4.5.6. Must be in X.Y.Z-preview.N format.',
+      );
     });
   });
 
