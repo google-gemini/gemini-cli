@@ -75,7 +75,7 @@ import {
 import * as metrics from './metrics.js';
 import { FileOperation } from './metrics.js';
 import * as sdk from './sdk.js';
-import { vi, describe, beforeEach, it, expect } from 'vitest';
+import { vi, describe, beforeEach, it, expect, afterEach } from 'vitest';
 import type {
   CallableTool,
   GenerateContentResponseUsageMetadata,
