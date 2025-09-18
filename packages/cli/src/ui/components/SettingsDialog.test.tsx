@@ -173,8 +173,9 @@ describe('SettingsDialog', () => {
   const wait = (ms = 50) => new Promise((resolve) => setTimeout(resolve, ms));
 
   // Generic waitFor utility for waiting on conditions with better error handling
+  // Compatible with @testing-library/react waitFor - handles both boolean predicates and assertion functions
   const waitFor = async (
-    predicate: () => boolean,
+    predicate: () => boolean | void,
     options: { timeout?: number; interval?: number; message?: string } = {},
   ) => {
     const {
@@ -183,11 +184,20 @@ describe('SettingsDialog', () => {
       message = 'Condition not met in time',
     } = options;
     const start = Date.now();
+    let lastError: unknown;
     while (Date.now() - start < timeout) {
-      if (predicate()) {
-        return;
+      try {
+        const result = predicate();
+        if (result !== false) {
+          return;
+        }
+      } catch (e) {
+        lastError = e;
       }
       await new Promise((resolve) => setTimeout(resolve, interval));
+    }
+    if (lastError) {
+      throw lastError;
     }
     throw new Error(message);
   };
