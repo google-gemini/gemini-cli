@@ -100,7 +100,7 @@ import { useSettingsCommand } from './hooks/useSettingsCommand.js';
 import { SettingsDialog } from './components/SettingsDialog.js';
 import { NotificationsSetup } from './components/notifications/NotificationsSetup.js';
 import { setUpdateHandler } from '../utils/handleAutoUpdate.js';
-import { startIdleTimer, stopIdleTimer } from '../../notifications/idleTimer.js';
+import { startIdleTimer, stopIdleTimer } from '../notifications/idleTimer.js';
 import { appEvents, AppEvent } from '../utils/events.js';
 import { isNarrowWidth } from './utils/isNarrowWidth.js';
 
@@ -1068,7 +1068,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
             </Box>
           ) : isNotificationsSetupOpen ? (
             <NotificationsSetup
-              config={config}
+              settings={settings}
               onComplete={closeNotificationsSetup}
             />
           ) : isAuthenticating ? (
