@@ -59,6 +59,27 @@ async function main() {
     console.log(`Release branch ${releaseBranch} already exists.`);
   }
 
+  // Check if hotfix branch already exists
+  if (branchExists(hotfixBranch)) {
+    console.log(`Hotfix branch ${hotfixBranch} already exists.`);
+
+    // Check if the existing branch already has this commit
+    const hasCommit = run(
+      `git branch --contains ${commit} | grep ${hotfixBranch}`,
+      dryRun,
+      false,
+    );
+    if (hasCommit) {
+      console.log(`Branch ${hotfixBranch} already contains commit ${commit}.`);
+      return { existingBranch: hotfixBranch, hasCommit: true };
+    } else {
+      console.log(
+        `Branch ${hotfixBranch} exists but doesn't contain commit ${commit}.`,
+      );
+      return { existingBranch: hotfixBranch, hasCommit: false };
+    }
+  }
+
   // Create the hotfix branch from the release branch.
   console.log(
     `Creating hotfix branch ${hotfixBranch} from ${releaseBranch}...`,
@@ -94,9 +115,11 @@ async function main() {
     console.log(`Pull Request Command: ${prCommand}`);
     console.log('---------------------');
   }
+
+  return { newBranch: hotfixBranch, created: true };
 }
 
-function run(command, dryRun = false) {
+function run(command, dryRun = false, throwOnError = true) {
   console.log(`> ${command}`);
   if (dryRun) {
     return;
@@ -105,7 +128,10 @@ function run(command, dryRun = false) {
     return execSync(command).toString().trim();
   } catch (err) {
     console.error(`Command failed: ${command}`);
-    throw err;
+    if (throwOnError) {
+      throw err;
+    }
+    return null;
   }
 }
 
