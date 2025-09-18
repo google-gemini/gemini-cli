@@ -101,23 +101,17 @@ jobs:
 
           # Check if patch output exists and contains branch info
           if [ -f patch_output.log ]; then
-            if grep -q "already exists" patch_output.log && grep -q "already contains commit" patch_output.log; then
-              # Branch exists and has the commit
+            if grep -q "already exists" patch_output.log; then
+              # Branch exists - let user review
               BRANCH=$(grep "Hotfix branch" patch_output.log | grep "already exists" | sed 's/.*Hotfix branch \(.*\) already exists.*/\1/')
               gh pr comment ${{ github.event.inputs.original_pr }} --body "ℹ️ Patch branch already exists!
 
-              The commit is already included in the existing patch branch: \`$BRANCH\`
+              A patch branch already exists: [\`$BRANCH\`](https://github.com/${{ github.repository }}/tree/$BRANCH)
 
-              Check if there's already a PR for this patch: https://github.com/${{ github.repository }}/pulls?q=is%3Apr+is%3Aopen+head%3A$BRANCH"
+              Please review this existing branch. If it's correct, check for an existing PR:
+              [View patch PRs for this branch](https://github.com/${{ github.repository }}/pulls?q=is%3Apr+head%3A$BRANCH)
 
-            elif grep -q "already exists" patch_output.log; then
-              # Branch exists but doesn't have the commit
-              BRANCH=$(grep "Hotfix branch" patch_output.log | grep "already exists" | sed 's/.*Hotfix branch \(.*\) already exists.*/\1/')
-              gh pr comment ${{ github.event.inputs.original_pr }} --body "⚠️ Patch branch exists but needs update!
-
-              A patch branch \`$BRANCH\` exists but doesn't contain this commit. You may need to manually handle this conflict.
-
-              View the existing branch: https://github.com/${{ github.repository }}/tree/$BRANCH"
+              If the branch is incorrect or outdated, please delete it manually and run the patch command again."
 
             elif [ "$EXIT_CODE" = "0" ]; then
               # Success - new branch created
@@ -125,17 +119,17 @@ jobs:
 
               The patch release PR for this change has been created. Please review and approve it to complete the patch release:
 
-              View all patch PRs: https://github.com/${{ github.repository }}/pulls?q=is%3Apr+is%3Aopen+label%3Apatch"
+              [View all patch PRs](https://github.com/${{ github.repository }}/pulls?q=is%3Apr+is%3Aopen+label%3Apatch)"
             else
               # Other error
               gh pr comment ${{ github.event.inputs.original_pr }} --body "❌ Patch creation failed!
 
               There was an error creating the patch. Please check the workflow logs for details:
-              https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+              [View workflow run](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})"
             fi
           else
             gh pr comment ${{ github.event.inputs.original_pr }} --body "❌ Patch creation failed!
 
             No output was generated. Please check the workflow logs:
-            https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            [View workflow run](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})"
           fi
