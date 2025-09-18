@@ -19,7 +19,7 @@ jobs:
     name: 'Merge Queue Skipper'
     runs-on: 'ubuntu-latest'
     outputs:
-      skip: ${{ steps.skipper.outputs.skip }}
+      skip: '${{ steps.skipper.outputs.skip }}'
     steps:
       - name: 'Check if skip'
         id: 'skipper'
@@ -33,8 +33,8 @@ jobs:
   build:
     name: 'Build Project'
     runs-on: 'gemini-cli-ubuntu-16-core'
-    needs: merge_queue_skipper
-    if: needs.merge_queue_skipper.outputs.skip != 'true'
+    needs: 'merge_queue_skipper'
+    if: "needs.merge_queue_skipper.outputs.skip != 'true'"
     steps:
       - name: 'Checkout'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
