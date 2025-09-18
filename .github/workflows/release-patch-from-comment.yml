@@ -62,7 +62,8 @@ jobs:
               inputs: {
                 commit: '${{ steps.pr_status.outputs.MERGE_COMMIT_SHA }}',
                 channel: args.channel || 'stable',
-                dry_run: args.dry_run || 'false'
+                dry_run: args.dry_run || 'false',
+                original_pr: '${{ github.event.issue.number }}'
               }
             })
 
