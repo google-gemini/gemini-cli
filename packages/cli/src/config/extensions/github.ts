@@ -74,7 +74,7 @@ export async function cloneFromGit(
   }
 }
 
-export function parseGitHubRepo(source: string): {
+export function parseGitHubRepoForReleases(source: string): {
   owner: string;
   repo: string;
 } {
@@ -168,7 +168,7 @@ export async function checkForExtensionUpdate(
       if (!source) {
         return ExtensionUpdateState.ERROR;
       }
-      const { owner, repo } = parseGitHubRepo(source);
+      const { owner, repo } = parseGitHubRepoForReleases(source);
 
       const releaseData = await fetchFromGithub(
         owner,
@@ -193,7 +193,7 @@ export async function downloadFromGitHubRelease(
   destination: string,
 ): Promise<string> {
   const { source, ref } = installMetadata;
-  const { owner, repo } = parseGitHubRepo(source);
+  const { owner, repo } = parseGitHubRepoForReleases(source);
 
   try {
     const releaseData = await fetchFromGithub(owner, repo, ref);
