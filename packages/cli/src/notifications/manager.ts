@@ -115,7 +115,7 @@ export function triggerNotification(eventType: NotificationEventType): void {
  * Returns the current notification settings.
  */
 export function getNotificationSettings(): NotificationSettings {
-  return currentSettings;
+  return JSON.parse(JSON.stringify(currentSettings));
 }
 
 /**
