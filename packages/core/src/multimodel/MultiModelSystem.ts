@@ -630,14 +630,71 @@ export class MultiModelSystem {
         // No tool calls, conversation is complete
         // Add assistant's response to history
         if (assistantContent.trim()) {
-          // Try to generate intelligent title if conditions are met
+          // Try to generate intelligent title using current provider
           const currentSessionId = SessionManager.getInstance().getCurrentSessionId();
           if (currentSessionId) {
-            SessionManager.getInstance().triggerIntelligentTitleGeneration(currentSessionId, this.currentProvider ? { type: this.currentProvider.type, model: this.currentProvider.model } : undefined);
+            this.generateIntelligentTitle(currentSessionId).catch(error => {
+              console.error('[MultiModelSystem] Failed to generate title:', error);
+            });
           }
         }
         return;
       }
+    }
+  }
+
+  /**
+   * Generate intelligent title using current provider (no new provider creation)
+   */
+  private async generateIntelligentTitle(sessionId: string): Promise<void> {
+    if (!this.currentProvider) {
+      return;
+    }
+
+    try {
+      const sessionManager = SessionManager.getInstance();
+
+      // Get display messages for the session (exclude tool messages)
+      const displayMessages = sessionManager.getDisplayMessages(sessionId).filter(msg =>
+        msg.role !== 'tool' &&
+        !msg.content.startsWith('Tool response:') &&
+        !msg.content.startsWith('Tool execution completed successfully')
+      );
+
+      // Only generate when user has exactly 3 messages (after 3rd message is sent)
+      const userMessages = displayMessages.filter(msg => msg.role === 'user');
+      if (userMessages.length !== 3) {
+        return;
+      }
+
+      // Create a conversation summary prompt
+      const conversationText = displayMessages
+        .map(msg => `${msg.role}: ${msg.content}`)
+        .join('\n');
+
+      const titlePrompt = `Based on this conversation, generate a short, descriptive title (max 40 characters). Only respond with the title, no explanation:
+
+${conversationText}
+
+Title:`;
+
+      // Use current provider instance to generate title
+      const provider = await this.getOrCreateProvider(this.currentProvider);
+
+      const titleResponse = await provider.sendMessage(
+        [{ role: 'user', content: titlePrompt }],
+        new AbortController().signal
+      );
+
+      const generatedTitle = titleResponse.content.trim().replace(/^["']|["']$/g, ''); // Remove quotes if any
+
+      // Validate and clean the generated title
+      if (generatedTitle && generatedTitle.length > 0 && generatedTitle.length <= 50) {
+        console.log(`[MultiModelSystem] Generated title for session ${sessionId}: ${generatedTitle}`);
+        sessionManager.updateSessionTitle(sessionId, generatedTitle);
+      }
+    } catch (error) {
+      console.error('[MultiModelSystem] Title generation failed:', error);
     }
   }
 
@@ -1000,7 +1057,48 @@ export class MultiModelSystem {
       historyArray,
       1 - COMPRESSION_PRESERVE_THRESHOLD,
     );
-    
+
+    // Ensure we don't split in the middle of tool call/response pairs
+    const pendingToolCalls: string[] = [];
+
+    // Scan backwards from the split point to find any incomplete tool calls
+    for (let i = compressBeforeIndex - 1; i >= 0; i--) {
+      const msg = historyArray[i];
+
+      if (msg.role === 'tool' && msg.tool_call_id) {
+        // Found a tool response, add to pending list
+        pendingToolCalls.push(msg.tool_call_id);
+      } else if (msg.role === 'assistant' && msg.toolCalls && msg.toolCalls.length > 0) {
+        // Found tool calls, remove matched ones from pending
+        for (const toolCall of msg.toolCalls) {
+          const idx = pendingToolCalls.indexOf(toolCall.id);
+          if (idx !== -1) {
+            pendingToolCalls.splice(idx, 1);
+          }
+        }
+      }
+    }
+
+    // If we have unmatched tool responses before the split, move split point earlier
+    // to include the complete tool call/response sequence
+    if (pendingToolCalls.length > 0) {
+      console.log(`[MultiModelSystem] Found ${pendingToolCalls.length} incomplete tool calls at split point, adjusting...`);
+
+      // Find the assistant message that initiated these tool calls
+      for (let i = compressBeforeIndex - 1; i >= 0; i--) {
+        const msg = historyArray[i];
+        if (msg.role === 'assistant' && msg.toolCalls && msg.toolCalls.length > 0) {
+          const hasMatchingCall = msg.toolCalls.some(tc => pendingToolCalls.includes(tc.id));
+          if (hasMatchingCall) {
+            // Move split point to before this assistant message
+            compressBeforeIndex = i;
+            console.log(`[MultiModelSystem] Moved split point to index ${i} to preserve tool call integrity`);
+            break;
+          }
+        }
+      }
+    }
+
     // Find the first user message after the index to maintain conversation flow
     while (
       compressBeforeIndex < historyArray.length &&
