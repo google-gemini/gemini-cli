@@ -4,17 +4,17 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { CommandModule } from 'yargs';
-import { initNotifications, setGlobalNotificationsEnabled } from '../../notifications/manager.js';
-import { getConfig } from '../../config/config.js';
+import { setGlobalNotificationsEnabled, initNotifications } from '../../notifications/manager.js';
+import { loadSettings } from '../../config/settings.js';
+import { CommandModule } from 'yargs';
 
 export const disableCommand: CommandModule = {
   command: 'disable',
   describe: 'Disable all notifications',
   handler: async () => {
-    const config = await getConfig();
-    initNotifications(config);
-    setGlobalNotificationsEnabled(false, config);
+    const settings = loadSettings(process.cwd());
+    initNotifications(settings);
+    setGlobalNotificationsEnabled(false, settings);
     console.log('All audio notifications have been disabled.');
   },
 };
