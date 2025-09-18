@@ -177,6 +177,15 @@ jobs:
           node-version: '${{ matrix.node-version }}'
           cache: 'npm'
 
+      - name: 'Configure Windows Defender exclusions'
+        if: "runner.os == 'Windows'"
+        run: |
+          Add-MpPreference -ExclusionPath $env:GITHUB_WORKSPACE -Force
+          Add-MpPreference -ExclusionPath "$env:GITHUB_WORKSPACE\node_modules" -Force
+          Add-MpPreference -ExclusionPath "$env:GITHUB_WORKSPACE\packages" -Force
+          Add-MpPreference -ExclusionPath "$env:TEMP" -Force
+        shell: 'pwsh'
+
       - name: 'Configure npm for Windows performance'
         if: "runner.os == 'Windows'"
         run: |
@@ -184,7 +193,7 @@ jobs:
           npm config set audit false
           npm config set fund false
           npm config set loglevel error
-          npm config set maxsockets 1
+          npm config set maxsockets 32
           npm config set registry https://registry.npmjs.org/
         shell: 'pwsh'
 
@@ -192,6 +201,10 @@ jobs:
         if: "runner.os == 'Windows'"
         run: 'npm run build'
         shell: 'pwsh'
+        env:
+          NODE_OPTIONS: '--max-old-space-size=32768 --max-semi-space-size=256 --optimize-for-size'
+          UV_THREADPOOL_SIZE: '32'
+          NODE_ENV: 'production'
 
       - name: 'Build project (non-Windows)'
         if: "runner.os != 'Windows'"
@@ -201,6 +214,9 @@ jobs:
         if: "runner.os == 'Windows'"
         run: 'npm ci'
         shell: 'pwsh'
+        env:
+          NODE_OPTIONS: '--max-old-space-size=32768'
+          UV_THREADPOOL_SIZE: '32'
 
       - name: 'Install dependencies for testing (non-Windows)'
         if: "runner.os != 'Windows'"
@@ -210,6 +226,9 @@ jobs:
         if: "runner.os == 'Windows'"
         env:
           NO_COLOR: true
+          NODE_OPTIONS: '--max-old-space-size=32768 --max-semi-space-size=256'
+          UV_THREADPOOL_SIZE: '32'
+          NODE_ENV: 'test'
         run: 'npm run test:ci -- --coverage.enabled=false'
         shell: 'pwsh'
 
