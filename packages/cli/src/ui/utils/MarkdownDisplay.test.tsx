@@ -9,8 +9,6 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { MarkdownDisplay } from './MarkdownDisplay.js';
 import { LoadedSettings } from '../../config/settings.js';
 import { SettingsContext } from '../contexts/SettingsContext.js';
-import fs from 'node:fs';
-import path from 'node:path';
 
 describe('<MarkdownDisplay />', () => {
   const baseProps = {
@@ -253,7 +251,26 @@ Another paragraph.
   });
 
   it('correctly renders a file with Unix (LF) line endings', () => {
-    const markdownContent = fs.readFileSync(path.resolve(process.cwd(), 'list.md'), 'utf-8');
+    const markdownContent = `# Programming Languages Overview
+
+## 1. Python
+
+- **Strengths:**
+  - Easy to learn syntax
+  - Extensive library ecosystem
+  - Great for data science
+    - NumPy for numerical computing
+    - Pandas for data analysis
+    - Matplotlib for visualization
+- **Use Cases:**
+  - Web development with Django/Flask
+  - Machine learning and AI
+  - Automation and scripting
+
+## 2. JavaScript
+
+- **Strengths:**
+  - Universal language (frontend/backend)`;
     const { lastFrame } = render(
       <SettingsContext.Provider value={mockSettings}>
         <MarkdownDisplay
@@ -262,7 +279,7 @@ Another paragraph.
           availableTerminalHeight={100} // Provide ample height
           terminalWidth={120} // Provide ample width
         />
-      </SettingsContext.Provider>
+      </SettingsContext.Provider>,
     );
     expect(lastFrame()).toMatchSnapshot();
   });
