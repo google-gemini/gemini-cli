@@ -1688,7 +1688,7 @@ export function useTextBuffer({
     [visualLayout, cursorRow, cursorCol],
   );
 
-  const { visualLines } = visualLayout;
+  const { visualLines, visualToLogicalMap } = visualLayout;
 
   const [visualScrollRow, setVisualScrollRow] = useState<number>(0);
 
@@ -1708,6 +1708,8 @@ export function useTextBuffer({
   // Update visual scroll (vertical)
   useEffect(() => {
     const { height } = viewport;
+    const totalVisualLines = visualLines.length;
+    const maxScrollStart = Math.max(0, totalVisualLines - height);
     let newVisualScrollRow = visualScrollRow;
 
     if (visualCursor[0] < visualScrollRow) {
@@ -1715,10 +1717,15 @@ export function useTextBuffer({
     } else if (visualCursor[0] >= visualScrollRow + height) {
       newVisualScrollRow = visualCursor[0] - height + 1;
     }
+
+    // When the number of visual lines shrinks (e.g., after widening the viewport),
+    // ensure scroll never starts beyond the last valid start so we can render a full window.
+    newVisualScrollRow = clamp(newVisualScrollRow, 0, maxScrollStart);
+
     if (newVisualScrollRow !== visualScrollRow) {
       setVisualScrollRow(newVisualScrollRow);
     }
-  }, [visualCursor, visualScrollRow, viewport]);
+  }, [visualCursor, visualScrollRow, viewport, visualLines.length]);
 
   const insert = useCallback(
     (ch: string, { paste = false }: { paste?: boolean } = {}): void => {
@@ -2131,73 +2138,141 @@ export function useTextBuffer({
     [state.pendingPastes],
   );
 
-  const returnValue: TextBuffer = {
-    lines,
-    text,
-    cursor: [cursorRow, cursorCol],
-    preferredCol,
-    selectionAnchor,
+  const returnValue: TextBuffer = useMemo(
+    () => ({
+      lines,
+      text,
+      cursor: [cursorRow, cursorCol],
+      preferredCol,
+      selectionAnchor,
 
-    allVisualLines: visualLines,
-    viewportVisualLines: renderedVisualLines,
-    visualCursor,
-    visualScrollRow,
-    pastePlaceholders,
+      allVisualLines: visualLines,
+      viewportVisualLines: renderedVisualLines,
+      visualCursor,
+      visualScrollRow,
+      visualToLogicalMap,
+      pastePlaceholders,
 
-    setText,
-    insert,
-    newline,
-    backspace,
-    del,
-    move,
-    expandPlaceholders,
-    clearPendingPastes,
-    undo,
-    redo,
-    replaceRange,
-    replaceRangeByOffset,
-    moveToOffset,
-    deleteWordLeft,
-    deleteWordRight,
+      setText,
+      insert,
+      newline,
+      backspace,
+      del,
+      move,
+      undo,
+      expandPlaceholders,
+      clearPendingPastes,
+      redo,
+      replaceRange,
+      replaceRangeByOffset,
+      moveToOffset,
+      deleteWordLeft,
+      deleteWordRight,
 
-    killLineRight,
-    killLineLeft,
-    handleInput,
-    openInExternalEditor,
-    // Vim-specific operations
-    vimDeleteWordForward,
-    vimDeleteWordBackward,
-    vimDeleteWordEnd,
-    vimChangeWordForward,
-    vimChangeWordBackward,
-    vimChangeWordEnd,
-    vimDeleteLine,
-    vimChangeLine,
-    vimDeleteToEndOfLine,
-    vimChangeToEndOfLine,
-    vimChangeMovement,
-    vimMoveLeft,
-    vimMoveRight,
-    vimMoveUp,
-    vimMoveDown,
-    vimMoveWordForward,
-    vimMoveWordBackward,
-    vimMoveWordEnd,
-    vimDeleteChar,
-    vimInsertAtCursor,
-    vimAppendAtCursor,
-    vimOpenLineBelow,
-    vimOpenLineAbove,
-    vimAppendAtLineEnd,
-    vimInsertAtLineStart,
-    vimMoveToLineStart,
-    vimMoveToLineEnd,
-    vimMoveToFirstNonWhitespace,
-    vimMoveToFirstLine,
-    vimMoveToLastLine,
-    vimMoveToLine,
-    vimEscapeInsertMode,
-  };
+      killLineRight,
+      killLineLeft,
+      handleInput,
+      openInExternalEditor,
+      // Vim-specific operations
+      vimDeleteWordForward,
+      vimDeleteWordBackward,
+      vimDeleteWordEnd,
+      vimChangeWordForward,
+      vimChangeWordBackward,
+      vimChangeWordEnd,
+      vimDeleteLine,
+      vimChangeLine,
+      vimDeleteToEndOfLine,
+      vimChangeToEndOfLine,
+      vimChangeMovement,
+      vimMoveLeft,
+      vimMoveRight,
+      vimMoveUp,
+      vimMoveDown,
+      vimMoveWordForward,
+      vimMoveWordBackward,
+      vimMoveWordEnd,
+      vimDeleteChar,
+      vimInsertAtCursor,
+      vimAppendAtCursor,
+      vimOpenLineBelow,
+      vimOpenLineAbove,
+      vimAppendAtLineEnd,
+      vimInsertAtLineStart,
+      vimMoveToLineStart,
+      vimMoveToLineEnd,
+      vimMoveToFirstNonWhitespace,
+      vimMoveToFirstLine,
+      vimMoveToLastLine,
+      vimMoveToLine,
+      vimEscapeInsertMode,
+    }),
+    [
+      lines,
+      text,
+      cursorRow,
+      cursorCol,
+      preferredCol,
+      selectionAnchor,
+      visualLines,
+      renderedVisualLines,
+      visualCursor,
+      visualScrollRow,
+      setText,
+      insert,
+      newline,
+      backspace,
+      del,
+      move,
+      undo,
+      redo,
+      replaceRange,
+      replaceRangeByOffset,
+      moveToOffset,
+      deleteWordLeft,
+      deleteWordRight,
+      killLineRight,
+      killLineLeft,
+      handleInput,
+      openInExternalEditor,
+      vimDeleteWordForward,
+      vimDeleteWordBackward,
+      vimDeleteWordEnd,
+      vimChangeWordForward,
+      vimChangeWordBackward,
+      vimChangeWordEnd,
+      vimDeleteLine,
+      vimChangeLine,
+      vimDeleteToEndOfLine,
+      vimChangeToEndOfLine,
+      vimChangeMovement,
+      vimMoveLeft,
+      vimMoveRight,
+      vimMoveUp,
+      vimMoveDown,
+      vimMoveWordForward,
+      vimMoveWordBackward,
+      vimMoveWordEnd,
+      vimDeleteChar,
+      vimInsertAtCursor,
+      vimAppendAtCursor,
+      vimOpenLineBelow,
+      vimOpenLineAbove,
+      vimAppendAtLineEnd,
+      vimInsertAtLineStart,
+      vimMoveToLineStart,
+      vimMoveToLineEnd,
+      vimMoveToFirstNonWhitespace,
+      vimMoveToFirstLine,
+      vimMoveToLastLine,
+      vimMoveToLine,
+      vimEscapeInsertMode,
+      visualToLogicalMap,
+      clearPendingPastes,
+      pastePlaceholders,
+      expandPlaceholders,
+    ],
+  );
   return returnValue;
 }
 
@@ -2220,6 +2295,12 @@ export interface TextBuffer {
   viewportVisualLines: string[]; // The subset of visual lines to be rendered based on visualScrollRow and viewport.height
   visualCursor: [number, number]; // Visual cursor [row, col] relative to the start of all visualLines
   visualScrollRow: number; // Scroll position for visual lines (index of the first visible visual line)
+  /**
+   * For each visual line (by absolute index in allVisualLines) provides a tuple
+   * [logicalLineIndex, startColInLogical] that maps where that visual line
+   * begins within the logical buffer. Indices are code-point based.
+   */
+  visualToLogicalMap: Array<[number, number]>;
   pastePlaceholders: string[]; // Current placeholder tokens to highlight
 
   // Actions

@@ -119,7 +119,7 @@ jobs:
           IS_DRY_RUN: '${{ steps.vars.outputs.is_dry_run }}'
           RELEASE_TAG: '${{ steps.version.outputs.RELEASE_TAG }}'
         run: |-
-          git add package.json package-lock.json packages/*/package.json
+          git add package.json npm-shrinkwrap.json packages/*/package.json
           git commit -m "chore(release): ${RELEASE_TAG}"
           if [[ "${IS_DRY_RUN}" == "false" ]]; then
             echo "Pushing release branch to remote..."

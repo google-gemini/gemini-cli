@@ -25,6 +25,7 @@ import type { UseReverseSearchCompletionReturn } from '../hooks/useReverseSearch
 import { useReverseSearchCompletion } from '../hooks/useReverseSearchCompletion.js';
 import * as clipboardUtils from '../utils/clipboardUtils.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
+import stripAnsi from 'strip-ansi';
 import chalk from 'chalk';
 
 vi.mock('../hooks/useShellHistory.js');
@@ -112,6 +113,7 @@ describe('InputPrompt', () => {
         mockBuffer.cursor = [0, newText.length];
         mockBuffer.viewportVisualLines = [newText];
         mockBuffer.allVisualLines = [newText];
+        mockBuffer.visualToLogicalMap = [[0, 0]];
       }),
       replaceRangeByOffset: vi.fn(),
       viewportVisualLines: [''],
@@ -137,6 +139,7 @@ describe('InputPrompt', () => {
       replaceRange: vi.fn(),
       deleteWordLeft: vi.fn(),
       deleteWordRight: vi.fn(),
+      visualToLogicalMap: [[0, 0]],
     } as unknown as TextBuffer;
 
     mockShellHistory = {
@@ -1343,6 +1346,12 @@ describe('InputPrompt', () => {
       mockBuffer.viewportVisualLines = text.split('\n');
       mockBuffer.allVisualLines = text.split('\n');
       mockBuffer.visualCursor = [2, 5]; // cursor at the end of "world"
+      // Provide a visual-to-logical mapping for each visual line
+      mockBuffer.visualToLogicalMap = [
+        [0, 0], // 'hello' starts at col 0 of logical line 0
+        [1, 0], // '' (blank) is logical line 1, col 0
+        [2, 0], // 'world' is logical line 2, col 0
+      ];
 
       const { stdout, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
@@ -1789,6 +1798,144 @@ describe('InputPrompt', () => {
     });
   });
 
+  describe('command search (Ctrl+R when not in shell)', () => {
+    it('enters command search on Ctrl+R and shows suggestions', async () => {
+      props.shellModeActive = false;
+
+      vi.mocked(useReverseSearchCompletion).mockImplementation(
+        (buffer, data, isActive) => ({
+          ...mockReverseSearchCompletion,
+          suggestions: isActive
+            ? [
+                { label: 'git commit -m "msg"', value: 'git commit -m "msg"' },
+                { label: 'git push', value: 'git push' },
+              ]
+            : [],
+          showSuggestions: !!isActive,
+          activeSuggestionIndex: isActive ? 0 : -1,
+        }),
+      );
+
+      const { stdin, stdout, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+      );
+      await wait();
+
+      act(() => {
+        stdin.write('\x12'); // Ctrl+R
+      });
+      await wait();
+
+      const frame = stdout.lastFrame() ?? '';
+      expect(frame).toContain('(r:)');
+      expect(frame).toContain('git commit');
+      expect(frame).toContain('git push');
+      unmount();
+    });
+
+    it('expands and collapses long suggestion via Right/Left arrows', async () => {
+      props.shellModeActive = false;
+      const longValue = 'l'.repeat(200);
+
+      vi.mocked(useReverseSearchCompletion).mockReturnValue({
+        ...mockReverseSearchCompletion,
+        suggestions: [{ label: longValue, value: longValue, matchedIndex: 0 }],
+        showSuggestions: true,
+        activeSuggestionIndex: 0,
+        visibleStartIndex: 0,
+        isLoadingSuggestions: false,
+      });
+
+      const { stdin, stdout, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+      );
+      await wait();
+
+      stdin.write('\x12');
+      await wait();
+
+      expect(clean(stdout.lastFrame())).toContain('→');
+
+      stdin.write('\u001B[C');
+      await wait();
+      expect(clean(stdout.lastFrame())).toContain('←');
+      expect(stdout.lastFrame()).toMatchSnapshot(
+        'command-search-expanded-match',
+      );
+
+      stdin.write('\u001B[D');
+      await wait();
+      expect(clean(stdout.lastFrame())).toContain('→');
+      expect(stdout.lastFrame()).toMatchSnapshot(
+        'command-search-collapsed-match',
+      );
+      unmount();
+    });
+
+    it('renders match window and expanded view (snapshots)', async () => {
+      props.shellModeActive = false;
+      props.buffer.setText('commit');
+
+      const label = 'git commit -m "feat: add search" in src/app';
+      const matchedIndex = label.indexOf('commit');
+
+      vi.mocked(useReverseSearchCompletion).mockReturnValue({
+        ...mockReverseSearchCompletion,
+        suggestions: [{ label, value: label, matchedIndex }],
+        showSuggestions: true,
+        activeSuggestionIndex: 0,
+        visibleStartIndex: 0,
+        isLoadingSuggestions: false,
+      });
+
+      const { stdin, stdout, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+      );
+      await wait();
+
+      stdin.write('\x12');
+      await wait();
+      expect(stdout.lastFrame()).toMatchSnapshot(
+        'command-search-collapsed-match',
+      );
+
+      stdin.write('\u001B[C');
+      await wait();
+      expect(stdout.lastFrame()).toMatchSnapshot(
+        'command-search-expanded-match',
+      );
+
+      unmount();
+    });
+
+    it('does not show expand/collapse indicator for short suggestions', async () => {
+      props.shellModeActive = false;
+      const shortValue = 'echo hello';
+
+      vi.mocked(useReverseSearchCompletion).mockReturnValue({
+        ...mockReverseSearchCompletion,
+        suggestions: [{ label: shortValue, value: shortValue }],
+        showSuggestions: true,
+        activeSuggestionIndex: 0,
+        visibleStartIndex: 0,
+        isLoadingSuggestions: false,
+      });
+
+      const { stdin, stdout, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+      );
+      await wait();
+
+      stdin.write('\x12');
+      await wait();
+
+      const frame = clean(stdout.lastFrame());
+      expect(frame).not.toContain('→');
+      expect(frame).not.toContain('←');
+      unmount();
+    });
+  });
+
   describe('snapshots', () => {
     it('should render correctly in shell mode', async () => {
       props.shellModeActive = true;
@@ -1821,3 +1968,8 @@ describe('InputPrompt', () => {
     });
   });
 });
+function clean(str: string | undefined): string {
+  if (!str) return '';
+  // Remove ANSI escape codes and trim whitespace
+  return stripAnsi(str).trim();
+}
