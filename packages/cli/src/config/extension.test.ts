@@ -708,7 +708,7 @@ describe('extension tests', () => {
       ).resolves.toBe('my-local-extension');
 
       expect(mockQuestion).toHaveBeenCalledWith(
-        expect.stringContaining('Do you want to continue? (Y/n)'),
+        expect.stringContaining('Do you want to continue? [Y/n]'),
         expect.any(Function),
       );
     });
@@ -733,7 +733,7 @@ describe('extension tests', () => {
       ).rejects.toThrow('Installation cancelled by user.');
 
       expect(mockQuestion).toHaveBeenCalledWith(
-        expect.stringContaining('Do you want to continue? (Y/n)'),
+        expect.stringContaining('Do you want to continue? [Y/n]'),
         expect.any(Function),
       );
     });
@@ -758,7 +758,7 @@ describe('extension tests', () => {
       ).resolves.toBe('my-local-extension');
 
       expect(mockQuestion).toHaveBeenCalledWith(
-        expect.stringContaining('Do you want to continue? (Y/n)'),
+        expect.stringContaining('Do you want to continue? [Y/n]'),
         expect.any(Function),
       );
     });

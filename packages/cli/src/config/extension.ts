@@ -537,7 +537,7 @@ async function requestConsent(extensionConfig: ExtensionConfig) {
     console.info('The extension will append info to your gemini.md context');
 
     const shouldContinue = await promptForContinuation(
-      'Do you want to continue? (Y/n): ',
+      'Do you want to continue? [Y/n]: ',
     );
     if (!shouldContinue) {
       throw new Error('Installation cancelled by user.');
