@@ -11,20 +11,18 @@ import {
   DEFAULT_NOTIFICATION_SETTINGS,
   NotificationEventSettings,
 } from './types.js';
-import { loadSettings, SettingScope } from '../config/settings.js';
-import { Config } from '@google/gemini-cli-core';
+import { LoadedSettings, SettingScope } from '../config/settings.js';
 import * as os from 'os';
 
 let currentSettings: NotificationSettings = DEFAULT_NOTIFICATION_SETTINGS;
 
 /**
  * Initializes the notification manager by loading settings.
- * @param config The Config object to load settings from.
+ * @param settings The LoadedSettings object to load settings from.
  */
-export function initNotifications(config: Config): void {
+export function initNotifications(settings: LoadedSettings): void {
   try {
-    const loadedSettings = loadSettings(config.getProjectRoot());
-    const notificationSettings = loadedSettings.merged.notifications;
+    const notificationSettings = settings.merged.notifications;
     if (notificationSettings) {
       currentSettings = {
         enabled:
@@ -54,16 +52,11 @@ export function initNotifications(config: Config): void {
 
 /**
  * Saves the current notification settings.
- * @param config The Config object to save settings to.
+ * @param settings The LoadedSettings object to save settings to.
  */
-export function saveNotificationSettings(config: Config): void {
+export function saveNotificationSettings(settings: LoadedSettings): void {
   try {
-    const loadedSettings = loadSettings(config.getProjectRoot());
-    loadedSettings.setValue(
-      SettingScope.User,
-      'notifications',
-      currentSettings,
-    );
+    settings.setValue(SettingScope.User, 'notifications', currentSettings);
   } catch (error) {
     console.error('Failed to save notification settings:', error);
   }
@@ -134,28 +127,28 @@ export function getNotificationSettings(): NotificationSettings {
 export function updateNotificationEventSettings(
   eventType: NotificationEventType,
   updates: Partial<NotificationEventSettings>,
-  config: Config,
+  settings: LoadedSettings,
 ): void {
   if (currentSettings.events[eventType]) {
     currentSettings.events[eventType] = {
       ...currentSettings.events[eventType],
       ...updates,
     };
-    saveNotificationSettings(config);
+    saveNotificationSettings(settings);
   }
 }
 
 /**
  * Enables or disables global notifications.
  * @param enabled Whether to enable or disable notifications.
- * @param config The Config object to save settings to.
+ * @param settings The LoadedSettings object to save settings to.
  */
 export function setGlobalNotificationsEnabled(
   enabled: boolean,
-  config: Config,
+  settings: LoadedSettings,
 ): void {
   currentSettings.enabled = enabled;
-  saveNotificationSettings(config);
+  saveNotificationSettings(settings);
 }
 
 /**
