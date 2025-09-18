@@ -12,4 +12,5 @@ export enum ExtensionUpdateState {
   UP_TO_DATE = 'up to date',
   ERROR = 'error checking for updates',
   NOT_UPDATABLE = 'not updatable',
+  UNKNOWN = 'unknown',
 }

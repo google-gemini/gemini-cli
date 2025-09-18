@@ -4,10 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type { GeminiCLIExtension } from '@google/gemini-cli-core';
 import {
   updateAllUpdatableExtensions,
-  updateExtensionByName,
-} from '../../config/extension.js';
+  updateExtension,
+} from '../../config/extensions/update.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
 import { MessageType } from '../types.js';
 import { extensionsCommand } from './extensionsCommand.js';
@@ -20,20 +21,23 @@ import {
   beforeEach,
   type MockedFunction,
 } from 'vitest';
+import { ExtensionUpdateState } from '../state/extensions.js';
 
-vi.mock('../../config/extension.js', () => ({
-  updateExtensionByName: vi.fn(),
+vi.mock('../../config/extensions/update.js', () => ({
+  updateExtension: vi.fn(),
   updateAllUpdatableExtensions: vi.fn(),
 }));
 
-const mockUpdateExtensionByName = updateExtensionByName as MockedFunction<
-  typeof updateExtensionByName
+const mockUpdateExtension = updateExtension as MockedFunction<
+  typeof updateExtension
 >;
 
 const mockUpdateAllUpdatableExtensions =
   updateAllUpdatableExtensions as MockedFunction<
     typeof updateAllUpdatableExtensions
   >;
+
+const mockGetExtensions = vi.fn();
 
 describe('extensionsCommand', () => {
   let mockContext: CommandContext;
@@ -43,7 +47,7 @@ describe('extensionsCommand', () => {
     mockContext = createMockCommandContext({
       services: {
         config: {
-          getExtensions: () => [],
+          getExtensions: mockGetExtensions,
           getWorkingDir: () => '/test/dir',
         },
       },
@@ -147,36 +151,73 @@ describe('extensionsCommand', () => {
     });
 
     it('should update a single extension by name', async () => {
-      mockUpdateExtensionByName.mockResolvedValue({
+      const extension: GeminiCLIExtension = {
         name: 'ext-one',
-        originalVersion: '1.0.0',
+        type: 'git',
+        version: '1.0.0',
+        isActive: true,
+        path: '/test/dir/ext-one',
+        autoUpdate: false,
+      };
+      mockUpdateExtension.mockResolvedValue({
+        name: extension.name,
+        originalVersion: extension.version,
         updatedVersion: '1.0.1',
       });
+      mockGetExtensions.mockReturnValue([extension]);
+      mockContext.ui.extensionsUpdateState.set(
+        extension.name,
+        ExtensionUpdateState.UPDATE_AVAILABLE,
+      );
       await updateAction(mockContext, 'ext-one');
-      expect(mockUpdateExtensionByName).toHaveBeenCalledWith(
-        'ext-one',
+      expect(mockUpdateExtension).toHaveBeenCalledWith(
+        extension,
         '/test/dir',
-        [],
+        ExtensionUpdateState.UPDATE_AVAILABLE,
         expect.any(Function),
       );
     });
 
     it('should handle errors when updating a single extension', async () => {
-      mockUpdateExtensionByName.mockRejectedValue(
-        new Error('Extension not found'),
-      );
+      mockUpdateExtension.mockRejectedValue(new Error('Extension not found'));
+      mockGetExtensions.mockReturnValue([]);
       await updateAction(mockContext, 'ext-one');
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
         {
           type: MessageType.ERROR,
-          text: 'Extension not found',
+          text: 'Extension ext-one not found.',
         },
         expect.any(Number),
       );
     });
 
     it('should update multiple extensions by name', async () => {
-      mockUpdateExtensionByName
+      const extensionOne: GeminiCLIExtension = {
+        name: 'ext-one',
+        type: 'git',
+        version: '1.0.0',
+        isActive: true,
+        path: '/test/dir/ext-one',
+        autoUpdate: false,
+      };
+      const extensionTwo: GeminiCLIExtension = {
+        name: 'ext-two',
+        type: 'git',
+        version: '1.0.0',
+        isActive: true,
+        path: '/test/dir/ext-two',
+        autoUpdate: false,
+      };
+      mockGetExtensions.mockReturnValue([extensionOne, extensionTwo]);
+      mockContext.ui.extensionsUpdateState.set(
+        extensionOne.name,
+        ExtensionUpdateState.UPDATE_AVAILABLE,
+      );
+      mockContext.ui.extensionsUpdateState.set(
+        extensionTwo.name,
+        ExtensionUpdateState.UPDATE_AVAILABLE,
+      );
+      mockUpdateExtension
         .mockResolvedValueOnce({
           name: 'ext-one',
           originalVersion: '1.0.0',
@@ -188,7 +229,7 @@ describe('extensionsCommand', () => {
           updatedVersion: '2.0.1',
         });
       await updateAction(mockContext, 'ext-one ext-two');
-      expect(mockUpdateExtensionByName).toHaveBeenCalledTimes(2);
+      expect(mockUpdateExtension).toHaveBeenCalledTimes(2);
       expect(mockContext.ui.setPendingItem).toHaveBeenCalledWith({
         type: MessageType.EXTENSIONS_LIST,
       });

@@ -5,11 +5,12 @@
  */
 
 import {
-  updateExtensionByName,
   updateAllUpdatableExtensions,
   type ExtensionUpdateInfo,
-} from '../../config/extension.js';
+  updateExtension,
+} from '../../config/extensions/update.js';
 import { getErrorMessage } from '../../utils/errors.js';
+import { ExtensionUpdateState } from '../state/extensions.js';
 import { MessageType } from '../types.js';
 import {
   type CommandContext,
@@ -55,19 +56,36 @@ async function updateAction(context: CommandContext, args: string) {
         context.ui.setExtensionsUpdateState,
       );
     } else if (names?.length) {
+      const workingDir = context.services.config!.getWorkingDir();
+      const extensions = context.services.config!.getExtensions();
       for (const name of names) {
-        updateInfos.push(
-          await updateExtensionByName(
-            name,
-            context.services.config!.getWorkingDir(),
-            context.services.config!.getExtensions(),
-            (updateState) => {
-              const newState = new Map(context.ui.extensionsUpdateState);
-              newState.set(name, updateState);
-              context.ui.setExtensionsUpdateState(newState);
-            },
-          ),
+        const extension = extensions.find(
+          (extension) => extension.name === name,
         );
+        if (!extension) {
+          context.ui.addItem(
+            {
+              type: MessageType.ERROR,
+              text: `Extension ${name} not found.`,
+            },
+            Date.now(),
+          );
+          continue;
+        }
+        const updateInfo = await updateExtension(
+          extension,
+          workingDir,
+          context.ui.extensionsUpdateState.get(extension.name) ??
+            ExtensionUpdateState.UNKNOWN,
+          (updateState) => {
+            context.ui.setExtensionsUpdateState((prev) => {
+              const newState = new Map(prev);
+              newState.set(name, updateState);
+              return newState;
+            });
+          },
+        );
+        if (updateInfo) updateInfos.push(updateInfo);
       }
     }
 

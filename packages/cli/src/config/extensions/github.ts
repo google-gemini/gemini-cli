@@ -6,7 +6,10 @@
 
 import { simpleGit } from 'simple-git';
 import { getErrorMessage } from '../../utils/errors.js';
-import type { ExtensionInstallMetadata } from '@google/gemini-cli-core';
+import type {
+  ExtensionInstallMetadata,
+  GeminiCLIExtension,
+} from '@google/gemini-cli-core';
 import { ExtensionUpdateState } from '../../ui/state/extensions.js';
 import * as os from 'node:os';
 import * as https from 'node:https';
@@ -110,39 +113,44 @@ async function fetchFromGithub(
 }
 
 export async function checkForExtensionUpdate(
-  installMetadata: ExtensionInstallMetadata,
-): Promise<ExtensionUpdateState> {
+  extension: GeminiCLIExtension,
+  setExtensionUpdateState: (updateState: ExtensionUpdateState) => void,
+): Promise<void> {
+  setExtensionUpdateState(ExtensionUpdateState.CHECKING_FOR_UPDATES);
+  const installMetadata = extension.installMetadata;
   if (
-    installMetadata.type !== 'git' &&
-    installMetadata.type !== 'github-release'
+    !installMetadata ||
+    (installMetadata.type !== 'git' &&
+      installMetadata.type !== 'github-release')
   ) {
-    return ExtensionUpdateState.NOT_UPDATABLE;
+    setExtensionUpdateState(ExtensionUpdateState.NOT_UPDATABLE);
+    return;
   }
   try {
     if (installMetadata.type === 'git') {
-      const git = simpleGit(installMetadata.source);
+      const git = simpleGit(extension.path);
       const remotes = await git.getRemotes(true);
       if (remotes.length === 0) {
         console.error('No git remotes found.');
-        return ExtensionUpdateState.ERROR;
+        setExtensionUpdateState(ExtensionUpdateState.ERROR);
+        return;
       }
       const remoteUrl = remotes[0].refs.fetch;
       if (!remoteUrl) {
         console.error(`No fetch URL found for git remote ${remotes[0].name}.`);
-        return ExtensionUpdateState.ERROR;
+        setExtensionUpdateState(ExtensionUpdateState.ERROR);
+        return;
       }
 
       // Determine the ref to check on the remote.
       const refToCheck = installMetadata.ref || 'HEAD';
 
-      const lsRemoteOutput = await git.listRemote([
-        remotes[0].name,
-        refToCheck,
-      ]);
+      const lsRemoteOutput = await git.listRemote([remoteUrl, refToCheck]);
 
       if (typeof lsRemoteOutput !== 'string' || lsRemoteOutput.trim() === '') {
         console.error(`Git ref ${refToCheck} not found.`);
-        return ExtensionUpdateState.ERROR;
+        setExtensionUpdateState(ExtensionUpdateState.ERROR);
+        return;
       }
 
       const remoteHash = lsRemoteOutput.split('\t')[0];
@@ -152,16 +160,21 @@ export async function checkForExtensionUpdate(
         console.error(
           `Unable to parse hash from git ls-remote output "${lsRemoteOutput}"`,
         );
-        return ExtensionUpdateState.ERROR;
+        setExtensionUpdateState(ExtensionUpdateState.ERROR);
+        return;
       }
       if (remoteHash === localHash) {
-        return ExtensionUpdateState.UP_TO_DATE;
+        setExtensionUpdateState(ExtensionUpdateState.UP_TO_DATE);
+        return;
       }
-      return ExtensionUpdateState.UPDATE_AVAILABLE;
+      setExtensionUpdateState(ExtensionUpdateState.UPDATE_AVAILABLE);
+      return;
     } else {
       const { source, ref } = installMetadata;
       if (!source) {
-        return ExtensionUpdateState.ERROR;
+        console.error(`No "source" provided for extension.`);
+        setExtensionUpdateState(ExtensionUpdateState.ERROR);
+        return;
       }
       const { owner, repo } = parseGitHubRepoForReleases(source);
 
@@ -171,15 +184,18 @@ export async function checkForExtensionUpdate(
         installMetadata.ref,
       );
       if (releaseData.tag_name !== ref) {
-        return ExtensionUpdateState.UPDATE_AVAILABLE;
+        setExtensionUpdateState(ExtensionUpdateState.UPDATE_AVAILABLE);
+        return;
       }
-      return ExtensionUpdateState.UP_TO_DATE;
+      setExtensionUpdateState(ExtensionUpdateState.UP_TO_DATE);
+      return;
     }
   } catch (error) {
     console.error(
       `Failed to check for updates for extension "${installMetadata.source}": ${getErrorMessage(error)}`,
     );
-    return ExtensionUpdateState.ERROR;
+    setExtensionUpdateState(ExtensionUpdateState.ERROR);
+    return;
   }
 }
 
