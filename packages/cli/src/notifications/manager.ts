@@ -42,6 +42,9 @@ export function initNotifications(settings: LoadedSettings): void {
           {} as typeof DEFAULT_NOTIFICATION_SETTINGS.events,
         ),
       };
+    } else {
+      // Reset to default if settings are not present in the config.
+      currentSettings = DEFAULT_NOTIFICATION_SETTINGS;
     }
   } catch (error) {
     console.error('Failed to load notification settings:', error);
