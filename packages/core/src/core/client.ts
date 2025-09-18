@@ -49,6 +49,7 @@ import {
 import type { IdeContext, File } from '../ide/types.js';
 import { handleFallback } from '../fallback/handler.js';
 import type { RoutingContext } from '../routing/routingStrategy.js';
+import { uiTelemetryService } from '../telemetry/uiTelemetry.js';
 
 export function isThinkingSupported(model: string) {
   return model.startsWith('gemini-2.5') || model === DEFAULT_GEMINI_MODEL_AUTO;
@@ -771,6 +772,8 @@ export class GeminiClient {
           CompressionStatus.COMPRESSION_FAILED_TOKEN_COUNT_ERROR,
       };
     }
+
+    uiTelemetryService.setLastPromptTokenCount(newTokenCount);
 
     logChatCompression(
       this.config,
