@@ -266,7 +266,6 @@ jobs:
       - 'merge_queue_skipper'
       - 'lint'
       - 'test_linux'
-      - 'test_slow_platforms'
       - 'codeql'
       - 'bundle_size'
     runs-on: 'gemini-cli-ubuntu-16-core'
