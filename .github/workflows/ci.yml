@@ -144,7 +144,7 @@ jobs:
           path: 'packages/*/junit.xml'
 
   test_slow_platforms:
-    name: 'Test (Slow Platforms - Mac)'
+    name: 'Slow Test - Mac'
     runs-on: '${{ matrix.os }}'
     needs:
       - 'merge_queue_skipper'
@@ -259,24 +259,20 @@ jobs:
           clean-script: 'clean'
 
   test_windows:
-    name: 'Test (Slow Platforms - Windows)'
+    name: 'Slow Test - Win'
     needs: 'merge_queue_skipper'
     if: "needs.merge_queue_skipper.outputs.skip != 'true'"
     runs-on: 'gemini-cli-windows-16-core'
     continue-on-error: true
-    strategy:
-      matrix:
-        node-version:
-          - '20.x'
 
     steps:
       - name: 'Checkout'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
 
-      - name: 'Set up Node.js ${{ matrix.node-version }}'
+      - name: 'Set up Node.js 20.x'
         uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions/setup-node@v4
         with:
-          node-version: '${{ matrix.node-version }}'
+          node-version: '20.x'
           cache: 'npm'
 
       - name: 'Configure Windows Defender exclusions'

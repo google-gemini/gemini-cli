@@ -127,7 +127,7 @@ jobs:
           npx vitest run --root ./integration-tests
 
   e2e_slow_platforms:
-    name: 'E2E Test (Slow Platforms - Mac)'
+    name: 'Slow E2E - Mac'
     needs:
       - 'merge_queue_skipper'
       - 'build'
@@ -190,16 +190,12 @@ jobs:
         run: 'npx vitest run --root ./integration-tests'
 
   e2e_windows:
-    name: 'E2E Test (Slow Platforms - Windows)'
+    name: 'Slow E2E - Win'
     if: "needs.merge_queue_skipper.outputs.skip != 'true'"
     needs:
       - 'merge_queue_skipper'
     runs-on: 'gemini-cli-windows-16-core'
     continue-on-error: true
-    strategy:
-      matrix:
-        node-version:
-          - '20.x'
 
     steps:
       - name: 'Checkout (fork)'
@@ -213,10 +209,10 @@ jobs:
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
         if: "github.event_name != 'pull_request_target'"
 
-      - name: 'Set up Node.js ${{ matrix.node-version }}'
+      - name: 'Set up Node.js 20.x'
         uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions-node@v4
         with:
-          node-version: '${{ matrix.node-version }}'
+          node-version: '20.x'
           cache: 'npm'
 
       - name: 'Configure Windows Defender exclusions'
