@@ -20,6 +20,7 @@ import {
 } from 'react';
 import readline from 'node:readline';
 import { PassThrough } from 'node:stream';
+import { runExitCleanup } from '../../utils/cleanup.js';
 import {
   BACKSLASH_ENTER_DETECTION_WINDOW_MS,
   CHAR_CODE_ESC,
@@ -93,6 +94,10 @@ export function KeypressProvider({
   const dragBufferRef = useRef('');
   const draggingTimerRef = useRef<NodeJS.Timeout | null>(null);
 
+  const ctrlCPressCount = useRef(0);
+  const ctrlCTimer = useRef<NodeJS.Timeout | null>(null);
+  const CTRL_C_TIMEOUT_MS = 3000;
+
   const subscribe = useCallback(
     (handler: KeypressHandler) => {
       subscribers.add(handler);
@@ -112,6 +117,30 @@ export function KeypressProvider({
       if (draggingTimerRef.current) {
         clearTimeout(draggingTimerRef.current);
         draggingTimerRef.current = null;
+      }
+    };
+
+    const handleCtrlCExit = () => {
+      ctrlCPressCount.current++;
+
+      if (ctrlCPressCount.current === 1) {
+        console.log('\nPress Ctrl+C again within 3 seconds to exit');
+
+        if (ctrlCTimer.current) {
+          clearTimeout(ctrlCTimer.current);
+        }
+        ctrlCTimer.current = setTimeout(() => {
+          ctrlCPressCount.current = 0;
+        }, CTRL_C_TIMEOUT_MS);
+
+        return false;
+      } else {
+        // Second press - execute exit
+        console.log('\nExiting Gemini CLI...');
+        runExitCleanup().then(() => {
+          process.exit(0);
+        });
+        return true;
       }
     };
 
@@ -489,6 +518,12 @@ export function KeypressProvider({
           );
         }
         kittySequenceBuffer = '';
+
+        const shouldExit = handleCtrlCExit();
+        if (shouldExit) {
+          return;
+        }
+
         if (key.sequence === `${ESC}${KITTY_CTRL_C}`) {
           broadcast({
             name: 'c',
@@ -717,6 +752,12 @@ export function KeypressProvider({
         });
         isDraggingRef.current = false;
         dragBufferRef.current = '';
+      }
+
+      // Clear Ctrl+C timer
+      if (ctrlCTimer.current) {
+        clearTimeout(ctrlCTimer.current);
+        ctrlCTimer.current = null;
       }
     };
   }, [
