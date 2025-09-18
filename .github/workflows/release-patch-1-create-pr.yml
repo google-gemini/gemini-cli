@@ -65,25 +65,13 @@ jobs:
           permission-pull-requests: 'write'
           permission-contents: 'write'
 
-      - name: 'Create Patch for Stable'
-        id: 'create_patch_stable'
-        if: "github.event.inputs.channel == 'stable'"
+      - name: 'Create Patch'
+        id: 'create_patch'
         env:
           GH_TOKEN: '${{ steps.generate_token.outputs.token }}'
         continue-on-error: true
         run: |
-          node scripts/create-patch-pr.js --commit=${{ github.event.inputs.commit }} --channel=stable --dry-run=${{ github.event.inputs.dry_run }} > patch_output.log 2>&1
-          echo "EXIT_CODE=$?" >> "$GITHUB_OUTPUT"
-          cat patch_output.log
-
-      - name: 'Create Patch for Preview'
-        id: 'create_patch_preview'
-        if: "github.event.inputs.channel != 'stable'"
-        env:
-          GH_TOKEN: '${{ steps.generate_token.outputs.token }}'
-        continue-on-error: true
-        run: |
-          node scripts/create-patch-pr.js --commit=${{ github.event.inputs.commit }} --channel=${{ github.event.inputs.channel }} --dry-run=${{ github.event.inputs.dry_run }} > patch_output.log 2>&1
+          node scripts/releasing/create-patch-pr.js --commit=${{ github.event.inputs.commit }} --channel=${{ github.event.inputs.channel }} --dry-run=${{ github.event.inputs.dry_run }} > patch_output.log 2>&1
           echo "EXIT_CODE=$?" >> "$GITHUB_OUTPUT"
           cat patch_output.log
 
@@ -91,46 +79,12 @@ jobs:
         if: '!inputs.dry_run && inputs.original_pr'
         env:
           GH_TOKEN: '${{ steps.generate_token.outputs.token }}'
+          ORIGINAL_PR: '${{ github.event.inputs.original_pr }}'
+          EXIT_CODE: '${{ steps.create_patch.outputs.EXIT_CODE }}'
+          OUTPUT_LOG: 'patch_output.log'
+          COMMIT: '${{ github.event.inputs.commit }}'
+          CHANNEL: '${{ github.event.inputs.channel }}'
+          REPOSITORY: '${{ github.repository }}'
+          GITHUB_RUN_ID: '${{ github.run_id }}'
         run: |
-          # Determine which step ran based on channel
-          if [ "${{ github.event.inputs.channel }}" = "stable" ]; then
-            EXIT_CODE="${{ steps.create_patch_stable.outputs.EXIT_CODE }}"
-          else
-            EXIT_CODE="${{ steps.create_patch_preview.outputs.EXIT_CODE }}"
-          fi
-
-          # Check if patch output exists and contains branch info
-          if [ -f patch_output.log ]; then
-            if grep -q "already has an open PR" patch_output.log; then
-              # Branch exists with existing PR
-              PR_NUMBER=$(grep "Found existing PR" patch_output.log | sed 's/.*Found existing PR #\([0-9]*\).*/\1/')
-              PR_URL=$(grep "Found existing PR" patch_output.log | sed 's/.*Found existing PR #[0-9]*: \(.*\)/\1/')
-              gh pr comment ${{ github.event.inputs.original_pr }} --body "ℹ️ Patch PR already exists! A patch PR for this change already exists: [#$PR_NUMBER]($PR_URL). Please review and approve this existing patch PR. If it's incorrect, close it and run the patch command again."
-
-            elif grep -q "exists but has no open PR" patch_output.log; then
-              # Branch exists but no PR
-              BRANCH=$(grep "Hotfix branch" patch_output.log | grep "already exists" | sed 's/.*Hotfix branch \(.*\) already exists.*/\1/')
-              gh pr comment ${{ github.event.inputs.original_pr }} --body "ℹ️ Patch branch exists but no PR found! A patch branch [\`$BRANCH\`](https://github.com/${{ github.repository }}/tree/$BRANCH) exists but has no open PR. This might indicate an incomplete patch process. Please delete the branch and run the patch command again."
-
-            elif [ "$EXIT_CODE" = "0" ]; then
-              # Success - find the newly created PR
-              BRANCH=$(grep "Creating hotfix branch" patch_output.log | sed 's/.*Creating hotfix branch \(.*\) from.*/\1/')
-
-              # Find the PR for the new branch
-              PR_INFO=$(gh pr list --head "$BRANCH" --json number,url --jq '.[0] // empty')
-
-              if [ -n "$PR_INFO" ]; then
-                PR_NUMBER=$(echo "$PR_INFO" | jq -r '.number')
-                PR_URL=$(echo "$PR_INFO" | jq -r '.url')
-                gh pr comment ${{ github.event.inputs.original_pr }} --body "🚀 Patch PR created! The patch release PR has been created: [#$PR_NUMBER]($PR_URL). Please review and approve this PR to complete the patch release."
-              else
-                # Fallback if we can't find the specific PR
-                gh pr comment ${{ github.event.inputs.original_pr }} --body "🚀 Patch PR created! The patch release PR for this change has been created. Please review and approve it: [View all patch PRs](https://github.com/${{ github.repository }}/pulls?q=is%3Apr+is%3Aopen+label%3Apatch)"
-              fi
-            else
-              # Other error
-              gh pr comment ${{ github.event.inputs.original_pr }} --body "❌ Patch creation failed! There was an error creating the patch. Please check the workflow logs for details: [View workflow run](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})"
-            fi
-          else
-            gh pr comment ${{ github.event.inputs.original_pr }} --body "❌ Patch creation failed! No output was generated. Please check the workflow logs: [View workflow run](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})"
-          fi
+          node scripts/releasing/patch-create-comment.js
