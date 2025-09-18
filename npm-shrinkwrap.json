@@ -1,12 +1,12 @@
 {
   "name": "@google/gemini-cli",
-  "version": "0.6.0-nightly",
+  "version": "0.7.0-nightly.20250918.2722473a",
   "lockfileVersion": 3,
   "requires": true,
   "packages": {
     "": {
       "name": "@google/gemini-cli",
-      "version": "0.6.0-nightly",
+      "version": "0.7.0-nightly.20250918.2722473a",
       "workspaces": [
         "packages/*"
       ],
@@ -34,6 +34,7 @@
         "eslint-plugin-react-hooks": "^5.2.0",
         "glob": "^10.4.5",
         "globals": "^16.0.0",
+        "google-artifactregistry-auth": "^3.4.0",
         "json": "^11.0.0",
         "memfs": "^4.17.2",
         "mnemonist": "^0.40.3",
@@ -8980,6 +8981,20 @@
         "url": "https://github.com/sponsors/sindresorhus"
       }
     },
+    "node_modules/google-artifactregistry-auth": {
+      "version": "3.4.0",
+      "resolved": "https://registry.npmjs.org/google-artifactregistry-auth/-/google-artifactregistry-auth-3.4.0.tgz",
+      "integrity": "sha512-Z2EmP7gbKtTmK5k846tfF7dQqeU2vREIcfCI79FKRTAdkbUZ/BFGJwwTvC2ss0vYSySvK7h6I1JsqBFqIXABBg==",
+      "dev": true,
+      "license": "Apache-2.0",
+      "dependencies": {
+        "google-auth-library": "^9.14.0",
+        "yargs": "^17.1.1"
+      },
+      "bin": {
+        "artifactregistry-auth": "src/main.js"
+      }
+    },
     "node_modules/google-auth-library": {
       "version": "9.15.1",
       "resolved": "https://registry.npmjs.org/google-auth-library/-/google-auth-library-9.15.1.tgz",
@@ -16279,7 +16294,7 @@
     },
     "packages/a2a-server": {
       "name": "@google/gemini-cli-a2a-server",
-      "version": "0.6.0-nightly",
+      "version": "0.7.0-nightly.20250918.2722473a",
       "dependencies": {
         "@a2a-js/sdk": "^0.3.2",
         "@google-cloud/storage": "^7.16.0",
@@ -16550,7 +16565,7 @@
     },
     "packages/cli": {
       "name": "@google/gemini-cli",
-      "version": "0.6.0-nightly",
+      "version": "0.7.0-nightly.20250918.2722473a",
       "dependencies": {
         "@google/gemini-cli-core": "file:../core",
         "@google/genai": "1.16.0",
@@ -16742,7 +16757,7 @@
     },
     "packages/core": {
       "name": "@google/gemini-cli-core",
-      "version": "0.6.0-nightly",
+      "version": "0.7.0-nightly.20250918.2722473a",
       "dependencies": {
         "@google-cloud/logging": "^11.2.1",
         "@google-cloud/opentelemetry-cloud-monitoring-exporter": "^0.21.0",
@@ -16887,7 +16902,7 @@
     },
     "packages/test-utils": {
       "name": "@google/gemini-cli-test-utils",
-      "version": "0.6.0-nightly",
+      "version": "0.7.0-nightly.20250918.2722473a",
       "license": "Apache-2.0",
       "devDependencies": {
         "typescript": "^5.3.3"
@@ -16898,7 +16913,7 @@
     },
     "packages/vscode-ide-companion": {
       "name": "gemini-cli-vscode-ide-companion",
-      "version": "0.6.0-nightly",
+      "version": "0.7.0-nightly.20250918.2722473a",
       "license": "LICENSE",
       "dependencies": {
         "@modelcontextprotocol/sdk": "^1.15.1",
