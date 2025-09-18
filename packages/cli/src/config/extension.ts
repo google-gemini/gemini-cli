@@ -367,7 +367,7 @@ async function promptForContinuation(prompt: string): Promise<boolean> {
   return new Promise((resolve) => {
     rl.question(prompt, (answer) => {
       rl.close();
-      resolve(answer.toLowerCase() === 'y' || answer.trim() === '');
+      resolve(['y', ''].includes(answer.trim().toLowerCase()));
     });
   });
 }
