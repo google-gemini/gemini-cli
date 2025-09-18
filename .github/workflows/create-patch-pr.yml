@@ -46,13 +46,22 @@ jobs:
           git config user.name "gemini-cli-robot"
           git config user.email "gemini-cli-robot@google.com"
 
+      - name: 'Generate GitHub App Token'
+        id: 'generate_token'
+        uses: 'actions/create-github-app-token@a8d616148505b5069dccd32f177bb87d7f39123b'
+        with:
+          app-id: '${{ secrets.APP_ID }}'
+          private-key: '${{ secrets.PRIVATE_KEY }}'
+          permission-pull-requests: 'write'
+          permission-contents: 'write'
+
       - name: 'Create Patch for Stable'
         if: "github.event.inputs.channel == 'stable'"
         env:
-          GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+          GH_TOKEN: '${{ steps.generate_token.outputs.token }}'
         run: 'node scripts/create-patch-pr.js --commit=${{ github.event.inputs.commit }} --channel=stable --dry-run=${{ github.event.inputs.dry_run }}'
 
       - name: 'Create Patch for Preview'
         env:
-          GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+          GH_TOKEN: '${{ steps.generate_token.outputs.token }}'
         run: 'node scripts/create-patch-pr.js --commit=${{ github.event.inputs.commit }} --channel=${{ github.event.inputs.channel }} --dry-run=${{ github.event.inputs.dry_run }}'

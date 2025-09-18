@@ -163,11 +163,16 @@ describe('gemini.tsx main function', () => {
 });
 
 describe('gemini.tsx main function kitty protocol', () => {
+  let originalEnvNoRelaunch: string | undefined;
   let setRawModeSpy: MockInstance<
     (mode: boolean) => NodeJS.ReadStream & { fd: 0 }
   >;
 
   beforeEach(() => {
+    // Set no relaunch in tests since process spawning causing issues in tests
+    originalEnvNoRelaunch = process.env['GEMINI_CLI_NO_RELAUNCH'];
+    process.env['GEMINI_CLI_NO_RELAUNCH'] = 'true';
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     if (!(process.stdin as any).setRawMode) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -183,6 +188,15 @@ describe('gemini.tsx main function kitty protocol', () => {
       value: false,
       configurable: true,
     });
+  });
+
+  afterEach(() => {
+    // Restore original env variables
+    if (originalEnvNoRelaunch !== undefined) {
+      process.env['GEMINI_CLI_NO_RELAUNCH'] = originalEnvNoRelaunch;
+    } else {
+      delete process.env['GEMINI_CLI_NO_RELAUNCH'];
+    }
   });
 
   it('should call setRawMode and detectAndEnableKittyProtocol when isInteractive is true', async () => {
