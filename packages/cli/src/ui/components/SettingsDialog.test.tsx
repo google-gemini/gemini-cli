@@ -154,27 +154,18 @@ describe('SettingsDialog', () => {
   // Simple delay function for remaining tests that need gradual migration
   const wait = (ms = 50) => new Promise((resolve) => setTimeout(resolve, ms));
 
-  // Generic waitFor utility for waiting on conditions with better error handling
-  // Compatible with @testing-library/react waitFor - handles both boolean predicates and assertion functions
+  // Custom waitFor utility for ink testing environment (not compatible with @testing-library/react)
   const waitFor = async (
-    predicate: () => boolean | void,
-    options: { timeout?: number; interval?: number; message?: string } = {},
+    predicate: () => void,
+    options: { timeout?: number; interval?: number } = {},
   ) => {
-    const {
-      timeout = 1000,
-      interval = 10,
-      message = 'Condition not met in time',
-    } = options;
+    const { timeout = 1000, interval = 10 } = options;
     const start = Date.now();
     let lastError: unknown;
     while (Date.now() - start < timeout) {
       try {
-        const result = predicate();
-        if (result !== false) {
-          return;
-        }
-        // Predicate ran without throwing, but returned false. Clear any stale error.
-        lastError = undefined;
+        predicate();
+        return;
       } catch (e) {
         lastError = e;
       }
@@ -183,7 +174,7 @@ describe('SettingsDialog', () => {
     if (lastError) {
       throw lastError;
     }
-    throw new Error(message);
+    throw new Error('waitFor timed out');
   };
 
   beforeEach(() => {
@@ -389,21 +380,16 @@ describe('SettingsDialog', () => {
         stdin.write(TerminalKeys.ENTER as string);
       });
       // Wait for the setting change to be processed
-      await waitFor(
-        () => vi.mocked(saveModifiedSettings).mock.calls.length > 0,
-        {
-          message:
-            'saveModifiedSettings was not called within the timeout period',
-        },
-      );
+      await waitFor(() => {
+        expect(
+          vi.mocked(saveModifiedSettings).mock.calls.length,
+        ).toBeGreaterThan(0);
+      });
 
-      // Wait for the mock to be called with more generous timeout for Windows
-      await waitFor(
-        () => {
-          expect(vi.mocked(saveModifiedSettings)).toHaveBeenCalled();
-        },
-        { timeout: 1000 },
-      );
+      // Wait for the mock to be called
+      await waitFor(() => {
+        expect(vi.mocked(saveModifiedSettings)).toHaveBeenCalled();
+      });
 
       expect(vi.mocked(saveModifiedSettings)).toHaveBeenCalledWith(
         new Set<string>(['general.disableAutoUpdate']),
@@ -480,12 +466,9 @@ describe('SettingsDialog', () => {
         await wait();
         stdin.write(TerminalKeys.ENTER as string);
         await wait();
-        await waitFor(
-          () => {
-            expect(vi.mocked(saveModifiedSettings)).toHaveBeenCalled();
-          },
-          { timeout: 1000 },
-        );
+        await waitFor(() => {
+          expect(vi.mocked(saveModifiedSettings)).toHaveBeenCalled();
+        });
 
         expect(vi.mocked(saveModifiedSettings)).toHaveBeenCalledWith(
           new Set<string>(['ui.theme']),
@@ -520,12 +503,9 @@ describe('SettingsDialog', () => {
         await wait();
         stdin.write(TerminalKeys.ENTER as string);
         await wait();
-        await waitFor(
-          () => {
-            expect(vi.mocked(saveModifiedSettings)).toHaveBeenCalled();
-          },
-          { timeout: 1000 },
-        );
+        await waitFor(() => {
+          expect(vi.mocked(saveModifiedSettings)).toHaveBeenCalled();
+        });
 
         expect(vi.mocked(saveModifiedSettings)).toHaveBeenCalledWith(
           new Set<string>(['ui.theme']),
@@ -613,8 +593,7 @@ describe('SettingsDialog', () => {
 
       // Wait for initial render
       await waitFor(() => {
-        const frame = lastFrame();
-        expect(frame).toContain('Vim Mode');
+        expect(lastFrame()).toContain('Vim Mode');
       });
 
       // The UI should show the settings section is active and scope section is inactive
@@ -1036,8 +1015,7 @@ describe('SettingsDialog', () => {
 
       // Wait for initial render
       await waitFor(() => {
-        const frame = lastFrame();
-        expect(frame).toContain('Vim Mode');
+        expect(lastFrame()).toContain('Vim Mode');
       });
 
       // Verify initial state: settings section active, scope section inactive
@@ -1099,8 +1077,7 @@ describe('SettingsDialog', () => {
 
       // Wait for initial render
       await waitFor(() => {
-        const frame = lastFrame();
-        expect(frame).toContain('Vim Mode');
+        expect(lastFrame()).toContain('Vim Mode');
       });
 
       // Verify the complete UI is rendered with all necessary sections
