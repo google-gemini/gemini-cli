@@ -1,0 +1,296 @@
+name: Fork: sync upstream tag → GH Packages publish + release
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Only simulate (true/false)"
+        type: boolean
+        default: false
+      force_skip_tests:
+        description: "Skip tests"
+        type: boolean
+        default: false
+      tag_only:
+        description: "Only sync tags and create releases (skip build, test, publish)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  packages: write
+  id-token: write
+  pull-requests: write
+
+concurrency:
+  group: fork-sync-release
+  cancel-in-progress: true
+
+env:
+  # === REQUIRED: original repo coordinates ===
+  UPSTREAM_OWNER: google-gemini
+  UPSTREAM_REPO: gemini-cli
+
+  # strict semver v0.5.3 (no pre-release or build)
+  TAG_REGEX: '^v[0-9]+\.[0-9]+\.[0-9]+$'
+
+  # node & publish mode
+  NODE_VERSION_FILE: .nvmrc
+  PACKAGE_PUBLISH_MODE: workspaces  # or: single
+  WORKSPACES_FILTER: ""             # comma-separated names to limit (optional)
+
+  # GitHub Packages (npm) config
+  GH_NPM_REGISTRY: "https://npm.pkg.github.com"
+  USER_SCOPE: "${{ github.repository_owner }}"  # resolves to your username
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout fork
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure git
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Add remotes & fetch
+        run: |
+          git remote set-url origin "https://github.com/${{ github.repository }}"
+          git remote add upstream "https://github.com/${{ env.UPSTREAM_OWNER }}/${{ env.UPSTREAM_REPO }}.git" 2>/dev/null || true
+          git fetch --tags origin
+          git fetch --tags upstream
+
+      - name: Build upstream/origin tag maps
+        id: maps
+        shell: bash
+        run: |
+          set -euo pipefail
+          map_tag_commit() {
+            local remote="$1"
+            git ls-remote --tags "$remote" \
+            | awk '{print $1" "$2}' \
+            | sed 's#refs/tags/##' \
+            | awk '
+              { tag=$2; sha=$1; base[tag]=sha }
+              /\^\{\}$/ { sub(/\^\{\}$/, "", tag); peeled[tag]=$1 }
+              END { for (t in base) print t, ((t in peeled)?peeled[t]:base[t]) }'
+          }
+          echo "UPSTREAM_MAP<<EOF" >> $GITHUB_OUTPUT
+          map_tag_commit upstream | sort >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+          echo "ORIGIN_MAP<<EOF" >> $GITHUB_OUTPUT
+          map_tag_commit origin | sort >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Decide missing strict semver tags
+        id: decide-missing-tags
+        run: |
+          printf "%s\n" "${{ steps.maps.outputs.UPSTREAM_MAP }}" > /tmp/upstream_map.txt
+          printf "%s\n" "${{ steps.maps.outputs.ORIGIN_MAP }}"  > /tmp/origin_map.txt
+          awk -v re="${TAG_REGEX}" 	'$1 ~ re' /tmp/upstream_map.txt > /tmp/upstream_semver.txt
+          awk -v re="${TAG_REGEX}" 	'$1 ~ re' /tmp/origin_map.txt  > /tmp/origin_semver.txt
+          cut -d' ' -f1 /tmp/upstream_semver.txt | sort > /tmp/upstream_tags.txt
+          cut -d' ' -f1 /tmp/origin_semver.txt  | sort > /tmp/origin_tags.txt
+          missing="$(comm -23 /tmp/upstream_tags.txt /tmp/origin_tags.txt || true)"
+          if [ -z "$missing" ]; then
+            echo "has_missing=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_missing=true" >> "$GITHUB_OUTPUT"
+            echo "missing<<EOF" >> "$GITHUB_OUTPUT"
+            echo "$missing" >> "$GITHUB_OUTPUT"
+            echo "EOF" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Exit if nothing to sync
+        if: steps.decide-missing-tags.outputs.has_missing == 'false'
+        run: echo "No new tags to sync."
+
+      - name: Select oldest missing tag to process
+        id: select-next-tag
+        if: steps.decide-missing-tags.outputs.has_missing == 'true'
+        run: |
+          set -euo pipefail
+          tag=$(echo "${{ steps.decide-missing-tags.outputs.missing }}" | head -n 1)
+          sha=$(awk -v t="$tag" 	'$1==t {print $2; exit}' /tmp/upstream_semver.txt)
+          if [ -z "$tag" ] || [ -z "$sha" ]; then
+            echo "::error::Could not determine next tag or its SHA."
+            exit 1
+          fi
+          echo "tag=${tag}" >> $GITHUB_OUTPUT
+          echo "sha=${sha}" >> $GITHUB_OUTPUT
+          echo "has_tag=true" >> $GITHUB_OUTPUT
+          echo "Processing tag: ${tag} (${sha})"
+
+      # =================================================================
+      #  Node.js Project Setup (skipped in tag_only mode)
+      # =================================================================
+      - name: Setup Node.js
+        if: steps.select-next-tag.outputs.has_tag == 'true' && env.TAG_ONLY == 'false'
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: ${{ env.NODE_VERSION_FILE }}
+          registry-url: ${{ env.GH_NPM_REGISTRY }}
+          scope: '@${{ env.USER_SCOPE }}'
+          always-auth: true
+
+      - name: Configure npm for GitHub Packages
+        if: steps.select-next-tag.outputs.has_tag == 'true' && env.TAG_ONLY == 'false'
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cat <<EOF > ~/.npmrc
+          @${{ env.USER_SCOPE }}:registry=${{ env.GH_NPM_REGISTRY }}
+          //npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}
+          always-auth=true
+          EOF
+
+      - name: Install dependencies
+        if: steps.select-next-tag.outputs.has_tag == 'true' && env.TAG_ONLY == 'false'
+        run: npm ci
+
+      - name: Validate package scopes for publishing
+        if: steps.select-next-tag.outputs.has_tag == 'true' && env.TAG_ONLY == 'false'
+        run: |
+          FAIL=0
+          check_pkg () {
+            local file="$1"
+            local name
+            name=$(jq -r '.name' "$file" 2>/dev/null || echo "")
+            [ "$name" = "null" ] && name=""
+            if [ -n "$name" ] && ! grep -q "^@${{ env.USER_SCOPE }}/" <<<"$name"; then
+              echo "::error file=$file::Package name 	'$name' must start with @${{ env.USER_SCOPE }}/"
+              FAIL=1
+            fi
+          }
+          check_pkg package.json
+          if [ -f package-lock.json ] || [ -d packages ]; then
+            find . -path "*/node_modules/*" -prune -o -name package.json -print \
+            | grep -v 	'^./package.json$' \
+            | while read -r f; do check_pkg "$f"; done
+          fi
+          [ $FAIL -eq 0 ] || exit 1
+
+      # =================================================================
+      #  Release Process for Selected Tag
+      # =================================================================
+      - name: Merge upstream tag into main branch
+        id: merge
+        if: steps.select-next-tag.outputs.has_tag == 'true'
+        env:
+          DRY_RUN: ${{ inputs.dry_run }}
+          TAG: ${{ steps.select-next-tag.outputs.tag }}
+          SHA: ${{ steps.select-next-tag.outputs.sha }}
+        run: |
+          set -euo pipefail
+          MAIN_BRANCH=$(git symbolic-ref --short HEAD)
+          echo "Checking out ${MAIN_BRANCH} and pulling latest changes."
+          git checkout "$MAIN_BRANCH"
+          git pull origin "$MAIN_BRANCH"
+
+          echo "Attempting to merge upstream commit ${SHA} (from tag ${TAG}) into ${MAIN_BRANCH}"
+          if ! git merge --no-ff -m "Merge tag 	'${TAG}' from upstream" "$SHA"; then
+            echo "::warning::Merge conflict detected for tag ${TAG}. Aborting merge."
+            git merge --abort
+            echo "conflict=true" >> $GITHUB_OUTPUT
+          else
+            echo "Merge successful."
+            [ "${DRY_RUN}" = "true" ] && echo "[DRY RUN] Would push ${MAIN_BRANCH} to origin" || git push origin "$MAIN_BRANCH"
+            MERGE_COMMIT_SHA=$(git rev-parse HEAD)
+            echo "conflict=false" >> $GITHUB_OUTPUT
+            echo "merge_commit_sha=${MERGE_COMMIT_SHA}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create PR for manual merge on conflict
+        if: steps.merge.outputs.conflict == 'true'
+        env:
+          DRY_RUN: ${{ inputs.dry_run }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.select-next-tag.outputs.tag }}
+          SHA: ${{ steps.select-next-tag.outputs.sha }}
+        run: |
+          set -euo pipefail
+          MAIN_BRANCH=$(git symbolic-ref --short HEAD)
+          echo "Creating PR to merge upstream commit ${SHA} into ${MAIN_BRANCH}."
+          if [ "${DRY_RUN}" = "true" ]; then
+            echo "[DRY RUN] Would create PR to merge ${SHA} into ${MAIN_BRANCH}"
+          else
+            gh pr create --base "${MAIN_BRANCH}" --head "${SHA}" \
+                --title "chore(release): Merge upstream tag ${TAG}" \
+                --body "Automatic merge of upstream tag 	`${TAG}` into 	`${MAIN_BRANCH}` failed due to conflicts. Please resolve them manually." \
+                || echo "Could not create PR. One may already exist for this ref."
+          fi
+
+      - name: Run tests on merged code
+        if: steps.merge.outputs.conflict == 'false' && env.TAG_ONLY == 'false'
+        env:
+          DRY_RUN: ${{ inputs.dry_run }}
+          FORCE_SKIP_TESTS: ${{ inputs.force_skip_tests }}
+        run: |
+          if [ "${FORCE_SKIP_TESTS}" != "true" ]; then
+            [ "${DRY_RUN}" = "true" ] && echo "[DRY RUN] npm test" || npm test
+          fi
+
+      - name: Build packages
+        if: steps.merge.outputs.conflict == 'false' && env.TAG_ONLY == 'false'
+        env:
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          if [ "${DRY_RUN}" = "true" ]; then
+            echo "[DRY RUN] npm run build || true"
+            echo "[DRY RUN] npm run build:packages || true"
+            echo "[DRY RUN] npm run prepare:package || true"
+          else
+            npm run build || true
+            npm run build:packages || true
+            npm run prepare:package || true
+          fi
+
+      - name: Publish packages to GitHub Packages
+        if: steps.merge.outputs.conflict == 'false' && env.TAG_ONLY == 'false'
+        env:
+          DRY_RUN: ${{ inputs.dry_run }}
+          PACKAGE_PUBLISH_MODE: ${{ env.PACKAGE_PUBLISH_MODE }}
+          WORKSPACES_FILTER: ${{ env.WORKSPACES_FILTER }}
+        run: |
+          if [ "${DRY_RUN}" = "true" ]; then
+            echo "[DRY RUN] publish to GitHub Packages"
+          else
+            if [ "${PACKAGE_PUBLISH_MODE}" = "single" ]; then
+              npm publish --provenance
+            else
+              if [ -n "${WORKSPACES_FILTER}" ]; then
+                IFS=',' read -ra WS <<< "${WORKSPACES_FILTER}"
+                for w in "${WS[@]}"; do
+                  npm publish --workspace "$(echo "$w" | xargs)" --if-present --provenance
+                done
+              else
+                npm publish --workspaces --if-present --provenance
+              fi
+            fi
+          fi
+
+      - name: Create Git Tag and GitHub Release
+        if: steps.merge.outputs.conflict == 'false'
+        env:
+          DRY_RUN: ${{ inputs.dry_run }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.select-next-tag.outputs.tag }}
+        run: |
+          set -euo pipefail
+          echo "Creating git tag ${{ env.TAG }} and GitHub release."
+          if [ "${DRY_RUN}" = "true" ]; then
+            echo "[DRY RUN] git tag -fa ${{ env.TAG }} on commit ${{ steps.merge.outputs.merge_commit_sha }}"
+            echo "[DRY RUN] git push origin ${{ env.TAG }} --force"
+            echo "[DRY RUN] gh release create ${{ env.TAG }} --target ${{ steps.merge.outputs.merge_commit_sha }} --title 'Release ${{ env.TAG }}' --generate-notes"
+          else
+            git tag -fa "${{ env.TAG }}" -m "Release ${{ env.TAG }} with custom changes" "${{ steps.merge.outputs.merge_commit_sha }}"
+            git push origin "${{ env.TAG }}" --force
+            gh release create "${{ env.TAG }}" --target "${{ steps.merge.outputs.merge_commit_sha }}" --title "Release ${{ env.TAG }}" --generate-notes || true
+          fi

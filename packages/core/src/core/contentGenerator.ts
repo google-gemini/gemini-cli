@@ -137,6 +137,25 @@ export async function createContentGenerator(
         'x-gemini-api-privileged-user-id': `${installationId}`,
       };
     }
+
+    const iapClientId = process.env['IAP_CLIENT_ID'];
+    const gcpCreds = process.env['GOOGLE_APPLICATION_CREDENTIALS'];
+    if (iapClientId && gcpCreds) {
+      const { GoogleAuth } = await import('google-auth-library');
+      const auth = new GoogleAuth({
+        keyFile: gcpCreds,
+      });
+      const client = await auth.getIdTokenClient(iapClientId);
+      const idToken = await client.idTokenProvider.fetchIdToken(iapClientId);
+      if (idToken) {
+        headers['Proxy-Authorization'] = `Bearer ${idToken}`;
+      } else {
+        throw new Error(
+          'Failed to fetch IAP token. Please check your credentials and permissions.',
+        );
+      }
+    }
+
     const httpOptions = { headers };
 
     const googleGenAI = new GoogleGenAI({
