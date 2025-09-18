@@ -145,7 +145,6 @@ jobs:
       matrix:
         os:
           - 'macos-latest'
-          - 'gemini-cli-windows-16-core'
         node-version:
           - '20.x'
 
@@ -175,39 +174,6 @@ jobs:
         with:
           node-version: '${{ matrix.node-version }}'
 
-      - name: 'Configure Windows Defender exclusions'
-        if: "runner.os == 'Windows'"
-        run: |
-          Add-MpPreference -ExclusionPath $env:GITHUB_WORKSPACE -Force
-          Add-MpPreference -ExclusionPath "$env:GITHUB_WORKSPACE\node_modules" -Force
-          Add-MpPreference -ExclusionPath "$env:GITHUB_WORKSPACE\packages" -Force
-          Add-MpPreference -ExclusionPath "$env:TEMP" -Force
-        shell: 'pwsh'
-
-      - name: 'Configure npm for Windows performance'
-        if: "runner.os == 'Windows'"
-        run: |
-          npm config set progress false
-          npm config set audit false
-          npm config set fund false
-          npm config set loglevel error
-          npm config set maxsockets 32
-          npm config set registry https://registry.npmjs.org/
-        shell: 'pwsh'
-
-      - name: 'Run E2E tests (Windows)'
-        if: "runner.os == 'Windows'"
-        env:
-          GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
-          KEEP_OUTPUT: 'true'
-          SANDBOX: 'sandbox:none'
-          VERBOSE: 'true'
-          NODE_OPTIONS: '--max-old-space-size=32768 --max-semi-space-size=256'
-          UV_THREADPOOL_SIZE: '32'
-          NODE_ENV: 'test'
-        shell: 'pwsh'
-        run: 'npx vitest run --root ./integration-tests'
-
       - name: 'Fix rollup optional dependencies on macOS'
         if: "runner.os == 'macOS'"
         run: |
@@ -221,6 +187,70 @@ jobs:
           KEEP_OUTPUT: 'true'
           SANDBOX: 'sandbox:none'
           VERBOSE: 'true'
+        run: 'npx vitest run --root ./integration-tests'
+
+  e2e_windows:
+    name: 'E2E Test (Windows)'
+    if: 'needs.merge_queue_skipper.outputs.should_skip != ''true'''
+    needs:
+      - 'merge_queue_skipper'
+    runs-on: 'gemini-cli-windows-16-core'
+    continue-on-error: true
+    strategy:
+      matrix:
+        node-version:
+          - '20.x'
+
+    steps:
+      - name: 'Checkout (fork)'
+        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
+        if: "github.event_name == 'pull_request_target'"
+        with:
+          ref: '${{ github.event.pull_request.head.sha }}'
+          repository: '${{ github.event.pull_request.head.repo.full_name }}'
+
+      - name: 'Checkout (internal)'
+        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
+        if: "github.event_name != 'pull_request_target'"
+
+      - name: 'Set up Node.js ${{ matrix.node-version }}'
+        uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions-node@v4
+        with:
+          node-version: '${{ matrix.node-version }}'
+          cache: 'npm'
+
+      - name: 'Configure Windows Defender exclusions'
+        run: |
+          Add-MpPreference -ExclusionPath $env:GITHUB_WORKSPACE -Force
+          Add-MpPreference -ExclusionPath "$env:GITHUB_WORKSPACE\node_modules" -Force
+          Add-MpPreference -ExclusionPath "$env:GITHUB_WORKSPACE\packages" -Force
+          Add-MpPreference -ExclusionPath "$env:TEMP" -Force
+        shell: 'pwsh'
+
+      - name: 'Configure npm for Windows performance'
+        run: |
+          npm config set progress false
+          npm config set audit false
+          npm config set fund false
+          npm config set loglevel error
+          npm config set maxsockets 32
+          npm config set registry https://registry.npmjs.org/
+        shell: 'pwsh'
+
+      - name: 'Install dependencies'
+        run: 'npm ci'
+        shell: 'pwsh'
+
+      - name: 'Run E2E tests'
+        env:
+          GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
+          KEEP_OUTPUT: 'true'
+          SANDBOX: 'sandbox:none'
+          VERBOSE: 'true'
+          NODE_OPTIONS: '--max-old-space-size=32768 --max-semi-space-size=256'
+          UV_THREADPOOL_SIZE: '32'
+          NODE_ENV: 'test'
+        shell: 'pwsh'
         run: 'npx vitest run --root ./integration-tests'
 
   e2e:
