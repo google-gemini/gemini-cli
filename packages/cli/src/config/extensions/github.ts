@@ -74,20 +74,28 @@ export async function cloneFromGit(
   }
 }
 
-function parseGitHubRepo(source: string): { owner: string; repo: string } {
-  // The source should be "owner/repo" or a full GitHub URL.
-  const parts = source.split('/');
-  if (!source.includes('://') && parts.length !== 2) {
+export function parseGitHubRepoForReleases(source: string): {
+  owner: string;
+  repo: string;
+} {
+  // Default to a github repo path, so `source` can be just an org/repo
+  const parsedUrl = URL.parse(source, 'https://github.com');
+  // The pathname should be "/owner/repo".
+  const parts = parsedUrl?.pathname.substring(1).split('/');
+  if (parts?.length !== 2) {
     throw new Error(
-      `Invalid GitHub repository source: ${source}. Expected "owner/repo".`,
+      `Invalid GitHub repository source: ${source}. Expected "owner/repo" or a github repo uri.`,
     );
   }
-  const owner = parts.at(-2);
-  const repo = parts.at(-1)?.replace('.git', '');
+  const owner = parts[0];
+  const repo = parts[1].replace('.git', '');
 
-  if (!owner || !repo) {
-    throw new Error(`Invalid GitHub repository source: ${source}`);
+  if (owner.startsWith('git@github.com')) {
+    throw new Error(
+      `GitHub release-based extensions are not supported for SSH. You must use an HTTPS URI with a personal access token to download releases from private repositories. You can set your personal access token in the GITHUB_TOKEN environment variable and install the extension via SSH.`,
+    );
   }
+
   return { owner, repo };
 }
 
@@ -155,7 +163,7 @@ export async function checkForExtensionUpdate(
       if (!source) {
         return ExtensionUpdateState.ERROR;
       }
-      const { owner, repo } = parseGitHubRepo(source);
+      const { owner, repo } = parseGitHubRepoForReleases(source);
 
       const releaseData = await fetchFromGithub(
         owner,
@@ -180,7 +188,7 @@ export async function downloadFromGitHubRelease(
   destination: string,
 ): Promise<string> {
   const { source, ref } = installMetadata;
-  const { owner, repo } = parseGitHubRepo(source);
+  const { owner, repo } = parseGitHubRepoForReleases(source);
 
   try {
     const releaseData = await fetchFromGithub(owner, repo, ref);
