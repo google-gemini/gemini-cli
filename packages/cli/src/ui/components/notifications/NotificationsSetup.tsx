@@ -83,10 +83,6 @@ export const NotificationsSetup: React.FC<NotificationsSetupProps> = ({ settings
           setStep('soundWarning');
           return; // Stop here and show warning
         }
-      } else {
-        setStep('customSoundPath');
-        setCurrentEventType(eventType);
-        return;
       }
     }
 
