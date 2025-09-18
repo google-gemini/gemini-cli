@@ -12,6 +12,11 @@ jobs:
       pull-requests: 'write'
       actions: 'write'
     steps:
+      - name: 'Checkout'
+        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
+        with:
+          fetch-depth: 1
+
       - name: 'Slash Command Dispatch'
         id: 'slash_command'
         uses: 'peter-evans/slash-command-dispatch@40877f718dce0101edfc7aea2b3800cc192f9ed5'
@@ -22,6 +27,16 @@ jobs:
           issue-type: 'pull-request'
           static-args: |
             dry_run=false
+
+      - name: 'Acknowledge Patch Command'
+        if: "steps.slash_command.outputs.dispatched == 'true'"
+        uses: 'peter-evans/create-or-update-comment@67dcc547d311b736a8e6c5c236542148a47adc3d'
+        with:
+          issue-number: '${{ github.event.issue.number }}'
+          body: |
+            👋 Patch command received! Processing...
+
+            You can track the progress here: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
       - name: 'Get PR Status'
         id: 'pr_status'
