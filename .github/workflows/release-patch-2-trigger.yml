@@ -1,0 +1,68 @@
+name: 'Release: Patch (2) Trigger'
+
+on:
+  pull_request:
+    types:
+      - 'closed'
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'The head ref of the merged hotfix PR to trigger the release for (e.g. hotfix/v1.2.3/cherry-pick-abc).'
+        required: true
+        type: 'string'
+      workflow_id:
+        description: 'The workflow to trigger. Defaults to patch-release.yml'
+        required: false
+        type: 'string'
+        default: 'release-patch-3-release.yml'
+      dry_run:
+        description: 'Whether this is a dry run.'
+        required: false
+        type: 'boolean'
+        default: false
+
+jobs:
+  trigger-patch-release:
+    if: "(github.event_name == 'pull_request' && github.event.pull_request.merged == true && startsWith(github.head_ref, 'hotfix/')) || github.event_name == 'workflow_dispatch'"
+    runs-on: 'ubuntu-latest'
+    permissions:
+      actions: 'write'
+    steps:
+      - name: 'Trigger Patch Release'
+        uses: 'actions/github-script@00f12e3e20659f42342b1c0226afda7f7c042325'
+        with:
+          script: |
+            let body = '';
+            let headRef = '';
+
+            if (context.eventName === 'pull_request') {
+              body = context.payload.pull_request.body;
+              headRef = context.payload.pull_request.head.ref;
+            } else { // workflow_dispatch
+              body = ${{ github.event.inputs.dry_run }} ? '[DRY RUN]' : '';
+              headRef = '${{ github.event.inputs.ref }}';
+            }
+
+            const isDryRun = body.includes('[DRY RUN]');
+
+            // Extract base version and channel from hotfix branch name
+            // e.g., hotfix/v0.5.3/cherry-pick-abc -> v0.5.3
+            const version = headRef.split('/')[1];
+            const channel = version.includes('preview') ? 'preview' : 'stable';
+            const releaseRef = `release/${version}`;
+
+            const workflow_id = context.eventName === 'pull_request'
+              ? 'release-patch-3-release.yml'
+              : '${{ github.event.inputs.workflow_id }}';
+
+            github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: workflow_id,
+              ref: 'main',
+              inputs: {
+                type: channel,
+                dry_run: isDryRun.toString(),
+                release_ref: releaseRef
+              }
+            })

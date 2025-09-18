@@ -715,7 +715,7 @@ describe('extension tests', () => {
 
     it('should throw an error if the extension does not exist', async () => {
       await expect(uninstallExtension('nonexistent-extension')).rejects.toThrow(
-        'Extension "nonexistent-extension" not found.',
+        'Extension not found.',
       );
     });
 
@@ -732,6 +732,40 @@ describe('extension tests', () => {
       expect(logger?.logExtensionUninstallEvent).toHaveBeenCalledWith(
         new ExtensionUninstallEvent('my-local-extension', 'success'),
       );
+    });
+
+    it('should uninstall an extension by its source URL', async () => {
+      const gitUrl = 'https://github.com/google/gemini-sql-extension.git';
+      const sourceExtDir = createExtension({
+        extensionsDir: userExtensionsDir,
+        name: 'gemini-sql-extension',
+        version: '1.0.0',
+        installMetadata: {
+          source: gitUrl,
+          type: 'git',
+        },
+      });
+
+      await uninstallExtension(gitUrl);
+
+      expect(fs.existsSync(sourceExtDir)).toBe(false);
+      const logger = ClearcutLogger.getInstance({} as Config);
+      expect(logger?.logExtensionUninstallEvent).toHaveBeenCalledWith(
+        new ExtensionUninstallEvent('gemini-sql-extension', 'success'),
+      );
+    });
+
+    it('should fail to uninstall by URL if an extension has no install metadata', async () => {
+      createExtension({
+        extensionsDir: userExtensionsDir,
+        name: 'no-metadata-extension',
+        version: '1.0.0',
+        // No installMetadata provided
+      });
+
+      await expect(
+        uninstallExtension('https://github.com/google/no-metadata-extension'),
+      ).rejects.toThrow('Extension not found.');
     });
   });
 

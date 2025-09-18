@@ -65,6 +65,21 @@ vi.mock('./ShowMoreLines.js', () => ({
   ShowMoreLines: () => <Text>ShowMoreLines</Text>,
 }));
 
+vi.mock('./QueuedMessageDisplay.js', () => ({
+  QueuedMessageDisplay: ({ messageQueue }: { messageQueue: string[] }) => {
+    if (messageQueue.length === 0) {
+      return null;
+    }
+    return (
+      <>
+        {messageQueue.map((message, index) => (
+          <Text key={index}>{message}</Text>
+        ))}
+      </>
+    );
+  },
+}));
+
 // Mock contexts
 vi.mock('../contexts/OverflowContext.js', () => ({
   OverflowProvider: ({ children }: { children: React.ReactNode }) => children,
@@ -289,36 +304,17 @@ describe('Composer', () => {
       expect(output).toContain('Third queued message');
     });
 
-    it('shows overflow indicator when more than 3 messages are queued', () => {
-      const uiState = createMockUIState({
-        messageQueue: [
-          'Message 1',
-          'Message 2',
-          'Message 3',
-          'Message 4',
-          'Message 5',
-        ],
-      });
-
-      const { lastFrame } = renderComposer(uiState);
-
-      const output = lastFrame();
-      expect(output).toContain('Message 1');
-      expect(output).toContain('Message 2');
-      expect(output).toContain('Message 3');
-      expect(output).toContain('... (+2 more)');
-    });
-
-    it('does not display message queue section when empty', () => {
+    it('renders QueuedMessageDisplay with empty message queue', () => {
       const uiState = createMockUIState({
         messageQueue: [],
       });
 
       const { lastFrame } = renderComposer(uiState);
 
-      // Should not contain queued message indicators
+      // The component should render but return null for empty queue
+      // This test verifies that the component receives the correct prop
       const output = lastFrame();
-      expect(output).not.toContain('more)');
+      expect(output).toContain('InputPrompt'); // Verify basic Composer rendering
     });
   });
 

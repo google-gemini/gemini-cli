@@ -31,7 +31,7 @@ import { MessageType, StreamingState } from './types.js';
 import {
   type EditorType,
   type Config,
-  type DetectedIde,
+  type IdeInfo,
   type IdeContext,
   type UserTierId,
   DEFAULT_GEMINI_FLASH_MODEL,
@@ -726,7 +726,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
   ]);
 
   const [idePromptAnswered, setIdePromptAnswered] = useState(false);
-  const [currentIDE, setCurrentIDE] = useState<DetectedIde | null>(null);
+  const [currentIDE, setCurrentIDE] = useState<IdeInfo | null>(null);
 
   useEffect(() => {
     const getIde = async () => {

@@ -24,6 +24,7 @@ import { AuthType } from './contentGenerator.js';
 import { type RetryOptions } from '../utils/retry.js';
 import type { ToolRegistry } from '../tools/tool-registry.js';
 import { Kind } from '../tools/tools.js';
+import { uiTelemetryService } from '../telemetry/uiTelemetry.js';
 
 // Mock fs module to prevent actual file system operations during tests
 const mockFileSystem = new Map<string, string>();
@@ -81,6 +82,12 @@ vi.mock('../telemetry/loggers.js', () => ({
   logContentRetryFailure: mockLogContentRetryFailure,
 }));
 
+vi.mock('../telemetry/uiTelemetry.js', () => ({
+  uiTelemetryService: {
+    setLastPromptTokenCount: vi.fn(),
+  },
+}));
+
 describe('GeminiChat', () => {
   let mockContentGenerator: ContentGenerator;
   let chat: GeminiChat;
@@ -89,6 +96,7 @@ describe('GeminiChat', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(uiTelemetryService.setLastPromptTokenCount).mockClear();
     mockContentGenerator = {
       generateContent: vi.fn(),
       generateContentStream: vi.fn(),
@@ -529,6 +537,11 @@ describe('GeminiChat', () => {
             },
           ],
           text: () => 'response',
+          usageMetadata: {
+            promptTokenCount: 42,
+            candidatesTokenCount: 15,
+            totalTokenCount: 57,
+          },
         } as unknown as GenerateContentResponse;
       })();
       vi.mocked(mockContentGenerator.generateContentStream).mockResolvedValue(
@@ -556,6 +569,14 @@ describe('GeminiChat', () => {
           config: {},
         },
         'prompt-id-1',
+      );
+
+      // Verify that token counting is called when usageMetadata is present
+      expect(uiTelemetryService.setLastPromptTokenCount).toHaveBeenCalledWith(
+        42,
+      );
+      expect(uiTelemetryService.setLastPromptTokenCount).toHaveBeenCalledTimes(
+        1,
       );
     });
   });
@@ -700,6 +721,9 @@ describe('GeminiChat', () => {
         role: 'model',
         parts: [{ text: 'Successful response' }],
       });
+
+      // Verify that token counting is not called when usageMetadata is missing
+      expect(uiTelemetryService.setLastPromptTokenCount).not.toHaveBeenCalled();
     });
 
     it('should fail after all retries on persistent invalid content and report metrics', async () => {
