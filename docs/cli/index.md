@@ -8,7 +8,7 @@ Within Gemini CLI, `packages/cli` is the frontend for users to send and receive 
 - **[Commands](./commands.md):** A reference for Gemini CLI commands (e.g., `/help`, `/tools`, `/theme`).
 - **[Configuration](./configuration.md):** A guide to tailoring Gemini CLI behavior using configuration files.
 - **[Enterprise](./enterprise.md):** A guide to enterprise configuration.
-- **[Headless Mode](./headless.md):** A comprehensive guide to using Gemini CLI programmatically for scripting and automation.
+- **[Headless Mode](../headless.md):** A comprehensive guide to using Gemini CLI programmatically for scripting and automation.
 - **[Token Caching](./token-caching.md):** Optimize API costs through token caching.
 - **[Themes](./themes.md)**: A guide to customizing the CLI's appearance with different themes.
 - **[Tutorials](tutorials.md)**: A tutorial showing how to use Gemini CLI to automate a development task.
@@ -29,4 +29,4 @@ You can also use the `--prompt` or `-p` flag:
 gemini -p "What is fine tuning?"
 ```
 
-For comprehensive documentation on headless usage, scripting, automation, and advanced examples, see the **[Headless Mode](./headless.md)** guide.
+For comprehensive documentation on headless usage, scripting, automation, and advanced examples, see the **[Headless Mode](../headless.md)** guide.
