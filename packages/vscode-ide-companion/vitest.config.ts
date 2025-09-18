@@ -9,8 +9,8 @@ import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
   test: {
-    include: ['**/*.{test,spec}.?(c|m)[jt]s?(x)', 'config.test.ts'],
-    exclude: ['**/node_modules/**', '**/dist/**', '**/cypress/**'],
+    include: ['**/*.{test,spec}.?(c|m)[jt]s?(x)'],
+    exclude: ['**/node_modules/**', '**/dist/**'],
     environment: 'jsdom',
     globals: true,
     reporters: ['default', 'junit'],
@@ -36,6 +36,9 @@ export default defineConfig({
     minThreads: 8,
     maxThreads: 16,
   },
+  // This is the important part to fix the CI error.
+  // It tells Vitest to process these dependencies from source,
+  // allowing it to resolve the necessary modules in the monorepo.
   deps: {
     inline: [/@google\/gemini-cli-core/],
   },
