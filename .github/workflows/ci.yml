@@ -395,3 +395,25 @@ jobs:
           minimum-change-threshold: '1000'
           compression: 'none'
           clean-script: 'clean'
+  package_docker:
+    name: 'Package Docker'
+    runs-on: 'self-hosted'
+
+    permissions:
+      contents: 'read'
+      packages: 'write'
+
+    if: |-
+      ${{ always() && (github.event.pull_request.head.repo.full_name == github.repository) }}
+    steps:
+      - name: 'Checkout'
+        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
+        with:
+          fetch-depth: 1
+      - name: 'Push Docker to GHCR'
+        uses: './.github/actions/push-docker'
+        with:
+          github-actor: '${{ github.actor }}'
+          github-secret: '${{ secrets.GITHUB_TOKEN }}'
+          ref-name: '${{ github.ref_name }}'
+          github-sha: '${{ github.sha }}'
