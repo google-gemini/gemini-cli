@@ -1,4 +1,4 @@
-name: 'Promote Release'
+name: 'Release: Promote'
 
 on:
   workflow_dispatch:

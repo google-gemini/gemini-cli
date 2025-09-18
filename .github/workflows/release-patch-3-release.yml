@@ -1,0 +1,89 @@
+name: 'Release: Patch (3) Release'
+
+on:
+  workflow_dispatch:
+    inputs:
+      type:
+        description: 'The type of release to perform.'
+        required: true
+        type: 'choice'
+        options:
+          - 'stable'
+          - 'preview'
+      dry_run:
+        description: 'Run a dry-run of the release process; no branches, npm packages or GitHub releases will be created.'
+        required: true
+        type: 'boolean'
+        default: true
+      version:
+        description: 'The version to release.'
+        required: true
+        type: 'string'
+      release_ref:
+        description: 'The branch, tag, or SHA to release from.'
+        required: true
+        type: 'string'
+
+jobs:
+  release:
+    runs-on: 'ubuntu-latest'
+    permissions:
+      contents: 'write'
+      packages: 'write'
+      issues: 'write'
+    steps:
+      - name: 'Checkout'
+        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
+        with:
+          ref: '${{ github.event.inputs.release_ref }}'
+          fetch-depth: 0
+
+      - name: 'Setup Node.js'
+        uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+
+      - name: 'Install Dependencies'
+        run: |-
+          npm ci
+
+      - name: 'Get Patch Version'
+        id: 'patch_version'
+        run: |
+          echo "RELEASE_TAG=${{ github.event.inputs.version }}" >> "${GITHUB_OUTPUT}"
+          echo "RELEASE_VERSION=${{ github.event.inputs.version }}" >> "${GITHUB_OUTPUT}"
+          echo "NPM_TAG=${{ github.event.inputs.type }}" >> "${GITHUB_OUTPUT}"
+
+      - name: 'Print Calculated Version'
+        run: |-
+          echo "Calculated version: ${{ steps.patch_version.outputs.RELEASE_VERSION }}"
+
+      - name: 'Run Tests'
+        uses: './.github/actions/run-tests'
+        with:
+          gemini_api_key: '${{ secrets.GEMINI_API_KEY }}'
+
+      - name: 'Publish Release'
+        uses: './.github/actions/publish-release'
+        with:
+          release-version: '${{ steps.patch_version.outputs.RELEASE_VERSION }}'
+          release-tag: '${{ steps.patch_version.outputs.RELEASE_TAG }}'
+          npm-tag: '${{ steps.patch_version.outputs.NPM_TAG }}'
+          wombat-token-core: '${{ secrets.WOMBAT_TOKEN_CORE }}'
+          wombat-token-cli: '${{ secrets.WOMBAT_TOKEN_CLI }}'
+          github-token: '${{ secrets.GITHUB_TOKEN }}'
+          dry-run: '${{ github.event.inputs.dry_run }}'
+          previous-tag: '${{ steps.patch_version.outputs.RELEASE_TAG }}'
+
+      - name: 'Create Issue on Failure'
+        if: '${{ failure() && github.event.inputs.dry_run == false }}'
+        env:
+          GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+          RELEASE_TAG: '${{ steps.patch_version.outputs.RELEASE_TAG }}'
+          DETAILS_URL: '${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}'
+        run: |
+          gh issue create \
+            --title 'Patch Release Failed for ${RELEASE_TAG} on $(date +'%Y-%m-%d')' \
+            --body 'The patch-release workflow failed. See the full run for details: ${DETAILS_URL}' \
+            --label 'kind/bug,release-failure,priority/p0'

@@ -1,4 +1,4 @@
-name: 'Patch from Comment'
+name: 'Release: Patch from Comment'
 
 on:
   issue_comment:
@@ -38,7 +38,7 @@ jobs:
             github.rest.actions.createWorkflowDispatch({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              workflow_id: 'create-patch-pr.yml',
+              workflow_id: 'release-patch-1-create-pr.yml',
               ref: 'main',
               inputs: {
                 commit: '${{ steps.pr_status.outputs.MERGE_COMMIT_SHA }}',
