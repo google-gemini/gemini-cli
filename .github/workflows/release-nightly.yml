@@ -1,4 +1,4 @@
-name: 'Nightly Release'
+name: 'Release: Nightly'
 
 on:
   schedule:
