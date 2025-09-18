@@ -37,9 +37,13 @@ describe('ideCommand', () => {
       connect: vi.fn(),
       getCurrentIde: vi.fn(),
       getConnectionStatus: vi.fn(),
+      getDetectedIdeDisplayName: vi.fn(),
     } as unknown as core.IdeClient;
 
     vi.mocked(core.IdeClient.getInstance).mockResolvedValue(mockIdeClient);
+    vi.mocked(mockIdeClient.getDetectedIdeDisplayName).mockReturnValue(
+      'VS Code',
+    );
 
     mockContext = {
       ui: {
