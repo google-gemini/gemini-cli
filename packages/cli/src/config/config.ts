@@ -43,6 +43,7 @@ import { resolvePath } from '../utils/resolvePath.js';
 import { appEvents } from '../utils/events.js';
 
 import { isWorkspaceTrusted } from './trustedFolders.js';
+import { createPolicyEngineConfig } from './policy.js';
 
 // Simple console logger for now - replace with actual logger if available
 const logger = {
@@ -489,6 +490,8 @@ export async function loadCliConfig(
     approvalMode = ApprovalMode.DEFAULT;
   }
 
+  const policyEngineConfig = createPolicyEngineConfig(settings, approvalMode);
+
   const interactive =
     !!argv.promptInteractive || (process.stdin.isTTY && question.length === 0);
   // In non-interactive mode, exclude tools that require a prompt.
@@ -574,6 +577,7 @@ export async function loadCliConfig(
     fullContext: argv.allFiles || false,
     coreTools: settings.tools?.core || undefined,
     allowedTools: argv.allowedTools || settings.tools?.allowed || undefined,
+    policyEngineConfig,
     excludeTools,
     toolDiscoveryCommand: settings.tools?.discoveryCommand,
     toolCallCommand: settings.tools?.callCommand,
