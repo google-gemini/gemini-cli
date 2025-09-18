@@ -102,34 +102,46 @@ jobs:
           # Check if patch output exists and contains branch info
           if [ -f patch_output.log ]; then
             if grep -q "already exists" patch_output.log; then
-              # Branch exists - let user review
+              # Branch exists - find the PR for it
               BRANCH=$(grep "Hotfix branch" patch_output.log | grep "already exists" | sed 's/.*Hotfix branch \(.*\) already exists.*/\1/')
-              gh pr comment ${{ github.event.inputs.original_pr }} --body "ℹ️ Patch branch already exists!
 
-              A patch branch already exists: [\`$BRANCH\`](https://github.com/${{ github.repository }}/tree/$BRANCH)
+              # Find the PR for this branch
+              PR_INFO=$(gh pr list --head "$BRANCH" --json number,url --jq '.[0] // empty')
 
-              Please review this existing branch. If it's correct, check for an existing PR:
-              [View patch PRs for this branch](https://github.com/${{ github.repository }}/pulls?q=is%3Apr+head%3A$BRANCH)
-
-              If the branch is incorrect or outdated, please delete it manually and run the patch command again."
+              if [ -n "$PR_INFO" ]; then
+                PR_NUMBER=$(echo "$PR_INFO" | jq -r '.number')
+                PR_URL=$(echo "$PR_INFO" | jq -r '.url')
+                MESSAGE="ℹ️ Patch branch already exists!\n\nA patch branch already exists with an open PR: [#$PR_NUMBER]($PR_URL)\n\nPlease review and approve this existing patch PR. If it's incorrect, close it and run the patch command again."
+                gh pr comment ${{ github.event.inputs.original_pr }} --body "$MESSAGE"
+              else
+                # Branch exists but no PR
+                MESSAGE="ℹ️ Patch branch already exists!\n\nA patch branch [\`$BRANCH\`](https://github.com/${{ github.repository }}/tree/$BRANCH) exists but has no open PR.\n\nThis might indicate an incomplete patch process. Please delete the branch and run the patch command again."
+                gh pr comment ${{ github.event.inputs.original_pr }} --body "$MESSAGE"
+              fi
 
             elif [ "$EXIT_CODE" = "0" ]; then
-              # Success - new branch created
-              gh pr comment ${{ github.event.inputs.original_pr }} --body "🚀 Patch PR created!
+              # Success - find the newly created PR
+              BRANCH=$(grep "Creating hotfix branch" patch_output.log | sed 's/.*Creating hotfix branch \(.*\) from.*/\1/')
 
-              The patch release PR for this change has been created. Please review and approve it to complete the patch release:
+              # Find the PR for the new branch
+              PR_INFO=$(gh pr list --head "$BRANCH" --json number,url --jq '.[0] // empty')
 
-              [View all patch PRs](https://github.com/${{ github.repository }}/pulls?q=is%3Apr+is%3Aopen+label%3Apatch)"
+              if [ -n "$PR_INFO" ]; then
+                PR_NUMBER=$(echo "$PR_INFO" | jq -r '.number')
+                PR_URL=$(echo "$PR_INFO" | jq -r '.url')
+                MESSAGE="🚀 Patch PR created!\n\nThe patch release PR has been created: [#$PR_NUMBER]($PR_URL)\n\nPlease review and approve this PR to complete the patch release."
+                gh pr comment ${{ github.event.inputs.original_pr }} --body "$MESSAGE"
+              else
+                # Fallback if we can't find the specific PR
+                MESSAGE="🚀 Patch PR created!\n\nThe patch release PR for this change has been created. Please review and approve it:\n\n[View all patch PRs](https://github.com/${{ github.repository }}/pulls?q=is%3Apr+is%3Aopen+label%3Apatch)"
+                gh pr comment ${{ github.event.inputs.original_pr }} --body "$MESSAGE"
+              fi
             else
               # Other error
-              gh pr comment ${{ github.event.inputs.original_pr }} --body "❌ Patch creation failed!
-
-              There was an error creating the patch. Please check the workflow logs for details:
-              [View workflow run](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})"
+              MESSAGE="❌ Patch creation failed!\n\nThere was an error creating the patch. Please check the workflow logs for details:\n[View workflow run](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})"
+              gh pr comment ${{ github.event.inputs.original_pr }} --body "$MESSAGE"
             fi
           else
-            gh pr comment ${{ github.event.inputs.original_pr }} --body "❌ Patch creation failed!
-
-            No output was generated. Please check the workflow logs:
-            [View workflow run](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})"
+            MESSAGE="❌ Patch creation failed!\n\nNo output was generated. Please check the workflow logs:\n[View workflow run](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})"
+            gh pr comment ${{ github.event.inputs.original_pr }} --body "$MESSAGE"
           fi
