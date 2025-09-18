@@ -40,7 +40,6 @@ jobs:
 
       - name: 'Get PR Status'
         id: 'pr_status'
-        if: "steps.slash_command.outputs.dispatched == 'true'"
         env:
           GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
         run: |
