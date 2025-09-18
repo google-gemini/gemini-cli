@@ -172,6 +172,26 @@ describe('SettingsDialog', () => {
   // Simple delay function for remaining tests that need gradual migration
   const wait = (ms = 50) => new Promise((resolve) => setTimeout(resolve, ms));
 
+  // Generic waitFor utility for waiting on conditions with better error handling
+  const waitFor = async (
+    predicate: () => boolean,
+    options: { timeout?: number; interval?: number; message?: string } = {},
+  ) => {
+    const {
+      timeout = 1000,
+      interval = 10,
+      message = 'Condition not met in time',
+    } = options;
+    const start = Date.now();
+    while (Date.now() - start < timeout) {
+      if (predicate()) {
+        return;
+      }
+      await new Promise((resolve) => setTimeout(resolve, interval));
+    }
+    throw new Error(message);
+  };
+
   beforeEach(() => {
     // Reset keypress mock state (variables are commented out)
     // currentKeypressHandler = null;
@@ -349,13 +369,13 @@ describe('SettingsDialog', () => {
         stdin.write(TerminalKeys.ENTER as string);
       });
       // Wait for the setting change to be processed
-      const start = Date.now();
-      while (Date.now() - start < 1000) {
-        if (vi.mocked(saveModifiedSettings).mock.calls.length > 0) {
-          break;
-        }
-        await new Promise((resolve) => setTimeout(resolve, 10));
-      }
+      await waitFor(
+        () => vi.mocked(saveModifiedSettings).mock.calls.length > 0,
+        {
+          message:
+            'saveModifiedSettings was not called within the timeout period',
+        },
+      );
 
       expect(vi.mocked(saveModifiedSettings)).toHaveBeenCalledWith(
         new Set<string>(['general.disableAutoUpdate']),
