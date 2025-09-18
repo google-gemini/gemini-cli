@@ -1263,6 +1263,7 @@ describe('SettingsDialog', () => {
         },
         tools: {
           enableInteractiveShell: true,
+          autoAccept: true,
           useRipgrep: true,
         },
         security: {
