@@ -14,7 +14,7 @@ interface DisableArgs {
   scope: SettingScope;
 }
 
-export async function handleDisable(args: DisableArgs) {
+export function handleDisable(args: DisableArgs) {
   try {
     disableExtension(args.name, args.scope);
     console.log(
@@ -42,8 +42,8 @@ export const disableCommand: CommandModule = {
         choices: [SettingScope.User, SettingScope.Workspace],
       })
       .check((_argv) => true),
-  handler: async (argv) => {
-    await handleDisable({
+  handler: (argv) => {
+    handleDisable({
       name: argv['name'] as string,
       scope: argv['scope'] as SettingScope,
     });
