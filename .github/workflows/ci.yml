@@ -202,7 +202,7 @@ jobs:
         run: 'npm run build'
         shell: 'pwsh'
         env:
-          NODE_OPTIONS: '--max-old-space-size=32768 --max-semi-space-size=256 --optimize-for-size'
+          NODE_OPTIONS: '--max-old-space-size=32768 --max-semi-space-size=256'
           UV_THREADPOOL_SIZE: '32'
           NODE_ENV: 'production'
 
