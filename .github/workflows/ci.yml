@@ -111,6 +111,9 @@ jobs:
           node-version: '${{ matrix.node-version }}'
           cache: 'npm'
 
+      - name: 'Build project'
+        run: 'npm run build'
+
       - name: 'Install dependencies for testing'
         run: 'npm ci'
 
@@ -167,6 +170,9 @@ jobs:
         with:
           node-version: '${{ matrix.node-version }}'
           cache: 'npm'
+
+      - name: 'Build project'
+        run: 'npm run build'
 
       - name: 'Install dependencies for testing'
         run: 'npm ci'
