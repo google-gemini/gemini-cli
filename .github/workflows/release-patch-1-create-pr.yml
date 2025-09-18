@@ -24,6 +24,10 @@ on:
         required: false
         type: 'string'
         default: 'main'
+      original_pr:
+        description: 'The original PR number to comment back on.'
+        required: false
+        type: 'string'
 
 jobs:
   create-patch:
@@ -68,6 +72,18 @@ jobs:
         run: 'node scripts/create-patch-pr.js --commit=${{ github.event.inputs.commit }} --channel=stable --dry-run=${{ github.event.inputs.dry_run }}'
 
       - name: 'Create Patch for Preview'
+        id: 'create_patch'
         env:
           GH_TOKEN: '${{ steps.generate_token.outputs.token }}'
         run: 'node scripts/create-patch-pr.js --commit=${{ github.event.inputs.commit }} --channel=${{ github.event.inputs.channel }} --dry-run=${{ github.event.inputs.dry_run }}'
+
+      - name: 'Comment on Original PR'
+        if: '!inputs.dry_run && inputs.original_pr'
+        env:
+          GH_TOKEN: '${{ steps.generate_token.outputs.token }}'
+        run: |
+          gh pr comment ${{ github.event.inputs.original_pr }} --body "🚀 Patch PR created!
+
+          The patch release PR for this change has been created. Please review and approve it to complete the patch release:
+
+          View all patch PRs: https://github.com/${{ github.repository }}/pulls?q=is%3Apr+is%3Aopen+label%3Apatch"
