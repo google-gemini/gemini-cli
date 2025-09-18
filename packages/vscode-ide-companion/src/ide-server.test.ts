@@ -475,9 +475,7 @@ const request = (
         resolve(res);
       },
     );
-    req.on('error', (err) => {
-      reject(err);
-    });
+    req.on('error', reject);
     if (body) {
       req.write(body);
     }
