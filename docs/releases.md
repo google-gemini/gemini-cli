@@ -59,169 +59,27 @@ To ensure the highest reliability, the release promotion process uses the **NPM 
 
 This NPM-first approach, backed by integrity checks, makes the release process highly robust and prevents the kinds of versioning discrepancies that can arise from relying solely on git history or API outputs.
 
-## Patching Releases
+## Manual Releases
 
-If a critical bug that is already fixed on `main` needs to be patched on a `stable` or `preview` release, the process is now highly automated.
+For situations requiring a release outside of the regular nightly and weekly promotion schedule (e.g., a critical hotfix), you can use the `Release: Manual` workflow. This workflow provides a direct way to publish a specific version from any branch, tag, or commit SHA.
 
-### 1. Create the Patch Pull Request
+This process replaces the previous multi-step patching procedure, offering a single, streamlined workflow for all manual release needs.
 
-There are two ways to create a patch pull request:
-
-**Option A: From a GitHub Comment (Recommended)**
-
-After a pull request has been merged, a maintainer can add a comment on that same PR with the following format:
-
-`/patch <channel> [--dry-run]`
-
-- **channel**: `stable` or `preview`
-- **--dry-run** (optional): If included, the workflow will run in dry-run mode. This will create the PR with "[DRY RUN]" in the title, and merging it will trigger a dry run of the final release, so nothing is actually published.
-
-Example: `/patch stable --dry-run`
-
-The workflow will automatically find the merge commit SHA and begin the patch process. If the PR is not yet merged, it will post a comment indicating the failure.
-
-**Option B: Manually Triggering the Workflow**
-
-Follow the manual release process using the "Patch Release" GitHub Actions workflow.
-
-- **Type**: Select whether you are patching a `stable` or `preview` release. The workflow will automatically calculate the next patch version.
-- **Ref**: Use your source branch as the reference (ex. `release/v0.2.0-preview.0`)
-  Navigate to the **Actions** tab and run the **Create Patch PR** workflow.
-
-- **Commit**: The full SHA of the commit on `main` that you want to cherry-pick.
-- **Channel**: The channel you want to patch (`stable` or `preview`).
-
-This workflow will automatically:
-
-1. Find the latest release tag for the channel.
-2. Create a release branch from that tag if one doesn't exist (e.g., `release/v0.5.1`).
-3. Create a new hotfix branch from the release branch.
-4. Cherry-pick your specified commit into the hotfix branch.
-5. Create a pull request from the hotfix branch back to the release branch.
-
-**Important:** If you select `stable`, the workflow will run twice, creating one PR for the `stable` channel and a second PR for the `preview` channel.
-
-### 2. Review and Merge
-
-Review the automatically created pull request(s) to ensure the cherry-pick was successful and the changes are correct. Once approved, merge the pull request.
-
-**Security Note:** The `release/*` branches are protected by branch protection rules. A pull request to one of these branches requires at least one review from a code owner before it can be merged. This ensures that no unauthorized code is released.
-
-### 3. Automatic Release
-
-Upon merging the pull request, a final workflow is automatically triggered. It will:
-
-1. Run the `patch-release` workflow.
-2. Build and test the patched code.
-3. Publish the new patch version to npm.
-4. Create a new GitHub release with the patch notes.
-
-This fully automated process ensures that patches are created and released consistently and reliably.
-
-## Release Schedule
-
-<table>
-  <tr>
-   <td>Date
-   </td>
-   <td>Stable UTC 2000
-   </td>
-   <td>Preview UTC 2359
-   </td>
-  </tr>
-  <tr>
-   <td>Aug 19th, 2025
-   </td>
-   <td>N/A
-   </td>
-   <td>0.2.0-preview.0
-   </td>
-  </tr>
-  <tr>
-   <td>Aug 26th, 2025
-   </td>
-   <td>0.2.0
-   </td>
-   <td>0.3.0-preview.0
-   </td>
-  </tr>
-  <tr>
-   <td>Sep 2nd, 2025
-   </td>
-   <td>0.3.0
-   </td>
-   <td>0.4.0-preview.0
-   </td>
-  </tr>
-  <tr>
-   <td>Sep 9th, 2025
-   </td>
-   <td>0.4.0
-   </td>
-   <td>0.5.0-preview.0
-   </td>
-  </tr>
-  <tr>
-   <td>Sep 16th, 2025
-   </td>
-   <td>0.5.0
-   </td>
-   <td>0.6.0-preview.0
-   </td>
-  </tr>
-  <tr>
-   <td>Sep 23rd, 2025
-   </td>
-   <td>0.6.0
-   </td>
-   <td>0.7.0-preview.0
-   </td>
-  </tr>
-</table>
-
-## How To Release
-
-Releases are managed through GitHub Actions workflows.
-
-### Weekly Promotions
-
-To perform the weekly promotion of `preview` to `stable` and `nightly` to `preview`:
+### How to Create a Manual Release
 
 1.  Navigate to the **Actions** tab of the repository.
-2.  Select the **Promote Release** workflow from the list.
-3.  Click the **Run workflow** dropdown button.
-4.  Leave **Dry Run** as `true` to test the workflow without publishing, or set to `false` to perform a live release.
-5.  Click **Run workflow**.
-
-### Patching a Release
-
-To perform a manual release for a patch or hotfix:
-
-1.  Navigate to the **Actions** tab of the repository.
-2.  Select the **Patch Release** workflow from the list.
+2.  Select the **Release: Manual** workflow from the list.
 3.  Click the **Run workflow** dropdown button.
 4.  Fill in the required inputs:
-    - **Type**: Select whether you are patching a `stable` or `preview` release.
-    - **Ref**: The branch or commit SHA to release from.
-    - **Dry Run**: Leave as `true` to test the workflow without publishing, or set to `false` to perform a live release.
+    -   **Version**: The exact version to release (e.g., `v0.6.1`). This must be a valid semantic version with a `v` prefix.
+    -   **Ref**: The branch, tag, or full commit SHA to release from.
+    -   **NPM Channel**: The npm tag to publish with. Select `stable` for a general release, `preview` for a pre-release, or `none` to skip publishing to npm entirely.
+    -   **Dry Run**: Leave as `true` to run all steps without publishing, or set to `false` to perform a live release.
+    -   **Force Skip Tests**: Set to `true` to skip the test suite. This is not recommended for production releases.
 5.  Click **Run workflow**.
 
-### TLDR
+The workflow will then proceed to test (if not skipped), build, and publish the release. If the workflow fails during a non-dry run, it will automatically create a GitHub issue with the failure details.
 
-Each release, wether automated or manual performs the following steps:
-
-1.  Checks out the latest code from the `main` branch.
-1.  Installs all dependencies.
-1.  Runs the full suite of `preflight` checks and integration tests.
-1.  If all tests succeed, it calculates the next version number based on the inputs.
-1.  It creates a branch name `release/${VERSION}`.
-1.  It creates a tag name `v${VERSION}`.
-1.  It then builds and publishes the packages to npm with the provided version number.
-1.  Finally, it creates a GitHub Release for the version.
-
-### Failure Handling
-
-If any step in the workflow fails, it will automatically create a new issue in the repository with the labels `bug` and `release-failure`. The issue will contain a link to the failed workflow run for easy debugging.
 
 ### Docker
 
