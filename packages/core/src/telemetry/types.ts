@@ -576,6 +576,7 @@ export type TelemetryEvent =
   | InvalidChunkEvent
   | ContentRetryEvent
   | ContentRetryFailureEvent
+  | ExtensionEnableEvent
   | ExtensionInstallEvent
   | ExtensionUninstallEvent
   | ModelRoutingEvent
@@ -646,5 +647,19 @@ export class ExtensionUninstallEvent implements BaseTelemetryEvent {
     this['event.timestamp'] = new Date().toISOString();
     this.extension_name = extension_name;
     this.status = status;
+  }
+}
+
+export class ExtensionEnableEvent implements BaseTelemetryEvent {
+  'event.name': 'extension_enable';
+  'event.timestamp': string;
+  extension_name: string;
+  setting_scope: string;
+
+  constructor(extension_name: string, settingScope: string) {
+    this['event.name'] = 'extension_enable';
+    this['event.timestamp'] = new Date().toISOString();
+    this.extension_name = extension_name;
+    this.setting_scope = settingScope;
   }
 }
