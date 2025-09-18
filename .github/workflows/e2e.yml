@@ -179,7 +179,7 @@ jobs:
             packages/*/package-lock.json
 
       - name: 'Configure npm for Windows performance'
-        if: runner.os == 'Windows'
+        if: "runner.os == 'Windows'"
         run: |
           npm config set progress false
           npm config set audit false
@@ -187,15 +187,25 @@ jobs:
           npm config set loglevel error
           npm config set maxsockets 1
           npm config set registry https://registry.npmjs.org/
-        shell: pwsh
+        shell: 'pwsh'
 
-      - name: 'Run E2E tests'
+      - name: 'Run E2E tests (Windows)'
+        if: "runner.os == 'Windows'"
         env:
           GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
           KEEP_OUTPUT: 'true'
           SANDBOX: 'sandbox:none'
           VERBOSE: 'true'
-        shell: ${{ runner.os == 'Windows' && 'pwsh' || 'bash' }}
+        shell: 'pwsh'
+        run: 'npx vitest run --root ./integration-tests'
+
+      - name: 'Run E2E tests (non-Windows)'
+        if: "runner.os != 'Windows'"
+        env:
+          GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
+          KEEP_OUTPUT: 'true'
+          SANDBOX: 'sandbox:none'
+          VERBOSE: 'true'
         run: 'npx vitest run --root ./integration-tests'
 
   e2e:

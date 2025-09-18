@@ -181,7 +181,7 @@ jobs:
             packages/*/package-lock.json
 
       - name: 'Configure npm for Windows performance'
-        if: runner.os == 'Windows'
+        if: "runner.os == 'Windows'"
         run: |
           npm config set progress false
           npm config set audit false
@@ -189,21 +189,38 @@ jobs:
           npm config set loglevel error
           npm config set maxsockets 1
           npm config set registry https://registry.npmjs.org/
-        shell: pwsh
+        shell: 'pwsh'
 
-      - name: 'Build project'
+      - name: 'Build project (Windows)'
+        if: "runner.os == 'Windows'"
         run: 'npm run build'
-        shell: ${{ runner.os == 'Windows' && 'pwsh' || 'bash' }}
+        shell: 'pwsh'
 
-      - name: 'Install dependencies for testing'
+      - name: 'Build project (non-Windows)'
+        if: "runner.os != 'Windows'"
+        run: 'npm run build'
+
+      - name: 'Install dependencies for testing (Windows)'
+        if: "runner.os == 'Windows'"
         run: 'npm ci'
-        shell: ${{ runner.os == 'Windows' && 'pwsh' || 'bash' }}
+        shell: 'pwsh'
 
-      - name: 'Run tests and generate reports'
+      - name: 'Install dependencies for testing (non-Windows)'
+        if: "runner.os != 'Windows'"
+        run: 'npm ci'
+
+      - name: 'Run tests and generate reports (Windows)'
+        if: "runner.os == 'Windows'"
         env:
           NO_COLOR: true
         run: 'npm run test:ci -- --coverage.enabled=false'
-        shell: ${{ runner.os == 'Windows' && 'pwsh' || 'bash' }}
+        shell: 'pwsh'
+
+      - name: 'Run tests and generate reports (non-Windows)'
+        if: "runner.os != 'Windows'"
+        env:
+          NO_COLOR: true
+        run: 'npm run test:ci -- --coverage.enabled=false'
 
       - name: 'Wait for file system sync'
         run: 'sleep 2'
