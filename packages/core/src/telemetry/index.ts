@@ -19,6 +19,11 @@ export {
   isTelemetrySdkInitialized,
 } from './sdk.js';
 export {
+  GcpTraceExporter,
+  GcpMetricExporter,
+  GcpLogExporter,
+} from './gcp-exporters.js';
+export {
   logCliConfiguration,
   logUserPrompt,
   logToolCall,
@@ -54,3 +59,10 @@ export { SemanticAttributes } from '@opentelemetry/semantic-conventions';
 export * from './uiTelemetry.js';
 export { HighWaterMarkTracker } from './high-water-mark-tracker.js';
 export { RateLimiter } from './rate-limiter.js';
+export { ActivityType } from './activity-types.js';
+export {
+  ActivityDetector,
+  getActivityDetector,
+  recordUserActivity,
+  isUserActive,
+} from './activity-detector.js';
