@@ -353,7 +353,7 @@ export enum EventMetadataKey {
   // Logs the status of the extension uninstall
   GEMINI_CLI_EXTENSION_UNINSTALL_STATUS = 96,
 
-  // Logs the status of the extension uninstall
+  // Logs the setting scope for an extension enablement.
   GEMINI_CLI_EXTENSION_ENABLE_SETTING_SCOPE = 102,
 
   // ==========================================================================
