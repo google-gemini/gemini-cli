@@ -55,7 +55,7 @@ jobs:
         uses: 'actions/github-script@00f12e3e20659f42342b1c0226afda7f7c042325'
         with:
           script: |
-            const args = ${{ fromJSON(steps.slash_command.outputs.command-arguments) }};
+            const args = ${{ fromJSON(steps.slash_command.outputs.command-arguments || '{}') }};
             github.rest.actions.createWorkflowDispatch({
               owner: context.repo.owner,
               repo: context.repo.repo,
