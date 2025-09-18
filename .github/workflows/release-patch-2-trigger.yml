@@ -10,6 +10,11 @@ on:
         description: 'The head ref of the merged hotfix PR to trigger the release for (e.g. hotfix/v1.2.3/cherry-pick-abc).'
         required: true
         type: 'string'
+      workflow_ref:
+        description: 'The ref to checkout the workflow code from.'
+        required: false
+        type: 'string'
+        default: 'main'
       workflow_id:
         description: 'The workflow to trigger. Defaults to patch-release.yml'
         required: false
@@ -31,6 +36,7 @@ jobs:
       - name: 'Checkout'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
         with:
+          ref: '${{ github.event.inputs.workflow_ref || ''main'' }}'
           fetch-depth: 1
 
       - name: 'Setup Node.js'
@@ -53,4 +59,4 @@ jobs:
           GITHUB_EVENT_NAME: '${{ github.event_name }}'
           GITHUB_EVENT_PAYLOAD: '${{ toJSON(github.event) }}'
         run: |
-          node scripts/patch-trigger.js
+          node scripts/releasing/patch-trigger.js

@@ -141,7 +141,7 @@ jobs:
           GITHUB_REPOSITORY_OWNER: '${{ github.repository_owner }}'
           GITHUB_REPOSITORY_NAME: '${{ github.event.repository.name }}'
         run: |
-          node scripts/patch-comment.js
+          node scripts/releasing/patch-comment.js
 
       - name: 'Comment Failure on Original PR'
         if: '${{ failure() && github.event.inputs.original_pr }}'
@@ -158,4 +158,4 @@ jobs:
           GITHUB_REPOSITORY_OWNER: '${{ github.repository_owner }}'
           GITHUB_REPOSITORY_NAME: '${{ github.event.repository.name }}'
         run: |
-          node scripts/patch-comment.js
+          node scripts/releasing/patch-comment.js
