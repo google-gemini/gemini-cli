@@ -6,7 +6,7 @@
 
 import React from 'react';
 import { Text, Box } from 'ink';
-import { EOL } from 'node:os';
+
 import { theme } from '../semantic-colors.js';
 import { colorizeCode } from './CodeColorizer.js';
 import { TableRenderer } from './TableRenderer.js';
@@ -35,7 +35,7 @@ const MarkdownDisplayInternal: React.FC<MarkdownDisplayProps> = ({
 }) => {
   if (!text) return <></>;
 
-  const lines = text.split(EOL);
+  const lines = text.replace(/\r\n/g, '\n').split('\n');
   const headerRegex = /^ *(#{1,4}) +(.*)/;
   const codeFenceRegex = /^ *(`{3,}|~{3,}) *(\w*?) *$/;
   const ulItemRegex = /^([ \t]*)([-*+]) +(.*)/;
