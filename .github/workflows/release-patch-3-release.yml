@@ -57,6 +57,11 @@ jobs:
         run: |-
           npm ci
 
+      - name: 'Print Inputs'
+        shell: 'bash'
+        run: |-
+          echo "${{ toJSON(inputs) }}"
+
       - name: 'Get Patch Version'
         id: 'patch_version'
         env:
@@ -79,7 +84,11 @@ jobs:
 
       - name: 'Print Calculated Version'
         run: |-
-          echo "Calculated version: ${{ steps.patch_version.outputs.RELEASE_VERSION }}"
+          echo "Patch Release Summary:"
+          echo "  Release Version: ${{ steps.patch_version.outputs.RELEASE_VERSION }}"
+          echo "  Release Tag: ${{ steps.patch_version.outputs.RELEASE_TAG }}"
+          echo "  NPM Tag: ${{ steps.patch_version.outputs.NPM_TAG }}"
+          echo "  Previous Tag: ${{ steps.patch_version.outputs.PREVIOUS_TAG }}"
 
       - name: 'Run Tests'
         uses: './.github/actions/run-tests'
