@@ -317,20 +317,15 @@ jobs:
             echo "Dry run enabled. Skipping push."
           fi
 
-      - name: 'Create and Approve Pull Request'
-        if: |-
-          ${{ github.event.inputs.dry_run == 'false' }}
-        env:
-          GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
-          BRANCH_NAME: '${{ steps.release_branch.outputs.BRANCH_NAME }}'
-        run: |
-          gh pr create \
-            --title "chore(release): bump version to ${{ needs.calculate-versions.outputs.NEXT_NIGHTLY_VERSION }}" \
-            --body "Automated version bump to prepare for the next nightly release." \
-            --base "main" \
-            --head "${BRANCH_NAME}" \
-            --fill
-          gh pr merge --auto --squash
+      - name: 'Create and Merge Pull Request'
+        uses: './.github/actions/create-pull-request'
+        with:
+          branch-name: '${{ steps.release_branch.outputs.BRANCH_NAME }}'
+          pr-title: 'chore(release): bump version to ${{ needs.calculate-versions.outputs.NEXT_NIGHTLY_VERSION }}'
+          pr-body: 'Automated version bump to prepare for the next nightly release.'
+          app-id: '${{ secrets.APP_ID }}'
+          private-key: '${{ secrets.PRIVATE_KEY }}'
+          dry-run: '${{ github.event.inputs.dry_run }}'
 
       - name: 'Create Issue on Failure'
         if: '${{ failure() && github.event.inputs.dry_run == false }}'
