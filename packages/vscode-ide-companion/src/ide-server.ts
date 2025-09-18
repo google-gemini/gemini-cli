@@ -13,7 +13,12 @@ import {
 import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
-import express, { type Request, type Response } from 'express';
+import express, {
+  type Request,
+  type Response,
+  type NextFunction,
+} from 'express';
+import cors from 'cors';
 import { randomUUID } from 'node:crypto';
 import { type Server as HTTPServer } from 'node:http';
 import * as path from 'node:path';
@@ -22,6 +27,13 @@ import * as os from 'node:os';
 import type { z } from 'zod';
 import type { DiffManager } from './diff-manager.js';
 import { OpenFilesManager } from './open-files-manager.js';
+
+class CORSError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'CORSError';
+  }
+}
 
 const MCP_SESSION_ID_HEADER = 'mcp-session-id';
 const IDE_SERVER_PORT_ENV_VAR = 'GEMINI_CLI_IDE_SERVER_PORT';
@@ -131,6 +143,34 @@ export class IDEServer {
 
       const app = express();
       app.use(express.json({ limit: '10mb' }));
+
+      app.use(
+        cors({
+          origin: (origin, callback) => {
+            // Only allow non-browser requests with no origin.
+            if (!origin) {
+              return callback(null, true);
+            }
+            return callback(
+              new CORSError('Request denied by CORS policy.'),
+              false,
+            );
+          },
+        }),
+      );
+
+      app.use((req, res, next) => {
+        const host = req.headers.host || '';
+        const allowedHosts = [
+          `localhost:${this.port}`,
+          `127.0.0.1:${this.port}`,
+        ];
+        if (!allowedHosts.includes(host)) {
+          return res.status(403).json({ error: 'Invalid Host header' });
+        }
+        next();
+      });
+
       app.use((req, res, next) => {
         const authHeader = req.headers.authorization;
         if (authHeader) {
@@ -274,7 +314,15 @@ export class IDEServer {
 
       app.get('/mcp', handleSessionRequest);
 
-      this.server = app.listen(0, async () => {
+      app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
+        if (err instanceof CORSError) {
+          res.status(403).json({ error: 'Request denied by CORS policy.' });
+        } else {
+          next(err);
+        }
+      });
+
+      this.server = app.listen(0, '127.0.0.1', async () => {
         const address = (this.server as HTTPServer).address();
         if (address && typeof address !== 'string') {
           this.port = address.port;
@@ -286,7 +334,7 @@ export class IDEServer {
             os.tmpdir(),
             `gemini-ide-server-${process.ppid}.json`,
           );
-          this.log(`IDE server listening on port ${this.port}`);
+          this.log(`IDE server listening on http://127.0.0.1:${this.port}`);
 
           if (this.authToken) {
             await writePortAndWorkspace({
