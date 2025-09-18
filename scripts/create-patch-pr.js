@@ -65,7 +65,11 @@ async function main() {
 
     // Check if there's already a PR for this branch
     try {
-      const prInfo = execSync(`gh pr list --head ${hotfixBranch} --json number,url --jq '.[0] // empty'`).toString().trim();
+      const prInfo = execSync(
+        `gh pr list --head ${hotfixBranch} --json number,url --jq '.[0] // empty'`,
+      )
+        .toString()
+        .trim();
       if (prInfo && prInfo !== 'null' && prInfo !== '') {
         const pr = JSON.parse(prInfo);
         console.log(`Found existing PR #${pr.number}: ${pr.url}`);
@@ -73,7 +77,9 @@ async function main() {
         return { existingBranch: hotfixBranch, existingPR: pr };
       } else {
         console.log(`Hotfix branch ${hotfixBranch} exists but has no open PR.`);
-        console.log(`You may need to delete the branch and run this command again.`);
+        console.log(
+          `You may need to delete the branch and run this command again.`,
+        );
         return { existingBranch: hotfixBranch };
       }
     } catch (err) {
