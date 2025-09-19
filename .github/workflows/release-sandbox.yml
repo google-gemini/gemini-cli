@@ -22,4 +22,4 @@ jobs:
           username: '${{ github.actor }}'
           password: '${{ secrets.GITHUB_TOKEN }}'
           github-sha: '${{ github.event.inputs.ref || github.sha }}'
-          github-ref-name: '${github.event.inputs.ref}'
+          github-ref-name: '${{github.event.inputs.ref}}'
