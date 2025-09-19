@@ -52,15 +52,27 @@ jobs:
       - name: 'Install Script Dependencies'
         run: 'npm install yargs'
 
+      - name: 'Generate GitHub App Token'
+        id: 'generate_token'
+        uses: 'actions/create-github-app-token@a8d616148505b5069dccd32f177bb87d7f39123b'
+        with:
+          app-id: '${{ secrets.APP_ID }}'
+          private-key: '${{ secrets.PRIVATE_KEY }}'
+          permission-pull-requests: 'write'
+          permission-contents: 'write'
+
       - name: 'Configure Git User'
         run: |-
           git config user.name "gemini-cli-robot"
           git config user.email "gemini-cli-robot@google.com"
+          # Configure git to use GITHUB_TOKEN for remote operations (has actions:write for workflow files)
+          git remote set-url origin "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git"
 
       - name: 'Create Patch'
         id: 'create_patch'
         env:
-          GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+          GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+          GH_TOKEN: '${{ steps.generate_token.outputs.token }}'
         continue-on-error: true
         run: |
           # Capture output and display it in logs using tee
