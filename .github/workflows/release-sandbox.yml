@@ -18,7 +18,8 @@ jobs:
   build:
     runs-on: 'self-hosted'
     steps:
-      - uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
+      - name: 'Checkout'
+        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
         with:
           ref: '${{ github.event.inputs.ref || github.sha }}'
           fetch-depth: 0
