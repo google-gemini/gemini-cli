@@ -55,9 +55,8 @@ jobs:
     if: |
       github.event_name == 'push' ||
       github.event_name == 'merge_group' ||
-      (github.event.pull_request.head.repo.full_name == github.repository) ||
-      (github.event.label.name == 'maintainer:e2e:ok') ||
-      (contains(github.event.pull_request.labels.*.name, 'maintainer:e2e:ok'))
+      (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) ||
+      (github.event_name == 'pull_request_target' && github.event.label.name == 'maintainer:e2e:ok')
     runs-on: 'gemini-cli-ubuntu-16-core'
     strategy:
       fail-fast: false
@@ -119,9 +118,8 @@ jobs:
     if: |
       github.event_name == 'push' ||
       github.event_name == 'merge_group' ||
-      (github.event.pull_request.head.repo.full_name == github.repository) ||
-      (github.event.label.name == 'maintainer:e2e:ok') ||
-      (contains(github.event.pull_request.labels.*.name, 'maintainer:e2e:ok'))
+      (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) ||
+      (github.event_name == 'pull_request_target' && github.event.label.name == 'maintainer:e2e:ok')
     runs-on: '${{ matrix.os }}'
     continue-on-error: true
     strategy:
@@ -178,9 +176,8 @@ jobs:
     if: |
       github.event_name == 'push' ||
       github.event_name == 'merge_group' ||
-      (github.event.pull_request.head.repo.full_name == github.repository) ||
-      (github.event.label.name == 'maintainer:e2e:ok') ||
-      (contains(github.event.pull_request.labels.*.name, 'maintainer:e2e:ok'))
+      (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) ||
+      (github.event_name == 'pull_request_target' && github.event.label.name == 'maintainer:e2e:ok')
     runs-on: 'gemini-cli-windows-16-core'
     continue-on-error: true
 
