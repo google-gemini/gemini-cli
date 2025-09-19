@@ -49,3 +49,6 @@ packages/vscode-ide-companion/*.vsix
 
 # GHA credentials
 gha-creds-*.json
+
+# Log files
+patch_output.log
