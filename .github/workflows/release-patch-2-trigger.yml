@@ -28,7 +28,7 @@ on:
 
 jobs:
   trigger-patch-release:
-    if: "(github.event_name == 'pull_request' && github.event.pull_request.merged == true && startsWith(github.head_ref, 'hotfix/')) || github.event_name == 'workflow_dispatch'"
+    if: "(github.event_name == 'pull_request' && github.event.pull_request.merged == true && startsWith(github.event.pull_request.head.ref, 'hotfix/')) || github.event_name == 'workflow_dispatch'"
     runs-on: 'ubuntu-latest'
     permissions:
       actions: 'write'
