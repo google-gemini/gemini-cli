@@ -8,13 +8,18 @@ on:
         required: true
         type: 'string'
       channel:
-        description: 'The npm dist-tag to apply (e.g., preview, stable).'
+        description: 'The npm dist-tag to apply (e.g., latest, preview, nightly).'
         required: true
         type: 'choice'
         options:
-          - 'stable'
+          - 'latest'
           - 'preview'
           - 'nightly'
+      ref:
+        description: 'The branch, tag, or SHA to run from.'
+        required: false
+        type: 'string'
+        default: 'main'
       dry_run:
         description: 'Whether to run in dry-run mode.'
         required: false
@@ -28,6 +33,12 @@ jobs:
       packages: 'write'
       issues: 'write'
     steps:
+      - name: 'Checkout repository'
+        uses: 'actions/checkout@v4'
+        with:
+          ref: '${{ github.event.inputs.ref }}'
+          fetch-depth: 0
+
       - name: 'Setup Node.js'
         uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020'
         with:
