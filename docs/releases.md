@@ -200,21 +200,32 @@ This fully automated process ensures that patches are created and released consi
 **Solutions**:
 
 **Option 1: Manual Trigger (Quick Fix)**
-Manually trigger the updated workflow from the main branch:
+Manually trigger the updated workflow from the branch with the latest workflow code:
 
 ```bash
 # For a preview channel patch with tests skipped
-gh workflow run release-patch-2-trigger.yml --ref main \
+gh workflow run release-patch-2-trigger.yml --ref <branch-with-updated-workflow> \
   --field ref="hotfix/v0.6.0-preview.2/preview/cherry-pick-abc1234" \
+  --field workflow_ref=<branch-with-updated-workflow> \
   --field dry_run=false \
   --field force_skip_tests=true
 
 # For a stable channel patch
-gh workflow run release-patch-2-trigger.yml --ref main \
+gh workflow run release-patch-2-trigger.yml --ref <branch-with-updated-workflow> \
   --field ref="hotfix/v0.5.1/stable/cherry-pick-abc1234" \
+  --field workflow_ref=<branch-with-updated-workflow> \
   --field dry_run=false \
   --field force_skip_tests=false
+
+# Example using main branch (most common case)
+gh workflow run release-patch-2-trigger.yml --ref main \
+  --field ref="hotfix/v0.6.0-preview.2/preview/cherry-pick-abc1234" \
+  --field workflow_ref=main \
+  --field dry_run=false \
+  --field force_skip_tests=true
 ```
+
+**Note**: Replace `<branch-with-updated-workflow>` with the branch containing the latest workflow improvements (usually `main`, but could be a feature branch if testing updates).
 
 **Option 2: Update the Hotfix Branch**
 Merge the latest main branch into your hotfix branch to get the updated workflows:

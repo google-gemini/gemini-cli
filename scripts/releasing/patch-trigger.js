@@ -68,7 +68,8 @@ async function main() {
   const headRef = argv.headRef || process.env.HEAD_REF;
   const body = argv.prBody || process.env.PR_BODY || '';
   const isDryRun = argv.dryRun || body.includes('[DRY RUN]');
-  const forceSkipTests = argv.forceSkipTests || process.env.FORCE_SKIP_TESTS === 'true';
+  const forceSkipTests =
+    argv.forceSkipTests || process.env.FORCE_SKIP_TESTS === 'true';
 
   if (!headRef) {
     throw new Error(
@@ -131,7 +132,7 @@ async function main() {
   if (!testMode) {
     try {
       console.log('Looking for original PR using search...');
-      const { execSync } = await import('child_process');
+      const { execSync } = await import('node:child_process');
 
       // Use gh CLI to search for PRs with comments referencing the hotfix branch
       const query = `repo:${context.repo.owner}/${context.repo.repo} is:pr is:all in:comments "Patch PR Created" "${headRef}"`;
@@ -139,7 +140,7 @@ async function main() {
 
       const result = execSync(searchCommand, {
         encoding: 'utf8',
-        env: { ...process.env, GH_TOKEN: process.env.GITHUB_TOKEN }
+        env: { ...process.env, GH_TOKEN: process.env.GITHUB_TOKEN },
       });
 
       const searchResults = JSON.parse(result);
@@ -161,24 +162,24 @@ async function main() {
   console.log(`Triggering release workflow: ${workflowId}`);
   if (!testMode) {
     try {
-      const { execSync } = await import('child_process');
+      const { execSync } = await import('node:child_process');
 
       const inputs = [
         `type=${channel}`,
         `dry_run=${isDryRun.toString()}`,
         `force_skip_tests=${forceSkipTests.toString()}`,
         `release_ref=${releaseRef}`,
-        originalPr ? `original_pr=${originalPr.toString()}` : 'original_pr='
+        originalPr ? `original_pr=${originalPr.toString()}` : 'original_pr=',
       ];
 
-      const inputFields = inputs.map(input => `--field ${input}`).join(' ');
+      const inputFields = inputs.map((input) => `--field ${input}`).join(' ');
       const dispatchCommand = `gh workflow run ${workflowId} --ref main ${inputFields}`;
 
       console.log(`Running command: ${dispatchCommand}`);
 
       execSync(dispatchCommand, {
         stdio: 'inherit',
-        env: { ...process.env, GH_TOKEN: process.env.GITHUB_TOKEN }
+        env: { ...process.env, GH_TOKEN: process.env.GITHUB_TOKEN },
       });
 
       console.log('✅ Workflow dispatch completed successfully');
@@ -216,8 +217,8 @@ async function main() {
 
     if (!testMode) {
       try {
-        const { execSync } = await import('child_process');
-        const { writeFileSync, unlinkSync } = await import('fs');
+        const { execSync } = await import('node:child_process');
+        const { writeFileSync, unlinkSync } = await import('node:fs');
 
         // Write comment to temp file to handle multiline content safely
         const tempFile = `/tmp/comment-${Date.now()}.md`;
@@ -227,7 +228,7 @@ async function main() {
 
         execSync(commentCommand, {
           stdio: 'inherit',
-          env: { ...process.env, GH_TOKEN: process.env.GITHUB_TOKEN }
+          env: { ...process.env, GH_TOKEN: process.env.GITHUB_TOKEN },
         });
 
         // Clean up temp file
