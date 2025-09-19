@@ -26,9 +26,7 @@ import {
   type GeminiCLIExtension,
   ClearcutLogger,
   type Config,
-  ExtensionEnableEvent,
   ExtensionUninstallEvent,
-  logExtensionEnable,
 } from '@google/gemini-cli-core';
 import { execSync } from 'node:child_process';
 import { SettingScope } from './settings.js';

@@ -17,6 +17,7 @@ import {
   ExtensionUninstallEvent,
   ExtensionEnableEvent,
   logExtensionEnable,
+  logExtensionInstallEvent,
 } from '@google/gemini-cli-core';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -486,7 +487,7 @@ export async function installExtension(
       }
     }
 
-    logger?.logExtensionInstallEvent(
+    logExtensionInstallEvent(
       new ExtensionInstallEvent(
         newExtensionConfig!.name,
         newExtensionConfig!.version,

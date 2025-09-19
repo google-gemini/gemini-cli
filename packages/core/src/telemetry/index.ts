@@ -36,6 +36,7 @@ export {
   logKittySequenceOverflow,
   logChatCompression,
   logToolOutputTruncated,
+  logExtensionInstallEvent,
 } from './loggers.js';
 export type { SlashCommandEvent, ChatCompressionEvent } from './types.js';
 export {
