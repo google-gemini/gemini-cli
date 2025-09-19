@@ -2,16 +2,17 @@ name: 'Release Sandbox'
 
 on:
   workflow_dispatch:
-    ref:
-      description: 'The branch, tag, or SHA to release from.'
-      required: false
-      type: 'string'
-      default: 'main'
-    dry-run:
-      description: 'Whether this is a dry run.'
-      required: false
-      type: 'boolean'
-      default: true
+    inputs:
+      ref:
+        description: 'The branch, tag, or SHA to release from.'
+        required: false
+        type: 'string'
+        default: 'main'
+      dry-run:
+        description: 'Whether this is a dry run.'
+        required: false
+        type: 'boolean'
+        default: true
 
 jobs:
   build:
@@ -24,8 +25,8 @@ jobs:
       - name: 'Push'
         uses: './.github/actions/push-sandbox'
         with:
-          username: '${{ github.actor }}'
-          password: '${{ secrets.GITHUB_TOKEN }}'
+          github-actor: '${{ github.actor }}'
+          github-secret: '${{ secrets.GITHUB_TOKEN }}'
           github-sha: '${{ github.event.inputs.ref || github.sha }}'
           github-ref-name: '${{github.event.inputs.ref}}'
-          dry-run: '${{ github.event.inputs.dry_run }}'
+          dry-run: '${{ github.event.inputs.dry-run }}'

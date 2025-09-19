@@ -1,4 +1,5 @@
 name: 'Build and push sandbox docker'
+description: 'Pushes sandbox docker image to container registry'
 
 inputs:
   github-actor:
