@@ -51,13 +51,14 @@ jobs:
             const commentBody = process.env.COMMENT_BODY;
             console.log('Comment body:', commentBody);
 
-            let channels = ['stable'];  // default
+            let channels = ['stable', 'preview'];  // default to both
 
             // Parse different formats:
+            // /patch (defaults to both)
             // /patch both
             // /patch stable
             // /patch preview
-            if (commentBody.trim() === '/patch both') {
+            if (commentBody.trim() === '/patch' || commentBody.trim() === '/patch both') {
               channels = ['stable', 'preview'];
             } else if (commentBody.trim() === '/patch stable') {
               channels = ['stable'];

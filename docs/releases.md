@@ -110,16 +110,18 @@ There are two ways to create a patch pull request:
 
 After a pull request containing the fix has been merged, a maintainer can add a comment on that same PR with the following format:
 
-`/patch <channel>`
+`/patch [channel]`
 
-- **channel**:
-  - `both` - patches both stable and preview channels (recommended for most fixes)
+- **channel** (optional):
+  - _no channel_ - patches both stable and preview channels (default, recommended for most fixes)
+  - `both` - patches both stable and preview channels (same as default)
   - `stable` - patches only the stable channel
   - `preview` - patches only the preview channel
 
 Examples:
 
-- `/patch both` (patches both stable and preview)
+- `/patch` (patches both stable and preview - default)
+- `/patch both` (patches both stable and preview - explicit)
 - `/patch stable` (patches only stable)
 - `/patch preview` (patches only preview)
 
