@@ -182,18 +182,22 @@ A patch branch [\`${branch}\`](https://github.com/${repository}/tree/${branch}) 
         const mockPrNumber = Math.floor(Math.random() * 1000) + 8000;
         const mockPrUrl = `https://github.com/${repository}/pull/${mockPrNumber}`;
 
+        const hasConflicts =
+          logContent.includes('Cherry-pick has conflicts') ||
+          logContent.includes('[CONFLICTS]');
+
         commentBody = `🚀 **Patch PR Created!**
 
 **📋 Patch Details:**
 - **Channel**: \`${channel}\` → will publish to npm tag \`${npmTag}\`
 - **Commit**: \`${commit}\`
 - **Hotfix Branch**: [\`${branch}\`](https://github.com/${repository}/tree/${branch})
-- **Hotfix PR**: [#${mockPrNumber}](${mockPrUrl})
+- **Hotfix PR**: [#${mockPrNumber}](${mockPrUrl})${hasConflicts ? '\n- **⚠️ Status**: Cherry-pick conflicts detected - manual resolution required' : ''}
 
 **📝 Next Steps:**
-1. Review and approve the hotfix PR: [#${mockPrNumber}](${mockPrUrl})
-2. Once merged, the patch release will automatically trigger
-3. You'll receive updates here when the release completes
+1. ${hasConflicts ? '⚠️ **Resolve conflicts** in the hotfix PR first' : 'Review and approve the hotfix PR'}: [#${mockPrNumber}](${mockPrUrl})${hasConflicts ? '\n2. **Test your changes** after resolving conflicts' : ''}
+${hasConflicts ? '3' : '2'}. Once merged, the patch release will automatically trigger
+${hasConflicts ? '4' : '3'}. You'll receive updates here when the release completes
 
 **🔗 Track Progress:**
 - [View hotfix PR #${mockPrNumber}](${mockPrUrl})`;
@@ -209,18 +213,22 @@ A patch branch [\`${branch}\`](https://github.com/${repository}/tree/${branch}) 
 
           if (prList.data.length > 0) {
             const pr = prList.data[0];
+            const hasConflicts =
+              logContent.includes('Cherry-pick has conflicts') ||
+              pr.title.includes('[CONFLICTS]');
+
             commentBody = `🚀 **Patch PR Created!**
 
 **📋 Patch Details:**
 - **Channel**: \`${channel}\` → will publish to npm tag \`${npmTag}\`
 - **Commit**: \`${commit}\`
 - **Hotfix Branch**: [\`${branch}\`](https://github.com/${repository}/tree/${branch})
-- **Hotfix PR**: [#${pr.number}](${pr.html_url})
+- **Hotfix PR**: [#${pr.number}](${pr.html_url})${hasConflicts ? '\n- **⚠️ Status**: Cherry-pick conflicts detected - manual resolution required' : ''}
 
 **📝 Next Steps:**
-1. Review and approve the hotfix PR: [#${pr.number}](${pr.html_url})
-2. Once merged, the patch release will automatically trigger
-3. You'll receive updates here when the release completes
+1. ${hasConflicts ? '⚠️ **Resolve conflicts** in the hotfix PR first' : 'Review and approve the hotfix PR'}: [#${pr.number}](${pr.html_url})${hasConflicts ? '\n2. **Test your changes** after resolving conflicts' : ''}
+${hasConflicts ? '3' : '2'}. Once merged, the patch release will automatically trigger
+${hasConflicts ? '4' : '3'}. You'll receive updates here when the release completes
 
 **🔗 Track Progress:**
 - [View hotfix PR #${pr.number}](${pr.html_url})`;
