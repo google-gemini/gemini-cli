@@ -36,6 +36,7 @@ jobs:
       contents: 'write'
       pull-requests: 'write'
       actions: 'write'
+      workflows: 'write'
     steps:
       - name: 'Checkout'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
@@ -52,14 +53,6 @@ jobs:
       - name: 'Install Script Dependencies'
         run: 'npm install yargs'
 
-      - name: 'Generate GitHub App Token'
-        id: 'generate_token'
-        uses: 'actions/create-github-app-token@a8d616148505b5069dccd32f177bb87d7f39123b'
-        with:
-          app-id: '${{ secrets.APP_ID }}'
-          private-key: '${{ secrets.PRIVATE_KEY }}'
-          permission-pull-requests: 'write'
-          permission-contents: 'write'
 
       - name: 'Configure Git User'
         run: |-
@@ -72,7 +65,7 @@ jobs:
         id: 'create_patch'
         env:
           GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
-          GH_TOKEN: '${{ steps.generate_token.outputs.token }}'
+          GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
         continue-on-error: true
         run: |
           # Capture output and display it in logs using tee
