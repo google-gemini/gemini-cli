@@ -95,6 +95,11 @@ async function main() {
   );
   run(`git checkout -b ${hotfixBranch} origin/${releaseBranch}`, dryRun);
 
+  // Ensure git user is configured properly for commits
+  console.log('Configuring git user for cherry-pick commits...');
+  run('git config user.name "gemini-cli-robot"', dryRun);
+  run('git config user.email "gemini-cli-robot@google.com"', dryRun);
+
   // Cherry-pick the commit.
   console.log(`Cherry-picking commit ${commit} into ${hotfixBranch}...`);
   let hasConflicts = false;
