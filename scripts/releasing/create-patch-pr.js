@@ -59,8 +59,8 @@ async function main() {
     } catch (error) {
       // Check if this is a GitHub App workflows permission error
       if (
-        error.message.includes('refusing to allow a GitHub App') &&
-        error.message.includes('workflows` permission')
+        error.message.match(/refusing to allow a GitHub App/i) &&
+        error.message.match(/workflows?['`]? permission/i)
       ) {
         console.error(
           `❌ Failed to create release branch due to insufficient GitHub App permissions.`,
