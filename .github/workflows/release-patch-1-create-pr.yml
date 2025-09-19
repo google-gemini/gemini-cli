@@ -59,8 +59,6 @@ jobs:
           private-key: '${{ secrets.PRIVATE_KEY }}'
           permission-pull-requests: 'write'
           permission-contents: 'write'
-          permission-metadata: 'read'
-          permission-actions: 'read'
 
       - name: 'Configure Git User'
         run: |-
