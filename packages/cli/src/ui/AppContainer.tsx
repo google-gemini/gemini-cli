@@ -754,7 +754,12 @@ Logging in with Google... Please restart Gemini CLI to continue.
   const [showIdeRestartPrompt, setShowIdeRestartPrompt] = useState(false);
 
   const { isFolderTrustDialogOpen, handleFolderTrustSelect, isRestarting } =
-    useFolderTrust(settings, setIsTrustedFolder, refreshStatic);
+    useFolderTrust(
+      settings,
+      setIsTrustedFolder,
+      refreshStatic,
+      isConfigInitialized,
+    );
   const { needsRestart: ideNeedsRestart } = useIdeTrustListener();
   const isInitialMount = useRef(true);
 
@@ -1196,6 +1201,11 @@ Logging in with Google... Please restart Gemini CLI to continue.
       handleProQuotaChoice,
     ],
   );
+
+  if (!isConfigInitialized) {
+    // Don't render the app until the config is initialized.
+    return null;
+  }
 
   return (
     <UIStateContext.Provider value={uiState}>
