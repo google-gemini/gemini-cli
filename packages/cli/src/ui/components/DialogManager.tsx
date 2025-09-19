@@ -149,7 +149,12 @@ export const DialogManager = ({ addItem }: DialogManagerProps) => {
     );
   }
   if (uiState.isModelDialogOpen) {
-    return <ModelDialog onClose={uiActions.closeModelDialog} />;
+    return (
+      <ModelDialog
+        onClose={uiActions.closeModelDialog}
+        onSelect={uiActions.handleModelSelect}
+      />
+    );
   }
   if (uiState.isAuthenticating) {
     return (

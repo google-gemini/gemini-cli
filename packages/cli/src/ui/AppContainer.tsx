@@ -53,6 +53,7 @@ import { useAuthCommand } from './auth/useAuth.js';
 import { useQuotaAndFallback } from './hooks/useQuotaAndFallback.js';
 import { useEditorSettings } from './hooks/useEditorSettings.js';
 import { useSettingsCommand } from './hooks/useSettingsCommand.js';
+import { useModelCommand } from './hooks/useModelCommand.js';
 import { useSlashCommandProcessor } from './hooks/slashCommandProcessor.js';
 import { useVimMode } from './contexts/VimModeContext.js';
 import { useConsoleMessages } from './hooks/useConsoleMessages.js';
@@ -131,7 +132,6 @@ export const AppContainer = (props: AppContainerProps) => {
     HistoryItem[] | null
   >(null);
   const [showPrivacyNotice, setShowPrivacyNotice] = useState<boolean>(false);
-  const [isModelDialogOpen, setIsModelDialogOpen] = useState<boolean>(false);
   const [themeError, setThemeError] = useState<string | null>(
     initializationResult.themeError,
   );
@@ -420,6 +420,13 @@ Logging in with Google... Please restart Gemini CLI to continue.
     useSettingsCommand();
 
   const {
+    isModelDialogOpen,
+    openModelDialog,
+    closeModelDialog,
+    handleModelSelect,
+  } = useModelCommand(config);
+
+  const {
     showWorkspaceMigrationDialog,
     workspaceExtensions,
     onWorkspaceMigrationDialogOpen,
@@ -435,7 +442,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       openEditorDialog,
       openPrivacyNotice: () => setShowPrivacyNotice(true),
       openSettingsDialog,
-      openModelDialog: () => setIsModelDialogOpen(true),
+      openModelDialog,
       openPermissionsDialog,
       quit: (messages: HistoryItem[]) => {
         setQuittingMessages(messages);
@@ -453,6 +460,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       openThemeDialog,
       openEditorDialog,
       openSettingsDialog,
+      openModelDialog,
       setQuittingMessages,
       setDebugMessage,
       setShowPrivacyNotice,
@@ -1183,8 +1191,9 @@ Logging in with Google... Please restart Gemini CLI to continue.
       exitEditorDialog,
       exitPrivacyNotice: () => setShowPrivacyNotice(false),
       closeSettingsDialog,
-      closeModelDialog: () => setIsModelDialogOpen(false),
+      closeModelDialog,
       closePermissionsDialog,
+      handleModelSelect,
       setShellModeActive,
       vimHandleInput,
       handleIdePromptComplete,
@@ -1207,7 +1216,9 @@ Logging in with Google... Please restart Gemini CLI to continue.
       handleEditorSelect,
       exitEditorDialog,
       closeSettingsDialog,
+      closeModelDialog,
       closePermissionsDialog,
+      handleModelSelect,
       setShellModeActive,
       vimHandleInput,
       handleIdePromptComplete,

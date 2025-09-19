@@ -33,6 +33,7 @@ export interface UIActions {
   closeSettingsDialog: () => void;
   closeModelDialog: () => void;
   closePermissionsDialog: () => void;
+  handleModelSelect: (model: string) => void;
   setShellModeActive: (value: boolean) => void;
   vimHandleInput: (key: Key) => boolean;
   handleIdePromptComplete: (result: IdeIntegrationNudgeResult) => void;
