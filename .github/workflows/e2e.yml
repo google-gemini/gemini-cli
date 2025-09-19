@@ -20,26 +20,9 @@ concurrency:
     ${{ github.ref != 'refs/heads/main' && !startsWith(github.ref, 'refs/heads/release/') }}
 
 jobs:
-  merge_queue_skipper:
-    name: 'Merge Queue Skipper'
-    runs-on: 'ubuntu-latest'
-    outputs:
-      skip: '${{ steps.skipper.outputs.skip }}'
-    steps:
-      - name: 'Check if skip'
-        id: 'skipper'
-        uses: 'fkirc/skip-duplicate-actions@f75f66ce1886f00957d99748a42c724f4330bdcf' # ratchet:fkirc/skip-duplicate-actions@v5
-        with:
-          concurrent_skipping: 'never'
-          skip_after_successful_duplicate: 'true'
-          paths_ignore: '["**.md", "docs/**"]'
-          do_not_skip: '["push", "workflow_dispatch", "schedule"]'
-
   build:
     name: 'Build Project'
     runs-on: 'gemini-cli-ubuntu-16-core'
-    needs: 'merge_queue_skipper'
-    if: "needs.merge_queue_skipper.outputs.skip != 'true'"
     steps:
       - name: 'Checkout'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
