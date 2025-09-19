@@ -486,8 +486,10 @@ export async function installExtension(
         await fs.promises.rm(tempDir, { recursive: true, force: true });
       }
     }
+    const clearcutConfig = await getClearcutConfig(cwd);
 
     logExtensionInstallEvent(
+      clearcutConfig,
       new ExtensionInstallEvent(
         newExtensionConfig!.name,
         newExtensionConfig!.version,
