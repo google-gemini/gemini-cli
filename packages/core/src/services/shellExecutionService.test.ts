@@ -10,6 +10,7 @@ import type { Readable } from 'node:stream';
 import { type ChildProcess } from 'node:child_process';
 import type { ShellOutputEvent } from './shellExecutionService.js';
 import { ShellExecutionService } from './shellExecutionService.js';
+import type { AnsiOutput } from '../utils/terminalSerializer.js';
 
 // Hoisted Mocks
 const mockPtySpawn = vi.hoisted(() => vi.fn());
@@ -54,6 +55,10 @@ vi.mock('../utils/terminalSerializer.js', () => ({
   serializeTerminalToObject: mockSerializeTerminalToObject,
 }));
 
+const mockProcessKill = vi
+  .spyOn(process, 'kill')
+  .mockImplementation(() => true);
+
 const shellExecutionConfig = {
   terminalWidth: 80,
   terminalHeight: 24,
@@ -61,9 +66,25 @@ const shellExecutionConfig = {
   showColor: false,
 };
 
-const mockProcessKill = vi
-  .spyOn(process, 'kill')
-  .mockImplementation(() => true);
+const createExpectedAnsiOutput = (text: string | string[]): AnsiOutput => {
+  const lines = Array.isArray(text) ? text : text.split('\n');
+  const expected: AnsiOutput = Array.from(
+    { length: shellExecutionConfig.terminalHeight },
+    (_, i) => [
+      {
+        text: expect.stringMatching((lines[i] || '').trim()),
+        bold: false,
+        italic: false,
+        underline: false,
+        dim: false,
+        inverse: false,
+        fg: '',
+        bg: '',
+      },
+    ],
+  );
+  return expected;
+};
 
 describe('ShellExecutionService', () => {
   let mockPtyProcess: EventEmitter & {
@@ -77,6 +98,11 @@ describe('ShellExecutionService', () => {
   let mockHeadlessTerminal: {
     resize: Mock;
     scrollLines: Mock;
+    buffer: {
+      active: {
+        viewportY: number;
+      };
+    };
   };
   let onOutputEventMock: Mock<(event: ShellOutputEvent) => void>;
 
@@ -110,6 +136,11 @@ describe('ShellExecutionService', () => {
     mockHeadlessTerminal = {
       resize: vi.fn(),
       scrollLines: vi.fn(),
+      buffer: {
+        active: {
+          viewportY: 0,
+        },
+      },
     };
 
     mockPtySpawn.mockReturnValue(mockPtyProcess);
@@ -161,7 +192,7 @@ describe('ShellExecutionService', () => {
 
       expect(onOutputEventMock).toHaveBeenCalledWith({
         type: 'data',
-        chunk: 'file1.txt',
+        chunk: createExpectedAnsiOutput('file1.txt'),
       });
     });
 
@@ -175,7 +206,7 @@ describe('ShellExecutionService', () => {
       expect(onOutputEventMock).toHaveBeenCalledWith(
         expect.objectContaining({
           type: 'data',
-          chunk: expect.stringContaining('aredword'),
+          chunk: createExpectedAnsiOutput('aredword'),
         }),
       );
     });
@@ -197,7 +228,7 @@ describe('ShellExecutionService', () => {
 
       expect(onOutputEventMock).toHaveBeenCalledWith(
         expect.objectContaining({
-          chunk: expect.stringMatching(/^\s*$/),
+          chunk: createExpectedAnsiOutput(''),
         }),
       );
     });
@@ -438,17 +469,44 @@ describe('ShellExecutionService', () => {
       );
     });
 
-    it('should call onOutputEvent with plain string when showColor is false', async () => {
-      await simulateExecution('ls --color=auto', (pty) => {
-        pty.onData.mock.calls[0][0]('a\u001b[31mred\u001b[0mword');
-        pty.onExit.mock.calls[0][0]({ exitCode: 0, signal: null });
-      });
+    it('should call onOutputEvent with AnsiOutput when showColor is false', async () => {
+      await simulateExecution(
+        'ls --color=auto',
+        (pty) => {
+          pty.onData.mock.calls[0][0]('a\u001b[31mred\u001b[0mword');
+          pty.onExit.mock.calls[0][0]({ exitCode: 0, signal: null });
+        },
+        { ...shellExecutionConfig, showColor: false },
+      );
 
-      expect(mockSerializeTerminalToObject).not.toHaveBeenCalled();
+      const expected = createExpectedAnsiOutput('aredword');
+
       expect(onOutputEventMock).toHaveBeenCalledWith(
         expect.objectContaining({
           type: 'data',
-          chunk: 'aredword',
+          chunk: expected,
+        }),
+      );
+    });
+
+    it('should handle multi-line output correctly when showColor is false', async () => {
+      await simulateExecution(
+        'ls --color=auto',
+        (pty) => {
+          pty.onData.mock.calls[0][0](
+            'line 1\n\u001b[32mline 2\u001b[0m\nline 3',
+          );
+          pty.onExit.mock.calls[0][0]({ exitCode: 0, signal: null });
+        },
+        { ...shellExecutionConfig, showColor: false },
+      );
+
+      const expected = createExpectedAnsiOutput(['line 1', 'line 2', 'line 3']);
+
+      expect(onOutputEventMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'data',
+          chunk: expected,
         }),
       );
     });
@@ -541,7 +599,7 @@ describe('ShellExecutionService child_process fallback', () => {
       expect(onOutputEventMock).toHaveBeenCalledWith(
         expect.objectContaining({
           type: 'data',
-          chunk: expect.stringContaining('aredword'),
+          chunk: 'aredword',
         }),
       );
     });
