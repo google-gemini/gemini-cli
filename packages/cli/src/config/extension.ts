@@ -12,6 +12,7 @@ import type {
 import {
   GEMINI_DIR,
   Storage,
+  Config,
   ExtensionInstallEvent,
   ExtensionUninstallEvent,
   ExtensionEnableEvent,
@@ -23,7 +24,6 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
 import { SettingScope, loadSettings } from '../config/settings.js';
-import { loadCliConfig, type CliArgs } from './config.js';
 import { getErrorMessage } from '../utils/errors.js';
 import { recursivelyHydrateStrings } from './extensions/variables.js';
 import { isWorkspaceTrusted } from './trustedFolders.js';
@@ -128,14 +128,15 @@ export async function performWorkspaceExtensionMigration(
 
 async function getTelemetryConfig(cwd: string) {
   const settings = loadSettings(cwd);
-  const sessionId = randomUUID();
-  const extensions = loadExtensions();
-  const config = await loadCliConfig(
-    settings.merged,
-    extensions,
-    sessionId,
-    {} as unknown as CliArgs,
-  );
+  const config = new Config({
+    telemetry: settings.merged.telemetry,
+    interactive: false,
+    sessionId: randomUUID(),
+    targetDir: cwd,
+    cwd,
+    model: '',
+    debugMode: false,
+  });
   return config;
 }
 
@@ -602,7 +603,10 @@ export async function uninstallExtension(
     recursive: true,
     force: true,
   });
-  logExtensionUninstall(telemetryConfig, new ExtensionUninstallEvent(extensionName, 'success'));
+  logExtensionUninstall(
+    telemetryConfig,
+    new ExtensionUninstallEvent(extensionName, 'success'),
+  );
 }
 
 export function toOutputString(extension: Extension): string {
