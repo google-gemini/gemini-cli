@@ -48,18 +48,6 @@ jobs:
           node-version-file: '.nvmrc'
           cache: 'npm'
 
-      - name: 'Install Dependencies'
-        run: 'npm ci'
-
-      - name: 'Generate GitHub App Token'
-        id: 'generate_token'
-        uses: 'actions/create-github-app-token@a8d616148505b5069dccd32f177bb87d7f39123b'
-        with:
-          app-id: '${{ secrets.APP_ID }}'
-          private-key: '${{ secrets.PRIVATE_KEY }}'
-          permission-pull-requests: 'write'
-          permission-contents: 'write'
-
       - name: 'Configure Git User'
         run: |-
           git config user.name "gemini-cli-robot"
@@ -68,7 +56,7 @@ jobs:
       - name: 'Create Patch'
         id: 'create_patch'
         env:
-          GH_TOKEN: '${{ steps.generate_token.outputs.token }}'
+          GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
         continue-on-error: true
         run: |
           # Capture output and display it in logs using tee
@@ -82,7 +70,7 @@ jobs:
           )
 
       - name: 'Comment on Original PR'
-        if: 'inputs.original_pr'
+        if: 'always() && inputs.original_pr'
         env:
           GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
           ORIGINAL_PR: '${{ github.event.inputs.original_pr }}'
@@ -91,6 +79,14 @@ jobs:
           CHANNEL: '${{ github.event.inputs.channel }}'
           REPOSITORY: '${{ github.repository }}'
           GITHUB_RUN_ID: '${{ github.run_id }}'
+          LOG_CONTENT: '${{ env.LOG_CONTENT }}'
         run: |
           git checkout '${{ github.event.inputs.ref }}'
           node scripts/releasing/patch-create-comment.js
+
+      - name: 'Fail Workflow if Main Task Failed'
+        if: 'always() && steps.create_patch.outputs.EXIT_CODE != 0'
+        run: |
+          echo "Patch creation failed with exit code: ${{ steps.create_patch.outputs.EXIT_CODE }}"
+          echo "Check the logs above and the comment posted to the original PR for details."
+          exit 1
