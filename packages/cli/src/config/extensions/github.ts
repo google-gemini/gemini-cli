@@ -208,21 +208,24 @@ export async function downloadFromGitHubRelease(
 
   try {
     const releaseData = await fetchFromGithub(owner, repo, ref);
-    if (
-      !releaseData ||
-      !releaseData.assets ||
-      releaseData.assets.length === 0
-    ) {
+    if (!releaseData) {
       throw new Error(
-        `No release assets found for ${owner}/${repo} at tag ${ref}`,
+        `No release data found for ${owner}/${repo} at tag ${ref}`,
       );
     }
 
     const asset = findReleaseAsset(releaseData.assets);
     if (!asset) {
-      throw new Error(
-        `No suitable release asset found for platform ${os.platform()}-${os.arch()}`,
+      // If there are no release assets, then we just clone the repo using the
+      // ref the release points to.
+      await cloneFromGit(
+        {
+          ...installMetadata,
+          ref: releaseData.tag_name,
+        },
+        destination,
       );
+      return releaseData.tag_name;
     }
 
     const downloadedAssetPath = path.join(
