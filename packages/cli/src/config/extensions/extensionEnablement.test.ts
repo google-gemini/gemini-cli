@@ -196,11 +196,11 @@ describe('ExtensionEnablementManager', () => {
       const overrides = config['ext-test'].overrides;
 
       // The new parent rule should be present
-      expect(overrides).toContain(`!/path/to/dir${path.sep}*`);
+      expect(overrides).toContain(`!/path/to/dir/*`);
 
       // Child rules should be removed
       expect(overrides).not.toContain('/path/to/dir/subdir1/');
-      expect(overrides).not.toContain(`!/path/to/dir/subdir2${path.sep}*`);
+      expect(overrides).not.toContain(`!/path/to/dir/subdir2/*`);
 
       // Unrelated rules should remain
       expect(overrides).toContain('/path/to/another/dir/');
@@ -238,14 +238,14 @@ describe('ExtensionEnablementManager', () => {
 describe('Override', () => {
   it('should create an override from input', () => {
     const override = Override.fromInput('/path/to/dir', true);
-    expect(override.baseRule).toBe(`/path/to/dir${path.sep}`);
+    expect(override.baseRule).toBe(`/path/to/dir/`);
     expect(override.isDisable).toBe(false);
     expect(override.includeSubdirs).toBe(true);
   });
 
   it('should create a disable override from input', () => {
     const override = Override.fromInput('!/path/to/dir', false);
-    expect(override.baseRule).toBe(`/path/to/dir${path.sep}`);
+    expect(override.baseRule).toBe(`/path/to/dir/`);
     expect(override.isDisable).toBe(true);
     expect(override.includeSubdirs).toBe(false);
   });
@@ -323,16 +323,16 @@ describe('Override', () => {
 
   it('should generate the correct output string', () => {
     const override = Override.fromInput('/path/to/dir', true);
-    expect(override.output()).toBe(`/path/to/dir${path.sep}*`);
+    expect(override.output()).toBe(`/path/to/dir/*`);
   });
 
   it('should generate the correct output string for a disable override', () => {
     const override = Override.fromInput('!/path/to/dir', false);
-    expect(override.output()).toBe(`!/path/to/dir${path.sep}`);
+    expect(override.output()).toBe(`!/path/to/dir/`);
   });
 
   it('should disable a path based on a disable override rule', () => {
     const override = Override.fromInput('!/path/to/dir', false);
-    expect(override.output()).toBe(`!/path/to/dir${path.sep}`);
+    expect(override.output()).toBe(`!/path/to/dir/`);
   });
 });
