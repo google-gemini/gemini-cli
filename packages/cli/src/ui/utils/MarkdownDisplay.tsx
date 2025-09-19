@@ -59,14 +59,19 @@ const MarkdownDisplayInternal: React.FC<MarkdownDisplayProps> = ({
     if (line.trim() === '' && i > 0 && i < lines.length - 1) {
       const prevLine = lines[i - 1];
       const nextLine = lines[i + 1];
-      const prevIsListItem = prevLine.match(ulItemRegex) || prevLine.match(olItemRegex);
-      const nextIsListItem = nextLine.match(ulItemRegex) || nextLine.match(olItemRegex);
+      const prevIsListItem =
+        prevLine.match(ulItemRegex) || prevLine.match(olItemRegex);
+      const nextIsListItem =
+        nextLine.match(ulItemRegex) || nextLine.match(olItemRegex);
       return prevIsListItem && nextIsListItem;
     }
     return false;
   });
 
-  function addContentBlock(block: React.ReactNode, blockType: 'list' | 'header' | 'other' = 'other') {
+  function addContentBlock(
+    block: React.ReactNode,
+    blockType: 'list' | 'header' | 'other' = 'other',
+  ) {
     if (block) {
       contentBlocks.push(block);
       lastLineEmpty = false;
@@ -183,9 +188,12 @@ const MarkdownDisplayInternal: React.FC<MarkdownDisplayProps> = ({
     } else if (headerMatch) {
       // Add spacing before header if there was previous content
       // Always add spacing before headers unless it's the very first content or after an empty line
-      if (contentBlocks.length > 0 && (!lastLineEmpty || lastBlockType === 'list')) {
+      if (
+        contentBlocks.length > 0 &&
+        (!lastLineEmpty || lastBlockType === 'list')
+      ) {
         contentBlocks.push(
-          <Box key={`header-spacer-${index}`} height={EMPTY_LINE_HEIGHT} />
+          <Box key={`header-spacer-${index}`} height={EMPTY_LINE_HEIGHT} />,
         );
       }
 
@@ -229,16 +237,21 @@ const MarkdownDisplayInternal: React.FC<MarkdownDisplayProps> = ({
           );
           break;
       }
-      if (headerNode) addContentBlock(<Box key={key}>{headerNode}</Box>, 'header');
+      if (headerNode)
+        addContentBlock(<Box key={key}>{headerNode}</Box>, 'header');
     } else if (ulMatch) {
       const leadingWhitespace = ulMatch[1];
       const marker = ulMatch[2];
       const itemText = ulMatch[3];
 
       // Add spacing before top-level list items in loose lists when following another list item
-      if (isLooseList && leadingWhitespace.length === 0 && lastBlockType === 'list') {
+      if (
+        isLooseList &&
+        leadingWhitespace.length === 0 &&
+        lastBlockType === 'list'
+      ) {
         contentBlocks.push(
-          <Box key={`list-spacer-${index}`} height={EMPTY_LINE_HEIGHT} />
+          <Box key={`list-spacer-${index}`} height={EMPTY_LINE_HEIGHT} />,
         );
       }
 
@@ -250,7 +263,7 @@ const MarkdownDisplayInternal: React.FC<MarkdownDisplayProps> = ({
           marker={marker}
           leadingWhitespace={leadingWhitespace}
         />,
-        'list'
+        'list',
       );
     } else if (olMatch) {
       const leadingWhitespace = olMatch[1];
@@ -258,9 +271,13 @@ const MarkdownDisplayInternal: React.FC<MarkdownDisplayProps> = ({
       const itemText = olMatch[3];
 
       // Add spacing before top-level list items in loose lists when following another list item
-      if (isLooseList && leadingWhitespace.length === 0 && lastBlockType === 'list') {
+      if (
+        isLooseList &&
+        leadingWhitespace.length === 0 &&
+        lastBlockType === 'list'
+      ) {
         contentBlocks.push(
-          <Box key={`list-spacer-${index}`} height={EMPTY_LINE_HEIGHT} />
+          <Box key={`list-spacer-${index}`} height={EMPTY_LINE_HEIGHT} />,
         );
       }
 
@@ -272,21 +289,22 @@ const MarkdownDisplayInternal: React.FC<MarkdownDisplayProps> = ({
           marker={marker}
           leadingWhitespace={leadingWhitespace}
         />,
-        'list'
+        'list',
       );
     } else {
       if (line.trim().length === 0 && !inCodeBlock) {
         // Check if next line is a list item or header to avoid unnecessary spacers
         const nextLine = index + 1 < lines.length ? lines[index + 1] : '';
-        const nextIsListItem = nextLine.match(ulItemRegex) || nextLine.match(olItemRegex);
+        const nextIsListItem =
+          nextLine.match(ulItemRegex) || nextLine.match(olItemRegex);
         const nextIsHeader = nextLine.match(headerRegex);
         // Preserve empty lines from source as visual spacing
         // Don't add spacing between consecutive list items (tight lists)
         // Always add spacing before headers
-        const shouldAddSpacer = !lastLineEmpty && (
-          nextIsHeader || // Always add space before headers
-          !(lastBlockType === 'list' && nextIsListItem) // Add space unless both prev and next are list items
-        );
+        const shouldAddSpacer =
+          !lastLineEmpty &&
+          (nextIsHeader || // Always add space before headers
+            !(lastBlockType === 'list' && nextIsListItem)); // Add space unless both prev and next are list items
 
         if (shouldAddSpacer) {
           contentBlocks.push(
@@ -431,10 +449,7 @@ const RenderListItemInternal: React.FC<RenderListItemProps> = ({
   const indentation = Math.floor(leadingWhitespace.length / 2);
 
   return (
-    <Box
-      paddingLeft={indentation}
-      flexDirection="row"
-    >
+    <Box paddingLeft={indentation} flexDirection="row">
       <Text color={theme.text.primary}>{prefix}</Text>
       <Box flexGrow={LIST_ITEM_TEXT_FLEX_GROW}>
         <Text wrap="wrap" color={theme.text.primary}>
