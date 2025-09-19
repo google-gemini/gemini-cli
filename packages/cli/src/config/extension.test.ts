@@ -24,9 +24,8 @@ import {
 import {
   GEMINI_DIR,
   type GeminiCLIExtension,
-  ClearcutLogger,
-  type Config,
   ExtensionUninstallEvent,
+  ExtensionEnableEvent,
 } from '@google/gemini-cli-core';
 import { execSync } from 'node:child_process';
 import { SettingScope } from './settings.js';
@@ -70,23 +69,17 @@ vi.mock('./trustedFolders.js', async (importOriginal) => {
 });
 
 const mockLogExtensionEnable = vi.hoisted(() => vi.fn());
+const mockLogExtensionInstallEvent = vi.hoisted(() => vi.fn());
+const mockLogExtensionUninstall = vi.hoisted(() => vi.fn());
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const actual =
     await importOriginal<typeof import('@google/gemini-cli-core')>();
-  const mockLogExtensionEnableEvent = vi.fn();
-  const mockLogExtensionInstallEvent = vi.fn();
-  const mockLogExtensionUninstallEvent = vi.fn();
   return {
     ...actual,
     logExtensionEnable: mockLogExtensionEnable,
-    ClearcutLogger: {
-      getInstance: vi.fn(() => ({
-        logExtensionEnableEvent: mockLogExtensionEnableEvent,
-        logExtensionInstallEvent: mockLogExtensionInstallEvent,
-        logExtensionUninstallEvent: mockLogExtensionUninstallEvent,
-      })),
-    },
-    Config: vi.fn(),
+    logExtensionInstallEvent: mockLogExtensionInstallEvent,
+    logExtensionUninstall: mockLogExtensionUninstall,
+    ExtensionEnableEvent: vi.fn(),
     ExtensionInstallEvent: vi.fn(),
     ExtensionUninstallEvent: vi.fn(),
   };
@@ -649,8 +642,7 @@ describe('extension tests', () => {
 
       await installExtension({ source: sourceExtDir, type: 'local' });
 
-      const logger = ClearcutLogger.getInstance({} as Config);
-      expect(logger?.logExtensionInstallEvent).toHaveBeenCalled();
+      expect(mockLogExtensionInstallEvent).toHaveBeenCalled();
     });
 
     it('should show users information on their mcp server when installing', async () => {
@@ -834,9 +826,10 @@ describe('extension tests', () => {
 
       await uninstallExtension('my-local-extension');
 
-      const logger = ClearcutLogger.getInstance({} as Config);
-      expect(logger?.logExtensionUninstallEvent).toHaveBeenCalledWith(
-        new ExtensionUninstallEvent('my-local-extension', 'success'),
+      expect(mockLogExtensionUninstall).toHaveBeenCalled();
+      expect(ExtensionUninstallEvent).toHaveBeenCalledWith(
+        'my-local-extension',
+        'success',
       );
     });
 
@@ -855,9 +848,10 @@ describe('extension tests', () => {
       await uninstallExtension(gitUrl);
 
       expect(fs.existsSync(sourceExtDir)).toBe(false);
-      const logger = ClearcutLogger.getInstance({} as Config);
-      expect(logger?.logExtensionUninstallEvent).toHaveBeenCalledWith(
-        new ExtensionUninstallEvent('gemini-sql-extension', 'success'),
+      expect(mockLogExtensionUninstall).toHaveBeenCalled();
+      expect(ExtensionUninstallEvent).toHaveBeenCalledWith(
+        'gemini-sql-extension',
+        'success',
       );
     });
 
@@ -1118,6 +1112,22 @@ describe('extension tests', () => {
       activeExtensions = getActiveExtensions();
       expect(activeExtensions).toHaveLength(1);
       expect(activeExtensions[0].name).toBe('ext1');
+    });
+
+    it('should log an enable event', () => {
+      createExtension({
+        extensionsDir: userExtensionsDir,
+        name: 'ext1',
+        version: '1.0.0',
+      });
+      disableExtension('ext1', SettingScope.Workspace);
+      enableExtension('ext1', SettingScope.Workspace);
+
+      expect(mockLogExtensionEnable).toHaveBeenCalled();
+      expect(ExtensionEnableEvent).toHaveBeenCalledWith(
+        'ext1',
+        SettingScope.Workspace,
+      );
     });
   });
 });
