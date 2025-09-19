@@ -275,7 +275,12 @@ There was an error creating the patch release.
 - Ensure you have permissions to create branches and PRs
 
 **🔗 Links:**
-- [View workflow run](https://github.com/${repository}/actions/runs/${runId})`;
+- [View workflow run](https://github.com/${repository}/actions/runs/${runId})
+
+**📋 Full Output:**
+\`\`\`
+${logContent}
+\`\`\``;
   }
 
   if (!commentBody) {
