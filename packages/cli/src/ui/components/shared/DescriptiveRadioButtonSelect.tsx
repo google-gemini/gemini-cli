@@ -10,6 +10,8 @@ import { Text, Box } from 'ink';
 import { theme } from '../../semantic-colors.js';
 import { useKeypress } from '../../hooks/useKeypress.js';
 
+const NUMBER_INPUT_TIMEOUT_MS = 1000;
+
 export interface DescriptiveRadioSelectItem<T> {
   value: T;
   title: string;
@@ -35,7 +37,7 @@ export function DescriptiveRadioButtonSelect<T>({
   showNumbers = false,
 }: DescriptiveRadioButtonSelectProps<T>): React.JSX.Element {
   const [activeIndex, setActiveIndex] = useState(initialIndex);
-  const [numberInput, setNumberInput] = useState('');
+  const numberInputRef = useRef('');
   const numberInputTimer = useRef<NodeJS.Timeout | null>(null);
 
   useKeypress(
@@ -44,8 +46,7 @@ export function DescriptiveRadioButtonSelect<T>({
       const isNumeric = showNumbers && /^[0-9]$/.test(sequence);
 
       if (!isNumeric && numberInputTimer.current) {
-        clearTimeout(numberInputTimer.current);
-        setNumberInput('');
+        numberInputRef.current = '';
       }
 
       if (name === 'k' || name === 'up') {
@@ -72,13 +73,16 @@ export function DescriptiveRadioButtonSelect<T>({
           clearTimeout(numberInputTimer.current);
         }
 
-        const newNumberInput = numberInput + sequence;
-        setNumberInput(newNumberInput);
+        numberInputRef.current = numberInputRef.current + sequence;
+        const newNumberInput = numberInputRef.current;
 
         const targetIndex = Number.parseInt(newNumberInput, 10) - 1;
 
         if (newNumberInput === '0') {
-          numberInputTimer.current = setTimeout(() => setNumberInput(''), 350);
+          numberInputTimer.current = setTimeout(
+            () => (numberInputRef.current = ''),
+            NUMBER_INPUT_TIMEOUT_MS,
+          );
           return;
         }
 
@@ -90,15 +94,15 @@ export function DescriptiveRadioButtonSelect<T>({
           const potentialNextNumber = Number.parseInt(newNumberInput + '0', 10);
           if (potentialNextNumber > items.length) {
             onSelect(targetItem.value);
-            setNumberInput('');
+            numberInputRef.current = '';
           } else {
             numberInputTimer.current = setTimeout(() => {
               onSelect(targetItem.value);
-              setNumberInput('');
-            }, 350);
+              numberInputRef.current = '';
+            }, NUMBER_INPUT_TIMEOUT_MS);
           }
         } else {
-          setNumberInput('');
+          numberInputRef.current = '';
         }
       }
     },
