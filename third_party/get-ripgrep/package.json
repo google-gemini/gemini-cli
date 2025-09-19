@@ -1,19 +1,20 @@
 {
-  "name": "@lvce-editor/ripgrep",
+  "name": "get-ripgrep",
   "version": "0.0.0-dev",
-  "description": "A module for using ripgrep in a Node project",
-  "main": "src/index.js",
-  "typings": "src/index.d.ts",
+  "description": "A module for downloading ripgrep at runtime a Node project",
+  "main": "dist/index.js",
+  "files": [
+    "dist"
+  ],
   "type": "module",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/lvce-editor/ripgrep"
-  },
   "scripts": {
-    "postinstall": "node ./src/postinstall.js",
-    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
-    "test:watch": "node --experimental-vm-modules node_modules/jest/bin/jest.js --watch",
-    "format": "prettier --write ."
+    "build": "node ../../scripts/build_package.js",
+    "prepublishOnly": "npm run build",
+    "format": "prettier --write .",
+    "lint": "eslint . --ext .ts,.tsx",
+    "test": "vitest run",
+    "test:ci": "vitest run --coverage",
+    "typecheck": "tsc --noEmit"
   },
   "keywords": [
     "lvce-editor",
@@ -22,20 +23,17 @@
   "author": "Lvce Editor",
   "license": "MIT",
   "dependencies": {
-    "@lvce-editor/verror": "^1.6.0",
     "execa": "^9.5.2",
     "extract-zip": "^2.0.1",
     "fs-extra": "^11.3.0",
     "got": "^14.4.5",
     "path-exists": "^5.0.0",
-    "tempy": "^3.1.0",
     "xdg-basedir": "^5.1.0"
   },
   "devDependencies": {
     "@types/fs-extra": "^11.0.4",
-    "@types/jest": "^29.5.14",
     "@types/node": "^22.13.0",
-    "jest": "^29.7.0",
+    "vitest": "^3.1.1",
     "prettier": "^3.4.2",
     "typescript": "^5.7.3"
   },
