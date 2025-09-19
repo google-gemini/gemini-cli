@@ -27,26 +27,9 @@ defaults:
     shell: 'bash'
 
 jobs:
-  merge_queue_skipper:
-    name: 'Merge Queue Skipper'
-    runs-on: 'ubuntu-latest'
-    outputs:
-      skip: '${{ steps.skipper.outputs.skip }}'
-    steps:
-      - name: 'Check if skip'
-        id: 'skipper'
-        uses: 'fkirc/skip-duplicate-actions@f75f66ce1886f00957d99748a42c724f4330bdcf' # ratchet:fkirc/skip-duplicate-actions@v5
-        with:
-          concurrent_skipping: 'never'
-          skip_after_successful_duplicate: 'true'
-          paths_ignore: '["**.md", "docs/**"]'
-          do_not_skip: '["push", "workflow_dispatch", "schedule"]'
-
   lint:
     name: 'Lint'
     runs-on: 'gemini-cli-ubuntu-16-core'
-    needs: 'merge_queue_skipper'
-    if: "needs.merge_queue_skipper.outputs.skip != 'true'"
     steps:
       - name: 'Checkout'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
@@ -87,9 +70,7 @@ jobs:
     name: 'Test (Linux)'
     runs-on: 'gemini-cli-ubuntu-16-core'
     needs:
-      - 'merge_queue_skipper'
       - 'lint'
-    if: "needs.merge_queue_skipper.outputs.skip != 'true'"
     permissions:
       contents: 'read'
       checks: 'write'
@@ -146,9 +127,7 @@ jobs:
     name: 'Slow Test - Mac'
     runs-on: '${{ matrix.os }}'
     needs:
-      - 'merge_queue_skipper'
       - 'lint'
-    if: "needs.merge_queue_skipper.outputs.skip != 'true'"
     permissions:
       contents: 'read'
       checks: 'write'
@@ -215,8 +194,6 @@ jobs:
   codeql:
     name: 'CodeQL'
     runs-on: 'gemini-cli-ubuntu-16-core'
-    needs: 'merge_queue_skipper'
-    if: "needs.merge_queue_skipper.outputs.skip != 'true'"
     permissions:
       actions: 'read'
       contents: 'read'
@@ -236,8 +213,7 @@ jobs:
   # Check for changes in bundle size.
   bundle_size:
     name: 'Check Bundle Size'
-    if: "github.event_name == 'pull_request' && needs.merge_queue_skipper.outputs.skip != 'true'"
-    needs: 'merge_queue_skipper'
+    if: "github.event_name == 'pull_request'"
     runs-on: 'gemini-cli-ubuntu-16-core'
     permissions:
       contents: 'read' # For checkout
@@ -259,8 +235,6 @@ jobs:
 
   test_windows:
     name: 'Slow Test - Win'
-    needs: 'merge_queue_skipper'
-    if: "needs.merge_queue_skipper.outputs.skip != 'true'"
     runs-on: 'gemini-cli-windows-16-core'
     continue-on-error: true
 
@@ -318,7 +292,6 @@ jobs:
     name: 'CI'
     if: 'always()'
     needs:
-      - 'merge_queue_skipper'
       - 'lint'
       - 'test_linux'
       - 'codeql'

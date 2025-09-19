@@ -68,15 +68,12 @@ jobs:
   e2e_linux:
     name: 'E2E Test (Linux) - ${{ matrix.sandbox }}'
     needs:
-      - 'merge_queue_skipper'
       - 'build'
     if: |
-      needs.merge_queue_skipper.outputs.skip != 'true' && (
-        github.event_name == 'push' ||
-        github.event_name == 'merge_group' ||
-        (github.event.pull_request.head.repo.full_name == github.repository) ||
-        (github.event.label.name == 'maintainer:e2e:ok')
-      )
+      github.event_name == 'push' ||
+      github.event_name == 'merge_group' ||
+      (github.event.pull_request.head.repo.full_name == github.repository) ||
+      (github.event.label.name == 'maintainer:e2e:ok')
     runs-on: 'gemini-cli-ubuntu-16-core'
     strategy:
       fail-fast: false
@@ -134,15 +131,12 @@ jobs:
   e2e_slow_platforms:
     name: 'Slow E2E - Mac'
     needs:
-      - 'merge_queue_skipper'
       - 'build'
     if: |
-      needs.merge_queue_skipper.outputs.skip != 'true' && (
-        github.event_name == 'push' ||
-        github.event_name == 'merge_group' ||
-        (github.event.pull_request.head.repo.full_name == github.repository) ||
-        (github.event.label.name == 'maintainer:e2e:ok')
-      )
+      github.event_name == 'push' ||
+      github.event_name == 'merge_group' ||
+      (github.event.pull_request.head.repo.full_name == github.repository) ||
+      (github.event.label.name == 'maintainer:e2e:ok')
     runs-on: '${{ matrix.os }}'
     continue-on-error: true
     strategy:
@@ -260,7 +254,6 @@ jobs:
     name: 'E2E'
     if: 'always()'
     needs:
-      - 'merge_queue_skipper'
       - 'e2e_linux'
     runs-on: 'gemini-cli-ubuntu-16-core'
     steps:
