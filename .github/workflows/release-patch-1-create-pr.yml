@@ -83,6 +83,7 @@ jobs:
           REPOSITORY: '${{ github.repository }}'
           GITHUB_RUN_ID: '${{ github.run_id }}'
           LOG_CONTENT: '${{ env.LOG_CONTENT }}'
+        continue-on-error: true
         run: |
           git checkout '${{ github.event.inputs.ref }}'
           node scripts/releasing/patch-create-comment.js
