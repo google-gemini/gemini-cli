@@ -102,7 +102,7 @@ export async function handleUpdate(args: UpdateArgs) {
 }
 
 export const updateCommand: CommandModule = {
-  command: 'update [name]',
+  command: 'update [<name>] [--all]',
   describe:
     'Updates all extensions or a named extension to the latest version.',
   builder: (yargs) =>

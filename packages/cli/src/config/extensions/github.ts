@@ -125,7 +125,14 @@ export async function checkForExtensionUpdate(
       extensionDir: installMetadata.source,
       workspaceDir: cwd,
     });
-    if (newExtension?.config.version !== extension.version) {
+    if (!newExtension) {
+      console.error(
+        `Failed to check for update for local extension "${extension.name}". Could not load extension from source path: ${installMetadata.source}`,
+      );
+      setExtensionUpdateState(ExtensionUpdateState.ERROR);
+      return;
+    }
+    if (newExtension.config.version !== extension.version) {
       setExtensionUpdateState(ExtensionUpdateState.UPDATE_AVAILABLE);
       return;
     }
