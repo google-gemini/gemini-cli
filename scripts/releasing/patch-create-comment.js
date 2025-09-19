@@ -13,7 +13,6 @@
 
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
-import { readFileSync } from 'node:fs';
 
 async function main() {
   const argv = await yargs(hideBin(process.argv))
@@ -26,11 +25,6 @@ async function main() {
       description: 'Exit code from patch creation step',
       type: 'number',
       demandOption: !process.env.GITHUB_ACTIONS,
-    })
-    .option('output-log', {
-      description: 'Path to the patch output log file',
-      type: 'string',
-      default: 'patch_output.log',
     })
     .option('commit', {
       description: 'The commit SHA being patched',
@@ -86,8 +80,6 @@ async function main() {
     argv.exitCode !== undefined
       ? argv.exitCode
       : parseInt(process.env.EXIT_CODE || '1');
-  const outputLog =
-    argv.outputLog || process.env.OUTPUT_LOG || 'patch_output.log';
   const commit = argv.commit || process.env.COMMIT;
   const channel = argv.channel || process.env.CHANNEL;
   const repository =
@@ -111,7 +103,6 @@ async function main() {
     console.log('\n📋 Inputs:');
     console.log(`  - Original PR: ${originalPr}`);
     console.log(`  - Exit Code: ${exitCode}`);
-    console.log(`  - Output Log: ${outputLog}`);
     console.log(`  - Commit: ${commit}`);
     console.log(`  - Channel: ${channel} → npm tag: ${npmTag}`);
     console.log(`  - Repository: ${repository}`);
@@ -121,20 +112,17 @@ async function main() {
   let commentBody;
   let logContent = '';
 
-  // Try to read the output log
-  try {
-    if (testMode) {
-      // Create mock log content for testing
-      if (exitCode === 0) {
-        logContent = `Creating hotfix branch hotfix/v0.5.3/${channel}/cherry-pick-${commit.substring(0, 7)} from release/v0.5.3`;
-      } else {
-        logContent = 'Error: Failed to create patch';
-      }
+  // Get log content from environment variable or generate mock content for testing
+  if (testMode && !process.env.LOG_CONTENT) {
+    // Create mock log content for testing only if LOG_CONTENT is not provided
+    if (exitCode === 0) {
+      logContent = `Creating hotfix branch hotfix/v0.5.3/${channel}/cherry-pick-${commit.substring(0, 7)} from release/v0.5.3`;
     } else {
-      logContent = readFileSync(outputLog, 'utf8');
+      logContent = 'Error: Failed to create patch';
     }
-  } catch (error) {
-    console.log(`Could not read output log ${outputLog}:`, error.message);
+  } else {
+    // Use log content from environment variable
+    logContent = process.env.LOG_CONTENT || '';
   }
 
   if (logContent.includes('already has an open PR')) {
