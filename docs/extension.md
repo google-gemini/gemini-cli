@@ -36,11 +36,13 @@ gemini extensions uninstall gemini-cli-security
 
 Extensions are, by default, enabled across all workspaces. You can disable an extension entirely or for specific workspace.
 
-For example, `gemini extensions disable extension-name` will disable the extension at the user level, so it will be disabled everywhere. `gemini extensions disable extension-name --scope=Workspace` will only disable the extension in the current workspace.
+For example, `gemini extensions disable extension-name` will disable the extension at the user level, so it will be disabled everywhere. `gemini extensions disable extension-name --scope=workspace` will only disable the extension in the current workspace.
 
 ### Enabling an extension
 
-You can re-enable extensions using `gemini extensions enable extension-name`. Note that if an extension is disabled at the user-level, enabling it at the workspace level will not do anything.
+You can enable extensions using `gemini extensions enable extension-name`. You can also enable an extension for a specific workspace using `gemini extensions enable extension-name --scope=workspace` from within that workspace.
+
+This is useful if you have an extension disabled at the top-level and only enabled in specific places.
 
 ### Updating an extension
 
