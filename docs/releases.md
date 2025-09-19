@@ -110,12 +110,20 @@ There are two ways to create a patch pull request:
 
 After a pull request containing the fix has been merged, a maintainer can add a comment on that same PR with the following format:
 
-`/patch <channel> [--dry-run]`
+`/patch [channel]`
 
-- **channel**: `stable` or `preview`
-- **--dry-run** (optional): If included, the workflow will run in dry-run mode. This will create the PR with "[DRY RUN]" in the title, and merging it will trigger a dry run of the final release, so nothing is actually published.
+- **channel** (optional):
+  - _no channel_ - patches both stable and preview channels (default, recommended for most fixes)
+  - `both` - patches both stable and preview channels (same as default)
+  - `stable` - patches only the stable channel
+  - `preview` - patches only the preview channel
 
-Example: `/patch stable --dry-run`
+Examples:
+
+- `/patch` (patches both stable and preview - default)
+- `/patch both` (patches both stable and preview - explicit)
+- `/patch stable` (patches only stable)
+- `/patch preview` (patches only preview)
 
 The `Release: Patch from Comment` workflow will automatically find the merge commit SHA and trigger the `Release: Patch (1) Create PR` workflow. If the PR is not yet merged, it will post a comment indicating the failure.
 
@@ -133,8 +141,6 @@ This workflow will automatically:
 3.  Create a new hotfix branch from the release branch.
 4.  Cherry-pick your specified commit into the hotfix branch.
 5.  Create a pull request from the hotfix branch back to the release branch.
-
-**Important:** If you select `stable`, the workflow will run twice, creating one PR for the `stable` channel and a second PR for the `preview` channel.
 
 #### 2. Review and Merge
 

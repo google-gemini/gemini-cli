@@ -73,7 +73,7 @@ jobs:
           }
 
       - name: 'Comment on Original PR'
-        if: '!inputs.dry_run && inputs.original_pr'
+        if: 'inputs.original_pr'
         env:
           GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
           ORIGINAL_PR: '${{ github.event.inputs.original_pr }}'
