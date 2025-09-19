@@ -32,6 +32,22 @@ vi.mock('./components/QuittingDisplay.js', () => ({
   QuittingDisplay: () => <Text>Quitting...</Text>,
 }));
 
+vi.mock('./layouts/DefaultAppLayout.js', () => ({
+  DefaultAppLayout: () => <Text>DefaultAppLayout</Text>,
+}));
+
+vi.mock('./layouts/ScreenReaderAppLayout.js', () => ({
+  ScreenReaderAppLayout: () => <Text>ScreenReaderAppLayout</Text>,
+}));
+
+vi.mock('./hooks/useLayoutConfig.js', () => ({
+  useLayoutConfig: () => ({
+    mode: 'default',
+    shouldUseStatic: true,
+    shouldShowFooterInComposer: true,
+  }),
+}));
+
 describe('App', () => {
   const mockUIState: Partial<UIState> = {
     streamingState: StreamingState.Idle,
@@ -47,9 +63,7 @@ describe('App', () => {
       </UIStateContext.Provider>,
     );
 
-    expect(lastFrame()).toContain('MainContent');
-    expect(lastFrame()).toContain('Notifications');
-    expect(lastFrame()).toContain('Composer');
+    expect(lastFrame()).toContain('DefaultAppLayout');
   });
 
   it('should render quitting display when quittingMessages is set', () => {
@@ -79,8 +93,6 @@ describe('App', () => {
       </UIStateContext.Provider>,
     );
 
-    expect(lastFrame()).toContain('MainContent');
-    expect(lastFrame()).toContain('Notifications');
-    expect(lastFrame()).toContain('DialogManager');
+    expect(lastFrame()).toContain('DefaultAppLayout');
   });
 });
