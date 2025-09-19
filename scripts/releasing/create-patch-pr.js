@@ -95,29 +95,33 @@ async function main() {
     console.log(
       `Release branch ${releaseBranch} does not exist. Creating it from tag ${latestTag}...`,
     );
-
     try {
       run(`git checkout -b ${releaseBranch} ${latestTag}`, dryRun);
       run(`git push origin ${releaseBranch}`, dryRun);
     } catch (error) {
-      console.log(`Failed to push release branch with git (likely due to workflow file permissions): ${error.message}`);
-      console.log(`Attempting to create release branch using GitHub API instead...`);
-
-      if (!dryRun) {
-        try {
-          // Get the tag SHA
-          const tagSha = run(`git rev-parse ${latestTag}`, false);
-
-          // Create branch using GitHub API
-          const repo = process.env.GITHUB_REPOSITORY || 'google-gemini/gemini-cli';
-          const [owner, repoName] = repo.split('/');
-
-          run(`gh api repos/${owner}/${repoName}/git/refs --method POST --field ref="refs/heads/${releaseBranch}" --field sha="${tagSha.trim()}"`, false);
-          console.log(`✅ Successfully created release branch ${releaseBranch} using GitHub API`);
-        } catch (apiError) {
-          console.error(`Failed to create release branch using GitHub API: ${apiError.message}`);
-          throw new Error(`Cannot create release branch ${releaseBranch}. Both git push and GitHub API failed.`);
-        }
+      // Check if this is a GitHub App workflows permission error
+      if (
+        /refusing to allow a GitHub App.*workflows?['`]? permission/i.test(
+          error.message,
+        )
+      ) {
+        console.error(
+          `❌ Failed to create release branch due to insufficient GitHub App permissions.`,
+        );
+        console.log(
+          `\n📋 Please run these commands manually to create the branch:`,
+        );
+        console.log(`\n\`\`\`bash`);
+        console.log(`git checkout -b ${releaseBranch} ${latestTag}`);
+        console.log(`git push origin ${releaseBranch}`);
+        console.log(`\`\`\``);
+        console.log(
+          `\nAfter running these commands, you can run the patch command again.`,
+        );
+        process.exit(1);
+      } else {
+        // Re-throw other errors
+        throw error;
       }
     }
   } else {
