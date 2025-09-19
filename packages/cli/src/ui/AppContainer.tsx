@@ -1012,6 +1012,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
   const uiState: UIState = useMemo(
     () => ({
       history: historyManager.history,
+      historyManager,
       isThemeDialogOpen,
       themeError,
       isAuthenticating,
@@ -1088,7 +1089,6 @@ Logging in with Google... Please restart Gemini CLI to continue.
       embeddedShellFocused,
     }),
     [
-      historyManager.history,
       isThemeDialogOpen,
       themeError,
       isAuthenticating,
@@ -1162,6 +1162,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       currentModel,
       extensionsUpdateState,
       activePtyId,
+      historyManager,
       embeddedShellFocused,
     ],
   );

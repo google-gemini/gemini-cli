@@ -22,7 +22,8 @@ export const permissionsCommand: SlashCommand = {
       return {
         type: 'message',
         messageType: 'info',
-        content: 'Folder trust is disabled. You can enable it in the settings.',
+        content:
+          'Folder trust permissions cannot be modified since the feature is currently disabled. You can enable it in the settings.',
       };
     }
     return {
