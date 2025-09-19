@@ -214,5 +214,6 @@ export async function shutdownTelemetry(config: Config): Promise<void> {
     console.error('Error shutting down SDK:', error);
   } finally {
     telemetryInitialized = false;
+    process.exit(0);
   }
 }
