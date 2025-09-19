@@ -21,9 +21,7 @@ import { execSync } from 'node:child_process';
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-if (
-  !(process.cwd().includes('packages') || process.cwd().includes('third_party'))
-) {
+if (!process.cwd().includes('packages')) {
   console.error('must be invoked from a package directory');
   process.exit(1);
 }
