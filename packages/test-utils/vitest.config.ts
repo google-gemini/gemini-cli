@@ -8,12 +8,11 @@ import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
   test: {
-    testTimeout: 300000, // 5 minutes
-    globalSetup: './globalSetup.ts',
-    reporters: ['default'],
-    include: ['**/*.test.ts'],
-    retry: 2,
-    fileParallelism: true,
+    reporters: ['default', 'junit'],
+    silent: true,
+    outputFile: {
+      junit: 'junit.xml',
+    },
     poolOptions: {
       threads: {
         minThreads: 8,

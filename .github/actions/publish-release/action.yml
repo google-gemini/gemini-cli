@@ -149,3 +149,12 @@ runs:
           --title "Release ${{ inputs.release-tag }}" \
           --notes-start-tag "${{ inputs.previous-tag }}" \
           --generate-notes
+
+    - name: '🧹 Clean up release branch'
+      working-directory: '${{ inputs.working-directory }}'
+      if: "${{ inputs.dry-run == 'false' }}"
+      continue-on-error: true
+      shell: 'bash'
+      run: |
+        echo "Cleaning up release branch ${{ steps.release_branch.outputs.BRANCH_NAME }}..."
+        git push origin --delete "${{ steps.release_branch.outputs.BRANCH_NAME }}"
