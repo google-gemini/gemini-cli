@@ -4,12 +4,10 @@
 # Require reviews from the release approvers for critical files.
 # These patterns override the rule above.
 /package.json @google-gemini/gemini-cli-askmode-approvers
-/package-lock.json @google-gemini/gemini-cli-askmode-approvers
+/npm-shrinkwrap.json @google-gemini/gemini-cli-askmode-approvers
 /GEMINI.md @google-gemini/gemini-cli-askmode-approvers
 /SECURITY.md @google-gemini/gemini-cli-askmode-approvers
 /LICENSE @google-gemini/gemini-cli-askmode-approvers
 /.github/workflows/ @google-gemini/gemini-cli-askmode-approvers
 /packages/cli/package.json @google-gemini/gemini-cli-askmode-approvers
-/packages/cli/package-lock.json @google-gemini/gemini-cli-askmode-approvers
 /packages/core/package.json @google-gemini/gemini-cli-askmode-approvers
-/packages/core/package-lock.json @google-gemini/gemini-cli-askmode-approvers

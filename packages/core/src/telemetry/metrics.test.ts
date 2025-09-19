@@ -15,6 +15,7 @@ import type {
 import type { Config } from '../config/config.js';
 import { FileOperation } from './metrics.js';
 import { makeFakeConfig } from '../test-utils/config.js';
+import { ModelRoutingEvent } from './types.js';
 
 const mockCounterAddFn: Mock<
   (value: number, attributes?: Attributes, context?: Context) => void
@@ -63,6 +64,7 @@ describe('Telemetry Metrics', () => {
   let recordTokenUsageMetricsModule: typeof import('./metrics.js').recordTokenUsageMetrics;
   let recordFileOperationMetricModule: typeof import('./metrics.js').recordFileOperationMetric;
   let recordChatCompressionMetricsModule: typeof import('./metrics.js').recordChatCompressionMetrics;
+  let recordModelRoutingMetricsModule: typeof import('./metrics.js').recordModelRoutingMetrics;
 
   beforeEach(async () => {
     vi.resetModules();
@@ -78,6 +80,7 @@ describe('Telemetry Metrics', () => {
     recordFileOperationMetricModule = metricsJsModule.recordFileOperationMetric;
     recordChatCompressionMetricsModule =
       metricsJsModule.recordChatCompressionMetrics;
+    recordModelRoutingMetricsModule = metricsJsModule.recordModelRoutingMetrics;
 
     const otelApiModule = await import('@opentelemetry/api');
 
@@ -313,6 +316,73 @@ describe('Telemetry Metrics', () => {
       expect(mockCounterAddFn).toHaveBeenCalledWith(1, {
         'session.id': 'test-session-id',
         operation: FileOperation.UPDATE,
+      });
+    });
+  });
+
+  describe('recordModelRoutingMetrics', () => {
+    const mockConfig = {
+      getSessionId: () => 'test-session-id',
+    } as unknown as Config;
+
+    it('should not record metrics if not initialized', () => {
+      const event = new ModelRoutingEvent(
+        'gemini-pro',
+        'default',
+        100,
+        'test-reason',
+        false,
+        undefined,
+      );
+      recordModelRoutingMetricsModule(mockConfig, event);
+      expect(mockHistogramRecordFn).not.toHaveBeenCalled();
+      expect(mockCounterAddFn).not.toHaveBeenCalled();
+    });
+
+    it('should record latency for a successful routing decision', () => {
+      initializeMetricsModule(mockConfig);
+      const event = new ModelRoutingEvent(
+        'gemini-pro',
+        'default',
+        150,
+        'test-reason',
+        false,
+        undefined,
+      );
+      recordModelRoutingMetricsModule(mockConfig, event);
+
+      expect(mockHistogramRecordFn).toHaveBeenCalledWith(150, {
+        'session.id': 'test-session-id',
+        'routing.decision_model': 'gemini-pro',
+        'routing.decision_source': 'default',
+      });
+      // The session counter is called once on init
+      expect(mockCounterAddFn).toHaveBeenCalledTimes(1);
+    });
+
+    it('should record latency and failure for a failed routing decision', () => {
+      initializeMetricsModule(mockConfig);
+      const event = new ModelRoutingEvent(
+        'gemini-pro',
+        'classifier',
+        200,
+        'test-reason',
+        true,
+        'test-error',
+      );
+      recordModelRoutingMetricsModule(mockConfig, event);
+
+      expect(mockHistogramRecordFn).toHaveBeenCalledWith(200, {
+        'session.id': 'test-session-id',
+        'routing.decision_model': 'gemini-pro',
+        'routing.decision_source': 'classifier',
+      });
+
+      expect(mockCounterAddFn).toHaveBeenCalledTimes(2);
+      expect(mockCounterAddFn).toHaveBeenNthCalledWith(2, 1, {
+        'session.id': 'test-session-id',
+        'routing.decision_source': 'classifier',
+        'routing.error_message': 'test-error',
       });
     });
   });

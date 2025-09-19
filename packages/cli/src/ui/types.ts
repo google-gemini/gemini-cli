@@ -106,6 +106,11 @@ export type HistoryItemError = HistoryItemBase & {
   text: string;
 };
 
+export type HistoryItemWarning = HistoryItemBase & {
+  type: 'warning';
+  text: string;
+};
+
 export type HistoryItemAbout = HistoryItemBase & {
   type: 'about';
   cliVersion: string;
@@ -155,6 +160,10 @@ export type HistoryItemCompression = HistoryItemBase & {
   compression: CompressionProps;
 };
 
+export type HistoryItemExtensionsList = HistoryItemBase & {
+  type: 'extensions_list';
+};
+
 // Using Omit<HistoryItem, 'id'> seems to have some issues with typescript's
 // type inference e.g. historyItem.type === 'tool_group' isn't auto-inferring that
 // 'tools' in historyItem.
@@ -166,6 +175,7 @@ export type HistoryItemWithoutId =
   | HistoryItemGeminiContent
   | HistoryItemInfo
   | HistoryItemError
+  | HistoryItemWarning
   | HistoryItemAbout
   | HistoryItemHelp
   | HistoryItemToolGroup
@@ -173,7 +183,8 @@ export type HistoryItemWithoutId =
   | HistoryItemModelStats
   | HistoryItemToolStats
   | HistoryItemQuit
-  | HistoryItemCompression;
+  | HistoryItemCompression
+  | HistoryItemExtensionsList;
 
 export type HistoryItem = HistoryItemWithoutId & { id: number };
 
@@ -181,6 +192,7 @@ export type HistoryItem = HistoryItemWithoutId & { id: number };
 export enum MessageType {
   INFO = 'info',
   ERROR = 'error',
+  WARNING = 'warning',
   USER = 'user',
   ABOUT = 'about',
   HELP = 'help',
@@ -190,6 +202,7 @@ export enum MessageType {
   QUIT = 'quit',
   GEMINI = 'gemini',
   COMPRESSION = 'compression',
+  EXTENSIONS_LIST = 'extensions_list',
 }
 
 // Simplified message structure for internal feedback

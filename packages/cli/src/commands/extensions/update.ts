@@ -6,11 +6,18 @@
 
 import type { CommandModule } from 'yargs';
 import {
-  updateExtensionByName,
+  loadExtensions,
+  annotateActiveExtensions,
+} from '../../config/extension.js';
+import {
   updateAllUpdatableExtensions,
   type ExtensionUpdateInfo,
-} from '../../config/extension.js';
+  checkForAllExtensionUpdates,
+  updateExtension,
+} from '../../config/extensions/update.js';
+import { checkForExtensionUpdate } from '../../config/extensions/github.js';
 import { getErrorMessage } from '../../utils/errors.js';
+import { ExtensionUpdateState } from '../../ui/state/extensions.js';
 
 interface UpdateArgs {
   name?: string;
@@ -21,9 +28,25 @@ const updateOutput = (info: ExtensionUpdateInfo) =>
   `Extension "${info.name}" successfully updated: ${info.originalVersion} → ${info.updatedVersion}.`;
 
 export async function handleUpdate(args: UpdateArgs) {
+  const workingDir = process.cwd();
+  const allExtensions = loadExtensions();
+  const extensions = annotateActiveExtensions(
+    allExtensions,
+    allExtensions.map((e) => e.config.name),
+    workingDir,
+  );
+
   if (args.all) {
     try {
-      const updateInfos = await updateAllUpdatableExtensions();
+      let updateInfos = await updateAllUpdatableExtensions(
+        workingDir,
+        extensions,
+        await checkForAllExtensionUpdates(extensions, new Map(), (_) => {}),
+        () => {},
+      );
+      updateInfos = updateInfos.filter(
+        (info) => info.originalVersion !== info.updatedVersion,
+      );
       if (updateInfos.length === 0) {
         console.log('No extensions to update.');
         return;
@@ -35,11 +58,44 @@ export async function handleUpdate(args: UpdateArgs) {
   }
   if (args.name)
     try {
-      // TODO(chrstnb): we should list extensions if the requested extension is not installed.
-      const updatedExtensionInfo = await updateExtensionByName(args.name);
-      console.log(
-        `Extension "${args.name}" successfully updated: ${updatedExtensionInfo.originalVersion} → ${updatedExtensionInfo.updatedVersion}.`,
+      const extension = extensions.find(
+        (extension) => extension.name === args.name,
       );
+      if (!extension) {
+        console.log(`Extension "${args.name}" not found.`);
+        return;
+      }
+      let updateState: ExtensionUpdateState | undefined;
+      if (!extension.installMetadata) {
+        console.log(
+          `Unable to install extension "${args.name}" due to missing install metadata`,
+        );
+        return;
+      }
+      await checkForExtensionUpdate(extension, (newState) => {
+        updateState = newState;
+      });
+      if (updateState !== ExtensionUpdateState.UPDATE_AVAILABLE) {
+        console.log(`Extension "${args.name}" is already up to date.`);
+        return;
+      }
+      // TODO(chrstnb): we should list extensions if the requested extension is not installed.
+      const updatedExtensionInfo = (await updateExtension(
+        extension,
+        workingDir,
+        updateState,
+        () => {},
+      ))!;
+      if (
+        updatedExtensionInfo.originalVersion !==
+        updatedExtensionInfo.updatedVersion
+      ) {
+        console.log(
+          `Extension "${args.name}" successfully updated: ${updatedExtensionInfo.originalVersion} → ${updatedExtensionInfo.updatedVersion}.`,
+        );
+      } else {
+        console.log(`Extension "${args.name}" is already up to date.`);
+      }
     } catch (error) {
       console.error(getErrorMessage(error));
     }

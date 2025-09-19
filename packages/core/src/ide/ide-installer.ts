@@ -9,7 +9,7 @@ import * as process from 'node:process';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
-import { DetectedIde, getIdeInfo, type IdeInfo } from './detect-ide.js';
+import { IDE_DEFINITIONS, type IdeInfo } from './detect-ide.js';
 import { GEMINI_CLI_COMPANION_EXTENSION_NAME } from './constants.js';
 
 function getVsCodeCommand(platform: NodeJS.Platform = process.platform) {
@@ -100,14 +100,12 @@ async function findVsCodeCommand(
 
 class VsCodeInstaller implements IdeInstaller {
   private vsCodeCommand: Promise<string | null>;
-  private readonly ideInfo: IdeInfo;
 
   constructor(
-    readonly ide: DetectedIde,
+    readonly ideInfo: IdeInfo,
     readonly platform = process.platform,
   ) {
     this.vsCodeCommand = findVsCodeCommand(platform);
-    this.ideInfo = getIdeInfo(ide);
   }
 
   async install(): Promise<InstallResult> {
@@ -119,9 +117,23 @@ class VsCodeInstaller implements IdeInstaller {
       };
     }
 
-    const command = `"${commandPath}" --install-extension google.gemini-cli-vscode-ide-companion --force`;
     try {
-      child_process.execSync(command, { stdio: 'pipe' });
+      const result = child_process.spawnSync(
+        commandPath,
+        [
+          '--install-extension',
+          'google.gemini-cli-vscode-ide-companion',
+          '--force',
+        ],
+        { stdio: 'pipe' },
+      );
+
+      if (result.status !== 0) {
+        throw new Error(
+          `Failed to install extension: ${result.stderr?.toString()}`,
+        );
+      }
+
       return {
         success: true,
         message: `${this.ideInfo.displayName} companion extension was installed successfully.`,
@@ -136,12 +148,12 @@ class VsCodeInstaller implements IdeInstaller {
 }
 
 export function getIdeInstaller(
-  ide: DetectedIde,
+  ide: IdeInfo,
   platform = process.platform,
 ): IdeInstaller | null {
-  switch (ide) {
-    case DetectedIde.VSCode:
-    case DetectedIde.FirebaseStudio:
+  switch (ide.name) {
+    case IDE_DEFINITIONS.vscode.name:
+    case IDE_DEFINITIONS.firebasestudio.name:
       return new VsCodeInstaller(ide, platform);
     default:
       return null;
