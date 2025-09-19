@@ -142,7 +142,7 @@ describe('Message Bus Integration', () => {
       expect(unsubscribeSpy).toHaveBeenCalled();
     });
 
-    it('should handle confirmation denial', async () => {
+    it('should reject promise when confirmation is denied', async () => {
       const tool = new TestTool(messageBus);
       const invocation = tool.build({ testParam: 'test-value' });
 
@@ -162,8 +162,10 @@ describe('Message Bus Integration', () => {
 
       responseHandler(response);
 
-      const result = await confirmationPromise;
-      expect(result).toBe(false);
+      // Should reject with error when denied
+      await expect(confirmationPromise).rejects.toThrow(
+        'Tool execution denied by policy',
+      );
     });
 
     it('should handle timeout', async () => {

@@ -129,49 +129,56 @@ export abstract class BaseToolInvocation<
           return;
         }
 
-        // Set up timeout and abort handling
-        const timeoutId = setTimeout(() => {
-          this.messageBus?.unsubscribe(
-            MessageBusType.TOOL_CONFIRMATION_RESPONSE,
-            responseHandler,
-          );
-          resolve(false);
-        }, 30000); // 30 second timeout
+        let timeoutId: NodeJS.Timeout | undefined;
 
-        const abortHandler = () => {
-          clearTimeout(timeoutId);
+        // Centralized cleanup function
+        const cleanup = () => {
+          if (timeoutId) {
+            clearTimeout(timeoutId);
+            timeoutId = undefined;
+          }
+          abortSignal.removeEventListener('abort', abortHandler);
           this.messageBus?.unsubscribe(
             MessageBusType.TOOL_CONFIRMATION_RESPONSE,
             responseHandler,
           );
+        };
+
+        // Set up abort handler
+        const abortHandler = () => {
+          cleanup();
           reject(new Error('Tool confirmation aborted'));
         };
 
+        // Check if already aborted
         if (abortSignal.aborted) {
-          abortHandler();
+          reject(new Error('Tool confirmation aborted'));
           return;
         }
-        abortSignal.addEventListener('abort', abortHandler);
 
         // Set up response handler
         const responseHandler = (response: ToolConfirmationResponse) => {
           if (response.correlationId === correlationId) {
-            clearTimeout(timeoutId);
-            abortSignal.removeEventListener('abort', abortHandler);
-            this.messageBus?.unsubscribe(
-              MessageBusType.TOOL_CONFIRMATION_RESPONSE,
-              responseHandler,
-            );
+            cleanup();
 
             if (response.confirmed) {
               // Tool was confirmed, return false to indicate no further confirmation needed
               resolve(false);
             } else {
-              // Tool was denied, return false to indicate no confirmation
-              resolve(false);
+              // Tool was denied, reject to prevent execution
+              reject(new Error('Tool execution denied by policy'));
             }
           }
         };
+
+        // Add event listener for abort signal
+        abortSignal.addEventListener('abort', abortHandler);
+
+        // Set up timeout
+        timeoutId = setTimeout(() => {
+          cleanup();
+          resolve(false);
+        }, 30000); // 30 second timeout
 
         // Subscribe to response
         this.messageBus.subscribe(
@@ -189,12 +196,7 @@ export abstract class BaseToolInvocation<
         try {
           this.messageBus.publish(request);
         } catch (_error) {
-          clearTimeout(timeoutId);
-          abortSignal.removeEventListener('abort', abortHandler);
-          this.messageBus.unsubscribe(
-            MessageBusType.TOOL_CONFIRMATION_RESPONSE,
-            responseHandler,
-          );
+          cleanup();
           resolve(false);
         }
       },
