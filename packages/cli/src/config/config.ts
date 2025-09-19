@@ -385,6 +385,16 @@ export async function loadHierarchicalGeminiMemory(
   );
 }
 
+export function isDebugMode(argv: CliArgs): boolean {
+  return (
+    argv.debug ||
+    [process.env['DEBUG'], process.env['DEBUG_MODE']].some(
+      (v) => v === 'true' || v === '1',
+    ) ||
+    false
+  );
+}
+
 export async function loadCliConfig(
   settings: Settings,
   extensions: Extension[],
@@ -392,12 +402,8 @@ export async function loadCliConfig(
   argv: CliArgs,
   cwd: string = process.cwd(),
 ): Promise<Config> {
-  const debugMode =
-    argv.debug ||
-    [process.env['DEBUG'], process.env['DEBUG_MODE']].some(
-      (v) => v === 'true' || v === '1',
-    ) ||
-    false;
+  const debugMode = isDebugMode(argv);
+
   const memoryImportFormat = settings.context?.importFormat || 'tree';
 
   const ideMode = settings.ide?.enabled ?? false;
