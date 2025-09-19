@@ -7,7 +7,18 @@ on:
 jobs:
   slash-command:
     runs-on: 'ubuntu-latest'
+    # Only run if the comment is from a human user (not automated)
+    if: "github.event.comment.user.type == 'User' && github.event.comment.user.login != 'github-actions[bot]'"
+    permissions:
+      contents: 'write'
+      pull-requests: 'write'
+      actions: 'write'
     steps:
+      - name: 'Checkout'
+        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
+        with:
+          fetch-depth: 1
+
       - name: 'Slash Command Dispatch'
         id: 'slash_command'
         uses: 'peter-evans/slash-command-dispatch@40877f718dce0101edfc7aea2b3800cc192f9ed5'
@@ -19,9 +30,19 @@ jobs:
           static-args: |
             dry_run=false
 
+      - name: 'Acknowledge Patch Command'
+        if: "startsWith(github.event.comment.body, '/patch')"
+        uses: 'peter-evans/create-or-update-comment@67dcc547d311b736a8e6c5c236542148a47adc3d'
+        with:
+          issue-number: '${{ github.event.issue.number }}'
+          body: |
+            👋 Patch command received! Processing...
+
+            You can track the progress here: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
       - name: 'Get PR Status'
         id: 'pr_status'
-        if: "steps.slash_command.outputs.dispatched == 'true'"
+        if: "startsWith(github.event.comment.body, '/patch')"
         env:
           GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
         run: |
@@ -32,9 +53,35 @@ jobs:
       - name: 'Dispatch if Merged'
         if: "steps.pr_status.outputs.STATE == 'MERGED'"
         uses: 'actions/github-script@00f12e3e20659f42342b1c0226afda7f7c042325'
+        env:
+          COMMENT_BODY: '${{ github.event.comment.body }}'
         with:
           script: |
-            const args = JSON.parse('${{ steps.slash_command.outputs.command-arguments }}');
+            // Parse the comment body directly to extract channel
+            const commentBody = process.env.COMMENT_BODY;
+            console.log('Comment body:', commentBody);
+
+            let channel = 'stable';  // default
+
+            // Parse different formats:
+            // /patch channel=preview
+            // /patch --channel preview
+            // /patch preview
+            if (commentBody.includes('channel=preview')) {
+              channel = 'preview';
+            } else if (commentBody.includes('--channel preview')) {
+              channel = 'preview';
+            } else if (commentBody.trim() === '/patch preview') {
+              channel = 'preview';
+            }
+
+            // Validate channel
+            if (channel !== 'stable' && channel !== 'preview') {
+              throw new Error(`Invalid channel: ${channel}. Must be 'stable' or 'preview'.`);
+            }
+
+            console.log('Detected channel:', channel);
+
             github.rest.actions.createWorkflowDispatch({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -42,13 +89,14 @@ jobs:
               ref: 'main',
               inputs: {
                 commit: '${{ steps.pr_status.outputs.MERGE_COMMIT_SHA }}',
-                channel: args.channel,
-                dry_run: args.dry_run
+                channel: channel,
+                dry_run: 'false',
+                original_pr: '${{ github.event.issue.number }}'
               }
             })
 
       - name: 'Comment on Failure'
-        if: "steps.pr_status.outputs.STATE != 'MERGED'"
+        if: "startsWith(github.event.comment.body, '/patch') && steps.pr_status.outputs.STATE != 'MERGED'"
         uses: 'peter-evans/create-or-update-comment@67dcc547d311b736a8e6c5c236542148a47adc3d'
         with:
           issue-number: '${{ github.event.issue.number }}'
