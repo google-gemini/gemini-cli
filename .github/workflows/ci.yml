@@ -1,4 +1,4 @@
-name: 'Gemini CLI CI'
+name: 'Testing: CI'
 
 on:
   push:
@@ -10,6 +10,7 @@ on:
       - 'main'
       - 'release/**'
   merge_group:
+  workflow_dispatch:
 
 concurrency:
   group: '${{ github.workflow }}-${{ github.head_ref || github.ref }}'
@@ -25,63 +26,10 @@ defaults:
   run:
     shell: 'bash'
 
-env:
-  ACTIONLINT_VERSION: '1.7.7'
-  SHELLCHECK_VERSION: '0.11.0'
-  YAMLLINT_VERSION: '1.35.1'
-
 jobs:
-  #
-  # Lint: GitHub Actions
-  #
-  lint_github_actions:
-    name: 'Lint (GitHub Actions)'
-    runs-on: 'ubuntu-latest'
-    steps:
-      - name: 'Checkout'
-        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
-        with:
-          fetch-depth: 1
-
-      - name: 'Install shellcheck' # Actionlint uses shellcheck
-        run: |-
-          mkdir -p "${RUNNER_TEMP}/shellcheck"
-          curl -sSLo "${RUNNER_TEMP}/.shellcheck.txz" "https://github.com/koalaman/shellcheck/releases/download/v${SHELLCHECK_VERSION}/shellcheck-v${SHELLCHECK_VERSION}.linux.x86_64.tar.xz"
-          tar -xf "${RUNNER_TEMP}/.shellcheck.txz" -C "${RUNNER_TEMP}/shellcheck" --strip-components=1
-          echo "${RUNNER_TEMP}/shellcheck" >> "${GITHUB_PATH}"
-
-      - name: 'Install actionlint'
-        run: |-
-          mkdir -p "${RUNNER_TEMP}/actionlint"
-          curl -sSLo "${RUNNER_TEMP}/.actionlint.tgz" "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
-          tar -xzf "${RUNNER_TEMP}/.actionlint.tgz" -C "${RUNNER_TEMP}/actionlint"
-          echo "${RUNNER_TEMP}/actionlint" >> "${GITHUB_PATH}"
-
-      # For actionlint, we specifically ignore shellcheck rules that are
-      # annoying or unhelpful. See the shellcheck action for a description.
-      - name: 'Run actionlint'
-        run: |-
-          actionlint \
-            -color \
-            -format '{{range $err := .}}::error file={{$err.Filepath}},line={{$err.Line}},col={{$err.Column}}::{{$err.Filepath}}@{{$err.Line}} {{$err.Message}}%0A```%0A{{replace $err.Snippet "\\n" "%0A"}}%0A```\n{{end}}' \
-            -ignore 'SC2002:' \
-            -ignore 'SC2016:' \
-            -ignore 'SC2129:' \
-            -ignore 'label ".+" is unknown'
-
-      - name: 'Run ratchet'
-        uses: 'sethvargo/ratchet@8b4ca256dbed184350608a3023620f267f0a5253' # ratchet:sethvargo/ratchet@v0.11.4
-        with:
-          files: |-
-            .github/workflows/*.yml
-            .github/actions/**/*.yml
-
-  #
-  # Lint: Javascript
-  #
-  lint_javascript:
-    name: 'Lint (Javascript)'
-    runs-on: 'ubuntu-latest'
+  lint:
+    name: 'Lint'
+    runs-on: 'gemini-cli-ubuntu-16-core'
     steps:
       - name: 'Checkout'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
@@ -94,161 +42,33 @@ jobs:
           node-version-file: '.nvmrc'
           cache: 'npm'
 
-      - name: 'Run lockfile check'
-        run: |-
-          npm run check:lockfile
-
       - name: 'Install dependencies'
-        run: |-
-          npm ci
+        run: 'npm ci'
 
-      - name: 'Run formatter check'
-        run: |-
-          npm run format
-          git diff --exit-code
+      - name: 'Check lockfile'
+        run: 'npm run check:lockfile'
 
-      - name: 'Run linter'
-        run: |-
-          npm run lint:ci
+      - name: 'Install linters'
+        run: 'node scripts/lint.js --setup'
 
-      - name: 'Run linter on integration tests'
-        run: |-
-          npx eslint integration-tests --max-warnings 0
+      - name: 'Run ESLint'
+        run: 'node scripts/lint.js --eslint'
 
-      - name: 'Run formatter on integration tests'
-        run: |-
-          npx prettier --check integration-tests
-          git diff --exit-code
+      - name: 'Run actionlint'
+        run: 'node scripts/lint.js --actionlint'
 
-      - name: 'Build project'
-        run: |-
-          npm run build
-
-      - name: 'Run type check'
-        run: |-
-          npm run typecheck
-
-  #
-  # Lint: Shell
-  #
-  lint_shell:
-    name: 'Lint (Shell)'
-    runs-on: 'ubuntu-latest'
-    steps:
-      - name: 'Checkout'
-        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
-        with:
-          fetch-depth: 1
-
-      - name: 'Install shellcheck'
-        run: |-
-          mkdir -p "${RUNNER_TEMP}/shellcheck"
-          curl -sSLo "${RUNNER_TEMP}/.shellcheck.txz" "https://github.com/koalaman/shellcheck/releases/download/v${SHELLCHECK_VERSION}/shellcheck-v${SHELLCHECK_VERSION}.linux.x86_64.tar.xz"
-          tar -xf "${RUNNER_TEMP}/.shellcheck.txz" -C "${RUNNER_TEMP}/shellcheck" --strip-components=1
-          echo "${RUNNER_TEMP}/shellcheck" >> "${GITHUB_PATH}"
-
-      - name: 'Install shellcheck problem matcher'
-        run: |-
-          cat > "${RUNNER_TEMP}/shellcheck/problem-matcher-lint-shell.json" <<"EOF"
-          {
-            "problemMatcher": [
-              {
-                "owner": "lint_shell",
-                "pattern": [
-                  {
-                    "regexp": "^(.*):(\\\\d+):(\\\\d+):\\\\s+(?:fatal\\\\s+)?(warning|error):\\\\s+(.*)$",
-                    "file": 1,
-                    "line": 2,
-                    "column": 3,
-                    "severity": 4,
-                    "message": 5
-                  }
-                ]
-              }
-            ]
-          }
-          EOF
-          echo "::add-matcher::${RUNNER_TEMP}/shellcheck/problem-matcher-lint-shell.json"
-
-      # Note that only warning and error severity show up in the github files
-      # page. So we replace 'style' and 'note' with 'warning' to make it show
-      # up.
-      #
-      # We also try and find all bash scripts even if they don't have an
-      # explicit extension.
-      #
-      # We explicitly ignore the following rules:
-      #
-      # - SC2002: This rule suggests using "cmd < file" instead of "cat | cmd".
-      #   While < is more efficient, pipes are much more readable and expected.
-      #
-      # - SC2129: This rule suggests grouping multiple writes to a file in
-      #   braces like "{ cmd1; cmd2; } >> file". This is unexpected and less
-      #   readable.
-      #
-      # - SC2310: This is an optional warning that only appears with "set -e"
-      #   and when a command is used as a conditional.
       - name: 'Run shellcheck'
-        run: |-
-          git ls-files | grep -E '^([^.]+|.*\.(sh|zsh|bash))$' | xargs file --mime-type \
-            | grep "text/x-shellscript" | awk '{ print substr($1, 1, length($1)-1) }' \
-            | xargs shellcheck \
-              --check-sourced \
-              --enable=all \
-              --exclude=SC2002,SC2129,SC2310 \
-              --severity=style \
-              --format=gcc \
-              --color=never | sed -e 's/note:/warning:/g' -e 's/style:/warning:/g'
-
-  #
-  # Lint: YAML
-  #
-  lint_yaml:
-    name: 'Lint (YAML)'
-    runs-on: 'ubuntu-latest'
-    steps:
-      - name: 'Checkout'
-        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
-        with:
-          fetch-depth: 1
-
-      - name: 'Setup Python'
-        uses: 'actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065' # ratchet:actions/setup-python@v5
-        with:
-          python-version: '3'
-
-      - name: 'Install yamllint'
-        run: |-
-          pip install --user "yamllint==${YAMLLINT_VERSION}"
+        run: 'node scripts/lint.js --shellcheck'
 
       - name: 'Run yamllint'
-        run: |-
-          git ls-files | grep -E '\.(yaml|yml)' | xargs yamllint --format github
+        run: 'node scripts/lint.js --yamllint'
 
-  #
-  # Lint: All
-  #
-  # This is a virtual job that other jobs depend on to wait for all linters to
-  # finish. It's also used to ensure linting happens on CI via required
-  # workflows.
-  lint:
-    name: 'Lint'
-    needs:
-      - 'lint_github_actions'
-      - 'lint_javascript'
-      - 'lint_shell'
-      - 'lint_yaml'
-    runs-on: 'ubuntu-latest'
-    steps:
-      - run: |-
-          echo 'All linters finished!'
+      - name: 'Run Prettier'
+        run: 'node scripts/lint.js --prettier'
 
-  #
-  # Test: Node
-  #
-  test:
-    name: 'Test'
-    runs-on: '${{ matrix.os }}'
+  test_linux:
+    name: 'Test (Linux)'
+    runs-on: 'gemini-cli-ubuntu-16-core'
     needs:
       - 'lint'
     permissions:
@@ -256,12 +76,7 @@ jobs:
       checks: 'write'
       pull-requests: 'write'
     strategy:
-      fail-fast: false # So we can see all test failures
       matrix:
-        os:
-          - 'macos-latest'
-          - 'ubuntu-latest'
-          - 'windows-latest'
         node-version:
           - '20.x'
           - '22.x'
@@ -277,17 +92,18 @@ jobs:
           cache: 'npm'
 
       - name: 'Build project'
-        run: |-
-          npm run build
+        run: 'npm run build'
 
       - name: 'Install dependencies for testing'
-        run: |-
-          npm ci
+        run: 'npm ci'
 
       - name: 'Run tests and generate reports'
         env:
           NO_COLOR: true
         run: 'npm run test:ci'
+
+      - name: 'Wait for file system sync'
+        run: 'sleep 2'
 
       - name: 'Publish Test Report (for non-forks)'
         if: |-
@@ -304,7 +120,67 @@ jobs:
           ${{ always() && (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository) }}
         uses: 'actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02' # ratchet:actions/upload-artifact@v4
         with:
-          name: 'test-results-fork-${{ matrix.node-version }}-${{ matrix.os }}'
+          name: 'test-results-fork-${{ matrix.node-version }}-${{ runner.os }}'
+          path: 'packages/*/junit.xml'
+
+  test_slow_platforms:
+    name: 'Slow Test - Mac'
+    runs-on: '${{ matrix.os }}'
+    needs:
+      - 'lint'
+    permissions:
+      contents: 'read'
+      checks: 'write'
+      pull-requests: 'write'
+    continue-on-error: true
+    strategy:
+      matrix:
+        os:
+          - 'macos-latest'
+        node-version:
+          - '20.x'
+          - '22.x'
+          - '24.x'
+    steps:
+      - name: 'Checkout'
+        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
+
+      - name: 'Set up Node.js ${{ matrix.node-version }}'
+        uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions/setup-node@v4
+        with:
+          node-version: '${{ matrix.node-version }}'
+          cache: 'npm'
+
+      - name: 'Build project'
+        run: 'npm run build'
+
+      - name: 'Install dependencies for testing'
+        run: 'npm ci'
+
+      - name: 'Run tests and generate reports'
+        env:
+          NO_COLOR: true
+        run: 'npm run test:ci -- --coverage.enabled=false'
+
+      - name: 'Wait for file system sync'
+        run: 'sleep 2'
+
+      - name: 'Publish Test Report (for non-forks)'
+        if: |-
+          ${{ always() && (github.event.pull_request.head.repo.full_name == github.repository) }}
+        uses: 'dorny/test-reporter@dc3a92680fcc15842eef52e8c4606ea7ce6bd3f3' # ratchet:dorny/test-reporter@v2
+        with:
+          name: 'Test Results (Node ${{ matrix.node-version }})'
+          path: 'packages/*/junit.xml'
+          reporter: 'java-junit'
+          fail-on-error: 'false'
+
+      - name: 'Upload Test Results Artifact (for forks)'
+        if: |-
+          ${{ always() && (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository) }}
+        uses: 'actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02' # ratchet:actions/upload-artifact@v4
+        with:
+          name: 'test-results-fork-${{ matrix.node-version }}-${{ runner.os }}'
           path: 'packages/*/junit.xml'
 
       - name: 'Upload coverage reports'
@@ -315,47 +191,9 @@ jobs:
           name: 'coverage-reports-${{ matrix.node-version }}-${{ matrix.os }}'
           path: 'packages/*/coverage'
 
-  post_coverage_comment:
-    name: 'Post Coverage Comment'
-    runs-on: 'ubuntu-latest'
-    needs: 'test'
-    if: |-
-      ${{ always() && github.event_name == 'pull_request' && (github.event.pull_request.head.repo.full_name == github.repository) }}
-    continue-on-error: true
-    permissions:
-      contents: 'read' # For checkout
-      pull-requests: 'write' # For commenting
-    strategy:
-      matrix:
-        # Reduce noise by only posting the comment once
-        os:
-          - 'ubuntu-latest'
-        node-version:
-          - '22.x'
-    steps:
-      - name: 'Checkout'
-        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
-
-      - name: 'Download coverage reports artifact'
-        uses: 'actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0' # ratchet:actions/download-artifact@v5
-        with:
-          name: 'coverage-reports-${{ matrix.node-version }}-${{ matrix.os }}'
-          path: 'coverage_artifact' # Download to a specific directory
-
-      - name: 'Post Coverage Comment using Composite Action'
-        uses: './.github/actions/post-coverage-comment' # Path to the composite action directory
-        with:
-          cli_json_file: 'coverage_artifact/cli/coverage/coverage-summary.json'
-          core_json_file: 'coverage_artifact/core/coverage/coverage-summary.json'
-          cli_full_text_summary_file: 'coverage_artifact/cli/coverage/full-text-summary.txt'
-          core_full_text_summary_file: 'coverage_artifact/core/coverage/full-text-summary.txt'
-          node_version: '${{ matrix.node-version }}'
-          os: '${{ matrix.os }}'
-          github_token: '${{ secrets.GITHUB_TOKEN }}'
-
   codeql:
     name: 'CodeQL'
-    runs-on: 'ubuntu-latest'
+    runs-on: 'gemini-cli-ubuntu-16-core'
     permissions:
       actions: 'read'
       contents: 'read'
@@ -375,9 +213,8 @@ jobs:
   # Check for changes in bundle size.
   bundle_size:
     name: 'Check Bundle Size'
-    if: |-
-      ${{ github.event_name != 'merge_group' }}
-    runs-on: 'ubuntu-latest'
+    if: "github.event_name == 'pull_request'"
+    runs-on: 'gemini-cli-ubuntu-16-core'
     permissions:
       contents: 'read' # For checkout
       pull-requests: 'write' # For commenting
@@ -395,3 +232,79 @@ jobs:
           minimum-change-threshold: '1000'
           compression: 'none'
           clean-script: 'clean'
+
+  test_windows:
+    name: 'Slow Test - Win'
+    runs-on: 'gemini-cli-windows-16-core'
+    continue-on-error: true
+
+    steps:
+      - name: 'Checkout'
+        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
+
+      - name: 'Set up Node.js 20.x'
+        uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+
+      - name: 'Configure Windows Defender exclusions'
+        run: |
+          Add-MpPreference -ExclusionPath $env:GITHUB_WORKSPACE -Force
+          Add-MpPreference -ExclusionPath "$env:GITHUB_WORKSPACE\node_modules" -Force
+          Add-MpPreference -ExclusionPath "$env:GITHUB_WORKSPACE\packages" -Force
+          Add-MpPreference -ExclusionPath "$env:TEMP" -Force
+        shell: 'pwsh'
+
+      - name: 'Configure npm for Windows performance'
+        run: |
+          npm config set progress false
+          npm config set audit false
+          npm config set fund false
+          npm config set loglevel error
+          npm config set maxsockets 32
+          npm config set registry https://registry.npmjs.org/
+        shell: 'pwsh'
+
+      - name: 'Install dependencies'
+        run: 'npm ci'
+        shell: 'pwsh'
+
+      - name: 'Build project'
+        run: 'npm run build'
+        shell: 'pwsh'
+        env:
+          NODE_OPTIONS: '--max-old-space-size=32768 --max-semi-space-size=256'
+          UV_THREADPOOL_SIZE: '32'
+          NODE_ENV: 'production'
+
+      - name: 'Run tests and generate reports'
+        env:
+          GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
+          NO_COLOR: true
+          NODE_OPTIONS: '--max-old-space-size=32768 --max-semi-space-size=256'
+          UV_THREADPOOL_SIZE: '32'
+          NODE_ENV: 'test'
+        run: 'npm run test:ci -- --coverage.enabled=false'
+        shell: 'pwsh'
+
+  ci:
+    name: 'CI'
+    if: 'always()'
+    needs:
+      - 'lint'
+      - 'test_linux'
+      - 'codeql'
+      - 'bundle_size'
+    runs-on: 'gemini-cli-ubuntu-16-core'
+    steps:
+      - name: 'Check all job results'
+        run: |
+          if [[ (${{ needs.lint.result }} != 'success' && ${{ needs.lint.result }} != 'skipped') || \
+               (${{ needs.test_linux.result }} != 'success' && ${{ needs.test_linux.result }} != 'skipped') || \
+               (${{ needs.codeql.result }} != 'success' && ${{ needs.codeql.result }} != 'skipped') || \
+               (${{ needs.bundle_size.result }} != 'success' && ${{ needs.bundle_size.result }} != 'skipped') ]]; then
+            echo "One or more CI jobs failed."
+            exit 1
+          fi
+          echo "All CI jobs passed!"
