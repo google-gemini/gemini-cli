@@ -35,8 +35,11 @@ export interface ProQuotaDialogRequest {
   resolve: (intent: FallbackIntent) => void;
 }
 
+import { type UseHistoryManagerReturn } from '../hooks/useHistoryManager.js';
+
 export interface UIState {
   history: HistoryItem[];
+  historyManager: UseHistoryManagerReturn;
   isThemeDialogOpen: boolean;
   themeError: string | null;
   isAuthenticating: boolean;

@@ -28,7 +28,11 @@ export const App = () => {
         <Box flexDirection="column" ref={uiState.mainControlsRef}>
           <Notifications />
 
-          {uiState.dialogsVisible ? <DialogManager /> : <Composer />}
+          {uiState.dialogsVisible ? (
+            <DialogManager addItem={uiState.historyManager.addItem} />
+          ) : (
+            <Composer />
+          )}
         </Box>
       </Box>
     </StreamingContext.Provider>

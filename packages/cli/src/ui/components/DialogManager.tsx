@@ -25,9 +25,14 @@ import { useUIActions } from '../contexts/UIActionsContext.js';
 import { useConfig } from '../contexts/ConfigContext.js';
 import { useSettings } from '../contexts/SettingsContext.js';
 import process from 'node:process';
+import { type UseHistoryManagerReturn } from '../hooks/useHistoryManager.js';
+
+interface DialogManagerProps {
+  addItem: UseHistoryManagerReturn['addItem'];
+}
 
 // Props for DialogManager
-export const DialogManager = () => {
+export const DialogManager = ({ addItem }: DialogManagerProps) => {
   const config = useConfig();
   const settings = useSettings();
 
@@ -191,7 +196,10 @@ export const DialogManager = () => {
 
   if (uiState.isPermissionsDialogOpen) {
     return (
-      <PermissionsModifyTrustDialog onExit={uiActions.closePermissionsDialog} />
+      <PermissionsModifyTrustDialog
+        onExit={uiActions.closePermissionsDialog}
+        addItem={addItem}
+      />
     );
   }
 

@@ -191,7 +191,10 @@ describe('useExtensionUpdates', () => {
         JSON.stringify({ name: 'test-extension', version: '1.1.0' }),
       );
     });
-    vi.mocked(isWorkspaceTrusted).mockReturnValue(true);
+    vi.mocked(isWorkspaceTrusted).mockReturnValue({
+      isTrusted: true,
+      source: 'file',
+    });
 
     renderHook(() => useExtensionUpdates([extension], addItem, tempHomeDir));
 
