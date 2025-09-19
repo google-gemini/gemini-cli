@@ -42,6 +42,7 @@ interface SettingsDialogProps {
   settings: LoadedSettings;
   onSelect: (settingName: string | undefined, scope: SettingScope) => void;
   onRestartRequest?: () => void;
+  availableTerminalHeight?: number;
 }
 
 const maxItemsToShow = 8;
@@ -50,6 +51,7 @@ export function SettingsDialog({
   settings,
   onSelect,
   onRestartRequest,
+  availableTerminalHeight,
 }: SettingsDialogProps): React.JSX.Element {
   // Get vim mode context to sync vim mode changes
   const { vimEnabled, toggleVimEnabled } = useVimMode();
@@ -367,16 +369,97 @@ export function SettingsDialog({
     setFocusSection('settings');
   };
 
+  // Height constraint calculations similar to ThemeDialog
+  const DIALOG_PADDING = 2;
+  const SETTINGS_TITLE_HEIGHT = 2; // "Settings" title + spacing
+  const SCROLL_ARROWS_HEIGHT = 2; // Up and down arrows
+  const SPACING_HEIGHT = 1; // Space between settings list and scope
+  const SCOPE_SELECTION_HEIGHT = 4; // Apply To section height
+  const BOTTOM_HELP_TEXT_HEIGHT = 1; // Help text
+  const RESTART_PROMPT_HEIGHT = showRestartPrompt ? 1 : 0;
+
+  let currentAvailableTerminalHeight =
+    availableTerminalHeight ?? Number.MAX_SAFE_INTEGER;
+  currentAvailableTerminalHeight -= 2; // Top and bottom borders
+
+  // Start with basic fixed height (without scope selection)
+  let totalFixedHeight =
+    DIALOG_PADDING +
+    SETTINGS_TITLE_HEIGHT +
+    SCROLL_ARROWS_HEIGHT +
+    SPACING_HEIGHT +
+    BOTTOM_HELP_TEXT_HEIGHT +
+    RESTART_PROMPT_HEIGHT;
+
+  // Calculate how much space we have for settings
+  let availableHeightForSettings = Math.max(
+    1,
+    currentAvailableTerminalHeight - totalFixedHeight,
+  );
+
+  // Each setting item takes 2 lines (the setting row + spacing)
+  let maxVisibleItems = Math.max(1, Math.floor(availableHeightForSettings / 2));
+
+  // Decide whether to show scope selection based on remaining space
+  let showScopeSelection = true;
+
+  // If we have limited height, prioritize showing more settings over scope selection
+  if (availableTerminalHeight && availableTerminalHeight < 25) {
+    // For very limited height, hide scope selection to show more settings
+    const totalWithScope = totalFixedHeight + SCOPE_SELECTION_HEIGHT;
+    const availableWithScope = Math.max(
+      1,
+      currentAvailableTerminalHeight - totalWithScope,
+    );
+    const maxItemsWithScope = Math.max(1, Math.floor(availableWithScope / 2));
+
+    // If hiding scope selection allows us to show significantly more settings, do it
+    if (maxVisibleItems > maxItemsWithScope + 1) {
+      showScopeSelection = false;
+    } else {
+      // Otherwise include scope selection and recalculate
+      totalFixedHeight += SCOPE_SELECTION_HEIGHT;
+      availableHeightForSettings = Math.max(
+        1,
+        currentAvailableTerminalHeight - totalFixedHeight,
+      );
+      maxVisibleItems = Math.max(1, Math.floor(availableHeightForSettings / 2));
+    }
+  } else {
+    // For normal height, include scope selection
+    totalFixedHeight += SCOPE_SELECTION_HEIGHT;
+    availableHeightForSettings = Math.max(
+      1,
+      currentAvailableTerminalHeight - totalFixedHeight,
+    );
+    maxVisibleItems = Math.max(1, Math.floor(availableHeightForSettings / 2));
+  }
+
+  // Use the calculated maxVisibleItems or fall back to the original maxItemsToShow
+  const effectiveMaxItemsToShow = availableTerminalHeight
+    ? Math.min(maxVisibleItems, items.length)
+    : maxItemsToShow;
+
+  // Ensure focus stays on settings when scope selection is hidden
+  React.useEffect(() => {
+    if (!showScopeSelection && focusSection === 'scope') {
+      setFocusSection('settings');
+    }
+  }, [showScopeSelection, focusSection]);
+
   // Scroll logic for settings
-  const visibleItems = items.slice(scrollOffset, scrollOffset + maxItemsToShow);
-  // Always show arrows for consistent UI and to indicate circular navigation
-  const showScrollUp = true;
-  const showScrollDown = true;
+  const visibleItems = items.slice(
+    scrollOffset,
+    scrollOffset + effectiveMaxItemsToShow,
+  );
+  // Show arrows if there are more items than can be displayed
+  const showScrollUp = items.length > effectiveMaxItemsToShow;
+  const showScrollDown = items.length > effectiveMaxItemsToShow;
 
   useKeypress(
     (key) => {
       const { name, ctrl } = key;
-      if (name === 'tab') {
+      if (name === 'tab' && showScopeSelection) {
         setFocusSection((prev) => (prev === 'settings' ? 'scope' : 'settings'));
       }
       if (focusSection === 'settings') {
@@ -480,7 +563,9 @@ export function SettingsDialog({
           setActiveSettingIndex(newIndex);
           // Adjust scroll offset for wrap-around
           if (newIndex === items.length - 1) {
-            setScrollOffset(Math.max(0, items.length - maxItemsToShow));
+            setScrollOffset(
+              Math.max(0, items.length - effectiveMaxItemsToShow),
+            );
           } else if (newIndex < scrollOffset) {
             setScrollOffset(newIndex);
           }
@@ -495,8 +580,8 @@ export function SettingsDialog({
           // Adjust scroll offset for wrap-around
           if (newIndex === 0) {
             setScrollOffset(0);
-          } else if (newIndex >= scrollOffset + maxItemsToShow) {
-            setScrollOffset(newIndex - maxItemsToShow + 1);
+          } else if (newIndex >= scrollOffset + effectiveMaxItemsToShow) {
+            setScrollOffset(newIndex - effectiveMaxItemsToShow + 1);
           }
         } else if (name === 'return' || name === 'space') {
           const currentItem = items[activeSettingIndex];
@@ -663,8 +748,8 @@ export function SettingsDialog({
       height="100%"
     >
       <Box flexDirection="column" flexGrow={1}>
-        <Text bold color={theme.text.link}>
-          Settings
+        <Text bold={focusSection === 'settings'} wrap="truncate">
+          {focusSection === 'settings' ? '> ' : '  '}Settings
         </Text>
         <Box height={1} />
         {showScrollUp && <Text color={theme.text.secondary}>▲</Text>}
@@ -787,23 +872,27 @@ export function SettingsDialog({
 
         <Box height={1} />
 
-        <Box marginTop={1} flexDirection="column">
-          <Text bold={focusSection === 'scope'} wrap="truncate">
-            {focusSection === 'scope' ? '> ' : '  '}Apply To
-          </Text>
-          <RadioButtonSelect
-            items={scopeItems}
-            initialIndex={0}
-            onSelect={handleScopeSelect}
-            onHighlight={handleScopeHighlight}
-            isFocused={focusSection === 'scope'}
-            showNumbers={focusSection === 'scope'}
-          />
-        </Box>
+        {/* Scope Selection - conditionally visible based on height constraints */}
+        {showScopeSelection && (
+          <Box marginTop={1} flexDirection="column">
+            <Text bold={focusSection === 'scope'} wrap="truncate">
+              {focusSection === 'scope' ? '> ' : '  '}Apply To
+            </Text>
+            <RadioButtonSelect
+              items={scopeItems}
+              initialIndex={0}
+              onSelect={handleScopeSelect}
+              onHighlight={handleScopeHighlight}
+              isFocused={focusSection === 'scope'}
+              showNumbers={focusSection === 'scope'}
+            />
+          </Box>
+        )}
 
         <Box height={1} />
         <Text color={theme.text.secondary}>
-          (Use Enter to select, Tab to change focus)
+          (Use Enter to select
+          {showScopeSelection ? ', Tab to change focus' : ''})
         </Text>
         {showRestartPrompt && (
           <Text color={theme.status.warning}>

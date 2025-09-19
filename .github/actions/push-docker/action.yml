@@ -1,0 +1,73 @@
+name: 'Push to docker'
+description: 'Builds packages and pushes a docker image to GHCR'
+
+inputs:
+  github-actor:
+    description: 'Github actor'
+    required: true
+  github-secret:
+    description: 'Github secret'
+    required: true
+  ref-name:
+    description: 'Github ref name'
+    required: true
+  github-sha:
+    description: 'Github Commit SHA Hash'
+    required: true
+
+runs:
+  using: 'composite'
+  steps:
+    - name: 'Checkout'
+      uses: 'actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955' # ratchet:actions/checkout@v4
+      with:
+        ref: '${{ inputs.github-sha }}'
+        fetch-depth: 0
+    - name: 'Install Dependencies'
+      shell: 'bash'
+      run: 'npm install'
+    - name: 'Set up Docker Buildx'
+      uses: 'docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435' # ratchet:docker/setup-buildx-action@v3
+    - name: 'build'
+      shell: 'bash'
+      run: 'npm run build'
+    - name: 'pack @google/gemini-cli'
+      shell: 'bash'
+      run: 'npm pack -w @google/gemini-cli --pack-destination ./packages/cli/dist'
+    - name: 'pack @google/gemini-cli-core'
+      shell: 'bash'
+      run: 'npm pack -w @google/gemini-cli-core --pack-destination ./packages/core/dist'
+    - name: 'Log in to GitHub Container Registry'
+      uses: 'docker/login-action@184bdaa0721073962dff0199f1fb9940f07167d1' # ratchet:docker/login-action@v3
+      with:
+        registry: 'ghcr.io'
+        username: '${{ inputs.github-actor }}'
+        password: '${{ inputs.github-secret }}'
+    - name: 'Get branch name'
+      id: 'branch_name'
+      shell: 'bash'
+      run: |
+        REF_NAME="${{ inputs.ref-name }}"
+        echo "name=${REF_NAME%/merge}" >> $GITHUB_OUTPUT
+    - name: 'Build and Push the Docker Image'
+      uses: 'docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83' # ratchet:docker/build-push-action@v6
+      with:
+        context: '.'
+        file: './Dockerfile'
+        push: true
+        provenance: false # avoid pushing 3 images to Aritfact Registry
+        tags: |
+          ghcr.io/${{ github.repository }}/cli:${{ steps.branch_name.outputs.name }}
+          ghcr.io/${{ github.repository }}/cli:${{ inputs.github-sha }}
+    - name: 'Create issue on failure'
+      if: |-
+        ${{ failure() }}
+      shell: 'bash'
+      env:
+        GITHUB_TOKEN: '${{ inputs.github-secret }}'
+        DETAILS_URL: '${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}'
+      run: |-
+        gh issue create \
+          --title "Docker build failed" \
+          --body "The docker build failed. See the full run for details: ${DETAILS_URL}" \
+          --label "kind/bug,release-failure"

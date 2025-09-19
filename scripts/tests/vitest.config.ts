@@ -16,5 +16,11 @@ export default defineConfig({
       provider: 'v8',
       reporter: ['text', 'lcov'],
     },
+    poolOptions: {
+      threads: {
+        minThreads: 8,
+        maxThreads: 16,
+      },
+    },
   },
 });

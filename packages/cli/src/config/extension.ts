@@ -7,6 +7,7 @@
 import type {
   MCPServerConfig,
   GeminiCLIExtension,
+  ExtensionInstallMetadata,
 } from '@google/gemini-cli-core';
 import {
   GEMINI_DIR,
@@ -19,14 +20,16 @@ import {
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
-import { simpleGit } from 'simple-git';
 import { SettingScope, loadSettings } from '../config/settings.js';
 import { getErrorMessage } from '../utils/errors.js';
 import { recursivelyHydrateStrings } from './extensions/variables.js';
 import { isWorkspaceTrusted } from './trustedFolders.js';
 import { resolveEnvVarsInObject } from '../utils/envVarResolver.js';
 import { randomUUID } from 'node:crypto';
-import { ExtensionUpdateState } from '../ui/state/extensions.js';
+import {
+  cloneFromGit,
+  downloadFromGitHubRelease,
+} from './extensions/github.js';
 import type { LoadExtensionContext } from './extensions/variableSchema.js';
 import { ExtensionEnablementManager } from './extensions/extensionEnablement.js';
 
@@ -48,12 +51,6 @@ export interface ExtensionConfig {
   mcpServers?: Record<string, MCPServerConfig>;
   contextFileName?: string | string[];
   excludeTools?: string[];
-}
-
-export interface ExtensionInstallMetadata {
-  source: string;
-  type: 'git' | 'local' | 'link';
-  ref?: string;
 }
 
 export interface ExtensionUpdateInfo {
@@ -100,7 +97,7 @@ export function getWorkspaceExtensions(workspaceDir: string): Extension[] {
   return loadExtensionsFromDir(workspaceDir);
 }
 
-async function copyExtension(
+export async function copyExtension(
   source: string,
   destination: string,
 ): Promise<void> {
@@ -264,7 +261,7 @@ export function loadExtension(context: LoadExtensionContext): Extension | null {
   }
 }
 
-function loadInstallMetadata(
+export function loadInstallMetadata(
   extensionDir: string,
 ): ExtensionInstallMetadata | undefined {
   const metadataFilePath = path.join(extensionDir, INSTALL_METADATA_FILENAME);
@@ -301,7 +298,6 @@ export function annotateActiveExtensions(
   const manager = new ExtensionEnablementManager(
     ExtensionStorage.getUserExtensionsDir(),
   );
-
   const annotatedExtensions: GeminiCLIExtension[] = [];
   if (enabledExtensionNames.length === 0) {
     return extensions.map((extension) => ({
@@ -309,9 +305,7 @@ export function annotateActiveExtensions(
       version: extension.config.version,
       isActive: manager.isEnabled(extension.config.name, workspaceDir),
       path: extension.path,
-      source: extension.installMetadata?.source,
-      type: extension.installMetadata?.type,
-      ref: extension.installMetadata?.ref,
+      installMetadata: extension.installMetadata,
     }));
   }
 
@@ -328,9 +322,7 @@ export function annotateActiveExtensions(
       version: extension.config.version,
       isActive: false,
       path: extension.path,
-      source: extension.installMetadata?.source,
-      type: extension.installMetadata?.type,
-      ref: extension.installMetadata?.ref,
+      installMetadata: extension.installMetadata,
     }));
   }
 
@@ -349,6 +341,7 @@ export function annotateActiveExtensions(
       version: extension.config.version,
       isActive,
       path: extension.path,
+      installMetadata: extension.installMetadata,
     });
   }
 
@@ -357,43 +350,6 @@ export function annotateActiveExtensions(
   }
 
   return annotatedExtensions;
-}
-
-/**
- * Clones a Git repository to a specified local path.
- * @param installMetadata The metadata for the extension to install.
- * @param destination The destination path to clone the repository to.
- */
-async function cloneFromGit(
-  installMetadata: ExtensionInstallMetadata,
-  destination: string,
-): Promise<void> {
-  try {
-    const git = simpleGit(destination);
-    await git.clone(installMetadata.source, './', ['--depth', '1']);
-
-    const remotes = await git.getRemotes(true);
-    if (remotes.length === 0) {
-      throw new Error(
-        `Unable to find any remotes for repo ${installMetadata.source}`,
-      );
-    }
-
-    const refToFetch = installMetadata.ref || 'HEAD';
-
-    await git.fetch(remotes[0].name, refToFetch);
-
-    // After fetching, checkout FETCH_HEAD to get the content of the fetched ref.
-    // This results in a detached HEAD state, which is fine for this purpose.
-    await git.checkout('FETCH_HEAD');
-  } catch (error) {
-    throw new Error(
-      `Failed to clone Git repository from ${installMetadata.source}`,
-      {
-        cause: error,
-      },
-    );
-  }
 }
 
 /**
@@ -418,6 +374,7 @@ async function promptForContinuation(prompt: string): Promise<boolean> {
 
 export async function installExtension(
   installMetadata: ExtensionInstallMetadata,
+  askConsent: boolean = false,
   cwd: string = process.cwd(),
 ): Promise<string> {
   const logger = getClearcutLogger(cwd);
@@ -444,9 +401,22 @@ export async function installExtension(
 
     let tempDir: string | undefined;
 
-    if (installMetadata.type === 'git') {
+    if (
+      installMetadata.type === 'git' ||
+      installMetadata.type === 'github-release'
+    ) {
       tempDir = await ExtensionStorage.createTmpDir();
-      await cloneFromGit(installMetadata, tempDir);
+      try {
+        const tagName = await downloadFromGitHubRelease(
+          installMetadata,
+          tempDir,
+        );
+        updateExtensionVersion(tempDir, tagName);
+        installMetadata.type = 'github-release';
+      } catch (_error) {
+        await cloneFromGit(installMetadata, tempDir);
+        installMetadata.type = 'git';
+      }
       localSourcePath = tempDir;
     } else if (
       installMetadata.type === 'local' ||
@@ -482,33 +452,16 @@ export async function installExtension(
           `Extension "${newExtensionName}" is already installed. Please uninstall it first.`,
         );
       }
-
-      const mcpServerEntries = Object.entries(
-        newExtensionConfig.mcpServers || {},
-      );
-      if (mcpServerEntries.length) {
-        console.info('This extension will run the following MCP servers: ');
-        for (const [key, mcpServer] of mcpServerEntries) {
-          const isLocal = !!mcpServer.command;
-          console.info(
-            `  * ${key} (${isLocal ? 'local' : 'remote'}): ${mcpServer.description}`,
-          );
-        }
-        console.info(
-          'The extension will append info to your gemini.md context',
-        );
-
-        const shouldContinue = await promptForContinuation(
-          'Do you want to continue? (y/n): ',
-        );
-        if (!shouldContinue) {
-          throw new Error('Installation cancelled by user.');
-        }
+      if (askConsent) {
+        await requestConsent(newExtensionConfig);
       }
-
       await fs.promises.mkdir(destinationPath, { recursive: true });
 
-      if (installMetadata.type === 'local' || installMetadata.type === 'git') {
+      if (
+        installMetadata.type === 'local' ||
+        installMetadata.type === 'git' ||
+        installMetadata.type === 'github-release'
+      ) {
         await copyExtension(localSourcePath, destinationPath);
       }
 
@@ -556,6 +509,42 @@ export async function installExtension(
   }
 }
 
+async function updateExtensionVersion(
+  extensionDir: string,
+  extensionVersion: string,
+) {
+  const configFilePath = path.join(extensionDir, EXTENSIONS_CONFIG_FILENAME);
+  if (fs.existsSync(configFilePath)) {
+    const configContent = await fs.promises.readFile(configFilePath, 'utf-8');
+    const config = JSON.parse(configContent);
+    config.version = extensionVersion;
+    await fs.promises.writeFile(
+      configFilePath,
+      JSON.stringify(config, null, 2),
+    );
+  }
+}
+async function requestConsent(extensionConfig: ExtensionConfig) {
+  const mcpServerEntries = Object.entries(extensionConfig.mcpServers || {});
+  if (mcpServerEntries.length) {
+    console.info('This extension will run the following MCP servers: ');
+    for (const [key, mcpServer] of mcpServerEntries) {
+      const isLocal = !!mcpServer.command;
+      console.info(
+        `  * ${key} (${isLocal ? 'local' : 'remote'}): ${mcpServer.description}`,
+      );
+    }
+    console.info('The extension will append info to your gemini.md context');
+
+    const shouldContinue = await promptForContinuation(
+      'Do you want to continue? (y/n): ',
+    );
+    if (!shouldContinue) {
+      throw new Error('Installation cancelled by user.');
+    }
+  }
+}
+
 export async function loadExtensionConfig(
   context: LoadExtensionContext,
 ): Promise<ExtensionConfig | null> {
@@ -582,17 +571,20 @@ export async function loadExtensionConfig(
 }
 
 export async function uninstallExtension(
-  extensionName: string,
+  extensionIdentifier: string,
   cwd: string = process.cwd(),
 ): Promise<void> {
   const logger = getClearcutLogger(cwd);
   const installedExtensions = loadUserExtensions();
-  if (
-    !installedExtensions.some(
-      (installed) => installed.config.name === extensionName,
-    )
-  ) {
-    throw new Error(`Extension "${extensionName}" not found.`);
+  const extensionName = installedExtensions.find(
+    (installed) =>
+      installed.config.name.toLowerCase() ===
+        extensionIdentifier.toLowerCase() ||
+      installed.installMetadata?.source.toLowerCase() ===
+        extensionIdentifier.toLowerCase(),
+  )?.config.name;
+  if (!extensionName) {
+    throw new Error(`Extension not found.`);
   }
   const manager = new ExtensionEnablementManager(
     ExtensionStorage.getUserExtensionsDir(),
@@ -639,82 +631,6 @@ export function toOutputString(extension: Extension): string {
   return output;
 }
 
-export async function updateExtensionByName(
-  extensionName: string,
-  cwd: string = process.cwd(),
-  extensions: GeminiCLIExtension[],
-  setExtensionUpdateState: (updateState: ExtensionUpdateState) => void,
-): Promise<ExtensionUpdateInfo> {
-  const extension = extensions.find(
-    (installed) => installed.name === extensionName,
-  );
-  if (!extension) {
-    throw new Error(
-      `Extension "${extensionName}" not found. Run gemini extensions list to see available extensions.`,
-    );
-  }
-  return await updateExtension(extension, cwd, setExtensionUpdateState);
-}
-
-export async function updateExtension(
-  extension: GeminiCLIExtension,
-  cwd: string = process.cwd(),
-  setExtensionUpdateState: (updateState: ExtensionUpdateState) => void,
-): Promise<ExtensionUpdateInfo> {
-  if (!extension.type) {
-    setExtensionUpdateState(ExtensionUpdateState.ERROR);
-    throw new Error(
-      `Extension ${extension.name} cannot be updated, type is unknown.`,
-    );
-  }
-  if (extension.type === 'link') {
-    setExtensionUpdateState(ExtensionUpdateState.UP_TO_DATE);
-    throw new Error(`Extension is linked so does not need to be updated`);
-  }
-  setExtensionUpdateState(ExtensionUpdateState.UPDATING);
-  const originalVersion = extension.version;
-
-  const tempDir = await ExtensionStorage.createTmpDir();
-  try {
-    await copyExtension(extension.path, tempDir);
-    await uninstallExtension(extension.name, cwd);
-    await installExtension(
-      {
-        source: extension.source!,
-        type: extension.type,
-        ref: extension.ref,
-      },
-      cwd,
-    );
-
-    const updatedExtensionStorage = new ExtensionStorage(extension.name);
-    const updatedExtension = loadExtension({
-      extensionDir: updatedExtensionStorage.getExtensionDir(),
-      workspaceDir: cwd,
-    });
-    if (!updatedExtension) {
-      setExtensionUpdateState(ExtensionUpdateState.ERROR);
-      throw new Error('Updated extension not found after installation.');
-    }
-    const updatedVersion = updatedExtension.config.version;
-    setExtensionUpdateState(ExtensionUpdateState.UPDATED_NEEDS_RESTART);
-    return {
-      name: extension.name,
-      originalVersion,
-      updatedVersion,
-    };
-  } catch (e) {
-    console.error(
-      `Error updating extension, rolling back. ${getErrorMessage(e)}`,
-    );
-    setExtensionUpdateState(ExtensionUpdateState.ERROR);
-    await copyExtension(tempDir, extension.path);
-    throw e;
-  } finally {
-    await fs.promises.rm(tempDir, { recursive: true, force: true });
-  }
-}
-
 export function disableExtension(
   name: string,
   scope: SettingScope,
@@ -744,101 +660,4 @@ export function enableExtension(
   );
   const scopePath = scope === SettingScope.Workspace ? cwd : os.homedir();
   manager.enable(name, true, scopePath);
-}
-
-export async function updateAllUpdatableExtensions(
-  cwd: string = process.cwd(),
-  extensions: GeminiCLIExtension[],
-  extensionsState: Map<string, ExtensionUpdateState>,
-  setExtensionsUpdateState: (
-    updateState: Map<string, ExtensionUpdateState>,
-  ) => void,
-): Promise<ExtensionUpdateInfo[]> {
-  return await Promise.all(
-    extensions
-      .filter(
-        (extension) =>
-          extensionsState.get(extension.name) ===
-          ExtensionUpdateState.UPDATE_AVAILABLE,
-      )
-      .map((extension) =>
-        updateExtension(extension, cwd, (updateState) => {
-          const newState = new Map(extensionsState);
-          newState.set(extension.name, updateState);
-          setExtensionsUpdateState(newState);
-        }),
-      ),
-  );
-}
-
-export interface ExtensionUpdateCheckResult {
-  state: ExtensionUpdateState;
-  error?: string;
-}
-
-export async function checkForAllExtensionUpdates(
-  extensions: GeminiCLIExtension[],
-  setExtensionsUpdateState: (
-    updateState: Map<string, ExtensionUpdateState>,
-  ) => void,
-): Promise<Map<string, ExtensionUpdateState>> {
-  const finalState = new Map<string, ExtensionUpdateState>();
-  for (const extension of extensions) {
-    finalState.set(extension.name, await checkForExtensionUpdate(extension));
-  }
-  setExtensionsUpdateState(finalState);
-  return finalState;
-}
-
-export async function checkForExtensionUpdate(
-  extension: GeminiCLIExtension,
-): Promise<ExtensionUpdateState> {
-  if (extension.type !== 'git') {
-    return ExtensionUpdateState.NOT_UPDATABLE;
-  }
-
-  try {
-    const git = simpleGit(extension.path);
-    const remotes = await git.getRemotes(true);
-    if (remotes.length === 0) {
-      console.error('No git remotes found.');
-      return ExtensionUpdateState.ERROR;
-    }
-    const remoteUrl = remotes[0].refs.fetch;
-    if (!remoteUrl) {
-      console.error(`No fetch URL found for git remote ${remotes[0].name}.`);
-      return ExtensionUpdateState.ERROR;
-    }
-
-    // Determine the ref to check on the remote.
-    const refToCheck = extension.ref || 'HEAD';
-
-    const lsRemoteOutput = await git.listRemote([remoteUrl, refToCheck]);
-
-    if (typeof lsRemoteOutput !== 'string' || lsRemoteOutput.trim() === '') {
-      console.error(`Git ref ${refToCheck} not found.`);
-      return ExtensionUpdateState.ERROR;
-    }
-
-    const remoteHash = lsRemoteOutput.split('\t')[0];
-    const localHash = await git.revparse(['HEAD']);
-
-    if (!remoteHash) {
-      console.error(
-        `Unable to parse hash from git ls-remote output "${lsRemoteOutput}"`,
-      );
-      return ExtensionUpdateState.ERROR;
-    } else if (remoteHash === localHash) {
-      return ExtensionUpdateState.UP_TO_DATE;
-    } else {
-      return ExtensionUpdateState.UPDATE_AVAILABLE;
-    }
-  } catch (error) {
-    console.error(
-      `Failed to check for updates for extension "${
-        extension.name
-      }": ${getErrorMessage(error)}`,
-    );
-    return ExtensionUpdateState.ERROR;
-  }
 }

@@ -9,6 +9,7 @@ import type * as vscode from 'vscode';
 import * as fs from 'node:fs/promises';
 import type * as os from 'node:os';
 import * as path from 'node:path';
+import * as http from 'node:http';
 import { IDEServer } from './ide-server.js';
 import type { DiffManager } from './diff-manager.js';
 
@@ -62,25 +63,25 @@ vi.mock('./open-files-manager', () => {
   return { OpenFilesManager };
 });
 
+const getPortFromMock = (
+  replaceMock: ReturnType<
+    () => vscode.ExtensionContext['environmentVariableCollection']['replace']
+  >,
+) => {
+  const port = vi
+    .mocked(replaceMock)
+    .mock.calls.find((call) => call[0] === 'GEMINI_CLI_IDE_SERVER_PORT')?.[1];
+
+  if (port === undefined) {
+    expect.fail('Port was not set');
+  }
+  return port;
+};
+
 describe('IDEServer', () => {
   let ideServer: IDEServer;
   let mockContext: vscode.ExtensionContext;
   let mockLog: (message: string) => void;
-
-  const getPortFromMock = (
-    replaceMock: ReturnType<
-      () => vscode.ExtensionContext['environmentVariableCollection']['replace']
-    >,
-  ) => {
-    const port = vi
-      .mocked(replaceMock)
-      .mock.calls.find((call) => call[0] === 'GEMINI_CLI_IDE_SERVER_PORT')?.[1];
-
-    if (port === undefined) {
-      expect.fail('Port was not set');
-    }
-    return port;
-  };
 
   beforeEach(() => {
     mockLog = vi.fn();
@@ -454,5 +455,107 @@ describe('IDEServer', () => {
         expect(body, `Failed for header: ${header}`).toBe('Unauthorized');
       }
     });
+  });
+});
+
+const request = (
+  port: string,
+  options: http.RequestOptions,
+  body?: string,
+): Promise<http.IncomingMessage> =>
+  new Promise((resolve, reject) => {
+    const req = http.request(
+      {
+        hostname: '127.0.0.1',
+        port,
+        ...options,
+      },
+      (res) => {
+        res.resume(); // Consume response data to free up memory
+        resolve(res);
+      },
+    );
+    req.on('error', reject);
+    if (body) {
+      req.write(body);
+    }
+    req.end();
+  });
+
+describe('IDEServer HTTP endpoints', () => {
+  let ideServer: IDEServer;
+  let mockContext: vscode.ExtensionContext;
+  let mockLog: (message: string) => void;
+  let port: string;
+
+  beforeEach(async () => {
+    mockLog = vi.fn();
+    ideServer = new IDEServer(mockLog, mocks.diffManager);
+    mockContext = {
+      subscriptions: [],
+      environmentVariableCollection: {
+        replace: vi.fn(),
+        clear: vi.fn(),
+      },
+    } as unknown as vscode.ExtensionContext;
+    await ideServer.start(mockContext);
+    const replaceMock = mockContext.environmentVariableCollection.replace;
+    port = getPortFromMock(replaceMock);
+  });
+
+  afterEach(async () => {
+    await ideServer.stop();
+    vi.restoreAllMocks();
+  });
+
+  it('should deny requests with an origin header', async () => {
+    const response = await request(
+      port,
+      {
+        path: '/mcp',
+        method: 'POST',
+        headers: {
+          Host: `localhost:${port}`,
+          Origin: 'https://evil.com',
+          'Content-Type': 'application/json',
+        },
+      },
+      JSON.stringify({ jsonrpc: '2.0', method: 'initialize' }),
+    );
+    expect(response.statusCode).toBe(403);
+  });
+
+  it('should deny requests with an invalid host header', async () => {
+    const response = await request(
+      port,
+      {
+        path: '/mcp',
+        method: 'POST',
+        headers: {
+          Host: 'evil.com',
+          'Content-Type': 'application/json',
+        },
+      },
+      JSON.stringify({ jsonrpc: '2.0', method: 'initialize' }),
+    );
+    expect(response.statusCode).toBe(403);
+  });
+
+  it('should allow requests with a valid host header', async () => {
+    const response = await request(
+      port,
+      {
+        path: '/mcp',
+        method: 'POST',
+        headers: {
+          Host: `localhost:${port}`,
+          'Content-Type': 'application/json',
+        },
+      },
+      JSON.stringify({ jsonrpc: '2.0', method: 'initialize' }),
+    );
+    // We expect a 400 here because we are not sending a valid MCP request,
+    // but it's not a host error, which is what we are testing.
+    expect(response.statusCode).toBe(400);
   });
 });
