@@ -13,6 +13,10 @@ inputs:
   github-ref-name:
     description: 'Github ref name'
     required: true
+  dry-run:
+    description: 'Whether this is a dry run.'
+    required: true
+    type: 'boolean'
 
 runs:
   using: 'composite'
@@ -63,6 +67,7 @@ runs:
         echo "uri=$(cat final_image_uri.txt)" >> $GITHUB_OUTPUT
     - name: 'publish'
       shell: 'bash'
+      if: '{{ inputs.dry-run == "false" }}'
       run: |-
         docker push "${{ steps.docker_build.outputs.uri }}"
     - name: 'Create issue on failure'
