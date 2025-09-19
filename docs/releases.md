@@ -148,6 +148,39 @@ Review the automatically created pull request(s) to ensure the cherry-pick was s
 
 **Security Note:** The `release/*` branches are protected by branch protection rules. A pull request to one of these branches requires at least one review from a code owner before it can be merged. This ensures that no unauthorized code is released.
 
+#### 2.5. Adding Multiple Commits to a Hotfix (Advanced)
+
+If you need to include multiple fixes in a single patch release, you can add additional commits to the hotfix branch after the initial patch PR has been created:
+
+1. **Start with the primary fix**: Use `/patch` (or `/patch both`) on the most important PR to create the initial hotfix branch and PR.
+
+2. **Checkout the hotfix branch locally**:
+
+   ```bash
+   git fetch origin
+   git checkout hotfix/v0.5.1/stable/cherry-pick-abc1234  # Use the actual branch name from the PR
+   ```
+
+3. **Cherry-pick additional commits**:
+
+   ```bash
+   git cherry-pick <commit-sha-1>
+   git cherry-pick <commit-sha-2>
+   # Add as many commits as needed
+   ```
+
+4. **Push the updated branch**:
+
+   ```bash
+   git push origin hotfix/v0.5.1/stable/cherry-pick-abc1234
+   ```
+
+5. **Test and review**: The existing patch PR will automatically update with your additional commits. Test thoroughly since you're now releasing multiple changes together.
+
+6. **Update the PR description**: Consider updating the PR title and description to reflect that it includes multiple fixes.
+
+This approach allows you to group related fixes into a single patch release while maintaining full control over what gets included and how conflicts are resolved.
+
 #### 3. Automatic Release
 
 Upon merging the pull request, the `Release: Patch (2) Trigger` workflow is automatically triggered. It will then start the `Release: Patch (3) Release` workflow, which will:
