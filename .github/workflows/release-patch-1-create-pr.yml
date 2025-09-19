@@ -58,6 +58,24 @@ jobs:
           git config user.name "gemini-cli-robot"
           git config user.email "gemini-cli-robot@google.com"
 
+      - name: 'Test 1: Create branch from HEAD and push'
+        run: |-
+          echo "Testing branch creation from HEAD..."
+          BRANCH_NAME="test-from-head-$(date +%s)"
+          git checkout -b "$BRANCH_NAME"
+          echo "# Test file" > test-file.txt
+          git add test-file.txt
+          git commit -m "test commit from HEAD"
+          git push origin "$BRANCH_NAME" || echo "HEAD push failed"
+
+      - name: 'Test 2: Create branch from v0.5.3 tag and push'
+        run: |-
+          echo "Testing branch creation from v0.5.3 tag..."
+          git fetch --tags
+          BRANCH_NAME="test-from-v053-$(date +%s)"
+          git checkout -b "$BRANCH_NAME" v0.5.3 || echo "Failed to checkout from v0.5.3"
+          git push origin "$BRANCH_NAME" || echo "v0.5.3 tag push failed"
+
       - name: 'Create Patch'
         id: 'create_patch'
         env:
