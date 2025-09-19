@@ -81,11 +81,17 @@ jobs:
           GH_TOKEN: '${{ steps.generate_token.outputs.token }}'
           ORIGINAL_PR: '${{ github.event.inputs.original_pr }}'
           EXIT_CODE: '${{ steps.create_patch.outputs.EXIT_CODE }}'
-          OUTPUT_LOG: 'patch_output.log'
+          OUTPUT_LOG_CONTENT: '${{ steps.create_patch.outcome == ''success'' && '' '' || steps.create_patch.outcome }}'
           COMMIT: '${{ github.event.inputs.commit }}'
           CHANNEL: '${{ github.event.inputs.channel }}'
           REPOSITORY: '${{ github.repository }}'
           GITHUB_RUN_ID: '${{ github.run_id }}'
         run: |
+          # Read the log content into an environment variable
+          if [ -f patch_output.log ]; then
+            echo "LOG_CONTENT<<EOF" >> $GITHUB_ENV
+            cat patch_output.log >> $GITHUB_ENV
+            echo "EOF" >> $GITHUB_ENV
+          fi
           git checkout '${{ github.event.inputs.ref }}'
           node scripts/releasing/patch-create-comment.js
