@@ -59,8 +59,9 @@ function originalOtelMockFactory() {
     },
     diag: {
       setLogger: vi.fn(),
+      warn: vi.fn(),
     },
-  };
+  } as const;
 }
 
 vi.mock('@opentelemetry/api');
@@ -970,11 +971,12 @@ describe('Telemetry Metrics', () => {
         });
       });
 
-      it('should skip recording when baseline is zero', () => {
-        // Mock console.warn to verify warning message
-        const consoleSpy = vi
-          .spyOn(console, 'warn')
-          .mockImplementation(() => {});
+      it('should skip recording when baseline is zero', async () => {
+        // Access the actual mocked module
+        const mockedModule = (await vi.importMock('@opentelemetry/api')) as {
+          diag: { warn: ReturnType<typeof vi.fn> };
+        };
+        const diagSpy = vi.spyOn(mockedModule.diag, 'warn');
 
         initializeMetricsModule(mockConfig);
         mockHistogramRecordFn.mockClear();
@@ -987,12 +989,10 @@ describe('Telemetry Metrics', () => {
           'testing',
         );
 
-        expect(consoleSpy).toHaveBeenCalledWith(
+        expect(diagSpy).toHaveBeenCalledWith(
           'Baseline value is zero, skipping comparison.',
         );
         expect(mockHistogramRecordFn).not.toHaveBeenCalled();
-
-        consoleSpy.mockRestore();
       });
     });
   });

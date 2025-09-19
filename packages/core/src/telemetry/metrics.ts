@@ -5,7 +5,7 @@
  */
 
 import type { Attributes, Meter, Counter, Histogram } from '@opentelemetry/api';
-import { metrics, ValueType } from '@opentelemetry/api';
+import { diag, metrics, ValueType } from '@opentelemetry/api';
 import {
   SERVICE_NAME,
   METRIC_TOOL_CALL_COUNT,
@@ -661,7 +661,7 @@ export function recordBaselineComparison(
   if (!baselineComparisonHistogram || !isPerformanceMonitoringEnabled) return;
 
   if (baselineValue === 0) {
-    console.warn('Baseline value is zero, skipping comparison.');
+    diag.warn('Baseline value is zero, skipping comparison.');
     return;
   }
   const percentageChange =
