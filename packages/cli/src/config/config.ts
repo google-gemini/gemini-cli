@@ -43,6 +43,7 @@ import { resolvePath } from '../utils/resolvePath.js';
 import { appEvents } from '../utils/events.js';
 
 import { isWorkspaceTrusted } from './trustedFolders.js';
+import { createPolicyEngineConfig } from './policy.js';
 
 // Simple console logger for now - replace with actual logger if available
 const logger = {
@@ -81,7 +82,6 @@ export interface CliArgs {
   includeDirectories: string[] | undefined;
   screenReader: boolean | undefined;
   useSmartEdit: boolean | undefined;
-  sessionSummary: string | undefined;
   promptWords: string[] | undefined;
   outputFormat: string | undefined;
 }
@@ -232,11 +232,8 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
           description: 'Enable screen reader mode for accessibility.',
           default: false,
         })
-        .option('session-summary', {
-          type: 'string',
-          description: 'File to write session summary to.',
-        })
         .option('output-format', {
+          alias: 'o',
           type: 'string',
           description: 'The format of the CLI output.',
           choices: ['text', 'json'],
@@ -493,6 +490,8 @@ export async function loadCliConfig(
     approvalMode = ApprovalMode.DEFAULT;
   }
 
+  const policyEngineConfig = createPolicyEngineConfig(settings, approvalMode);
+
   const interactive =
     !!argv.promptInteractive || (process.stdin.isTTY && question.length === 0);
   // In non-interactive mode, exclude tools that require a prompt.
@@ -578,6 +577,7 @@ export async function loadCliConfig(
     fullContext: argv.allFiles || false,
     coreTools: settings.tools?.core || undefined,
     allowedTools: argv.allowedTools || settings.tools?.allowed || undefined,
+    policyEngineConfig,
     excludeTools,
     toolDiscoveryCommand: settings.tools?.discoveryCommand,
     toolCallCommand: settings.tools?.callCommand,
@@ -607,6 +607,7 @@ export async function loadCliConfig(
       ),
       logPrompts: argv.telemetryLogPrompts ?? settings.telemetry?.logPrompts,
       outfile: argv.telemetryOutfile ?? settings.telemetry?.outfile,
+      useCollector: settings.telemetry?.useCollector,
     },
     usageStatisticsEnabled: settings.privacy?.usageStatisticsEnabled ?? true,
     fileFiltering: settings.context?.fileFiltering,
@@ -636,7 +637,7 @@ export async function loadCliConfig(
     interactive,
     trustedFolder,
     useRipgrep: settings.tools?.useRipgrep,
-    shouldUseNodePtyShell: settings.tools?.usePty,
+    shouldUseNodePtyShell: settings.tools?.shell?.enableInteractiveShell,
     skipNextSpeakerCheck: settings.model?.skipNextSpeakerCheck,
     enablePromptCompletion: settings.general?.enablePromptCompletion ?? false,
     truncateToolOutputThreshold: settings.tools?.truncateToolOutputThreshold,

@@ -549,7 +549,13 @@ describe('useSlashCompletion', () => {
 
       await waitFor(() => {
         expect(mockCompletionFn).toHaveBeenCalledWith(
-          mockCommandContext,
+          expect.objectContaining({
+            invocation: {
+              raw: '/chat resume my-ch',
+              name: 'resume',
+              args: 'my-ch',
+            },
+          }),
           'my-ch',
         );
       });
@@ -591,7 +597,16 @@ describe('useSlashCompletion', () => {
       );
 
       await waitFor(() => {
-        expect(mockCompletionFn).toHaveBeenCalledWith(mockCommandContext, '');
+        expect(mockCompletionFn).toHaveBeenCalledWith(
+          expect.objectContaining({
+            invocation: {
+              raw: '/chat resume',
+              name: 'resume',
+              args: '',
+            },
+          }),
+          '',
+        );
       });
 
       await waitFor(() => {

@@ -13,7 +13,12 @@ import {
 import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
-import express, { type Request, type Response } from 'express';
+import express, {
+  type Request,
+  type Response,
+  type NextFunction,
+} from 'express';
+import cors from 'cors';
 import { randomUUID } from 'node:crypto';
 import { type Server as HTTPServer } from 'node:http';
 import * as path from 'node:path';
@@ -23,17 +28,34 @@ import type { z } from 'zod';
 import type { DiffManager } from './diff-manager.js';
 import { OpenFilesManager } from './open-files-manager.js';
 
+class CORSError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'CORSError';
+  }
+}
+
 const MCP_SESSION_ID_HEADER = 'mcp-session-id';
 const IDE_SERVER_PORT_ENV_VAR = 'GEMINI_CLI_IDE_SERVER_PORT';
 const IDE_WORKSPACE_PATH_ENV_VAR = 'GEMINI_CLI_IDE_WORKSPACE_PATH';
 
-async function writePortAndWorkspace(
-  context: vscode.ExtensionContext,
-  port: number,
-  portFile: string,
-  ppidPortFile: string,
-  log: (message: string) => void,
-): Promise<void> {
+interface WritePortAndWorkspaceArgs {
+  context: vscode.ExtensionContext;
+  port: number;
+  portFile: string;
+  ppidPortFile: string;
+  authToken: string;
+  log: (message: string) => void;
+}
+
+async function writePortAndWorkspace({
+  context,
+  port,
+  portFile,
+  ppidPortFile,
+  authToken,
+  log,
+}: WritePortAndWorkspaceArgs): Promise<void> {
   const workspaceFolders = vscode.workspace.workspaceFolders;
   const workspacePath =
     workspaceFolders && workspaceFolders.length > 0
@@ -49,15 +71,22 @@ async function writePortAndWorkspace(
     workspacePath,
   );
 
-  const content = JSON.stringify({ port, workspacePath, ppid: process.ppid });
+  const content = JSON.stringify({
+    port,
+    workspacePath,
+    ppid: process.ppid,
+    authToken,
+  });
 
   log(`Writing port file to: ${portFile}`);
   log(`Writing ppid port file to: ${ppidPortFile}`);
 
   try {
     await Promise.all([
-      fs.writeFile(portFile, content),
-      fs.writeFile(ppidPortFile, content),
+      fs.writeFile(portFile, content).then(() => fs.chmod(portFile, 0o600)),
+      fs
+        .writeFile(ppidPortFile, content)
+        .then(() => fs.chmod(ppidPortFile, 0o600)),
     ]);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -95,6 +124,7 @@ export class IDEServer {
   private portFile: string | undefined;
   private ppidPortFile: string | undefined;
   private port: number | undefined;
+  private authToken: string | undefined;
   private transports: { [sessionId: string]: StreamableHTTPServerTransport } =
     {};
   private openFilesManager: OpenFilesManager | undefined;
@@ -108,10 +138,58 @@ export class IDEServer {
   start(context: vscode.ExtensionContext): Promise<void> {
     return new Promise((resolve) => {
       this.context = context;
+      this.authToken = randomUUID();
       const sessionsWithInitialNotification = new Set<string>();
 
       const app = express();
       app.use(express.json({ limit: '10mb' }));
+
+      app.use(
+        cors({
+          origin: (origin, callback) => {
+            // Only allow non-browser requests with no origin.
+            if (!origin) {
+              return callback(null, true);
+            }
+            return callback(
+              new CORSError('Request denied by CORS policy.'),
+              false,
+            );
+          },
+        }),
+      );
+
+      app.use((req, res, next) => {
+        const host = req.headers.host || '';
+        const allowedHosts = [
+          `localhost:${this.port}`,
+          `127.0.0.1:${this.port}`,
+        ];
+        if (!allowedHosts.includes(host)) {
+          return res.status(403).json({ error: 'Invalid Host header' });
+        }
+        next();
+      });
+
+      app.use((req, res, next) => {
+        const authHeader = req.headers.authorization;
+        if (authHeader) {
+          const parts = authHeader.split(' ');
+          if (parts.length !== 2 || parts[0] !== 'Bearer') {
+            this.log('Malformed Authorization header. Rejecting request.');
+            res.status(401).send('Unauthorized');
+            return;
+          }
+          const token = parts[1];
+          if (token !== this.authToken) {
+            this.log('Invalid auth token provided. Rejecting request.');
+            res.status(401).send('Unauthorized');
+            return;
+          }
+        }
+        next();
+      });
+
       const mcpServer = createMcpServer(this.diffManager);
 
       this.openFilesManager = new OpenFilesManager(context);
@@ -153,7 +231,7 @@ export class IDEServer {
               );
               clearInterval(keepAlive);
             }
-          }, 60000); // 60 sec
+          }, 30000); // 30 sec
 
           transport.onclose = () => {
             clearInterval(keepAlive);
@@ -236,7 +314,15 @@ export class IDEServer {
 
       app.get('/mcp', handleSessionRequest);
 
-      this.server = app.listen(0, async () => {
+      app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
+        if (err instanceof CORSError) {
+          res.status(403).json({ error: 'Request denied by CORS policy.' });
+        } else {
+          next(err);
+        }
+      });
+
+      this.server = app.listen(0, '127.0.0.1', async () => {
         const address = (this.server as HTTPServer).address();
         if (address && typeof address !== 'string') {
           this.port = address.port;
@@ -248,15 +334,18 @@ export class IDEServer {
             os.tmpdir(),
             `gemini-ide-server-${process.ppid}.json`,
           );
-          this.log(`IDE server listening on port ${this.port}`);
+          this.log(`IDE server listening on http://127.0.0.1:${this.port}`);
 
-          await writePortAndWorkspace(
-            context,
-            this.port,
-            this.portFile,
-            this.ppidPortFile,
-            this.log,
-          );
+          if (this.authToken) {
+            await writePortAndWorkspace({
+              context,
+              port: this.port,
+              portFile: this.portFile,
+              ppidPortFile: this.ppidPortFile,
+              authToken: this.authToken,
+              log: this.log,
+            });
+          }
         }
         resolve();
       });
@@ -282,15 +371,17 @@ export class IDEServer {
       this.server &&
       this.port &&
       this.portFile &&
-      this.ppidPortFile
+      this.ppidPortFile &&
+      this.authToken
     ) {
-      await writePortAndWorkspace(
-        this.context,
-        this.port,
-        this.portFile,
-        this.ppidPortFile,
-        this.log,
-      );
+      await writePortAndWorkspace({
+        context: this.context,
+        port: this.port,
+        portFile: this.portFile,
+        ppidPortFile: this.ppidPortFile,
+        authToken: this.authToken,
+        log: this.log,
+      });
       this.broadcastIdeContextUpdate();
     }
   }
