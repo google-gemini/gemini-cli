@@ -179,8 +179,12 @@ export const useSlashCommandProcessor = (
     },
     [addItem],
   );
-  const commandContext = useMemo(
-    (): CommandContext => ({
+  // Create command context factory that accepts signal as argument
+  const createCommandContext = useCallback(
+    (
+      signal: AbortSignal,
+    ): Omit<CommandContext, 'invocation' | 'overwriteConfirmed'> => ({
+      signal,
       services: {
         config,
         settings,
@@ -278,6 +282,7 @@ export const useSlashCommandProcessor = (
   const handleSlashCommand = useCallback(
     async (
       rawQuery: PartListUnion,
+      signal: AbortSignal,
       oneTimeShellAllowlist?: Set<string>,
       overwriteConfirmed?: boolean,
     ): Promise<SlashCommandProcessorResult | false> => {
@@ -311,7 +316,7 @@ export const useSlashCommandProcessor = (
         if (commandToExecute) {
           if (commandToExecute.action) {
             const fullCommandContext: CommandContext = {
-              ...commandContext,
+              ...createCommandContext(signal),
               invocation: {
                 raw: trimmed,
                 name: commandToExecute.name,
@@ -436,6 +441,7 @@ export const useSlashCommandProcessor = (
 
                   return await handleSlashCommand(
                     result.originalInvocation.raw,
+                    signal,
                     // Pass the approved commands as a one-time grant for this execution.
                     new Set(approvedCommands),
                   );
@@ -466,6 +472,7 @@ export const useSlashCommandProcessor = (
 
                   return await handleSlashCommand(
                     result.originalInvocation.raw,
+                    signal,
                     undefined,
                     true,
                   );
@@ -535,7 +542,7 @@ export const useSlashCommandProcessor = (
       addItem,
       actions,
       commands,
-      commandContext,
+      createCommandContext,
       addMessage,
       setShellConfirmationRequest,
       setSessionShellAllowlist,
@@ -544,11 +551,23 @@ export const useSlashCommandProcessor = (
     ],
   );
 
+  // Create a dummy CommandContext for components that need the full interface
+  // The signal will always be provided when actually used in handleSlashCommand
+  const dummyCommandContext: CommandContext = {
+    ...createCommandContext(new AbortController().signal), // Dummy signal, never used
+    invocation: {
+      raw: '',
+      name: '',
+      args: '',
+    },
+    overwriteConfirmed: false,
+  };
+
   return {
     handleSlashCommand,
     slashCommands: commands,
     pendingHistoryItems,
-    commandContext,
+    commandContext: dummyCommandContext,
     shellConfirmationRequest,
     confirmationRequest,
   };
