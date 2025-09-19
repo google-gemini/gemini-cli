@@ -186,11 +186,34 @@ ${hasConflicts ? '4' : '3'}. You'll receive updates here when the release comple
       } else if (hasGitHubCli) {
         // Find the actual PR for the new branch using gh CLI
         try {
-          const { execSync } = await import('node:child_process');
-          const prListOutput = execSync(
-            `gh pr list --head ${branch} --state open --json number,title,url --limit 1`,
+          const { spawnSync } = await import('node:child_process');
+          const result = spawnSync(
+            'gh',
+            [
+              'pr',
+              'list',
+              '--head',
+              branch,
+              '--state',
+              'open',
+              '--json',
+              'number,title,url',
+              '--limit',
+              '1',
+            ],
             { encoding: 'utf8' },
           );
+
+          if (result.error) {
+            throw result.error;
+          }
+          if (result.status !== 0) {
+            throw new Error(
+              `gh pr list failed with status ${result.status}: ${result.stderr}`,
+            );
+          }
+
+          const prListOutput = result.stdout;
 
           const prList = JSON.parse(prListOutput);
 
@@ -271,7 +294,7 @@ No output was generated during patch creation.
     console.log('----------------------------------------');
     console.log('\n✅ Comment generation working correctly!');
   } else if (hasGitHubCli) {
-    const { execSync } = await import('node:child_process');
+    const { spawnSync } = await import('node:child_process');
     const { writeFileSync, unlinkSync } = await import('node:fs');
     const { join } = await import('node:path');
 
@@ -280,9 +303,21 @@ No output was generated during patch creation.
     writeFileSync(tmpFile, commentBody);
 
     try {
-      execSync(`gh pr comment ${originalPr} --body-file "${tmpFile}"`, {
-        stdio: 'inherit',
-      });
+      const result = spawnSync(
+        'gh',
+        ['pr', 'comment', originalPr.toString(), '--body-file', tmpFile],
+        {
+          stdio: 'inherit',
+        },
+      );
+
+      if (result.error) {
+        throw result.error;
+      }
+      if (result.status !== 0) {
+        throw new Error(`gh pr comment failed with status ${result.status}`);
+      }
+
       console.log(`Successfully commented on PR ${originalPr}`);
     } finally {
       // Clean up temp file
