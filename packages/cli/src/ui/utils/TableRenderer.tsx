@@ -30,6 +30,8 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
     const maxRowWidth = Math.max(
       ...rows.map((row) => getPlainTextLength(row[index] || '')),
     );
+
+    // Use the square root of the content length to calculate column widths, preventing excessive width differences between cells.
     return Math.pow(Math.max(headerWidth, maxRowWidth, 10), 0.5);
   });
 
@@ -61,6 +63,7 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
         borderRight={false}
         borderBottom={false}
         borderLeft={index === 0 ? false : true}
+        key={index}
       >
         {isHeader ? (
           <Text bold color={theme.text.link}>
@@ -80,7 +83,7 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
       return renderCell(cell || '', width, isHeader, index);
     });
 
-    return <Box>{renderedCells.map((cell, index) => cell)}</Box>;
+    return <Box>{renderedCells.map((cell) => cell)}</Box>;
   };
 
   return (
