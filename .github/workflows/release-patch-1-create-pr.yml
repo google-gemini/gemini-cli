@@ -68,64 +68,44 @@ jobs:
           # Configure git to use GITHUB_TOKEN for remote operations (has actions:write for workflow files)
           git remote set-url origin "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git"
 
-      - name: 'Create Branches'
-        id: 'create_branches'
+      - name: 'Create Patch'
+        id: 'create_patch'
         env:
           GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
-          GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
-        continue-on-error: true
-        run: |
-          # Capture output and display it in logs using tee
-          {
-            node scripts/releasing/create-patch-pr.js --commit=${{ github.event.inputs.commit }} --channel=${{ github.event.inputs.channel }} --dry-run=${{ github.event.inputs.dry_run }} --skip-pr-creation
-            echo "BRANCH_EXIT_CODE=$?" >> "$GITHUB_OUTPUT"
-          } 2>&1 | tee >(
-            echo "BRANCH_LOG_CONTENT<<EOF" >> "$GITHUB_ENV"
-            cat >> "$GITHUB_ENV"
-            echo "EOF" >> "$GITHUB_ENV"
-          )
-
-      - name: 'Create Pull Request'
-        id: 'create_pr'
-        if: 'always() && steps.create_branches.outputs.BRANCH_EXIT_CODE == 0'
-        env:
           GH_TOKEN: '${{ steps.generate_token.outputs.token }}'
         continue-on-error: true
         run: |
           # Capture output and display it in logs using tee
           {
-            node scripts/releasing/create-patch-pr.js --commit=${{ github.event.inputs.commit }} --channel=${{ github.event.inputs.channel }} --dry-run=${{ github.event.inputs.dry_run }} --pr-only
-            echo "PR_EXIT_CODE=$?" >> "$GITHUB_OUTPUT"
+            node scripts/releasing/create-patch-pr.js --commit=${{ github.event.inputs.commit }} --channel=${{ github.event.inputs.channel }} --dry-run=${{ github.event.inputs.dry_run }}
+            EXIT_CODE=$?
+            echo "EXIT_CODE=$EXIT_CODE" >> "$GITHUB_OUTPUT"
+            exit $EXIT_CODE
           } 2>&1 | tee >(
-            echo "PR_LOG_CONTENT<<EOF" >> "$GITHUB_ENV"
+            echo "LOG_CONTENT<<EOF" >> "$GITHUB_ENV"
             cat >> "$GITHUB_ENV"
             echo "EOF" >> "$GITHUB_ENV"
           )
 
       - name: 'Comment on Original PR'
-        if: 'always() && inputs.original_pr'
+        if: 'always() && github.event.inputs.original_pr'
         env:
           GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
           ORIGINAL_PR: '${{ github.event.inputs.original_pr }}'
-          EXIT_CODE: '${{ steps.create_branches.outputs.BRANCH_EXIT_CODE != 0 && steps.create_branches.outputs.BRANCH_EXIT_CODE || steps.create_pr.outputs.PR_EXIT_CODE }}'
+          EXIT_CODE: '${{ steps.create_patch.outputs.EXIT_CODE }}'
           COMMIT: '${{ github.event.inputs.commit }}'
           CHANNEL: '${{ github.event.inputs.channel }}'
           REPOSITORY: '${{ github.repository }}'
           GITHUB_RUN_ID: '${{ github.run_id }}'
-          LOG_CONTENT: '${{ steps.create_branches.outputs.BRANCH_EXIT_CODE != 0 && env.BRANCH_LOG_CONTENT || env.PR_LOG_CONTENT }}'
+          LOG_CONTENT: '${{ env.LOG_CONTENT }}'
         continue-on-error: true
         run: |
           git checkout '${{ github.event.inputs.ref }}'
           node scripts/releasing/patch-create-comment.js
 
-      - name: 'Fail Workflow if Tasks Failed'
-        if: 'always() && (steps.create_branches.outputs.BRANCH_EXIT_CODE != 0 || steps.create_pr.outputs.PR_EXIT_CODE != 0)'
+      - name: 'Fail Workflow if Main Task Failed'
+        if: 'always() && steps.create_patch.outputs.EXIT_CODE != 0'
         run: |
-          if [[ "${{ steps.create_branches.outputs.BRANCH_EXIT_CODE }}" != "0" ]]; then
-            echo "Branch creation failed with exit code: ${{ steps.create_branches.outputs.BRANCH_EXIT_CODE }}"
-          fi
-          if [[ "${{ steps.create_pr.outputs.PR_EXIT_CODE }}" != "0" ]]; then
-            echo "PR creation failed with exit code: ${{ steps.create_pr.outputs.PR_EXIT_CODE }}"
-          fi
+          echo "Patch creation failed with exit code: ${{ steps.create_patch.outputs.EXIT_CODE }}"
           echo "Check the logs above and the comment posted to the original PR for details."
           exit 1

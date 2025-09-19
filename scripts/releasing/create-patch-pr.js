@@ -95,7 +95,9 @@ async function main() {
     console.log(
       `Release branch ${releaseBranch} does not exist. Creating it from tag ${latestTag}...`,
     );
-    run(`git checkout -b ${releaseBranch} ${latestTag}`, dryRun);
+    // Workaround for workflow permission issues: create branch from HEAD then reset to tag
+    run(`git checkout -b ${releaseBranch}`, dryRun);
+    run(`git reset --hard ${latestTag}`, dryRun);
     run(`git push origin ${releaseBranch}`, dryRun);
   } else {
     console.log(`Release branch ${releaseBranch} already exists.`);
