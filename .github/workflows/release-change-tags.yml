@@ -8,14 +8,19 @@ on:
         required: true
         type: 'string'
       channel:
-        description: 'The npm dist-tag to apply (e.g., preview, stable).'
+        description: 'The npm dist-tag to apply (e.g., latest, preview, nightly).'
         required: true
         type: 'choice'
         options:
-          - 'stable'
+          - 'latest'
           - 'preview'
           - 'nightly'
-      dry_run:
+      ref:
+        description: 'The branch, tag, or SHA to run from.'
+        required: false
+        type: 'string'
+        default: 'main'
+      dry-run:
         description: 'Whether to run in dry-run mode.'
         required: false
         type: 'boolean'
@@ -28,6 +33,12 @@ jobs:
       packages: 'write'
       issues: 'write'
     steps:
+      - name: 'Checkout repository'
+        uses: 'actions/checkout@v4'
+        with:
+          ref: '${{ github.event.inputs.ref }}'
+          fetch-depth: 0
+
       - name: 'Setup Node.js'
         uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020'
         with:
@@ -36,20 +47,23 @@ jobs:
           scope: '@google'
 
       - name: 'Change tag for @google/gemini-cli-core'
-        if: 'github.event.inputs.dry_run == false'
+        if: |-
+          ${{ github.event.inputs.dry-run == 'false' }}
         env:
           NODE_AUTH_TOKEN: '${{ secrets.WOMBAT_TOKEN_CORE }}'
         run: |
           npm dist-tag add @google/gemini-cli-core@${{ github.event.inputs.version }} ${{ github.event.inputs.channel }}
 
       - name: 'Change tag for @google/gemini-cli'
-        if: 'github.event.inputs.dry_run == false'
+        if: |-
+          ${{ github.event.inputs.dry-run == 'false' }}
         env:
           NODE_AUTH_TOKEN: '${{ secrets.WOMBAT_TOKEN_CLI }}'
         run: |
           npm dist-tag add @google/gemini-cli@${{ github.event.inputs.version }} ${{ github.event.inputs.channel }}
 
       - name: 'Log dry run'
-        if: 'github.event.inputs.dry_run == true'
+        if: |-
+          ${{ github.event.inputs.dry-run == 'true' }}
         run: |
           echo "Dry run: Would have added tag '${{ github.event.inputs.channel }}' to version '${{ github.event.inputs.version }}' for @google/gemini-cli and @google/gemini-cli-core."
