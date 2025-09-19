@@ -51,6 +51,15 @@ jobs:
       - name: 'Install Dependencies'
         run: 'npm ci'
 
+      - name: 'Generate GitHub App Token'
+        id: 'generate_token'
+        uses: 'actions/create-github-app-token@a8d616148505b5069dccd32f177bb87d7f39123b'
+        with:
+          app-id: '${{ secrets.APP_ID }}'
+          private-key: '${{ secrets.PRIVATE_KEY }}'
+          permission-pull-requests: 'write'
+          permission-contents: 'write'
+
       - name: 'Configure Git User'
         run: |-
           git config user.name "gemini-cli-robot"
@@ -59,7 +68,7 @@ jobs:
       - name: 'Create Patch'
         id: 'create_patch'
         env:
-          GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+          GH_TOKEN: '${{ steps.generate_token.outputs.token }}'
         continue-on-error: true
         run: |
           # Capture output directly to environment variable
