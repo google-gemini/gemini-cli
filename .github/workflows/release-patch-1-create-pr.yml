@@ -24,6 +24,10 @@ on:
         required: false
         type: 'string'
         default: 'main'
+      original_pr:
+        description: 'The original PR number to comment back on.'
+        required: false
+        type: 'string'
 
 jobs:
   create-patch:
@@ -61,13 +65,32 @@ jobs:
           permission-pull-requests: 'write'
           permission-contents: 'write'
 
-      - name: 'Create Patch for Stable'
-        if: "github.event.inputs.channel == 'stable'"
+      - name: 'Create Patch'
+        id: 'create_patch'
         env:
           GH_TOKEN: '${{ steps.generate_token.outputs.token }}'
-        run: 'node scripts/create-patch-pr.js --commit=${{ github.event.inputs.commit }} --channel=stable --dry-run=${{ github.event.inputs.dry_run }}'
+        continue-on-error: true
+        run: |
+          # Capture output directly to environment variable
+          {
+            node scripts/releasing/create-patch-pr.js --commit=${{ github.event.inputs.commit }} --channel=${{ github.event.inputs.channel }} --dry-run=${{ github.event.inputs.dry_run }}
+            echo "EXIT_CODE=$?" >> "$GITHUB_OUTPUT"
+          } 2>&1 | {
+            echo "LOG_CONTENT<<EOF" >> "$GITHUB_ENV"
+            cat >> "$GITHUB_ENV"
+            echo "EOF" >> "$GITHUB_ENV"
+          }
 
-      - name: 'Create Patch for Preview'
+      - name: 'Comment on Original PR'
+        if: '!inputs.dry_run && inputs.original_pr'
         env:
           GH_TOKEN: '${{ steps.generate_token.outputs.token }}'
-        run: 'node scripts/create-patch-pr.js --commit=${{ github.event.inputs.commit }} --channel=${{ github.event.inputs.channel }} --dry-run=${{ github.event.inputs.dry_run }}'
+          ORIGINAL_PR: '${{ github.event.inputs.original_pr }}'
+          EXIT_CODE: '${{ steps.create_patch.outputs.EXIT_CODE }}'
+          COMMIT: '${{ github.event.inputs.commit }}'
+          CHANNEL: '${{ github.event.inputs.channel }}'
+          REPOSITORY: '${{ github.repository }}'
+          GITHUB_RUN_ID: '${{ github.run_id }}'
+        run: |
+          git checkout '${{ github.event.inputs.ref }}'
+          node scripts/releasing/patch-create-comment.js

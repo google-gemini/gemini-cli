@@ -12,5 +12,6 @@
   },
   "[javascript]": {
     "editor.defaultFormatter": "esbenp.prettier-vscode"
-  }
+  },
+  "vitest.disableWorkspaceWarning": true
 }

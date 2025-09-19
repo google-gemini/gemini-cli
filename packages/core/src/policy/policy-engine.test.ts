@@ -217,6 +217,75 @@ describe('PolicyEngine', () => {
     });
   });
 
+  describe('MCP server wildcard patterns', () => {
+    it('should match MCP server wildcard patterns', () => {
+      const rules: PolicyRule[] = [
+        {
+          toolName: 'my-server__*',
+          decision: PolicyDecision.ALLOW,
+          priority: 10,
+        },
+        {
+          toolName: 'blocked-server__*',
+          decision: PolicyDecision.DENY,
+          priority: 20,
+        },
+      ];
+
+      engine = new PolicyEngine({ rules });
+
+      // Should match my-server tools
+      expect(engine.check({ name: 'my-server__tool1' })).toBe(
+        PolicyDecision.ALLOW,
+      );
+      expect(engine.check({ name: 'my-server__another_tool' })).toBe(
+        PolicyDecision.ALLOW,
+      );
+
+      // Should match blocked-server tools
+      expect(engine.check({ name: 'blocked-server__tool1' })).toBe(
+        PolicyDecision.DENY,
+      );
+      expect(engine.check({ name: 'blocked-server__dangerous' })).toBe(
+        PolicyDecision.DENY,
+      );
+
+      // Should not match other patterns
+      expect(engine.check({ name: 'other-server__tool' })).toBe(
+        PolicyDecision.ASK_USER,
+      );
+      expect(engine.check({ name: 'my-server-tool' })).toBe(
+        PolicyDecision.ASK_USER,
+      ); // No __ separator
+      expect(engine.check({ name: 'my-server' })).toBe(PolicyDecision.ASK_USER); // No tool name
+    });
+
+    it('should prioritize specific tool rules over server wildcards', () => {
+      const rules: PolicyRule[] = [
+        {
+          toolName: 'my-server__*',
+          decision: PolicyDecision.ALLOW,
+          priority: 10,
+        },
+        {
+          toolName: 'my-server__dangerous-tool',
+          decision: PolicyDecision.DENY,
+          priority: 20,
+        },
+      ];
+
+      engine = new PolicyEngine({ rules });
+
+      // Specific tool deny should override server allow
+      expect(engine.check({ name: 'my-server__dangerous-tool' })).toBe(
+        PolicyDecision.DENY,
+      );
+      expect(engine.check({ name: 'my-server__safe-tool' })).toBe(
+        PolicyDecision.ALLOW,
+      );
+    });
+  });
+
   describe('complex scenarios', () => {
     it('should handle multiple matching rules with different priorities', () => {
       const rules: PolicyRule[] = [

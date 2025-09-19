@@ -7,12 +7,33 @@ on:
 jobs:
   slash-command:
     runs-on: 'ubuntu-latest'
+    # Only run if the comment is from a human user (not automated)
+    if: "github.event.comment.user.type == 'User' && github.event.comment.user.login != 'github-actions[bot]'"
+    permissions:
+      contents: 'write'
+      pull-requests: 'write'
+      actions: 'write'
     steps:
+      - name: 'Checkout'
+        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
+        with:
+          fetch-depth: 1
+
+      - name: 'Generate GitHub App Token'
+        id: 'generate_token'
+        uses: 'actions/create-github-app-token@a8d616148505b5069dccd32f177bb87d7f39123b'
+        with:
+          app-id: '${{ secrets.APP_ID }}'
+          private-key: '${{ secrets.PRIVATE_KEY }}'
+          permission-pull-requests: 'write'
+          permission-contents: 'write'
+          permission-actions: 'write'
+
       - name: 'Slash Command Dispatch'
         id: 'slash_command'
         uses: 'peter-evans/slash-command-dispatch@40877f718dce0101edfc7aea2b3800cc192f9ed5'
         with:
-          token: '${{ secrets.GITHUB_TOKEN }}'
+          token: '${{ steps.generate_token.outputs.token }}'
           commands: 'patch'
           permission: 'write'
           issue-type: 'pull-request'
@@ -21,9 +42,9 @@ jobs:
 
       - name: 'Get PR Status'
         id: 'pr_status'
-        if: "steps.slash_command.outputs.dispatched == 'true'"
+        if: "startsWith(github.event.comment.body, '/patch')"
         env:
-          GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+          GH_TOKEN: '${{ steps.generate_token.outputs.token }}'
         run: |
           gh pr view "${{ github.event.issue.number }}" --json mergeCommit,state > pr_status.json
           echo "MERGE_COMMIT_SHA=$(jq -r .mergeCommit.oid pr_status.json)" >> "$GITHUB_OUTPUT"
@@ -31,26 +52,132 @@ jobs:
 
       - name: 'Dispatch if Merged'
         if: "steps.pr_status.outputs.STATE == 'MERGED'"
+        id: 'dispatch_patch'
         uses: 'actions/github-script@00f12e3e20659f42342b1c0226afda7f7c042325'
+        env:
+          COMMENT_BODY: '${{ github.event.comment.body }}'
         with:
           script: |
-            const args = JSON.parse('${{ steps.slash_command.outputs.command-arguments }}');
-            github.rest.actions.createWorkflowDispatch({
+            // Parse the comment body directly to extract channel
+            const commentBody = process.env.COMMENT_BODY;
+            console.log('Comment body:', commentBody);
+
+            let channel = 'stable';  // default
+
+            // Parse different formats:
+            // /patch channel=preview
+            // /patch --channel preview
+            // /patch preview
+            if (commentBody.includes('channel=preview')) {
+              channel = 'preview';
+            } else if (commentBody.includes('--channel preview')) {
+              channel = 'preview';
+            } else if (commentBody.trim() === '/patch preview') {
+              channel = 'preview';
+            }
+
+            // Validate channel
+            if (channel !== 'stable' && channel !== 'preview') {
+              throw new Error(`Invalid channel: ${channel}. Must be 'stable' or 'preview'.`);
+            }
+
+            console.log('Detected channel:', channel);
+
+            const response = await github.rest.actions.createWorkflowDispatch({
               owner: context.repo.owner,
               repo: context.repo.repo,
               workflow_id: 'release-patch-1-create-pr.yml',
               ref: 'main',
               inputs: {
                 commit: '${{ steps.pr_status.outputs.MERGE_COMMIT_SHA }}',
-                channel: args.channel,
-                dry_run: args.dry_run
+                channel: channel,
+                dry_run: 'false',
+                original_pr: '${{ github.event.issue.number }}'
               }
-            })
+            });
+
+            // Wait a moment for the workflow to be created, then find it
+            await new Promise(resolve => setTimeout(resolve, 2000));
+
+            const runs = await github.rest.actions.listWorkflowRuns({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'release-patch-1-create-pr.yml',
+              per_page: 10
+            });
+
+            // Find the most recent run that matches our trigger
+            const dispatchedRun = runs.data.workflow_runs.find(run =>
+              run.event === 'workflow_dispatch' &&
+              new Date(run.created_at) > new Date(Date.now() - 10000) // Within last 10 seconds
+            );
+
+            if (dispatchedRun) {
+              core.setOutput('dispatched_run_id', dispatchedRun.id);
+              core.setOutput('dispatched_run_url', dispatchedRun.html_url);
+            }
+
+            core.setOutput('channel', channel);
 
       - name: 'Comment on Failure'
-        if: "steps.pr_status.outputs.STATE != 'MERGED'"
+        if: "startsWith(github.event.comment.body, '/patch') && steps.pr_status.outputs.STATE != 'MERGED'"
         uses: 'peter-evans/create-or-update-comment@67dcc547d311b736a8e6c5c236542148a47adc3d'
         with:
+          token: '${{ steps.generate_token.outputs.token }}'
           issue-number: '${{ github.event.issue.number }}'
           body: |
             :x: The `/patch` command failed. This pull request must be merged before a patch can be created.
+
+      - name: 'Final Status Comment - Success'
+        if: "always() && startsWith(github.event.comment.body, '/patch') && steps.dispatch_patch.outcome == 'success' && steps.dispatch_patch.outputs.dispatched_run_url"
+        uses: 'peter-evans/create-or-update-comment@67dcc547d311b736a8e6c5c236542148a47adc3d'
+        with:
+          token: '${{ steps.generate_token.outputs.token }}'
+          issue-number: '${{ github.event.issue.number }}'
+          body: |
+            ✅ **Patch workflow dispatched successfully!**
+
+            **📋 Details:**
+            - **Channel**: `${{ steps.dispatch_patch.outputs.channel }}`
+            - **Commit**: `${{ steps.pr_status.outputs.MERGE_COMMIT_SHA }}`
+
+            **🔗 Track Progress:**
+            - [Dispatched patch workflow](${{ steps.dispatch_patch.outputs.dispatched_run_url }})
+            - [This workflow run](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
+
+      - name: 'Final Status Comment - Dispatch Success (No URL)'
+        if: "always() && startsWith(github.event.comment.body, '/patch') && steps.dispatch_patch.outcome == 'success' && !steps.dispatch_patch.outputs.dispatched_run_url"
+        uses: 'peter-evans/create-or-update-comment@67dcc547d311b736a8e6c5c236542148a47adc3d'
+        with:
+          token: '${{ steps.generate_token.outputs.token }}'
+          issue-number: '${{ github.event.issue.number }}'
+          body: |
+            ✅ **Patch workflow dispatched successfully!**
+
+            **📋 Details:**
+            - **Channel**: `${{ steps.dispatch_patch.outputs.channel }}`
+            - **Commit**: `${{ steps.pr_status.outputs.MERGE_COMMIT_SHA }}`
+
+            **🔗 Track Progress:**
+            - [View patch workflows](https://github.com/${{ github.repository }}/actions/workflows/release-patch-1-create-pr.yml)
+            - [This workflow run](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
+
+      - name: 'Final Status Comment - Failure'
+        if: "always() && startsWith(github.event.comment.body, '/patch') && (steps.dispatch_patch.outcome == 'failure' || steps.dispatch_patch.outcome == 'cancelled')"
+        uses: 'peter-evans/create-or-update-comment@67dcc547d311b736a8e6c5c236542148a47adc3d'
+        with:
+          token: '${{ steps.generate_token.outputs.token }}'
+          issue-number: '${{ github.event.issue.number }}'
+          body: |
+            ❌ **Patch workflow dispatch failed!**
+
+            There was an error dispatching the patch creation workflow.
+
+            **🔍 Troubleshooting:**
+            - Check that the PR is properly merged
+            - Verify workflow permissions
+            - Review error logs in the workflow run
+
+            **🔗 Debug Links:**
+            - [This workflow run](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
+            - [Patch workflow history](https://github.com/${{ github.repository }}/actions/workflows/release-patch-1-create-pr.yml)

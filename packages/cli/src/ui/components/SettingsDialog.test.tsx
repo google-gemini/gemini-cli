@@ -1263,7 +1263,7 @@ describe('SettingsDialog', () => {
           },
         },
         tools: {
-          usePty: true,
+          enableInteractiveShell: true,
           autoAccept: true,
           useRipgrep: true,
         },
@@ -1376,7 +1376,7 @@ describe('SettingsDialog', () => {
           },
           tools: {
             useRipgrep: true,
-            usePty: false,
+            enableInteractiveShell: false,
           },
         },
       );
@@ -1450,7 +1450,7 @@ describe('SettingsDialog', () => {
     it('should render with tools and security settings', () => {
       const settings = createMockSettings({
         tools: {
-          usePty: true,
+          enableInteractiveShell: true,
           autoAccept: false,
           useRipgrep: true,
           truncateToolOutputThreshold: 25000,
@@ -1509,7 +1509,7 @@ describe('SettingsDialog', () => {
           },
         },
         tools: {
-          usePty: false,
+          enableInteractiveShell: false,
           autoAccept: false,
           useRipgrep: false,
         },
