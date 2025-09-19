@@ -4,6 +4,8 @@ on:
   pull_request:
     types:
       - 'closed'
+    branches:
+      - 'release/**'
   workflow_dispatch:
     inputs:
       ref:
