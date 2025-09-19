@@ -18,10 +18,12 @@ import { resourceFromAttributes } from '@opentelemetry/resources';
 import {
   BatchSpanProcessor,
   ConsoleSpanExporter,
+  SimpleSpanProcessor,
 } from '@opentelemetry/sdk-trace-node';
 import {
   BatchLogRecordProcessor,
   ConsoleLogRecordExporter,
+  SimpleLogRecordProcessor,
 } from '@opentelemetry/sdk-logs';
 import {
   ConsoleMetricExporter,
@@ -173,10 +175,18 @@ export function initializeTelemetry(config: Config): void {
     });
   }
 
+  const isInteractive = config.isInteractive();
+  const spanProcessors = isInteractive
+    ? [new BatchSpanProcessor(spanExporter)]
+    : [new SimpleSpanProcessor(spanExporter)];
+  const logRecordProcessors = isInteractive
+    ? [new BatchLogRecordProcessor(logExporter)]
+    : [new SimpleLogRecordProcessor(logExporter)];
+
   sdk = new NodeSDK({
     resource,
-    spanProcessors: [new BatchSpanProcessor(spanExporter)],
-    logRecordProcessors: [new BatchLogRecordProcessor(logExporter)],
+    spanProcessors,
+    logRecordProcessors,
     metricReader,
     instrumentations: [new HttpInstrumentation()],
   });

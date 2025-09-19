@@ -44,6 +44,7 @@ describe('Telemetry SDK', () => {
       getTelemetryOutfile: () => undefined,
       getDebugMode: () => false,
       getSessionId: () => 'test-session',
+      isInteractive: () => false,
     } as unknown as Config;
   });
 
