@@ -19,32 +19,32 @@ jobs:
         with:
           fetch-depth: 1
 
+      - name: 'Generate GitHub App Token'
+        id: 'generate_token'
+        uses: 'actions/create-github-app-token@a8d616148505b5069dccd32f177bb87d7f39123b'
+        with:
+          app-id: '${{ secrets.APP_ID }}'
+          private-key: '${{ secrets.PRIVATE_KEY }}'
+          permission-pull-requests: 'write'
+          permission-contents: 'write'
+          permission-actions: 'write'
+
       - name: 'Slash Command Dispatch'
         id: 'slash_command'
         uses: 'peter-evans/slash-command-dispatch@40877f718dce0101edfc7aea2b3800cc192f9ed5'
         with:
-          token: '${{ secrets.GITHUB_TOKEN }}'
+          token: '${{ steps.generate_token.outputs.token }}'
           commands: 'patch'
           permission: 'write'
           issue-type: 'pull-request'
           static-args: |
             dry_run=false
 
-      - name: 'Acknowledge Patch Command'
-        if: "startsWith(github.event.comment.body, '/patch')"
-        uses: 'peter-evans/create-or-update-comment@67dcc547d311b736a8e6c5c236542148a47adc3d'
-        with:
-          issue-number: '${{ github.event.issue.number }}'
-          body: |
-            👋 Patch command received! Processing...
-
-            You can track the progress here: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
-
       - name: 'Get PR Status'
         id: 'pr_status'
         if: "startsWith(github.event.comment.body, '/patch')"
         env:
-          GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+          GH_TOKEN: '${{ steps.generate_token.outputs.token }}'
         run: |
           gh pr view "${{ github.event.issue.number }}" --json mergeCommit,state > pr_status.json
           echo "MERGE_COMMIT_SHA=$(jq -r .mergeCommit.oid pr_status.json)" >> "$GITHUB_OUTPUT"
@@ -123,6 +123,7 @@ jobs:
         if: "startsWith(github.event.comment.body, '/patch') && steps.pr_status.outputs.STATE != 'MERGED'"
         uses: 'peter-evans/create-or-update-comment@67dcc547d311b736a8e6c5c236542148a47adc3d'
         with:
+          token: '${{ steps.generate_token.outputs.token }}'
           issue-number: '${{ github.event.issue.number }}'
           body: |
             :x: The `/patch` command failed. This pull request must be merged before a patch can be created.
@@ -131,6 +132,7 @@ jobs:
         if: "always() && startsWith(github.event.comment.body, '/patch') && steps.dispatch_patch.outcome == 'success' && steps.dispatch_patch.outputs.dispatched_run_url"
         uses: 'peter-evans/create-or-update-comment@67dcc547d311b736a8e6c5c236542148a47adc3d'
         with:
+          token: '${{ steps.generate_token.outputs.token }}'
           issue-number: '${{ github.event.issue.number }}'
           body: |
             ✅ **Patch workflow dispatched successfully!**
@@ -147,6 +149,7 @@ jobs:
         if: "always() && startsWith(github.event.comment.body, '/patch') && steps.dispatch_patch.outcome == 'success' && !steps.dispatch_patch.outputs.dispatched_run_url"
         uses: 'peter-evans/create-or-update-comment@67dcc547d311b736a8e6c5c236542148a47adc3d'
         with:
+          token: '${{ steps.generate_token.outputs.token }}'
           issue-number: '${{ github.event.issue.number }}'
           body: |
             ✅ **Patch workflow dispatched successfully!**
@@ -163,6 +166,7 @@ jobs:
         if: "always() && startsWith(github.event.comment.body, '/patch') && (steps.dispatch_patch.outcome == 'failure' || steps.dispatch_patch.outcome == 'cancelled')"
         uses: 'peter-evans/create-or-update-comment@67dcc547d311b736a8e6c5c236542148a47adc3d'
         with:
+          token: '${{ steps.generate_token.outputs.token }}'
           issue-number: '${{ github.event.issue.number }}'
           body: |
             ❌ **Patch workflow dispatch failed!**
