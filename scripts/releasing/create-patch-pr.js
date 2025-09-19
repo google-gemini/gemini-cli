@@ -95,8 +95,31 @@ async function main() {
     console.log(
       `Release branch ${releaseBranch} does not exist. Creating it from tag ${latestTag}...`,
     );
-    run(`git checkout -b ${releaseBranch} ${latestTag}`, dryRun);
-    run(`git push origin ${releaseBranch}`, dryRun);
+
+    try {
+      run(`git checkout -b ${releaseBranch} ${latestTag}`, dryRun);
+      run(`git push origin ${releaseBranch}`, dryRun);
+    } catch (error) {
+      console.log(`Failed to push release branch with git (likely due to workflow file permissions): ${error.message}`);
+      console.log(`Attempting to create release branch using GitHub API instead...`);
+
+      if (!dryRun) {
+        try {
+          // Get the tag SHA
+          const tagSha = run(`git rev-parse ${latestTag}`, false);
+
+          // Create branch using GitHub API
+          const repo = process.env.GITHUB_REPOSITORY || 'google-gemini/gemini-cli';
+          const [owner, repoName] = repo.split('/');
+
+          run(`gh api repos/${owner}/${repoName}/git/refs --method POST --field ref="refs/heads/${releaseBranch}" --field sha="${tagSha.trim()}"`, false);
+          console.log(`✅ Successfully created release branch ${releaseBranch} using GitHub API`);
+        } catch (apiError) {
+          console.error(`Failed to create release branch using GitHub API: ${apiError.message}`);
+          throw new Error(`Cannot create release branch ${releaseBranch}. Both git push and GitHub API failed.`);
+        }
+      }
+    }
   } else {
     console.log(`Release branch ${releaseBranch} already exists.`);
   }
