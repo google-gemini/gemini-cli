@@ -20,10 +20,6 @@ import {
   type DescriptiveRadioSelectItem,
 } from './DescriptiveRadioButtonSelect.js';
 
-// --- Mock useKeypress ---
-// We use `vi.hoisted` to create the mock function and its state
-// so they can be safely accessed by `vi.mock` (which is hoisted)
-// and by the test's helper functions.
 const { mockUseKeypress, state } = vi.hoisted(() => {
   const state: {
     keypressHandler: (key: { sequence: string; name: string }) => void;
@@ -41,13 +37,10 @@ const { mockUseKeypress, state } = vi.hoisted(() => {
   return { mockUseKeypress, state };
 });
 
-// Mock the hook's module, providing the hoisted mock function
 vi.mock('../../hooks/useKeypress.js', () => ({
   useKeypress: mockUseKeypress,
 }));
 
-// Helper to simulate a keypress
-// This now safely reads from the hoisted `state` object
 const pressKey = async (key: { sequence: string; name: string }) => {
   if (state.hookOptions.isActive) {
     await act(async () => {
@@ -55,7 +48,6 @@ const pressKey = async (key: { sequence: string; name: string }) => {
     });
   }
 };
-// --- End Mock ---
 
 const testItems: Array<DescriptiveRadioSelectItem<string>> = [
   { value: 'foo', title: 'Foo', description: 'This is Foo.' },
@@ -70,18 +62,17 @@ describe('DescriptiveRadioButtonSelect', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.clearAllMocks();
-    // Reset mock state before each test
     state.keypressHandler = () => {};
     state.hookOptions = {};
   });
 
   afterEach(() => {
     vi.useRealTimers();
-    cleanup(); // Cleans up the Ink renderer
+    cleanup();
   });
 
   afterAll(() => {
-    vi.restoreAllMocks(); // Restore original module
+    vi.restoreAllMocks();
   });
 
   it('renders all items with titles and descriptions', () => {
@@ -125,12 +116,9 @@ describe('DescriptiveRadioButtonSelect', () => {
     // Item 1 (Bar) is lines 3-5
     // Item 2 (Baz) is lines 6-8
 
-    // Item 0 (Foo) should be unselected
     expect(lines[0]).toContain('  '); // 2 spaces for '●'
     expect(lines[0]).not.toContain('●');
-    // Item 1 (Bar) should be selected
     expect(lines[3]).toContain('●');
-    // Item 2 (Baz) should be unselected
     expect(lines[6]).toContain('  ');
     expect(lines[6]).not.toContain('●');
   });
@@ -181,32 +169,26 @@ describe('DescriptiveRadioButtonSelect', () => {
         />,
       );
 
-      // Initial state (index 0)
       let output = lastFrame();
       expect(output).toBeDefined();
       if (!output) return;
 
-      // Item 0 (Foo) on line 0
       expect(output.split('\n')[0]).toContain('●');
       expect(onHighlight).not.toHaveBeenCalled();
 
-      // Press 'j'
       await pressKey({ name: 'j', sequence: 'j' });
       output = lastFrame();
       expect(output).toBeDefined();
       if (!output) return;
 
-      // Item 1 (Bar) on line 3
       expect(output.split('\n')[3]).toContain('●');
       expect(onHighlight).toHaveBeenCalledWith('bar');
 
-      // Press 'down'
       await pressKey({ name: 'down', sequence: '\u001B[B' });
       output = lastFrame();
       expect(output).toBeDefined();
       if (!output) return;
 
-      // Item 2 (Baz) on line 6
       expect(output.split('\n')[6]).toContain('●');
       expect(onHighlight).toHaveBeenCalledWith('baz');
     });
@@ -215,7 +197,7 @@ describe('DescriptiveRadioButtonSelect', () => {
       render(
         <DescriptiveRadioButtonSelect
           items={testItems}
-          initialIndex={2} // Start at 'Baz'
+          initialIndex={2}
           onSelect={onSelect}
           onHighlight={onHighlight}
         />,
@@ -229,7 +211,7 @@ describe('DescriptiveRadioButtonSelect', () => {
       const { lastFrame } = render(
         <DescriptiveRadioButtonSelect
           items={testItems}
-          initialIndex={2} // Start at 'Baz'
+          initialIndex={2}
           onSelect={onSelect}
           onHighlight={onHighlight}
         />,
@@ -240,27 +222,22 @@ describe('DescriptiveRadioButtonSelect', () => {
       expect(output).toBeDefined();
       if (!output) return;
 
-      // Item 2 (Baz) on line 6
       expect(output.split('\n')[6]).toContain('●');
       expect(onHighlight).not.toHaveBeenCalled();
 
-      // Press 'k'
       await pressKey({ name: 'k', sequence: 'k' });
       output = lastFrame();
       expect(output).toBeDefined();
       if (!output) return;
 
-      // Item 1 (Bar) on line 3
       expect(output.split('\n')[3]).toContain('●');
       expect(onHighlight).toHaveBeenCalledWith('bar');
 
-      // Press 'up'
       await pressKey({ name: 'up', sequence: '\u001B[A' });
       output = lastFrame();
       expect(output).toBeDefined();
       if (!output) return;
 
-      // Item 0 (Foo) on line 0
       expect(output.split('\n')[0]).toContain('●');
       expect(onHighlight).toHaveBeenCalledWith('foo');
     });
@@ -269,7 +246,7 @@ describe('DescriptiveRadioButtonSelect', () => {
       render(
         <DescriptiveRadioButtonSelect
           items={testItems}
-          initialIndex={0} // Start at 'Foo'
+          initialIndex={0}
           onSelect={onSelect}
           onHighlight={onHighlight}
         />,
@@ -283,7 +260,7 @@ describe('DescriptiveRadioButtonSelect', () => {
       render(
         <DescriptiveRadioButtonSelect
           items={testItems}
-          initialIndex={1} // Start at 'Bar'
+          initialIndex={1}
           onSelect={onSelect}
           onHighlight={onHighlight}
         />,
@@ -306,19 +283,14 @@ describe('DescriptiveRadioButtonSelect', () => {
         />,
       );
 
-      // Press '2'
       pressKey({ name: '2', sequence: '2' });
 
-      // Should immediately highlight 'Bar' (index 1)
       expect(onHighlight).toHaveBeenCalledWith('bar');
 
-      // The component logic checks `potentialNextNumber > items.length` (20 > 3)
-      // which is true, so it selects immediately, not after a timeout.
       expect(onSelect).toHaveBeenCalledWith('bar');
     });
 
-    it('selects an item based on buggy state (press 1, then 2 -> selects 2)', () => {
-      // Create 12 items
+    it('selects an item with multi-digit input', () => {
       const manyItems = Array.from({ length: 12 }, (_, i) => ({
         value: `item-${i + 1}`,
         title: `Item ${i + 1}`,
@@ -334,26 +306,19 @@ describe('DescriptiveRadioButtonSelect', () => {
         />,
       );
 
-      // Press '1'
       pressKey({ name: '1', sequence: '1' });
       expect(onHighlight).toHaveBeenCalledWith('item-1');
-      expect(onSelect).not.toHaveBeenCalled(); // 10 is not > 12, so timer is set
+      expect(onSelect).not.toHaveBeenCalled();
       onHighlight.mockClear();
 
-      // Press '2'
-      // Because the `numberInput` state in the keypress handler is stale,
-      // it processes this as `'' + '2'` instead of `'1' + '2'`.
       pressKey({ name: '2', sequence: '2' });
 
-      // Test asserts the actual (buggy) behavior
-      expect(onHighlight).toHaveBeenCalledWith('item-2');
+      expect(onHighlight).toHaveBeenCalledWith('item-12');
 
-      // `potentialNextNumber` is 20, which is > 12, so it selects immediately.
-      expect(onSelect).toHaveBeenCalledWith('item-2');
+      expect(onSelect).toHaveBeenCalledWith('item-12');
 
-      // Timer should not be running
       vi.advanceTimersByTime(350);
-      expect(onSelect).toHaveBeenCalledTimes(1); // No new call
+      expect(onSelect).toHaveBeenCalledTimes(1);
     });
 
     it('resets number input on invalid number', () => {
@@ -366,12 +331,10 @@ describe('DescriptiveRadioButtonSelect', () => {
         />,
       );
 
-      // Press '9' (invalid)
       pressKey({ name: '9', sequence: '9' });
       expect(onHighlight).not.toHaveBeenCalled();
       expect(onSelect).not.toHaveBeenCalled();
 
-      // Press '1' (should work now)
       pressKey({ name: '1', sequence: '1' });
       expect(onHighlight).toHaveBeenCalledWith('foo');
     });
@@ -386,12 +349,10 @@ describe('DescriptiveRadioButtonSelect', () => {
         />,
       );
 
-      // Press '0' (invalid)
       pressKey({ name: '0', sequence: '0' });
       expect(onHighlight).not.toHaveBeenCalled();
 
-      // Press '1' (should not form '01')
-      vi.advanceTimersByTime(350); // Let '0' timeout
+      vi.advanceTimersByTime(350);
       pressKey({ name: '1', sequence: '1' });
       expect(onHighlight).toHaveBeenCalledWith('foo');
     });
@@ -406,20 +367,17 @@ describe('DescriptiveRadioButtonSelect', () => {
         />,
       );
 
-      // Press '1'
       pressKey({ name: '1', sequence: '1' });
       expect(onHighlight).toHaveBeenCalledWith('foo');
       onHighlight.mockClear();
 
-      // Press 'j'
       pressKey({ name: 'j', sequence: 'j' });
-      expect(onHighlight).toHaveBeenCalledWith('bar'); // 'j' moves down
+      expect(onHighlight).toHaveBeenCalledWith('bar');
       onHighlight.mockClear();
 
-      // Press '2' (should be '2', not '12')
       pressKey({ name: '2', sequence: '2' });
-      expect(onHighlight).toHaveBeenCalledWith('bar'); // already on 'bar'
-      expect(onSelect).toHaveBeenCalledWith('bar'); // immediate select
+      expect(onHighlight).toHaveBeenCalledWith('bar');
+      expect(onSelect).toHaveBeenCalledWith('bar');
     });
   });
 
@@ -434,19 +392,16 @@ describe('DescriptiveRadioButtonSelect', () => {
         />,
       );
 
-      // Check that the hook was initialized with isActive: false
       expect(mockUseKeypress).toHaveBeenCalledWith(
         expect.any(Function),
         expect.objectContaining({ isActive: false }),
       );
       expect(state.hookOptions.isActive).toBe(false);
 
-      // Try to press keys
       pressKey({ name: 'j', sequence: 'j' });
       pressKey({ name: 'return', sequence: '\r' });
       pressKey({ name: '1', sequence: '1' });
 
-      // Nothing should have happened
       expect(onHighlight).not.toHaveBeenCalled();
       expect(onSelect).not.toHaveBeenCalled();
     });

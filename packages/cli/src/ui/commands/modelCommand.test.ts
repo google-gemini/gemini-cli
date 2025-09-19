@@ -17,14 +17,12 @@ describe('modelCommand', () => {
   });
 
   it('should return a dialog action to open the model dialog', async () => {
-    // Ensure the command has an action to test.
     if (!modelCommand.action) {
       throw new Error('The model command must have an action.');
     }
 
     const result = await modelCommand.action(mockContext, '');
 
-    // Assert that the action returns the correct object to trigger the model dialog.
     expect(result).toEqual({
       type: 'dialog',
       dialog: 'model',
