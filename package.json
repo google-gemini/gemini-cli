@@ -6,7 +6,6 @@
   },
   "type": "module",
   "workspaces": [
-    "third_party/get-ripgrep",
     "packages/*"
   ],
   "private": "true",
@@ -60,8 +59,7 @@
   "files": [
     "bundle/",
     "README.md",
-    "LICENSE",
-    "npm-shrinkwrap.json"
+    "LICENSE"
   ],
   "devDependencies": {
     "@types/marked": "^5.0.2",
