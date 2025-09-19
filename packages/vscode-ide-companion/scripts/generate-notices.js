@@ -50,6 +50,8 @@ async function getDependencyLicense(depName, depVersion) {
       'LICENSE.md',
       'LICENSE.txt',
       'LICENSE-MIT.txt',
+      'README.md',
+      'Readme.md',
     ].filter(Boolean);
 
     let licenseFile;
@@ -63,7 +65,16 @@ async function getDependencyLicense(depName, depVersion) {
 
     if (licenseFile) {
       try {
-        licenseContent = await fs.readFile(licenseFile, 'utf-8');
+        let fileContent = await fs.readFile(licenseFile, 'utf-8');
+        if (path.basename(licenseFile).toLowerCase().startsWith('readme')) {
+          const licenseSection = fileContent.match(
+            /(#+\s*license\s*|(?:\(the )?mit license\)?\s*)([\s\S]+?)(?=\n#|$)/i,
+          );
+          if (licenseSection && licenseSection[2]) {
+            fileContent = licenseSection[2].trim();
+          }
+        }
+        licenseContent = fileContent;
       } catch (e) {
         console.warn(
           `Warning: Failed to read license file for ${depName}: ${e.message}`,

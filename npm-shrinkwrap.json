@@ -7,6 +7,7 @@
     "": {
       "name": "@google/gemini-cli",
       "version": "0.7.0-nightly.20250918.2722473a",
+      "hasInstallScript": true,
       "workspaces": [
         "packages/*"
       ],
