@@ -7,6 +7,5 @@
     "types": ["node", "vitest/globals"]
   },
   "include": ["index.ts", "src/**/*.ts", "src/**/*.json"],
-  "exclude": ["node_modules", "dist"],
-  "references": [{ "path": "../../third_party/get-ripgrep" }]
+  "exclude": ["node_modules", "dist"]
 }
