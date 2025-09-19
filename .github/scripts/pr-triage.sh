@@ -35,6 +35,11 @@ process_pr() {
         ISSUE_NUMBER=$(echo "${PR_BODY}" | grep -iE '(closes?|fixes?|resolves?) #[0-9]+' | grep -oE '#[0-9]+' | head -1 | sed 's/#//' 2>/dev/null || echo "")
     fi
 
+    # If no issue found with keyword + #<number>, try full GitHub issue URIs
+    if [[ -z "${ISSUE_NUMBER}" ]]; then
+        ISSUE_NUMBER=$(echo "${PR_BODY}" | grep -iE 'https?://github.com/[^/]+/[^/]+/issues/[0-9]+' | head -1 | sed -E 's/.*issues\/([0-9]+).*/\1/' 2>/dev/null || echo "")
+    fi
+
 
     if [[ -z "${ISSUE_NUMBER}" ]]; then
         echo "⚠️  No linked issue found for PR #${PR_NUMBER}, adding status/need-issue label"
