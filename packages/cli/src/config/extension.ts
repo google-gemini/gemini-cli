@@ -12,12 +12,12 @@ import type {
 import {
   GEMINI_DIR,
   Storage,
-  ClearcutLogger,
   ExtensionInstallEvent,
   ExtensionUninstallEvent,
   ExtensionEnableEvent,
   logExtensionEnable,
   logExtensionInstallEvent,
+  logExtensionUninstall,
 } from '@google/gemini-cli-core';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -137,12 +137,6 @@ async function getClearcutConfig(cwd: string) {
     {} as unknown as CliArgs,
   );
   return config;
-}
-
-async function getClearcutLogger(cwd: string) {
-  const config = await getClearcutConfig(cwd);
-  const logger = ClearcutLogger.getInstance(config);
-  return logger;
 }
 
 export function loadExtensions(
@@ -387,7 +381,7 @@ export async function installExtension(
   askConsent: boolean = false,
   cwd: string = process.cwd(),
 ): Promise<string> {
-  const logger = await getClearcutLogger(cwd);
+  const clearcutConfig = await getClearcutConfig(cwd);
   let newExtensionConfig: ExtensionConfig | null = null;
   let localSourcePath: string | undefined;
 
@@ -486,7 +480,6 @@ export async function installExtension(
         await fs.promises.rm(tempDir, { recursive: true, force: true });
       }
     }
-    const clearcutConfig = await getClearcutConfig(cwd);
 
     logExtensionInstallEvent(
       clearcutConfig,
@@ -509,7 +502,8 @@ export async function installExtension(
         workspaceDir: cwd,
       });
     }
-    logger?.logExtensionInstallEvent(
+    logExtensionInstallEvent(
+      clearcutConfig,
       new ExtensionInstallEvent(
         newExtensionConfig?.name ?? '',
         newExtensionConfig?.version ?? '',
@@ -586,7 +580,7 @@ export async function uninstallExtension(
   extensionIdentifier: string,
   cwd: string = process.cwd(),
 ): Promise<void> {
-  const logger = await getClearcutLogger(cwd);
+  const clearcutConfig = await getClearcutConfig(cwd);
   const installedExtensions = loadUserExtensions();
   const extensionName = installedExtensions.find(
     (installed) =>
@@ -608,9 +602,7 @@ export async function uninstallExtension(
     recursive: true,
     force: true,
   });
-  logger?.logExtensionUninstallEvent(
-    new ExtensionUninstallEvent(extensionName, 'success'),
-  );
+  logExtensionUninstall(clearcutConfig, new ExtensionUninstallEvent(extensionName, 'success'));
 }
 
 export function toOutputString(extension: Extension): string {
