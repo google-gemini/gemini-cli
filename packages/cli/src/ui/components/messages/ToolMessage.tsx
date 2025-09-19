@@ -14,7 +14,11 @@ import { AnsiOutputText } from '../AnsiOutput.js';
 import { GeminiRespondingSpinner } from '../GeminiRespondingSpinner.js';
 import { MaxSizedBox } from '../shared/MaxSizedBox.js';
 import { ShellInputPrompt } from '../ShellInputPrompt.js';
-import { SHELL_COMMAND_NAME, TOOL_STATUS } from '../../constants.js';
+import {
+  SHELL_COMMAND_NAME,
+  SHELL_NAME,
+  TOOL_STATUS,
+} from '../../constants.js';
 import { theme } from '../../semantic-colors.js';
 import type { AnsiOutput, Config } from '@google/gemini-cli-core';
 
@@ -88,7 +92,7 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
   return (
     <Box paddingX={1} paddingY={0} flexDirection="column">
       <Box minHeight={1}>
-        <ToolStatusIndicator status={status} />
+        <ToolStatusIndicator status={status} name={name} />
         <ToolInfo
           name={name}
           status={status}
@@ -155,43 +159,50 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
 
 type ToolStatusIndicatorProps = {
   status: ToolCallStatus;
+  name: string;
 };
 
 const ToolStatusIndicator: React.FC<ToolStatusIndicatorProps> = ({
   status,
-}) => (
-  <Box minWidth={STATUS_INDICATOR_WIDTH}>
-    {status === ToolCallStatus.Pending && (
-      <Text color={theme.status.success}>{TOOL_STATUS.PENDING}</Text>
-    )}
-    {status === ToolCallStatus.Executing && (
-      <GeminiRespondingSpinner
-        spinnerType="toggle"
-        nonRespondingDisplay={TOOL_STATUS.EXECUTING}
-      />
-    )}
-    {status === ToolCallStatus.Success && (
-      <Text color={theme.status.success} aria-label={'Success:'}>
-        {TOOL_STATUS.SUCCESS}
-      </Text>
-    )}
-    {status === ToolCallStatus.Confirming && (
-      <Text color={theme.status.warning} aria-label={'Confirming:'}>
-        {TOOL_STATUS.CONFIRMING}
-      </Text>
-    )}
-    {status === ToolCallStatus.Canceled && (
-      <Text color={theme.status.warning} aria-label={'Canceled:'} bold>
-        {TOOL_STATUS.CANCELED}
-      </Text>
-    )}
-    {status === ToolCallStatus.Error && (
-      <Text color={theme.status.error} aria-label={'Error:'} bold>
-        {TOOL_STATUS.ERROR}
-      </Text>
-    )}
-  </Box>
-);
+  name,
+}) => {
+  const isShell = name === SHELL_COMMAND_NAME || name === SHELL_NAME;
+  const statusColor = isShell ? theme.ui.symbol : theme.status.warning;
+
+  return (
+    <Box minWidth={STATUS_INDICATOR_WIDTH}>
+      {status === ToolCallStatus.Pending && (
+        <Text color={theme.status.success}>{TOOL_STATUS.PENDING}</Text>
+      )}
+      {status === ToolCallStatus.Executing && (
+        <GeminiRespondingSpinner
+          spinnerType="toggle"
+          nonRespondingDisplay={TOOL_STATUS.EXECUTING}
+        />
+      )}
+      {status === ToolCallStatus.Success && (
+        <Text color={theme.status.success} aria-label={'Success:'}>
+          {TOOL_STATUS.SUCCESS}
+        </Text>
+      )}
+      {status === ToolCallStatus.Confirming && (
+        <Text color={statusColor} aria-label={'Confirming:'}>
+          {TOOL_STATUS.CONFIRMING}
+        </Text>
+      )}
+      {status === ToolCallStatus.Canceled && (
+        <Text color={statusColor} aria-label={'Canceled:'} bold>
+          {TOOL_STATUS.CANCELED}
+        </Text>
+      )}
+      {status === ToolCallStatus.Error && (
+        <Text color={theme.status.error} aria-label={'Error:'} bold>
+          {TOOL_STATUS.ERROR}
+        </Text>
+      )}
+    </Box>
+  );
+};
 
 type ToolInfo = {
   name: string;
