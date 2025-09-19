@@ -53,8 +53,34 @@ async function main() {
     console.log(
       `Release branch ${releaseBranch} does not exist. Creating it from tag ${latestTag}...`,
     );
-    run(`git checkout -b ${releaseBranch} ${latestTag}`, dryRun);
-    run(`git push origin ${releaseBranch}`, dryRun);
+    try {
+      run(`git checkout -b ${releaseBranch} ${latestTag}`, dryRun);
+      run(`git push origin ${releaseBranch}`, dryRun);
+    } catch (error) {
+      // Check if this is a GitHub App workflows permission error
+      if (
+        error.message.includes('refusing to allow a GitHub App') &&
+        error.message.includes('workflows` permission')
+      ) {
+        console.error(
+          `❌ Failed to create release branch due to insufficient GitHub App permissions.`,
+        );
+        console.log(
+          `\n📋 Please run these commands manually to create the branch:`,
+        );
+        console.log(`\n\`\`\`bash`);
+        console.log(`git checkout -b ${releaseBranch} ${latestTag}`);
+        console.log(`git push origin ${releaseBranch}`);
+        console.log(`\`\`\``);
+        console.log(
+          `\nAfter running these commands, you can run the patch command again.`,
+        );
+        process.exit(1);
+      } else {
+        // Re-throw other errors
+        throw error;
+      }
+    }
   } else {
     console.log(`Release branch ${releaseBranch} already exists.`);
   }
