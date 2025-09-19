@@ -639,16 +639,6 @@ const SETTINGS_SCHEMA = {
           'Sandbox execution environment (can be a boolean or a path string).',
         showInDialog: false,
       },
-      usePty: {
-        type: 'boolean',
-        label: 'Use node-pty for Shell Execution',
-        category: 'Tools',
-        requiresRestart: true,
-        default: false,
-        description:
-          'Use node-pty for shell command execution. Fallback to child_process still applies.',
-        showInDialog: true,
-      },
       shell: {
         type: 'object',
         label: 'Shell',
@@ -658,6 +648,16 @@ const SETTINGS_SCHEMA = {
         description: 'Settings for shell execution.',
         showInDialog: false,
         properties: {
+          enableInteractiveShell: {
+            type: 'boolean',
+            label: 'Enable Interactive Shell',
+            category: 'Tools',
+            requiresRestart: true,
+            default: false,
+            description:
+              'Use node-pty for an interactive shell experience. Fallback to child_process still applies.',
+            showInDialog: true,
+          },
           pager: {
             type: 'string',
             label: 'Pager',
