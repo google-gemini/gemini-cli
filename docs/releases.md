@@ -110,12 +110,20 @@ There are two ways to create a patch pull request:
 
 After a pull request containing the fix has been merged, a maintainer can add a comment on that same PR with the following format:
 
-`/patch <channel> [--dry-run]`
+`/patch [channel]`
 
-- **channel**: `stable` or `preview`
-- **--dry-run** (optional): If included, the workflow will run in dry-run mode. This will create the PR with "[DRY RUN]" in the title, and merging it will trigger a dry run of the final release, so nothing is actually published.
+- **channel** (optional):
+  - _no channel_ - patches both stable and preview channels (default, recommended for most fixes)
+  - `both` - patches both stable and preview channels (same as default)
+  - `stable` - patches only the stable channel
+  - `preview` - patches only the preview channel
 
-Example: `/patch stable --dry-run`
+Examples:
+
+- `/patch` (patches both stable and preview - default)
+- `/patch both` (patches both stable and preview - explicit)
+- `/patch stable` (patches only stable)
+- `/patch preview` (patches only preview)
 
 The `Release: Patch from Comment` workflow will automatically find the merge commit SHA and trigger the `Release: Patch (1) Create PR` workflow. If the PR is not yet merged, it will post a comment indicating the failure.
 
@@ -134,13 +142,44 @@ This workflow will automatically:
 4.  Cherry-pick your specified commit into the hotfix branch.
 5.  Create a pull request from the hotfix branch back to the release branch.
 
-**Important:** If you select `stable`, the workflow will run twice, creating one PR for the `stable` channel and a second PR for the `preview` channel.
-
 #### 2. Review and Merge
 
 Review the automatically created pull request(s) to ensure the cherry-pick was successful and the changes are correct. Once approved, merge the pull request.
 
 **Security Note:** The `release/*` branches are protected by branch protection rules. A pull request to one of these branches requires at least one review from a code owner before it can be merged. This ensures that no unauthorized code is released.
+
+#### 2.5. Adding Multiple Commits to a Hotfix (Advanced)
+
+If you need to include multiple fixes in a single patch release, you can add additional commits to the hotfix branch after the initial patch PR has been created:
+
+1. **Start with the primary fix**: Use `/patch` (or `/patch both`) on the most important PR to create the initial hotfix branch and PR.
+
+2. **Checkout the hotfix branch locally**:
+
+   ```bash
+   git fetch origin
+   git checkout hotfix/v0.5.1/stable/cherry-pick-abc1234  # Use the actual branch name from the PR
+   ```
+
+3. **Cherry-pick additional commits**:
+
+   ```bash
+   git cherry-pick <commit-sha-1>
+   git cherry-pick <commit-sha-2>
+   # Add as many commits as needed
+   ```
+
+4. **Push the updated branch**:
+
+   ```bash
+   git push origin hotfix/v0.5.1/stable/cherry-pick-abc1234
+   ```
+
+5. **Test and review**: The existing patch PR will automatically update with your additional commits. Test thoroughly since you're now releasing multiple changes together.
+
+6. **Update the PR description**: Consider updating the PR title and description to reflect that it includes multiple fixes.
+
+This approach allows you to group related fixes into a single patch release while maintaining full control over what gets included and how conflicts are resolved.
 
 #### 3. Automatic Release
 
