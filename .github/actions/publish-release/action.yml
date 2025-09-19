@@ -47,14 +47,12 @@ runs:
         git config user.name "gemini-cli-robot"
         git config user.email "gemini-cli-robot@google.com"
 
-    - name: '🌿 Create and switch to a release branch'
+    - name: '🏷️ Prepare for tag-based release'
       working-directory: '${{ inputs.working-directory }}'
-      id: 'release_branch'
+      id: 'release_prep'
       shell: 'bash'
       run: |
-        BRANCH_NAME="release/${{ inputs.release-tag }}"
-        git switch -c "${BRANCH_NAME}"
-        echo "BRANCH_NAME=${BRANCH_NAME}" >> "${GITHUB_OUTPUT}"
+        echo "RELEASE_TAG=${{ inputs.release-tag }}" >> "${GITHUB_OUTPUT}"
 
     - name: '⬆️ Update package versions'
       working-directory: '${{ inputs.working-directory }}'
@@ -62,11 +60,10 @@ runs:
       run: |
         npm run release:version "${{ inputs.release-version }}"
 
-    - name: '💾 Commit and Conditionally Push package versions'
+    - name: '💾 Commit and Create Tag'
       working-directory: '${{ inputs.working-directory }}'
       shell: 'bash'
       env:
-        BRANCH_NAME: '${{ steps.release_branch.outputs.BRANCH_NAME }}'
         DRY_RUN: '${{ inputs.dry-run }}'
         RELEASE_TAG: '${{ inputs.release-tag }}'
       run: |
@@ -78,9 +75,10 @@ runs:
           git add package-lock.json
         fi
         git commit -m "chore(release): ${RELEASE_TAG}"
+        git tag "${RELEASE_TAG}"
         if [[ "${DRY_RUN}" == "false" ]]; then
-          echo "Pushing release branch to remote..."
-          git push --set-upstream origin "${BRANCH_NAME}" --follow-tags
+          echo "Pushing commit and tag to remote..."
+          git push origin HEAD --tags
         else
           echo "Dry run enabled. Skipping push."
         fi
@@ -145,7 +143,6 @@ runs:
       run: |
         gh release create "${{ inputs.release-tag }}" \
           bundle/gemini.js \
-          --target "${{ steps.release_branch.outputs.BRANCH_NAME }}" \
           --title "Release ${{ inputs.release-tag }}" \
           --notes-start-tag "${{ inputs.previous-tag }}" \
           --generate-notes
