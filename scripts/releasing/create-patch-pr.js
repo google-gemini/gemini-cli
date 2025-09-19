@@ -97,7 +97,53 @@ async function main() {
 
   // Cherry-pick the commit.
   console.log(`Cherry-picking commit ${commit} into ${hotfixBranch}...`);
-  run(`git cherry-pick ${commit}`, dryRun);
+  let hasConflicts = false;
+  if (!dryRun) {
+    try {
+      execSync(`git cherry-pick ${commit}`, { stdio: 'pipe' });
+      console.log(`✅ Cherry-pick successful - no conflicts detected`);
+    } catch (error) {
+      // Check if this is a cherry-pick conflict
+      try {
+        const status = execSync('git status --porcelain', { encoding: 'utf8' });
+        const conflictFiles = status
+          .split('\n')
+          .filter(
+            (line) =>
+              line.startsWith('UU ') ||
+              line.startsWith('AA ') ||
+              line.startsWith('DU ') ||
+              line.startsWith('UD '),
+          );
+
+        if (conflictFiles.length > 0) {
+          hasConflicts = true;
+          console.log(
+            `⚠️  Cherry-pick has conflicts in ${conflictFiles.length} file(s):`,
+          );
+          conflictFiles.forEach((file) =>
+            console.log(`   - ${file.substring(3)}`),
+          );
+
+          // Add all files (including conflict markers) and commit
+          console.log(
+            `📝 Creating commit with conflict markers for manual resolution...`,
+          );
+          execSync('git add .');
+          execSync(`git commit --no-edit`);
+          console.log(`✅ Committed cherry-pick with conflict markers`);
+        } else {
+          // Re-throw if it's not a conflict error
+          throw error;
+        }
+      } catch (_statusError) {
+        // Re-throw original error if we can't determine the status
+        throw error;
+      }
+    }
+  } else {
+    console.log(`[DRY RUN] Would cherry-pick ${commit}`);
+  }
 
   // Push the hotfix branch.
   console.log(`Pushing hotfix branch ${hotfixBranch} to origin...`);
@@ -107,15 +153,45 @@ async function main() {
   console.log(
     `Creating pull request from ${hotfixBranch} to ${releaseBranch}...`,
   );
-  const prTitle = `fix(patch): cherry-pick ${commit.substring(0, 7)} to ${releaseBranch}`;
+  let prTitle = `fix(patch): cherry-pick ${commit.substring(0, 7)} to ${releaseBranch}`;
   let prBody = `This PR automatically cherry-picks commit ${commit} to patch the ${channel} release.`;
+
+  if (hasConflicts) {
+    prTitle = `fix(patch): cherry-pick ${commit.substring(0, 7)} to ${releaseBranch} [CONFLICTS]`;
+    prBody += `
+
+## ⚠️ Merge Conflicts Detected
+
+This cherry-pick resulted in merge conflicts that need manual resolution.
+
+### 🔧 Next Steps:
+1. **Review the conflicts**: Check out this branch and review the conflict markers
+2. **Resolve conflicts**: Edit the affected files to resolve the conflicts
+3. **Test the changes**: Ensure the patch works correctly after resolution
+4. **Update this PR**: Push your conflict resolution
+
+### 📋 Files with conflicts:
+The commit has been created with conflict markers for easier manual resolution.
+
+### 🚨 Important:
+- Do not merge this PR until conflicts are resolved
+- The automated patch release will trigger once this PR is merged`;
+  }
+
   if (dryRun) {
     prBody += '\n\n**[DRY RUN]**';
   }
+
   const prCommand = `gh pr create --base ${releaseBranch} --head ${hotfixBranch} --title "${prTitle}" --body "${prBody}"`;
   run(prCommand, dryRun);
 
-  console.log('Patch process completed successfully!');
+  if (hasConflicts) {
+    console.log(
+      '⚠️  Patch process completed with conflicts - manual resolution required!',
+    );
+  } else {
+    console.log('✅ Patch process completed successfully!');
+  }
 
   if (dryRun) {
     console.log('\n--- Dry Run Summary ---');
@@ -125,7 +201,7 @@ async function main() {
     console.log('---------------------');
   }
 
-  return { newBranch: hotfixBranch, created: true };
+  return { newBranch: hotfixBranch, created: true, hasConflicts };
 }
 
 function run(command, dryRun = false, throwOnError = true) {

@@ -164,20 +164,40 @@ function getPatchVersion(patchFrom) {
   const distTag = patchFrom === 'stable' ? 'latest' : 'preview';
   const pattern = distTag === 'latest' ? 'v[0-9].[0-9].[0-9]' : 'v*-preview*';
   const { latestVersion, latestTag } = getAndVerifyTags(distTag, pattern);
-  const [version, ...prereleaseParts] = latestVersion.split('-');
-  const prerelease = prereleaseParts.join('-');
-  const versionParts = version.split('.');
-  const major = versionParts[0];
-  const minor = versionParts[1];
-  const patch = versionParts[2] ? parseInt(versionParts[2]) : 0;
-  const releaseVersion = prerelease
-    ? `${major}.${minor}.${patch + 1}-${prerelease}`
-    : `${major}.${minor}.${patch + 1}`;
-  return {
-    releaseVersion,
-    npmTag: distTag,
-    previousReleaseTag: latestTag,
-  };
+
+  if (patchFrom === 'stable') {
+    // For stable versions, increment the patch number: 0.5.4 -> 0.5.5
+    const versionParts = latestVersion.split('.');
+    const major = versionParts[0];
+    const minor = versionParts[1];
+    const patch = versionParts[2] ? parseInt(versionParts[2]) : 0;
+    const releaseVersion = `${major}.${minor}.${patch + 1}`;
+    return {
+      releaseVersion,
+      npmTag: distTag,
+      previousReleaseTag: latestTag,
+    };
+  } else {
+    // For preview versions, increment the preview number: 0.6.0-preview.2 -> 0.6.0-preview.3
+    const [version, prereleasePart] = latestVersion.split('-');
+    if (!prereleasePart || !prereleasePart.startsWith('preview.')) {
+      throw new Error(
+        `Invalid preview version format: ${latestVersion}. Expected format like "0.6.0-preview.2"`,
+      );
+    }
+
+    const previewNumber = parseInt(prereleasePart.split('.')[1]);
+    if (isNaN(previewNumber)) {
+      throw new Error(`Could not parse preview number from: ${prereleasePart}`);
+    }
+
+    const releaseVersion = `${version}-preview.${previewNumber + 1}`;
+    return {
+      releaseVersion,
+      npmTag: distTag,
+      previousReleaseTag: latestTag,
+    };
+  }
 }
 
 export function getVersion(options = {}) {

@@ -1,4 +1,4 @@
-name: 'Gemini CLI CI'
+name: 'Testing: CI'
 
 on:
   push:

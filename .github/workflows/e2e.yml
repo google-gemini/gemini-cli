@@ -1,4 +1,4 @@
-name: 'E2E Tests'
+name: 'Testing: E2E'
 
 on:
   push:
