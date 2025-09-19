@@ -303,9 +303,6 @@ jobs:
           DRY_RUN: '${{ github.event.inputs.dry_run }}'
         run: |-
           git add package.json packages/*/package.json
-          if [ -f npm-shrinkwrap.json ]; then
-            git add npm-shrinkwrap.json
-          fi
           if [ -f package-lock.json ]; then
             git add package-lock.json
           fi

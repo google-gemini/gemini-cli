@@ -59,8 +59,7 @@
   "files": [
     "bundle/",
     "README.md",
-    "LICENSE",
-    "npm-shrinkwrap.json"
+    "LICENSE"
   ],
   "devDependencies": {
     "@types/marked": "^5.0.2",

@@ -22,8 +22,7 @@
     "typecheck": "tsc --noEmit"
   },
   "files": [
-    "dist",
-    "npm-shrinkwrap.json"
+    "dist"
   ],
   "config": {
     "sandboxImageUri": "us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:0.7.0-nightly.20250918.2722473a"
