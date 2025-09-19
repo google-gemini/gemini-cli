@@ -31,8 +31,6 @@ import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
 import cliPkgJson from '../packages/cli/package.json' with { type: 'json' };
 
-const BASE_IMAGE = cliPkgJson.config.sandboxImageUri;
-
 const argv = yargs(hideBin(process.argv))
   .option('s', {
     alias: 'skip-npm-install-build',
@@ -49,6 +47,7 @@ const argv = yargs(hideBin(process.argv))
   .option('i', {
     alias: 'image',
     type: 'string',
+    default: cliPkgJson.config.sandboxImageUri,
     description: 'use <image> name for custom image',
   })
   .option('output-file', {
@@ -80,7 +79,7 @@ console.log(`using ${sandboxCommand} for sandboxing`);
 const image = argv.i;
 const dockerFile = argv.f;
 
-if (!BASE_IMAGE?.length) {
+if (!image.length) {
   console.warn(
     'No default image tag specified in gemini-cli/packages/cli/package.json',
   );
