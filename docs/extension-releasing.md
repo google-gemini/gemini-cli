@@ -29,11 +29,11 @@ You can also cherry pick changes from one branch into another using `git cherry-
 
 Gemini CLI extensions can be distributed through [GitHub Releases](https://docs.github.com/en/repositories/releasing-projects-on-github/about-releases). This provides a faster and more reliable initial installation experience for users, as it avoids the need to clone the repository.
 
-Each release includes at least one archive file, which contains the full contents of the repo at the tag that it was linked to. Releases may also include [pre-built archives](#custom-pre-built-binaries) if your extension requires some build step or has platform specific binaries attached to it.
+Each release includes at least one archive file, which contains the full contents of the repo at the tag that it was linked to. Releases may also include [pre-built archives](#custom-pre-built-archives) if your extension requires some build step or has platform specific binaries attached to it.
 
 ### Custom pre-built archives
 
-Custom archives must be attached directly to the github release as assets and must be fully self-contained. This means they should include the entire extension, see the [archive structure](#archive-structure) section for the full requirements.
+Custom archives must be attached directly to the github release as assets and must be fully self-contained. This means they should include the entire extension, see [archive structure](#archive-structure).
 
 If your extension is platform-independent, you can provide a single generic asset. In this case, there should be only one asset attached to the release.
 
