@@ -1,0 +1,25 @@
+name: 'Release Sandbox'
+
+on:
+  workflow_dispatch:
+    ref:
+      description: 'The branch, tag, or SHA to release from.'
+      required: false
+      type: 'string'
+      default: 'main'
+
+jobs:
+  build:
+    runs-on: 'self-hosted'
+    steps:
+      - uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
+        with:
+          ref: '${{ github.event.inputs.ref || github.sha }}'
+          fetch-depth: 0
+      - name: 'Push'
+        uses: './.github/actions/push-sandbox'
+        with:
+          username: '${{ github.actor }}'
+          password: '${{ secrets.GITHUB_TOKEN }}'
+          github-sha: '${{ github.event.inputs.ref || github.sha }}'
+          github-ref-name: '${github.event.inputs.ref}'
