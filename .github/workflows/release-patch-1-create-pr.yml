@@ -52,43 +52,33 @@ jobs:
       - name: 'Install Script Dependencies'
         run: 'npm install yargs'
 
+      - name: 'Generate GitHub App Token'
+        id: 'generate_token'
+        uses: 'actions/create-github-app-token@a8d616148505b5069dccd32f177bb87d7f39123b'
+        with:
+          app-id: '${{ secrets.APP_ID }}'
+          private-key: '${{ secrets.PRIVATE_KEY }}'
+          permission-pull-requests: 'write'
+          permission-contents: 'write'
 
       - name: 'Configure Git User'
         run: |-
           git config user.name "gemini-cli-robot"
           git config user.email "gemini-cli-robot@google.com"
-
-      - name: 'Test 1: Create branch from HEAD and push'
-        run: |-
-          echo "Testing branch creation from HEAD..."
-          BRANCH_NAME="test-from-head-$(date +%s)"
-          git checkout -b "$BRANCH_NAME"
-          echo "# Test file" > test-file.txt
-          git add test-file.txt
-          git commit -m "test commit from HEAD"
-          git push origin "$BRANCH_NAME" || echo "HEAD push failed"
-
-      - name: 'Test 2: Create branch from v0.5.3 tag and push'
-        run: |-
-          echo "Testing branch creation from v0.5.3 tag..."
-          git fetch --tags
-          BRANCH_NAME="test-from-v053-$(date +%s)"
-          git checkout -b "$BRANCH_NAME" v0.5.3 || echo "Failed to checkout from v0.5.3"
-          git push origin "$BRANCH_NAME" || echo "v0.5.3 tag push failed"
+          # Configure git to use GITHUB_TOKEN for remote operations (has actions:write for workflow files)
+          git remote set-url origin "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git"
 
       - name: 'Create Patch'
         id: 'create_patch'
         env:
           GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
-          GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+          GH_TOKEN: '${{ steps.generate_token.outputs.token }}'
         continue-on-error: true
         run: |
           # Capture output and display it in logs using tee
           {
             node scripts/releasing/create-patch-pr.js --commit=${{ github.event.inputs.commit }} --channel=${{ github.event.inputs.channel }} --dry-run=${{ github.event.inputs.dry_run }}
-            EXIT_CODE=$?
-            echo "EXIT_CODE=$EXIT_CODE" >> "$GITHUB_OUTPUT"
-            exit $EXIT_CODE
+            echo "EXIT_CODE=$?" >> "$GITHUB_OUTPUT"
           } 2>&1 | tee >(
             echo "LOG_CONTENT<<EOF" >> "$GITHUB_ENV"
             cat >> "$GITHUB_ENV"
@@ -96,7 +86,7 @@ jobs:
           )
 
       - name: 'Comment on Original PR'
-        if: 'always() && github.event.inputs.original_pr'
+        if: 'always() && inputs.original_pr'
         env:
           GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
           ORIGINAL_PR: '${{ github.event.inputs.original_pr }}'
