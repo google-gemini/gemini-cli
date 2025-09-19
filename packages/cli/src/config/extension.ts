@@ -126,7 +126,7 @@ export async function performWorkspaceExtensionMigration(
   return failedInstallNames;
 }
 
-async function getTelemetryConfig(cwd: string) {
+function getTelemetryConfig(cwd: string) {
   const settings = loadSettings(cwd);
   const config = new Config({
     telemetry: settings.merged.telemetry,
@@ -382,7 +382,7 @@ export async function installExtension(
   askConsent: boolean = false,
   cwd: string = process.cwd(),
 ): Promise<string> {
-  const telemetryConfig = await getTelemetryConfig(cwd);
+  const telemetryConfig = getTelemetryConfig(cwd);
   let newExtensionConfig: ExtensionConfig | null = null;
   let localSourcePath: string | undefined;
 
@@ -581,7 +581,7 @@ export async function uninstallExtension(
   extensionIdentifier: string,
   cwd: string = process.cwd(),
 ): Promise<void> {
-  const telemetryConfig = await getTelemetryConfig(cwd);
+  const telemetryConfig = getTelemetryConfig(cwd);
   const installedExtensions = loadUserExtensions();
   const extensionName = installedExtensions.find(
     (installed) =>
@@ -655,7 +655,7 @@ export function disableExtension(
   manager.disable(name, true, scopePath);
 }
 
-export async function enableExtension(
+export function enableExtension(
   name: string,
   scope: SettingScope,
   cwd: string = process.cwd(),
@@ -668,6 +668,6 @@ export async function enableExtension(
   );
   const scopePath = scope === SettingScope.Workspace ? cwd : os.homedir();
   manager.enable(name, true, scopePath);
-  const config = await getTelemetryConfig(cwd);
+  const config = getTelemetryConfig(cwd);
   logExtensionEnable(config, new ExtensionEnableEvent(name, scope));
 }
