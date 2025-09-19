@@ -51,11 +51,6 @@ jobs:
       - name: 'Install Dependencies'
         run: 'npm ci'
 
-      - name: 'Configure Git User'
-        run: |-
-          git config user.name "gemini-cli-robot"
-          git config user.email "gemini-cli-robot@google.com"
-
       - name: 'Generate GitHub App Token'
         id: 'generate_token'
         uses: 'actions/create-github-app-token@a8d616148505b5069dccd32f177bb87d7f39123b'
@@ -65,23 +60,33 @@ jobs:
           permission-pull-requests: 'write'
           permission-contents: 'write'
 
+      - name: 'Configure Git User'
+        run: |-
+          git config user.name "gemini-cli-robot"
+          git config user.email "gemini-cli-robot@google.com"
+
       - name: 'Create Patch'
         id: 'create_patch'
         env:
           GH_TOKEN: '${{ steps.generate_token.outputs.token }}'
         continue-on-error: true
         run: |
-          node scripts/releasing/create-patch-pr.js --commit=${{ github.event.inputs.commit }} --channel=${{ github.event.inputs.channel }} --dry-run=${{ github.event.inputs.dry_run }} > patch_output.log 2>&1
-          echo "EXIT_CODE=$?" >> "$GITHUB_OUTPUT"
-          cat patch_output.log
+          # Capture output and display it in logs using tee
+          {
+            node scripts/releasing/create-patch-pr.js --commit=${{ github.event.inputs.commit }} --channel=${{ github.event.inputs.channel }} --dry-run=${{ github.event.inputs.dry_run }}
+            echo "EXIT_CODE=$?" >> "$GITHUB_OUTPUT"
+          } 2>&1 | tee >(
+            echo "LOG_CONTENT<<EOF" >> "$GITHUB_ENV"
+            cat >> "$GITHUB_ENV"
+            echo "EOF" >> "$GITHUB_ENV"
+          )
 
       - name: 'Comment on Original PR'
-        if: '!inputs.dry_run && inputs.original_pr'
+        if: 'inputs.original_pr'
         env:
-          GH_TOKEN: '${{ steps.generate_token.outputs.token }}'
+          GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
           ORIGINAL_PR: '${{ github.event.inputs.original_pr }}'
           EXIT_CODE: '${{ steps.create_patch.outputs.EXIT_CODE }}'
-          OUTPUT_LOG: 'patch_output.log'
           COMMIT: '${{ github.event.inputs.commit }}'
           CHANNEL: '${{ github.event.inputs.channel }}'
           REPOSITORY: '${{ github.repository }}'
