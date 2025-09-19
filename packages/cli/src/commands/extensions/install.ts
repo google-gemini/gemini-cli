@@ -5,10 +5,8 @@
  */
 
 import type { CommandModule } from 'yargs';
-import {
-  installExtension,
-  type ExtensionInstallMetadata,
-} from '../../config/extension.js';
+import { installExtension } from '../../config/extension.js';
+import type { ExtensionInstallMetadata } from '@google/gemini-cli-core';
 
 import { getErrorMessage } from '../../utils/errors.js';
 
@@ -16,6 +14,7 @@ interface InstallArgs {
   source?: string;
   path?: string;
   ref?: string;
+  autoUpdate?: boolean;
 }
 
 export async function handleInstall(args: InstallArgs) {
@@ -34,6 +33,7 @@ export async function handleInstall(args: InstallArgs) {
           source,
           type: 'git',
           ref: args.ref,
+          autoUpdate: args.autoUpdate,
         };
       } else {
         throw new Error(`The source "${source}" is not a valid URL format.`);
@@ -42,6 +42,7 @@ export async function handleInstall(args: InstallArgs) {
       installMetadata = {
         source: args.path,
         type: 'local',
+        autoUpdate: args.autoUpdate,
       };
     } else {
       // This should not be reached due to the yargs check.
@@ -73,8 +74,13 @@ export const installCommand: CommandModule = {
         describe: 'The git ref to install from.',
         type: 'string',
       })
+      .option('auto-update', {
+        describe: 'Enable auto-update for this extension.',
+        type: 'boolean',
+      })
       .conflicts('source', 'path')
       .conflicts('path', 'ref')
+      .conflicts('path', 'auto-update')
       .check((argv) => {
         if (!argv.source && !argv.path) {
           throw new Error('Either source or --path must be provided.');
@@ -86,6 +92,7 @@ export const installCommand: CommandModule = {
       source: argv['source'] as string | undefined,
       path: argv['path'] as string | undefined,
       ref: argv['ref'] as string | undefined,
+      autoUpdate: argv['auto-update'] as boolean | undefined,
     });
   },
 };
