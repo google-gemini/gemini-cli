@@ -132,16 +132,19 @@ async function main() {
   if (!testMode) {
     try {
       console.log('Looking for original PR using search...');
-      const { execSync } = await import('node:child_process');
+      const { execFileSync } = await import('node:child_process');
 
       // Use gh CLI to search for PRs with comments referencing the hotfix branch
       const query = `repo:${context.repo.owner}/${context.repo.repo} is:pr is:all in:comments "Patch PR Created" "${headRef}"`;
-      const searchCommand = `gh search prs --json number,title --limit 1 "${query}"`;
 
-      const result = execSync(searchCommand, {
-        encoding: 'utf8',
-        env: { ...process.env, GH_TOKEN: process.env.GITHUB_TOKEN },
-      });
+      const result = execFileSync(
+        'gh',
+        ['search', 'prs', '--json', 'number,title', '--limit', '1', query],
+        {
+          encoding: 'utf8',
+          env: { ...process.env, GH_TOKEN: process.env.GITHUB_TOKEN },
+        },
+      );
 
       const searchResults = JSON.parse(result);
       if (searchResults && searchResults.length > 0) {
@@ -162,22 +165,29 @@ async function main() {
   console.log(`Triggering release workflow: ${workflowId}`);
   if (!testMode) {
     try {
-      const { execSync } = await import('node:child_process');
+      const { execFileSync } = await import('node:child_process');
 
-      const inputs = [
+      const args = [
+        'workflow',
+        'run',
+        workflowId,
+        '--ref',
+        'main',
+        '--field',
         `type=${channel}`,
+        '--field',
         `dry_run=${isDryRun.toString()}`,
+        '--field',
         `force_skip_tests=${forceSkipTests.toString()}`,
+        '--field',
         `release_ref=${releaseRef}`,
+        '--field',
         originalPr ? `original_pr=${originalPr.toString()}` : 'original_pr=',
       ];
 
-      const inputFields = inputs.map((input) => `--field ${input}`).join(' ');
-      const dispatchCommand = `gh workflow run ${workflowId} --ref main ${inputFields}`;
+      console.log(`Running command: gh ${args.join(' ')}`);
 
-      console.log(`Running command: ${dispatchCommand}`);
-
-      execSync(dispatchCommand, {
+      execFileSync('gh', args, {
         stdio: 'inherit',
         env: { ...process.env, GH_TOKEN: process.env.GITHUB_TOKEN },
       });
@@ -216,28 +226,44 @@ async function main() {
 - [View release workflow](https://github.com/${context.repo.owner}/${context.repo.repo}/actions)`;
 
     if (!testMode) {
+      let tempDir;
       try {
-        const { execSync } = await import('node:child_process');
-        const { writeFileSync, unlinkSync } = await import('node:fs');
+        const { execFileSync } = await import('node:child_process');
+        const { writeFileSync, mkdtempSync } = await import('node:fs');
+        const { join } = await import('node:path');
+        const { tmpdir } = await import('node:os');
 
-        // Write comment to temp file to handle multiline content safely
-        const tempFile = `/tmp/comment-${Date.now()}.md`;
+        // Create secure temporary directory and file
+        tempDir = mkdtempSync(join(tmpdir(), 'patch-trigger-'));
+        const tempFile = join(tempDir, 'comment.md');
         writeFileSync(tempFile, commentBody);
 
-        const commentCommand = `gh pr comment ${originalPr} --body-file "${tempFile}"`;
-
-        execSync(commentCommand, {
-          stdio: 'inherit',
-          env: { ...process.env, GH_TOKEN: process.env.GITHUB_TOKEN },
-        });
-
-        // Clean up temp file
-        unlinkSync(tempFile);
+        execFileSync(
+          'gh',
+          ['pr', 'comment', originalPr.toString(), '--body-file', tempFile],
+          {
+            stdio: 'inherit',
+            env: { ...process.env, GH_TOKEN: process.env.GITHUB_TOKEN },
+          },
+        );
 
         console.log('✅ Comment posted successfully');
       } catch (e) {
         console.error('❌ Failed to post comment:', e.message);
         // Don't throw here since the main workflow dispatch succeeded
+      } finally {
+        // Clean up temp directory and all its contents
+        if (tempDir) {
+          try {
+            const { rmSync } = await import('node:fs');
+            rmSync(tempDir, { recursive: true, force: true });
+          } catch (cleanupError) {
+            console.warn(
+              '⚠️ Failed to clean up temp directory:',
+              cleanupError.message,
+            );
+          }
+        }
       }
     } else {
       console.log('✅ Would post comment:', commentBody);
