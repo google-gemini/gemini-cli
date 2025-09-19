@@ -8,6 +8,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { StreamingState } from '../types.js';
 
 export interface UseMessageQueueOptions {
+  isConfigInitialized: boolean;
   streamingState: StreamingState;
   submitQuery: (query: string) => void;
 }
@@ -25,6 +26,7 @@ export interface UseMessageQueueReturn {
  * sends them when streaming completes.
  */
 export function useMessageQueue({
+  isConfigInitialized,
   streamingState,
   submitQuery,
 }: UseMessageQueueOptions): UseMessageQueueReturn {
@@ -51,14 +53,18 @@ export function useMessageQueue({
 
   // Process queued messages when streaming becomes idle
   useEffect(() => {
-    if (streamingState === StreamingState.Idle && messageQueue.length > 0) {
+    if (
+      isConfigInitialized &&
+      streamingState === StreamingState.Idle &&
+      messageQueue.length > 0
+    ) {
       // Combine all messages with double newlines for clarity
       const combinedMessage = messageQueue.join('\n\n');
       // Clear the queue and submit
       setMessageQueue([]);
       submitQuery(combinedMessage);
     }
-  }, [streamingState, messageQueue, submitQuery]);
+  }, [isConfigInitialized, streamingState, messageQueue, submitQuery]);
 
   return {
     messageQueue,

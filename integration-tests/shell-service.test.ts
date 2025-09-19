@@ -6,8 +6,8 @@
 
 import { describe, it, expect, beforeAll } from 'vitest';
 import { ShellExecutionService } from '../packages/core/src/services/shellExecutionService.js';
-import * as fs from 'fs/promises';
-import * as path from 'path';
+import * as fs from 'node:fs/promises';
+import * as path from 'node:path';
 import { vi } from 'vitest';
 
 describe('ShellExecutionService programmatic integration tests', () => {
@@ -96,8 +96,8 @@ describe('ShellExecutionService programmatic integration tests', () => {
   );
 
   it('should abort a running process', async () => {
-    // A command that runs for a bit. 'sleep' on unix, 'timeout' on windows.
-    const command = process.platform === 'win32' ? 'timeout /t 20' : 'sleep 20';
+    // A command that runs for a bit.
+    const command = 'node -e "setTimeout(() => {}, 20000)"';
     const onOutputEvent = vi.fn();
     const abortController = new AbortController();
 

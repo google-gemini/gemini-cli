@@ -4,27 +4,28 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {
+import type {
   HistoryItemWithoutId,
   IndividualToolCallDisplay,
-  ToolCallStatus,
 } from '../types.js';
-import { useCallback } from 'react';
-import {
+import { ToolCallStatus } from '../types.js';
+import { useCallback, useState } from 'react';
+import type {
+  AnsiOutput,
   Config,
   GeminiClient,
-  isBinary,
   ShellExecutionResult,
-  ShellExecutionService,
 } from '@google/gemini-cli-core';
+import { isBinary, ShellExecutionService } from '@google/gemini-cli-core';
 import { type PartListUnion } from '@google/genai';
-import { UseHistoryManagerReturn } from './useHistoryManager.js';
+import type { UseHistoryManagerReturn } from './useHistoryManager.js';
 import { SHELL_COMMAND_NAME } from '../constants.js';
 import { formatMemoryUsage } from '../utils/formatters.js';
-import crypto from 'crypto';
-import path from 'path';
-import os from 'os';
-import fs from 'fs';
+import crypto from 'node:crypto';
+import path from 'node:path';
+import os from 'node:os';
+import fs from 'node:fs';
+import { themeManager } from '../../ui/themes/theme-manager.js';
 
 export const OUTPUT_UPDATE_INTERVAL_MS = 1000;
 const MAX_OUTPUT_LENGTH = 10000;
@@ -70,7 +71,11 @@ export const useShellCommandProcessor = (
   onDebugMessage: (message: string) => void,
   config: Config,
   geminiClient: GeminiClient,
+  setShellInputFocused: (value: boolean) => void,
+  terminalWidth?: number,
+  terminalHeight?: number,
 ) => {
+  const [activeShellPtyId, setActiveShellPtyId] = useState<number | null>(null);
   const handleShellCommand = useCallback(
     (rawQuery: PartListUnion, abortSignal: AbortSignal): boolean => {
       if (typeof rawQuery !== 'string' || rawQuery.trim() === '') {
@@ -105,7 +110,7 @@ export const useShellCommandProcessor = (
         resolve: (value: void | PromiseLike<void>) => void,
       ) => {
         let lastUpdateTime = Date.now();
-        let cumulativeStdout = '';
+        let cumulativeStdout: string | AnsiOutput = '';
         let isBinaryStream = false;
         let binaryBytesReceived = 0;
 
@@ -135,18 +140,40 @@ export const useShellCommandProcessor = (
         onDebugMessage(`Executing in ${targetDir}: ${commandToExecute}`);
 
         try {
+          const activeTheme = themeManager.getActiveTheme();
+          const shellExecutionConfig = {
+            ...config.getShellExecutionConfig(),
+            terminalWidth,
+            terminalHeight,
+            defaultFg: activeTheme.colors.Foreground,
+            defaultBg: activeTheme.colors.Background,
+          };
+
           const { pid, result } = await ShellExecutionService.execute(
             commandToExecute,
             targetDir,
             (event) => {
+              let shouldUpdate = false;
               switch (event.type) {
                 case 'data':
                   // Do not process text data if we've already switched to binary mode.
                   if (isBinaryStream) break;
-                  cumulativeStdout += event.chunk;
+                  // PTY provides the full screen state, so we just replace.
+                  // Child process provides chunks, so we append.
+                  if (config.getShouldUseNodePtyShell()) {
+                    cumulativeStdout = event.chunk;
+                    shouldUpdate = true;
+                  } else if (
+                    typeof event.chunk === 'string' &&
+                    typeof cumulativeStdout === 'string'
+                  ) {
+                    cumulativeStdout += event.chunk;
+                  }
                   break;
                 case 'binary_detected':
                   isBinaryStream = true;
+                  // Force an immediate UI update to show the binary detection message.
+                  shouldUpdate = true;
                   break;
                 case 'binary_progress':
                   isBinaryStream = true;
@@ -158,7 +185,7 @@ export const useShellCommandProcessor = (
               }
 
               // Compute the display string based on the *current* state.
-              let currentDisplayOutput: string;
+              let currentDisplayOutput: string | AnsiOutput;
               if (isBinaryStream) {
                 if (binaryBytesReceived > 0) {
                   currentDisplayOutput = `[Receiving binary output... ${formatMemoryUsage(
@@ -172,25 +199,49 @@ export const useShellCommandProcessor = (
                 currentDisplayOutput = cumulativeStdout;
               }
 
-              // Throttle pending UI updates to avoid excessive re-renders.
-              if (Date.now() - lastUpdateTime > OUTPUT_UPDATE_INTERVAL_MS) {
-                setPendingHistoryItem({
-                  type: 'tool_group',
-                  tools: [
-                    {
-                      ...initialToolDisplay,
-                      resultDisplay: currentDisplayOutput,
-                    },
-                  ],
+              // Throttle pending UI updates, but allow forced updates.
+              if (
+                shouldUpdate ||
+                Date.now() - lastUpdateTime > OUTPUT_UPDATE_INTERVAL_MS
+              ) {
+                setPendingHistoryItem((prevItem) => {
+                  if (prevItem?.type === 'tool_group') {
+                    return {
+                      ...prevItem,
+                      tools: prevItem.tools.map((tool) =>
+                        tool.callId === callId
+                          ? { ...tool, resultDisplay: currentDisplayOutput }
+                          : tool,
+                      ),
+                    };
+                  }
+                  return prevItem;
                 });
                 lastUpdateTime = Date.now();
               }
             },
             abortSignal,
             config.getShouldUseNodePtyShell(),
+            shellExecutionConfig,
           );
 
+          console.log(terminalHeight, terminalWidth);
+
           executionPid = pid;
+          if (pid) {
+            setActiveShellPtyId(pid);
+            setPendingHistoryItem((prevItem) => {
+              if (prevItem?.type === 'tool_group') {
+                return {
+                  ...prevItem,
+                  tools: prevItem.tools.map((tool) =>
+                    tool.callId === callId ? { ...tool, ptyId: pid } : tool,
+                  ),
+                };
+              }
+              return prevItem;
+            });
+          }
 
           result
             .then((result: ShellExecutionResult) => {
@@ -270,6 +321,8 @@ export const useShellCommandProcessor = (
               if (pwdFilePath && fs.existsSync(pwdFilePath)) {
                 fs.unlinkSync(pwdFilePath);
               }
+              setActiveShellPtyId(null);
+              setShellInputFocused(false);
               resolve();
             });
         } catch (err) {
@@ -288,7 +341,8 @@ export const useShellCommandProcessor = (
           if (pwdFilePath && fs.existsSync(pwdFilePath)) {
             fs.unlinkSync(pwdFilePath);
           }
-
+          setActiveShellPtyId(null);
+          setShellInputFocused(false);
           resolve(); // Resolve the promise to unblock `onExec`
         }
       };
@@ -307,8 +361,11 @@ export const useShellCommandProcessor = (
       setPendingHistoryItem,
       onExec,
       geminiClient,
+      setShellInputFocused,
+      terminalHeight,
+      terminalWidth,
     ],
   );
 
-  return { handleShellCommand };
+  return { handleShellCommand, activeShellPtyId };
 };

@@ -4,11 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React from 'react';
+import type React from 'react';
 import { Text, Box } from 'ink';
 import { MarkdownDisplay } from '../../utils/MarkdownDisplay.js';
-import { Colors } from '../../colors.js';
-import { SCREEN_READER_MODEL_PREFIX } from '../../constants.js';
+import { theme } from '../../semantic-colors.js';
+import { SCREEN_READER_MODEL_PREFIX } from '../../textConstants.js';
 
 interface GeminiMessageProps {
   text: string;
@@ -29,10 +29,7 @@ export const GeminiMessage: React.FC<GeminiMessageProps> = ({
   return (
     <Box flexDirection="row">
       <Box width={prefixWidth}>
-        <Text
-          color={Colors.AccentPurple}
-          aria-label={SCREEN_READER_MODEL_PREFIX}
-        >
+        <Text color={theme.text.accent} aria-label={SCREEN_READER_MODEL_PREFIX}>
           {prefix}
         </Text>
       </Box>

@@ -13,7 +13,7 @@ import { MessageType } from '../types.js';
 
 export const toolsCommand: SlashCommand = {
   name: 'tools',
-  description: 'list available Gemini CLI tools',
+  description: 'list available Gemini CLI tools. Usage: /tools [desc]',
   kind: CommandKind.BUILT_IN,
   action: async (context: CommandContext, args?: string): Promise<void> => {
     const subCommand = args?.trim();

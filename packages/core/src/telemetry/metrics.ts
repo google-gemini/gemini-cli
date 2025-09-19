@@ -4,14 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {
-  metrics,
-  Attributes,
-  ValueType,
-  Meter,
-  Counter,
-  Histogram,
-} from '@opentelemetry/api';
+import type { Attributes, Meter, Counter, Histogram } from '@opentelemetry/api';
+import { metrics, ValueType } from '@opentelemetry/api';
 import {
   SERVICE_NAME,
   METRIC_TOOL_CALL_COUNT,
@@ -25,9 +19,11 @@ import {
   METRIC_INVALID_CHUNK_COUNT,
   METRIC_CONTENT_RETRY_COUNT,
   METRIC_CONTENT_RETRY_FAILURE_COUNT,
+  METRIC_MODEL_ROUTING_LATENCY,
+  METRIC_MODEL_ROUTING_FAILURE_COUNT,
 } from './constants.js';
-import { Config } from '../config/config.js';
-import { DiffStat } from '../tools/tools.js';
+import type { Config } from '../config/config.js';
+import type { ModelRoutingEvent } from './types.js';
 
 export enum FileOperation {
   CREATE = 'create',
@@ -46,6 +42,8 @@ let chatCompressionCounter: Counter | undefined;
 let invalidChunkCounter: Counter | undefined;
 let contentRetryCounter: Counter | undefined;
 let contentRetryFailureCounter: Counter | undefined;
+let modelRoutingLatencyHistogram: Histogram | undefined;
+let modelRoutingFailureCounter: Counter | undefined;
 let isMetricsInitialized = false;
 
 function getCommonAttributes(config: Config): Attributes {
@@ -117,6 +115,21 @@ export function initializeMetrics(config: Config): void {
       valueType: ValueType.INT,
     },
   );
+  modelRoutingLatencyHistogram = meter.createHistogram(
+    METRIC_MODEL_ROUTING_LATENCY,
+    {
+      description: 'Latency of model routing decisions in milliseconds.',
+      unit: 'ms',
+      valueType: ValueType.INT,
+    },
+  );
+  modelRoutingFailureCounter = meter.createCounter(
+    METRIC_MODEL_ROUTING_FAILURE_COUNT,
+    {
+      description: 'Counts model routing failures.',
+      valueType: ValueType.INT,
+    },
+  );
 
   const sessionCounter = meter.createCounter(METRIC_SESSION_COUNT, {
     description: 'Count of CLI sessions started.',
@@ -181,7 +194,6 @@ export function recordApiResponseMetrics(
   model: string,
   durationMs: number,
   statusCode?: number | string,
-  error?: string,
 ): void {
   if (
     !apiRequestCounter ||
@@ -192,7 +204,7 @@ export function recordApiResponseMetrics(
   const metricAttributes: Attributes = {
     ...getCommonAttributes(config),
     model,
-    status_code: statusCode ?? (error ? 'error' : 'ok'),
+    status_code: statusCode ?? 'ok',
   };
   apiRequestCounter.add(1, metricAttributes);
   apiRequestLatencyHistogram.record(durationMs, {
@@ -233,7 +245,6 @@ export function recordFileOperationMetric(
   lines?: number,
   mimetype?: string,
   extension?: string,
-  diffStat?: DiffStat,
   programming_language?: string,
 ): void {
   if (!fileOperationCounter || !isMetricsInitialized) return;
@@ -244,12 +255,6 @@ export function recordFileOperationMetric(
   if (lines !== undefined) attributes['lines'] = lines;
   if (mimetype !== undefined) attributes['mimetype'] = mimetype;
   if (extension !== undefined) attributes['extension'] = extension;
-  if (diffStat !== undefined) {
-    attributes['ai_added_lines'] = diffStat.ai_added_lines;
-    attributes['ai_removed_lines'] = diffStat.ai_removed_lines;
-    attributes['user_added_lines'] = diffStat.user_added_lines;
-    attributes['user_removed_lines'] = diffStat.user_removed_lines;
-  }
   if (programming_language !== undefined) {
     attributes['programming_language'] = programming_language;
   }
@@ -280,4 +285,30 @@ export function recordContentRetry(config: Config): void {
 export function recordContentRetryFailure(config: Config): void {
   if (!contentRetryFailureCounter || !isMetricsInitialized) return;
   contentRetryFailureCounter.add(1, getCommonAttributes(config));
+}
+
+export function recordModelRoutingMetrics(
+  config: Config,
+  event: ModelRoutingEvent,
+): void {
+  if (
+    !modelRoutingLatencyHistogram ||
+    !modelRoutingFailureCounter ||
+    !isMetricsInitialized
+  )
+    return;
+
+  modelRoutingLatencyHistogram.record(event.routing_latency_ms, {
+    ...getCommonAttributes(config),
+    'routing.decision_model': event.decision_model,
+    'routing.decision_source': event.decision_source,
+  });
+
+  if (event.failed) {
+    modelRoutingFailureCounter.add(1, {
+      ...getCommonAttributes(config),
+      'routing.decision_source': event.decision_source,
+      'routing.error_message': event.error_message,
+    });
+  }
 }

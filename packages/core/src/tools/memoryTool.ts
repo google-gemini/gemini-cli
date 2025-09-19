@@ -4,22 +4,24 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type { ToolEditConfirmationDetails, ToolResult } from './tools.js';
 import {
   BaseDeclarativeTool,
   BaseToolInvocation,
   Kind,
-  ToolEditConfirmationDetails,
   ToolConfirmationOutcome,
-  ToolResult,
 } from './tools.js';
-import { FunctionDeclaration } from '@google/genai';
-import * as fs from 'fs/promises';
-import * as path from 'path';
+import type { FunctionDeclaration } from '@google/genai';
+import * as fs from 'node:fs/promises';
+import * as path from 'node:path';
 import { Storage } from '../config/storage.js';
 import * as Diff from 'diff';
 import { DEFAULT_DIFF_OPTIONS } from './diffOptions.js';
 import { tildeifyPath } from '../utils/paths.js';
-import { ModifiableDeclarativeTool, ModifyContext } from './modifiable-tool.js';
+import type {
+  ModifiableDeclarativeTool,
+  ModifyContext,
+} from './modifiable-tool.js';
 import { ToolErrorType } from './tool-error.js';
 
 const memoryToolSchemaData: FunctionDeclaration = {
@@ -328,49 +330,18 @@ export class MemoryTool
       ) => Promise<string | undefined>;
     },
   ): Promise<void> {
-    let processedText = text.trim();
-    // Remove leading hyphens and spaces that might be misinterpreted as markdown list items
-    processedText = processedText.replace(/^(-+\s*)+/, '').trim();
-    const newMemoryItem = `- ${processedText}`;
-
     try {
       await fsAdapter.mkdir(path.dirname(memoryFilePath), { recursive: true });
-      let content = '';
+      let currentContent = '';
       try {
-        content = await fsAdapter.readFile(memoryFilePath, 'utf-8');
+        currentContent = await fsAdapter.readFile(memoryFilePath, 'utf-8');
       } catch (_e) {
-        // File doesn't exist, will be created with header and item.
+        // File doesn't exist, which is fine. currentContent will be empty.
       }
 
-      const headerIndex = content.indexOf(MEMORY_SECTION_HEADER);
+      const newContent = computeNewContent(currentContent, text);
 
-      if (headerIndex === -1) {
-        // Header not found, append header and then the entry
-        const separator = ensureNewlineSeparation(content);
-        content += `${separator}${MEMORY_SECTION_HEADER}\n${newMemoryItem}\n`;
-      } else {
-        // Header found, find where to insert the new memory entry
-        const startOfSectionContent =
-          headerIndex + MEMORY_SECTION_HEADER.length;
-        let endOfSectionIndex = content.indexOf('\n## ', startOfSectionContent);
-        if (endOfSectionIndex === -1) {
-          endOfSectionIndex = content.length; // End of file
-        }
-
-        const beforeSectionMarker = content
-          .substring(0, startOfSectionContent)
-          .trimEnd();
-        let sectionContent = content
-          .substring(startOfSectionContent, endOfSectionIndex)
-          .trimEnd();
-        const afterSectionMarker = content.substring(endOfSectionIndex);
-
-        sectionContent += `\n${newMemoryItem}`;
-        content =
-          `${beforeSectionMarker}\n${sectionContent.trimStart()}\n${afterSectionMarker}`.trimEnd() +
-          '\n';
-      }
-      await fsAdapter.writeFile(memoryFilePath, content, 'utf-8');
+      await fsAdapter.writeFile(memoryFilePath, newContent, 'utf-8');
     } catch (error) {
       console.error(
         `[MemoryTool] Error adding memory entry to ${memoryFilePath}:`,

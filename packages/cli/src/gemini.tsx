@@ -6,7 +6,7 @@
 
 import React from 'react';
 import { render } from 'ink';
-import { AppWrapper } from './ui/App.js';
+import { AppContainer } from './ui/AppContainer.js';
 import { loadCliConfig, parseArguments } from './config/config.js';
 import { readStdin } from './utils/readStdin.js';
 import { basename } from 'node:path';
@@ -15,10 +15,11 @@ import os from 'node:os';
 import dns from 'node:dns';
 import { spawn } from 'node:child_process';
 import { start_sandbox } from './utils/sandbox.js';
+import type { DnsResolutionOrder, LoadedSettings } from './config/settings.js';
+import { RELAUNCH_EXIT_CODE } from './utils/processUtils.js';
 import {
-  DnsResolutionOrder,
-  LoadedSettings,
   loadSettings,
+  migrateDeprecatedSettings,
   SettingScope,
 } from './config/settings.js';
 import { themeManager } from './ui/themes/theme-manager.js';
@@ -27,18 +28,23 @@ import { getUserStartupWarnings } from './utils/userStartupWarnings.js';
 import { ConsolePatcher } from './ui/utils/ConsolePatcher.js';
 import { runNonInteractive } from './nonInteractiveCli.js';
 import { loadExtensions } from './config/extension.js';
-import { cleanupCheckpoints, registerCleanup } from './utils/cleanup.js';
-import { getCliVersion } from './utils/version.js';
 import {
-  Config,
+  cleanupCheckpoints,
+  registerCleanup,
+  runExitCleanup,
+} from './utils/cleanup.js';
+import { getCliVersion } from './utils/version.js';
+import type { Config } from '@google/gemini-cli-core';
+import {
   sessionId,
   logUserPrompt,
   AuthType,
   getOauthClient,
-  logIdeConnection,
-  IdeConnectionEvent,
-  IdeConnectionType,
 } from '@google/gemini-cli-core';
+import {
+  initializeApp,
+  type InitializationResult,
+} from './core/initializer.js';
 import { validateAuthMethod } from './config/auth.js';
 import { setMaxSizedBoxDebugging } from './ui/components/shared/MaxSizedBox.js';
 import { validateNonInteractiveAuth } from './validateNonInterActiveAuth.js';
@@ -47,6 +53,11 @@ import { checkForUpdates } from './ui/utils/updateCheck.js';
 import { handleAutoUpdate } from './utils/handleAutoUpdate.js';
 import { appEvents, AppEvent } from './utils/events.js';
 import { SettingsContext } from './ui/contexts/SettingsContext.js';
+
+import { SessionStatsProvider } from './ui/contexts/SessionContext.js';
+import { VimModeProvider } from './ui/contexts/VimModeContext.js';
+import { KeypressProvider } from './ui/contexts/KeypressContext.js';
+import { useKittyKeyboardProtocol } from './ui/hooks/useKittyKeyboardProtocol.js';
 
 export function validateDnsResolutionOrder(
   order: string | undefined,
@@ -96,18 +107,52 @@ function getNodeMemoryArgs(config: Config): string[] {
   return [];
 }
 
-async function relaunchWithAdditionalArgs(additionalArgs: string[]) {
-  const nodeArgs = [...additionalArgs, ...process.argv.slice(1)];
-  const newEnv = { ...process.env, GEMINI_CLI_NO_RELAUNCH: 'true' };
+async function relaunchOnExitCode(runner: () => Promise<number>) {
+  while (true) {
+    try {
+      const exitCode = await runner();
 
-  const child = spawn(process.execPath, nodeArgs, {
-    stdio: 'inherit',
-    env: newEnv,
-  });
-
-  await new Promise((resolve) => child.on('close', resolve));
-  process.exit(0);
+      if (exitCode !== RELAUNCH_EXIT_CODE) {
+        process.exit(exitCode);
+      }
+    } catch (error) {
+      process.stdin.resume();
+      console.error('Fatal error: Failed to relaunch the CLI process.', error);
+      process.exit(1);
+    }
+  }
 }
+
+async function relaunchAppInChildProcess(additionalArgs: string[]) {
+  if (process.env['GEMINI_CLI_NO_RELAUNCH']) {
+    return;
+  }
+
+  const runner = () => {
+    const nodeArgs = [...additionalArgs, ...process.argv.slice(1)];
+    const newEnv = { ...process.env, GEMINI_CLI_NO_RELAUNCH: 'true' };
+
+    // The parent process should not be reading from stdin while the child is running.
+    process.stdin.pause();
+
+    const child = spawn(process.execPath, nodeArgs, {
+      stdio: 'inherit',
+      env: newEnv,
+    });
+
+    return new Promise<number>((resolve, reject) => {
+      child.on('error', reject);
+      child.on('close', (code) => {
+        // Resume stdin before the parent process exits.
+        process.stdin.resume();
+        resolve(code ?? 1);
+      });
+    });
+  };
+
+  await relaunchOnExitCode(runner);
+}
+
 import { runZedIntegration } from './zed-integration/zedIntegration.js';
 
 export function setupUnhandledRejectionHandler() {
@@ -136,24 +181,50 @@ export async function startInteractiveUI(
   config: Config,
   settings: LoadedSettings,
   startupWarnings: string[],
-  workspaceRoot: string,
+  workspaceRoot: string = process.cwd(),
+  initializationResult: InitializationResult,
 ) {
   const version = await getCliVersion();
-  // Detect and enable Kitty keyboard protocol once at startup
-  await detectAndEnableKittyProtocol();
   setWindowTitle(basename(workspaceRoot), settings);
-  const instance = render(
-    <React.StrictMode>
+
+  // Create wrapper component to use hooks inside render
+  const AppWrapper = () => {
+    const kittyProtocolStatus = useKittyKeyboardProtocol();
+    return (
       <SettingsContext.Provider value={settings}>
-        <AppWrapper
+        <KeypressProvider
+          kittyProtocolEnabled={kittyProtocolStatus.enabled}
           config={config}
-          settings={settings}
-          startupWarnings={startupWarnings}
-          version={version}
-        />
+          debugKeystrokeLogging={settings.merged.general?.debugKeystrokeLogging}
+        >
+          <SessionStatsProvider>
+            <VimModeProvider settings={settings}>
+              <AppContainer
+                config={config}
+                settings={settings}
+                startupWarnings={startupWarnings}
+                version={version}
+                initializationResult={initializationResult}
+              />
+            </VimModeProvider>
+          </SessionStatsProvider>
+        </KeypressProvider>
       </SettingsContext.Provider>
-    </React.StrictMode>,
-    { exitOnCtrlC: false, isScreenReaderEnabled: config.getScreenReader() },
+    );
+  };
+
+  const instance = render(
+    process.env['DEBUG'] ? (
+      <React.StrictMode>
+        <AppWrapper />
+      </React.StrictMode>
+    ) : (
+      <AppWrapper />
+    ),
+    {
+      exitOnCtrlC: false,
+      isScreenReaderEnabled: config.getScreenReader(),
+    },
   );
 
   checkForUpdates()
@@ -172,30 +243,45 @@ export async function startInteractiveUI(
 
 export async function main() {
   setupUnhandledRejectionHandler();
-  const workspaceRoot = process.cwd();
-  const settings = loadSettings(workspaceRoot);
-
+  const settings = loadSettings();
+  migrateDeprecatedSettings(settings);
   await cleanupCheckpoints();
-  if (settings.errors.length > 0) {
-    for (const error of settings.errors) {
-      let errorMessage = `Error in ${error.path}: ${error.message}`;
-      if (!process.env['NO_COLOR']) {
-        errorMessage = `\x1b[31m${errorMessage}\x1b[0m`;
-      }
-      console.error(errorMessage);
-      console.error(`Please fix ${error.path} and try again.`);
-    }
-    process.exit(1);
-  }
 
-  const argv = await parseArguments();
-  const extensions = loadExtensions(workspaceRoot);
+  const argv = await parseArguments(settings.merged);
+  const extensions = loadExtensions();
   const config = await loadCliConfig(
     settings.merged,
     extensions,
     sessionId,
     argv,
   );
+
+  // Check for invalid input combinations early to prevent crashes
+  if (argv.promptInteractive && !process.stdin.isTTY) {
+    console.error(
+      'Error: The --prompt-interactive flag cannot be used when input is piped from stdin.',
+    );
+    process.exit(1);
+  }
+
+  const wasRaw = process.stdin.isRaw;
+  let kittyProtocolDetectionComplete: Promise<boolean> | undefined;
+  if (config.isInteractive() && !wasRaw && process.stdin.isTTY) {
+    // Set this as early as possible to avoid spurious characters from
+    // input showing up in the output.
+    process.stdin.setRawMode(true);
+
+    // This cleanup isn't strictly needed but may help in certain situations.
+    process.on('SIGTERM', () => {
+      process.stdin.setRawMode(wasRaw);
+    });
+    process.on('SIGINT', () => {
+      process.stdin.setRawMode(wasRaw);
+    });
+
+    // Detect and enable Kitty keyboard protocol once at startup.
+    kittyProtocolDetectionComplete = detectAndEnableKittyProtocol();
+  }
 
   const consolePatcher = new ConsolePatcher({
     stderr: true,
@@ -205,15 +291,8 @@ export async function main() {
   registerCleanup(consolePatcher.cleanup);
 
   dns.setDefaultResultOrder(
-    validateDnsResolutionOrder(settings.merged.dnsResolutionOrder),
+    validateDnsResolutionOrder(settings.merged.advanced?.dnsResolutionOrder),
   );
-
-  if (argv.promptInteractive && !process.stdin.isTTY) {
-    console.error(
-      'Error: The --prompt-interactive flag is not supported when piping input from stdin.',
-    );
-    process.exit(1);
-  }
 
   if (config.getListExtensions()) {
     console.log('Installed extensions:');
@@ -224,7 +303,7 @@ export async function main() {
   }
 
   // Set a default auth type if one isn't set.
-  if (!settings.merged.selectedAuthType) {
+  if (!settings.merged.security?.auth?.selectedType) {
     if (process.env['CLOUD_SHELL'] === 'true') {
       settings.setValue(
         SettingScope.User,
@@ -236,42 +315,39 @@ export async function main() {
 
   setMaxSizedBoxDebugging(config.getDebugMode());
 
-  await config.initialize();
-
-  if (config.getIdeMode()) {
-    await config.getIdeClient().connect();
-    logIdeConnection(config, new IdeConnectionEvent(IdeConnectionType.START));
-  }
-
   // Load custom themes from settings
-  themeManager.loadCustomThemes(settings.merged.customThemes);
+  themeManager.loadCustomThemes(settings.merged.ui?.customThemes);
 
-  if (settings.merged.theme) {
-    if (!themeManager.setActiveTheme(settings.merged.theme)) {
+  if (settings.merged.ui?.theme) {
+    if (!themeManager.setActiveTheme(settings.merged.ui?.theme)) {
       // If the theme is not found during initial load, log a warning and continue.
-      // The useThemeCommand hook in App.tsx will handle opening the dialog.
-      console.warn(`Warning: Theme "${settings.merged.theme}" not found.`);
+      // The useThemeCommand hook in AppContainer.tsx will handle opening the dialog.
+      console.warn(`Warning: Theme "${settings.merged.ui?.theme}" not found.`);
     }
   }
 
+  const initializationResult = await initializeApp(config, settings);
+
   // hop into sandbox if we are outside and sandboxing is enabled
   if (!process.env['SANDBOX']) {
-    const memoryArgs = settings.merged.autoConfigureMaxOldSpaceSize
+    const memoryArgs = settings.merged.advanced?.autoConfigureMemory
       ? getNodeMemoryArgs(config)
       : [];
     const sandboxConfig = config.getSandbox();
     if (sandboxConfig) {
       if (
-        settings.merged.selectedAuthType &&
-        !settings.merged.useExternalAuth
+        settings.merged.security?.auth?.selectedType &&
+        !settings.merged.security?.auth?.useExternal
       ) {
         // Validate authentication here because the sandbox will interfere with the Oauth2 web redirect.
         try {
-          const err = validateAuthMethod(settings.merged.selectedAuthType);
+          const err = validateAuthMethod(
+            settings.merged.security.auth.selectedType,
+          );
           if (err) {
             throw new Error(err);
           }
-          await config.refreshAuth(settings.merged.selectedAuthType);
+          await config.refreshAuth(settings.merged.security.auth.selectedType);
         } catch (err) {
           console.error('Error authenticating:', err);
           process.exit(1);
@@ -307,24 +383,24 @@ export async function main() {
 
       const sandboxArgs = injectStdinIntoArgs(process.argv, stdinData);
 
-      await start_sandbox(sandboxConfig, memoryArgs, config, sandboxArgs);
+      await relaunchOnExitCode(() =>
+        start_sandbox(sandboxConfig, memoryArgs, config, sandboxArgs),
+      );
       process.exit(0);
     } else {
-      // Not in a sandbox and not entering one, so relaunch with additional
-      // arguments to control memory usage if needed.
-      if (memoryArgs.length > 0) {
-        await relaunchWithAdditionalArgs(memoryArgs);
-        process.exit(0);
-      }
+      // Relaunch app so we always have a child process that can be internally
+      // restarted if needed.
+      await relaunchAppInChildProcess(memoryArgs);
     }
   }
 
   if (
-    settings.merged.selectedAuthType === AuthType.LOGIN_WITH_GOOGLE &&
+    settings.merged.security?.auth?.selectedType ===
+      AuthType.LOGIN_WITH_GOOGLE &&
     config.isBrowserLaunchSuppressed()
   ) {
     // Do oauth before app renders to make copying the link possible.
-    await getOauthClient(settings.merged.selectedAuthType, config);
+    await getOauthClient(settings.merged.security.auth.selectedType, config);
   }
 
   if (config.getExperimentalZedIntegration()) {
@@ -334,14 +410,25 @@ export async function main() {
   let input = config.getQuestion();
   const startupWarnings = [
     ...(await getStartupWarnings()),
-    ...(await getUserStartupWarnings(workspaceRoot)),
+    ...(await getUserStartupWarnings()),
   ];
 
   // Render UI, passing necessary config values. Check that there is no command line question.
   if (config.isInteractive()) {
-    await startInteractiveUI(config, settings, startupWarnings, workspaceRoot);
+    // Need kitty detection to be complete before we can start the interactive UI.
+    await kittyProtocolDetectionComplete;
+    await startInteractiveUI(
+      config,
+      settings,
+      startupWarnings,
+      process.cwd(),
+      initializationResult,
+    );
     return;
   }
+
+  await config.initialize();
+
   // If not a TTY, read from stdin
   // This is for cases where the user pipes input directly into the command
   if (!process.stdin.isTTY) {
@@ -368,17 +455,24 @@ export async function main() {
   });
 
   const nonInteractiveConfig = await validateNonInteractiveAuth(
-    settings.merged.selectedAuthType,
-    settings.merged.useExternalAuth,
+    settings.merged.security?.auth?.selectedType,
+    settings.merged.security?.auth?.useExternal,
     config,
+    settings,
   );
 
-  await runNonInteractive(nonInteractiveConfig, input, prompt_id);
+  if (config.getDebugMode()) {
+    console.log('Session ID: %s', sessionId);
+  }
+
+  await runNonInteractive(nonInteractiveConfig, settings, input, prompt_id);
+  // Call cleanup before process.exit, which causes cleanup to not run
+  await runExitCleanup();
   process.exit(0);
 }
 
 function setWindowTitle(title: string, settings: LoadedSettings) {
-  if (!settings.merged.hideWindowTitle) {
+  if (!settings.merged.ui?.hideWindowTitle) {
     const windowTitle = (
       process.env['CLI_TITLE'] || `Gemini - ${title}`
     ).replace(

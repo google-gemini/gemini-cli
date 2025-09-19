@@ -14,26 +14,24 @@ import {
   beforeAll,
   afterAll,
 } from 'vitest';
-import {
-  ClearcutLogger,
-  LogEvent,
-  LogEventEntry,
-  EventNames,
-  TEST_ONLY,
-} from './clearcut-logger.js';
-import {
-  AuthType,
-  ContentGeneratorConfig,
-} from '../../core/contentGenerator.js';
-import { ConfigParameters } from '../../config/config.js';
+import type { LogEvent, LogEventEntry } from './clearcut-logger.js';
+import { ClearcutLogger, EventNames, TEST_ONLY } from './clearcut-logger.js';
+import type { ContentGeneratorConfig } from '../../core/contentGenerator.js';
+import { AuthType } from '../../core/contentGenerator.js';
+import type { ConfigParameters } from '../../config/config.js';
 import { EventMetadataKey } from './event-metadata-key.js';
 import { makeFakeConfig } from '../../test-utils/config.js';
 import { http, HttpResponse } from 'msw';
 import { server } from '../../mocks/msw.js';
-import { UserPromptEvent, makeChatCompressionEvent } from '../types.js';
+import {
+  UserPromptEvent,
+  makeChatCompressionEvent,
+  ModelRoutingEvent,
+} from '../types.js';
 import { GIT_COMMIT_INFO, CLI_VERSION } from '../../generated/git-commit.js';
 import { UserAccountManager } from '../../utils/userAccountManager.js';
 import { InstallationManager } from '../../utils/installationManager.js';
+import { safeJsonStringify } from '../../utils/safeJsonStringify.js';
 
 interface CustomMatchers<R = unknown> {
   toHaveMetadataValue: ([key, value]: [EventMetadataKey, string]) => R;
@@ -215,6 +213,9 @@ describe('ClearcutLogger', () => {
       const cli_version = CLI_VERSION;
       const git_commit_hash = GIT_COMMIT_INFO;
       const prompt_id = 'my-prompt-123';
+      const user_settings = safeJsonStringify([
+        { smart_edit_enabled: true, model_router_enabled: false },
+      ]);
 
       // Setup logger with expected values
       const { logger, loggerConfig } = setup({
@@ -261,8 +262,27 @@ describe('ClearcutLogger', () => {
             gemini_cli_key: EventMetadataKey.GEMINI_CLI_PROMPT_ID,
             value: prompt_id,
           },
+          {
+            gemini_cli_key: EventMetadataKey.GEMINI_CLI_OS,
+            value: process.platform,
+          },
+          {
+            gemini_cli_key: EventMetadataKey.GEMINI_CLI_USER_SETTINGS,
+            value: user_settings,
+          },
         ]),
       );
+    });
+
+    it('logs the current nodejs version', () => {
+      const { logger } = setup({});
+
+      const event = logger?.createLogEvent(EventNames.API_ERROR, []);
+
+      expect(event?.event_metadata[0]).toContainEqual({
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_NODE_VERSION,
+        value: process.versions.node,
+      });
     });
 
     it('logs the current surface', () => {
@@ -279,11 +299,32 @@ describe('ClearcutLogger', () => {
       });
     });
 
+    it('logs the value of config.useSmartEdit and config.useModelRouter', () => {
+      const user_settings = safeJsonStringify([
+        { smart_edit_enabled: true, model_router_enabled: true },
+      ]);
+
+      const { logger } = setup({
+        config: { useSmartEdit: true, useModelRouter: true },
+      });
+
+      vi.stubEnv('TERM_PROGRAM', 'vscode');
+      vi.stubEnv('SURFACE', 'ide-1234');
+
+      const event = logger?.createLogEvent(EventNames.TOOL_CALL, []);
+
+      expect(event?.event_metadata[0]).toContainEqual({
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_USER_SETTINGS,
+        value: user_settings,
+      });
+    });
+
     it.each([
       {
         env: {
           CURSOR_TRACE_ID: 'abc123',
           GITHUB_SHA: undefined,
+          TERM_PROGRAM: 'vscode',
         },
         expectedValue: 'cursor',
       },
@@ -291,6 +332,7 @@ describe('ClearcutLogger', () => {
         env: {
           TERM_PROGRAM: 'vscode',
           GITHUB_SHA: undefined,
+          MONOSPACE_ENV: '',
         },
         expectedValue: 'vscode',
       },
@@ -298,6 +340,7 @@ describe('ClearcutLogger', () => {
         env: {
           MONOSPACE_ENV: 'true',
           GITHUB_SHA: undefined,
+          TERM_PROGRAM: 'vscode',
         },
         expectedValue: 'firebasestudio',
       },
@@ -305,6 +348,7 @@ describe('ClearcutLogger', () => {
         env: {
           __COG_BASHRC_SOURCED: 'true',
           GITHUB_SHA: undefined,
+          TERM_PROGRAM: 'vscode',
         },
         expectedValue: 'devin',
       },
@@ -312,6 +356,7 @@ describe('ClearcutLogger', () => {
         env: {
           CLOUD_SHELL: 'true',
           GITHUB_SHA: undefined,
+          TERM_PROGRAM: 'vscode',
         },
         expectedValue: 'cloudshell',
       },
@@ -322,7 +367,6 @@ describe('ClearcutLogger', () => {
         for (const [key, value] of Object.entries(env)) {
           vi.stubEnv(key, value);
         }
-        vi.stubEnv('TERM_PROGRAM', 'vscode');
         const event = logger?.createLogEvent(EventNames.API_ERROR, []);
         expect(event?.event_metadata[0][3]).toEqual({
           gemini_cli_key: EventMetadataKey.GEMINI_CLI_SURFACE,
@@ -353,6 +397,24 @@ describe('ClearcutLogger', () => {
         EventMetadataKey.GEMINI_CLI_COMPRESSION_TOKENS_AFTER,
         '8000',
       ]);
+    });
+  });
+
+  describe('logRipgrepFallbackEvent', () => {
+    it('logs an event with the proper name', () => {
+      const { logger } = setup();
+      // Spy on flushToClearcut to prevent it from clearing the queue
+      const flushSpy = vi
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .spyOn(logger!, 'flushToClearcut' as any)
+        .mockResolvedValue({ nextRequestWaitMs: 0 });
+
+      logger?.logRipgrepFallbackEvent();
+
+      const events = getEvents(logger!);
+      expect(events.length).toBe(1);
+      expect(events[0]).toHaveEventName(EventNames.RIPGREP_FALLBACK);
+      expect(flushSpy).toHaveBeenCalledOnce();
     });
   });
 
@@ -539,6 +601,80 @@ describe('ClearcutLogger', () => {
         getEvents(logger!)[0][0].source_extension_json,
       ) as { event_id: string };
       expect(firstRequeuedEvent.event_id).toBe('failed_5');
+    });
+  });
+
+  describe('logModelRoutingEvent', () => {
+    it('logs a successful routing event', () => {
+      const { logger } = setup();
+      const event = new ModelRoutingEvent(
+        'gemini-pro',
+        'default-strategy',
+        123,
+        'some reasoning',
+        false,
+        undefined,
+      );
+
+      logger?.logModelRoutingEvent(event);
+
+      const events = getEvents(logger!);
+      expect(events.length).toBe(1);
+      expect(events[0]).toHaveEventName(EventNames.MODEL_ROUTING);
+      expect(events[0]).toHaveMetadataValue([
+        EventMetadataKey.GEMINI_CLI_ROUTING_DECISION,
+        'gemini-pro',
+      ]);
+      expect(events[0]).toHaveMetadataValue([
+        EventMetadataKey.GEMINI_CLI_ROUTING_DECISION_SOURCE,
+        'default-strategy',
+      ]);
+      expect(events[0]).toHaveMetadataValue([
+        EventMetadataKey.GEMINI_CLI_ROUTING_LATENCY_MS,
+        '123',
+      ]);
+      expect(events[0]).toHaveMetadataValue([
+        EventMetadataKey.GEMINI_CLI_ROUTING_FAILURE,
+        'false',
+      ]);
+    });
+
+    it('logs a failed routing event with a reason', () => {
+      const { logger } = setup();
+      const event = new ModelRoutingEvent(
+        'gemini-pro',
+        'router-exception',
+        234,
+        'some reasoning',
+        true,
+        'Something went wrong',
+      );
+
+      logger?.logModelRoutingEvent(event);
+
+      const events = getEvents(logger!);
+      expect(events.length).toBe(1);
+      expect(events[0]).toHaveEventName(EventNames.MODEL_ROUTING);
+      expect(events[0]).toHaveMetadataValue([
+        EventMetadataKey.GEMINI_CLI_ROUTING_DECISION,
+        'gemini-pro',
+      ]);
+      expect(events[0]).toHaveMetadataValue([
+        EventMetadataKey.GEMINI_CLI_ROUTING_DECISION_SOURCE,
+        'router-exception',
+      ]);
+      expect(events[0]).toHaveMetadataValue([
+        EventMetadataKey.GEMINI_CLI_ROUTING_LATENCY_MS,
+        '234',
+      ]);
+      expect(events[0]).toHaveMetadataValue([
+        EventMetadataKey.GEMINI_CLI_ROUTING_FAILURE,
+        'true',
+      ]);
+      expect(events[0]).toHaveMetadataValue([
+        EventMetadataKey.GEMINI_CLI_ROUTING_FAILURE_REASON,
+        'Something went wrong',
+      ]);
     });
   });
 });

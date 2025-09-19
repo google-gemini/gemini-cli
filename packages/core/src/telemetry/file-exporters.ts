@@ -5,14 +5,18 @@
  */
 
 import * as fs from 'node:fs';
-import { ExportResult, ExportResultCode } from '@opentelemetry/core';
-import { ReadableSpan, SpanExporter } from '@opentelemetry/sdk-trace-base';
-import { ReadableLogRecord, LogRecordExporter } from '@opentelemetry/sdk-logs';
-import {
+import type { ExportResult } from '@opentelemetry/core';
+import { ExportResultCode } from '@opentelemetry/core';
+import type { ReadableSpan, SpanExporter } from '@opentelemetry/sdk-trace-base';
+import type {
+  ReadableLogRecord,
+  LogRecordExporter,
+} from '@opentelemetry/sdk-logs';
+import type {
   ResourceMetrics,
   PushMetricExporter,
-  AggregationTemporality,
 } from '@opentelemetry/sdk-metrics';
+import { AggregationTemporality } from '@opentelemetry/sdk-metrics';
 
 class FileExporter {
   protected writeStream: fs.WriteStream;
