@@ -4,10 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React from 'react';
+import type React from 'react';
 import { Text, Box } from 'ink';
-import { Colors } from '../../colors.js';
-import { SCREEN_READER_USER_PREFIX } from '../../constants.js';
+import { theme } from '../../semantic-colors.js';
+import { SCREEN_READER_USER_PREFIX } from '../../textConstants.js';
+import { isSlashCommand as checkIsSlashCommand } from '../../utils/commandUtils.js';
 
 interface UserMessageProps {
   text: string;
@@ -16,10 +17,10 @@ interface UserMessageProps {
 export const UserMessage: React.FC<UserMessageProps> = ({ text }) => {
   const prefix = '> ';
   const prefixWidth = prefix.length;
-  const isSlashCommand = text.startsWith('/');
+  const isSlashCommand = checkIsSlashCommand(text);
 
-  const textColor = isSlashCommand ? Colors.AccentPurple : Colors.Gray;
-  const borderColor = isSlashCommand ? Colors.AccentPurple : Colors.Gray;
+  const textColor = isSlashCommand ? theme.text.accent : theme.text.secondary;
+  const borderColor = isSlashCommand ? theme.text.accent : theme.text.secondary;
 
   return (
     <Box

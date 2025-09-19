@@ -1,6 +1,7 @@
 # Gemini CLI
 
 [![Gemini CLI CI](https://github.com/google-gemini/gemini-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/google-gemini/gemini-cli/actions/workflows/ci.yml)
+[![Gemini CLI E2E](https://github.com/google-gemini/gemini-cli/actions/workflows/e2e.yml/badge.svg)](https://github.com/google-gemini/gemini-cli/actions/workflows/e2e.yml)
 [![Version](https://img.shields.io/npm/v/@google/gemini-cli)](https://www.npmjs.com/package/@google/gemini-cli)
 [![License](https://img.shields.io/github/license/google-gemini/gemini-cli)](https://github.com/google-gemini/gemini-cli/blob/main/LICENSE)
 
@@ -106,7 +107,7 @@ Integrate Gemini CLI directly into your GitHub workflows with [**Gemini CLI GitH
 
 Choose the authentication method that best fits your needs:
 
-### Option 1: OAuth login (Using your Google Account)
+### Option 1: Login with Google (OAuth login using your Google Account)
 
 **✨ Best for:** Individual developers as well as anyone who has a Gemini Code Assist License. (see [quota limits and terms of service](https://cloud.google.com/gemini/docs/quotas) for details)
 
@@ -117,7 +118,7 @@ Choose the authentication method that best fits your needs:
 - **No API key management** - just sign in with your Google account
 - **Automatic updates** to latest models
 
-#### Start Gemini CLI, then choose OAuth and follow the browser authentication flow when prompted
+#### Start Gemini CLI, then choose _Login with Google_ and follow the browser authentication flow when prompted
 
 ```bash
 gemini
@@ -190,8 +191,17 @@ gemini -m gemini-2.5-flash
 
 #### Non-interactive mode for scripts
 
+Get a simple text response:
+
 ```bash
 gemini -p "Explain the architecture of this codebase"
+```
+
+For more advanced scripting, including how to parse JSON and handle errors, use
+the `--output-format json` flag to get structured output:
+
+```bash
+gemini -p "Explain the architecture of this codebase" --output-format json
 ```
 
 ### Quick Examples

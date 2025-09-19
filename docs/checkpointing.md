@@ -38,8 +38,10 @@ Add the following key to your `settings.json`:
 
 ```json
 {
-  "checkpointing": {
-    "enabled": true
+  "general": {
+    "checkpointing": {
+      "enabled": true
+    }
   }
 }
 ```

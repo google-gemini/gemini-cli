@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { EventEmitter } from 'events';
+import { EventEmitter } from 'node:events';
 import {
   EVENT_API_ERROR,
   EVENT_API_RESPONSE,
@@ -12,7 +12,11 @@ import {
 } from './constants.js';
 
 import { ToolCallDecision } from './tool-call-decision.js';
-import { ApiErrorEvent, ApiResponseEvent, ToolCallEvent } from './types.js';
+import type {
+  ApiErrorEvent,
+  ApiResponseEvent,
+  ToolCallEvent,
+} from './types.js';
 
 export type UiEvent =
   | (ApiResponseEvent & { 'event.name': typeof EVENT_API_RESPONSE })
@@ -140,8 +144,8 @@ export class UiTelemetryService extends EventEmitter {
     return this.#lastPromptTokenCount;
   }
 
-  resetLastPromptTokenCount(): void {
-    this.#lastPromptTokenCount = 0;
+  setLastPromptTokenCount(lastPromptTokenCount: number): void {
+    this.#lastPromptTokenCount = lastPromptTokenCount;
     this.emit('update', {
       metrics: this.#metrics,
       lastPromptTokenCount: this.#lastPromptTokenCount,
@@ -167,8 +171,6 @@ export class UiTelemetryService extends EventEmitter {
     modelMetrics.tokens.cached += event.cached_content_token_count;
     modelMetrics.tokens.thoughts += event.thoughts_token_count;
     modelMetrics.tokens.tool += event.tool_token_count;
-
-    this.#lastPromptTokenCount = event.input_token_count;
   }
 
   private processApiError(event: ApiErrorEvent) {
@@ -220,11 +222,11 @@ export class UiTelemetryService extends EventEmitter {
 
     // Aggregate line count data from metadata
     if (event.metadata) {
-      if (event.metadata['ai_added_lines'] !== undefined) {
-        files.totalLinesAdded += event.metadata['ai_added_lines'];
+      if (event.metadata['model_added_lines'] !== undefined) {
+        files.totalLinesAdded += event.metadata['model_added_lines'];
       }
-      if (event.metadata['ai_removed_lines'] !== undefined) {
-        files.totalLinesRemoved += event.metadata['ai_removed_lines'];
+      if (event.metadata['model_removed_lines'] !== undefined) {
+        files.totalLinesRemoved += event.metadata['model_removed_lines'];
       }
     }
   }

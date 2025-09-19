@@ -8,11 +8,8 @@ import { type MutableRefObject } from 'react';
 import { render } from 'ink-testing-library';
 import { renderHook } from '@testing-library/react';
 import { act } from 'react-dom/test-utils';
-import {
-  SessionStatsProvider,
-  useSessionStats,
-  SessionMetrics,
-} from './SessionContext.js';
+import type { SessionMetrics } from './SessionContext.js';
+import { SessionStatsProvider, useSessionStats } from './SessionContext.js';
 import { describe, it, expect, vi } from 'vitest';
 import { uiTelemetryService } from '@google/gemini-cli-core';
 
@@ -114,6 +111,88 @@ describe('SessionStatsContext', () => {
     const stats = contextRef.current?.stats;
     expect(stats?.metrics).toEqual(newMetrics);
     expect(stats?.lastPromptTokenCount).toBe(100);
+  });
+
+  it('should not update metrics if the data is the same', () => {
+    const contextRef: MutableRefObject<
+      ReturnType<typeof useSessionStats> | undefined
+    > = { current: undefined };
+
+    let renderCount = 0;
+    const CountingTestHarness = () => {
+      contextRef.current = useSessionStats();
+      renderCount++;
+      return null;
+    };
+
+    render(
+      <SessionStatsProvider>
+        <CountingTestHarness />
+      </SessionStatsProvider>,
+    );
+
+    expect(renderCount).toBe(1);
+
+    const metrics: SessionMetrics = {
+      models: {
+        'gemini-pro': {
+          api: { totalRequests: 1, totalErrors: 0, totalLatencyMs: 100 },
+          tokens: {
+            prompt: 10,
+            candidates: 20,
+            total: 30,
+            cached: 0,
+            thoughts: 0,
+            tool: 0,
+          },
+        },
+      },
+      tools: {
+        totalCalls: 0,
+        totalSuccess: 0,
+        totalFail: 0,
+        totalDurationMs: 0,
+        totalDecisions: { accept: 0, reject: 0, modify: 0 },
+        byName: {},
+      },
+    };
+
+    act(() => {
+      uiTelemetryService.emit('update', { metrics, lastPromptTokenCount: 10 });
+    });
+
+    expect(renderCount).toBe(2);
+
+    act(() => {
+      uiTelemetryService.emit('update', { metrics, lastPromptTokenCount: 10 });
+    });
+
+    expect(renderCount).toBe(2);
+
+    const newMetrics = {
+      ...metrics,
+      models: {
+        'gemini-pro': {
+          api: { totalRequests: 2, totalErrors: 0, totalLatencyMs: 200 },
+          tokens: {
+            prompt: 20,
+            candidates: 40,
+            total: 60,
+            cached: 0,
+            thoughts: 0,
+            tool: 0,
+          },
+        },
+      },
+    };
+    act(() => {
+      uiTelemetryService.emit('update', {
+        metrics: newMetrics,
+        lastPromptTokenCount: 20,
+      });
+    });
+
+    expect(renderCount).toBe(3);
   });
 
   it('should throw an error when useSessionStats is used outside of a provider', () => {

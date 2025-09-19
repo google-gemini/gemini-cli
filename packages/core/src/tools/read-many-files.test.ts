@@ -9,10 +9,10 @@ import type { Mock } from 'vitest';
 import { mockControl } from '../__mocks__/fs/promises.js';
 import { ReadManyFilesTool } from './read-many-files.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
-import path from 'path';
-import fs from 'fs'; // Actual fs for setup
-import os from 'os';
-import { Config } from '../config/config.js';
+import path from 'node:path';
+import fs from 'node:fs'; // Actual fs for setup
+import os from 'node:os';
+import type { Config } from '../config/config.js';
 import { WorkspaceContext } from '../utils/workspaceContext.js';
 import { StandardFileSystemService } from '../services/fileSystemService.js';
 import { ToolErrorType } from './tool-error.js';
@@ -24,8 +24,8 @@ import * as glob from 'glob';
 
 vi.mock('glob', { spy: true });
 
-vi.mock('mime-types', () => {
-  const lookup = (filename: string) => {
+vi.mock('mime', () => {
+  const getType = (filename: string) => {
     if (filename.endsWith('.ts') || filename.endsWith('.js')) {
       return 'text/plain';
     }
@@ -45,9 +45,9 @@ vi.mock('mime-types', () => {
   };
   return {
     default: {
-      lookup,
+      getType,
     },
-    lookup,
+    getType,
   };
 });
 

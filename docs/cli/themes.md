@@ -46,25 +46,14 @@ Add a `customThemes` block to your user, project, or system `settings.json` file
 
 ```json
 {
-  "customThemes": {
-    "MyCustomTheme": {
-      "name": "MyCustomTheme",
-      "type": "custom",
-      "Background": "#181818",
-      "Foreground": "#F8F8F2",
-      "LightBlue": "#82AAFF",
-      "AccentBlue": "#61AFEF",
-      "AccentPurple": "#C678DD",
-      "AccentCyan": "#56B6C2",
-      "AccentGreen": "#98C379",
-      "AccentYellow": "#E5C07B",
-      "AccentRed": "#E06C75",
-      "Comment": "#5C6370",
-      "Gray": "#ABB2BF",
-      "DiffAdded": "#A6E3A1",
-      "DiffRemoved": "#F38BA8",
-      "DiffModified": "#89B4FA",
-      "GradientColors": ["#4796E4", "#847ACE", "#C3677F"]
+  "ui": {
+    "customThemes": {
+      "MyCustomTheme": {
+        "name": "MyCustomTheme",
+        "type": "custom",
+        "Background": "#181818",
+        ...
+      }
     }
   }
 }
@@ -115,7 +104,9 @@ To load a theme from a file, set the `theme` property in your `settings.json` to
 
 ```json
 {
-  "theme": "/path/to/your/theme.json"
+  "ui": {
+    "theme": "/path/to/your/theme.json"
+  }
 }
 ```
 
@@ -154,7 +145,7 @@ The theme file must be a valid JSON file that follows the same structure as a cu
 ### Using Your Custom Theme
 
 - Select your custom theme using the `/theme` command in Gemini CLI. Your custom theme will appear in the theme selection dialog.
-- Or, set it as the default by adding `"theme": "MyCustomTheme"` to your `settings.json`.
+- Or, set it as the default by adding `"theme": "MyCustomTheme"` to the `ui` object in your `settings.json`.
 - Custom themes can be set at the user, project, or system level, and follow the same [configuration precedence](./configuration.md) as other settings.
 
 ---

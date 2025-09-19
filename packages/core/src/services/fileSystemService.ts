@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import fs from 'fs/promises';
+import fs from 'node:fs/promises';
 
 /**
  * Interface for file system operations that may be delegated to different implementations

@@ -6,7 +6,7 @@ exports[`ShellTool > getDescription > should return the non-windows description 
       The following information is returned:
 
       Command: Executed command.
-      Directory: Directory (relative to project root) where command was executed, or \`(root)\`.
+      Directory: Directory where command was executed, or \`(root)\`.
       Stdout: Output on stdout stream. Can be \`(empty)\` or partial on error and for any unwaited background processes.
       Stderr: Output on stderr stream. Can be \`(empty)\` or partial on error and for any unwaited background processes.
       Error: Error or \`(none)\` if no error was reported for the subprocess.
@@ -22,7 +22,7 @@ exports[`ShellTool > getDescription > should return the windows description when
       The following information is returned:
 
       Command: Executed command.
-      Directory: Directory (relative to project root) where command was executed, or \`(root)\`.
+      Directory: Directory where command was executed, or \`(root)\`.
       Stdout: Output on stdout stream. Can be \`(empty)\` or partial on error and for any unwaited background processes.
       Stderr: Output on stderr stream. Can be \`(empty)\` or partial on error and for any unwaited background processes.
       Error: Error or \`(none)\` if no error was reported for the subprocess.

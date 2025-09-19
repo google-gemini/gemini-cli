@@ -5,9 +5,9 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import * as fsPromises from 'fs/promises';
-import * as path from 'path';
-import * as os from 'os';
+import * as fsPromises from 'node:fs/promises';
+import * as path from 'node:path';
+import * as os from 'node:os';
 import { bfsFileSearch } from './bfsFileSearch.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 

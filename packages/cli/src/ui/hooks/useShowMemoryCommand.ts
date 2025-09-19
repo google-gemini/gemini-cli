@@ -4,9 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Message, MessageType } from '../types.js';
-import { Config } from '@google/gemini-cli-core';
-import { LoadedSettings } from '../../config/settings.js';
+import type { Message } from '../types.js';
+import { MessageType } from '../types.js';
+import type { Config } from '@google/gemini-cli-core';
+import type { LoadedSettings } from '../../config/settings.js';
 
 export function createShowMemoryAction(
   config: Config | null,
@@ -31,7 +32,7 @@ export function createShowMemoryAction(
 
     const currentMemory = config.getUserMemory();
     const fileCount = config.getGeminiMdFileCount();
-    const contextFileName = settings.merged.contextFileName;
+    const contextFileName = settings.merged.context?.fileName;
     const contextFileNames = Array.isArray(contextFileName)
       ? contextFileName
       : [contextFileName];

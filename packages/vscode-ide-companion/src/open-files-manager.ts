@@ -172,6 +172,7 @@ export class OpenFilesManager {
     return {
       workspaceState: {
         openFiles: [...this.openFiles],
+        isTrusted: vscode.workspace.isTrusted,
       },
     };
   }

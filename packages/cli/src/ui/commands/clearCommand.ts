@@ -5,7 +5,8 @@
  */
 
 import { uiTelemetryService } from '@google/gemini-cli-core';
-import { CommandKind, SlashCommand } from './types.js';
+import type { SlashCommand } from './types.js';
+import { CommandKind } from './types.js';
 
 export const clearCommand: SlashCommand = {
   name: 'clear',
@@ -23,7 +24,7 @@ export const clearCommand: SlashCommand = {
       context.ui.setDebugMessage('Clearing terminal.');
     }
 
-    uiTelemetryService.resetLastPromptTokenCount();
+    uiTelemetryService.setLastPromptTokenCount(0);
     context.ui.clear();
   },
 };
