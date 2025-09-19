@@ -57,8 +57,6 @@ jobs:
         run: |-
           git config user.name "gemini-cli-robot"
           git config user.email "gemini-cli-robot@google.com"
-          # Configure git to use GITHUB_TOKEN for remote operations (has actions:write for workflow files)
-          git remote set-url origin "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git"
 
       - name: 'Create Patch'
         id: 'create_patch'

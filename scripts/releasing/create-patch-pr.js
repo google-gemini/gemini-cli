@@ -95,17 +95,7 @@ async function main() {
     console.log(
       `Release branch ${releaseBranch} does not exist. Creating it from tag ${latestTag}...`,
     );
-    // Workaround for workflow permission issues: create branch from HEAD then reset to tag
-    run(`git checkout -b ${releaseBranch}`, dryRun);
-    run(`git reset --hard ${latestTag}`, dryRun);
-
-    // Ensure we're using GITHUB_TOKEN (with actions:write) for pushing workflow files
-    const githubToken = process.env.GITHUB_TOKEN;
-    const repo = process.env.GITHUB_REPOSITORY || 'google-gemini/gemini-cli';
-    if (githubToken) {
-      run(`git remote set-url origin https://x-access-token:${githubToken}@github.com/${repo}.git`, dryRun);
-    }
-
+    run(`git checkout -b ${releaseBranch} ${latestTag}`, dryRun);
     run(`git push origin ${releaseBranch}`, dryRun);
   } else {
     console.log(`Release branch ${releaseBranch} already exists.`);
