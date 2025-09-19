@@ -5,14 +5,35 @@
  */
 
 import { playSound } from './player.js';
-import {
+import type{
   NotificationSettings,
   NotificationEventType,
-  DEFAULT_NOTIFICATION_SETTINGS,
   NotificationEventSettings,
 } from './types.js';
 import { LoadedSettings, SettingScope } from '../config/settings.js';
 import * as os from 'os';
+
+/**
+ * Default notification settings.
+ */
+export const DEFAULT_NOTIFICATION_SETTINGS: NotificationSettings = {
+  enabled: true,
+  events: {
+    inputRequired: {
+      enabled: true,
+      sound: 'system',
+    },
+    taskComplete: {
+      enabled: false,
+      sound: 'system',
+    },
+    idleAlert: {
+      enabled: true,
+      sound: 'system',
+      timeout: 60, // seconds
+    },
+  },
+};
 
 let currentSettings: NotificationSettings = JSON.parse(JSON.stringify(DEFAULT_NOTIFICATION_SETTINGS));
 

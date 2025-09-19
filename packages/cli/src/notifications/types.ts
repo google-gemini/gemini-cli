@@ -30,25 +30,3 @@ export interface NotificationSettings {
  * Defines the event types for notifications.
  */
 export type NotificationEventType = 'inputRequired' | 'taskComplete' | 'idleAlert';
-
-/**
- * Default notification settings.
- */
-export const DEFAULT_NOTIFICATION_SETTINGS: NotificationSettings = {
-  enabled: true,
-  events: {
-    inputRequired: {
-      enabled: true,
-      sound: 'system',
-    },
-    taskComplete: {
-      enabled: false,
-      sound: 'system',
-    },
-    idleAlert: {
-      enabled: true,
-      sound: 'system',
-      timeout: 60, // seconds
-    },
-  },
-};
