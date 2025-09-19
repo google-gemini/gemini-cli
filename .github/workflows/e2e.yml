@@ -62,7 +62,7 @@ jobs:
       - name: 'Upload build artifacts'
         uses: 'actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02'
         with:
-          name: 'build-artifacts'
+          name: 'build-artifacts-${{ github.run_id }}'
           path: 'build-artifacts.tar'
 
   e2e_linux:
@@ -102,7 +102,7 @@ jobs:
       - name: 'Download build artifacts'
         uses: 'actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093'
         with:
-          name: 'build-artifacts'
+          name: 'build-artifacts-${{ github.run_id }}'
           path: '.'
 
       - name: 'Extract build artifacts'
@@ -168,7 +168,7 @@ jobs:
       - name: 'Download build artifacts'
         uses: 'actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093'
         with:
-          name: 'build-artifacts'
+          name: 'build-artifacts-${{ github.run_id }}'
           path: '.'
 
       - name: 'Extract build artifacts'
@@ -196,9 +196,11 @@ jobs:
 
   e2e_windows:
     name: 'Slow E2E - Win'
-    if: "needs.merge_queue_skipper.outputs.skip != 'true'"
-    needs:
-      - 'merge_queue_skipper'
+    if: |
+      github.event_name == 'push' ||
+      github.event_name == 'merge_group' ||
+      (github.event.pull_request.head.repo.full_name == github.repository) ||
+      (github.event.label.name == 'maintainer:e2e:ok')
     runs-on: 'gemini-cli-windows-16-core'
     continue-on-error: true
 
