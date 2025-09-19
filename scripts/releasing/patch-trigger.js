@@ -37,6 +37,11 @@ async function main() {
       type: 'boolean',
       default: false,
     })
+    .option('force-skip-tests', {
+      description: 'Skip the "Run Tests" step in testing',
+      type: 'boolean',
+      default: false,
+    })
     .example(
       '$0 --head-ref "hotfix/v0.5.3/preview/cherry-pick-abc1234" --test',
       'Test channel detection logic',
@@ -72,6 +77,7 @@ async function main() {
   const headRef = argv.headRef || process.env.HEAD_REF;
   const body = argv.prBody || process.env.PR_BODY || '';
   const isDryRun = argv.dryRun || body.includes('[DRY RUN]');
+  const forceSkipTests = argv.forceSkipTests || process.env.FORCE_SKIP_TESTS === 'true';
 
   if (!headRef) {
     throw new Error(
@@ -169,6 +175,7 @@ async function main() {
       inputs: {
         type: channel,
         dry_run: isDryRun.toString(),
+        force_skip_tests: forceSkipTests.toString(),
         release_ref: releaseRef,
         original_pr: originalPr ? originalPr.toString() : '',
       },
@@ -177,6 +184,7 @@ async function main() {
     console.log('✅ Would trigger workflow with inputs:', {
       type: channel,
       dry_run: isDryRun.toString(),
+      force_skip_tests: forceSkipTests.toString(),
       release_ref: releaseRef,
       original_pr: originalPr ? originalPr.toString() : '',
     });
