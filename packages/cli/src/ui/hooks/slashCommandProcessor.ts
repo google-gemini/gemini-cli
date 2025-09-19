@@ -4,7 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useCallback, useMemo, useEffect, useState } from 'react';
+import {
+  useCallback,
+  useMemo,
+  useEffect,
+  useState,
+  type Dispatch,
+  type SetStateAction,
+} from 'react';
 import { type PartListUnion } from '@google/genai';
 import process from 'node:process';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
@@ -45,9 +52,9 @@ interface SlashCommandProcessorActions {
   quit: (messages: HistoryItem[]) => void;
   setDebugMessage: (message: string) => void;
   toggleCorgiMode: () => void;
-  setExtensionsUpdateState: (
-    updateState: Map<string, ExtensionUpdateState>,
-  ) => void;
+  setExtensionsUpdateState: Dispatch<
+    SetStateAction<Map<string, ExtensionUpdateState>>
+  >;
 }
 
 /**

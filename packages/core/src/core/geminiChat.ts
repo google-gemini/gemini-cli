@@ -41,6 +41,7 @@ import {
 import { handleFallback } from '../fallback/handler.js';
 import { isFunctionResponse } from '../utils/messageInspectors.js';
 import { partListUnionToString } from './geminiRequest.js';
+import { uiTelemetryService } from '../telemetry/uiTelemetry.js';
 
 export enum StreamEventType {
   /** A regular content chunk from the API. */
@@ -529,6 +530,11 @@ export class GeminiChat {
       // Record token usage if this chunk has usageMetadata
       if (chunk.usageMetadata) {
         this.chatRecordingService.recordMessageTokens(chunk.usageMetadata);
+        if (chunk.usageMetadata.promptTokenCount !== undefined) {
+          uiTelemetryService.setLastPromptTokenCount(
+            chunk.usageMetadata.promptTokenCount,
+          );
+        }
       }
 
       yield chunk; // Yield every chunk to the UI immediately.

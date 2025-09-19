@@ -110,12 +110,20 @@ There are two ways to create a patch pull request:
 
 After a pull request containing the fix has been merged, a maintainer can add a comment on that same PR with the following format:
 
-`/patch <channel> [--dry-run]`
+`/patch [channel]`
 
-- **channel**: `stable` or `preview`
-- **--dry-run** (optional): If included, the workflow will run in dry-run mode. This will create the PR with "[DRY RUN]" in the title, and merging it will trigger a dry run of the final release, so nothing is actually published.
+- **channel** (optional):
+  - _no channel_ - patches both stable and preview channels (default, recommended for most fixes)
+  - `both` - patches both stable and preview channels (same as default)
+  - `stable` - patches only the stable channel
+  - `preview` - patches only the preview channel
 
-Example: `/patch stable --dry-run`
+Examples:
+
+- `/patch` (patches both stable and preview - default)
+- `/patch both` (patches both stable and preview - explicit)
+- `/patch stable` (patches only stable)
+- `/patch preview` (patches only preview)
 
 The `Release: Patch from Comment` workflow will automatically find the merge commit SHA and trigger the `Release: Patch (1) Create PR` workflow. If the PR is not yet merged, it will post a comment indicating the failure.
 
@@ -134,13 +142,44 @@ This workflow will automatically:
 4.  Cherry-pick your specified commit into the hotfix branch.
 5.  Create a pull request from the hotfix branch back to the release branch.
 
-**Important:** If you select `stable`, the workflow will run twice, creating one PR for the `stable` channel and a second PR for the `preview` channel.
-
 #### 2. Review and Merge
 
 Review the automatically created pull request(s) to ensure the cherry-pick was successful and the changes are correct. Once approved, merge the pull request.
 
 **Security Note:** The `release/*` branches are protected by branch protection rules. A pull request to one of these branches requires at least one review from a code owner before it can be merged. This ensures that no unauthorized code is released.
+
+#### 2.5. Adding Multiple Commits to a Hotfix (Advanced)
+
+If you need to include multiple fixes in a single patch release, you can add additional commits to the hotfix branch after the initial patch PR has been created:
+
+1. **Start with the primary fix**: Use `/patch` (or `/patch both`) on the most important PR to create the initial hotfix branch and PR.
+
+2. **Checkout the hotfix branch locally**:
+
+   ```bash
+   git fetch origin
+   git checkout hotfix/v0.5.1/stable/cherry-pick-abc1234  # Use the actual branch name from the PR
+   ```
+
+3. **Cherry-pick additional commits**:
+
+   ```bash
+   git cherry-pick <commit-sha-1>
+   git cherry-pick <commit-sha-2>
+   # Add as many commits as needed
+   ```
+
+4. **Push the updated branch**:
+
+   ```bash
+   git push origin hotfix/v0.5.1/stable/cherry-pick-abc1234
+   ```
+
+5. **Test and review**: The existing patch PR will automatically update with your additional commits. Test thoroughly since you're now releasing multiple changes together.
+
+6. **Update the PR description**: Consider updating the PR title and description to reflect that it includes multiple fixes.
+
+This approach allows you to group related fixes into a single patch release while maintaining full control over what gets included and how conflicts are resolved.
 
 #### 3. Automatic Release
 
@@ -151,6 +190,65 @@ Upon merging the pull request, the `Release: Patch (2) Trigger` workflow is auto
 3.  Create a new GitHub release with the patch notes.
 
 This fully automated process ensures that patches are created and released consistently and reliably.
+
+#### Troubleshooting: Older Branch Workflows
+
+**Issue**: If the patch trigger workflow fails with errors like "Resource not accessible by integration" or references to non-existent workflow files (e.g., `patch-release.yml`), this indicates the hotfix branch contains an outdated version of the workflow files.
+
+**Root Cause**: When a PR is merged, GitHub Actions runs the workflow definition from the **source branch** (the hotfix branch), not from the target branch (the release branch). If the hotfix branch was created from an older release branch that predates workflow improvements, it will use the old workflow logic.
+
+**Solutions**:
+
+**Option 1: Manual Trigger (Quick Fix)**
+Manually trigger the updated workflow from the branch with the latest workflow code:
+
+```bash
+# For a preview channel patch with tests skipped
+gh workflow run release-patch-2-trigger.yml --ref <branch-with-updated-workflow> \
+  --field ref="hotfix/v0.6.0-preview.2/preview/cherry-pick-abc1234" \
+  --field workflow_ref=<branch-with-updated-workflow> \
+  --field dry_run=false \
+  --field force_skip_tests=true
+
+# For a stable channel patch
+gh workflow run release-patch-2-trigger.yml --ref <branch-with-updated-workflow> \
+  --field ref="hotfix/v0.5.1/stable/cherry-pick-abc1234" \
+  --field workflow_ref=<branch-with-updated-workflow> \
+  --field dry_run=false \
+  --field force_skip_tests=false
+
+# Example using main branch (most common case)
+gh workflow run release-patch-2-trigger.yml --ref main \
+  --field ref="hotfix/v0.6.0-preview.2/preview/cherry-pick-abc1234" \
+  --field workflow_ref=main \
+  --field dry_run=false \
+  --field force_skip_tests=true
+```
+
+**Note**: Replace `<branch-with-updated-workflow>` with the branch containing the latest workflow improvements (usually `main`, but could be a feature branch if testing updates).
+
+**Option 2: Update the Hotfix Branch**
+Merge the latest main branch into your hotfix branch to get the updated workflows:
+
+```bash
+git checkout hotfix/v0.6.0-preview.2/preview/cherry-pick-abc1234
+git merge main
+git push
+```
+
+Then close and reopen the PR to retrigger the workflow with the updated version.
+
+**Option 3: Direct Release Trigger**
+Skip the trigger workflow entirely and directly run the release workflow:
+
+```bash
+# Replace channel and release_ref with appropriate values
+gh workflow run release-patch-3-release.yml --ref main \
+  --field type="preview" \
+  --field dry_run=false \
+  --field force_skip_tests=true \
+  --field release_ref="release/v0.6.0-preview.2"
+```
 
 ### Docker
 
@@ -299,3 +397,26 @@ graph TD
 
 This process ensures that the final published artifact is a purpose-built, clean, and efficient representation of the
 project, rather than a direct copy of the development workspace.
+
+## Notifications
+
+Failing release workflows will automatically create an issue with the label
+`release-failure`.
+
+A notification will be posted to the maintainer's chat channel when issues with
+this type are created.
+
+### Modifying chat notifications
+
+Notifications use [GitHub for Google Chat](https://workspace.google.com/marketplace/app/github_for_google_chat/536184076190). To modify the notifications, use `/github-settings` within the chat space.
+
+> [!WARNING]
+> The following instructions describe a fragile workaround that depends on the internal structure of the chat application's UI. It is likely to break with future updates.
+
+The list of available labels is not currently populated correctly. If you want to add a label that does not appear alphabetically in the first 30 labels in the repo, you must use your browser's developer tools to manually modify the UI:
+
+1. Open your browser's developer tools (e.g., Chrome DevTools).
+2. In the `/github-settings` dialog, inspect the list of labels.
+3. Locate one of the `<li>` elements representing a label.
+4. In the HTML, modify the `data-option-value` attribute of that `<li>` element to the desired label name (e.g., `release-failure`).
+5. Click on your modified label in the UI to select it, then save your settings.
