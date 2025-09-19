@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, type MockInstance } from 'vitest';
+import { describe, it, expect, vi, type MockInstance } from 'vitest';
 import { handleInstall, installCommand } from './install.js';
 import yargs from 'yargs';
 
@@ -31,6 +31,15 @@ describe('extensions install command', () => {
     expect(() =>
       validationParser.parse('install some-url --path /some/path'),
     ).toThrow('Arguments source and path are mutually exclusive');
+  });
+
+  it('should fail if both auto update and local path are provided', () => {
+    const validationParser = yargs([]).command(installCommand).fail(false);
+    expect(() =>
+      validationParser.parse(
+        'install some-url --path /some/path --auto-update',
+      ),
+    ).toThrow('Arguments path and auto-update are mutually exclusive');
   });
 });
 

@@ -50,6 +50,9 @@ export enum EventMetadataKey {
   // Logs whether the session was configured to respect gitignore files.
   GEMINI_CLI_START_SESSION_RESPECT_GITIGNORE = 12,
 
+  // Logs the output format of the session.
+  GEMINI_CLI_START_SESSION_OUTPUT_FORMAT = 94,
+
   // ==========================================================================
   // User Prompt Event Keys
   // ===========================================================================
@@ -63,6 +66,9 @@ export enum EventMetadataKey {
 
   // Logs the function name.
   GEMINI_CLI_TOOL_CALL_NAME = 14,
+
+  // Logs the MCP server name.
+  GEMINI_CLI_TOOL_CALL_MCP_SERVER_NAME = 95,
 
   // Logs the user's decision about how to handle the tool call.
   GEMINI_CLI_TOOL_CALL_DECISION = 15,
@@ -352,6 +358,9 @@ export enum EventMetadataKey {
 
   // Logs the status of the extension uninstall
   GEMINI_CLI_EXTENSION_UNINSTALL_STATUS = 96,
+
+  // Logs the setting scope for an extension enablement.
+  GEMINI_CLI_EXTENSION_ENABLE_SETTING_SCOPE = 102,
 
   // ==========================================================================
   // Tool Output Truncated Event Keys

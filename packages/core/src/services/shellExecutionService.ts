@@ -85,17 +85,6 @@ interface ActivePty {
   headlessTerminal: pkg.Terminal;
 }
 
-const getVisibleText = (terminal: pkg.Terminal): string => {
-  const buffer = terminal.buffer.active;
-  const lines: string[] = [];
-  for (let i = 0; i < terminal.rows; i++) {
-    const line = buffer.getLine(buffer.viewportY + i);
-    const lineContent = line ? line.translateToString(true) : '';
-    lines.push(lineContent);
-  }
-  return lines.join('\n').trimEnd();
-};
-
 const getFullBufferText = (terminal: pkg.Terminal): string => {
   const buffer = terminal.buffer.active;
   const lines: string[] = [];
@@ -379,6 +368,7 @@ export class ShellExecutionService {
           cols,
           rows,
         });
+        headlessTerminal.scrollToTop();
 
         this.activePtys.set(ptyProcess.pid, { ptyProcess, headlessTerminal });
 
@@ -404,14 +394,33 @@ export class ShellExecutionService {
             if (!isStreamingRawContent) {
               return;
             }
-            const newOutput = shellExecutionConfig.showColor
-              ? serializeTerminalToObject(headlessTerminal, {
-                  defaultFg: shellExecutionConfig.defaultFg,
-                  defaultBg: shellExecutionConfig.defaultBg,
-                })
-              : getVisibleText(headlessTerminal);
-
-            // console.log(newOutput)
+            let newOutput: AnsiOutput;
+            if (shellExecutionConfig.showColor) {
+              newOutput = serializeTerminalToObject(headlessTerminal, {
+                defaultFg: shellExecutionConfig.defaultFg,
+                defaultBg: shellExecutionConfig.defaultBg,
+              });
+            } else {
+              const buffer = headlessTerminal.buffer.active;
+              const lines: AnsiOutput = [];
+              for (let y = 0; y < headlessTerminal.rows; y++) {
+                const line = buffer.getLine(buffer.viewportY + y);
+                const lineContent = line ? line.translateToString(true) : '';
+                lines.push([
+                  {
+                    text: lineContent,
+                    bold: false,
+                    italic: false,
+                    underline: false,
+                    dim: false,
+                    inverse: false,
+                    fg: '',
+                    bg: '',
+                  },
+                ]);
+              }
+              newOutput = lines;
+            }
 
             // Using stringify for a quick deep comparison.
             if (JSON.stringify(output) !== JSON.stringify(newOutput)) {
@@ -602,6 +611,9 @@ export class ShellExecutionService {
     if (activePty) {
       try {
         activePty.headlessTerminal.scrollLines(lines);
+        if (activePty.headlessTerminal.buffer.active.viewportY < 0) {
+          activePty.headlessTerminal.scrollToTop();
+        }
       } catch (e) {
         // Ignore errors if the pty has already exited, which can happen
         // due to a race condition between the exit event and this call.
