@@ -43,6 +43,7 @@ for (const workspace of rootPackageJson.workspaces) {
   for (const pkgPath of packages) {
     const pkgDir = dirname(join(root, pkgPath));
     rmSync(join(pkgDir, 'dist'), RMRF_OPTIONS);
+    rmSync(join(pkgDir, 'tsconfig.tsbuildinfo'), RMRF_OPTIONS);
   }
 }
 

@@ -22,11 +22,11 @@ import type { Config } from '../config/config.js';
 import { createMockWorkspaceContext } from '../test-utils/mockWorkspaceContext.js';
 import type { ChildProcess } from 'node:child_process';
 import { spawn } from 'node:child_process';
-import { downloadRipGrep } from '@joshua.litt/get-ripgrep';
+import { downloadRipGrep } from 'get-ripgrep';
 import { fileExists } from '../utils/fileUtils.js';
 
 // Mock dependencies for canUseRipgrep
-vi.mock('@joshua.litt/get-ripgrep', () => ({
+vi.mock('get-ripgrep', () => ({
   downloadRipGrep: vi.fn(),
 }));
 vi.mock('../utils/fileUtils.js', async (importOriginal) => {

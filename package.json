@@ -6,6 +6,7 @@
   },
   "type": "module",
   "workspaces": [
+    "third_party/get-ripgrep",
     "packages/*"
   ],
   "private": "true",
