@@ -132,7 +132,7 @@ async function main() {
   ) {
     // GitHub App permission error - extract manual commands
     const manualCommandsMatch = logContent.match(
-      /Please run these commands manually to create the branch:\s*\n\s*```bash\s*([\s\S]*?)\s*```/,
+      /📋 Please run these commands manually to create the branch:[\s\S]*?```bash\s*([\s\S]*?)\s*```/,
     );
     let manualCommands = '';
     if (manualCommandsMatch) {
