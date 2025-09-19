@@ -34,12 +34,7 @@ import {
 } from './utils/cleanup.js';
 import { getCliVersion } from './utils/version.js';
 import type { Config } from '@google/gemini-cli-core';
-import {
-  sessionId,
-  logUserPrompt,
-  AuthType,
-  getOauthClient,
-} from '@google/gemini-cli-core';
+import { sessionId, logUserPrompt, AuthType } from '@google/gemini-cli-core';
 import {
   initializeApp,
   type InitializationResult,
