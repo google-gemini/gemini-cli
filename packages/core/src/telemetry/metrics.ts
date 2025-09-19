@@ -24,10 +24,6 @@ import {
   // Performance Monitoring Metrics
   METRIC_STARTUP_TIME,
   METRIC_MEMORY_USAGE,
-  METRIC_MEMORY_HEAP_USED,
-  METRIC_MEMORY_HEAP_TOTAL,
-  METRIC_MEMORY_EXTERNAL,
-  METRIC_MEMORY_RSS,
   METRIC_CPU_USAGE,
   METRIC_TOOL_QUEUE_DEPTH,
   METRIC_TOOL_EXECUTION_BREAKDOWN,
@@ -35,6 +31,7 @@ import {
   METRIC_API_REQUEST_BREAKDOWN,
   METRIC_PERFORMANCE_SCORE,
   METRIC_REGRESSION_DETECTION,
+  METRIC_REGRESSION_PERCENTAGE_CHANGE,
   METRIC_BASELINE_COMPARISON,
 } from './constants.js';
 import type { Config } from '../config/config.js';
@@ -93,10 +90,6 @@ let modelRoutingFailureCounter: Counter | undefined;
 // Performance Monitoring Metrics
 let startupTimeHistogram: Histogram | undefined;
 let memoryUsageGauge: Histogram | undefined; // Using Histogram until ObservableGauge is available
-let memoryHeapUsedGauge: Histogram | undefined;
-let memoryHeapTotalGauge: Histogram | undefined;
-let memoryExternalGauge: Histogram | undefined;
-let memoryRssGauge: Histogram | undefined;
 let cpuUsageGauge: Histogram | undefined;
 let toolQueueDepthGauge: Histogram | undefined;
 let toolExecutionBreakdownHistogram: Histogram | undefined;
@@ -104,6 +97,7 @@ let tokenEfficiencyHistogram: Histogram | undefined;
 let apiRequestBreakdownHistogram: Histogram | undefined;
 let performanceScoreGauge: Histogram | undefined;
 let regressionDetectionCounter: Counter | undefined;
+let regressionPercentageChangeHistogram: Histogram | undefined;
 let baselineComparisonHistogram: Histogram | undefined;
 let isMetricsInitialized = false;
 let isPerformanceMonitoringEnabled = false;
@@ -400,33 +394,9 @@ export function initializePerformanceMonitoring(config: Config): void {
     valueType: ValueType.DOUBLE,
   });
 
-  // Initialize memory usage histograms (using histograms for now, will upgrade to gauges when available)
+  // Initialize memory usage histogram (using histogram until ObservableGauge is available)
   memoryUsageGauge = meter.createHistogram(METRIC_MEMORY_USAGE, {
     description: 'Memory usage in bytes.',
-    unit: 'bytes',
-    valueType: ValueType.INT,
-  });
-
-  memoryHeapUsedGauge = meter.createHistogram(METRIC_MEMORY_HEAP_USED, {
-    description: 'Heap memory used in bytes.',
-    unit: 'bytes',
-    valueType: ValueType.INT,
-  });
-
-  memoryHeapTotalGauge = meter.createHistogram(METRIC_MEMORY_HEAP_TOTAL, {
-    description: 'Total heap memory in bytes.',
-    unit: 'bytes',
-    valueType: ValueType.INT,
-  });
-
-  memoryExternalGauge = meter.createHistogram(METRIC_MEMORY_EXTERNAL, {
-    description: 'External memory in bytes.',
-    unit: 'bytes',
-    valueType: ValueType.INT,
-  });
-
-  memoryRssGauge = meter.createHistogram(METRIC_MEMORY_RSS, {
-    description: 'Resident Set Size (RSS) memory in bytes.',
     unit: 'bytes',
     valueType: ValueType.INT,
   });
@@ -484,6 +454,16 @@ export function initializePerformanceMonitoring(config: Config): void {
     },
   );
 
+  regressionPercentageChangeHistogram = meter.createHistogram(
+    METRIC_REGRESSION_PERCENTAGE_CHANGE,
+    {
+      description:
+        'Percentage change compared to baseline for detected regressions.',
+      unit: 'percent',
+      valueType: ValueType.DOUBLE,
+    },
+  );
+
   baselineComparisonHistogram = meter.createHistogram(
     METRIC_BASELINE_COMPARISON,
     {
@@ -518,7 +498,7 @@ export function recordMemoryUsage(
   bytes: number,
   component?: string,
 ): void {
-  if (!isPerformanceMonitoringEnabled) return;
+  if (!memoryUsageGauge || !isPerformanceMonitoringEnabled) return;
 
   const attributes: Attributes = {
     ...getCommonAttributes(config),
@@ -526,22 +506,7 @@ export function recordMemoryUsage(
     component,
   };
 
-  switch (memoryType) {
-    case MemoryMetricType.HEAP_USED:
-      memoryHeapUsedGauge?.record(bytes, attributes);
-      break;
-    case MemoryMetricType.HEAP_TOTAL:
-      memoryHeapTotalGauge?.record(bytes, attributes);
-      break;
-    case MemoryMetricType.EXTERNAL:
-      memoryExternalGauge?.record(bytes, attributes);
-      break;
-    case MemoryMetricType.RSS:
-      memoryRssGauge?.record(bytes, attributes);
-      break;
-    default:
-      memoryUsageGauge?.record(bytes, attributes);
-  }
+  memoryUsageGauge.record(bytes, attributes);
 }
 
 export function recordCpuUsage(
@@ -647,12 +612,7 @@ export function recordPerformanceRegression(
   baselineValue: number,
   severity: 'low' | 'medium' | 'high',
 ): void {
-  if (
-    !regressionDetectionCounter ||
-    !baselineComparisonHistogram ||
-    !isPerformanceMonitoringEnabled
-  )
-    return;
+  if (!regressionDetectionCounter || !isPerformanceMonitoringEnabled) return;
 
   const attributes: Attributes = {
     ...getCommonAttributes(config),
@@ -664,10 +624,10 @@ export function recordPerformanceRegression(
 
   regressionDetectionCounter.add(1, attributes);
 
-  if (baselineValue !== 0) {
+  if (baselineValue !== 0 && regressionPercentageChangeHistogram) {
     const percentageChange =
       ((currentValue - baselineValue) / baselineValue) * 100;
-    baselineComparisonHistogram.record(percentageChange, attributes);
+    regressionPercentageChangeHistogram.record(percentageChange, attributes);
   }
 }
 
