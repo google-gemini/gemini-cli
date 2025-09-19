@@ -69,15 +69,19 @@ vi.mock('./trustedFolders.js', async (importOriginal) => {
   };
 });
 
+const mockLogExtensionEnable = vi.hoisted(() => vi.fn());
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const actual =
     await importOriginal<typeof import('@google/gemini-cli-core')>();
+  const mockLogExtensionEnableEvent = vi.fn();
   const mockLogExtensionInstallEvent = vi.fn();
   const mockLogExtensionUninstallEvent = vi.fn();
   return {
     ...actual,
+    logExtensionEnable: mockLogExtensionEnable,
     ClearcutLogger: {
       getInstance: vi.fn(() => ({
+        logExtensionEnableEvent: mockLogExtensionEnableEvent,
         logExtensionInstallEvent: mockLogExtensionInstallEvent,
         logExtensionUninstallEvent: mockLogExtensionUninstallEvent,
       })),
