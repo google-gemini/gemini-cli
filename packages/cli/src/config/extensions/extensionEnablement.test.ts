@@ -10,14 +10,6 @@ import os from 'node:os';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { ExtensionEnablementManager, Override } from './extensionEnablement.js';
 
-vi.mock('node:path', async (importOriginal) => {
-  const originalPath = await importOriginal<typeof path>();
-  return {
-    ...originalPath,
-    sep: '/',
-  };
-});
-
 // Helper to create a temporary directory for testing
 function createTestDir() {
   const dirPath = fs.mkdtempSync(path.join(os.tmpdir(), 'gemini-test-'));

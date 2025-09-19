@@ -78,12 +78,13 @@ export class Override {
 }
 
 const ensureLeadingAndTrailingSlash = function (dirPath: string): string {
-  let result = dirPath;
-  if (dirPath.charAt(0) !== path.sep) {
-    result = path.sep + result;
+  // Normalize separators to forward slashes for consistent matching across platforms.
+  let result = dirPath.replace(/\\/g, '/');
+  if (result.charAt(0) !== '/') {
+    result = '/' + result;
   }
-  if (dirPath.charAt(dirPath.length - 1) !== path.sep) {
-    result = result + path.sep;
+  if (result.charAt(result.length - 1) !== '/') {
+    result = result + '/';
   }
   return result;
 };
