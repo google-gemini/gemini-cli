@@ -103,7 +103,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   const escPressCount = useRef(0);
   const [showEscapePrompt, setShowEscapePrompt] = useState(false);
   const escapeTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const [recentPasteTime, setRecentPasteTime] = useState<number | null>(null);
+  const recentPasteTime = useRef<number | null>(null);
   const pasteTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const [dirs, setDirs] = useState<readonly string[]>(
@@ -298,7 +298,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
       if (key.paste) {
         // Record paste time to prevent accidental auto-submission
-        setRecentPasteTime(Date.now());
+        recentPasteTime.current = Date.now();
 
         // Clear any existing paste timeout
         if (pasteTimeoutRef.current) {
@@ -307,7 +307,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
         // Clear the paste protection after a safe delay
         pasteTimeoutRef.current = setTimeout(() => {
-          setRecentPasteTime(null);
+          recentPasteTime.current = null;
           pasteTimeoutRef.current = null;
         }, 500);
 
@@ -579,7 +579,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       if (keyMatchers[Command.SUBMIT](key)) {
         if (buffer.text.trim()) {
           // Check if a paste operation occurred recently to prevent accidental auto-submission
-          if (recentPasteTime !== null) {
+          if (recentPasteTime.current !== null) {
             // Paste occurred recently, ignore this submit to prevent auto-execution
             return;
           }
@@ -682,7 +682,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       reverseSearchActive,
       textBeforeReverseSearch,
       cursorPosition,
-      recentPasteTime,
       commandSearchActive,
       commandSearchCompletion,
     ],
