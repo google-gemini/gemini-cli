@@ -13,8 +13,6 @@ This is the most flexible and simple option. All you need to do us create a publ
 
 Whenever commits are pushed to the ref that a user depends on, they will be prompted to update the extension. Note that this also allows for easy rollbacks, the HEAD commit is always treated as the latest version regardless of the actual version in the `gemini-extension.json` file.
 
-Using a git repo can also provide a more incremental update as opposed to a github release which always downloads and entirely new copy of the extension.
-
 ### Managing release channels using a git repository
 
 Users can depend on any ref from your git repo, such as a branch or tag, which allows you to manage multiple release channels.
