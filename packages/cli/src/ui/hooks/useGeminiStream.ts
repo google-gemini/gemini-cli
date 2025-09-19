@@ -139,10 +139,16 @@ export const useGeminiStream = (
 
           // Record tool calls with full metadata before sending responses.
           try {
+            const currentModel =
+              config.getGeminiClient().getCurrentSequenceModel() ??
+              config.getModel();
             config
               .getGeminiClient()
               .getChat()
-              .recordCompletedToolCalls(completedToolCallsFromScheduler);
+              .recordCompletedToolCalls(
+                currentModel,
+                completedToolCallsFromScheduler,
+              );
           } catch (error) {
             console.error(
               `Error recording completed tool call information: ${error}`,

@@ -197,7 +197,7 @@ export class ChatRecordingService {
    * Records a message in the conversation.
    */
   recordMessage(message: {
-    model: string;
+    model: string | undefined;
     type: ConversationRecordExtra['type'];
     content: PartListUnion;
   }): void {
