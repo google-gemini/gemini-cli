@@ -4,7 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { type Config } from '@google/gemini-cli-core';
+import {
+  IdeClient,
+  IdeConnectionEvent,
+  IdeConnectionType,
+  logIdeConnection,
+  type Config,
+} from '@google/gemini-cli-core';
 import { type LoadedSettings } from '../config/settings.js';
 import { performInitialAuth } from './auth.js';
 import { validateTheme } from './theme.js';
@@ -35,6 +41,12 @@ export async function initializeApp(
 
   const shouldOpenAuthDialog =
     settings.merged.security?.auth?.selectedType === undefined || !!authError;
+
+  if (config.getIdeMode()) {
+    const ideClient = await IdeClient.getInstance();
+    await ideClient.connect();
+    logIdeConnection(config, new IdeConnectionEvent(IdeConnectionType.START));
+  }
 
   return {
     authError,

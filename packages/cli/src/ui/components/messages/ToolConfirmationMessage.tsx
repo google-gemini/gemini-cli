@@ -5,9 +5,9 @@
  */
 
 import type React from 'react';
+import { useEffect, useState } from 'react';
 import { Box, Text } from 'ink';
 import { DiffRenderer } from './DiffRenderer.js';
-import { Colors } from '../../colors.js';
 import { RenderInline } from '../../utils/InlineMarkdownRenderer.js';
 import type {
   ToolCallConfirmationDetails,
@@ -20,6 +20,7 @@ import type { RadioSelectItem } from '../shared/RadioButtonSelect.js';
 import { RadioButtonSelect } from '../shared/RadioButtonSelect.js';
 import { MaxSizedBox } from '../shared/MaxSizedBox.js';
 import { useKeypress } from '../../hooks/useKeypress.js';
+import { theme } from '../../semantic-colors.js';
 
 export interface ToolConfirmationMessageProps {
   confirmationDetails: ToolCallConfirmationDetails;
@@ -41,12 +42,31 @@ export const ToolConfirmationMessage: React.FC<
   const { onConfirm } = confirmationDetails;
   const childWidth = terminalWidth - 2; // 2 for padding
 
+  const [ideClient, setIdeClient] = useState<IdeClient | null>(null);
+  const [isDiffingEnabled, setIsDiffingEnabled] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+    if (config.getIdeMode()) {
+      const getIdeClient = async () => {
+        const client = await IdeClient.getInstance();
+        if (isMounted) {
+          setIdeClient(client);
+          setIsDiffingEnabled(client?.isDiffingEnabled() ?? false);
+        }
+      };
+      getIdeClient();
+    }
+    return () => {
+      isMounted = false;
+    };
+  }, [config]);
+
   const handleConfirm = async (outcome: ToolConfirmationOutcome) => {
     if (confirmationDetails.type === 'edit') {
-      if (config.getIdeMode()) {
+      if (config.getIdeMode() && isDiffingEnabled) {
         const cliOutcome =
           outcome === ToolConfirmationOutcome.Cancel ? 'rejected' : 'accepted';
-        const ideClient = await IdeClient.getInstance();
         await ideClient?.resolveDiffFromCli(
           confirmationDetails.filePath,
           cliOutcome,
@@ -113,13 +133,13 @@ export const ToolConfirmationMessage: React.FC<
         <Box
           minWidth="90%"
           borderStyle="round"
-          borderColor={Colors.Gray}
+          borderColor={theme.border.default}
           justifyContent="space-around"
           padding={1}
           overflow="hidden"
         >
-          <Text>Modify in progress: </Text>
-          <Text color={Colors.AccentGreen}>
+          <Text color={theme.text.primary}>Modify in progress: </Text>
+          <Text color={theme.status.success}>
             Save and close external editor to continue
           </Text>
         </Box>
@@ -137,21 +157,17 @@ export const ToolConfirmationMessage: React.FC<
         value: ToolConfirmationOutcome.ProceedAlways,
       });
     }
-    if (config.getIdeMode()) {
-      options.push({
-        label: 'No (esc)',
-        value: ToolConfirmationOutcome.Cancel,
-      });
-    } else {
+    if (!config.getIdeMode() || !isDiffingEnabled) {
       options.push({
         label: 'Modify with external editor',
         value: ToolConfirmationOutcome.ModifyWithEditor,
       });
-      options.push({
-        label: 'No, suggest changes (esc)',
-        value: ToolConfirmationOutcome.Cancel,
-      });
     }
+
+    options.push({
+      label: 'No, suggest changes (esc)',
+      value: ToolConfirmationOutcome.Cancel,
+    });
 
     bodyContent = (
       <DiffRenderer
@@ -193,7 +209,7 @@ export const ToolConfirmationMessage: React.FC<
             maxWidth={Math.max(childWidth - 4, 1)}
           >
             <Box>
-              <Text color={Colors.AccentCyan}>{executionProps.command}</Text>
+              <Text color={theme.text.link}>{executionProps.command}</Text>
             </Box>
           </MaxSizedBox>
         </Box>
@@ -223,12 +239,12 @@ export const ToolConfirmationMessage: React.FC<
 
     bodyContent = (
       <Box flexDirection="column" paddingX={1} marginLeft={1}>
-        <Text color={Colors.AccentCyan}>
+        <Text color={theme.text.link}>
           <RenderInline text={infoProps.prompt} />
         </Text>
         {displayUrls && infoProps.urls && infoProps.urls.length > 0 && (
           <Box flexDirection="column" marginTop={1}>
-            <Text>URLs to fetch:</Text>
+            <Text color={theme.text.primary}>URLs to fetch:</Text>
             {infoProps.urls.map((url) => (
               <Text key={url}>
                 {' '}
@@ -245,8 +261,8 @@ export const ToolConfirmationMessage: React.FC<
 
     bodyContent = (
       <Box flexDirection="column" paddingX={1} marginLeft={1}>
-        <Text color={Colors.AccentCyan}>MCP Server: {mcpProps.serverName}</Text>
-        <Text color={Colors.AccentCyan}>Tool: {mcpProps.toolName}</Text>
+        <Text color={theme.text.link}>MCP Server: {mcpProps.serverName}</Text>
+        <Text color={theme.text.link}>Tool: {mcpProps.toolName}</Text>
       </Box>
     );
 
@@ -281,7 +297,9 @@ export const ToolConfirmationMessage: React.FC<
 
       {/* Confirmation Question */}
       <Box marginBottom={1} flexShrink={0}>
-        <Text wrap="truncate">{question}</Text>
+        <Text color={theme.text.primary} wrap="truncate">
+          {question}
+        </Text>
       </Box>
 
       {/* Select Input for Options */}

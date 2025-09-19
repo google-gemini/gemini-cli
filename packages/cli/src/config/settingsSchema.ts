@@ -187,6 +187,30 @@ const SETTINGS_SCHEMA = {
       },
     },
   },
+  output: {
+    type: 'object',
+    label: 'Output',
+    category: 'General',
+    requiresRestart: false,
+    default: {},
+    description: 'Settings for the CLI output.',
+    showInDialog: false,
+    properties: {
+      format: {
+        type: 'enum',
+        label: 'Output Format',
+        category: 'General',
+        requiresRestart: false,
+        default: 'text',
+        description: 'The format of the CLI output.',
+        showInDialog: true,
+        options: [
+          { value: 'text', label: 'Text' },
+          { value: 'json', label: 'JSON' },
+        ],
+      },
+    },
+  },
 
   ui: {
     type: 'object',
@@ -615,15 +639,45 @@ const SETTINGS_SCHEMA = {
           'Sandbox execution environment (can be a boolean or a path string).',
         showInDialog: false,
       },
-      usePty: {
-        type: 'boolean',
-        label: 'Use node-pty for Shell Execution',
+      shell: {
+        type: 'object',
+        label: 'Shell',
         category: 'Tools',
-        requiresRestart: true,
-        default: false,
-        description:
-          'Use node-pty for shell command execution. Fallback to child_process still applies.',
-        showInDialog: true,
+        requiresRestart: false,
+        default: {},
+        description: 'Settings for shell execution.',
+        showInDialog: false,
+        properties: {
+          enableInteractiveShell: {
+            type: 'boolean',
+            label: 'Enable Interactive Shell',
+            category: 'Tools',
+            requiresRestart: true,
+            default: false,
+            description:
+              'Use node-pty for an interactive shell experience. Fallback to child_process still applies.',
+            showInDialog: true,
+          },
+          pager: {
+            type: 'string',
+            label: 'Pager',
+            category: 'Tools',
+            requiresRestart: false,
+            default: 'cat' as string | undefined,
+            description:
+              'The pager command to use for shell output. Defaults to `cat`.',
+            showInDialog: false,
+          },
+          showColor: {
+            type: 'boolean',
+            label: 'Show Color',
+            category: 'Tools',
+            requiresRestart: false,
+            default: false,
+            description: 'Show color in shell output.',
+            showInDialog: true,
+          },
+        },
       },
       autoAccept: {
         type: 'boolean',
@@ -662,6 +716,7 @@ const SETTINGS_SCHEMA = {
         default: undefined as string[] | undefined,
         description: 'Tool names to exclude from discovery.',
         showInDialog: false,
+        mergeStrategy: MergeStrategy.UNION,
       },
       discoveryCommand: {
         type: 'string',
@@ -686,7 +741,7 @@ const SETTINGS_SCHEMA = {
         label: 'Use Ripgrep',
         category: 'Tools',
         requiresRestart: false,
-        default: false,
+        default: true,
         description:
           'Use ripgrep for file content search instead of the fallback implementation. Provides faster search performance.',
         showInDialog: true,
@@ -905,6 +960,16 @@ const SETTINGS_SCHEMA = {
         requiresRestart: true,
         default: true,
         description: 'Enable extension management features.',
+        showInDialog: false,
+      },
+      useModelRouter: {
+        type: 'boolean',
+        label: 'Use Model Router',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: false,
+        description:
+          'Enable model routing to route requests to the best model based on complexity.',
         showInDialog: false,
       },
     },

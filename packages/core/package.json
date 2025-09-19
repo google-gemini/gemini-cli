@@ -1,6 +1,6 @@
 {
   "name": "@google/gemini-cli-core",
-  "version": "0.4.0",
+  "version": "0.7.0-nightly.20250918.2722473a",
   "description": "Gemini CLI Core",
   "repository": {
     "type": "git",
@@ -21,7 +21,9 @@
   ],
   "dependencies": {
     "@google/genai": "1.16.0",
-    "@joshua.litt/get-ripgrep": "^0.0.2",
+    "@google-cloud/opentelemetry-cloud-monitoring-exporter": "^0.21.0",
+    "@google-cloud/opentelemetry-cloud-trace-exporter": "^3.0.0",
+    "@google-cloud/logging": "^11.2.1",
     "@modelcontextprotocol/sdk": "^1.11.0",
     "@opentelemetry/api": "^1.9.0",
     "@opentelemetry/exporter-logs-otlp-grpc": "^0.203.0",
@@ -31,6 +33,7 @@
     "@opentelemetry/exporter-trace-otlp-grpc": "^0.203.0",
     "@opentelemetry/exporter-trace-otlp-http": "^0.203.0",
     "@opentelemetry/instrumentation-http": "^0.203.0",
+    "@opentelemetry/resource-detector-gcp": "^0.40.0",
     "@opentelemetry/sdk-node": "^0.203.0",
     "@types/glob": "^8.1.0",
     "@types/html-to-text": "^9.0.4",
@@ -44,6 +47,7 @@
     "fast-uri": "^3.0.6",
     "fdir": "^6.4.6",
     "fzf": "^0.5.2",
+    "get-ripgrep": "file:../../third_party/get-ripgrep",
     "glob": "^10.4.5",
     "google-auth-library": "^9.11.0",
     "html-to-text": "^9.0.5",

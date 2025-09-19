@@ -13,6 +13,8 @@ import {
   EVENT_API_REQUEST,
   EVENT_API_RESPONSE,
   EVENT_CLI_CONFIG,
+  EVENT_EXTENSION_UNINSTALL,
+  EVENT_EXTENSION_ENABLE,
   EVENT_IDE_CONNECTION,
   EVENT_TOOL_CALL,
   EVENT_USER_PROMPT,
@@ -28,6 +30,8 @@ import {
   EVENT_CONTENT_RETRY_FAILURE,
   EVENT_FILE_OPERATION,
   EVENT_RIPGREP_FALLBACK,
+  EVENT_MODEL_ROUTING,
+  EVENT_EXTENSION_INSTALL,
 } from './constants.js';
 import type {
   ApiErrorEvent,
@@ -41,6 +45,7 @@ import type {
   FlashFallbackEvent,
   NextSpeakerCheckEvent,
   LoopDetectedEvent,
+  LoopDetectionDisabledEvent,
   SlashCommandEvent,
   ConversationFinishedEvent,
   KittySequenceOverflowEvent,
@@ -50,6 +55,11 @@ import type {
   ContentRetryEvent,
   ContentRetryFailureEvent,
   RipgrepFallbackEvent,
+  ToolOutputTruncatedEvent,
+  ModelRoutingEvent,
+  ExtensionEnableEvent,
+  ExtensionUninstallEvent,
+  ExtensionInstallEvent,
 } from './types.js';
 import {
   recordApiErrorMetrics,
@@ -61,6 +71,7 @@ import {
   recordInvalidChunk,
   recordContentRetry,
   recordContentRetryFailure,
+  recordModelRoutingMetrics,
 } from './metrics.js';
 import { isTelemetrySdkInitialized } from './sdk.js';
 import type { UiEvent } from './uiTelemetry.js';
@@ -106,6 +117,7 @@ export function logCliConfiguration(
     mcp_servers_count: event.mcp_servers_count,
     mcp_tools: event.mcp_tools,
     mcp_tools_count: event.mcp_tools_count,
+    output_format: event.output_format,
   };
 
   const logger = logs.getLogger(SERVICE_NAME);
@@ -182,6 +194,28 @@ export function logToolCall(config: Config, event: ToolCallEvent): void {
     event.decision,
     event.tool_type,
   );
+}
+
+export function logToolOutputTruncated(
+  config: Config,
+  event: ToolOutputTruncatedEvent,
+): void {
+  ClearcutLogger.getInstance(config)?.logToolOutputTruncatedEvent(event);
+  if (!isTelemetrySdkInitialized()) return;
+
+  const attributes: LogAttributes = {
+    ...getCommonAttributes(config),
+    ...event,
+    'event.name': 'tool_output_truncated',
+    'event.timestamp': new Date().toISOString(),
+  };
+
+  const logger = logs.getLogger(SERVICE_NAME);
+  const logRecord: LogRecord = {
+    body: `Tool output truncated for ${event.tool_name}.`,
+    attributes,
+  };
+  logger.emit(logRecord);
 }
 
 export function logFileOperation(
@@ -352,9 +386,7 @@ export function logApiResponse(config: Config, event: ApiResponseEvent): void {
   if (event.response_text) {
     attributes['response_text'] = event.response_text;
   }
-  if (event.error) {
-    attributes['error.message'] = event.error;
-  } else if (event.status_code) {
+  if (event.status_code) {
     if (typeof event.status_code === 'number') {
       attributes[SemanticAttributes.HTTP_STATUS_CODE] = event.status_code;
     }
@@ -371,7 +403,6 @@ export function logApiResponse(config: Config, event: ApiResponseEvent): void {
     event.model,
     event.duration_ms,
     event.status_code,
-    event.error,
   );
   recordTokenUsageMetrics(
     config,
@@ -418,6 +449,13 @@ export function logLoopDetected(
     attributes,
   };
   logger.emit(logRecord);
+}
+
+export function logLoopDetectionDisabled(
+  config: Config,
+  _event: LoopDetectionDisabledEvent,
+): void {
+  ClearcutLogger.getInstance(config)?.logLoopDetectionDisabledEvent();
 }
 
 export function logNextSpeakerCheck(
@@ -636,4 +674,96 @@ export function logContentRetryFailure(
   };
   logger.emit(logRecord);
   recordContentRetryFailure(config);
+}
+
+export function logModelRouting(
+  config: Config,
+  event: ModelRoutingEvent,
+): void {
+  ClearcutLogger.getInstance(config)?.logModelRoutingEvent(event);
+  if (!isTelemetrySdkInitialized()) return;
+
+  const attributes: LogAttributes = {
+    ...getCommonAttributes(config),
+    ...event,
+    'event.name': EVENT_MODEL_ROUTING,
+  };
+
+  const logger = logs.getLogger(SERVICE_NAME);
+  const logRecord: LogRecord = {
+    body: `Model routing decision. Model: ${event.decision_model}, Source: ${event.decision_source}`,
+    attributes,
+  };
+  logger.emit(logRecord);
+  recordModelRoutingMetrics(config, event);
+}
+
+export function logExtensionInstallEvent(
+  config: Config,
+  event: ExtensionInstallEvent,
+): void {
+  ClearcutLogger.getInstance(config)?.logExtensionInstallEvent(event);
+  if (!isTelemetrySdkInitialized()) return;
+
+  const attributes: LogAttributes = {
+    ...getCommonAttributes(config),
+    ...event,
+    'event.name': EVENT_EXTENSION_INSTALL,
+    'event.timestamp': new Date().toISOString(),
+    extension_name: event.extension_name,
+    extension_version: event.extension_version,
+    extension_source: event.extension_source,
+    status: event.status,
+  };
+
+  const logger = logs.getLogger(SERVICE_NAME);
+  const logRecord: LogRecord = {
+    body: `Installed extension ${event.extension_name}`,
+    attributes,
+  };
+  logger.emit(logRecord);
+}
+
+export function logExtensionUninstall(
+  config: Config,
+  event: ExtensionUninstallEvent,
+): void {
+  ClearcutLogger.getInstance(config)?.logExtensionUninstallEvent(event);
+  if (!isTelemetrySdkInitialized()) return;
+
+  const attributes: LogAttributes = {
+    ...getCommonAttributes(config),
+    ...event,
+    'event.name': EVENT_EXTENSION_UNINSTALL,
+    'event.timestamp': new Date().toISOString(),
+  };
+
+  const logger = logs.getLogger(SERVICE_NAME);
+  const logRecord: LogRecord = {
+    body: `Uninstalled extension ${event.extension_name}`,
+    attributes,
+  };
+  logger.emit(logRecord);
+}
+
+export function logExtensionEnable(
+  config: Config,
+  event: ExtensionEnableEvent,
+): void {
+  ClearcutLogger.getInstance(config)?.logExtensionEnableEvent(event);
+  if (!isTelemetrySdkInitialized()) return;
+
+  const attributes: LogAttributes = {
+    ...getCommonAttributes(config),
+    ...event,
+    'event.name': EVENT_EXTENSION_ENABLE,
+    'event.timestamp': new Date().toISOString(),
+  };
+
+  const logger = logs.getLogger(SERVICE_NAME);
+  const logRecord: LogRecord = {
+    body: `Enabled extension ${event.extension_name}`,
+    attributes,
+  };
+  logger.emit(logRecord);
 }

@@ -28,6 +28,10 @@ describe('GlobTool', () => {
   const mockConfig = {
     getFileService: () => new FileDiscoveryService(tempRootDir),
     getFileFilteringRespectGitIgnore: () => true,
+    getFileFilteringOptions: () => ({
+      respectGitIgnore: true,
+      respectGeminiIgnore: true,
+    }),
     getTargetDir: () => tempRootDir,
     getWorkspaceContext: () => createMockWorkspaceContext(tempRootDir),
     getFileExclusions: () => ({
@@ -38,6 +42,7 @@ describe('GlobTool', () => {
   beforeEach(async () => {
     // Create a unique root directory for each test run
     tempRootDir = await fs.mkdtemp(path.join(os.tmpdir(), 'glob-tool-root-'));
+    await fs.writeFile(path.join(tempRootDir, '.git'), ''); // Fake git repo
     globTool = new GlobTool(mockConfig);
 
     // Create some test files and directories within this root
@@ -364,6 +369,88 @@ describe('GlobTool', () => {
       expect(result.llmContent).toContain('Found 2 file(s)');
       expect(result.llmContent).toContain('fileC.md');
       expect(result.llmContent).toContain('FileD.MD');
+    });
+  });
+
+  describe('ignore file handling', () => {
+    it('should respect .gitignore files by default', async () => {
+      await fs.writeFile(path.join(tempRootDir, '.gitignore'), '*.ignored.txt');
+      await fs.writeFile(
+        path.join(tempRootDir, 'a.ignored.txt'),
+        'ignored content',
+      );
+      await fs.writeFile(
+        path.join(tempRootDir, 'b.notignored.txt'),
+        'not ignored content',
+      );
+
+      const params: GlobToolParams = { pattern: '*.txt' };
+      const invocation = globTool.build(params);
+      const result = await invocation.execute(abortSignal);
+
+      expect(result.llmContent).toContain('Found 3 file(s)'); // fileA.txt, FileB.TXT, b.notignored.txt
+      expect(result.llmContent).not.toContain('a.ignored.txt');
+    });
+
+    it('should respect .geminiignore files by default', async () => {
+      await fs.writeFile(
+        path.join(tempRootDir, '.geminiignore'),
+        '*.geminiignored.txt',
+      );
+      await fs.writeFile(
+        path.join(tempRootDir, 'a.geminiignored.txt'),
+        'ignored content',
+      );
+      await fs.writeFile(
+        path.join(tempRootDir, 'b.notignored.txt'),
+        'not ignored content',
+      );
+
+      const params: GlobToolParams = { pattern: '*.txt' };
+      const invocation = globTool.build(params);
+      const result = await invocation.execute(abortSignal);
+
+      expect(result.llmContent).toContain('Found 3 file(s)'); // fileA.txt, FileB.TXT, b.notignored.txt
+      expect(result.llmContent).not.toContain('a.geminiignored.txt');
+    });
+
+    it('should not respect .gitignore when respect_git_ignore is false', async () => {
+      await fs.writeFile(path.join(tempRootDir, '.gitignore'), '*.ignored.txt');
+      await fs.writeFile(
+        path.join(tempRootDir, 'a.ignored.txt'),
+        'ignored content',
+      );
+
+      const params: GlobToolParams = {
+        pattern: '*.txt',
+        respect_git_ignore: false,
+      };
+      const invocation = globTool.build(params);
+      const result = await invocation.execute(abortSignal);
+
+      expect(result.llmContent).toContain('Found 3 file(s)'); // fileA.txt, FileB.TXT, a.ignored.txt
+      expect(result.llmContent).toContain('a.ignored.txt');
+    });
+
+    it('should not respect .geminiignore when respect_gemini_ignore is false', async () => {
+      await fs.writeFile(
+        path.join(tempRootDir, '.geminiignore'),
+        '*.geminiignored.txt',
+      );
+      await fs.writeFile(
+        path.join(tempRootDir, 'a.geminiignored.txt'),
+        'ignored content',
+      );
+
+      const params: GlobToolParams = {
+        pattern: '*.txt',
+        respect_gemini_ignore: false,
+      };
+      const invocation = globTool.build(params);
+      const result = await invocation.execute(abortSignal);
+
+      expect(result.llmContent).toContain('Found 3 file(s)'); // fileA.txt, FileB.TXT, a.geminiignored.txt
+      expect(result.llmContent).toContain('a.geminiignored.txt');
     });
   });
 });

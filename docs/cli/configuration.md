@@ -76,6 +76,13 @@ Settings are organized into categories. All settings should be placed within the
   - **Description:** Enable session checkpointing for recovery.
   - **Default:** `false`
 
+#### `output`
+
+- **`output.format`** (string):
+  - **Description:** The format of the CLI output.
+  - **Default:** `"text"`
+  - **Values:** `"text"`, `"json"`
+
 #### `ui`
 
 - **`ui.theme`** (string):
@@ -112,7 +119,7 @@ Settings are organized into categories. All settings should be placed within the
 
 - **`ui.showCitations`** (boolean):
   - **Description:** Show citations for generated text in the chat.
-  - **Default:** `false`
+  - **Default:** `true`
 
 - **`ui.accessibility.disableLoadingPhrases`** (boolean):
   - **Description:** Disable loading phrases for accessibility.
@@ -196,9 +203,9 @@ Settings are organized into categories. All settings should be placed within the
   - **Description:** Sandbox execution environment (can be a boolean or a path string).
   - **Default:** `undefined`
 
-- **`tools.usePty`** (boolean):
-  - **Description:** Use node-pty for shell command execution. Fallback to child_process still applies.
-  - **Default:** `false`
+- **`tools.shell.enableInteractiveShell`** (boolean):
+
+  Use `node-pty` for an interactive shell experience. Fallback to `child_process` still applies. Defaults to `false`.
 
 - **`tools.core`** (array of strings):
   - **Description:** This can be used to restrict the set of built-in tools [with an allowlist](./enterprise.md#restricting-tool-access). See [Built-in Tools](../core/tools-api.md#built-in-tools) for a list of core tools. The match semantics are the same as `tools.allowed`.
@@ -442,11 +449,18 @@ Arguments passed directly when running the CLI can override other configurations
   - Example: `npm start -- --model gemini-1.5-pro-latest`
 - **`--prompt <your_prompt>`** (**`-p <your_prompt>`**):
   - Used to pass a prompt directly to the command. This invokes Gemini CLI in a non-interactive mode.
+  - For scripting examples, use the `--output-format json` flag to get structured output.
 - **`--prompt-interactive <your_prompt>`** (**`-i <your_prompt>`**):
   - Starts an interactive session with the provided prompt as the initial input.
   - The prompt is processed within the interactive session, not before it.
   - Cannot be used when piping input from stdin.
   - Example: `gemini -i "explain this code"`
+- **`--output-format <format>`**:
+  - **Description:** Specifies the format of the CLI output for non-interactive mode.
+  - **Values:**
+    - `text`: (Default) The standard human-readable output.
+    - `json`: A machine-readable JSON output.
+  - **Note:** For structured output and scripting, use the `--output-format json` flag.
 - **`--sandbox`** (**`-s`**):
   - Enables sandbox mode for this session.
 - **`--sandbox-image`**:

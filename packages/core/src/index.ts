@@ -6,6 +6,10 @@
 
 // Export config
 export * from './config/config.js';
+export * from './output/types.js';
+export * from './output/json-formatter.js';
+export * from './policy/types.js';
+export * from './policy/policy-engine.js';
 
 // Export Core Logic
 export * from './core/client.js';
@@ -40,6 +44,7 @@ export * from './utils/quotaErrorDetection.js';
 export * from './utils/fileUtils.js';
 export * from './utils/retry.js';
 export * from './utils/shell-utils.js';
+export * from './utils/terminalSerializer.js';
 export * from './utils/systemEncoding.js';
 export * from './utils/textUtils.js';
 export * from './utils/formatters.js';
@@ -49,7 +54,6 @@ export * from './utils/errorParsing.js';
 export * from './utils/workspaceContext.js';
 export * from './utils/ignorePatterns.js';
 export * from './utils/partUtils.js';
-export * from './utils/ide-trust.js';
 export * from './utils/promptIdContext.js';
 
 // Export services
@@ -62,8 +66,7 @@ export * from './services/fileSystemService.js';
 export * from './ide/ide-client.js';
 export * from './ide/ideContext.js';
 export * from './ide/ide-installer.js';
-export { getIdeInfo, DetectedIde } from './ide/detect-ide.js';
-export { type IdeInfo } from './ide/detect-ide.js';
+export { IDE_DEFINITIONS, type IdeInfo } from './ide/detect-ide.js';
 export * from './ide/constants.js';
 export * from './ide/types.js';
 

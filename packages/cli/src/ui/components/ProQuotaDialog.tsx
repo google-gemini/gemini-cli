@@ -7,7 +7,7 @@
 import type React from 'react';
 import { Box, Text } from 'ink';
 import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
-import { Colors } from '../colors.js';
+import { theme } from '../semantic-colors.js';
 
 interface ProQuotaDialogProps {
   failedModel: string;
@@ -37,7 +37,7 @@ export function ProQuotaDialog({
 
   return (
     <Box borderStyle="round" flexDirection="column" paddingX={1}>
-      <Text bold color={Colors.AccentYellow}>
+      <Text bold color={theme.status.warning}>
         Pro quota limit reached for {failedModel}.
       </Text>
       <Box marginTop={1}>

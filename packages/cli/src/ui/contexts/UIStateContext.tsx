@@ -11,6 +11,7 @@ import type {
   ConsoleMessageItem,
   ShellConfirmationRequest,
   ConfirmationRequest,
+  LoopDetectionConfirmationRequest,
   HistoryItemWithoutId,
   StreamingState,
 } from '../types.js';
@@ -20,12 +21,13 @@ import type {
   IdeContext,
   ApprovalMode,
   UserTierId,
-  DetectedIde,
+  IdeInfo,
   FallbackIntent,
 } from '@google/gemini-cli-core';
 import type { DOMElement } from 'ink';
 import type { SessionStatsState } from '../contexts/SessionContext.js';
 import type { UpdateObject } from '../utils/updateCheck.js';
+import type { ExtensionUpdateState } from '../state/extensions.js';
 
 export interface ProQuotaDialogRequest {
   failedModel: string;
@@ -53,6 +55,7 @@ export interface UIState {
   commandContext: CommandContext;
   shellConfirmationRequest: ShellConfirmationRequest | null;
   confirmationRequest: ConfirmationRequest | null;
+  loopDetectionConfirmationRequest: LoopDetectionConfirmationRequest | null;
   geminiMdFileCount: number;
   streamingState: StreamingState;
   initError: string | null;
@@ -75,7 +78,6 @@ export interface UIState {
   ctrlCPressedOnce: boolean;
   ctrlDPressedOnce: boolean;
   showEscapePrompt: boolean;
-  isFocused: boolean;
   elapsedTime: number;
   currentLoadingPhrase: string;
   historyRemountKey: number;
@@ -102,10 +104,13 @@ export interface UIState {
   terminalWidth: number;
   terminalHeight: number;
   mainControlsRef: React.MutableRefObject<DOMElement | null>;
-  currentIDE: DetectedIde | null;
+  currentIDE: IdeInfo | null;
   updateInfo: UpdateObject | null;
   showIdeRestartPrompt: boolean;
   isRestarting: boolean;
+  extensionsUpdateState: Map<string, ExtensionUpdateState>;
+  activePtyId: number | undefined;
+  shellFocused: boolean;
 }
 
 export const UIStateContext = createContext<UIState | null>(null);

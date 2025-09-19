@@ -8,7 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { EOL } from 'node:os';
 import { spawn } from 'node:child_process';
-import { downloadRipGrep } from '@joshua.litt/get-ripgrep';
+import { downloadRipGrep } from 'get-ripgrep';
 import type { ToolInvocation, ToolResult } from './tools.js';
 import { BaseDeclarativeTool, BaseToolInvocation, Kind } from './tools.js';
 import { SchemaValidator } from '../utils/schemaValidator.js';
@@ -20,7 +20,7 @@ import { Storage } from '../config/storage.js';
 
 const DEFAULT_TOTAL_MAX_MATCHES = 20000;
 
-function getRgPath() {
+function getRgPath(): string {
   return path.join(Storage.getGlobalBinDir(), 'rg');
 }
 
@@ -34,6 +34,16 @@ export async function canUseRipgrep(): Promise<boolean> {
 
   await downloadRipGrep(Storage.getGlobalBinDir());
   return await fileExists(getRgPath());
+}
+
+/**
+ * Ensures `rg` is downloaded, or throws.
+ */
+export async function ensureRgPath(): Promise<string> {
+  if (await canUseRipgrep()) {
+    return getRgPath();
+  }
+  throw new Error('Cannot use ripgrep.');
 }
 
 /**
@@ -310,8 +320,9 @@ class GrepToolInvocation extends BaseToolInvocation<
     rgArgs.push(absolutePath);
 
     try {
+      const rgPath = await ensureRgPath();
       const output = await new Promise<string>((resolve, reject) => {
-        const child = spawn(getRgPath(), rgArgs, {
+        const child = spawn(rgPath, rgArgs, {
           windowsHide: true,
         });
 

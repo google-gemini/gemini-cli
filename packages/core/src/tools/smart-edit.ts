@@ -28,28 +28,10 @@ import {
   type ModifiableDeclarativeTool,
   type ModifyContext,
 } from './modifiable-tool.js';
-import { IdeClient, IDEConnectionStatus } from '../ide/ide-client.js';
+import { IdeClient } from '../ide/ide-client.js';
 import { FixLLMEditWithInstruction } from '../utils/llm-edit-fixer.js';
-
-export function applyReplacement(
-  currentContent: string | null,
-  oldString: string,
-  newString: string,
-  isNewFile: boolean,
-): string {
-  if (isNewFile) {
-    return newString;
-  }
-  if (currentContent === null) {
-    // Should not happen if not a new file, but defensively return empty or newString if oldString is also empty
-    return oldString === '' ? newString : '';
-  }
-  // If oldString is empty and it's not a new file, do not modify the content.
-  if (oldString === '' && !isNewFile) {
-    return currentContent;
-  }
-  return currentContent.replaceAll(oldString, newString);
-}
+import { applyReplacement } from './edit.js';
+import { safeLiteralReplace } from '../utils/textUtils.js';
 
 interface ReplacementContext {
   params: EditToolParams;
@@ -89,7 +71,8 @@ async function calculateExactReplacement(
 
   const exactOccurrences = normalizedCode.split(normalizedSearch).length - 1;
   if (exactOccurrences > 0) {
-    let modifiedCode = normalizedCode.replaceAll(
+    let modifiedCode = safeLiteralReplace(
+      normalizedCode,
       normalizedSearch,
       normalizedReplace,
     );
@@ -528,8 +511,7 @@ class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
     );
     const ideClient = await IdeClient.getInstance();
     const ideConfirmation =
-      this.config.getIdeMode() &&
-      ideClient?.getConnectionStatus().status === IDEConnectionStatus.Connected
+      this.config.getIdeMode() && ideClient.isDiffingEnabled()
         ? ideClient.openDiff(this.params.file_path, editData.newContent)
         : undefined;
 
