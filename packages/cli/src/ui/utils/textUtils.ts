@@ -5,6 +5,7 @@
  */
 
 import stripAnsi from 'strip-ansi';
+import ansiRegex from 'ansi-regex';
 import { stripVTControlCharacters } from 'node:util';
 import stringWidth from 'string-width';
 
@@ -146,3 +147,60 @@ export const getCachedStringWidth = (str: string): number => {
 export const clearStringWidthCache = (): void => {
   stringWidthCache.clear();
 };
+
+const regex = ansiRegex();
+
+/* Recursively traverses a JSON-like structure (objects, arrays, primitives)
+ * and escapes all ANSI control characters found in any string values.
+ *
+ * This function is designed to be robust, handling deeply nested objects and
+ * arrays. It applies a regex-based replacement to all string values to
+ * safely escape control characters.
+ *
+ * To optimize performance, this function uses a "copy-on-write" strategy.
+ * It avoids allocating new objects or arrays if no nested string values
+ * required escaping, returning the original object reference in such cases.
+ *
+ * @param obj The JSON-like value (object, array, string, etc.) to traverse.
+ * @returns A new value with all nested string fields escaped, or the
+ * original `obj` reference if no changes were necessary.
+ */
+export function escapeAnsiCtrlCodes<T>(obj: T): T {
+  if (typeof obj === 'string') {
+    return obj.replace(regex, (match) =>
+      JSON.stringify(match).slice(1, -1),
+    ) as T;
+  }
+
+  if (obj === null || typeof obj !== 'object') {
+    return obj;
+  }
+
+  let madeChanges = false;
+  if (Array.isArray(obj)) {
+    const newArr = [...obj];
+    for (let i = 0; i < newArr.length; i++) {
+      const value = newArr[i];
+      const escapedValue = escapeAnsiCtrlCodes(value);
+      if (escapedValue !== value) {
+        newArr[i] = escapedValue;
+        madeChanges = true;
+      }
+    }
+    return madeChanges ? (newArr as T) : obj;
+  }
+
+  const newObj = { ...obj };
+  for (const key in newObj) {
+    if (Object.prototype.hasOwnProperty.call(newObj, key)) {
+      const value = newObj[key];
+      const escapedValue = escapeAnsiCtrlCodes(value);
+      if (escapedValue !== value) {
+        (newObj as Record<string, unknown>)[key] = escapedValue;
+        madeChanges = true;
+      }
+    }
+  }
+
+  return madeChanges ? newObj : obj;
+}

@@ -47,6 +47,7 @@ import { useShellCommandProcessor } from './shellCommandProcessor.js';
 import { handleAtCommand } from './atCommandProcessor.js';
 import { findLastSafeSplitPoint } from '../utils/markdownUtilities.js';
 import { useStateAndRef } from './useStateAndRef.js';
+import { escapeAnsiCtrlCodes } from '../utils/textUtils.js';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
 import { useLogger } from './useLogger.js';
 import {
@@ -669,7 +670,8 @@ export const useGeminiStream = (
     ): Promise<StreamProcessingStatus> => {
       let geminiMessageBuffer = '';
       const toolCallRequests: ToolCallRequestInfo[] = [];
-      for await (const event of stream) {
+      for await (let event of stream) {
+        event = escapeAnsiCtrlCodes(event);
         switch (event.type) {
           case ServerGeminiEventType.Thought:
             setThought(event.value);

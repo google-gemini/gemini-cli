@@ -821,6 +821,53 @@ describe('useGeminiStream', () => {
     expect(result.current.streamingState).toBe(StreamingState.Responding);
   });
 
+  it('should escape ANSI codes from streaming content', async () => {
+    mockSendMessageStream.mockReturnValue(
+      (async function* () {
+        yield {
+          type: ServerGeminiEventType.ToolCallRequest,
+          value: {
+            callId: 'tool-123',
+            name: 'my_tool',
+            args: { message: 'this is a \u001b[34mblue\u001b[0m message' },
+          },
+        };
+        yield {
+          type: ServerGeminiEventType.Content,
+          value: '\u001b[31mHello\u001b[0m, world!',
+        };
+        yield {
+          type: ServerGeminiEventType.Finished,
+          value: { reason: 'STOP', usageMetadata: undefined },
+        };
+      })(),
+    );
+
+    const { result } = renderTestHook();
+    await act(async () => {
+      await result.current.submitQuery('test query');
+    });
+
+    await waitFor(() => {
+      expect(mockScheduleToolCalls).toHaveBeenCalledWith(
+        [
+          expect.objectContaining({
+            name: 'my_tool',
+            args: { message: 'this is a \\u001b[34mblue\\u001b[0m message' },
+          }),
+        ],
+        expect.any(AbortSignal),
+      );
+      expect(mockAddItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'gemini',
+          text: '\\u001b[31mHello\\u001b[0m, world!',
+        }),
+        expect.any(Number),
+      );
+    });
+  });
+
   describe('User Cancellation', () => {
     let keypressCallback: (key: any) => void;
     const mockUseKeypress = useKeypress as Mock;
