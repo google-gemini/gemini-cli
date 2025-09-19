@@ -54,6 +54,7 @@
     "strip-json-comments": "^3.1.1",
     "undici": "^7.10.0",
     "update-notifier": "^7.3.1",
+    "wrap-ansi": "9.0.2",
     "yargs": "^17.7.2",
     "zod": "^3.23.8"
   },
