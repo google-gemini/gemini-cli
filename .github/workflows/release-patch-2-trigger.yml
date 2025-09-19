@@ -39,7 +39,7 @@ jobs:
     runs-on: 'ubuntu-latest'
     permissions:
       actions: 'write'
-      contents: 'read'
+      contents: 'write'
       pull-requests: 'write'
     steps:
       - name: 'Checkout'

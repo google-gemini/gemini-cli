@@ -55,15 +55,6 @@ async function main() {
 
   const testMode = argv.test || process.env.TEST_MODE === 'true';
 
-  // Initialize GitHub API client only if not in test mode
-  let github;
-  if (!testMode) {
-    const { Octokit } = await import('@octokit/rest');
-    github = new Octokit({
-      auth: process.env.GITHUB_TOKEN,
-    });
-  }
-
   const context = {
     eventName: process.env.GITHUB_EVENT_NAME || 'pull_request',
     repo: {
@@ -137,21 +128,23 @@ async function main() {
 
   // Try to find the original PR that requested this patch
   let originalPr = null;
-  if (!testMode && github) {
+  if (!testMode) {
     try {
       console.log('Looking for original PR using search...');
-      // Use GitHub search to find the PR with a comment referencing the hotfix branch.
-      // This is much more efficient than listing PRs and their comments.
+      const { execSync } = await import('child_process');
+
+      // Use gh CLI to search for PRs with comments referencing the hotfix branch
       const query = `repo:${context.repo.owner}/${context.repo.repo} is:pr is:all in:comments "Patch PR Created" "${headRef}"`;
-      const searchResults = await github.rest.search.issuesAndPullRequests({
-        q: query,
-        sort: 'updated',
-        order: 'desc',
-        per_page: 1,
+      const searchCommand = `gh search prs --json number,title --limit 1 "${query}"`;
+
+      const result = execSync(searchCommand, {
+        encoding: 'utf8',
+        env: { ...process.env, GH_TOKEN: process.env.GITHUB_TOKEN }
       });
 
-      if (searchResults.data.items.length > 0) {
-        originalPr = searchResults.data.items[0].number;
+      const searchResults = JSON.parse(result);
+      if (searchResults && searchResults.length > 0) {
+        originalPr = searchResults[0].number;
         console.log(`Found original PR: #${originalPr}`);
       } else {
         console.log('Could not find a matching original PR via search.');
@@ -166,20 +159,33 @@ async function main() {
 
   // Trigger the release workflow
   console.log(`Triggering release workflow: ${workflowId}`);
-  if (!testMode && github) {
-    await github.rest.actions.createWorkflowDispatch({
-      owner: context.repo.owner,
-      repo: context.repo.repo,
-      workflow_id: workflowId,
-      ref: 'main',
-      inputs: {
-        type: channel,
-        dry_run: isDryRun.toString(),
-        force_skip_tests: forceSkipTests.toString(),
-        release_ref: releaseRef,
-        original_pr: originalPr ? originalPr.toString() : '',
-      },
-    });
+  if (!testMode) {
+    try {
+      const { execSync } = await import('child_process');
+
+      const inputs = [
+        `type=${channel}`,
+        `dry_run=${isDryRun.toString()}`,
+        `force_skip_tests=${forceSkipTests.toString()}`,
+        `release_ref=${releaseRef}`,
+        originalPr ? `original_pr=${originalPr.toString()}` : 'original_pr='
+      ];
+
+      const inputFields = inputs.map(input => `--field ${input}`).join(' ');
+      const dispatchCommand = `gh workflow run ${workflowId} --ref main ${inputFields}`;
+
+      console.log(`Running command: ${dispatchCommand}`);
+
+      execSync(dispatchCommand, {
+        stdio: 'inherit',
+        env: { ...process.env, GH_TOKEN: process.env.GITHUB_TOKEN }
+      });
+
+      console.log('✅ Workflow dispatch completed successfully');
+    } catch (e) {
+      console.error('❌ Failed to dispatch workflow:', e.message);
+      throw e;
+    }
   } else {
     console.log('✅ Would trigger workflow with inputs:', {
       type: channel,
@@ -208,13 +214,30 @@ async function main() {
 **🔗 Track Progress:**
 - [View release workflow](https://github.com/${context.repo.owner}/${context.repo.repo}/actions)`;
 
-    if (!testMode && github) {
-      await github.rest.issues.createComment({
-        owner: context.repo.owner,
-        repo: context.repo.repo,
-        issue_number: originalPr,
-        body: commentBody,
-      });
+    if (!testMode) {
+      try {
+        const { execSync } = await import('child_process');
+        const { writeFileSync, unlinkSync } = await import('fs');
+
+        // Write comment to temp file to handle multiline content safely
+        const tempFile = `/tmp/comment-${Date.now()}.md`;
+        writeFileSync(tempFile, commentBody);
+
+        const commentCommand = `gh pr comment ${originalPr} --body-file "${tempFile}"`;
+
+        execSync(commentCommand, {
+          stdio: 'inherit',
+          env: { ...process.env, GH_TOKEN: process.env.GITHUB_TOKEN }
+        });
+
+        // Clean up temp file
+        unlinkSync(tempFile);
+
+        console.log('✅ Comment posted successfully');
+      } catch (e) {
+        console.error('❌ Failed to post comment:', e.message);
+        // Don't throw here since the main workflow dispatch succeeded
+      }
     } else {
       console.log('✅ Would post comment:', commentBody);
     }
