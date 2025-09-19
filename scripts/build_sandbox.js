@@ -31,6 +31,8 @@ import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
 import cliPkgJson from '../packages/cli/package.json' with { type: 'json' };
 
+const BASE_IMAGE = cliPkgJson.config.sandboxImageUri;
+
 const argv = yargs(hideBin(process.argv))
   .option('s', {
     alias: 'skip-npm-install-build',
@@ -41,6 +43,7 @@ const argv = yargs(hideBin(process.argv))
   .option('f', {
     alias: 'dockerfile',
     type: 'string',
+    default: 'Dockerfile',
     description: 'use <dockerfile> for custom image',
   })
   .option('i', {
@@ -74,12 +77,10 @@ if (sandboxCommand === 'sandbox-exec') {
 
 console.log(`using ${sandboxCommand} for sandboxing`);
 
-const baseImage = cliPkgJson.config.sandboxImageUri;
-const customImage = argv.i;
-const baseDockerfile = 'Dockerfile';
-const customDockerfile = argv.f;
+const image = argv.i;
+const dockerFile = argv.f;
 
-if (!baseImage?.length) {
+if (!BASE_IMAGE?.length) {
   console.warn(
     'No default image tag specified in gemini-cli/packages/cli/package.json',
   );
@@ -187,12 +188,6 @@ function buildImage(imageName, dockerfile) {
   }
 }
 
-if (baseImage && baseDockerfile) {
-  buildImage(baseImage, baseDockerfile);
-}
-
-if (customDockerfile && customImage) {
-  buildImage(customImage, customDockerfile);
-}
+buildImage(image, dockerFile);
 
 execSync(`${sandboxCommand} image prune -f`, { stdio: 'ignore' });
