@@ -40,6 +40,7 @@ bundle
 # Test report files
 junit.xml
 packages/*/coverage/
+third_party/*/coverage/
 
 # Generated files
 packages/cli/src/generated/
