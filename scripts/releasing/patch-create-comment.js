@@ -45,7 +45,6 @@ async function main() {
     .option('run-id', {
       description: 'The GitHub workflow run ID',
       type: 'string',
-      default: '0',
     })
     .option('test', {
       description: 'Test mode - validate logic without GitHub API calls',
@@ -79,6 +78,13 @@ async function main() {
   const repository =
     argv.repository || process.env.REPOSITORY || 'google-gemini/gemini-cli';
   const runId = argv.runId || process.env.GITHUB_RUN_ID || '0';
+
+  // Validate required parameters
+  if (!runId || runId === '0') {
+    console.warn(
+      'Warning: No valid GitHub run ID found, workflow links may not work correctly',
+    );
+  }
 
   if (!originalPr) {
     console.log('No original PR specified, skipping comment');
@@ -119,7 +125,40 @@ async function main() {
     logContent = process.env.LOG_CONTENT || '';
   }
 
-  if (logContent.includes('already has an open PR')) {
+  if (
+    logContent.includes(
+      'Failed to create release branch due to insufficient GitHub App permissions',
+    )
+  ) {
+    // GitHub App permission error - extract manual commands
+    const manualCommandsMatch = logContent.match(
+      /Please run these commands manually to create the branch:\s*\n\s*```bash\s*([\s\S]*?)\s*```/,
+    );
+    let manualCommands = '';
+    if (manualCommandsMatch) {
+      manualCommands = manualCommandsMatch[1].trim();
+    }
+
+    commentBody = `🔒 **GitHub App Permission Issue**
+
+The patch creation failed due to insufficient GitHub App permissions for creating workflow files.
+
+**📝 Manual Action Required:**
+${
+  manualCommands
+    ? `Please run these commands manually to create the release branch:
+
+\`\`\`bash
+${manualCommands}
+\`\`\`
+
+After running these commands, you can re-run the patch workflow.`
+    : 'Please check the workflow logs for manual commands to run.'
+}
+
+**🔗 Links:**
+- [View workflow run](https://github.com/${repository}/actions/runs/${runId})`;
+  } else if (logContent.includes('already has an open PR')) {
     // Branch exists with existing PR
     const prMatch = logContent.match(/Found existing PR #(\d+): (.*)/);
     if (prMatch) {
