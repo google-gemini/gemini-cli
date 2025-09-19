@@ -126,7 +126,7 @@ export async function performWorkspaceExtensionMigration(
   return failedInstallNames;
 }
 
-async function getClearcutConfig(cwd: string) {
+async function getTelemetryConfig(cwd: string) {
   const settings = loadSettings(cwd);
   const sessionId = randomUUID();
   const extensions = loadExtensions();
@@ -381,7 +381,7 @@ export async function installExtension(
   askConsent: boolean = false,
   cwd: string = process.cwd(),
 ): Promise<string> {
-  const clearcutConfig = await getClearcutConfig(cwd);
+  const telemetryConfig = await getTelemetryConfig(cwd);
   let newExtensionConfig: ExtensionConfig | null = null;
   let localSourcePath: string | undefined;
 
@@ -482,7 +482,7 @@ export async function installExtension(
     }
 
     logExtensionInstallEvent(
-      clearcutConfig,
+      telemetryConfig,
       new ExtensionInstallEvent(
         newExtensionConfig!.name,
         newExtensionConfig!.version,
@@ -503,7 +503,7 @@ export async function installExtension(
       });
     }
     logExtensionInstallEvent(
-      clearcutConfig,
+      telemetryConfig,
       new ExtensionInstallEvent(
         newExtensionConfig?.name ?? '',
         newExtensionConfig?.version ?? '',
@@ -580,7 +580,7 @@ export async function uninstallExtension(
   extensionIdentifier: string,
   cwd: string = process.cwd(),
 ): Promise<void> {
-  const clearcutConfig = await getClearcutConfig(cwd);
+  const telemetryConfig = await getTelemetryConfig(cwd);
   const installedExtensions = loadUserExtensions();
   const extensionName = installedExtensions.find(
     (installed) =>
@@ -602,7 +602,7 @@ export async function uninstallExtension(
     recursive: true,
     force: true,
   });
-  logExtensionUninstall(clearcutConfig, new ExtensionUninstallEvent(extensionName, 'success'));
+  logExtensionUninstall(telemetryConfig, new ExtensionUninstallEvent(extensionName, 'success'));
 }
 
 export function toOutputString(extension: Extension): string {
@@ -664,6 +664,6 @@ export async function enableExtension(
   );
   const scopePath = scope === SettingScope.Workspace ? cwd : os.homedir();
   manager.enable(name, true, scopePath);
-  const config = await getClearcutConfig(cwd);
+  const config = await getTelemetryConfig(cwd);
   logExtensionEnable(config, new ExtensionEnableEvent(name, scope));
 }
