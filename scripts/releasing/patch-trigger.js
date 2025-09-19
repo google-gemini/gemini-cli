@@ -37,6 +37,11 @@ async function main() {
       type: 'boolean',
       default: false,
     })
+    .option('force-skip-tests', {
+      description: 'Skip the "Run Tests" step in testing',
+      type: 'boolean',
+      default: false,
+    })
     .example(
       '$0 --head-ref "hotfix/v0.5.3/preview/cherry-pick-abc1234" --test',
       'Test channel detection logic',
@@ -49,15 +54,6 @@ async function main() {
     .alias('help', 'h').argv;
 
   const testMode = argv.test || process.env.TEST_MODE === 'true';
-
-  // Initialize GitHub API client only if not in test mode
-  let github;
-  if (!testMode) {
-    const { Octokit } = await import('@octokit/rest');
-    github = new Octokit({
-      auth: process.env.GITHUB_TOKEN,
-    });
-  }
 
   const context = {
     eventName: process.env.GITHUB_EVENT_NAME || 'pull_request',
@@ -72,6 +68,8 @@ async function main() {
   const headRef = argv.headRef || process.env.HEAD_REF;
   const body = argv.prBody || process.env.PR_BODY || '';
   const isDryRun = argv.dryRun || body.includes('[DRY RUN]');
+  const forceSkipTests =
+    argv.forceSkipTests || process.env.FORCE_SKIP_TESTS === 'true';
 
   if (!headRef) {
     throw new Error(
@@ -131,21 +129,26 @@ async function main() {
 
   // Try to find the original PR that requested this patch
   let originalPr = null;
-  if (!testMode && github) {
+  if (!testMode) {
     try {
       console.log('Looking for original PR using search...');
-      // Use GitHub search to find the PR with a comment referencing the hotfix branch.
-      // This is much more efficient than listing PRs and their comments.
-      const query = `repo:${context.repo.owner}/${context.repo.repo} is:pr is:all in:comments "Patch PR Created" "${headRef}"`;
-      const searchResults = await github.rest.search.issuesAndPullRequests({
-        q: query,
-        sort: 'updated',
-        order: 'desc',
-        per_page: 1,
-      });
+      const { execFileSync } = await import('node:child_process');
 
-      if (searchResults.data.items.length > 0) {
-        originalPr = searchResults.data.items[0].number;
+      // Use gh CLI to search for PRs with comments referencing the hotfix branch
+      const query = `repo:${context.repo.owner}/${context.repo.repo} is:pr is:all in:comments "Patch PR Created" "${headRef}"`;
+
+      const result = execFileSync(
+        'gh',
+        ['search', 'prs', '--json', 'number,title', '--limit', '1', query],
+        {
+          encoding: 'utf8',
+          env: { ...process.env, GH_TOKEN: process.env.GITHUB_TOKEN },
+        },
+      );
+
+      const searchResults = JSON.parse(result);
+      if (searchResults && searchResults.length > 0) {
+        originalPr = searchResults[0].number;
         console.log(`Found original PR: #${originalPr}`);
       } else {
         console.log('Could not find a matching original PR via search.');
@@ -160,23 +163,45 @@ async function main() {
 
   // Trigger the release workflow
   console.log(`Triggering release workflow: ${workflowId}`);
-  if (!testMode && github) {
-    await github.rest.actions.createWorkflowDispatch({
-      owner: context.repo.owner,
-      repo: context.repo.repo,
-      workflow_id: workflowId,
-      ref: 'main',
-      inputs: {
-        type: channel,
-        dry_run: isDryRun.toString(),
-        release_ref: releaseRef,
-        original_pr: originalPr ? originalPr.toString() : '',
-      },
-    });
+  if (!testMode) {
+    try {
+      const { execFileSync } = await import('node:child_process');
+
+      const args = [
+        'workflow',
+        'run',
+        workflowId,
+        '--ref',
+        'main',
+        '--field',
+        `type=${channel}`,
+        '--field',
+        `dry_run=${isDryRun.toString()}`,
+        '--field',
+        `force_skip_tests=${forceSkipTests.toString()}`,
+        '--field',
+        `release_ref=${releaseRef}`,
+        '--field',
+        originalPr ? `original_pr=${originalPr.toString()}` : 'original_pr=',
+      ];
+
+      console.log(`Running command: gh ${args.join(' ')}`);
+
+      execFileSync('gh', args, {
+        stdio: 'inherit',
+        env: { ...process.env, GH_TOKEN: process.env.GITHUB_TOKEN },
+      });
+
+      console.log('✅ Workflow dispatch completed successfully');
+    } catch (e) {
+      console.error('❌ Failed to dispatch workflow:', e.message);
+      throw e;
+    }
   } else {
     console.log('✅ Would trigger workflow with inputs:', {
       type: channel,
       dry_run: isDryRun.toString(),
+      force_skip_tests: forceSkipTests.toString(),
       release_ref: releaseRef,
       original_pr: originalPr ? originalPr.toString() : '',
     });
@@ -200,13 +225,46 @@ async function main() {
 **🔗 Track Progress:**
 - [View release workflow](https://github.com/${context.repo.owner}/${context.repo.repo}/actions)`;
 
-    if (!testMode && github) {
-      await github.rest.issues.createComment({
-        owner: context.repo.owner,
-        repo: context.repo.repo,
-        issue_number: originalPr,
-        body: commentBody,
-      });
+    if (!testMode) {
+      let tempDir;
+      try {
+        const { execFileSync } = await import('node:child_process');
+        const { writeFileSync, mkdtempSync } = await import('node:fs');
+        const { join } = await import('node:path');
+        const { tmpdir } = await import('node:os');
+
+        // Create secure temporary directory and file
+        tempDir = mkdtempSync(join(tmpdir(), 'patch-trigger-'));
+        const tempFile = join(tempDir, 'comment.md');
+        writeFileSync(tempFile, commentBody);
+
+        execFileSync(
+          'gh',
+          ['pr', 'comment', originalPr.toString(), '--body-file', tempFile],
+          {
+            stdio: 'inherit',
+            env: { ...process.env, GH_TOKEN: process.env.GITHUB_TOKEN },
+          },
+        );
+
+        console.log('✅ Comment posted successfully');
+      } catch (e) {
+        console.error('❌ Failed to post comment:', e.message);
+        // Don't throw here since the main workflow dispatch succeeded
+      } finally {
+        // Clean up temp directory and all its contents
+        if (tempDir) {
+          try {
+            const { rmSync } = await import('node:fs');
+            rmSync(tempDir, { recursive: true, force: true });
+          } catch (cleanupError) {
+            console.warn(
+              '⚠️ Failed to clean up temp directory:',
+              cleanupError.message,
+            );
+          }
+        }
+      }
     } else {
       console.log('✅ Would post comment:', commentBody);
     }

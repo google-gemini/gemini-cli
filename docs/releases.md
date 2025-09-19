@@ -191,6 +191,65 @@ Upon merging the pull request, the `Release: Patch (2) Trigger` workflow is auto
 
 This fully automated process ensures that patches are created and released consistently and reliably.
 
+#### Troubleshooting: Older Branch Workflows
+
+**Issue**: If the patch trigger workflow fails with errors like "Resource not accessible by integration" or references to non-existent workflow files (e.g., `patch-release.yml`), this indicates the hotfix branch contains an outdated version of the workflow files.
+
+**Root Cause**: When a PR is merged, GitHub Actions runs the workflow definition from the **source branch** (the hotfix branch), not from the target branch (the release branch). If the hotfix branch was created from an older release branch that predates workflow improvements, it will use the old workflow logic.
+
+**Solutions**:
+
+**Option 1: Manual Trigger (Quick Fix)**
+Manually trigger the updated workflow from the branch with the latest workflow code:
+
+```bash
+# For a preview channel patch with tests skipped
+gh workflow run release-patch-2-trigger.yml --ref <branch-with-updated-workflow> \
+  --field ref="hotfix/v0.6.0-preview.2/preview/cherry-pick-abc1234" \
+  --field workflow_ref=<branch-with-updated-workflow> \
+  --field dry_run=false \
+  --field force_skip_tests=true
+
+# For a stable channel patch
+gh workflow run release-patch-2-trigger.yml --ref <branch-with-updated-workflow> \
+  --field ref="hotfix/v0.5.1/stable/cherry-pick-abc1234" \
+  --field workflow_ref=<branch-with-updated-workflow> \
+  --field dry_run=false \
+  --field force_skip_tests=false
+
+# Example using main branch (most common case)
+gh workflow run release-patch-2-trigger.yml --ref main \
+  --field ref="hotfix/v0.6.0-preview.2/preview/cherry-pick-abc1234" \
+  --field workflow_ref=main \
+  --field dry_run=false \
+  --field force_skip_tests=true
+```
+
+**Note**: Replace `<branch-with-updated-workflow>` with the branch containing the latest workflow improvements (usually `main`, but could be a feature branch if testing updates).
+
+**Option 2: Update the Hotfix Branch**
+Merge the latest main branch into your hotfix branch to get the updated workflows:
+
+```bash
+git checkout hotfix/v0.6.0-preview.2/preview/cherry-pick-abc1234
+git merge main
+git push
+```
+
+Then close and reopen the PR to retrigger the workflow with the updated version.
+
+**Option 3: Direct Release Trigger**
+Skip the trigger workflow entirely and directly run the release workflow:
+
+```bash
+# Replace channel and release_ref with appropriate values
+gh workflow run release-patch-3-release.yml --ref main \
+  --field type="preview" \
+  --field dry_run=false \
+  --field force_skip_tests=true \
+  --field release_ref="release/v0.6.0-preview.2"
+```
+
 ### Docker
 
 We also run a Google cloud build called [release-docker.yml](../.gcp/release-docker.yml). Which publishes the sandbox docker to match your release. This will also be moved to GH and combined with the main release file once service account permissions are sorted out.
