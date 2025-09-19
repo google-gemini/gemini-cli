@@ -59,6 +59,8 @@ jobs:
           private-key: '${{ secrets.PRIVATE_KEY }}'
           permission-pull-requests: 'write'
           permission-contents: 'write'
+          permission-metadata: 'read'
+          permission-actions: 'read'
 
       - name: 'Configure Git User'
         run: |-
@@ -71,15 +73,15 @@ jobs:
           GH_TOKEN: '${{ steps.generate_token.outputs.token }}'
         continue-on-error: true
         run: |
-          # Capture output directly to environment variable
+          # Capture output and display it in logs using tee
           {
             node scripts/releasing/create-patch-pr.js --commit=${{ github.event.inputs.commit }} --channel=${{ github.event.inputs.channel }} --dry-run=${{ github.event.inputs.dry_run }}
             echo "EXIT_CODE=$?" >> "$GITHUB_OUTPUT"
-          } 2>&1 | {
+          } 2>&1 | tee >(
             echo "LOG_CONTENT<<EOF" >> "$GITHUB_ENV"
             cat >> "$GITHUB_ENV"
             echo "EOF" >> "$GITHUB_ENV"
-          }
+          )
 
       - name: 'Comment on Original PR'
         if: 'inputs.original_pr'
