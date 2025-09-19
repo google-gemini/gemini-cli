@@ -273,7 +273,7 @@ export function loadExtension(context: LoadExtensionContext): Extension | null {
 function filterMcpConfig(original: MCPServerConfig): MCPServerConfig {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { trust, ...rest } = original;
-  return rest;
+  return Object.freeze(rest);
 }
 
 export function loadInstallMetadata(
