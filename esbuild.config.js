@@ -41,6 +41,10 @@ esbuild
     format: 'esm',
     external,
     alias: {
+      'get-ripgrep': path.resolve(
+        __dirname,
+        'third_party/get-ripgrep/src/index.ts',
+      ),
       'is-in-ci': path.resolve(
         __dirname,
         'packages/cli/src/patches/is-in-ci.ts',
