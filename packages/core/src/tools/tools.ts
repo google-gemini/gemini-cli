@@ -10,6 +10,13 @@ import type { DiffUpdateResult } from '../ide/ide-client.js';
 import type { ShellExecutionConfig } from '../services/shellExecutionService.js';
 import { SchemaValidator } from '../utils/schemaValidator.js';
 import type { AnsiOutput } from '../utils/terminalSerializer.js';
+import type { MessageBus } from '../confirmation-bus/message-bus.js';
+import { randomUUID } from 'node:crypto';
+import {
+  MessageBusType,
+  type ToolConfirmationRequest,
+  type ToolConfirmationResponse,
+} from '../confirmation-bus/types.js';
 
 /**
  * Represents a validated and ready-to-execute tool call.
@@ -66,7 +73,16 @@ export abstract class BaseToolInvocation<
   TResult extends ToolResult,
 > implements ToolInvocation<TParams, TResult>
 {
-  constructor(readonly params: TParams) {}
+  constructor(
+    readonly params: TParams,
+    protected readonly messageBus?: MessageBus,
+  ) {
+    if (this.messageBus) {
+      console.log(
+        `[DEBUG] Tool ${this.constructor.name} created with messageBus: YES`,
+      );
+    }
+  }
 
   abstract getDescription(): string;
 
@@ -77,7 +93,112 @@ export abstract class BaseToolInvocation<
   shouldConfirmExecute(
     _abortSignal: AbortSignal,
   ): Promise<ToolCallConfirmationDetails | false> {
+    // If message bus is available, use it for confirmation
+    if (this.messageBus) {
+      console.log(
+        `[DEBUG] Using message bus for tool confirmation: ${this.constructor.name}`,
+      );
+      return this.handleMessageBusConfirmation(_abortSignal);
+    }
+
+    // Fall back to existing confirmation flow
     return Promise.resolve(false);
+  }
+
+  /**
+   * Handle tool confirmation using the message bus.
+   * This method publishes a confirmation request and waits for the response.
+   */
+  protected async handleMessageBusConfirmation(
+    abortSignal: AbortSignal,
+  ): Promise<ToolCallConfirmationDetails | false> {
+    if (!this.messageBus) {
+      return false;
+    }
+
+    const correlationId = randomUUID();
+    const toolCall = {
+      name: this.constructor.name,
+      args: this.params as Record<string, unknown>,
+    };
+
+    return new Promise<ToolCallConfirmationDetails | false>(
+      (resolve, reject) => {
+        if (!this.messageBus) {
+          resolve(false);
+          return;
+        }
+
+        // Set up timeout and abort handling
+        const timeoutId = setTimeout(() => {
+          this.messageBus?.unsubscribe(
+            MessageBusType.TOOL_CONFIRMATION_RESPONSE,
+            responseHandler,
+          );
+          resolve(false);
+        }, 30000); // 30 second timeout
+
+        const abortHandler = () => {
+          clearTimeout(timeoutId);
+          this.messageBus?.unsubscribe(
+            MessageBusType.TOOL_CONFIRMATION_RESPONSE,
+            responseHandler,
+          );
+          reject(new Error('Tool confirmation aborted'));
+        };
+
+        if (abortSignal.aborted) {
+          abortHandler();
+          return;
+        }
+        abortSignal.addEventListener('abort', abortHandler);
+
+        // Set up response handler
+        const responseHandler = (response: ToolConfirmationResponse) => {
+          if (response.correlationId === correlationId) {
+            clearTimeout(timeoutId);
+            abortSignal.removeEventListener('abort', abortHandler);
+            this.messageBus?.unsubscribe(
+              MessageBusType.TOOL_CONFIRMATION_RESPONSE,
+              responseHandler,
+            );
+
+            if (response.confirmed) {
+              // Tool was confirmed, return false to indicate no further confirmation needed
+              resolve(false);
+            } else {
+              // Tool was denied, return false to indicate no confirmation
+              resolve(false);
+            }
+          }
+        };
+
+        // Subscribe to response
+        this.messageBus.subscribe(
+          MessageBusType.TOOL_CONFIRMATION_RESPONSE,
+          responseHandler,
+        );
+
+        // Publish confirmation request
+        const request: ToolConfirmationRequest = {
+          type: MessageBusType.TOOL_CONFIRMATION_REQUEST,
+          toolCall,
+          correlationId,
+        };
+
+        try {
+          this.messageBus.publish(request);
+        } catch (_error) {
+          clearTimeout(timeoutId);
+          abortSignal.removeEventListener('abort', abortHandler);
+          this.messageBus.unsubscribe(
+            MessageBusType.TOOL_CONFIRMATION_RESPONSE,
+            responseHandler,
+          );
+          resolve(false);
+        }
+      },
+    );
   }
 
   abstract execute(
@@ -159,6 +280,7 @@ export abstract class DeclarativeTool<
     readonly parameterSchema: unknown,
     readonly isOutputMarkdown: boolean = true,
     readonly canUpdateOutput: boolean = false,
+    readonly messageBus?: MessageBus,
   ) {}
 
   get schema(): FunctionDeclaration {
@@ -282,7 +404,7 @@ export abstract class BaseDeclarativeTool<
     if (validationError) {
       throw new Error(validationError);
     }
-    return this.createInvocation(params);
+    return this.createInvocation(params, this.messageBus);
   }
 
   override validateToolParams(params: TParams): string | null {
@@ -304,6 +426,7 @@ export abstract class BaseDeclarativeTool<
 
   protected abstract createInvocation(
     params: TParams,
+    messageBus?: MessageBus,
   ): ToolInvocation<TParams, TResult>;
 }
 
