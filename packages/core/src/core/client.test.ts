@@ -16,7 +16,7 @@ import {
 
 import type { Content, GenerateContentResponse, Part } from '@google/genai';
 import {
-  findIndexAfterFraction,
+  findCompressSplitPoint,
   isThinkingDefault,
   isThinkingSupported,
   GeminiClient,
@@ -42,6 +42,7 @@ import { tokenLimit } from './tokenLimits.js';
 import { ideContextStore } from '../ide/ideContext.js';
 import { ClearcutLogger } from '../telemetry/clearcut-logger/clearcut-logger.js';
 import type { ModelRouterService } from '../routing/modelRouterService.js';
+import { uiTelemetryService } from '../telemetry/uiTelemetry.js';
 
 // Mock fs module to prevent actual file system operations during tests
 const mockFileSystem = new Map<string, string>();
@@ -111,6 +112,11 @@ vi.mock('../telemetry/index.js', () => ({
   logApiError: vi.fn(),
 }));
 vi.mock('../ide/ideContext.js');
+vi.mock('../telemetry/uiTelemetry.js', () => ({
+  uiTelemetryService: {
+    setLastPromptTokenCount: vi.fn(),
+  },
+}));
 
 /**
  * Array.fromAsync ponyfill, which will be available in es 2024.
@@ -126,51 +132,70 @@ async function fromAsync<T>(promise: AsyncGenerator<T>): Promise<readonly T[]> {
 }
 
 describe('findIndexAfterFraction', () => {
-  const history: Content[] = [
-    { role: 'user', parts: [{ text: 'This is the first message.' }] }, // JSON length: 66
-    { role: 'model', parts: [{ text: 'This is the second message.' }] }, // JSON length: 68
-    { role: 'user', parts: [{ text: 'This is the third message.' }] }, // JSON length: 66
-    { role: 'model', parts: [{ text: 'This is the fourth message.' }] }, // JSON length: 68
-    { role: 'user', parts: [{ text: 'This is the fifth message.' }] }, // JSON length: 65
-  ];
-  // Total length: 333
-
   it('should throw an error for non-positive numbers', () => {
-    expect(() => findIndexAfterFraction(history, 0)).toThrow(
+    expect(() => findCompressSplitPoint([], 0)).toThrow(
       'Fraction must be between 0 and 1',
     );
   });
 
   it('should throw an error for a fraction greater than or equal to 1', () => {
-    expect(() => findIndexAfterFraction(history, 1)).toThrow(
+    expect(() => findCompressSplitPoint([], 1)).toThrow(
       'Fraction must be between 0 and 1',
     );
   });
 
-  it('should handle a fraction in the middle', () => {
-    // 333 * 0.5 = 166.5
-    // 0: 66
-    // 1: 66 + 68 = 134
-    // 2: 134 + 66 = 200
-    // 200 >= 166.5, so index is 3
-    expect(findIndexAfterFraction(history, 0.5)).toBe(3);
-  });
-
-  it('should handle a fraction that results in the last index', () => {
-    // 333 * 0.9 = 299.7
-    // ...
-    // 3: 200 + 68 = 268
-    // 4: 268 + 65 = 333
-    // 333 >= 299.7, so index is 5
-    expect(findIndexAfterFraction(history, 0.9)).toBe(5);
-  });
-
   it('should handle an empty history', () => {
-    expect(findIndexAfterFraction([], 0.5)).toBe(0);
+    expect(findCompressSplitPoint([], 0.5)).toBe(0);
+  });
+
+  it('should handle a fraction in the middle', () => {
+    const history: Content[] = [
+      { role: 'user', parts: [{ text: 'This is the first message.' }] }, // JSON length: 66 (19%)
+      { role: 'model', parts: [{ text: 'This is the second message.' }] }, // JSON length: 68 (40%)
+      { role: 'user', parts: [{ text: 'This is the third message.' }] }, // JSON length: 66 (60%)
+      { role: 'model', parts: [{ text: 'This is the fourth message.' }] }, // JSON length: 68 (80%)
+      { role: 'user', parts: [{ text: 'This is the fifth message.' }] }, // JSON length: 65 (100%)
+    ];
+    expect(findCompressSplitPoint(history, 0.5)).toBe(2);
+  });
+
+  it('should handle a fraction of last index', () => {
+    const history: Content[] = [
+      { role: 'user', parts: [{ text: 'This is the first message.' }] }, // JSON length: 66 (19%)
+      { role: 'model', parts: [{ text: 'This is the second message.' }] }, // JSON length: 68 (40%)
+      { role: 'user', parts: [{ text: 'This is the third message.' }] }, // JSON length: 66 (60%)
+      { role: 'model', parts: [{ text: 'This is the fourth message.' }] }, // JSON length: 68 (80%)
+      { role: 'user', parts: [{ text: 'This is the fifth message.' }] }, // JSON length: 65 (100%)
+    ];
+    expect(findCompressSplitPoint(history, 0.9)).toBe(4);
+  });
+
+  it('should handle a fraction of after last index', () => {
+    const history: Content[] = [
+      { role: 'user', parts: [{ text: 'This is the first message.' }] }, // JSON length: 66 (24%%)
+      { role: 'model', parts: [{ text: 'This is the second message.' }] }, // JSON length: 68 (50%)
+      { role: 'user', parts: [{ text: 'This is the third message.' }] }, // JSON length: 66 (74%)
+      { role: 'model', parts: [{ text: 'This is the fourth message.' }] }, // JSON length: 68 (100%)
+    ];
+    expect(findCompressSplitPoint(history, 0.8)).toBe(4);
+  });
+
+  it('should return earlier splitpoint if no valid ones are after threshhold', () => {
+    const history: Content[] = [
+      { role: 'user', parts: [{ text: 'This is the first message.' }] },
+      { role: 'model', parts: [{ text: 'This is the second message.' }] },
+      { role: 'user', parts: [{ text: 'This is the third message.' }] },
+      { role: 'model', parts: [{ functionCall: {} }] },
+    ];
+    // Can't return 4 because the previous item has a function call.
+    expect(findCompressSplitPoint(history, 0.99)).toBe(2);
   });
 
   it('should handle a history with only one item', () => {
-    expect(findIndexAfterFraction(history.slice(0, 1), 0.5)).toBe(1);
+    const historyWithEmptyParts: Content[] = [
+      { role: 'user', parts: [{ text: 'Message 1' }] },
+    ];
+    expect(findCompressSplitPoint(historyWithEmptyParts, 0.5)).toBe(0);
   });
 
   it('should handle history with weird parts', () => {
@@ -179,7 +204,7 @@ describe('findIndexAfterFraction', () => {
       { role: 'model', parts: [{ fileData: { fileUri: 'derp' } }] },
       { role: 'user', parts: [{ text: 'Message 2' }] },
     ];
-    expect(findIndexAfterFraction(historyWithEmptyParts, 0.5)).toBe(2);
+    expect(findCompressSplitPoint(historyWithEmptyParts, 0.5)).toBe(2);
   });
 });
 
@@ -224,6 +249,7 @@ describe('Gemini Client (client.ts)', () => {
   let mockGenerateContentFn: Mock;
   beforeEach(async () => {
     vi.resetAllMocks();
+    vi.mocked(uiTelemetryService.setLastPromptTokenCount).mockClear();
 
     mockGenerateContentFn = vi.fn().mockResolvedValue({
       candidates: [{ content: { parts: [{ text: '{"key": "value"}' }] } }],
@@ -421,6 +447,12 @@ describe('Gemini Client (client.ts)', () => {
           newTokenCount: 5000,
           originalTokenCount: 1000,
         });
+        expect(uiTelemetryService.setLastPromptTokenCount).toHaveBeenCalledWith(
+          5000,
+        );
+        expect(
+          uiTelemetryService.setLastPromptTokenCount,
+        ).toHaveBeenCalledTimes(1);
       });
 
       it('does not manipulate the source chat', async () => {
@@ -539,6 +571,12 @@ describe('Gemini Client (client.ts)', () => {
           tokens_before: originalTokenCount,
           tokens_after: newTokenCount,
         }),
+      );
+      expect(uiTelemetryService.setLastPromptTokenCount).toHaveBeenCalledWith(
+        newTokenCount,
+      );
+      expect(uiTelemetryService.setLastPromptTokenCount).toHaveBeenCalledTimes(
+        1,
       );
     });
 
