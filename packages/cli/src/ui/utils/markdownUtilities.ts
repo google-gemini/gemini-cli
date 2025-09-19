@@ -36,6 +36,18 @@ This function aims to find an *intelligent* or "safe" index within the provided 
 */
 
 /**
+ * Number of spaces equivalent to one tab for indentation calculations
+ */
+const SPACES_PER_TAB = 4;
+
+/**
+ * Maximum characters to scan ahead when checking for list structures.
+ * This limits the lookahead to prevent performance issues with very large content
+ * while still capturing most reasonable list patterns.
+ */
+const LIST_LOOKAHEAD_CHARS = 200;
+
+/**
  * Normalizes leading whitespace to count indentation (1 tab = 4 spaces)
  */
 const getIndentationLevel = (line: string): number => {
@@ -44,7 +56,7 @@ const getIndentationLevel = (line: string): number => {
     if (char === ' ') {
       indent++;
     } else if (char === '\t') {
-      indent += 4;
+      indent += SPACES_PER_TAB;
     } else {
       break;
     }
@@ -85,7 +97,7 @@ const isIndexInsideIndentedCodeBlock = (
   const targetIndent = getIndentationLevel(targetLine);
 
   // If the line is not indented enough, it's not in an indented code block
-  if (targetIndent < 4 && targetLine.trim() !== '') {
+  if (targetIndent < SPACES_PER_TAB && targetLine.trim() !== '') {
     return false;
   }
 
@@ -96,13 +108,13 @@ const isIndexInsideIndentedCodeBlock = (
     const indent = getIndentationLevel(line);
 
     // If we hit a line with <4 spaces that's not blank, we've found the start boundary
-    if (line.trim() !== '' && indent < 4) {
+    if (line.trim() !== '' && indent < SPACES_PER_TAB) {
       codeBlockStart = i + 1;
       break;
     }
 
     // If this line is indented 4+, continue looking backwards
-    if (indent >= 4) {
+    if (indent >= SPACES_PER_TAB) {
       codeBlockStart = i;
     }
   }
@@ -114,13 +126,13 @@ const isIndexInsideIndentedCodeBlock = (
     const indent = getIndentationLevel(line);
 
     // If we hit a line with <4 spaces that's not blank, we've found the end boundary
-    if (line.trim() !== '' && indent < 4) {
+    if (line.trim() !== '' && indent < SPACES_PER_TAB) {
       codeBlockEnd = i - 1;
       break;
     }
 
     // If this line is indented 4+ or blank, continue the block
-    if (indent >= 4 || line.trim() === '') {
+    if (indent >= SPACES_PER_TAB || line.trim() === '') {
       codeBlockEnd = i;
     }
   }
@@ -129,7 +141,7 @@ const isIndexInsideIndentedCodeBlock = (
   // (at least one non-blank line with 4+ spaces)
   for (let i = codeBlockStart; i <= codeBlockEnd; i++) {
     const line = lines[i];
-    if (line.trim() !== '' && getIndentationLevel(line) >= 4) {
+    if (line.trim() !== '' && getIndentationLevel(line) >= SPACES_PER_TAB) {
       return true; // Found at least one properly indented code line
     }
   }
@@ -212,13 +224,13 @@ const findEnclosingIndentedCodeBlockStart = (
     const indent = getIndentationLevel(line);
 
     // If we hit a line with <4 spaces that's not blank, we've found the start boundary
-    if (line.trim() !== '' && indent < 4) {
+    if (line.trim() !== '' && indent < SPACES_PER_TAB) {
       codeBlockStart = i + 1;
       break;
     }
 
     // If this line is indented 4+, continue looking backwards
-    if (indent >= 4) {
+    if (indent >= SPACES_PER_TAB) {
       codeBlockStart = i;
     }
   }
@@ -298,12 +310,13 @@ const isWithinList = (content: string, index: number): boolean => {
   // Check a more generous range of lines to handle unusual spacing
   const nextContent = content.substring(
     index,
-    Math.min(index + 200, content.length),
+    Math.min(index + LIST_LOOKAHEAD_CHARS, content.length),
   );
   const nextLines = nextContent.split('\n').slice(0, 6); // Check more lines
 
   // Enhanced list patterns including task lists and varied spacing
-  const listPattern = /^[\s]*([*\-+]|\d+\.|[a-zA-Z]\.|[ivxlcdm]+\.)\s+/;
+  // Note: Only includes patterns supported by CommonMark/GFM spec
+  const listPattern = /^[\s]*([*\-+]|\d+\.|[a-zA-Z]\.)\s+/;
   const taskListPattern = /^[\s]*[-*+]\s*\[[ xX]\]\s+/; // Task lists: - [ ] or - [x]
 
   return nextLines.some(
@@ -337,24 +350,6 @@ const endsWithHeader = (content: string, index: number): boolean => {
 };
 
 /**
- * Checks if a position would split within a blockquote structure
- * Note: Since \n\n terminates a blockquote per Markdown spec, splits at \n\n are always valid
- */
-const isWithinBlockquote = (_content: string, _index: number): boolean =>
-  // Since we only split at \n\n positions and \n\n terminates blockquotes,
-  // splitting at \n\n is always safe for blockquotes - never "within" one
-  false;
-
-/**
- * Checks if a position would split within a table structure
- * Note: Since \n\n terminates a table per Markdown spec, splits at \n\n are always valid
- */
-const isWithinTable = (_content: string, _index: number): boolean =>
-  // Since we only split at \n\n positions and \n\n terminates tables,
-  // splitting at \n\n is always safe for tables - never "within" one
-  false;
-
-/**
  * Finds the last safe split point in markdown content to preserve structure integrity.
  * LIMITATION: Heuristic-based detection may have edge cases with complex nested structures or false positives.
  * FUTURE: Consider migrating to a dedicated markdown parser (e.g., unified/remark) for AST-based structure detection.
@@ -385,9 +380,7 @@ export const findLastSafeSplitPoint = (content: string) => {
       // Check if this split would break any markdown structure
       const wouldBreakStructure =
         isWithinList(content, potentialSplitPoint) ||
-        endsWithHeader(content, dnlIndex) ||
-        isWithinBlockquote(content, potentialSplitPoint) ||
-        isWithinTable(content, potentialSplitPoint);
+        endsWithHeader(content, dnlIndex);
 
       if (!wouldBreakStructure) {
         return potentialSplitPoint;
