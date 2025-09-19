@@ -2,7 +2,7 @@
 
 Gemini CLI includes a pre-built extension for connecting to any PostgreSQL database, allowing you to query and manage your database using natural language.
 
-This guide covers how to activate and configure this extension.
+This guide covers how to activate and configure this extension. To learn more, go to https://github.com/gemini-cli-extensions/postgres.
 
 ## Installation
 
@@ -37,6 +37,19 @@ After activating the extension, configure it by setting the following environmen
 ### Permissions
 
 Ensure the configured database user has the necessary database-level permissions (e.g., `SELECT`, `INSERT`) to execute the desired queries.
+
+## Supported Tools
+
+This extension provides the following tools. Note that these can be used in combination with core Gemini CLI tools (like `write_file` and `run_shell_command`).
+
+- `execute_sql`: Executes a SQL query.
+- `list_tables`: Lists tables in the database.
+- `list_autovacuum_configurations`: Lists autovacuum configurations in the database.
+- `list_memory_configurations`: Lists memory-related configurations in the database.
+- `list_top_bloated_tables`: Lists the top bloated tables in the database.
+- `list_replication_slots`: Lists replication slots in the database.
+- `list_invalid_indexes`: Lists invalid indexes in the database.
+- `get_query_plan`: Generates the execution plan of a statement.
 
 ## Usage Examples
 
@@ -158,15 +171,26 @@ She wants to know how products relate to other tables.
 > "What are the foreign key relationships for the 'products' table?"
 *Tool Used*: `execute_sql`
 
-## Supported Tools
+### Test Data Generation Journey: Populating a New Table
 
-This extension provides the following tools:
+A developer, Sam, needs to create some test data for a new `products` table.
 
-- `execute_sql`: Executes a SQL query.
-- `list_tables`: Lists tables in the database.
-- `list_autovacuum_configurations`: Lists autovacuum configurations in the database.
-- `list_memory_configurations`: Lists memory-related configurations in the database.
-- `list_top_bloated_tables`: Lists the top bloated tables in the database.
-- `list_replication_slots`: Lists replication slots in the database.
-- `list_invalid_indexes`: Lists invalid indexes in the database.
-- `get_query_plan`: Generates the execution plan of a statement.
+#### Step 1: Create the Table
+Sam first needs to create the `products` table.
+> "Create a table named 'products' with columns for 'id' (integer, primary key), 'name' (varchar), and 'price' (decimal)."
+*Tool Used*: `execute_sql`
+
+#### Step 2: Insert a Single Row
+Sam inserts a single product to verify the table structure.
+> "Insert a product with id 1, name 'Laptop', and price 1200.00 into the 'products' table."
+*Tool Used*: `execute_sql`
+
+#### Step 3: Insert Multiple Rows
+Now, Sam wants to add a few more products in a single command.
+> "Insert the following products into the 'products' table: (2, 'Keyboard', 75.00), (3, 'Mouse', 25.00), (4, 'Monitor', 300.00)."
+*Tool Used*: `execute_sql`
+
+#### Step 4: Verify the Data
+Finally, Sam checks that the data was inserted correctly.
+> "Show me all the data from the 'products' table."
+*Tool Used*: `execute_sql`
