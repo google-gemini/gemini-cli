@@ -48,6 +48,9 @@ jobs:
           node-version-file: '.nvmrc'
           cache: 'npm'
 
+      - name: 'Install Script Dependencies'
+        run: 'npm install yargs'
+
       - name: 'Configure Git User'
         run: |-
           git config user.name "gemini-cli-robot"
