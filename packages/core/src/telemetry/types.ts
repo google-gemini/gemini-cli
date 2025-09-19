@@ -582,6 +582,7 @@ export type TelemetryEvent =
   | InvalidChunkEvent
   | ContentRetryEvent
   | ContentRetryFailureEvent
+  | ExtensionEnableEvent
   | ExtensionInstallEvent
   | ExtensionUninstallEvent
   | ModelRoutingEvent
