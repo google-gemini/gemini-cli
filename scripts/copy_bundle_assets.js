@@ -50,7 +50,10 @@ for (const file of localeFiles) {
     mkdirSync(destDir, { recursive: true });
   }
   
-  copyFileSync(join(root, file), destPath);
+  // Copy file with absolute paths
+  const srcPath = join(root, file);
+  copyFileSync(srcPath, destPath);
+  console.log(`Copied i18n locale: ${file} -> locales/${relativePath}`);
 }
 
 console.log('Assets copied to bundle/');
