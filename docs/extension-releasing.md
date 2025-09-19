@@ -9,13 +9,19 @@ Git repository releases tend to be the simplest and most flexible approach, whil
 
 ## Releasing through a git repository
 
-This is the most flexible and simple option. Users can depend on any ref from your git repo, such as a branch or tag, which allows you to manage multiple release channels. You also can point at any git repository, so your extension does not have to be hosted on github.
+This is the most flexible and simple option. All you need to do us create a publicly accessible git repo (such as a public github repository) and then users can install your extension using `gemini extensions install <your-repo-uri>`, or for a GitHub repository they can use the simplified `gemini extensions install <org>/<repo>` format. They can optionally depend on a specific ref (branch/tag/commit) using the `--ref=<some-ref>` argument, this defaults to the default branch.
 
-For instance, you can maintain a `stable` branch, which users can install this way `gemini extensions install <your-repo-uri> --ref=stable`. Or, you could make this the default by treating your default branch as your stable release, and doing development in a different branch (for instance called `dev`). You can maintain as many branches or tags as you like, providing maximum flexibility for you and your users.
+Whenever commits are pushed to the ref that a user depends on, they will be prompted to update the extension. Note that this also allows for easy rollbacks, the HEAD commit is always treated as the latest version regardless of the actual version in the `gemini-extension.json` file.
+
+Using a git repo can also provide a more incremental update as opposed to a github release which always downloads and entirely new copy of the extension.
+
+### Managing release channels using a git repository
+
+Users can depend on any ref from your git repo, such as a branch or tag, which allows you to manage multiple release channels.
+
+For instance, you can maintain a `stable` branch, which users can install this way `gemini extensions install <your-repo-uri> --ref=stable`. Or, you could make this the default by treating your default branch as your stable release branch, and doing development in a different branch (for instance called `dev`). You can maintain as many branches or tags as you like, providing maximum flexibility for you and your users.
 
 Note that these `ref` arguments can be tags, branches, or even specific commits, which allows users to depend on a specific version of your extension. It is up to you how you want to manage your tags and branches.
-
-Whenever the commit at HEAD of the ref that a user depends on changes, they will be prompted to update the extension. Note that this also allows for easy rollbacks, the HEAD commit is always treated as the latest version regardless of the actual version in the `gemini-extension.json` file. This can also provide a more incremental update as opposed to a github release which always downloads and entirely new copy of the extension.
 
 ### Example releasing flow using a git repo
 
