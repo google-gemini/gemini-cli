@@ -65,14 +65,8 @@ async function main() {
 
   const testMode = argv.test || process.env.TEST_MODE === 'true';
 
-  // Initialize GitHub API client only if not in test mode
-  let github;
-  if (!testMode) {
-    const { Octokit } = await import('@octokit/rest');
-    github = new Octokit({
-      auth: process.env.GH_TOKEN || process.env.GITHUB_TOKEN,
-    });
-  }
+  // GitHub CLI is available in the workflow environment
+  const hasGitHubCli = !testMode;
 
   // Get inputs from CLI args or environment
   const originalPr = argv.originalPr || process.env.ORIGINAL_PR;
@@ -95,7 +89,7 @@ async function main() {
     `Analyzing patch creation result for PR ${originalPr} (exit code: ${exitCode})`,
   );
 
-  const [owner, repo] = repository.split('/');
+  const [_owner, _repo] = repository.split('/');
   const npmTag = channel === 'stable' ? 'latest' : 'preview';
 
   if (testMode) {
@@ -189,18 +183,19 @@ ${hasConflicts ? '4' : '3'}. You'll receive updates here when the release comple
 
 **🔗 Track Progress:**
 - [View hotfix PR #${mockPrNumber}](${mockPrUrl})`;
-      } else if (github) {
-        // Find the actual PR for the new branch
+      } else if (hasGitHubCli) {
+        // Find the actual PR for the new branch using gh CLI
         try {
-          const prList = await github.rest.pulls.list({
-            owner,
-            repo,
-            head: `${owner}:${branch}`,
-            state: 'open',
-          });
+          const { execSync } = await import('node:child_process');
+          const prListOutput = execSync(
+            `gh pr list --head ${branch} --state open --json number,title,url --limit 1`,
+            { encoding: 'utf8' },
+          );
 
-          if (prList.data.length > 0) {
-            const pr = prList.data[0];
+          const prList = JSON.parse(prListOutput);
+
+          if (prList.length > 0) {
+            const pr = prList[0];
             const hasConflicts =
               logContent.includes('Cherry-pick has conflicts') ||
               pr.title.includes('[CONFLICTS]');
@@ -211,15 +206,15 @@ ${hasConflicts ? '4' : '3'}. You'll receive updates here when the release comple
 - **Channel**: \`${channel}\` → will publish to npm tag \`${npmTag}\`
 - **Commit**: \`${commit}\`
 - **Hotfix Branch**: [\`${branch}\`](https://github.com/${repository}/tree/${branch})
-- **Hotfix PR**: [#${pr.number}](${pr.html_url})${hasConflicts ? '\n- **⚠️ Status**: Cherry-pick conflicts detected - manual resolution required' : ''}
+- **Hotfix PR**: [#${pr.number}](${pr.url})${hasConflicts ? '\n- **⚠️ Status**: Cherry-pick conflicts detected - manual resolution required' : ''}
 
 **📝 Next Steps:**
-1. ${hasConflicts ? '⚠️ **Resolve conflicts** in the hotfix PR first' : 'Review and approve the hotfix PR'}: [#${pr.number}](${pr.html_url})${hasConflicts ? '\n2. **Test your changes** after resolving conflicts' : ''}
+1. ${hasConflicts ? '⚠️ **Resolve conflicts** in the hotfix PR first' : 'Review and approve the hotfix PR'}: [#${pr.number}](${pr.url})${hasConflicts ? '\n2. **Test your changes** after resolving conflicts' : ''}
 ${hasConflicts ? '3' : '2'}. Once merged, the patch release will automatically trigger
 ${hasConflicts ? '4' : '3'}. You'll receive updates here when the release completes
 
 **🔗 Track Progress:**
-- [View hotfix PR #${pr.number}](${pr.html_url})`;
+- [View hotfix PR #${pr.number}](${pr.url})`;
           } else {
             // Fallback if PR not found yet
             commentBody = `🚀 **Patch PR Created!**
@@ -275,17 +270,30 @@ No output was generated during patch creation.
     console.log(commentBody);
     console.log('----------------------------------------');
     console.log('\n✅ Comment generation working correctly!');
-  } else if (github) {
-    await github.rest.issues.createComment({
-      owner,
-      repo,
-      issue_number: parseInt(originalPr),
-      body: commentBody,
-    });
+  } else if (hasGitHubCli) {
+    const { execSync } = await import('node:child_process');
+    const { writeFileSync, unlinkSync } = await import('node:fs');
+    const { join } = await import('node:path');
 
-    console.log(`Successfully commented on PR ${originalPr}`);
+    // Write comment to temporary file to avoid shell escaping issues
+    const tmpFile = join(process.cwd(), `comment-${Date.now()}.md`);
+    writeFileSync(tmpFile, commentBody);
+
+    try {
+      execSync(`gh pr comment ${originalPr} --body-file "${tmpFile}"`, {
+        stdio: 'inherit',
+      });
+      console.log(`Successfully commented on PR ${originalPr}`);
+    } finally {
+      // Clean up temp file
+      try {
+        unlinkSync(tmpFile);
+      } catch (_e) {
+        // Ignore cleanup errors
+      }
+    }
   } else {
-    console.log('No GitHub client available');
+    console.log('No GitHub CLI available');
   }
 }
 
