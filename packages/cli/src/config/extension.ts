@@ -26,10 +26,8 @@ import { recursivelyHydrateStrings } from './extensions/variables.js';
 import { isWorkspaceTrusted } from './trustedFolders.js';
 import { resolveEnvVarsInObject } from '../utils/envVarResolver.js';
 import { randomUUID } from 'node:crypto';
-import { ExtensionUpdateState } from '../ui/state/extensions.js';
 import {
   cloneFromGit,
-  checkForExtensionUpdate,
   downloadFromGitHubRelease,
 } from './extensions/github.js';
 import type { LoadExtensionContext } from './extensions/variableSchema.js';
@@ -99,7 +97,7 @@ export function getWorkspaceExtensions(workspaceDir: string): Extension[] {
   return loadExtensionsFromDir(workspaceDir);
 }
 
-async function copyExtension(
+export async function copyExtension(
   source: string,
   destination: string,
 ): Promise<void> {
@@ -263,7 +261,7 @@ export function loadExtension(context: LoadExtensionContext): Extension | null {
   }
 }
 
-function loadInstallMetadata(
+export function loadInstallMetadata(
   extensionDir: string,
 ): ExtensionInstallMetadata | undefined {
   const metadataFilePath = path.join(extensionDir, INSTALL_METADATA_FILENAME);
@@ -573,17 +571,20 @@ export async function loadExtensionConfig(
 }
 
 export async function uninstallExtension(
-  extensionName: string,
+  extensionIdentifier: string,
   cwd: string = process.cwd(),
 ): Promise<void> {
   const logger = getClearcutLogger(cwd);
   const installedExtensions = loadUserExtensions();
-  if (
-    !installedExtensions.some(
-      (installed) => installed.config.name === extensionName,
-    )
-  ) {
-    throw new Error(`Extension "${extensionName}" not found.`);
+  const extensionName = installedExtensions.find(
+    (installed) =>
+      installed.config.name.toLowerCase() ===
+        extensionIdentifier.toLowerCase() ||
+      installed.installMetadata?.source.toLowerCase() ===
+        extensionIdentifier.toLowerCase(),
+  )?.config.name;
+  if (!extensionName) {
+    throw new Error(`Extension not found.`);
   }
   const manager = new ExtensionEnablementManager(
     ExtensionStorage.getUserExtensionsDir(),
@@ -630,77 +631,6 @@ export function toOutputString(extension: Extension): string {
   return output;
 }
 
-export async function updateExtensionByName(
-  extensionName: string,
-  cwd: string = process.cwd(),
-  extensions: GeminiCLIExtension[],
-  setExtensionUpdateState: (updateState: ExtensionUpdateState) => void,
-): Promise<ExtensionUpdateInfo> {
-  const extension = extensions.find(
-    (installed) => installed.name === extensionName,
-  );
-  if (!extension) {
-    throw new Error(
-      `Extension "${extensionName}" not found. Run gemini extensions list to see available extensions.`,
-    );
-  }
-  return await updateExtension(extension, cwd, setExtensionUpdateState);
-}
-
-export async function updateExtension(
-  extension: GeminiCLIExtension,
-  cwd: string = process.cwd(),
-  setExtensionUpdateState: (updateState: ExtensionUpdateState) => void,
-): Promise<ExtensionUpdateInfo> {
-  const installMetadata = loadInstallMetadata(extension.path);
-
-  if (!installMetadata?.type) {
-    setExtensionUpdateState(ExtensionUpdateState.ERROR);
-    throw new Error(
-      `Extension ${extension.name} cannot be updated, type is unknown.`,
-    );
-  }
-  if (installMetadata?.type === 'link') {
-    setExtensionUpdateState(ExtensionUpdateState.UP_TO_DATE);
-    throw new Error(`Extension is linked so does not need to be updated`);
-  }
-  setExtensionUpdateState(ExtensionUpdateState.UPDATING);
-  const originalVersion = extension.version;
-
-  const tempDir = await ExtensionStorage.createTmpDir();
-  try {
-    await copyExtension(extension.path, tempDir);
-    await uninstallExtension(extension.name, cwd);
-    await installExtension(installMetadata, false, cwd);
-
-    const updatedExtensionStorage = new ExtensionStorage(extension.name);
-    const updatedExtension = loadExtension({
-      extensionDir: updatedExtensionStorage.getExtensionDir(),
-      workspaceDir: cwd,
-    });
-    if (!updatedExtension) {
-      setExtensionUpdateState(ExtensionUpdateState.ERROR);
-      throw new Error('Updated extension not found after installation.');
-    }
-    const updatedVersion = updatedExtension.config.version;
-    setExtensionUpdateState(ExtensionUpdateState.UPDATED_NEEDS_RESTART);
-    return {
-      name: extension.name,
-      originalVersion,
-      updatedVersion,
-    };
-  } catch (e) {
-    console.error(
-      `Error updating extension, rolling back. ${getErrorMessage(e)}`,
-    );
-    setExtensionUpdateState(ExtensionUpdateState.ERROR);
-    await copyExtension(tempDir, extension.path);
-    throw e;
-  } finally {
-    await fs.promises.rm(tempDir, { recursive: true, force: true });
-  }
-}
-
 export function disableExtension(
   name: string,
   scope: SettingScope,
@@ -730,55 +660,4 @@ export function enableExtension(
   );
   const scopePath = scope === SettingScope.Workspace ? cwd : os.homedir();
   manager.enable(name, true, scopePath);
-}
-
-export async function updateAllUpdatableExtensions(
-  cwd: string = process.cwd(),
-  extensions: GeminiCLIExtension[],
-  extensionsState: Map<string, ExtensionUpdateState>,
-  setExtensionsUpdateState: (
-    updateState: Map<string, ExtensionUpdateState>,
-  ) => void,
-): Promise<ExtensionUpdateInfo[]> {
-  return await Promise.all(
-    extensions
-      .filter(
-        (extension) =>
-          extensionsState.get(extension.name) ===
-          ExtensionUpdateState.UPDATE_AVAILABLE,
-      )
-      .map((extension) =>
-        updateExtension(extension, cwd, (updateState) => {
-          const newState = new Map(extensionsState);
-          newState.set(extension.name, updateState);
-          setExtensionsUpdateState(newState);
-        }),
-      ),
-  );
-}
-
-export interface ExtensionUpdateCheckResult {
-  state: ExtensionUpdateState;
-  error?: string;
-}
-
-export async function checkForAllExtensionUpdates(
-  extensions: GeminiCLIExtension[],
-  setExtensionsUpdateState: (
-    updateState: Map<string, ExtensionUpdateState>,
-  ) => void,
-): Promise<Map<string, ExtensionUpdateState>> {
-  const finalState = new Map<string, ExtensionUpdateState>();
-  for (const extension of extensions) {
-    if (!extension.installMetadata) {
-      finalState.set(extension.name, ExtensionUpdateState.NOT_UPDATABLE);
-      continue;
-    }
-    finalState.set(
-      extension.name,
-      await checkForExtensionUpdate(extension.installMetadata),
-    );
-  }
-  setExtensionsUpdateState(finalState);
-  return finalState;
 }
