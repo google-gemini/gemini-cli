@@ -29,18 +29,44 @@ async function main() {
       type: 'boolean',
       default: false,
     })
+    .option('skip-pr-creation', {
+      description: 'Only create branches, skip PR creation.',
+      type: 'boolean',
+      default: false,
+    })
+    .option('pr-only', {
+      description: 'Only create PR, skip branch creation.',
+      type: 'boolean',
+      default: false,
+    })
     .help()
     .alias('help', 'h').argv;
 
-  const { commit, channel, dryRun } = argv;
+  const { commit, channel, dryRun, skipPrCreation, prOnly } = argv;
+
+  // Validate mutually exclusive flags
+  if (skipPrCreation && prOnly) {
+    console.error(
+      'Error: --skip-pr-creation and --pr-only are mutually exclusive.',
+    );
+    process.exit(1);
+  }
 
   console.log(`Starting patch process for commit: ${commit}`);
   console.log(`Targeting channel: ${channel}`);
   if (dryRun) {
     console.log('Running in dry-run mode.');
   }
+  if (skipPrCreation) {
+    console.log('Mode: Branch creation only (skipping PR creation)');
+  }
+  if (prOnly) {
+    console.log('Mode: PR creation only (skipping branch creation)');
+  }
 
-  run('git fetch --all --tags --prune', dryRun);
+  if (!prOnly) {
+    run('git fetch --all --tags --prune', dryRun);
+  }
 
   const latestTag = getLatestTag(channel);
   console.log(`Found latest tag for ${channel}: ${latestTag}`);
@@ -48,13 +74,52 @@ async function main() {
   const releaseBranch = `release/${latestTag}`;
   const hotfixBranch = `hotfix/${latestTag}/${channel}/cherry-pick-${commit.substring(0, 7)}`;
 
+  // If PR-only mode, skip all branch creation logic
+  if (prOnly) {
+    console.log(
+      'PR-only mode: Skipping branch creation, proceeding to PR creation...',
+    );
+    // Jump to PR creation section
+    return await createPullRequest(
+      hotfixBranch,
+      releaseBranch,
+      commit,
+      channel,
+      dryRun,
+      false,
+    );
+  }
+
   // Create the release branch from the tag if it doesn't exist.
   if (!branchExists(releaseBranch)) {
     console.log(
       `Release branch ${releaseBranch} does not exist. Creating it from tag ${latestTag}...`,
     );
-    run(`git checkout -b ${releaseBranch} ${latestTag}`, dryRun);
-    run(`git push origin ${releaseBranch}`, dryRun);
+
+    try {
+      run(`git checkout -b ${releaseBranch} ${latestTag}`, dryRun);
+      run(`git push origin ${releaseBranch}`, dryRun);
+    } catch (error) {
+      console.log(`Failed to push release branch with git (likely due to workflow file permissions): ${error.message}`);
+      console.log(`Attempting to create release branch using GitHub API instead...`);
+
+      if (!dryRun) {
+        try {
+          // Get the tag SHA
+          const tagSha = run(`git rev-parse ${latestTag}`, false);
+
+          // Create branch using GitHub API
+          const repo = process.env.GITHUB_REPOSITORY || 'google-gemini/gemini-cli';
+          const [owner, repoName] = repo.split('/');
+
+          run(`gh api repos/${owner}/${repoName}/git/refs --method POST --field ref="refs/heads/${releaseBranch}" --field sha="${tagSha.trim()}"`, false);
+          console.log(`✅ Successfully created release branch ${releaseBranch} using GitHub API`);
+        } catch (apiError) {
+          console.error(`Failed to create release branch using GitHub API: ${apiError.message}`);
+          throw new Error(`Cannot create release branch ${releaseBranch}. Both git push and GitHub API failed.`);
+        }
+      }
+    }
   } else {
     console.log(`Release branch ${releaseBranch} already exists.`);
   }
@@ -154,7 +219,43 @@ async function main() {
   console.log(`Pushing hotfix branch ${hotfixBranch} to origin...`);
   run(`git push --set-upstream origin ${hotfixBranch}`, dryRun);
 
-  // Create the pull request.
+  // If skip-pr-creation mode, stop here
+  if (skipPrCreation) {
+    console.log(
+      '✅ Branch creation completed! Skipping PR creation as requested.',
+    );
+    if (hasConflicts) {
+      console.log(
+        '⚠️  Note: Conflicts were detected during cherry-pick - manual resolution required before PR creation!',
+      );
+    }
+    return {
+      newBranch: hotfixBranch,
+      created: true,
+      hasConflicts,
+      skippedPR: true,
+    };
+  }
+
+  // Create the pull request
+  return await createPullRequest(
+    hotfixBranch,
+    releaseBranch,
+    commit,
+    channel,
+    dryRun,
+    hasConflicts,
+  );
+}
+
+async function createPullRequest(
+  hotfixBranch,
+  releaseBranch,
+  commit,
+  channel,
+  dryRun,
+  hasConflicts,
+) {
   console.log(
     `Creating pull request from ${hotfixBranch} to ${releaseBranch}...`,
   );

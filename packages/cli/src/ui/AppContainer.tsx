@@ -865,14 +865,27 @@ Logging in with Google... Please restart Gemini CLI to continue.
         console.log('[DEBUG] Keystroke:', JSON.stringify(key));
       }
 
-      const anyDialogOpen =
-        isThemeDialogOpen ||
-        isAuthDialogOpen ||
-        isEditorDialogOpen ||
-        isSettingsDialogOpen ||
-        isFolderTrustDialogOpen ||
-        showPrivacyNotice;
-      if (anyDialogOpen) {
+      if (keyMatchers[Command.QUIT](key)) {
+        if (!ctrlCPressedOnce) {
+          cancelOngoingRequest?.();
+        }
+
+        if (!ctrlCPressedOnce) {
+          setCtrlCPressedOnce(true);
+          ctrlCTimerRef.current = setTimeout(() => {
+            setCtrlCPressedOnce(false);
+            ctrlCTimerRef.current = null;
+          }, CTRL_EXIT_PROMPT_DURATION_MS);
+          return;
+        }
+
+        handleExit(ctrlCPressedOnce, setCtrlCPressedOnce, ctrlCTimerRef);
+        return;
+      } else if (keyMatchers[Command.EXIT](key)) {
+        if (buffer.text.length > 0) {
+          return;
+        }
+        handleExit(ctrlDPressedOnce, setCtrlDPressedOnce, ctrlDTimerRef);
         return;
       }
 
@@ -898,16 +911,6 @@ Logging in with Google... Please restart Gemini CLI to continue.
         ideContextState
       ) {
         handleSlashCommand('/ide status');
-      } else if (keyMatchers[Command.QUIT](key)) {
-        if (!ctrlCPressedOnce) {
-          cancelOngoingRequest?.();
-        }
-        handleExit(ctrlCPressedOnce, setCtrlCPressedOnce, ctrlCTimerRef);
-      } else if (keyMatchers[Command.EXIT](key)) {
-        if (buffer.text.length > 0) {
-          return;
-        }
-        handleExit(ctrlDPressedOnce, setCtrlDPressedOnce, ctrlDTimerRef);
       } else if (
         keyMatchers[Command.SHOW_MORE_LINES](key) &&
         !enteringConstrainHeightMode
@@ -937,12 +940,6 @@ Logging in with Google... Please restart Gemini CLI to continue.
       ctrlDTimerRef,
       handleSlashCommand,
       cancelOngoingRequest,
-      isThemeDialogOpen,
-      isAuthDialogOpen,
-      isEditorDialogOpen,
-      isSettingsDialogOpen,
-      isFolderTrustDialogOpen,
-      showPrivacyNotice,
       activePtyId,
       shellFocused,
       settings.merged.general?.debugKeystrokeLogging,
