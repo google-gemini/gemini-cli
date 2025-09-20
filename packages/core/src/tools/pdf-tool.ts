@@ -19,7 +19,7 @@ import { BackupableTool, type FileOperationParams } from './backupable-tool.js';
 
 // PDF manipulation libraries
 import PDFDocument from 'pdfkit';
-import { PDFDocument as PDFLibDocument } from 'pdf-lib';
+import { PDFDocument as PDFLibDocument, PDFArray, PDFDict, PDFObject, PDFString } from 'pdf-lib';
 import pdfParse from 'pdf-parse';
 // Import PDF.js using the correct .mjs extension
 // import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs';
@@ -109,11 +109,18 @@ interface MatchResult {
   index: number; // Position in the text where match was found
 }
 
+interface PDFOutlineItem {
+  title: string;
+  page: number;
+  level: number;
+  children?: PDFOutlineItem[];
+}
+
 interface PDFResult extends ToolResult {
   success: boolean;
   file: string;
   op: string;
-  
+
   // Data results
   text?: string;
   pageTexts?: Record<number, string>; // Page number -> text content
@@ -121,11 +128,18 @@ interface PDFResult extends ToolResult {
   pages?: PageInfo[];
   metadata?: PDFMetadata;
   forms?: FormField[];
-  
+
+  // Document structure
+  outline?: {
+    hasOutline: boolean;
+    items: PDFOutlineItem[];
+    totalItems: number;
+  };
+
   // File results
   outputFile?: string;
   outputFiles?: string[];
-  
+
   // Status
   pageCount?: number;
   fileSize?: number;
@@ -846,10 +860,14 @@ ${totalMatches === 0 ? `The text "${query}" was not found in the searched pages.
         });
       }
       
+      // Extract outline/bookmark structure
+      const originalBuffer = await fs.readFile(file);
+      const outlineInfo = await this.extractOutline(pdfDoc, originalBuffer);
+
       // Create optimized page structure display
       const pageStructureDisplay = Array.from(pageSizeGroups.entries())
         .map(([, group]) => {
-          const pageList = group.pages.length === 1 
+          const pageList = group.pages.length === 1
             ? `Page ${group.pages[0]}`
             : group.pages.length <= 5
               ? `Pages ${group.pages.join(', ')}`
@@ -858,6 +876,23 @@ ${totalMatches === 0 ? `The text "${query}" was not found in the searched pages.
         })
         .join('\n');
       
+      // Create outline display with recursive children handling
+      const formatOutlineItems = (items: PDFOutlineItem[]): string[] => {
+        const result: string[] = [];
+        for (const item of items) {
+          const indent = '  '.repeat(item.level);
+          result.push(`${indent}- ${item.title} (Page ${item.page})`);
+          if (item.children && item.children.length > 0) {
+            result.push(...formatOutlineItems(item.children));
+          }
+        }
+        return result;
+      };
+
+      const outlineDisplay = outlineInfo.hasOutline
+        ? formatOutlineItems(outlineInfo.items).join('\n')
+        : 'No outline/bookmarks found';
+
       return {
         success: true,
         file,
@@ -866,6 +901,7 @@ ${totalMatches === 0 ? `The text "${query}" was not found in the searched pages.
         fileSize: stats.size,
         metadata,
         pages: pagesInfo,
+        outline: outlineInfo,
         isProtected: false, // Would need to check encryption
         llmContent: `pdf(info): PDF "${file}" has ${pageCount} pages, size: ${Math.round(stats.size/1024)}KB
 
@@ -875,12 +911,187 @@ ${Object.entries(metadata)
   .map(([key, value]) => `- ${key}: ${value}`)
   .join('\n') || 'No metadata available'}
 
+**Document Structure (${outlineInfo.totalItems} bookmarks):**
+${outlineDisplay}
+
 **Page Structure:**
 ${pageStructureDisplay}`,
-        returnDisplay: `pdf(info): PDF has ${pageCount} pages, size: ${Math.round(stats.size/1024)}KB`
+        returnDisplay: `pdf(info): PDF has ${pageCount} pages, size: ${Math.round(stats.size/1024)}KB${outlineInfo.hasOutline ? `, ${outlineInfo.totalItems} bookmarks` : ''}`
       };
     } catch (error) {
       return this.createErrorResult(`Failed to get PDF info: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+
+
+
+  private async extractOutline(pdfDoc: PDFLibDocument, originalBuffer: Buffer): Promise<{ hasOutline: boolean; items: PDFOutlineItem[]; totalItems: number }> {
+    try {
+      const catalog = pdfDoc.catalog;
+      const outlines = catalog.lookup(catalog.context.obj('Outlines'));
+
+      if (!outlines) {
+        return { hasOutline: false, items: [], totalItems: 0 };
+      }
+
+      const pages = pdfDoc.getPages();
+
+      // Helper function to recursively parse outline items
+      const parseOutlineLevel = (outlineRef: unknown, level: number = 0): PDFOutlineItem[] => {
+        const levelItems: PDFOutlineItem[] = [];
+
+        try {
+          const outlineDict = outlineRef instanceof PDFDict ? outlineRef : null;
+          if (!outlineDict) return levelItems;
+
+          // If has /First, start from First; otherwise start from current item
+          const firstRef = outlineDict.lookup(outlineDict.context.obj('First'));
+          let current: PDFObject | null = firstRef || outlineDict;
+
+          while (current) {
+            try {
+              const currentDict: PDFDict | null = current instanceof PDFDict ? current : null;
+              if (!currentDict) {
+                current = null;
+                continue;
+              }
+
+              // Get title
+              const titleObj = currentDict.lookup(currentDict.context.obj('Title'));
+              let title = 'Untitled';
+
+              if (titleObj) {
+                let rawTitle: string;
+
+                if (titleObj instanceof PDFString) {
+                  rawTitle = titleObj.decodeText();
+                } else if (typeof titleObj === 'string') {
+                  rawTitle = titleObj;
+                } else if (typeof titleObj === 'object' && titleObj !== null && 'asString' in titleObj && typeof (titleObj as { asString: unknown }).asString === 'function') {
+                  rawTitle = (titleObj as { asString: () => string }).asString();
+                } else {
+                  rawTitle = String(titleObj);
+                }
+
+                title = rawTitle;
+              }
+
+              // Get destination page
+              let pageNum = 1;
+              const dest = currentDict.lookup(currentDict.context.obj('Dest'));
+              const action = currentDict.lookup(currentDict.context.obj('A'));
+
+              const findPageNumber = (pageRef: PDFObject): number => {
+                if (!pageRef) return 1;
+
+                // Try direct reference comparison
+                const pageIndex = pages.findIndex(page => page.ref === pageRef);
+                if (pageIndex !== -1) {
+                  return pageIndex + 1;
+                }
+
+                // Try comparing object numbers if available
+                if (typeof pageRef === 'object' && pageRef !== null && 'num' in pageRef) {
+                  const refNum = (pageRef as { num: unknown }).num;
+                  const pageByNum = pages.findIndex(page => {
+                    if (page.ref && typeof page.ref === 'object' && page.ref !== null && 'num' in page.ref) {
+                      const pageRefNum = (page.ref as { num: unknown }).num;
+                      return pageRefNum === refNum;
+                    }
+                    return false;
+                  });
+                  if (pageByNum !== -1) {
+                    return pageByNum + 1;
+                  }
+                }
+
+                // Try string comparison as fallback
+                try {
+                  const refStr = String(pageRef);
+                  const pageByStr = pages.findIndex(page => String(page.ref) === refStr);
+                  if (pageByStr !== -1) {
+                    return pageByStr + 1;
+                  }
+                } catch {
+                  // Ignore string conversion errors
+                }
+
+                return 1; // Default to page 1 if no match found
+              };
+
+              if (dest) {
+                // Check if it's a PDFArray object or regular array
+                if (dest instanceof PDFArray) {
+                  // PDFArray can be accessed like an array
+                  if (dest.size() > 0) {
+                    // Direct destination array like [65 0 R /XYZ 76.184792 704.65576 0]
+                    // The first element (65 0 R) is the page reference
+                    pageNum = findPageNumber(dest.get(0));
+                  }
+                } else if (Array.isArray(dest) && dest.length > 0) {
+                  pageNum = findPageNumber(dest[0]);
+                }
+              } else if (action instanceof PDFDict) {
+                // Action-based destination
+                const actionDest = action.lookup(action.context.obj('D'));
+                if (actionDest && Array.isArray(actionDest)) {
+                  pageNum = findPageNumber(actionDest[0]);
+                }
+              }
+
+              const item: PDFOutlineItem = {
+                title: title.trim(),
+                page: pageNum,
+                level,
+              };
+
+              // Check for children using the standard PDF outline structure
+              // Only 'First' points to the first child, then use 'Next' to traverse siblings
+              const children: PDFOutlineItem[] = [];
+
+              const firstChild = currentDict.lookup(currentDict.context.obj('First'));
+              if (firstChild instanceof PDFDict) {
+                // Parse all children starting from the first child
+                const childItems = parseOutlineLevel(firstChild, level + 1);
+                children.push(...childItems);
+              }
+
+              if (children.length > 0) {
+                item.children = children;
+              }
+
+              levelItems.push(item);
+
+              // Move to next sibling
+              current = currentDict.lookup(currentDict.context.obj('Next')) || null;
+            } catch (itemError) {
+              console.warn('[PDF Outline] Error parsing outline item:', itemError);
+              break;
+            }
+          }
+        } catch (levelError) {
+          console.warn('[PDF Outline] Error parsing outline level:', levelError);
+        }
+
+        return levelItems;
+      };
+
+      const rootItems = parseOutlineLevel(outlines);
+
+      // Count total items recursively
+      const countItems = (items: PDFOutlineItem[]): number =>
+        items.reduce((count, item) => count + 1 + (item.children ? countItems(item.children) : 0), 0);
+
+      return {
+        hasOutline: rootItems.length > 0,
+        items: rootItems,
+        totalItems: countItems(rootItems)
+      };
+
+    } catch (error) {
+      console.warn('[PDF Outline] Failed to extract outline:', error);
+      return { hasOutline: false, items: [], totalItems: 0 };
     }
   }
 
@@ -967,9 +1178,11 @@ ${pageStructureDisplay}`,
 }
 
 export class PDFTool extends BackupableTool<PDFParams, PDFResult> {
+  static readonly Name: string = 'pdf-tools';
+
   constructor() {
     super(
-      'pdf',
+      'pdf-tools',
       'PDF Operations',
       'PDF operations: create/merge PDFs, SPLIT pages into separate PDF files, extracttext to get text from pages, SEARCH text across entire PDF (pages optional), info for PDF metadata.',
       Kind.Other,
@@ -980,10 +1193,10 @@ export class PDFTool extends BackupableTool<PDFParams, PDFResult> {
           file: { type: 'string', description: 'PDF file path' },
           op: {
             type: 'string',
-            enum: ['create', 'merge', 'split', 'extracttext', 'search', 'info', 'undo'], 
-            description: 'Operation: split=save pages as PDF files, extracttext=get text content (use output param to save to file), search=find text in entire PDF, info=get PDF info' // , toimage=convert PDF pages to PNG images for visual analysis
+            enum: ['create', 'merge', 'split', 'extracttext', 'search', 'info', 'undo'],
+            description: 'Operation: extracttext=get text from specific pages (use pages param like "1-5" or "1,3,5" to avoid processing entire document), search=find text (pages param optional to limit search scope), split=save specified pages as separate PDFs, info=get PDF metadata, create=make new PDF, merge=combine PDFs'
           },
-          pages: { type: 'string', description: 'OPTIONAL page numbers/ranges (1-based): "1-3,5,7-10". If not specified, processes ALL pages' },
+          pages: { type: 'string', description: 'RECOMMENDED: Page numbers/ranges (1-based) like "1-5", "1,3,5", or "1-3,8-10". Saves time by avoiding full document processing. If omitted, processes ALL pages' },
           query: { type: 'string', description: 'Search text query (REQUIRED for search operation)' },
           output: { type: 'string', description: 'Output file path (for extracttext: saves text to file; for split/create: output PDF file)' },
           text: { type: 'string', description: 'Text content to add' },
