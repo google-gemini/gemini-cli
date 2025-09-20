@@ -49,6 +49,9 @@ vi.mock('../ui/commands/extensionsCommand.js', () => ({
 }));
 vi.mock('../ui/commands/helpCommand.js', () => ({ helpCommand: {} }));
 vi.mock('../ui/commands/memoryCommand.js', () => ({ memoryCommand: {} }));
+vi.mock('../ui/commands/modelCommand.js', () => ({
+  modelCommand: { name: 'model' },
+}));
 vi.mock('../ui/commands/privacyCommand.js', () => ({ privacyCommand: {} }));
 vi.mock('../ui/commands/quitCommand.js', () => ({ quitCommand: {} }));
 vi.mock('../ui/commands/statsCommand.js', () => ({ statsCommand: {} }));
@@ -69,7 +72,9 @@ describe('BuiltinCommandLoader', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mockConfig = { some: 'config' } as unknown as Config;
+    mockConfig = {
+      getUseModelRouter: () => false,
+    } as unknown as Config;
 
     restoreCommandMock.mockReturnValue({
       name: 'restore',
@@ -122,5 +127,27 @@ describe('BuiltinCommandLoader', () => {
 
     const mcpCmd = commands.find((c) => c.name === 'mcp');
     expect(mcpCmd).toBeDefined();
+  });
+
+  it('should include modelCommand when getUseModelRouter is true', async () => {
+    const mockConfigWithModelRouter = {
+      ...mockConfig,
+      getUseModelRouter: () => true,
+    } as unknown as Config;
+    const loader = new BuiltinCommandLoader(mockConfigWithModelRouter);
+    const commands = await loader.loadCommands(new AbortController().signal);
+    const modelCmd = commands.find((c) => c.name === 'model');
+    expect(modelCmd).toBeDefined();
+  });
+
+  it('should not include modelCommand when getUseModelRouter is false', async () => {
+    const mockConfigWithoutModelRouter = {
+      ...mockConfig,
+      getUseModelRouter: () => false,
+    } as unknown as Config;
+    const loader = new BuiltinCommandLoader(mockConfigWithoutModelRouter);
+    const commands = await loader.loadCommands(new AbortController().signal);
+    const modelCmd = commands.find((c) => c.name === 'model');
+    expect(modelCmd).toBeUndefined();
   });
 });
