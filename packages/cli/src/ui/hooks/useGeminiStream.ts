@@ -592,7 +592,8 @@ export const useGeminiStream = (
         finishReason === FinishReason.STOP &&
         toolCalls.length > 0 &&
         (!pendingHistoryItemRef.current ||
-          (pendingHistoryItemRef.current.type === 'gemini' &&
+          ((pendingHistoryItemRef.current.type === 'gemini' ||
+            pendingHistoryItemRef.current.type === 'gemini_content') &&
             pendingHistoryItemRef.current.text.trim() === ''))
       ) {
         addItem(
