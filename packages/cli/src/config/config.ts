@@ -261,10 +261,6 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
           description: 'Enable screen reader mode for accessibility.',
           default: false,
         })
-        .option('use-write-todos', {
-          type: 'boolean',
-          description: 'Enable the write_todos_list tool.',
-        })
         .option('output-format', {
           alias: 'o',
           type: 'string',
