@@ -370,7 +370,7 @@ export function annotateActiveExtensions(
 /**
  * Asks users a prompt and awaits for a y/n response
  * @param prompt A yes/no prompt to ask the user
- * @returns Whether or not the user answers 'y' (yes)
+ * @returns Whether or not the user answers 'y' (yes) or presses Enter (defaults to yes)
  */
 async function promptForContinuation(prompt: string): Promise<boolean> {
   const readline = await import('node:readline');
@@ -382,7 +382,7 @@ async function promptForContinuation(prompt: string): Promise<boolean> {
   return new Promise((resolve) => {
     rl.question(prompt, (answer) => {
       rl.close();
-      resolve(answer.toLowerCase() === 'y');
+      resolve(['y', ''].includes(answer.trim().toLowerCase()));
     });
   });
 }
@@ -552,7 +552,7 @@ async function requestConsent(extensionConfig: ExtensionConfig) {
     console.info('The extension will append info to your gemini.md context');
 
     const shouldContinue = await promptForContinuation(
-      'Do you want to continue? (y/n): ',
+      'Do you want to continue? [Y/n]: ',
     );
     if (!shouldContinue) {
       throw new Error('Installation cancelled by user.');
