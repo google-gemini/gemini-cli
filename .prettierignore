@@ -17,5 +17,4 @@ eslint.config.js
 **/generated
 gha-creds-*.json
 junit.xml
-npm-shrinkwrap.json
 Thumbs.db

@@ -45,7 +45,7 @@ jobs:
         run: 'npm run build'
 
       - name: 'Archive build artifacts'
-        run: 'tar -cvf build-artifacts.tar bundle/ node_modules/ packages/ package.json npm-shrinkwrap.json'
+        run: 'tar -cvf build-artifacts.tar bundle/ node_modules/ packages/ package.json'
 
       - name: 'Upload build artifacts'
         uses: 'actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02'

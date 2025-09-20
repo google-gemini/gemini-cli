@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = join(__dirname, '..');
-const lockfilePath = join(root, 'npm-shrinkwrap.json');
+const lockfilePath = join(root, 'package-lock.json');
 
 function readJsonFile(filePath) {
   try {
@@ -64,7 +64,7 @@ for (const [location, details] of Object.entries(packages)) {
 
 if (invalidPackages.length > 0) {
   console.error(
-    '\nError: The following dependencies in npm-shrinkwrap.json are missing the "resolved" or "integrity" field:',
+    '\nError: The following dependencies in package-lock.json are missing the "resolved" or "integrity" field:',
   );
   invalidPackages.forEach((pkg) => console.error(`- ${pkg}`));
   process.exitCode = 1;
