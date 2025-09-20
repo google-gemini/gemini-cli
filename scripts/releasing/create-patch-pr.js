@@ -42,8 +42,8 @@ async function main() {
 
   run('git fetch --all --tags --prune', dryRun);
 
-  const latestTag = getLatestTag(channel);
-  console.log(`Found latest tag for ${channel}: ${latestTag}`);
+  const releaseInfo = getLatestReleaseInfo(channel);
+  const latestTag = releaseInfo.currentTag;
 
   const releaseBranch = `release/${latestTag}`;
   const hotfixBranch = `hotfix/${latestTag}/${channel}/cherry-pick-${commit.substring(0, 7)}`;
@@ -260,17 +260,20 @@ function branchExists(branchName) {
   }
 }
 
-function getLatestTag(channel) {
-  console.log(`Fetching latest tag for channel: ${channel}...`);
-  const pattern =
-    channel === 'stable'
-      ? '(contains("nightly") or contains("preview")) | not'
-      : '(contains("preview"))';
-  const command = `gh release list --limit 30 --json tagName | jq -r '[.[] | select(.tagName | ${pattern})] | .[0].tagName'`;
+function getLatestReleaseInfo(channel) {
+  console.log(`Fetching latest release info for channel: ${channel}...`);
+  const patchFrom = channel; // 'stable' or 'preview'
+  const command = `node scripts/get-release-version.js --type=patch --patch-from=${patchFrom}`;
   try {
-    return execSync(command).toString().trim();
+    const result = JSON.parse(execSync(command).toString().trim());
+    console.log(`Current ${channel} tag: ${result.previousReleaseTag}`);
+    console.log(`Next ${channel} version would be: ${result.releaseVersion}`);
+    return {
+      currentTag: result.previousReleaseTag,
+      nextVersion: result.releaseVersion,
+    };
   } catch (err) {
-    console.error(`Failed to get latest tag for channel: ${channel}`);
+    console.error(`Failed to get release info for channel: ${channel}`);
     throw err;
   }
 }
