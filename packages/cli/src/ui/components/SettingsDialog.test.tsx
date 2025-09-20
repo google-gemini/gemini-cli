@@ -28,6 +28,7 @@ import { SettingsDialog } from './SettingsDialog.js';
 import { LoadedSettings, SettingScope } from '../../config/settings.js';
 import { VimModeProvider } from '../contexts/VimModeContext.js';
 import { KeypressProvider } from '../contexts/KeypressContext.js';
+import '../../i18n/index.js';
 import { act } from 'react';
 import { saveModifiedSettings, TEST_ONLY } from '../../utils/settingsUtils.js';
 import {

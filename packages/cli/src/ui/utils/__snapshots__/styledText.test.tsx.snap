@@ -1,0 +1,364 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`I18n Styled Text Solution > Error Handling Golden Tests > should provide detailed error structure for missing mappings (golden test) > missing-mapping-error.json 1`] = `
+"{
+  "message": "renderStyledText mismatch: Missing style mappings for placeholders: {missing}. Text: \\"Use {symbol} and {missing}\\". Expected placeholders: [symbol, missing]. Provided style mappings: [symbol].",
+  "name": "Error",
+  "cause": null
+}"
+`;
+
+exports[`I18n Styled Text Solution > Error Handling Golden Tests > should provide detailed error structure for unused mappings (golden test) > unused-mapping-error.json 1`] = `
+"{
+  "message": "renderStyledText mismatch: Unused style mappings: unused. Text: \\"Use {symbol}\\". Expected placeholders: [symbol]. Provided style mappings: [symbol, unused].",
+  "name": "Error",
+  "cause": null
+}"
+`;
+
+exports[`I18n Styled Text Solution > Golden Test Suite - Complete Component Serialization > should handle complex multi-placeholder with different styles (golden test) > multi-placeholder-complex.json 1`] = `
+"{
+  "key": null,
+  "props": {
+    "children": [
+      {
+        "key": "0",
+        "props": {
+          "children": "Execute "
+        },
+        "_owner": null,
+        "_store": {}
+      },
+      {
+        "key": "1",
+        "props": {
+          "children": {
+            "key": null,
+            "props": {
+              "italic": true,
+              "color": "blue",
+              "children": "shell"
+            },
+            "_owner": null,
+            "_store": {}
+          }
+        },
+        "_owner": null,
+        "_store": {}
+      },
+      {
+        "key": "2",
+        "props": {
+          "children": " commands via "
+        },
+        "_owner": null,
+        "_store": {}
+      },
+      {
+        "key": "3",
+        "props": {
+          "children": {
+            "key": null,
+            "props": {
+              "bold": true,
+              "color": "purple",
+              "children": "!"
+            },
+            "_owner": null,
+            "_store": {}
+          }
+        },
+        "_owner": null,
+        "_store": {}
+      },
+      {
+        "key": "4",
+        "props": {
+          "children": " (e.g., "
+        },
+        "_owner": null,
+        "_store": {}
+      },
+      {
+        "key": "5",
+        "props": {
+          "children": {
+            "key": null,
+            "props": {
+              "bold": true,
+              "color": "purple",
+              "children": "!npm run start"
+            },
+            "_owner": null,
+            "_store": {}
+          }
+        },
+        "_owner": null,
+        "_store": {}
+      },
+      {
+        "key": "6",
+        "props": {
+          "children": ")"
+        },
+        "_owner": null,
+        "_store": {}
+      }
+    ]
+  },
+  "_owner": null,
+  "_store": {}
+}"
+`;
+
+exports[`I18n Styled Text Solution > Golden Test Suite - Complete Component Serialization > should handle nested styling and special characters (golden test) > nested-styling.json 1`] = `
+"{
+  "key": null,
+  "props": {
+    "children": [
+      {
+        "key": "0",
+        "props": {
+          "children": "Code: "
+        },
+        "_owner": null,
+        "_store": {}
+      },
+      {
+        "key": "1",
+        "props": {
+          "children": {
+            "key": null,
+            "props": {
+              "bold": true,
+              "underline": true,
+              "children": "function() return true"
+            },
+            "_owner": null,
+            "_store": {}
+          }
+        },
+        "_owner": null,
+        "_store": {}
+      },
+      {
+        "key": "2",
+        "props": {
+          "children": " with "
+        },
+        "_owner": null,
+        "_store": {}
+      },
+      {
+        "key": "3",
+        "props": {
+          "children": {
+            "key": null,
+            "props": {
+              "bold": true,
+              "color": "yellow",
+              "children": "important"
+            },
+            "_owner": null,
+            "_store": {}
+          }
+        },
+        "_owner": null,
+        "_store": {}
+      },
+      {
+        "key": "4",
+        "props": {
+          "children": ""
+        },
+        "_owner": null,
+        "_store": {}
+      }
+    ]
+  },
+  "_owner": null,
+  "_store": {}
+}"
+`;
+
+exports[`I18n Styled Text Solution > Golden Test Suite - Complete Component Serialization > should handle only placeholders with no surrounding text (golden test) > only-placeholder.json 1`] = `
+"{
+  "key": null,
+  "props": {
+    "children": [
+      {
+        "key": "0",
+        "props": {
+          "children": ""
+        },
+        "_owner": null,
+        "_store": {}
+      },
+      {
+        "key": "1",
+        "props": {
+          "children": {
+            "key": null,
+            "props": {
+              "bold": true,
+              "color": "red",
+              "children": "Placeholder"
+            },
+            "_owner": null,
+            "_store": {}
+          }
+        },
+        "_owner": null,
+        "_store": {}
+      },
+      {
+        "key": "2",
+        "props": {
+          "children": ""
+        },
+        "_owner": null,
+        "_store": {}
+      }
+    ]
+  },
+  "_owner": null,
+  "_store": {}
+}"
+`;
+
+exports[`I18n Styled Text Solution > Golden Test Suite - Complete Component Serialization > should handle simple single placeholder (golden test) > simple-placeholder.json 1`] = `
+"{
+  "key": null,
+  "props": {
+    "children": [
+      {
+        "key": "0",
+        "props": {
+          "children": "Hello "
+        },
+        "_owner": null,
+        "_store": {}
+      },
+      {
+        "key": "1",
+        "props": {
+          "children": {
+            "key": null,
+            "props": {
+              "bold": true,
+              "color": "green",
+              "children": "World"
+            },
+            "_owner": null,
+            "_store": {}
+          }
+        },
+        "_owner": null,
+        "_store": {}
+      },
+      {
+        "key": "2",
+        "props": {
+          "children": "!"
+        },
+        "_owner": null,
+        "_store": {}
+      }
+    ]
+  },
+  "_owner": null,
+  "_store": {}
+}"
+`;
+
+exports[`I18n Styled Text Solution > Golden Test Suite - Complete Component Serialization > should handle text with no placeholders (golden test) > no-placeholders.json 1`] = `
+"{
+  "key": null,
+  "props": {
+    "color": "cyan",
+    "children": [
+      {
+        "key": "0",
+        "props": {
+          "children": "Plain text with no placeholders"
+        },
+        "_owner": null,
+        "_store": {}
+      }
+    ]
+  },
+  "_owner": null,
+  "_store": {}
+}"
+`;
+
+exports[`I18n Styled Text Solution > should apply correct styling attributes to interpolated components (golden test) > styled-text-component.json 1`] = `
+"{
+  "key": null,
+  "props": {
+    "color": "white",
+    "children": [
+      {
+        "key": "0",
+        "props": {
+          "children": "Use "
+        },
+        "_owner": null,
+        "_store": {}
+      },
+      {
+        "key": "1",
+        "props": {
+          "children": {
+            "key": null,
+            "props": {
+              "bold": true,
+              "color": "purple",
+              "children": "@"
+            },
+            "_owner": null,
+            "_store": {}
+          }
+        },
+        "_owner": null,
+        "_store": {}
+      },
+      {
+        "key": "2",
+        "props": {
+          "children": " to specify "
+        },
+        "_owner": null,
+        "_store": {}
+      },
+      {
+        "key": "3",
+        "props": {
+          "children": {
+            "key": null,
+            "props": {
+              "bold": true,
+              "color": "purple",
+              "children": "files"
+            },
+            "_owner": null,
+            "_store": {}
+          }
+        },
+        "_owner": null,
+        "_store": {}
+      },
+      {
+        "key": "4",
+        "props": {
+          "children": ""
+        },
+        "_owner": null,
+        "_store": {}
+      }
+    ]
+  },
+  "_owner": null,
+  "_store": {}
+}"
+`;
