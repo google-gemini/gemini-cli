@@ -231,7 +231,9 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
           description: 'Allowed MCP server names',
           coerce: (mcpServerNames: string[]) =>
             // Handle comma-separated values
-            mcpServerNames.flatMap((mcpServerName) => mcpServerName.split(',').map((m) => m.trim())),
+            mcpServerNames.flatMap((mcpServerName) =>
+              mcpServerName.split(',').map((m) => m.trim()),
+            ),
         })
         .option('allowed-tools', {
           type: 'array',
@@ -249,7 +251,9 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
             'A list of extensions to use. If not provided, all extensions are used.',
           coerce: (extensions: string[]) =>
             // Handle comma-separated values
-            extensions.flatMap((extension) => extension.split(',').map((e) => e.trim())),
+            extensions.flatMap((extension) =>
+              extension.split(',').map((e) => e.trim()),
+            ),
         })
         .option('list-extensions', {
           alias: 'l',
