@@ -120,7 +120,7 @@ jobs:
           ${{ always() && (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository) }}
         uses: 'actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02' # ratchet:actions/upload-artifact@v4
         with:
-          name: 'test-results-fork-${{ matrix.node-version }}-linux'
+          name: 'test-results-fork-${{ matrix.node-version }}-${{ runner.os }}'
           path: 'packages/*/junit.xml'
 
   test_slow_platforms:
@@ -180,7 +180,7 @@ jobs:
           ${{ always() && (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository) }}
         uses: 'actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02' # ratchet:actions/upload-artifact@v4
         with:
-          name: 'test-results-fork-${{ matrix.node-version }}-linux'
+          name: 'test-results-fork-${{ matrix.node-version }}-${{ runner.os }}'
           path: 'packages/*/junit.xml'
 
       - name: 'Upload coverage reports'
