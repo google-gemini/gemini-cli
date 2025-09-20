@@ -322,11 +322,13 @@ sys.exit(_exit_code)`;
 }
 
 export class PythonEmbeddedTool extends BaseDeclarativeTool<PythonEmbeddedToolParams, ToolResult> {
+  static readonly Name: string = 'python-embedded-tools';
+
   private readonly allowlist = new Set<string>();
 
   constructor(private readonly config: Config) {
     super(
-      'python',
+      'python-embedded-tools',
       'Python Code Execution (Embedded)',
       'Execute Python code using embedded Python 3.13.7 environment for stable and consistent execution. IMPORTANT: Always use UTF-8 encoding for text operations to avoid Unicode errors.',
       Kind.Execute,
