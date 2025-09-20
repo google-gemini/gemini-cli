@@ -316,13 +316,13 @@ describe('parseArguments', () => {
       'server1,server2',
     ];
     const argv = await parseArguments({} as Settings);
-    expect(argv.allowedMcpServerNames).toEqual(['server1,server2']);
+    expect(argv.allowedMcpServerNames).toEqual(['server1', 'server2']);
   });
 
   it('should support comma-separated values for --extensions', async () => {
     process.argv = ['node', 'script.js', '--extensions', 'ext1,ext2'];
     const argv = await parseArguments({} as Settings);
-    expect(argv.extensions).toEqual(['ext1,ext2']);
+    expect(argv.extensions).toEqual(['ext1', 'ext2']);
   });
 });
 
