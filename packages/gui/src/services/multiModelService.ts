@@ -37,6 +37,13 @@ interface ElectronAPI {
     renderTemplate: (templateId: string, variables: Record<string, string | number | boolean>) => Promise<string>;
     addWorkspaceDirectory: (directory: string, basePath?: string) => Promise<void>;
     getWorkspaceDirectories: () => Promise<readonly string[]>;
+    getDirectoryContents: (directoryPath: string) => Promise<Array<{
+      name: string;
+      path: string;
+      type: 'file' | 'folder';
+      size?: number;
+      modified?: Date;
+    }>>;
     setWorkspaceDirectories: (directories: readonly string[]) => Promise<void>;
     getCurrentToolset: () => Promise<string[]>;
     addCustomRole: (role: RoleDefinition) => Promise<void>;
@@ -440,6 +447,30 @@ class MultiModelService {
     }
 
     return await this.api.getWorkspaceDirectories();
+  }
+
+  async getDirectoryContents(directoryPath: string): Promise<Array<{
+    name: string;
+    path: string;
+    type: 'file' | 'folder';
+    size?: number;
+    modified?: Date;
+  }>> {
+    if (!this.initialized) {
+      return [];
+    }
+
+    try {
+      const items = await this.api.getDirectoryContents(directoryPath);
+      // Convert modified dates from strings back to Date objects
+      return items.map(item => ({
+        ...item,
+        modified: item.modified ? new Date(item.modified) : undefined
+      }));
+    } catch (error) {
+      console.error('Failed to get directory contents:', error);
+      return [];
+    }
   }
 
   async getCurrentToolset(): Promise<string[]> {

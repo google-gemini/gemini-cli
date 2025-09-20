@@ -31,6 +31,7 @@ import { CompressionStatus } from '../core/turn.js';
 import type { ToolCallResponseInfo } from '../core/turn.js';
 import { SessionManager } from '../sessions/SessionManager.js';
 import { getCompressionPrompt } from '../core/prompts.js';
+import { checkNextSpeaker } from './nextSpeakerChecker.js';
 // import { findIndexAfterFraction } from '../core/client.js';
 
 // Compression constants (same as Gemini client)
@@ -43,6 +44,7 @@ export class MultiModelSystem {
   private currentProvider: ModelProviderConfig | null = null;
   private config: Config;
   private initializedProviders: Map<string, BaseModelProvider> = new Map();
+  private utilityProviders: Map<string, BaseModelProvider> = new Map();
   private toolConfirmationHandler?: (details: ToolCallConfirmationDetails) => Promise<ToolConfirmationOutcome>;
   private activeToolScheduler?: CoreToolScheduler;
   // Static mapping of model names to their tool call formats
@@ -203,7 +205,8 @@ export class MultiModelSystem {
   async *sendMessageStream(
     messages: UniversalMessage[],
     signal: AbortSignal,
-    roleId?: string
+    roleId?: string,
+    continuationDepth: number = 0
   ): AsyncGenerator<UniversalStreamEvent> {
     if (!this.currentProvider) {
       throw new Error('No provider configured');
@@ -627,10 +630,65 @@ export class MultiModelSystem {
         continue;
       } 
       else {
-        // No tool calls, conversation is complete
-        // Add assistant's response to history
+        // No tool calls, check if model should continue
+
+        // Check if we should skip next speaker check
+        const skipNextSpeakerCheck = this.config.getSkipNextSpeakerCheck ? this.config.getSkipNextSpeakerCheck() : false;
+
+        // Limit continuation depth to prevent infinite recursion
+        const MAX_CONTINUATION_DEPTH = 10;
+
+        if (!skipNextSpeakerCheck && assistantContent.trim() && continuationDepth < MAX_CONTINUATION_DEPTH) {
+          try {
+            // Perform next speaker check
+            const allMessages = SessionManager.getInstance().getHistory();
+            const nextSpeakerResult = await checkNextSpeaker(
+              [...allMessages], // Create a mutable copy
+              this.currentProvider?.type || 'gemini',
+              async (checkMessages, checkModel) => {
+                // Use dedicated utility provider for the check
+                const providerType = this.currentProvider?.type || 'gemini';
+                const utilityModel = checkModel || 'gemini-2.5-flash'; // Default to Flash for checks
+
+                // Get or create a dedicated utility provider
+                const utilityProvider = await this.getOrCreateUtilityProvider(providerType as ModelProviderType, utilityModel);
+
+                // Send check message using utility provider
+                const response = await utilityProvider.sendMessage(
+                  checkMessages,
+                  signal
+                );
+                return response.content;
+              }
+            );
+
+            console.log('[MultiModelSystem] Next speaker check result:', nextSpeakerResult);
+
+            if (nextSpeakerResult && nextSpeakerResult.next_speaker === 'model') {
+              // Model should continue, send "Please continue." message
+              console.log('[MultiModelSystem] Model should continue, sending continuation prompt');
+
+              const continueMessage: UniversalMessage = {
+                role: 'user',
+                content: 'Please continue.'
+              };
+
+              // DO NOT add to session history to avoid polluting the conversation
+              // SessionManager.getInstance().addHistory(continueMessage);
+
+              // Recursively call to continue conversation (increment depth)
+              // Pass the continue message directly without adding to permanent history
+              yield* this.sendMessageStream([continueMessage], signal, roleId, continuationDepth + 1);
+              return;
+            }
+          } catch (error) {
+            console.warn('[MultiModelSystem] Next speaker check failed:', error);
+            // If check fails, default to waiting for user input
+          }
+        }
+
+        // Generate title if appropriate
         if (assistantContent.trim()) {
-          // Try to generate intelligent title using current provider
           const currentSessionId = SessionManager.getInstance().getCurrentSessionId();
           if (currentSessionId) {
             this.generateIntelligentTitle(currentSessionId).catch(error => {
@@ -638,6 +696,7 @@ export class MultiModelSystem {
             });
           }
         }
+
         return;
       }
     }
@@ -835,22 +894,60 @@ Title:`;
 
   private async getOrCreateProvider(config: ModelProviderConfig): Promise<BaseModelProvider> {
     const key = this.getProviderKey(config);
-    
+
     if (this.initializedProviders.has(key)) {
       const cachedProvider = this.initializedProviders.get(key)!;
       // Update config in case it changed
       cachedProvider.updateConfig(config);
       return cachedProvider;
     }
-    
+
     // Create new provider and initialize it
     const provider = ModelProviderFactory.create(config, this.config);
     await provider.initialize();
-    
+
     // Cache the initialized provider
     this.initializedProviders.set(key, provider);
     console.log(`[MultiModelSystem] Created and initialized provider: ${config.type}-${config.model}`);
-    
+
+    return provider;
+  }
+
+  private async getOrCreateUtilityProvider(providerType: ModelProviderType, utilityModel: string): Promise<BaseModelProvider> {
+    const key = `${providerType}-${utilityModel}-utility`;
+
+    if (this.utilityProviders.has(key)) {
+      return this.utilityProviders.get(key)!;
+    }
+
+    // Create utility provider config with same auth settings
+    const utilityConfig: ModelProviderConfig = {
+      type: providerType,
+      model: utilityModel,
+      // Use same auth settings as current provider if available
+      baseUrl: this.currentProvider?.baseUrl,
+      apiKey: this.currentProvider?.apiKey
+    };
+
+    // Create new provider and initialize it
+    const provider = ModelProviderFactory.create(utilityConfig, this.config);
+    await provider.initialize();
+
+    // Update provider with optimized settings for utility tasks
+    // Note: These settings may vary by provider implementation
+    provider.updateConfig({
+      ...utilityConfig,
+      additionalConfig: {
+        temperature: 0,  // Deterministic responses
+        maxOutputTokens: 500,  // Small response expected
+        systemPrompt: ''  // No system prompt needed
+      }
+    });
+
+    // Cache the utility provider
+    this.utilityProviders.set(key, provider);
+    console.log(`[MultiModelSystem] Created utility provider: ${providerType}-${utilityModel}`);
+
     return provider;
   }
 
@@ -1018,7 +1115,7 @@ Title:`;
     if (!force) {
       const tokenThreshold = COMPRESSION_TOKEN_THRESHOLD;
       const thresholdTokens = tokenThreshold * tokenLimit;
-      console.log(`[MultiModelSystem] Compression check: ${originalTokenCount} tokens vs ${thresholdTokens} threshold (${tokenThreshold} * ${tokenLimit})`);
+      // console.log(`[MultiModelSystem] Compression check: ${originalTokenCount} tokens vs ${thresholdTokens} threshold (${tokenThreshold} * ${tokenLimit})`);
       
       // Check token threshold
       if (originalTokenCount >= thresholdTokens) {
@@ -1037,7 +1134,7 @@ Title:`;
       }
       
       if (!compressionNeeded) {
-        console.log(`[MultiModelSystem] No compression needed: ${originalTokenCount} < ${thresholdTokens} tokens and ${userTurns} < ${TURN_COMPRESSION_THRESHOLD} turns`);
+        // console.log(`[MultiModelSystem] No compression needed: ${originalTokenCount} < ${thresholdTokens} tokens and ${userTurns} < ${TURN_COMPRESSION_THRESHOLD} turns`);
         return {
           originalTokenCount,
           newTokenCount: originalTokenCount,
@@ -1342,5 +1439,81 @@ Title:`;
     };
     
     return [enhancedSystemMessage, ...otherMessages];
+  }
+
+  /**
+   * Cleanup all cached providers
+   */
+  cleanup(): void {
+    console.log('[MultiModelSystem] Cleaning up providers...');
+
+    // Clear main providers cache
+    this.initializedProviders.clear();
+
+    // Clear utility providers cache
+    this.utilityProviders.clear();
+
+    console.log('[MultiModelSystem] All providers cleaned up');
+  }
+
+  /**
+   * Gets the first-level contents of a directory (files and subdirectories).
+   * @param directoryPath The absolute path to the directory
+   * @returns Promise resolving to an array of directory items
+   */
+  async getDirectoryContents(directoryPath: string): Promise<Array<{
+    name: string;
+    path: string;
+    type: 'file' | 'folder';
+    size?: number;
+    modified?: Date;
+  }>> {
+    const fs = await import('node:fs/promises');
+    const path = await import('node:path');
+
+    try {
+      const entries = await fs.readdir(directoryPath, { withFileTypes: true });
+      const items = [];
+
+      for (const entry of entries) {
+        const fullPath = path.join(directoryPath, entry.name);
+
+        try {
+          if (entry.isDirectory()) {
+            items.push({
+              name: entry.name,
+              path: fullPath,
+              type: 'folder' as const
+            });
+          } else if (entry.isFile()) {
+            // Get file stats for additional info
+            const stats = await fs.stat(fullPath);
+            items.push({
+              name: entry.name,
+              path: fullPath,
+              type: 'file' as const,
+              size: stats.size,
+              modified: stats.mtime
+            });
+          }
+        } catch (error) {
+          // Skip files/folders we can't access
+          console.warn(`Cannot access ${fullPath}:`, error);
+        }
+      }
+
+      // Sort: folders first, then files, alphabetically within each group
+      items.sort((a, b) => {
+        if (a.type !== b.type) {
+          return a.type === 'folder' ? -1 : 1;
+        }
+        return a.name.localeCompare(b.name);
+      });
+
+      return items;
+    } catch (error) {
+      console.error(`Failed to read directory ${directoryPath}:`, error);
+      return [];
+    }
   }
 }
