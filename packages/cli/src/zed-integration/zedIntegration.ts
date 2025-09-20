@@ -109,6 +109,10 @@ class GeminiAgent {
           audio: true,
           embeddedContext: true,
         },
+        mcpCapabilities: {
+          http: true,
+          sse: true,
+        },
       },
     };
   }
@@ -175,12 +179,46 @@ class GeminiAgent {
   ): Promise<Config> {
     const mergedMcpServers = { ...this.settings.merged.mcpServers };
 
-    for (const { command, args, env: rawEnv, name } of mcpServers) {
-      const env: Record<string, string> = {};
-      for (const { name: envName, value } of rawEnv) {
-        env[envName] = value;
+    for (const mcpServer of mcpServers) {
+      if (!('type' in mcpServer)) {
+        const env: Record<string, string> = {};
+        for (const envVar of mcpServer.env) {
+          env[envVar.name] = envVar.value;
+        }
+        mergedMcpServers[mcpServer.name] = new MCPServerConfig(
+          mcpServer.command,
+          mcpServer.args,
+          env,
+          cwd,
+        );
+      } else {
+        const headers: Record<string, string> = {};
+        for (const header of mcpServer.headers) {
+          headers[header.name] = header.value;
+        }
+
+        let sseUrl: string | undefined;
+        let httpUrl: string | undefined;
+
+        if (mcpServer.type === 'sse') {
+          sseUrl = mcpServer.url;
+        } else if (mcpServer.type === 'http') {
+          httpUrl = mcpServer.url;
+        } else {
+          const unreachable: never = mcpServer;
+          throw new Error(`Unexpected MCP server type: ${unreachable}`);
+        }
+
+        mergedMcpServers[mcpServer.name] = new MCPServerConfig(
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          sseUrl,
+          httpUrl,
+          headers,
+        );
       }
-      mergedMcpServers[name] = new MCPServerConfig(command, args, env, cwd);
     }
 
     const settings = { ...this.settings.merged, mcpServers: mergedMcpServers };

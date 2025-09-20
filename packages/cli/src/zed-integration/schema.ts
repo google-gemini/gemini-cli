@@ -265,12 +265,31 @@ export const envVariableSchema = z.object({
   value: z.string(),
 });
 
-export const mcpServerSchema = z.object({
-  args: z.array(z.string()),
-  command: z.string(),
-  env: z.array(envVariableSchema),
+export const httpHeaderSchema = z.object({
   name: z.string(),
+  value: z.string(),
 });
+
+export const mcpServerSchema = z.union([
+  z.object({
+    headers: z.array(httpHeaderSchema),
+    name: z.string(),
+    type: z.literal('http'),
+    url: z.string(),
+  }),
+  z.object({
+    headers: z.array(httpHeaderSchema),
+    name: z.string(),
+    type: z.literal('sse'),
+    url: z.string(),
+  }),
+  z.object({
+    args: z.array(z.string()),
+    command: z.string(),
+    env: z.array(envVariableSchema),
+    name: z.string(),
+  }),
+]);
 
 export const promptCapabilitiesSchema = z.object({
   audio: z.boolean().optional(),
@@ -278,9 +297,15 @@ export const promptCapabilitiesSchema = z.object({
   image: z.boolean().optional(),
 });
 
+export const mcpCapabilitiesSchema = z.object({
+  http: z.boolean().optional(),
+  sse: z.boolean().optional(),
+});
+
 export const agentCapabilitiesSchema = z.object({
   loadSession: z.boolean().optional(),
   promptCapabilities: promptCapabilitiesSchema.optional(),
+  mcpCapabilities: mcpCapabilitiesSchema.optional(),
 });
 
 export const authMethodSchema = z.object({
