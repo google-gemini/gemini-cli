@@ -149,7 +149,9 @@ describe('useShellHistory', () => {
     const { result } = renderHook(() => useShellHistory(MOCKED_PROJECT_ROOT));
 
     // Wait for history to be loaded: ['cmd3', 'cmd2', 'cmd1']
-    await waitFor(() => expect(mockedFs.readFile).toHaveBeenCalled());
+    await waitFor(() => {
+      expect(result.current.history).toHaveLength(3);
+    });
 
     let command: string | null = null;
 
