@@ -20,12 +20,7 @@ import { getIdeProcessInfo } from './process-utils.js';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
-import {
-  detectIde,
-  DetectedIde,
-  getIdeInfo,
-  type IdeInfo,
-} from './detect-ide.js';
+import { detectIde, IDE_DEFINITIONS } from './detect-ide.js';
 import * as os from 'node:os';
 import * as path from 'node:path';
 
@@ -67,10 +62,7 @@ describe('IdeClient', () => {
 
     // Mock dependencies
     vi.spyOn(process, 'cwd').mockReturnValue('/test/workspace/sub-dir');
-    vi.mocked(detectIde).mockReturnValue(DetectedIde.VSCode);
-    vi.mocked(getIdeInfo).mockReturnValue({
-      displayName: 'VS Code',
-    } as IdeInfo);
+    vi.mocked(detectIde).mockReturnValue(IDE_DEFINITIONS.vscode);
     vi.mocked(getIdeProcessInfo).mockResolvedValue({
       pid: 12345,
       command: 'test-ide',
@@ -654,6 +646,36 @@ describe('IdeClient', () => {
         IDEConnectionStatus.Connected,
       );
       expect(ideClient.isDiffingEnabled()).toBe(true);
+    });
+  });
+
+  describe('authentication', () => {
+    it('should connect with an auth token if provided in the discovery file', async () => {
+      const authToken = 'test-auth-token';
+      const config = { port: '8080', authToken };
+      vi.mocked(fs.promises.readFile).mockResolvedValue(JSON.stringify(config));
+      (
+        vi.mocked(fs.promises.readdir) as Mock<
+          (path: fs.PathLike) => Promise<string[]>
+        >
+      ).mockResolvedValue([]);
+
+      const ideClient = await IdeClient.getInstance();
+      await ideClient.connect();
+
+      expect(StreamableHTTPClientTransport).toHaveBeenCalledWith(
+        new URL('http://localhost:8080/mcp'),
+        expect.objectContaining({
+          requestInit: {
+            headers: {
+              Authorization: `Bearer ${authToken}`,
+            },
+          },
+        }),
+      );
+      expect(ideClient.getConnectionStatus().status).toBe(
+        IDEConnectionStatus.Connected,
+      );
     });
   });
 });

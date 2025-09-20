@@ -50,6 +50,9 @@ export enum EventMetadataKey {
   // Logs whether the session was configured to respect gitignore files.
   GEMINI_CLI_START_SESSION_RESPECT_GITIGNORE = 12,
 
+  // Logs the output format of the session.
+  GEMINI_CLI_START_SESSION_OUTPUT_FORMAT = 94,
+
   // ==========================================================================
   // User Prompt Event Keys
   // ===========================================================================
@@ -63,6 +66,9 @@ export enum EventMetadataKey {
 
   // Logs the function name.
   GEMINI_CLI_TOOL_CALL_NAME = 14,
+
+  // Logs the MCP server name.
+  GEMINI_CLI_TOOL_CALL_MCP_SERVER_NAME = 95,
 
   // Logs the user's decision about how to handle the tool call.
   GEMINI_CLI_TOOL_CALL_DECISION = 15,
@@ -353,6 +359,9 @@ export enum EventMetadataKey {
   // Logs the status of the extension uninstall
   GEMINI_CLI_EXTENSION_UNINSTALL_STATUS = 96,
 
+  // Logs the setting scope for an extension enablement.
+  GEMINI_CLI_EXTENSION_ENABLE_SETTING_SCOPE = 102,
+
   // ==========================================================================
   // Tool Output Truncated Event Keys
   // ===========================================================================
@@ -368,4 +377,25 @@ export enum EventMetadataKey {
 
   // Logs the number of lines the tool output was truncated to.
   GEMINI_CLI_TOOL_OUTPUT_TRUNCATED_LINES = 92,
+
+  // ==========================================================================
+  // Model Router Event Keys
+  // ==========================================================================
+
+  // Logs the outcome of a model routing decision (e.g., which route/model was
+  // selected).
+  GEMINI_CLI_ROUTING_DECISION = 97,
+
+  // Logs an event when the model router fails to make a decision or the chosen
+  // route fails.
+  GEMINI_CLI_ROUTING_FAILURE = 98,
+
+  // Logs the latency in milliseconds for the router to make a decision.
+  GEMINI_CLI_ROUTING_LATENCY_MS = 99,
+
+  // Logs a specific reason for a routing failure.
+  GEMINI_CLI_ROUTING_FAILURE_REASON = 100,
+
+  // Logs the source of the decision.
+  GEMINI_CLI_ROUTING_DECISION_SOURCE = 101,
 }

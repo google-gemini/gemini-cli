@@ -12,6 +12,9 @@ export const EVENT_API_REQUEST = 'gemini_cli.api_request';
 export const EVENT_API_ERROR = 'gemini_cli.api_error';
 export const EVENT_API_RESPONSE = 'gemini_cli.api_response';
 export const EVENT_CLI_CONFIG = 'gemini_cli.config';
+export const EVENT_EXTENSION_ENABLE = 'gemini_cli.extension_enable';
+export const EVENT_EXTENSION_INSTALL = 'gemini_cli.extension_install';
+export const EVENT_EXTENSION_UNINSTALL = 'gemini_cli.extension_uninstall';
 export const EVENT_FLASH_FALLBACK = 'gemini_cli.flash_fallback';
 export const EVENT_RIPGREP_FALLBACK = 'gemini_cli.ripgrep_fallback';
 export const EVENT_NEXT_SPEAKER_CHECK = 'gemini_cli.next_speaker_check';
@@ -37,3 +40,7 @@ export const METRIC_INVALID_CHUNK_COUNT = 'gemini_cli.chat.invalid_chunk.count';
 export const METRIC_CONTENT_RETRY_COUNT = 'gemini_cli.chat.content_retry.count';
 export const METRIC_CONTENT_RETRY_FAILURE_COUNT =
   'gemini_cli.chat.content_retry_failure.count';
+export const EVENT_MODEL_ROUTING = 'gemini_cli.model_routing';
+export const METRIC_MODEL_ROUTING_LATENCY = 'gemini_cli.model_routing.latency';
+export const METRIC_MODEL_ROUTING_FAILURE_COUNT =
+  'gemini_cli.model_routing.failure.count';
