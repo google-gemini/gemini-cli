@@ -85,6 +85,11 @@ export class FileCommandLoader implements ICommandLoader {
    */
   async loadCommands(signal: AbortSignal): Promise<SlashCommand[]> {
     const allCommands: SlashCommand[] = [];
+    // If folder trust is enabled but the current folder is not trusted,
+    // short-circuit and do not load any commands from any directory.
+    if (this.folderTrustEnabled && !this.folderTrust) {
+      return [];
+    }
     const globOptions = {
       nodir: true,
       dot: true,
@@ -101,9 +106,6 @@ export class FileCommandLoader implements ICommandLoader {
           cwd: dirInfo.path,
         });
 
-        if (this.folderTrustEnabled && !this.folderTrust) {
-          return [];
-        }
 
         const commandPromises = files.map((file) =>
           this.parseAndAdaptFile(
