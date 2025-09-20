@@ -233,7 +233,8 @@ export async function handleAtCommand({
         const stats = await fs.stat(absolutePath);
         if (stats.isDirectory()) {
           // Use absolute path to ensure read-many-files only searches this specific directory
-          currentPathSpec = absolutePath + (absolutePath.endsWith(path.sep) ? `**` : `/**`);
+          // Normalize to POSIX-style paths for cross-platform glob compatibility
+          currentPathSpec = path.posix.join(absolutePath.replace(/\\/g, '/'), '**');
           onDebugMessage(
             `Path ${pathName} resolved to directory in ${dir}, using absolute glob: ${currentPathSpec}`,
           );
