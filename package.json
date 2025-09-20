@@ -81,7 +81,7 @@
     "globals": "^16.0.0",
     "google-artifactregistry-auth": "^3.4.0",
     "json": "^11.0.0",
-    "memfs": "^4.17.2",
+    "memfs": "^4.42.0",
     "mnemonist": "^0.40.3",
     "mock-fs": "^5.5.0",
     "msw": "^2.10.4",
