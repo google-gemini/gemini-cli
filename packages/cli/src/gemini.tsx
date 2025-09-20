@@ -35,12 +35,7 @@ import {
 } from './utils/cleanup.js';
 import { getCliVersion } from './utils/version.js';
 import type { Config } from '@google/gemini-cli-core';
-import {
-  sessionId,
-  logUserPrompt,
-  AuthType,
-  getOauthClient,
-} from '@google/gemini-cli-core';
+import { sessionId, logUserPrompt, AuthType } from '@google/gemini-cli-core';
 import {
   initializeApp,
   type InitializationResult,
@@ -326,8 +321,6 @@ export async function main() {
     }
   }
 
-  const initializationResult = await initializeApp(config, settings);
-
   // hop into sandbox if we are outside and sandboxing is enabled
   if (!process.env['SANDBOX']) {
     const memoryArgs = settings.merged.advanced?.autoConfigureMemory
@@ -394,14 +387,7 @@ export async function main() {
     }
   }
 
-  if (
-    settings.merged.security?.auth?.selectedType ===
-      AuthType.LOGIN_WITH_GOOGLE &&
-    config.isBrowserLaunchSuppressed()
-  ) {
-    // Do oauth before app renders to make copying the link possible.
-    await getOauthClient(settings.merged.security.auth.selectedType, config);
-  }
+  const initializationResult = await initializeApp(config, settings);
 
   if (config.getExperimentalZedIntegration()) {
     return runZedIntegration(config, settings, extensions, argv);
