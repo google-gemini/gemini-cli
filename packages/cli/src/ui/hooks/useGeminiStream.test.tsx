@@ -2347,7 +2347,10 @@ describe('useGeminiStream', () => {
           };
           yield {
             type: ServerGeminiEventType.Error,
-            value: { error: { message: 'Test error' } },
+            value: {
+              error: { message: 'Test error' },
+              request: ['Previous request'],
+            },
           };
         })(),
       );
@@ -2397,6 +2400,7 @@ describe('useGeminiStream', () => {
         undefined,
         'gemini-2.5-pro',
         'gemini-2.5-flash',
+        ['Previous request'],
       );
     });
   });
