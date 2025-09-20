@@ -4,70 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { z } from 'zod';
 import {
   IDE_MAX_OPEN_FILES,
   IDE_MAX_SELECTED_TEXT_LENGTH,
 } from './constants.js';
 import type { IdeContext } from './types.js';
-
-export const IdeDiffAcceptedNotificationSchema = z.object({
-  jsonrpc: z.literal('2.0'),
-  method: z.literal('ide/diffAccepted'),
-  params: z.object({
-    filePath: z.string(),
-    content: z.string(),
-  }),
-});
-
-export const IdeDiffClosedNotificationSchema = z.object({
-  jsonrpc: z.literal('2.0'),
-  method: z.literal('ide/diffClosed'),
-  params: z.object({
-    filePath: z.string(),
-    content: z.string().optional(),
-  }),
-});
-
-export const CloseDiffResponseSchema = z
-  .object({
-    content: z
-      .array(
-        z.object({
-          text: z.string(),
-          type: z.literal('text'),
-        }),
-      )
-      .min(1),
-  })
-  .transform((val, ctx) => {
-    try {
-      const parsed = JSON.parse(val.content[0].text);
-      const innerSchema = z.object({ content: z.string().optional() });
-      const validationResult = innerSchema.safeParse(parsed);
-      if (!validationResult.success) {
-        validationResult.error.issues.forEach((issue) => ctx.addIssue(issue));
-        return z.NEVER;
-      }
-      return validationResult.data;
-    } catch (_) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'Invalid JSON in text content',
-      });
-      return z.NEVER;
-    }
-  });
-
-export type DiffUpdateResult =
-  | {
-      status: 'accepted';
-      content?: string;
-    }
-  | {
-      status: 'rejected';
-      content: undefined;
-    };
 
 type IdeContextSubscriber = (ideContext?: IdeContext) => void;
 

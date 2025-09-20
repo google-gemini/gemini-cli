@@ -5,11 +5,12 @@
  */
 
 import {
-  updateExtensionByName,
   updateAllUpdatableExtensions,
   type ExtensionUpdateInfo,
-} from '../../config/extension.js';
+  updateExtension,
+} from '../../config/extensions/update.js';
 import { getErrorMessage } from '../../utils/errors.js';
+import { ExtensionUpdateState } from '../state/extensions.js';
 import { MessageType } from '../types.js';
 import {
   type CommandContext,
@@ -18,64 +19,75 @@ import {
 } from './types.js';
 
 async function listAction(context: CommandContext) {
-  const activeExtensions = context.services.config
-    ?.getExtensions()
-    .filter((ext) => ext.isActive);
-  if (!activeExtensions || activeExtensions.length === 0) {
-    context.ui.addItem(
-      {
-        type: MessageType.INFO,
-        text: 'No active extensions.',
-      },
-      Date.now(),
-    );
-    return;
-  }
-
-  const extensionLines = activeExtensions.map(
-    (ext) => `  - \u001b[36m${ext.name} (v${ext.version})\u001b[0m`,
-  );
-  const message = `Active extensions:\n\n${extensionLines.join('\n')}\n`;
-
   context.ui.addItem(
     {
-      type: MessageType.INFO,
-      text: message,
+      type: MessageType.EXTENSIONS_LIST,
     },
     Date.now(),
   );
 }
-
-const updateOutput = (info: ExtensionUpdateInfo) =>
-  `Extension "${info.name}" successfully updated: ${info.originalVersion} → ${info.updatedVersion}.`;
 
 async function updateAction(context: CommandContext, args: string) {
   const updateArgs = args.split(' ').filter((value) => value.length > 0);
   const all = updateArgs.length === 1 && updateArgs[0] === '--all';
   const names = all ? undefined : updateArgs;
   let updateInfos: ExtensionUpdateInfo[] = [];
-  try {
-    if (all) {
-      updateInfos = await updateAllUpdatableExtensions();
-    } else if (names?.length) {
-      for (const name of names) {
-        updateInfos.push(await updateExtensionByName(name));
-      }
-    } else {
-      context.ui.addItem(
-        {
-          type: MessageType.ERROR,
-          text: 'Usage: /extensions update <extension-names>|--all',
-        },
-        Date.now(),
-      );
-      return;
-    }
 
-    // Filter to the actually updated ones.
-    updateInfos = updateInfos.filter(
-      (info) => info.originalVersion !== info.updatedVersion,
+  if (!all && names?.length === 0) {
+    context.ui.addItem(
+      {
+        type: MessageType.ERROR,
+        text: 'Usage: /extensions update <extension-names>|--all',
+      },
+      Date.now(),
     );
+    return;
+  }
+
+  try {
+    context.ui.setPendingItem({
+      type: MessageType.EXTENSIONS_LIST,
+    });
+    if (all) {
+      updateInfos = await updateAllUpdatableExtensions(
+        context.services.config!.getWorkingDir(),
+        context.services.config!.getExtensions(),
+        context.ui.extensionsUpdateState,
+        context.ui.setExtensionsUpdateState,
+      );
+    } else if (names?.length) {
+      const workingDir = context.services.config!.getWorkingDir();
+      const extensions = context.services.config!.getExtensions();
+      for (const name of names) {
+        const extension = extensions.find(
+          (extension) => extension.name === name,
+        );
+        if (!extension) {
+          context.ui.addItem(
+            {
+              type: MessageType.ERROR,
+              text: `Extension ${name} not found.`,
+            },
+            Date.now(),
+          );
+          continue;
+        }
+        const updateInfo = await updateExtension(
+          extension,
+          workingDir,
+          context.ui.extensionsUpdateState.get(extension.name) ??
+            ExtensionUpdateState.UNKNOWN,
+          (updateState) => {
+            context.ui.setExtensionsUpdateState((prev) => {
+              const newState = new Map(prev);
+              newState.set(name, updateState);
+              return newState;
+            });
+          },
+        );
+        if (updateInfo) updateInfos.push(updateInfo);
+      }
+    }
 
     if (updateInfos.length === 0) {
       context.ui.addItem(
@@ -87,17 +99,6 @@ async function updateAction(context: CommandContext, args: string) {
       );
       return;
     }
-
-    context.ui.addItem(
-      {
-        type: MessageType.INFO,
-        text: [
-          ...updateInfos.map((info) => updateOutput(info)),
-          'Restart gemini-cli to see the changes.',
-        ].join('\n'),
-      },
-      Date.now(),
-    );
   } catch (error) {
     context.ui.addItem(
       {
@@ -106,6 +107,14 @@ async function updateAction(context: CommandContext, args: string) {
       },
       Date.now(),
     );
+  } finally {
+    context.ui.addItem(
+      {
+        type: MessageType.EXTENSIONS_LIST,
+      },
+      Date.now(),
+    );
+    context.ui.setPendingItem(null);
   }
 }
 
