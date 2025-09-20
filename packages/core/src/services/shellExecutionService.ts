@@ -159,17 +159,28 @@ export class ShellExecutionService {
         combinedController.abort();
       }, timeoutMs);
     }
-
-    // Abort if timeout signal is aborted
-    timeoutController.signal.addEventListener(
-      'abort',
-      () => {
-        combinedController.abort();
-      },
-      { once: true },
-    );
     const cleanup = () => {
       if (timeoutId) clearTimeout(timeoutId);
+    };
+
+    // Helper function to enhance result with timeout cleanup and detection
+    const enhanceResultWithTimeout = (
+      handle: ShellExecutionHandle,
+    ): ShellExecutionHandle => {
+      const enhancedResult = handle.result
+        .then((result) => {
+          cleanup();
+          return {
+            ...result,
+            timedOut: timeoutController.signal.aborted && !abortSignal.aborted,
+          };
+        })
+        .catch((error) => {
+          cleanup();
+          throw error;
+        });
+
+      return { ...handle, result: enhancedResult };
     };
 
     if (shouldUseNodePty) {
@@ -185,22 +196,7 @@ export class ShellExecutionService {
             ptyInfo,
           );
 
-          // Enhance the result promise to include timeout cleanup and detection
-          const enhancedResult = handle.result
-            .then((result) => {
-              cleanup();
-              return {
-                ...result,
-                timedOut:
-                  timeoutController.signal.aborted && !abortSignal.aborted,
-              };
-            })
-            .catch((error) => {
-              cleanup();
-              throw error;
-            });
-
-          return { ...handle, result: enhancedResult };
+          return enhanceResultWithTimeout(handle);
         } catch (_e) {
           // Fallback to child_process
         }
@@ -214,21 +210,7 @@ export class ShellExecutionService {
       combinedSignal,
     );
 
-    // Enhance the result promise to include timeout cleanup and detection
-    const enhancedResult = handle.result
-      .then((result) => {
-        cleanup();
-        return {
-          ...result,
-          timedOut: timeoutController.signal.aborted && !abortSignal.aborted,
-        };
-      })
-      .catch((error) => {
-        cleanup();
-        throw error;
-      });
-
-    return { ...handle, result: enhancedResult };
+    return enhanceResultWithTimeout(handle);
   }
 
   private static childProcessFallback(

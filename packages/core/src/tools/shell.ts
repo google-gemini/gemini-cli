@@ -214,21 +214,17 @@ export class ShellToolInvocation extends BaseToolInvocation<
 
       let llmContent = '';
       if (result.aborted) {
-        if (result.timedOut) {
-          llmContent = 'Command was terminated due to timeout.';
-          if (result.output.trim()) {
-            llmContent += ` Below is the output before it timed out:\n${result.output}`;
-          } else {
-            llmContent += ' There was no output before it timed out.';
-          }
+        // Determine the reason for abortion first
+        const isTimeout = result.timedOut;
+        const reason = isTimeout ? 'timeout' : 'user cancellation';
+        const actionVerb = isTimeout ? 'timed out' : 'was cancelled';
+        
+        // Construct the message using the determined reason
+        llmContent = `Command was ${isTimeout ? 'terminated due to timeout' : 'cancelled by user before it could complete'}.`;
+        if (result.output.trim()) {
+          llmContent += ` Below is the output before it ${actionVerb}:\n${result.output}`;
         } else {
-          llmContent =
-            'Command was cancelled by user before it could complete.';
-          if (result.output.trim()) {
-            llmContent += ` Below is the output before it was cancelled:\n${result.output}`;
-          } else {
-            llmContent += ' There was no output before it was cancelled.';
-          }
+          llmContent += ` There was no output before it ${actionVerb}.`;
         }
       } else {
         // Create a formatted error string for display, replacing the wrapper command
