@@ -653,6 +653,8 @@ export async function loadCliConfig(
       format: (argv.outputFormat ?? settings.output?.format) as OutputFormat,
     },
     useModelRouter,
+    enableMessageBusIntegration:
+      settings.tools?.enableMessageBusIntegration ?? false,
   });
 }
 
