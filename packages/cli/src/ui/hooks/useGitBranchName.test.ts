@@ -10,8 +10,6 @@ import { act } from 'react';
 import { renderHook, waitFor } from '@testing-library/react';
 import { useGitBranchName } from './useGitBranchName.js';
 import { fs, vol } from 'memfs'; // For mocking fs
-
-import type { FSWatcher } from 'memfs/lib/volume.js';
 import { spawnAsync as mockSpawnAsync } from '@google/gemini-cli-core';
 
 // Mock @google/gemini-cli-core
@@ -207,7 +205,7 @@ describe('useGitBranchName', () => {
     const closeMock = vi.fn();
     const watchMock = vi.spyOn(fs, 'watch').mockReturnValue({
       close: closeMock,
-    } as unknown as FSWatcher);
+    } as unknown as ReturnType<typeof fs.watch>);
 
     (mockSpawnAsync as MockedFunction<typeof mockSpawnAsync>).mockResolvedValue(
       {
