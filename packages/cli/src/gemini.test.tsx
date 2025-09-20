@@ -257,6 +257,7 @@ describe('gemini.tsx main function kitty protocol', () => {
       includeDirectories: undefined,
       screenReader: undefined,
       useSmartEdit: undefined,
+      useWriteTodos: undefined,
       promptWords: undefined,
       outputFormat: undefined,
     });
