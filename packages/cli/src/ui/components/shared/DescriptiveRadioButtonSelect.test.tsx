@@ -4,422 +4,178 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { render, cleanup } from 'ink-testing-library';
-import { act } from 'react-dom/test-utils';
-import {
-  vi,
-  describe,
-  it,
-  expect,
-  beforeEach,
-  afterEach,
-  afterAll,
-} from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { renderWithProviders } from '../../../test-utils/render.js';
+import type React from 'react';
 import {
   DescriptiveRadioButtonSelect,
   type DescriptiveRadioSelectItem,
+  type DescriptiveRadioButtonSelectProps,
 } from './DescriptiveRadioButtonSelect.js';
+import {
+  BaseSelectionList,
+  type BaseSelectionListProps,
+  type RenderItemContext,
+} from './BaseSelectionList.js';
 
-const { mockUseKeypress, state } = vi.hoisted(() => {
-  const state: {
-    keypressHandler: (key: { sequence: string; name: string }) => void;
-    hookOptions: { isActive?: boolean };
-  } = {
-    keypressHandler: () => {},
-    hookOptions: {},
-  };
-
-  const mockUseKeypress = vi.fn((handler, options) => {
-    state.keypressHandler = handler;
-    state.hookOptions = options ?? {};
-  });
-
-  return { mockUseKeypress, state };
-});
-
-vi.mock('../../hooks/useKeypress.js', () => ({
-  useKeypress: mockUseKeypress,
+vi.mock('./BaseSelectionList.js', () => ({
+  BaseSelectionList: vi.fn(() => null),
 }));
 
-const pressKey = async (key: { sequence: string; name: string }) => {
-  if (state.hookOptions.isActive) {
-    await act(async () => {
-      state.keypressHandler(key);
-    });
+vi.mock('../../semantic-colors.js', () => ({
+  theme: {
+    text: { secondary: 'COLOR_SECONDARY' },
+  },
+}));
+
+const MockedBaseSelectionList = vi.mocked(
+  BaseSelectionList,
+) as unknown as ReturnType<typeof vi.fn>;
+
+type DescriptiveRenderItemFn = (
+  item: DescriptiveRadioSelectItem<string>,
+  context: RenderItemContext,
+) => React.JSX.Element;
+
+const extractRenderItem = (): DescriptiveRenderItemFn => {
+  const mockCalls = MockedBaseSelectionList.mock.calls;
+
+  if (mockCalls.length === 0) {
+    throw new Error(
+      'BaseSelectionList was not called. Ensure DescriptiveRadioButtonSelect is rendered before calling extractRenderItem.',
+    );
   }
+
+  const props = mockCalls[0][0] as BaseSelectionListProps<
+    string,
+    DescriptiveRadioSelectItem<string>
+  >;
+
+  if (typeof props.renderItem !== 'function') {
+    throw new Error('renderItem prop was not found on BaseSelectionList call.');
+  }
+
+  return props.renderItem as DescriptiveRenderItemFn;
 };
 
-const testItems: Array<DescriptiveRadioSelectItem<string>> = [
-  { value: 'foo', title: 'Foo', description: 'This is Foo.' },
-  { value: 'bar', title: 'Bar', description: 'This is Bar.' },
-  { value: 'baz', title: 'Baz', description: 'This is Baz.' },
-];
-
 describe('DescriptiveRadioButtonSelect', () => {
-  const onSelect = vi.fn();
-  const onHighlight = vi.fn();
+  const mockOnSelect = vi.fn();
+  const mockOnHighlight = vi.fn();
+
+  const ITEMS: Array<DescriptiveRadioSelectItem<string>> = [
+    { title: 'Foo Title', description: 'This is Foo.', value: 'foo' },
+    { title: 'Bar Title', description: 'This is Bar.', value: 'bar' },
+    {
+      title: 'Baz Title',
+      description: 'This is Baz.',
+      value: 'baz',
+      disabled: true,
+    },
+  ];
+
+  const renderComponent = (
+    props: Partial<DescriptiveRadioButtonSelectProps<string>> = {},
+  ) => {
+    const defaultProps: DescriptiveRadioButtonSelectProps<string> = {
+      items: ITEMS,
+      onSelect: mockOnSelect,
+      ...props,
+    };
+    return renderWithProviders(
+      <DescriptiveRadioButtonSelect {...defaultProps} />,
+    );
+  };
 
   beforeEach(() => {
-    vi.useFakeTimers();
     vi.clearAllMocks();
-    state.keypressHandler = () => {};
-    state.hookOptions = {};
   });
 
-  afterEach(() => {
-    vi.useRealTimers();
-    cleanup();
-  });
+  describe('Prop forwarding to BaseSelectionList', () => {
+    it('should forward all props correctly when provided', () => {
+      const props = {
+        items: ITEMS,
+        initialIndex: 1,
+        onSelect: mockOnSelect,
+        onHighlight: mockOnHighlight,
+        isFocused: false,
+        showScrollArrows: true,
+        maxItemsToShow: 5,
+        showNumbers: false,
+      };
 
-  afterAll(() => {
-    vi.restoreAllMocks();
-  });
+      renderComponent(props);
 
-  it('renders all items with titles and descriptions', () => {
-    const { lastFrame } = render(
-      <DescriptiveRadioButtonSelect
-        items={testItems}
-        onSelect={onSelect}
-        onHighlight={onHighlight}
-      />,
-    );
-
-    const output = lastFrame();
-    expect(output).toBeDefined();
-    if (!output) return;
-
-    expect(output).toContain('Foo');
-    expect(output).toContain('This is Foo.');
-    expect(output).toContain('Bar');
-    expect(output).toContain('This is Bar.');
-    expect(output).toContain('Baz');
-    expect(output).toContain('This is Baz.');
-  });
-
-  it('highlights the initialIndex item', () => {
-    const { lastFrame } = render(
-      <DescriptiveRadioButtonSelect
-        items={testItems}
-        initialIndex={1}
-        onSelect={onSelect}
-      />,
-    );
-
-    const output = lastFrame();
-    expect(output).toBeDefined();
-    if (!output) return;
-
-    const lines = output.split('\n');
-
-    // Each item renders as 3 lines: Title, Description, Margin (newline)
-    // Item 0 (Foo) is lines 0-2
-    // Item 1 (Bar) is lines 3-5
-    // Item 2 (Baz) is lines 6-8
-
-    expect(lines[0]).toContain('  '); // 2 spaces for '●'
-    expect(lines[0]).not.toContain('●');
-    expect(lines[3]).toContain('●');
-    expect(lines[6]).toContain('  ');
-    expect(lines[6]).not.toContain('●');
-  });
-
-  it('shows numbers when showNumbers is true', () => {
-    const { lastFrame } = render(
-      <DescriptiveRadioButtonSelect
-        items={testItems}
-        onSelect={onSelect}
-        showNumbers={true}
-      />,
-    );
-
-    const output = lastFrame();
-    expect(output).toBeDefined();
-    if (!output) return;
-
-    expect(output).toContain('1.');
-    expect(output).toContain('2.');
-    expect(output).toContain('3.');
-  });
-
-  it('does not show numbers when showNumbers is false', () => {
-    const { lastFrame } = render(
-      <DescriptiveRadioButtonSelect
-        items={testItems}
-        onSelect={onSelect}
-        showNumbers={false}
-      />,
-    );
-
-    const output = lastFrame();
-    expect(output).toBeDefined();
-    if (!output) return;
-
-    expect(output).not.toContain('1.');
-    expect(output).not.toContain('2.');
-    expect(output).not.toContain('3.');
-  });
-
-  describe('Keyboard Navigation', () => {
-    it('navigates down with "j" or "down"', async () => {
-      const { lastFrame } = render(
-        <DescriptiveRadioButtonSelect
-          items={testItems}
-          onSelect={onSelect}
-          onHighlight={onHighlight}
-        />,
+      expect(BaseSelectionList).toHaveBeenCalledTimes(1);
+      expect(BaseSelectionList).toHaveBeenCalledWith(
+        expect.objectContaining({
+          ...props,
+          renderItem: expect.any(Function),
+        }),
+        undefined,
       );
-
-      let output = lastFrame();
-      expect(output).toBeDefined();
-      if (!output) return;
-
-      expect(output.split('\n')[0]).toContain('●');
-      expect(onHighlight).not.toHaveBeenCalled();
-
-      await pressKey({ name: 'j', sequence: 'j' });
-      output = lastFrame();
-      expect(output).toBeDefined();
-      if (!output) return;
-
-      expect(output.split('\n')[3]).toContain('●');
-      expect(onHighlight).toHaveBeenCalledWith('bar');
-
-      await pressKey({ name: 'down', sequence: '\u001B[B' });
-      output = lastFrame();
-      expect(output).toBeDefined();
-      if (!output) return;
-
-      expect(output.split('\n')[6]).toContain('●');
-      expect(onHighlight).toHaveBeenCalledWith('baz');
     });
 
-    it('wraps from last to first item when navigating down', () => {
-      render(
-        <DescriptiveRadioButtonSelect
-          items={testItems}
-          initialIndex={2}
-          onSelect={onSelect}
-          onHighlight={onHighlight}
-        />,
+    it('should use default props if not provided', () => {
+      renderComponent({
+        items: ITEMS,
+        onSelect: mockOnSelect,
+      });
+
+      expect(BaseSelectionList).toHaveBeenCalledWith(
+        expect.objectContaining({
+          initialIndex: 0,
+          isFocused: true,
+          showScrollArrows: false,
+          maxItemsToShow: 10,
+          showNumbers: false,
+        }),
+        undefined,
       );
-
-      pressKey({ name: 'j', sequence: 'j' });
-      expect(onHighlight).toHaveBeenCalledWith('foo');
-    });
-
-    it('navigates up with "k" or "up"', async () => {
-      const { lastFrame } = render(
-        <DescriptiveRadioButtonSelect
-          items={testItems}
-          initialIndex={2}
-          onSelect={onSelect}
-          onHighlight={onHighlight}
-        />,
-      );
-
-      // Initial state (index 2)
-      let output = lastFrame();
-      expect(output).toBeDefined();
-      if (!output) return;
-
-      expect(output.split('\n')[6]).toContain('●');
-      expect(onHighlight).not.toHaveBeenCalled();
-
-      await pressKey({ name: 'k', sequence: 'k' });
-      output = lastFrame();
-      expect(output).toBeDefined();
-      if (!output) return;
-
-      expect(output.split('\n')[3]).toContain('●');
-      expect(onHighlight).toHaveBeenCalledWith('bar');
-
-      await pressKey({ name: 'up', sequence: '\u001B[A' });
-      output = lastFrame();
-      expect(output).toBeDefined();
-      if (!output) return;
-
-      expect(output.split('\n')[0]).toContain('●');
-      expect(onHighlight).toHaveBeenCalledWith('foo');
-    });
-
-    it('wraps from first to last item when navigating up', () => {
-      render(
-        <DescriptiveRadioButtonSelect
-          items={testItems}
-          initialIndex={0}
-          onSelect={onSelect}
-          onHighlight={onHighlight}
-        />,
-      );
-
-      pressKey({ name: 'k', sequence: 'k' });
-      expect(onHighlight).toHaveBeenCalledWith('baz');
-    });
-
-    it('selects the active item with "return"', () => {
-      render(
-        <DescriptiveRadioButtonSelect
-          items={testItems}
-          initialIndex={1}
-          onSelect={onSelect}
-          onHighlight={onHighlight}
-        />,
-      );
-
-      pressKey({ name: 'return', sequence: '\r' });
-      expect(onSelect).toHaveBeenCalledWith('bar');
-      expect(onHighlight).not.toHaveBeenCalled();
     });
   });
 
-  describe('Numeric Input', () => {
-    it('selects an item by number immediately (for lists < 10)', () => {
-      render(
-        <DescriptiveRadioButtonSelect
-          items={testItems}
-          onSelect={onSelect}
-          onHighlight={onHighlight}
-          showNumbers={true}
-        />,
-      );
+  describe('renderItem implementation', () => {
+    let renderItem: DescriptiveRenderItemFn;
+    const mockContext: RenderItemContext = {
+      isSelected: false,
+      titleColor: 'MOCK_TITLE_COLOR',
+      numberColor: 'MOCK_NUMBER_COLOR',
+    };
 
-      pressKey({ name: '2', sequence: '2' });
-
-      expect(onHighlight).toHaveBeenCalledWith('bar');
-
-      expect(onSelect).toHaveBeenCalledWith('bar');
+    beforeEach(() => {
+      renderComponent();
+      renderItem = extractRenderItem();
     });
 
-    it('selects an item with multi-digit input', () => {
-      const manyItems = Array.from({ length: 12 }, (_, i) => ({
-        value: `item-${i + 1}`,
-        title: `Item ${i + 1}`,
-        description: `Desc ${i + 1}`,
-      }));
+    it('should render title and description with correct colors', () => {
+      const item = ITEMS[0];
 
-      render(
-        <DescriptiveRadioButtonSelect
-          items={manyItems}
-          onSelect={onSelect}
-          onHighlight={onHighlight}
-          showNumbers={true}
-        />,
-      );
+      const result = renderItem(item, mockContext);
 
-      pressKey({ name: '1', sequence: '1' });
-      expect(onHighlight).toHaveBeenCalledWith('item-1');
-      expect(onSelect).not.toHaveBeenCalled();
-      onHighlight.mockClear();
+      // Should be a Box with flexDirection="column"
+      expect(result?.props?.flexDirection).toBe('column');
+      expect(result?.props?.children).toHaveLength(2);
 
-      pressKey({ name: '2', sequence: '2' });
+      const [titleElement, descriptionElement] = result?.props?.children || [];
 
-      expect(onHighlight).toHaveBeenCalledWith('item-12');
+      // Title should use titleColor
+      expect(titleElement?.props?.color).toBe(mockContext.titleColor);
+      expect(titleElement?.props?.children).toBe('Foo Title');
 
-      expect(onSelect).toHaveBeenCalledWith('item-12');
-
-      vi.advanceTimersByTime(350);
-      expect(onSelect).toHaveBeenCalledTimes(1);
+      // Description should use secondary color
+      expect(descriptionElement?.props?.color).toBe('COLOR_SECONDARY');
+      expect(descriptionElement?.props?.children).toBe('This is Foo.');
     });
 
-    it('resets number input on invalid number', () => {
-      render(
-        <DescriptiveRadioButtonSelect
-          items={testItems}
-          onSelect={onSelect}
-          onHighlight={onHighlight}
-          showNumbers={true}
-        />,
-      );
+    it('should render different items with their respective content', () => {
+      const item = ITEMS[1];
 
-      pressKey({ name: '9', sequence: '9' });
-      expect(onHighlight).not.toHaveBeenCalled();
-      expect(onSelect).not.toHaveBeenCalled();
+      const result = renderItem(item, mockContext);
 
-      pressKey({ name: '1', sequence: '1' });
-      expect(onHighlight).toHaveBeenCalledWith('foo');
-    });
+      const [titleElement, descriptionElement] = result?.props?.children || [];
 
-    it('resets number input on "0"', () => {
-      render(
-        <DescriptiveRadioButtonSelect
-          items={testItems}
-          onSelect={onSelect}
-          onHighlight={onHighlight}
-          showNumbers={true}
-        />,
-      );
-
-      pressKey({ name: '0', sequence: '0' });
-      expect(onHighlight).not.toHaveBeenCalled();
-
-      vi.advanceTimersByTime(350);
-      pressKey({ name: '1', sequence: '1' });
-      expect(onHighlight).toHaveBeenCalledWith('foo');
-    });
-
-    it('resets number input on non-numeric key', () => {
-      render(
-        <DescriptiveRadioButtonSelect
-          items={testItems}
-          onSelect={onSelect}
-          onHighlight={onHighlight}
-          showNumbers={true}
-        />,
-      );
-
-      pressKey({ name: '1', sequence: '1' });
-      expect(onHighlight).toHaveBeenCalledWith('foo');
-      onHighlight.mockClear();
-
-      pressKey({ name: 'j', sequence: 'j' });
-      expect(onHighlight).toHaveBeenCalledWith('bar');
-      onHighlight.mockClear();
-
-      pressKey({ name: '2', sequence: '2' });
-      expect(onHighlight).toHaveBeenCalledWith('bar');
-      expect(onSelect).toHaveBeenCalledWith('bar');
-    });
-  });
-
-  describe('Focus Management', () => {
-    it('does not register keypresses when isFocused is false', () => {
-      render(
-        <DescriptiveRadioButtonSelect
-          items={testItems}
-          onSelect={onSelect}
-          onHighlight={onHighlight}
-          isFocused={false}
-        />,
-      );
-
-      expect(mockUseKeypress).toHaveBeenCalledWith(
-        expect.any(Function),
-        expect.objectContaining({ isActive: false }),
-      );
-      expect(state.hookOptions.isActive).toBe(false);
-
-      pressKey({ name: 'j', sequence: 'j' });
-      pressKey({ name: 'return', sequence: '\r' });
-      pressKey({ name: '1', sequence: '1' });
-
-      expect(onHighlight).not.toHaveBeenCalled();
-      expect(onSelect).not.toHaveBeenCalled();
-    });
-
-    it('registers keypresses when isFocused is true', () => {
-      render(
-        <DescriptiveRadioButtonSelect
-          items={testItems}
-          onSelect={onSelect}
-          onHighlight={onHighlight}
-          isFocused={true}
-        />,
-      );
-
-      expect(state.hookOptions.isActive).toBe(true);
-
-      pressKey({ name: 'j', sequence: 'j' });
-      expect(onHighlight).toHaveBeenCalledWith('bar');
+      expect(titleElement?.props?.children).toBe('Bar Title');
+      expect(descriptionElement?.props?.children).toBe('This is Bar.');
     });
   });
 });

@@ -179,7 +179,6 @@ describe('AppContainer State Management', () => {
       isModelDialogOpen: false,
       openModelDialog: vi.fn(),
       closeModelDialog: vi.fn(),
-      handleModelSelect: vi.fn(),
     });
     mockedUseSlashCommandProcessor.mockReturnValue({
       handleSlashCommand: vi.fn(),
@@ -781,7 +780,6 @@ describe('AppContainer State Management', () => {
         isModelDialogOpen: true,
         openModelDialog: vi.fn(),
         closeModelDialog: vi.fn(),
-        handleModelSelect: vi.fn(),
       });
 
       render(
@@ -797,14 +795,12 @@ describe('AppContainer State Management', () => {
     });
 
     it('should provide model dialog actions in the UIActionsContext', () => {
-      const mockHandleModelSelect = vi.fn();
       const mockCloseModelDialog = vi.fn();
 
       mockedUseModelCommand.mockReturnValue({
         isModelDialogOpen: false,
         openModelDialog: vi.fn(),
         closeModelDialog: mockCloseModelDialog,
-        handleModelSelect: mockHandleModelSelect,
       });
 
       render(
@@ -817,9 +813,6 @@ describe('AppContainer State Management', () => {
       );
 
       // Verify that the actions are correctly passed through context
-      capturedUIActions.handleModelSelect('test-model');
-      expect(mockHandleModelSelect).toHaveBeenCalledWith('test-model');
-
       capturedUIActions.closeModelDialog();
       expect(mockCloseModelDialog).toHaveBeenCalled();
     });

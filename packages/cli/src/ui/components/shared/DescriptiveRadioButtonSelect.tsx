@@ -5,12 +5,9 @@
  */
 
 import type React from 'react';
-import { useState, useRef } from 'react';
 import { Text, Box } from 'ink';
 import { theme } from '../../semantic-colors.js';
-import { useKeypress } from '../../hooks/useKeypress.js';
-
-const NUMBER_INPUT_TIMEOUT_MS = 1000;
+import { BaseSelectionList } from './BaseSelectionList.js';
 
 export interface DescriptiveRadioSelectItem<T> {
   value: T;
@@ -20,14 +17,29 @@ export interface DescriptiveRadioSelectItem<T> {
 }
 
 export interface DescriptiveRadioButtonSelectProps<T> {
+  /** An array of items to display as descriptive radio options. */
   items: Array<DescriptiveRadioSelectItem<T>>;
+  /** The initial index selected */
   initialIndex?: number;
+  /** Function called when an item is selected. Receives the `value` of the selected item. */
   onSelect: (value: T) => void;
+  /** Function called when an item is highlighted. Receives the `value` of the selected item. */
   onHighlight?: (value: T) => void;
+  /** Whether this select input is currently focused and should respond to input. */
   isFocused?: boolean;
+  /** Whether to show numbers next to items. */
   showNumbers?: boolean;
+  /** Whether to show the scroll arrows. */
+  showScrollArrows?: boolean;
+  /** The maximum number of items to show at once. */
+  maxItemsToShow?: number;
 }
 
+/**
+ * A radio button select component that displays items with title and description.
+ *
+ * @template T The type of the value associated with each descriptive radio item.
+ */
 export function DescriptiveRadioButtonSelect<T>({
   items,
   initialIndex = 0,
@@ -35,130 +47,25 @@ export function DescriptiveRadioButtonSelect<T>({
   onHighlight,
   isFocused = true,
   showNumbers = false,
+  showScrollArrows = false,
+  maxItemsToShow = 10,
 }: DescriptiveRadioButtonSelectProps<T>): React.JSX.Element {
-  const [activeIndex, setActiveIndex] = useState(initialIndex);
-  const numberInputRef = useRef('');
-  const numberInputTimer = useRef<NodeJS.Timeout | null>(null);
-
-  useKeypress(
-    (key) => {
-      const { sequence, name } = key;
-      const isNumeric = showNumbers && /^[0-9]$/.test(sequence);
-
-      if (!isNumeric && numberInputTimer.current) {
-        numberInputRef.current = '';
-      }
-
-      if (name === 'k' || name === 'up') {
-        const newIndex = activeIndex > 0 ? activeIndex - 1 : items.length - 1;
-        setActiveIndex(newIndex);
-        onHighlight?.(items[newIndex]!.value);
-        return;
-      }
-
-      if (name === 'j' || name === 'down') {
-        const newIndex = activeIndex < items.length - 1 ? activeIndex + 1 : 0;
-        setActiveIndex(newIndex);
-        onHighlight?.(items[newIndex]!.value);
-        return;
-      }
-
-      if (name === 'return') {
-        onSelect(items[activeIndex]!.value);
-        return;
-      }
-
-      if (isNumeric) {
-        if (numberInputTimer.current) {
-          clearTimeout(numberInputTimer.current);
-        }
-
-        numberInputRef.current = numberInputRef.current + sequence;
-        const newNumberInput = numberInputRef.current;
-
-        const targetIndex = Number.parseInt(newNumberInput, 10) - 1;
-
-        if (newNumberInput === '0') {
-          numberInputTimer.current = setTimeout(
-            () => (numberInputRef.current = ''),
-            NUMBER_INPUT_TIMEOUT_MS,
-          );
-          return;
-        }
-
-        if (targetIndex >= 0 && targetIndex < items.length) {
-          const targetItem = items[targetIndex]!;
-          setActiveIndex(targetIndex);
-          onHighlight?.(targetItem.value);
-
-          const potentialNextNumber = Number.parseInt(newNumberInput + '0', 10);
-          if (potentialNextNumber > items.length) {
-            onSelect(targetItem.value);
-            numberInputRef.current = '';
-          } else {
-            numberInputTimer.current = setTimeout(() => {
-              onSelect(targetItem.value);
-              numberInputRef.current = '';
-            }, NUMBER_INPUT_TIMEOUT_MS);
-          }
-        } else {
-          numberInputRef.current = '';
-        }
-      }
-    },
-    { isActive: !!(isFocused && items.length > 0) },
-  );
-
   return (
-    <Box flexDirection="column">
-      {items.map((item, index) => {
-        const isSelected = activeIndex === index;
-
-        let titleColor = theme.text.primary;
-        let numberColor = theme.text.primary;
-
-        if (isSelected) {
-          titleColor = theme.status.success;
-          numberColor = theme.status.success;
-        } else if (item.disabled) {
-          titleColor = theme.text.secondary;
-          numberColor = theme.text.secondary;
-        }
-
-        if (!showNumbers) {
-          numberColor = theme.text.secondary;
-        }
-
-        const numberColumnWidth = String(items.length).length;
-        const itemNumberText = `${String(index + 1).padStart(
-          numberColumnWidth,
-        )}.`;
-
-        return (
-          <Box key={index} flexDirection="row" marginBottom={1}>
-            <Box minWidth={2} flexShrink={0}>
-              <Text
-                color={isSelected ? theme.status.success : theme.text.primary}
-              >
-                {isSelected ? '●' : ' '}
-              </Text>
-            </Box>
-            {showNumbers && (
-              <Box
-                marginRight={1}
-                flexShrink={0}
-                minWidth={itemNumberText.length}
-              >
-                <Text color={numberColor}>{itemNumberText}</Text>
-              </Box>
-            )}
-            <Box flexDirection="column">
-              <Text color={titleColor}>{item.title}</Text>
-              <Text color={theme.text.secondary}>{item.description}</Text>
-            </Box>
-          </Box>
-        );
-      })}
-    </Box>
+    <BaseSelectionList<T, DescriptiveRadioSelectItem<T>>
+      items={items}
+      initialIndex={initialIndex}
+      onSelect={onSelect}
+      onHighlight={onHighlight}
+      isFocused={isFocused}
+      showNumbers={showNumbers}
+      showScrollArrows={showScrollArrows}
+      maxItemsToShow={maxItemsToShow}
+      renderItem={(item, { titleColor }) => (
+        <Box flexDirection="column">
+          <Text color={titleColor}>{item.title}</Text>
+          <Text color={theme.text.secondary}>{item.description}</Text>
+        </Box>
+      )}
+    />
   );
 }

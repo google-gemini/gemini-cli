@@ -34,7 +34,6 @@ const renderComponent = (
 ) => {
   const defaultProps = {
     onClose: vi.fn(),
-    onSelect: vi.fn(),
   };
   const combinedProps = { ...defaultProps, ...props };
 
@@ -121,41 +120,35 @@ describe('<ModelDialog />', () => {
 
     expect(mockGetModel).toHaveBeenCalled();
 
-    expect(mockedSelect).toHaveBeenNthCalledWith(
-      1,
+    // When getModel returns undefined, preferredModel falls back to DEFAULT_GEMINI_MODEL_AUTO
+    // which has index 0, so initialIndex should be 0
+    expect(mockedSelect).toHaveBeenCalledWith(
       expect.objectContaining({
         initialIndex: 0,
       }),
       undefined,
     );
-
-    expect(mockedSelect).toHaveBeenNthCalledWith(
-      2,
-      expect.objectContaining({
-        initialIndex: -1,
-      }),
-      undefined,
-    );
-    expect(mockedSelect).toHaveBeenCalledTimes(2);
+    expect(mockedSelect).toHaveBeenCalledTimes(1);
   });
 
-  it('calls onSelect prop when DescriptiveRadioButtonSelect.onSelect is triggered', () => {
-    const { props } = renderComponent();
+  it('calls config.setModel and onClose when DescriptiveRadioButtonSelect.onSelect is triggered', () => {
+    const mockSetModel = vi.fn();
+    const { props } = renderComponent({}, { setModel: mockSetModel });
 
     const childOnSelect = mockedSelect.mock.calls[0][0].onSelect;
     expect(childOnSelect).toBeDefined();
 
     childOnSelect(DEFAULT_GEMINI_MODEL);
 
-    expect(props.onSelect).toHaveBeenCalledWith(DEFAULT_GEMINI_MODEL);
+    expect(mockSetModel).toHaveBeenCalledWith(DEFAULT_GEMINI_MODEL);
+    expect(props.onClose).toHaveBeenCalledTimes(1);
   });
 
-  it('updates the highlighted model when DescriptiveRadioButtonSelect.onHighlight is triggered', () => {
+  it('does not pass onHighlight to DescriptiveRadioButtonSelect', () => {
     renderComponent();
 
     const childOnHighlight = mockedSelect.mock.calls[0][0].onHighlight;
-    expect(childOnHighlight).toBeDefined();
-    expect(childOnHighlight).toBeInstanceOf(Function);
+    expect(childOnHighlight).toBeUndefined();
   });
 
   it('calls onClose prop when "escape" key is pressed', () => {
@@ -195,7 +188,7 @@ describe('<ModelDialog />', () => {
       <ConfigContext.Provider
         value={{ getModel: mockGetModel } as unknown as Config}
       >
-        <ModelDialog onClose={vi.fn()} onSelect={vi.fn()} />
+        <ModelDialog onClose={vi.fn()} />
       </ConfigContext.Provider>,
     );
 
@@ -206,11 +199,12 @@ describe('<ModelDialog />', () => {
 
     rerender(
       <ConfigContext.Provider value={newMockConfig}>
-        <ModelDialog onClose={vi.fn()} onSelect={vi.fn()} />
+        <ModelDialog onClose={vi.fn()} />
       </ConfigContext.Provider>,
     );
 
-    expect(mockedSelect).toHaveBeenCalledTimes(3);
-    expect(mockedSelect.mock.calls[2][0].initialIndex).toBe(3);
+    // Should be called at least twice: initial render + re-render after context change
+    expect(mockedSelect).toHaveBeenCalledTimes(2);
+    expect(mockedSelect.mock.calls[1][0].initialIndex).toBe(3);
   });
 });

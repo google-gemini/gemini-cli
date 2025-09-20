@@ -5,16 +5,14 @@
  */
 
 import { useState, useCallback } from 'react';
-import type { Config } from '@google/gemini-cli-core';
 
 interface UseModelCommandReturn {
   isModelDialogOpen: boolean;
   openModelDialog: () => void;
   closeModelDialog: () => void;
-  handleModelSelect: (model: string) => void;
 }
 
-export const useModelCommand = (config: Config): UseModelCommandReturn => {
+export const useModelCommand = (): UseModelCommandReturn => {
   const [isModelDialogOpen, setIsModelDialogOpen] = useState(false);
 
   const openModelDialog = useCallback(() => {
@@ -25,18 +23,9 @@ export const useModelCommand = (config: Config): UseModelCommandReturn => {
     setIsModelDialogOpen(false);
   }, []);
 
-  const handleModelSelect = useCallback(
-    (model: string) => {
-      config.setModel(model);
-      setIsModelDialogOpen(false);
-    },
-    [config],
-  );
-
   return {
     isModelDialogOpen,
     openModelDialog,
     closeModelDialog,
-    handleModelSelect,
   };
 };

@@ -419,12 +419,8 @@ Logging in with Google... Please restart Gemini CLI to continue.
   const { isSettingsDialogOpen, openSettingsDialog, closeSettingsDialog } =
     useSettingsCommand();
 
-  const {
-    isModelDialogOpen,
-    openModelDialog,
-    closeModelDialog,
-    handleModelSelect,
-  } = useModelCommand(config);
+  const { isModelDialogOpen, openModelDialog, closeModelDialog } =
+    useModelCommand();
 
   const {
     showWorkspaceMigrationDialog,
@@ -1193,7 +1189,6 @@ Logging in with Google... Please restart Gemini CLI to continue.
       closeSettingsDialog,
       closeModelDialog,
       closePermissionsDialog,
-      handleModelSelect,
       setShellModeActive,
       vimHandleInput,
       handleIdePromptComplete,
@@ -1218,7 +1213,6 @@ Logging in with Google... Please restart Gemini CLI to continue.
       closeSettingsDialog,
       closeModelDialog,
       closePermissionsDialog,
-      handleModelSelect,
       setShellModeActive,
       vimHandleInput,
       handleIdePromptComplete,

@@ -5,7 +5,7 @@
  */
 
 import type React from 'react';
-import { useContext, useEffect, useState } from 'react';
+import { useCallback, useContext, useMemo } from 'react';
 import { Box, Text } from 'ink';
 import {
   DEFAULT_GEMINI_FLASH_LITE_MODEL,
@@ -20,7 +20,6 @@ import { ConfigContext } from '../contexts/ConfigContext.js';
 
 interface ModelDialogProps {
   onClose: () => void;
-  onSelect: (model: string) => void;
 }
 
 const MODEL_OPTIONS = [
@@ -46,20 +45,11 @@ const MODEL_OPTIONS = [
   },
 ];
 
-export function ModelDialog({
-  onClose,
-  onSelect,
-}: ModelDialogProps): React.JSX.Element {
+export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
   const config = useContext(ConfigContext);
-  const [selectedModel, setSelectedModel] = useState(
-    config?.getModel() || DEFAULT_GEMINI_MODEL_AUTO,
-  );
 
-  useEffect(() => {
-    if (config) {
-      setSelectedModel(config.getModel());
-    }
-  }, [config]);
+  // Determine the Preferred Model (read once when the dialog opens).
+  const preferredModel = config?.getModel() || DEFAULT_GEMINI_MODEL_AUTO;
 
   useKeypress(
     (key) => {
@@ -70,9 +60,22 @@ export function ModelDialog({
     { isActive: true },
   );
 
-  const handleSelect = (model: string) => {
-    onSelect(model);
-  };
+  // Calculate the initial index based on the preferred model.
+  const initialIndex = useMemo(
+    () => MODEL_OPTIONS.findIndex((option) => option.value === preferredModel),
+    [preferredModel],
+  );
+
+  // Handle selection internally (Autonomous Dialog).
+  const handleSelect = useCallback(
+    (model: string) => {
+      if (config) {
+        config.setModel(model);
+      }
+      onClose();
+    },
+    [config, onClose],
+  );
 
   return (
     <Box
@@ -88,10 +91,7 @@ export function ModelDialog({
         <DescriptiveRadioButtonSelect
           items={MODEL_OPTIONS}
           onSelect={handleSelect}
-          onHighlight={setSelectedModel}
-          initialIndex={MODEL_OPTIONS.findIndex(
-            (option) => option.value === selectedModel,
-          )}
+          initialIndex={initialIndex}
           showNumbers={true}
         />
       </Box>
