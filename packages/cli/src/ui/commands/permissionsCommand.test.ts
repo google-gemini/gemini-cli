@@ -25,27 +25,11 @@ describe('permissionsCommand', () => {
     expect(permissionsCommand.kind).toBe(CommandKind.BUILT_IN);
   });
 
-  it('should return an action to open the permissions dialog if folder trust is enabled', () => {
-    mockContext.services.settings.merged.security = {
-      folderTrust: { enabled: true },
-    };
+  it('should return an action to open the permissions dialog', () => {
     const actionResult = permissionsCommand.action?.(mockContext, '');
     expect(actionResult).toEqual({
       type: 'dialog',
       dialog: 'permissions',
-    });
-  });
-
-  it('should return a message if folder trust is disabled', () => {
-    mockContext.services.settings.merged.security = {
-      folderTrust: { enabled: false },
-    };
-    const actionResult = permissionsCommand.action?.(mockContext, '');
-    expect(actionResult).toEqual({
-      type: 'message',
-      messageType: 'info',
-      content:
-        'Folder trust permissions cannot be modified since the feature is currently disabled. You can enable it in the settings.',
     });
   });
 });

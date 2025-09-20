@@ -69,7 +69,7 @@ export class BuiltinCommandLoader implements ICommandLoader {
       initCommand,
       mcpCommand,
       memoryCommand,
-      permissionsCommand,
+      this.config?.getFolderTrust() ? permissionsCommand : null,
       privacyCommand,
       quitCommand,
       restoreCommand(this.config),
