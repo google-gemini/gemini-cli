@@ -90,6 +90,7 @@ const electronAPI = {
     renderTemplate: (templateId, variables) => ipcRenderer.invoke('multimodel-render-template', templateId, variables),
     addWorkspaceDirectory: (directory, basePath) => ipcRenderer.invoke('multimodel-add-workspace-directory', directory, basePath),
     getWorkspaceDirectories: () => ipcRenderer.invoke('multimodel-get-workspace-directories'),
+    getDirectoryContents: (directoryPath) => ipcRenderer.invoke('multimodel-get-directory-contents', directoryPath),
     setWorkspaceDirectories: (directories) => ipcRenderer.invoke('multimodel-set-workspace-directories', directories),
     getCurrentToolset: () => ipcRenderer.invoke('multimodel-get-current-toolset'),
     addCustomRole: (role) => ipcRenderer.invoke('multimodel-add-custom-role', role),

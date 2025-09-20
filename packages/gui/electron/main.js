@@ -314,6 +314,19 @@ ipcMain.handle('multimodel-get-workspace-directories', async () => {
   }
 })
 
+ipcMain.handle('multimodel-get-directory-contents', async (_, directoryPath) => {
+  try {
+    // console.log('MultiModel getDirectoryContents called for:', directoryPath)
+    const system = await ensureInitialized()
+    const items = await multiModelSystem.getDirectoryContents(directoryPath)
+    // console.log('Got directory contents:', items.length, 'items')
+    return items
+  } catch (error) {
+    console.error('Error getting directory contents:', error)
+    return []
+  }
+})
+
 ipcMain.handle('multimodel-add-workspace-directory', async (event, directory, basePath) => {
   try {
     // console.log('MultiModel addWorkspaceDirectory called:', directory, 'basePath:', basePath)

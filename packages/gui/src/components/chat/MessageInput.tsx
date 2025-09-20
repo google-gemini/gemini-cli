@@ -7,6 +7,7 @@ import { useChatStore } from '@/stores/chatStore';
 import { multiModelService } from '@/services/multiModelService';
 import { cn } from '@/utils/cn';
 import type { ChatMessage, UniversalMessage } from '@/types';
+import { AutocompleteDropdown, useAutocomplete } from './autocomplete';
 
 interface MessageInputProps {
   disabled?: boolean;
@@ -46,16 +47,59 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(({ di
     textarea.style.height = Math.min(scrollHeight, maxHeight) + 'px';
   }, []);
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setMessage(e.target.value);
+  // Initialize autocomplete
+  const autocomplete = useAutocomplete({
+    textareaRef: textareaRef as React.RefObject<HTMLTextAreaElement>,
+    value: message,
+    onChange: setMessage,
+    onSelectionChange: (_start, _end) => {
+      // Update cursor position after autocomplete
+      setTimeout(() => adjustTextareaHeight(), 0);
+    }
+  });
+
+  const handleInputChange = async (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const newValue = e.target.value;
+    const cursorPos = e.target.selectionStart;
+
+    setMessage(newValue);
     adjustTextareaHeight();
+
+    // Check for autocomplete triggers
+    await autocomplete.checkForAutocomplete(newValue, cursorPos);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    // First, let autocomplete handle the key if it's visible
+    if (autocomplete.handleKeyDown(e)) {
+      return; // Autocomplete handled the key
+    }
+
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSendMessage();
     }
+
+    // For backspace/delete, schedule autocomplete check after the key is processed
+    if (e.key === 'Backspace' || e.key === 'Delete') {
+      setTimeout(async () => {
+        if (textareaRef.current) {
+          const newValue = textareaRef.current.value;
+          const newCursorPos = textareaRef.current.selectionStart;
+          await autocomplete.checkForAutocomplete(newValue, newCursorPos);
+        }
+      }, 0);
+    }
+  };
+
+  const handleTextareaClick = () => {
+    // Check for autocomplete when user clicks to change cursor position
+    setTimeout(async () => {
+      if (textareaRef.current) {
+        const cursorPos = textareaRef.current.selectionStart;
+        await autocomplete.checkForAutocomplete(message, cursorPos);
+      }
+    }, 0);
   };
 
   const handleSendMessage = async () => {
@@ -391,16 +435,33 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(({ di
           <div className="flex-1 relative">
             <Textarea
               ref={textareaRef}
-              placeholder={disabled ? "Select a session to start chatting..." : "Type a message..."}
+              placeholder={disabled ? "Select a session to start chatting..." : "Type a message... (use @ for workspace directories)"}
               value={message}
               onChange={handleInputChange}
               onKeyDown={handleKeyDown}
+              onClick={handleTextareaClick}
               disabled={disabled || isStreaming || isThinking}
               className={cn(
                 "min-h-[44px] max-h-[200px] resize-none pr-12",
                 "focus:ring-1 focus:ring-primary/50"
               )}
               style={{ height: 'auto' }}
+            />
+
+            <AutocompleteDropdown
+              items={autocomplete.items}
+              selectedIndex={autocomplete.selectedIndex}
+              onSelect={autocomplete.selectItem}
+              onClose={autocomplete.hideAutocomplete}
+              position={autocomplete.position}
+              visible={autocomplete.isVisible}
+              onRefresh={() => {
+                // Trigger autocomplete refresh by re-checking current position
+                if (textareaRef.current) {
+                  const cursorPos = textareaRef.current.selectionStart;
+                  autocomplete.checkForAutocomplete(message, cursorPos);
+                }
+              }}
             />
           </div>
 
