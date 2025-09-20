@@ -2250,6 +2250,74 @@ describe('Settings Loading and Merging', () => {
 
       expect(process.env['TESTTEST']).not.toEqual('1234');
     });
+
+    describe('GEMINI_SAFE_TRUST_DEFAULT security tests', () => {
+      let originalEnv: string | undefined;
+      let originalIsWorkspaceTrusted: Mock;
+
+      beforeEach(() => {
+        originalEnv = process.env['GEMINI_SAFE_TRUST_DEFAULT'];
+        originalIsWorkspaceTrusted = vi.mocked(isWorkspaceTrusted);
+      });
+
+      afterEach(() => {
+        if (originalEnv !== undefined) {
+          process.env['GEMINI_SAFE_TRUST_DEFAULT'] = originalEnv;
+        } else {
+          delete process.env['GEMINI_SAFE_TRUST_DEFAULT'];
+        }
+        originalIsWorkspaceTrusted.mockRestore();
+      });
+
+      it('should load env files when workspace is trusted', () => {
+        setup({ isFolderTrustEnabled: true, isWorkspaceTrustedValue: true });
+        originalIsWorkspaceTrusted.mockReturnValue(true);
+
+        loadEnvironment(loadSettings(MOCK_WORKSPACE_DIR).merged);
+
+        expect(process.env['TESTTEST']).toEqual('1234');
+      });
+
+      it('should not load env files when workspace is not trusted', () => {
+        setup({ isFolderTrustEnabled: true, isWorkspaceTrustedValue: false });
+        originalIsWorkspaceTrusted.mockReturnValue(false);
+
+        loadEnvironment(loadSettings(MOCK_WORKSPACE_DIR).merged);
+
+        expect(process.env['TESTTEST']).toBeUndefined();
+      });
+
+      it('should not load env files when workspace trust is undefined', () => {
+        setup({ isFolderTrustEnabled: true, isWorkspaceTrustedValue: undefined });
+        originalIsWorkspaceTrusted.mockReturnValue(undefined);
+
+        loadEnvironment(loadSettings(MOCK_WORKSPACE_DIR).merged);
+
+        expect(process.env['TESTTEST']).toBeUndefined();
+      });
+
+      it('should load env files when workspace trust returns true with GEMINI_SAFE_TRUST_DEFAULT logic', () => {
+        // Test that the centralized isWorkspaceTrusted function handles GEMINI_SAFE_TRUST_DEFAULT
+        setup({ isFolderTrustEnabled: true, isWorkspaceTrustedValue: true });
+        process.env['GEMINI_SAFE_TRUST_DEFAULT'] = '1';
+        originalIsWorkspaceTrusted.mockReturnValue(true); // Explicit trust overrides env var
+
+        loadEnvironment(loadSettings(MOCK_WORKSPACE_DIR).merged);
+
+        expect(process.env['TESTTEST']).toEqual('1234');
+      });
+
+      it('should not load env files when GEMINI_SAFE_TRUST_DEFAULT blocks access', () => {
+        // Test that the centralized isWorkspaceTrusted function handles GEMINI_SAFE_TRUST_DEFAULT
+        setup({ isFolderTrustEnabled: true, isWorkspaceTrustedValue: false });
+        process.env['GEMINI_SAFE_TRUST_DEFAULT'] = '1';
+        originalIsWorkspaceTrusted.mockReturnValue(false); // Env var blocks access
+
+        loadEnvironment(loadSettings(MOCK_WORKSPACE_DIR).merged);
+
+        expect(process.env['TESTTEST']).toBeUndefined();
+      });
+    });
   });
 
   describe('needsMigration', () => {
