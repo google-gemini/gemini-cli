@@ -32,7 +32,15 @@ export class ClipboardTestHelpers {
         const proc = exec('pbcopy');
         proc.stdin?.write(text);
         proc.stdin?.end();
-        await new Promise((resolve) => proc.on('close', resolve));
+        await new Promise((resolve, reject) => {
+          proc.on('close', (code) => {
+            if (code === 0) resolve(undefined);
+            else reject(new Error(`pbcopy exited with code ${code}`));
+          });
+          proc.on('error', reject);
+          // Add timeout to prevent hanging
+          setTimeout(() => reject(new Error('pbcopy timed out')), 5000);
+        });
       } else if (platform === 'linux') {
         // Linux
         try {
@@ -44,6 +52,9 @@ export class ClipboardTestHelpers {
               if (code === 0) resolve(true);
               else reject(new Error(`xclip exited with code ${code}`));
             });
+            proc.on('error', reject);
+            // Add timeout to prevent hanging
+            setTimeout(() => reject(new Error('xclip timed out')), 5000);
           });
         } catch (error) {
           console.error('xclip failed, trying xsel...', error);
@@ -51,7 +62,15 @@ export class ClipboardTestHelpers {
           const proc = exec('xsel --clipboard --input');
           proc.stdin?.write(text);
           proc.stdin?.end();
-          await new Promise((resolve) => proc.on('close', resolve));
+          await new Promise((resolve, reject) => {
+            proc.on('close', (code) => {
+              if (code === 0) resolve(undefined);
+              else reject(new Error(`xsel exited with code ${code}`));
+            });
+            proc.on('error', reject);
+            // Add timeout to prevent hanging
+            setTimeout(() => reject(new Error('xsel timed out')), 5000);
+          });
         }
       }
     } catch (error) {
@@ -196,6 +215,20 @@ export class ClipboardTestHelpers {
    */
   static getPlatform(): NodeJS.Platform {
     return os.platform();
+  }
+
+  /**
+   * Tests if clipboard operations are working
+   */
+  static async isClipboardAvailable(): Promise<boolean> {
+    try {
+      const testString = 'clipboard_availability_test_' + Date.now();
+      await this.copyText(testString);
+      const retrieved = await this.getClipboardText();
+      return retrieved.trim() === testString;
+    } catch {
+      return false;
+    }
   }
 
   /**

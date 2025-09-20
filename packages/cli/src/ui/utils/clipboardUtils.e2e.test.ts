@@ -41,6 +41,16 @@ const clipboardToolsAvailable = (() => {
   }
 })();
 
+// Async check for clipboard functionality
+let clipboardFunctionalityAvailable: boolean | null = null;
+const checkClipboardFunctionality = async () => {
+  if (clipboardFunctionalityAvailable === null) {
+    clipboardFunctionalityAvailable =
+      await ClipboardTestHelpers.isClipboardAvailable();
+  }
+  return clipboardFunctionalityAvailable;
+};
+
 const describeE2E =
   skipE2E || !clipboardToolsAvailable ? describe.skip : describe;
 
@@ -76,6 +86,15 @@ describeE2E('Clipboard E2E Tests', () => {
   });
 
   it('should validate clipboard content without sensitive data restrictions', async () => {
+    // Skip if clipboard functionality is not available
+    const isAvailable = await checkClipboardFunctionality();
+    if (!isAvailable) {
+      console.warn(
+        'Clipboard test skipped: clipboard functionality not available',
+      );
+      return;
+    }
+
     const testContent = 'API_KEY=abc123xyz456';
     await ClipboardTestHelpers.copyText(testContent);
 
@@ -89,7 +108,7 @@ describeE2E('Clipboard E2E Tests', () => {
     const result = await clipboardUtils.validatePasteContent(testContent);
     expect(result.isValid).toBe(true);
     expect(result.error).toBeUndefined();
-  });
+  }, 15000); // 15 second timeout for clipboard operations
 
   it('should handle image clipboard operations', async () => {
     // Skip on unsupported platforms
