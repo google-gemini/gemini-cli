@@ -1805,6 +1805,60 @@ describe('loadCliConfig useRipgrep', () => {
   });
 });
 
+describe('screenReader configuration', () => {
+  const originalArgv = process.argv;
+
+  beforeEach(() => {
+    vi.resetAllMocks();
+    vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
+    vi.stubEnv('GEMINI_API_KEY', 'test-api-key');
+  });
+
+  afterEach(() => {
+    process.argv = originalArgv;
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
+  });
+
+  it('should use screenReader value from settings if CLI flag is not present (settings true)', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments({} as Settings);
+    const settings: Settings = {
+      ui: { accessibility: { screenReader: true } },
+    };
+    const config = await loadCliConfig(settings, [], 'test-session', argv);
+    expect(config.getScreenReader()).toBe(true);
+  });
+
+  it('should use screenReader value from settings if CLI flag is not present (settings false)', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments({} as Settings);
+    const settings: Settings = {
+      ui: { accessibility: { screenReader: false } },
+    };
+    const config = await loadCliConfig(settings, [], 'test-session', argv);
+    expect(config.getScreenReader()).toBe(false);
+  });
+
+  it('should prioritize --screen-reader CLI flag (true) over settings (false)', async () => {
+    process.argv = ['node', 'script.js', '--screen-reader'];
+    const argv = await parseArguments({} as Settings);
+    const settings: Settings = {
+      ui: { accessibility: { screenReader: false } },
+    };
+    const config = await loadCliConfig(settings, [], 'test-session', argv);
+    expect(config.getScreenReader()).toBe(true);
+  });
+
+  it('should be false by default when no flag or setting is present', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments({} as Settings);
+    const settings: Settings = {};
+    const config = await loadCliConfig(settings, [], 'test-session', argv);
+    expect(config.getScreenReader()).toBe(false);
+  });
+});
+
 describe('loadCliConfig tool exclusions', () => {
   const originalArgv = process.argv;
   const originalIsTTY = process.stdin.isTTY;
