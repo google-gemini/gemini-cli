@@ -18,6 +18,7 @@ import { EditorSettingsDialog } from './EditorSettingsDialog.js';
 import { PrivacyNotice } from '../privacy/PrivacyNotice.js';
 import { WorkspaceMigrationDialog } from './WorkspaceMigrationDialog.js';
 import { ProQuotaDialog } from './ProQuotaDialog.js';
+import { NotificationsSetup } from './notifications/NotificationsSetup.js';
 import { theme } from '../semantic-colors.js';
 import { useUIState } from '../contexts/UIStateContext.js';
 import { useUIActions } from '../contexts/UIActionsContext.js';
@@ -182,7 +183,9 @@ export const DialogManager = () => {
   if (uiState.showPrivacyNotice) {
     return (
       <PrivacyNotice
+        config={config}
         onExit={() => uiActions.exitPrivacyNotice()}
+      />
     );
   }
   if (uiState.isNotificationsSetupOpen) {
