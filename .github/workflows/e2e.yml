@@ -13,6 +13,16 @@ on:
   pull_request_target:
     types: ['labeled']
   merge_group:
+  workflow_dispatch:
+    inputs:
+      auth_method:
+        description: 'Authentication method'
+        required: false
+        type: 'choice'
+        options:
+          - 'vertex'
+          - 'gemini'
+        default: 'vertex'
 
 concurrency:
   group: '${{ github.workflow }}-${{ github.head_ref || github.ref }}'
@@ -102,7 +112,22 @@ jobs:
         if: "matrix.sandbox == 'sandbox:docker'"
         uses: 'docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435' # ratchet:docker/setup-buildx-action@v3
 
-      - name: 'Run E2E tests'
+      - name: 'Run E2E tests with Vertex AI'
+        if: "(github.event.inputs.auth_method || vars.E2E_AUTH_METHOD || 'vertex') == 'vertex'"
+        env:
+          GOOGLE_API_KEY: '${{ secrets.GOOGLE_API_KEY }}'
+          GOOGLE_GENAI_USE_VERTEXAI: 'true'
+          GOOGLE_CLOUD_PROJECT: '${{ vars.E2E_GOOGLE_CLOUD_PROJECT }}'
+          GOOGLE_CLOUD_LOCATION: 'global'
+          KEEP_OUTPUT: 'true'
+          SANDBOX: '${{ matrix.sandbox }}'
+          VERBOSE: 'true'
+        shell: 'bash'
+        run: |-
+          npm run "test:integration:${SANDBOX}"
+
+      - name: 'Run E2E tests with Gemini API'
+        if: "(github.event.inputs.auth_method || vars.E2E_AUTH_METHOD) == 'gemini'"
         env:
           GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
           KEEP_OUTPUT: 'true'
