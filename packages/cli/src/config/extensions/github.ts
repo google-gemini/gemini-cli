@@ -109,7 +109,7 @@ async function fetchFromGithub(
 ): Promise<{ assets: Asset[]; tag_name: string }> {
   const endpoint = ref ? `releases/tags/${ref}` : 'releases/latest';
   const url = `https://api.github.com/repos/${owner}/${repo}/${endpoint}`;
-  return await fetchJson(url);
+  return fetchJson(url);
 }
 
 export async function checkForExtensionUpdate(

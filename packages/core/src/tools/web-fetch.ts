@@ -243,7 +243,7 @@ ${textContent}
       }
 
       if (processingError) {
-        return this.executeFallback(signal);
+        return await this.executeFallback(signal);
       }
 
       const sourceListFormatted: string[] = [];

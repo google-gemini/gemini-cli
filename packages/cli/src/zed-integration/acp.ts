@@ -68,7 +68,7 @@ export class AgentSideConnection implements Client {
    * Streams new content to the client including text, tool calls, etc.
    */
   async sessionUpdate(params: schema.SessionNotification): Promise<void> {
-    return await this.#connection.sendNotification(
+    return this.#connection.sendNotification(
       schema.CLIENT_METHODS.session_update,
       params,
     );
@@ -83,7 +83,7 @@ export class AgentSideConnection implements Client {
   async requestPermission(
     params: schema.RequestPermissionRequest,
   ): Promise<schema.RequestPermissionResponse> {
-    return await this.#connection.sendRequest(
+    return this.#connection.sendRequest(
       schema.CLIENT_METHODS.session_request_permission,
       params,
     );
@@ -92,7 +92,7 @@ export class AgentSideConnection implements Client {
   async readTextFile(
     params: schema.ReadTextFileRequest,
   ): Promise<schema.ReadTextFileResponse> {
-    return await this.#connection.sendRequest(
+    return this.#connection.sendRequest(
       schema.CLIENT_METHODS.fs_read_text_file,
       params,
     );
@@ -101,7 +101,7 @@ export class AgentSideConnection implements Client {
   async writeTextFile(
     params: schema.WriteTextFileRequest,
   ): Promise<schema.WriteTextFileResponse> {
-    return await this.#connection.sendRequest(
+    return this.#connection.sendRequest(
       schema.CLIENT_METHODS.fs_write_text_file,
       params,
     );

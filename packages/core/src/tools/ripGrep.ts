@@ -33,7 +33,7 @@ export async function canUseRipgrep(): Promise<boolean> {
   }
 
   await downloadRipGrep(Storage.getGlobalBinDir());
-  return await fileExists(getRgPath());
+  return fileExists(getRgPath());
 }
 
 /**
