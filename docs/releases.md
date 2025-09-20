@@ -11,6 +11,15 @@ Each Tuesaday ~2000 UTC new Stable and Preview releases will be cut. The promoti
 - After 1 week the most recent `preview` channel is promoted to `stable` cannel
 - Patch fixes will be produced against both `preview` and `stable` as needed, with the final 'patch' version number incrementing each time.
 
+### Channels
+
+The npm channels we use are:
+
+- `latest` for a general release (likely promotion of a `stable` release)
+- `stable` for a [stable release (likely promotion of a `preview` release)](#stable)
+- `preview` for a [preview pre-release](#preview)
+- `dev` to publish only for testing purposes
+
 ### Preview
 
 These releases will not have been fully vetted and may contain regressions or other outstanding issues. Please help us test and install with `preview` tag.
@@ -70,7 +79,7 @@ For situations requiring a release outside of the regular nightly and weekly pro
 4.  Fill in the required inputs:
     - **Version**: The exact version to release (e.g., `v0.6.1`). This must be a valid semantic version with a `v` prefix.
     - **Ref**: The branch, tag, or full commit SHA to release from.
-    - **NPM Channel**: The npm tag to publish with. Select `stable` for a general release, `preview` for a pre-release, or `none` to skip publishing to npm entirely.
+    - **NPM Channel**: The npm tag to publish with. (See [channels](#channels) or choose `none` to skip publishing to npm entirely.)
     - **Dry Run**: Leave as `true` to run all steps without publishing, or set to `false` to perform a live release.
     - **Force Skip Tests**: Set to `true` to skip the test suite. This is not recommended for production releases.
 5.  Click **Run workflow**.
