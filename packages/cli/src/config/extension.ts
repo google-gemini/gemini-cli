@@ -21,7 +21,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
 import { SettingScope, loadSettings } from '../config/settings.js';
-import { getErrorMessage } from '../utils/errors.js';
+import { ExtensionNotFoundError, getErrorMessage } from '../utils/errors.js';
 import { recursivelyHydrateStrings } from './extensions/variables.js';
 import { isWorkspaceTrusted } from './trustedFolders.js';
 import { resolveEnvVarsInObject } from '../utils/envVarResolver.js';
@@ -599,7 +599,7 @@ export async function uninstallExtension(
         extensionIdentifier.toLowerCase(),
   )?.config.name;
   if (!extensionName) {
-    throw new Error(`Extension not found.`);
+    throw new ExtensionNotFoundError(extensionIdentifier);
   }
   const manager = new ExtensionEnablementManager(
     ExtensionStorage.getUserExtensionsDir(),
