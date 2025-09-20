@@ -192,7 +192,7 @@ export const NotificationsSetup: React.FC<NotificationsSetupProps> = ({ settings
         <RadioButtonSelect
           items={[
             { label: 'Disable this notification', value: 'disable' },
-            { label: 'Use a custom sound (not yet implemented)', value: 'custom' },
+            { label: 'Use a custom sound', value: 'custom' },
             { label: 'Continue anyway (notification might not play)', value: 'continue' },
           ]}
           onSelect={handleSoundWarningResponse}
