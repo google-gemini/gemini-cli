@@ -11,6 +11,7 @@ import type {
   AuthType,
   ChatCompressionSettings,
 } from '@google/gemini-cli-core';
+import { NotificationSettings } from '../notifications/types.js';
 import {
   DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
   DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
@@ -983,6 +984,15 @@ const SETTINGS_SCHEMA = {
       },
     },
   },
+  notifications: {
+    type: 'object',
+    label: 'Notifications',
+    category: 'General',
+    requiresRestart: false,
+    default: undefined as NotificationSettings | undefined,
+    description: 'Audio notification settings.',
+    showInDialog: false,
+  },
 
   extensions: {
     type: 'object',
@@ -1029,7 +1039,9 @@ type InferSettings<T extends SettingsSchema> = {
     ? InferSettings<T[K]['properties']>
     : T[K]['default'] extends boolean
       ? boolean
-      : T[K]['default'];
+      : T[K]['default'] extends infer U
+        ? U
+        : never;
 };
 
 export type Settings = InferSettings<SettingsSchemaType>;
