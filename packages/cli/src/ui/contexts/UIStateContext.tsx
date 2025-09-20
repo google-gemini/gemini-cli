@@ -111,6 +111,7 @@ export interface UIState {
   extensionsUpdateState: Map<string, ExtensionUpdateState>;
   activePtyId: number | undefined;
   shellFocused: boolean;
+  isNotificationsSetupOpen: boolean;
 }
 
 export const UIStateContext = createContext<UIState | null>(null);
