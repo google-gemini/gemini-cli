@@ -8,17 +8,15 @@ import React, { useState } from 'react';
 import { Box, Text, useInput } from 'ink';
 import * as os from 'os';
 import * as fs from 'fs';
-import {
-  RadioButtonSelect,
-  RadioSelectItem,
-} from '../shared/RadioButtonSelect.js';
+import { RadioButtonSelect } from '../shared/RadioButtonSelect.js';
+import type { RadioSelectItem } from '../shared/RadioButtonSelect.js';
 import {
   getNotificationSettings,
   setGlobalNotificationsEnabled,
   updateNotificationEventSettings,
 } from '../../../notifications/manager.js';
 import { LoadedSettings } from '../../../config/settings.js';
-import { NotificationEventType } from '../../../notifications/types.js';
+import type { NotificationEventType } from '../../../notifications/types.js';
 
 const getSystemSoundPath = (eventType: NotificationEventType): string | undefined => {
   switch (os.platform()) {
