@@ -176,6 +176,10 @@ The theme file must be a valid JSON file that follows the same structure as a cu
 
 <img src="../assets/theme-github.png" alt="GitHub theme" width="600">
 
+### Tokyo Night
+
+<img src="../assets/theme-tokyo-night.png" alt="Tokyo Night theme" width="600">
+
 ## Light Themes
 
 ### ANSI Light
