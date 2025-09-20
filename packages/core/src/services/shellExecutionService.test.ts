@@ -98,6 +98,7 @@ describe('ShellExecutionService', () => {
   let mockHeadlessTerminal: {
     resize: Mock;
     scrollLines: Mock;
+    dispose: Mock;
     buffer: {
       active: {
         viewportY: number;
@@ -136,6 +137,7 @@ describe('ShellExecutionService', () => {
     mockHeadlessTerminal = {
       resize: vi.fn(),
       scrollLines: vi.fn(),
+      dispose: vi.fn(),
       buffer: {
         active: {
           viewportY: 0,

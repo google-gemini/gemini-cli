@@ -502,15 +502,21 @@ export class ShellExecutionService {
           ({ exitCode, signal }: { exitCode: number; signal?: number }) => {
             exited = true;
             abortSignal.removeEventListener('abort', abortHandler);
-            this.activePtys.delete(ptyProcess.pid);
 
             processingChain.then(() => {
               render(true);
+              const finalText = getFullBufferText(headlessTerminal);
               const finalBuffer = Buffer.concat(outputChunks);
+
+              const activePty = this.activePtys.get(ptyProcess.pid);
+              if (activePty) {
+                activePty.headlessTerminal.dispose();
+                this.activePtys.delete(ptyProcess.pid);
+              }
 
               resolve({
                 rawOutput: finalBuffer,
-                output: getFullBufferText(headlessTerminal),
+                output: finalText,
                 exitCode,
                 signal: signal ?? null,
                 error,
@@ -526,15 +532,36 @@ export class ShellExecutionService {
 
         const abortHandler = async () => {
           if (ptyProcess.pid && !exited) {
-            if (os.platform() === 'win32') {
-              ptyProcess.kill();
+            if (isWindows) {
+              cpSpawn('taskkill', [
+                '/pid',
+                ptyProcess.pid.toString(),
+                '/f',
+                '/t',
+              ]);
             } else {
               try {
-                // Kill the entire process group
-                process.kill(-ptyProcess.pid, 'SIGINT');
+                // SIGHUP is sent to a process when its controlling terminal is closed.
+                // This might trigger a cleaner shutdown of the process tree.
+                process.kill(-ptyProcess.pid, 'SIGHUP');
+                await new Promise((res) => setTimeout(res, 100));
+                if (exited) return;
+
+                process.kill(-ptyProcess.pid, 'SIGTERM');
+                await new Promise((res) => setTimeout(res, SIGKILL_TIMEOUT_MS));
+                if (exited) return;
+
+                process.kill(-ptyProcess.pid, 'SIGKILL');
               } catch (_e) {
-                // Fallback to killing just the process if the group kill fails
-                ptyProcess.kill('SIGINT');
+                // If any signal fails, it might be because the process is already gone.
+                // As a fallback, try a direct SIGKILL on the main process.
+                if (!exited) {
+                  try {
+                    ptyProcess.kill('SIGKILL');
+                  } catch (_e2) {
+                    // Ignore.
+                  }
+                }
               }
             }
           }
@@ -584,7 +611,7 @@ export class ShellExecutionService {
    */
   static resizePty(pid: number, cols: number, rows: number): void {
     const activePty = this.activePtys.get(pid);
-    if (activePty) {
+    if (activePty && this.isProcessAlive(pid)) {
       try {
         activePty.ptyProcess.resize(cols, rows);
         activePty.headlessTerminal.resize(cols, rows);
@@ -597,6 +624,15 @@ export class ShellExecutionService {
           throw e;
         }
       }
+    }
+  }
+
+  static isProcessAlive(pid: number) {
+    try {
+      process.kill(pid, 0); // Send signal 0
+      return true; // Process exists
+    } catch (e) {
+      return (e as { code: string }).code !== 'ESRCH';
     }
   }
 
