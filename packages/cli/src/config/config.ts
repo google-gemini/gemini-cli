@@ -229,9 +229,9 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
           type: 'array',
           string: true,
           description: 'Allowed MCP server names',
-          coerce: (mcpServers: string[]) =>
+          coerce: (mcpServerNames: string[]) =>
             // Handle comma-separated values
-            mcpServers.flatMap((mcpServer) => mcpServer.split(',').map((m) => m.trim())),
+            mcpServerNames.flatMap((mcpServerName) => mcpServerName.split(',').map((m) => m.trim())),
         })
         .option('allowed-tools', {
           type: 'array',
