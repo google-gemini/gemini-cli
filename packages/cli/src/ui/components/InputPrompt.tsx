@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type { Config } from '@google/gemini-cli-core';
+import { ApprovalMode } from '@google/gemini-cli-core';
 import type React from 'react';
 import { useCallback, useEffect, useState, useRef } from 'react';
 import { Box, Text } from 'ink';
@@ -14,12 +16,21 @@ import type { TextBuffer } from './shared/text-buffer.js';
 import { logicalPosToOffset } from './shared/text-buffer.js';
 import { cpSlice, cpLen, toCodePoints } from '../utils/textUtils.js';
 import chalk from 'chalk';
+import { Box, Text } from 'ink';
+import * as path from 'node:path';
+import type React from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import stringWidth from 'string-width';
-import { useShellHistory } from '../hooks/useShellHistory.js';
-import { useReverseSearchCompletion } from '../hooks/useReverseSearchCompletion.js';
+import type { CommandContext, SlashCommand } from '../commands/types.js';
 import { useCommandCompletion } from '../hooks/useCommandCompletion.js';
+import { useInputHistory } from '../hooks/useInputHistory.js';
 import type { Key } from '../hooks/useKeypress.js';
 import { useKeypress } from '../hooks/useKeypress.js';
+import { useReverseSearchCompletion } from '../hooks/useReverseSearchCompletion.js';
+import { useShellHistory } from '../hooks/useShellHistory.js';
+import { Command, keyMatchers } from '../keyMatchers.js';
+import { theme } from '../semantic-colors.js';
+import { SCREEN_READER_USER_PREFIX } from '../textConstants.js';
 import { keyMatchers, Command } from '../keyMatchers.js';
 import type { CommandContext, SlashCommand } from '../commands/types.js';
 import type { Config } from '@google/gemini-cli-core';
@@ -29,12 +40,19 @@ import {
   buildSegmentsForVisualSlice,
 } from '../utils/highlight.js';
 import {
+  cleanupOldClipboardImages,
   clipboardHasImage,
   saveClipboardImage,
-  cleanupOldClipboardImages,
 } from '../utils/clipboardUtils.js';
+
+import { parseInputForHighlighting } from '../utils/highlight.js';
+import { cpLen, cpSlice, toCodePoints } from '../utils/textUtils.js';
+import type { TextBuffer } from './shared/text-buffer.js';
+import { logicalPosToOffset } from './shared/text-buffer.js';
+import { SuggestionsDisplay } from './SuggestionsDisplay.js';
 import * as path from 'node:path';
 import { SCREEN_READER_USER_PREFIX } from '../textConstants.js';
+
 export interface InputPromptProps {
   buffer: TextBuffer;
   onSubmit: (value: string) => void;
@@ -242,7 +260,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   ]);
 
   // Handle clipboard image pasting with Ctrl+V
-  const handleClipboardImage = useCallback(async () => {
+  const handleClipboardImage = useCallback(async (): Promise<boolean> => {
     try {
       if (await clipboardHasImage()) {
         const imagePath = await saveClipboardImage(config.getTargetDir());
@@ -282,11 +300,13 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
           // Insert at cursor position
           buffer.replaceRangeByOffset(offset, offset, textToInsert);
+          return true;
         }
       }
     } catch (error) {
       console.error('Error handling clipboard image:', error);
     }
+    return false;
   }, [buffer, config]);
 
   const handleInput = useCallback(
@@ -297,21 +317,38 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       }
 
       if (key.paste) {
-        // Record paste time to prevent accidental auto-submission
-        setRecentPasteTime(Date.now());
+        const isMac = process.platform === 'darwin';
+        if (isMac) {
+          // On macOS, Cmd+V arrives as a generic paste event. We check for an
+          // image and handle it, otherwise we fall through to regular text paste.
+          handleClipboardImage().then((imageWasPasted) => {
+            if (imageWasPasted) {
+              return;
+            }
+            // If no image was pasted, handle as a regular text paste.
+            setRecentPasteTime(Date.now());
+            if (pasteTimeoutRef.current) {
+              clearTimeout(pasteTimeoutRef.current);
+            }
+            pasteTimeoutRef.current = setTimeout(() => {
+              setRecentPasteTime(null);
+              pasteTimeoutRef.current = null;
+            }, 500);
+            buffer.handleInput(key);
+          });
+          return;
+        }
 
-        // Clear any existing paste timeout
+        // On other platforms, we rely on the specific Ctrl+V keybinding for
+        // images, so any generic paste event is treated as text.
+        setRecentPasteTime(Date.now());
         if (pasteTimeoutRef.current) {
           clearTimeout(pasteTimeoutRef.current);
         }
-
-        // Clear the paste protection after a safe delay
         pasteTimeoutRef.current = setTimeout(() => {
           setRecentPasteTime(null);
           pasteTimeoutRef.current = null;
         }, 500);
-
-        // Ensure we never accidentally interpret paste as regular input.
         buffer.handleInput(key);
         return;
       }
