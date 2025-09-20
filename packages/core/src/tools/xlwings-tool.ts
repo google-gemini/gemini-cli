@@ -946,6 +946,8 @@ interface SheetData {
  * Excel interaction tool using xlwings for real-time Excel manipulation
  */
 export class XlwingsTool extends BasePythonTool<XlwingsParams, XlwingsResult> {
+  static readonly Name: string = 'xlwings-tools';
+
   /**
    * Escapes a file path for safe use in Python string literals
    */
@@ -981,7 +983,7 @@ export class XlwingsTool extends BasePythonTool<XlwingsParams, XlwingsResult> {
 
   constructor(config: Config) {
     super(
-      'xlwings',
+      'xlwings-tools',
       'Excel Automation',
       'Automates Excel operations: read/write data, create charts, format cells, manage sheets. Requires Microsoft Excel and xlwings Python library.',
       ['xlwings'], // Python requirements
@@ -11347,8 +11349,12 @@ try:
             row_data = []
             for col_idx in range(top_range_obj.columns.count):
                 cell = top_range_obj[row_idx, col_idx]
-                # Simplified: only store the cell value
-                row_data.append(cell.value)
+                # Simplified: only store the cell value, handle null cells
+                try:
+                    value = cell.value if cell is not None else None
+                    row_data.append(value)
+                except:
+                    row_data.append(None)
             top_data.append(row_data)
         
         result_data["top_rows"] = {
@@ -11370,8 +11376,12 @@ try:
             row_data = []
             for col_idx in range(bottom_range_obj.columns.count):
                 cell = bottom_range_obj[row_idx, col_idx]
-                # Simplified: only store the cell value
-                row_data.append(cell.value)
+                # Simplified: only store the cell value, handle null cells
+                try:
+                    value = cell.value if cell is not None else None
+                    row_data.append(value)
+                except:
+                    row_data.append(None)
             bottom_data.append(row_data)
         
         result_data["bottom_rows"] = {
@@ -12575,15 +12585,31 @@ except Exception as e:
 # Connect to Excel
 app = xw.apps.active if xw.apps else None
 if not app:
-    app = xw.App(visible=False)
+    app = xw.App(visible=${params.visible !== false ? 'True' : 'False'})
 
 wb, app_used, opened_by_us, created_by_us = get_workbook_smart("${this.escapePythonPath(params.workbook || '')}", app)
 if not wb:
     wb = xw.books.active
+    if not wb:
+        result = {
+            "success": False,
+            "operation": "add_filter",
+            "error": "No workbook found or specified"
+        }
+        print(json.dumps(result))
+        exit()
 
 ws = get_worksheet(wb, ${this.formatPythonString(params.worksheet || '')})
 if not ws:
     ws = wb.sheets.active
+    if not ws:
+        result = {
+            "success": False,
+            "operation": "add_filter",
+            "error": "No worksheet found or specified"
+        }
+        print(json.dumps(result))
+        exit()
 
 try:
     # Determine filter range
@@ -12593,12 +12619,13 @@ try:
         # Use used range if no specific range provided
         filter_range = ws.used_range
 
-    # Enable AutoFilter
-    filter_range.api.AutoFilter()
+    # Enable AutoFilter on the range
+    # According to xlwings docs, Field=1 is required to initialize AutoFilter
+    filter_range.api.AutoFilter(Field=1)
 
     # Apply filter criteria if provided
     criteria_applied = []
-    ${criteria.map((criterion, index) => `
+    ${criteria.length > 0 ? criteria.map((criterion, index) => `
     # Filter criterion ${index + 1}
     column_${index} = ${typeof criterion.column === 'string' ? `"${criterion.column}"` : criterion.column}
     condition_${index} = "${criterion.condition}"
@@ -12627,18 +12654,25 @@ try:
     elif condition_${index} == "less_than":
         filter_range.api.AutoFilter(Field=col_index_${index}, Criteria1=f"<{value_${index}}")
         criteria_applied.append({"column": column_${index}, "condition": condition_${index}, "value": value_${index}})
-    `).join('')}
+    `).join('') : '# No additional criteria to apply'}
 
-    # Count visible/hidden rows
+    # Count visible/hidden rows (skip counting for large ranges to avoid performance issues)
     total_rows = filter_range.rows.count
-    visible_rows = 0
+    visible_rows = total_rows
     hidden_rows = 0
 
-    for row in filter_range.rows:
-        if row.api.Hidden:
-            hidden_rows += 1
-        else:
-            visible_rows += 1
+    # Only count if range is reasonably small (less than 1000 rows)
+    if total_rows < 1000:
+        visible_rows = 0
+        for row in filter_range.rows:
+            try:
+                if row.api.Hidden:
+                    hidden_rows += 1
+                else:
+                    visible_rows += 1
+            except:
+                # If we can't check Hidden property, assume visible
+                visible_rows += 1
 
     result = {
         "success": True,
@@ -12673,15 +12707,31 @@ print(json.dumps(result))`;
 # Connect to Excel
 app = xw.apps.active if xw.apps else None
 if not app:
-    app = xw.App(visible=False)
+    app = xw.App(visible=${params.visible !== false ? 'True' : 'False'})
 
 wb, app_used, opened_by_us, created_by_us = get_workbook_smart("${this.escapePythonPath(params.workbook || '')}", app)
 if not wb:
     wb = xw.books.active
+    if not wb:
+        result = {
+            "success": False,
+            "operation": "remove_filter",
+            "error": "No workbook found or specified"
+        }
+        print(json.dumps(result))
+        exit()
 
 ws = get_worksheet(wb, ${this.formatPythonString(params.worksheet || '')})
 if not ws:
     ws = wb.sheets.active
+    if not ws:
+        result = {
+            "success": False,
+            "operation": "remove_filter",
+            "error": "No worksheet found or specified"
+        }
+        print(json.dumps(result))
+        exit()
 
 try:
     # Check if AutoFilter is currently applied
@@ -12732,15 +12782,31 @@ print(json.dumps(result))`;
 # Connect to Excel
 app = xw.apps.active if xw.apps else None
 if not app:
-    app = xw.App(visible=False)
+    app = xw.App(visible=${params.visible !== false ? 'True' : 'False'})
 
 wb, app_used, opened_by_us, created_by_us = get_workbook_smart("${this.escapePythonPath(params.workbook || '')}", app)
 if not wb:
     wb = xw.books.active
+    if not wb:
+        result = {
+            "success": False,
+            "operation": "get_filter_info",
+            "error": "No workbook found or specified"
+        }
+        print(json.dumps(result))
+        exit()
 
 ws = get_worksheet(wb, ${this.formatPythonString(params.worksheet || '')})
 if not ws:
     ws = wb.sheets.active
+    if not ws:
+        result = {
+            "success": False,
+            "operation": "get_filter_info",
+            "error": "No worksheet found or specified"
+        }
+        print(json.dumps(result))
+        exit()
 
 try:
     # Check AutoFilter status
@@ -12894,7 +12960,7 @@ class XlwingsInvocation extends BaseToolInvocation<XlwingsParams, XlwingsResult>
     // Define safe operations that don't need approval
     const safeOperations = new Set([
       // Read operations
-      'read_range', 'get_sheet_info', 'get_cell_info', 'get_used_range', 'find_range',
+      'get_sheet_info', 'get_cell_info', 'get_used_range', 'find_range',
       'get_row_height', 'get_column_width', 'get_last_row', 'get_last_column',
 
       // List operations
