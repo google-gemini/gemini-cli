@@ -21,6 +21,8 @@ import {
 const { Terminal } = pkg;
 
 const SIGKILL_TIMEOUT_MS = 200;
+/** Default timeout for shell commands: 2 minutes */
+const DEFAULT_SHELL_TIMEOUT_MS = 120000;
 
 /** A structured result from a shell command execution. */
 export interface ShellExecutionResult {
@@ -40,6 +42,8 @@ export interface ShellExecutionResult {
   pid: number | undefined;
   /** The method used to execute the shell command. */
   executionMethod: 'lydell-node-pty' | 'node-pty' | 'child_process' | 'none';
+  /** A boolean indicating if the command was terminated due to timeout. */
+  timedOut?: boolean;
 }
 
 /** A handle for an ongoing shell execution. */
@@ -57,6 +61,8 @@ export interface ShellExecutionConfig {
   showColor?: boolean;
   defaultFg?: string;
   defaultBg?: string;
+  /** Timeout in milliseconds for shell commands. Default: 120000 (2 minutes) */
+  timeoutMs?: number;
 }
 
 /**
@@ -122,30 +128,107 @@ export class ShellExecutionService {
     shouldUseNodePty: boolean,
     shellExecutionConfig: ShellExecutionConfig,
   ): Promise<ShellExecutionHandle> {
+    // Create timeout signal if configured
+    const timeoutMs =
+      shellExecutionConfig.timeoutMs ?? DEFAULT_SHELL_TIMEOUT_MS;
+    const timeoutController = new AbortController();
+    let timeoutId: NodeJS.Timeout | undefined;
+
+    // Create combined abort signal
+    const combinedController = new AbortController();
+    const combinedSignal = combinedController.signal;
+
+    // Abort if original signal is aborted
+    if (abortSignal.aborted) {
+      combinedController.abort();
+    } else {
+      abortSignal.addEventListener(
+        'abort',
+        () => {
+          combinedController.abort();
+          if (timeoutId) clearTimeout(timeoutId);
+        },
+        { once: true },
+      );
+    }
+
+    // Set up timeout
+    if (timeoutMs > 0) {
+      timeoutId = setTimeout(() => {
+        timeoutController.abort();
+        combinedController.abort();
+      }, timeoutMs);
+    }
+
+    // Abort if timeout signal is aborted
+    timeoutController.signal.addEventListener(
+      'abort',
+      () => {
+        combinedController.abort();
+      },
+      { once: true },
+    );
+    const cleanup = () => {
+      if (timeoutId) clearTimeout(timeoutId);
+    };
+
     if (shouldUseNodePty) {
       const ptyInfo = await getPty();
       if (ptyInfo) {
         try {
-          return this.executeWithPty(
+          const handle = this.executeWithPty(
             commandToExecute,
             cwd,
             onOutputEvent,
-            abortSignal,
+            combinedSignal,
             shellExecutionConfig,
             ptyInfo,
           );
+
+          // Enhance the result promise to include timeout cleanup and detection
+          const enhancedResult = handle.result
+            .then((result) => {
+              cleanup();
+              return {
+                ...result,
+                timedOut:
+                  timeoutController.signal.aborted && !abortSignal.aborted,
+              };
+            })
+            .catch((error) => {
+              cleanup();
+              throw error;
+            });
+
+          return { ...handle, result: enhancedResult };
         } catch (_e) {
           // Fallback to child_process
         }
       }
     }
 
-    return this.childProcessFallback(
+    const handle = this.childProcessFallback(
       commandToExecute,
       cwd,
       onOutputEvent,
-      abortSignal,
+      combinedSignal,
     );
+
+    // Enhance the result promise to include timeout cleanup and detection
+    const enhancedResult = handle.result
+      .then((result) => {
+        cleanup();
+        return {
+          ...result,
+          timedOut: timeoutController.signal.aborted && !abortSignal.aborted,
+        };
+      })
+      .catch((error) => {
+        cleanup();
+        throw error;
+      });
+
+    return { ...handle, result: enhancedResult };
   }
 
   private static childProcessFallback(

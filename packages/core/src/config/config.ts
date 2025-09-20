@@ -239,6 +239,8 @@ export interface ConfigParameters {
   shouldUseNodePtyShell?: boolean;
   skipNextSpeakerCheck?: boolean;
   shellExecutionConfig?: ShellExecutionConfig;
+  /** Timeout in milliseconds for shell commands. Default: 120000 (2 minutes) */
+  shellTimeoutMs?: number;
   extensionManagement?: boolean;
   enablePromptCompletion?: boolean;
   truncateToolOutputThreshold?: number;
@@ -415,6 +417,8 @@ export class Config {
       terminalHeight: params.shellExecutionConfig?.terminalHeight ?? 24,
       showColor: params.shellExecutionConfig?.showColor ?? false,
       pager: params.shellExecutionConfig?.pager ?? 'cat',
+      timeoutMs:
+        params.shellTimeoutMs ?? params.shellExecutionConfig?.timeoutMs,
     };
     this.truncateToolOutputThreshold =
       params.truncateToolOutputThreshold ??
@@ -920,6 +924,7 @@ export class Config {
         config.terminalHeight ?? this.shellExecutionConfig.terminalHeight,
       showColor: config.showColor ?? this.shellExecutionConfig.showColor,
       pager: config.pager ?? this.shellExecutionConfig.pager,
+      timeoutMs: config.timeoutMs ?? this.shellExecutionConfig.timeoutMs,
     };
   }
   getScreenReader(): boolean {

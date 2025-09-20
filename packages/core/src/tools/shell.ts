@@ -214,11 +214,21 @@ export class ShellToolInvocation extends BaseToolInvocation<
 
       let llmContent = '';
       if (result.aborted) {
-        llmContent = 'Command was cancelled by user before it could complete.';
-        if (result.output.trim()) {
-          llmContent += ` Below is the output before it was cancelled:\n${result.output}`;
+        if (result.timedOut) {
+          llmContent = 'Command was terminated due to timeout.';
+          if (result.output.trim()) {
+            llmContent += ` Below is the output before it timed out:\n${result.output}`;
+          } else {
+            llmContent += ' There was no output before it timed out.';
+          }
         } else {
-          llmContent += ' There was no output before it was cancelled.';
+          llmContent =
+            'Command was cancelled by user before it could complete.';
+          if (result.output.trim()) {
+            llmContent += ` Below is the output before it was cancelled:\n${result.output}`;
+          } else {
+            llmContent += ' There was no output before it was cancelled.';
+          }
         }
       } else {
         // Create a formatted error string for display, replacing the wrapper command
