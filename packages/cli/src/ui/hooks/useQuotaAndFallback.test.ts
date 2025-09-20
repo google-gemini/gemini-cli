@@ -204,6 +204,48 @@ describe('useQuotaAndFallback', () => {
           expect(mockConfig.setQuotaErrorOccurred).toHaveBeenCalledWith(true);
         });
       }
+
+      it('should use config.getUserTier as fallback when userTier prop is undefined', async () => {
+        // Arrange
+        vi.spyOn(mockConfig, 'getUserTier').mockReturnValue(
+          UserTierId.STANDARD,
+        );
+        mockedIsGenericQuotaExceededError.mockReturnValue(true);
+
+        // The getRegisteredHandler helper has a default value for userTier,
+        // so we call renderHook directly to ensure we are testing the
+        // truly `undefined` case.
+        renderHook(() =>
+          useQuotaAndFallback({
+            config: mockConfig,
+            historyManager: mockHistoryManager,
+            userTier: undefined,
+            setAuthState: mockSetAuthState,
+            setModelSwitchedFromQuotaError: mockSetModelSwitchedFromQuotaError,
+          }),
+        );
+        const handler = setFallbackHandlerSpy.mock
+          .calls[0][0] as FallbackModelHandler;
+
+        // Act
+        const result = await handler(
+          'model-A',
+          'model-B',
+          new Error('quota exceeded'),
+        );
+
+        // Assert
+        expect(result).toBe('stop');
+        expect(mockHistoryManager.addItem).toHaveBeenCalledTimes(1);
+        const message = (mockHistoryManager.addItem as Mock).mock.calls[0][0]
+          .text;
+        expect(message).toContain(
+          'switch to using a paid API key from AI Studio',
+        );
+        expect(message).not.toContain(
+          'upgrade to a Gemini Code Assist Standard or Enterprise plan',
+        );
+      });
     });
 
     describe('Interactive Fallback (Pro Quota Error)', () => {

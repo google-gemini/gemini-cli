@@ -58,8 +58,11 @@ export function useQuotaAndFallback({
       }
 
       // Use actual user tier if available; otherwise, default to FREE tier behavior (safe default)
+      // The userTier prop can be undefined on initial render, so we fall back to the config value.
+      const currentUserTier = userTier ?? config.getUserTier();
       const isPaidTier =
-        userTier === UserTierId.LEGACY || userTier === UserTierId.STANDARD;
+        currentUserTier === UserTierId.LEGACY ||
+        currentUserTier === UserTierId.STANDARD;
 
       let message: string;
 
