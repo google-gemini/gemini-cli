@@ -198,7 +198,8 @@ ${finalExclusionPatternsForDescription
             processedPatterns.push(escape(normalizedP));
           } else {
             // The path does not exist or is not a file, so we treat it as a glob pattern.
-            processedPatterns.push(normalizedP);
+            const escapedP = normalizedP.replace(/[()[\]]/g, '\\$&');
+            processedPatterns.push(escapedP);
           }
         }
 
