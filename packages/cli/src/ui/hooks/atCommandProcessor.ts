@@ -232,12 +232,14 @@ export async function handleAtCommand({
         const absolutePath = path.resolve(dir, pathName);
         const stats = await fs.stat(absolutePath);
         if (stats.isDirectory()) {
-          currentPathSpec =
-            pathName + (pathName.endsWith(path.sep) ? `**` : `/**`);
+          // Use absolute path to ensure read-many-files only searches this specific directory
+          currentPathSpec = absolutePath + (absolutePath.endsWith(path.sep) ? `**` : `/**`);
           onDebugMessage(
-            `Path ${pathName} resolved to directory, using glob: ${currentPathSpec}`,
+            `Path ${pathName} resolved to directory in ${dir}, using absolute glob: ${currentPathSpec}`,
           );
         } else {
+          // Use absolute path for files too
+          currentPathSpec = absolutePath;
           onDebugMessage(`Path ${pathName} resolved to file: ${absolutePath}`);
         }
         resolvedSuccessfully = true;
@@ -264,9 +266,10 @@ export async function handleAtCommand({
                 const lines = globResult.llmContent.split('\n');
                 if (lines.length > 1 && lines[1]) {
                   const firstMatchAbsolute = lines[1].trim();
-                  currentPathSpec = path.relative(dir, firstMatchAbsolute);
+                  // Use absolute path to ensure read-many-files only searches this specific location
+                  currentPathSpec = firstMatchAbsolute;
                   onDebugMessage(
-                    `Glob search for ${pathName} found ${firstMatchAbsolute}, using relative path: ${currentPathSpec}`,
+                    `Glob search for ${pathName} found ${firstMatchAbsolute}, using absolute path: ${currentPathSpec}`,
                   );
                   resolvedSuccessfully = true;
                 } else {
