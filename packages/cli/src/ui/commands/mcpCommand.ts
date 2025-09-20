@@ -11,7 +11,10 @@ import type {
   MessageActionReturn,
 } from './types.js';
 import { CommandKind } from './types.js';
-import type { DiscoveredMCPPrompt } from '@google/gemini-cli-core';
+import type {
+  DiscoveredMCPPrompt,
+  DiscoveredMCPResource,
+} from '@google/gemini-cli-core';
 import {
   DiscoveredMCPTool,
   getMCPDiscoveryState,
@@ -96,8 +99,15 @@ const getMcpStatus = async (
     const promptRegistry = await config.getPromptRegistry();
     const serverPrompts = promptRegistry.getPromptsByServer(serverName) || [];
 
+    const resourceRegistry = config.getResourceRegistry();
+    const serverResources =
+      resourceRegistry.getResourcesByServer(serverName) || [];
+
     const originalStatus = getMCPServerStatus(serverName);
-    const hasCachedItems = serverTools.length > 0 || serverPrompts.length > 0;
+    const hasCachedItems =
+      serverTools.length > 0 ||
+      serverPrompts.length > 0 ||
+      serverResources.length > 0;
 
     // If the server is "disconnected" but has prompts or cached tools, display it as Ready
     // by using CONNECTED as the display status.
@@ -176,13 +186,20 @@ const getMcpStatus = async (
           }`,
         );
       }
+      if (serverResources.length > 0) {
+        parts.push(
+          `${serverResources.length} ${
+            serverResources.length === 1 ? 'resource' : 'resources'
+          }`,
+        );
+      }
       if (parts.length > 0) {
         message += ` (${parts.join(', ')})`;
       } else {
         message += ` (0 tools)`;
       }
     } else if (status === MCPServerStatus.CONNECTING) {
-      message += ` (tools and prompts will appear when ready)`;
+      message += ` (tools, prompts, and resources will appear when ready)`;
     } else {
       message += ` (${serverTools.length} tools cached)`;
     }
@@ -267,9 +284,49 @@ const getMcpStatus = async (
       });
     }
 
-    if (serverTools.length === 0 && serverPrompts.length === 0) {
-      message += '  No tools or prompts available\n';
-    } else if (serverTools.length === 0) {
+    if (serverResources.length > 0) {
+      if (serverTools.length > 0 || serverPrompts.length > 0) {
+        message += '\n';
+      }
+      message += `  ${COLOR_CYAN}Resources:${RESET_COLOR}\n`;
+      serverResources.forEach((resource: DiscoveredMCPResource) => {
+        message += `  - ${COLOR_CYAN}${resource.name}${RESET_COLOR}`;
+        
+        // Show URI and MIME type for resources inline with the name
+        if (resource.uri) {
+          message += ` ${COLOR_GREY}(${resource.uri}`;
+          if (resource.mimeType) {
+            message += `, ${resource.mimeType}`;
+          }
+          message += `)${RESET_COLOR}`;
+        }
+
+        if (showDescriptions && resource.description) {
+          const descLines = resource.description.trim().split('\n');
+          if (descLines) {
+            message += ':\n';
+            for (const descLine of descLines) {
+              message += `      ${COLOR_GREEN}${descLine}${RESET_COLOR}\n`;
+            }
+          } else {
+            message += '\n';
+          }
+        } else {
+          message += '\n';
+        }
+      });
+    }
+
+    if (
+      serverTools.length === 0 &&
+      serverPrompts.length === 0 &&
+      serverResources.length === 0
+    ) {
+      message += '  No tools, prompts, or resources available\n';
+    } else if (
+      serverTools.length === 0 &&
+      (serverPrompts.length > 0 || serverResources.length > 0)
+    ) {
       message += '  No tools available';
       if (originalStatus === MCPServerStatus.DISCONNECTED && needsAuthHint) {
         message += ` ${COLOR_GREY}(type: "/mcp auth ${serverName}" to authenticate this server)${RESET_COLOR}`;
@@ -297,7 +354,7 @@ const getMcpStatus = async (
   if (showTips) {
     message += '\n';
     message += `${COLOR_CYAN}💡 Tips:${RESET_COLOR}\n`;
-    message += `  • Use ${COLOR_CYAN}/mcp desc${RESET_COLOR} to show server and tool descriptions\n`;
+    message += `  • Use ${COLOR_CYAN}/mcp desc${RESET_COLOR} to show server, tool, and resource descriptions\n`;
     message += `  • Use ${COLOR_CYAN}/mcp schema${RESET_COLOR} to show tool parameter schemas\n`;
     message += `  • Use ${COLOR_CYAN}/mcp nodesc${RESET_COLOR} to hide descriptions\n`;
     message += `  • Use ${COLOR_CYAN}/mcp auth <server-name>${RESET_COLOR} to authenticate with OAuth-enabled servers\n`;
