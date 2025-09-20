@@ -50,6 +50,8 @@ async function getDependencyLicense(depName, depVersion) {
       'LICENSE.md',
       'LICENSE.txt',
       'LICENSE-MIT.txt',
+      'license.md',
+      'license',
     ].filter(Boolean);
 
     let licenseFile;
@@ -94,7 +96,7 @@ function collectDependencies(packageName, packageLock, dependenciesMap) {
   const packageInfo = packageLock.packages[`node_modules/${packageName}`];
   if (!packageInfo) {
     console.warn(
-      `Warning: Could not find package info for ${packageName} in npm-shrinkwrap.json.`,
+      `Warning: Could not find package info for ${packageName} in package-lock.json.`,
     );
     return;
   }
@@ -114,7 +116,7 @@ async function main() {
     const packageJsonContent = await fs.readFile(packageJsonPath, 'utf-8');
     const packageJson = JSON.parse(packageJsonContent);
 
-    const packageLockJsonPath = path.join(projectRoot, 'npm-shrinkwrap.json');
+    const packageLockJsonPath = path.join(projectRoot, 'package-lock.json');
     const packageLockJsonContent = await fs.readFile(
       packageLockJsonPath,
       'utf-8',
