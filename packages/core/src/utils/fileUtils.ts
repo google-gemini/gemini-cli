@@ -255,7 +255,7 @@ export async function detectFileType(
   // The mimetype for various TypeScript extensions (ts, mts, cts, tsx) can be
   // MPEG transport stream (a video format), but we want to assume these are
   // TypeScript files instead.
-  if (['.ts', '.mts', '.cts'].includes(ext)) {
+  if (['.ts', '.mts', '.cts', '.tsx'].includes(ext)) {
     return 'text';
   }
 
