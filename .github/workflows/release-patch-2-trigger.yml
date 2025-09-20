@@ -4,12 +4,19 @@ on:
   pull_request:
     types:
       - 'closed'
+    branches:
+      - 'release/**'
   workflow_dispatch:
     inputs:
       ref:
         description: 'The head ref of the merged hotfix PR to trigger the release for (e.g. hotfix/v1.2.3/cherry-pick-abc).'
         required: true
         type: 'string'
+      workflow_ref:
+        description: 'The ref to checkout the workflow code from.'
+        required: false
+        type: 'string'
+        default: 'main'
       workflow_id:
         description: 'The workflow to trigger. Defaults to patch-release.yml'
         required: false
@@ -20,46 +27,46 @@ on:
         required: false
         type: 'boolean'
         default: false
+      force_skip_tests:
+        description: 'Select to skip the "Run Tests" step in testing. Prod releases should run tests'
+        required: false
+        type: 'boolean'
+        default: false
 
 jobs:
   trigger-patch-release:
-    if: "(github.event_name == 'pull_request' && github.event.pull_request.merged == true && startsWith(github.head_ref, 'hotfix/')) || github.event_name == 'workflow_dispatch'"
+    if: "(github.event_name == 'pull_request' && github.event.pull_request.merged == true && startsWith(github.event.pull_request.head.ref, 'hotfix/')) || github.event_name == 'workflow_dispatch'"
     runs-on: 'ubuntu-latest'
     permissions:
       actions: 'write'
+      contents: 'write'
+      pull-requests: 'write'
     steps:
-      - name: 'Trigger Patch Release'
-        uses: 'actions/github-script@00f12e3e20659f42342b1c0226afda7f7c042325'
+      - name: 'Checkout'
+        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
         with:
-          script: |
-            let body = '';
-            let headRef = '';
+          ref: "${{ github.event.inputs.workflow_ref || 'main' }}"
+          fetch-depth: 1
 
-            if (context.eventName === 'pull_request') {
-              body = context.payload.pull_request.body;
-              headRef = context.payload.pull_request.head.ref;
-            } else { // workflow_dispatch
-              body = ${{ github.event.inputs.dry_run }} ? '[DRY RUN]' : '';
-              headRef = '${{ github.event.inputs.ref }}';
-            }
+      - name: 'Setup Node.js'
+        uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020'
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
 
-            const isDryRun = body.includes('[DRY RUN]');
-            const version = headRef.split('/')[1];
-            const channel = version.includes('preview') ? 'preview' : 'stable';
-            const ref = `release/${version}`;
-            const workflow_id = context.eventName === 'pull_request'
-              ? 'release-patch-3-release.yml'
-              : '${{ github.event.inputs.workflow_id }}';
+      - name: 'Install Dependencies'
+        run: 'npm ci'
 
-            github.rest.actions.createWorkflowDispatch({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              workflow_id: workflow_id,
-              ref: 'mk-patch-releases',
-              inputs: {
-                type: channel,
-                dry_run: isDryRun.toString(),
-                version: version,
-                release_ref: ref
-              }
-            })
+      - name: 'Trigger Patch Release'
+        env:
+          GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+          HEAD_REF: "${{ github.event_name == 'pull_request' && github.event.pull_request.head.ref || github.event.inputs.ref }}"
+          PR_BODY: "${{ github.event_name == 'pull_request' && github.event.pull_request.body || '' }}"
+          WORKFLOW_ID: '${{ github.event.inputs.workflow_id }}'
+          GITHUB_REPOSITORY_OWNER: '${{ github.repository_owner }}'
+          GITHUB_REPOSITORY_NAME: '${{ github.event.repository.name }}'
+          GITHUB_EVENT_NAME: '${{ github.event_name }}'
+          GITHUB_EVENT_PAYLOAD: '${{ toJSON(github.event) }}'
+          FORCE_SKIP_TESTS: '${{ github.event.inputs.force_skip_tests }}'
+        run: |
+          node scripts/releasing/patch-trigger.js

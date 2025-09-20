@@ -13,6 +13,7 @@ import {
   WriteFileTool,
   DEFAULT_GEMINI_MODEL,
   DEFAULT_GEMINI_MODEL_AUTO,
+  OutputFormat,
 } from '@google/gemini-cli-core';
 import { loadCliConfig, parseArguments, type CliArgs } from './config.js';
 import type { Settings } from './settings.js';
@@ -294,6 +295,17 @@ describe('parseArguments', () => {
 
     mockExit.mockRestore();
     mockConsoleError.mockRestore();
+  });
+
+  it('should support comma-separated values for --allowed-tools', async () => {
+    process.argv = [
+      'node',
+      'script.js',
+      '--allowed-tools',
+      'read_file,ShellTool(git status)',
+    ];
+    const argv = await parseArguments({} as Settings);
+    expect(argv.allowedTools).toEqual(['read_file', 'ShellTool(git status)']);
   });
 });
 
@@ -1793,6 +1805,60 @@ describe('loadCliConfig useRipgrep', () => {
   });
 });
 
+describe('screenReader configuration', () => {
+  const originalArgv = process.argv;
+
+  beforeEach(() => {
+    vi.resetAllMocks();
+    vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
+    vi.stubEnv('GEMINI_API_KEY', 'test-api-key');
+  });
+
+  afterEach(() => {
+    process.argv = originalArgv;
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
+  });
+
+  it('should use screenReader value from settings if CLI flag is not present (settings true)', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments({} as Settings);
+    const settings: Settings = {
+      ui: { accessibility: { screenReader: true } },
+    };
+    const config = await loadCliConfig(settings, [], 'test-session', argv);
+    expect(config.getScreenReader()).toBe(true);
+  });
+
+  it('should use screenReader value from settings if CLI flag is not present (settings false)', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments({} as Settings);
+    const settings: Settings = {
+      ui: { accessibility: { screenReader: false } },
+    };
+    const config = await loadCliConfig(settings, [], 'test-session', argv);
+    expect(config.getScreenReader()).toBe(false);
+  });
+
+  it('should prioritize --screen-reader CLI flag (true) over settings (false)', async () => {
+    process.argv = ['node', 'script.js', '--screen-reader'];
+    const argv = await parseArguments({} as Settings);
+    const settings: Settings = {
+      ui: { accessibility: { screenReader: false } },
+    };
+    const config = await loadCliConfig(settings, [], 'test-session', argv);
+    expect(config.getScreenReader()).toBe(true);
+  });
+
+  it('should be false by default when no flag or setting is present', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments({} as Settings);
+    const settings: Settings = {};
+    const config = await loadCliConfig(settings, [], 'test-session', argv);
+    expect(config.getScreenReader()).toBe(false);
+  });
+});
+
 describe('loadCliConfig tool exclusions', () => {
   const originalArgv = process.argv;
   const originalIsTTY = process.stdin.isTTY;
@@ -2095,52 +2161,54 @@ describe('loadCliConfig fileFiltering', () => {
   );
 });
 
-describe('Output Format Configuration', () => {
-  const originalArgv = process.argv;
-
-  afterEach(() => {
-    process.argv = originalArgv;
-    vi.restoreAllMocks();
+describe('Output format', () => {
+  it('should default to TEXT', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments({} as Settings);
+    const config = await loadCliConfig({}, [], 'test-session', argv);
+    expect(config.getOutputFormat()).toBe(OutputFormat.TEXT);
   });
 
-  it('should default to text format when no setting or flag is provided', async () => {
+  it('should use the format from settings', async () => {
     process.argv = ['node', 'script.js'];
     const argv = await parseArguments({} as Settings);
     const config = await loadCliConfig(
-      {} as Settings,
+      { output: { format: OutputFormat.JSON } },
       [],
       'test-session',
       argv,
     );
-    expect(config.getOutputFormat()).toBe(ServerConfig.OutputFormat.TEXT);
+    expect(config.getOutputFormat()).toBe(OutputFormat.JSON);
   });
 
-  it('should use the format from settings when no flag is provided', async () => {
-    process.argv = ['node', 'script.js'];
-    const settings: Settings = { output: { format: 'json' } };
-    const argv = await parseArguments(settings);
-    const config = await loadCliConfig(settings, [], 'test-session', argv);
-    expect(config.getOutputFormat()).toBe(ServerConfig.OutputFormat.JSON);
-  });
-
-  it('should use the format from the flag when provided', async () => {
+  it('should prioritize the format from argv', async () => {
     process.argv = ['node', 'script.js', '--output-format', 'json'];
     const argv = await parseArguments({} as Settings);
     const config = await loadCliConfig(
-      {} as Settings,
+      { output: { format: OutputFormat.JSON } },
       [],
       'test-session',
       argv,
     );
-    expect(config.getOutputFormat()).toBe(ServerConfig.OutputFormat.JSON);
+    expect(config.getOutputFormat()).toBe(OutputFormat.JSON);
   });
 
-  it('should prioritize the flag over the setting', async () => {
-    process.argv = ['node', 'script.js', '--output-format', 'text'];
-    const settings: Settings = { output: { format: 'json' } };
-    const argv = await parseArguments(settings);
-    const config = await loadCliConfig(settings, [], 'test-session', argv);
-    expect(config.getOutputFormat()).toBe(ServerConfig.OutputFormat.TEXT);
+  it('should error on invalid --output-format argument', async () => {
+    process.argv = ['node', 'script.js', '--output-format', 'yaml'];
+    const mockExit = vi.spyOn(process, 'exit').mockImplementation(() => {
+      throw new Error('process.exit called');
+    });
+    const mockConsoleError = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
+    await expect(parseArguments({} as Settings)).rejects.toThrow(
+      'process.exit called',
+    );
+    expect(mockConsoleError).toHaveBeenCalledWith(
+      expect.stringContaining('Invalid values:'),
+    );
+    mockExit.mockRestore();
+    mockConsoleError.mockRestore();
   });
 });
 

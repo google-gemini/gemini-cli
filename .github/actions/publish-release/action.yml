@@ -27,6 +27,11 @@ inputs:
   previous-tag:
     description: 'The previous tag to use for generating release notes.'
     required: true
+  skip-github-release:
+    description: 'Whether to skip creating a GitHub release.'
+    type: 'boolean'
+    required: false
+    default: false
   working-directory:
     description: 'The working directory to run the steps in.'
     required: false
@@ -69,14 +74,8 @@ runs:
         BRANCH_NAME: '${{ steps.release_branch.outputs.BRANCH_NAME }}'
         DRY_RUN: '${{ inputs.dry-run }}'
         RELEASE_TAG: '${{ inputs.release-tag }}'
-      run: |
-        git add package.json packages/*/package.json
-        if [ -f npm-shrinkwrap.json ]; then
-          git add npm-shrinkwrap.json
-        fi
-        if [ -f package-lock.json ]; then
-          git add package-lock.json
-        fi
+      run: |-
+        git add package.json package-lock.json packages/*/package.json
         git commit -m "chore(release): ${RELEASE_TAG}"
         if [[ "${DRY_RUN}" == "false" ]]; then
           echo "Pushing release branch to remote..."
@@ -138,7 +137,7 @@ runs:
 
     - name: '🎉 Create GitHub Release'
       working-directory: '${{ inputs.working-directory }}'
-      if: "${{ inputs.dry-run == 'false' }}"
+      if: "${{ inputs.dry-run == 'false' && inputs.skip-github-release == 'false' }}"
       env:
         GITHUB_TOKEN: '${{ inputs.github-token }}'
       shell: 'bash'
@@ -149,3 +148,12 @@ runs:
           --title "Release ${{ inputs.release-tag }}" \
           --notes-start-tag "${{ inputs.previous-tag }}" \
           --generate-notes
+
+    - name: '🧹 Clean up release branch'
+      working-directory: '${{ inputs.working-directory }}'
+      if: "${{ inputs.dry-run == 'false' }}"
+      continue-on-error: true
+      shell: 'bash'
+      run: |
+        echo "Cleaning up release branch ${{ steps.release_branch.outputs.BRANCH_NAME }}..."
+        git push origin --delete "${{ steps.release_branch.outputs.BRANCH_NAME }}"

@@ -26,7 +26,6 @@ import { reportError } from '../utils/errorReporting.js';
 import { GeminiChat } from './geminiChat.js';
 import { retryWithBackoff } from '../utils/retry.js';
 import { getErrorMessage } from '../utils/errors.js';
-import { isFunctionResponse } from '../utils/messageInspectors.js';
 import { tokenLimit } from './tokenLimits.js';
 import type { ChatRecordingService } from '../services/chatRecordingService.js';
 import type { ContentGenerator } from './contentGenerator.js';
@@ -50,6 +49,7 @@ import {
 import type { IdeContext, File } from '../ide/types.js';
 import { handleFallback } from '../fallback/handler.js';
 import type { RoutingContext } from '../routing/routingStrategy.js';
+import { uiTelemetryService } from '../telemetry/uiTelemetry.js';
 
 export function isThinkingSupported(model: string) {
   return model.startsWith('gemini-2.5') || model === DEFAULT_GEMINI_MODEL_AUTO;
@@ -63,36 +63,51 @@ export function isThinkingDefault(model: string) {
 }
 
 /**
- * Returns the index of the content after the fraction of the total characters in the history.
+ * Returns the index of the oldest item to keep when compressing. May return
+ * contents.length which indicates that everything should be compressed.
  *
  * Exported for testing purposes.
  */
-export function findIndexAfterFraction(
-  history: Content[],
+export function findCompressSplitPoint(
+  contents: Content[],
   fraction: number,
 ): number {
   if (fraction <= 0 || fraction >= 1) {
     throw new Error('Fraction must be between 0 and 1');
   }
 
-  const contentLengths = history.map(
-    (content) => JSON.stringify(content).length,
-  );
+  const charCounts = contents.map((content) => JSON.stringify(content).length);
+  const totalCharCount = charCounts.reduce((a, b) => a + b, 0);
+  const targetCharCount = totalCharCount * fraction;
 
-  const totalCharacters = contentLengths.reduce(
-    (sum, length) => sum + length,
-    0,
-  );
-  const targetCharacters = totalCharacters * fraction;
-
-  let charactersSoFar = 0;
-  for (let i = 0; i < contentLengths.length; i++) {
-    if (charactersSoFar >= targetCharacters) {
-      return i;
+  let lastSplitPoint = 0; // 0 is always valid (compress nothing)
+  let cumulativeCharCount = 0;
+  for (let i = 0; i < contents.length; i++) {
+    cumulativeCharCount += charCounts[i];
+    const content = contents[i];
+    if (
+      content.role === 'user' &&
+      !content.parts?.some((part) => !!part.functionResponse)
+    ) {
+      if (cumulativeCharCount >= targetCharCount) {
+        return i;
+      }
+      lastSplitPoint = i;
     }
-    charactersSoFar += contentLengths[i];
   }
-  return contentLengths.length;
+
+  // We found no split points after targetCharCount.
+  // Check if it's safe to compress everything.
+  const lastContent = contents[contents.length - 1];
+  if (
+    lastContent?.role === 'model' &&
+    !lastContent?.parts?.some((part) => part.functionCall)
+  ) {
+    return contents.length;
+  }
+
+  // Can't compress everything so just compress at last splitpoint.
+  return lastSplitPoint;
 }
 
 const MAX_TURNS = 100;
@@ -696,21 +711,13 @@ export class GeminiClient {
       }
     }
 
-    let compressBeforeIndex = findIndexAfterFraction(
+    const splitPoint = findCompressSplitPoint(
       curatedHistory,
       1 - COMPRESSION_PRESERVE_THRESHOLD,
     );
-    // Find the first user message after the index. This is the start of the next turn.
-    while (
-      compressBeforeIndex < curatedHistory.length &&
-      (curatedHistory[compressBeforeIndex]?.role === 'model' ||
-        isFunctionResponse(curatedHistory[compressBeforeIndex]))
-    ) {
-      compressBeforeIndex++;
-    }
 
-    const historyToCompress = curatedHistory.slice(0, compressBeforeIndex);
-    const historyToKeep = curatedHistory.slice(compressBeforeIndex);
+    const historyToCompress = curatedHistory.slice(0, splitPoint);
+    const historyToKeep = curatedHistory.slice(splitPoint);
 
     const summaryResponse = await this.config
       .getContentGenerator()
@@ -765,6 +772,8 @@ export class GeminiClient {
           CompressionStatus.COMPRESSION_FAILED_TOKEN_COUNT_ERROR,
       };
     }
+
+    uiTelemetryService.setLastPromptTokenCount(newTokenCount);
 
     logChatCompression(
       this.config,

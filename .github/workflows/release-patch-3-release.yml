@@ -15,13 +15,18 @@ on:
         required: true
         type: 'boolean'
         default: true
-      version:
-        description: 'The version to release.'
-        required: true
-        type: 'string'
+      force_skip_tests:
+        description: 'Select to skip the "Run Tests" step in testing. Prod releases should run tests'
+        required: false
+        type: 'boolean'
+        default: false
       release_ref:
         description: 'The branch, tag, or SHA to release from.'
         required: true
+        type: 'string'
+      original_pr:
+        description: 'The original PR number to comment back on.'
+        required: false
         type: 'string'
 
 jobs:
@@ -35,7 +40,14 @@ jobs:
       - name: 'Checkout'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
         with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: 'Checkout Release Code'
+        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
+        with:
           ref: '${{ github.event.inputs.release_ref }}'
+          path: 'release'
           fetch-depth: 0
 
       - name: 'Setup Node.js'
@@ -45,24 +57,98 @@ jobs:
           cache: 'npm'
 
       - name: 'Install Dependencies'
+        working-directory: './release'
         run: |-
           npm ci
 
+      - name: 'Print Inputs'
+        shell: 'bash'
+        run: |-
+          echo "${{ toJSON(inputs) }}"
+
       - name: 'Get Patch Version'
         id: 'patch_version'
+        env:
+          GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
         run: |
-          echo "RELEASE_TAG=${{ github.event.inputs.version }}" >> "${GITHUB_OUTPUT}"
-          echo "RELEASE_VERSION=${{ github.event.inputs.version }}" >> "${GITHUB_OUTPUT}"
-          echo "NPM_TAG=${{ github.event.inputs.type }}" >> "${GITHUB_OUTPUT}"
+          # Use the existing get-release-version.js script to calculate patch version
+          # Run from main checkout which has full git history and access to npm
+          PATCH_JSON=$(node scripts/get-release-version.js --type=patch --patch-from=${{ github.event.inputs.type }})
+          echo "Patch version calculation result: ${PATCH_JSON}"
+
+          RELEASE_VERSION=$(echo "${PATCH_JSON}" | jq -r .releaseVersion)
+          RELEASE_TAG=$(echo "${PATCH_JSON}" | jq -r .releaseTag)
+          NPM_TAG=$(echo "${PATCH_JSON}" | jq -r .npmTag)
+          PREVIOUS_TAG=$(echo "${PATCH_JSON}" | jq -r .previousReleaseTag)
+
+          echo "RELEASE_VERSION=${RELEASE_VERSION}" >> "${GITHUB_OUTPUT}"
+          echo "RELEASE_TAG=${RELEASE_TAG}" >> "${GITHUB_OUTPUT}"
+          echo "NPM_TAG=${NPM_TAG}" >> "${GITHUB_OUTPUT}"
+          echo "PREVIOUS_TAG=${PREVIOUS_TAG}" >> "${GITHUB_OUTPUT}"
+
+      - name: 'Verify Version Consistency'
+        env:
+          GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+          CHANNEL: '${{ github.event.inputs.type }}'
+        run: |
+          echo "🔍 Verifying no concurrent patch releases have occurred..."
+
+          # Store original calculation for comparison
+          ORIGINAL_RELEASE_VERSION="${{ steps.patch_version.outputs.RELEASE_VERSION }}"
+          ORIGINAL_RELEASE_TAG="${{ steps.patch_version.outputs.RELEASE_TAG }}"
+          ORIGINAL_PREVIOUS_TAG="${{ steps.patch_version.outputs.PREVIOUS_TAG }}"
+
+          echo "Original calculation:"
+          echo "  Release version: ${ORIGINAL_RELEASE_VERSION}"
+          echo "  Release tag: ${ORIGINAL_RELEASE_TAG}"
+          echo "  Previous tag: ${ORIGINAL_PREVIOUS_TAG}"
+
+          # Re-run the same version calculation script
+          echo "Re-calculating version to check for changes..."
+          CURRENT_PATCH_JSON=$(node scripts/get-release-version.js --type=patch --patch-from="${CHANNEL}")
+          CURRENT_RELEASE_VERSION=$(echo "${CURRENT_PATCH_JSON}" | jq -r .releaseVersion)
+          CURRENT_RELEASE_TAG=$(echo "${CURRENT_PATCH_JSON}" | jq -r .releaseTag)
+          CURRENT_PREVIOUS_TAG=$(echo "${CURRENT_PATCH_JSON}" | jq -r .previousReleaseTag)
+
+          echo "Current calculation:"
+          echo "  Release version: ${CURRENT_RELEASE_VERSION}"
+          echo "  Release tag: ${CURRENT_RELEASE_TAG}"
+          echo "  Previous tag: ${CURRENT_PREVIOUS_TAG}"
+
+          # Compare calculations
+          if [[ "${ORIGINAL_RELEASE_VERSION}" != "${CURRENT_RELEASE_VERSION}" ]] || \
+             [[ "${ORIGINAL_RELEASE_TAG}" != "${CURRENT_RELEASE_TAG}" ]] || \
+             [[ "${ORIGINAL_PREVIOUS_TAG}" != "${CURRENT_PREVIOUS_TAG}" ]]; then
+            echo "❌ RACE CONDITION DETECTED: Version calculations have changed!"
+            echo "This indicates another patch release completed while this one was in progress."
+            echo ""
+            echo "Originally planned:  ${ORIGINAL_RELEASE_VERSION} (from ${ORIGINAL_PREVIOUS_TAG})"
+            echo "Should now build:    ${CURRENT_RELEASE_VERSION} (from ${CURRENT_PREVIOUS_TAG})"
+            echo ""
+            echo "# Setting outputs for failure comment"
+            echo "CURRENT_RELEASE_VERSION=${CURRENT_RELEASE_VERSION}" >> "${GITHUB_ENV}"
+            echo "CURRENT_RELEASE_TAG=${CURRENT_RELEASE_TAG}" >> "${GITHUB_ENV}"
+            echo "CURRENT_PREVIOUS_TAG=${CURRENT_PREVIOUS_TAG}" >> "${GITHUB_ENV}"
+            echo "The patch release must be restarted to use the correct version numbers."
+            exit 1
+          fi
+
+          echo "✅ Version calculations unchanged - proceeding with release"
 
       - name: 'Print Calculated Version'
         run: |-
-          echo "Calculated version: ${{ steps.patch_version.outputs.RELEASE_VERSION }}"
+          echo "Patch Release Summary:"
+          echo "  Release Version: ${{ steps.patch_version.outputs.RELEASE_VERSION }}"
+          echo "  Release Tag: ${{ steps.patch_version.outputs.RELEASE_TAG }}"
+          echo "  NPM Tag: ${{ steps.patch_version.outputs.NPM_TAG }}"
+          echo "  Previous Tag: ${{ steps.patch_version.outputs.PREVIOUS_TAG }}"
 
       - name: 'Run Tests'
         uses: './.github/actions/run-tests'
         with:
+          force_skip_tests: '${{ github.event.inputs.force_skip_tests }}'
           gemini_api_key: '${{ secrets.GEMINI_API_KEY }}'
+          working-directory: './release'
 
       - name: 'Publish Release'
         uses: './.github/actions/publish-release'
@@ -74,7 +160,8 @@ jobs:
           wombat-token-cli: '${{ secrets.WOMBAT_TOKEN_CLI }}'
           github-token: '${{ secrets.GITHUB_TOKEN }}'
           dry-run: '${{ github.event.inputs.dry_run }}'
-          previous-tag: '${{ steps.patch_version.outputs.RELEASE_TAG }}'
+          previous-tag: '${{ steps.patch_version.outputs.PREVIOUS_TAG }}'
+          working-directory: './release'
 
       - name: 'Create Issue on Failure'
         if: '${{ failure() && github.event.inputs.dry_run == false }}'
@@ -87,3 +174,46 @@ jobs:
             --title 'Patch Release Failed for ${RELEASE_TAG} on $(date +'%Y-%m-%d')' \
             --body 'The patch-release workflow failed. See the full run for details: ${DETAILS_URL}' \
             --label 'kind/bug,release-failure,priority/p0'
+
+      - name: 'Comment Success on Original PR'
+        if: '${{ success() && github.event.inputs.original_pr }}'
+        env:
+          GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+          ORIGINAL_PR: '${{ github.event.inputs.original_pr }}'
+          SUCCESS: 'true'
+          RELEASE_VERSION: '${{ steps.patch_version.outputs.RELEASE_VERSION }}'
+          RELEASE_TAG: '${{ steps.patch_version.outputs.RELEASE_TAG }}'
+          NPM_TAG: '${{ steps.patch_version.outputs.NPM_TAG }}'
+          CHANNEL: '${{ github.event.inputs.type }}'
+          DRY_RUN: '${{ github.event.inputs.dry_run }}'
+          GITHUB_RUN_ID: '${{ github.run_id }}'
+          GITHUB_REPOSITORY_OWNER: '${{ github.repository_owner }}'
+          GITHUB_REPOSITORY_NAME: '${{ github.event.repository.name }}'
+        run: |
+          node scripts/releasing/patch-comment.js
+
+      - name: 'Comment Failure on Original PR'
+        if: '${{ failure() && github.event.inputs.original_pr }}'
+        env:
+          GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+          ORIGINAL_PR: '${{ github.event.inputs.original_pr }}'
+          SUCCESS: 'false'
+          RELEASE_VERSION: '${{ steps.patch_version.outputs.RELEASE_VERSION }}'
+          RELEASE_TAG: '${{ steps.patch_version.outputs.RELEASE_TAG }}'
+          NPM_TAG: '${{ steps.patch_version.outputs.NPM_TAG }}'
+          CHANNEL: '${{ github.event.inputs.type }}'
+          DRY_RUN: '${{ github.event.inputs.dry_run }}'
+          GITHUB_RUN_ID: '${{ github.run_id }}'
+          GITHUB_REPOSITORY_OWNER: '${{ github.repository_owner }}'
+          GITHUB_REPOSITORY_NAME: '${{ github.event.repository.name }}'
+          # Pass current version info for race condition failures
+          CURRENT_RELEASE_VERSION: '${{ env.CURRENT_RELEASE_VERSION }}'
+          CURRENT_RELEASE_TAG: '${{ env.CURRENT_RELEASE_TAG }}'
+          CURRENT_PREVIOUS_TAG: '${{ env.CURRENT_PREVIOUS_TAG }}'
+        run: |
+          # Check if this was a version consistency failure
+          if [[ -n "${CURRENT_RELEASE_VERSION}" ]]; then
+            echo "Detected version race condition failure - posting specific comment with current version info"
+            export RACE_CONDITION_FAILURE=true
+          fi
+          node scripts/releasing/patch-comment.js
