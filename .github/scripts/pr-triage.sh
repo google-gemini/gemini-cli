@@ -21,7 +21,7 @@ process_pr() {
 
     # Get closing issue number with error handling
     local ISSUE_NUMBER
-    if ! ISSUE_NUMBER=$(gh pr view "${PR_NUMBER}" --repo "${GITHUB_REPOSITORY}" --json closingIssuesReferences -q '.closingIssuesReferences.nodes[0].number' 2>/dev/null); then
+    if ! ISSUE_NUMBER=$(gh pr view "${PR_NUMBER}" --repo "${GITHUB_REPOSITORY}" --json closingIssuesReferences -q '.closingIssuesReferences.[0].number' 2>/dev/null); then
         echo "   ⚠️ Could not fetch closing issue for PR #${PR_NUMBER}"
     fi
 
