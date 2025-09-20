@@ -148,6 +148,7 @@ export const AppContainer = (props: AppContainerProps) => {
   const [isTrustedFolder, setIsTrustedFolder] = useState<boolean | undefined>(
     config.isTrustedFolder(),
   );
+  const [isNotificationsSetupOpen, setIsNotificationsSetupOpen] = useState(false);
 
   const extensions = config.getExtensions();
   const { extensionsUpdateState, setExtensionsUpdateState } =
@@ -156,6 +157,14 @@ export const AppContainer = (props: AppContainerProps) => {
       historyManager.addItem,
       config.getWorkingDir(),
     );
+
+  useEffect(() => {
+    if (streamingState === StreamingState.Idle) {
+      startIdleTimer();
+    } else {
+      stopIdleTimer();
+    }
+  }, [streamingState]);
 
   // Helper to determine the effective model, considering the fallback state.
   const getEffectiveModel = useCallback(() => {
@@ -1070,6 +1079,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       extensionsUpdateState,
       activePtyId,
       shellFocused,
+      isNotificationsSetupOpen,
     }),
     [
       historyManager.history,
@@ -1172,6 +1182,8 @@ Logging in with Google... Please restart Gemini CLI to continue.
       onWorkspaceMigrationDialogOpen,
       onWorkspaceMigrationDialogClose,
       handleProQuotaChoice,
+      openNotificationsSetup: () => setIsNotificationsSetupOpen(true),
+      closeNotificationsSetup: () => setIsNotificationsSetupOpen(false),
     }),
     [
       handleThemeSelect,

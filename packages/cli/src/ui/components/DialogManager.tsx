@@ -183,7 +183,13 @@ export const DialogManager = () => {
     return (
       <PrivacyNotice
         onExit={() => uiActions.exitPrivacyNotice()}
-        config={config}
+    );
+  }
+  if (uiState.isNotificationsSetupOpen) {
+    return (
+      <NotificationsSetup
+        settings={settings}
+        onComplete={uiActions.closeNotificationsSetup}
       />
     );
   }
