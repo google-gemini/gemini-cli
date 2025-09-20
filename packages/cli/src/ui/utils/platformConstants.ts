@@ -56,6 +56,16 @@ export const MODIFIER_CTRL_BIT = 4;
 export const CTRL_EXIT_PROMPT_DURATION_MS = 1000;
 
 /**
+ * The escape code timeout for Node.js's readline interface.
+ * A value of 0 can cause bugs with IME (Input Method Editor) composition,
+ * where backspacing a composing character incorrectly finalizes it.
+ * A small delay (e.g., 20ms) gives the IME and readline enough time to
+ * process the composition correctly without being perceptible to the user or
+ * affecting other escape-based shortcuts.
+ */
+export const IME_ESCAPE_CODE_TIMEOUT_MS = 20;
+
+/**
  * VS Code terminal integration constants
  */
 export const VSCODE_SHIFT_ENTER_SEQUENCE = '\\\r\n';
