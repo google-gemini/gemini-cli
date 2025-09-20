@@ -47,6 +47,8 @@ import {
 } from './core/initializer.js';
 import { validateAuthMethod } from './config/auth.js';
 import { setMaxSizedBoxDebugging } from './ui/components/shared/MaxSizedBox.js';
+import { runZedIntegration } from './zed-integration/zedIntegration.js';
+import { cleanupExpiredSessions } from './utils/sessionCleanup.js';
 import { validateNonInteractiveAuth } from './validateNonInterActiveAuth.js';
 import { detectAndEnableKittyProtocol } from './ui/utils/kittyProtocolDetector.js';
 import { checkForUpdates } from './ui/utils/updateCheck.js';
@@ -153,8 +155,6 @@ async function relaunchAppInChildProcess(additionalArgs: string[]) {
   await relaunchOnExitCode(runner);
 }
 
-import { runZedIntegration } from './zed-integration/zedIntegration.js';
-
 export function setupUnhandledRejectionHandler() {
   let unhandledRejectionOccurred = false;
   process.on('unhandledRejection', (reason, _promise) => {
@@ -255,6 +255,9 @@ export async function main() {
     sessionId,
     argv,
   );
+
+  // Cleanup sessions after config initialization
+  await cleanupExpiredSessions(config, settings.merged);
 
   // Check for invalid input combinations early to prevent crashes
   if (argv.promptInteractive && !process.stdin.isTTY) {
