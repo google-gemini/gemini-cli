@@ -31,6 +31,11 @@ on:
         required: false
         type: 'boolean'
         default: false
+      skip_github_release:
+        description: 'Select to skip creating a GitHub release and create a npm release only.'
+        required: false
+        type: 'boolean'
+        default: false
 
 jobs:
   release:
@@ -80,3 +85,4 @@ jobs:
           github-token: '${{ secrets.GITHUB_TOKEN }}'
           dry-run: '${{ github.event.inputs.dry_run }}'
           previous-tag: '${{ steps.release_info.outputs.PREVIOUS_TAG }}'
+          skip-github-release: '${{ github.event.inputs.skip_github_release }}'
