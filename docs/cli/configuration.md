@@ -64,6 +64,10 @@ Settings are organized into categories. All settings should be placed within the
   - **Description:** Enable Vim keybindings.
   - **Default:** `false`
 
+- **`general.showNonInteractiveToolInfo`** (boolean):
+  - **Description:** If `true`, logs tool calls and their output to stderr in non-interactive mode.
+  - **Default:** `false`
+
 - **`general.disableAutoUpdate`** (boolean):
   - **Description:** Disable automatic updates.
   - **Default:** `false`
@@ -473,6 +477,8 @@ Arguments passed directly when running the CLI can override other configurations
   - Displays help information about command-line arguments.
 - **`--show-memory-usage`**:
   - Displays the current memory usage.
+- **`--show-non-interactive-tool-info`**:
+  - Logs tool calls and their output to stderr in non-interactive mode.
 - **`--yolo`**:
   - Enables YOLO mode, which automatically approves all tool calls.
 - **`--approval-mode <mode>`**:

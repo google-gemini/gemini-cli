@@ -185,6 +185,15 @@ const SETTINGS_SCHEMA = {
         description: 'Enable debug logging of keystrokes to the console.',
         showInDialog: true,
       },
+      showNonInteractiveToolInfo: {
+        type: 'boolean',
+        label: 'Show Non-Interactive Tool Info',
+        category: 'General',
+        requiresRestart: false,
+        default: false,
+        description: 'Show tool usage information in non-interactive mode.',
+        showInDialog: true,
+      },
     },
   },
   output: {
