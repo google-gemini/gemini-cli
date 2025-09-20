@@ -4,6 +4,8 @@ on:
   pull_request:
     types:
       - 'closed'
+    branches:
+      - 'release/**'
   workflow_dispatch:
     inputs:
       ref:
@@ -25,6 +27,11 @@ on:
         required: false
         type: 'boolean'
         default: false
+      force_skip_tests:
+        description: 'Select to skip the "Run Tests" step in testing. Prod releases should run tests'
+        required: false
+        type: 'boolean'
+        default: false
 
 jobs:
   trigger-patch-release:
@@ -32,6 +39,8 @@ jobs:
     runs-on: 'ubuntu-latest'
     permissions:
       actions: 'write'
+      contents: 'write'
+      pull-requests: 'write'
     steps:
       - name: 'Checkout'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
@@ -58,5 +67,6 @@ jobs:
           GITHUB_REPOSITORY_NAME: '${{ github.event.repository.name }}'
           GITHUB_EVENT_NAME: '${{ github.event_name }}'
           GITHUB_EVENT_PAYLOAD: '${{ toJSON(github.event) }}'
+          FORCE_SKIP_TESTS: '${{ github.event.inputs.force_skip_tests }}'
         run: |
           node scripts/releasing/patch-trigger.js

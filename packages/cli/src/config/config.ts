@@ -93,6 +93,76 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
     .usage(
       'Usage: gemini [options] [command]\n\nGemini CLI - Launch an interactive CLI, use -p/--prompt for non-interactive mode',
     )
+    .option('telemetry', {
+      type: 'boolean',
+      description:
+        'Enable telemetry? This flag specifically controls if telemetry is sent. Other --telemetry-* flags set specific values but do not enable telemetry on their own.',
+    })
+    .option('telemetry-target', {
+      type: 'string',
+      choices: ['local', 'gcp'],
+      description:
+        'Set the telemetry target (local or gcp). Overrides settings files.',
+    })
+    .option('telemetry-otlp-endpoint', {
+      type: 'string',
+      description:
+        'Set the OTLP endpoint for telemetry. Overrides environment variables and settings files.',
+    })
+    .option('telemetry-otlp-protocol', {
+      type: 'string',
+      choices: ['grpc', 'http'],
+      description:
+        'Set the OTLP protocol for telemetry (grpc or http). Overrides settings files.',
+    })
+    .option('telemetry-log-prompts', {
+      type: 'boolean',
+      description:
+        'Enable or disable logging of user prompts for telemetry. Overrides settings files.',
+    })
+    .option('telemetry-outfile', {
+      type: 'string',
+      description: 'Redirect all telemetry output to the specified file.',
+    })
+    .deprecateOption(
+      'telemetry',
+      'Use the "telemetry.enabled" setting in settings.json instead. This flag will be removed in a future version.',
+    )
+    .deprecateOption(
+      'telemetry-target',
+      'Use the "telemetry.target" setting in settings.json instead. This flag will be removed in a future version.',
+    )
+    .deprecateOption(
+      'telemetry-otlp-endpoint',
+      'Use the "telemetry.otlpEndpoint" setting in settings.json instead. This flag will be removed in a future version.',
+    )
+    .deprecateOption(
+      'telemetry-otlp-protocol',
+      'Use the "telemetry.otlpProtocol" setting in settings.json instead. This flag will be removed in a future version.',
+    )
+    .deprecateOption(
+      'telemetry-log-prompts',
+      'Use the "telemetry.logPrompts" setting in settings.json instead. This flag will be removed in a future version.',
+    )
+    .deprecateOption(
+      'telemetry-outfile',
+      'Use the "telemetry.outfile" setting in settings.json instead. This flag will be removed in a future version.',
+    )
+    .option('debug', {
+      alias: 'd',
+      type: 'boolean',
+      description: 'Run in debug mode?',
+      default: false,
+    })
+    .option('proxy', {
+      type: 'string',
+      description:
+        'Proxy for gemini client, like schema://user:password@host:port',
+    })
+    .deprecateOption(
+      'proxy',
+      'Use the "proxy" setting in settings.json instead. This flag will be removed in a future version.',
+    )
     .command('$0 [promptWords...]', 'Launch Gemini CLI', (yargsInstance) =>
       yargsInstance
         .option('model', {
@@ -120,12 +190,6 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
           type: 'string',
           description: 'Sandbox image URI.',
         })
-        .option('debug', {
-          alias: 'd',
-          type: 'boolean',
-          description: 'Run in debug mode?',
-          default: false,
-        })
         .option('all-files', {
           alias: ['a'],
           type: 'boolean',
@@ -150,37 +214,6 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
           description:
             'Set the approval mode: default (prompt for approval), auto_edit (auto-approve edit tools), yolo (auto-approve all tools)',
         })
-        .option('telemetry', {
-          type: 'boolean',
-          description:
-            'Enable telemetry? This flag specifically controls if telemetry is sent. Other --telemetry-* flags set specific values but do not enable telemetry on their own.',
-        })
-        .option('telemetry-target', {
-          type: 'string',
-          choices: ['local', 'gcp'],
-          description:
-            'Set the telemetry target (local or gcp). Overrides settings files.',
-        })
-        .option('telemetry-otlp-endpoint', {
-          type: 'string',
-          description:
-            'Set the OTLP endpoint for telemetry. Overrides environment variables and settings files.',
-        })
-        .option('telemetry-otlp-protocol', {
-          type: 'string',
-          choices: ['grpc', 'http'],
-          description:
-            'Set the OTLP protocol for telemetry (grpc or http). Overrides settings files.',
-        })
-        .option('telemetry-log-prompts', {
-          type: 'boolean',
-          description:
-            'Enable or disable logging of user prompts for telemetry. Overrides settings files.',
-        })
-        .option('telemetry-outfile', {
-          type: 'string',
-          description: 'Redirect all telemetry output to the specified file.',
-        })
         .option('checkpointing', {
           alias: 'c',
           type: 'boolean',
@@ -200,6 +233,9 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
           type: 'array',
           string: true,
           description: 'Tools that are allowed to run without confirmation',
+          coerce: (tools: string[]) =>
+            // Handle comma-separated values
+            tools.flatMap((tool) => tool.split(',').map((t) => t.trim())),
         })
         .option('extensions', {
           alias: 'e',
@@ -213,11 +249,6 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
           type: 'boolean',
           description: 'List all available extensions and exit.',
         })
-        .option('proxy', {
-          type: 'string',
-          description:
-            'Proxy for gemini client, like schema://user:password@host:port',
-        })
         .option('include-directories', {
           type: 'array',
           string: true,
@@ -230,7 +261,6 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
         .option('screen-reader', {
           type: 'boolean',
           description: 'Enable screen reader mode for accessibility.',
-          default: false,
         })
         .option('output-format', {
           alias: 'o',
@@ -239,40 +269,12 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
           choices: ['text', 'json'],
         })
         .deprecateOption(
-          'telemetry',
-          'Use the "telemetry.enabled" setting in settings.json instead. This flag will be removed in a future version.',
-        )
-        .deprecateOption(
-          'telemetry-target',
-          'Use the "telemetry.target" setting in settings.json instead. This flag will be removed in a future version.',
-        )
-        .deprecateOption(
-          'telemetry-otlp-endpoint',
-          'Use the "telemetry.otlpEndpoint" setting in settings.json instead. This flag will be removed in a future version.',
-        )
-        .deprecateOption(
-          'telemetry-otlp-protocol',
-          'Use the "telemetry.otlpProtocol" setting in settings.json instead. This flag will be removed in a future version.',
-        )
-        .deprecateOption(
-          'telemetry-log-prompts',
-          'Use the "telemetry.logPrompts" setting in settings.json instead. This flag will be removed in a future version.',
-        )
-        .deprecateOption(
-          'telemetry-outfile',
-          'Use the "telemetry.outfile" setting in settings.json instead. This flag will be removed in a future version.',
-        )
-        .deprecateOption(
           'show-memory-usage',
           'Use the "ui.showMemoryUsage" setting in settings.json instead. This flag will be removed in a future version.',
         )
         .deprecateOption(
           'sandbox-image',
           'Use the "tools.sandbox" setting in settings.json instead. This flag will be removed in a future version.',
-        )
-        .deprecateOption(
-          'proxy',
-          'Use the "proxy" setting in settings.json instead. This flag will be removed in a future version.',
         )
         .deprecateOption(
           'checkpointing',
