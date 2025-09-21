@@ -1,20 +1,37 @@
+/**
+ * @license
+ * Copyright 2025 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 import { create } from 'zustand';
 import type { ChatMessage, CompressionInfo, ToolCallConfirmationDetails } from '@/types';
 
+// Status type for different operations
+export type OperationStatus = {
+  type: 'thinking' | 'tool_executing' | 'streaming' | 'compressing';
+  message: string;
+  details?: string;
+  toolName?: string;
+  progress?: number;
+};
+
 interface ChatState {
   isLoading: boolean;
-  isStreaming: boolean;
-  isThinking: boolean; // New state for when waiting for LLM response
+  currentOperation: OperationStatus | null; // Current operation status - single source of truth
   error: string | null;
   streamingMessage: string;
   compressionNotification: CompressionInfo | null; // Show compression notification
   toolConfirmation: ToolCallConfirmationDetails | null; // Tool confirmation request
   approvalMode: 'default' | 'autoEdit' | 'yolo'; // Current tool approval mode
-  
+
+  // Computed getters for backward compatibility
+  get isStreaming(): boolean;
+  get isThinking(): boolean;
+
   // Actions
   setLoading: (loading: boolean) => void;
-  setStreaming: (streaming: boolean) => void;
-  setThinking: (thinking: boolean) => void;
+  setCurrentOperation: (operation: OperationStatus | null) => void;
   setError: (error: string | null) => void;
   setStreamingMessage: (message: string) => void;
   setCompressionNotification: (info: CompressionInfo | null) => void;
@@ -24,22 +41,31 @@ interface ChatState {
   updateMessage: (sessionId: string, messageId: string, updates: Partial<ChatMessage>) => void;
 }
 
-export const useChatStore = create<ChatState>()((set) => ({
+export const useChatStore = create<ChatState>()((set, get) => ({
   isLoading: false,
-  isStreaming: false,
-  isThinking: false,
+  currentOperation: null,
   error: null,
   streamingMessage: '',
   compressionNotification: null,
   toolConfirmation: null,
   approvalMode: 'default',
 
+  // Computed properties for backward compatibility
+  get isStreaming() {
+    const op = get().currentOperation;
+    return op?.type === 'streaming';
+  },
+
+  get isThinking() {
+    const op = get().currentOperation;
+    return op?.type === 'thinking';
+  },
+
   setLoading: (loading: boolean) => set({ isLoading: loading }),
-  
-  setStreaming: (streaming: boolean) => set({ isStreaming: streaming }),
-  
-  setThinking: (thinking: boolean) => set({ isThinking: thinking }),
-  
+
+  // Primary method - single source of truth
+  setCurrentOperation: (operation: OperationStatus | null) => set({ currentOperation: operation }),
+
   setError: (error: string | null) => set({ error }),
   
   setStreamingMessage: (message: string) => {

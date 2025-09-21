@@ -12,10 +12,11 @@ import { Bot, User, AlertCircle, ChevronDown, ChevronRight, BookTemplate, Play, 
 import { cn } from '@/utils/cn';
 import { Card, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
-import { TypingIndicator } from './TypingIndicator';
+import { StatusIndicator } from './StatusIndicator';
 import { MarkdownRenderer } from './MarkdownRenderer';
 import ToolConfirmationMessage from './ToolConfirmationMessage';
 import { multiModelService } from '@/services/multiModelService';
+import { useChatStore } from '@/stores/chatStore';
 import type { ChatMessage, ToolCallConfirmationDetails, ToolConfirmationOutcome, ToolCall } from '@/types';
 
 
@@ -293,6 +294,7 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(({
   onToolConfirm,
   onTemplateSaved,
 }, ref) => {
+  const { currentOperation } = useChatStore();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -457,10 +459,10 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(({
         </div>
       )}
 
-      {/* Show thinking indicator when AI is processing */}
-      {isThinking && (
+      {/* Show status indicator when AI is processing */}
+      {(isThinking || currentOperation) && (
         <div className="mt-4">
-          <TypingIndicator />
+          <StatusIndicator operation={currentOperation} isThinking={isThinking} />
         </div>
       )}
 

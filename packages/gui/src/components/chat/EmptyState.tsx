@@ -1,13 +1,24 @@
-import React, { useState } from 'react';
-import { Bot, Sparkles, MessageSquare, Zap, FolderPlus, Settings, BookOpen, Lightbulb, ChevronDown, ChevronUp } from 'lucide-react';
+/**
+ * @license
+ * Copyright 2025 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import type React from 'react';
+import { useState } from 'react';
+import { Bot, Sparkles, MessageSquare, Zap, FolderPlus, Settings, BookOpen, Lightbulb, ChevronDown, ChevronUp, Folder, Plus, X, Check } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { useAppStore } from '@/stores/appStore';
+import { WorkspaceSelector } from '@/components/workspace/WorkspaceSelector';
+import { ModelSelector } from '@/components/chat/ModelSelector';
+import { RoleSelector } from '@/components/chat/RoleSelector';
+import { useWorkspaceDirectories } from '@/hooks';
 
 const quickStartSteps = [
   {
     icon: <FolderPlus size={16} />,
-    title: "Add Workspace",
+    title: "Add Working Folder",
     description: "Add your project directory so AI can access your code files",
     action: "workspace"
   },
@@ -57,10 +68,25 @@ interface EmptyStateProps {
 }
 
 export const EmptyState: React.FC<EmptyStateProps> = ({ onPromptSelect }) => {
-  const { currentRole, currentWorkspace, workspaces } = useAppStore();
+  const { currentRole } = useAppStore();
+  const { directories: workingDirectories, loading: directoriesLoading } = useWorkspaceDirectories();
   const [showQuickStart, setShowQuickStart] = useState(true);
-  
-  const hasWorkspace = currentWorkspace || workspaces.length > 0;
+  const [showWorkspaceSelector, setShowWorkspaceSelector] = useState(false);
+  const [showModelSelector, setShowModelSelector] = useState(false);
+  const [showRoleSelector, setShowRoleSelector] = useState(false);
+
+
+  const handleAddWorkspace = () => {
+    setShowWorkspaceSelector(true);
+  };
+
+  const handleSelectModel = () => {
+    setShowModelSelector(true);
+  };
+
+  const handleChooseRole = () => {
+    setShowRoleSelector(true);
+  };
 
   return (
     <div className="flex-1 flex items-center justify-center p-8 overflow-y-auto">
@@ -105,8 +131,22 @@ export const EmptyState: React.FC<EmptyStateProps> = ({ onPromptSelect }) => {
                 </p>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   {quickStartSteps.map((step, index) => (
-                    <div key={index} className="flex items-start gap-3 p-3 rounded-lg bg-muted/30">
-                      <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5">
+                    <div
+                      key={index}
+                      className={`flex items-start gap-3 p-3 rounded-lg ${
+                        step.action === "workspace" || step.action === "model" || step.action === "role"
+                          ? "bg-muted/30 cursor-pointer hover:bg-muted/50 transition-colors border border-transparent hover:border-primary/20"
+                          : "bg-muted/30"
+                      }`}
+                      onClick={
+                        step.action === "workspace" ? handleAddWorkspace :
+                        step.action === "model" ? handleSelectModel :
+                        step.action === "role" ? handleChooseRole : undefined
+                      }
+                    >
+                      <div className={`w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5 ${
+                        (step.action === "workspace" || step.action === "model" || step.action === "role") ? "group-hover:bg-primary/20" : ""
+                      }`}>
                         {step.icon}
                       </div>
                       <div>
@@ -121,23 +161,54 @@ export const EmptyState: React.FC<EmptyStateProps> = ({ onPromptSelect }) => {
                   ))}
                 </div>
                 
-                {/* Workspace Status */}
-                <div className="mt-4 p-3 rounded-lg bg-muted/20 border-l-4 border-primary/30">
-                  <div className="flex items-center gap-2 mb-1">
-                    <FolderPlus size={14} />
-                    <span className="text-sm font-medium">Workspace Status</span>
+                {/* Working Folders */}
+                <div className="mt-4 p-4 rounded-lg bg-muted/20 border-l-4 border-primary/30">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <FolderPlus size={16} />
+                      <span className="text-sm font-medium">Working Folders</span>
+                      {directoriesLoading && (
+                        <div className="w-3 h-3 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                      )}
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleAddWorkspace}
+                      className="h-7 px-2 text-xs"
+                    >
+                      <Plus size={12} className="mr-1" />
+                      Add
+                    </Button>
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    {hasWorkspace ? (
-                      <span className="text-green-600 dark:text-green-400">
-                        ✓ Workspace configured - AI can access your project files
-                      </span>
-                    ) : (
-                      <span className="text-amber-600 dark:text-amber-400">
-                        ⚠ No workspace added - Add your project directory for better assistance
-                      </span>
-                    )}
-                  </p>
+
+                  {workingDirectories.length === 0 ? (
+                    <div className="text-xs text-muted-foreground space-y-2">
+                      <p className="text-amber-600 dark:text-amber-400">
+                        ⚠ No working folders configured
+                      </p>
+                      <p>Add your project directory so AI can access your code files and provide better assistance.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <div className="text-xs text-green-600 dark:text-green-400 mb-2">
+                        ✓ {workingDirectories.length} working folder{workingDirectories.length === 1 ? '' : 's'} configured
+                      </div>
+                      <div className="space-y-1 max-h-32 overflow-y-auto">
+                        {workingDirectories.map((directory, index) => (
+                          <div
+                            key={`${directory}-${index}`}
+                            className="flex items-center gap-2 p-2 rounded bg-muted/30"
+                          >
+                            <Folder size={12} className="text-primary flex-shrink-0" />
+                            <div className="flex-1 min-w-0 text-left">
+                              <div className="text-xs font-medium font-mono truncate">{directory}</div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -181,14 +252,35 @@ export const EmptyState: React.FC<EmptyStateProps> = ({ onPromptSelect }) => {
         <div className="space-y-2 text-xs text-muted-foreground">
           <p><strong>Pro Tips:</strong></p>
           <div className="space-y-1 max-w-2xl mx-auto">
-            <p>• Use <kbd className="px-2 py-1 text-xs bg-muted rounded">@</kbd> to reference files in your workspace</p>
+            <p>• Use <kbd className="px-2 py-1 text-xs bg-muted rounded">@</kbd> to reference files in your working folders</p>
             <p>• Switch models in the header to try different AI capabilities</p>
             <p>• Change roles to get specialized assistance for different tasks</p>
-            <p>• Add multiple workspace directories for complex projects</p>
+            <p>• Add multiple working folders for complex projects</p>
           </div>
           <p className="pt-2">Gemini CLI can make mistakes. Please verify important information.</p>
         </div>
       </div>
+
+      {/* Working Folder Selector Modal */}
+      {showWorkspaceSelector && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <WorkspaceSelector onClose={() => setShowWorkspaceSelector(false)} />
+        </div>
+      )}
+
+      {/* Model Selector Modal */}
+      {showModelSelector && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <ModelSelector onClose={() => setShowModelSelector(false)} />
+        </div>
+      )}
+
+      {/* Role Selector Modal */}
+      {showRoleSelector && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <RoleSelector onClose={() => setShowRoleSelector(false)} />
+        </div>
+      )}
     </div>
   );
 };

@@ -1,4 +1,11 @@
-import React, { useState, useRef, useCallback, useImperativeHandle, forwardRef } from 'react';
+/**
+ * @license
+ * Copyright 2025 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import { useState, useRef, useCallback, useImperativeHandle, forwardRef } from 'react';
+import type React from 'react';
 import { Send, StopCircle, Paperclip, Mic } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Textarea } from '@/components/ui/Textarea';
@@ -24,7 +31,17 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(({ di
   const streamCleanupRef = useRef<(() => void) | null>(null);
   
   const { activeSessionId, updateSession } = useAppStore();
-  const { isStreaming, isThinking, setStreaming, setThinking, setStreamingMessage, setError, setCompressionNotification } = useChatStore();
+  const { isStreaming, isThinking, setStreamingMessage, setError, setCompressionNotification, setCurrentOperation } = useChatStore();
+  
+  const adjustTextareaHeight = useCallback(() => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+
+    textarea.style.height = 'auto';
+    const scrollHeight = textarea.scrollHeight;
+    const maxHeight = 200; // max height in pixels
+    textarea.style.height = Math.min(scrollHeight, maxHeight) + 'px';
+  }, []);
 
   useImperativeHandle(ref, () => ({
     setMessage: (newMessage: string) => {
@@ -35,17 +52,8 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(({ di
         adjustTextareaHeight();
       }, 0);
     }
-  }), []);
+  }), [adjustTextareaHeight]);
 
-  const adjustTextareaHeight = useCallback(() => {
-    const textarea = textareaRef.current;
-    if (!textarea) return;
-
-    textarea.style.height = 'auto';
-    const scrollHeight = textarea.scrollHeight;
-    const maxHeight = 200; // max height in pixels
-    textarea.style.height = Math.min(scrollHeight, maxHeight) + 'px';
-  }, []);
 
   // Initialize autocomplete
   const autocomplete = useAutocomplete({
@@ -129,7 +137,11 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(({ di
 
     // Start thinking state first
     // console.log('[MessageInput] Setting thinking to true, current state:', { isThinking, isStreaming });
-    setThinking(true);
+    setCurrentOperation({
+      type: 'thinking',
+      message: 'AI is thinking',
+      details: 'Processing your request...'
+    });
     setStreamingMessage('');
     setError(null);
 
@@ -166,10 +178,12 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(({ di
           break;
         }
 
-        setThinking(false);
-        
         if (event.type === 'content' || event.type === 'content_delta') {
-          setStreaming(true);
+          setCurrentOperation({
+            type: 'streaming',
+            message: 'AI is responding',
+            details: 'Generating response...'
+          });
           assistantContent += event.content;
           setStreamingMessage(assistantContent);
           
@@ -213,6 +227,16 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(({ di
           }
         } 
         else if (event.type === 'tool_call') {
+          // Update status to show tool is executing
+          if (event.toolCall) {
+            setCurrentOperation({
+              type: 'tool_executing',
+              message: `Executing tool: ${event.toolCall.name}`,
+              toolName: event.toolCall.name,
+              details: 'Processing...'
+            });
+          }
+
           // Finalize current assistant message streaming first
           if (currentAssistantMessageId && assistantContent.trim()) {
             // Update the existing message with final content
@@ -233,8 +257,7 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(({ di
                 });
               }
             }
-            
-            setStreaming(false);
+
             setStreamingMessage('');
             // Reset for next message
             assistantContent = '';
@@ -261,6 +284,13 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(({ di
           }
         } 
         else if (event.type === 'tool_response') {
+          // Set thinking status since AI will process the tool result
+          setCurrentOperation({
+            type: 'thinking',
+            message: 'AI is thinking',
+            details: 'Processing tool result...'
+          });
+
           // Handle tool response events - create tool response message immediately
           if (event.toolCallId && event.toolName) {
             const toolResponseMessage: ChatMessage = {
@@ -288,6 +318,13 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(({ di
           }
         }
         else if (event.type === 'compression') {
+          // Update status to show compression is happening
+          setCurrentOperation({
+            type: 'compressing',
+            message: 'Compressing conversation history',
+            details: 'Optimizing context for better performance...'
+          });
+
           // Handle compression event - show notification and add info message
           if (event.compressionInfo) {
             setCompressionNotification(event.compressionInfo);
@@ -311,6 +348,9 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(({ di
             }
           }
         } else if (event.type === 'done' || event.type === 'message_complete') {
+          // Clear operation status when message is complete
+          setCurrentOperation(null);
+
           // Final content update for streaming message if we had content
           if (currentAssistantMessageId && assistantContent) {
             const currentSession = useAppStore.getState().sessions.find(s => s.id === activeSessionId);
@@ -387,8 +427,7 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(({ di
       setError(errorMessage);
     } finally {
       // console.log('[MessageInput] Finally block - resetting states');
-      setThinking(false);
-      setStreaming(false);
+      setCurrentOperation(null);
       setStreamingMessage('');
       // Clear abort controller and stream cleanup
       abortControllerRef.current = null;
@@ -414,8 +453,7 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(({ di
     }
 
     // Reset UI states immediately
-    setThinking(false);
-    setStreaming(false);
+    setCurrentOperation(null);
     setStreamingMessage('');
   };
 
