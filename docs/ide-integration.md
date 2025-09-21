@@ -2,7 +2,7 @@
 
 Gemini CLI can integrate with your IDE to provide a more seamless and context-aware experience. This integration allows the CLI to understand your workspace better and enables powerful features like native in-editor diffing.
 
-Currently, the only supported IDE is [Visual Studio Code](https://code.visualstudio.com/) and other editors that support VS Code extensions.
+Currently, the only supported IDE is [Visual Studio Code](https://code.visualstudio.com/) and other editors that support VS Code extensions. To build support for other editors, see the [IDE Companion Extension Spec](./ide-companion-spec.md).
 
 ## Features
 

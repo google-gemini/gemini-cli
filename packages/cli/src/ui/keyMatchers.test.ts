@@ -29,6 +29,8 @@ describe('keyMatchers', () => {
     [Command.KILL_LINE_RIGHT]: (key: Key) => key.ctrl && key.name === 'k',
     [Command.KILL_LINE_LEFT]: (key: Key) => key.ctrl && key.name === 'u',
     [Command.CLEAR_INPUT]: (key: Key) => key.ctrl && key.name === 'c',
+    [Command.DELETE_WORD_BACKWARD]: (key: Key) =>
+      (key.ctrl || key.meta) && key.name === 'backspace',
     [Command.CLEAR_SCREEN]: (key: Key) => key.ctrl && key.name === 'l',
     [Command.HISTORY_UP]: (key: Key) => key.ctrl && key.name === 'p',
     [Command.HISTORY_DOWN]: (key: Key) => key.ctrl && key.name === 'n',
@@ -61,6 +63,10 @@ describe('keyMatchers', () => {
       key.name === 'return' && !key.ctrl,
     [Command.ACCEPT_SUGGESTION_REVERSE_SEARCH]: (key: Key) =>
       key.name === 'tab',
+    [Command.TOGGLE_SHELL_INPUT_FOCUS]: (key: Key) =>
+      key.ctrl && key.name === 'f',
+    [Command.EXPAND_SUGGESTION]: (key: Key) => key.name === 'right',
+    [Command.COLLAPSE_SUGGESTION]: (key: Key) => key.name === 'left',
   };
 
   // Test data for each command with positive and negative test cases
@@ -112,6 +118,14 @@ describe('keyMatchers', () => {
       command: Command.CLEAR_INPUT,
       positive: [createKey('c', { ctrl: true })],
       negative: [createKey('c'), createKey('k', { ctrl: true })],
+    },
+    {
+      command: Command.DELETE_WORD_BACKWARD,
+      positive: [
+        createKey('backspace', { ctrl: true }),
+        createKey('backspace', { meta: true }),
+      ],
+      negative: [createKey('backspace'), createKey('delete', { ctrl: true })],
     },
 
     // Screen control
@@ -242,6 +256,11 @@ describe('keyMatchers', () => {
       command: Command.ACCEPT_SUGGESTION_REVERSE_SEARCH,
       positive: [createKey('tab'), createKey('tab', { ctrl: true })],
       negative: [createKey('return'), createKey('space')],
+    },
+    {
+      command: Command.TOGGLE_SHELL_INPUT_FOCUS,
+      positive: [createKey('f', { ctrl: true })],
+      negative: [createKey('f')],
     },
   ];
 

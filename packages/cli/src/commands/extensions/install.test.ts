@@ -4,46 +4,151 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect } from 'vitest';
-import { installCommand, handleInstall } from './install.js';
+import { describe, it, expect, vi, type MockInstance } from 'vitest';
+import { handleInstall, installCommand } from './install.js';
 import yargs from 'yargs';
-import * as extension from '../../config/extension.js';
+
+const mockInstallExtension = vi.hoisted(() => vi.fn());
 
 vi.mock('../../config/extension.js', () => ({
-  installExtension: vi.fn(),
+  installExtension: mockInstallExtension,
+}));
+
+vi.mock('../../utils/errors.js', () => ({
+  getErrorMessage: vi.fn((error: Error) => error.message),
 }));
 
 describe('extensions install command', () => {
   it('should fail if no source is provided', () => {
     const validationParser = yargs([]).command(installCommand).fail(false);
     expect(() => validationParser.parse('install')).toThrow(
-      'Either --source or --path must be provided.',
+      'Either source or --path must be provided.',
     );
   });
 
   it('should fail if both git source and local path are provided', () => {
     const validationParser = yargs([]).command(installCommand).fail(false);
     expect(() =>
-      validationParser.parse('install --source some-url --path /some/path'),
+      validationParser.parse('install some-url --path /some/path'),
     ).toThrow('Arguments source and path are mutually exclusive');
+  });
+
+  it('should fail if both auto update and local path are provided', () => {
+    const validationParser = yargs([]).command(installCommand).fail(false);
+    expect(() =>
+      validationParser.parse(
+        'install some-url --path /some/path --auto-update',
+      ),
+    ).toThrow('Arguments path and auto-update are mutually exclusive');
   });
 });
 
-describe('extensions install with org/repo', () => {
-  it('should call installExtension with the correct git URL', async () => {
-    const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-    const installExtensionSpy = vi
-      .spyOn(extension, 'installExtension')
-      .mockResolvedValue('test-extension');
+describe('handleInstall', () => {
+  let consoleLogSpy: MockInstance;
+  let consoleErrorSpy: MockInstance;
+  let processSpy: MockInstance;
 
-    await handleInstall({ source: 'test-org/test-repo' });
+  beforeEach(() => {
+    consoleLogSpy = vi.spyOn(console, 'log');
+    consoleErrorSpy = vi.spyOn(console, 'error');
+    processSpy = vi
+      .spyOn(process, 'exit')
+      .mockImplementation(() => undefined as never);
+  });
 
-    expect(installExtensionSpy).toHaveBeenCalledWith({
-      source: 'https://github.com/test-org/test-repo.git',
-      type: 'git',
+  afterEach(() => {
+    mockInstallExtension.mockClear();
+    vi.resetAllMocks();
+  });
+
+  it('should install an extension from a http source', async () => {
+    mockInstallExtension.mockResolvedValue('http-extension');
+
+    await handleInstall({
+      source: 'http://google.com',
     });
+
     expect(consoleLogSpy).toHaveBeenCalledWith(
-      'Extension "test-extension" installed successfully and enabled.',
+      'Extension "http-extension" installed successfully and enabled.',
     );
+  });
+
+  it('should install an extension from a https source', async () => {
+    mockInstallExtension.mockResolvedValue('https-extension');
+
+    await handleInstall({
+      source: 'https://google.com',
+    });
+
+    expect(consoleLogSpy).toHaveBeenCalledWith(
+      'Extension "https-extension" installed successfully and enabled.',
+    );
+  });
+
+  it('should install an extension from a git source', async () => {
+    mockInstallExtension.mockResolvedValue('git-extension');
+
+    await handleInstall({
+      source: 'git@some-url',
+    });
+
+    expect(consoleLogSpy).toHaveBeenCalledWith(
+      'Extension "git-extension" installed successfully and enabled.',
+    );
+  });
+
+  it('throws an error from an unknown source', async () => {
+    await handleInstall({
+      source: 'test://google.com',
+    });
+
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      'The source "test://google.com" is not a valid URL format.',
+    );
+    expect(processSpy).toHaveBeenCalledWith(1);
+  });
+
+  it('should install an extension from a sso source', async () => {
+    mockInstallExtension.mockResolvedValue('sso-extension');
+
+    await handleInstall({
+      source: 'sso://google.com',
+    });
+
+    expect(consoleLogSpy).toHaveBeenCalledWith(
+      'Extension "sso-extension" installed successfully and enabled.',
+    );
+  });
+
+  it('should install an extension from a local path', async () => {
+    mockInstallExtension.mockResolvedValue('local-extension');
+
+    await handleInstall({
+      path: '/some/path',
+    });
+
+    expect(consoleLogSpy).toHaveBeenCalledWith(
+      'Extension "local-extension" installed successfully and enabled.',
+    );
+  });
+
+  it('should throw an error if no source or path is provided', async () => {
+    await handleInstall({});
+
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      'Either --source or --path must be provided.',
+    );
+    expect(processSpy).toHaveBeenCalledWith(1);
+  });
+
+  it('should throw an error if install extension fails', async () => {
+    mockInstallExtension.mockRejectedValue(
+      new Error('Install extension failed'),
+    );
+
+    await handleInstall({ source: 'git@some-url' });
+
+    expect(consoleErrorSpy).toHaveBeenCalledWith('Install extension failed');
+    expect(processSpy).toHaveBeenCalledWith(1);
   });
 });

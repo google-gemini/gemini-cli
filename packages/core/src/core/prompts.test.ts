@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { getCoreSystemPrompt } from './prompts.js';
+import { getCoreSystemPrompt, resolvePathFromEnv } from './prompts.js';
 import { isGitRepository } from '../utils/gitUtils.js';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -267,6 +267,156 @@ describe('Core System Prompt (prompts.ts)', () => {
         path.resolve(expectedPath),
         expect.any(String),
       );
+    });
+  });
+});
+
+describe('resolvePathFromEnv helper function', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+  });
+
+  describe('when envVar is undefined, empty, or whitespace', () => {
+    it('should return null for undefined', () => {
+      const result = resolvePathFromEnv(undefined);
+      expect(result).toEqual({
+        isSwitch: false,
+        value: null,
+        isDisabled: false,
+      });
+    });
+
+    it('should return null for empty string', () => {
+      const result = resolvePathFromEnv('');
+      expect(result).toEqual({
+        isSwitch: false,
+        value: null,
+        isDisabled: false,
+      });
+    });
+
+    it('should return null for whitespace only', () => {
+      const result = resolvePathFromEnv('   \n\t  ');
+      expect(result).toEqual({
+        isSwitch: false,
+        value: null,
+        isDisabled: false,
+      });
+    });
+  });
+
+  describe('when envVar is a boolean-like string', () => {
+    it('should handle "0" as disabled switch', () => {
+      const result = resolvePathFromEnv('0');
+      expect(result).toEqual({
+        isSwitch: true,
+        value: '0',
+        isDisabled: true,
+      });
+    });
+
+    it('should handle "false" as disabled switch', () => {
+      const result = resolvePathFromEnv('false');
+      expect(result).toEqual({
+        isSwitch: true,
+        value: 'false',
+        isDisabled: true,
+      });
+    });
+
+    it('should handle "1" as enabled switch', () => {
+      const result = resolvePathFromEnv('1');
+      expect(result).toEqual({
+        isSwitch: true,
+        value: '1',
+        isDisabled: false,
+      });
+    });
+
+    it('should handle "true" as enabled switch', () => {
+      const result = resolvePathFromEnv('true');
+      expect(result).toEqual({
+        isSwitch: true,
+        value: 'true',
+        isDisabled: false,
+      });
+    });
+
+    it('should be case-insensitive for boolean values', () => {
+      expect(resolvePathFromEnv('FALSE')).toEqual({
+        isSwitch: true,
+        value: 'false',
+        isDisabled: true,
+      });
+      expect(resolvePathFromEnv('TRUE')).toEqual({
+        isSwitch: true,
+        value: 'true',
+        isDisabled: false,
+      });
+    });
+  });
+
+  describe('when envVar is a file path', () => {
+    it('should resolve absolute paths', () => {
+      const result = resolvePathFromEnv('/absolute/path/file.txt');
+      expect(result).toEqual({
+        isSwitch: false,
+        value: path.resolve('/absolute/path/file.txt'),
+        isDisabled: false,
+      });
+    });
+
+    it('should resolve relative paths', () => {
+      const result = resolvePathFromEnv('relative/path/file.txt');
+      expect(result).toEqual({
+        isSwitch: false,
+        value: path.resolve('relative/path/file.txt'),
+        isDisabled: false,
+      });
+    });
+
+    it('should expand tilde to home directory', () => {
+      const homeDir = '/Users/test';
+      vi.spyOn(os, 'homedir').mockReturnValue(homeDir);
+
+      const result = resolvePathFromEnv('~/documents/file.txt');
+      expect(result).toEqual({
+        isSwitch: false,
+        value: path.resolve(path.join(homeDir, 'documents/file.txt')),
+        isDisabled: false,
+      });
+    });
+
+    it('should handle standalone tilde', () => {
+      const homeDir = '/Users/test';
+      vi.spyOn(os, 'homedir').mockReturnValue(homeDir);
+
+      const result = resolvePathFromEnv('~');
+      expect(result).toEqual({
+        isSwitch: false,
+        value: path.resolve(homeDir),
+        isDisabled: false,
+      });
+    });
+
+    it('should handle os.homedir() errors gracefully', () => {
+      vi.spyOn(os, 'homedir').mockImplementation(() => {
+        throw new Error('Cannot resolve home directory');
+      });
+      const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      const result = resolvePathFromEnv('~/documents/file.txt');
+      expect(result).toEqual({
+        isSwitch: false,
+        value: null,
+        isDisabled: false,
+      });
+      expect(consoleSpy).toHaveBeenCalledWith(
+        'Could not resolve home directory for path: ~/documents/file.txt',
+        expect.any(Error),
+      );
+
+      consoleSpy.mockRestore();
     });
   });
 });

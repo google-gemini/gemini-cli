@@ -30,8 +30,11 @@ describe('useFolderTrust', () => {
   beforeEach(() => {
     mockSettings = {
       merged: {
-        folderTrustFeature: true,
-        folderTrust: undefined,
+        security: {
+          folderTrust: {
+            enabled: true,
+          },
+        },
       },
       setValue: vi.fn(),
     } as unknown as LoadedSettings;

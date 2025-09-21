@@ -7,17 +7,24 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { homedir } from 'node:os';
-import { getErrorMessage, isWithinRoot } from '@google/gemini-cli-core';
+import {
+  getErrorMessage,
+  isWithinRoot,
+  ideContextStore,
+} from '@google/gemini-cli-core';
 import type { Settings } from './settings.js';
 import stripJsonComments from 'strip-json-comments';
 
 export const TRUSTED_FOLDERS_FILENAME = 'trustedFolders.json';
 export const SETTINGS_DIRECTORY_NAME = '.gemini';
 export const USER_SETTINGS_DIR = path.join(homedir(), SETTINGS_DIRECTORY_NAME);
-export const USER_TRUSTED_FOLDERS_PATH = path.join(
-  USER_SETTINGS_DIR,
-  TRUSTED_FOLDERS_FILENAME,
-);
+
+export function getTrustedFoldersPath(): string {
+  if (process.env['GEMINI_CLI_TRUSTED_FOLDERS_PATH']) {
+    return process.env['GEMINI_CLI_TRUSTED_FOLDERS_PATH'];
+  }
+  return path.join(USER_SETTINGS_DIR, TRUSTED_FOLDERS_FILENAME);
+}
 
 export enum TrustLevel {
   TRUST_FOLDER = 'TRUST_FOLDER',
@@ -106,7 +113,7 @@ export function loadTrustedFolders(): LoadedTrustedFolders {
   const errors: TrustedFoldersError[] = [];
   const userConfig: Record<string, TrustLevel> = {};
 
-  const userPath = USER_TRUSTED_FOLDERS_PATH;
+  const userPath = getTrustedFoldersPath();
 
   // Load user trusted folders
   try {
@@ -146,7 +153,7 @@ export function saveTrustedFolders(
     fs.writeFileSync(
       trustedFoldersFile.path,
       JSON.stringify(trustedFoldersFile.config, null, 2),
-      'utf-8',
+      { encoding: 'utf-8', mode: 0o600 },
     );
   } catch (error) {
     console.error('Error saving trusted folders file:', error);
@@ -159,11 +166,7 @@ export function isFolderTrustEnabled(settings: Settings): boolean {
   return folderTrustSetting;
 }
 
-export function isWorkspaceTrusted(settings: Settings): boolean | undefined {
-  if (!isFolderTrustEnabled(settings)) {
-    return true;
-  }
-
+function getWorkspaceTrustFromLocalConfig(): boolean | undefined {
   const folders = loadTrustedFolders();
 
   if (folders.errors.length > 0) {
@@ -175,4 +178,18 @@ export function isWorkspaceTrusted(settings: Settings): boolean | undefined {
   }
 
   return folders.isPathTrusted(process.cwd());
+}
+
+export function isWorkspaceTrusted(settings: Settings): boolean | undefined {
+  if (!isFolderTrustEnabled(settings)) {
+    return true;
+  }
+
+  const ideTrust = ideContextStore.get()?.workspaceState?.isTrusted;
+  if (ideTrust !== undefined) {
+    return ideTrust;
+  }
+
+  // Fall back to the local user configuration
+  return getWorkspaceTrustFromLocalConfig();
 }
