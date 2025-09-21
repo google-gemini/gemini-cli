@@ -5,8 +5,9 @@
  */
 
 import { BaseDotNetTool } from './base-dotnet-tool.js';
-import type { ToolResult } from './tools.js';
+import type { ToolResult, ToolCallConfirmationDetails, ToolExecuteConfirmationDetails, ToolConfirmationOutcome } from './tools.js';
 import type { Config } from '../config/config.js';
+import { ApprovalMode } from '../config/config.js';
 
 interface ExcelParams {
   /** Excel file path */
@@ -224,6 +225,38 @@ export class ExcelTool extends BaseDotNetTool<ExcelParams, ExcelResult> {
   protected isModifyOperation(params: ExcelParams): boolean {
     const modifyOps = ['write', 'create', 'style', 'merge', 'addSheet', 'deleteSheet', 'editSheet', 'csvImport'];
     return modifyOps.includes(params.op);
+  }
+
+  override async shouldConfirmExecute(
+    _abortSignal: AbortSignal,
+    params: ExcelParams,
+  ): Promise<ToolCallConfirmationDetails | false> {
+    if (!this.config || this.config.getApprovalMode() === ApprovalMode.YOLO) {
+      return false;
+    }
+
+    // Check if it's a destructive Excel operation
+    const isDestructiveOperation = this.isDestructiveExcelOperation(params);
+
+    if (!isDestructiveOperation) {
+      return false;
+    }
+
+    const confirmationDetails: ToolExecuteConfirmationDetails = {
+      type: 'exec',
+      title: 'Confirm Excel Operation',
+      command: `excel(${params.op}): ${params.file}`,
+      rootCommand: 'excel',
+      onConfirm: async (_outcome: ToolConfirmationOutcome) => {
+        // No persistent approval for Excel operations
+      },
+    };
+    return confirmationDetails;
+  }
+
+  private isDestructiveExcelOperation(params: ExcelParams): boolean {
+    const destructiveOps = ['write', 'create', 'style', 'merge', 'addSheet', 'deleteSheet', 'editSheet', 'csvImport'];
+    return destructiveOps.includes(params.op);
   }
 
 }

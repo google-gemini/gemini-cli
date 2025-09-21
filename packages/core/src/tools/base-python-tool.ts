@@ -23,8 +23,13 @@ import {
 import { getErrorMessage } from '../utils/errors.js';
 import { ShellExecutionService } from '../services/shellExecutionService.js';
 
+interface PythonOperationParams {
+  /** Operation type */
+  op?: string;
+}
+
 export abstract class BasePythonTool<
-  TParams extends object,
+  TParams extends PythonOperationParams,
   TResult extends ToolResult,
 > extends BaseDeclarativeTool<TParams, TResult> {
   private readonly allowlist = new Set<string>();
@@ -73,7 +78,7 @@ export abstract class BasePythonTool<
   /**
    * Get the requirements for this specific tool execution
    */
-  protected getRequirements(params: TParams): string[] {
+  protected getRequirements(_params: TParams): string[] {
     return this.defaultRequirements;
   }
 
@@ -99,7 +104,7 @@ export abstract class BasePythonTool<
 }
 
 class BasePythonToolInvocation<
-  TParams extends object,
+  TParams extends PythonOperationParams,
   TResult extends ToolResult,
 > extends BaseToolInvocation<TParams, TResult> {
   constructor(
@@ -131,7 +136,7 @@ class BasePythonToolInvocation<
   }
 
   override async shouldConfirmExecute(
-    abortSignal: AbortSignal,
+    _abortSignal: AbortSignal,
   ): Promise<ToolCallConfirmationDetails | false> {
     // Check if Python execution is already allowed
     const rootCommand = `${this.tool.name}_python`;
@@ -167,7 +172,7 @@ class BasePythonToolInvocation<
   override async execute(
     signal: AbortSignal,
     updateOutput?: (output: string) => void,
-    terminalColumns?: number,
+    _terminalColumns?: number,
   ): Promise<TResult> {
     try {
       // Get embedded Python path
@@ -257,7 +262,7 @@ class BasePythonToolInvocation<
       // Create temporary Python script file
       const tempDir = os.tmpdir();
       const timestamp = Date.now();
-      const operation = (this.params as any)?.op || 'unknown';
+      const operation = this.params.op || 'unknown';
       const scriptPath = path.join(tempDir, `${this.tool.name}_${operation}_${timestamp}.py`);
       
       // Write Python code to temporary file with UTF-8 encoding and Base64 output wrapper

@@ -18,6 +18,7 @@ const mockConfig: Config = {
 interface TestParams {
   message: string;
   count: number;
+  op?: string;
 }
 
 interface TestResult extends ToolResult {

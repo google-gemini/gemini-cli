@@ -14,18 +14,20 @@ import {
   BaseToolInvocation,
   Kind,  
 } from './tools.js';
-import type { 
-  ToolResult, 
+import type {
+  ToolResult,
   ToolInvocation,
   ToolCallConfirmationDetails,
-  ToolExecuteConfirmationDetails,
-  ToolConfirmationOutcome,
 } from './tools.js';
 import { ToolErrorType } from './tool-error.js';
 import { BackupableTool } from './backupable-tool.js';
 import type { FileOperationParams } from './backupable-tool.js';
 import type { Config } from '../config/config.js';
-import { ApprovalMode } from '../config/config.js';
+
+interface DotNetOperationParams {
+  /** Operation type */
+  op?: string;
+}
 
 interface DotNetRequest {
   module: string;
@@ -46,8 +48,18 @@ interface DotNetResponse {
  * Base class for tools that delegate processing to .NET modules
  * Includes automatic file backup functionality for modify operations
  */
-export abstract class BaseDotNetTool<TParams extends FileOperationParams, TResult extends ToolResult>
+export abstract class BaseDotNetTool<TParams extends FileOperationParams & DotNetOperationParams, TResult extends ToolResult>
   extends BackupableTool<TParams, TResult> {
+
+  /**
+   * Override point for subclasses to implement custom confirmation logic
+   */
+  async shouldConfirmExecute(
+    _abortSignal: AbortSignal,
+    _params: TParams,
+  ): Promise<ToolCallConfirmationDetails | false> {
+    return false;
+  }
 
   constructor(
     name: string,
@@ -74,7 +86,7 @@ export abstract class BaseDotNetTool<TParams extends FileOperationParams, TResul
    * Create .NET invocation as the original invocation
    */
   protected createOriginalInvocation(params: TParams): ToolInvocation<TParams, TResult> {
-    return new DotNetInvocation(params, this.dotnetModule, this.config);
+    return new DotNetInvocation(params, this.dotnetModule, this.config, this);
   }
 
 }
@@ -82,7 +94,7 @@ export abstract class BaseDotNetTool<TParams extends FileOperationParams, TResul
 /**
  * Handles the invocation of .NET processors for tool execution
  */
-class DotNetInvocation<TParams extends object, TResult extends ToolResult>
+class DotNetInvocation<TParams extends FileOperationParams & DotNetOperationParams, TResult extends ToolResult>
   extends BaseToolInvocation<TParams, TResult> {
 
   private static readonly __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -92,7 +104,8 @@ class DotNetInvocation<TParams extends object, TResult extends ToolResult>
   constructor(
     params: TParams,
     private moduleName: string,
-    private config?: Config
+    _config?: Config,
+    private tool?: BaseDotNetTool<TParams, TResult>
   ) {
     super(params);
   }
@@ -102,35 +115,13 @@ class DotNetInvocation<TParams extends object, TResult extends ToolResult>
   }
 
   override async shouldConfirmExecute(
-    _abortSignal: AbortSignal,
+    abortSignal: AbortSignal,
   ): Promise<ToolCallConfirmationDetails | false> {
-    if (!this.config || this.config.getApprovalMode() === ApprovalMode.YOLO) {
-      return false;
+    // Delegate to the tool's shouldConfirmExecute method if available
+    if (this.tool) {
+      return await this.tool.shouldConfirmExecute(abortSignal, this.params);
     }
-
-    // For Excel operations, check if it's a destructive operation
-    const params = this.params as any;
-    const isDestructiveOperation = this.isDestructiveExcelOperation(params);
-    
-    if (!isDestructiveOperation) {
-      return false;
-    }
-
-    const confirmationDetails: ToolExecuteConfirmationDetails = {
-      type: 'exec',
-      title: 'Confirm Excel Operation',
-      command: `${this.moduleName}(${params.op}): ${params.file}`,
-      rootCommand: this.moduleName,
-      onConfirm: async (_outcome: ToolConfirmationOutcome) => {
-        // No persistent approval for .NET tools
-      },
-    };
-    return confirmationDetails;
-  }
-
-  private isDestructiveExcelOperation(params: any): boolean {
-    const destructiveOps = ['write', 'create', 'style', 'merge', 'addSheet', 'deleteSheet', 'editSheet', 'csvImport'];
-    return destructiveOps.includes(params.op);
+    return false;
   }
 
   async execute(): Promise<TResult> {
@@ -145,7 +136,7 @@ class DotNetInvocation<TParams extends object, TResult extends ToolResult>
       // Create request
       const request: DotNetRequest = {
         module: this.moduleName,
-        operation: (this.params as any).op || 'process',
+        operation: this.params.op || 'process',
         parameters: this.params as Record<string, unknown>,
         requestId,
         responseFile,
@@ -170,8 +161,8 @@ class DotNetInvocation<TParams extends object, TResult extends ToolResult>
       const message = error instanceof Error ? error.message : 'Unknown error';
       return {
         success: false,
-        llmContent: `${this.moduleName}(${(this.params as any).op || 'process'}): FAILED - ${message}`,
-        returnDisplay: `${this.moduleName}(${(this.params as any).op || 'process'}): ${message}`,
+        llmContent: `${this.moduleName}(${this.params.op || 'process'}): FAILED - ${message}`,
+        returnDisplay: `${this.moduleName}(${this.params.op || 'process'}): ${message}`,
         error: {
           message,
           type: ToolErrorType.EXECUTION_FAILED,
@@ -246,8 +237,8 @@ class DotNetInvocation<TParams extends object, TResult extends ToolResult>
       const errorMessage = dotNetResponse.error || 'Unknown error';
       return {
         success: false,
-        llmContent: `${this.moduleName}(${(this.params as any).op || 'process'}): FAILED - ${errorMessage}`,
-        returnDisplay: `${this.moduleName}(${(this.params as any).op || 'process'}): ${errorMessage}`,
+        llmContent: `${this.moduleName}(${this.params.op || 'process'}): FAILED - ${errorMessage}`,
+        returnDisplay: `${this.moduleName}(${this.params.op || 'process'}): ${errorMessage}`,
         error: {
           message: errorMessage,
           type: ToolErrorType.EXECUTION_FAILED,
