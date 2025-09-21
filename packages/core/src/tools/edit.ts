@@ -20,7 +20,10 @@ import { makeRelative, shortenPath } from '../utils/paths.js';
 import { isNodeError } from '../utils/errors.js';
 import type { Config } from '../config/config.js';
 import { ApprovalMode } from '../config/config.js';
-import { ensureCorrectEdit } from '../utils/editCorrector.js';
+import {
+  ensureCorrectEdit,
+  ensureCorrectFileContent,
+} from '../utils/editCorrector.js';
 import { DEFAULT_DIFF_OPTIONS, getDiffStat } from './diffOptions.js';
 import { ReadFileTool } from './read-file.js';
 import { logFileOperation } from '../telemetry/loggers.js';
@@ -34,6 +37,7 @@ import type {
 } from './modifiable-tool.js';
 import { IdeClient } from '../ide/ide-client.js';
 import { safeLiteralReplace } from '../utils/textUtils.js';
+import { FileStateTracker, type FileState } from '../utils/fileStateTracker.js';
 
 export function applyReplacement(
   currentContent: string | null,
@@ -99,13 +103,18 @@ interface CalculatedEdit {
   occurrences: number;
   error?: { display: string; raw: string; type: ToolErrorType };
   isNewFile: boolean;
+  fileState?: FileState;
 }
 
 class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
+  private readonly fileStateTracker: FileStateTracker;
+
   constructor(
     private readonly config: Config,
     public params: EditToolParams,
-  ) {}
+  ) {
+    this.fileStateTracker = new FileStateTracker();
+  }
 
   toolLocations(): ToolLocation[] {
     return [{ path: this.params.file_path }];
@@ -132,6 +141,8 @@ class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
       | { display: string; raw: string; type: ToolErrorType }
       | undefined = undefined;
 
+    let fileState: FileState | undefined;
+
     try {
       currentContent = await this.config
         .getFileSystemService()
@@ -139,6 +150,14 @@ class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
       // Normalize line endings to LF for consistent processing.
       currentContent = currentContent.replace(/\r\n/g, '\n');
       fileExists = true;
+
+      // Capture file state for freshness checking
+      try {
+        fileState = await this.fileStateTracker.getFileState(params.file_path);
+      } catch {
+        // If we can't capture file state, continue without it
+        // This shouldn't happen since we just read the file successfully
+      }
     } catch (err: unknown) {
       if (!isNodeError(err) || err.code !== 'ENOENT') {
         // Rethrow unexpected FS errors (permissions, etc.)
@@ -233,6 +252,7 @@ class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
       occurrences,
       error,
       isNewFile,
+      fileState,
     };
   }
 
@@ -359,6 +379,43 @@ class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
     }
 
     try {
+      // Check file freshness before writing to prevent data loss
+      let wasFileReRead = false;
+      if (editData.fileState && !editData.isNewFile) {
+        const freshnessResult = await this.fileStateTracker.checkFreshness(
+          this.params.file_path,
+          editData.fileState,
+        );
+
+        if (!freshnessResult.isFresh) {
+          wasFileReRead = true;
+          // File has changed externally - re-read current content and re-calculate edit
+          const currentContent = freshnessResult.currentState?.content;
+          if (currentContent !== undefined) {
+            // Re-calculate edit with current content
+            const correctedEdit = await ensureCorrectEdit(
+              this.params.file_path,
+              currentContent,
+              this.params,
+              this.config.getGeminiClient(),
+              this.config.getBaseLlmClient(),
+              signal,
+            );
+            editData.newContent = correctedEdit.params.new_string;
+            editData.occurrences = correctedEdit.occurrences;
+          } else {
+            // File was deleted - create new file with proposed content
+            const correctedFileContent = await ensureCorrectFileContent(
+              editData.newContent,
+              this.config.getBaseLlmClient(),
+              signal,
+            );
+            editData.newContent = correctedFileContent;
+            editData.isNewFile = true;
+          }
+        }
+      }
+
       this.ensureParentDirectoriesExist(this.params.file_path);
       await this.config
         .getFileSystemService()
@@ -417,6 +474,12 @@ class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
           ? `Created new file: ${this.params.file_path} with provided content.`
           : `Successfully modified file: ${this.params.file_path} (${editData.occurrences} replacements).`,
       ];
+
+      if (wasFileReRead) {
+        llmSuccessMessageParts.push(
+          'File was automatically re-read due to external changes before applying the edit.',
+        );
+      }
       if (this.params.modified_by_user) {
         llmSuccessMessageParts.push(
           `User modified the \`new_string\` content to be: ${this.params.new_string}.`,

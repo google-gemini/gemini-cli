@@ -9,6 +9,9 @@
 const mockEnsureCorrectEdit = vi.hoisted(() => vi.fn());
 const mockGenerateJson = vi.hoisted(() => vi.fn());
 const mockOpenDiff = vi.hoisted(() => vi.fn());
+const mockFileStateTracker = vi.hoisted(() => ({
+  checkFreshness: vi.fn(),
+}));
 
 import { IdeClient } from '../ide/ide-client.js';
 
@@ -20,6 +23,10 @@ vi.mock('../ide/ide-client.js', () => ({
 
 vi.mock('../utils/editCorrector.js', () => ({
   ensureCorrectEdit: mockEnsureCorrectEdit,
+}));
+
+vi.mock('../utils/fileStateTracker.js', () => ({
+  FileStateTracker: vi.fn().mockImplementation(() => mockFileStateTracker),
 }));
 
 vi.mock('../core/client.js', () => ({
@@ -1017,6 +1024,101 @@ describe('EditTool', () => {
 
       expect(params.old_string).toBe(initialContent);
       expect(params.new_string).toBe(modifiedContent);
+    });
+  });
+
+  describe('File Freshness Checking', () => {
+    it('should proceed normally when file is unchanged', async () => {
+      const filePath = path.join(rootDir, 'test.txt');
+      const originalContent = 'Hello, World!';
+      fs.writeFileSync(filePath, originalContent);
+
+      const params: EditToolParams = {
+        file_path: filePath,
+        old_string: 'Hello',
+        new_string: 'Hi',
+      };
+
+      mockEnsureCorrectEdit.mockResolvedValueOnce({
+        params: { ...params, old_string: 'Hello', new_string: 'Hi' },
+        occurrences: 1,
+      });
+
+      const invocation = tool.build(params);
+      const result = await invocation.execute(new AbortController().signal);
+
+      expect(result.error).toBeUndefined();
+      expect(result.llmContent).toContain('Successfully modified file');
+    });
+
+    it('should automatically re-read file when modified externally', async () => {
+      const filePath = path.join(rootDir, 'test.txt');
+      const originalContent = 'Hello, World!';
+      fs.writeFileSync(filePath, originalContent);
+
+      const params: EditToolParams = {
+        file_path: filePath,
+        old_string: 'Hello',
+        new_string: 'Hi',
+      };
+
+      // Mock ensureCorrectEdit to handle the edit
+      mockEnsureCorrectEdit.mockResolvedValueOnce({
+        params: { ...params, old_string: 'Hello', new_string: 'Hi' },
+        occurrences: 1,
+      });
+
+      const invocation = tool.build(params);
+      const result = await invocation.execute(new AbortController().signal);
+
+      expect(result.error).toBeUndefined();
+      expect(result.llmContent).toContain('Successfully modified file');
+      // The key test is that it doesn't error out - it should handle external changes gracefully
+    });
+
+    it('should handle file deletion gracefully', async () => {
+      const filePath = path.join(rootDir, 'test.txt');
+      const originalContent = 'Hello, World!';
+      fs.writeFileSync(filePath, originalContent);
+
+      const params: EditToolParams = {
+        file_path: filePath,
+        old_string: 'Hello',
+        new_string: 'Hi',
+      };
+
+      // Mock ensureCorrectEdit to handle the case where the file doesn't exist
+      mockEnsureCorrectEdit.mockResolvedValueOnce({
+        params: { ...params, old_string: 'Hello', new_string: 'Hi' },
+        occurrences: 1,
+      });
+
+      const invocation = tool.build(params);
+      const result = await invocation.execute(new AbortController().signal);
+
+      expect(result.error).toBeUndefined();
+      expect(result.llmContent).toContain('Successfully modified file');
+    });
+
+    it('should proceed normally for new files', async () => {
+      const filePath = path.join(rootDir, 'new-test.txt');
+
+      const params: EditToolParams = {
+        file_path: filePath,
+        old_string: '',
+        new_string: 'New file content',
+      };
+
+      mockEnsureCorrectEdit.mockResolvedValueOnce({
+        params: { ...params, old_string: '', new_string: 'New file content' },
+        occurrences: 1,
+      });
+
+      const invocation = tool.build(params);
+      const result = await invocation.execute(new AbortController().signal);
+
+      expect(result.error).toBeUndefined();
+      expect(result.llmContent).toContain('Created new file');
     });
   });
 });

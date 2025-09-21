@@ -34,6 +34,11 @@ export enum ToolErrorType {
   EDIT_EXPECTED_OCCURRENCE_MISMATCH = 'edit_expected_occurrence_mismatch',
   EDIT_NO_CHANGE = 'edit_no_change',
 
+  // File Freshness Errors
+  FILE_STALE = 'file_stale',
+  FILE_CONFLICT_DETECTED = 'file_conflict_detected',
+  FILE_EXTERNAL_CHANGE = 'file_external_change',
+
   // Glob-specific Errors
   GLOB_EXECUTION_ERROR = 'glob_execution_error',
 

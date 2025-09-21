@@ -41,6 +41,7 @@ import { FileOperationEvent } from '../telemetry/types.js';
 import { FileOperation } from '../telemetry/metrics.js';
 import { getSpecificMimeType } from '../utils/fileUtils.js';
 import { getLanguageFromFilePath } from '../utils/language-detection.js';
+import { FileStateTracker, type FileState } from '../utils/fileStateTracker.js';
 
 /**
  * Parameters for the WriteFile tool
@@ -71,6 +72,7 @@ interface GetCorrectedFileContentResult {
   originalContent: string;
   correctedContent: string;
   fileExists: boolean;
+  fileState?: FileState;
   error?: { message: string; code?: string };
 }
 
@@ -83,12 +85,23 @@ export async function getCorrectedFileContent(
   let originalContent = '';
   let fileExists = false;
   let correctedContent = proposedContent;
+  let fileState: FileState | undefined;
+
+  const fileStateTracker = new FileStateTracker();
 
   try {
     originalContent = await config
       .getFileSystemService()
       .readTextFile(filePath);
     fileExists = true; // File exists and was read
+
+    // Capture file state for freshness checking
+    try {
+      fileState = await fileStateTracker.getFileState(filePath);
+    } catch {
+      // If we can't capture file state, continue without it
+      // This shouldn't happen since we just read the file successfully
+    }
   } catch (err) {
     if (isNodeError(err) && err.code === 'ENOENT') {
       fileExists = false;
@@ -102,7 +115,13 @@ export async function getCorrectedFileContent(
         code: isNodeError(err) ? err.code : undefined,
       };
       // Return early as we can't proceed with content correction meaningfully
-      return { originalContent, correctedContent, fileExists, error };
+      return {
+        originalContent,
+        correctedContent,
+        fileExists,
+        fileState,
+        error,
+      };
     }
   }
 
@@ -133,18 +152,21 @@ export async function getCorrectedFileContent(
       abortSignal,
     );
   }
-  return { originalContent, correctedContent, fileExists };
+  return { originalContent, correctedContent, fileExists, fileState };
 }
 
 class WriteFileToolInvocation extends BaseToolInvocation<
   WriteFileToolParams,
   ToolResult
 > {
+  private readonly fileStateTracker: FileStateTracker;
+
   constructor(
     private readonly config: Config,
     params: WriteFileToolParams,
   ) {
     super(params);
+    this.fileStateTracker = new FileStateTracker();
   }
 
   override toolLocations(): ToolLocation[] {
@@ -250,19 +272,59 @@ class WriteFileToolInvocation extends BaseToolInvocation<
       };
     }
 
-    const {
+    let {
       originalContent,
       correctedContent: fileContent,
       fileExists,
+      fileState,
     } = correctedContentResult;
     // fileExists is true if the file existed (and was readable or unreadable but caught by readError).
     // fileExists is false if the file did not exist (ENOENT).
-    const isNewFile =
+    let isNewFile =
       !fileExists ||
       (correctedContentResult.error !== undefined &&
         !correctedContentResult.fileExists);
 
     try {
+      // Check file freshness before writing to prevent data loss (only for existing files)
+      let wasFileReRead = false;
+      if (fileState && fileExists) {
+        const freshnessResult = await this.fileStateTracker.checkFreshness(
+          file_path,
+          fileState,
+        );
+
+        if (!freshnessResult.isFresh) {
+          wasFileReRead = true;
+          // File has changed externally - re-read current content and re-apply corrections
+          const currentContent = freshnessResult.currentState?.content;
+          if (currentContent !== undefined) {
+            // Re-apply content correction to current content
+            const { params: correctedParams } = await ensureCorrectEdit(
+              file_path,
+              currentContent,
+              {
+                old_string: currentContent, // Treat entire current content as old_string
+                new_string: fileContent,
+                file_path,
+              },
+              this.config.getGeminiClient(),
+              this.config.getBaseLlmClient(),
+              abortSignal,
+            );
+            fileContent = correctedParams.new_string;
+          } else {
+            // File was deleted - use the original corrected content
+            fileContent = await ensureCorrectFileContent(
+              fileContent,
+              this.config.getBaseLlmClient(),
+              abortSignal,
+            );
+            isNewFile = true;
+          }
+        }
+      }
+
       const dirName = path.dirname(file_path);
       if (!fs.existsSync(dirName)) {
         fs.mkdirSync(dirName, { recursive: true });
@@ -306,6 +368,11 @@ class WriteFileToolInvocation extends BaseToolInvocation<
       if (modified_by_user) {
         llmSuccessMessageParts.push(
           `User modified the \`content\` to be: ${content}`,
+        );
+      }
+      if (wasFileReRead) {
+        llmSuccessMessageParts.push(
+          'File was automatically re-read due to external changes before writing.',
         );
       }
 
