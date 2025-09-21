@@ -5,9 +5,9 @@
  */
 
 import { getNotificationSettings, initNotifications } from '../../notifications/manager.js';
-import { NotificationEventType } from '../../notifications/types.js';
+import type { NotificationEventType } from '../../notifications/types.js';
 import { loadSettings } from '../../config/settings.js';
-import { CommandModule } from 'yargs';
+import type { CommandModule } from 'yargs';
 
 export const statusCommand: CommandModule = {
   command: 'status',

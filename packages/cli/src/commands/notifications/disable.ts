@@ -6,7 +6,7 @@
 
 import { setGlobalNotificationsEnabled, initNotifications } from '../../notifications/manager.js';
 import { loadSettings } from '../../config/settings.js';
-import { CommandModule } from 'yargs';
+import type { CommandModule } from 'yargs';
 
 export const disableCommand: CommandModule = {
   command: 'disable',

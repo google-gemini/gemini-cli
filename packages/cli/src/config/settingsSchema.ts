@@ -11,7 +11,7 @@ import type {
   AuthType,
   ChatCompressionSettings,
 } from '@google/gemini-cli-core';
-import { NotificationSettings } from '../notifications/types.js';
+import type { NotificationSettings } from '../notifications/types.js';
 import {
   DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
   DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
