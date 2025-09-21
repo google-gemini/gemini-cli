@@ -20,26 +20,14 @@ concurrency:
     ${{ github.ref != 'refs/heads/main' && !startsWith(github.ref, 'refs/heads/release/') }}
 
 jobs:
-  merge_queue_skipper:
-    name: 'Merge Queue Skipper'
-    runs-on: 'ubuntu-latest'
-    outputs:
-      skip: '${{ steps.skipper.outputs.skip }}'
-    steps:
-      - name: 'Check if skip'
-        id: 'skipper'
-        uses: 'fkirc/skip-duplicate-actions@f75f66ce1886f00957d99748a42c724f4330bdcf' # ratchet:fkirc/skip-duplicate-actions@v5
-        with:
-          concurrent_skipping: 'never'
-          skip_after_successful_duplicate: 'true'
-          paths_ignore: '["**.md", "docs/**"]'
-          do_not_skip: '["push", "workflow_dispatch", "schedule"]'
-
   build:
     name: 'Build Project'
     runs-on: 'gemini-cli-ubuntu-16-core'
-    needs: 'merge_queue_skipper'
-    if: "needs.merge_queue_skipper.outputs.skip != 'true'"
+    if: |
+      github.event_name == 'push' ||
+      github.event_name == 'merge_group' ||
+      (github.event.pull_request.head.repo.full_name == github.repository) ||
+      (github.event.label.name == 'maintainer:e2e:ok')
     steps:
       - name: 'Checkout'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
@@ -57,26 +45,23 @@ jobs:
         run: 'npm run build'
 
       - name: 'Archive build artifacts'
-        run: 'tar -cvf build-artifacts.tar bundle/ node_modules/ packages/ package.json npm-shrinkwrap.json'
+        run: 'tar -cvf build-artifacts.tar bundle/ node_modules/ packages/ package.json'
 
       - name: 'Upload build artifacts'
         uses: 'actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02'
         with:
-          name: 'build-artifacts'
+          name: 'build-artifacts-${{ github.run_id }}'
           path: 'build-artifacts.tar'
 
   e2e_linux:
     name: 'E2E Test (Linux) - ${{ matrix.sandbox }}'
     needs:
-      - 'merge_queue_skipper'
       - 'build'
     if: |
-      needs.merge_queue_skipper.outputs.skip != 'true' && (
-        github.event_name == 'push' ||
-        github.event_name == 'merge_group' ||
-        (github.event.pull_request.head.repo.full_name == github.repository) ||
-        (github.event.label.name == 'maintainer:e2e:ok')
-      )
+      github.event_name == 'push' ||
+      github.event_name == 'merge_group' ||
+      (github.event.pull_request.head.repo.full_name == github.repository) ||
+      (github.event.label.name == 'maintainer:e2e:ok')
     runs-on: 'gemini-cli-ubuntu-16-core'
     strategy:
       fail-fast: false
@@ -102,7 +87,7 @@ jobs:
       - name: 'Download build artifacts'
         uses: 'actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093'
         with:
-          name: 'build-artifacts'
+          name: 'build-artifacts-${{ github.run_id }}'
           path: '.'
 
       - name: 'Extract build artifacts'
@@ -134,15 +119,12 @@ jobs:
   e2e_slow_platforms:
     name: 'Slow E2E - Mac'
     needs:
-      - 'merge_queue_skipper'
       - 'build'
     if: |
-      needs.merge_queue_skipper.outputs.skip != 'true' && (
-        github.event_name == 'push' ||
-        github.event_name == 'merge_group' ||
-        (github.event.pull_request.head.repo.full_name == github.repository) ||
-        (github.event.label.name == 'maintainer:e2e:ok')
-      )
+      github.event_name == 'push' ||
+      github.event_name == 'merge_group' ||
+      (github.event.pull_request.head.repo.full_name == github.repository) ||
+      (github.event.label.name == 'maintainer:e2e:ok')
     runs-on: '${{ matrix.os }}'
     continue-on-error: true
     strategy:
@@ -168,7 +150,7 @@ jobs:
       - name: 'Download build artifacts'
         uses: 'actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093'
         with:
-          name: 'build-artifacts'
+          name: 'build-artifacts-${{ github.run_id }}'
           path: '.'
 
       - name: 'Extract build artifacts'
@@ -196,9 +178,11 @@ jobs:
 
   e2e_windows:
     name: 'Slow E2E - Win'
-    if: "needs.merge_queue_skipper.outputs.skip != 'true'"
-    needs:
-      - 'merge_queue_skipper'
+    if: |
+      github.event_name == 'push' ||
+      github.event_name == 'merge_group' ||
+      (github.event.pull_request.head.repo.full_name == github.repository) ||
+      (github.event.label.name == 'maintainer:e2e:ok')
     runs-on: 'gemini-cli-windows-16-core'
     continue-on-error: true
 
@@ -256,9 +240,14 @@ jobs:
 
   e2e:
     name: 'E2E'
-    if: 'always()'
+    if: |
+      always() && (
+        github.event_name == 'push' ||
+        github.event_name == 'merge_group' ||
+        (github.event.pull_request.head.repo.full_name == github.repository) ||
+        (github.event.label.name == 'maintainer:e2e:ok')
+      )
     needs:
-      - 'merge_queue_skipper'
       - 'e2e_linux'
     runs-on: 'gemini-cli-ubuntu-16-core'
     steps:
