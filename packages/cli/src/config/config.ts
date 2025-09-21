@@ -82,6 +82,7 @@ export interface CliArgs {
   includeDirectories: string[] | undefined;
   screenReader: boolean | undefined;
   useSmartEdit: boolean | undefined;
+  useWriteTodos: boolean | undefined;
   promptWords: string[] | undefined;
   outputFormat: string | undefined;
 }
@@ -228,6 +229,11 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
           type: 'array',
           string: true,
           description: 'Allowed MCP server names',
+          coerce: (mcpServerNames: string[]) =>
+            // Handle comma-separated values
+            mcpServerNames.flatMap((mcpServerName) =>
+              mcpServerName.split(',').map((m) => m.trim()),
+            ),
         })
         .option('allowed-tools', {
           type: 'array',
@@ -243,6 +249,11 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
           string: true,
           description:
             'A list of extensions to use. If not provided, all extensions are used.',
+          coerce: (extensions: string[]) =>
+            // Handle comma-separated values
+            extensions.flatMap((extension) =>
+              extension.split(',').map((e) => e.trim()),
+            ),
         })
         .option('list-extensions', {
           alias: 'l',
@@ -261,7 +272,6 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
         .option('screen-reader', {
           type: 'boolean',
           description: 'Enable screen reader mode for accessibility.',
-          default: false,
         })
         .option('output-format', {
           alias: 'o',
@@ -495,8 +505,11 @@ export async function loadCliConfig(
 
   const policyEngineConfig = createPolicyEngineConfig(settings, approvalMode);
 
+  // Fix: If promptWords are provided, always use non-interactive mode
+  const hasPromptWords = argv.promptWords && argv.promptWords.length > 0;
   const interactive =
-    !!argv.promptInteractive || (process.stdin.isTTY && question.length === 0);
+    !!argv.promptInteractive ||
+    (process.stdin.isTTY && !hasPromptWords && !argv.prompt);
   // In non-interactive mode, exclude tools that require a prompt.
   const extraExcludes: string[] = [];
   if (!interactive && !argv.experimentalAcp) {
@@ -648,6 +661,7 @@ export async function loadCliConfig(
     enableToolOutputTruncation: settings.tools?.enableToolOutputTruncation,
     eventEmitter: appEvents,
     useSmartEdit: argv.useSmartEdit ?? settings.useSmartEdit,
+    useWriteTodos: argv.useWriteTodos ?? settings.useWriteTodos,
     output: {
       format: (argv.outputFormat ?? settings.output?.format) as OutputFormat,
     },
