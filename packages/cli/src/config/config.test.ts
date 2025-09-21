@@ -296,6 +296,34 @@ describe('parseArguments', () => {
     mockExit.mockRestore();
     mockConsoleError.mockRestore();
   });
+
+  it('should support comma-separated values for --allowed-tools', async () => {
+    process.argv = [
+      'node',
+      'script.js',
+      '--allowed-tools',
+      'read_file,ShellTool(git status)',
+    ];
+    const argv = await parseArguments({} as Settings);
+    expect(argv.allowedTools).toEqual(['read_file', 'ShellTool(git status)']);
+  });
+
+  it('should support comma-separated values for --allowed-mcp-server-names', async () => {
+    process.argv = [
+      'node',
+      'script.js',
+      '--allowed-mcp-server-names',
+      'server1,server2',
+    ];
+    const argv = await parseArguments({} as Settings);
+    expect(argv.allowedMcpServerNames).toEqual(['server1', 'server2']);
+  });
+
+  it('should support comma-separated values for --extensions', async () => {
+    process.argv = ['node', 'script.js', '--extensions', 'ext1,ext2'];
+    const argv = await parseArguments({} as Settings);
+    expect(argv.extensions).toEqual(['ext1', 'ext2']);
+  });
 });
 
 describe('loadCliConfig', () => {
@@ -1791,6 +1819,60 @@ describe('loadCliConfig useRipgrep', () => {
       const config = await loadCliConfig(settings, [], 'test-session', argv);
       expect(config.getUseModelRouter()).toBe(false);
     });
+  });
+});
+
+describe('screenReader configuration', () => {
+  const originalArgv = process.argv;
+
+  beforeEach(() => {
+    vi.resetAllMocks();
+    vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
+    vi.stubEnv('GEMINI_API_KEY', 'test-api-key');
+  });
+
+  afterEach(() => {
+    process.argv = originalArgv;
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
+  });
+
+  it('should use screenReader value from settings if CLI flag is not present (settings true)', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments({} as Settings);
+    const settings: Settings = {
+      ui: { accessibility: { screenReader: true } },
+    };
+    const config = await loadCliConfig(settings, [], 'test-session', argv);
+    expect(config.getScreenReader()).toBe(true);
+  });
+
+  it('should use screenReader value from settings if CLI flag is not present (settings false)', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments({} as Settings);
+    const settings: Settings = {
+      ui: { accessibility: { screenReader: false } },
+    };
+    const config = await loadCliConfig(settings, [], 'test-session', argv);
+    expect(config.getScreenReader()).toBe(false);
+  });
+
+  it('should prioritize --screen-reader CLI flag (true) over settings (false)', async () => {
+    process.argv = ['node', 'script.js', '--screen-reader'];
+    const argv = await parseArguments({} as Settings);
+    const settings: Settings = {
+      ui: { accessibility: { screenReader: false } },
+    };
+    const config = await loadCliConfig(settings, [], 'test-session', argv);
+    expect(config.getScreenReader()).toBe(true);
+  });
+
+  it('should be false by default when no flag or setting is present', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments({} as Settings);
+    const settings: Settings = {};
+    const config = await loadCliConfig(settings, [], 'test-session', argv);
+    expect(config.getScreenReader()).toBe(false);
   });
 });
 

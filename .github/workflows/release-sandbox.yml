@@ -1,0 +1,33 @@
+name: 'Release Sandbox'
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'The branch, tag, or SHA to release from.'
+        required: false
+        type: 'string'
+        default: 'main'
+      dry-run:
+        description: 'Whether this is a dry run.'
+        required: false
+        type: 'boolean'
+        default: true
+
+jobs:
+  build:
+    runs-on: 'ubuntu-latest'
+    steps:
+      - name: 'Checkout'
+        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
+        with:
+          ref: '${{ github.event.inputs.ref || github.sha }}'
+          fetch-depth: 0
+      - name: 'Push'
+        uses: './.github/actions/push-sandbox'
+        with:
+          github-actor: '${{ github.actor }}'
+          github-secret: '${{ secrets.GITHUB_TOKEN }}'
+          github-sha: '${{ github.event.inputs.ref || github.sha }}'
+          github-ref-name: '${{github.event.inputs.ref}}'
+          dry-run: '${{ github.event.inputs.dry-run }}'
