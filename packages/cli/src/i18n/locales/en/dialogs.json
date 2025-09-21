@@ -18,8 +18,8 @@
   "settings": {
     "title": "Settings",
     "applyTo": "Apply To",
-    "instructions": "(Use Enter to select",
-    "tabToChangeFocus": ", Tab to change focus)",
+    "instructions": "(Use Enter to select)",
+    "instructionsWithScope": "(Use Enter to select, Tab to change focus)",
     "restartPrompt": "To see changes, Gemini CLI must be restarted. Press r to exit and apply changes now."
   }
 }

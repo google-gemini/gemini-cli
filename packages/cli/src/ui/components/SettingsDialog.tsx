@@ -896,8 +896,9 @@ export function SettingsDialog({
 
         <Box height={1} />
         <Text color={theme.text.secondary}>
-          {t('settings.instructions')}
-          {showScopeSelection ? t('settings.tabToChangeFocus') : ''}
+          {showScopeSelection
+            ? t('settings.instructionsWithScope')
+            : t('settings.instructions')}
         </Text>
         {showRestartPrompt && (
           <Text color={theme.status.warning}>
