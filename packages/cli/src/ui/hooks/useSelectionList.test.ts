@@ -269,6 +269,58 @@ describe('useSelectionList', () => {
     });
   });
 
+  describe('Keyboard Navigation Robustness (Rapid Input)', () => {
+    it('should handle rapid navigation and selection robustly (avoiding stale state)', () => {
+      const { result } = renderHook(() =>
+        useSelectionList({
+          items, // A, B(disabled), C, D. Initial index 0 (A).
+          onSelect: mockOnSelect,
+          onHighlight: mockOnHighlight,
+        }),
+      );
+
+      // Simulate rapid inputs with separate act blocks to allow effects to run
+      if (!activeKeypressHandler) throw new Error('Handler not active');
+
+      const handler = activeKeypressHandler;
+
+      const press = (name: string) => {
+        const key: Key = {
+          name,
+          sequence: name,
+          ctrl: false,
+          meta: false,
+          shift: false,
+          paste: false,
+        };
+        handler(key);
+      };
+
+      // 1. Press Down. Should move 0 (A) -> 2 (C).
+      act(() => {
+        press('down');
+      });
+      // 2. Press Down again. Should move 2 (C) -> 3 (D).
+      act(() => {
+        press('down');
+      });
+      // 3. Press Enter. Should select D.
+      act(() => {
+        press('return');
+      });
+
+      expect(result.current.activeIndex).toBe(3);
+
+      expect(mockOnHighlight).toHaveBeenCalledTimes(2);
+      expect(mockOnHighlight).toHaveBeenNthCalledWith(1, 'C');
+      expect(mockOnHighlight).toHaveBeenNthCalledWith(2, 'D');
+
+      expect(mockOnSelect).toHaveBeenCalledTimes(1);
+      expect(mockOnSelect).toHaveBeenCalledWith('D');
+      expect(mockOnSelect).not.toHaveBeenCalledWith('A');
+    });
+  });
+
   describe('Focus Management (isFocused)', () => {
     it('should activate the keypress handler when focused (default) and items exist', () => {
       const { result } = renderHook(() =>
@@ -367,6 +419,7 @@ describe('useSelectionList', () => {
       const { result } = renderHook(() =>
         useSelectionList({
           items: longList,
+          initialIndex: 1, // Start at index 1 so pressing "1" (index 0) causes a change
           onSelect: mockOnSelect,
           onHighlight: mockOnHighlight,
           showNumbers: true,

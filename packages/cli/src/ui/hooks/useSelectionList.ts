@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useRef, useEffect } from 'react';
+import { useReducer, useRef, useEffect } from 'react';
 import { useKeypress } from './useKeypress.js';
 
 export interface SelectionListItem<T> {
@@ -26,6 +26,46 @@ export interface UseSelectionListResult {
   setActiveIndex: (index: number) => void;
 }
 
+interface SelectionListState {
+  activeIndex: number;
+  pendingHighlight: boolean;
+  pendingSelect: boolean;
+}
+
+type SelectionListAction<T> =
+  | {
+      type: 'SET_ACTIVE_INDEX';
+      payload: {
+        index: number;
+        items: Array<SelectionListItem<T>>;
+      };
+    }
+  | {
+      type: 'MOVE_UP';
+      payload: {
+        items: Array<SelectionListItem<T>>;
+      };
+    }
+  | {
+      type: 'MOVE_DOWN';
+      payload: {
+        items: Array<SelectionListItem<T>>;
+      };
+    }
+  | {
+      type: 'SELECT_CURRENT';
+      payload: {
+        items: Array<SelectionListItem<T>>;
+      };
+    }
+  | {
+      type: 'INITIALIZE';
+      payload: { initialIndex: number; items: Array<SelectionListItem<T>> };
+    }
+  | {
+      type: 'CLEAR_PENDING_FLAGS';
+    };
+
 const NUMBER_INPUT_TIMEOUT_MS = 1000;
 
 /**
@@ -42,7 +82,6 @@ const findNextValidIndex = <T>(
   let nextIndex = currentIndex;
   const step = direction === 'down' ? 1 : -1;
 
-  // Iterate through the list (at most once) until an enabled item is found
   for (let i = 0; i < len; i++) {
     // Calculate the next index, wrapping around if necessary.
     // We add `len` before the modulo to ensure a positive result in JS for negative steps.
@@ -56,6 +95,91 @@ const findNextValidIndex = <T>(
   // If all items are disabled, return the original index
   return currentIndex;
 };
+
+function selectionListReducer<T>(
+  state: SelectionListState,
+  action: SelectionListAction<T>,
+): SelectionListState {
+  switch (action.type) {
+    case 'SET_ACTIVE_INDEX': {
+      const { index, items } = action.payload;
+
+      // Only update if index actually changed and is valid
+      if (index === state.activeIndex) {
+        return state;
+      }
+
+      if (index >= 0 && index < items.length) {
+        return { ...state, activeIndex: index, pendingHighlight: true };
+      }
+      return state;
+    }
+
+    case 'MOVE_UP': {
+      const { items } = action.payload;
+      const newIndex = findNextValidIndex(state.activeIndex, 'up', items);
+      if (newIndex !== state.activeIndex) {
+        return { ...state, activeIndex: newIndex, pendingHighlight: true };
+      }
+      return state;
+    }
+
+    case 'MOVE_DOWN': {
+      const { items } = action.payload;
+      const newIndex = findNextValidIndex(state.activeIndex, 'down', items);
+      if (newIndex !== state.activeIndex) {
+        return { ...state, activeIndex: newIndex, pendingHighlight: true };
+      }
+      return state;
+    }
+
+    case 'SELECT_CURRENT': {
+      return { ...state, pendingSelect: true };
+    }
+
+    case 'INITIALIZE': {
+      const { initialIndex, items } = action.payload;
+
+      if (items.length === 0) {
+        const newIndex = 0;
+        return newIndex === state.activeIndex
+          ? state
+          : { ...state, activeIndex: newIndex };
+      }
+
+      let targetIndex = initialIndex;
+
+      if (targetIndex < 0 || targetIndex >= items.length) {
+        targetIndex = 0;
+      }
+
+      if (items[targetIndex]?.disabled) {
+        const nextValid = findNextValidIndex(targetIndex, 'down', items);
+        targetIndex = nextValid;
+      }
+
+      // Only return new state if activeIndex actually changed
+      // Don't set pendingHighlight on initialization
+      return targetIndex === state.activeIndex
+        ? state
+        : { ...state, activeIndex: targetIndex, pendingHighlight: false };
+    }
+
+    case 'CLEAR_PENDING_FLAGS': {
+      return {
+        ...state,
+        pendingHighlight: false,
+        pendingSelect: false,
+      };
+    }
+
+    default: {
+      const exhaustiveCheck: never = action;
+      console.error(`Unknown selection list action: ${exhaustiveCheck}`);
+      return state;
+    }
+  }
+}
 
 /**
  * A headless hook that provides keyboard navigation and selection logic
@@ -76,46 +200,47 @@ export function useSelectionList<T>({
   isFocused = true,
   showNumbers = false,
 }: UseSelectionListOptions<T>): UseSelectionListResult {
-  const [activeIndex, setActiveIndex] = useState(initialIndex);
+  const [state, dispatch] = useReducer(selectionListReducer<T>, {
+    activeIndex: initialIndex,
+    pendingHighlight: false,
+    pendingSelect: false,
+  });
   const numberInputRef = useRef('');
   const numberInputTimer = useRef<NodeJS.Timeout | null>(null);
 
-  // Synchronize internal state when initialIndex or items change.
-  // Crucially, this ensures the active index is valid (enabled) if possible.
+  // Initialize/synchronize state when initialIndex or items change
   useEffect(() => {
-    let targetIndex = initialIndex;
-
-    if (items.length === 0) {
-      // Reset if the list is empty
-      setActiveIndex(0);
-      return;
-    }
-
-    // Ensure targetIndex is within bounds; default to 0 if out of bounds.
-    if (targetIndex < 0 || targetIndex >= items.length) {
-      targetIndex = 0;
-    }
-
-    // Check if the target index is disabled.
-    if (items[targetIndex]?.disabled) {
-      const nextValid = findNextValidIndex(targetIndex, 'down', items);
-
-      if (nextValid !== targetIndex) {
-        setActiveIndex(nextValid);
-        return;
-      }
-    }
-
-    // We only call setActiveIndex if the value is actually different to avoid unnecessary re-renders.
-    if (targetIndex !== activeIndex) {
-      setActiveIndex(targetIndex);
-    }
-
-    // We depend on the 'items' array reference itself to detect changes in the list structure or disabled status.
-    // We also depend on initialIndex to sync external changes.
-    // We explicitly exclude activeIndex from the dependency array to prevent loops, as this effect sets activeIndex.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    dispatch({ type: 'INITIALIZE', payload: { initialIndex, items } });
   }, [initialIndex, items]);
+
+  // Handle side effects based on state changes
+  useEffect(() => {
+    let needsClear = false;
+
+    if (state.pendingHighlight && items[state.activeIndex]) {
+      onHighlight?.(items[state.activeIndex]!.value);
+      needsClear = true;
+    }
+
+    if (state.pendingSelect && items[state.activeIndex]) {
+      const currentItem = items[state.activeIndex];
+      if (currentItem && !currentItem.disabled) {
+        onSelect(currentItem.value);
+      }
+      needsClear = true;
+    }
+
+    if (needsClear) {
+      dispatch({ type: 'CLEAR_PENDING_FLAGS' });
+    }
+  }, [
+    state.pendingHighlight,
+    state.pendingSelect,
+    state.activeIndex,
+    items,
+    onHighlight,
+    onSelect,
+  ]);
 
   useEffect(
     () => () => {
@@ -138,28 +263,17 @@ export function useSelectionList<T>({
       }
 
       if (name === 'k' || name === 'up') {
-        const newIndex = findNextValidIndex(activeIndex, 'up', items);
-        if (newIndex !== activeIndex) {
-          setActiveIndex(newIndex);
-          onHighlight?.(items[newIndex]!.value);
-        }
+        dispatch({ type: 'MOVE_UP', payload: { items } });
         return;
       }
 
       if (name === 'j' || name === 'down') {
-        const newIndex = findNextValidIndex(activeIndex, 'down', items);
-        if (newIndex !== activeIndex) {
-          setActiveIndex(newIndex);
-          onHighlight?.(items[newIndex]!.value);
-        }
+        dispatch({ type: 'MOVE_DOWN', payload: { items } });
         return;
       }
 
       if (name === 'return') {
-        const currentItem = items[activeIndex];
-        if (currentItem && !currentItem.disabled) {
-          onSelect(currentItem.value);
-        }
+        dispatch({ type: 'SELECT_CURRENT', payload: { items } });
         return;
       }
 
@@ -183,23 +297,26 @@ export function useSelectionList<T>({
         }
 
         if (targetIndex >= 0 && targetIndex < items.length) {
-          const targetItem = items[targetIndex]!;
-          setActiveIndex(targetIndex);
-          onHighlight?.(targetItem.value);
+          dispatch({
+            type: 'SET_ACTIVE_INDEX',
+            payload: { index: targetIndex, items },
+          });
 
           // If the number can't be a prefix for another valid number, select immediately
           const potentialNextNumber = Number.parseInt(newNumberInput + '0', 10);
           if (potentialNextNumber > items.length) {
-            if (!targetItem.disabled) {
-              onSelect(targetItem.value);
-            }
+            dispatch({
+              type: 'SELECT_CURRENT',
+              payload: { items },
+            });
             numberInputRef.current = '';
           } else {
             // Otherwise wait for more input or timeout
             numberInputTimer.current = setTimeout(() => {
-              if (!targetItem.disabled) {
-                onSelect(targetItem.value);
-              }
+              dispatch({
+                type: 'SELECT_CURRENT',
+                payload: { items },
+              });
               numberInputRef.current = '';
             }, NUMBER_INPUT_TIMEOUT_MS);
           }
@@ -212,8 +329,15 @@ export function useSelectionList<T>({
     { isActive: !!(isFocused && items.length > 0) },
   );
 
+  const setActiveIndex = (index: number) => {
+    dispatch({
+      type: 'SET_ACTIVE_INDEX',
+      payload: { index, items },
+    });
+  };
+
   return {
-    activeIndex,
+    activeIndex: state.activeIndex,
     setActiveIndex,
   };
 }

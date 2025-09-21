@@ -110,6 +110,10 @@ export function BaseSelectionList<T, TItem = Record<string, unknown>>({
           numberColor = theme.text.secondary;
         }
 
+        if (!isFocused && !item.disabled) {
+          numberColor = theme.text.secondary;
+        }
+
         if (!showNumbers) {
           numberColor = theme.text.secondary;
         }
@@ -154,7 +158,6 @@ export function BaseSelectionList<T, TItem = Record<string, unknown>>({
         );
       })}
 
-      {/* Use conditional coloring instead of conditional rendering */}
       {showScrollArrows && (
         <Text
           color={
