@@ -209,8 +209,12 @@ export class FileStateTracker {
   }
 
   /**
-   * Validates that the file state is still current by performing a quick check.
-   * This is useful for avoiding expensive content comparisons when possible.
+   * Performs a quick check to see if a file's metadata (size and mtime)
+   * matches the expected state. This is a lightweight alternative to
+   * `checkFreshness` as it does not read the file content.
+   * @param filePath Path to the file
+   * @param expectedState The expected file state (mtime and size)
+   * @returns Promise resolving to true if the state is current, false otherwise
    */
   async isFileStateCurrent(
     filePath: string,

@@ -56,6 +56,7 @@ The Gemini CLI provides a comprehensive suite of tools for interacting with the 
 - **Behavior:**
   - Writes the provided `content` to the `file_path`.
   - Creates parent directories if they don't exist.
+  - **File Freshness:** To prevent data loss, the tool checks if the file has been modified by an external process between reading and writing. If a change is detected, it automatically re-reads the file and intelligently re-applies the intended changes to the latest content.
 - **Output (`llmContent`):** A success message, e.g., `Successfully overwrote file: /path/to/your/file.txt` or `Successfully created and wrote to new file: /path/to/new/file.txt`.
 - **Confirmation:** Yes. Shows a diff of changes and asks for user approval before writing.
 
@@ -126,6 +127,7 @@ The Gemini CLI provides a comprehensive suite of tools for interacting with the 
   - If `old_string` is empty and `file_path` does not exist, creates a new file with `new_string` as content.
   - If `old_string` is provided, it reads the `file_path` and attempts to find exactly one occurrence of `old_string`.
   - If one occurrence is found, it replaces it with `new_string`.
+  - **File Freshness:** To prevent data loss, the tool checks if the file has been modified by an external process between reading and writing. If a change is detected, it automatically re-reads the file and intelligently re-applies the intended changes to the latest content.
   - **Enhanced Reliability (Multi-Stage Edit Correction):** To significantly improve the success rate of edits, especially when the model-provided `old_string` might not be perfectly precise, the tool incorporates a multi-stage edit correction mechanism.
     - If the initial `old_string` isn't found or matches multiple locations, the tool can leverage the Gemini model to iteratively refine `old_string` (and potentially `new_string`).
     - This self-correction process attempts to identify the unique segment the model intended to modify, making the `replace` operation more robust even with slightly imperfect initial context.
@@ -141,3 +143,19 @@ The Gemini CLI provides a comprehensive suite of tools for interacting with the 
 - **Confirmation:** Yes. Shows a diff of the proposed changes and asks for user approval before writing to the file.
 
 These file system tools provide a foundation for the Gemini CLI to understand and interact with your local project context.
+
+## 7. File Freshness and Conflict Resolution
+
+To prevent data loss and ensure that the agent doesn't overwrite changes made by you or another process, the `write_file` and `replace` tools have a built-in file freshness mechanism.
+
+### How it Works
+
+1.  **State Tracking:** When a file is first read by one of these tools, it records the file's metadata, including its modification time and size.
+2.  **Verification Before Writing:** Just before the tool is about to write to the file, it re-checks the file's metadata.
+3.  **Conflict Detection:** If the metadata has changed, it indicates that the file has been modified since it was first read.
+4.  **Automatic Recovery:** Instead of overwriting the file and causing data loss, the tool automatically performs the following steps:
+    - It re-reads the file to get the latest content.
+    - It intelligently re-applies the original intended edit to this new, updated content.
+    - It informs you that the file was modified and that your edit has been applied to the latest version.
+
+This automated conflict resolution ensures that your work is not silently overwritten and that the agent's edits are applied in a safe and predictable manner, even when you are making changes to the same files concurrently.

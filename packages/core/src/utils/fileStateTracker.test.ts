@@ -8,7 +8,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { FileStateTracker, type FileState, type FileFreshnessResult } from './fileStateTracker.js';
+import { FileStateTracker, type FileState } from './fileStateTracker.js';
 
 vi.mock('node:fs/promises');
 

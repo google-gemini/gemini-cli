@@ -372,7 +372,7 @@ class WriteFileToolInvocation extends BaseToolInvocation<
       }
       if (wasFileReRead) {
         llmSuccessMessageParts.push(
-          'File was automatically re-read due to external changes before writing.',
+          'The file was modified on disk by another process. To avoid overwriting these changes, the file was automatically re-read and the changes were re-applied to the latest version.',
         );
       }
 

@@ -477,7 +477,7 @@ class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
 
       if (wasFileReRead) {
         llmSuccessMessageParts.push(
-          'File was automatically re-read due to external changes before applying the edit.',
+          'The file was modified on disk by another process. To avoid overwriting these changes, the file was automatically re-read and the edit was re-applied to the latest version.',
         );
       }
       if (this.params.modified_by_user) {
