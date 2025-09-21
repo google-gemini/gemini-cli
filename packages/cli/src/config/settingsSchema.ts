@@ -824,6 +824,15 @@ const SETTINGS_SCHEMA = {
     description: 'Enable the smart-edit tool instead of the replace tool.',
     showInDialog: false,
   },
+  useWriteTodos: {
+    type: 'boolean',
+    label: 'Use Write Todos',
+    category: 'Advanced',
+    requiresRestart: false,
+    default: false,
+    description: 'Enable the write_todos_list tool.',
+    showInDialog: false,
+  },
   security: {
     type: 'object',
     label: 'Security',

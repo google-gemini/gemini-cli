@@ -1336,6 +1336,128 @@ describe('InputPrompt', () => {
       expect(frame).toContain(`hello 👍${chalk.inverse(' ')}`);
       unmount();
     });
+
+    it('should display cursor on an empty line', async () => {
+      mockBuffer.text = '';
+      mockBuffer.lines = [''];
+      mockBuffer.viewportVisualLines = [''];
+      mockBuffer.visualCursor = [0, 0];
+
+      const { stdout, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+      );
+      await wait();
+
+      const frame = stdout.lastFrame();
+      expect(frame).toContain(chalk.inverse(' '));
+      unmount();
+    });
+
+    it('should display cursor on a space between words', async () => {
+      mockBuffer.text = 'hello world';
+      mockBuffer.lines = ['hello world'];
+      mockBuffer.viewportVisualLines = ['hello world'];
+      mockBuffer.visualCursor = [0, 5]; // cursor on the space
+
+      const { stdout, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+      );
+      await wait();
+
+      const frame = stdout.lastFrame();
+      expect(frame).toContain(`hello${chalk.inverse(' ')}world`);
+      unmount();
+    });
+
+    it('should display cursor in the middle of a line in a multiline block', async () => {
+      const text = 'first line\nsecond line\nthird line';
+      mockBuffer.text = text;
+      mockBuffer.lines = text.split('\n');
+      mockBuffer.viewportVisualLines = text.split('\n');
+      mockBuffer.visualCursor = [1, 3]; // cursor on 'o' in 'second'
+      mockBuffer.visualToLogicalMap = [
+        [0, 0],
+        [1, 0],
+        [2, 0],
+      ];
+
+      const { stdout, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+      );
+      await wait();
+
+      const frame = stdout.lastFrame();
+      expect(frame).toContain(`sec${chalk.inverse('o')}nd line`);
+      unmount();
+    });
+
+    it('should display cursor at the beginning of a line in a multiline block', async () => {
+      const text = 'first line\nsecond line';
+      mockBuffer.text = text;
+      mockBuffer.lines = text.split('\n');
+      mockBuffer.viewportVisualLines = text.split('\n');
+      mockBuffer.visualCursor = [1, 0]; // cursor on 's' in 'second'
+      mockBuffer.visualToLogicalMap = [
+        [0, 0],
+        [1, 0],
+      ];
+
+      const { stdout, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+      );
+      await wait();
+
+      const frame = stdout.lastFrame();
+      expect(frame).toContain(`${chalk.inverse('s')}econd line`);
+      unmount();
+    });
+
+    it('should display cursor at the end of a line in a multiline block', async () => {
+      const text = 'first line\nsecond line';
+      mockBuffer.text = text;
+      mockBuffer.lines = text.split('\n');
+      mockBuffer.viewportVisualLines = text.split('\n');
+      mockBuffer.visualCursor = [0, 10]; // cursor after 'first line'
+      mockBuffer.visualToLogicalMap = [
+        [0, 0],
+        [1, 0],
+      ];
+
+      const { stdout, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+      );
+      await wait();
+
+      const frame = stdout.lastFrame();
+      expect(frame).toContain(`first line${chalk.inverse(' ')}`);
+      unmount();
+    });
+
+    it('should display cursor on a blank line in a multiline block', async () => {
+      const text = 'first line\n\nthird line';
+      mockBuffer.text = text;
+      mockBuffer.lines = text.split('\n');
+      mockBuffer.viewportVisualLines = text.split('\n');
+      mockBuffer.visualCursor = [1, 0]; // cursor on the blank line
+      mockBuffer.visualToLogicalMap = [
+        [0, 0],
+        [1, 0],
+        [2, 0],
+      ];
+
+      const { stdout, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+      );
+      await wait();
+
+      const frame = stdout.lastFrame();
+      const lines = frame!.split('\n');
+      // The line with the cursor should just be an inverted space inside the box border
+      expect(
+        lines.find((l) => l.includes(chalk.inverse(' '))),
+      ).not.toBeUndefined();
+      unmount();
+    });
   });
 
   describe('multiline rendering', () => {
@@ -1966,6 +2088,33 @@ describe('InputPrompt', () => {
       expect(stdout.lastFrame()).toMatchSnapshot();
       unmount();
     });
+
+    it('should not show inverted cursor when shell is focused', async () => {
+      props.isEmbeddedShellFocused = true;
+      props.focus = false;
+      const { stdout, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+      );
+      await wait();
+      expect(stdout.lastFrame()).not.toContain(`{chalk.inverse(' ')}`);
+      // This snapshot is good to make sure there was an input prompt but does
+      // not show the inverted cursor because snapshots do not show colors.
+      expect(stdout.lastFrame()).toMatchSnapshot();
+      unmount();
+    });
+  });
+
+  it('should still allow input when shell is not focused', async () => {
+    const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />, {
+      shellFocus: false,
+    });
+    await wait();
+
+    stdin.write('a');
+    await wait();
+
+    expect(mockBuffer.handleInput).toHaveBeenCalled();
+    unmount();
   });
 });
 function clean(str: string | undefined): string {
