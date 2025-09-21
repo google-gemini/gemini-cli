@@ -1,3 +1,9 @@
+/**
+ * @license
+ * Copyright 2025 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 import { useState, useCallback, useRef } from 'react';
 import { autocompleteSystem } from './AutocompleteSystem';
 import type { AutocompleteItem, AutocompleteMatch } from './types';
