@@ -927,9 +927,27 @@ describe('WriteFileTool', () => {
 
       const content = 'New content for file';
 
-      // Modify file externally after initial read
+      const originalState = {
+        content: originalContent,
+        mtime: fs.statSync(filePath).mtime,
+        size: originalContent.length,
+      };
+
       const modifiedContent = 'Hello, Universe!';
-      fs.writeFileSync(filePath, modifiedContent);
+      const currentState = {
+        content: modifiedContent,
+        mtime: new Date(fs.statSync(filePath).mtime.getTime() + 1000), // 1 second later
+        size: modifiedContent.length,
+      };
+
+      // Mock FileStateTracker to simulate file modification during execution
+      mockFileStateTracker.getFileState.mockResolvedValueOnce(originalState);
+      mockFileStateTracker.checkFreshness.mockResolvedValueOnce({
+        isFresh: false,
+        originalState,
+        currentState,
+        changeDescription: 'file content changed',
+      });
 
       const params = { file_path: filePath, content };
       const invocation = tool.build(params);
@@ -949,16 +967,29 @@ describe('WriteFileTool', () => {
 
       const content = 'New content for file';
 
-      // Delete file after initial read
-      fs.unlinkSync(filePath);
+      const originalState = {
+        content: originalContent,
+        mtime: fs.statSync(filePath).mtime,
+        size: originalContent.length,
+      };
+
+      // Mock FileStateTracker to simulate file deletion during execution
+      mockFileStateTracker.getFileState.mockResolvedValueOnce(originalState);
+      mockFileStateTracker.checkFreshness.mockResolvedValueOnce({
+        isFresh: false,
+        originalState,
+        currentState: undefined,
+        changeDescription: 'file was deleted',
+      });
 
       const params = { file_path: filePath, content };
       const invocation = tool.build(params);
       const result = await invocation.execute(new AbortController().signal);
 
       expect(result.error).toBeUndefined();
+      expect(result.llmContent).toContain('Successfully overwrote file');
       expect(result.llmContent).toContain(
-        'Successfully created and wrote to new file',
+        'File was automatically re-read due to external changes',
       );
     });
 

@@ -152,7 +152,9 @@ export class FileStateTracker {
         currentState,
       };
     } catch (error) {
-      if (isNodeError(error) && error.code === 'ENOENT') {
+      // Check if this is a file not found error (ENOENT)
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      if (errorMessage.startsWith('File not found:') || (isNodeError(error) && error.code === 'ENOENT')) {
         return this.createStaleResult(
           expectedState,
           undefined,
@@ -161,8 +163,6 @@ export class FileStateTracker {
       }
 
       // Other file system errors
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
       return {
         isFresh: false,
         originalState: expectedState,
