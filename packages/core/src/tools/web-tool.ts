@@ -103,7 +103,7 @@ function extractLinksFromHtml(
   } else if (selector.includes('.')) {
     // Class-based selector (simplified) - fixed to handle nested HTML content
     const className = selector.replace(/^a\./, '').replace(/\[.*\]/, '');
-    linkRegex = new RegExp(`<a[^>]*class=["'][^"']*${className}[^"']*["'][^>]*href=["']([^"']+)["'][^>]*>(.*?)<\/a>`, 'gi');
+    linkRegex = new RegExp(`<a[^>]*class=["'][^"']*${className}[^"']*["'][^>]*href=["']([^"']+)["'][^>]*>(.*?)</a>`, 'gi');
   } else {
     // Fallback to default - fixed to handle nested HTML content
     linkRegex = /<a[^>]*href=["']([^"']+)["'][^>]*>(.*?)<\/a>/gi;
@@ -153,7 +153,7 @@ function extractLinksFromHtml(
       // If no filename in path, try to extract from query params or use link text
       if (!filename && linkText) {
         // Try to extract filename from link text if it looks like a file
-        const textMatch = linkText.match(/([^\/\\]+\.[a-zA-Z0-9]{1,6})$/);
+        const textMatch = linkText.match(/([^/\\]+\.[a-zA-Z0-9]{1,6})$/);
         if (textMatch) {
           filename = textMatch[1];
         }

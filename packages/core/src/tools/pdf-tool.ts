@@ -19,7 +19,8 @@ import { BackupableTool, type FileOperationParams } from './backupable-tool.js';
 
 // PDF manipulation libraries
 import PDFDocument from 'pdfkit';
-import { PDFDocument as PDFLibDocument, PDFArray, PDFDict, PDFObject, PDFString } from 'pdf-lib';
+import { PDFDocument as PDFLibDocument, PDFArray, PDFDict, PDFString } from 'pdf-lib';
+import type { PDFObject } from 'pdf-lib';
 import pdfParse from 'pdf-parse';
 // Import PDF.js using the correct .mjs extension
 // import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs';
@@ -926,7 +927,7 @@ ${pageStructureDisplay}`,
 
 
 
-  private async extractOutline(pdfDoc: PDFLibDocument, originalBuffer: Buffer): Promise<{ hasOutline: boolean; items: PDFOutlineItem[]; totalItems: number }> {
+  private async extractOutline(pdfDoc: PDFLibDocument, _originalBuffer: Buffer): Promise<{ hasOutline: boolean; items: PDFOutlineItem[]; totalItems: number }> {
     try {
       const catalog = pdfDoc.catalog;
       const outlines = catalog.lookup(catalog.context.obj('Outlines'));
