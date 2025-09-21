@@ -884,7 +884,7 @@ export function SettingsDialog({
               onSelect={handleScopeSelect}
               onHighlight={handleScopeHighlight}
               isFocused={focusSection === 'scope'}
-              showNumbers={focusSection === 'scope'}
+              showNumbers={true}
             />
           </Box>
         )}
