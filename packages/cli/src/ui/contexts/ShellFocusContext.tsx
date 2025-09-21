@@ -6,6 +6,6 @@
 
 import { createContext, useContext } from 'react';
 
-export const FocusContext = createContext<boolean>(true);
+export const ShellFocusContext = createContext<boolean>(true);
 
-export const useFocusState = () => useContext(FocusContext);
+export const useShellFocusState = () => useContext(ShellFocusContext);

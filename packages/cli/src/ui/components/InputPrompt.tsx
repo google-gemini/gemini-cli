@@ -35,6 +35,7 @@ import {
 } from '../utils/clipboardUtils.js';
 import * as path from 'node:path';
 import { SCREEN_READER_USER_PREFIX } from '../textConstants.js';
+import { useShellFocusState } from '../contexts/ShellFocusContext.js';
 export interface InputPromptProps {
   buffer: TextBuffer;
   onSubmit: (value: string) => void;
@@ -52,7 +53,7 @@ export interface InputPromptProps {
   approvalMode: ApprovalMode;
   onEscapePromptChange?: (showPrompt: boolean) => void;
   vimHandleInput?: (key: Key) => boolean;
-  isShellFocused?: boolean;
+  isEmbeddedShellFocused?: boolean;
 }
 
 // The input content, input container, and input suggestions list may have different widths
@@ -97,8 +98,9 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   approvalMode,
   onEscapePromptChange,
   vimHandleInput,
-  isShellFocused,
+  isEmbeddedShellFocused,
 }) => {
+  const isShellFocused = useShellFocusState();
   const [justNavigatedHistory, setJustNavigatedHistory] = useState(false);
   const [escPressCount, setEscPressCount] = useState(0);
   const [showEscapePrompt, setShowEscapePrompt] = useState(false);
@@ -153,6 +155,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     reverseSearchCompletion.resetCompletionState;
   const resetCommandSearchCompletionState =
     commandSearchCompletion.resetCompletionState;
+
+  const showCursor = focus && isShellFocused && !isEmbeddedShellFocused;
 
   const resetEscapeState = useCallback(() => {
     if (escapeTimerRef.current) {
@@ -291,6 +295,9 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
   const handleInput = useCallback(
     (key: Key) => {
+      // TODO(jacobr): this special case is likely not needed anymore.
+      // We should probably stop supporting paste if the InputPrompt is not
+      // focused.
       /// We want to handle paste even when not focused to support drag and drop.
       if (!focus && !key.paste) {
         return;
@@ -689,9 +696,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     ],
   );
 
-  useKeypress(handleInput, {
-    isActive: !isShellFocused,
-  });
+  useKeypress(handleInput, { isActive: !isEmbeddedShellFocused });
 
   const linesToRender = buffer.viewportVisualLines;
   const [cursorVisualRowAbsolute, cursorVisualColAbsolute] =
@@ -842,7 +847,9 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       <Box
         borderStyle="round"
         borderColor={
-          statusColor ?? (focus ? theme.border.focused : theme.border.default)
+          isShellFocused && !isEmbeddedShellFocused
+            ? (statusColor ?? theme.border.focused)
+            : theme.border.default
         }
         paddingX={1}
       >
@@ -871,7 +878,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         </Text>
         <Box flexGrow={1} flexDirection="column">
           {buffer.text.length === 0 && placeholder ? (
-            focus ? (
+            showCursor ? (
               <Text>
                 {chalk.inverse(placeholder.slice(0, 1))}
                 <Text color={theme.text.secondary}>{placeholder.slice(1)}</Text>
@@ -926,7 +933,9 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
                         relativeVisualColForHighlight - segStart,
                         relativeVisualColForHighlight - segStart + 1,
                       );
-                      const highlighted = chalk.inverse(charToHighlight);
+                      const highlighted = showCursor
+                        ? chalk.inverse(charToHighlight)
+                        : charToHighlight;
                       display =
                         cpSlice(
                           seg.text,
@@ -962,7 +971,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
                   if (!currentLineGhost) {
                     renderedLine.push(
                       <Text key={`cursor-end-${cursorVisualColAbsolute}`}>
-                        {chalk.inverse(' ')}
+                        {showCursor ? chalk.inverse(' ') : ' '}
                       </Text>,
                     );
                   }
@@ -978,7 +987,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
                   <Box key={`line-${visualIdxInRenderedSet}`} height={1}>
                     <Text>
                       {renderedLine}
-                      {showCursorBeforeGhost && chalk.inverse(' ')}
+                      {showCursorBeforeGhost &&
+                        (showCursor ? chalk.inverse(' ') : ' ')}
                       {currentLineGhost && (
                         <Text color={theme.text.secondary}>
                           {currentLineGhost}
