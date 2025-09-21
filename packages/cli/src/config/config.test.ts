@@ -1985,6 +1985,37 @@ describe('loadCliConfig interactive', () => {
     const config = await loadCliConfig({}, [], 'test-session', argv);
     expect(config.isInteractive()).toBe(false);
   });
+
+  it('should not be interactive if positional prompt words are provided with other flags', async () => {
+    process.stdin.isTTY = true;
+    process.argv = ['node', 'script.js', '--model', 'gemini-1.5-pro', 'Hello'];
+    const argv = await parseArguments({} as Settings);
+    const config = await loadCliConfig({}, [], 'test-session', argv);
+    expect(config.isInteractive()).toBe(false);
+  });
+
+  it('should not be interactive if positional prompt words are provided with multiple flags', async () => {
+    process.stdin.isTTY = true;
+    process.argv = [
+      'node',
+      'script.js',
+      '--model',
+      'gemini-1.5-pro',
+      '--sandbox',
+      'Hello world',
+    ];
+    const argv = await parseArguments({} as Settings);
+    const config = await loadCliConfig({}, [], 'test-session', argv);
+    expect(config.isInteractive()).toBe(false);
+  });
+
+  it('should be interactive if no positional prompt words are provided with flags', async () => {
+    process.stdin.isTTY = true;
+    process.argv = ['node', 'script.js', '--model', 'gemini-1.5-pro'];
+    const argv = await parseArguments({} as Settings);
+    const config = await loadCliConfig({}, [], 'test-session', argv);
+    expect(config.isInteractive()).toBe(true);
+  });
 });
 
 describe('loadCliConfig approval mode', () => {
