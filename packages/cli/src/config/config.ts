@@ -12,7 +12,6 @@ import { hideBin } from 'yargs/helpers';
 import process from 'node:process';
 import { mcpCommand } from '../commands/mcp.js';
 import type {
-  TelemetryTarget,
   FileFilteringOptions,
   MCPServerConfig,
   OutputFormat,
@@ -24,6 +23,7 @@ import {
   setGeminiMdFilename as setServerGeminiMdFilename,
   getCurrentGeminiMdFilename,
   ApprovalMode,
+  TelemetryTarget,
   DEFAULT_GEMINI_MODEL,
   DEFAULT_GEMINI_MODEL_AUTO,
   DEFAULT_GEMINI_EMBEDDING_MODEL,
@@ -395,6 +395,21 @@ export async function loadHierarchicalGeminiMemory(
   );
 }
 
+function parseBooleanEnv(value: string | undefined): boolean | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  return value === 'true' || value === '1';
+}
+
+function parseTelemetryTarget(
+  value: string | undefined,
+): TelemetryTarget | undefined {
+  if (value === 'local') return TelemetryTarget.LOCAL;
+  if (value === 'gcp') return TelemetryTarget.GCP;
+  return undefined;
+}
+
 export async function loadCliConfig(
   settings: Settings,
   extensions: Extension[],
@@ -609,21 +624,38 @@ export async function loadCliConfig(
       screenReader,
     },
     telemetry: {
-      enabled: argv.telemetry ?? settings.telemetry?.enabled,
-      target: (argv.telemetryTarget ??
-        settings.telemetry?.target) as TelemetryTarget,
+      enabled:
+        argv.telemetry ??
+        parseBooleanEnv(process.env['GEMINI_TELEMETRY_ENABLED']) ??
+        settings.telemetry?.enabled,
+      target: parseTelemetryTarget(
+        argv.telemetryTarget ??
+          process.env['GEMINI_TELEMETRY_TARGET'] ??
+          settings.telemetry?.target,
+      ),
       otlpEndpoint:
         argv.telemetryOtlpEndpoint ??
+        process.env['GEMINI_TELEMETRY_OTLP_ENDPOINT'] ??
         process.env['OTEL_EXPORTER_OTLP_ENDPOINT'] ??
         settings.telemetry?.otlpEndpoint,
       otlpProtocol: (['grpc', 'http'] as const).find(
         (p) =>
           p ===
-          (argv.telemetryOtlpProtocol ?? settings.telemetry?.otlpProtocol),
+          (argv.telemetryOtlpProtocol ??
+            process.env['GEMINI_TELEMETRY_OTLP_PROTOCOL'] ??
+            settings.telemetry?.otlpProtocol),
       ),
-      logPrompts: argv.telemetryLogPrompts ?? settings.telemetry?.logPrompts,
-      outfile: argv.telemetryOutfile ?? settings.telemetry?.outfile,
-      useCollector: settings.telemetry?.useCollector,
+      logPrompts:
+        argv.telemetryLogPrompts ??
+        parseBooleanEnv(process.env['GEMINI_TELEMETRY_LOG_PROMPTS']) ??
+        settings.telemetry?.logPrompts,
+      outfile:
+        argv.telemetryOutfile ??
+        process.env['GEMINI_TELEMETRY_OUTFILE'] ??
+        settings.telemetry?.outfile,
+      useCollector:
+        parseBooleanEnv(process.env['GEMINI_TELEMETRY_USE_COLLECTOR']) ??
+        settings.telemetry?.useCollector,
     },
     usageStatisticsEnabled: settings.privacy?.usageStatisticsEnabled ?? true,
     fileFiltering: settings.context?.fileFiltering,
