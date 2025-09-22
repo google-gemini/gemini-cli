@@ -27,6 +27,7 @@ import {
   UserPromptEvent,
   makeChatCompressionEvent,
   ModelRoutingEvent,
+  ToolCallEvent,
 } from '../types.js';
 import { GIT_COMMIT_INFO, CLI_VERSION } from '../../generated/git-commit.js';
 import { UserAccountManager } from '../../utils/userAccountManager.js';
@@ -37,6 +38,11 @@ interface CustomMatchers<R = unknown> {
   toHaveMetadataValue: ([key, value]: [EventMetadataKey, string]) => R;
   toHaveEventName: (name: EventNames) => R;
 }
+
+type Metadata = {
+  gemini_cli_key: EventMetadataKey;
+  value: string;
+};
 
 declare module 'vitest' {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-empty-object-type
@@ -675,6 +681,192 @@ describe('ClearcutLogger', () => {
         EventMetadataKey.GEMINI_CLI_ROUTING_FAILURE_REASON,
         'Something went wrong',
       ]);
+    });
+  });
+
+  // Define mock types to avoid dependency on coreToolScheduler
+  interface MockFileDiff {
+    diffStat?: {
+      model_added_lines?: number;
+      model_removed_lines?: number;
+      model_added_chars?: number;
+      model_removed_chars?: number;
+      user_added_lines?: number;
+      user_removed_lines?: number;
+      user_added_chars?: number;
+      user_removed_chars?: number;
+    };
+  }
+
+  interface MockCompletedToolCall {
+    request: {
+      name: string;
+      args: Record<string, unknown>;
+      prompt_id: string;
+    };
+    response: {
+      resultDisplay?: MockFileDiff;
+      error?: Error;
+      errorType?: string;
+      contentLength?: number;
+    };
+    status: 'success' | 'error';
+    durationMs?: number;
+    outcome?: string;
+    tool?: unknown;
+  }
+
+  describe('logToolCallEvent', () => {
+    it('logs an event with all diff metadata', () => {
+      const { logger } = setup();
+      const completedToolCall: MockCompletedToolCall = {
+        request: { name: 'test', args: {}, prompt_id: 'prompt-123' },
+        response: {
+          resultDisplay: {
+            diffStat: {
+              model_added_lines: 1,
+              model_removed_lines: 2,
+              model_added_chars: 3,
+              model_removed_chars: 4,
+              user_added_lines: 5,
+              user_removed_lines: 6,
+              user_added_chars: 7,
+              user_removed_chars: 8,
+            },
+          },
+        },
+        status: 'success',
+      };
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      logger?.logToolCallEvent(new ToolCallEvent(completedToolCall as any));
+
+      const events = getEvents(logger!);
+      expect(events.length).toBe(1);
+      expect(events[0]).toHaveEventName(EventNames.TOOL_CALL);
+      expect(events[0]).toHaveMetadataValue([
+        EventMetadataKey.GEMINI_CLI_AI_ADDED_LINES,
+        '1',
+      ]);
+      expect(events[0]).toHaveMetadataValue([
+        EventMetadataKey.GEMINI_CLI_AI_REMOVED_LINES,
+        '2',
+      ]);
+      expect(events[0]).toHaveMetadataValue([
+        EventMetadataKey.GEMINI_CLI_AI_ADDED_CHARS,
+        '3',
+      ]);
+      expect(events[0]).toHaveMetadataValue([
+        EventMetadataKey.GEMINI_CLI_AI_REMOVED_CHARS,
+        '4',
+      ]);
+      expect(events[0]).toHaveMetadataValue([
+        EventMetadataKey.GEMINI_CLI_USER_ADDED_LINES,
+        '5',
+      ]);
+      expect(events[0]).toHaveMetadataValue([
+        EventMetadataKey.GEMINI_CLI_USER_REMOVED_LINES,
+        '6',
+      ]);
+      expect(events[0]).toHaveMetadataValue([
+        EventMetadataKey.GEMINI_CLI_USER_ADDED_CHARS,
+        '7',
+      ]);
+      expect(events[0]).toHaveMetadataValue([
+        EventMetadataKey.GEMINI_CLI_USER_REMOVED_CHARS,
+        '8',
+      ]);
+    });
+
+    it('logs an event with partial diff metadata', () => {
+      const { logger } = setup();
+      const completedToolCall: MockCompletedToolCall = {
+        request: { name: 'test', args: {}, prompt_id: 'prompt-123' },
+        response: {
+          resultDisplay: {
+            diffStat: {
+              model_added_lines: 1,
+              model_added_chars: 3,
+              user_removed_lines: 6,
+              user_removed_chars: 8,
+            },
+          },
+        },
+        status: 'success',
+      };
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      logger?.logToolCallEvent(new ToolCallEvent(completedToolCall as any));
+
+      const events = getEvents(logger!);
+      const metadata = JSON.parse(events[0][0].source_extension_json)
+        .event_metadata[0] as Metadata[];
+      expect(events.length).toBe(1);
+      expect(events[0]).toHaveEventName(EventNames.TOOL_CALL);
+      expect(events[0]).toHaveMetadataValue([
+        EventMetadataKey.GEMINI_CLI_AI_ADDED_LINES,
+        '1',
+      ]);
+      expect(
+        metadata.find(
+          (m: Metadata) =>
+            m.gemini_cli_key === EventMetadataKey.GEMINI_CLI_AI_REMOVED_LINES,
+        ),
+      ).toBeUndefined();
+      expect(events[0]).toHaveMetadataValue([
+        EventMetadataKey.GEMINI_CLI_AI_ADDED_CHARS,
+        '3',
+      ]);
+      expect(
+        metadata.find(
+          (m: Metadata) =>
+            m.gemini_cli_key === EventMetadataKey.GEMINI_CLI_AI_REMOVED_CHARS,
+        ),
+      ).toBeUndefined();
+      expect(
+        metadata.find(
+          (m: Metadata) =>
+            m.gemini_cli_key === EventMetadataKey.GEMINI_CLI_USER_ADDED_LINES,
+        ),
+      ).toBeUndefined();
+      expect(events[0]).toHaveMetadataValue([
+        EventMetadataKey.GEMINI_CLI_USER_REMOVED_LINES,
+        '6',
+      ]);
+      expect(
+        metadata.find(
+          (m: Metadata) =>
+            m.gemini_cli_key === EventMetadataKey.GEMINI_CLI_USER_ADDED_CHARS,
+        ),
+      ).toBeUndefined();
+      expect(events[0]).toHaveMetadataValue([
+        EventMetadataKey.GEMINI_CLI_USER_REMOVED_CHARS,
+        '8',
+      ]);
+    });
+
+    it('does not log diff metadata if diffStat is not present', () => {
+      const { logger } = setup();
+      const completedToolCall: MockCompletedToolCall = {
+        request: { name: 'test', args: {}, prompt_id: 'prompt-123' },
+        response: {
+          resultDisplay: {},
+        },
+        status: 'success',
+      };
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      logger?.logToolCallEvent(new ToolCallEvent(completedToolCall as any));
+
+      const events = getEvents(logger!);
+      const metadata = JSON.parse(events[0][0].source_extension_json)
+        .event_metadata[0] as Metadata[];
+      expect(
+        metadata.find(
+          (m: Metadata) =>
+            m.gemini_cli_key === EventMetadataKey.GEMINI_CLI_AI_ADDED_LINES,
+        ),
+      ).toBeUndefined();
     });
   });
 });
