@@ -17,6 +17,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { execSync } from 'node:child_process';
 import { loadExtension } from '../extension.js';
+import { quote } from 'shell-quote';
 
 function getGitHubToken(): string | undefined {
   return process.env['GITHUB_TOKEN'];
@@ -401,10 +402,12 @@ async function downloadFile(url: string, dest: string): Promise<void> {
 }
 
 function extractFile(file: string, dest: string) {
+  const safeFile = quote([file]);
+  const safeDest = quote([dest]);
   if (file.endsWith('.tar.gz')) {
-    execSync(`tar -xzf ${file} -C ${dest}`);
+    execSync(`tar -xzf ${safeFile} -C ${safeDest}`);
   } else if (file.endsWith('.zip')) {
-    execSync(`unzip ${file} -d ${dest}`);
+    execSync(`unzip ${safeFile} -d ${safeDest}`);
   } else {
     throw new Error(`Unsupported file extension for extraction: ${file}`);
   }
