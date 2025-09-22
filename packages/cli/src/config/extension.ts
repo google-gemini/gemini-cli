@@ -482,7 +482,7 @@ export async function installExtension(
       ),
     );
 
-    await enableExtension(newExtensionConfig!.name, SettingScope.User);
+    enableExtension(newExtensionConfig!.name, SettingScope.User);
     return newExtensionConfig!.name;
   } catch (error) {
     // Attempt to load config from the source path even if installation fails
