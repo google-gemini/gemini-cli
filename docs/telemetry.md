@@ -48,18 +48,22 @@ observability framework — Gemini CLI's observability system provides:
 
 ## Configuration
 
-All telemetry behavior is controlled through your `.gemini/settings.json` file
-and can be overridden with CLI flags:
+All telemetry behavior is controlled through your `.gemini/settings.json` file.
+These settings can be overridden by environment variables or CLI flags.
 
-| Setting        | Values            | Default                 | CLI Override                                             | Description                                       |
-| -------------- | ----------------- | ----------------------- | -------------------------------------------------------- | ------------------------------------------------- |
-| `enabled`      | `true`/`false`    | `false`                 | `--telemetry` / `--no-telemetry`                         | Enable or disable telemetry                       |
-| `target`       | `"gcp"`/`"local"` | `"local"`               | `--telemetry-target <local\|gcp>`                        | Where to send telemetry data                      |
-| `otlpEndpoint` | URL string        | `http://localhost:4317` | `--telemetry-otlp-endpoint <URL>`                        | OTLP collector endpoint                           |
-| `otlpProtocol` | `"grpc"`/`"http"` | `"grpc"`                | `--telemetry-otlp-protocol <grpc\|http>`                 | OTLP transport protocol                           |
-| `outfile`      | file path         | -                       | `--telemetry-outfile <path>`                             | Save telemetry to file (overrides `otlpEndpoint`) |
-| `logPrompts`   | `true`/`false`    | `true`                  | `--telemetry-log-prompts` / `--no-telemetry-log-prompts` | Include prompts in telemetry logs                 |
-| `useCollector` | `true`/`false`    | `false`                 | -                                                        | Use external OTLP collector (advanced)            |
+| Setting        | Environment Variable             | CLI Flag                                                 | Description                                       | Values            | Default                 |
+| -------------- | -------------------------------- | -------------------------------------------------------- | ------------------------------------------------- | ----------------- | ----------------------- |
+| `enabled`      | `GEMINI_TELEMETRY_ENABLED`       | `--telemetry` / `--no-telemetry`                         | Enable or disable telemetry                       | `true`/`false`    | `false`                 |
+| `target`       | `GEMINI_TELEMETRY_TARGET`        | `--telemetry-target <local\|gcp>`                        | Where to send telemetry data                      | `"gcp"`/`"local"` | `"local"`               |
+| `otlpEndpoint` | `GEMINI_TELEMETRY_OTLP_ENDPOINT` | `--telemetry-otlp-endpoint <URL>`                        | OTLP collector endpoint                           | URL string        | `http://localhost:4317` |
+| `otlpProtocol` | `GEMINI_TELEMETRY_OTLP_PROTOCOL` | `--telemetry-otlp-protocol <grpc\|http>`                 | OTLP transport protocol                           | `"grpc"`/`"http"` | `"grpc"`                |
+| `outfile`      | `GEMINI_TELEMETRY_OUTFILE`       | `--telemetry-outfile <path>`                             | Save telemetry to file (overrides `otlpEndpoint`) | file path         | -                       |
+| `logPrompts`   | `GEMINI_TELEMETRY_LOG_PROMPTS`   | `--telemetry-log-prompts` / `--no-telemetry-log-prompts` | Include prompts in telemetry logs                 | `true`/`false`    | `true`                  |
+| `useCollector` | `GEMINI_TELEMETRY_USE_COLLECTOR` | -                                                        | Use external OTLP collector (advanced)            | `true`/`false`    | `false`                 |
+
+**Note on boolean environment variables:** For the boolean settings (`enabled`,
+`logPrompts`, `useCollector`), setting the corresponding environment variable to
+`true` or `1` will enable the feature. Any other value will disable it.
 
 For detailed information about all configuration options, see the
 [Configuration Guide](./cli/configuration.md).

@@ -19,6 +19,11 @@ export {
   isTelemetrySdkInitialized,
 } from './sdk.js';
 export {
+  resolveTelemetrySettings,
+  parseBooleanEnvFlag,
+  parseTelemetryTargetValue,
+} from './config.js';
+export {
   GcpTraceExporter,
   GcpMetricExporter,
   GcpLogExporter,
