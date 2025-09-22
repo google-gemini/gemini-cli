@@ -198,9 +198,6 @@ export const DialogManager = ({ addItem }: DialogManagerProps) => {
     );
   }
 
-  if (uiState.isModelDialogOpen) {
-    return <ModelDialog onClose={uiActions.closeModelDialog} />;
-  }
   if (uiState.isPermissionsDialogOpen) {
     return (
       <PermissionsModifyTrustDialog
