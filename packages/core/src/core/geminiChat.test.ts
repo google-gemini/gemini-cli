@@ -25,6 +25,7 @@ import { type RetryOptions } from '../utils/retry.js';
 import type { ToolRegistry } from '../tools/tool-registry.js';
 import { Kind } from '../tools/tools.js';
 import { uiTelemetryService } from '../telemetry/uiTelemetry.js';
+import { HookSystem } from '../hooks/hookSystem.js';
 
 // Mock fs module to prevent actual file system operations during tests
 const mockFileSystem = new Map<string, string>();
@@ -137,6 +138,9 @@ describe('GeminiChat', () => {
     setSimulate429(false);
     // Reset history for each test by creating a new instance
     chat = new GeminiChat(mockConfig, config, []);
+    mockConfig.getHookSystem = vi
+      .fn()
+      .mockReturnValue(new HookSystem(mockConfig));
   });
 
   afterEach(() => {

@@ -446,6 +446,47 @@ export class GeminiClient {
     prompt_id: string,
     turns: number = MAX_TURNS,
   ): AsyncGenerator<ServerGeminiStreamEvent, Turn> {
+    // Fire BeforeAgent hook
+    const hookSystem = this.config.getHookSystem();
+    if (hookSystem) {
+      try {
+        const promptText = this.getPromptTextFromRequest(request);
+        const beforeResult = await hookSystem
+          .getEventBus()
+          .fireBeforeAgentEvent(promptText);
+
+        // Check if hook blocked the agent processing or requested to stop execution
+        if (
+          beforeResult.finalOutput?.isBlockingDecision() ||
+          beforeResult.finalOutput?.shouldStopExecution()
+        ) {
+          const reason = beforeResult.finalOutput.getEffectiveReason();
+          yield {
+            type: GeminiEventType.Error,
+            value: {
+              error: new Error(
+                `BeforeAgent hook blocked processing: ${reason}`,
+              ),
+            },
+          };
+          return new Turn(this.getChat(), prompt_id);
+        }
+
+        // Add additional context from hooks to the request
+        if (beforeResult.finalOutput) {
+          const additionalContext =
+            beforeResult.finalOutput.getAdditionalContext();
+          if (additionalContext) {
+            // Add the additional context as a user message to the request
+            const requestArray = Array.isArray(request) ? request : [request];
+            request = [...requestArray, { text: additionalContext }];
+          }
+        }
+      } catch (error) {
+        console.warn(`BeforeAgent hook failed:`, error);
+      }
+    }
+
     if (this.lastPromptId !== prompt_id) {
       this.loopDetector.reset(prompt_id);
       this.lastPromptId = prompt_id;
@@ -576,6 +617,37 @@ export class GeminiClient {
         );
       }
     }
+
+    // Fire AfterAgent hook
+    if (hookSystem) {
+      try {
+        const response = this.getTurnResponseText(turn);
+        const promptText = this.getPromptTextFromRequest(request);
+        const afterResult = await hookSystem
+          .getEventBus()
+          .fireAfterAgentEvent(promptText, response, false);
+
+        // Check if hook wants to force continuation or stop execution
+        if (
+          afterResult.finalOutput?.isBlockingDecision() ||
+          afterResult.finalOutput?.shouldStopExecution()
+        ) {
+          const reason = afterResult.finalOutput.getEffectiveReason();
+
+          // For AfterAgent hooks, both blocking and stop execution should force continuation
+          const continueRequest = [{ text: reason }];
+          yield* this.sendMessageStream(
+            continueRequest,
+            signal,
+            prompt_id,
+            boundedTurns - 1,
+          );
+        }
+      } catch (error) {
+        console.warn(`AfterAgent hook failed:`, error);
+      }
+    }
+
     return turn;
   }
 
@@ -801,6 +873,45 @@ export class GeminiClient {
       newTokenCount,
       compressionStatus: CompressionStatus.COMPRESSED,
     };
+  }
+
+  /**
+   * Extract prompt text from request for hooks
+   */
+  private getPromptTextFromRequest(request: PartListUnion): string {
+    if (typeof request === 'string') {
+      return request;
+    }
+
+    if (Array.isArray(request)) {
+      return request
+        .map((part) => {
+          if (typeof part === 'string') return part;
+          if ('text' in part) return part.text;
+          return '[non-text content]';
+        })
+        .join(' ');
+    }
+
+    if ('text' in request && typeof request.text === 'string') {
+      return request.text;
+    }
+
+    return '[complex content]';
+  }
+
+  /**
+   * Extract response text from turn for hooks
+   */
+  private getTurnResponseText(turn: Turn): string {
+    // This is a simplified implementation - in a real scenario,
+    // you might want to extract the actual response text from the turn
+    return (
+      turn
+        .getDebugResponses()
+        .map((response) => getResponseText(response))
+        .join(' ') || '[no response text]'
+    );
   }
 }
 

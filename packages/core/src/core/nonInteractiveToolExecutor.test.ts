@@ -17,6 +17,7 @@ import {
   DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
   ToolErrorType,
   ApprovalMode,
+  HookSystem,
 } from '../index.js';
 import type { Part } from '@google/genai';
 import { MockTool } from '../test-utils/tools.js';
@@ -60,7 +61,9 @@ describe('executeToolCall', () => {
       getUseModelRouter: () => false,
       getGeminiClient: () => null, // No client needed for these tests
     } as unknown as Config;
-
+    mockConfig.getHookSystem = vi
+      .fn()
+      .mockReturnValue(new HookSystem(mockConfig));
     abortController = new AbortController();
   });
 

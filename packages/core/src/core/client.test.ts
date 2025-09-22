@@ -43,6 +43,7 @@ import { ideContextStore } from '../ide/ideContext.js';
 import { ClearcutLogger } from '../telemetry/clearcut-logger/clearcut-logger.js';
 import type { ModelRouterService } from '../routing/modelRouterService.js';
 import { uiTelemetryService } from '../telemetry/uiTelemetry.js';
+import { HookSystem } from '../hooks/hookSystem.js';
 
 // Mock fs module to prevent actual file system operations during tests
 const mockFileSystem = new Map<string, string>();
@@ -117,6 +118,7 @@ vi.mock('../telemetry/uiTelemetry.js', () => ({
     setLastPromptTokenCount: vi.fn(),
   },
 }));
+vi.mock('../hooks/hookSystem.js');
 
 /**
  * Array.fromAsync ponyfill, which will be available in es 2024.
@@ -327,6 +329,9 @@ describe('Gemini Client (client.ts)', () => {
         }),
       }),
     } as unknown as Config;
+    mockConfig.getHookSystem = vi
+      .fn()
+      .mockReturnValue(new HookSystem(mockConfig));
 
     client = new GeminiClient(mockConfig);
     await client.initialize();
