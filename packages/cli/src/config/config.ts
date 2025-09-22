@@ -505,8 +505,11 @@ export async function loadCliConfig(
 
   const policyEngineConfig = createPolicyEngineConfig(settings, approvalMode);
 
+  // Fix: If promptWords are provided, always use non-interactive mode
+  const hasPromptWords = argv.promptWords && argv.promptWords.length > 0;
   const interactive =
-    !!argv.promptInteractive || (process.stdin.isTTY && question.length === 0);
+    !!argv.promptInteractive ||
+    (process.stdin.isTTY && !hasPromptWords && !argv.prompt);
   // In non-interactive mode, exclude tools that require a prompt.
   const extraExcludes: string[] = [];
   if (!interactive && !argv.experimentalAcp) {
