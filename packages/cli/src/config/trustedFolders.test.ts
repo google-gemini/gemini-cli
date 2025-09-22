@@ -229,52 +229,70 @@ describe('isWorkspaceTrusted', () => {
   it('should return true for a directly trusted folder', () => {
     mockCwd = '/home/user/projectA';
     mockRules['/home/user/projectA'] = TrustLevel.TRUST_FOLDER;
-    expect(isWorkspaceTrusted(mockSettings)).toBe(true);
+    expect(isWorkspaceTrusted(mockSettings)).toEqual({
+      isTrusted: true,
+      source: 'file',
+    });
   });
 
   it('should return true for a child of a trusted folder', () => {
     mockCwd = '/home/user/projectA/src';
     mockRules['/home/user/projectA'] = TrustLevel.TRUST_FOLDER;
-    expect(isWorkspaceTrusted(mockSettings)).toBe(true);
+    expect(isWorkspaceTrusted(mockSettings)).toEqual({
+      isTrusted: true,
+      source: 'file',
+    });
   });
 
   it('should return true for a child of a trusted parent folder', () => {
     mockCwd = '/home/user/projectB';
     mockRules['/home/user/projectB/somefile.txt'] = TrustLevel.TRUST_PARENT;
-    expect(isWorkspaceTrusted(mockSettings)).toBe(true);
+    expect(isWorkspaceTrusted(mockSettings)).toEqual({
+      isTrusted: true,
+      source: 'file',
+    });
   });
 
   it('should return false for a directly untrusted folder', () => {
     mockCwd = '/home/user/untrusted';
     mockRules['/home/user/untrusted'] = TrustLevel.DO_NOT_TRUST;
-    expect(isWorkspaceTrusted(mockSettings)).toBe(false);
+    expect(isWorkspaceTrusted(mockSettings)).toEqual({
+      isTrusted: false,
+      source: 'file',
+    });
   });
 
   it('should return undefined for a child of an untrusted folder', () => {
     mockCwd = '/home/user/untrusted/src';
     mockRules['/home/user/untrusted'] = TrustLevel.DO_NOT_TRUST;
-    expect(isWorkspaceTrusted(mockSettings)).toBeUndefined();
+    expect(isWorkspaceTrusted(mockSettings).isTrusted).toBeUndefined();
   });
 
   it('should return undefined when no rules match', () => {
     mockCwd = '/home/user/other';
     mockRules['/home/user/projectA'] = TrustLevel.TRUST_FOLDER;
     mockRules['/home/user/untrusted'] = TrustLevel.DO_NOT_TRUST;
-    expect(isWorkspaceTrusted(mockSettings)).toBeUndefined();
+    expect(isWorkspaceTrusted(mockSettings).isTrusted).toBeUndefined();
   });
 
   it('should prioritize trust over distrust', () => {
     mockCwd = '/home/user/projectA/untrusted';
     mockRules['/home/user/projectA'] = TrustLevel.TRUST_FOLDER;
     mockRules['/home/user/projectA/untrusted'] = TrustLevel.DO_NOT_TRUST;
-    expect(isWorkspaceTrusted(mockSettings)).toBe(true);
+    expect(isWorkspaceTrusted(mockSettings)).toEqual({
+      isTrusted: true,
+      source: 'file',
+    });
   });
 
   it('should handle path normalization', () => {
     mockCwd = '/home/user/projectA';
     mockRules[`/home/user/../user/${path.basename('/home/user/projectA')}`] =
       TrustLevel.TRUST_FOLDER;
-    expect(isWorkspaceTrusted(mockSettings)).toBe(true);
+    expect(isWorkspaceTrusted(mockSettings)).toEqual({
+      isTrusted: true,
+      source: 'file',
+    });
   });
 });
 
@@ -297,7 +315,10 @@ describe('isWorkspaceTrusted with IDE override', () => {
     vi.spyOn(fs, 'readFileSync').mockReturnValue(
       JSON.stringify({ [process.cwd()]: TrustLevel.DO_NOT_TRUST }),
     );
-    expect(isWorkspaceTrusted(mockSettings)).toBe(true);
+    expect(isWorkspaceTrusted(mockSettings)).toEqual({
+      isTrusted: true,
+      source: 'ide',
+    });
   });
 
   it('should return false when ideTrust is false, ignoring config', () => {
@@ -306,7 +327,10 @@ describe('isWorkspaceTrusted with IDE override', () => {
     vi.spyOn(fs, 'readFileSync').mockReturnValue(
       JSON.stringify({ [process.cwd()]: TrustLevel.TRUST_FOLDER }),
     );
-    expect(isWorkspaceTrusted(mockSettings)).toBe(false);
+    expect(isWorkspaceTrusted(mockSettings)).toEqual({
+      isTrusted: false,
+      source: 'ide',
+    });
   });
 
   it('should fall back to config when ideTrust is undefined', () => {
@@ -314,7 +338,10 @@ describe('isWorkspaceTrusted with IDE override', () => {
     vi.spyOn(fs, 'readFileSync').mockReturnValue(
       JSON.stringify({ [process.cwd()]: TrustLevel.TRUST_FOLDER }),
     );
-    expect(isWorkspaceTrusted(mockSettings)).toBe(true);
+    expect(isWorkspaceTrusted(mockSettings)).toEqual({
+      isTrusted: true,
+      source: 'file',
+    });
   });
 
   it('should always return true if folderTrust setting is disabled', () => {
@@ -326,6 +353,9 @@ describe('isWorkspaceTrusted with IDE override', () => {
       },
     };
     ideContextStore.set({ workspaceState: { isTrusted: false } });
-    expect(isWorkspaceTrusted(settings)).toBe(true);
+    expect(isWorkspaceTrusted(settings)).toEqual({
+      isTrusted: true,
+      source: undefined,
+    });
   });
 });

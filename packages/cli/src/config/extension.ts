@@ -12,10 +12,13 @@ import type {
 import {
   GEMINI_DIR,
   Storage,
-  ClearcutLogger,
   Config,
   ExtensionInstallEvent,
   ExtensionUninstallEvent,
+  ExtensionEnableEvent,
+  logExtensionEnable,
+  logExtensionInstallEvent,
+  logExtensionUninstall,
 } from '@google/gemini-cli-core';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -123,16 +126,18 @@ export async function performWorkspaceExtensionMigration(
   return failedInstallNames;
 }
 
-function getClearcutLogger(cwd: string) {
+function getTelemetryConfig(cwd: string) {
+  const settings = loadSettings(cwd);
   const config = new Config({
+    telemetry: settings.merged.telemetry,
+    interactive: false,
     sessionId: randomUUID(),
     targetDir: cwd,
     cwd,
     model: '',
     debugMode: false,
   });
-  const logger = ClearcutLogger.getInstance(config);
-  return logger;
+  return config;
 }
 
 export function loadExtensions(
@@ -372,7 +377,7 @@ export async function installExtension(
   askConsent: boolean = false,
   cwd: string = process.cwd(),
 ): Promise<string> {
-  const logger = getClearcutLogger(cwd);
+  const telemetryConfig = getTelemetryConfig(cwd);
   let newExtensionConfig: ExtensionConfig | null = null;
   let localSourcePath: string | undefined;
 
@@ -406,8 +411,8 @@ export async function installExtension(
           installMetadata,
           tempDir,
         );
-        updateExtensionVersion(tempDir, tagName);
         installMetadata.type = 'github-release';
+        installMetadata.releaseTag = tagName;
       } catch (_error) {
         await cloneFromGit(installMetadata, tempDir);
         installMetadata.type = 'git';
@@ -467,7 +472,8 @@ export async function installExtension(
       }
     }
 
-    logger?.logExtensionInstallEvent(
+    logExtensionInstallEvent(
+      telemetryConfig,
       new ExtensionInstallEvent(
         newExtensionConfig!.name,
         newExtensionConfig!.version,
@@ -491,7 +497,8 @@ export async function installExtension(
         // Ignore error, this is just for logging.
       }
     }
-    logger?.logExtensionInstallEvent(
+    logExtensionInstallEvent(
+      telemetryConfig,
       new ExtensionInstallEvent(
         newExtensionConfig?.name ?? '',
         newExtensionConfig?.version ?? '',
@@ -503,21 +510,6 @@ export async function installExtension(
   }
 }
 
-async function updateExtensionVersion(
-  extensionDir: string,
-  extensionVersion: string,
-) {
-  const configFilePath = path.join(extensionDir, EXTENSIONS_CONFIG_FILENAME);
-  if (fs.existsSync(configFilePath)) {
-    const configContent = await fs.promises.readFile(configFilePath, 'utf-8');
-    const config = JSON.parse(configContent);
-    config.version = extensionVersion;
-    await fs.promises.writeFile(
-      configFilePath,
-      JSON.stringify(config, null, 2),
-    );
-  }
-}
 async function requestConsent(extensionConfig: ExtensionConfig) {
   const mcpServerEntries = Object.entries(extensionConfig.mcpServers || {});
   if (mcpServerEntries.length) {
@@ -574,7 +566,7 @@ export async function uninstallExtension(
   extensionIdentifier: string,
   cwd: string = process.cwd(),
 ): Promise<void> {
-  const logger = getClearcutLogger(cwd);
+  const telemetryConfig = getTelemetryConfig(cwd);
   const installedExtensions = loadUserExtensions();
   const extensionName = installedExtensions.find(
     (installed) =>
@@ -596,7 +588,8 @@ export async function uninstallExtension(
     recursive: true,
     force: true,
   });
-  logger?.logExtensionUninstallEvent(
+  logExtensionUninstall(
+    telemetryConfig,
     new ExtensionUninstallEvent(extensionName, 'success'),
   );
 }
@@ -608,6 +601,9 @@ export function toOutputString(extension: Extension): string {
     output += `\n Source: ${extension.installMetadata.source} (Type: ${extension.installMetadata.type})`;
     if (extension.installMetadata.ref) {
       output += `\n Ref: ${extension.installMetadata.ref}`;
+    }
+    if (extension.installMetadata.releaseTag) {
+      output += `\n Release tag: ${extension.installMetadata.releaseTag}`;
     }
   }
   if (extension.contextFiles.length > 0) {
@@ -660,4 +656,6 @@ export function enableExtension(
   );
   const scopePath = scope === SettingScope.Workspace ? cwd : os.homedir();
   manager.enable(name, true, scopePath);
+  const config = getTelemetryConfig(cwd);
+  logExtensionEnable(config, new ExtensionEnableEvent(name, scope));
 }
