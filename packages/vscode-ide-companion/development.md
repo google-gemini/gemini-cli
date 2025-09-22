@@ -21,3 +21,4 @@ If you only need to compile the extension once without watching for changes:
 
 ```bash
 npm run build
+```

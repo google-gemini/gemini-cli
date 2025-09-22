@@ -47,7 +47,10 @@ for (const workspace of rootPackageJson.workspaces) {
 }
 
 // Clean up vscode-ide-companion package
-rmSync(join(root, 'packages/vscode-ide-companion/node_modules'), { recursive: true, force: true });
+rmSync(join(root, 'packages/vscode-ide-companion/node_modules'), {
+  recursive: true,
+  force: true,
+});
 const vsixFiles = globSync('packages/vscode-ide-companion/*.vsix', {
   cwd: root,
 });
