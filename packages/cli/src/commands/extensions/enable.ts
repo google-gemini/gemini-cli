@@ -14,7 +14,7 @@ interface EnableArgs {
   scope?: string;
 }
 
-export async function handleEnable(args: EnableArgs) {
+export function handleEnable(args: EnableArgs) {
   try {
     if (args.scope?.toLowerCase() === 'workspace') {
       enableExtension(args.name, SettingScope.Workspace);
