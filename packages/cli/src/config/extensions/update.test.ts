@@ -87,7 +87,10 @@ describe('update tests', () => {
     // Clean up before each test
     fs.rmSync(userExtensionsDir, { recursive: true, force: true });
     fs.mkdirSync(userExtensionsDir, { recursive: true });
-    vi.mocked(isWorkspaceTrusted).mockReturnValue(true);
+    vi.mocked(isWorkspaceTrusted).mockReturnValue({
+      isTrusted: true,
+      source: 'file',
+    });
     vi.spyOn(process, 'cwd').mockReturnValue(tempWorkspaceDir);
     Object.values(mockGit).forEach((fn) => fn.mockReset());
   });

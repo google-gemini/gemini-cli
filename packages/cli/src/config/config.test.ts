@@ -22,7 +22,9 @@ import * as ServerConfig from '@google/gemini-cli-core';
 import { isWorkspaceTrusted } from './trustedFolders.js';
 
 vi.mock('./trustedFolders.js', () => ({
-  isWorkspaceTrusted: vi.fn().mockReturnValue(true), // Default to trusted
+  isWorkspaceTrusted: vi
+    .fn()
+    .mockReturnValue({ isTrusted: true, source: 'file' }), // Default to trusted
 }));
 
 vi.mock('fs', async (importOriginal) => {
@@ -2098,7 +2100,10 @@ describe('loadCliConfig approval mode', () => {
   // --- Untrusted Folder Scenarios ---
   describe('when folder is NOT trusted', () => {
     beforeEach(() => {
-      vi.mocked(isWorkspaceTrusted).mockReturnValue(false);
+      vi.mocked(isWorkspaceTrusted).mockReturnValue({
+        isTrusted: false,
+        source: 'file',
+      });
     });
 
     it('should override --approval-mode=yolo to DEFAULT', async () => {
