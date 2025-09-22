@@ -88,7 +88,6 @@ describe('usePermissionsModifyTrust', () => {
     );
 
     expect(result.current.currentTrustLevel).toBe(TrustLevel.TRUST_FOLDER);
-    expect(result.current.loading).toBe(false);
   });
 
   it('should detect inherited trust from parent', () => {

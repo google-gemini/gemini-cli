@@ -55,7 +55,6 @@ describe('PermissionsModifyTrustDialog', () => {
     mockCommitTrustLevelChange = vi.fn();
     vi.mocked(usePermissionsModifyTrust).mockReturnValue({
       cwd: '/test/dir',
-      loading: false,
       currentTrustLevel: TrustLevel.DO_NOT_TRUST,
       isInheritedTrustFromParent: false,
       isInheritedTrustFromIde: false,
@@ -85,7 +84,6 @@ describe('PermissionsModifyTrustDialog', () => {
   it('should display the inherited trust note from parent', async () => {
     vi.mocked(usePermissionsModifyTrust).mockReturnValue({
       cwd: '/test/dir',
-      loading: false,
       currentTrustLevel: TrustLevel.DO_NOT_TRUST,
       isInheritedTrustFromParent: true,
       isInheritedTrustFromIde: false,
@@ -108,7 +106,6 @@ describe('PermissionsModifyTrustDialog', () => {
   it('should display the inherited trust note from IDE', async () => {
     vi.mocked(usePermissionsModifyTrust).mockReturnValue({
       cwd: '/test/dir',
-      loading: false,
       currentTrustLevel: TrustLevel.DO_NOT_TRUST,
       isInheritedTrustFromParent: false,
       isInheritedTrustFromIde: true,
@@ -151,7 +148,6 @@ describe('PermissionsModifyTrustDialog', () => {
       .mockResolvedValue(undefined);
     vi.mocked(usePermissionsModifyTrust).mockReturnValue({
       cwd: '/test/dir',
-      loading: false,
       currentTrustLevel: TrustLevel.DO_NOT_TRUST,
       isInheritedTrustFromParent: false,
       isInheritedTrustFromIde: false,
@@ -182,7 +178,6 @@ describe('PermissionsModifyTrustDialog', () => {
   it('should not commit when escape is pressed during restart prompt', async () => {
     vi.mocked(usePermissionsModifyTrust).mockReturnValue({
       cwd: '/test/dir',
-      loading: false,
       currentTrustLevel: TrustLevel.DO_NOT_TRUST,
       isInheritedTrustFromParent: false,
       isInheritedTrustFromIde: false,

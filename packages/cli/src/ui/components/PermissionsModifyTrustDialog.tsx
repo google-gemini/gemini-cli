@@ -11,7 +11,6 @@ import { useKeypress } from '../hooks/useKeypress.js';
 import { usePermissionsModifyTrust } from '../hooks/usePermissionsModifyTrust.js';
 import { theme } from '../semantic-colors.js';
 import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
-import Spinner from 'ink-spinner';
 import { relaunchApp } from '../../utils/processUtils.js';
 import { type UseHistoryManagerReturn } from '../hooks/useHistoryManager.js';
 
@@ -41,7 +40,6 @@ export function PermissionsModifyTrustDialog({
 }: PermissionsModifyTrustDialogProps): React.JSX.Element {
   const {
     cwd,
-    loading,
     currentTrustLevel,
     isInheritedTrustFromParent,
     isInheritedTrustFromIde,
@@ -63,16 +61,6 @@ export function PermissionsModifyTrustDialog({
     },
     { isActive: true },
   );
-
-  if (loading) {
-    return (
-      <Box>
-        <Text color={theme.text.secondary}>
-          <Spinner /> Loading...
-        </Text>
-      </Box>
-    );
-  }
 
   const index = TRUST_LEVEL_ITEMS.findIndex(
     (item) => item.value === currentTrustLevel,

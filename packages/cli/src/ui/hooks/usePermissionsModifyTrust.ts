@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import * as process from 'node:process';
 import {
   loadTrustedFolders,
@@ -15,47 +15,57 @@ import { useSettings } from '../contexts/SettingsContext.js';
 
 import { MessageType } from '../types.js';
 import { type UseHistoryManagerReturn } from './useHistoryManager.js';
+import type { LoadedSettings } from '../../config/settings.js';
+
+interface TrustState {
+  currentTrustLevel: TrustLevel | undefined;
+  isInheritedTrustFromParent: boolean;
+  isInheritedTrustFromIde: boolean;
+}
+
+function getInitialTrustState(
+  settings: LoadedSettings,
+  cwd: string,
+): TrustState {
+  const folders = loadTrustedFolders();
+  const explicitTrustLevel = folders.user.config[cwd];
+  const { isTrusted, source } = isWorkspaceTrusted(settings.merged);
+
+  const isInheritedTrust =
+    isTrusted &&
+    (!explicitTrustLevel || explicitTrustLevel === TrustLevel.DO_NOT_TRUST);
+
+  return {
+    currentTrustLevel: explicitTrustLevel,
+    isInheritedTrustFromParent: !!(source === 'file' && isInheritedTrust),
+    isInheritedTrustFromIde: !!(source === 'ide' && isInheritedTrust),
+  };
+}
 
 export const usePermissionsModifyTrust = (
   onExit: () => void,
   addItem: UseHistoryManagerReturn['addItem'],
 ) => {
-  const [loading, setLoading] = useState(true);
-  const [currentTrustLevel, setCurrentTrustLevel] = useState<
-    TrustLevel | undefined
-  >();
-  const [pendingTrustLevel, setPendingTrustLevel] = useState<
-    TrustLevel | undefined
-  >();
-  const [isInheritedTrustFromParent, setIsInheritedTrustFromParent] =
-    useState(false);
-  const [isInheritedTrustFromIde, setIsInheritedTrustFromIde] = useState(false);
-  const [needsRestart, setNeedsRestart] = useState(false);
   const settings = useSettings();
   const cwd = process.cwd();
 
+  const [initialState] = useState(() => getInitialTrustState(settings, cwd));
+
+  const [currentTrustLevel] = useState<TrustLevel | undefined>(
+    initialState.currentTrustLevel,
+  );
+  const [pendingTrustLevel, setPendingTrustLevel] = useState<
+    TrustLevel | undefined
+  >();
+  const [isInheritedTrustFromParent] = useState(
+    initialState.isInheritedTrustFromParent,
+  );
+  const [isInheritedTrustFromIde] = useState(
+    initialState.isInheritedTrustFromIde,
+  );
+  const [needsRestart, setNeedsRestart] = useState(false);
+
   const isFolderTrustEnabled = !!settings.merged.security?.folderTrust?.enabled;
-
-  useEffect(() => {
-    if (!isFolderTrustEnabled) {
-      setLoading(false);
-      return;
-    }
-    const folders = loadTrustedFolders();
-    const explicitTrustLevel = folders.user.config[cwd];
-    setCurrentTrustLevel(explicitTrustLevel);
-
-    const { isTrusted, source } = isWorkspaceTrusted(settings.merged);
-
-    const isInheritedTrust =
-      isTrusted &&
-      (!explicitTrustLevel || explicitTrustLevel === TrustLevel.DO_NOT_TRUST);
-
-    setIsInheritedTrustFromIde(!!(source === 'ide' && isInheritedTrust));
-    setIsInheritedTrustFromParent(!!(source === 'file' && isInheritedTrust));
-
-    setLoading(false);
-  }, [cwd, settings.merged, isFolderTrustEnabled]);
 
   const updateTrustLevel = useCallback(
     (trustLevel: TrustLevel) => {
@@ -107,7 +117,6 @@ export const usePermissionsModifyTrust = (
 
   return {
     cwd,
-    loading,
     currentTrustLevel,
     isInheritedTrustFromParent,
     isInheritedTrustFromIde,
