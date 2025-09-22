@@ -123,6 +123,7 @@ export interface GeminiCLIExtension {
 export interface ExtensionInstallMetadata {
   source: string;
   type: 'git' | 'local' | 'link' | 'github-release';
+  releaseTag?: string; // Only present for github-release installs.
   ref?: string;
   autoUpdate?: boolean;
 }
