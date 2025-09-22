@@ -735,10 +735,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   return (
     <>
       <Box
-        borderStyle="single"
-        borderLeft={false}
-        borderRight={false}
-        borderTop={false}
+        borderStyle="round"
         borderColor={
           statusColor ?? (focus ? theme.border.focused : theme.border.default)
         }
