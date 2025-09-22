@@ -211,31 +211,11 @@ export function loadExtension(context: LoadExtensionContext): Extension | null {
     effectiveExtensionPath = installMetadata.source;
   }
 
-  const configFilePath = path.join(
-    effectiveExtensionPath,
-    EXTENSIONS_CONFIG_FILENAME,
-  );
-  if (!fs.existsSync(configFilePath)) {
-    console.error(
-      `Warning: extension directory ${effectiveExtensionPath} does not contain a config file ${configFilePath}.`,
-    );
-    return null;
-  }
-
   try {
-    const configContent = fs.readFileSync(configFilePath, 'utf-8');
-    let config = recursivelyHydrateStrings(JSON.parse(configContent), {
-      extensionPath: extensionDir,
-      workspacePath: workspaceDir,
-      '/': path.sep,
-      pathSeparator: path.sep,
-    }) as unknown as ExtensionConfig;
-    if (!config.name || !config.version) {
-      console.error(
-        `Invalid extension config in ${configFilePath}: missing name or version.`,
-      );
-      return null;
-    }
+    let config = loadExtensionConfig({
+      extensionDir: effectiveExtensionPath,
+      workspaceDir,
+    });
 
     config = resolveEnvVarsInObject(config);
 
@@ -262,7 +242,7 @@ export function loadExtension(context: LoadExtensionContext): Extension | null {
     };
   } catch (e) {
     console.error(
-      `Warning: error parsing extension config in ${configFilePath}: ${getErrorMessage(
+      `Warning: Skipping extension in ${effectiveExtensionPath}: ${getErrorMessage(
         e,
       )}`,
     );
@@ -443,15 +423,10 @@ export async function installExtension(
     }
 
     try {
-      newExtensionConfig = await loadExtensionConfig({
+      newExtensionConfig = loadExtensionConfig({
         extensionDir: localSourcePath,
         workspaceDir: cwd,
       });
-      if (!newExtensionConfig) {
-        throw new Error(
-          `Invalid extension at ${installMetadata.source}. Please make sure it has a valid gemini-extension.json file.`,
-        );
-      }
 
       const newExtensionName = newExtensionConfig.name;
       const extensionStorage = new ExtensionStorage(newExtensionName);
@@ -507,10 +482,14 @@ export async function installExtension(
     // Attempt to load config from the source path even if installation fails
     // to get the name and version for logging.
     if (!newExtensionConfig && localSourcePath) {
-      newExtensionConfig = await loadExtensionConfig({
-        extensionDir: localSourcePath,
-        workspaceDir: cwd,
-      });
+      try {
+        newExtensionConfig = loadExtensionConfig({
+          extensionDir: localSourcePath,
+          workspaceDir: cwd,
+        });
+      } catch {
+        // Ignore error, this is just for logging.
+      }
     }
     logger?.logExtensionInstallEvent(
       new ExtensionInstallEvent(
@@ -560,13 +539,13 @@ async function requestConsent(extensionConfig: ExtensionConfig) {
   }
 }
 
-export async function loadExtensionConfig(
+export function loadExtensionConfig(
   context: LoadExtensionContext,
-): Promise<ExtensionConfig | null> {
+): ExtensionConfig {
   const { extensionDir, workspaceDir } = context;
   const configFilePath = path.join(extensionDir, EXTENSIONS_CONFIG_FILENAME);
   if (!fs.existsSync(configFilePath)) {
-    return null;
+    throw new Error(`Configuration file not found at ${configFilePath}`);
   }
   try {
     const configContent = fs.readFileSync(configFilePath, 'utf-8');
@@ -577,11 +556,17 @@ export async function loadExtensionConfig(
       pathSeparator: path.sep,
     }) as unknown as ExtensionConfig;
     if (!config.name || !config.version) {
-      return null;
+      throw new Error(
+        `Invalid configuration in ${configFilePath}: missing ${!config.name ? '"name"' : '"version"'}`,
+      );
     }
     return config;
-  } catch (_) {
-    return null;
+  } catch (e) {
+    throw new Error(
+      `Failed to load extension config from ${configFilePath}: ${getErrorMessage(
+        e,
+      )}`,
+    );
   }
 }
 
