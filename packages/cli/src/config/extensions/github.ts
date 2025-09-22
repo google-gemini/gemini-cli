@@ -103,11 +103,11 @@ export function parseGitHubRepoForReleases(source: string): {
   return { owner, repo };
 }
 
-async function fetchFromGithub(
+async function fetchReleaseFromGithub(
   owner: string,
   repo: string,
   ref?: string,
-): Promise<{ assets: Asset[]; tag_name: string }> {
+): Promise<GithubReleaseData> {
   const endpoint = ref ? `releases/tags/${ref}` : 'releases/latest';
   const url = `https://api.github.com/repos/${owner}/${repo}/${endpoint}`;
   return await fetchJson(url);
@@ -199,7 +199,7 @@ export async function checkForExtensionUpdate(
       }
       const { owner, repo } = parseGitHubRepoForReleases(source);
 
-      const releaseData = await fetchFromGithub(
+      const releaseData = await fetchReleaseFromGithub(
         owner,
         repo,
         installMetadata.ref,
@@ -228,7 +228,7 @@ export async function downloadFromGitHubRelease(
   const { owner, repo } = parseGitHubRepoForReleases(source);
 
   try {
-    const releaseData = await fetchFromGithub(owner, repo, ref);
+    const releaseData = await fetchReleaseFromGithub(owner, repo, ref);
     if (!releaseData) {
       throw new Error(
         `No release data found for ${owner}/${repo} at tag ${ref}`,
@@ -236,24 +236,36 @@ export async function downloadFromGitHubRelease(
     }
 
     const asset = findReleaseAsset(releaseData.assets);
-    if (!asset) {
-      // If there are no release assets, then we just clone the repo using the
-      // ref the release points to.
-      await cloneFromGit(
-        {
-          ...installMetadata,
-          ref: releaseData.tag_name,
-        },
-        destination,
+    let archiveUrl: string | undefined;
+    let isTar = false;
+    let isZip = false;
+    if (asset) {
+      archiveUrl = asset.browser_download_url;
+    } else {
+      if (releaseData.tarball_url) {
+        archiveUrl = releaseData.tarball_url;
+        isTar = true;
+      } else if (releaseData.zipball_url) {
+        archiveUrl = releaseData.zipball_url;
+        isZip = true;
+      }
+    }
+    if (!archiveUrl) {
+      throw new Error(
+        `No assets found for release with tag ${releaseData.tag_name}`,
       );
-      return releaseData.tag_name;
+    }
+    let downloadedAssetPath = path.join(
+      destination,
+      path.basename(new URL(archiveUrl).pathname),
+    );
+    if (isTar && !downloadedAssetPath.endsWith('.tar.gz')) {
+      downloadedAssetPath += '.tar.gz';
+    } else if (isZip && !downloadedAssetPath.endsWith('.zip')) {
+      downloadedAssetPath += '.zip';
     }
 
-    const downloadedAssetPath = path.join(
-      destination,
-      path.basename(asset.browser_download_url),
-    );
-    await downloadFile(asset.browser_download_url, downloadedAssetPath);
+    await downloadFile(archiveUrl, downloadedAssetPath);
 
     extractFile(downloadedAssetPath, destination);
 
@@ -282,6 +294,13 @@ export async function downloadFromGitHubRelease(
       `Failed to download release from ${installMetadata.source}: ${getErrorMessage(error)}`,
     );
   }
+}
+
+interface GithubReleaseData {
+  assets: Asset[];
+  tag_name: string;
+  tarball_url?: string;
+  zipball_url?: string;
 }
 
 interface Asset {
@@ -326,9 +345,7 @@ export function findReleaseAsset(assets: Asset[]): Asset | undefined {
   return undefined;
 }
 
-async function fetchJson(
-  url: string,
-): Promise<{ assets: Asset[]; tag_name: string }> {
+async function fetchJson<T>(url: string): Promise<T> {
   const headers: { 'User-Agent': string; Authorization?: string } = {
     'User-Agent': 'gemini-cli',
   };
@@ -348,7 +365,7 @@ async function fetchJson(
         res.on('data', (chunk) => chunks.push(chunk));
         res.on('end', () => {
           const data = Buffer.concat(chunks).toString();
-          resolve(JSON.parse(data) as { assets: Asset[]; tag_name: string });
+          resolve(JSON.parse(data) as T);
         });
       })
       .on('error', reject);
