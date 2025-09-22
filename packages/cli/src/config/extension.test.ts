@@ -430,13 +430,13 @@ describe('extension tests', () => {
       expect(consoleSpy).toHaveBeenCalledOnce();
       expect(consoleSpy).toHaveBeenCalledWith(
         expect.stringContaining(
-          `Warning: Skipping extension in ${badExtDir}: Failed to load extension config from ${badConfigPath}: Invalid configuration in ${badConfigPath}: missing "name" or "version"`,
+          `Warning: Skipping extension in ${badExtDir}: Failed to load extension config from ${badConfigPath}: Invalid configuration in ${badConfigPath}: missing "name"`,
         ),
       );
 
       consoleSpy.mockRestore();
     });
-    
+
     it('should filter trust out of mcp servers', () => {
       createExtension({
         extensionsDir: userExtensionsDir,
@@ -691,7 +691,7 @@ describe('extension tests', () => {
       await expect(
         installExtension({ source: sourceExtDir, type: 'local' }),
       ).rejects.toThrow(
-        `Invalid configuration in ${configPath}: missing "name" or "version"`,
+        `Invalid configuration in ${configPath}: missing "name"`,
       );
     });
 

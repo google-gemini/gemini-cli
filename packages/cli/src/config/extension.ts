@@ -557,7 +557,7 @@ export function loadExtensionConfig(
     }) as unknown as ExtensionConfig;
     if (!config.name || !config.version) {
       throw new Error(
-        `Invalid configuration in ${configFilePath}: missing "name" or "version"`,
+        `Invalid configuration in ${configFilePath}: missing ${!config.name ? '"name"' : '"version"'}`,
       );
     }
     return config;
