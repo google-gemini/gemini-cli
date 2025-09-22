@@ -492,7 +492,9 @@ export function setUpCloudShellEnvironment(envFilePath: string | null): void {
 export function loadEnvironment(settings: Settings): void {
   const envFilePath = findEnvFile(process.cwd());
 
-  if (!isWorkspaceTrusted(settings)) {
+  // Only load project-level env when the workspace is trusted. This avoids
+  // untrusted repos injecting environment variables by dropping a .env file.
+  if (isWorkspaceTrusted(settings) !== true) {
     return;
   }
 
