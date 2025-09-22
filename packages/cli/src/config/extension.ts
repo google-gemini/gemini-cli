@@ -553,7 +553,7 @@ async function requestConsent(extensionConfig: ExtensionConfig) {
       const isLocal = !!mcpServer.command;
       const source =
         mcpServer.httpUrl ??
-        `${mcpServer.command}${mcpServer.args ? ' ' + mcpServer.args : ''}`;
+        `${mcpServer.command || ''}${mcpServer.args ? ' ' + mcpServer.args.join(' ') : ''}`;
       output.push(`  * ${key} (${isLocal ? 'local' : 'remote'}): ${source}`);
     }
   }
