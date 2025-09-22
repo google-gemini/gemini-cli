@@ -76,6 +76,9 @@ import type { PolicyEngineConfig } from '../policy/types.js';
 import type { UserTierId } from '../code_assist/types.js';
 import { ProxyAgent, setGlobalDispatcher } from 'undici';
 
+import { AgentRegistry } from '../agents/registry.js';
+import { SubagentToolWrapper } from '../agents/subagent-tool-wrapper.js';
+
 export enum ApprovalMode {
   DEFAULT = 'default',
   AUTO_EDIT = 'autoEdit',
@@ -260,6 +263,7 @@ export interface ConfigParameters {
 export class Config {
   private toolRegistry!: ToolRegistry;
   private promptRegistry!: PromptRegistry;
+  private agentRegistry!: AgentRegistry;
   private readonly sessionId: string;
   private fileSystemService: FileSystemService;
   private contentGeneratorConfig!: ContentGeneratorConfig;
@@ -474,6 +478,10 @@ export class Config {
       await this.getGitService();
     }
     this.promptRegistry = new PromptRegistry();
+
+    this.agentRegistry = new AgentRegistry(this);
+    await this.agentRegistry.initialize();
+
     this.toolRegistry = await this.createToolRegistry();
 
     await this.geminiClient.initialize();
@@ -618,6 +626,10 @@ export class Config {
 
   getWorkspaceContext(): WorkspaceContext {
     return this.workspaceContext;
+  }
+
+  getAgentRegistry(): AgentRegistry {
+    return this.agentRegistry;
   }
 
   getToolRegistry(): ToolRegistry {
@@ -1085,6 +1097,33 @@ export class Config {
     registerCoreTool(WebSearchTool, this);
     if (this.getUseWriteTodos()) {
       registerCoreTool(WriteTodosTool, this);
+    }
+
+    // Register Subagents as Tools
+    const agentDefinitions = this.agentRegistry.getAllDefinitions();
+    for (const definition of agentDefinitions) {
+      // We must respect the main allowed/exclude lists for agents too.
+      const excludeTools = this.getExcludeTools() || [];
+      const allowedTools = this.getAllowedTools();
+
+      const isExcluded = excludeTools.includes(definition.name);
+      const isAllowed = !allowedTools || allowedTools.includes(definition.name);
+
+      if (isAllowed && !isExcluded) {
+        try {
+          const wrapper = new SubagentToolWrapper(definition, this);
+          registry.registerTool(wrapper);
+        } catch (error) {
+          console.error(
+            `Failed to wrap agent '${definition.name}' as a tool:`,
+            error,
+          );
+        }
+      } else if (this.getDebugMode()) {
+        console.log(
+          `[Config] Skipping registration of agent '${definition.name}' due to allow/exclude configuration.`,
+        );
+      }
     }
 
     await registry.discoverAllTools();
