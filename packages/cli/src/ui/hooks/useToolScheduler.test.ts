@@ -31,6 +31,7 @@ import {
   ToolConfirmationOutcome,
   ApprovalMode,
   MockTool,
+  HookSystem,
 } from '@google/gemini-cli-core';
 import type { HistoryItemWithoutId, HistoryItemToolGroup } from '../types.js';
 import { ToolCallStatus } from '../types.js';
@@ -71,6 +72,7 @@ const mockConfig = {
   getGeminiClient: () => null, // No client needed for these tests
   getShellExecutionConfig: () => ({ terminalWidth: 80, terminalHeight: 24 }),
 } as unknown as Config;
+mockConfig.getHookSystem = vi.fn().mockReturnValue(new HookSystem(mockConfig));
 
 const mockTool = new MockTool({
   name: 'mockTool',
