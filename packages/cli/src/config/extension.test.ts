@@ -674,7 +674,12 @@ describe('extension tests', () => {
       await expect(
         installExtension({ source: sourceExtDir, type: 'local' }),
       ).rejects.toThrow(
-        new RegExp(`^Failed to load extension config from ${configPath}`),
+        new RegExp(
+          `^Failed to load extension config from ${configPath.replace(
+            /\\/g,
+            '\\\\',
+          )}`,
+        ),
       );
     });
 
