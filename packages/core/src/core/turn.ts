@@ -385,7 +385,7 @@ export class Turn {
   }
 
   getDebugResponses(): GenerateContentResponse[] {
-    return this.debugResponses;
+    return [...this.debugResponses];
   }
 }
 
