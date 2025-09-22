@@ -18,6 +18,7 @@ import type { LogEvent, LogEventEntry } from './clearcut-logger.js';
 import { ClearcutLogger, EventNames, TEST_ONLY } from './clearcut-logger.js';
 import type { ContentGeneratorConfig } from '../../core/contentGenerator.js';
 import { AuthType } from '../../core/contentGenerator.js';
+import type { SuccessfulToolCall } from '../../core/coreToolScheduler.js';
 import type { ConfigParameters } from '../../config/config.js';
 import { EventMetadataKey } from './event-metadata-key.js';
 import { makeFakeConfig } from '../../test-utils/config.js';
@@ -37,12 +38,8 @@ import { safeJsonStringify } from '../../utils/safeJsonStringify.js';
 interface CustomMatchers<R = unknown> {
   toHaveMetadataValue: ([key, value]: [EventMetadataKey, string]) => R;
   toHaveEventName: (name: EventNames) => R;
+  toHaveMetadataKey: (key: EventMetadataKey) => R;
 }
-
-type Metadata = {
-  gemini_cli_key: EventMetadataKey;
-  value: string;
-};
 
 declare module 'vitest' {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-empty-object-type
@@ -76,6 +73,20 @@ expect.extend({
       pass,
       message: () =>
         `event ${received} does${isNot ? ' not' : ''} have ${value}}`,
+    };
+  },
+
+  toHaveMetadataKey(received: LogEventEntry[], key: EventMetadataKey) {
+    const { isNot } = this;
+    const event = JSON.parse(received[0].source_extension_json) as LogEvent;
+    const metadata = event['event_metadata'][0];
+
+    const pass = metadata.some((m) => m.gemini_cli_key === key);
+
+    return {
+      pass,
+      message: () =>
+        `event ${received} ${isNot ? 'has' : 'does not have'} the metadata key ${key}`,
     };
   },
 });
@@ -684,42 +695,10 @@ describe('ClearcutLogger', () => {
     });
   });
 
-  // Define mock types to avoid dependency on coreToolScheduler
-  interface MockFileDiff {
-    diffStat?: {
-      model_added_lines?: number;
-      model_removed_lines?: number;
-      model_added_chars?: number;
-      model_removed_chars?: number;
-      user_added_lines?: number;
-      user_removed_lines?: number;
-      user_added_chars?: number;
-      user_removed_chars?: number;
-    };
-  }
-
-  interface MockCompletedToolCall {
-    request: {
-      name: string;
-      args: Record<string, unknown>;
-      prompt_id: string;
-    };
-    response: {
-      resultDisplay?: MockFileDiff;
-      error?: Error;
-      errorType?: string;
-      contentLength?: number;
-    };
-    status: 'success' | 'error';
-    durationMs?: number;
-    outcome?: string;
-    tool?: unknown;
-  }
-
   describe('logToolCallEvent', () => {
     it('logs an event with all diff metadata', () => {
       const { logger } = setup();
-      const completedToolCall: MockCompletedToolCall = {
+      const completedToolCall = {
         request: { name: 'test', args: {}, prompt_id: 'prompt-123' },
         response: {
           resultDisplay: {
@@ -736,10 +715,9 @@ describe('ClearcutLogger', () => {
           },
         },
         status: 'success',
-      };
+      } as SuccessfulToolCall;
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      logger?.logToolCallEvent(new ToolCallEvent(completedToolCall as any));
+      logger?.logToolCallEvent(new ToolCallEvent(completedToolCall));
 
       const events = getEvents(logger!);
       expect(events.length).toBe(1);
@@ -780,93 +758,76 @@ describe('ClearcutLogger', () => {
 
     it('logs an event with partial diff metadata', () => {
       const { logger } = setup();
-      const completedToolCall: MockCompletedToolCall = {
+      const completedToolCall = {
         request: { name: 'test', args: {}, prompt_id: 'prompt-123' },
         response: {
           resultDisplay: {
             diffStat: {
               model_added_lines: 1,
+              model_removed_lines: 2,
               model_added_chars: 3,
-              user_removed_lines: 6,
-              user_removed_chars: 8,
+              model_removed_chars: 4,
             },
           },
         },
         status: 'success',
-      };
+      } as SuccessfulToolCall;
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       logger?.logToolCallEvent(new ToolCallEvent(completedToolCall as any));
 
       const events = getEvents(logger!);
-      const metadata = JSON.parse(events[0][0].source_extension_json)
-        .event_metadata[0] as Metadata[];
       expect(events.length).toBe(1);
       expect(events[0]).toHaveEventName(EventNames.TOOL_CALL);
       expect(events[0]).toHaveMetadataValue([
         EventMetadataKey.GEMINI_CLI_AI_ADDED_LINES,
         '1',
       ]);
-      expect(
-        metadata.find(
-          (m: Metadata) =>
-            m.gemini_cli_key === EventMetadataKey.GEMINI_CLI_AI_REMOVED_LINES,
-        ),
-      ).toBeUndefined();
+      expect(events[0]).toHaveMetadataValue([
+        EventMetadataKey.GEMINI_CLI_AI_REMOVED_LINES,
+        '2',
+      ]);
       expect(events[0]).toHaveMetadataValue([
         EventMetadataKey.GEMINI_CLI_AI_ADDED_CHARS,
         '3',
       ]);
-      expect(
-        metadata.find(
-          (m: Metadata) =>
-            m.gemini_cli_key === EventMetadataKey.GEMINI_CLI_AI_REMOVED_CHARS,
-        ),
-      ).toBeUndefined();
-      expect(
-        metadata.find(
-          (m: Metadata) =>
-            m.gemini_cli_key === EventMetadataKey.GEMINI_CLI_USER_ADDED_LINES,
-        ),
-      ).toBeUndefined();
       expect(events[0]).toHaveMetadataValue([
+        EventMetadataKey.GEMINI_CLI_AI_REMOVED_CHARS,
+        '4',
+      ]);
+      expect(events[0]).not.toHaveMetadataKey(
+        EventMetadataKey.GEMINI_CLI_USER_ADDED_LINES,
+      );
+      expect(events[0]).not.toHaveMetadataKey(
         EventMetadataKey.GEMINI_CLI_USER_REMOVED_LINES,
-        '6',
-      ]);
-      expect(
-        metadata.find(
-          (m: Metadata) =>
-            m.gemini_cli_key === EventMetadataKey.GEMINI_CLI_USER_ADDED_CHARS,
-        ),
-      ).toBeUndefined();
-      expect(events[0]).toHaveMetadataValue([
+      );
+      expect(events[0]).not.toHaveMetadataKey(
+        EventMetadataKey.GEMINI_CLI_USER_ADDED_CHARS,
+      );
+      expect(events[0]).not.toHaveMetadataKey(
         EventMetadataKey.GEMINI_CLI_USER_REMOVED_CHARS,
-        '8',
-      ]);
+      );
     });
 
     it('does not log diff metadata if diffStat is not present', () => {
       const { logger } = setup();
-      const completedToolCall: MockCompletedToolCall = {
+      const completedToolCall = {
         request: { name: 'test', args: {}, prompt_id: 'prompt-123' },
         response: {
           resultDisplay: {},
         },
         status: 'success',
-      };
+      } as SuccessfulToolCall;
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       logger?.logToolCallEvent(new ToolCallEvent(completedToolCall as any));
 
       const events = getEvents(logger!);
-      const metadata = JSON.parse(events[0][0].source_extension_json)
-        .event_metadata[0] as Metadata[];
-      expect(
-        metadata.find(
-          (m: Metadata) =>
-            m.gemini_cli_key === EventMetadataKey.GEMINI_CLI_AI_ADDED_LINES,
-        ),
-      ).toBeUndefined();
+      expect(events.length).toBe(1);
+      expect(events[0]).toHaveEventName(EventNames.TOOL_CALL);
+      expect(events[0]).not.toHaveMetadataKey(
+        EventMetadataKey.GEMINI_CLI_AI_ADDED_LINES,
+      );
     });
   });
 });
