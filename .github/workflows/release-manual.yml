@@ -16,9 +16,11 @@ on:
         required: true
         type: 'choice'
         options:
-          - 'stable'
           - 'preview'
+          - 'nightly'
+          - 'latest'
           - 'dev'
+        default: 'dev'
       dry_run:
         description: 'Run a dry-run of the release process; no branches, npm packages or GitHub releases will be created.'
         required: true
@@ -26,6 +28,11 @@ on:
         default: true
       force_skip_tests:
         description: 'Select to skip the "Run Tests" step in testing. Prod releases should run tests'
+        required: false
+        type: 'boolean'
+        default: false
+      skip_github_release:
+        description: 'Select to skip creating a GitHub release and create a npm release only.'
         required: false
         type: 'boolean'
         default: false
@@ -78,3 +85,4 @@ jobs:
           github-token: '${{ secrets.GITHUB_TOKEN }}'
           dry-run: '${{ github.event.inputs.dry_run }}'
           previous-tag: '${{ steps.release_info.outputs.PREVIOUS_TAG }}'
+          skip-github-release: '${{ github.event.inputs.skip_github_release }}'
