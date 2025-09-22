@@ -95,8 +95,8 @@ export function initializeTelemetry(config: Config): void {
   const telemetryTarget = config.getTelemetryTarget();
   const useCollector = config.getTelemetryUseCollector();
   const parsedEndpoint = parseOtlpEndpoint(otlpEndpoint, otlpProtocol);
-  const useOtlp = !!parsedEndpoint;
   const telemetryOutfile = config.getTelemetryOutfile();
+  const useOtlp = !!parsedEndpoint && !telemetryOutfile;
 
   const gcpProjectId =
     process.env['OTLP_GOOGLE_CLOUD_PROJECT'] ||
@@ -196,6 +196,9 @@ export function initializeTelemetry(config: Config): void {
     shutdownTelemetry(config);
   });
   process.on('SIGINT', () => {
+    shutdownTelemetry(config);
+  });
+  process.on('exit', () => {
     shutdownTelemetry(config);
   });
 }
