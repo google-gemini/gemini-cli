@@ -307,6 +307,15 @@ for Gemini CLI:
     - `command` (string)
     - `subcommand` (string, if applicable)
 
+- `gemini_cli.extension_enable`: This event occurs when an extension is enabled
+- `gemini_cli.extension_install`: This event occurs when an extension is installed
+  - **Attributes**:
+    - `extension_name` (string)
+    - `extension_version` (string)
+    - `extension_source` (string)
+    - `status` (string)
+- `gemini_cli.extension_uninstall`: This event occurs when an extension is uninstalled
+
 ### Metrics
 
 Metrics are numerical measurements of behavior over time. The following metrics are collected for Gemini CLI:
