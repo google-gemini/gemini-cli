@@ -14,11 +14,11 @@ import { DetailedMessagesDisplay } from './DetailedMessagesDisplay.js';
 import { InputPrompt, calculatePromptWidths } from './InputPrompt.js';
 import { Footer, type FooterProps } from './Footer.js';
 import { ShowMoreLines } from './ShowMoreLines.js';
+import { QueuedMessageDisplay } from './QueuedMessageDisplay.js';
 import { OverflowProvider } from '../contexts/OverflowContext.js';
 import { theme } from '../semantic-colors.js';
 import { isNarrowWidth } from '../utils/isNarrowWidth.js';
 import { useUIState } from '../contexts/UIStateContext.js';
-import { useFocusState } from '../contexts/FocusContext.js';
 import { useUIActions } from '../contexts/UIActionsContext.js';
 import { useVimMode } from '../contexts/VimModeContext.js';
 import { useConfig } from '../contexts/ConfigContext.js';
@@ -27,13 +27,10 @@ import { ApprovalMode } from '@google/gemini-cli-core';
 import { StreamingState } from '../types.js';
 import { ConfigInitDisplay } from '../components/ConfigInitDisplay.js';
 
-const MAX_DISPLAYED_QUEUED_MESSAGES = 3;
-
 export const Composer = () => {
   const config = useConfig();
   const settings = useSettings();
   const uiState = useUIState();
-  const isFocused = useFocusState();
   const uiActions = useUIActions();
   const { vimEnabled, vimMode } = useVimMode();
   const terminalWidth = process.stdout.columns;
@@ -70,7 +67,7 @@ export const Composer = () => {
 
   return (
     <Box flexDirection="column">
-      {!uiState.shellFocused && (
+      {!uiState.embeddedShellFocused && (
         <LoadingIndicator
           thought={
             uiState.streamingState === StreamingState.WaitingForConfirmation ||
@@ -89,33 +86,7 @@ export const Composer = () => {
 
       {!uiState.isConfigInitialized && <ConfigInitDisplay />}
 
-      {uiState.messageQueue.length > 0 && (
-        <Box flexDirection="column" marginTop={1}>
-          {uiState.messageQueue
-            .slice(0, MAX_DISPLAYED_QUEUED_MESSAGES)
-            .map((message, index) => {
-              const preview = message.replace(/\s+/g, ' ');
-
-              return (
-                <Box key={index} paddingLeft={2} width="100%">
-                  <Text dimColor wrap="truncate">
-                    {preview}
-                  </Text>
-                </Box>
-              );
-            })}
-          {uiState.messageQueue.length > MAX_DISPLAYED_QUEUED_MESSAGES && (
-            <Box paddingLeft={2}>
-              <Text dimColor>
-                ... (+
-                {uiState.messageQueue.length -
-                  MAX_DISPLAYED_QUEUED_MESSAGES}{' '}
-                more)
-              </Text>
-            </Box>
-          )}
-        </Box>
-      )}
+      <QueuedMessageDisplay messageQueue={uiState.messageQueue} />
 
       <Box
         marginTop={1}
@@ -194,9 +165,9 @@ export const Composer = () => {
           setShellModeActive={uiActions.setShellModeActive}
           approvalMode={showAutoAcceptIndicator}
           onEscapePromptChange={uiActions.onEscapePromptChange}
-          focus={isFocused}
+          focus={true}
           vimHandleInput={uiActions.vimHandleInput}
-          isShellFocused={uiState.shellFocused}
+          isEmbeddedShellFocused={uiState.embeddedShellFocused}
           placeholder={
             vimEnabled
               ? "  Press 'i' for INSERT mode and 'Esc' for NORMAL mode."

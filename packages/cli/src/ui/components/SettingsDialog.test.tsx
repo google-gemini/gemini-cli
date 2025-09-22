@@ -1084,7 +1084,7 @@ describe('SettingsDialog', () => {
       expect(lastFrame()).toContain('Settings'); // Title
       expect(lastFrame()).toContain('● Vim Mode'); // Active setting
       expect(lastFrame()).toContain('Apply To'); // Scope section
-      expect(lastFrame()).toContain('1. User Settings'); // Scope options
+      expect(lastFrame()).toContain('User Settings'); // Scope options (no numbers when settings focused)
       expect(lastFrame()).toContain(
         '(Use Enter to select, Tab to change focus)',
       ); // Help text
@@ -1294,7 +1294,7 @@ describe('SettingsDialog', () => {
           },
         },
         tools: {
-          usePty: true,
+          enableInteractiveShell: true,
           autoAccept: true,
           useRipgrep: true,
         },
@@ -1407,7 +1407,7 @@ describe('SettingsDialog', () => {
           },
           tools: {
             useRipgrep: true,
-            usePty: false,
+            enableInteractiveShell: false,
           },
         },
       );
@@ -1481,7 +1481,7 @@ describe('SettingsDialog', () => {
     it('should render with tools and security settings', () => {
       const settings = createMockSettings({
         tools: {
-          usePty: true,
+          enableInteractiveShell: true,
           autoAccept: false,
           useRipgrep: true,
           truncateToolOutputThreshold: 25000,
@@ -1540,7 +1540,7 @@ describe('SettingsDialog', () => {
           },
         },
         tools: {
-          usePty: false,
+          enableInteractiveShell: false,
           autoAccept: false,
           useRipgrep: false,
         },
