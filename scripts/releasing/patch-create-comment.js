@@ -13,7 +13,6 @@
 
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
-import { readFileSync } from 'node:fs';
 
 async function main() {
   const argv = await yargs(hideBin(process.argv))
@@ -26,11 +25,6 @@ async function main() {
       description: 'Exit code from patch creation step',
       type: 'number',
       demandOption: !process.env.GITHUB_ACTIONS,
-    })
-    .option('output-log', {
-      description: 'Path to the patch output log file',
-      type: 'string',
-      default: 'patch_output.log',
     })
     .option('commit', {
       description: 'The commit SHA being patched',
@@ -51,7 +45,6 @@ async function main() {
     .option('run-id', {
       description: 'The GitHub workflow run ID',
       type: 'string',
-      default: '0',
     })
     .option('test', {
       description: 'Test mode - validate logic without GitHub API calls',
@@ -71,14 +64,8 @@ async function main() {
 
   const testMode = argv.test || process.env.TEST_MODE === 'true';
 
-  // Initialize GitHub API client only if not in test mode
-  let github;
-  if (!testMode) {
-    const { Octokit } = await import('@octokit/rest');
-    github = new Octokit({
-      auth: process.env.GH_TOKEN || process.env.GITHUB_TOKEN,
-    });
-  }
+  // GitHub CLI is available in the workflow environment
+  const hasGitHubCli = !testMode;
 
   // Get inputs from CLI args or environment
   const originalPr = argv.originalPr || process.env.ORIGINAL_PR;
@@ -86,13 +73,18 @@ async function main() {
     argv.exitCode !== undefined
       ? argv.exitCode
       : parseInt(process.env.EXIT_CODE || '1');
-  const outputLog =
-    argv.outputLog || process.env.OUTPUT_LOG || 'patch_output.log';
   const commit = argv.commit || process.env.COMMIT;
   const channel = argv.channel || process.env.CHANNEL;
   const repository =
     argv.repository || process.env.REPOSITORY || 'google-gemini/gemini-cli';
   const runId = argv.runId || process.env.GITHUB_RUN_ID || '0';
+
+  // Validate required parameters
+  if (!runId || runId === '0') {
+    console.warn(
+      'Warning: No valid GitHub run ID found, workflow links may not work correctly',
+    );
+  }
 
   if (!originalPr) {
     console.log('No original PR specified, skipping comment');
@@ -103,7 +95,7 @@ async function main() {
     `Analyzing patch creation result for PR ${originalPr} (exit code: ${exitCode})`,
   );
 
-  const [owner, repo] = repository.split('/');
+  const [_owner, _repo] = repository.split('/');
   const npmTag = channel === 'stable' ? 'latest' : 'preview';
 
   if (testMode) {
@@ -111,7 +103,6 @@ async function main() {
     console.log('\n📋 Inputs:');
     console.log(`  - Original PR: ${originalPr}`);
     console.log(`  - Exit Code: ${exitCode}`);
-    console.log(`  - Output Log: ${outputLog}`);
     console.log(`  - Commit: ${commit}`);
     console.log(`  - Channel: ${channel} → npm tag: ${npmTag}`);
     console.log(`  - Repository: ${repository}`);
@@ -121,23 +112,53 @@ async function main() {
   let commentBody;
   let logContent = '';
 
-  // Try to read the output log
-  try {
-    if (testMode) {
-      // Create mock log content for testing
-      if (exitCode === 0) {
-        logContent = `Creating hotfix branch hotfix/v0.5.3/${channel}/cherry-pick-${commit.substring(0, 7)} from release/v0.5.3`;
-      } else {
-        logContent = 'Error: Failed to create patch';
-      }
+  // Get log content from environment variable or generate mock content for testing
+  if (testMode && !process.env.LOG_CONTENT) {
+    // Create mock log content for testing only if LOG_CONTENT is not provided
+    if (exitCode === 0) {
+      logContent = `Creating hotfix branch hotfix/v0.5.3/${channel}/cherry-pick-${commit.substring(0, 7)} from release/v0.5.3`;
     } else {
-      logContent = readFileSync(outputLog, 'utf8');
+      logContent = 'Error: Failed to create patch';
     }
-  } catch (error) {
-    console.log(`Could not read output log ${outputLog}:`, error.message);
+  } else {
+    // Use log content from environment variable
+    logContent = process.env.LOG_CONTENT || '';
   }
 
-  if (logContent.includes('already has an open PR')) {
+  if (
+    logContent.includes(
+      'Failed to create release branch due to insufficient GitHub App permissions',
+    )
+  ) {
+    // GitHub App permission error - extract manual commands
+    const manualCommandsMatch = logContent.match(
+      /📋 Please run these commands manually to create the branch:[\s\S]*?```bash\s*([\s\S]*?)\s*```/,
+    );
+    let manualCommands = '';
+    if (manualCommandsMatch) {
+      manualCommands = manualCommandsMatch[1].trim();
+    }
+
+    commentBody = `🔒 **GitHub App Permission Issue**
+
+The patch creation failed due to insufficient GitHub App permissions for creating workflow files.
+
+**📝 Manual Action Required:**
+${
+  manualCommands
+    ? `Please run these commands manually to create the release branch:
+
+\`\`\`bash
+${manualCommands}
+\`\`\`
+
+After running these commands, you can re-run the patch workflow.`
+    : 'Please check the workflow logs for manual commands to run.'
+}
+
+**🔗 Links:**
+- [View workflow run](https://github.com/${repository}/actions/runs/${runId})`;
+  } else if (logContent.includes('already has an open PR')) {
     // Branch exists with existing PR
     const prMatch = logContent.match(/Found existing PR #(\d+): (.*)/);
     if (prMatch) {
@@ -201,18 +222,42 @@ ${hasConflicts ? '4' : '3'}. You'll receive updates here when the release comple
 
 **🔗 Track Progress:**
 - [View hotfix PR #${mockPrNumber}](${mockPrUrl})`;
-      } else if (github) {
-        // Find the actual PR for the new branch
+      } else if (hasGitHubCli) {
+        // Find the actual PR for the new branch using gh CLI
         try {
-          const prList = await github.rest.pulls.list({
-            owner,
-            repo,
-            head: `${owner}:${branch}`,
-            state: 'open',
-          });
+          const { spawnSync } = await import('node:child_process');
+          const result = spawnSync(
+            'gh',
+            [
+              'pr',
+              'list',
+              '--head',
+              branch,
+              '--state',
+              'open',
+              '--json',
+              'number,title,url',
+              '--limit',
+              '1',
+            ],
+            { encoding: 'utf8' },
+          );
 
-          if (prList.data.length > 0) {
-            const pr = prList.data[0];
+          if (result.error) {
+            throw result.error;
+          }
+          if (result.status !== 0) {
+            throw new Error(
+              `gh pr list failed with status ${result.status}: ${result.stderr}`,
+            );
+          }
+
+          const prListOutput = result.stdout;
+
+          const prList = JSON.parse(prListOutput);
+
+          if (prList.length > 0) {
+            const pr = prList[0];
             const hasConflicts =
               logContent.includes('Cherry-pick has conflicts') ||
               pr.title.includes('[CONFLICTS]');
@@ -223,15 +268,15 @@ ${hasConflicts ? '4' : '3'}. You'll receive updates here when the release comple
 - **Channel**: \`${channel}\` → will publish to npm tag \`${npmTag}\`
 - **Commit**: \`${commit}\`
 - **Hotfix Branch**: [\`${branch}\`](https://github.com/${repository}/tree/${branch})
-- **Hotfix PR**: [#${pr.number}](${pr.html_url})${hasConflicts ? '\n- **⚠️ Status**: Cherry-pick conflicts detected - manual resolution required' : ''}
+- **Hotfix PR**: [#${pr.number}](${pr.url})${hasConflicts ? '\n- **⚠️ Status**: Cherry-pick conflicts detected - manual resolution required' : ''}
 
 **📝 Next Steps:**
-1. ${hasConflicts ? '⚠️ **Resolve conflicts** in the hotfix PR first' : 'Review and approve the hotfix PR'}: [#${pr.number}](${pr.html_url})${hasConflicts ? '\n2. **Test your changes** after resolving conflicts' : ''}
+1. ${hasConflicts ? '⚠️ **Resolve conflicts** in the hotfix PR first' : 'Review and approve the hotfix PR'}: [#${pr.number}](${pr.url})${hasConflicts ? '\n2. **Test your changes** after resolving conflicts' : ''}
 ${hasConflicts ? '3' : '2'}. Once merged, the patch release will automatically trigger
 ${hasConflicts ? '4' : '3'}. You'll receive updates here when the release completes
 
 **🔗 Track Progress:**
-- [View hotfix PR #${pr.number}](${pr.html_url})`;
+- [View hotfix PR #${pr.number}](${pr.url})`;
           } else {
             // Fallback if PR not found yet
             commentBody = `🚀 **Patch PR Created!**
@@ -287,17 +332,42 @@ No output was generated during patch creation.
     console.log(commentBody);
     console.log('----------------------------------------');
     console.log('\n✅ Comment generation working correctly!');
-  } else if (github) {
-    await github.rest.issues.createComment({
-      owner,
-      repo,
-      issue_number: parseInt(originalPr),
-      body: commentBody,
-    });
+  } else if (hasGitHubCli) {
+    const { spawnSync } = await import('node:child_process');
+    const { writeFileSync, unlinkSync } = await import('node:fs');
+    const { join } = await import('node:path');
 
-    console.log(`Successfully commented on PR ${originalPr}`);
+    // Write comment to temporary file to avoid shell escaping issues
+    const tmpFile = join(process.cwd(), `comment-${Date.now()}.md`);
+    writeFileSync(tmpFile, commentBody);
+
+    try {
+      const result = spawnSync(
+        'gh',
+        ['pr', 'comment', originalPr.toString(), '--body-file', tmpFile],
+        {
+          stdio: 'inherit',
+        },
+      );
+
+      if (result.error) {
+        throw result.error;
+      }
+      if (result.status !== 0) {
+        throw new Error(`gh pr comment failed with status ${result.status}`);
+      }
+
+      console.log(`Successfully commented on PR ${originalPr}`);
+    } finally {
+      // Clean up temp file
+      try {
+        unlinkSync(tmpFile);
+      } catch (_e) {
+        // Ignore cleanup errors
+      }
+    }
   } else {
-    console.log('No GitHub client available');
+    console.log('No GitHub CLI available');
   }
 }
 
