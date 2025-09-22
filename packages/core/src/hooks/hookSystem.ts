@@ -13,6 +13,7 @@ import { HookEventHandler } from './hookEventHandler.js';
 import type { HookRegistryEntry } from './hookRegistry.js';
 import { logs, type Logger } from '@opentelemetry/api-logs';
 import { SERVICE_NAME } from '../telemetry/constants.js';
+import { debugLogger } from '../utils/debugLogger.js';
 
 /**
  * Main hook system that coordinates all hook-related functionality
@@ -52,14 +53,9 @@ export class HookSystem {
       return;
     }
 
-    try {
-      await this.hookRegistry.initialize();
-      this.initialized = true;
-      console.log('Hook system initialized successfully');
-    } catch (error) {
-      console.error(`Failed to initialize hook system: ${error}`);
-      throw error;
-    }
+    await this.hookRegistry.initialize();
+    this.initialized = true;
+    debugLogger.debug('Hook system initialized successfully');
   }
 
   /**

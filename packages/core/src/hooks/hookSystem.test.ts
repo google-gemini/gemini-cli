@@ -28,6 +28,18 @@ vi.mock('node:child_process', async (importOriginal) => {
   };
 });
 
+// Mock debugLogger - use vi.hoisted to define mock before it's used in vi.mock
+const mockDebugLogger = vi.hoisted(() => ({
+  debug: vi.fn(),
+  log: vi.fn(),
+  warn: vi.fn(),
+  error: vi.fn(),
+}));
+
+vi.mock('../utils/debugLogger.js', () => ({
+  debugLogger: mockDebugLogger,
+}));
+
 // Mock console methods
 const mockConsole = {
   log: vi.fn(),
@@ -110,7 +122,7 @@ describe('HookSystem Integration', () => {
     it('should initialize successfully', async () => {
       await hookSystem.initialize();
 
-      expect(mockConsole.log).toHaveBeenCalledWith(
+      expect(mockDebugLogger.debug).toHaveBeenCalledWith(
         'Hook system initialized successfully',
       );
 
@@ -125,7 +137,7 @@ describe('HookSystem Integration', () => {
       await hookSystem.initialize(); // Second call should be no-op
 
       // The system logs both registry initialization and system initialization
-      expect(mockConsole.log).toHaveBeenCalledWith(
+      expect(mockDebugLogger.debug).toHaveBeenCalledWith(
         'Hook system initialized successfully',
       );
     });
@@ -154,10 +166,10 @@ describe('HookSystem Integration', () => {
 
       const invalidHookSystem = new HookSystem(invalidConfig);
 
-      // Should not throw, but should log warnings
+      // Should not throw, but should log warnings via debugLogger
       await invalidHookSystem.initialize();
 
-      expect(mockConsole.warn).toHaveBeenCalled();
+      expect(mockDebugLogger.warn).toHaveBeenCalled();
     });
   });
 
