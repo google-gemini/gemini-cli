@@ -14,6 +14,7 @@ import type {
   Tool,
   PartListUnion,
   GenerateContentConfig,
+  GenerateContentParameters,
 } from '@google/genai';
 import { ThinkingLevel } from '@google/genai';
 import { toParts } from '../code_assist/converter.js';
@@ -47,6 +48,11 @@ import { isFunctionResponse } from '../utils/messageInspectors.js';
 import { partListUnionToString } from './geminiRequest.js';
 import type { ModelConfigKey } from '../services/modelConfigService.js';
 import { estimateTokenCountSync } from '../utils/tokenCalculation.js';
+import {
+  fireAfterModelHook,
+  fireBeforeModelHook,
+  fireBeforeToolSelectionHook,
+} from './geminiChatHookTriggers.js';
 
 export enum StreamEventType {
   /** A regular content chunk from the API. */
@@ -397,18 +403,27 @@ export class GeminiChat {
     let effectiveModel = model;
     const contentsForPreviewModel =
       this.ensureActiveLoopHasThoughtSignatures(requestContents);
-    const apiCall = () => {
+
+    // Track final request parameters for AfterModel hooks
+    let lastModelToUse = model;
+    let lastConfig: GenerateContentConfig = generateContentConfig;
+    let lastContentsToUse: Content[] = requestContents;
+
+    // eslint-disable-next-line @typescript-eslint/no-this-alias
+    const self = this;
+
+    const apiCall = async () => {
       let modelToUse = getEffectiveModel(
-        this.config.isInFallbackMode(),
+        self.config.isInFallbackMode(),
         model,
-        this.config.getPreviewFeatures(),
+        self.config.getPreviewFeatures(),
       );
 
       // Preview Model Bypass Logic:
       // If we are in "Preview Model Bypass Mode" (transient failure), we force downgrade to 2.5 Pro
       // IF the effective model is currently Preview Model.
       if (
-        this.config.isPreviewModelBypassMode() &&
+        self.config.isPreviewModelBypassMode() &&
         modelToUse === PREVIEW_GEMINI_MODEL
       ) {
         modelToUse = DEFAULT_GEMINI_MODEL;
@@ -419,8 +434,8 @@ export class GeminiChat {
         ...generateContentConfig,
         // TODO(12622): Ensure we don't overrwrite these when they are
         // passed via config.
-        systemInstruction: this.systemInstruction,
-        tools: this.tools,
+        systemInstruction: self.systemInstruction,
+        tools: self.tools,
       };
 
       // TODO(joshualitt): Clean this up with model configs.
@@ -439,14 +454,79 @@ export class GeminiChat {
         };
         delete config.thinkingConfig?.thinkingLevel;
       }
+      let contentsToUse =
+        modelToUse === PREVIEW_GEMINI_MODEL
+          ? contentsForPreviewModel
+          : requestContents;
 
-      return this.config.getContentGenerator().generateContentStream(
+      // Fire BeforeModel and BeforeToolSelection hooks if enabled
+      const hooksEnabled = self.config.getEnableHooks();
+      const messageBus = self.config.getMessageBus();
+      if (hooksEnabled && messageBus) {
+        // Fire BeforeModel hook
+        const beforeModelResult = await fireBeforeModelHook(messageBus, {
+          model: modelToUse,
+          config,
+          contents: contentsToUse,
+        });
+
+        // Check if hook blocked the model call
+        if (beforeModelResult.blocked) {
+          // Return a synthetic response generator
+          const syntheticResponse = beforeModelResult.syntheticResponse;
+          if (syntheticResponse) {
+            return (async function* () {
+              yield syntheticResponse;
+            })();
+          }
+          // If blocked without synthetic response, return empty generator
+          return (async function* () {
+            // Empty generator - no response
+          })();
+        }
+
+        // Apply modifications from BeforeModel hook
+        if (beforeModelResult.modifiedConfig) {
+          Object.assign(config, beforeModelResult.modifiedConfig);
+        }
+        if (
+          beforeModelResult.modifiedContents &&
+          Array.isArray(beforeModelResult.modifiedContents)
+        ) {
+          contentsToUse = beforeModelResult.modifiedContents as Content[];
+        }
+
+        // Fire BeforeToolSelection hook
+        const toolSelectionResult = await fireBeforeToolSelectionHook(
+          messageBus,
+          {
+            model: modelToUse,
+            config,
+            contents: contentsToUse,
+          },
+        );
+
+        // Apply tool configuration modifications
+        if (toolSelectionResult.toolConfig) {
+          config.toolConfig = toolSelectionResult.toolConfig;
+        }
+        if (
+          toolSelectionResult.tools &&
+          Array.isArray(toolSelectionResult.tools)
+        ) {
+          config.tools = toolSelectionResult.tools as Tool[];
+        }
+      }
+
+      // Track final request parameters for AfterModel hooks
+      lastModelToUse = modelToUse;
+      lastConfig = config;
+      lastContentsToUse = contentsToUse;
+
+      return self.config.getContentGenerator().generateContentStream(
         {
           model: modelToUse,
-          contents:
-            modelToUse === PREVIEW_GEMINI_MODEL
-              ? contentsForPreviewModel
-              : requestContents,
+          contents: contentsToUse,
           config,
         },
         prompt_id,
@@ -470,7 +550,14 @@ export class GeminiChat {
           : undefined,
     });
 
-    return this.processStreamResponse(effectiveModel, streamResponse);
+    // Store the original request for AfterModel hooks
+    const originalRequest: GenerateContentParameters = {
+      model: lastModelToUse,
+      config: lastConfig,
+      contents: lastContentsToUse,
+    };
+
+    return this.processStreamResponse(effectiveModel, streamResponse, originalRequest);
   }
 
   /**
@@ -624,6 +711,7 @@ export class GeminiChat {
   private async *processStreamResponse(
     model: string,
     streamResponse: AsyncGenerator<GenerateContentResponse>,
+    originalRequest: GenerateContentParameters,
   ): AsyncGenerator<GenerateContentResponse> {
     const modelResponseParts: Part[] = [];
 
@@ -663,7 +751,19 @@ export class GeminiChat {
         }
       }
 
-      yield chunk; // Yield every chunk to the UI immediately.
+      // Fire AfterModel hook through MessageBus (only if hooks are enabled)
+      const hooksEnabled = this.config.getEnableHooks();
+      const messageBus = this.config.getMessageBus();
+      if (hooksEnabled && messageBus && originalRequest && chunk) {
+        const hookResult = await fireAfterModelHook(
+          messageBus,
+          originalRequest,
+          chunk,
+        );
+        yield hookResult.response;
+      } else {
+        yield chunk; // Yield every chunk to the UI immediately.
+      }
     }
 
     // String thoughts and consolidate text parts.
