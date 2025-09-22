@@ -2,11 +2,10 @@
   "extends": "../../tsconfig.json",
   "compilerOptions": {
     "outDir": "dist",
-    "lib": ["DOM", "DOM.Iterable", "ES2021"],
+    "lib": ["DOM", "DOM.Iterable", "ES2023"],
     "composite": true,
     "types": ["node", "vitest/globals"]
   },
   "include": ["index.ts", "src/**/*.ts", "src/**/*.json"],
-  "exclude": ["node_modules", "dist"],
-  "references": [{ "path": "../../third_party/get-ripgrep" }]
+  "exclude": ["node_modules", "dist"]
 }

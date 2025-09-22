@@ -280,10 +280,29 @@ export function serializeHistoryToMarkdown(history: Content[]): string {
     .map((item) => {
       const text =
         item.parts
-          ?.filter((m) => !!m.text)
-          .map((m) => m.text)
+          ?.map((part) => {
+            if (part.text) {
+              return part.text;
+            }
+            if (part.functionCall) {
+              return `**Tool Command**:\n\`\`\`json\n${JSON.stringify(
+                part.functionCall,
+                null,
+                2,
+              )}\n\`\`\``;
+            }
+            if (part.functionResponse) {
+              return `**Tool Response**:\n\`\`\`json\n${JSON.stringify(
+                part.functionResponse,
+                null,
+                2,
+              )}\n\`\`\``;
+            }
+            return '';
+          })
           .join('') || '';
-      return `**${item.role}**:\n\n${text}`;
+      const roleIcon = item.role === 'user' ? '🧑‍💻' : '✨';
+      return `${roleIcon} ## ${(item.role || 'model').toUpperCase()}\n\n${text}`;
     })
     .join('\n\n---\n\n');
 }
