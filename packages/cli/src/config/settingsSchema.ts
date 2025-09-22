@@ -10,6 +10,8 @@ import type {
   TelemetrySettings,
   AuthType,
   ChatCompressionSettings,
+  HookDefinition,
+  HookEventName,
 } from '@google/gemini-cli-core';
 import {
   DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
@@ -1015,6 +1017,18 @@ const SETTINGS_SCHEMA = {
         mergeStrategy: MergeStrategy.UNION,
       },
     },
+  },
+
+  hooks: {
+    type: 'object',
+    label: 'Hooks',
+    category: 'Advanced',
+    requiresRestart: false,
+    default: {} as { [K in HookEventName]?: HookDefinition[] },
+    description:
+      'Hook configurations for intercepting and customizing agent behavior.',
+    showInDialog: false,
+    mergeStrategy: MergeStrategy.SHALLOW_MERGE,
   },
 } as const satisfies SettingsSchema;
 

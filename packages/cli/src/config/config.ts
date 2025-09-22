@@ -666,6 +666,7 @@ export async function loadCliConfig(
       format: (argv.outputFormat ?? settings.output?.format) as OutputFormat,
     },
     useModelRouter,
+    hooks: settings.hooks || {},
   });
 }
 
