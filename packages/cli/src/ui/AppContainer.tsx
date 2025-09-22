@@ -87,6 +87,7 @@ import { useSessionStats } from './contexts/SessionContext.js';
 import { useGitBranchName } from './hooks/useGitBranchName.js';
 import { useExtensionUpdates } from './hooks/useExtensionUpdates.js';
 import { ShellFocusContext } from './contexts/ShellFocusContext.js';
+import { startIdleTimer, stopIdleTimer } from '../notifications/idleTimer.js';
 
 const CTRL_EXIT_PROMPT_DURATION_MS = 1000;
 
@@ -148,6 +149,9 @@ export const AppContainer = (props: AppContainerProps) => {
   const [isTrustedFolder, setIsTrustedFolder] = useState<boolean | undefined>(
     config.isTrustedFolder(),
   );
+  const [streamingState, setStreamingState] = useState(StreamingState.Idle);
+  const [isNotificationsSetupOpen, setIsNotificationsSetupOpen] =
+    useState(false);
 
   const extensions = config.getExtensions();
   const { extensionsUpdateState, setExtensionsUpdateState } =
@@ -156,6 +160,14 @@ export const AppContainer = (props: AppContainerProps) => {
       historyManager.addItem,
       config.getWorkingDir(),
     );
+
+  useEffect(() => {
+    if (streamingState === StreamingState.Idle) {
+      startIdleTimer();
+    } else {
+      stopIdleTimer();
+    }
+  }, [streamingState]);
 
   // Helper to determine the effective model, considering the fallback state.
   const getEffectiveModel = useCallback(() => {
@@ -434,6 +446,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       setDebugMessage,
       toggleCorgiMode: () => setCorgiMode((prev) => !prev),
       setExtensionsUpdateState,
+      openNotificationsSetup: () => setIsNotificationsSetupOpen(true),
     }),
     [
       setAuthState,
@@ -532,7 +545,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
   const cancelHandlerRef = useRef<() => void>(() => {});
 
   const {
-    streamingState,
+    streamingState: geminiStreamingState,
     submitQuery,
     initError,
     pendingHistoryItems: pendingGeminiHistoryItems,
@@ -562,7 +575,12 @@ Logging in with Google... Please restart Gemini CLI to continue.
     terminalHeight,
     embeddedShellFocused,
   );
+  useEffect(() => {
+    setStreamingState(geminiStreamingState);
+  }, [geminiStreamingState]);
 
+  // This is a temporary fix to address the 'streamingState' variable being used before being assigned.
+  // The actual fix should involve a more robust state management solution or reordering of hooks.
   // Auto-accept indicator
   const showAutoAcceptIndicator = useAutoAcceptIndicator({
     config,
@@ -1072,6 +1090,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       extensionsUpdateState,
       activePtyId,
       embeddedShellFocused,
+      isNotificationsSetupOpen,
     }),
     [
       historyManager.history,
@@ -1148,6 +1167,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       extensionsUpdateState,
       activePtyId,
       embeddedShellFocused,
+      isNotificationsSetupOpen,
     ],
   );
 
@@ -1174,6 +1194,8 @@ Logging in with Google... Please restart Gemini CLI to continue.
       onWorkspaceMigrationDialogOpen,
       onWorkspaceMigrationDialogClose,
       handleProQuotaChoice,
+      openNotificationsSetup: () => setIsNotificationsSetupOpen(true),
+      closeNotificationsSetup: () => setIsNotificationsSetupOpen(false),
     }),
     [
       handleThemeSelect,

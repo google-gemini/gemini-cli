@@ -40,6 +40,10 @@ import { CommandService } from '../../services/CommandService.js';
 import { BuiltinCommandLoader } from '../../services/BuiltinCommandLoader.js';
 import { FileCommandLoader } from '../../services/FileCommandLoader.js';
 import { McpPromptLoader } from '../../services/McpPromptLoader.js';
+import {
+  initNotifications,
+  triggerNotification,
+} from '../../notifications/manager.js';
 import { parseSlashCommand } from '../../utils/commands.js';
 import type { ExtensionUpdateState } from '../state/extensions.js';
 
@@ -49,6 +53,7 @@ interface SlashCommandProcessorActions {
   openEditorDialog: () => void;
   openPrivacyNotice: () => void;
   openSettingsDialog: () => void;
+  openNotificationsSetup: () => void;
   quit: (messages: HistoryItem[]) => void;
   setDebugMessage: (message: string) => void;
   toggleCorgiMode: () => void;
@@ -256,6 +261,9 @@ export const useSlashCommandProcessor = (
   useEffect(() => {
     const controller = new AbortController();
     const load = async () => {
+      if (settings) {
+        initNotifications(settings);
+      }
       const loaders = [
         new McpPromptLoader(config),
         new BuiltinCommandLoader(config),
@@ -273,7 +281,7 @@ export const useSlashCommandProcessor = (
     return () => {
       controller.abort();
     };
-  }, [config, reloadTrigger, isConfigInitialized]);
+  }, [config, settings, reloadTrigger, isConfigInitialized]);
 
   const handleSlashCommand = useCallback(
     async (
@@ -373,6 +381,9 @@ export const useSlashCommandProcessor = (
                     case 'settings':
                       actions.openSettingsDialog();
                       return { type: 'handled' };
+                    case 'notifications-setup':
+                      actions.openNotificationsSetup();
+                      return { type: 'handled' };
                     case 'help':
                       return { type: 'handled' };
                     default: {
@@ -401,6 +412,7 @@ export const useSlashCommandProcessor = (
                     content: result.content,
                   };
                 case 'confirm_shell_commands': {
+                  triggerNotification('inputRequired');
                   const { outcome, approvedCommands } = await new Promise<{
                     outcome: ToolConfirmationOutcome;
                     approvedCommands?: string[];
@@ -441,6 +453,7 @@ export const useSlashCommandProcessor = (
                   );
                 }
                 case 'confirm_action': {
+                  triggerNotification('inputRequired');
                   const { confirmed } = await new Promise<{
                     confirmed: boolean;
                   }>((resolve) => {
@@ -528,6 +541,7 @@ export const useSlashCommandProcessor = (
           logSlashCommand(config, event);
         }
         setIsProcessing(false);
+        triggerNotification('taskComplete');
       }
     },
     [
