@@ -16,6 +16,7 @@ import type {
   AnyDeclarativeTool,
   AnyToolInvocation,
   AnsiOutput,
+  ShellExecutionConfig,
 } from '../index.js';
 import {
   ToolConfirmationOutcome,
@@ -45,9 +46,15 @@ import {
 import { doesToolInvocationMatch } from '../utils/tool-utils.js';
 import levenshtein from 'fast-levenshtein';
 import { ShellToolInvocation } from '../tools/shell.js';
-import type { ToolConfirmationRequest } from '../confirmation-bus/types.js';
+import type {
+  ToolConfirmationRequest,
+  HookExecutionRequest,
+  HookExecutionResponse,
+} from '../confirmation-bus/types.js';
 import { MessageBusType } from '../confirmation-bus/types.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
+import { NotificationType, createHookOutput } from '../hooks/types.js';
+import { debugLogger } from '../utils/debugLogger.js';
 
 export type ValidatingToolCall = {
   status: 'validating';
@@ -867,6 +874,26 @@ export class CoreToolScheduler {
             );
             this.setStatusInternal(reqInfo.callId, 'scheduled', signal);
           } else {
+            // Fire Notification hook before showing confirmation to user
+            const hookSystem = this.config.getHookSystem();
+            if (hookSystem) {
+              const message = this.getNotificationMessage(confirmationDetails);
+              try {
+                await hookSystem
+                  .getEventHandler()
+                  .fireNotificationEvent(
+                    NotificationType.ToolPermission,
+                    message,
+                    confirmationDetails as unknown as Record<string, unknown>,
+                  );
+              } catch (error) {
+                debugLogger.warn(
+                  `Notification hook failed for ${toolCall.tool.displayName}:`,
+                  error,
+                );
+              }
+            }
+
             // Allow IDE to resolve confirmation
             if (
               confirmationDetails.type === 'edit' &&
@@ -1127,14 +1154,18 @@ export class CoreToolScheduler {
                 );
                 this.notifyToolCallsUpdate();
               };
-              promise = invocation.execute(
+              promise = this.executeToolWithHooks(
+                invocation,
+                toolName,
                 signal,
                 liveOutputCallback,
                 shellExecutionConfig,
                 setPidCallback,
               );
             } else {
-              promise = invocation.execute(
+              promise = this.executeToolWithHooks(
+                invocation,
+                toolName,
                 signal,
                 liveOutputCallback,
                 shellExecutionConfig,
@@ -1397,5 +1428,177 @@ export class CoreToolScheduler {
     }
 
     return doesToolInvocationMatch(tool, invocation, allowedTools);
+  }
+
+  /**
+   * Execute a tool with BeforeTool and AfterTool hooks
+   */
+  private async executeToolWithHooks(
+    invocation: ShellToolInvocation | AnyToolInvocation,
+    toolName: string,
+    signal: AbortSignal,
+    liveOutputCallback?: (outputChunk: string | AnsiOutput) => void,
+    shellExecutionConfig?: ShellExecutionConfig,
+    setPidCallback?: (pid: number) => void,
+  ): Promise<ToolResult> {
+    const hooksEnabled = this.config.getEnableHooks();
+    const messageBus = this.config.getMessageBus();
+    const toolInput = invocation.params || {};
+
+    // Fire BeforeTool hook through MessageBus (only if hooks are enabled)
+    if (hooksEnabled && messageBus) {
+      try {
+        const response = await messageBus.request<
+          HookExecutionRequest,
+          HookExecutionResponse
+        >(
+          {
+            type: MessageBusType.HOOK_EXECUTION_REQUEST,
+            eventName: 'BeforeTool',
+            input: {
+              tool_name: toolName,
+              tool_input: toolInput as Record<string, unknown>,
+            },
+          },
+          MessageBusType.HOOK_EXECUTION_RESPONSE,
+        );
+
+        // Reconstruct result from response
+        const beforeResultFinalOutput = response.output
+          ? createHookOutput('BeforeTool', response.output)
+          : undefined;
+
+        // Check if hook blocked the tool execution
+        const blockingError = beforeResultFinalOutput?.getBlockingError();
+        if (blockingError?.blocked) {
+          return {
+            llmContent: `Tool execution blocked: ${blockingError.reason}`,
+            returnDisplay: `Tool execution blocked: ${blockingError.reason}`,
+            error: {
+              type: ToolErrorType.EXECUTION_FAILED,
+              message: blockingError.reason,
+            },
+          };
+        }
+
+        // Check if hook requested to stop entire agent execution
+        if (beforeResultFinalOutput?.shouldStopExecution()) {
+          const reason = beforeResultFinalOutput.getEffectiveReason();
+          return {
+            llmContent: `Agent execution stopped by hook: ${reason}`,
+            returnDisplay: `Agent execution stopped by hook: ${reason}`,
+            error: {
+              type: ToolErrorType.EXECUTION_FAILED,
+              message: `Agent execution stopped: ${reason}`,
+            },
+          };
+        }
+      } catch (error) {
+        debugLogger.warn(`BeforeTool hook failed for ${toolName}:`, error);
+      }
+    }
+
+    // Execute the actual tool
+    let toolResult: ToolResult;
+    if (setPidCallback && invocation instanceof ShellToolInvocation) {
+      toolResult = await invocation.execute(
+        signal,
+        liveOutputCallback,
+        shellExecutionConfig,
+        setPidCallback,
+      );
+    } else {
+      toolResult = await invocation.execute(
+        signal,
+        liveOutputCallback,
+        shellExecutionConfig,
+      );
+    }
+
+    // Fire AfterTool hook through MessageBus (only if hooks are enabled)
+    if (hooksEnabled && messageBus) {
+      try {
+        const response = await messageBus.request<
+          HookExecutionRequest,
+          HookExecutionResponse
+        >(
+          {
+            type: MessageBusType.HOOK_EXECUTION_REQUEST,
+            eventName: 'AfterTool',
+            input: {
+              tool_name: toolName,
+              tool_input: toolInput as Record<string, unknown>,
+              tool_response: {
+                llmContent: toolResult.llmContent,
+                returnDisplay: toolResult.returnDisplay,
+                error: toolResult.error,
+              },
+            },
+          },
+          MessageBusType.HOOK_EXECUTION_RESPONSE,
+        );
+
+        // Reconstruct result from response
+        const afterResultFinalOutput = response.output
+          ? createHookOutput('AfterTool', response.output)
+          : undefined;
+
+        // Check if hook requested to stop entire agent execution
+        if (afterResultFinalOutput?.shouldStopExecution()) {
+          const reason = afterResultFinalOutput.getEffectiveReason();
+          return {
+            llmContent: `Agent execution stopped by hook: ${reason}`,
+            returnDisplay: `Agent execution stopped by hook: ${reason}`,
+            error: {
+              type: ToolErrorType.EXECUTION_FAILED,
+              message: `Agent execution stopped: ${reason}`,
+            },
+          };
+        }
+
+        // Add additional context from hooks to the tool result
+        const additionalContext =
+          afterResultFinalOutput?.getAdditionalContext();
+        if (additionalContext) {
+          if (typeof toolResult.llmContent === 'string') {
+            toolResult.llmContent += '\n\n' + additionalContext;
+          } else if (Array.isArray(toolResult.llmContent)) {
+            toolResult.llmContent.push({ text: '\n\n' + additionalContext });
+          } else if (toolResult.llmContent) {
+            // Handle single Part case by converting to an array
+            toolResult.llmContent = [
+              toolResult.llmContent,
+              { text: '\n\n' + additionalContext },
+            ];
+          } else {
+            toolResult.llmContent = additionalContext;
+          }
+        }
+      } catch (error) {
+        debugLogger.warn(`AfterTool hook failed for ${toolName}:`, error);
+      }
+    }
+
+    return toolResult;
+  }
+
+  /**
+   * Get the message to display in the notification hook
+   */
+  private getNotificationMessage(
+    confirmationDetails: ToolCallConfirmationDetails,
+  ): string {
+    switch (confirmationDetails.type) {
+      case 'edit':
+        return `Tool ${confirmationDetails.title} requires editing`;
+      case 'exec':
+        return `Tool ${confirmationDetails.title} requires execution`;
+      case 'mcp':
+        return `Tool ${confirmationDetails.title} requires MCP`;
+      case 'info':
+        return `Tool ${confirmationDetails.title} requires information`;
+      default:
+        return `Tool requires confirmation`;
+    }
   }
 }
