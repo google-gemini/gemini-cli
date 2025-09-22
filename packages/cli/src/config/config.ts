@@ -397,6 +397,36 @@ export async function loadHierarchicalGeminiMemory(
   );
 }
 
+/**
+ * Creates a filter function to determine if a tool should be excluded.
+ *
+ * In non-interactive mode, we want to disable tools that require user
+ * interaction to prevent the CLI from hanging. This function creates a predicate
+ * that returns `true` if a tool should be excluded.
+ *
+ * A tool is excluded if it's not in the `allowedToolsSet`. The shell tool
+ * has a special case: it's not excluded if any of its subcommands
+ * are in the `allowedTools` list.
+ *
+ * @param allowedTools A list of explicitly allowed tool names.
+ * @param allowedToolsSet A set of explicitly allowed tool names for quick lookups.
+ * @returns A function that takes a tool name and returns `true` if it should be excluded.
+ */
+function createToolExclusionFilter(
+  allowedTools: string[],
+  allowedToolsSet: Set<string>,
+) {
+  return (tool: string): boolean => {
+    if (tool === ShellTool.Name) {
+      // If any of the allowed tools is ShellTool (even with subcommands), don't exclude it.
+      return !allowedTools.some((allowed) =>
+        SHELL_TOOL_NAMES.some((shellName) => allowed.startsWith(shellName)),
+      );
+    }
+    return !allowedToolsSet.has(tool);
+  };
+}
+
 export async function loadCliConfig(
   settings: Settings,
   extensions: Extension[],
@@ -537,38 +567,19 @@ export async function loadCliConfig(
     const defaultExcludes = [ShellTool.Name, EditTool.Name, WriteFileTool.Name];
     const autoEditExcludes = [ShellTool.Name];
 
+    const toolExclusionFilter = createToolExclusionFilter(
+      allowedTools,
+      allowedToolsSet,
+    );
+
     switch (approvalMode) {
       case ApprovalMode.DEFAULT:
         // In default non-interactive mode, all tools that require approval are excluded.
-        extraExcludes.push(
-          ...defaultExcludes.filter((t) => {
-            if (t === ShellTool.Name) {
-              // If any of the allowed tools is ShellTool (even with subcommands), don't exclude it.
-              return !allowedTools.some((allowed) =>
-                SHELL_TOOL_NAMES.some((shellName) =>
-                  allowed.startsWith(shellName),
-                ),
-              );
-            }
-            return !allowedToolsSet.has(t);
-          }),
-        );
+        extraExcludes.push(...defaultExcludes.filter(toolExclusionFilter));
         break;
       case ApprovalMode.AUTO_EDIT:
         // In auto-edit non-interactive mode, only tools that still require a prompt are excluded.
-        extraExcludes.push(
-          ...autoEditExcludes.filter((t) => {
-            if (t === ShellTool.Name) {
-              // If any of the allowed tools is ShellTool (even with subcommands), don't exclude it.
-              return !allowedTools.some((allowed) =>
-                SHELL_TOOL_NAMES.some((shellName) =>
-                  allowed.startsWith(shellName),
-                ),
-              );
-            }
-            return !allowedToolsSet.has(t);
-          }),
-        );
+        extraExcludes.push(...autoEditExcludes.filter(toolExclusionFilter));
         break;
       case ApprovalMode.YOLO:
         // No extra excludes for YOLO mode.
