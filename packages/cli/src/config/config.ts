@@ -12,7 +12,6 @@ import { hideBin } from 'yargs/helpers';
 import process from 'node:process';
 import { mcpCommand } from '../commands/mcp.js';
 import type {
-  TelemetryTarget,
   FileFilteringOptions,
   MCPServerConfig,
   OutputFormat,
@@ -32,6 +31,8 @@ import {
   ShellTool,
   EditTool,
   WriteFileTool,
+  resolveTelemetrySettings,
+  FatalConfigError,
 } from '@google/gemini-cli-core';
 import type { Settings } from './settings.js';
 
@@ -503,6 +504,22 @@ export async function loadCliConfig(
     approvalMode = ApprovalMode.DEFAULT;
   }
 
+  let telemetrySettings;
+  try {
+    telemetrySettings = await resolveTelemetrySettings({
+      argv,
+      env: process.env as unknown as Record<string, string | undefined>,
+      settings: settings.telemetry,
+    });
+  } catch (err) {
+    if (err instanceof FatalConfigError) {
+      throw new FatalConfigError(
+        `Invalid telemetry configuration: ${err.message}.`,
+      );
+    }
+    throw err;
+  }
+
   const policyEngineConfig = createPolicyEngineConfig(settings, approvalMode);
 
   // Fix: If promptWords are provided, always use non-interactive mode
@@ -608,23 +625,7 @@ export async function loadCliConfig(
       ...settings.ui?.accessibility,
       screenReader,
     },
-    telemetry: {
-      enabled: argv.telemetry ?? settings.telemetry?.enabled,
-      target: (argv.telemetryTarget ??
-        settings.telemetry?.target) as TelemetryTarget,
-      otlpEndpoint:
-        argv.telemetryOtlpEndpoint ??
-        process.env['OTEL_EXPORTER_OTLP_ENDPOINT'] ??
-        settings.telemetry?.otlpEndpoint,
-      otlpProtocol: (['grpc', 'http'] as const).find(
-        (p) =>
-          p ===
-          (argv.telemetryOtlpProtocol ?? settings.telemetry?.otlpProtocol),
-      ),
-      logPrompts: argv.telemetryLogPrompts ?? settings.telemetry?.logPrompts,
-      outfile: argv.telemetryOutfile ?? settings.telemetry?.outfile,
-      useCollector: settings.telemetry?.useCollector,
-    },
+    telemetry: telemetrySettings,
     usageStatisticsEnabled: settings.privacy?.usageStatisticsEnabled ?? true,
     fileFiltering: settings.context?.fileFiltering,
     checkpointing:

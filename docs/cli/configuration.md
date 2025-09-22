@@ -309,6 +309,7 @@ Configures logging and metrics collection for Gemini CLI. For more information, 
   - **`otlpProtocol`** (string): The protocol for the OTLP Exporter (`grpc` or `http`).
   - **`logPrompts`** (boolean): Whether or not to include the content of user prompts in the logs.
   - **`outfile`** (string): The file to write telemetry to when `target` is `local`.
+  - **`useCollector`** (boolean): Whether to use an external OTLP collector.
 
 ### Example `settings.json`
 
@@ -417,6 +418,27 @@ The CLI automatically loads environment variables from an `.env` file. The loadi
 - **`OTLP_GOOGLE_CLOUD_PROJECT`**:
   - Your Google Cloud Project ID for Telemetry in Google Cloud
   - Example: `export OTLP_GOOGLE_CLOUD_PROJECT="YOUR_PROJECT_ID"`.
+- **`GEMINI_TELEMETRY_ENABLED`**:
+  - Set to `true` or `1` to enable telemetry. Any other value is treated as disabling it.
+  - Overrides the `telemetry.enabled` setting.
+- **`GEMINI_TELEMETRY_TARGET`**:
+  - Sets the telemetry target (`local` or `gcp`).
+  - Overrides the `telemetry.target` setting.
+- **`GEMINI_TELEMETRY_OTLP_ENDPOINT`**:
+  - Sets the OTLP endpoint for telemetry.
+  - Overrides the `telemetry.otlpEndpoint` setting.
+- **`GEMINI_TELEMETRY_OTLP_PROTOCOL`**:
+  - Sets the OTLP protocol (`grpc` or `http`).
+  - Overrides the `telemetry.otlpProtocol` setting.
+- **`GEMINI_TELEMETRY_LOG_PROMPTS`**:
+  - Set to `true` or `1` to enable or disable logging of user prompts. Any other value is treated as disabling it.
+  - Overrides the `telemetry.logPrompts` setting.
+- **`GEMINI_TELEMETRY_OUTFILE`**:
+  - Sets the file path to write telemetry to when the target is `local`.
+  - Overrides the `telemetry.outfile` setting.
+- **`GEMINI_TELEMETRY_USE_COLLECTOR`**:
+  - Set to `true` or `1` to enable or disable using an external OTLP collector. Any other value is treated as disabling it.
+  - Overrides the `telemetry.useCollector` setting.
 - **`GOOGLE_CLOUD_LOCATION`**:
   - Your Google Cloud Project Location (e.g., us-central1).
   - Required for using Vertex AI in non express mode.
