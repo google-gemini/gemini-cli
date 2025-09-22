@@ -404,7 +404,7 @@ async function downloadFile(url: string, dest: string): Promise<void> {
 function extractFile(file: string, dest: string) {
   const safeFile = quote([file]);
   const safeDest = quote([dest]);
-  if (safeFile.endsWith('.tar.gz')) {
+  if (file.endsWith('.tar.gz')) {
     execSync(`tar -xzf ${safeFile} -C ${safeDest}`);
   } else if (file.endsWith('.zip')) {
     execSync(`unzip ${safeFile} -d ${safeDest}`);
