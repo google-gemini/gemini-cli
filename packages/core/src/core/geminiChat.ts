@@ -29,13 +29,11 @@ import type { StructuredError } from './turn.js';
 import {
   logContentRetry,
   logContentRetryFailure,
-  logInvalidChunk,
 } from '../telemetry/loggers.js';
 import { ChatRecordingService } from '../services/chatRecordingService.js';
 import {
   ContentRetryEvent,
   ContentRetryFailureEvent,
-  InvalidChunkEvent,
 } from '../telemetry/types.js';
 import { handleFallback } from '../fallback/handler.js';
 import { isFunctionResponse } from '../utils/messageInspectors.js';
@@ -491,19 +489,14 @@ export class GeminiChat {
     streamResponse: AsyncGenerator<GenerateContentResponse>,
   ): AsyncGenerator<GenerateContentResponse> {
     const modelResponseParts: Part[] = [];
-    let hasReceivedAnyChunk = false;
-    let hasReceivedValidChunk = false;
+
     let hasToolCall = false;
-    let lastChunk: GenerateContentResponse | null = null;
-    let lastChunkIsInvalid = false;
+    let hasFinishReason = false;
 
     for await (const chunk of this.stopBeforeSecondMutator(streamResponse)) {
-      hasReceivedAnyChunk = true;
-      lastChunk = chunk;
-
+      hasFinishReason =
+        chunk?.candidates?.some((candidate) => candidate.finishReason) ?? false;
       if (isValidResponse(chunk)) {
-        hasReceivedValidChunk = true;
-        lastChunkIsInvalid = false;
         const content = chunk.candidates?.[0]?.content;
         if (content?.parts) {
           if (content.parts.some((part) => part.thought)) {
@@ -518,12 +511,6 @@ export class GeminiChat {
             ...content.parts.filter((part) => !part.thought),
           );
         }
-      } else {
-        logInvalidChunk(
-          this.config,
-          new InvalidChunkEvent('Invalid chunk received from stream.'),
-        );
-        lastChunkIsInvalid = true;
       }
 
       // Record token usage if this chunk has usageMetadata
@@ -539,46 +526,6 @@ export class GeminiChat {
       yield chunk; // Yield every chunk to the UI immediately.
     }
 
-    if (!hasReceivedAnyChunk) {
-      throw new EmptyStreamError('Model stream completed without any chunks.');
-    }
-
-    const hasFinishReason = lastChunk?.candidates?.some(
-      (candidate) => candidate.finishReason,
-    );
-
-    // Stream validation logic: A stream is considered successful if:
-    // 1. There's a tool call (tool calls can end without explicit finish reasons), OR
-    // 2. There's a finish reason AND the last chunk is valid (or we haven't received any valid chunks)
-    //
-    // We throw an error only when there's no tool call AND:
-    // - No finish reason, OR
-    // - Last chunk is invalid after receiving valid content
-    if (
-      !hasToolCall &&
-      (!hasFinishReason || (lastChunkIsInvalid && !hasReceivedValidChunk))
-    ) {
-      throw new EmptyStreamError(
-        'Model stream ended with an invalid chunk or missing finish reason.',
-      );
-    }
-
-    // Record model response text from the collected parts
-    if (modelResponseParts.length > 0) {
-      const responseText = modelResponseParts
-        .filter((part) => part.text)
-        .map((part) => part.text)
-        .join('');
-
-      if (responseText.trim()) {
-        this.chatRecordingService.recordMessage({
-          model,
-          type: 'gemini',
-          content: responseText,
-        });
-      }
-    }
-
     // String thoughts and consolidate text parts.
     const consolidatedParts: Part[] = [];
     for (const part of modelResponseParts) {
@@ -592,6 +539,34 @@ export class GeminiChat {
       } else {
         consolidatedParts.push(part);
       }
+    }
+
+    const responseText = consolidatedParts
+      .filter((part) => part.text)
+      .map((part) => part.text)
+      .join('')
+      .trim();
+
+    // Record model response text from the collected parts
+    if (responseText) {
+      this.chatRecordingService.recordMessage({
+        model,
+        type: 'gemini',
+        content: responseText,
+      });
+    }
+
+    // Stream validation logic: A stream is considered successful if:
+    // 1. There's a tool call (tool calls can end without explicit finish reasons), OR
+    // 2. There's a finish reason AND we have non-empty response text
+    //
+    // We throw an error only when there's no tool call AND:
+    // - No finish reason, OR
+    // - Empty response text (e.g., only thoughts with no actual content)
+    if (!hasToolCall && (!hasFinishReason || !responseText)) {
+      throw new EmptyStreamError(
+        'Model stream ended with an invalid chunk or missing finish reason.',
+      );
     }
 
     this.history.push({ role: 'model', parts: consolidatedParts });
