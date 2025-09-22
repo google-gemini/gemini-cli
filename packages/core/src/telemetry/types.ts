@@ -137,6 +137,7 @@ export class ToolCallEvent implements BaseTelemetryEvent {
   prompt_id: string;
   tool_type: 'native' | 'mcp';
   content_length?: number;
+  mcp_server_name?: string;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   metadata?: { [key: string]: any };
 
@@ -153,11 +154,16 @@ export class ToolCallEvent implements BaseTelemetryEvent {
     this.error = call.response.error?.message;
     this.error_type = call.response.errorType;
     this.prompt_id = call.request.prompt_id;
-    this.tool_type =
-      typeof call.tool !== 'undefined' && call.tool instanceof DiscoveredMCPTool
-        ? 'mcp'
-        : 'native';
     this.content_length = call.response.contentLength;
+    if (
+      typeof call.tool !== 'undefined' &&
+      call.tool instanceof DiscoveredMCPTool
+    ) {
+      this.tool_type = 'mcp';
+      this.mcp_server_name = call.tool.serverName;
+    } else {
+      this.tool_type = 'native';
+    }
 
     if (
       call.status === 'success' &&
@@ -309,6 +315,18 @@ export class LoopDetectedEvent implements BaseTelemetryEvent {
     this['event.name'] = 'loop_detected';
     this['event.timestamp'] = new Date().toISOString();
     this.loop_type = loop_type;
+    this.prompt_id = prompt_id;
+  }
+}
+
+export class LoopDetectionDisabledEvent implements BaseTelemetryEvent {
+  'event.name': 'loop_detection_disabled';
+  'event.timestamp': string;
+  prompt_id: string;
+
+  constructor(prompt_id: string) {
+    this['event.name'] = 'loop_detection_disabled';
+    this['event.timestamp'] = new Date().toISOString();
     this.prompt_id = prompt_id;
   }
 }
@@ -536,6 +554,35 @@ export class ContentRetryFailureEvent implements BaseTelemetryEvent {
   }
 }
 
+export class ModelRoutingEvent implements BaseTelemetryEvent {
+  'event.name': 'model_routing';
+  'event.timestamp': string;
+  decision_model: string;
+  decision_source: string;
+  routing_latency_ms: number;
+  reasoning?: string;
+  failed: boolean;
+  error_message?: string;
+
+  constructor(
+    decision_model: string,
+    decision_source: string,
+    routing_latency_ms: number,
+    reasoning: string | undefined,
+    failed: boolean,
+    error_message: string | undefined,
+  ) {
+    this['event.name'] = 'model_routing';
+    this['event.timestamp'] = new Date().toISOString();
+    this.decision_model = decision_model;
+    this.decision_source = decision_source;
+    this.routing_latency_ms = routing_latency_ms;
+    this.reasoning = reasoning;
+    this.failed = failed;
+    this.error_message = error_message;
+  }
+}
+
 export type TelemetryEvent =
   | StartSessionEvent
   | EndSessionEvent
@@ -546,6 +593,7 @@ export type TelemetryEvent =
   | ApiResponseEvent
   | FlashFallbackEvent
   | LoopDetectedEvent
+  | LoopDetectionDisabledEvent
   | NextSpeakerCheckEvent
   | KittySequenceOverflowEvent
   | MalformedJsonResponseEvent
@@ -557,8 +605,10 @@ export type TelemetryEvent =
   | InvalidChunkEvent
   | ContentRetryEvent
   | ContentRetryFailureEvent
+  | ExtensionEnableEvent
   | ExtensionInstallEvent
   | ExtensionUninstallEvent
+  | ModelRoutingEvent
   | ToolOutputTruncatedEvent;
 
 export class ExtensionInstallEvent implements BaseTelemetryEvent {
@@ -626,5 +676,19 @@ export class ExtensionUninstallEvent implements BaseTelemetryEvent {
     this['event.timestamp'] = new Date().toISOString();
     this.extension_name = extension_name;
     this.status = status;
+  }
+}
+
+export class ExtensionEnableEvent implements BaseTelemetryEvent {
+  'event.name': 'extension_enable';
+  'event.timestamp': string;
+  extension_name: string;
+  setting_scope: string;
+
+  constructor(extension_name: string, settingScope: string) {
+    this['event.name'] = 'extension_enable';
+    this['event.timestamp'] = new Date().toISOString();
+    this.extension_name = extension_name;
+    this.setting_scope = settingScope;
   }
 }
