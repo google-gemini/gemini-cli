@@ -330,8 +330,6 @@ const renderDiffContent = (
             lastLineNumber = item.line.newLine ?? null;
             break;
           case 'pair':
-            gutterNumStr = (item.addLine.newLine ?? '').toString();
-            prefixSymbol = '+'; // the first rendered line will be the deletion; we will render both with their own prefixes
             lastLineNumber = item.addLine.newLine ?? null;
             break;
           default:
