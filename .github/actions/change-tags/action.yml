@@ -1,0 +1,47 @@
+name: 'Change npm dist-tag'
+description: 'Changes the npm dist-tag for CLI packages.'
+inputs:
+  version:
+    description: 'The package version to tag.'
+    required: true
+  channel:
+    description: 'The npm dist-tag to apply.'
+    required: true
+  dry-run:
+    description: 'Whether to run in dry-run mode.'
+    required: false
+    default: 'true'
+  token-core:
+    description: 'NPM token for core package.'
+    required: true
+  token-cli:
+    description: 'NPM token for cli package.'
+    required: true
+runs:
+  using: "composite"
+  steps:
+    - name: 'Setup Node.js'
+      uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020'
+      with:
+        node-version-file: '.nvmrc'
+        registry-url: 'https://wombat-dressing-room.appspot.com'
+        scope: '@google'
+
+    - name: 'Change tag for @google/gemini-cli-core'
+      if: inputs.dry-run == 'false'
+      shell: bash
+      env:
+        NODE_AUTH_TOKEN: ${{ inputs.token-core }}
+      run: npm dist-tag add @google/gemini-cli-core@${{ inputs.version }} ${{ inputs.channel }}
+
+    - name: 'Change tag for @google/gemini-cli'
+      if: inputs.dry-run == 'false'
+      shell: bash
+      env:
+        NODE_AUTH_TOKEN: ${{ inputs.token-cli }}
+      run: npm dist-tag add @google/gemini-cli@${{ inputs.version }} ${{ inputs.channel }}
+
+    - name: 'Log dry run'
+      if: inputs.dry-run == 'true'
+      shell: bash
+      run: echo "Dry run: Would have added tag '${{ inputs.channel }}' to version '${{ inputs.version }}' for @google/gemini-cli and @google/gemini-cli-core."
