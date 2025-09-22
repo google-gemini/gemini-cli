@@ -1,0 +1,43 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`RenderInline > renders a bare ftp link as text with its URL 1`] = `
+"Go to
+ftp://example.com/file (ftp://example.com/file)
+ for the file."
+`;
+
+exports[`RenderInline > renders a bare http link as text with its URL 1`] = `
+"Go to
+https://example.com (https://example.com)
+ for more info."
+`;
+
+exports[`RenderInline > renders a bare mailto link as text with its URL 1`] = `
+"Contact
+mailto:team@example.com (mailto:team@example.com)
+ for details."
+`;
+
+exports[`RenderInline > renders a markdown ftp link as text 1`] = `
+"Download from
+ftp (ftp://example.com/file)
+."
+`;
+
+exports[`RenderInline > renders a markdown https link as text 1`] = `
+"This is a
+link (https://example.com)
+."
+`;
+
+exports[`RenderInline > renders a markdown javascript URI as text 1`] = `
+"This is a
+malicious link (javascript:alert(1)
+)."
+`;
+
+exports[`RenderInline > renders a markdown mailto link as text 1`] = `
+"Contact us at
+email (mailto:team@example.com)
+."
+`;

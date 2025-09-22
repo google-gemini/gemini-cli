@@ -30,7 +30,7 @@ const RenderInlineInternal: React.FC<RenderInlineProps> = ({ text }) => {
   const nodes: React.ReactNode[] = [];
   let lastIndex = 0;
   const inlineRegex =
-    /(\*\*.*?\*\*|\*.*?\*|_.*?_|~~.*?~~|\[.*?\]\(.*?\)|`+.+?`+|<u>.*?<\/u>|https?:\/\/\S+)/g;
+    /(\*\*.*?\*\*|\*.*?\*|_.*?_|~~.*?~~|\[.*?\]\(.*?\)|`+.+?`+|<u>.*?<\/u>|(?:https?|ftp):\/\/\S+|mailto:\S+)/g;
   let match;
 
   while ((match = inlineRegex.exec(text)) !== null) {
@@ -131,10 +131,15 @@ const RenderInlineInternal: React.FC<RenderInlineProps> = ({ text }) => {
             )}
           </Text>
         );
-      } else if (fullMatch.match(/^https?:\/\//)) {
+      } else if (
+        fullMatch.match(/^(https?|ftp):\/\//) ||
+        fullMatch.match(/^mailto:/)
+      ) {
+        const url = fullMatch;
         renderedNode = (
-          <Text key={key} color={theme.text.link}>
-            {fullMatch}
+          <Text key={key}>
+            {url}
+            <Text color={theme.text.link}> ({url})</Text>
           </Text>
         );
       }
@@ -168,6 +173,6 @@ export const getPlainTextLength = (text: string): number => {
     .replace(/~~(.*?)~~/g, '$1')
     .replace(/`(.*?)`/g, '$1')
     .replace(/<u>(.*?)<\/u>/g, '$1')
-    .replace(/.*\[(.*?)\]\(.*\)/g, '$1');
+    .replace(/\[(.*?)\]\(.*?\)/g, '$1');
   return stringWidth(cleanText);
 };
