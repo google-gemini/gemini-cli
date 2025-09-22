@@ -27,6 +27,11 @@ inputs:
   previous-tag:
     description: 'The previous tag to use for generating release notes.'
     required: true
+  skip-github-release:
+    description: 'Whether to skip creating a GitHub release.'
+    type: 'boolean'
+    required: false
+    default: false
   working-directory:
     description: 'The working directory to run the steps in.'
     required: false
@@ -132,7 +137,7 @@ runs:
 
     - name: '🎉 Create GitHub Release'
       working-directory: '${{ inputs.working-directory }}'
-      if: "${{ inputs.dry-run == 'false' }}"
+      if: "${{ inputs.dry-run == 'false' && inputs.skip-github-release == 'false' }}"
       env:
         GITHUB_TOKEN: '${{ inputs.github-token }}'
       shell: 'bash'
