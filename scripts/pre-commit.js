@@ -5,14 +5,18 @@
  */
 
 import { execSync } from 'node:child_process';
+import lintStaged from 'lint-staged';
 
 try {
   // Get repository root
   const root = execSync('git rev-parse --show-toplevel').toString().trim();
 
-  // Run lint-staged from the root directory
-  execSync('npx lint-staged', { cwd: root, stdio: 'inherit' });
-} catch (error) {
-  // Exit with the same code as lint-staged
-  process.exit(error.status || 1);
+  // Run lint-staged with API directly
+  const passed = await lintStaged({ cwd: root });
+
+  // Exit with appropriate code
+  process.exit(passed ? 0 : 1);
+} catch {
+  // Exit with error code
+  process.exit(1);
 }
