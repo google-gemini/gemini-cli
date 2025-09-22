@@ -532,6 +532,7 @@ export async function loadCliConfig(
     settings,
     activeExtensions,
     extraExcludes.length > 0 ? extraExcludes : undefined,
+    argv.allowedTools || settings.tools?.allowed,
   );
   const blockedMcpServers: Array<{ name: string; extensionName: string }> = [];
 
@@ -722,11 +723,32 @@ function mergeExcludeTools(
   settings: Settings,
   extensions: Extension[],
   extraExcludes?: string[] | undefined,
+  allowedTools?: string[] | undefined,
 ): string[] {
   const allExcludeTools = new Set([
     ...(settings.tools?.exclude || []),
     ...(extraExcludes || []),
   ]);
+
+  // NEW: Remove tools from exclude list that are explicitly allowed via --allowed-tools
+  if (allowedTools) {
+    for (const allowedTool of allowedTools) {
+      // Handle patterns like "ShellTool(git status)"
+      if (allowedTool.includes('(') && allowedTool.endsWith(')')) {
+        const toolName = allowedTool.substring(0, allowedTool.indexOf('('));
+
+        // Map common tool names to their actual names
+        const actualToolName =
+          toolName === 'ShellTool' ? 'run_shell_command' : toolName;
+        allExcludeTools.delete(actualToolName);
+        allExcludeTools.delete(toolName); // Also try the original name
+      } else {
+        // Handle exact tool names
+        allExcludeTools.delete(allowedTool);
+      }
+    }
+  }
+
   for (const extension of extensions) {
     for (const tool of extension.config.excludeTools || []) {
       allExcludeTools.add(tool);

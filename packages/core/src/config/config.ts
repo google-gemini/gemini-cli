@@ -1013,7 +1013,17 @@ export class Config {
         (tool) => tool === toolName || tool === normalizedClassName,
       );
 
-      if (isExcluded) {
+      // NEW: Check if tool is explicitly allowed via --allowed-tools
+      const isExplicitlyAllowed = this.getAllowedTools()?.some(
+        (allowedTool) =>
+          // Handle both exact matches and pattern matches like "ShellTool(wc)"
+          allowedTool === toolName ||
+          allowedTool === normalizedClassName ||
+          allowedTool.startsWith(`${toolName}(`) ||
+          allowedTool.startsWith(`${normalizedClassName}(`),
+      );
+
+      if (isExcluded && !isExplicitlyAllowed) {
         isEnabled = false;
       }
 
