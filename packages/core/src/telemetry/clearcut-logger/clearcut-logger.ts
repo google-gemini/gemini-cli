@@ -19,6 +19,7 @@ import type {
   IdeConnectionEvent,
   ConversationFinishedEvent,
   KittySequenceOverflowEvent,
+  ResearchOptInEvent,
   ChatCompressionEvent,
   FileOperationEvent,
   InvalidChunkEvent,
@@ -55,6 +56,7 @@ export enum EventNames {
   IDE_CONNECTION = 'ide_connection',
   KITTY_SEQUENCE_OVERFLOW = 'kitty_sequence_overflow',
   CHAT_COMPRESSION = 'chat_compression',
+  RESEARCH_OPT_IN = 'research_opt_in',
   CONVERSATION_FINISHED = 'conversation_finished',
   INVALID_CHUNK = 'invalid_chunk',
   CONTENT_RETRY = 'content_retry',
@@ -240,7 +242,11 @@ export class ClearcutLogger {
     if (email) {
       logEvent.client_email = email;
     } else {
-      logEvent.client_install_id = this.installationManager.getInstallationId();
+      const installId = this.installationManager.getInstallationId();
+      if (installId) {
+        logEvent.client_install_id = installId;
+      }
+      // If installId is undefined, we don't set any identifier
     }
 
     return logEvent;
@@ -765,6 +771,37 @@ export class ClearcutLogger {
     this.enqueueLogEvent(
       this.createLogEvent(EventNames.KITTY_SEQUENCE_OVERFLOW, data),
     );
+    this.flushIfNeeded();
+  }
+
+  logResearchOptInEvent(event: ResearchOptInEvent): void {
+    const data: EventValue[] = [];
+
+    // Add opt_in_status if available
+    if (event.opt_in_status !== undefined) {
+      data.push({
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_RESEARCH_OPT_IN_STATUS,
+        value: `${event.opt_in_status}`,
+      });
+    }
+
+    // Add contact_email if available
+    if (event.contact_email) {
+      data.push({
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_RESEARCH_CONTACT_EMAIL,
+        value: `${event.contact_email}`,
+      });
+    }
+
+    // Add user_id if available
+    if (event.user_id) {
+      data.push({
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_RESEARCH_USER_ID,
+        value: `${event.user_id}`,
+      });
+    }
+
+    this.enqueueLogEvent(this.createLogEvent(EventNames.RESEARCH_OPT_IN, data));
     this.flushIfNeeded();
   }
 

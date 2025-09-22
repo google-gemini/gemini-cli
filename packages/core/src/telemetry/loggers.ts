@@ -20,6 +20,7 @@ import {
   EVENT_NEXT_SPEAKER_CHECK,
   SERVICE_NAME,
   EVENT_SLASH_COMMAND,
+  EVENT_RESEARCH_OPT_IN,
   EVENT_CONVERSATION_FINISHED,
   EVENT_CHAT_COMPRESSION,
   EVENT_MALFORMED_JSON_RESPONSE,
@@ -44,6 +45,7 @@ import type {
   SlashCommandEvent,
   ConversationFinishedEvent,
   KittySequenceOverflowEvent,
+  ResearchOptInEvent,
   ChatCompressionEvent,
   MalformedJsonResponseEvent,
   InvalidChunkEvent,
@@ -563,6 +565,28 @@ export function logKittySequenceOverflow(
   const logger = logs.getLogger(SERVICE_NAME);
   const logRecord: LogRecord = {
     body: `Kitty sequence buffer overflow: ${event.sequence_length} bytes`,
+    attributes,
+  };
+  logger.emit(logRecord);
+}
+
+export function logResearchOptIn(
+  config: Config,
+  event: ResearchOptInEvent,
+): void {
+  ClearcutLogger.getInstance(config)?.logResearchOptInEvent(event);
+  if (!isTelemetrySdkInitialized()) return;
+  const attributes: LogAttributes = {
+    ...getCommonAttributes(config),
+    opt_in_status: event.opt_in_status,
+    ...(event.contact_email && { contact_email: event.contact_email }),
+    ...(event.user_id && { user_id: event.user_id }),
+    'event.name': EVENT_RESEARCH_OPT_IN,
+    'event.timestamp': event['event.timestamp'],
+  };
+  const logger = logs.getLogger(SERVICE_NAME);
+  const logRecord: LogRecord = {
+    body: `Research opt-in: ${event.opt_in_status ? 'enabled' : 'disabled'}`,
     attributes,
   };
   logger.emit(logRecord);
