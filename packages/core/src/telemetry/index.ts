@@ -19,6 +19,11 @@ export {
   isTelemetrySdkInitialized,
 } from './sdk.js';
 export {
+  resolveTelemetrySettings,
+  parseBooleanEnvFlag,
+  parseTelemetryTargetValue,
+} from './config.js';
+export {
   GcpTraceExporter,
   GcpMetricExporter,
   GcpLogExporter,
@@ -36,6 +41,9 @@ export {
   logKittySequenceOverflow,
   logChatCompression,
   logToolOutputTruncated,
+  logExtensionEnable,
+  logExtensionInstallEvent,
+  logExtensionUninstall,
 } from './loggers.js';
 export type { SlashCommandEvent, ChatCompressionEvent } from './types.js';
 export {
