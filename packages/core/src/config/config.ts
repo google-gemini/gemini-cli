@@ -127,6 +127,7 @@ export interface ExtensionInstallMetadata {
   type: 'git' | 'local' | 'link' | 'github-release';
   ref?: string;
   autoUpdate?: boolean;
+  hooks?: { [K in HookEventName]?: HookDefinition[] };
 }
 
 export interface FileFilteringOptions {
