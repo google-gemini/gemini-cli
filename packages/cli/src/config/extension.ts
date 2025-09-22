@@ -594,6 +594,9 @@ export function toOutputString(extension: Extension): string {
     if (extension.installMetadata.ref) {
       output += `\n Ref: ${extension.installMetadata.ref}`;
     }
+    if (extension.installMetadata.releaseTag) {
+      output += `\n Release tag: ${extension.installMetadata.releaseTag}`;
+    }
   }
   if (extension.contextFiles.length > 0) {
     output += `\n Context files:`;
