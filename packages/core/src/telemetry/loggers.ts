@@ -32,6 +32,7 @@ import {
   EVENT_RIPGREP_FALLBACK,
   EVENT_MODEL_ROUTING,
   EVENT_EXTENSION_INSTALL,
+  EVENT_HOOK_CALL,
 } from './constants.js';
 import type {
   ApiErrorEvent,
@@ -60,6 +61,7 @@ import type {
   ExtensionEnableEvent,
   ExtensionUninstallEvent,
   ExtensionInstallEvent,
+  HookCallEvent,
 } from './types.js';
 import {
   recordApiErrorMetrics,
@@ -72,6 +74,7 @@ import {
   recordContentRetry,
   recordContentRetryFailure,
   recordModelRoutingMetrics,
+  recordHookCallMetrics,
 } from './metrics.js';
 import { isTelemetrySdkInitialized } from './sdk.js';
 import type { UiEvent } from './uiTelemetry.js';
@@ -766,4 +769,31 @@ export function logExtensionEnable(
     attributes,
   };
   logger.emit(logRecord);
+}
+
+export function logHookCall(config: Config, event: HookCallEvent): void {
+  if (!isTelemetrySdkInitialized()) return;
+
+  const attributes: LogAttributes = {
+    ...getCommonAttributes(config),
+    ...event,
+    'event.name': EVENT_HOOK_CALL,
+    hook_input: safeJsonStringify(event.hook_input, 2),
+    hook_output: safeJsonStringify(event.hook_output, 2),
+  };
+
+  const logger = logs.getLogger(SERVICE_NAME);
+  const logRecord: LogRecord = {
+    body: `Hook call ${event.hook_event_name}.${event.hook_name} ${event.success ? 'succeeded' : 'failed'} in ${event.duration_ms}ms.`,
+    attributes,
+  };
+  logger.emit(logRecord);
+
+  recordHookCallMetrics(
+    config,
+    event.hook_event_name,
+    event.hook_name,
+    event.duration_ms,
+    event.success,
+  );
 }
