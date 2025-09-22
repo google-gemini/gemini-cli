@@ -73,6 +73,7 @@ import type { EventEmitter } from 'node:events';
 import { MessageBus } from '../confirmation-bus/message-bus.js';
 import { PolicyEngine } from '../policy/policy-engine.js';
 import type { PolicyEngineConfig } from '../policy/types.js';
+import { HookSystem } from '../hooks/index.js';
 import type { UserTierId } from '../code_assist/types.js';
 import { ProxyAgent, setGlobalDispatcher } from 'undici';
 
@@ -119,6 +120,7 @@ export interface GeminiCLIExtension {
   isActive: boolean;
   path: string;
   installMetadata?: ExtensionInstallMetadata;
+  hooks?: { [K in HookEventName]?: HookDefinition[] };
 }
 
 export interface ExtensionInstallMetadata {
@@ -183,6 +185,51 @@ export enum AuthProviderType {
 export interface SandboxConfig {
   command: 'docker' | 'podman' | 'sandbox-exec';
   image: string;
+}
+
+/**
+ * Hook event names as defined in the design document
+ */
+export enum HookEventName {
+  BeforeTool = 'BeforeTool',
+  AfterTool = 'AfterTool',
+  BeforeAgent = 'BeforeAgent',
+  Notification = 'Notification',
+  AfterAgent = 'AfterAgent',
+  SessionStart = 'SessionStart',
+  SessionEnd = 'SessionEnd',
+  PreCompress = 'PreCompress',
+  BeforeModel = 'BeforeModel',
+  AfterModel = 'AfterModel',
+  BeforeToolSelection = 'BeforeToolSelection',
+}
+
+/**
+ * Hook configuration entry
+ */
+export interface HookConfig {
+  type: HookType;
+  command?: string;
+  package?: string;
+  method?: string;
+  timeout?: number;
+}
+
+/**
+ * Hook definition with matcher
+ */
+export interface HookDefinition {
+  matcher?: string;
+  sequential?: boolean;
+  hooks: HookConfig[];
+}
+
+/**
+ * Hook implementation types
+ */
+export enum HookType {
+  Command = 'command',
+  Plugin = 'plugin',
 }
 
 export interface ConfigParameters {
@@ -251,6 +298,9 @@ export interface ConfigParameters {
   policyEngineConfig?: PolicyEngineConfig;
   output?: OutputSettings;
   useModelRouter?: boolean;
+  hooks?: {
+    [K in HookEventName]?: HookDefinition[];
+  };
 }
 
 export class Config {
@@ -340,6 +390,10 @@ export class Config {
   private readonly policyEngine: PolicyEngine;
   private readonly outputSettings: OutputSettings;
   private readonly useModelRouter: boolean;
+  private readonly hooks:
+    | { [K in HookEventName]?: HookDefinition[] }
+    | undefined;
+  private hookSystem?: HookSystem;
 
   constructor(params: ConfigParameters) {
     this.sessionId = params.sessionId;
@@ -437,6 +491,7 @@ export class Config {
     this.outputSettings = {
       format: params.output?.format ?? OutputFormat.TEXT,
     };
+    this.hooks = params.hooks;
 
     if (params.contextFileName) {
       setGeminiMdFilename(params.contextFileName);
@@ -469,6 +524,10 @@ export class Config {
     }
     this.promptRegistry = new PromptRegistry();
     this.toolRegistry = await this.createToolRegistry();
+
+    // Initialize hook system
+    this.hookSystem = new HookSystem(this);
+    await this.hookSystem.initialize();
 
     await this.geminiClient.initialize();
   }
@@ -1062,6 +1121,20 @@ export class Config {
 
     await registry.discoverAllTools();
     return registry;
+  }
+
+  /**
+   * Get the hook system instance
+   */
+  getHookSystem(): HookSystem | undefined {
+    return this.hookSystem;
+  }
+
+  /**
+   * Get hooks configuration
+   */
+  getHooks(): { [K in HookEventName]?: HookDefinition[] } | undefined {
+    return this.hooks;
   }
 }
 // Export model constants for use in CLI
