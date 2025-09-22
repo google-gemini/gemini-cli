@@ -69,15 +69,12 @@ vi.mock('../fallback/handler.js', () => ({
   handleFallback: mockHandleFallback,
 }));
 
-const { mockLogInvalidChunk, mockLogContentRetry, mockLogContentRetryFailure } =
-  vi.hoisted(() => ({
-    mockLogInvalidChunk: vi.fn(),
-    mockLogContentRetry: vi.fn(),
-    mockLogContentRetryFailure: vi.fn(),
-  }));
+const { mockLogContentRetry, mockLogContentRetryFailure } = vi.hoisted(() => ({
+  mockLogContentRetry: vi.fn(),
+  mockLogContentRetryFailure: vi.fn(),
+}));
 
 vi.mock('../telemetry/loggers.js', () => ({
-  logInvalidChunk: mockLogInvalidChunk,
   logContentRetry: mockLogContentRetry,
   logContentRetryFailure: mockLogContentRetryFailure,
 }));
@@ -514,6 +511,155 @@ describe('GeminiChat', () => {
       ).rejects.toThrow(EmptyStreamError);
     });
 
+    it('should succeed when there is a tool call without finish reason', async () => {
+      // Setup: Stream with tool call but no finish reason
+      const streamWithToolCall = (async function* () {
+        yield {
+          candidates: [
+            {
+              content: {
+                role: 'model',
+                parts: [
+                  {
+                    functionCall: {
+                      name: 'test_function',
+                      args: { param: 'value' },
+                    },
+                  },
+                ],
+              },
+              // No finishReason
+            },
+          ],
+        } as unknown as GenerateContentResponse;
+      })();
+
+      vi.mocked(mockContentGenerator.generateContentStream).mockResolvedValue(
+        streamWithToolCall,
+      );
+
+      const stream = await chat.sendMessageStream(
+        'test-model',
+        { message: 'test' },
+        'prompt-id-1',
+      );
+
+      // Should not throw an error
+      await expect(
+        (async () => {
+          for await (const _ of stream) {
+            // consume stream
+          }
+        })(),
+      ).resolves.not.toThrow();
+    });
+
+    it('should throw EmptyStreamError when no tool call and no finish reason', async () => {
+      // Setup: Stream with text but no finish reason and no tool call
+      const streamWithoutFinishReason = (async function* () {
+        yield {
+          candidates: [
+            {
+              content: {
+                role: 'model',
+                parts: [{ text: 'some response' }],
+              },
+              // No finishReason
+            },
+          ],
+        } as unknown as GenerateContentResponse;
+      })();
+
+      vi.mocked(mockContentGenerator.generateContentStream).mockResolvedValue(
+        streamWithoutFinishReason,
+      );
+
+      const stream = await chat.sendMessageStream(
+        'test-model',
+        { message: 'test' },
+        'prompt-id-1',
+      );
+
+      await expect(
+        (async () => {
+          for await (const _ of stream) {
+            // consume stream
+          }
+        })(),
+      ).rejects.toThrow(EmptyStreamError);
+    });
+
+    it('should throw EmptyStreamError when no tool call and empty response text', async () => {
+      // Setup: Stream with finish reason but empty response (only thoughts)
+      const streamWithEmptyResponse = (async function* () {
+        yield {
+          candidates: [
+            {
+              content: {
+                role: 'model',
+                parts: [{ thought: 'thinking...' }],
+              },
+              finishReason: 'STOP',
+            },
+          ],
+        } as unknown as GenerateContentResponse;
+      })();
+
+      vi.mocked(mockContentGenerator.generateContentStream).mockResolvedValue(
+        streamWithEmptyResponse,
+      );
+
+      const stream = await chat.sendMessageStream(
+        'test-model',
+        { message: 'test' },
+        'prompt-id-1',
+      );
+
+      await expect(
+        (async () => {
+          for await (const _ of stream) {
+            // consume stream
+          }
+        })(),
+      ).rejects.toThrow(EmptyStreamError);
+    });
+
+    it('should succeed when there is finish reason and response text', async () => {
+      // Setup: Stream with both finish reason and text content
+      const validStream = (async function* () {
+        yield {
+          candidates: [
+            {
+              content: {
+                role: 'model',
+                parts: [{ text: 'valid response' }],
+              },
+              finishReason: 'STOP',
+            },
+          ],
+        } as unknown as GenerateContentResponse;
+      })();
+
+      vi.mocked(mockContentGenerator.generateContentStream).mockResolvedValue(
+        validStream,
+      );
+
+      const stream = await chat.sendMessageStream(
+        'test-model',
+        { message: 'test' },
+        'prompt-id-1',
+      );
+
+      // Should not throw an error
+      await expect(
+        (async () => {
+          for await (const _ of stream) {
+            // consume stream
+          }
+        })(),
+      ).resolves.not.toThrow();
+    });
+
     it('should call generateContentStream with the correct parameters', async () => {
       const response = (async function* () {
         yield {
@@ -682,7 +828,6 @@ describe('GeminiChat', () => {
       }
 
       // Assertions
-      expect(mockLogInvalidChunk).toHaveBeenCalledTimes(1);
       expect(mockLogContentRetry).toHaveBeenCalledTimes(1);
       expect(mockLogContentRetryFailure).not.toHaveBeenCalled();
       expect(mockContentGenerator.generateContentStream).toHaveBeenCalledTimes(
@@ -750,7 +895,6 @@ describe('GeminiChat', () => {
       expect(mockContentGenerator.generateContentStream).toHaveBeenCalledTimes(
         3,
       );
-      expect(mockLogInvalidChunk).toHaveBeenCalledTimes(3);
       expect(mockLogContentRetry).toHaveBeenCalledTimes(2);
       expect(mockLogContentRetryFailure).toHaveBeenCalledTimes(1);
 
