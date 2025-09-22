@@ -191,7 +191,7 @@ export async function checkForExtensionUpdate(
       setExtensionUpdateState(ExtensionUpdateState.UPDATE_AVAILABLE);
       return;
     } else {
-      const { source, ref } = installMetadata;
+      const { source, releaseTag } = installMetadata;
       if (!source) {
         console.error(`No "source" provided for extension.`);
         setExtensionUpdateState(ExtensionUpdateState.ERROR);
@@ -204,7 +204,7 @@ export async function checkForExtensionUpdate(
         repo,
         installMetadata.ref,
       );
-      if (releaseData.tag_name !== ref) {
+      if (releaseData.tag_name !== releaseTag) {
         setExtensionUpdateState(ExtensionUpdateState.UPDATE_AVAILABLE);
         return;
       }

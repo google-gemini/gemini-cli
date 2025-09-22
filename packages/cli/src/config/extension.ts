@@ -406,8 +406,8 @@ export async function installExtension(
           installMetadata,
           tempDir,
         );
-        updateExtensionVersion(tempDir, tagName);
         installMetadata.type = 'github-release';
+        installMetadata.releaseTag = tagName;
       } catch (_error) {
         await cloneFromGit(installMetadata, tempDir);
         installMetadata.type = 'git';
@@ -503,21 +503,6 @@ export async function installExtension(
   }
 }
 
-async function updateExtensionVersion(
-  extensionDir: string,
-  extensionVersion: string,
-) {
-  const configFilePath = path.join(extensionDir, EXTENSIONS_CONFIG_FILENAME);
-  if (fs.existsSync(configFilePath)) {
-    const configContent = await fs.promises.readFile(configFilePath, 'utf-8');
-    const config = JSON.parse(configContent);
-    config.version = extensionVersion;
-    await fs.promises.writeFile(
-      configFilePath,
-      JSON.stringify(config, null, 2),
-    );
-  }
-}
 async function requestConsent(extensionConfig: ExtensionConfig) {
   const mcpServerEntries = Object.entries(extensionConfig.mcpServers || {});
   if (mcpServerEntries.length) {
@@ -608,6 +593,9 @@ export function toOutputString(extension: Extension): string {
     output += `\n Source: ${extension.installMetadata.source} (Type: ${extension.installMetadata.type})`;
     if (extension.installMetadata.ref) {
       output += `\n Ref: ${extension.installMetadata.ref}`;
+    }
+    if (extension.installMetadata.releaseTag) {
+      output += `\n Release tag: ${extension.installMetadata.releaseTag}`;
     }
   }
   if (extension.contextFiles.length > 0) {
