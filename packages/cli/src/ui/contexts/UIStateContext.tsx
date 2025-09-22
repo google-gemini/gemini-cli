@@ -110,7 +110,7 @@ export interface UIState {
   isRestarting: boolean;
   extensionsUpdateState: Map<string, ExtensionUpdateState>;
   activePtyId: number | undefined;
-  shellFocused: boolean;
+  embeddedShellFocused: boolean;
   isNotificationsSetupOpen: boolean;
 }
 

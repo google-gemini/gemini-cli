@@ -51,15 +51,15 @@ observability framework — Gemini CLI's observability system provides:
 All telemetry behavior is controlled through your `.gemini/settings.json` file
 and can be overridden with CLI flags:
 
-| Setting        | Values            | Default                 | CLI Override                                             | Description                                          |
-| -------------- | ----------------- | ----------------------- | -------------------------------------------------------- | ---------------------------------------------------- |
-| `enabled`      | `true`/`false`    | `false`                 | `--telemetry` / `--no-telemetry`                         | Enable or disable telemetry                          |
-| `target`       | `"gcp"`/`"local"` | `"local"`               | `--telemetry-target <local\|gcp>`                        | Where to send telemetry data                         |
-| `otlpEndpoint` | URL string        | `http://localhost:4317` | `--telemetry-otlp-endpoint <URL>`                        | OTLP collector endpoint                              |
-| `otlpProtocol` | `"grpc"`/`"http"` | `"grpc"`                | `--telemetry-otlp-protocol <grpc\|http>`                 | OTLP transport protocol                              |
-| `outfile`      | file path         | -                       | `--telemetry-outfile <path>`                             | Save telemetry to file (requires `otlpEndpoint: ""`) |
-| `logPrompts`   | `true`/`false`    | `true`                  | `--telemetry-log-prompts` / `--no-telemetry-log-prompts` | Include prompts in telemetry logs                    |
-| `useCollector` | `true`/`false`    | `false`                 | -                                                        | Use external OTLP collector (advanced)               |
+| Setting        | Values            | Default                 | CLI Override                                             | Description                                       |
+| -------------- | ----------------- | ----------------------- | -------------------------------------------------------- | ------------------------------------------------- |
+| `enabled`      | `true`/`false`    | `false`                 | `--telemetry` / `--no-telemetry`                         | Enable or disable telemetry                       |
+| `target`       | `"gcp"`/`"local"` | `"local"`               | `--telemetry-target <local\|gcp>`                        | Where to send telemetry data                      |
+| `otlpEndpoint` | URL string        | `http://localhost:4317` | `--telemetry-otlp-endpoint <URL>`                        | OTLP collector endpoint                           |
+| `otlpProtocol` | `"grpc"`/`"http"` | `"grpc"`                | `--telemetry-otlp-protocol <grpc\|http>`                 | OTLP transport protocol                           |
+| `outfile`      | file path         | -                       | `--telemetry-outfile <path>`                             | Save telemetry to file (overrides `otlpEndpoint`) |
+| `logPrompts`   | `true`/`false`    | `true`                  | `--telemetry-log-prompts` / `--no-telemetry-log-prompts` | Include prompts in telemetry logs                 |
+| `useCollector` | `true`/`false`    | `false`                 | -                                                        | Use external OTLP collector (advanced)            |
 
 For detailed information about all configuration options, see the
 [Configuration Guide](./cli/configuration.md).
@@ -306,6 +306,15 @@ for Gemini CLI:
   - **Attributes**:
     - `command` (string)
     - `subcommand` (string, if applicable)
+
+- `gemini_cli.extension_enable`: This event occurs when an extension is enabled
+- `gemini_cli.extension_install`: This event occurs when an extension is installed
+  - **Attributes**:
+    - `extension_name` (string)
+    - `extension_version` (string)
+    - `extension_source` (string)
+    - `status` (string)
+- `gemini_cli.extension_uninstall`: This event occurs when an extension is uninstalled
 
 ### Metrics
 

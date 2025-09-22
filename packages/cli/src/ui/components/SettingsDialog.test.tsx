@@ -1052,7 +1052,7 @@ describe('SettingsDialog', () => {
       expect(lastFrame()).toContain('Settings'); // Title
       expect(lastFrame()).toContain('● Vim Mode'); // Active setting
       expect(lastFrame()).toContain('Apply To'); // Scope section
-      expect(lastFrame()).toContain('1. User Settings'); // Scope options
+      expect(lastFrame()).toContain('User Settings'); // Scope options (no numbers when settings focused)
       expect(lastFrame()).toContain(
         '(Use Enter to select, Tab to change focus)',
       ); // Help text

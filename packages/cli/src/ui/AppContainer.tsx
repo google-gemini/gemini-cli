@@ -86,7 +86,7 @@ import { useWorkspaceMigration } from './hooks/useWorkspaceMigration.js';
 import { useSessionStats } from './contexts/SessionContext.js';
 import { useGitBranchName } from './hooks/useGitBranchName.js';
 import { useExtensionUpdates } from './hooks/useExtensionUpdates.js';
-import { FocusContext } from './contexts/FocusContext.js';
+import { ShellFocusContext } from './contexts/ShellFocusContext.js';
 import { startIdleTimer, stopIdleTimer } from '../notifications/idleTimer.js';
 
 const CTRL_EXIT_PROMPT_DURATION_MS = 1000;
@@ -136,7 +136,7 @@ export const AppContainer = (props: AppContainerProps) => {
     initializationResult.themeError,
   );
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
-  const [shellFocused, setShellFocused] = useState(false);
+  const [embeddedShellFocused, setEmbeddedShellFocused] = useState(false);
 
   const [geminiMdFileCount, setGeminiMdFileCount] = useState<number>(
     initializationResult.geminiMdFileCount,
@@ -569,10 +569,10 @@ Logging in with Google... Please restart Gemini CLI to continue.
     setModelSwitchedFromQuotaError,
     refreshStatic,
     () => cancelHandlerRef.current(),
-    setShellFocused,
+    setEmbeddedShellFocused,
     terminalWidth,
     terminalHeight,
-    shellFocused,
+    embeddedShellFocused,
   );
   useEffect(() => {
     setStreamingState(geminiStreamingState);
@@ -771,7 +771,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
   const [showIdeRestartPrompt, setShowIdeRestartPrompt] = useState(false);
 
   const { isFolderTrustDialogOpen, handleFolderTrustSelect, isRestarting } =
-    useFolderTrust(settings, setIsTrustedFolder, refreshStatic);
+    useFolderTrust(settings, setIsTrustedFolder);
   const { needsRestart: ideNeedsRestart } = useIdeTrustListener();
   const isInitialMount = useRef(true);
 
@@ -850,8 +850,10 @@ Logging in with Google... Please restart Gemini CLI to continue.
     [handleSlashCommand, settings],
   );
 
-  const { elapsedTime, currentLoadingPhrase } =
-    useLoadingIndicator(streamingState);
+  const { elapsedTime, currentLoadingPhrase } = useLoadingIndicator(
+    streamingState,
+    settings.merged.ui?.customWittyPhrases,
+  );
 
   const handleExit = useCallback(
     (
@@ -934,8 +936,8 @@ Logging in with Google... Please restart Gemini CLI to continue.
       ) {
         setConstrainHeight(false);
       } else if (keyMatchers[Command.TOGGLE_SHELL_INPUT_FOCUS](key)) {
-        if (activePtyId || shellFocused) {
-          setShellFocused((prev) => !prev);
+        if (activePtyId || embeddedShellFocused) {
+          setEmbeddedShellFocused((prev) => !prev);
         }
       }
     },
@@ -958,7 +960,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       handleSlashCommand,
       cancelOngoingRequest,
       activePtyId,
-      shellFocused,
+      embeddedShellFocused,
       settings.merged.general?.debugKeystrokeLogging,
     ],
   );
@@ -1086,7 +1088,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       isRestarting,
       extensionsUpdateState,
       activePtyId,
-      shellFocused,
+      embeddedShellFocused,
       isNotificationsSetupOpen,
     }),
     [
@@ -1163,7 +1165,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       currentModel,
       extensionsUpdateState,
       activePtyId,
-      shellFocused,
+      embeddedShellFocused,
     ],
   );
 
@@ -1227,9 +1229,9 @@ Logging in with Google... Please restart Gemini CLI to continue.
               startupWarnings: props.startupWarnings || [],
             }}
           >
-            <FocusContext.Provider value={isFocused}>
+            <ShellFocusContext.Provider value={isFocused}>
               <App />
-            </FocusContext.Provider>
+            </ShellFocusContext.Provider>
           </AppContext.Provider>
         </ConfigContext.Provider>
       </UIActionsContext.Provider>
