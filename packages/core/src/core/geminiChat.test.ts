@@ -13,7 +13,7 @@ import type {
 import type { ContentGenerator } from '../core/contentGenerator.js';
 import {
   GeminiChat,
-  EmptyStreamError,
+  InvalidStreamError,
   StreamEventType,
   type StreamEvent,
 } from './geminiChat.js';
@@ -237,7 +237,7 @@ describe('GeminiChat', () => {
             /* consume stream */
           }
         })(),
-      ).rejects.toThrow(EmptyStreamError);
+      ).rejects.toThrow(InvalidStreamError);
     });
 
     it('should succeed if the stream ends with an invalid part but has a finishReason and contained a valid part', async () => {
@@ -501,14 +501,14 @@ describe('GeminiChat', () => {
         'prompt-id-stream-1',
       );
 
-      // 4. Assert: The stream processing should throw an EmptyStreamError.
+      // 4. Assert: The stream processing should throw an InvalidStreamError.
       await expect(
         (async () => {
           for await (const _ of stream) {
             // This loop consumes the stream to trigger the internal logic.
           }
         })(),
-      ).rejects.toThrow(EmptyStreamError);
+      ).rejects.toThrow(InvalidStreamError);
     });
 
     it('should succeed when there is a tool call without finish reason', async () => {
@@ -554,7 +554,7 @@ describe('GeminiChat', () => {
       ).resolves.not.toThrow();
     });
 
-    it('should throw EmptyStreamError when no tool call and no finish reason', async () => {
+    it('should throw InvalidStreamError when no tool call and no finish reason', async () => {
       // Setup: Stream with text but no finish reason and no tool call
       const streamWithoutFinishReason = (async function* () {
         yield {
@@ -586,10 +586,10 @@ describe('GeminiChat', () => {
             // consume stream
           }
         })(),
-      ).rejects.toThrow(EmptyStreamError);
+      ).rejects.toThrow(InvalidStreamError);
     });
 
-    it('should throw EmptyStreamError when no tool call and empty response text', async () => {
+    it('should throw InvalidStreamError when no tool call and empty response text', async () => {
       // Setup: Stream with finish reason but empty response (only thoughts)
       const streamWithEmptyResponse = (async function* () {
         yield {
@@ -621,7 +621,7 @@ describe('GeminiChat', () => {
             // consume stream
           }
         })(),
-      ).rejects.toThrow(EmptyStreamError);
+      ).rejects.toThrow(InvalidStreamError);
     });
 
     it('should succeed when there is finish reason and response text', async () => {
@@ -889,7 +889,7 @@ describe('GeminiChat', () => {
         for await (const _ of stream) {
           // Must loop to trigger the internal logic that throws.
         }
-      }).rejects.toThrow(EmptyStreamError);
+      }).rejects.toThrow(InvalidStreamError);
 
       // Should be called 3 times (initial + 2 retries)
       expect(mockContentGenerator.generateContentStream).toHaveBeenCalledTimes(
