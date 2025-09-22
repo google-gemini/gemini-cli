@@ -35,28 +35,7 @@ export async function handleUpdate(args: UpdateArgs) {
     allExtensions.map((e) => e.config.name),
     workingDir,
   );
-
-  if (args.all) {
-    try {
-      let updateInfos = await updateAllUpdatableExtensions(
-        workingDir,
-        extensions,
-        await checkForAllExtensionUpdates(extensions, new Map(), (_) => {}),
-        () => {},
-      );
-      updateInfos = updateInfos.filter(
-        (info) => info.originalVersion !== info.updatedVersion,
-      );
-      if (updateInfos.length === 0) {
-        console.log('No extensions to update.');
-        return;
-      }
-      console.log(updateInfos.map((info) => updateOutput(info)).join('\n'));
-    } catch (error) {
-      console.error(getErrorMessage(error));
-    }
-  }
-  if (args.name)
+  if (args.name) {
     try {
       const extension = extensions.find(
         (extension) => extension.name === args.name,
@@ -99,10 +78,31 @@ export async function handleUpdate(args: UpdateArgs) {
     } catch (error) {
       console.error(getErrorMessage(error));
     }
+  }
+  if (args.all) {
+    try {
+      let updateInfos = await updateAllUpdatableExtensions(
+        workingDir,
+        extensions,
+        await checkForAllExtensionUpdates(extensions, new Map(), (_) => {}),
+        () => {},
+      );
+      updateInfos = updateInfos.filter(
+        (info) => info.originalVersion !== info.updatedVersion,
+      );
+      if (updateInfos.length === 0) {
+        console.log('No extensions to update.');
+        return;
+      }
+      console.log(updateInfos.map((info) => updateOutput(info)).join('\n'));
+    } catch (error) {
+      console.error(getErrorMessage(error));
+    }
+  }
 }
 
 export const updateCommand: CommandModule = {
-  command: 'update [--all] [name]',
+  command: 'update [<name>] [--all]',
   describe:
     'Updates all extensions or a named extension to the latest version.',
   builder: (yargs) =>

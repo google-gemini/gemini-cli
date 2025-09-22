@@ -341,17 +341,24 @@ describe('update tests', () => {
       expect(result).toBe(ExtensionUpdateState.UP_TO_DATE);
     });
 
-    it('should return NotUpdatable for a non-git extension', async () => {
-      const extensionDir = createExtension({
+    it('should return UpToDate for a local extension with no updates', async () => {
+      const localExtensionSourcePath = path.join(tempHomeDir, 'local-source');
+      const sourceExtensionDir = createExtension({
+        extensionsDir: localExtensionSourcePath,
+        name: 'my-local-ext',
+        version: '1.0.0',
+      });
+
+      const installedExtensionDir = createExtension({
         extensionsDir: userExtensionsDir,
         name: 'local-extension',
         version: '1.0.0',
-        installMetadata: { source: '/local/path', type: 'local' },
+        installMetadata: { source: sourceExtensionDir, type: 'local' },
       });
       const extension = annotateActiveExtensions(
         [
           loadExtension({
-            extensionDir,
+            extensionDir: installedExtensionDir,
             workspaceDir: tempWorkspaceDir,
           })!,
         ],
@@ -369,9 +376,51 @@ describe('update tests', () => {
             extensionState = newState;
           }
         },
+        tempWorkspaceDir,
       );
       const result = results.get('local-extension');
-      expect(result).toBe(ExtensionUpdateState.NOT_UPDATABLE);
+      expect(result).toBe(ExtensionUpdateState.UP_TO_DATE);
+    });
+
+    it('should return UpdateAvailable for a local extension with updates', async () => {
+      const localExtensionSourcePath = path.join(tempHomeDir, 'local-source');
+      const sourceExtensionDir = createExtension({
+        extensionsDir: localExtensionSourcePath,
+        name: 'my-local-ext',
+        version: '1.1.0',
+      });
+
+      const installedExtensionDir = createExtension({
+        extensionsDir: userExtensionsDir,
+        name: 'local-extension',
+        version: '1.0.0',
+        installMetadata: { source: sourceExtensionDir, type: 'local' },
+      });
+      const extension = annotateActiveExtensions(
+        [
+          loadExtension({
+            extensionDir: installedExtensionDir,
+            workspaceDir: tempWorkspaceDir,
+          })!,
+        ],
+        [],
+        process.cwd(),
+      )[0];
+      let extensionState = new Map();
+      const results = await checkForAllExtensionUpdates(
+        [extension],
+        extensionState,
+        (newState) => {
+          if (typeof newState === 'function') {
+            newState(extensionState);
+          } else {
+            extensionState = newState;
+          }
+        },
+        tempWorkspaceDir,
+      );
+      const result = results.get('local-extension');
+      expect(result).toBe(ExtensionUpdateState.UPDATE_AVAILABLE);
     });
 
     it('should return Error when git check fails', async () => {

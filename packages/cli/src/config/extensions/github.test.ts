@@ -128,7 +128,7 @@ describe('git extension helpers', () => {
         version: '1.0.0',
         isActive: true,
         installMetadata: {
-          type: 'local',
+          type: 'link',
           source: '',
         },
       };
