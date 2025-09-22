@@ -21,6 +21,8 @@ import {
   METRIC_CONTENT_RETRY_FAILURE_COUNT,
   METRIC_MODEL_ROUTING_LATENCY,
   METRIC_MODEL_ROUTING_FAILURE_COUNT,
+  METRIC_HOOK_CALL_COUNT,
+  METRIC_HOOK_CALL_LATENCY,
 } from './constants.js';
 import type { Config } from '../config/config.js';
 import type { ModelRoutingEvent } from './types.js';
@@ -44,6 +46,8 @@ let contentRetryCounter: Counter | undefined;
 let contentRetryFailureCounter: Counter | undefined;
 let modelRoutingLatencyHistogram: Histogram | undefined;
 let modelRoutingFailureCounter: Counter | undefined;
+let hookCallCounter: Counter | undefined;
+let hookCallLatencyHistogram: Histogram | undefined;
 let isMetricsInitialized = false;
 
 function getCommonAttributes(config: Config): Attributes {
@@ -136,6 +140,18 @@ export function initializeMetrics(config: Config): void {
     valueType: ValueType.INT,
   });
   sessionCounter.add(1, getCommonAttributes(config));
+
+  // Hook metrics
+  hookCallCounter = meter.createCounter(METRIC_HOOK_CALL_COUNT, {
+    description: 'Counts hook calls, tagged by hook event name and success.',
+    valueType: ValueType.INT,
+  });
+  hookCallLatencyHistogram = meter.createHistogram(METRIC_HOOK_CALL_LATENCY, {
+    description: 'Latency of hook calls in milliseconds.',
+    unit: 'ms',
+    valueType: ValueType.INT,
+  });
+
   isMetricsInitialized = true;
 }
 
@@ -187,6 +203,27 @@ export function recordTokenUsageMetrics(
     model,
     type,
   });
+}
+
+export function recordHookCallMetrics(
+  config: Config,
+  hookEventName: string,
+  hookName: string,
+  durationMs: number,
+  success: boolean,
+): void {
+  if (!hookCallCounter || !hookCallLatencyHistogram || !isMetricsInitialized)
+    return;
+
+  const metricAttributes: Attributes = {
+    ...getCommonAttributes(config),
+    hook_event_name: hookEventName,
+    hook_name: hookName,
+    success,
+  };
+
+  hookCallCounter.add(1, metricAttributes);
+  hookCallLatencyHistogram.record(durationMs, metricAttributes);
 }
 
 export function recordApiResponseMetrics(
