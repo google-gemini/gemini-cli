@@ -45,11 +45,16 @@ export function playSound(soundPath: string): void {
     case 'win32': // Windows
       command = 'powershell.exe';
       if (isSystemSound) {
-        args.push('-c', `(New-Object Media.SystemSounds).${soundPath}.Play();`);
+        // This is safe as isSystemSound check validates the input.
+        args.push('-c', `[System.Media.SystemSounds]::${soundPath}.Play();`);
       } else {
+        // Securely pass the file path as an argument to the script block.
+        // This prevents command injection.
         args.push(
-          '-c',
-          `(New-Object Media.SoundPlayer '${soundPath.replace(/'/g, "''")}').PlaySync();`,
+          '-Command',
+          `param($soundFile) (New-Object Media.SoundPlayer $soundFile).PlaySync()`,
+          '-', // Indicates the end of command arguments and start of script arguments
+          soundPath,
         );
       }
       break;

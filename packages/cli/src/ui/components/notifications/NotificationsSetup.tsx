@@ -9,6 +9,7 @@ import { useState } from 'react';
 import { Box, Text, useInput } from 'ink';
 import * as os from 'node:os';
 import * as fs from 'node:fs';
+import * as path from 'node:path';
 import { RadioButtonSelect } from '../shared/RadioButtonSelect.js';
 import type { RadioSelectItem } from '../shared/RadioButtonSelect.js';
 import {
@@ -55,6 +56,7 @@ export const NotificationsSetup: React.FC<NotificationsSetupProps> = ({
   const [currentEventType, setCurrentEventType] =
     useState<NotificationEventType | null>(null); // To keep track of which event triggered the warning
   const [customSoundPathInput, setCustomSoundPathInput] = useState('');
+  const [customPathError, setCustomPathError] = useState<string | null>(null);
 
   useInput((input, key) => {
     if (step === 'customSoundPath') {
@@ -145,16 +147,28 @@ export const NotificationsSetup: React.FC<NotificationsSetupProps> = ({
     setCurrentEventType(null); // Clear the current event type
   };
 
-  const handleCustomSoundPath = (path: string) => {
+  const handleCustomSoundPath = (rawPath: string) => {
     if (!currentEventType) return;
+
+    // Resolve path, expanding tilde to home directory
+    const resolvedPath = rawPath.startsWith('~')
+      ? path.join(os.homedir(), rawPath.slice(1))
+      : path.resolve(rawPath);
+
+    if (!fs.existsSync(resolvedPath)) {
+      setCustomPathError(`File not found: ${resolvedPath}`);
+      return; // Stop and wait for user to correct the path
+    }
+    setCustomPathError(null); // Clear error on success
 
     updateNotificationEventSettings(
       currentEventType,
-      { sound: 'custom', customPath: path },
+      { sound: 'custom', customPath: resolvedPath },
       settings,
     );
     setCurrentSettings(getNotificationSettings());
 
+    // Move to the next step
     const orderedEventTypes: NotificationEventType[] = [
       'inputRequired',
       'taskComplete',
@@ -257,6 +271,11 @@ export const NotificationsSetup: React.FC<NotificationsSetupProps> = ({
         <Box>
           <Text>{customSoundPathInput}</Text>
         </Box>
+        {customPathError && (
+          <Box marginTop={1}>
+            <Text color="red">{customPathError}</Text>
+          </Box>
+        )}
       </Box>
     );
   }
