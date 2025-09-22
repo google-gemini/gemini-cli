@@ -255,7 +255,10 @@ export async function downloadFromGitHubRelease(
         `No assets found for release with tag ${releaseData.tag_name}`,
       );
     }
-    let downloadedAssetPath = path.join(destination, path.basename(archiveUrl));
+    let downloadedAssetPath = path.join(
+      destination,
+      path.basename(new URL(archiveUrl).pathname),
+    );
     if (isTar && !downloadedAssetPath.endsWith('.tar.gz')) {
       downloadedAssetPath += '.tar.gz';
     } else if (isZip && !downloadedAssetPath.endsWith('.zip')) {
