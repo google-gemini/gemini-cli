@@ -833,8 +833,10 @@ Logging in with Google... Please restart Gemini CLI to continue.
     [handleSlashCommand, settings],
   );
 
-  const { elapsedTime, currentLoadingPhrase } =
-    useLoadingIndicator(streamingState);
+  const { elapsedTime, currentLoadingPhrase } = useLoadingIndicator(
+    streamingState,
+    settings.merged.ui?.customWittyPhrases,
+  );
 
   const handleExit = useCallback(
     (
