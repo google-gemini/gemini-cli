@@ -40,7 +40,10 @@ import { CommandService } from '../../services/CommandService.js';
 import { BuiltinCommandLoader } from '../../services/BuiltinCommandLoader.js';
 import { FileCommandLoader } from '../../services/FileCommandLoader.js';
 import { McpPromptLoader } from '../../services/McpPromptLoader.js';
-import { initNotifications, triggerNotification } from '../../notifications/manager.js';
+import {
+  initNotifications,
+  triggerNotification,
+} from '../../notifications/manager.js';
 import { parseSlashCommand } from '../../utils/commands.js';
 import type { ExtensionUpdateState } from '../state/extensions.js';
 
@@ -278,7 +281,7 @@ export const useSlashCommandProcessor = (
     return () => {
       controller.abort();
     };
-  }, [config, reloadTrigger, isConfigInitialized]);
+  }, [config, settings, reloadTrigger, isConfigInitialized]);
 
   const handleSlashCommand = useCallback(
     async (

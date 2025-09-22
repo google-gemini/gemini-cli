@@ -4,10 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import type React from 'react';
+import { useState } from 'react';
 import { Box, Text, useInput } from 'ink';
-import * as os from 'os';
-import * as fs from 'fs';
+import * as os from 'node:os';
+import * as fs from 'node:fs';
 import { RadioButtonSelect } from '../shared/RadioButtonSelect.js';
 import type { RadioSelectItem } from '../shared/RadioButtonSelect.js';
 import {
@@ -15,10 +16,12 @@ import {
   setGlobalNotificationsEnabled,
   updateNotificationEventSettings,
 } from '../../../notifications/manager.js';
-import { LoadedSettings } from '../../../config/settings.js';
+import { type LoadedSettings } from '../../../config/settings.js';
 import type { NotificationEventType } from '../../../notifications/types.js';
 
-const getSystemSoundPath = (eventType: NotificationEventType): string | undefined => {
+const getSystemSoundPath = (
+  eventType: NotificationEventType,
+): string | undefined => {
   switch (os.platform()) {
     case 'darwin':
       return eventType === 'inputRequired'
@@ -41,10 +44,16 @@ interface NotificationsSetupProps {
   onComplete: () => void;
 }
 
-export const NotificationsSetup: React.FC<NotificationsSetupProps> = ({ settings, onComplete }) => {
-  const [currentSettings, setCurrentSettings] = useState(getNotificationSettings());
+export const NotificationsSetup: React.FC<NotificationsSetupProps> = ({
+  settings,
+  onComplete,
+}) => {
+  const [_currentSettings, setCurrentSettings] = useState(
+    getNotificationSettings(),
+  );
   const [step, setStep] = useState('global'); // 'global', 'inputRequired', 'taskComplete', 'idleAlert', 'customSoundPath', 'done', 'soundWarning'
-  const [currentEventType, setCurrentEventType] = useState<NotificationEventType | null>(null); // To keep track of which event triggered the warning
+  const [currentEventType, setCurrentEventType] =
+    useState<NotificationEventType | null>(null); // To keep track of which event triggered the warning
   const [customSoundPathInput, setCustomSoundPathInput] = useState('');
 
   useInput((input, key) => {
@@ -69,7 +78,10 @@ export const NotificationsSetup: React.FC<NotificationsSetupProps> = ({ settings
     }
   };
 
-  const handleEventEnable = (eventType: NotificationEventType, value: boolean) => {
+  const handleEventEnable = (
+    eventType: NotificationEventType,
+    value: boolean,
+  ) => {
     updateNotificationEventSettings(eventType, { enabled: value }, settings);
     setCurrentSettings(getNotificationSettings());
 
@@ -84,8 +96,14 @@ export const NotificationsSetup: React.FC<NotificationsSetupProps> = ({ settings
       }
     }
 
-    const orderedEventTypes: NotificationEventType[] = ['inputRequired', 'taskComplete', 'idleAlert'];
-    const currentIndex = orderedEventTypes.indexOf(eventType as NotificationEventType);
+    const orderedEventTypes: NotificationEventType[] = [
+      'inputRequired',
+      'taskComplete',
+      'idleAlert',
+    ];
+    const currentIndex = orderedEventTypes.indexOf(
+      eventType as NotificationEventType,
+    );
     if (currentIndex !== -1 && currentIndex < orderedEventTypes.length - 1) {
       setStep(orderedEventTypes[currentIndex + 1]);
     } else {
@@ -94,11 +112,17 @@ export const NotificationsSetup: React.FC<NotificationsSetupProps> = ({ settings
     }
   };
 
-  const handleSoundWarningResponse = (response: 'disable' | 'custom' | 'continue') => {
+  const handleSoundWarningResponse = (
+    response: 'disable' | 'custom' | 'continue',
+  ) => {
     if (!currentEventType) return;
 
     if (response === 'disable') {
-      updateNotificationEventSettings(currentEventType, { enabled: false }, settings);
+      updateNotificationEventSettings(
+        currentEventType,
+        { enabled: false },
+        settings,
+      );
       setCurrentSettings(getNotificationSettings());
     } else if (response === 'custom') {
       setStep('customSoundPath');
@@ -106,7 +130,11 @@ export const NotificationsSetup: React.FC<NotificationsSetupProps> = ({ settings
     }
 
     // Move to the next step after handling the warning
-    const orderedEventTypes: NotificationEventType[] = ['inputRequired', 'taskComplete', 'idleAlert'];
+    const orderedEventTypes: NotificationEventType[] = [
+      'inputRequired',
+      'taskComplete',
+      'idleAlert',
+    ];
     const currentIndex = orderedEventTypes.indexOf(currentEventType);
     if (currentIndex !== -1 && currentIndex < orderedEventTypes.length - 1) {
       setStep(orderedEventTypes[currentIndex + 1]);
@@ -120,10 +148,18 @@ export const NotificationsSetup: React.FC<NotificationsSetupProps> = ({ settings
   const handleCustomSoundPath = (path: string) => {
     if (!currentEventType) return;
 
-    updateNotificationEventSettings(currentEventType, { sound: 'custom', customPath: path }, settings);
+    updateNotificationEventSettings(
+      currentEventType,
+      { sound: 'custom', customPath: path },
+      settings,
+    );
     setCurrentSettings(getNotificationSettings());
 
-    const orderedEventTypes: NotificationEventType[] = ['inputRequired', 'taskComplete', 'idleAlert'];
+    const orderedEventTypes: NotificationEventType[] = [
+      'inputRequired',
+      'taskComplete',
+      'idleAlert',
+    ];
     const currentIndex = orderedEventTypes.indexOf(currentEventType);
     if (currentIndex !== -1 && currentIndex < orderedEventTypes.length - 1) {
       setStep(orderedEventTypes[currentIndex + 1]);
@@ -159,7 +195,7 @@ export const NotificationsSetup: React.FC<NotificationsSetupProps> = ({ settings
   if (step === 'done') {
     return <Text>Notification setup complete!</Text>;
   }
-  
+
   if (step === 'global') {
     return (
       <Box flexDirection="column" padding={1}>
@@ -179,9 +215,14 @@ export const NotificationsSetup: React.FC<NotificationsSetupProps> = ({ settings
   if (step === 'soundWarning') {
     return (
       <Box flexDirection="column" padding={1}>
-        <Text bold color="red">Warning: System Sound Not Found!</Text>
+        <Text bold color="red">
+          Warning: System Sound Not Found!
+        </Text>
         <Box marginTop={1}>
-          <Text>The default system sound for &quot;{currentEventType}&quot; was not found on your system:</Text>
+          <Text>
+            The default system sound for &quot;{currentEventType}&quot; was not
+            found on your system:
+          </Text>
           <Text>{getSystemSoundPath(currentEventType!)}</Text>
         </Box>
         <Box marginTop={1}>
@@ -191,7 +232,10 @@ export const NotificationsSetup: React.FC<NotificationsSetupProps> = ({ settings
           items={[
             { label: 'Disable this notification', value: 'disable' },
             { label: 'Use a custom sound', value: 'custom' },
-            { label: 'Continue anyway (notification might not play)', value: 'continue' },
+            {
+              label: 'Continue anyway (notification might not play)',
+              value: 'continue',
+            },
           ]}
           onSelect={handleSoundWarningResponse}
           isFocused
@@ -205,7 +249,10 @@ export const NotificationsSetup: React.FC<NotificationsSetupProps> = ({ settings
       <Box flexDirection="column" padding={1}>
         <Text bold>Audio Notification Setup</Text>
         <Box marginTop={1}>
-          <Text>Enter the path to your custom sound file for &quot;{currentEventType}&quot;:</Text>
+          <Text>
+            Enter the path to your custom sound file for &quot;
+            {currentEventType}&quot;:
+          </Text>
         </Box>
         <Box>
           <Text>{customSoundPathInput}</Text>

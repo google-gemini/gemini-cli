@@ -108,7 +108,14 @@ export interface MessageActionReturn {
 export interface OpenDialogActionReturn {
   type: 'dialog';
 
-  dialog: 'help' | 'auth' | 'theme' | 'editor' | 'privacy' | 'settings' | 'notifications-setup';
+  dialog:
+    | 'help'
+    | 'auth'
+    | 'theme'
+    | 'editor'
+    | 'privacy'
+    | 'settings'
+    | 'notifications-setup';
 }
 
 /**

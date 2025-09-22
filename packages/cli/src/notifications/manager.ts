@@ -5,13 +5,13 @@
  */
 
 import { playSound } from './player.js';
-import type{
+import type {
   NotificationSettings,
   NotificationEventType,
   NotificationEventSettings,
 } from './types.js';
-import { LoadedSettings, SettingScope } from '../config/settings.js';
-import * as os from 'os';
+import { type LoadedSettings, SettingScope } from '../config/settings.js';
+import * as os from 'node:os';
 
 /**
  * Default notification settings.
@@ -35,7 +35,9 @@ export const DEFAULT_NOTIFICATION_SETTINGS: NotificationSettings = {
   },
 };
 
-let currentSettings: NotificationSettings = JSON.parse(JSON.stringify(DEFAULT_NOTIFICATION_SETTINGS));
+let currentSettings: NotificationSettings = JSON.parse(
+  JSON.stringify(DEFAULT_NOTIFICATION_SETTINGS),
+);
 
 /**
  * Initializes the notification manager by loading settings.
@@ -65,7 +67,9 @@ export function initNotifications(settings: LoadedSettings): void {
       };
     } else {
       // Reset to default if settings are not present in the config.
-      currentSettings = JSON.parse(JSON.stringify(DEFAULT_NOTIFICATION_SETTINGS));
+      currentSettings = JSON.parse(
+        JSON.stringify(DEFAULT_NOTIFICATION_SETTINGS),
+      );
     }
   } catch (error) {
     console.error('Failed to load notification settings:', error);

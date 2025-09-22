@@ -4,10 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { spawn } from 'child_process';
-import * as os from 'os';
-import * as fs from 'fs';
-import * as path from 'path';
+import { spawn } from 'node:child_process';
+import * as os from 'node:os';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 
 /**
  * Plays a sound using platform-specific commands.
@@ -16,8 +16,7 @@ import * as path from 'path';
 export function playSound(soundPath: string): void {
   const isWindows = os.platform() === 'win32';
   const isSystemSound =
-    isWindows &&
-    ['SystemAsterisk', 'SystemExclamation'].includes(soundPath);
+    isWindows && ['SystemAsterisk', 'SystemExclamation'].includes(soundPath);
 
   // Validate file path if it's not a Windows system sound
   if (!isSystemSound) {
@@ -46,10 +45,7 @@ export function playSound(soundPath: string): void {
     case 'win32': // Windows
       command = 'powershell.exe';
       if (isSystemSound) {
-        args.push(
-          '-c',
-          `(New-Object Media.SystemSounds).${soundPath}.Play();`,
-        );
+        args.push('-c', `(New-Object Media.SystemSounds).${soundPath}.Play();`);
       } else {
         args.push(
           '-c',
@@ -66,11 +62,19 @@ export function playSound(soundPath: string): void {
     const child = spawn(command, args, { detached: true, stdio: 'ignore' });
 
     child.on('error', (err) => {
-      if (os.platform() === 'linux' && (err as NodeJS.ErrnoException).code === 'ENOENT') {
+      if (
+        os.platform() === 'linux' &&
+        (err as NodeJS.ErrnoException).code === 'ENOENT'
+      ) {
         // Try aplay if paplay is not found
-        const fallback = spawn('aplay', args, { detached: true, stdio: 'ignore' });
+        const fallback = spawn('aplay', args, {
+          detached: true,
+          stdio: 'ignore',
+        });
         fallback.on('error', (fallbackErr) => {
-          console.error(`Failed to play sound with paplay and aplay: ${fallbackErr.message}`);
+          console.error(
+            `Failed to play sound with paplay and aplay: ${fallbackErr.message}`,
+          );
         });
         fallback.unref();
       } else {

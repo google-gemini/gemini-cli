@@ -150,7 +150,8 @@ export const AppContainer = (props: AppContainerProps) => {
     config.isTrustedFolder(),
   );
   const [streamingState, setStreamingState] = useState(StreamingState.Idle);
-  const [isNotificationsSetupOpen, setIsNotificationsSetupOpen] = useState(false);
+  const [isNotificationsSetupOpen, setIsNotificationsSetupOpen] =
+    useState(false);
 
   const extensions = config.getExtensions();
   const { extensionsUpdateState, setExtensionsUpdateState } =
@@ -161,12 +162,12 @@ export const AppContainer = (props: AppContainerProps) => {
     );
 
   useEffect(() => {
-    if (uiState.streamingState === StreamingState.Idle) {
+    if (streamingState === StreamingState.Idle) {
       startIdleTimer();
     } else {
       stopIdleTimer();
     }
-  }, [streamingState, startIdleTimer, stopIdleTimer]);
+  }, [streamingState]);
 
   // Helper to determine the effective model, considering the fallback state.
   const getEffectiveModel = useCallback(() => {
@@ -1166,6 +1167,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       extensionsUpdateState,
       activePtyId,
       embeddedShellFocused,
+      isNotificationsSetupOpen,
     ],
   );
 

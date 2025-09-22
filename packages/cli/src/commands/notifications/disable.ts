@@ -4,9 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { setGlobalNotificationsEnabled, initNotifications } from '../../notifications/manager.js';
+import {
+  setGlobalNotificationsEnabled,
+  initNotifications,
+} from '../../notifications/manager.js';
 import { loadSettings } from '../../config/settings.js';
-import type { CommandModule } from 'yargs';
+import { type CommandModule } from 'yargs';
 
 export const disableCommand: CommandModule = {
   command: 'disable',

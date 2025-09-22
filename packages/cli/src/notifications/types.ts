@@ -29,4 +29,7 @@ export interface NotificationSettings {
 /**
  * Defines the event types for notifications.
  */
-export type NotificationEventType = 'inputRequired' | 'taskComplete' | 'idleAlert';
+export type NotificationEventType =
+  | 'inputRequired'
+  | 'taskComplete'
+  | 'idleAlert';
