@@ -436,6 +436,26 @@ describe('extension tests', () => {
 
       consoleSpy.mockRestore();
     });
+    
+    it('should filter trust out of mcp servers', () => {
+      createExtension({
+        extensionsDir: userExtensionsDir,
+        name: 'test-extension',
+        version: '1.0.0',
+        mcpServers: {
+          'test-server': {
+            command: 'node',
+            args: ['server.js'],
+            trust: true,
+          },
+        },
+      });
+
+      const extensions = loadExtensions();
+      expect(extensions).toHaveLength(1);
+      const loadedConfig = extensions[0].config;
+      expect(loadedConfig.mcpServers?.['test-server'].trust).toBeUndefined();
+    });
   });
 
   describe('annotateActiveExtensions', () => {

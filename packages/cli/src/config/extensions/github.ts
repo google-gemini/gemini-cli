@@ -16,6 +16,7 @@ import * as https from 'node:https';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { execSync } from 'node:child_process';
+import { loadExtension } from '../extension.js';
 
 function getGitHubToken(): string | undefined {
   return process.env['GITHUB_TOKEN'];
@@ -115,9 +116,29 @@ async function fetchFromGithub(
 export async function checkForExtensionUpdate(
   extension: GeminiCLIExtension,
   setExtensionUpdateState: (updateState: ExtensionUpdateState) => void,
+  cwd: string = process.cwd(),
 ): Promise<void> {
   setExtensionUpdateState(ExtensionUpdateState.CHECKING_FOR_UPDATES);
   const installMetadata = extension.installMetadata;
+  if (installMetadata?.type === 'local') {
+    const newExtension = loadExtension({
+      extensionDir: installMetadata.source,
+      workspaceDir: cwd,
+    });
+    if (!newExtension) {
+      console.error(
+        `Failed to check for update for local extension "${extension.name}". Could not load extension from source path: ${installMetadata.source}`,
+      );
+      setExtensionUpdateState(ExtensionUpdateState.ERROR);
+      return;
+    }
+    if (newExtension.config.version !== extension.version) {
+      setExtensionUpdateState(ExtensionUpdateState.UPDATE_AVAILABLE);
+      return;
+    }
+    setExtensionUpdateState(ExtensionUpdateState.UP_TO_DATE);
+    return;
+  }
   if (
     !installMetadata ||
     (installMetadata.type !== 'git' &&
@@ -208,21 +229,24 @@ export async function downloadFromGitHubRelease(
 
   try {
     const releaseData = await fetchFromGithub(owner, repo, ref);
-    if (
-      !releaseData ||
-      !releaseData.assets ||
-      releaseData.assets.length === 0
-    ) {
+    if (!releaseData) {
       throw new Error(
-        `No release assets found for ${owner}/${repo} at tag ${ref}`,
+        `No release data found for ${owner}/${repo} at tag ${ref}`,
       );
     }
 
     const asset = findReleaseAsset(releaseData.assets);
     if (!asset) {
-      throw new Error(
-        `No suitable release asset found for platform ${os.platform()}-${os.arch()}`,
+      // If there are no release assets, then we just clone the repo using the
+      // ref the release points to.
+      await cloneFromGit(
+        {
+          ...installMetadata,
+          ref: releaseData.tag_name,
+        },
+        destination,
       );
+      return releaseData.tag_name;
     }
 
     const downloadedAssetPath = path.join(
