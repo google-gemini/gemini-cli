@@ -684,12 +684,12 @@ export class TestRig {
     return logs;
   }
 
-  readLastApiRequest(): Record<string, unknown> | null {
+  readAllApiRequest(): Record<string, unknown>[] {
     // Telemetry is always written to the test directory
     const logFilePath = join(this.testDir!, 'telemetry.log');
 
     if (!logFilePath || !fs.existsSync(logFilePath)) {
-      return null;
+      return [];
     }
 
     const content = readFileSync(logFilePath, 'utf-8');
@@ -702,7 +702,7 @@ export class TestRig {
       })
       .filter((obj) => obj);
 
-    let lastApiRequest = null;
+    const apiRequests: Record<string, unknown>[] = [];
 
     for (const jsonStr of jsonObjects) {
       try {
@@ -711,12 +711,17 @@ export class TestRig {
           logData.attributes &&
           logData.attributes['event.name'] === 'gemini_cli.api_request'
         ) {
-          lastApiRequest = logData;
+          apiRequests.push(logData);
         }
       } catch {
         // ignore
       }
     }
-    return lastApiRequest;
+    return apiRequests;
+  }
+
+  readLastApiRequest(): Record<string, unknown> | null {
+    const apiRequests = this.readAllApiRequest();
+    return apiRequests[apiRequests.length - 1] || null;
   }
 }

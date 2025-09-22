@@ -28,6 +28,7 @@ import {
   ToolConfirmationOutcome,
   Kind,
   ApprovalMode,
+  HookSystem,
 } from '../index.js';
 import type { Part, PartListUnion } from '@google/genai';
 import { MockModifiableTool, MockTool } from '../test-utils/tools.js';
@@ -304,6 +305,9 @@ describe('CoreToolScheduler with payload', () => {
       getUseModelRouter: () => false,
       getGeminiClient: () => null, // No client needed for these tests
     } as unknown as Config;
+    mockConfig.getHookSystem = vi
+      .fn()
+      .mockReturnValue(new HookSystem(mockConfig));
 
     const scheduler = new CoreToolScheduler({
       config: mockConfig,
@@ -624,6 +628,9 @@ describe('CoreToolScheduler edit cancellation', () => {
       getUseModelRouter: () => false,
       getGeminiClient: () => null, // No client needed for these tests
     } as unknown as Config;
+    mockConfig.getHookSystem = vi
+      .fn()
+      .mockReturnValue(new HookSystem(mockConfig));
 
     const scheduler = new CoreToolScheduler({
       config: mockConfig,
@@ -728,6 +735,9 @@ describe('CoreToolScheduler YOLO mode', () => {
       getUseModelRouter: () => false,
       getGeminiClient: () => null, // No client needed for these tests
     } as unknown as Config;
+    mockConfig.getHookSystem = vi
+      .fn()
+      .mockReturnValue(new HookSystem(mockConfig));
 
     const scheduler = new CoreToolScheduler({
       config: mockConfig,
@@ -835,6 +845,9 @@ describe('CoreToolScheduler request queueing', () => {
       getUseModelRouter: () => false,
       getGeminiClient: () => null, // No client needed for these tests
     } as unknown as Config;
+    mockConfig.getHookSystem = vi
+      .fn()
+      .mockReturnValue(new HookSystem(mockConfig));
 
     const scheduler = new CoreToolScheduler({
       config: mockConfig,
@@ -966,6 +979,9 @@ describe('CoreToolScheduler request queueing', () => {
       getUseModelRouter: () => false,
       getGeminiClient: () => null, // No client needed for these tests
     } as unknown as Config;
+    mockConfig.getHookSystem = vi
+      .fn()
+      .mockReturnValue(new HookSystem(mockConfig));
 
     const scheduler = new CoreToolScheduler({
       config: mockConfig,
@@ -1064,6 +1080,9 @@ describe('CoreToolScheduler request queueing', () => {
       getUseModelRouter: () => false,
       getGeminiClient: () => null, // No client needed for these tests
     } as unknown as Config;
+    mockConfig.getHookSystem = vi
+      .fn()
+      .mockReturnValue(new HookSystem(mockConfig));
 
     const scheduler = new CoreToolScheduler({
       config: mockConfig,
@@ -1136,6 +1155,9 @@ describe('CoreToolScheduler request queueing', () => {
       getUseModelRouter: () => false,
       getGeminiClient: () => null, // No client needed for these tests
     } as unknown as Config;
+    mockConfig.getHookSystem = vi
+      .fn()
+      .mockReturnValue(new HookSystem(mockConfig));
 
     const testTool = new TestApprovalTool(mockConfig);
     const toolRegistry = {

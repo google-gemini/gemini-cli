@@ -29,8 +29,11 @@ export const EVENT_CONTENT_RETRY = 'gemini_cli.chat.content_retry';
 export const EVENT_CONTENT_RETRY_FAILURE =
   'gemini_cli.chat.content_retry_failure';
 export const EVENT_FILE_OPERATION = 'gemini_cli.file_operation';
+export const EVENT_HOOK_CALL = 'gemini_cli.hook_call';
 export const METRIC_TOOL_CALL_COUNT = 'gemini_cli.tool.call.count';
 export const METRIC_TOOL_CALL_LATENCY = 'gemini_cli.tool.call.latency';
+export const METRIC_HOOK_CALL_COUNT = 'gemini_cli.hook.call.count';
+export const METRIC_HOOK_CALL_LATENCY = 'gemini_cli.hook.call.latency';
 export const METRIC_API_REQUEST_COUNT = 'gemini_cli.api.request.count';
 export const METRIC_API_REQUEST_LATENCY = 'gemini_cli.api.request.latency';
 export const METRIC_TOKEN_USAGE = 'gemini_cli.token.usage';

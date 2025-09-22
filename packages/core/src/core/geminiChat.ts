@@ -15,6 +15,8 @@ import {
   type Part,
   type Tool,
   FinishReason,
+  type GenerateContentParameters,
+  type ContentListUnion,
 } from '@google/genai';
 import { toParts } from '../code_assist/converter.js';
 import { createUserContent } from '@google/genai';
@@ -41,6 +43,11 @@ import { handleFallback } from '../fallback/handler.js';
 import { isFunctionResponse } from '../utils/messageInspectors.js';
 import { partListUnionToString } from './geminiRequest.js';
 import { uiTelemetryService } from '../telemetry/uiTelemetry.js';
+import type {
+  BeforeModelHookOutput,
+  BeforeToolSelectionHookOutput,
+  AfterModelHookOutput,
+} from '../hooks/types.js';
 
 export enum StreamEventType {
   /** A regular content chunk from the API. */
@@ -341,26 +348,105 @@ export class GeminiChat {
     params: SendMessageParameters,
     prompt_id: string,
   ): Promise<AsyncGenerator<GenerateContentResponse>> {
-    const apiCall = () => {
-      const modelToUse = getEffectiveModel(
-        this.config.isInFallbackMode(),
-        model,
-      );
+    // Prepare the request
+    let finalConfig = {
+      ...this.generationConfig,
+      ...params.config,
+    } as GenerateContentConfig;
+    let finalContents = requestContents as ContentListUnion;
 
-      if (
-        this.config.getQuotaErrorOccurred() &&
-        modelToUse === DEFAULT_GEMINI_FLASH_MODEL
-      ) {
-        throw new Error(
-          'Please submit a new query to continue with the Flash model.',
-        );
+    const modelToUse = getEffectiveModel(this.config.isInFallbackMode(), model);
+
+    if (
+      this.config.getQuotaErrorOccurred() &&
+      modelToUse === DEFAULT_GEMINI_FLASH_MODEL
+    ) {
+      throw new Error(
+        'Please submit a new query to continue with the Flash model.',
+      );
+    }
+
+    const apiCall = async () => {
+      const llmRequest: GenerateContentParameters = {
+        model: modelToUse,
+        config: finalConfig,
+        contents: finalContents,
+      };
+
+      // Fire BeforeModel hook
+      const hookSystem = this.config.getHookSystem();
+      if (hookSystem) {
+        try {
+          const beforeResult = await hookSystem
+            .getEventBus()
+            .fireBeforeModelEvent(llmRequest);
+          // Return a synthetic response from the hook
+          const hookOutput = beforeResult.finalOutput;
+
+          // Check if hook blocked the model call or requested to stop execution
+          const blockingError = hookOutput?.getBlockingError();
+          if (blockingError?.blocked || hookOutput?.shouldStopExecution()) {
+            const beforeModelOutput = hookOutput as BeforeModelHookOutput;
+            const syntheticResponse = beforeModelOutput.getSyntheticResponse();
+            if (syntheticResponse) {
+              // Return an async generator that yields the synthetic response
+              return (async function* () {
+                yield syntheticResponse;
+              })();
+            }
+            const reason =
+              hookOutput?.getEffectiveReason() || 'Model call blocked by hook';
+            throw new Error(reason);
+          }
+
+          // Apply modifications from hook
+          if (hookOutput) {
+            const beforeModelOutput = hookOutput as BeforeModelHookOutput;
+            const modifiedRequest =
+              beforeModelOutput.applyLLMRequestModifications(llmRequest);
+            finalConfig = modifiedRequest.config || finalConfig;
+            finalContents = modifiedRequest.contents || finalContents;
+          }
+        } catch (error) {
+          console.warn(`BeforeModel hook failed:`, error);
+        }
+      }
+
+      // Fire BeforeToolSelection hook
+      if (hookSystem) {
+        try {
+          llmRequest.config = finalConfig;
+          llmRequest.contents = finalContents;
+          const toolSelectionResult = await hookSystem
+            .getEventBus()
+            .fireBeforeToolSelectionEvent(llmRequest);
+
+          // Apply tool configuration modifications
+          if (toolSelectionResult.finalOutput) {
+            const beforeToolSelectionOutput =
+              toolSelectionResult.finalOutput as BeforeToolSelectionHookOutput;
+            const modifiedConfig =
+              beforeToolSelectionOutput.applyToolConfigModifications({
+                toolConfig: finalConfig.toolConfig,
+                tools: finalConfig.tools,
+              });
+            if (modifiedConfig.toolConfig) {
+              finalConfig.toolConfig = modifiedConfig.toolConfig;
+            }
+            if (modifiedConfig.tools) {
+              finalConfig.tools = modifiedConfig.tools;
+            }
+          }
+        } catch (error) {
+          console.warn(`BeforeToolSelection hook failed:`, error);
+        }
       }
 
       return this.config.getContentGenerator().generateContentStream(
         {
           model: modelToUse,
-          contents: requestContents,
-          config: { ...this.generationConfig, ...params.config },
+          contents: finalContents,
+          config: finalConfig,
         },
         prompt_id,
       );
@@ -384,7 +470,14 @@ export class GeminiChat {
       authType: this.config.getContentGeneratorConfig()?.authType,
     });
 
-    return this.processStreamResponse(model, streamResponse);
+    // Store the original request for AfterModel hooks
+    const originalRequest: GenerateContentParameters = {
+      model: modelToUse,
+      config: finalConfig,
+      contents: finalContents,
+    };
+
+    return this.processStreamResponse(model, streamResponse, originalRequest);
   }
 
   /**
@@ -489,6 +582,7 @@ export class GeminiChat {
   private async *processStreamResponse(
     model: string,
     streamResponse: AsyncGenerator<GenerateContentResponse>,
+    originalRequest: GenerateContentParameters,
   ): AsyncGenerator<GenerateContentResponse> {
     const modelResponseParts: Part[] = [];
     let hasReceivedAnyChunk = false;
@@ -536,7 +630,35 @@ export class GeminiChat {
         }
       }
 
-      yield chunk; // Yield every chunk to the UI immediately.
+      // Fire AfterModel hook
+      const hookSystem = this.config.getHookSystem();
+      if (hookSystem && originalRequest && chunk) {
+        try {
+          const afterResult = await hookSystem
+            .getEventBus()
+            .fireAfterModelEvent(originalRequest, chunk);
+
+          // Apply modifications from hook (handles both normal modifications and stop execution)
+          if (afterResult.finalOutput) {
+            const afterModelOutput =
+              afterResult.finalOutput as AfterModelHookOutput;
+            const modifiedResponse = afterModelOutput.getModifiedResponse();
+            if (modifiedResponse) {
+              yield modifiedResponse;
+            } else {
+              yield chunk;
+            }
+          } else {
+            yield chunk;
+          }
+        } catch (error) {
+          console.warn(`AfterModel hook failed:`, error);
+        } finally {
+          yield chunk; // Yield every chunk to the UI immediately.
+        }
+      } else {
+        yield chunk; // Yield every chunk to the UI immediately.
+      }
     }
 
     if (!hasReceivedAnyChunk) {
