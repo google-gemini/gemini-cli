@@ -13,6 +13,8 @@ import {
   EVENT_API_REQUEST,
   EVENT_API_RESPONSE,
   EVENT_CLI_CONFIG,
+  EVENT_EXTENSION_UNINSTALL,
+  EVENT_EXTENSION_ENABLE,
   EVENT_IDE_CONNECTION,
   EVENT_TOOL_CALL,
   EVENT_USER_PROMPT,
@@ -29,6 +31,7 @@ import {
   EVENT_FILE_OPERATION,
   EVENT_RIPGREP_FALLBACK,
   EVENT_MODEL_ROUTING,
+  EVENT_EXTENSION_INSTALL,
 } from './constants.js';
 import type {
   ApiErrorEvent,
@@ -54,6 +57,9 @@ import type {
   RipgrepFallbackEvent,
   ToolOutputTruncatedEvent,
   ModelRoutingEvent,
+  ExtensionEnableEvent,
+  ExtensionUninstallEvent,
+  ExtensionInstallEvent,
 } from './types.js';
 import {
   recordApiErrorMetrics,
@@ -690,4 +696,74 @@ export function logModelRouting(
   };
   logger.emit(logRecord);
   recordModelRoutingMetrics(config, event);
+}
+
+export function logExtensionInstallEvent(
+  config: Config,
+  event: ExtensionInstallEvent,
+): void {
+  ClearcutLogger.getInstance(config)?.logExtensionInstallEvent(event);
+  if (!isTelemetrySdkInitialized()) return;
+
+  const attributes: LogAttributes = {
+    ...getCommonAttributes(config),
+    ...event,
+    'event.name': EVENT_EXTENSION_INSTALL,
+    'event.timestamp': new Date().toISOString(),
+    extension_name: event.extension_name,
+    extension_version: event.extension_version,
+    extension_source: event.extension_source,
+    status: event.status,
+  };
+
+  const logger = logs.getLogger(SERVICE_NAME);
+  const logRecord: LogRecord = {
+    body: `Installed extension ${event.extension_name}`,
+    attributes,
+  };
+  logger.emit(logRecord);
+}
+
+export function logExtensionUninstall(
+  config: Config,
+  event: ExtensionUninstallEvent,
+): void {
+  ClearcutLogger.getInstance(config)?.logExtensionUninstallEvent(event);
+  if (!isTelemetrySdkInitialized()) return;
+
+  const attributes: LogAttributes = {
+    ...getCommonAttributes(config),
+    ...event,
+    'event.name': EVENT_EXTENSION_UNINSTALL,
+    'event.timestamp': new Date().toISOString(),
+  };
+
+  const logger = logs.getLogger(SERVICE_NAME);
+  const logRecord: LogRecord = {
+    body: `Uninstalled extension ${event.extension_name}`,
+    attributes,
+  };
+  logger.emit(logRecord);
+}
+
+export function logExtensionEnable(
+  config: Config,
+  event: ExtensionEnableEvent,
+): void {
+  ClearcutLogger.getInstance(config)?.logExtensionEnableEvent(event);
+  if (!isTelemetrySdkInitialized()) return;
+
+  const attributes: LogAttributes = {
+    ...getCommonAttributes(config),
+    ...event,
+    'event.name': EVENT_EXTENSION_ENABLE,
+    'event.timestamp': new Date().toISOString(),
+  };
+
+  const logger = logs.getLogger(SERVICE_NAME);
+  const logRecord: LogRecord = {
+    body: `Enabled extension ${event.extension_name}`,
+    attributes,
+  };
+  logger.emit(logRecord);
 }

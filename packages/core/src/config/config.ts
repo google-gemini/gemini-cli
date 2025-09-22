@@ -50,6 +50,7 @@ import {
 import { shouldAttemptBrowserLaunch } from '../utils/browser.js';
 import type { MCPOAuthConfig } from '../mcp/oauth-provider.js';
 import { ideContextStore } from '../ide/ideContext.js';
+import { WriteTodosTool } from '../tools/write-todos.js';
 import type { FileSystemService } from '../services/fileSystemService.js';
 import { StandardFileSystemService } from '../services/fileSystemService.js';
 import {
@@ -117,9 +118,14 @@ export interface GeminiCLIExtension {
   version: string;
   isActive: boolean;
   path: string;
-  source?: string;
-  type?: 'git' | 'local' | 'link';
+  installMetadata?: ExtensionInstallMetadata;
+}
+
+export interface ExtensionInstallMetadata {
+  source: string;
+  type: 'git' | 'local' | 'link' | 'github-release';
   ref?: string;
+  autoUpdate?: boolean;
 }
 
 export interface FileFilteringOptions {
@@ -240,6 +246,7 @@ export interface ConfigParameters {
   enableToolOutputTruncation?: boolean;
   eventEmitter?: EventEmitter;
   useSmartEdit?: boolean;
+  useWriteTodos?: boolean;
   policyEngineConfig?: PolicyEngineConfig;
   output?: OutputSettings;
   useModelRouter?: boolean;
@@ -327,6 +334,7 @@ export class Config {
   private readonly fileExclusions: FileExclusions;
   private readonly eventEmitter?: EventEmitter;
   private readonly useSmartEdit: boolean;
+  private readonly useWriteTodos: boolean;
   private readonly messageBus: MessageBus;
   private readonly policyEngine: PolicyEngine;
   private readonly outputSettings: OutputSettings;
@@ -416,6 +424,7 @@ export class Config {
     this.enableToolOutputTruncation =
       params.enableToolOutputTruncation ?? false;
     this.useSmartEdit = params.useSmartEdit ?? true;
+    this.useWriteTodos = params.useWriteTodos ?? false;
     this.useModelRouter = params.useModelRouter ?? false;
     this.extensionManagement = params.extensionManagement ?? true;
     this.storage = new Storage(this.targetDir);
@@ -459,7 +468,6 @@ export class Config {
     }
     this.promptRegistry = new PromptRegistry();
     this.toolRegistry = await this.createToolRegistry();
-    logCliConfiguration(this, new StartSessionEvent(this, this.toolRegistry));
 
     await this.geminiClient.initialize();
   }
@@ -496,6 +504,9 @@ export class Config {
 
     // Reset the session flag since we're explicitly changing auth and using default model
     this.inFallbackMode = false;
+
+    // Logging the cli configuration here as the auth related configuration params would have been loaded by this point
+    logCliConfiguration(this, new StartSessionEvent(this, this.toolRegistry));
   }
 
   getUserTier(): UserTierId | undefined {
@@ -940,6 +951,10 @@ export class Config {
     return this.useSmartEdit;
   }
 
+  getUseWriteTodos(): boolean {
+    return this.useWriteTodos;
+  }
+
   getOutputFormat(): OutputFormat {
     return this.outputSettings?.format
       ? this.outputSettings.format
@@ -1040,6 +1055,9 @@ export class Config {
     registerCoreTool(ShellTool, this);
     registerCoreTool(MemoryTool);
     registerCoreTool(WebSearchTool, this);
+    if (this.getUseWriteTodos()) {
+      registerCoreTool(WriteTodosTool, this);
+    }
 
     await registry.discoverAllTools();
     return registry;

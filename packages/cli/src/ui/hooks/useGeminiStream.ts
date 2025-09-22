@@ -32,8 +32,6 @@ import {
   ApprovalMode,
   parseAndFormatApiError,
   ToolConfirmationOutcome,
-  getCodeAssistServer,
-  UserTierId,
   promptIdContext,
 } from '@google/gemini-cli-core';
 import { type Part, type PartListUnion, FinishReason } from '@google/genai';
@@ -73,13 +71,12 @@ enum StreamProcessingStatus {
 
 const EDIT_TOOL_NAMES = new Set(['replace', 'write_file']);
 
-function showCitations(settings: LoadedSettings, config: Config): boolean {
+function showCitations(settings: LoadedSettings): boolean {
   const enabled = settings?.merged?.ui?.showCitations;
   if (enabled !== undefined) {
     return enabled;
   }
-  const server = getCodeAssistServer(config);
-  return (server && server.userTier !== UserTierId.FREE) ?? false;
+  return true;
 }
 
 /**
@@ -114,7 +111,7 @@ export const useGeminiStream = (
   const turnCancelledRef = useRef(false);
   const [isResponding, setIsResponding] = useState<boolean>(false);
   const [thought, setThought] = useState<ThoughtSummary | null>(null);
-  const [pendingHistoryItemRef, setPendingHistoryItem] =
+  const [pendingHistoryItem, pendingHistoryItemRef, setPendingHistoryItem] =
     useStateAndRef<HistoryItemWithoutId | null>(null);
   const processedMemoryToolsRef = useRef<Set<string>>(new Set());
   const { startNewPrompt, getPromptCount } = useSessionStats();
@@ -528,7 +525,7 @@ export const useGeminiStream = (
 
   const handleCitationEvent = useCallback(
     (text: string, userMessageTimestamp: number) => {
-      if (!showCitations(settings, config)) {
+      if (!showCitations(settings)) {
         return;
       }
 
@@ -538,7 +535,7 @@ export const useGeminiStream = (
       }
       addItem({ type: MessageType.INFO, text }, userMessageTimestamp);
     },
-    [addItem, pendingHistoryItemRef, setPendingHistoryItem, settings, config],
+    [addItem, pendingHistoryItemRef, setPendingHistoryItem, settings],
   );
 
   const handleFinishedEvent = useCallback(
@@ -585,8 +582,15 @@ export const useGeminiStream = (
   );
 
   const handleChatCompressionEvent = useCallback(
-    (eventValue: ServerGeminiChatCompressedEvent['value']) =>
-      addItem(
+    (
+      eventValue: ServerGeminiChatCompressedEvent['value'],
+      userMessageTimestamp: number,
+    ) => {
+      if (pendingHistoryItemRef.current) {
+        addItem(pendingHistoryItemRef.current, userMessageTimestamp);
+        setPendingHistoryItem(null);
+      }
+      return addItem(
         {
           type: 'info',
           text:
@@ -596,8 +600,9 @@ export const useGeminiStream = (
             `${eventValue?.newTokenCount ?? 'unknown'} tokens).`,
         },
         Date.now(),
-      ),
-    [addItem, config],
+      );
+    },
+    [addItem, config, pendingHistoryItemRef, setPendingHistoryItem],
   );
 
   const handleMaxSessionTurnsEvent = useCallback(
@@ -677,7 +682,7 @@ export const useGeminiStream = (
             handleErrorEvent(event.value, userMessageTimestamp);
             break;
           case ServerGeminiEventType.ChatCompressed:
-            handleChatCompressionEvent(event.value);
+            handleChatCompressionEvent(event.value, userMessageTimestamp);
             break;
           case ServerGeminiEventType.ToolCallConfirmation:
           case ServerGeminiEventType.ToolCallResponse:
@@ -1014,10 +1019,13 @@ export const useGeminiStream = (
     ],
   );
 
-  const pendingHistoryItems = [
-    pendingHistoryItemRef.current,
-    pendingToolCallGroupDisplay,
-  ].filter((i) => i !== undefined && i !== null);
+  const pendingHistoryItems = useMemo(
+    () =>
+      [pendingHistoryItem, pendingToolCallGroupDisplay].filter(
+        (i) => i !== undefined && i !== null,
+      ),
+    [pendingHistoryItem, pendingToolCallGroupDisplay],
+  );
 
   useEffect(() => {
     const saveRestorableToolCalls = async () => {
