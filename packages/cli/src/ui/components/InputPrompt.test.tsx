@@ -1279,7 +1279,8 @@ describe('InputPrompt', () => {
       await wait();
 
       const frame = stdout.lastFrame();
-      expect(frame).toContain(`hello${chalk.inverse(' ')}`);
+      expect(frame).toContain(`hello`);
+      expect(frame).not.toContain(`hello${chalk.inverse(' ')}`);
       unmount();
     });
 
@@ -1330,7 +1331,8 @@ describe('InputPrompt', () => {
       await wait();
 
       const frame = stdout.lastFrame();
-      expect(frame).toContain(`hello 👍${chalk.inverse(' ')}`);
+      expect(frame).toContain(`hello 👍`);
+      expect(frame).not.toContain(`hello 👍${chalk.inverse(' ')}`);
       unmount();
     });
   });
@@ -1353,11 +1355,12 @@ describe('InputPrompt', () => {
       // Check that all lines, including the empty one, are rendered.
       // This implicitly tests that the Box wrapper provides height for the empty line.
       expect(frame).toContain('hello');
-      expect(frame).toContain(`world${chalk.inverse(' ')}`);
+      expect(frame).toContain(`world`);
+      expect(frame).not.toContain(`world${chalk.inverse(' ')}`);
 
       const outputLines = frame!.split('\n');
-      // The number of lines should be 2 for the border plus 3 for the content.
-      expect(outputLines.length).toBe(5);
+      // The number of lines should be 4 for the content and bottom border.
+      expect(outputLines.length).toBe(4);
       unmount();
     });
   });
