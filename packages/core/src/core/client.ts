@@ -42,6 +42,12 @@ import {
   logContentRetryFailure,
   logNextSpeakerCheck,
 } from '../telemetry/loggers.js';
+import type {
+  HookExecutionRequest,
+  HookExecutionResponse,
+} from '../confirmation-bus/types.js';
+import { MessageBusType } from '../confirmation-bus/types.js';
+import { createHookOutput } from '../hooks/types.js';
 import {
   ContentRetryFailureEvent,
   NextSpeakerCheckEvent,
@@ -52,6 +58,7 @@ import { handleFallback } from '../fallback/handler.js';
 import type { RoutingContext } from '../routing/routingStrategy.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import type { ModelConfigKey } from '../services/modelConfigService.js';
+import { getResponseText } from '../utils/partUtils.js';
 
 const MAX_TURNS = 100;
 
@@ -400,6 +407,64 @@ export class GeminiClient {
     turns: number = MAX_TURNS,
     isInvalidStreamRetry: boolean = false,
   ): AsyncGenerator<ServerGeminiStreamEvent, Turn> {
+    // Fire BeforeAgent hook through MessageBus (only if hooks are enabled)
+    const hooksEnabled = this.config.getEnableHooks();
+    const messageBus = this.config.getMessageBus();
+    if (hooksEnabled && messageBus) {
+      try {
+        const promptText = this.getPromptTextFromRequest(request);
+
+        const response = await messageBus.request<
+          HookExecutionRequest,
+          HookExecutionResponse
+        >(
+          {
+            type: MessageBusType.HOOK_EXECUTION_REQUEST,
+            eventName: 'BeforeAgent',
+            input: {
+              prompt: promptText,
+            },
+          },
+          MessageBusType.HOOK_EXECUTION_RESPONSE,
+        );
+
+        // Reconstruct result from response
+        const beforeResultFinalOutput = response.output
+          ? createHookOutput('BeforeAgent', response.output)
+          : undefined;
+
+        // Check if hook blocked the agent processing or requested to stop execution
+        if (
+          beforeResultFinalOutput?.isBlockingDecision() ||
+          beforeResultFinalOutput?.shouldStopExecution()
+        ) {
+          const reason = beforeResultFinalOutput.getEffectiveReason();
+          yield {
+            type: GeminiEventType.Error,
+            value: {
+              error: new Error(
+                `BeforeAgent hook blocked processing: ${reason}`,
+              ),
+            },
+          };
+          return new Turn(this.getChat(), prompt_id);
+        }
+
+        // Add additional context from hooks to the request
+        if (beforeResultFinalOutput) {
+          const additionalContext =
+            beforeResultFinalOutput.getAdditionalContext();
+          if (additionalContext) {
+            // Add the additional context as a user message to the request
+            const requestArray = Array.isArray(request) ? request : [request];
+            request = [...requestArray, { text: additionalContext }];
+          }
+        }
+      } catch (error) {
+        console.warn(`BeforeAgent hook failed:`, error);
+      }
+    }
+
     if (this.lastPromptId !== prompt_id) {
       this.loopDetector.reset(prompt_id);
       this.lastPromptId = prompt_id;
@@ -567,9 +632,9 @@ export class GeminiClient {
       );
       if (nextSpeakerCheck?.next_speaker === 'model') {
         const nextRequest = [{ text: 'Please continue.' }];
-        // This recursive call's events will be yielded out, but the final
-        // turn object will be from the top-level call.
-        yield* this.sendMessageStream(
+        // This recursive call's events will be yielded out, and the final
+        // turn object from the recursive call will be returned.
+        return yield* this.sendMessageStream(
           nextRequest,
           signal,
           prompt_id,
@@ -578,6 +643,55 @@ export class GeminiClient {
         );
       }
     }
+
+    // Fire AfterAgent hook through MessageBus (only if hooks are enabled)
+    if (hooksEnabled && messageBus) {
+      try {
+        const responseText = this.getTurnResponseText(turn);
+        const promptText = this.getPromptTextFromRequest(request);
+
+        const response = await messageBus.request<
+          HookExecutionRequest,
+          HookExecutionResponse
+        >(
+          {
+            type: MessageBusType.HOOK_EXECUTION_REQUEST,
+            eventName: 'AfterAgent',
+            input: {
+              prompt: promptText,
+              prompt_response: responseText,
+              stop_hook_active: false,
+            },
+          },
+          MessageBusType.HOOK_EXECUTION_RESPONSE,
+        );
+
+        // Reconstruct result from response
+        const afterResultFinalOutput = response.output
+          ? createHookOutput('AfterAgent', response.output)
+          : undefined;
+
+        // Check if hook wants to force continuation or stop execution
+        if (
+          afterResultFinalOutput?.isBlockingDecision() ||
+          afterResultFinalOutput?.shouldStopExecution()
+        ) {
+          const reason = afterResultFinalOutput.getEffectiveReason();
+
+          // For AfterAgent hooks, both blocking and stop execution should force continuation
+          const continueRequest = [{ text: reason }];
+          yield* this.sendMessageStream(
+            continueRequest,
+            signal,
+            prompt_id,
+            boundedTurns - 1,
+          );
+        }
+      } catch (error) {
+        console.warn(`AfterAgent hook failed:`, error);
+      }
+    }
+
     return turn;
   }
 
@@ -688,5 +802,44 @@ export class GeminiClient {
     }
 
     return info;
+  }
+
+  /**
+   * Extract prompt text from request for hooks
+   */
+  private getPromptTextFromRequest(request: PartListUnion): string {
+    if (typeof request === 'string') {
+      return request;
+    }
+
+    if (Array.isArray(request)) {
+      return request
+        .map((part) => {
+          if (typeof part === 'string') return part;
+          if ('text' in part) return part.text;
+          return '[non-text content]';
+        })
+        .join(' ');
+    }
+
+    if ('text' in request && typeof request.text === 'string') {
+      return request.text;
+    }
+
+    return '[complex content]';
+  }
+
+  /**
+   * Extract response text from turn for hooks
+   */
+  private getTurnResponseText(turn: Turn): string {
+    // This is a simplified implementation - in a real scenario,
+    // you might want to extract the actual response text from the turn
+    return (
+      turn
+        .getDebugResponses()
+        .map((response) => getResponseText(response))
+        .join(' ') || '[no response text]'
+    );
   }
 }
