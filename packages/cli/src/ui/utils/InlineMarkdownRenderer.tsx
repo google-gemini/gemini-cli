@@ -6,173 +6,279 @@
 
 import React from 'react';
 import { Text } from 'ink';
-import { theme } from '../semantic-colors.js';
+import { theme } from '../semantic-colors.js'; // Assuming this import path is correct
 import stringWidth from 'string-width';
-
-// Constants for Markdown parsing
-const BOLD_MARKER_LENGTH = 2; // For "**"
-const ITALIC_MARKER_LENGTH = 1; // For "*" or "_"
-const STRIKETHROUGH_MARKER_LENGTH = 2; // For "~~")
-const INLINE_CODE_MARKER_LENGTH = 1; // For "`"
-const UNDERLINE_TAG_START_LENGTH = 3; // For "<u>"
-const UNDERLINE_TAG_END_LENGTH = 4; // For "</u>"
 
 interface RenderInlineProps {
   text: string;
 }
 
+/**
+ * Defines the shape of the named capture groups in our regex.
+ */
+interface MarkdownMatchGroups {
+  bold?: string;
+  italic?: string;
+  strike?: string;
+  inlineCode?: string;
+  link?: string;
+  underline?: string;
+  bareUrl?: string;
+}
+
+/**
+ * A regex that checks for characters that might start a markdown
+ * sequence or a bare URL.
+ *
+ * - `[*_~`<\\[]`: Matches styling characters *, _, ~, `, < (for <u>), or [ (for links).
+ * - `(https?|ftp|mailto):`: Matches common URL protocols.
+ */
+const POTENTIAL_MARKDOWN_REGEX = /[*_~`<\\[]|(https?|ftp|mailto):/;
+
+/**
+ * Checks if a string is just plain text, with no markdown or URLs.
+ * This allows for a fast exit before attempting to parse.
+ */
+const isPlainText = (text: string): boolean =>
+  !POTENTIAL_MARKDOWN_REGEX.test(text);
+
+// Marker lengths for slicing
+const BOLD_MARKER_LENGTH = 2; // For "**"
+const ITALIC_MARKER_LENGTH = 1; // For "*" or "_"
+const STRIKETHROUGH_MARKER_LENGTH = 2; // For "~~"
+const UNDERLINE_TAG_START_LENGTH = 3; // For "<u>"
+const UNDERLINE_TAG_END_LENGTH = 4; // For "</u>"
+
+/**
+ * The source of truth for all markdown rules.
+ * It defines the key that matches MarkdownMatchGroups,
+ * and the regex pattern for that key.
+ *
+ * The order of this array defines the parsing priority.
+ */
+const MARKDOWN_RULES: Array<{
+  key: keyof MarkdownMatchGroups;
+  pattern: string;
+}> = [
+  { key: 'bold', pattern: `(?<bold>\\*\\*.+?\\*\\*)` },
+  { key: 'italic', pattern: `(?<italic>\\*.+?\\*|_.+?_)` },
+  { key: 'strike', pattern: `(?<strike>~~.+?~~)` },
+  { key: 'link', pattern: `(?<link>\\[.*?\\]\\((?:[^\\s()]|\\([^)]*\\))*\\))` },
+  { key: 'inlineCode', pattern: `(?<inlineCode>\`+.+?\`+)` },
+  { key: 'underline', pattern: `(?<underline><u>.*?<\\/u>)` },
+  {
+    key: 'bareUrl',
+    pattern: `(?<bareUrl>(?:https?|ftp):\\/\\/\\S+|mailto:\\S+)`,
+  },
+];
+
+/**
+ * Generated regex token, built from the patterns in MARKDOWN_RULES.
+ */
+const MARKDOWN_TOKEN_REGEX = new RegExp(
+  MARKDOWN_RULES.map((rule) => rule.pattern).join('|'),
+  'g',
+);
+
+/**
+ * Generated array of keys, built from the keys in MARKDOWN_RULES.
+ * This guarantees the iteration order matches the regex priority.
+ */
+const HANDLER_KEYS_IN_ORDER = MARKDOWN_RULES.map((rule) => rule.key);
+
+const extractSimpleContent = (match: string, start: number, end: number) =>
+  match.slice(start, -end);
+
+const extractCodeContent = (match: string) => {
+  const codeMatch = match.match(/^(`+)(.+?)\1$/s);
+  return codeMatch ? codeMatch[2] : match;
+};
+
+const extractLinkContent = (match: string) => {
+  const linkMatch = match.match(/\[(.*?)\]\((.*)\)/);
+  if (!linkMatch) {
+    return { text: match, url: '', isSafe: false };
+  }
+  const url = linkMatch[2];
+  const isSafe = /^(https|http|mailto):/i.test(url);
+  return { text: linkMatch[1], url, isSafe };
+};
+
+/**
+ * A handler that defines all logic for a markdown type.
+ */
+interface MarkdownHandler {
+  render: (match: string, key: string) => React.ReactNode;
+  strip: (match: string) => string;
+}
+
+/**
+ * The map for all markdown operations.
+ */
+const MARKDOWN_HANDLERS: Record<keyof MarkdownMatchGroups, MarkdownHandler> = {
+  bold: {
+    render: (match, key) => (
+      <Text key={key} bold>
+        {extractSimpleContent(match, BOLD_MARKER_LENGTH, BOLD_MARKER_LENGTH)}
+      </Text>
+    ),
+    strip: (match) =>
+      extractSimpleContent(match, BOLD_MARKER_LENGTH, BOLD_MARKER_LENGTH),
+  },
+  italic: {
+    render: (match, key) => (
+      <Text key={key} italic>
+        {extractSimpleContent(
+          match,
+          ITALIC_MARKER_LENGTH,
+          ITALIC_MARKER_LENGTH,
+        )}
+      </Text>
+    ),
+    strip: (match) =>
+      extractSimpleContent(match, ITALIC_MARKER_LENGTH, ITALIC_MARKER_LENGTH),
+  },
+  strike: {
+    render: (match, key) => (
+      <Text key={key} strikethrough>
+        {extractSimpleContent(
+          match,
+          STRIKETHROUGH_MARKER_LENGTH,
+          STRIKETHROUGH_MARKER_LENGTH,
+        )}
+      </Text>
+    ),
+    strip: (match) =>
+      extractSimpleContent(
+        match,
+        STRIKETHROUGH_MARKER_LENGTH,
+        STRIKETHROUGH_MARKER_LENGTH,
+      ),
+  },
+  inlineCode: {
+    render: (match, key) => (
+      <Text key={key} color={theme.text.accent}>
+        {extractCodeContent(match)}
+      </Text>
+    ),
+    strip: (match) => extractCodeContent(match),
+  },
+  link: {
+    render: (match, key) => {
+      const { text, url, isSafe } = extractLinkContent(match);
+      const linkComponent = <Text color={theme.text.link}> ({url})</Text>;
+      return (
+        <Text key={key}>
+          {text}
+          {isSafe ? linkComponent : ` (${url})`}
+        </Text>
+      );
+    },
+    strip: (match) => extractLinkContent(match).text,
+  },
+  underline: {
+    render: (match, key) => (
+      <Text key={key} underline>
+        {extractSimpleContent(
+          match,
+          UNDERLINE_TAG_START_LENGTH,
+          UNDERLINE_TAG_END_LENGTH,
+        )}
+      </Text>
+    ),
+    strip: (match) =>
+      extractSimpleContent(
+        match,
+        UNDERLINE_TAG_START_LENGTH,
+        UNDERLINE_TAG_END_LENGTH,
+      ),
+  },
+  bareUrl: {
+    render: (match, key) => (
+      <Text key={key}>
+        {match}
+        <Text color={theme.text.link}> ({match})</Text>
+      </Text>
+    ),
+    strip: (match) => match,
+  },
+};
+
+const getRenderedNodeForMatch = (
+  match: RegExpMatchArray,
+  key: string,
+): React.ReactNode => {
+  const groups = match.groups as MarkdownMatchGroups | undefined;
+  if (groups) {
+    for (const handlerKey of HANDLER_KEYS_IN_ORDER) {
+      const matchText = groups[handlerKey];
+      if (matchText) {
+        return MARKDOWN_HANDLERS[handlerKey].render(matchText, key);
+      }
+    }
+  }
+  return <Text key={key}>{match[0]}</Text>;
+};
+
+/**
+ * A helper to add the plain text between matches (or at the end).
+ */
+const addPrecedingPlainTextNode = (
+  nodes: React.ReactNode[],
+  text: string,
+  from: number,
+  to: number,
+) => {
+  if (to > from) {
+    const plainText = text.slice(from, to);
+    nodes.push(<Text key={`t-${from}`}>{plainText}</Text>);
+  }
+};
+
+/**
+ * Utility function to get the plain text length of a string with markdown formatting.
+ */
+export const getPlainTextLength = (text: string): number => {
+  const cleanText = text.replace(MARKDOWN_TOKEN_REGEX, (match, ...args) => {
+    const groups = args[args.length - 1] as MarkdownMatchGroups;
+    for (const key of HANDLER_KEYS_IN_ORDER) {
+      const matchText = groups[key];
+      if (matchText) {
+        return MARKDOWN_HANDLERS[key].strip(matchText);
+      }
+    }
+    return match;
+  });
+  return stringWidth(cleanText);
+};
+
 const RenderInlineInternal: React.FC<RenderInlineProps> = ({ text }) => {
-  // Early return for plain text without markdown or URLs
-  if (!/[*_~`<[https?:]/.test(text)) {
+  if (isPlainText(text)) {
     return <Text color={theme.text.primary}>{text}</Text>;
   }
 
   const nodes: React.ReactNode[] = [];
   let lastIndex = 0;
-  const inlineRegex =
-    /(\*\*.*?\*\*|\*.*?\*|_.*?_|~~.*?~~|\[.*?\]\(.*?\)|`+.+?`+|<u>.*?<\/u>|(?:https?|ftp):\/\/\S+|mailto:\S+)/g;
-  let match;
 
-  while ((match = inlineRegex.exec(text)) !== null) {
-    if (match.index > lastIndex) {
-      nodes.push(
-        <Text key={`t-${lastIndex}`}>
-          {text.slice(lastIndex, match.index)}
-        </Text>,
-      );
-    }
+  for (const match of text.matchAll(MARKDOWN_TOKEN_REGEX)) {
+    const matchIndex = match.index!;
 
-    const fullMatch = match[0];
-    let renderedNode: React.ReactNode = null;
-    const key = `m-${match.index}`;
+    // Add any plain text before this match
+    addPrecedingPlainTextNode(nodes, text, lastIndex, matchIndex);
 
-    try {
-      if (
-        fullMatch.startsWith('**') &&
-        fullMatch.endsWith('**') &&
-        fullMatch.length > BOLD_MARKER_LENGTH * 2
-      ) {
-        renderedNode = (
-          <Text key={key} bold>
-            {fullMatch.slice(BOLD_MARKER_LENGTH, -BOLD_MARKER_LENGTH)}
-          </Text>
-        );
-      } else if (
-        fullMatch.length > ITALIC_MARKER_LENGTH * 2 &&
-        ((fullMatch.startsWith('*') && fullMatch.endsWith('*')) ||
-          (fullMatch.startsWith('_') && fullMatch.endsWith('_'))) &&
-        !/\w/.test(text.substring(match.index - 1, match.index)) &&
-        !/\w/.test(
-          text.substring(inlineRegex.lastIndex, inlineRegex.lastIndex + 1),
-        ) &&
-        !/\S[./\\]/.test(text.substring(match.index - 2, match.index)) &&
-        !/[./\\]\S/.test(
-          text.substring(inlineRegex.lastIndex, inlineRegex.lastIndex + 2),
-        )
-      ) {
-        renderedNode = (
-          <Text key={key} italic>
-            {fullMatch.slice(ITALIC_MARKER_LENGTH, -ITALIC_MARKER_LENGTH)}
-          </Text>
-        );
-      } else if (
-        fullMatch.startsWith('~~') &&
-        fullMatch.endsWith('~~') &&
-        fullMatch.length > STRIKETHROUGH_MARKER_LENGTH * 2
-      ) {
-        renderedNode = (
-          <Text key={key} strikethrough>
-            {fullMatch.slice(
-              STRIKETHROUGH_MARKER_LENGTH,
-              -STRIKETHROUGH_MARKER_LENGTH,
-            )}
-          </Text>
-        );
-      } else if (
-        fullMatch.startsWith('`') &&
-        fullMatch.endsWith('`') &&
-        fullMatch.length > INLINE_CODE_MARKER_LENGTH
-      ) {
-        const codeMatch = fullMatch.match(/^(`+)(.+?)\1$/s);
-        if (codeMatch && codeMatch[2]) {
-          renderedNode = (
-            <Text key={key} color={theme.text.accent}>
-              {codeMatch[2]}
-            </Text>
-          );
-        }
-      } else if (
-        fullMatch.startsWith('[') &&
-        fullMatch.includes('](') &&
-        fullMatch.endsWith(')')
-      ) {
-        const linkMatch = fullMatch.match(/\[(.*?)\]\((.*?)\)/);
-        if (linkMatch) {
-          const linkText = linkMatch[1];
-          const url = linkMatch[2];
-          renderedNode = (
-            <Text key={key}>
-              {linkText}
-              <Text color={theme.text.link}> ({url})</Text>
-            </Text>
-          );
-        }
-      } else if (
-        fullMatch.startsWith('<u>') &&
-        fullMatch.endsWith('</u>') &&
-        fullMatch.length >
-          UNDERLINE_TAG_START_LENGTH + UNDERLINE_TAG_END_LENGTH - 1 // -1 because length is compared to combined length of start and end tags
-      ) {
-        renderedNode = (
-          <Text key={key} underline>
-            {fullMatch.slice(
-              UNDERLINE_TAG_START_LENGTH,
-              -UNDERLINE_TAG_END_LENGTH,
-            )}
-          </Text>
-        );
-      } else if (
-        fullMatch.match(/^(https?|ftp):\/\//) ||
-        fullMatch.match(/^mailto:/)
-      ) {
-        const url = fullMatch;
-        renderedNode = (
-          <Text key={key}>
-            {url}
-            <Text color={theme.text.link}> ({url})</Text>
-          </Text>
-        );
-      }
-    } catch (e) {
-      console.error('Error parsing inline markdown part:', fullMatch, e);
-      renderedNode = null;
-    }
+    // Get the rendered node for the match itself
+    const key = `m-${matchIndex}`;
+    const renderedNode = getRenderedNodeForMatch(match, key);
+    nodes.push(renderedNode);
 
-    nodes.push(renderedNode ?? <Text key={key}>{fullMatch}</Text>);
-    lastIndex = inlineRegex.lastIndex;
+    // Update position
+    lastIndex = matchIndex + match[0].length;
   }
 
-  if (lastIndex < text.length) {
-    nodes.push(<Text key={`t-${lastIndex}`}>{text.slice(lastIndex)}</Text>);
-  }
+  // Add any final plain text after the last match
+  addPrecedingPlainTextNode(nodes, text, lastIndex, text.length);
 
-  return <>{nodes.filter((node) => node !== null)}</>;
+  return <>{nodes}</>;
 };
 
 export const RenderInline = React.memo(RenderInlineInternal);
-
-/**
- * Utility function to get the plain text length of a string with markdown formatting
- * This is useful for calculating column widths in tables
- */
-export const getPlainTextLength = (text: string): number => {
-  const cleanText = text
-    .replace(/\*\*(.*?)\*\*/g, '$1')
-    .replace(/\*(.*?)\*/g, '$1')
-    .replace(/_(.*?)_/g, '$1')
-    .replace(/~~(.*?)~~/g, '$1')
-    .replace(/`(.*?)`/g, '$1')
-    .replace(/<u>(.*?)<\/u>/g, '$1')
-    .replace(/\[(.*?)\]\(.*?\)/g, '$1');
-  return stringWidth(cleanText);
-};

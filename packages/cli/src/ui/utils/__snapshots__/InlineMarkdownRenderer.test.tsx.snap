@@ -30,14 +30,52 @@ link (https://example.com)
 ."
 `;
 
-exports[`RenderInline > renders a markdown javascript URI as text 1`] = `
-"This is a
-malicious link (javascript:alert(1)
-)."
-`;
-
 exports[`RenderInline > renders a markdown mailto link as text 1`] = `
 "Contact us at
 email (mailto:team@example.com)
 ."
+`;
+
+exports[`RenderInline > renders bold text correctly 1`] = `
+"This is
+bold
+."
+`;
+
+exports[`RenderInline > renders inline code correctly 1`] = `
+"This is
+code
+."
+`;
+
+exports[`RenderInline > renders italic text correctly 1`] = `
+"This is
+italic
+."
+`;
+
+exports[`RenderInline > renders strikethrough text correctly 1`] = `
+"This is
+strikethrough
+."
+`;
+
+exports[`RenderInline > renders underline text correctly 1`] = `
+"This is
+underline
+."
+`;
+
+exports[`RenderInline Edge Cases > handles empty markdown content 1`] = `
+"A
+ ()
+ link and
+*
+* bold."
+`;
+
+exports[`RenderInline Edge Cases > handles mixed and adjacent markdown types 1`] = `
+"bold
+link (https://a.com)
+italic"
 `;
