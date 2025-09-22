@@ -6,7 +6,7 @@
 
 import { MergeStrategy } from '../config/settingsSchema.js';
 
-type Mergeable =
+export type Mergeable =
   | string
   | number
   | boolean
@@ -15,7 +15,7 @@ type Mergeable =
   | object
   | Mergeable[];
 
-type MergeableObject = Record<string, Mergeable>;
+export type MergeableObject = Record<string, Mergeable>;
 
 function isPlainObject(item: unknown): item is MergeableObject {
   return !!item && typeof item === 'object' && !Array.isArray(item);
