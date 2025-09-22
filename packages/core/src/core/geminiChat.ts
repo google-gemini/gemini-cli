@@ -558,11 +558,11 @@ export class GeminiChat {
 
     // Stream validation logic: A stream is considered successful if:
     // 1. There's a tool call (tool calls can end without explicit finish reasons), OR
-    // 2. There's a finish reason AND the last chunk is valid (or we haven't received any valid chunks)
+    // 2. There's a finish reason AND we have non-empty response text
     //
     // We throw an error only when there's no tool call AND:
     // - No finish reason, OR
-    // - Last chunk is invalid after receiving valid content
+    // - Empty response text (e.g., only thoughts with no actual content)
     if (!hasToolCall && (!hasFinishReason || !responseText)) {
       throw new EmptyStreamError(
         'Model stream ended with an invalid chunk or missing finish reason.',
