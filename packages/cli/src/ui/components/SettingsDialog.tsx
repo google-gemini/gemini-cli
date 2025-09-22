@@ -880,7 +880,9 @@ export function SettingsDialog({
             </Text>
             <RadioButtonSelect
               items={scopeItems}
-              initialIndex={0}
+              initialIndex={scopeItems.findIndex(
+                (item) => item.value === selectedScope,
+              )}
               onSelect={handleScopeSelect}
               onHighlight={handleScopeHighlight}
               isFocused={focusSection === 'scope'}
