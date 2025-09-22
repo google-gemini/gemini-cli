@@ -807,4 +807,47 @@ describe('useSlashCompletion', () => {
       });
     });
   });
+
+  it('should not call shared callbacks when disabled', () => {
+    const mockSetSuggestions = vi.fn();
+    const mockSetIsLoadingSuggestions = vi.fn();
+    const mockSetIsPerfectMatch = vi.fn();
+
+    const slashCommands = [
+      createTestCommand({
+        name: 'help',
+        description: 'Show help',
+      }),
+    ];
+
+    const { rerender } = renderHook(
+      ({ enabled, query }) =>
+        useSlashCompletion({
+          enabled,
+          query,
+          slashCommands,
+          commandContext: mockCommandContext,
+          setSuggestions: mockSetSuggestions,
+          setIsLoadingSuggestions: mockSetIsLoadingSuggestions,
+          setIsPerfectMatch: mockSetIsPerfectMatch,
+        }),
+      {
+        initialProps: { enabled: false, query: '@src/file' },
+      },
+    );
+
+    // Clear any initial calls
+    mockSetSuggestions.mockClear();
+    mockSetIsLoadingSuggestions.mockClear();
+    mockSetIsPerfectMatch.mockClear();
+
+    // Change query while disabled (simulating @ completion typing)
+    rerender({ enabled: false, query: '@src/file.ts' });
+    rerender({ enabled: false, query: '@src/file.tsx' });
+
+    // Should not have called shared callbacks during @ completion typing
+    expect(mockSetSuggestions).not.toHaveBeenCalled();
+    expect(mockSetIsLoadingSuggestions).not.toHaveBeenCalled();
+    expect(mockSetIsPerfectMatch).not.toHaveBeenCalled();
+  });
 });
