@@ -319,6 +319,46 @@ describe('useSelectionList', () => {
       expect(mockOnSelect).toHaveBeenCalledWith('D');
       expect(mockOnSelect).not.toHaveBeenCalledWith('A');
     });
+
+    it('should handle ultra-rapid input (multiple presses in single act) without stale state', () => {
+      const { result } = renderHook(() =>
+        useSelectionList({
+          items, // A, B(disabled), C, D. Initial index 0 (A).
+          onSelect: mockOnSelect,
+          onHighlight: mockOnHighlight,
+        }),
+      );
+
+      // Simulate ultra-rapid inputs where all keypresses happen faster than React can re-render
+      act(() => {
+        if (!activeKeypressHandler) throw new Error('Handler not active');
+
+        const handler = activeKeypressHandler;
+
+        const press = (name: string) => {
+          const key: Key = {
+            name,
+            sequence: name,
+            ctrl: false,
+            meta: false,
+            shift: false,
+            paste: false,
+          };
+          handler(key);
+        };
+
+        // All presses happen in same render cycle - React batches the state updates
+        press('down'); // Should move 0 (A) -> 2 (C)
+        press('down'); // Should move 2 (C) -> 3 (D)
+        press('return'); // Should select D
+      });
+
+      expect(result.current.activeIndex).toBe(3);
+
+      expect(mockOnHighlight).toHaveBeenCalledWith('D');
+      expect(mockOnSelect).toHaveBeenCalledTimes(1);
+      expect(mockOnSelect).toHaveBeenCalledWith('D');
+    });
   });
 
   describe('Focus Management (isFocused)', () => {
