@@ -17,8 +17,9 @@ inputs:
   token-cli:
     description: 'NPM token for cli package.'
     required: true
+
 runs:
-  using: "composite"
+  using: 'composite'
   steps:
     - name: 'Setup Node.js'
       uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020'
@@ -44,4 +45,5 @@ runs:
     - name: 'Log dry run'
       if: inputs.dry-run == 'true'
       shell: bash
-      run: echo "Dry run: Would have added tag '${{ inputs.channel }}' to version '${{ inputs.version }}' for @google/gemini-cli and @google/gemini-cli-core."
+      run: |
+        echo "Dry run: Would have added tag '${{ inputs.channel }}' to version '${{ inputs.version }}' for @google/gemini-cli and @google/gemini-cli-core."
