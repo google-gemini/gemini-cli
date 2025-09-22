@@ -414,7 +414,7 @@ export async function loadCliConfig(
   const ideMode = settings.ide?.enabled ?? false;
 
   const folderTrust = settings.security?.folderTrust?.enabled ?? false;
-  const trustedFolder = isWorkspaceTrusted(settings) ?? true;
+  const trustedFolder = isWorkspaceTrusted(settings)?.isTrusted ?? true;
 
   const allExtensions = annotateActiveExtensions(
     extensions,
@@ -667,6 +667,8 @@ export async function loadCliConfig(
       format: (argv.outputFormat ?? settings.output?.format) as OutputFormat,
     },
     useModelRouter,
+    enableMessageBusIntegration:
+      settings.tools?.enableMessageBusIntegration ?? false,
   });
 }
 
