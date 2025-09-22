@@ -358,6 +358,17 @@ class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
       };
     }
 
+    if (signal.aborted) {
+      return {
+        llmContent: 'Edit operation was cancelled by the user.',
+        returnDisplay: 'Edit operation was cancelled.',
+        error: {
+          message: 'Edit operation was cancelled by the user.',
+          type: ToolErrorType.USER_CANCELLED,
+        },
+      };
+    }
+
     try {
       this.ensureParentDirectoriesExist(this.params.file_path);
       await this.config
