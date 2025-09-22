@@ -16,6 +16,7 @@ import * as https from 'node:https';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { execSync } from 'node:child_process';
+import { loadExtension } from '../extension.js';
 
 function getGitHubToken(): string | undefined {
   return process.env['GITHUB_TOKEN'];
@@ -115,9 +116,29 @@ async function fetchFromGithub(
 export async function checkForExtensionUpdate(
   extension: GeminiCLIExtension,
   setExtensionUpdateState: (updateState: ExtensionUpdateState) => void,
+  cwd: string = process.cwd(),
 ): Promise<void> {
   setExtensionUpdateState(ExtensionUpdateState.CHECKING_FOR_UPDATES);
   const installMetadata = extension.installMetadata;
+  if (installMetadata?.type === 'local') {
+    const newExtension = loadExtension({
+      extensionDir: installMetadata.source,
+      workspaceDir: cwd,
+    });
+    if (!newExtension) {
+      console.error(
+        `Failed to check for update for local extension "${extension.name}". Could not load extension from source path: ${installMetadata.source}`,
+      );
+      setExtensionUpdateState(ExtensionUpdateState.ERROR);
+      return;
+    }
+    if (newExtension.config.version !== extension.version) {
+      setExtensionUpdateState(ExtensionUpdateState.UPDATE_AVAILABLE);
+      return;
+    }
+    setExtensionUpdateState(ExtensionUpdateState.UP_TO_DATE);
+    return;
+  }
   if (
     !installMetadata ||
     (installMetadata.type !== 'git' &&
