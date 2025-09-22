@@ -355,7 +355,7 @@ export function annotateActiveExtensions(
 /**
  * Asks users a prompt and awaits for a y/n response
  * @param prompt A yes/no prompt to ask the user
- * @returns Whether or not the user answers 'y' (yes)
+ * @returns Whether or not the user answers 'y' (yes). Defaults to 'yes' on enter.
  */
 async function promptForContinuation(prompt: string): Promise<boolean> {
   const readline = await import('node:readline');
@@ -367,7 +367,7 @@ async function promptForContinuation(prompt: string): Promise<boolean> {
   return new Promise((resolve) => {
     rl.question(prompt, (answer) => {
       rl.close();
-      resolve(answer.toLowerCase() === 'y');
+      resolve(['y', ''].includes(answer.trim().toLowerCase()));
     });
   });
 }
@@ -407,12 +407,12 @@ export async function installExtension(
     ) {
       tempDir = await ExtensionStorage.createTmpDir();
       try {
-        const tagName = await downloadFromGitHubRelease(
+        const result = await downloadFromGitHubRelease(
           installMetadata,
           tempDir,
         );
-        installMetadata.type = 'github-release';
-        installMetadata.releaseTag = tagName;
+        installMetadata.type = result.type;
+        installMetadata.releaseTag = result.tagName;
       } catch (_error) {
         await cloneFromGit(installMetadata, tempDir);
         installMetadata.type = 'git';
@@ -511,23 +511,39 @@ export async function installExtension(
 }
 
 async function requestConsent(extensionConfig: ExtensionConfig) {
+  const output: string[] = [];
   const mcpServerEntries = Object.entries(extensionConfig.mcpServers || {});
+  output.push('Extensions may introduce unexpected behavior.');
+  output.push(
+    'Ensure you have investigated the extension source and trust the author.',
+  );
+
   if (mcpServerEntries.length) {
-    console.info('This extension will run the following MCP servers: ');
+    output.push('This extension will run the following MCP servers:');
     for (const [key, mcpServer] of mcpServerEntries) {
       const isLocal = !!mcpServer.command;
-      console.info(
-        `  * ${key} (${isLocal ? 'local' : 'remote'}): ${mcpServer.description}`,
-      );
+      const source =
+        mcpServer.httpUrl ??
+        `${mcpServer.command || ''}${mcpServer.args ? ' ' + mcpServer.args.join(' ') : ''}`;
+      output.push(`  * ${key} (${isLocal ? 'local' : 'remote'}): ${source}`);
     }
-    console.info('The extension will append info to your gemini.md context');
-
-    const shouldContinue = await promptForContinuation(
-      'Do you want to continue? (y/n): ',
+  }
+  if (extensionConfig.contextFileName) {
+    output.push(
+      `This extension will append info to your gemini.md context using ${extensionConfig.contextFileName}`,
     );
-    if (!shouldContinue) {
-      throw new Error('Installation cancelled by user.');
-    }
+  }
+  if (extensionConfig.excludeTools) {
+    output.push(
+      `This extension will exclude the following core tools: ${extensionConfig.excludeTools}`,
+    );
+  }
+  console.info(output.join('\n'));
+  const shouldContinue = await promptForContinuation(
+    'Do you want to continue? [Y/n]: ',
+  );
+  if (!shouldContinue) {
+    throw new Error('Installation cancelled by user.');
   }
 }
 
