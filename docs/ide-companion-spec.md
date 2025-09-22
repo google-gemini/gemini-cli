@@ -30,24 +30,22 @@ For Gemini CLI to connect, it needs to discover which IDE instance it's running 
   ```json
   {
     "port": 12345,
-    "workspacePath": "/path/to/project1:/path/to/project2"
+    "workspacePath": "/path/to/project1:/path/to/project2",
+    "authToken": "a-very-secret-token",
+    "ideInfo": {
+      "name": "vscode",
+      "displayName": "VS Code"
+    }
   }
   ```
-  - `port` (number): The port of the MCP server.
-  - `workspacePath` (string): A list of all open workspace root paths, delimited by the OS-specific path separator (`:` for Linux/macOS, `;` for Windows). The CLI uses this path to ensure it's running in the same project folder that's open in the IDE. If the CLI's current working directory is not a sub-directory of `workspacePath`, the connection will be rejected. Your extension **MUST** provide the correct, absolute path(s) to the root of the open workspace(s).
-- **Tie-Breaking with Environment Variables (Recommended):** For the most reliable experience, your extension **SHOULD** both create the discovery file and set the `GEMINI_CLI_IDE_SERVER_PORT` and `GEMINI_CLI_IDE_WORKSPACE_PATH` environment variables in the integrated terminal. The file serves as the primary discovery mechanism, but the environment variables are crucial for tie-breaking. If a user has multiple IDE windows open for the same workspace, the CLI uses the `GEMINI_CLI_IDE_SERVER_PORT` variable to identify and connect to the correct window's server.
-  - For prototyping, you may opt to _only_ set the environment variables. However, this is not a robust solution for a production extension, as environment variables may not be reliably set in all terminal sessions (e.g., restored terminals), which can lead to connection failures.
-- **Authentication:** To secure the connection, the extension **SHOULD** generate a unique, secret token and include it in the discovery file. The CLI will then include this token in all requests to the MCP server.
-  - **Token Generation:** The extension should generate a random string to be used as a bearer token.
-  - **Discovery File Content:** The `authToken` field must be added to the JSON object in the discovery file:
-    ```json
-    {
-      "port": 12345,
-      "workspacePath": "/path/to/project",
-      "authToken": "a-very-secret-token"
-    }
-    ```
-  - **Request Authorization:** The CLI will read the `authToken` from the file and include it in the `Authorization` header for all HTTP requests to the MCP server (e.g., `Authorization: Bearer a-very-secret-token`). Your server **MUST** validate this token on every request and reject any that are unauthorized.
+  - `port` (number, required): The port of the MCP server.
+  - `workspacePath` (string, required): A list of all open workspace root paths, delimited by the OS-specific path separator (`:` for Linux/macOS, `;` for Windows). The CLI uses this path to ensure it's running in the same project folder that's open in the IDE. If the CLI's current working directory is not a sub-directory of `workspacePath`, the connection will be rejected. Your extension **MUST** provide the correct, absolute path(s) to the root of the open workspace(s).
+  - `authToken` (string, required): A secret token for securing the connection. The CLI will include this token in an `Authorization: Bearer <token>` header on all requests.
+  - `ideInfo` (object, required): Information about the IDE.
+    - `name` (string, required): A short, lowercase identifier for the IDE (e.g., `vscode`, `jetbrains`).
+    - `displayName` (string, required): A user-friendly name for the IDE (e.g., `VS Code`, `JetBrains IDE`).
+- **Authentication:** To secure the connection, the extension **MUST** generate a unique, secret token and include it in the discovery file. The CLI will then include this token in the `Authorization` header for all requests to the MCP server (e.g., `Authorization: Bearer a-very-secret-token`). Your server **MUST** validate this token on every request and reject any that are unauthorized.
+- **Tie-Breaking with Environment Variables (Recommended):** For the most reliable experience, your extension **SHOULD** both create the discovery file and set the `GEMINI_CLI_IDE_SERVER_PORT` environment variable in the integrated terminal. The file serves as the primary discovery mechanism, but the environment variable is crucial for tie-breaking. If a user has multiple IDE windows open for the same workspace, the CLI uses the `GEMINI_CLI_IDE_SERVER_PORT` variable to identify and connect to the correct window's server.
 
 ## II. The Context Interface
 
@@ -172,32 +170,7 @@ When the user rejects the changes (e.g., by closing the diff view without accept
   }
   ```
 
-## IV. Supporting Additional IDEs
-
-To add support for a new IDE, two main components in the Gemini CLI codebase need to be updated: the detection logic and the installer logic.
-
-### 1. IDE Detection (`@packages/core/src/ide/detect-ide.ts`)
-
-// TODO(skeshive): Determine whether we should discover the IDE via the port file
-
-The CLI must be able to identify when it is running inside a specific IDE's integrated terminal. This is primarily done by checking for unique environment variables. As a fallback, it can also inspect process information (like the command name) to help distinguish between IDEs if a unique environment variable is not available.
-
-- **Add to `DetectedIde` Enum:** First, add your new IDE to the `DetectedIde` enum.
-- **Update `detectIdeFromEnv`:** Add a check in this function for an environment variable specific to your IDE (e.g., `if (process.env['MY_IDE_VAR']) { return DetectedIde.MyIde; }`).
-- **Update `detectIde` (Optional):** If your IDE lacks a unique environment variable, you can add logic to the `detectIde` function to inspect `ideProcessInfo` (e.g., `ideProcessInfo.command`) as a secondary detection mechanism.
-
-### 2. Extension Installation (`@packages/core/src/ide/ide-installer.ts`)
-
-The CLI provides a command (`/ide install`) to help users automatically install the companion extension. While optional, implementing an `IdeInstaller` for your IDE is highly recommended to provide a seamless setup experience.
-
-- **Create an Installer Class:** Create a new class that implements the `IdeInstaller` interface.
-- **Implement `install()`:** The `install` method should:
-  1.  Locate the IDE's command-line executable. The `VsCodeInstaller` provides a good example of searching common installation paths for different operating systems.
-  2.  Execute the command to install the extension by its marketplace ID (e.g., `"path/to/my-ide-cli" --install-extension my-publisher.my-extension-id`).
-  3.  Return a result object indicating success or failure.
-- **Update `getIdeInstaller`:** Add a case to the `switch` statement in this factory function to return an instance of your new installer class when your `DetectedIde` enum is matched.
-
-## V. The Lifecycle Interface
+## IV. The Lifecycle Interface
 
 The extension **MUST** manage its resources and the discovery file correctly based on the IDE's lifecycle.
 

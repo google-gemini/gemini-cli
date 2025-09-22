@@ -16,10 +16,8 @@ export const IDE_DEFINITIONS = {
   vscodefork: { name: 'vscodefork', displayName: 'IDE' },
 } as const;
 
-export type IdeName = keyof typeof IDE_DEFINITIONS;
-
 export interface IdeInfo {
-  name: IdeName;
+  name: string;
   displayName: string;
 }
 
@@ -64,10 +62,20 @@ function verifyVSCode(
   return IDE_DEFINITIONS.vscodefork;
 }
 
-export function detectIde(ideProcessInfo: {
-  pid: number;
-  command: string;
-}): IdeInfo | undefined {
+export function detectIde(
+  ideProcessInfo: {
+    pid: number;
+    command: string;
+  },
+  ideInfoFromFile?: { name?: string; displayName?: string },
+): IdeInfo | undefined {
+  if (ideInfoFromFile?.name && ideInfoFromFile.displayName) {
+    return {
+      name: ideInfoFromFile.name,
+      displayName: ideInfoFromFile.displayName,
+    };
+  }
+
   // Only VSCode-based integrations are currently supported.
   if (process.env['TERM_PROGRAM'] !== 'vscode') {
     return undefined;
