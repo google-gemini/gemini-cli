@@ -28,7 +28,7 @@ import {
   getSettingsSchema,
 } from './settingsSchema.js';
 import { resolveEnvVarsInObject } from '../utils/envVarResolver.js';
-import { customDeepMerge } from '../utils/deepMerge.js';
+import { customDeepMerge, type MergeableObject } from '../utils/deepMerge.js';
 import { updateSettingsFilePreservingFormat } from '../utils/commentJson.js';
 import { disableExtension } from './extension.js';
 
@@ -69,6 +69,7 @@ const MIGRATION_MAP: Record<string, string> = {
   coreTools: 'tools.core',
   contextFileName: 'context.fileName',
   customThemes: 'ui.customThemes',
+  customWittyPhrases: 'ui.customWittyPhrases',
   debugKeystrokeLogging: 'general.debugKeystrokeLogging',
   disableAutoUpdate: 'general.disableAutoUpdate',
   disableUpdateNag: 'general.disableUpdateNag',
@@ -252,7 +253,28 @@ function migrateSettingsToV2(
 
   // Carry over any unrecognized keys
   for (const remainingKey of flatKeys) {
-    v2Settings[remainingKey] = flatSettings[remainingKey];
+    const existingValue = v2Settings[remainingKey];
+    const newValue = flatSettings[remainingKey];
+
+    if (
+      typeof existingValue === 'object' &&
+      existingValue !== null &&
+      !Array.isArray(existingValue) &&
+      typeof newValue === 'object' &&
+      newValue !== null &&
+      !Array.isArray(newValue)
+    ) {
+      const pathAwareGetStrategy = (path: string[]) =>
+        getMergeStrategyForPath([remainingKey, ...path]);
+      v2Settings[remainingKey] = customDeepMerge(
+        pathAwareGetStrategy,
+        {},
+        newValue as MergeableObject,
+        existingValue as MergeableObject,
+      );
+    } else {
+      v2Settings[remainingKey] = newValue;
+    }
   }
 
   return v2Settings;
