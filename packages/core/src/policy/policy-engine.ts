@@ -10,11 +10,13 @@ import {
   type PolicyEngineConfig,
   type PolicyRule,
   type SafetyCheckerRule,
+  type HookExecutionContext,
 } from './types.js';
 import { stableStringify } from './stable-stringify.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import type { CheckerRunner } from '../safety/checker-runner.js';
 import { SafetyCheckDecision } from '../safety/protocol.js';
+import type { HookExecutionRequest } from '../confirmation-bus/types.js';
 
 function ruleMatches(
   rule: PolicyRule | SafetyCheckerRule,
@@ -67,6 +69,7 @@ export class PolicyEngine {
   private readonly defaultDecision: PolicyDecision;
   private readonly nonInteractive: boolean;
   private readonly checkerRunner?: CheckerRunner;
+  private readonly allowHooks: boolean;
 
   constructor(config: PolicyEngineConfig = {}, checkerRunner?: CheckerRunner) {
     this.rules = (config.rules ?? []).sort(
@@ -78,6 +81,7 @@ export class PolicyEngine {
     this.defaultDecision = config.defaultDecision ?? PolicyDecision.ASK_USER;
     this.nonInteractive = config.nonInteractive ?? false;
     this.checkerRunner = checkerRunner;
+    this.allowHooks = config.allowHooks ?? true;
   }
 
   /**
@@ -204,6 +208,42 @@ export class PolicyEngine {
 
   getCheckers(): readonly SafetyCheckerRule[] {
     return this.checkers;
+  }
+
+  /**
+   * Check if a hook execution is allowed based on the configured policies.
+   */
+  checkHook(
+    request: HookExecutionRequest | HookExecutionContext,
+  ): PolicyDecision {
+    // If hooks are globally disabled, deny all hook executions
+    if (!this.allowHooks) {
+      return PolicyDecision.DENY;
+    }
+
+    const context: HookExecutionContext =
+      'input' in request
+        ? {
+            eventName: request.eventName,
+            hookSource:
+              (request.input['hook_source'] as
+                | 'project'
+                | 'user'
+                | 'system'
+                | 'extension') || 'project',
+            trustedFolder: request.input['trusted_folder'] as
+              | boolean
+              | undefined,
+          }
+        : request;
+
+    // In untrusted folders, deny project-level hooks
+    if (context.trustedFolder === false && context.hookSource === 'project') {
+      return PolicyDecision.DENY;
+    }
+
+    // Default: Allow hooks (they have their own internal security through deepFreeze)
+    return PolicyDecision.ALLOW;
   }
 
   private applyNonInteractiveMode(decision: PolicyDecision): PolicyDecision {

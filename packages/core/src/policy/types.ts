@@ -115,6 +115,12 @@ export interface SafetyCheckerRule {
   checker: SafetyCheckerConfig;
 }
 
+export interface HookExecutionContext {
+  eventName: string;
+  hookSource?: 'project' | 'user' | 'system' | 'extension';
+  trustedFolder?: boolean;
+}
+
 export interface PolicyEngineConfig {
   /**
    * List of policy rules to apply.
@@ -137,6 +143,13 @@ export interface PolicyEngineConfig {
    * When true, ASK_USER decisions become DENY.
    */
   nonInteractive?: boolean;
+
+  /**
+   * Whether to allow hooks to execute.
+   * When false, all hooks are denied.
+   * Defaults to true.
+   */
+  allowHooks?: boolean;
 }
 
 export interface PolicySettings {
