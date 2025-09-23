@@ -646,7 +646,11 @@ export class SubAgentScope {
       if (systemInstruction) {
         generationConfig.systemInstruction = systemInstruction;
       }
-
+      // TODO, only enable for pro and flash
+      generationConfig.thinkingConfig = {
+        includeThoughts: true,
+        thinkingBudget: -1,
+      };
       this.runtimeContext.setModel(this.modelConfig.model);
 
       return new GeminiChat(
