@@ -21,6 +21,7 @@ import {
   METRIC_CONTENT_RETRY_FAILURE_COUNT,
   METRIC_MODEL_ROUTING_LATENCY,
   METRIC_MODEL_ROUTING_FAILURE_COUNT,
+  METRIC_MODEL_SLASH_COMMAND_CALL_COUNT,
 } from './constants.js';
 import type { Config } from '../config/config.js';
 import type { ModelRoutingEvent, ModelSlashCommandEvent } from './types.js';
