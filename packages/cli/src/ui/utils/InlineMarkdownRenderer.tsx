@@ -6,7 +6,7 @@
 
 import React from 'react';
 import { Text } from 'ink';
-import { theme } from '../semantic-colors.js'; // Assuming this import path is correct
+import { theme } from '../semantic-colors.js';
 import stringWidth from 'string-width';
 
 interface RenderInlineProps {
@@ -42,12 +42,12 @@ const POTENTIAL_MARKDOWN_REGEX = /[*_~`<\\[]|(https?|ftp|mailto):/;
 const isPlainText = (text: string): boolean =>
   !POTENTIAL_MARKDOWN_REGEX.test(text);
 
-// Marker lengths for slicing
-const BOLD_MARKER_LENGTH = 2; // For "**"
-const ITALIC_MARKER_LENGTH = 1; // For "*" or "_"
-const STRIKETHROUGH_MARKER_LENGTH = 2; // For "~~"
-const UNDERLINE_TAG_START_LENGTH = 3; // For "<u>"
-const UNDERLINE_TAG_END_LENGTH = 4; // For "</u>"
+// Markers for slicing
+const BOLD_MARKER = '**';
+const ITALIC_MARKER = '*';
+const STRIKETHROUGH_MARKER = '~~';
+const UNDERLINE_TAG_START = '<u>';
+const UNDERLINE_TAG_END = '</u>';
 
 /**
  * The source of truth for all markdown rules.
@@ -115,49 +115,40 @@ interface MarkdownHandler {
   strip: (match: string) => string;
 }
 
+type TextStyle = {
+  bold?: boolean;
+  italic?: boolean;
+  strikethrough?: boolean;
+  underline?: boolean;
+};
+
+const createSimpleHandler = (
+  startMarker: string,
+  endMarker: string,
+  style: TextStyle,
+): MarkdownHandler => ({
+  render: (match, key) => (
+    <Text key={key} {...style}>
+      {extractSimpleContent(match, startMarker.length, endMarker.length)}
+    </Text>
+  ),
+  strip: (match) =>
+    extractSimpleContent(match, startMarker.length, endMarker.length),
+});
+
 /**
  * The map for all markdown operations.
  */
 const MARKDOWN_HANDLERS: Record<keyof MarkdownMatchGroups, MarkdownHandler> = {
-  bold: {
-    render: (match, key) => (
-      <Text key={key} bold>
-        {extractSimpleContent(match, BOLD_MARKER_LENGTH, BOLD_MARKER_LENGTH)}
-      </Text>
-    ),
-    strip: (match) =>
-      extractSimpleContent(match, BOLD_MARKER_LENGTH, BOLD_MARKER_LENGTH),
-  },
-  italic: {
-    render: (match, key) => (
-      <Text key={key} italic>
-        {extractSimpleContent(
-          match,
-          ITALIC_MARKER_LENGTH,
-          ITALIC_MARKER_LENGTH,
-        )}
-      </Text>
-    ),
-    strip: (match) =>
-      extractSimpleContent(match, ITALIC_MARKER_LENGTH, ITALIC_MARKER_LENGTH),
-  },
-  strike: {
-    render: (match, key) => (
-      <Text key={key} strikethrough>
-        {extractSimpleContent(
-          match,
-          STRIKETHROUGH_MARKER_LENGTH,
-          STRIKETHROUGH_MARKER_LENGTH,
-        )}
-      </Text>
-    ),
-    strip: (match) =>
-      extractSimpleContent(
-        match,
-        STRIKETHROUGH_MARKER_LENGTH,
-        STRIKETHROUGH_MARKER_LENGTH,
-      ),
-  },
+  bold: createSimpleHandler(BOLD_MARKER, BOLD_MARKER, {
+    bold: true,
+  }),
+  italic: createSimpleHandler(ITALIC_MARKER, ITALIC_MARKER, {
+    italic: true,
+  }),
+  strike: createSimpleHandler(STRIKETHROUGH_MARKER, STRIKETHROUGH_MARKER, {
+    strikethrough: true,
+  }),
   inlineCode: {
     render: (match, key) => (
       <Text key={key} color={theme.text.accent}>
@@ -179,23 +170,9 @@ const MARKDOWN_HANDLERS: Record<keyof MarkdownMatchGroups, MarkdownHandler> = {
     },
     strip: (match) => extractLinkContent(match).text,
   },
-  underline: {
-    render: (match, key) => (
-      <Text key={key} underline>
-        {extractSimpleContent(
-          match,
-          UNDERLINE_TAG_START_LENGTH,
-          UNDERLINE_TAG_END_LENGTH,
-        )}
-      </Text>
-    ),
-    strip: (match) =>
-      extractSimpleContent(
-        match,
-        UNDERLINE_TAG_START_LENGTH,
-        UNDERLINE_TAG_END_LENGTH,
-      ),
-  },
+  underline: createSimpleHandler(UNDERLINE_TAG_START, UNDERLINE_TAG_END, {
+    underline: true,
+  }),
   bareUrl: {
     render: (match, key) => (
       <Text key={key}>

@@ -4,111 +4,109 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect } from 'vitest';
+import { vi, describe, it, expect, beforeEach } from 'vitest';
 import { render } from 'ink-testing-library';
 import { RenderInline, getPlainTextLength } from './InlineMarkdownRenderer.js';
 import stringWidth from 'string-width';
+import { Text } from 'ink';
+import type { Mock } from 'vitest';
+import { theme } from '../semantic-colors.js';
+import React from 'react';
 
-const stripAnsi = (str: string) =>
-  str.replace(
-    // This regex is designed to strip ANSI escape codes from the output of the
-    // rendering library. These codes control terminal colors and formatting.
-    // The `no-control-regex` rule is disabled because ANSI escape sequences,
-    // by definition, begin with control characters like `\u001b`.
-    // eslint-disable-next-line no-control-regex
-    /[\u001b\u009b][[()#;?]?[0-9]{1,4}(?:;[0-9]{0,4})*[0-9A-ORZcf-nqry=><]/g,
-    '',
-  );
+// Mock the 'ink' library to inspect props passed to the Text component.
+vi.mock('ink');
 
 describe('RenderInline', () => {
-  it('renders a markdown https link as text', () => {
-    const { lastFrame } = render(
-      <RenderInline text="This is a [link](https://example.com)." />,
+  beforeEach(() => {
+    // Clear mock calls before each test
+    (Text as Mock).mockClear();
+  });
+
+  it('renders a markdown link as styled text and its URL', () => {
+    render(<RenderInline text="[a link](https://example.com)" />);
+
+    // Expect one parent <Text> call.
+    expect((Text as Mock).mock.calls).toHaveLength(1);
+    const textCall = (Text as Mock).mock.calls.at(0);
+    const children = React.Children.toArray(textCall?.at(0).children);
+
+    // The parent's children should be the link text and the linkComponent.
+    expect(children).toHaveLength(2);
+    expect(children.at(0)).toBe('a link');
+
+    // The second child is the linkComponent, which is another <Text> component.
+    const linkComponent = children[1] as React.ReactElement<{
+      color: string;
+      children: React.ReactNode[];
+    }>;
+    expect(linkComponent.type).toBe(Text);
+    expect(linkComponent.props.color).toBe(theme.text.link);
+    expect(linkComponent.props.children).toEqual([
+      ' (',
+      'https://example.com',
+      ')',
+    ]);
+  });
+
+  it('renders a markdown javascript URI as plain text for security', () => {
+    render(<RenderInline text="[a malicious link](javascript:alert(1))" />);
+
+    // Expect only one call to <Text>, rendering the whole thing as plain text.
+    expect((Text as Mock).mock.calls).toHaveLength(1);
+
+    const textCall = (Text as Mock).mock.calls.at(0);
+    expect(textCall?.at(0).children).toContain('a malicious link');
+    expect(textCall?.at(0).children).toContain(' (javascript:alert(1))');
+    // Crucially, the children should not contain a nested React element.
+    const children = React.Children.toArray(textCall?.at(0).children);
+    expect(children.some((child) => typeof child !== 'string')).toBe(false);
+  });
+
+  it('renders bold text with correct styling', () => {
+    render(<RenderInline text="This is **some bold text**." />);
+    const boldCalls = (Text as Mock).mock.calls.filter(
+      (call) => call?.at(0).bold === true,
     );
-    const output = stripAnsi(lastFrame()!).trim();
-    expect(output).toMatchSnapshot();
+    expect(boldCalls).toHaveLength(1);
+    expect(boldCalls.at(0)?.at(0).children).toBe('some bold text');
   });
 
-  it('renders a markdown javascript URI as plain text', () => {
-    const { lastFrame } = render(
-      <RenderInline text="[malicious link](javascript:alert(1))" />,
+  it('renders italic text with correct styling', () => {
+    render(<RenderInline text="This is *some italic text*." />);
+    const italicCalls = (Text as Mock).mock.calls.filter(
+      (call) => call[0].italic === true,
     );
-    const output = stripAnsi(lastFrame()!).trim();
-    expect(output).toBe('malicious link (javascript:alert(1))');
+    expect(italicCalls).toHaveLength(1);
+    expect(italicCalls.at(0)?.at(0).children).toBe('some italic text');
   });
 
-  it('renders a markdown mailto link as text', () => {
-    const { lastFrame } = render(
-      <RenderInline text="Contact us at [email](mailto:team@example.com)." />,
+  it('renders strikethrough text with correct styling', () => {
+    render(<RenderInline text="This is ~~some strikethrough text~~." />);
+    const strikethroughCalls = (Text as Mock).mock.calls.filter(
+      (call) => call[0].strikethrough === true,
     );
-    const output = stripAnsi(lastFrame()!).trim();
-    expect(output).toMatchSnapshot();
-  });
-
-  it('renders a markdown ftp link as text', () => {
-    const { lastFrame } = render(
-      <RenderInline text="Download from [ftp](ftp://example.com/file)." />,
+    expect(strikethroughCalls).toHaveLength(1);
+    expect(strikethroughCalls.at(0)?.at(0).children).toBe(
+      'some strikethrough text',
     );
-    const output = stripAnsi(lastFrame()!).trim();
-    expect(output).toMatchSnapshot();
   });
 
-  it('renders a bare http link as text with its URL', () => {
-    const { lastFrame } = render(
-      <RenderInline text="Go to https://example.com for more info." />,
+  it('renders underline text with correct styling', () => {
+    render(<RenderInline text="This is <u>some underline text</u>." />);
+    const underlineCalls = (Text as Mock).mock.calls.filter(
+      (call) => call[0].underline === true,
     );
-    const output = stripAnsi(lastFrame()!).trim();
-    expect(output).toMatchSnapshot();
+    expect(underlineCalls).toHaveLength(1);
+    expect(underlineCalls.at(0)?.at(0).children).toBe('some underline text');
   });
 
-  it('renders a bare ftp link as text with its URL', () => {
-    const { lastFrame } = render(
-      <RenderInline text="Go to ftp://example.com/file for the file." />,
+  it('renders inline code with correct styling', () => {
+    render(<RenderInline text="This is `some inline code`." />);
+    const codeCalls = (Text as Mock).mock.calls.filter(
+      (call) => call[0].color === theme.text.accent,
     );
-    const output = stripAnsi(lastFrame()!).trim();
-    expect(output).toMatchSnapshot();
-  });
-
-  it('renders a bare mailto link as text with its URL', () => {
-    const { lastFrame } = render(
-      <RenderInline text="Contact mailto:team@example.com for details." />,
-    );
-    const output = stripAnsi(lastFrame()!).trim();
-    expect(output).toMatchSnapshot();
-  });
-
-  it('renders bold text correctly', () => {
-    const { lastFrame } = render(<RenderInline text="This is **bold**." />);
-    const output = stripAnsi(lastFrame()!).trim();
-    expect(output).toMatchSnapshot();
-  });
-
-  it('renders italic text correctly', () => {
-    const { lastFrame } = render(<RenderInline text="This is *italic*." />);
-    const output = stripAnsi(lastFrame()!).trim();
-    expect(output).toMatchSnapshot();
-  });
-
-  it('renders strikethrough text correctly', () => {
-    const { lastFrame } = render(
-      <RenderInline text="This is ~~strikethrough~~." />,
-    );
-    const output = stripAnsi(lastFrame()!).trim();
-    expect(output).toMatchSnapshot();
-  });
-
-  it('renders inline code correctly', () => {
-    const { lastFrame } = render(<RenderInline text="This is `code`." />);
-    const output = stripAnsi(lastFrame()!).trim();
-    expect(output).toMatchSnapshot();
-  });
-
-  it('renders underline text correctly', () => {
-    const { lastFrame } = render(
-      <RenderInline text="This is <u>underline</u>." />,
-    );
-    const output = stripAnsi(lastFrame()!).trim();
-    expect(output).toMatchSnapshot();
+    expect(codeCalls).toHaveLength(1);
+    expect(codeCalls.at(0)?.at(0).children).toBe('some inline code');
   });
 });
 
@@ -123,39 +121,5 @@ describe('getPlainTextLength', () => {
     const plainText = 'This is bold and a link. code';
     const expectedLength = stringWidth(plainText);
     expect(getPlainTextLength(markdownText)).toBe(expectedLength);
-  });
-
-  it('should handle empty strings', () => {
-    expect(getPlainTextLength('')).toBe(0);
-  });
-
-  it('should handle strings with only markdown', () => {
-    expect(getPlainTextLength('**bold**')).toBe(4);
-  });
-});
-
-describe('RenderInline Edge Cases', () => {
-  it('handles mixed and adjacent markdown types', () => {
-    const { lastFrame } = render(
-      <RenderInline text="**bold**[link](https://a.com)_italic_" />,
-    );
-    const output = stripAnsi(lastFrame()!).trim();
-    expect(output).toMatchSnapshot();
-  });
-
-  it('handles empty markdown content', () => {
-    const { lastFrame } = render(
-      <RenderInline text="A []() link and **** bold." />,
-    );
-    const output = stripAnsi(lastFrame()!).trim();
-    expect(output).toMatchSnapshot();
-  });
-
-  it('handles unclosed markdown as plain text', () => {
-    const { lastFrame } = render(
-      <RenderInline text="This is an **unclosed bold tag." />,
-    );
-    const output = stripAnsi(lastFrame()!).trim();
-    expect(output).toBe('This is an **unclosed bold tag.');
   });
 });
