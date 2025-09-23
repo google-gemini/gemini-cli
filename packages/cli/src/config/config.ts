@@ -390,8 +390,7 @@ export function isDebugMode(argv: CliArgs): boolean {
     argv.debug ||
     [process.env['DEBUG'], process.env['DEBUG_MODE']].some(
       (v) => v === 'true' || v === '1',
-    ) ||
-    false
+    )
   );
 }
 

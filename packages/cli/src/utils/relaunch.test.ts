@@ -18,7 +18,6 @@ import { RELAUNCH_EXIT_CODE } from './processUtils.js';
 import type { ChildProcess } from 'node:child_process';
 import { spawn } from 'node:child_process';
 
-// Mock child_process spawn
 vi.mock('node:child_process', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:child_process')>();
   return {
@@ -113,10 +112,8 @@ describe('relaunchAppInChildProcess', () => {
   const originalExecPath = process.execPath;
 
   beforeEach(() => {
-    // Clear all mocks first
     vi.clearAllMocks();
 
-    // Reset environment to clean state
     process.env = { ...originalEnv };
     delete process.env['GEMINI_CLI_NO_RELAUNCH'];
 
@@ -124,7 +121,6 @@ describe('relaunchAppInChildProcess', () => {
     process.argv = [...originalArgv];
     process.execPath = '/usr/bin/node';
 
-    // Mock process methods
     processExitSpy = vi.spyOn(process, 'exit').mockImplementation(() => {
       throw new Error('PROCESS_EXIT_CALLED');
     });
@@ -138,13 +134,11 @@ describe('relaunchAppInChildProcess', () => {
   });
 
   afterEach(() => {
-    // Restore original values
     process.env = { ...originalEnv };
     process.execArgv = [...originalExecArgv];
     process.argv = [...originalArgv];
     process.execPath = originalExecPath;
 
-    // Restore all spies
     processExitSpy.mockRestore();
     consoleErrorSpy.mockRestore();
     stdinPauseSpy.mockRestore();
@@ -306,7 +300,6 @@ describe('relaunchAppInChildProcess', () => {
       // Start the relaunch process
       const promise = relaunchAppInChildProcess([], []);
 
-      // Wait for the promise to reject
       await expect(promise).rejects.toThrow('PROCESS_EXIT_CALLED');
 
       // Should default to exit code 1
@@ -324,7 +317,6 @@ function createMockChildProcess(
 ): ChildProcess {
   const mockChild = new EventEmitter() as ChildProcess;
 
-  // Add minimal ChildProcess properties to satisfy the interface
   Object.assign(mockChild, {
     stdin: null,
     stdout: null,
@@ -343,7 +335,6 @@ function createMockChildProcess(
     ref: vi.fn(),
   });
 
-  // Don't auto-close by default to give tests more control
   if (autoClose) {
     setImmediate(() => {
       mockChild.emit('close', exitCode);
