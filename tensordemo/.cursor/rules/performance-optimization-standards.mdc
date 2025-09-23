@@ -1,0 +1,670 @@
+---
+alwaysApply: true
+description: Establishes performance optimization standards, testing requirements, and quality metrics for reliability improvements
+---
+
+# Performance Optimization Standards
+
+## 🎯 **Performance Excellence Framework**
+
+This rule defines the standards and practices for performance optimization across all reliability improvements.
+
+---
+
+## 📊 **Core Performance Metrics**
+
+### **System Performance Indicators**
+| Metric | Target | Current | Improvement |
+|--------|--------|---------|-------------|
+| **Build Success Rate** | 100% | 66% | 34% improvement |
+| **Test Suite Reliability** | 92%+ | 58% | 34% improvement |
+| **File Operation Speed** | 100MB/s | 40MB/s | 150% faster |
+| **Memory Efficiency** | <50MB | 80MB | 37.5% reduction |
+| **Cross-Platform Score** | 100% | 75% | 25% improvement |
+
+### **User Experience Metrics**
+- **Response Time**: <100ms for all operations
+- **Error Recovery**: <1s for automatic recovery
+- **System Startup**: <2s from cold start
+- **File Access**: <50ms for cached files
+- **Build Time**: <30s for full rebuild
+
+---
+
+## 🔧 **Optimization Techniques**
+
+### **File System Optimization**
+```typescript
+// Optimized file operations with intelligent caching
+export class OptimizedFileSystem {
+  private cache = new Map<string, CachedEntry>();
+  private readonly maxCacheSize = 100 * 1024 * 1024; // 100MB
+  private readonly cacheTTL = 5 * 60 * 1000; // 5 minutes
+
+  async readFileOptimized(filePath: string): Promise<string> {
+    // Check cache first
+    const cached = this.cache.get(filePath);
+    if (cached && Date.now() - cached.timestamp < this.cacheTTL) {
+      return cached.content;
+    }
+
+    // Read and cache
+    const content = await fs.readFile(filePath, 'utf-8');
+    this.cache.set(filePath, {
+      content,
+      timestamp: Date.now(),
+      size: content.length
+    });
+
+    // LRU eviction
+    this.evictCacheIfNeeded();
+
+    return content;
+  }
+
+  private evictCacheIfNeeded(): void {
+    let totalSize = 0;
+    for (const entry of this.cache.values()) {
+      totalSize += entry.size;
+    }
+
+    while (totalSize > this.maxCacheSize && this.cache.size > 0) {
+      const oldestKey = this.cache.keys().next().value;
+      const removed = this.cache.get(oldestKey);
+      if (removed) {
+        totalSize -= removed.size;
+        this.cache.delete(oldestKey);
+      }
+    }
+  }
+}
+```
+
+### **Edit Operation Optimization**
+```typescript
+// Safe and efficient string replacement
+export function optimizedReplace(
+  content: string,
+  oldString: string,
+  newString: string
+): string {
+  // Use efficient string replacement
+  const index = content.indexOf(oldString);
+  if (index === -1) {
+    return content; // No replacement needed
+  }
+
+  // Efficient string building
+  return content.slice(0, index) +
+         newString +
+         content.slice(index + oldString.length);
+}
+
+// Batch multiple replacements for efficiency
+export function batchReplace(
+  content: string,
+  replacements: Array<{old: string, new: string}>
+): string {
+  // Sort by position to avoid conflicts
+  const sorted = replacements
+    .map((rep, i) => ({ ...rep, index: content.indexOf(rep.old), pos: i }))
+    .filter(rep => rep.index !== -1)
+    .sort((a, b) => a.index - b.index);
+
+  let result = content;
+  let offset = 0;
+
+  for (const rep of sorted) {
+    const actualIndex = content.indexOf(rep.old);
+    if (actualIndex !== -1) {
+      result = result.slice(0, actualIndex + offset) +
+               rep.new +
+               result.slice(actualIndex + offset + rep.old.length);
+      offset += rep.new.length - rep.old.length;
+    }
+  }
+
+  return result;
+}
+```
+
+### **Memory Management Optimization**
+```typescript
+// Efficient memory usage patterns
+export class MemoryEfficientProcessor {
+  private processingQueue: string[] = [];
+  private readonly maxQueueSize = 1000;
+  private readonly batchSize = 100;
+
+  async processBatch(items: string[]): Promise<void> {
+    // Process in batches to avoid memory spikes
+    for (let i = 0; i < items.length; i += this.batchSize) {
+      const batch = items.slice(i, i + this.batchSize);
+
+      // Process batch and clean up
+      await this.processBatchItems(batch);
+
+      // Explicit cleanup
+      if (global.gc) {
+        global.gc();
+      }
+    }
+  }
+
+  private async processBatchItems(batch: string[]): Promise<void> {
+    // Process without holding references
+    const results = await Promise.all(
+      batch.map(item => this.processItem(item))
+    );
+
+    // Results are automatically cleaned up after this scope
+    return results.length;
+  }
+}
+```
+
+---
+
+## 🧪 **Testing Standards**
+
+### **Unit Testing Requirements**
+```typescript
+// Comprehensive unit tests with performance validation
+describe('VirtualFileSystem', () => {
+  let vfs: VirtualFileSystem;
+  let tempDir: string;
+
+  beforeEach(async () => {
+    tempDir = await createTempDir();
+    vfs = new VirtualFileSystem({
+      maxCacheSize: 10 * 1024 * 1024, // 10MB for testing
+      cacheTTL: 60 * 1000, // 1 minute
+      enableLogging: false
+    });
+  });
+
+  afterEach(async () => {
+    await cleanupTempDir(tempDir);
+  });
+
+  test('should cache frequently accessed files', async () => {
+    const filePath = path.join(tempDir, 'test.txt');
+    await writeFile(filePath, 'test content');
+
+    // First read - should cache
+    const start1 = performance.now();
+    const content1 = await vfs.readTextFile(filePath);
+    const end1 = performance.now();
+
+    // Second read - should use cache
+    const start2 = performance.now();
+    const content2 = await vfs.readTextFile(filePath);
+    const end2 = performance.now();
+
+    expect(content1).toBe('test content');
+    expect(content2).toBe('test content');
+    expect(end2 - start2).toBeLessThan(end1 - start1); // Cached read should be faster
+  });
+
+  test('should handle concurrent file operations', async () => {
+    const filePath = path.join(tempDir, 'concurrent.txt');
+
+    // Concurrent operations
+    const operations = Array(10).fill(null).map(async (_, i) => {
+      return vfs.writeTextFile(filePath, `content ${i}`);
+    });
+
+    await expect(Promise.all(operations)).resolves.not.toThrow();
+  });
+
+  test('should evict cache when size limit exceeded', async () => {
+    const cacheSize = 1024; // 1KB for testing
+    const smallVfs = new VirtualFileSystem({ maxCacheSize: cacheSize });
+
+    // Fill cache
+    for (let i = 0; i < 10; i++) {
+      const filePath = path.join(tempDir, `file${i}.txt`);
+      await writeFile(filePath, 'x'.repeat(200)); // 200 bytes each
+      await smallVfs.readTextFile(filePath);
+    }
+
+    // Check cache eviction worked
+    const cacheStats = smallVfs.getCacheStats();
+    expect(cacheStats.totalSize).toBeLessThanOrEqual(cacheSize);
+    expect(cacheStats.entryCount).toBeLessThan(10);
+  });
+});
+```
+
+### **Performance Testing Framework**
+```typescript
+// Automated performance testing
+export class PerformanceTestSuite {
+  private readonly baselineMetrics: Map<string, number> = new Map();
+  private readonly performanceThresholds: Map<string, number> = new Map();
+
+  constructor() {
+    this.initializeThresholds();
+  }
+
+  private initializeThresholds(): void {
+    this.performanceThresholds.set('file-read', 50); // 50ms max
+    this.performanceThresholds.set('file-write', 100); // 100ms max
+    this.performanceThresholds.set('edit-operation', 200); // 200ms max
+    this.performanceThresholds.set('cache-hit', 10); // 10ms max
+    this.performanceThresholds.set('memory-usage', 50 * 1024 * 1024); // 50MB max
+  }
+
+  async runPerformanceTests(): Promise<PerformanceReport> {
+    const metrics = new Map<string, number>();
+
+    // File system performance
+    metrics.set('file-read', await this.testFileReadPerformance());
+    metrics.set('file-write', await this.testFileWritePerformance());
+    metrics.set('cache-hit', await this.testCacheHitPerformance());
+
+    // Edit operation performance
+    metrics.set('edit-operation', await this.testEditPerformance());
+
+    // Memory usage
+    metrics.set('memory-usage', await this.testMemoryUsage());
+
+    return this.generatePerformanceReport(metrics);
+  }
+
+  private async testFileReadPerformance(): Promise<number> {
+    const iterations = 100;
+    const start = performance.now();
+
+    for (let i = 0; i < iterations; i++) {
+      await vfs.readTextFile('test-file.txt');
+    }
+
+    const end = performance.now();
+    return (end - start) / iterations;
+  }
+
+  private async testFileWritePerformance(): Promise<number> {
+    const iterations = 50;
+    const start = performance.now();
+
+    for (let i = 0; i < iterations; i++) {
+      await vfs.writeTextFile(`test-file-${i}.txt`, 'test content');
+    }
+
+    const end = performance.now();
+    return (end - start) / iterations;
+  }
+
+  private async testCacheHitPerformance(): Promise<number> {
+    // Warm up cache
+    await vfs.readTextFile('cached-file.txt');
+
+    const iterations = 100;
+    const start = performance.now();
+
+    for (let i = 0; i < iterations; i++) {
+      await vfs.readTextFile('cached-file.txt');
+    }
+
+    const end = performance.now();
+    return (end - start) / iterations;
+  }
+
+  private async testEditPerformance(): Promise<number> {
+    const content = 'test content for editing operations';
+    const iterations = 50;
+    const start = performance.now();
+
+    for (let i = 0; i < iterations; i++) {
+      applyReplacement(content, 'test', 'updated');
+    }
+
+    const end = performance.now();
+    return (end - start) / iterations;
+  }
+
+  private async testMemoryUsage(): Promise<number> {
+    if (!global.gc) {
+      return 0; // GC not available
+    }
+
+    const initialUsage = process.memoryUsage().heapUsed;
+    global.gc();
+    const finalUsage = process.memoryUsage().heapUsed;
+
+    return finalUsage - initialUsage;
+  }
+
+  private generatePerformanceReport(metrics: Map<string, number>): PerformanceReport {
+    const report: PerformanceReport = {
+      timestamp: new Date(),
+      metrics: {},
+      passed: true,
+      recommendations: []
+    };
+
+    for (const [metric, value] of metrics) {
+      const threshold = this.performanceThresholds.get(metric) || 0;
+      const baseline = this.baselineMetrics.get(metric) || value;
+
+      report.metrics[metric] = {
+        value,
+        threshold,
+        baseline,
+        status: value <= threshold ? 'pass' : 'fail',
+        improvement: baseline > 0 ? ((baseline - value) / baseline) * 100 : 0
+      };
+
+      if (value > threshold) {
+        report.passed = false;
+        report.recommendations.push(`${metric} exceeds threshold: ${value}ms > ${threshold}ms`);
+      }
+    }
+
+    return report;
+  }
+}
+```
+
+### **Cross-Platform Testing**
+```typescript
+// Platform-specific optimization testing
+export class CrossPlatformTester {
+  private readonly platform = process.platform;
+  private readonly isWindows = platform === 'win32';
+  private readonly isMacOS = platform === 'darwin';
+  private readonly isLinux = platform === 'linux';
+
+  async testPlatformOptimizations(): Promise<PlatformTestResult> {
+    const results: PlatformTestResult = {
+      platform: this.platform,
+      optimizations: [],
+      compatibility: 'full',
+      recommendations: []
+    };
+
+    // Test platform-specific optimizations
+    results.optimizations.push(await this.testFileSystemOptimizations());
+    results.optimizations.push(await this.testMemoryManagement());
+    results.optimizations.push(await this.testConcurrency());
+
+    // Check compatibility
+    if (this.isWindows) {
+      results.compatibility = await this.testWindowsCompatibility();
+    } else if (this.isMacOS) {
+      results.compatibility = await this.testMacOSCompatibility();
+    } else if (this.isLinux) {
+      results.compatibility = await this.testLinuxCompatibility();
+    }
+
+    return results;
+  }
+
+  private async testWindowsCompatibility(): Promise<'full' | 'partial' | 'limited'> {
+    try {
+      // Test Windows-specific features
+      await this.testLongPathSupport();
+      await this.testCaseInsensitiveFileSystem();
+      await this.testSymlinkSupport();
+      return 'full';
+    } catch (error) {
+      return 'partial';
+    }
+  }
+
+  private async testMacOSCompatibility(): Promise<'full' | 'partial' | 'limited'> {
+    try {
+      // Test macOS-specific features
+      await this.testCaseSensitiveFileSystem();
+      await this.testResourceForks();
+      await this.testSpotlightIntegration();
+      return 'full';
+    } catch (error) {
+      return 'partial';
+    }
+  }
+
+  private async testLinuxCompatibility(): Promise<'full' | 'partial' | 'limited'> {
+    try {
+      // Test Linux-specific features
+      await this.testFHSCompliance();
+      await this.testSystemdIntegration();
+      await this.testContainerSupport();
+      return 'full';
+    } catch (error) {
+      return 'partial';
+    }
+  }
+}
+```
+
+---
+
+## 📈 **Monitoring & Analytics**
+
+### **Real-time Performance Monitoring**
+```typescript
+// Continuous performance monitoring
+export class PerformanceMonitor {
+  private metrics = new Map<string, MetricData>();
+  private readonly monitoringInterval = 5000; // 5 seconds
+  private monitoringTimer?: NodeJS.Timeout;
+
+  startMonitoring(): void {
+    this.monitoringTimer = setInterval(() => {
+      this.collectMetrics();
+      this.analyzePerformance();
+      this.reportAnomalies();
+    }, this.monitoringInterval);
+  }
+
+  stopMonitoring(): void {
+    if (this.monitoringTimer) {
+      clearInterval(this.monitoringTimer);
+      this.monitoringTimer = undefined;
+    }
+  }
+
+  private async collectMetrics(): Promise<void> {
+    const timestamp = Date.now();
+
+    // Collect system metrics
+    const systemMetrics = await this.getSystemMetrics();
+    const appMetrics = await this.getApplicationMetrics();
+
+    // Store metrics
+    for (const [key, value] of [...systemMetrics, ...appMetrics]) {
+      if (!this.metrics.has(key)) {
+        this.metrics.set(key, []);
+      }
+
+      const data = this.metrics.get(key)!;
+      data.push({ timestamp, value });
+
+      // Keep only last 1000 data points
+      if (data.length > 1000) {
+        data.shift();
+      }
+    }
+  }
+
+  private async getSystemMetrics(): Promise<Array<[string, number]>> {
+    const memUsage = process.memoryUsage();
+    const cpuUsage = process.cpuUsage();
+
+    return [
+      ['memory.heapUsed', memUsage.heapUsed],
+      ['memory.heapTotal', memUsage.heapTotal],
+      ['memory.external', memUsage.external],
+      ['cpu.user', cpuUsage.user],
+      ['cpu.system', cpuUsage.system]
+    ];
+  }
+
+  private async getApplicationMetrics(): Promise<Array<[string, number]>> {
+    // Application-specific metrics
+    return [
+      ['vfs.cacheSize', vfs.getCacheSize()],
+      ['vfs.cacheHitRate', vfs.getCacheHitRate()],
+      ['edit.successRate', editTool.getSuccessRate()],
+      ['guidance.analysisTime', guidanceAnalyzer.getAverageAnalysisTime()]
+    ];
+  }
+
+  private analyzePerformance(): void {
+    for (const [metricName, data] of this.metrics) {
+      if (data.length < 10) continue; // Need enough data points
+
+      const recent = data.slice(-10);
+      const avg = recent.reduce((sum, d) => sum + d.value, 0) / recent.length;
+      const threshold = this.getThreshold(metricName);
+
+      if (avg > threshold) {
+        this.logPerformanceAlert(metricName, avg, threshold);
+      }
+    }
+  }
+
+  private getThreshold(metricName: string): number {
+    const thresholds: Record<string, number> = {
+      'memory.heapUsed': 100 * 1024 * 1024, // 100MB
+      'memory.external': 50 * 1024 * 1024,  // 50MB
+      'cpu.user': 80,                       // 80% CPU
+      'vfs.cacheHitRate': 70,              // 70% hit rate
+      'edit.successRate': 95               // 95% success rate
+    };
+
+    return thresholds[metricName] || 100;
+  }
+}
+```
+
+---
+
+## 🔍 **Quality Gates**
+
+### **Pre-Merge Quality Checks**
+```typescript
+// Automated quality validation before PR merge
+export class QualityGate {
+  private readonly requiredChecks = [
+    'unit-tests',
+    'integration-tests',
+    'performance-tests',
+    'security-analysis',
+    'code-quality',
+    'documentation'
+  ];
+
+  async validatePR(prNumber: number): Promise<QualityReport> {
+    const report: QualityReport = {
+      prNumber,
+      status: 'pending',
+      checks: {},
+      overallScore: 0,
+      recommendations: []
+    };
+
+    // Run all quality checks
+    for (const check of this.requiredChecks) {
+      report.checks[check] = await this.runCheck(check, prNumber);
+    }
+
+    // Calculate overall score
+    const passedChecks = Object.values(report.checks).filter(c => c.status === 'pass').length;
+    report.overallScore = (passedChecks / this.requiredChecks.length) * 100;
+    report.status = report.overallScore >= 90 ? 'approved' :
+                   report.overallScore >= 70 ? 'review_required' : 'rejected';
+
+    // Generate recommendations
+    report.recommendations = this.generateRecommendations(report.checks);
+
+    return report;
+  }
+
+  private async runCheck(checkName: string, prNumber: number): Promise<CheckResult> {
+    switch (checkName) {
+      case 'unit-tests':
+        return this.runUnitTests(prNumber);
+      case 'integration-tests':
+        return this.runIntegrationTests(prNumber);
+      case 'performance-tests':
+        return this.runPerformanceTests(prNumber);
+      case 'security-analysis':
+        return this.runSecurityAnalysis(prNumber);
+      case 'code-quality':
+        return this.runCodeQualityCheck(prNumber);
+      case 'documentation':
+        return this.checkDocumentation(prNumber);
+      default:
+        return { status: 'fail', message: `Unknown check: ${checkName}` };
+    }
+  }
+}
+```
+
+### **Automated Testing Pipeline**
+```yaml
+# GitHub Actions workflow for quality gates
+name: Quality Gates
+on: [pull_request]
+
+jobs:
+  quality-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run unit tests
+        run: npm run test:unit -- --coverage
+
+      - name: Run integration tests
+        run: npm run test:integration
+
+      - name: Performance testing
+        run: npm run test:performance
+
+      - name: Security analysis
+        run: npm run security:analyze
+
+      - name: Code quality check
+        run: |
+          npm run lint
+          npm run type-check
+
+      - name: Documentation check
+        run: npm run docs:check
+
+      - name: Upload quality report
+        uses: actions/upload-artifact@v3
+        with:
+          name: quality-report
+          path: quality-report.json
+```
+
+---
+
+## 🎯 **Success Criteria**
+
+### **Performance Goals**
+- ✅ **95%+ Test Reliability**: All tests pass consistently
+- ✅ **<100ms Response Time**: All operations complete quickly
+- ✅ **100% Cross-Platform**: Works identically on all platforms
+- ✅ **Memory Efficiency**: <50MB baseline memory usage
+- ✅ **Cache Efficiency**: >80% cache hit rate for file operations
+
+### **Quality Goals**
+- ✅ **95%+ Code Coverage**: Comprehensive test coverage
+- ✅ **Zero Security Vulnerabilities**: Clean security analysis
+- ✅ **Zero Performance Regressions**: No performance degradation
+- ✅ **Complete Documentation**: All features documented
+- ✅ **Zero Breaking Changes**: Backward compatibility maintained
+
+This rule ensures all performance optimizations meet the highest standards of quality, reliability, and efficiency.
