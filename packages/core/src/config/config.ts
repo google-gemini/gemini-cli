@@ -124,6 +124,7 @@ export interface GeminiCLIExtension {
 export interface ExtensionInstallMetadata {
   source: string;
   type: 'git' | 'local' | 'link' | 'github-release';
+  releaseTag?: string; // Only present for github-release installs.
   ref?: string;
   autoUpdate?: boolean;
 }
@@ -250,6 +251,7 @@ export interface ConfigParameters {
   policyEngineConfig?: PolicyEngineConfig;
   output?: OutputSettings;
   useModelRouter?: boolean;
+  enableMessageBusIntegration?: boolean;
 }
 
 export class Config {
@@ -339,6 +341,7 @@ export class Config {
   private readonly policyEngine: PolicyEngine;
   private readonly outputSettings: OutputSettings;
   private readonly useModelRouter: boolean;
+  private readonly enableMessageBusIntegration: boolean;
 
   constructor(params: ConfigParameters) {
     this.sessionId = params.sessionId;
@@ -426,6 +429,8 @@ export class Config {
     this.useSmartEdit = params.useSmartEdit ?? true;
     this.useWriteTodos = params.useWriteTodos ?? false;
     this.useModelRouter = params.useModelRouter ?? false;
+    this.enableMessageBusIntegration =
+      params.enableMessageBusIntegration ?? false;
     this.extensionManagement = params.extensionManagement ?? true;
     this.storage = new Storage(this.targetDir);
     this.enablePromptCompletion = params.enablePromptCompletion ?? false;
@@ -985,6 +990,10 @@ export class Config {
     return this.policyEngine;
   }
 
+  getEnableMessageBusIntegration(): boolean {
+    return this.enableMessageBusIntegration;
+  }
+
   async createToolRegistry(): Promise<ToolRegistry> {
     const registry = new ToolRegistry(this, this.eventEmitter);
 
@@ -1018,7 +1027,24 @@ export class Config {
       }
 
       if (isEnabled) {
-        registry.registerTool(new ToolClass(...args));
+        // Pass message bus to tools when feature flag is enabled
+        // This first implementation is only focused on the general case of
+        // the tool registry.
+        const messageBusEnabled = this.getEnableMessageBusIntegration();
+        if (this.debugMode && messageBusEnabled) {
+          console.log(
+            `[DEBUG] enableMessageBusIntegration setting: ${messageBusEnabled}`,
+          );
+        }
+        const toolArgs = messageBusEnabled
+          ? [...args, this.getMessageBus()]
+          : args;
+        if (this.debugMode && messageBusEnabled) {
+          console.log(
+            `[DEBUG] Registering ${className} with messageBus: ${messageBusEnabled ? 'YES' : 'NO'}`,
+          );
+        }
+        registry.registerTool(new ToolClass(...toolArgs));
       }
     };
 

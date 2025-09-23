@@ -39,7 +39,7 @@ on:
 
 jobs:
   release:
-    runs-on: 'ubuntu-latest'
+    runs-on: 'self-hosted'
     permissions:
       contents: 'write'
       packages: 'write'
@@ -77,6 +77,7 @@ jobs:
       - name: 'Publish Release'
         uses: './.github/actions/publish-release'
         with:
+          force-skip-tests: '${{ github.event.inputs.force_skip_tests }}'
           release-version: '${{ steps.release_info.outputs.RELEASE_VERSION }}'
           release-tag: '${{ github.event.inputs.version }}'
           npm-tag: '${{ github.event.inputs.npm_channel }}'
