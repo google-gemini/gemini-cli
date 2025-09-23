@@ -13,6 +13,13 @@ on:
   pull_request_target:
     types: ['labeled']
   merge_group:
+  workflow_dispatch:
+    inputs:
+      branch_ref:
+        description: 'Branch to run on'
+        required: true
+        default: 'main'
+        type: string
 
 concurrency:
   group: '${{ github.workflow }}-${{ github.head_ref || github.ref }}'

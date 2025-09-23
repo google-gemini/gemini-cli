@@ -11,6 +11,12 @@ on:
       - 'release/**'
   merge_group:
   workflow_dispatch:
+    inputs:
+      branch_ref:
+        description: 'Branch to run on'
+        required: true
+        default: 'main'
+        type: string
 
 concurrency:
   group: '${{ github.workflow }}-${{ github.head_ref || github.ref }}'
