@@ -76,6 +76,7 @@ import {
   recordContentRetry,
   recordContentRetryFailure,
   recordModelRoutingMetrics,
+  recordModelSlashCommand,
 } from './metrics.js';
 import { isTelemetrySdkInitialized } from './sdk.js';
 import type { UiEvent } from './uiTelemetry.js';
@@ -721,7 +722,7 @@ export function logModelSlashCommand(
     attributes,
   };
   logger.emit(logRecord);
-  recordModelRoutingMetrics(config, event);
+  recordModelSlashCommand(config, event);
 }
 
 export function logExtensionInstallEvent(
