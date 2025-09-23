@@ -107,6 +107,7 @@ describe('useSlashCommandProcessor', () => {
   const mockLoadHistory = vi.fn();
   const mockOpenThemeDialog = vi.fn();
   const mockOpenAuthDialog = vi.fn();
+  const mockOpenModelDialog = vi.fn();
   const mockSetQuittingMessages = vi.fn();
 
   const mockConfig = makeFakeConfig({});
@@ -147,6 +148,7 @@ describe('useSlashCommandProcessor', () => {
           openEditorDialog: vi.fn(),
           openPrivacyNotice: vi.fn(),
           openSettingsDialog: vi.fn(),
+          openModelDialog: mockOpenModelDialog,
           quit: mockSetQuittingMessages,
           setDebugMessage: vi.fn(),
           toggleCorgiMode: vi.fn(),
@@ -389,6 +391,21 @@ describe('useSlashCommandProcessor', () => {
       });
 
       expect(mockOpenThemeDialog).toHaveBeenCalled();
+    });
+
+    it('should handle "dialog: model" action', async () => {
+      const command = createTestCommand({
+        name: 'modelcmd',
+        action: vi.fn().mockResolvedValue({ type: 'dialog', dialog: 'model' }),
+      });
+      const result = setupProcessorHook([command]);
+      await waitFor(() => expect(result.current.slashCommands).toHaveLength(1));
+
+      await act(async () => {
+        await result.current.handleSlashCommand('/modelcmd');
+      });
+
+      expect(mockOpenModelDialog).toHaveBeenCalled();
     });
 
     it('should handle "load_history" action', async () => {

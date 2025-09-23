@@ -49,6 +49,7 @@ interface SlashCommandProcessorActions {
   openEditorDialog: () => void;
   openPrivacyNotice: () => void;
   openSettingsDialog: () => void;
+  openModelDialog: () => void;
   openPermissionsDialog: () => void;
   quit: (messages: HistoryItem[]) => void;
   setDebugMessage: (message: string) => void;
@@ -373,6 +374,9 @@ export const useSlashCommandProcessor = (
                       return { type: 'handled' };
                     case 'settings':
                       actions.openSettingsDialog();
+                      return { type: 'handled' };
+                    case 'model':
+                      actions.openModelDialog();
                       return { type: 'handled' };
                     case 'permissions':
                       actions.openPermissionsDialog();
