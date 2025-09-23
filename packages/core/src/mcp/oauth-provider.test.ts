@@ -39,6 +39,10 @@ import type {
 import { MCPOAuthProvider } from './oauth-provider.js';
 import type { OAuthToken } from './token-storage/types.js';
 import { MCPOAuthTokenStorage } from './oauth-token-storage.js';
+import type {
+  OAuthAuthorizationServerMetadata,
+  OAuthProtectedResourceMetadata,
+} from './oauth-utils.js';
 
 // Mock fetch globally
 const mockFetch = vi.fn();
@@ -330,7 +334,7 @@ describe('MCPOAuthProvider', () => {
     });
 
     it('should perform dynamic client registration when no client ID is provided but registration URL is provided', async () => {
-      const configWithoutClient = {
+      const configWithoutClient: MCPOAuthConfig = {
         ...mockConfig,
         registrationUrl: 'https://auth.example.com/register',
       };
@@ -405,7 +409,7 @@ describe('MCPOAuthProvider', () => {
     });
 
     it('should perform OAuth discovery and dynamic client registration when no client ID or registration URL provided', async () => {
-      const configWithoutClient = { ...mockConfig };
+      const configWithoutClient: MCPOAuthConfig = { ...mockConfig };
       delete configWithoutClient.clientId;
 
       const mockRegistrationResponse: OAuthClientRegistrationResponse = {
@@ -417,7 +421,8 @@ describe('MCPOAuthProvider', () => {
         token_endpoint_auth_method: 'none',
       };
 
-      const mockAuthServerMetadata = {
+      const mockAuthServerMetadata: OAuthAuthorizationServerMetadata = {
+        issuer: 'https://auth.example.com',
         authorization_endpoint: 'https://auth.example.com/authorize',
         token_endpoint: 'https://auth.example.com/token',
         registration_endpoint: 'https://auth.example.com/register',
@@ -492,15 +497,19 @@ describe('MCPOAuthProvider', () => {
     });
 
     it('should perform OAuth discovery once and dynamic client registration when no client ID, authorization URL or registration URL provided', async () => {
-      const configWithoutClientAndAuthorizationUrl = { ...mockConfig };
+      const configWithoutClientAndAuthorizationUrl: MCPOAuthConfig = {
+        ...mockConfig,
+      };
       delete configWithoutClientAndAuthorizationUrl.clientId;
       delete configWithoutClientAndAuthorizationUrl.authorizationUrl;
 
-      const mockResourceMetadata = {
+      const mockResourceMetadata: OAuthProtectedResourceMetadata = {
+        resource: 'https://api.example.com',
         authorization_servers: ['https://auth.example.com'],
       };
 
-      const mockAuthServerMetadata = {
+      const mockAuthServerMetadata: OAuthAuthorizationServerMetadata = {
+        issuer: 'https://auth.example.com',
         authorization_endpoint: 'https://auth.example.com/authorize',
         token_endpoint: 'https://auth.example.com/token',
         registration_endpoint: 'https://auth.example.com/register',

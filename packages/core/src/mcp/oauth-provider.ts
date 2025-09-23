@@ -684,15 +684,9 @@ export class MCPOAuthProvider {
         console.debug('→ Attempting dynamic client registration...');
 
         // Get the authorization server metadata for registration
-        const authServerMetadataUrl = new URL(
-          '/.well-known/oauth-authorization-server',
-          serverUrl,
-        ).toString();
-
         const authServerMetadata =
-          await OAuthUtils.fetchAuthorizationServerMetadata(
-            authServerMetadataUrl,
-          );
+          await OAuthUtils.discoverAuthorizationServerMetadata(serverUrl);
+
         if (!authServerMetadata) {
           throw new Error(
             'Failed to fetch authorization server metadata for client registration',
