@@ -39,6 +39,7 @@ export class McpClientManager {
     promptRegistry: PromptRegistry,
     debugMode: boolean,
     workspaceContext: WorkspaceContext,
+    private readonly version?: string,
     eventEmitter?: EventEmitter,
   ) {
     this.mcpServers = mcpServers;
@@ -78,6 +79,7 @@ export class McpClientManager {
           this.promptRegistry,
           this.workspaceContext,
           this.debugMode,
+          this.version,
         );
         this.clients.set(name, client);
 

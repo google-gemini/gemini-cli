@@ -413,6 +413,7 @@ export async function loadCliConfig(
   cwd: string = process.cwd(),
 ): Promise<Config> {
   const debugMode = isDebugMode(argv);
+  const version = await getCliVersion();
 
   const memoryImportFormat = settings.context?.importFormat || 'tree';
 
@@ -604,6 +605,7 @@ export async function loadCliConfig(
       : (settings.ui?.accessibility?.screenReader ?? false);
   return new Config({
     sessionId,
+    version,
     embeddingModel: DEFAULT_GEMINI_EMBEDDING_MODEL,
     sandbox: sandboxConfig,
     targetDir: cwd,

@@ -190,6 +190,7 @@ export interface SandboxConfig {
 
 export interface ConfigParameters {
   sessionId: string;
+  version?: string;
   embeddingModel?: string;
   sandbox?: SandboxConfig;
   targetDir: string;
@@ -261,6 +262,7 @@ export class Config {
   private toolRegistry!: ToolRegistry;
   private promptRegistry!: PromptRegistry;
   private readonly sessionId: string;
+  private readonly version: string | undefined;
   private fileSystemService: FileSystemService;
   private contentGeneratorConfig!: ContentGeneratorConfig;
   private contentGenerator!: ContentGenerator;
@@ -348,6 +350,7 @@ export class Config {
 
   constructor(params: ConfigParameters) {
     this.sessionId = params.sessionId;
+    this.version = params.version;
     this.embeddingModel =
       params.embeddingModel ?? DEFAULT_GEMINI_EMBEDDING_MODEL;
     this.fileSystemService = new StandardFileSystemService();
@@ -543,6 +546,10 @@ export class Config {
 
   getSessionId(): string {
     return this.sessionId;
+  }
+
+  getVersion(): string | undefined {
+    return this.version;
   }
 
   shouldLoadMemoryFromIncludeDirectories(): boolean {
