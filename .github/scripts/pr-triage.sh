@@ -32,12 +32,12 @@ process_pr() {
     # Only detect explicit closing keywords to avoid false positives
     # Matches: "Closes #123", "Fixes #456", "Resolves #789" (case-insensitive)
     if [[ -z "${ISSUE_NUMBER}" ]]; then
-        ISSUE_NUMBER=$(echo "${PR_BODY}" | grep -iE '(closes?|fixes?|resolves?) #[0-9]+' | grep -oE '#[0-9]+' | head -1 | sed 's/#//' 2>/dev/null || echo "")
+        ISSUE_NUMBER=$(printf '%s\n' "${PR_BODY}" | grep -iE '(closes?|fixes?|resolves?) #[0-9]+' | grep -oE '#[0-9]+' | head -1 | sed 's/#//' 2>/dev/null || echo "")
     fi
 
     # If no issue found with keyword + #<number>, try full GitHub issue URIs
     if [[ -z "${ISSUE_NUMBER}" ]]; then
-        ISSUE_NUMBER=$(echo "${PR_BODY}" | grep -iE 'https?://github.com/[^/]+/[^/]+/issues/[0-9]+' | head -1 | sed -E 's/.*issues\/([0-9]+).*/\1/' 2>/dev/null || echo "")
+        ISSUE_NUMBER=$(printf '%s\n' "${PR_BODY}" | grep -iE 'https?://github.com/[^/]+/[^/]+/issues/[0-9]+' | head -1 | sed -E 's/.*issues\/([0-9]+).*/\1/' 2>/dev/null || echo "")
     fi
 
 
