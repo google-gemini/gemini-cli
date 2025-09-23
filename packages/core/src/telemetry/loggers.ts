@@ -786,7 +786,7 @@ export function logExtensionDisable(
 
   const logger = logs.getLogger(SERVICE_NAME);
   const logRecord: LogRecord = {
-    body: `Enabled extension ${event.extension_name}`,
+    body: `Disabled extension ${event.extension_name}`,
     attributes,
   };
   logger.emit(logRecord);
