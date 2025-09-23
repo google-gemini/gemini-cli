@@ -37,6 +37,7 @@ import {
   type SettingsValue,
   TOGGLE_TYPES,
 } from '../../config/settingsSchema.js';
+import { useTranslation } from '../../i18n/useTranslation.js';
 
 interface SettingsDialogProps {
   settings: LoadedSettings;
@@ -53,6 +54,8 @@ export function SettingsDialog({
   onRestartRequest,
   availableTerminalHeight,
 }: SettingsDialogProps): React.JSX.Element {
+  const { t } = useTranslation('dialogs');
+
   // Get vim mode context to sync vim mode changes
   const { vimEnabled, toggleVimEnabled } = useVimMode();
 
@@ -749,7 +752,8 @@ export function SettingsDialog({
     >
       <Box flexDirection="column" flexGrow={1}>
         <Text bold={focusSection === 'settings'} wrap="truncate">
-          {focusSection === 'settings' ? '> ' : '  '}Settings
+          {focusSection === 'settings' ? '> ' : '  '}
+          {t('settings.title')}
         </Text>
         <Box height={1} />
         {showScrollUp && <Text color={theme.text.secondary}>▲</Text>}
@@ -876,7 +880,8 @@ export function SettingsDialog({
         {showScopeSelection && (
           <Box marginTop={1} flexDirection="column">
             <Text bold={focusSection === 'scope'} wrap="truncate">
-              {focusSection === 'scope' ? '> ' : '  '}Apply To
+              {focusSection === 'scope' ? '> ' : '  '}
+              {t('settings.applyTo')}
             </Text>
             <RadioButtonSelect
               items={scopeItems}
@@ -893,13 +898,13 @@ export function SettingsDialog({
 
         <Box height={1} />
         <Text color={theme.text.secondary}>
-          (Use Enter to select
-          {showScopeSelection ? ', Tab to change focus' : ''})
+          {showScopeSelection
+            ? t('settings.instructionsWithScope')
+            : t('settings.instructions')}
         </Text>
         {showRestartPrompt && (
           <Text color={theme.status.warning}>
-            To see changes, Gemini CLI must be restarted. Press r to exit and
-            apply changes now.
+            {t('settings.restartPrompt')}
           </Text>
         )}
       </Box>

@@ -7,10 +7,11 @@
 /** @vitest-environment jsdom */
 
 import { render } from 'ink-testing-library';
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll } from 'vitest';
 import { Help } from './Help.js';
 import type { SlashCommand } from '../commands/types.js';
 import { CommandKind } from '../commands/types.js';
+import '../../i18n/index.js';
 
 const mockCommands: readonly SlashCommand[] = [
   {
@@ -45,6 +46,15 @@ const mockCommands: readonly SlashCommand[] = [
 ];
 
 describe('Help Component', () => {
+  beforeAll(async () => {
+    // Ensure i18next is ready and has loaded resources
+    const i18next = (await import('../../i18n/index.js')).default;
+    // Wait for i18next to be fully initialized
+    if (!i18next.isInitialized) {
+      await i18next.init();
+    }
+  });
+
   it('should not render hidden commands', () => {
     const { lastFrame } = render(<Help commands={mockCommands} />);
     const output = lastFrame();
@@ -59,5 +69,58 @@ describe('Help Component', () => {
 
     expect(output).toContain('visible-child');
     expect(output).not.toContain('hidden-child');
+  });
+
+  it('renders basic help content', () => {
+    const { lastFrame } = render(<Help commands={mockCommands} />);
+    const output = lastFrame();
+
+    // Test i18n content
+    expect(output).toContain('Basics:');
+    expect(output).toContain('Commands:');
+    expect(output).toContain('Keyboard Shortcuts:');
+    expect(output).toContain('Add context: Use @ to specify files');
+    expect(output).toContain('Shell mode: Execute shell commands via !');
+    expect(output).toContain('shell command');
+    expect(output).toContain('Model Context Protocol command');
+  });
+
+  // Only test snapshots on Linux to avoid cross-platform differences
+  it('renders help component with mock commands (Linux only)', () => {
+    // Skip on non-Linux platforms to avoid cross-platform CI failures
+    if (process.platform !== 'linux') {
+      return;
+    }
+
+    const { lastFrame } = render(<Help commands={mockCommands} />);
+    expect(lastFrame()).toMatchSnapshot();
+  });
+
+  it('renders platform-specific shortcuts correctly', () => {
+    const { lastFrame } = render(<Help commands={mockCommands} />);
+    const output = lastFrame();
+
+    // Test platform-agnostic shortcuts
+    expect(output).toContain('Ctrl+C - Quit application');
+    expect(output).toContain('Ctrl+L - Clear the screen');
+    expect(output).toContain('Ctrl+Y - Toggle YOLO mode');
+    expect(output).toContain('Alt+Left/Right - Jump through words');
+
+    // Test platform-specific shortcuts
+    if (process.platform === 'win32') {
+      expect(output).toContain('Ctrl+Enter - New line');
+      expect(output).toContain('Ctrl+X - Open input in external editor');
+    } else if (process.platform === 'darwin') {
+      expect(output).toContain('Ctrl+J - New line');
+      expect(output).toContain(
+        'Ctrl+X / Meta+Enter - Open input in external editor',
+      );
+    } else {
+      // Linux and other platforms
+      expect(output).toContain(
+        'Ctrl+J - New line (Alt+Enter works for certain linux distros)',
+      );
+      expect(output).toContain('Ctrl+X - Open input in external editor');
+    }
   });
 });
