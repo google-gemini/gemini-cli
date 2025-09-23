@@ -27,14 +27,20 @@ describe('extensions install command', () => {
   });
 
   it('should fail if both git source and local path are provided', () => {
-    const validationParser = yargs([]).command(installCommand).fail(false);
+    const validationParser = yargs([])
+      .command(installCommand)
+      .fail(false)
+      .locale('en');
     expect(() =>
       validationParser.parse('install some-url --path /some/path'),
     ).toThrow('Arguments source and path are mutually exclusive');
   });
 
   it('should fail if both auto update and local path are provided', () => {
-    const validationParser = yargs([]).command(installCommand).fail(false);
+    const validationParser = yargs([])
+      .command(installCommand)
+      .fail(false)
+      .locale('en');
     expect(() =>
       validationParser.parse(
         'install some-url --path /some/path --auto-update',
