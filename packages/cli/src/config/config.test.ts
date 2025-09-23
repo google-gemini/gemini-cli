@@ -204,6 +204,149 @@ describe('parseArguments', () => {
     expect(argv.prompt).toBeUndefined();
   });
 
+  it('should convert positional query argument to prompt by default', async () => {
+    process.argv = ['node', 'script.js', 'Hi Gemini'];
+    const argv = await parseArguments({} as Settings);
+    expect(argv.query).toBe('Hi Gemini');
+    expect(argv.prompt).toBe('Hi Gemini');
+    expect(argv.promptInteractive).toBeUndefined();
+  });
+
+  it('should map @path to promptInteractive when it starts with @', async () => {
+    process.argv = ['node', 'script.js', '@path ./file.md'];
+    const argv = await parseArguments({} as Settings);
+    expect(argv.query).toBe('@path ./file.md');
+    expect(argv.promptInteractive).toBe('@path ./file.md');
+    expect(argv.prompt).toBeUndefined();
+  });
+
+  it('should map @path to promptInteractive even when config flags are present', async () => {
+    // @path queries should always go to interactive mode regardless of other flags
+    process.argv = [
+      'node',
+      'script.js',
+      '@path',
+      './file.md',
+      '--model',
+      'gemini-1.5-pro',
+    ];
+    const argv = await parseArguments({} as Settings);
+    expect(argv.query).toBe('@path ./file.md');
+    expect(argv.promptInteractive).toBe('@path ./file.md'); // Should map to interactive
+    expect(argv.prompt).toBeUndefined();
+    expect(argv.model).toBe('gemini-1.5-pro');
+  });
+
+  it('maps unquoted positional @path + arg to promptInteractive', async () => {
+    // Simulate: gemini @path ./file.md
+    process.argv = ['node', 'script.js', '@path', './file.md'];
+    const argv = await parseArguments({} as Settings);
+    // After normalization, query is a single string
+    expect(argv.query).toBe('@path ./file.md');
+    // And it's mapped to interactive prompt when no -p/-i flags are set
+    expect(argv.promptInteractive).toBe('@path ./file.md');
+    expect(argv.prompt).toBeUndefined();
+  });
+
+  it('should handle multiple @path arguments in a single command', async () => {
+    // Simulate: gemini @path ./file1.md @path ./file2.md
+    process.argv = [
+      'node',
+      'script.js',
+      '@path',
+      './file1.md',
+      '@path',
+      './file2.md',
+    ];
+    const argv = await parseArguments({} as Settings);
+    // After normalization, all arguments are joined with spaces
+    expect(argv.query).toBe('@path ./file1.md @path ./file2.md');
+    // And it's mapped to interactive prompt
+    expect(argv.promptInteractive).toBe('@path ./file1.md @path ./file2.md');
+    expect(argv.prompt).toBeUndefined();
+  });
+
+  it('should handle mixed quoted and unquoted @path arguments', async () => {
+    // Simulate: gemini "@path ./file1.md" @path ./file2.md "additional text"
+    process.argv = [
+      'node',
+      'script.js',
+      '@path ./file1.md',
+      '@path',
+      './file2.md',
+      'additional text',
+    ];
+    const argv = await parseArguments({} as Settings);
+    // After normalization, all arguments are joined with spaces
+    expect(argv.query).toBe(
+      '@path ./file1.md @path ./file2.md additional text',
+    );
+    // And it's mapped to interactive prompt
+    expect(argv.promptInteractive).toBe(
+      '@path ./file1.md @path ./file2.md additional text',
+    );
+    expect(argv.prompt).toBeUndefined();
+  });
+
+  it('should map @path to promptInteractive with ambient flags (debug, telemetry)', async () => {
+    // Ambient flags like debug, telemetry should NOT force one-shot mode
+    process.argv = [
+      'node',
+      'script.js',
+      '@path',
+      './file.md',
+      '--debug',
+      '--telemetry',
+    ];
+    const argv = await parseArguments({} as Settings);
+    expect(argv.query).toBe('@path ./file.md');
+    expect(argv.promptInteractive).toBe('@path ./file.md'); // Should still map to interactive
+    expect(argv.prompt).toBeUndefined();
+    expect(argv.debug).toBe(true);
+    expect(argv.telemetry).toBe(true);
+  });
+
+  it('should map any @command to promptInteractive', async () => {
+    // Test that the regex pattern /^@\S/ works for various @commands
+    const testCases = [
+      '@path ./file.md',
+      '@include src/',
+      '@search pattern',
+      '@web query',
+      '@git status',
+    ];
+
+    for (const testQuery of testCases) {
+      process.argv = ['node', 'script.js', testQuery];
+      const argv = await parseArguments({} as Settings);
+      expect(argv.query).toBe(testQuery);
+      expect(argv.promptInteractive).toBe(testQuery);
+      expect(argv.prompt).toBeUndefined();
+    }
+  });
+
+  it('should handle @command with leading whitespace', async () => {
+    // Test that trim() + regex pattern handles leading whitespace correctly
+    process.argv = ['node', 'script.js', '  @path ./file.md'];
+    const argv = await parseArguments({} as Settings);
+    expect(argv.query).toBe('  @path ./file.md');
+    expect(argv.promptInteractive).toBe('  @path ./file.md');
+    expect(argv.prompt).toBeUndefined();
+  });
+
+  it('should not crash with --help and positional arguments', async () => {
+    // Lock in the crash fix for help with mixed arguments
+    process.argv = ['node', 'script.js', 'Hi', 'Gemini', '--help'];
+
+    const mockExit = vi.spyOn(process, 'exit').mockImplementation((() => {
+      throw new Error('exit');
+    }) as never);
+
+    await expect(parseArguments({} as Settings)).rejects.toThrow('exit');
+
+    mockExit.mockRestore();
+  });
+
   it('should throw an error when both --yolo and --approval-mode are used together', async () => {
     process.argv = [
       'node',
@@ -2001,12 +2144,15 @@ describe('loadCliConfig interactive', () => {
       'script.js',
       '--model',
       'gemini-1.5-pro',
-      '--sandbox',
+      '--yolo',
       'Hello world',
     ];
     const argv = await parseArguments({} as Settings);
     const config = await loadCliConfig({}, [], 'test-session', argv);
     expect(config.isInteractive()).toBe(false);
+    // Verify the question is preserved for one-shot execution
+    expect(argv.prompt).toBe('Hello world');
+    expect(argv.promptInteractive).toBeUndefined();
   });
 
   it('should be interactive if no positional prompt words are provided with flags', async () => {
@@ -2299,10 +2445,13 @@ describe('parseArguments with positional prompt', () => {
     mockConsoleError.mockRestore();
   });
 
-  it('should correctly parse a positional prompt', async () => {
+  it('should correctly parse a positional prompt to query field', async () => {
     process.argv = ['node', 'script.js', 'positional', 'prompt'];
     const argv = await parseArguments({} as Settings);
-    expect(argv.promptWords).toEqual(['positional', 'prompt']);
+    expect(argv.query).toBe('positional prompt');
+    // Since no explicit prompt flags are set and query doesn't start with @, should map to prompt (one-shot)
+    expect(argv.prompt).toBe('positional prompt');
+    expect(argv.promptInteractive).toBeUndefined();
   });
 
   it('should correctly parse a prompt from the --prompt flag', async () => {
