@@ -12,7 +12,6 @@ import { hideBin } from 'yargs/helpers';
 import process from 'node:process';
 import { mcpCommand } from '../commands/mcp.js';
 import type {
-  TelemetryTarget,
   FileFilteringOptions,
   MCPServerConfig,
   OutputFormat,
@@ -32,6 +31,8 @@ import {
   ShellTool,
   EditTool,
   WriteFileTool,
+  resolveTelemetrySettings,
+  FatalConfigError,
 } from '@google/gemini-cli-core';
 import type { Settings } from './settings.js';
 
@@ -395,6 +396,15 @@ export async function loadHierarchicalGeminiMemory(
   );
 }
 
+export function isDebugMode(argv: CliArgs): boolean {
+  return (
+    argv.debug ||
+    [process.env['DEBUG'], process.env['DEBUG_MODE']].some(
+      (v) => v === 'true' || v === '1',
+    )
+  );
+}
+
 export async function loadCliConfig(
   settings: Settings,
   extensions: Extension[],
@@ -402,18 +412,14 @@ export async function loadCliConfig(
   argv: CliArgs,
   cwd: string = process.cwd(),
 ): Promise<Config> {
-  const debugMode =
-    argv.debug ||
-    [process.env['DEBUG'], process.env['DEBUG_MODE']].some(
-      (v) => v === 'true' || v === '1',
-    ) ||
-    false;
+  const debugMode = isDebugMode(argv);
+
   const memoryImportFormat = settings.context?.importFormat || 'tree';
 
   const ideMode = settings.ide?.enabled ?? false;
 
   const folderTrust = settings.security?.folderTrust?.enabled ?? false;
-  const trustedFolder = isWorkspaceTrusted(settings) ?? true;
+  const trustedFolder = isWorkspaceTrusted(settings)?.isTrusted ?? true;
 
   const allExtensions = annotateActiveExtensions(
     extensions,
@@ -501,6 +507,22 @@ export async function loadCliConfig(
       `Approval mode overridden to "default" because the current folder is not trusted.`,
     );
     approvalMode = ApprovalMode.DEFAULT;
+  }
+
+  let telemetrySettings;
+  try {
+    telemetrySettings = await resolveTelemetrySettings({
+      argv,
+      env: process.env as unknown as Record<string, string | undefined>,
+      settings: settings.telemetry,
+    });
+  } catch (err) {
+    if (err instanceof FatalConfigError) {
+      throw new FatalConfigError(
+        `Invalid telemetry configuration: ${err.message}.`,
+      );
+    }
+    throw err;
   }
 
   const policyEngineConfig = createPolicyEngineConfig(settings, approvalMode);
@@ -608,23 +630,7 @@ export async function loadCliConfig(
       ...settings.ui?.accessibility,
       screenReader,
     },
-    telemetry: {
-      enabled: argv.telemetry ?? settings.telemetry?.enabled,
-      target: (argv.telemetryTarget ??
-        settings.telemetry?.target) as TelemetryTarget,
-      otlpEndpoint:
-        argv.telemetryOtlpEndpoint ??
-        process.env['OTEL_EXPORTER_OTLP_ENDPOINT'] ??
-        settings.telemetry?.otlpEndpoint,
-      otlpProtocol: (['grpc', 'http'] as const).find(
-        (p) =>
-          p ===
-          (argv.telemetryOtlpProtocol ?? settings.telemetry?.otlpProtocol),
-      ),
-      logPrompts: argv.telemetryLogPrompts ?? settings.telemetry?.logPrompts,
-      outfile: argv.telemetryOutfile ?? settings.telemetry?.outfile,
-      useCollector: settings.telemetry?.useCollector,
-    },
+    telemetry: telemetrySettings,
     usageStatisticsEnabled: settings.privacy?.usageStatisticsEnabled ?? true,
     fileFiltering: settings.context?.fileFiltering,
     checkpointing:
@@ -666,6 +672,8 @@ export async function loadCliConfig(
       format: (argv.outputFormat ?? settings.output?.format) as OutputFormat,
     },
     useModelRouter,
+    enableMessageBusIntegration:
+      settings.tools?.enableMessageBusIntegration ?? false,
   });
 }
 

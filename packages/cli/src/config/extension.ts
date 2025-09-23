@@ -12,10 +12,13 @@ import type {
 import {
   GEMINI_DIR,
   Storage,
-  ClearcutLogger,
   Config,
   ExtensionInstallEvent,
   ExtensionUninstallEvent,
+  ExtensionEnableEvent,
+  logExtensionEnable,
+  logExtensionInstallEvent,
+  logExtensionUninstall,
 } from '@google/gemini-cli-core';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -123,16 +126,18 @@ export async function performWorkspaceExtensionMigration(
   return failedInstallNames;
 }
 
-function getClearcutLogger(cwd: string) {
+function getTelemetryConfig(cwd: string) {
+  const settings = loadSettings(cwd);
   const config = new Config({
+    telemetry: settings.merged.telemetry,
+    interactive: false,
     sessionId: randomUUID(),
     targetDir: cwd,
     cwd,
     model: '',
     debugMode: false,
   });
-  const logger = ClearcutLogger.getInstance(config);
-  return logger;
+  return config;
 }
 
 export function loadExtensions(
@@ -350,7 +355,7 @@ export function annotateActiveExtensions(
 /**
  * Asks users a prompt and awaits for a y/n response
  * @param prompt A yes/no prompt to ask the user
- * @returns Whether or not the user answers 'y' (yes)
+ * @returns Whether or not the user answers 'y' (yes). Defaults to 'yes' on enter.
  */
 async function promptForContinuation(prompt: string): Promise<boolean> {
   const readline = await import('node:readline');
@@ -362,7 +367,7 @@ async function promptForContinuation(prompt: string): Promise<boolean> {
   return new Promise((resolve) => {
     rl.question(prompt, (answer) => {
       rl.close();
-      resolve(answer.toLowerCase() === 'y');
+      resolve(['y', ''].includes(answer.trim().toLowerCase()));
     });
   });
 }
@@ -372,7 +377,7 @@ export async function installExtension(
   askConsent: boolean = false,
   cwd: string = process.cwd(),
 ): Promise<string> {
-  const logger = getClearcutLogger(cwd);
+  const telemetryConfig = getTelemetryConfig(cwd);
   let newExtensionConfig: ExtensionConfig | null = null;
   let localSourcePath: string | undefined;
 
@@ -402,12 +407,12 @@ export async function installExtension(
     ) {
       tempDir = await ExtensionStorage.createTmpDir();
       try {
-        const tagName = await downloadFromGitHubRelease(
+        const result = await downloadFromGitHubRelease(
           installMetadata,
           tempDir,
         );
-        updateExtensionVersion(tempDir, tagName);
-        installMetadata.type = 'github-release';
+        installMetadata.type = result.type;
+        installMetadata.releaseTag = result.tagName;
       } catch (_error) {
         await cloneFromGit(installMetadata, tempDir);
         installMetadata.type = 'git';
@@ -467,7 +472,8 @@ export async function installExtension(
       }
     }
 
-    logger?.logExtensionInstallEvent(
+    logExtensionInstallEvent(
+      telemetryConfig,
       new ExtensionInstallEvent(
         newExtensionConfig!.name,
         newExtensionConfig!.version,
@@ -491,7 +497,8 @@ export async function installExtension(
         // Ignore error, this is just for logging.
       }
     }
-    logger?.logExtensionInstallEvent(
+    logExtensionInstallEvent(
+      telemetryConfig,
       new ExtensionInstallEvent(
         newExtensionConfig?.name ?? '',
         newExtensionConfig?.version ?? '',
@@ -503,39 +510,40 @@ export async function installExtension(
   }
 }
 
-async function updateExtensionVersion(
-  extensionDir: string,
-  extensionVersion: string,
-) {
-  const configFilePath = path.join(extensionDir, EXTENSIONS_CONFIG_FILENAME);
-  if (fs.existsSync(configFilePath)) {
-    const configContent = await fs.promises.readFile(configFilePath, 'utf-8');
-    const config = JSON.parse(configContent);
-    config.version = extensionVersion;
-    await fs.promises.writeFile(
-      configFilePath,
-      JSON.stringify(config, null, 2),
-    );
-  }
-}
 async function requestConsent(extensionConfig: ExtensionConfig) {
+  const output: string[] = [];
   const mcpServerEntries = Object.entries(extensionConfig.mcpServers || {});
+  output.push('Extensions may introduce unexpected behavior.');
+  output.push(
+    'Ensure you have investigated the extension source and trust the author.',
+  );
+
   if (mcpServerEntries.length) {
-    console.info('This extension will run the following MCP servers: ');
+    output.push('This extension will run the following MCP servers:');
     for (const [key, mcpServer] of mcpServerEntries) {
       const isLocal = !!mcpServer.command;
-      console.info(
-        `  * ${key} (${isLocal ? 'local' : 'remote'}): ${mcpServer.description}`,
-      );
+      const source =
+        mcpServer.httpUrl ??
+        `${mcpServer.command || ''}${mcpServer.args ? ' ' + mcpServer.args.join(' ') : ''}`;
+      output.push(`  * ${key} (${isLocal ? 'local' : 'remote'}): ${source}`);
     }
-    console.info('The extension will append info to your gemini.md context');
-
-    const shouldContinue = await promptForContinuation(
-      'Do you want to continue? (y/n): ',
+  }
+  if (extensionConfig.contextFileName) {
+    output.push(
+      `This extension will append info to your gemini.md context using ${extensionConfig.contextFileName}`,
     );
-    if (!shouldContinue) {
-      throw new Error('Installation cancelled by user.');
-    }
+  }
+  if (extensionConfig.excludeTools) {
+    output.push(
+      `This extension will exclude the following core tools: ${extensionConfig.excludeTools}`,
+    );
+  }
+  console.info(output.join('\n'));
+  const shouldContinue = await promptForContinuation(
+    'Do you want to continue? [Y/n]: ',
+  );
+  if (!shouldContinue) {
+    throw new Error('Installation cancelled by user.');
   }
 }
 
@@ -574,7 +582,7 @@ export async function uninstallExtension(
   extensionIdentifier: string,
   cwd: string = process.cwd(),
 ): Promise<void> {
-  const logger = getClearcutLogger(cwd);
+  const telemetryConfig = getTelemetryConfig(cwd);
   const installedExtensions = loadUserExtensions();
   const extensionName = installedExtensions.find(
     (installed) =>
@@ -596,7 +604,8 @@ export async function uninstallExtension(
     recursive: true,
     force: true,
   });
-  logger?.logExtensionUninstallEvent(
+  logExtensionUninstall(
+    telemetryConfig,
     new ExtensionUninstallEvent(extensionName, 'success'),
   );
 }
@@ -608,6 +617,9 @@ export function toOutputString(extension: Extension): string {
     output += `\n Source: ${extension.installMetadata.source} (Type: ${extension.installMetadata.type})`;
     if (extension.installMetadata.ref) {
       output += `\n Ref: ${extension.installMetadata.ref}`;
+    }
+    if (extension.installMetadata.releaseTag) {
+      output += `\n Release tag: ${extension.installMetadata.releaseTag}`;
     }
   }
   if (extension.contextFiles.length > 0) {
@@ -660,4 +672,6 @@ export function enableExtension(
   );
   const scopePath = scope === SettingScope.Workspace ? cwd : os.homedir();
   manager.enable(name, true, scopePath);
+  const config = getTelemetryConfig(cwd);
+  logExtensionEnable(config, new ExtensionEnableEvent(name, scope));
 }
