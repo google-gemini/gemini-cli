@@ -12,12 +12,6 @@ describe('Ctrl+C exit', () => {
     const rig = new TestRig();
     await rig.setup('should exit gracefully on second Ctrl+C');
 
-    // This test needs to run with a TTY to properly handle Ctrl+C
-    if (process.env['CI']) {
-      console.warn('Skipping Ctrl+C test in CI due to TTY limitations.');
-      return;
-    }
-
     const { ptyProcess, promise } = rig.runInteractive();
 
     let output = '';
