@@ -29,6 +29,7 @@ export interface MCPOAuthConfig {
   audiences?: string[];
   redirectUri?: string;
   tokenParamName?: string; // For SSE connections, specifies the query parameter name for the token
+  registrationUrl?: string;
 }
 
 /**
@@ -654,6 +655,7 @@ export class MCPOAuthProvider {
             // Preserve existing client credentials
             clientId: config.clientId,
             clientSecret: config.clientSecret,
+            registrationUrl: discoveredConfig.registrationUrl,
           };
         } else {
           throw new Error(
@@ -665,38 +667,44 @@ export class MCPOAuthProvider {
 
     // If no client ID is provided, try dynamic client registration
     if (!config.clientId) {
-      // Extract server URL from authorization URL
-      if (!config.authorizationUrl) {
-        throw new Error(
-          'Cannot perform dynamic registration without authorization URL',
-        );
-      }
+      let registrationUrl = config.registrationUrl;
 
-      const authUrl = new URL(config.authorizationUrl);
-      const serverUrl = `${authUrl.protocol}//${authUrl.host}`;
+      // If no registration URL was previously discovered, try to discover it
+      if (!registrationUrl) {
+        // Extract server URL from authorization URL
+        if (!config.authorizationUrl) {
+          throw new Error(
+            'Cannot perform dynamic registration without authorization URL',
+          );
+        }
 
-      console.debug('→ Attempting dynamic client registration...');
+        const authUrl = new URL(config.authorizationUrl);
+        const serverUrl = `${authUrl.protocol}//${authUrl.host}`;
 
-      // Get the authorization server metadata for registration
-      const authServerMetadataUrl = new URL(
-        '/.well-known/oauth-authorization-server',
-        serverUrl,
-      ).toString();
+        console.debug('→ Attempting dynamic client registration...');
 
-      const authServerMetadata =
-        await OAuthUtils.fetchAuthorizationServerMetadata(
-          authServerMetadataUrl,
-        );
-      if (!authServerMetadata) {
-        throw new Error(
-          'Failed to fetch authorization server metadata for client registration',
-        );
+        // Get the authorization server metadata for registration
+        const authServerMetadataUrl = new URL(
+          '/.well-known/oauth-authorization-server',
+          serverUrl,
+        ).toString();
+
+        const authServerMetadata =
+          await OAuthUtils.fetchAuthorizationServerMetadata(
+            authServerMetadataUrl,
+          );
+        if (!authServerMetadata) {
+          throw new Error(
+            'Failed to fetch authorization server metadata for client registration',
+          );
+        }
+        registrationUrl = authServerMetadata.registration_endpoint;
       }
 
       // Register client if registration endpoint is available
-      if (authServerMetadata.registration_endpoint) {
+      if (registrationUrl) {
         const clientRegistration = await this.registerClient(
-          authServerMetadata.registration_endpoint,
+          registrationUrl,
           config,
         );
 
