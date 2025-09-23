@@ -15,6 +15,8 @@ on:
           - 'latest'
           - 'preview'
           - 'nightly'
+          - 'dev'
+        default: 'dev'
       ref:
         description: 'The branch, tag, or SHA to run from.'
         required: false
@@ -25,9 +27,6 @@ on:
         required: false
         type: 'boolean'
         default: true
-      github-token:
-        description: 'The GitHub token for deleting the release.'
-        required: true
 
 jobs:
   change-tags:
@@ -37,7 +36,7 @@ jobs:
       issues: 'write'
     steps:
       - name: 'Checkout repository'
-        uses: 'actions/checkout@v4'
+        uses: 'actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955' # ratchet:actions/checkout@v4
         with:
           ref: '${{ github.event.inputs.ref }}'
           fetch-depth: 0
