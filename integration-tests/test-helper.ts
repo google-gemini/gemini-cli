@@ -152,6 +152,7 @@ export class TestRig {
         otlpEndpoint: '',
         outfile: telemetryPath,
       },
+      model: 'gemini-2.5-pro',
       sandbox: env.GEMINI_SANDBOX !== 'false' ? env.GEMINI_SANDBOX : false,
       ...options.settings, // Allow tests to override/add settings
     };
