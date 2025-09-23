@@ -5,12 +5,12 @@
  */
 
 import type { Mocked } from 'vitest';
-import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type {
+  type CommandContext,
   MessageActionReturn,
   SlashCommand,
-  type CommandContext,
 } from './types.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
 import type { Content } from '@google/genai';
@@ -393,7 +393,7 @@ describe('chatCommand', () => {
       expect(promptAsString).include(tag);
     });
 
-    it('should delete directly if checkpoint does not exist', async () => {
+    it('should return an error if checkpoint does not exist', async () => {
       mockContext.services.logger.checkpointExists = vi
         .fn()
         .mockResolvedValue(false);
@@ -408,9 +408,11 @@ describe('chatCommand', () => {
       expect(mockContext.services.logger.checkpointExists).toHaveBeenCalledWith(
         tag,
       );
-      expect(mockDeleteCheckpoint).toHaveBeenCalledWith(tag);
-      expect(result).not.toMatchObject({
-        type: 'confirm_action',
+      expect(mockDeleteCheckpoint).not.toHaveBeenCalled();
+      expect(result).toEqual({
+        type: 'message',
+        messageType: 'error',
+        content: `Error: No checkpoint found with tag '${tag}'.`,
       });
     });
 
@@ -436,28 +438,17 @@ describe('chatCommand', () => {
       expect(mockDeleteCheckpoint).not.toHaveBeenCalled();
     });
 
-    it('should return an error when trying to delete a non-existent checkpoint', async () => {
-      mockDeleteCheckpoint.mockResolvedValue(false);
-      mockContext.overwriteConfirmed = true;
-      const result = await deleteCommand?.action?.(mockContext, tag);
-      expect(result).toEqual({
-        type: 'message',
-        messageType: 'error',
-        content: `Error: No checkpoint found with tag '${tag}'.`,
-      });
-    });
-
     it('should delete the conversation when confirmation is provided', async () => {
       // This test simulates the scenario where the user has already confirmed
       // the action, e.g., by responding "yes" to the confirmation prompt.
-      const mockCheckpointExists = vi.fn().mockResolvedValue(true);
-      mockContext.services.logger.checkpointExists = mockCheckpointExists;
+
+      mockContext.services.logger.checkpointExists = vi
+        .fn()
+        .mockResolvedValue(true);
       mockContext.overwriteConfirmed = true;
 
       const result = await deleteCommand?.action?.(mockContext, tag);
 
-      // Ensure we don't even check for the file's existence, since we're forcing the action.
-      expect(mockCheckpointExists).not.toHaveBeenCalled();
       expect(mockDeleteCheckpoint).toHaveBeenCalledWith(tag);
       expect(result).toEqual({
         type: 'message',

@@ -252,23 +252,30 @@ const deleteCommand: SlashCommand = {
     const { logger } = context.services;
     await logger.initialize();
 
+    const exists = await logger.checkpointExists(tag);
+
+    if (!exists) {
+      return {
+        type: 'message',
+        messageType: 'error',
+        content: `Error: No checkpoint found with tag '${decodeTagName(tag)}'.`,
+      };
+    }
+
     if (!context.overwriteConfirmed) {
-      const exists = await logger.checkpointExists(tag);
-      if (exists) {
-        return {
-          type: 'confirm_action',
-          prompt: React.createElement(
-            Text,
-            null,
-            'Are you sure you want to delete conversation checkpoint: ',
-            React.createElement(Text, { color: theme.text.accent }, tag),
-            '?',
-          ),
-          originalInvocation: {
-            raw: context.invocation?.raw || `/chat delete ${tag}`,
-          },
-        };
-      }
+      return {
+        type: 'confirm_action',
+        prompt: React.createElement(
+          Text,
+          null,
+          'Are you sure you want to delete conversation checkpoint: ',
+          React.createElement(Text, { color: theme.text.accent }, tag),
+          '?',
+        ),
+        originalInvocation: {
+          raw: context.invocation?.raw || `/chat delete ${tag}`,
+        },
+      };
     }
 
     const deleted = await logger.deleteCheckpoint(tag);
@@ -283,7 +290,7 @@ const deleteCommand: SlashCommand = {
       return {
         type: 'message',
         messageType: 'error',
-        content: `Error: No checkpoint found with tag '${decodeTagName(tag)}'.`,
+        content: `Error: Failed to delete checkpoint '${decodeTagName(tag)}'.`,
       };
     }
   },
