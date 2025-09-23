@@ -37,7 +37,9 @@ export {
   ExtensionDisableEvent,
   ExtensionEnableEvent,
   ExtensionUninstallEvent,
+  ModelSlashCommandEvent,
 } from './src/telemetry/types.js';
 export { makeFakeConfig } from './src/test-utils/config.js';
 export * from './src/utils/pathReader.js';
 export { ClearcutLogger } from './src/telemetry/clearcut-logger/clearcut-logger.js';
+export { logModelSlashCommand } from './src/telemetry/loggers.js';

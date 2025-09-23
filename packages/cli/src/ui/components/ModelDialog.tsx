@@ -12,13 +12,13 @@ import {
   DEFAULT_GEMINI_FLASH_MODEL,
   DEFAULT_GEMINI_MODEL,
   DEFAULT_GEMINI_MODEL_AUTO,
+  ModelSlashCommandEvent,
+  logModelSlashCommand,
 } from '@google/gemini-cli-core';
 import { useKeypress } from '../hooks/useKeypress.js';
 import { theme } from '../semantic-colors.js';
 import { DescriptiveRadioButtonSelect } from './shared/DescriptiveRadioButtonSelect.js';
 import { ConfigContext } from '../contexts/ConfigContext.js';
-import { ModelSlashCommandEvent } from '@google/gemini-cli-core/src/telemetry/types.js';
-import { logModelSlashCommand } from '@google/gemini-cli-core/src/telemetry/loggers.js';
 
 interface ModelDialogProps {
   onClose: () => void;
