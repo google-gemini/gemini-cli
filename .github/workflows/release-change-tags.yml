@@ -41,8 +41,15 @@ jobs:
       - name: 'Change Tags'
         uses: ./.github/actions/change-tags
         with:
-          version: ${{ inputs.version }}
-          channel: ${{ inputs.channel }}
-          dry-run: ${{ inputs.dry-run }}
-          token-core: ${{ secrets.WOMBAT_TOKEN_CORE }}
-          token-cli: ${{ secrets.WOMBAT_TOKEN_CLI }}
+          node-version-file: '.nvmrc'
+          registry-url: 'https://wombat-dressing-room.appspot.com'
+          scope: '@google'
+
+      - name: 'Change tag'
+        uses: './.github/actions/tag-npm-release'
+        with:
+          channel: '${{ github.event.inputs.channel }}'
+          version: '${{ github.event.inputs.version }}'
+          dry-run: '${{ github.event.inputs.dry-run }}'
+          wombat-token-core: '${{ secrets.WOMBAT_TOKEN_CORE }}'
+          wombat-token-cli: '${{ secrets.WOMBAT_TOKEN_CLI }}'
