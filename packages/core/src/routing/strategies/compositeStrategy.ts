@@ -92,7 +92,9 @@ export class CompositeStrategy implements TerminalStrategy {
     startTime: number,
   ): RoutingDecision {
     const endTime = performance.now();
-    const totalLatency = endTime - startTime;
+    // Round to the nearest millisecond to ensure we send an integer to
+    // telemetry.
+    const totalLatency = Math.round(endTime - startTime);
 
     // Combine the source paths: composite_name/child_source (e.g. 'router/default')
     const compositeSource = `${this.name}/${decision.metadata.source}`;
