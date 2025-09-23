@@ -277,13 +277,13 @@ export async function downloadFromGitHubRelease(
     // directory. In this case we should see exactly two file in the destination
     // dir, the archive and the directory. If we see that, we move all files
     // from the directory up one level into the destination directory.
-    const files = await fs.promises.readdir(destination);
-    if (files.length === 2) {
-      const lonelyDirName = files.find((file) =>
-        fs.statSync(path.join(destination, file)).isDirectory(),
-      );
-      if (lonelyDirName) {
-        const dirPathToExtract = path.join(destination, lonelyDirName);
+    const entries = await fs.promises.readdir(destination, {
+      withFileTypes: true,
+    });
+    if (entries.length === 2) {
+      const lonelyDir = entries.find((entry) => entry.isDirectory());
+      if (lonelyDir) {
+        const dirPathToExtract = path.join(destination, lonelyDir.name);
         const extractedDirFiles = await fs.promises.readdir(dirPathToExtract);
         for (const file of extractedDirFiles) {
           await fs.promises.rename(
