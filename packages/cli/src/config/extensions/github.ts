@@ -273,24 +273,6 @@ export async function downloadFromGitHubRelease(
 
     extractFile(downloadedAssetPath, destination);
 
-    const files = await fs.promises.readdir(destination);
-    const extractedDirName = files.find((file) => {
-      const filePath = path.join(destination, file);
-      return fs.statSync(filePath).isDirectory();
-    });
-
-    if (extractedDirName) {
-      const extractedDirPath = path.join(destination, extractedDirName);
-      const extractedDirFiles = await fs.promises.readdir(extractedDirPath);
-      for (const file of extractedDirFiles) {
-        await fs.promises.rename(
-          path.join(extractedDirPath, file),
-          path.join(destination, file),
-        );
-      }
-      await fs.promises.rmdir(extractedDirPath);
-    }
-
     await fs.promises.unlink(downloadedAssetPath);
     return {
       tagName: releaseData.tag_name,

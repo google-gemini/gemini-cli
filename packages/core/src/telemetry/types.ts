@@ -682,3 +682,17 @@ export type TelemetryEvent =
   | ModelRoutingEvent
   | ToolOutputTruncatedEvent
   | ModelSlashCommandEvent;
+
+export class ExtensionDisableEvent implements BaseTelemetryEvent {
+  'event.name': 'extension_disable';
+  'event.timestamp': string;
+  extension_name: string;
+  setting_scope: string;
+
+  constructor(extension_name: string, settingScope: string) {
+    this['event.name'] = 'extension_disable';
+    this['event.timestamp'] = new Date().toISOString();
+    this.extension_name = extension_name;
+    this.setting_scope = settingScope;
+  }
+}

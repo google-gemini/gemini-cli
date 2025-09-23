@@ -30,6 +30,7 @@ import type {
   ModelRoutingEvent,
   ExtensionEnableEvent,
   ModelSlashCommandEvent,
+  ExtensionDisableEvent,
 } from '../types.js';
 import { EventMetadataKey } from './event-metadata-key.js';
 import type { Config } from '../../config/config.js';
@@ -64,6 +65,7 @@ export enum EventNames {
   CONTENT_RETRY = 'content_retry',
   CONTENT_RETRY_FAILURE = 'content_retry_failure',
   EXTENSION_ENABLE = 'extension_enable',
+  EXTENSION_DISABLE = 'extension_disable',
   EXTENSION_INSTALL = 'extension_install',
   EXTENSION_UNINSTALL = 'extension_uninstall',
   TOOL_OUTPUT_TRUNCATED = 'tool_output_truncated',
@@ -996,6 +998,25 @@ export class ClearcutLogger {
 
     this.enqueueLogEvent(
       this.createLogEvent(EventNames.MODEL_SLASH_COMMAND, data),
+    );
+    this.flushIfNeeded();
+  }
+
+  logExtensionDisableEvent(event: ExtensionDisableEvent): void {
+    const data: EventValue[] = [
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_EXTENSION_NAME,
+        value: event.extension_name,
+      },
+      {
+        gemini_cli_key:
+          EventMetadataKey.GEMINI_CLI_EXTENSION_DISABLE_SETTING_SCOPE,
+        value: event.setting_scope,
+      },
+    ];
+
+    this.enqueueLogEvent(
+      this.createLogEvent(EventNames.EXTENSION_DISABLE, data),
     );
     this.flushIfNeeded();
   }
