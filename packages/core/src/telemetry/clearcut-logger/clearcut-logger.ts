@@ -24,11 +24,11 @@ import type {
   InvalidChunkEvent,
   ContentRetryEvent,
   ContentRetryFailureEvent,
-  ExtensionEnableEvent,
   ExtensionInstallEvent,
   ToolOutputTruncatedEvent,
   ExtensionUninstallEvent,
   ModelRoutingEvent,
+  ExtensionEnableEvent,
 } from '../types.js';
 import { EventMetadataKey } from './event-metadata-key.js';
 import type { Config } from '../../config/config.js';

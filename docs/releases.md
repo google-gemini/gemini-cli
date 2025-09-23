@@ -70,9 +70,10 @@ For situations requiring a release outside of the regular nightly and weekly pro
 4.  Fill in the required inputs:
     - **Version**: The exact version to release (e.g., `v0.6.1`). This must be a valid semantic version with a `v` prefix.
     - **Ref**: The branch, tag, or full commit SHA to release from.
-    - **NPM Channel**: The npm tag to publish with. Select `stable` for a general release, `preview` for a pre-release, or `none` to skip publishing to npm entirely.
+    - **NPM Channel**: The npm channel to publish to. The options are `preview`, `nightly`, `latest` (for stable releases), and `dev`. The default is `dev`.
     - **Dry Run**: Leave as `true` to run all steps without publishing, or set to `false` to perform a live release.
     - **Force Skip Tests**: Set to `true` to skip the test suite. This is not recommended for production releases.
+    - **Skip GitHub Release**: Set to `true` to skip creating a GitHub release and create an npm release only.
 5.  Click **Run workflow**.
 
 The workflow will then proceed to test (if not skipped), build, and publish the release. If the workflow fails during a non-dry run, it will automatically create a GitHub issue with the failure details.
@@ -295,108 +296,54 @@ By performing a dry run, you can be confident that your changes to the packaging
 
 ## Release Deep Dive
 
-The main goal of the release process is to take the source code from the packages/ directory, build it, and assemble a
-clean, self-contained package in a temporary `bundle` directory at the root of the project. This `bundle` directory is what
-actually gets published to NPM.
+The release process creates two distinct types of artifacts for different distribution channels: standard packages for the NPM registry and a single, self-contained executable for GitHub Releases.
 
 Here are the key stages:
 
-Stage 1: Pre-Release Sanity Checks and Versioning
+**Stage 1: Pre-Release Sanity Checks and Versioning**
 
-- What happens: Before any files are moved, the process ensures the project is in a good state. This involves running tests,
-  linting, and type-checking (npm run preflight). The version number in the root package.json and packages/cli/package.json
-  is updated to the new release version.
-- Why: This guarantees that only high-quality, working code is released. Versioning is the first step to signify a new
-  release.
+- **What happens:** Before any files are moved, the process ensures the project is in a good state. This involves running tests, linting, and type-checking (`npm run preflight`). The version number in the root `package.json` and `packages/cli/package.json` is updated to the new release version.
 
-Stage 2: Building the Source Code
+**Stage 2: Building the Source Code for NPM**
 
-- What happens: The TypeScript source code in packages/core/src and packages/cli/src is compiled into JavaScript.
-- File movement:
-  - packages/core/src/\*_/_.ts -> compiled to -> packages/core/dist/
-  - packages/cli/src/\*_/_.ts -> compiled to -> packages/cli/dist/
-- Why: The TypeScript code written during development needs to be converted into plain JavaScript that can be run by
-  Node.js. The core package is built first as the cli package depends on it.
+- **What happens:** The TypeScript source code in `packages/core/src` and `packages/cli/src` is compiled into standard JavaScript.
+- **File movement:**
+  - `packages/core/src/**/*.ts` -> compiled to -> `packages/core/dist/`
+  - `packages/cli/src/**/*.ts` -> compiled to -> `packages/cli/dist/`
+- **Why:** The TypeScript code written during development needs to be converted into plain JavaScript that can be run by Node.js. The `core` package is built first as the `cli` package depends on it.
 
-Stage 3: Assembling the Final Publishable Package
+**Stage 3: Publishing Standard Packages to NPM**
 
-This is the most critical stage where files are moved and transformed into their final state for publishing. A temporary
-`bundle` folder is created at the project root to house the final package contents.
+- **What happens:** The `npm publish` command is run for the `@google/gemini-cli-core` and `@google/gemini-cli` packages.
+- **Why:** This publishes them as standard Node.js packages. Users installing via `npm install -g @google/gemini-cli` will download these packages, and `npm` will handle installing the `@google/gemini-cli-core` dependency automatically. The code in these packages is not bundled into a single file.
 
-1.  The `package.json` is Transformed:
-    - What happens: The package.json from packages/cli/ is read, modified, and written into the root `bundle`/ directory.
-    - File movement: packages/cli/package.json -> (in-memory transformation) -> `bundle`/package.json
-    - Why: The final package.json must be different from the one used in development. Key changes include:
-      - Removing devDependencies.
-      - Removing workspace-specific "dependencies": { "@gemini-cli/core": "workspace:\*" } and ensuring the core code is
-        bundled directly into the final JavaScript file.
-      - Ensuring the bin, main, and files fields point to the correct locations within the final package structure.
+**Stage 4: Assembling and Creating the GitHub Release Asset**
 
-2.  The JavaScript Bundle is Created:
-    - What happens: The built JavaScript from both packages/core/dist and packages/cli/dist are bundled into a single,
-      executable JavaScript file.
-    - File movement: packages/cli/dist/index.js + packages/core/dist/index.js -> (bundled by esbuild) -> `bundle`/gemini.js (or a
-      similar name).
-    - Why: This creates a single, optimized file that contains all the necessary application code. It simplifies the package
-      by removing the need for the core package to be a separate dependency on NPM, as its code is now included directly.
+This stage happens _after_ the NPM publish and creates the single-file executable that enables `npx` usage directly from the GitHub repository.
 
-3.  Static and Supporting Files are Copied:
-    - What happens: Essential files that are not part of the source code but are required for the package to work correctly
-      or be well-described are copied into the `bundle` directory.
-    - File movement:
-      - README.md -> `bundle`/README.md
-      - LICENSE -> `bundle`/LICENSE
-      - packages/cli/src/utils/\*.sb (sandbox profiles) -> `bundle`/
-    - Why:
-      - The README.md and LICENSE are standard files that should be included in any NPM package.
-      - The sandbox profiles (.sb files) are critical runtime assets required for the CLI's sandboxing feature to
-        function. They must be located next to the final executable.
+1.  **The JavaScript Bundle is Created:**
+    - **What happens:** The built JavaScript from both `packages/core/dist` and `packages/cli/dist`, along with all third-party JavaScript dependencies, are bundled by `esbuild` into a single, executable JavaScript file (e.g., `gemini.js`). The `node-pty` library is excluded from this bundle as it contains native binaries.
+    - **Why:** This creates a single, optimized file that contains all the necessary application code. It simplifies execution for users who want to run the CLI without a full `npm install`, as all dependencies (including the `core` package) are included directly.
 
-Stage 4: Publishing to NPM
+2.  **The `bundle` Directory is Assembled:**
+    - **What happens:** A temporary `bundle` folder is created at the project root. The single `gemini.js` executable is placed inside it, along with other essential files.
+    - **File movement:**
+      - `gemini.js` (from esbuild) -> `bundle/gemini.js`
+      - `README.md` -> `bundle/README.md`
+      - `LICENSE` -> `bundle/LICENSE`
+      - `packages/cli/src/utils/*.sb` (sandbox profiles) -> `bundle/`
+    - **Why:** This creates a clean, self-contained directory with everything needed to run the CLI and understand its license and usage.
 
-- What happens: The npm publish command is run from inside the root `bundle` directory.
-- Why: By running npm publish from within the `bundle` directory, only the files we carefully assembled in Stage 3 are uploaded
-  to the NPM registry. This prevents any source code, test files, or development configurations from being accidentally
-  published, resulting in a clean and minimal package for users.
+3.  **The GitHub Release is Created:**
+    - **What happens:** The contents of the `bundle` directory, including the `gemini.js` executable, are attached as assets to a new GitHub Release.
+    - **Why:** This makes the single-file version of the CLI available for direct download and enables the `npx https://github.com/google-gemini/gemini-cli` command, which downloads and runs this specific bundled asset.
 
-Summary of File Flow
+**Summary of Artifacts**
 
-```mermaid
-graph TD
-    subgraph "Source Files"
-        A["packages/core/src/*.ts<br/>packages/cli/src/*.ts"]
-        B["packages/cli/package.json"]
-        C["README.md<br/>LICENSE<br/>packages/cli/src/utils/*.sb"]
-    end
+- **NPM:** Publishes standard, un-bundled Node.js packages. The primary artifact is the code in `packages/cli/dist`, which depends on `@google/gemini-cli-core`.
+- **GitHub Release:** Publishes a single, bundled `gemini.js` file that contains all dependencies, for easy execution via `npx`.
 
-    subgraph "Process"
-        D(Build)
-        E(Transform)
-        F(Assemble)
-        G(Publish)
-    end
-
-    subgraph "Artifacts"
-        H["Bundled JS"]
-        I["Final package.json"]
-        J["bundle/"]
-    end
-
-    subgraph "Destination"
-        K["NPM Registry"]
-    end
-
-    A --> D --> H
-    B --> E --> I
-    C --> F
-    H --> F
-    I --> F
-    F --> J
-    J --> G --> K
-```
-
-This process ensures that the final published artifact is a purpose-built, clean, and efficient representation of the
-project, rather than a direct copy of the development workspace.
+This dual-artifact process ensures that both traditional `npm` users and those who prefer the convenience of `npx` have an optimized experience.
 
 ## Notifications
 
