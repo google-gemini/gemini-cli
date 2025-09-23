@@ -306,6 +306,13 @@ describe('git extension helpers', () => {
       );
     });
 
+    it('should fail on a non-GitHub URL', () => {
+      const source = 'https://example.com/owner/repo.git';
+      expect(() => parseGitHubRepoForReleases(source)).toThrow(
+        'Invalid GitHub repository source: https://example.com/owner/repo.git. Expected "owner/repo" or a github repo uri.',
+      );
+    });
+
     it('should parse owner and repo from a shorthand string', () => {
       const source = 'owner/repo';
       const { owner, repo } = parseGitHubRepoForReleases(source);
