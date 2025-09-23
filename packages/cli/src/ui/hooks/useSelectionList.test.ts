@@ -744,6 +744,109 @@ describe('useSelectionList', () => {
       rerender({ items: [] });
       expect(result.current.activeIndex).toBe(0);
     });
+
+    it('should not reset activeIndex when items are deeply equal', () => {
+      const initialItems = [
+        { value: 'A' },
+        { value: 'B', disabled: true },
+        { value: 'C' },
+        { value: 'D' },
+      ];
+
+      const { result, rerender } = renderHook(
+        ({ items: testItems }: { items: Array<SelectionListItem<string>> }) =>
+          useSelectionList({
+            onSelect: mockOnSelect,
+            onHighlight: mockOnHighlight,
+            initialIndex: 2,
+            items: testItems,
+          }),
+        { initialProps: { items: initialItems } },
+      );
+
+      expect(result.current.activeIndex).toBe(2);
+
+      act(() => {
+        result.current.setActiveIndex(3);
+      });
+      expect(result.current.activeIndex).toBe(3);
+
+      mockOnHighlight.mockClear();
+
+      // Create new array with same content (deeply equal but not identical)
+      const newItems = [
+        { value: 'A' },
+        { value: 'B', disabled: true },
+        { value: 'C' },
+        { value: 'D' },
+      ];
+
+      rerender({ items: newItems });
+
+      // Active index should remain the same since items are deeply equal
+      expect(result.current.activeIndex).toBe(3);
+      // onHighlight should NOT be called since the index didn't change
+      expect(mockOnHighlight).not.toHaveBeenCalled();
+    });
+
+    it('should update activeIndex when items change structurally', () => {
+      const initialItems = [
+        { value: 'A' },
+        { value: 'B', disabled: true },
+        { value: 'C' },
+        { value: 'D' },
+      ];
+
+      const { result, rerender } = renderHook(
+        ({ items: testItems }: { items: Array<SelectionListItem<string>> }) =>
+          useSelectionList({
+            onSelect: mockOnSelect,
+            onHighlight: mockOnHighlight,
+            initialIndex: 3,
+            items: testItems,
+          }),
+        { initialProps: { items: initialItems } },
+      );
+
+      expect(result.current.activeIndex).toBe(3);
+      mockOnHighlight.mockClear();
+
+      // Change item values (not deeply equal)
+      const newItems = [{ value: 'X' }, { value: 'Y' }, { value: 'Z' }];
+
+      rerender({ items: newItems });
+
+      // Active index should update based on initialIndex and new items
+      expect(result.current.activeIndex).toBe(0);
+    });
+
+    it('should handle partial changes in items array', () => {
+      const initialItems = [{ value: 'A' }, { value: 'B' }, { value: 'C' }];
+
+      const { result, rerender } = renderHook(
+        ({ items: testItems }: { items: Array<SelectionListItem<string>> }) =>
+          useSelectionList({
+            onSelect: mockOnSelect,
+            initialIndex: 1,
+            items: testItems,
+          }),
+        { initialProps: { items: initialItems } },
+      );
+
+      expect(result.current.activeIndex).toBe(1);
+
+      // Change only one item's disabled status
+      const newItems = [
+        { value: 'A' },
+        { value: 'B', disabled: true },
+        { value: 'C' },
+      ];
+
+      rerender({ items: newItems });
+
+      // Should find next valid index since current became disabled
+      expect(result.current.activeIndex).toBe(2);
+    });
   });
 
   describe('Manual Control', () => {
