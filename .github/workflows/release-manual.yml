@@ -72,7 +72,7 @@ jobs:
 
       - name: 'Run Tests'
         if: |-
-          ${{ github.event.inputs.force_skip_tests != true }}
+          ${{ github.event.inputs.force_skip_tests != 'true' }}
         uses: './.github/actions/run-tests'
         with:
           force_skip_tests: '${{ github.event.inputs.force_skip_tests }}'
