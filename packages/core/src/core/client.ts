@@ -758,8 +758,7 @@ export class GeminiClient {
 
     const { totalTokens: newTokenCount } =
       await this.getContentGeneratorOrFail().countTokens({
-        // model might change after calling `sendMessage`, so we get the newest value from config
-        model: this.config.getModel(),
+        model,
         contents: chat.getHistory(),
       });
     if (newTokenCount === undefined) {
