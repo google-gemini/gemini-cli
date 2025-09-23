@@ -38,6 +38,13 @@ describe('App', () => {
     quittingMessages: null,
     dialogsVisible: false,
     mainControlsRef: { current: null },
+    historyManager: {
+      addItem: vi.fn(),
+      history: [],
+      updateItem: vi.fn(),
+      clearItems: vi.fn(),
+      loadHistory: vi.fn(),
+    },
   };
 
   it('should render main content and composer when not quitting', () => {
