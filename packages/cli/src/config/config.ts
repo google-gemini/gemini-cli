@@ -425,6 +425,7 @@ function createToolExclusionFilter(
     }
     return !allowedToolsSet.has(tool);
   };
+}
 
 export function isDebugMode(argv: CliArgs): boolean {
   return (
