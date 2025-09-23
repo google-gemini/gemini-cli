@@ -29,6 +29,7 @@ import type {
   ExtensionUninstallEvent,
   ModelRoutingEvent,
   ExtensionEnableEvent,
+  ModelSlashCommandEvent,
   ExtensionDisableEvent,
 } from '../types.js';
 import { EventMetadataKey } from './event-metadata-key.js';
@@ -69,6 +70,7 @@ export enum EventNames {
   EXTENSION_UNINSTALL = 'extension_uninstall',
   TOOL_OUTPUT_TRUNCATED = 'tool_output_truncated',
   MODEL_ROUTING = 'model_routing',
+  MODEL_SLASH_COMMAND = 'model_slash_command',
 }
 
 export interface LogResponse {
@@ -990,6 +992,20 @@ export class ClearcutLogger {
 
     this.enqueueLogEvent(
       this.createLogEvent(EventNames.EXTENSION_ENABLE, data),
+    );
+    this.flushIfNeeded();
+  }
+
+  logModelSlashCommandEvent(event: ModelSlashCommandEvent): void {
+    const data: EventValue[] = [
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_MODEL_SLASH_COMMAND,
+        value: event.model_name,
+      },
+    ];
+
+    this.enqueueLogEvent(
+      this.createLogEvent(EventNames.MODEL_SLASH_COMMAND, data),
     );
     this.flushIfNeeded();
   }

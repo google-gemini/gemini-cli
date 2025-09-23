@@ -401,4 +401,7 @@ export enum EventMetadataKey {
 
   // Logs the source of the decision.
   GEMINI_CLI_ROUTING_DECISION_SOURCE = 101,
+
+  // Logs an event when the user uses the /model command.
+  GEMINI_CLI_MODEL_SLASH_COMMAND = 103,
 }

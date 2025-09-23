@@ -17,6 +17,8 @@ import { useKeypress } from '../hooks/useKeypress.js';
 import { theme } from '../semantic-colors.js';
 import { DescriptiveRadioButtonSelect } from './shared/DescriptiveRadioButtonSelect.js';
 import { ConfigContext } from '../contexts/ConfigContext.js';
+import { ModelSlashCommandEvent } from '@google/gemini-cli-core/src/telemetry/types.js';
+import { logModelSlashCommand } from '@google/gemini-cli-core/src/telemetry/loggers.js';
 
 interface ModelDialogProps {
   onClose: () => void;
@@ -71,6 +73,8 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
     (model: string) => {
       if (config) {
         config.setModel(model);
+        const event = new ModelSlashCommandEvent(model);
+        logModelSlashCommand(config, event);
       }
       onClose();
     },
