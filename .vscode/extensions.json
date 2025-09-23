@@ -2,6 +2,7 @@
   "recommendations": [
     "vitest.explorer",
     "esbenp.prettier-vscode",
-    "dbaeumer.vscode-eslint"
+    "dbaeumer.vscode-eslint",
+    "codespaces-contrib.codeswing"
   ]
 }
