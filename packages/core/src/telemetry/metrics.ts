@@ -131,6 +131,13 @@ export function initializeMetrics(config: Config): void {
       valueType: ValueType.INT,
     },
   );
+  modelSlashCommandCallCounter = meter.createCounter(
+    METRIC_MODEL_SLASH_COMMAND_CALL_COUNT,
+    {
+      description: 'Counts model slash command calls.',
+      valueType: ValueType.INT,
+    },
+  );
 
   const sessionCounter = meter.createCounter(METRIC_SESSION_COUNT, {
     description: 'Count of CLI sessions started.',

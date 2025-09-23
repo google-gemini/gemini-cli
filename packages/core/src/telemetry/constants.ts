@@ -46,3 +46,5 @@ export const EVENT_MODEL_ROUTING = 'gemini_cli.model_routing';
 export const METRIC_MODEL_ROUTING_LATENCY = 'gemini_cli.model_routing.latency';
 export const METRIC_MODEL_ROUTING_FAILURE_COUNT =
   'gemini_cli.model_routing.failure.count';
+export const METRIC_MODEL_SLASH_COMMAND_CALL_COUNT =
+  'gemini_cli.slash_command.model.call_count';
