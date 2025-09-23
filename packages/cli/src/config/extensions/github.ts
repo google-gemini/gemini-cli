@@ -6,13 +6,18 @@
 
 import { simpleGit } from 'simple-git';
 import { getErrorMessage } from '../../utils/errors.js';
-import type { ExtensionInstallMetadata } from '@google/gemini-cli-core';
+import type {
+  ExtensionInstallMetadata,
+  GeminiCLIExtension,
+} from '@google/gemini-cli-core';
 import { ExtensionUpdateState } from '../../ui/state/extensions.js';
 import * as os from 'node:os';
 import * as https from 'node:https';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { execSync } from 'node:child_process';
+import { loadExtension } from '../extension.js';
+import { quote } from 'shell-quote';
 
 function getGitHubToken(): string | undefined {
   return process.env['GITHUB_TOKEN'];
@@ -74,67 +79,100 @@ export async function cloneFromGit(
   }
 }
 
-function parseGitHubRepo(source: string): { owner: string; repo: string } {
-  // The source should be "owner/repo" or a full GitHub URL.
-  const parts = source.split('/');
-  if (!source.includes('://') && parts.length !== 2) {
+export function parseGitHubRepoForReleases(source: string): {
+  owner: string;
+  repo: string;
+} {
+  // Default to a github repo path, so `source` can be just an org/repo
+  const parsedUrl = URL.parse(source, 'https://github.com');
+  // The pathname should be "/owner/repo".
+  const parts = parsedUrl?.pathname.substring(1).split('/');
+  if (parts?.length !== 2) {
     throw new Error(
-      `Invalid GitHub repository source: ${source}. Expected "owner/repo".`,
+      `Invalid GitHub repository source: ${source}. Expected "owner/repo" or a github repo uri.`,
     );
   }
-  const owner = parts.at(-2);
-  const repo = parts.at(-1)?.replace('.git', '');
+  const owner = parts[0];
+  const repo = parts[1].replace('.git', '');
 
-  if (!owner || !repo) {
-    throw new Error(`Invalid GitHub repository source: ${source}`);
+  if (owner.startsWith('git@github.com')) {
+    throw new Error(
+      `GitHub release-based extensions are not supported for SSH. You must use an HTTPS URI with a personal access token to download releases from private repositories. You can set your personal access token in the GITHUB_TOKEN environment variable and install the extension via SSH.`,
+    );
   }
+
   return { owner, repo };
 }
 
-async function fetchFromGithub(
+async function fetchReleaseFromGithub(
   owner: string,
   repo: string,
   ref?: string,
-): Promise<{ assets: Asset[]; tag_name: string }> {
+): Promise<GithubReleaseData> {
   const endpoint = ref ? `releases/tags/${ref}` : 'releases/latest';
   const url = `https://api.github.com/repos/${owner}/${repo}/${endpoint}`;
   return await fetchJson(url);
 }
 
 export async function checkForExtensionUpdate(
-  installMetadata: ExtensionInstallMetadata,
-): Promise<ExtensionUpdateState> {
+  extension: GeminiCLIExtension,
+  setExtensionUpdateState: (updateState: ExtensionUpdateState) => void,
+  cwd: string = process.cwd(),
+): Promise<void> {
+  setExtensionUpdateState(ExtensionUpdateState.CHECKING_FOR_UPDATES);
+  const installMetadata = extension.installMetadata;
+  if (installMetadata?.type === 'local') {
+    const newExtension = loadExtension({
+      extensionDir: installMetadata.source,
+      workspaceDir: cwd,
+    });
+    if (!newExtension) {
+      console.error(
+        `Failed to check for update for local extension "${extension.name}". Could not load extension from source path: ${installMetadata.source}`,
+      );
+      setExtensionUpdateState(ExtensionUpdateState.ERROR);
+      return;
+    }
+    if (newExtension.config.version !== extension.version) {
+      setExtensionUpdateState(ExtensionUpdateState.UPDATE_AVAILABLE);
+      return;
+    }
+    setExtensionUpdateState(ExtensionUpdateState.UP_TO_DATE);
+    return;
+  }
   if (
-    installMetadata.type !== 'git' &&
-    installMetadata.type !== 'github-release'
+    !installMetadata ||
+    (installMetadata.type !== 'git' &&
+      installMetadata.type !== 'github-release')
   ) {
-    return ExtensionUpdateState.NOT_UPDATABLE;
+    setExtensionUpdateState(ExtensionUpdateState.NOT_UPDATABLE);
+    return;
   }
   try {
     if (installMetadata.type === 'git') {
-      const git = simpleGit(installMetadata.source);
+      const git = simpleGit(extension.path);
       const remotes = await git.getRemotes(true);
       if (remotes.length === 0) {
         console.error('No git remotes found.');
-        return ExtensionUpdateState.ERROR;
+        setExtensionUpdateState(ExtensionUpdateState.ERROR);
+        return;
       }
       const remoteUrl = remotes[0].refs.fetch;
       if (!remoteUrl) {
         console.error(`No fetch URL found for git remote ${remotes[0].name}.`);
-        return ExtensionUpdateState.ERROR;
+        setExtensionUpdateState(ExtensionUpdateState.ERROR);
+        return;
       }
 
       // Determine the ref to check on the remote.
       const refToCheck = installMetadata.ref || 'HEAD';
 
-      const lsRemoteOutput = await git.listRemote([
-        remotes[0].name,
-        refToCheck,
-      ]);
+      const lsRemoteOutput = await git.listRemote([remoteUrl, refToCheck]);
 
       if (typeof lsRemoteOutput !== 'string' || lsRemoteOutput.trim() === '') {
         console.error(`Git ref ${refToCheck} not found.`);
-        return ExtensionUpdateState.ERROR;
+        setExtensionUpdateState(ExtensionUpdateState.ERROR);
+        return;
       }
 
       const remoteHash = lsRemoteOutput.split('\t')[0];
@@ -144,68 +182,94 @@ export async function checkForExtensionUpdate(
         console.error(
           `Unable to parse hash from git ls-remote output "${lsRemoteOutput}"`,
         );
-        return ExtensionUpdateState.ERROR;
+        setExtensionUpdateState(ExtensionUpdateState.ERROR);
+        return;
       }
       if (remoteHash === localHash) {
-        return ExtensionUpdateState.UP_TO_DATE;
+        setExtensionUpdateState(ExtensionUpdateState.UP_TO_DATE);
+        return;
       }
-      return ExtensionUpdateState.UPDATE_AVAILABLE;
+      setExtensionUpdateState(ExtensionUpdateState.UPDATE_AVAILABLE);
+      return;
     } else {
-      const { source, ref } = installMetadata;
+      const { source, releaseTag } = installMetadata;
       if (!source) {
-        return ExtensionUpdateState.ERROR;
+        console.error(`No "source" provided for extension.`);
+        setExtensionUpdateState(ExtensionUpdateState.ERROR);
+        return;
       }
-      const { owner, repo } = parseGitHubRepo(source);
+      const { owner, repo } = parseGitHubRepoForReleases(source);
 
-      const releaseData = await fetchFromGithub(
+      const releaseData = await fetchReleaseFromGithub(
         owner,
         repo,
         installMetadata.ref,
       );
-      if (releaseData.tag_name !== ref) {
-        return ExtensionUpdateState.UPDATE_AVAILABLE;
+      if (releaseData.tag_name !== releaseTag) {
+        setExtensionUpdateState(ExtensionUpdateState.UPDATE_AVAILABLE);
+        return;
       }
-      return ExtensionUpdateState.UP_TO_DATE;
+      setExtensionUpdateState(ExtensionUpdateState.UP_TO_DATE);
+      return;
     }
   } catch (error) {
     console.error(
       `Failed to check for updates for extension "${installMetadata.source}": ${getErrorMessage(error)}`,
     );
-    return ExtensionUpdateState.ERROR;
+    setExtensionUpdateState(ExtensionUpdateState.ERROR);
+    return;
   }
 }
-
+export interface GitHubDownloadResult {
+  tagName: string;
+  type: 'git' | 'github-release';
+}
 export async function downloadFromGitHubRelease(
   installMetadata: ExtensionInstallMetadata,
   destination: string,
-): Promise<string> {
+): Promise<GitHubDownloadResult> {
   const { source, ref } = installMetadata;
-  const { owner, repo } = parseGitHubRepo(source);
+  const { owner, repo } = parseGitHubRepoForReleases(source);
 
   try {
-    const releaseData = await fetchFromGithub(owner, repo, ref);
-    if (
-      !releaseData ||
-      !releaseData.assets ||
-      releaseData.assets.length === 0
-    ) {
+    const releaseData = await fetchReleaseFromGithub(owner, repo, ref);
+    if (!releaseData) {
       throw new Error(
-        `No release assets found for ${owner}/${repo} at tag ${ref}`,
+        `No release data found for ${owner}/${repo} at tag ${ref}`,
       );
     }
 
     const asset = findReleaseAsset(releaseData.assets);
-    if (!asset) {
+    let archiveUrl: string | undefined;
+    let isTar = false;
+    let isZip = false;
+    if (asset) {
+      archiveUrl = asset.browser_download_url;
+    } else {
+      if (releaseData.tarball_url) {
+        archiveUrl = releaseData.tarball_url;
+        isTar = true;
+      } else if (releaseData.zipball_url) {
+        archiveUrl = releaseData.zipball_url;
+        isZip = true;
+      }
+    }
+    if (!archiveUrl) {
       throw new Error(
-        `No suitable release asset found for platform ${os.platform()}-${os.arch()}`,
+        `No assets found for release with tag ${releaseData.tag_name}`,
       );
     }
-
-    const downloadedAssetPath = path.join(
+    let downloadedAssetPath = path.join(
       destination,
-      path.basename(asset.browser_download_url),
+      path.basename(new URL(archiveUrl).pathname),
     );
-    await downloadFile(asset.browser_download_url, downloadedAssetPath);
+    if (isTar && !downloadedAssetPath.endsWith('.tar.gz')) {
+      downloadedAssetPath += '.tar.gz';
+    } else if (isZip && !downloadedAssetPath.endsWith('.zip')) {
+      downloadedAssetPath += '.zip';
+    }
+
+    await downloadFile(archiveUrl, downloadedAssetPath);
 
     extractFile(downloadedAssetPath, destination);
 
@@ -228,12 +292,22 @@ export async function downloadFromGitHubRelease(
     }
 
     await fs.promises.unlink(downloadedAssetPath);
-    return releaseData.tag_name;
+    return {
+      tagName: releaseData.tag_name,
+      type: 'github-release',
+    };
   } catch (error) {
     throw new Error(
       `Failed to download release from ${installMetadata.source}: ${getErrorMessage(error)}`,
     );
   }
+}
+
+interface GithubReleaseData {
+  assets: Asset[];
+  tag_name: string;
+  tarball_url?: string;
+  zipball_url?: string;
 }
 
 interface Asset {
@@ -278,9 +352,7 @@ export function findReleaseAsset(assets: Asset[]): Asset | undefined {
   return undefined;
 }
 
-async function fetchJson(
-  url: string,
-): Promise<{ assets: Asset[]; tag_name: string }> {
+async function fetchJson<T>(url: string): Promise<T> {
   const headers: { 'User-Agent': string; Authorization?: string } = {
     'User-Agent': 'gemini-cli',
   };
@@ -300,7 +372,7 @@ async function fetchJson(
         res.on('data', (chunk) => chunks.push(chunk));
         res.on('end', () => {
           const data = Buffer.concat(chunks).toString();
-          resolve(JSON.parse(data) as { assets: Asset[]; tag_name: string });
+          resolve(JSON.parse(data) as T);
         });
       })
       .on('error', reject);
@@ -336,10 +408,12 @@ async function downloadFile(url: string, dest: string): Promise<void> {
 }
 
 function extractFile(file: string, dest: string) {
+  const safeFile = quote([file]);
+  const safeDest = quote([dest]);
   if (file.endsWith('.tar.gz')) {
-    execSync(`tar -xzf ${file} -C ${dest}`);
+    execSync(`tar -xzf ${safeFile} -C ${safeDest}`);
   } else if (file.endsWith('.zip')) {
-    execSync(`unzip ${file} -d ${dest}`);
+    execSync(`unzip ${safeFile} -d ${safeDest}`);
   } else {
     throw new Error(`Unsupported file extension for extraction: ${file}`);
   }

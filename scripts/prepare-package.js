@@ -46,7 +46,6 @@ copyFiles('core', {
 copyFiles('cli', {
   'README.md': 'README.md',
   LICENSE: 'LICENSE',
-  'npm-shrinkwrap.json': 'npm-shrinkwrap.json',
 });
 
 console.log('Successfully prepared all packages.');

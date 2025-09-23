@@ -16,9 +16,11 @@ on:
         required: true
         type: 'choice'
         options:
-          - 'stable'
           - 'preview'
+          - 'nightly'
+          - 'latest'
           - 'dev'
+        default: 'dev'
       dry_run:
         description: 'Run a dry-run of the release process; no branches, npm packages or GitHub releases will be created.'
         required: true
@@ -29,10 +31,15 @@ on:
         required: false
         type: 'boolean'
         default: false
+      skip_github_release:
+        description: 'Select to skip creating a GitHub release and create a npm release only.'
+        required: false
+        type: 'boolean'
+        default: false
 
 jobs:
   release:
-    runs-on: 'ubuntu-latest'
+    runs-on: 'self-hosted'
     permissions:
       contents: 'write'
       packages: 'write'
@@ -70,6 +77,7 @@ jobs:
       - name: 'Publish Release'
         uses: './.github/actions/publish-release'
         with:
+          force-skip-tests: '${{ github.event.inputs.force_skip_tests }}'
           release-version: '${{ steps.release_info.outputs.RELEASE_VERSION }}'
           release-tag: '${{ github.event.inputs.version }}'
           npm-tag: '${{ github.event.inputs.npm_channel }}'
@@ -78,3 +86,4 @@ jobs:
           github-token: '${{ secrets.GITHUB_TOKEN }}'
           dry-run: '${{ github.event.inputs.dry_run }}'
           previous-tag: '${{ steps.release_info.outputs.PREVIOUS_TAG }}'
+          skip-github-release: '${{ github.event.inputs.skip_github_release }}'
