@@ -367,8 +367,78 @@ describe('chatCommand', () => {
       });
     });
 
-    it('should return an error if checkpoint is not found', async () => {
+    it('should prompt for confirmation if checkpoint exists', async () => {
+      mockContext.services.logger.checkpointExists = vi
+        .fn()
+        .mockResolvedValue(true);
+      mockContext.invocation = {
+        raw: `/chat delete ${tag}`,
+        name: 'delete',
+        args: tag,
+      };
+
+      const result = await deleteCommand?.action?.(mockContext, tag);
+
+      expect(mockContext.services.logger.checkpointExists).toHaveBeenCalledWith(
+        tag,
+      );
+      expect(mockDeleteCheckpoint).not.toHaveBeenCalled();
+      expect(result).toMatchObject({
+        type: 'confirm_action',
+        originalInvocation: { raw: `/chat delete ${tag}` },
+      });
+      // Check that prompt is a React element and contains the tag
+      expect(result).toHaveProperty('prompt');
+      const promptAsString = JSON.stringify(result?.['prompt']);
+      expect(promptAsString).include(tag);
+    });
+
+    it('should delete directly if checkpoint does not exist', async () => {
+      mockContext.services.logger.checkpointExists = vi
+        .fn()
+        .mockResolvedValue(false);
+      mockContext.invocation = {
+        raw: `/chat delete ${tag}`,
+        name: 'delete',
+        args: tag,
+      };
+
+      const result = await deleteCommand?.action?.(mockContext, tag);
+
+      expect(mockContext.services.logger.checkpointExists).toHaveBeenCalledWith(
+        tag,
+      );
+      expect(mockDeleteCheckpoint).toHaveBeenCalledWith(tag);
+      expect(result).not.toMatchObject({
+        type: 'confirm_action',
+      });
+    });
+
+    it('should not delete if confirmation is denied', async () => {
+      mockContext.services.logger.checkpointExists = vi
+        .fn()
+        .mockResolvedValue(true);
+      mockContext.overwriteConfirmed = false; // Explicitly set to false
+      mockContext.invocation = {
+        raw: `/chat delete ${tag}`,
+        name: 'delete',
+        args: tag,
+      };
+
+      const result = await deleteCommand?.action?.(mockContext, tag);
+
+      // It should ask for confirmation
+      expect(result).toMatchObject({
+        type: 'confirm_action',
+      });
+
+      // But it should NOT proceed to delete
+      expect(mockDeleteCheckpoint).not.toHaveBeenCalled();
+    });
+
+    it('should return an error when trying to delete a non-existent checkpoint', async () => {
       mockDeleteCheckpoint.mockResolvedValue(false);
+      mockContext.overwriteConfirmed = true;
       const result = await deleteCommand?.action?.(mockContext, tag);
       expect(result).toEqual({
         type: 'message',
@@ -377,9 +447,17 @@ describe('chatCommand', () => {
       });
     });
 
-    it('should delete the conversation', async () => {
+    it('should delete the conversation when confirmation is provided', async () => {
+      // This test simulates the scenario where the user has already confirmed
+      // the action, e.g., by responding "yes" to the confirmation prompt.
+      const mockCheckpointExists = vi.fn().mockResolvedValue(true);
+      mockContext.services.logger.checkpointExists = mockCheckpointExists;
+      mockContext.overwriteConfirmed = true;
+
       const result = await deleteCommand?.action?.(mockContext, tag);
 
+      // Ensure we don't even check for the file's existence, since we're forcing the action.
+      expect(mockCheckpointExists).not.toHaveBeenCalled();
       expect(mockDeleteCheckpoint).toHaveBeenCalledWith(tag);
       expect(result).toEqual({
         type: 'message',

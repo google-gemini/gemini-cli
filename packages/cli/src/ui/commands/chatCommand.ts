@@ -239,7 +239,7 @@ const deleteCommand: SlashCommand = {
   name: 'delete',
   description: 'Delete a conversation checkpoint. Usage: /chat delete <tag>',
   kind: CommandKind.BUILT_IN,
-  action: async (context, args): Promise<MessageActionReturn> => {
+  action: async (context, args): Promise<SlashCommandActionReturn> => {
     const tag = args.trim();
     if (!tag) {
       return {
@@ -251,6 +251,26 @@ const deleteCommand: SlashCommand = {
 
     const { logger } = context.services;
     await logger.initialize();
+
+    if (!context.overwriteConfirmed) {
+      const exists = await logger.checkpointExists(tag);
+      if (exists) {
+        return {
+          type: 'confirm_action',
+          prompt: React.createElement(
+            Text,
+            null,
+            'Are you sure you want to delete conversation checkpoint: ',
+            React.createElement(Text, { color: theme.text.accent }, tag),
+            '?',
+          ),
+          originalInvocation: {
+            raw: context.invocation?.raw || `/chat delete ${tag}`,
+          },
+        };
+      }
+    }
+
     const deleted = await logger.deleteCheckpoint(tag);
 
     if (deleted) {
