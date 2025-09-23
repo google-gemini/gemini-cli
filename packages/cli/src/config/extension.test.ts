@@ -789,16 +789,11 @@ describe('extension tests', () => {
       ).resolves.toBe('my-local-extension');
 
       expect(consoleInfoSpy).toHaveBeenCalledWith(
-        'This extension will run the following MCP servers: ',
-      );
-      expect(consoleInfoSpy).toHaveBeenCalledWith(
-        '  * test-server (local): a local mcp server',
-      );
-      expect(consoleInfoSpy).toHaveBeenCalledWith(
-        '  * test-server-2 (remote): a remote mcp server',
-      );
-      expect(consoleInfoSpy).toHaveBeenCalledWith(
-        'The extension will append info to your gemini.md context',
+        `Extensions may introduce unexpected behavior.
+Ensure you have investigated the extension source and trust the author.
+This extension will run the following MCP servers:
+  * test-server (local): node server.js
+  * test-server-2 (remote): https://google.com`,
       );
     });
 
@@ -822,7 +817,7 @@ describe('extension tests', () => {
       ).resolves.toBe('my-local-extension');
 
       expect(mockQuestion).toHaveBeenCalledWith(
-        expect.stringContaining('Do you want to continue? (y/n)'),
+        expect.stringContaining('Do you want to continue? [Y/n]: '),
         expect.any(Function),
       );
     });
@@ -847,7 +842,7 @@ describe('extension tests', () => {
       ).rejects.toThrow('Installation cancelled by user.');
 
       expect(mockQuestion).toHaveBeenCalledWith(
-        expect.stringContaining('Do you want to continue? (y/n)'),
+        expect.stringContaining('Do you want to continue? [Y/n]: '),
         expect.any(Function),
       );
     });
