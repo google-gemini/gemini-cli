@@ -40,6 +40,8 @@ const renderComponent = (
   const mockConfig = contextValue
     ? ({
         getModel: vi.fn(() => DEFAULT_GEMINI_MODEL_AUTO),
+        setModel: vi.fn(),
+        getUsageStatisticsEnabled: vi.fn(() => true),
         ...contextValue,
       } as Config)
     : undefined;
@@ -132,15 +134,15 @@ describe('<ModelDialog />', () => {
   });
 
   it('calls config.setModel and onClose when DescriptiveRadioButtonSelect.onSelect is triggered', () => {
-    const mockSetModel = vi.fn();
-    const { props } = renderComponent({}, { setModel: mockSetModel });
+    const { props, mockConfig } = renderComponent({}, {}); // Pass empty object for contextValue
 
     const childOnSelect = mockedSelect.mock.calls[0][0].onSelect;
     expect(childOnSelect).toBeDefined();
 
     childOnSelect(DEFAULT_GEMINI_MODEL);
 
-    expect(mockSetModel).toHaveBeenCalledWith(DEFAULT_GEMINI_MODEL);
+    // Assert against the default mock provided by renderComponent
+    expect(mockConfig?.setModel).toHaveBeenCalledWith(DEFAULT_GEMINI_MODEL);
     expect(props.onClose).toHaveBeenCalledTimes(1);
   });
 
