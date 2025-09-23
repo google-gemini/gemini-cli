@@ -521,10 +521,12 @@ export class ContentRetryFailureEvent implements BaseTelemetryEvent {
   total_attempts: number;
   final_error_type: string;
   total_duration_ms?: number; // Optional: total time spent retrying
+  model: string;
 
   constructor(
     total_attempts: number,
     final_error_type: string,
+    model: string,
     total_duration_ms?: number,
   ) {
     this['event.name'] = 'content_retry_failure';
@@ -532,6 +534,7 @@ export class ContentRetryFailureEvent implements BaseTelemetryEvent {
     this.total_attempts = total_attempts;
     this.final_error_type = final_error_type;
     this.total_duration_ms = total_duration_ms;
+    this.model = model;
   }
 }
 

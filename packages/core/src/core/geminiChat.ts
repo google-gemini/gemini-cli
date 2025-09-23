@@ -322,6 +322,7 @@ export class GeminiChat {
               new ContentRetryFailureEvent(
                 INVALID_CONTENT_RETRY_OPTIONS.maxAttempts,
                 (lastError as InvalidStreamError).type,
+                model,
               ),
             );
           }
