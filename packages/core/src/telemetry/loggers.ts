@@ -32,6 +32,7 @@ import {
   EVENT_RIPGREP_FALLBACK,
   EVENT_MODEL_ROUTING,
   EVENT_EXTENSION_INSTALL,
+  EVENT_MODEL_SLASH_COMMAND,
 } from './constants.js';
 import type {
   ApiErrorEvent,
@@ -60,6 +61,7 @@ import type {
   ExtensionEnableEvent,
   ExtensionUninstallEvent,
   ExtensionInstallEvent,
+  ModelSlashCommandEvent,
 } from './types.js';
 import {
   recordApiErrorMetrics,
@@ -692,6 +694,28 @@ export function logModelRouting(
   const logger = logs.getLogger(SERVICE_NAME);
   const logRecord: LogRecord = {
     body: `Model routing decision. Model: ${event.decision_model}, Source: ${event.decision_source}`,
+    attributes,
+  };
+  logger.emit(logRecord);
+  recordModelRoutingMetrics(config, event);
+}
+
+export function logModelSlashCommand(
+  config: Config,
+  event: ModelSlashCommandEvent,
+): void {
+  ClearcutLogger.getInstance(config)?.logModelSlashCommandEvent(event);
+  if (!isTelemetrySdkInitialized()) return;
+
+  const attributes: LogAttributes = {
+    ...getCommonAttributes(config),
+    ...event,
+    'event.name': EVENT_MODEL_SLASH_COMMAND,
+  };
+
+  const logger = logs.getLogger(SERVICE_NAME);
+  const logRecord: LogRecord = {
+    body: `Model slash command. Model: ${event.model_name}`,
     attributes,
   };
   logger.emit(logRecord);

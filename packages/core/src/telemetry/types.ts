@@ -561,33 +561,6 @@ export class ModelRoutingEvent implements BaseTelemetryEvent {
   }
 }
 
-export type TelemetryEvent =
-  | StartSessionEvent
-  | EndSessionEvent
-  | UserPromptEvent
-  | ToolCallEvent
-  | ApiRequestEvent
-  | ApiErrorEvent
-  | ApiResponseEvent
-  | FlashFallbackEvent
-  | LoopDetectedEvent
-  | LoopDetectionDisabledEvent
-  | NextSpeakerCheckEvent
-  | KittySequenceOverflowEvent
-  | MalformedJsonResponseEvent
-  | IdeConnectionEvent
-  | ConversationFinishedEvent
-  | SlashCommandEvent
-  | FileOperationEvent
-  | InvalidChunkEvent
-  | ContentRetryEvent
-  | ContentRetryFailureEvent
-  | ExtensionEnableEvent
-  | ExtensionInstallEvent
-  | ExtensionUninstallEvent
-  | ModelRoutingEvent
-  | ToolOutputTruncatedEvent;
-
 export class ExtensionInstallEvent implements BaseTelemetryEvent {
   'event.name': 'extension_install';
   'event.timestamp': string;
@@ -669,3 +642,43 @@ export class ExtensionEnableEvent implements BaseTelemetryEvent {
     this.setting_scope = settingScope;
   }
 }
+
+export class ModelSlashCommandEvent implements BaseTelemetryEvent {
+  'event.name': 'model_slash_command';
+  'event.timestamp': string;
+  model_name: string;
+
+  constructor(model_name: string) {
+    this['event.name'] = 'model_slash_command';
+    this['event.timestamp'] = new Date().toISOString();
+    this.model_name = model_name;
+  }
+}
+
+export type TelemetryEvent =
+  | StartSessionEvent
+  | EndSessionEvent
+  | UserPromptEvent
+  | ToolCallEvent
+  | ApiRequestEvent
+  | ApiErrorEvent
+  | ApiResponseEvent
+  | FlashFallbackEvent
+  | LoopDetectedEvent
+  | LoopDetectionDisabledEvent
+  | NextSpeakerCheckEvent
+  | KittySequenceOverflowEvent
+  | MalformedJsonResponseEvent
+  | IdeConnectionEvent
+  | ConversationFinishedEvent
+  | SlashCommandEvent
+  | FileOperationEvent
+  | InvalidChunkEvent
+  | ContentRetryEvent
+  | ContentRetryFailureEvent
+  | ExtensionEnableEvent
+  | ExtensionInstallEvent
+  | ExtensionUninstallEvent
+  | ModelRoutingEvent
+  | ToolOutputTruncatedEvent
+  | ModelSlashCommandEvent;
