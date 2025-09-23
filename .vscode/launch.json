@@ -9,7 +9,7 @@
       "request": "launch",
       "name": "Build & Launch CLI",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "build-and-start", "extensions", "install", "https://github.com/jakemac53/test-gemini-cli-extension"],
+      "runtimeArgs": ["run", "build-and-start"],
       "skipFiles": ["<node_internals>/**"],
       "cwd": "${workspaceFolder}",
       "console": "integratedTerminal",
