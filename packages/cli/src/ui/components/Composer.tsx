@@ -26,12 +26,10 @@ import { useSettings } from '../contexts/SettingsContext.js';
 import { ApprovalMode } from '@google/gemini-cli-core';
 import { StreamingState } from '../types.js';
 import { ConfigInitDisplay } from '../components/ConfigInitDisplay.js';
-import { useLayoutConfig } from '../hooks/useLayoutConfig.js';
 
 export const Composer = () => {
   const config = useConfig();
   const settings = useSettings();
-  const layout = useLayoutConfig();
   const uiState = useUIState();
   const uiActions = useUIActions();
   const { vimEnabled, vimMode } = useVimMode();
@@ -178,7 +176,7 @@ export const Composer = () => {
         />
       )}
 
-      {!settings.merged.ui?.hideFooter && layout.shouldShowFooterInComposer && (
+      {!settings.merged.ui?.hideFooter && (
         <Footer {...footerProps} vimMode={vimEnabled ? vimMode : undefined} />
       )}
     </Box>
