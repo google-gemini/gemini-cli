@@ -35,7 +35,7 @@ runs:
         timeout_seconds: 900
         retry_wait_seconds: 30
         max_attempts: 10
-        command: 'cd ./verify && npm install --prefer-online --no-cache -g ${{inputs.npm-package}}'
+        command: 'cd ./verify && pkg="${{ inputs.npm-package }}" && npm install --prefer-online --no-cache -g "$pkg"'
 
     # This provides a very basic smoke test for Gemini CLI
     - name: 'Run Gemini CLI'
