@@ -5,7 +5,7 @@
  */
 
 import * as osActual from 'node:os';
-import { ideContextStore } from '@google/gemini-cli-core';
+import { FatalConfigError, ideContextStore } from '@google/gemini-cli-core';
 import {
   describe,
   it,
@@ -24,6 +24,7 @@ import {
   getTrustedFoldersPath,
   TrustLevel,
   isWorkspaceTrusted,
+  resetTrustedFoldersForTesting,
 } from './trustedFolders.js';
 import type { Settings } from './settings.js';
 
@@ -55,6 +56,7 @@ describe('Trusted Folders Loading', () => {
   let mockFsWriteFileSync: Mocked<typeof fs.writeFileSync>;
 
   beforeEach(() => {
+    resetTrustedFoldersForTesting();
     vi.resetAllMocks();
     mockFsExistsSync = vi.mocked(fs.existsSync);
     mockStripJsonComments = vi.mocked(stripJsonComments);
@@ -208,6 +210,7 @@ describe('isWorkspaceTrusted', () => {
   };
 
   beforeEach(() => {
+    resetTrustedFoldersForTesting();
     vi.spyOn(process, 'cwd').mockImplementation(() => mockCwd);
     vi.spyOn(fs, 'readFileSync').mockImplementation((p) => {
       if (p === getTrustedFoldersPath()) {
@@ -224,6 +227,35 @@ describe('isWorkspaceTrusted', () => {
     vi.restoreAllMocks();
     // Clear the object
     Object.keys(mockRules).forEach((key) => delete mockRules[key]);
+  });
+
+  it('should throw a fatal error if the config is malformed', () => {
+    mockCwd = '/home/user/projectA';
+    // This mock needs to be specific to this test to override the one in beforeEach
+    vi.spyOn(fs, 'readFileSync').mockImplementation((p) => {
+      if (p === getTrustedFoldersPath()) {
+        return '{"foo": "bar",}'; // Malformed JSON with trailing comma
+      }
+      return '{}';
+    });
+    expect(() => isWorkspaceTrusted(mockSettings)).toThrow(FatalConfigError);
+    expect(() => isWorkspaceTrusted(mockSettings)).toThrow(
+      /Please fix the configuration file/,
+    );
+  });
+
+  it('should throw a fatal error if the config is not a JSON object', () => {
+    mockCwd = '/home/user/projectA';
+    vi.spyOn(fs, 'readFileSync').mockImplementation((p) => {
+      if (p === getTrustedFoldersPath()) {
+        return 'null';
+      }
+      return '{}';
+    });
+    expect(() => isWorkspaceTrusted(mockSettings)).toThrow(FatalConfigError);
+    expect(() => isWorkspaceTrusted(mockSettings)).toThrow(
+      /not a valid JSON object/,
+    );
   });
 
   it('should return true for a directly trusted folder', () => {
@@ -298,7 +330,9 @@ describe('isWorkspaceTrusted', () => {
 
 describe('isWorkspaceTrusted with IDE override', () => {
   afterEach(() => {
+    vi.clearAllMocks();
     ideContextStore.clear();
+    resetTrustedFoldersForTesting();
   });
 
   const mockSettings: Settings = {
@@ -357,5 +391,36 @@ describe('isWorkspaceTrusted with IDE override', () => {
       isTrusted: true,
       source: undefined,
     });
+  });
+});
+
+describe('Trusted Folders Caching', () => {
+  beforeEach(() => {
+    resetTrustedFoldersForTesting();
+    vi.mocked(fs.existsSync).mockReturnValue(true);
+    vi.mocked(fs.readFileSync).mockReturnValue('{}');
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('should cache the loaded folders object', () => {
+    const readSpy = vi.spyOn(fs, 'readFileSync');
+
+    // First call should read the file
+    loadTrustedFolders();
+    expect(readSpy).toHaveBeenCalledTimes(1);
+
+    // Second call should use the cache
+    loadTrustedFolders();
+    expect(readSpy).toHaveBeenCalledTimes(1);
+
+    // Resetting should clear the cache
+    resetTrustedFoldersForTesting();
+
+    // Third call should read the file again
+    loadTrustedFolders();
+    expect(readSpy).toHaveBeenCalledTimes(2);
   });
 });
