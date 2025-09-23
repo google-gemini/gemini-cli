@@ -208,7 +208,7 @@ function getWorkspaceTrustFromLocalConfig(
       (error) => `Error in ${error.path}: ${error.message}`,
     );
     throw new FatalConfigError(
-      `${errorMessages.join('\n')}\nPlease fix the configuration file(s) and try again.`,
+      `${errorMessages.join('\n')}\nPlease fix the configuration file and try again.`,
     );
   }
 
