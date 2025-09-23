@@ -42,8 +42,6 @@ import { FileCommandLoader } from '../../services/FileCommandLoader.js';
 import { McpPromptLoader } from '../../services/McpPromptLoader.js';
 import { parseSlashCommand } from '../../utils/commands.js';
 import type { ExtensionUpdateState } from '../state/extensions.js';
-import { ModelSlashCommandEvent } from '@google/gemini-cli-core/src/telemetry/types.js';
-import { logModelSlashCommand } from '@google/gemini-cli-core/src/telemetry/loggers.js';
 
 interface SlashCommandProcessorActions {
   openAuthDialog: () => void;
@@ -530,10 +528,6 @@ export const useSlashCommandProcessor = (
         return { type: 'handled' };
       } finally {
         if (config && resolvedCommandPath[0] && !hasError) {
-          if (commandToExecute && commandToExecute.name === 'model') {
-            const event = new ModelSlashCommandEvent(config.getModel());
-            logModelSlashCommand(config, event);
-          }
           const event = makeSlashCommandEvent({
             command: resolvedCommandPath[0],
             subcommand,
