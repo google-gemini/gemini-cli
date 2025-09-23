@@ -707,7 +707,7 @@ export class TestRig {
 
     for (const jsonStr of jsonObjects) {
       try {
-        const logData = JSON.Parse(jsonStr);
+        const logData = JSON.parse(jsonStr);
         if (
           logData.attributes &&
           logData.attributes['event.name'] === 'gemini_cli.api_request'
