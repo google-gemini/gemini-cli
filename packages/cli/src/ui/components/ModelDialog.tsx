@@ -73,7 +73,7 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
     (model: string) => {
       if (config) {
         config.setModel(model);
-        const event = new ModelSlashCommandEvent(config.getModel());
+        const event = new ModelSlashCommandEvent(model);
         logModelSlashCommand(config, event);
       }
       onClose();
