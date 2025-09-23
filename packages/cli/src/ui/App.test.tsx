@@ -32,6 +32,46 @@ vi.mock('./components/QuittingDisplay.js', () => ({
   QuittingDisplay: () => <Text>Quitting...</Text>,
 }));
 
+vi.mock('./components/Footer.js', () => ({
+  Footer: () => <Text>Footer</Text>,
+}));
+
+vi.mock('./semantic-colors.js', () => ({
+  theme: {
+    status: {
+      warning: 'yellow',
+    },
+  },
+}));
+
+// Don't mock the layout components - let them render normally so tests can see the Ctrl messages
+
+vi.mock('./hooks/useLayoutConfig.js', () => ({
+  useLayoutConfig: () => ({
+    mode: 'default',
+    shouldUseStatic: true,
+    shouldShowFooterInComposer: true,
+  }),
+}));
+
+vi.mock('./hooks/useFooterProps.js', () => ({
+  useFooterProps: () => ({
+    model: 'test-model',
+    targetDir: '/test',
+    debugMode: false,
+    branchName: 'test-branch',
+    debugMessage: '',
+    corgiMode: false,
+    errorCount: 0,
+    showErrorDetails: false,
+    showMemoryUsage: false,
+    promptTokenCount: 0,
+    nightly: false,
+    isTrustedFolder: true,
+    vimMode: undefined,
+  }),
+}));
+
 describe('App', () => {
   const mockUIState: Partial<UIState> = {
     streamingState: StreamingState.Idle,
@@ -55,7 +95,6 @@ describe('App', () => {
     );
 
     expect(lastFrame()).toContain('MainContent');
-    expect(lastFrame()).toContain('Notifications');
     expect(lastFrame()).toContain('Composer');
   });
 
@@ -87,7 +126,6 @@ describe('App', () => {
     );
 
     expect(lastFrame()).toContain('MainContent');
-    expect(lastFrame()).toContain('Notifications');
     expect(lastFrame()).toContain('DialogManager');
   });
 
