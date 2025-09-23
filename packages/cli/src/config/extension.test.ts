@@ -24,9 +24,8 @@ import {
 import {
   GEMINI_DIR,
   type GeminiCLIExtension,
-  ClearcutLogger,
-  type Config,
   ExtensionUninstallEvent,
+  ExtensionEnableEvent,
 } from '@google/gemini-cli-core';
 import { execSync } from 'node:child_process';
 import { SettingScope } from './settings.js';
@@ -69,20 +68,18 @@ vi.mock('./trustedFolders.js', async (importOriginal) => {
   };
 });
 
+const mockLogExtensionEnable = vi.hoisted(() => vi.fn());
+const mockLogExtensionInstallEvent = vi.hoisted(() => vi.fn());
+const mockLogExtensionUninstall = vi.hoisted(() => vi.fn());
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const actual =
     await importOriginal<typeof import('@google/gemini-cli-core')>();
-  const mockLogExtensionInstallEvent = vi.fn();
-  const mockLogExtensionUninstallEvent = vi.fn();
   return {
     ...actual,
-    ClearcutLogger: {
-      getInstance: vi.fn(() => ({
-        logExtensionInstallEvent: mockLogExtensionInstallEvent,
-        logExtensionUninstallEvent: mockLogExtensionUninstallEvent,
-      })),
-    },
-    Config: vi.fn(),
+    logExtensionEnable: mockLogExtensionEnable,
+    logExtensionInstallEvent: mockLogExtensionInstallEvent,
+    logExtensionUninstall: mockLogExtensionUninstall,
+    ExtensionEnableEvent: vi.fn(),
     ExtensionInstallEvent: vi.fn(),
     ExtensionUninstallEvent: vi.fn(),
   };
@@ -373,6 +370,70 @@ describe('extension tests', () => {
       expect(serverConfig.env!.MISSING_VAR_BRACES).toBe('${ALSO_UNDEFINED}');
     });
 
+    it('should skip extensions with invalid JSON and log a warning', () => {
+      const consoleSpy = vi
+        .spyOn(console, 'error')
+        .mockImplementation(() => {});
+
+      // Good extension
+      createExtension({
+        extensionsDir: userExtensionsDir,
+        name: 'good-ext',
+        version: '1.0.0',
+      });
+
+      // Bad extension
+      const badExtDir = path.join(userExtensionsDir, 'bad-ext');
+      fs.mkdirSync(badExtDir);
+      const badConfigPath = path.join(badExtDir, EXTENSIONS_CONFIG_FILENAME);
+      fs.writeFileSync(badConfigPath, '{ "name": "bad-ext"'); // Malformed
+
+      const extensions = loadExtensions();
+
+      expect(extensions).toHaveLength(1);
+      expect(extensions[0].config.name).toBe('good-ext');
+      expect(consoleSpy).toHaveBeenCalledOnce();
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining(
+          `Warning: Skipping extension in ${badExtDir}: Failed to load extension config from ${badConfigPath}`,
+        ),
+      );
+
+      consoleSpy.mockRestore();
+    });
+
+    it('should skip extensions with missing name and log a warning', () => {
+      const consoleSpy = vi
+        .spyOn(console, 'error')
+        .mockImplementation(() => {});
+
+      // Good extension
+      createExtension({
+        extensionsDir: userExtensionsDir,
+        name: 'good-ext',
+        version: '1.0.0',
+      });
+
+      // Bad extension
+      const badExtDir = path.join(userExtensionsDir, 'bad-ext-no-name');
+      fs.mkdirSync(badExtDir);
+      const badConfigPath = path.join(badExtDir, EXTENSIONS_CONFIG_FILENAME);
+      fs.writeFileSync(badConfigPath, JSON.stringify({ version: '1.0.0' }));
+
+      const extensions = loadExtensions();
+
+      expect(extensions).toHaveLength(1);
+      expect(extensions[0].config.name).toBe('good-ext');
+      expect(consoleSpy).toHaveBeenCalledOnce();
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining(
+          `Warning: Skipping extension in ${badExtDir}: Failed to load extension config from ${badConfigPath}: Invalid configuration in ${badConfigPath}: missing "name"`,
+        ),
+      );
+
+      consoleSpy.mockRestore();
+    });
+
     it('should filter trust out of mcp servers', () => {
       createExtension({
         extensionsDir: userExtensionsDir,
@@ -591,15 +652,49 @@ describe('extension tests', () => {
     it('should throw an error and cleanup if gemini-extension.json is missing', async () => {
       const sourceExtDir = path.join(tempHomeDir, 'bad-extension');
       fs.mkdirSync(sourceExtDir, { recursive: true });
+      const configPath = path.join(sourceExtDir, EXTENSIONS_CONFIG_FILENAME);
+
+      await expect(
+        installExtension({ source: sourceExtDir, type: 'local' }),
+      ).rejects.toThrow(`Configuration file not found at ${configPath}`);
+
+      const targetExtDir = path.join(userExtensionsDir, 'bad-extension');
+      expect(fs.existsSync(targetExtDir)).toBe(false);
+    });
+
+    it('should throw an error for invalid JSON in gemini-extension.json', async () => {
+      const sourceExtDir = path.join(tempHomeDir, 'bad-json-ext');
+      fs.mkdirSync(sourceExtDir, { recursive: true });
+      const configPath = path.join(sourceExtDir, EXTENSIONS_CONFIG_FILENAME);
+      fs.writeFileSync(configPath, '{ "name": "bad-json", "version": "1.0.0"'); // Malformed JSON
 
       await expect(
         installExtension({ source: sourceExtDir, type: 'local' }),
       ).rejects.toThrow(
-        `Invalid extension at ${sourceExtDir}. Please make sure it has a valid gemini-extension.json file.`,
+        new RegExp(
+          `^Failed to load extension config from ${configPath.replace(
+            /\\/g,
+            '\\\\',
+          )}`,
+        ),
       );
+    });
 
-      const targetExtDir = path.join(userExtensionsDir, 'bad-extension');
-      expect(fs.existsSync(targetExtDir)).toBe(false);
+    it('should throw an error for missing name in gemini-extension.json', async () => {
+      const sourceExtDir = createExtension({
+        extensionsDir: tempHomeDir,
+        name: 'missing-name-ext',
+        version: '1.0.0',
+      });
+      const configPath = path.join(sourceExtDir, EXTENSIONS_CONFIG_FILENAME);
+      // Overwrite with invalid config
+      fs.writeFileSync(configPath, JSON.stringify({ version: '1.0.0' }));
+
+      await expect(
+        installExtension({ source: sourceExtDir, type: 'local' }),
+      ).rejects.toThrow(
+        `Invalid configuration in ${configPath}: missing "name"`,
+      );
     });
 
     it('should install an extension from a git URL', async () => {
@@ -665,8 +760,7 @@ describe('extension tests', () => {
 
       await installExtension({ source: sourceExtDir, type: 'local' });
 
-      const logger = ClearcutLogger.getInstance({} as Config);
-      expect(logger?.logExtensionInstallEvent).toHaveBeenCalled();
+      expect(mockLogExtensionInstallEvent).toHaveBeenCalled();
     });
 
     it('should show users information on their mcp server when installing', async () => {
@@ -695,16 +789,11 @@ describe('extension tests', () => {
       ).resolves.toBe('my-local-extension');
 
       expect(consoleInfoSpy).toHaveBeenCalledWith(
-        'This extension will run the following MCP servers: ',
-      );
-      expect(consoleInfoSpy).toHaveBeenCalledWith(
-        '  * test-server (local): a local mcp server',
-      );
-      expect(consoleInfoSpy).toHaveBeenCalledWith(
-        '  * test-server-2 (remote): a remote mcp server',
-      );
-      expect(consoleInfoSpy).toHaveBeenCalledWith(
-        'The extension will append info to your gemini.md context',
+        `Extensions may introduce unexpected behavior.
+Ensure you have investigated the extension source and trust the author.
+This extension will run the following MCP servers:
+  * test-server (local): node server.js
+  * test-server-2 (remote): https://google.com`,
       );
     });
 
@@ -728,7 +817,7 @@ describe('extension tests', () => {
       ).resolves.toBe('my-local-extension');
 
       expect(mockQuestion).toHaveBeenCalledWith(
-        expect.stringContaining('Do you want to continue? (y/n)'),
+        expect.stringContaining('Do you want to continue? [Y/n]: '),
         expect.any(Function),
       );
     });
@@ -753,7 +842,7 @@ describe('extension tests', () => {
       ).rejects.toThrow('Installation cancelled by user.');
 
       expect(mockQuestion).toHaveBeenCalledWith(
-        expect.stringContaining('Do you want to continue? (y/n)'),
+        expect.stringContaining('Do you want to continue? [Y/n]: '),
         expect.any(Function),
       );
     });
@@ -850,9 +939,10 @@ describe('extension tests', () => {
 
       await uninstallExtension('my-local-extension');
 
-      const logger = ClearcutLogger.getInstance({} as Config);
-      expect(logger?.logExtensionUninstallEvent).toHaveBeenCalledWith(
-        new ExtensionUninstallEvent('my-local-extension', 'success'),
+      expect(mockLogExtensionUninstall).toHaveBeenCalled();
+      expect(ExtensionUninstallEvent).toHaveBeenCalledWith(
+        'my-local-extension',
+        'success',
       );
     });
 
@@ -871,9 +961,10 @@ describe('extension tests', () => {
       await uninstallExtension(gitUrl);
 
       expect(fs.existsSync(sourceExtDir)).toBe(false);
-      const logger = ClearcutLogger.getInstance({} as Config);
-      expect(logger?.logExtensionUninstallEvent).toHaveBeenCalledWith(
-        new ExtensionUninstallEvent('gemini-sql-extension', 'success'),
+      expect(mockLogExtensionUninstall).toHaveBeenCalled();
+      expect(ExtensionUninstallEvent).toHaveBeenCalledWith(
+        'gemini-sql-extension',
+        'success',
       );
     });
 
@@ -1134,6 +1225,22 @@ describe('extension tests', () => {
       activeExtensions = getActiveExtensions();
       expect(activeExtensions).toHaveLength(1);
       expect(activeExtensions[0].name).toBe('ext1');
+    });
+
+    it('should log an enable event', () => {
+      createExtension({
+        extensionsDir: userExtensionsDir,
+        name: 'ext1',
+        version: '1.0.0',
+      });
+      disableExtension('ext1', SettingScope.Workspace);
+      enableExtension('ext1', SettingScope.Workspace);
+
+      expect(mockLogExtensionEnable).toHaveBeenCalled();
+      expect(ExtensionEnableEvent).toHaveBeenCalledWith(
+        'ext1',
+        SettingScope.Workspace,
+      );
     });
   });
 });
