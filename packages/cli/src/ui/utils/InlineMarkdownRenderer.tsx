@@ -61,7 +61,10 @@ const MARKDOWN_RULES: Array<{
   pattern: string;
 }> = [
   { key: 'bold', pattern: `(?<bold>\\*\\*.+?\\*\\*)` },
-  { key: 'italic', pattern: `(?<italic>\\*.+?\\*|_.+?_)` },
+  {
+    key: 'italic',
+    pattern: `(?<italic>(?<![a-zA-Z0-9])(?:\\*(?!\\s).+?(?<!\\s)\\*|_(?!\\s).+?(?<!\\s)_)(?![a-zA-Z0-9]))`,
+  },
   { key: 'strike', pattern: `(?<strike>~~.+?~~)` },
   { key: 'link', pattern: `(?<link>\\[.*?\\]\\((?:[^\\s()]|\\([^)]*\\))*\\))` },
   { key: 'inlineCode', pattern: `(?<inlineCode>\`+.+?\`+)` },
@@ -100,7 +103,7 @@ const extractLinkContent = (match: string) => {
     return { text: match, url: '', isSafe: false };
   }
   const url = linkMatch[2];
-  const isSafe = /^(https|http|mailto):/i.test(url);
+  const isSafe = /^(https|http|ftp|mailto):/i.test(url);
   return { text: linkMatch[1], url, isSafe };
 };
 
