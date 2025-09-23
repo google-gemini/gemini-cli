@@ -17,6 +17,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { execSync } from 'node:child_process';
 import { loadExtension } from '../extension.js';
+import { quote } from 'shell-quote';
 
 function getGitHubToken(): string | undefined {
   return process.env['GITHUB_TOKEN'];
@@ -219,11 +220,14 @@ export async function checkForExtensionUpdate(
     return;
   }
 }
-
+export interface GitHubDownloadResult {
+  tagName: string;
+  type: 'git' | 'github-release';
+}
 export async function downloadFromGitHubRelease(
   installMetadata: ExtensionInstallMetadata,
   destination: string,
-): Promise<string> {
+): Promise<GitHubDownloadResult> {
   const { source, ref } = installMetadata;
   const { owner, repo } = parseGitHubRepoForReleases(source);
 
@@ -288,7 +292,10 @@ export async function downloadFromGitHubRelease(
     }
 
     await fs.promises.unlink(downloadedAssetPath);
-    return releaseData.tag_name;
+    return {
+      tagName: releaseData.tag_name,
+      type: 'github-release',
+    };
   } catch (error) {
     throw new Error(
       `Failed to download release from ${installMetadata.source}: ${getErrorMessage(error)}`,
@@ -401,10 +408,12 @@ async function downloadFile(url: string, dest: string): Promise<void> {
 }
 
 function extractFile(file: string, dest: string) {
+  const safeFile = quote([file]);
+  const safeDest = quote([dest]);
   if (file.endsWith('.tar.gz')) {
-    execSync(`tar -xzf ${file} -C ${dest}`);
+    execSync(`tar -xzf ${safeFile} -C ${safeDest}`);
   } else if (file.endsWith('.zip')) {
-    execSync(`unzip ${file} -d ${dest}`);
+    execSync(`unzip ${safeFile} -d ${safeDest}`);
   } else {
     throw new Error(`Unsupported file extension for extraction: ${file}`);
   }
