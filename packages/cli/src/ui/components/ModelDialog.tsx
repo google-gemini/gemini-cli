@@ -84,7 +84,6 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
       flexDirection="column"
       padding={1}
       width="100%"
-      height="100%"
     >
       <Text bold>Select Model</Text>
       <Box marginTop={1}>
