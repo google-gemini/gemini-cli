@@ -300,6 +300,7 @@ export function recordModelSlashCommand(
   config: Config,
   event: ModelSlashCommandEvent,
 ): void {
+  if (!modelSlashCommandCallCounter || !isMetricsInitialized) return;
   modelSlashCommandCallCounter.add(1, {
     ...getCommonAttributes(config),
     'slash_command.model.model_name': event.model_name,
