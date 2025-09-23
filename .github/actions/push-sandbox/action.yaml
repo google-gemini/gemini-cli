@@ -45,7 +45,7 @@ runs:
       uses: 'docker/login-action@v3'
       with:
         registry: 'docker.io'
-        username: '${{ inputs.dockerhub-user }}'
+        username: '${{ inputs.dockerhub-username }}'
         password: '${{ inputs.dockerhub-token }}'
     - name: 'determine image tag'
       id: 'image_tag'
