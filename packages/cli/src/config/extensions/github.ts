@@ -273,6 +273,28 @@ export async function downloadFromGitHubRelease(
 
     extractFile(downloadedAssetPath, destination);
 
+    // For regular github releases, the repository is put inside of a top level
+    // directory. In this case we should see exactly two file in the destination
+    // dir, the archive and the directory. If we see that, we move all files
+    // from the directory up one level into the destination directory.
+    const files = await fs.promises.readdir(destination);
+    if (files.length === 2) {
+      const lonelyDirName = files.find((file) =>
+        fs.statSync(path.join(destination, file)).isDirectory(),
+      );
+      if (lonelyDirName) {
+        const dirPathToExtract = path.join(destination, lonelyDirName);
+        const extractedDirFiles = await fs.promises.readdir(dirPathToExtract);
+        for (const file of extractedDirFiles) {
+          await fs.promises.rename(
+            path.join(dirPathToExtract, file),
+            path.join(destination, file),
+          );
+        }
+        await fs.promises.rmdir(dirPathToExtract);
+      }
+    }
+
     await fs.promises.unlink(downloadedAssetPath);
     return {
       tagName: releaseData.tag_name,
