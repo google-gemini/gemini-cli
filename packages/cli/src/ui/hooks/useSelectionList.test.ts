@@ -784,7 +784,7 @@ describe('useSelectionList', () => {
       rerender({ items: newItems });
 
       // Active index should remain the same since items are deeply equal
-      expect(result.current.activeIndex).toBe(2);
+      expect(result.current.activeIndex).toBe(3);
       // onHighlight should NOT be called since the index didn't change
       expect(mockOnHighlight).not.toHaveBeenCalled();
     });

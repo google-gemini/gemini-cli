@@ -28,6 +28,7 @@ export interface UseSelectionListResult {
 
 interface SelectionListState<T> {
   activeIndex: number;
+  initialIndex: number;
   pendingHighlight: boolean;
   pendingSelect: boolean;
   items: Array<SelectionListItem<T>>;
@@ -184,7 +185,7 @@ function selectionListReducer<T>(
     case 'INITIALIZE': {
       const { initialIndex, items } = action.payload;
       if (
-        state.activeIndex === initialIndex &&
+        state.initialIndex === initialIndex &&
         areItemsEqual(state.items, items)
       ) {
         return state;
@@ -236,6 +237,7 @@ export function useSelectionList<T>({
 }: UseSelectionListOptions<T>): UseSelectionListResult {
   const [state, dispatch] = useReducer(selectionListReducer<T>, {
     activeIndex: computeInitialIndex(initialIndex, items),
+    initialIndex,
     pendingHighlight: false,
     pendingSelect: false,
     items,
