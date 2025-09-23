@@ -1,18 +1,12 @@
 # Trusted Folders
 
-The Trusted Folders feature is a critical security checkpoint in the Gemini CLI, designed to protect you from running potentially malicious code from untrusted sources.
-
-## The Core Idea: Security First
-
-The Gemini CLI is powerful — it can execute shell commands, read and write files, and interact with external tools. Because a project can contain local configurations (like `.gemini/settings.json` or `.env` files) that can define custom commands or alter the CLI's behavior, there's a risk: if you clone a repository from an untrusted source, it could contain a malicious configuration designed to run harmful commands automatically.
-
-The Trusted Folders feature prevents the CLI from blindly loading and acting on any configuration from a folder it doesn't know is safe.
+The Trusted Folders feature is a security setting that gives you control over which projects can use the full capabilities of the Gemini CLI. It prevents potentially malicious code from running by asking you to approve a folder before the CLI loads any project-specific configurations from it.
 
 ## Enabling the Feature
 
-To enable the Trusted Folders feature, you need to first enable the `folderTrust` feature.
+The Trusted Folders feature is **disabled by default**. To use it, you must first enable it in your settings.
 
-Add the following to your `settings.json`:
+Add the following to your user `settings.json` file:
 
 ```json
 {
@@ -24,46 +18,44 @@ Add the following to your `settings.json`:
 }
 ```
 
-When you run the Gemini CLI from a folder for which a trust decision has not yet been made, you will be automatically prompted with a trust dialog. This allows you to choose a trust level for the folder.
+## How It Works: The Trust Dialog
 
-## The Trust Check Process
+Once the feature is enabled, the first time you run the Gemini CLI from a folder, a dialog will automatically appear, prompting you to make a choice:
 
-Once the feature is enabled, the Gemini CLI determines if a folder is trusted by following this order of precedence every time it starts in a new workspace:
+- **Trust folder**: Grants full trust to the current folder (e.g., `my-project`).
+- **Trust parent folder**: Grants trust to the parent directory (e.g., `safe-projects`), which automatically trusts all of its subdirectories as well. This is useful if you keep all your safe projects in one place.
+- **Don't trust**: Marks the folder as untrusted. The CLI will operate in a restricted "safe mode."
 
-1.  **IDE Trust Signal**: If you are using the [IDE Integration](./ide-integration.md), the CLI first asks the IDE if the current workspace is trusted. Modern IDEs like VS Code have their own built-in workspace trust features. The IDE's response is used immediately if available.
+Your choice is saved in a central file (`~/.gemini/trustedFolders.json`), so you will only be asked once per folder.
 
-2.  **Local Trust File**: If the IDE is not connected or does not provide a trust signal, the CLI checks the central trust file located at `~/.gemini/trustedFolders.json`. It compares the current workspace path against the rules you have configured in this file.
+## Why Trust Matters: The Impact of an Untrusted Workspace
 
-    > **Note on Inheritance:** Trust is inherited. If you trust a parent folder (e.g., `/Users/myuser/projects/`), all of its subdirectories will also be considered trusted.
+When a folder is **untrusted**, the Gemini CLI runs in a restricted "safe mode" to protect you. In this mode, the following features are disabled:
 
-## Impact of an Untrusted Workspace
+1.  **Workspace Settings are Ignored**: The CLI will **not** load the `.gemini/settings.json` file from the project. This prevents the loading of custom tools and other potentially dangerous configurations.
 
-When the Gemini CLI is running in an untrusted folder, it enters a "safe mode" where the following security-sensitive features are disabled:
+2.  **Environment Variables are Ignored**: The CLI will **not** load any `.env` files from the project.
 
-1.  **Workspace Settings are Ignored**: The CLI will **not** load the `.gemini/settings.json` file from the current project directory. This is the most critical restriction, as it prevents the loading of custom tools, shell commands, and other potentially dangerous configurations.
+3.  **Extension Management is Restricted**: You **cannot install, update, or uninstall** extensions.
 
-2.  **Environment Variable Loading is Disabled**: The CLI will **not** load environment variables from a `.env` file located in the workspace. This prevents a malicious repository from setting sensitive variables (like API keys) or dangerous ones (like `PATH`) that could affect command execution.
+4.  **Tool Auto-Acceptance is Disabled**: You will always be prompted before any tool is run, even if you have auto-acceptance enabled globally.
 
-3.  **Extension Management is Restricted**:
-    - You **cannot install, update, or uninstall** extensions while in an untrusted folder. This prevents a malicious project from tricking you into installing a compromised extension.
-    - The CLI will **not** automatically check for updates to extensions.
+5.  **Automatic Memory Loading is Disabled**: The CLI will not automatically load files into context from directories specified in local settings.
 
-4.  **Tool Auto-Acceptance is Disabled**: The `tools.autoAccept` setting, which allows the CLI to execute tool code without asking for confirmation, is disabled. In an untrusted folder, you will always be prompted before a tool is run, even if you have auto-acceptance enabled globally. This gives you a chance to review the command before it executes.
+Granting trust to a folder unlocks the full functionality of the Gemini CLI for that workspace.
 
-5.  **Loading Memory from Include Directories is Disabled**: The `context.loadFromIncludeDirectories` setting is ignored. This feature automatically loads files into the context from directories specified in your settings. Disabling it prevents a malicious project from forcing the CLI to read sensitive files from your system.
+## Managing Your Trust Settings
 
-## How to Manage Trusted Folders
+If you need to change a decision or see all your settings, you have a couple of options:
 
-### Using the `/permissions` Command
+- **Change the Current Folder's Trust**: Run the `/permissions` command from within the CLI. This will bring up the same interactive dialog, allowing you to change the trust level for the current folder.
 
-The `/permissions` command is the primary way to manage trust for your current workspace. Running this command opens an interactive dialog with three options:
+- **View All Trust Rules**: To see a complete list of all your trusted and untrusted folder rules, you can inspect the contents of the `~/.gemini/trustedFolders.json` file in your home directory.
 
-- **Trust this folder** (e.g., `my-project`)
-- **Trust parent folder** (e.g., `safe-projects`)
-- **Don't trust**
+## The Trust Check Process (Advanced)
 
-This dialog is strictly for making a trust decision about the current folder and does not allow you to manage other paths or view the full list.
+For advanced users, it's helpful to know the exact order of operations for how trust is determined:
 
-### Viewing the Full Trust List
+1.  **IDE Trust Signal**: If you are using the [IDE Integration](./ide-integration.md), the CLI first asks the IDE if the workspace is trusted. The IDE's response takes highest priority.
 
-To see a complete list of all your trusted and untrusted folder rules, you must inspect the contents of the `~/.gemini/trustedFolders.json` file directly.
+2.  **Local Trust File**: If the IDE is not connected, the CLI checks the central `~/.gemini/trustedFolders.json` file.
