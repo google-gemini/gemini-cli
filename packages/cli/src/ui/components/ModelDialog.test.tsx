@@ -39,9 +39,20 @@ const renderComponent = (
 
   const mockConfig = contextValue
     ? ({
+        // --- Functions used by ModelDialog ---
         getModel: vi.fn(() => DEFAULT_GEMINI_MODEL_AUTO),
         setModel: vi.fn(),
+
+        // --- Functions used by ClearcutLogger ---
         getUsageStatisticsEnabled: vi.fn(() => true),
+        getSessionId: vi.fn(() => 'mock-session-id'),
+        getDebugMode: vi.fn(() => false),
+        getContentGeneratorConfig: vi.fn(() => ({ authType: 'mock' })),
+        getUseSmartEdit: vi.fn(() => false),
+        getUseModelRouter: vi.fn(() => false),
+        getProxy: vi.fn(() => undefined),
+
+        // --- Spread test-specific overrides ---
         ...contextValue,
       } as Config)
     : undefined;
