@@ -6,8 +6,7 @@
 
 import type { AnyDeclarativeTool, AnyToolInvocation } from '../index.js';
 import { isTool } from '../index.js';
-
-const SHELL_TOOL_NAMES = ['run_shell_command', 'ShellTool'];
+import { SHELL_TOOL_NAMES } from './shell-utils.js';
 
 /**
  * Checks if a tool invocation matches any of a list of patterns.
