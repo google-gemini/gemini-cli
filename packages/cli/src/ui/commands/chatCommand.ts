@@ -258,7 +258,7 @@ const deleteCommand: SlashCommand = {
       return {
         type: 'message',
         messageType: 'error',
-        content: `Error: No checkpoint found with tag '${decodeTagName(tag)}'.`,
+        content: `Error: No checkpoint found with tag '${tag}'.`,
       };
     }
 
@@ -284,13 +284,13 @@ const deleteCommand: SlashCommand = {
       return {
         type: 'message',
         messageType: 'info',
-        content: `Conversation checkpoint '${decodeTagName(tag)}' has been deleted.`,
+        content: `Conversation checkpoint '${tag}' has been deleted.`,
       };
     } else {
       return {
         type: 'message',
         messageType: 'error',
-        content: `Error: Failed to delete checkpoint '${decodeTagName(tag)}'.`,
+        content: `Error: Failed to delete checkpoint '${tag}'.`,
       };
     }
   },
