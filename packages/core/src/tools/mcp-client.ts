@@ -91,10 +91,11 @@ export class McpClient {
     private readonly promptRegistry: PromptRegistry,
     private readonly workspaceContext: WorkspaceContext,
     private readonly debugMode: boolean,
+    private readonly version?: string,
   ) {
     this.client = new Client({
-      name: `gemini-cli-mcp-client-${this.serverName}`,
-      version: '0.0.1',
+      name: `gemini-cli`,
+      version: this.version || 'unknown',
     });
   }
 
@@ -818,10 +819,11 @@ export async function connectToMcpServer(
   mcpServerConfig: MCPServerConfig,
   debugMode: boolean,
   workspaceContext: WorkspaceContext,
+  version?: string,
 ): Promise<Client> {
   const mcpClient = new Client({
-    name: 'gemini-cli-mcp-client',
-    version: '0.0.1',
+    name: 'gemini-cli',
+    version: version || 'unknown',
   });
 
   mcpClient.registerCapabilities({
