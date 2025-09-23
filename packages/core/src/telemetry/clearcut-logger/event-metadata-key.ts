@@ -362,6 +362,9 @@ export enum EventMetadataKey {
   // Logs the setting scope for an extension enablement.
   GEMINI_CLI_EXTENSION_ENABLE_SETTING_SCOPE = 102,
 
+  // Logs the setting scope for an extension disablement.
+  GEMINI_CLI_EXTENSION_DISABLE_SETTING_SCOPE = 107,
+
   // ==========================================================================
   // Tool Output Truncated Event Keys
   // ===========================================================================

@@ -15,10 +15,12 @@ import {
   Config,
   ExtensionInstallEvent,
   ExtensionUninstallEvent,
+  ExtensionDisableEvent,
   ExtensionEnableEvent,
   logExtensionEnable,
   logExtensionInstallEvent,
   logExtensionUninstall,
+  logExtensionDisable,
 } from '@google/gemini-cli-core';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -648,6 +650,7 @@ export function disableExtension(
   scope: SettingScope,
   cwd: string = process.cwd(),
 ) {
+  const config = getTelemetryConfig(cwd);
   if (scope === SettingScope.System || scope === SettingScope.SystemDefaults) {
     throw new Error('System and SystemDefaults scopes are not supported.');
   }
@@ -657,6 +660,7 @@ export function disableExtension(
   );
   const scopePath = scope === SettingScope.Workspace ? cwd : os.homedir();
   manager.disable(name, true, scopePath);
+  logExtensionDisable(config, new ExtensionDisableEvent(name, scope));
 }
 
 export function enableExtension(

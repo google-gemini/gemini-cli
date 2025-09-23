@@ -25,6 +25,7 @@ import {
   GEMINI_DIR,
   type GeminiCLIExtension,
   ExtensionUninstallEvent,
+  ExtensionDisableEvent,
   ExtensionEnableEvent,
 } from '@google/gemini-cli-core';
 import { execSync } from 'node:child_process';
@@ -71,6 +72,7 @@ vi.mock('./trustedFolders.js', async (importOriginal) => {
 const mockLogExtensionEnable = vi.hoisted(() => vi.fn());
 const mockLogExtensionInstallEvent = vi.hoisted(() => vi.fn());
 const mockLogExtensionUninstall = vi.hoisted(() => vi.fn());
+const mockLogExtensionDisable = vi.hoisted(() => vi.fn());
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const actual =
     await importOriginal<typeof import('@google/gemini-cli-core')>();
@@ -79,9 +81,11 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     logExtensionEnable: mockLogExtensionEnable,
     logExtensionInstallEvent: mockLogExtensionInstallEvent,
     logExtensionUninstall: mockLogExtensionUninstall,
+    logExtensionDisable: mockLogExtensionDisable,
     ExtensionEnableEvent: vi.fn(),
     ExtensionInstallEvent: vi.fn(),
     ExtensionUninstallEvent: vi.fn(),
+    ExtensionDisableEvent: vi.fn(),
   };
 });
 
@@ -1177,6 +1181,16 @@ This extension will run the following MCP servers:
       expect(() =>
         disableExtension('my-extension', SettingScope.System),
       ).toThrow('System and SystemDefaults scopes are not supported.');
+    });
+
+    it('should log a disable event', () => {
+      disableExtension('ext1', SettingScope.Workspace);
+
+      expect(mockLogExtensionDisable).toHaveBeenCalled();
+      expect(ExtensionDisableEvent).toHaveBeenCalledWith(
+        'ext1',
+        SettingScope.Workspace,
+      );
     });
   });
 

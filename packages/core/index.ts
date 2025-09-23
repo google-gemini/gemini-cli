@@ -27,12 +27,14 @@ export { detectIdeFromEnv } from './src/ide/detect-ide.js';
 export {
   logExtensionEnable,
   logIdeConnection,
+  logExtensionDisable,
 } from './src/telemetry/loggers.js';
 
 export {
   IdeConnectionEvent,
   IdeConnectionType,
   ExtensionInstallEvent,
+  ExtensionDisableEvent,
   ExtensionEnableEvent,
   ExtensionUninstallEvent,
 } from './src/telemetry/types.js';

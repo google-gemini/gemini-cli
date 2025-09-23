@@ -32,6 +32,7 @@ import {
   EVENT_RIPGREP_FALLBACK,
   EVENT_MODEL_ROUTING,
   EVENT_EXTENSION_INSTALL,
+  EVENT_EXTENSION_DISABLE,
 } from './constants.js';
 import type {
   ApiErrorEvent,
@@ -57,6 +58,7 @@ import type {
   RipgrepFallbackEvent,
   ToolOutputTruncatedEvent,
   ModelRoutingEvent,
+  ExtensionDisableEvent,
   ExtensionEnableEvent,
   ExtensionUninstallEvent,
   ExtensionInstallEvent,
@@ -763,6 +765,28 @@ export function logExtensionEnable(
   const logger = logs.getLogger(SERVICE_NAME);
   const logRecord: LogRecord = {
     body: `Enabled extension ${event.extension_name}`,
+    attributes,
+  };
+  logger.emit(logRecord);
+}
+
+export function logExtensionDisable(
+  config: Config,
+  event: ExtensionDisableEvent,
+): void {
+  ClearcutLogger.getInstance(config)?.logExtensionDisableEvent(event);
+  if (!isTelemetrySdkInitialized()) return;
+
+  const attributes: LogAttributes = {
+    ...getCommonAttributes(config),
+    ...event,
+    'event.name': EVENT_EXTENSION_DISABLE,
+    'event.timestamp': new Date().toISOString(),
+  };
+
+  const logger = logs.getLogger(SERVICE_NAME);
+  const logRecord: LogRecord = {
+    body: `Disabled extension ${event.extension_name}`,
     attributes,
   };
   logger.emit(logRecord);

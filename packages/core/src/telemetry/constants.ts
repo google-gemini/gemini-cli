@@ -12,6 +12,7 @@ export const EVENT_API_REQUEST = 'gemini_cli.api_request';
 export const EVENT_API_ERROR = 'gemini_cli.api_error';
 export const EVENT_API_RESPONSE = 'gemini_cli.api_response';
 export const EVENT_CLI_CONFIG = 'gemini_cli.config';
+export const EVENT_EXTENSION_DISABLE = 'gemini_cli.extension_disable';
 export const EVENT_EXTENSION_ENABLE = 'gemini_cli.extension_enable';
 export const EVENT_EXTENSION_INSTALL = 'gemini_cli.extension_install';
 export const EVENT_EXTENSION_UNINSTALL = 'gemini_cli.extension_uninstall';
