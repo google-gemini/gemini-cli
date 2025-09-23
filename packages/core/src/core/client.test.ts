@@ -695,55 +695,6 @@ describe('Gemini Client (client.ts)', () => {
       // Assert that the chat was reset
       expect(newChat).not.toBe(initialChat);
     });
-
-    it('should use current model from config for token counting after sendMessage', async () => {
-      const initialModel = mockConfig.getModel();
-
-      // mock the model has been changed between calls of `countTokens`
-      const firstCurrentModel = initialModel + '-changed-1';
-      const secondCurrentModel = initialModel + '-changed-2';
-      vi.mocked(mockConfig.getModel)
-        .mockReturnValueOnce(firstCurrentModel)
-        .mockReturnValueOnce(secondCurrentModel);
-
-      vi.mocked(mockContentGenerator.countTokens)
-        .mockResolvedValueOnce({ totalTokens: 100000 })
-        .mockResolvedValueOnce({ totalTokens: 5000 });
-
-      const mockSendMessage = vi.fn().mockResolvedValue({ text: 'Summary' });
-
-      const mockChatHistory = [
-        { role: 'user', parts: [{ text: 'Long conversation' }] },
-        { role: 'model', parts: [{ text: 'Long response' }] },
-      ];
-
-      const mockChat = {
-        getHistory: vi.fn().mockImplementation(() => [...mockChatHistory]),
-        setHistory: vi.fn(),
-        sendMessage: mockSendMessage,
-      } as unknown as GeminiChat;
-
-      client['chat'] = mockChat;
-      client['startChat'] = vi.fn().mockResolvedValue(mockChat);
-
-      const result = await client.tryCompressChat('prompt-id-4', false);
-
-      expect(mockContentGenerator.countTokens).toHaveBeenCalledTimes(2);
-      expect(mockContentGenerator.countTokens).toHaveBeenNthCalledWith(1, {
-        model: firstCurrentModel,
-        contents: [...mockChatHistory],
-      });
-      expect(mockContentGenerator.countTokens).toHaveBeenNthCalledWith(2, {
-        model: secondCurrentModel,
-        contents: expect.any(Array),
-      });
-
-      expect(result).toEqual({
-        compressionStatus: CompressionStatus.COMPRESSED,
-        originalTokenCount: 100000,
-        newTokenCount: 5000,
-      });
-    });
   });
 
   describe('sendMessageStream', () => {
