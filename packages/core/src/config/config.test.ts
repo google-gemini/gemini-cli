@@ -574,6 +574,22 @@ describe('Server Config (config.ts)', () => {
     });
   });
 
+  describe('Version Configuration', () => {
+    it('should store and return version when provided', () => {
+      const paramsWithVersion: ConfigParameters = {
+        ...baseParams,
+        version: '2.3.4',
+      };
+      const config = new Config(paramsWithVersion);
+      expect(config.getVersion()).toBe('2.3.4');
+    });
+
+    it('should return undefined when version not provided', () => {
+      const config = new Config(baseParams);
+      expect(config.getVersion()).toBeUndefined();
+    });
+  });
+
   describe('UseModelRouter Configuration', () => {
     it('should default useModelRouter to false when not provided', () => {
       const config = new Config(baseParams);

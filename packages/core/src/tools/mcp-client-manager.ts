@@ -64,7 +64,7 @@ export class McpClientManager {
 
         this.eventEmitter?.emit('mcp-client-update', this.clients);
         try {
-          await client.connect();
+          await client.connect(cliConfig);
           await client.discover(cliConfig);
           this.eventEmitter?.emit('mcp-client-update', this.clients);
         } catch (error) {
