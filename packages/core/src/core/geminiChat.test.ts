@@ -891,11 +891,11 @@ describe('GeminiChat', () => {
         }
       }).rejects.toThrow(InvalidStreamError);
 
-      // Should be called 3 times (initial + 2 retries)
+      // Should be called 2 times (initial + 1 retry)
       expect(mockContentGenerator.generateContentStream).toHaveBeenCalledTimes(
-        3,
+        2,
       );
-      expect(mockLogContentRetry).toHaveBeenCalledTimes(2);
+      expect(mockLogContentRetry).toHaveBeenCalledTimes(1);
       expect(mockLogContentRetryFailure).toHaveBeenCalledTimes(1);
 
       // History should be clean, as if the failed turn never happened.
