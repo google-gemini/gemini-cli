@@ -19,7 +19,7 @@ runs:
   using: 'composite'
   steps:
     - name: 'Run Tests'
-      if: '${{ !inputs.force_skip_tests }}'
+      if: "${{ inputs.force_skip_tests != 'true' }}"
       env:
         GEMINI_API_KEY: '${{ inputs.gemini_api_key }}'
       working-directory: '${{ inputs.working-directory }}'
