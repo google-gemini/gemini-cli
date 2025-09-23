@@ -52,7 +52,7 @@
     "telemetry": "node scripts/telemetry.js",
     "check:lockfile": "node scripts/check-lockfile.js",
     "clean": "node scripts/clean.js",
-    "pre-commit": "lint-staged"
+    "pre-commit": "node scripts/pre-commit.js"
   },
   "bin": {
     "gemini": "bundle/gemini.js"
@@ -109,7 +109,10 @@
     "node-pty": "^1.0.0"
   },
   "overrides": {
-    "wrap-ansi": "9.0.2"
+    "wrap-ansi": "9.0.2",
+    "cliui": {
+      "wrap-ansi": "7.0.0"
+    }
   },
   "lint-staged": {
     "*.{js,jsx,ts,tsx}": [
