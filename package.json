@@ -104,6 +104,9 @@
     "node-pty": "^1.0.0"
   },
   "overrides": {
-    "wrap-ansi": "9.0.2"
+    "wrap-ansi": "9.0.2",
+    "cliui": {
+      "wrap-ansi": "7.0.0"
+    }
   }
 }
