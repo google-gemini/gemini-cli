@@ -46,9 +46,9 @@ jobs:
         run: 'npm ci'
 
       - name: 'Run Tests'
+        if: "${{github.event.inputs.force_skip_tests != 'true'}}"
         uses: './.github/actions/run-tests'
         with:
-          force_skip_tests: '${{ github.event.inputs.force_skip_tests }}'
           gemini_api_key: '${{ secrets.GEMINI_API_KEY }}'
 
       - name: 'Get Nightly Version'
