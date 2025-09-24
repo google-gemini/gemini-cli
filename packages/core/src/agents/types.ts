@@ -42,13 +42,7 @@ export type AgentInputs = Record<string, unknown>;
 export interface SubagentActivityEvent {
   isSubagentActivityEvent: true;
   agentName: string;
-  type:
-    | 'PHASE_START'
-    | 'PHASE_END' // Two-phase execution progress
-    | 'TOOL_CALL_START'
-    | 'TOOL_CALL_END' // Nested tool activity
-    | 'THOUGHT_CHUNK' // Model reasoning
-    | 'ERROR'; // Execution failures
+  type: 'TOOL_CALL_START' | 'TOOL_CALL_END' | 'THOUGHT_CHUNK' | 'ERROR';
   data: Record<string, unknown>;
 }
 

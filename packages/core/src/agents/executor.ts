@@ -19,14 +19,23 @@ import { ToolRegistry } from '../tools/tool-registry.js';
 import type { ToolCallRequestInfo } from '../core/turn.js';
 // TODO: Evaluate if subagents need environment context (date, OS, etc.).
 // import {getEnvironmentContext} from '../utils/environmentContext.js';
-import {
-  AgentTerminateMode,
-  type AgentDefinition,
-  type OutputObject,
-  type AgentInputs,
-  type SubagentActivityEvent,
+import { GlobTool } from '../tools/glob.js';
+import { GrepTool } from '../tools/grep.js';
+import { RipGrepTool } from '../tools/ripGrep.js';
+import { LSTool } from '../tools/ls.js';
+import { MemoryTool } from '../tools/memoryTool.js';
+import { ReadFileTool } from '../tools/read-file.js';
+import { ReadManyFilesTool } from '../tools/read-many-files.js';
+import { WebSearchTool } from '../tools/web-search.js';
+import type {
+  AgentDefinition,
+  AgentInputs,
+  OutputObject,
+  SubagentActivityEvent,
 } from './types.js';
+import { AgentTerminateMode } from './types.js';
 import { templateString } from './utils.js';
+import { parseThought } from '../utils/thoughtUtils.js';
 
 /** A callback function to report on agent activity. */
 export type ActivityCallback = (activity: SubagentActivityEvent) => void;
@@ -140,7 +149,6 @@ export class AgentExecutor {
 
       // Phase 1: Work Phase
       // The agent works in a loop until it stops calling tools.
-      this.emitActivity('PHASE_START', { phase: 'work' });
       let currentMessages: Content[] = [
         { role: 'user', parts: [{ text: 'Get Started!' }] },
       ];
@@ -184,8 +192,6 @@ export class AgentExecutor {
         );
       }
 
-      this.emitActivity('PHASE_END', { phase: 'work' });
-
       // If the work phase was terminated early, skip extraction and return.
       if (terminateReason !== AgentTerminateMode.GOAL) {
         return {
@@ -196,7 +202,6 @@ export class AgentExecutor {
 
       // Phase 2: Extraction Phase
       // A final message is sent to summarize findings and produce the output.
-      this.emitActivity('PHASE_START', { phase: 'extraction' });
       const extractionMessage = this.buildExtractionMessage();
       const extractionMessages: Content[] = [
         { role: 'user', parts: [{ text: extractionMessage }] },
@@ -212,7 +217,6 @@ export class AgentExecutor {
         signal,
         extractionPromptId,
       );
-      this.emitActivity('PHASE_END', { phase: 'extraction' });
 
       return {
         result: textResponse || 'No response generated',
@@ -260,10 +264,12 @@ export class AgentExecutor {
         const chunk = resp.value;
         const parts = chunk.candidates?.[0]?.content?.parts;
 
-        // Extract and emit any "thought" content from the model.
-        const thought = parts?.find((p) => p.thought)?.text;
-        if (thought) {
-          this.emitActivity('THOUGHT_CHUNK', { text: thought });
+        // Extract and emit any subject "thought" content from the model.
+        const { subject } = parseThought(
+          parts?.find((p) => p.thought)?.text || '',
+        );
+        if (subject) {
+          this.emitActivity('THOUGHT_CHUNK', { text: subject });
         }
 
         // Collect any function calls requested by the model.
@@ -326,8 +332,6 @@ export class AgentExecutor {
         generationConfig.systemInstruction = systemInstruction;
       }
 
-      this.runtimeContext.setModel(modelConfig.model);
-
       return new GeminiChat(
         this.runtimeContext,
         generationConfig,
@@ -355,7 +359,6 @@ export class AgentExecutor {
     signal: AbortSignal,
     promptId: string,
   ): Promise<Content[]> {
-    const toolResponseParts: Part[] = [];
     const allowedToolNames = new Set(this.toolRegistry.getAllToolNames());
 
     // Filter out any tool calls that are not in the agent's allowed list.
@@ -370,7 +373,7 @@ export class AgentExecutor {
       return true;
     });
 
-    for (const functionCall of validatedFunctionCalls) {
+    const toolPromises = validatedFunctionCalls.map(async (functionCall) => {
       const callId = functionCall.id ?? `${functionCall.name}-${Date.now()}`;
       const args = functionCall.args ?? {};
 
@@ -406,14 +409,17 @@ export class AgentExecutor {
         });
       }
 
-      if (toolResponse.responseParts) {
-        toolResponseParts.push(...toolResponse.responseParts);
-      }
-    }
+      return toolResponse;
+    });
+
+    const toolResponses = await Promise.all(toolPromises);
+    const toolResponseParts: Part[] = toolResponses
+      .flatMap((response) => response.responseParts)
+      .filter((part): part is Part => part !== undefined);
 
     // If all authorized tool calls failed, provide a generic error message
     // to the model so it can try a different approach.
-    if (validatedFunctionCalls.length > 0 && toolResponseParts.length === 0) {
+    if (functionCalls.length > 0 && toolResponseParts.length === 0) {
       toolResponseParts.push({
         text: 'All tool calls failed. Please analyze the errors and try an alternative approach.',
       });
@@ -502,48 +508,30 @@ Important Rules:
   /**
    * Validates that all tools in a registry are safe for non-interactive use.
    *
-   * @throws An error if a tool requires user confirmation.
+   * @throws An error if a tool is not on the allow-list for non-interactive execution.
    */
   private static async validateTools(
     toolRegistry: ToolRegistry,
     agentName: string,
   ): Promise<void> {
+    // Tools that are non-interactive. This is temporary until we have tool
+    // confirmations for subagents.
+    const allowlist = new Set([
+      LSTool.Name,
+      ReadFileTool.Name,
+      GrepTool.Name,
+      RipGrepTool.Name,
+      GlobTool.Name,
+      ReadManyFilesTool.Name,
+      MemoryTool.Name,
+      WebSearchTool.Name,
+    ]);
     for (const tool of toolRegistry.getAllTools()) {
-      // We can only reliably check tools that have no required parameters.
-      const schema = tool.schema.parametersJsonSchema as {
-        required?: string[];
-      };
-      if (schema?.required?.length) {
-        console.warn(
-          `Cannot check tool "${tool.name}" for interactivity in agent ` +
-            `"${agentName}". Assuming it is safe.`,
-        );
-        continue;
-      }
-
-      try {
-        const invocation = tool.build({});
-        const confirmationDetails = await invocation.shouldConfirmExecute(
-          new AbortController().signal,
-        );
-        if (confirmationDetails) {
-          throw new Error(
-            `Tool "${tool.name}" requires user confirmation and cannot be used ` +
-              `in non-interactive agent "${agentName}".`,
-          );
-        }
-      } catch (error) {
-        if (
-          error instanceof Error &&
-          error.message.includes('requires user confirmation')
-        ) {
-          // Re-throw the specific error from the check above.
-          throw error;
-        }
-        // Log other unexpected errors during the check but don't block.
-        console.warn(
-          `Interactivity check failed for tool "${tool.name}" in agent ` +
-            `"${agentName}": ${error}`,
+      if (!allowlist.has(tool.name)) {
+        throw new Error(
+          `Tool "${tool.name}" is not on the allow-list for non-interactive ` +
+            `execution in agent "${agentName}". Only tools that do not require user ` +
+            `confirmation can be used in subagents.`,
         );
       }
     }

@@ -39,11 +39,12 @@ export class AgentRegistry {
    * it will be overwritten, respecting the precedence established by the
    * initialization order.
    */
-  private registerAgent(definition: AgentDefinition): void {
+  protected registerAgent(definition: AgentDefinition): void {
     // Basic validation
     if (!definition.name || !definition.description) {
-      console.warn(`[AgentRegistry] Skipping invalid agent definition. 
-        Missing name or description.`);
+      console.warn(
+        `[AgentRegistry] Skipping invalid agent definition. Missing name or description.`,
+      );
       return;
     }
 

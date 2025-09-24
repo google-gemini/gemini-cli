@@ -87,7 +87,7 @@ export class SubagentInvocation extends BaseToolInvocation<
           activity.type === 'THOUGHT_CHUNK' &&
           typeof activity.data['text'] === 'string'
         ) {
-          updateOutput(activity.data['text']);
+          updateOutput(`🤖💭 ${activity.data['text']}`);
         }
       };
 
