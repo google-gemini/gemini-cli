@@ -88,17 +88,33 @@ export abstract class BasePythonTool<
   protected getEmbeddedPythonPath(): string {
     const currentFileUrl = import.meta.url;
     const currentFilePath = new URL(currentFileUrl).pathname;
-    
-    const normalizedPath = process.platform === 'win32' 
+
+    const normalizedPath = process.platform === 'win32'
       ? currentFilePath.slice(1)
       : currentFilePath;
-    
+
     const toolsPath = path.dirname(normalizedPath);
     const srcPath = path.dirname(toolsPath);
     const distPath = path.dirname(srcPath);
     const corePath = path.dirname(distPath);
     const packagesPath = path.dirname(corePath);
-    const embeddedPythonPath = path.join(packagesPath, 'python-3.13.7', 'python.exe');
+
+    // Try the calculated path first
+    let embeddedPythonPath = path.join(packagesPath, 'python-3.13.7', 'python.exe');
+
+    // If not found, try relative to current working directory (for test environment)
+    if (!fs.existsSync(embeddedPythonPath)) {
+      embeddedPythonPath = path.join(process.cwd(), 'packages', 'python-3.13.7', 'python.exe');
+    }
+
+    // If still not found, try from project root
+    if (!fs.existsSync(embeddedPythonPath)) {
+      const projectRoot = process.cwd().includes('packages')
+        ? path.join(process.cwd(), '..', '..')
+        : process.cwd();
+      embeddedPythonPath = path.join(projectRoot, 'packages', 'python-3.13.7', 'python.exe');
+    }
+
     return embeddedPythonPath;
   }
 }
