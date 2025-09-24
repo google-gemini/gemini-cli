@@ -429,6 +429,11 @@ function extractFile(file: string, dest: string) {
   const result = spawnSync('tar', args, { stdio: 'pipe' });
 
   if (result.status !== 0) {
-    throw new Error(`Failed to extract ${file}: ${result.stderr.toString()}`);
+    if (result.error) {
+      throw new Error(`Failed to spawn 'tar': ${result.error.message}`);
+    }
+    throw new Error(
+      `'tar' command failed with exit code ${result.status}: ${result.stderr.toString()}`,
+    );
   }
 }
