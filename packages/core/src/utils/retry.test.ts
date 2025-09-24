@@ -131,6 +131,18 @@ describe('retryWithBackoff', () => {
     expect(mockFn).toHaveBeenCalledTimes(1);
   });
 
+  it('should throw an error if maxAttempts is not a positive number', async () => {
+    const mockFn = createFailingFunction(1);
+
+    // Test with 0
+    await expect(retryWithBackoff(mockFn, { maxAttempts: 0 })).rejects.toThrow(
+      'maxAttempts must be a positive number.',
+    );
+
+    // The function should not be called at all if validation fails
+    expect(mockFn).not.toHaveBeenCalled();
+  });
+
   it('should use default shouldRetry if not provided, retrying on 429', async () => {
     const mockFn = vi.fn(async () => {
       const error = new Error('Too Many Requests') as any;
