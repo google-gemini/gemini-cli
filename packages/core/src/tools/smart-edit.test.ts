@@ -390,8 +390,12 @@ describe('SmartEditTool', () => {
       const invocation = tool.build(params);
       const result = await invocation.execute(new AbortController().signal);
 
-      expect(result.error?.type).toBe(ToolErrorType.EDIT_NO_CHANGE);
-      expect(result.llmContent).toMatch(/A secondary check determined/);
+      expect(result.error?.type).toBe(
+        ToolErrorType.EDIT_NO_CHANGE_LLM_JUDGEMENT,
+      );
+      expect(result.llmContent).toMatch(
+        /A secondary check by an LLM determined/,
+      );
       expect(fs.readFileSync(filePath, 'utf8')).toBe(initialContent); // File is unchanged
     });
 
