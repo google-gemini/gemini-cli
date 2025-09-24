@@ -74,6 +74,19 @@ export interface UniversalStreamEvent {
   compressionInfo?: CompressionInfo;
 }
 
+export interface VisualizationData {
+  type: 'quotes' | 'ohlc_bars' | 'technical_indicators' | 'screener_results' | 'signals';
+  title: string;
+  data: Array<Record<string, string | number | boolean>>;
+  metadata?: {
+    symbols?: string[];
+    timeframe?: string;
+    indicators?: string[];
+    source?: string;
+    [key: string]: string | number | boolean | string[] | undefined;
+  };
+}
+
 export interface ToolResponseData {
   operation: string;
   summary: string;
@@ -92,6 +105,7 @@ export interface ToolResponseData {
     worksheet?: string;
   };
   nextActions?: string[];
+  visualizations?: VisualizationData[];
 }
 
 export interface CompressionInfo {
