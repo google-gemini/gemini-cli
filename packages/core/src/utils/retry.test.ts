@@ -99,6 +99,26 @@ describe('retryWithBackoff', () => {
     expect(mockFn).toHaveBeenCalledTimes(3);
   });
 
+  it('should default to 5 maxAttempts if no options are provided', async () => {
+    // This function will fail more than 5 times to ensure all retries are used.
+    const mockFn = createFailingFunction(10);
+
+    const promise = retryWithBackoff(mockFn, {
+      // No maxAttempts provided, should use default.
+      initialDelayMs: 1,
+    });
+
+    // Expect it to fail with the error from the 5th attempt.
+    // eslint-disable-next-line vitest/valid-expect
+    const assertionPromise = expect(promise).rejects.toThrow(
+      'Simulated error attempt 5',
+    );
+    await vi.runAllTimersAsync();
+    await assertionPromise;
+
+    expect(mockFn).toHaveBeenCalledTimes(5);
+  });
+
   it('should not retry if shouldRetry returns false', async () => {
     const mockFn = vi.fn(async () => {
       throw new NonRetryableError('Non-retryable error');
