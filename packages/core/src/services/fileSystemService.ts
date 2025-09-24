@@ -114,7 +114,8 @@ export enum AgentType {
   RECOVERY_SPECIALIST = 'recovery_specialist',
   OPTIMIZATION_ENGINE = 'optimization_engine',
   SECURITY_GUARDIAN = 'security_guardian',
-  ANALYSIS_INSIGHT = 'analysis_insight'
+  ANALYSIS_INSIGHT = 'analysis_insight',
+  CODE_GENERATION = 'code_generation'
 }
 
 /**
