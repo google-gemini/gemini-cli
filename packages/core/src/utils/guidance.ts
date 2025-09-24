@@ -781,7 +781,7 @@ export class CodePatternAnalyzer {
    */
   private static calculateHalsteadVolume(code: string): number {
     const operators = ['+', '-', '*', '/', '=', '==', '===', '!=', '!==', '<', '>', '<=', '>=', '&&', '\\|\\|', '!', '\\?', ':'];
-    const operands = this.extractIdentifiers(code);
+    const N1 = operators.reduce((count, op) => count + (code.match(new RegExp(op.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g')) || []).length, 0); // Total operators
 
     const n1 = operators.length; // Unique operators
     const n2 = new Set(operands).size; // Unique operands
