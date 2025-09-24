@@ -735,7 +735,9 @@ export class TestRig {
       cols: 80,
       rows: 30,
       cwd: this.testDir!,
-      env: process.env as { [key: string]: string },
+      env: Object.fromEntries(
+        Object.entries(process.env).filter(([, v]) => v !== undefined),
+      ) as { [key: string]: string },
     };
 
     if (isWindows) {
