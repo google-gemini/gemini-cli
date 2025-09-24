@@ -4,6 +4,34 @@ set -euo pipefail
 # Initialize a comma-separated string to hold PR numbers that need a comment
 PRS_NEEDING_COMMENT=""
 
+# Determine script directory for invoking helper utilities
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Attempt to locate Node.js once so we can bail out gracefully if unavailable
+NODE_PATH=""
+if command -v node >/dev/null 2>&1; then
+    NODE_PATH="$(command -v node)"
+fi
+
+# Helper function to detect an issue reference within arbitrary text
+find_issue_reference() {
+    local text="$1"
+    local issue=""
+
+    if [[ -n "${NODE_PATH}" ]] && [[ -f "${SCRIPT_DIR}/find-linked-issue.js" ]]; then
+        # Use the helper script to perform robust parsing. Ignore failures and
+        # fall back to the legacy pattern matching below.
+        issue="$("${NODE_PATH}" "${SCRIPT_DIR}/find-linked-issue.js" <<<"${text}" 2>/dev/null || true)"
+    fi
+
+    if [[ -z "${issue}" ]]; then
+        issue=$(echo "${text}" | grep -oE '#[0-9]+' | head -1 | tr -d '#'
+            || echo "")
+    fi
+
+    echo "${issue}"
+}
+
 # Function to process a single PR
 process_pr() {
     if [[ -z "${GITHUB_REPOSITORY:-}" ]]; then
@@ -26,18 +54,17 @@ process_pr() {
         return 1
     fi
 
-    # Look for issue references using multiple patterns
+    # Fetch PR title for additional context when parsing issue references.
+    local PR_TITLE=""
+    if ! PR_TITLE=$(gh pr view "${PR_NUMBER}" --repo "${GITHUB_REPOSITORY}" --json title -q .title 2>/dev/null); then
+        PR_TITLE=""
+    fi
+
+    # Look for issue references using helper script (with fallback)
     local ISSUE_NUMBER=""
-
-    # Pattern 1: Direct reference like #123
-    if [[ -z "${ISSUE_NUMBER}" ]]; then
-        ISSUE_NUMBER=$(echo "${PR_BODY}" | grep -oE '#[0-9]+' | head -1 | sed 's/#//' 2>/dev/null || echo "")
-    fi
-
-    # Pattern 2: Closes/Fixes/Resolves patterns (case-insensitive)
-    if [[ -z "${ISSUE_NUMBER}" ]]; then
-        ISSUE_NUMBER=$(echo "${PR_BODY}" | grep -iE '(closes?|fixes?|resolves?) #[0-9]+' | grep -oE '#[0-9]+' | head -1 | sed 's/#//' 2>/dev/null || echo "")
-    fi
+    local SEARCH_TEXT="${PR_TITLE}
+${PR_BODY}"
+    ISSUE_NUMBER="$(find_issue_reference "${SEARCH_TEXT}")"
 
     if [[ -z "${ISSUE_NUMBER}" ]]; then
         echo "⚠️  No linked issue found for PR #${PR_NUMBER}, adding status/need-issue label"
