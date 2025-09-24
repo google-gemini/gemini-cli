@@ -17,6 +17,31 @@ import {
 import { UserTierId } from '../code_assist/types.js';
 import { AuthType } from '../core/contentGenerator.js';
 
+// Structured error typing for consumers that need richer context
+export enum ParsedErrorType {
+  PRO_QUOTA,
+  GENERIC_QUOTA,
+  RATE_LIMIT,
+  AUTH,
+  GENERIC,
+}
+
+export interface ParsedError {
+  type: ParsedErrorType;
+  title: string;
+  message: string;
+  rawError: unknown;
+  // HTTP status for structured errors (e.g., 429)
+  httpStatus?: number;
+  // API error fields for JSON error payloads
+  apiStatus?: string; // e.g., 'RESOURCE_EXHAUSTED'
+  apiCode?: number; // e.g., 429
+  // Source of the parsed error (useful for formatting decisions)
+  origin?: 'structured' | 'json' | 'text' | 'unknown';
+  // Optional appended advice (includes leading newline) for rate limiting
+  rateLimitNotice?: string;
+}
+
 // Common strings and URL constants
 const AI_STUDIO_API_KEY_URL = 'https://aistudio.google.com/apikey';
 const GEMINI_CODE_ASSIST_UPGRADE_URL =
@@ -31,47 +56,34 @@ const RATE_LIMIT_ERROR_MESSAGE_USE_GEMINI =
 const RATE_LIMIT_ERROR_MESSAGE_VERTEX =
   'Please wait and try again later. To increase your limits, request a quota increase through Vertex, or switch to another /auth method';
 
-// Quota classification for clearer control flow
-enum QuotaKind {
-  NONE = 'none',
-  GENERIC = 'generic',
-  PRO = 'pro',
-}
-
-function classifyQuota(error: unknown): QuotaKind {
-  if (isProQuotaExceededError(error)) return QuotaKind.PRO;
-  if (isGenericQuotaExceededError(error)) return QuotaKind.GENERIC;
-  return QuotaKind.NONE;
-}
-
 function isPaidUserTier(userTier?: UserTierId): boolean {
   return userTier === UserTierId.LEGACY || userTier === UserTierId.STANDARD;
 }
 
 // Builds the Google Login rate limit message (no leading newline)
 type FormatGoogleLoginRateLimitMessageOptions = {
-  quota: QuotaKind;
+  quotaType: ParsedErrorType;
   isPaidTier: boolean;
   currentModel?: string;
   fallbackModel?: string;
 };
 
 function formatGoogleLoginRateLimitMessage({
-  quota,
+  quotaType,
   isPaidTier,
   currentModel = DEFAULT_GEMINI_MODEL,
   fallbackModel = DEFAULT_GEMINI_FLASH_MODEL,
 }: FormatGoogleLoginRateLimitMessageOptions): string {
   let message: string;
 
-  switch (quota) {
-    case QuotaKind.PRO:
+  switch (quotaType) {
+    case ParsedErrorType.PRO_QUOTA:
       message = `You have reached your daily ${currentModel} quota limit. You will be switched to the ${fallbackModel} model for the rest of this session.`;
       break;
-    case QuotaKind.GENERIC:
+    case ParsedErrorType.GENERIC_QUOTA:
       message = 'You have reached your daily quota limit.';
       break;
-    case QuotaKind.NONE:
+    case ParsedErrorType.RATE_LIMIT:
     default:
       message = `${DEFAULT_FALLBACK_PREFIX} Switching to the ${fallbackModel} model for the rest of this session.`;
       break;
@@ -79,11 +91,17 @@ function formatGoogleLoginRateLimitMessage({
 
   if (isPaidTier) {
     message += ` ${APPRECIATION_NOTE}`;
-    if (quota === QuotaKind.PRO || quota === QuotaKind.GENERIC) {
+    if (
+      quotaType === ParsedErrorType.PRO_QUOTA ||
+      quotaType === ParsedErrorType.GENERIC_QUOTA
+    ) {
       message += ` To continue accessing the ${currentModel} model today, consider using /auth to switch to using a paid API key from AI Studio at ${AI_STUDIO_API_KEY_URL}`;
     }
   } else {
-    if (quota === QuotaKind.PRO || quota === QuotaKind.GENERIC) {
+    if (
+      quotaType === ParsedErrorType.PRO_QUOTA ||
+      quotaType === ParsedErrorType.GENERIC_QUOTA
+    ) {
       message += ` To increase your limits, upgrade to get higher limits at ${GEMINI_CODE_ASSIST_UPGRADE_URL}, or use /auth to switch to using a paid API key from AI Studio at ${AI_STUDIO_API_KEY_URL}`;
     }
   }
@@ -103,12 +121,12 @@ function getRateLimitMessage(
 
   switch (authType) {
     case AuthType.LOGIN_WITH_GOOGLE: {
-      const quota = classifyQuota(error);
+      const quotaType = classifyParsedErrorTypeFor429(error);
       const isPaidTier = isPaidUserTier(userTier);
       return (
         '\n' +
         formatGoogleLoginRateLimitMessage({
-          quota,
+          quotaType,
           isPaidTier,
           currentModel: sanitizedCurrent,
           fallbackModel: sanitizedFallback,
@@ -124,36 +142,89 @@ function getRateLimitMessage(
   }
 }
 
-export function parseAndFormatApiError(
+function classifyParsedErrorTypeFor429(error: unknown): ParsedErrorType {
+  if (isProQuotaExceededError(error)) return ParsedErrorType.PRO_QUOTA;
+  if (isGenericQuotaExceededError(error)) return ParsedErrorType.GENERIC_QUOTA;
+  return ParsedErrorType.RATE_LIMIT;
+}
+
+function titleForType(type: ParsedErrorType): string {
+  switch (type) {
+    case ParsedErrorType.PRO_QUOTA:
+    case ParsedErrorType.GENERIC_QUOTA:
+      return 'Quota Exceeded';
+    case ParsedErrorType.RATE_LIMIT:
+      return 'Rate Limit Exceeded';
+    case ParsedErrorType.AUTH:
+      return 'Authentication Error';
+    case ParsedErrorType.GENERIC:
+    default:
+      return 'API Error';
+  }
+}
+
+export function parseError(
   error: unknown,
   authType?: AuthType,
   userTier?: UserTierId,
   currentModel?: string,
   fallbackModel?: string,
-): string {
+): ParsedError {
+  // Handle structured errors first
   if (isStructuredError(error)) {
-    let text = `[API Error: ${error.message}]`;
     if (error.status === 429) {
-      text += getRateLimitMessage(
+      const type = classifyParsedErrorTypeFor429(error);
+      const rateLimitNotice = getRateLimitMessage(
         authType,
         error,
         userTier,
         currentModel,
         fallbackModel,
       );
+      return {
+        type,
+        title: titleForType(type),
+        message: error.message,
+        rawError: error,
+        httpStatus: error.status,
+        origin: 'structured',
+        rateLimitNotice,
+      };
     }
-    return text;
+    if (error.status === 401 || error.status === 403) {
+      return {
+        type: ParsedErrorType.AUTH,
+        title: titleForType(ParsedErrorType.AUTH),
+        message: error.message,
+        rawError: error,
+        httpStatus: error.status,
+        origin: 'structured',
+      };
+    }
+    return {
+      type: ParsedErrorType.GENERIC,
+      title: titleForType(ParsedErrorType.GENERIC),
+      message: error.message,
+      rawError: error,
+      httpStatus: error.status,
+      origin: 'structured',
+    };
   }
 
   // The error message might be a string containing a JSON object.
   if (typeof error === 'string') {
     const jsonStart = error.indexOf('{');
     if (jsonStart === -1) {
-      return `[API Error: ${error}]`; // Not a JSON error, return as is.
+      return {
+        type: ParsedErrorType.GENERIC,
+        title: titleForType(ParsedErrorType.GENERIC),
+        message: error,
+        rawError: error,
+        origin: 'text',
+      };
     }
 
     const jsonString = error.substring(jsonStart);
-
     try {
       const parsedError = JSON.parse(jsonString) as unknown;
       if (isApiError(parsedError)) {
@@ -165,25 +236,98 @@ export function parseAndFormatApiError(
             finalMessage = nestedError.error.message;
           }
         } catch (_e) {
-          // It's not a nested JSON error, so we just use the message as is.
+          // Not nested JSON, keep original message
         }
-        let text = `[API Error: ${finalMessage} (Status: ${parsedError.error.status})]`;
+
         if (parsedError.error.code === 429) {
-          text += getRateLimitMessage(
+          const type = classifyParsedErrorTypeFor429(parsedError);
+          const rateLimitNotice = getRateLimitMessage(
             authType,
             parsedError,
             userTier,
             currentModel,
             fallbackModel,
           );
+          return {
+            type,
+            title: titleForType(type),
+            message: finalMessage,
+            rawError: error,
+            apiCode: parsedError.error.code,
+            apiStatus: parsedError.error.status,
+            origin: 'json',
+            rateLimitNotice,
+          };
         }
-        return text;
+        if (parsedError.error.code === 401 || parsedError.error.code === 403) {
+          return {
+            type: ParsedErrorType.AUTH,
+            title: titleForType(ParsedErrorType.AUTH),
+            message: finalMessage,
+            rawError: error,
+            apiCode: parsedError.error.code,
+            apiStatus: parsedError.error.status,
+            origin: 'json',
+          };
+        }
+        return {
+          type: ParsedErrorType.GENERIC,
+          title: titleForType(ParsedErrorType.GENERIC),
+          message: finalMessage,
+          rawError: error,
+          apiCode: parsedError.error.code,
+          apiStatus: parsedError.error.status,
+          origin: 'json',
+        };
       }
     } catch (_e) {
-      // Not a valid JSON, fall through and return the original message.
+      // Not a valid JSON, fall through and return original message below
     }
-    return `[API Error: ${error}]`;
+
+    return {
+      type: ParsedErrorType.GENERIC,
+      title: titleForType(ParsedErrorType.GENERIC),
+      message: error,
+      rawError: error,
+      origin: 'text',
+    };
   }
 
-  return '[API Error: An unknown error occurred.]';
+  return {
+    type: ParsedErrorType.GENERIC,
+    title: titleForType(ParsedErrorType.GENERIC),
+    message: 'An unknown error occurred.',
+    rawError: error,
+    origin: 'unknown',
+  };
+}
+
+export function parseAndFormatApiError(
+  error: unknown,
+  authType?: AuthType,
+  userTier?: UserTierId,
+  currentModel?: string,
+  fallbackModel?: string,
+): string {
+  const parsed = parseError(
+    error,
+    authType,
+    userTier,
+    currentModel,
+    fallbackModel,
+  );
+
+  // Preserve existing formatting semantics:
+  // - Always prefix with [API Error: ...]
+  // - Include (Status: ...) only for API JSON errors
+  // - Append rate limit advice (with leading newline) after the bracketed text
+  let text = `[API Error: ${parsed.message}`;
+  if (parsed.origin === 'json') {
+    text += ` (Status: ${parsed.apiStatus})`;
+  }
+  text += ']';
+  if (parsed.rateLimitNotice) {
+    text += parsed.rateLimitNotice;
+  }
+  return text;
 }
