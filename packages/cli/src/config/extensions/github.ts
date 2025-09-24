@@ -87,7 +87,7 @@ export function parseGitHubRepoForReleases(source: string): {
   const parsedUrl = URL.parse(source, 'https://github.com');
   // The pathname should be "/owner/repo".
   const parts = parsedUrl?.pathname.substring(1).split('/');
-  if (parts?.length !== 2) {
+  if (parts?.length !== 2 || parsedUrl?.host !== 'github.com') {
     throw new Error(
       `Invalid GitHub repository source: ${source}. Expected "owner/repo" or a github repo uri.`,
     );
@@ -272,24 +272,6 @@ export async function downloadFromGitHubRelease(
     await downloadFile(archiveUrl, downloadedAssetPath);
 
     extractFile(downloadedAssetPath, destination);
-
-    const files = await fs.promises.readdir(destination);
-    const extractedDirName = files.find((file) => {
-      const filePath = path.join(destination, file);
-      return fs.statSync(filePath).isDirectory();
-    });
-
-    if (extractedDirName) {
-      const extractedDirPath = path.join(destination, extractedDirName);
-      const extractedDirFiles = await fs.promises.readdir(extractedDirPath);
-      for (const file of extractedDirFiles) {
-        await fs.promises.rename(
-          path.join(extractedDirPath, file),
-          path.join(destination, file),
-        );
-      }
-      await fs.promises.rmdir(extractedDirPath);
-    }
 
     await fs.promises.unlink(downloadedAssetPath);
     return {
