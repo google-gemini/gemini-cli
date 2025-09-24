@@ -17,7 +17,6 @@ import { GlobTool } from './glob.js';
 import { LSTool } from './ls.js';
 import { ReadFileTool } from './read-file.js';
 import { ReadManyFilesTool } from './read-many-files.js';
-import { WriteTodosTool } from './write-todos.js';
 import { RipGrepTool } from './ripGrep.js';
 import type { AnyDeclarativeTool } from '../tools/tools.js';
 import type { FunctionDeclaration } from '@google/genai';
@@ -99,7 +98,6 @@ export abstract class BaseSubAgentInvocation<
         : new GrepTool(this.config),
       new ReadFileTool(this.config),
       new ReadManyFilesTool(this.config),
-      new WriteTodosTool(),
     ];
     if (process.env['GEMINI_SUBAGENT_ADD_WEB_TOOL']) {
       required_tools.push(new WebFetchTool(this.config));
