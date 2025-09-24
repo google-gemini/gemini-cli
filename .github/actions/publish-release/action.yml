@@ -151,12 +151,6 @@ runs:
         wombat-token-core: '${{ inputs.wombat-token-core }}'
         wombat-token-cli: '${{ inputs.wombat-token-cli }}'
 
-    - name: 'Install deps'
-      working-directory: '${{ inputs.working-directory }}'
-      shell: 'bash'
-      run: |
-        npm install
-
     - name: '🎁 Bundle'
       working-directory: '${{ inputs.working-directory }}'
       shell: 'bash'
