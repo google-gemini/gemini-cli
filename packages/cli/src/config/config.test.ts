@@ -545,7 +545,7 @@ describe('loadCliConfig', () => {
     });
 
     it('should throw an error if --context-file does not exist', async () => {
-      vi.spyOn(fs, 'statSync').mockImplementation(() => {
+      vi.spyOn(fs.promises, 'stat').mockImplementation(async () => {
         const error = new Error('ENOENT: no such file or directory');
         (error as NodeJS.ErrnoException).code = 'ENOENT';
         throw error;
