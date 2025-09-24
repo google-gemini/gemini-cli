@@ -177,8 +177,16 @@ process_pr() {
 
             local LABELS_TO_REMOVE=""
             for label in "${PR_LABEL_ARRAY[@]}"; do
-                if [[ -n "${label}" ]] && [[ " ${ISSUE_LABEL_ARRAY[*]} " != *" ${label} "* ]]; then
-                    if [[ "${label}" != "status/need-issue" ]]; then
+                if [[ -n "${label}" ]] && [[ "${label}" != "status/need-issue" ]]; then
+                    local found=false
+                    for issue_label in "${ISSUE_LABEL_ARRAY[@]}"; do
+                        if [[ "${label}" == "${issue_label}" ]]; then
+                            found=true
+                            break
+                        fi
+                    done
+
+                    if [[ "${found}" == "false" ]]; then
                         if [[ -z "${LABELS_TO_REMOVE}" ]]; then
                             LABELS_TO_REMOVE="${label}"
                         else
