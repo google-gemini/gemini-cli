@@ -255,8 +255,20 @@ export async function main() {
       ? getNodeMemoryArgs(isDebugMode)
       : [];
     const sandboxConfig = await loadSandboxConfig(settings.merged, argv);
+    // We intentially omit the list of extensions here because extensions
+    // should not impact auth or setting up the sandbox.
+    // TODO(jacobr): refactor loadCliConfig so there is a minimal version
+    // that only initializes enough config to enable refreshAuth or find
+    // another way to decouple refreshAuth from requiring a config.
 
     if (sandboxConfig) {
+      const partialConfig = await loadCliConfig(
+        settings.merged,
+        [],
+        sessionId,
+        argv,
+      );
+
       if (
         settings.merged.security?.auth?.selectedType &&
         !settings.merged.security?.auth?.useExternal
@@ -269,17 +281,6 @@ export async function main() {
           if (err) {
             throw new Error(err);
           }
-          // We intentially omit the list of extensions here because extensions
-          // should not impact auth.
-          // TODO(jacobr): refactor loadCliConfig so there is a minimal version
-          // that only initializes enough config to enable refreshAuth or find
-          // another way to decouple refreshAuth from requiring a config.
-          const partialConfig = await loadCliConfig(
-            settings.merged,
-            [],
-            sessionId,
-            argv,
-          );
 
           await partialConfig.refreshAuth(
             settings.merged.security.auth.selectedType,
@@ -320,7 +321,7 @@ export async function main() {
       const sandboxArgs = injectStdinIntoArgs(process.argv, stdinData);
 
       await relaunchOnExitCode(() =>
-        start_sandbox(sandboxConfig, memoryArgs, config, sandboxArgs),
+        start_sandbox(sandboxConfig, memoryArgs, partialConfig, sandboxArgs),
       );
       process.exit(0);
     } else {
@@ -333,120 +334,122 @@ export async function main() {
   // We are now past the logic handling potentially launching a child process
   // to run Gemini CLI. It is now safe to perform expensive initialization that
   // may have side effects.
-  const extensions = loadExtensions();
-  const config = await loadCliConfig(
-    settings.merged,
-    extensions,
-    sessionId,
-    argv,
-  );
+  {
+    const extensions = loadExtensions();
+    const config = await loadCliConfig(
+      settings.merged,
+      extensions,
+      sessionId,
+      argv,
+    );
 
-  if (config.getListExtensions()) {
-    console.log('Installed extensions:');
-    for (const extension of extensions) {
-      console.log(`- ${extension.config.name}`);
+    if (config.getListExtensions()) {
+      console.log('Installed extensions:');
+      for (const extension of extensions) {
+        console.log(`- ${extension.config.name}`);
+      }
+      process.exit(0);
     }
-    process.exit(0);
-  }
 
-  const wasRaw = process.stdin.isRaw;
-  let kittyProtocolDetectionComplete: Promise<boolean> | undefined;
-  if (config.isInteractive() && !wasRaw && process.stdin.isTTY) {
-    // Set this as early as possible to avoid spurious characters from
-    // input showing up in the output.
-    process.stdin.setRawMode(true);
+    const wasRaw = process.stdin.isRaw;
+    let kittyProtocolDetectionComplete: Promise<boolean> | undefined;
+    if (config.isInteractive() && !wasRaw && process.stdin.isTTY) {
+      // Set this as early as possible to avoid spurious characters from
+      // input showing up in the output.
+      process.stdin.setRawMode(true);
 
-    // This cleanup isn't strictly needed but may help in certain situations.
-    process.on('SIGTERM', () => {
-      process.stdin.setRawMode(wasRaw);
+      // This cleanup isn't strictly needed but may help in certain situations.
+      process.on('SIGTERM', () => {
+        process.stdin.setRawMode(wasRaw);
+      });
+      process.on('SIGINT', () => {
+        process.stdin.setRawMode(wasRaw);
+      });
+
+      // Detect and enable Kitty keyboard protocol once at startup.
+      kittyProtocolDetectionComplete = detectAndEnableKittyProtocol();
+    }
+
+    setMaxSizedBoxDebugging(isDebugMode);
+
+    const initializationResult = await initializeApp(config, settings);
+
+    if (
+      settings.merged.security?.auth?.selectedType ===
+        AuthType.LOGIN_WITH_GOOGLE &&
+      config.isBrowserLaunchSuppressed()
+    ) {
+      // Do oauth before app renders to make copying the link possible.
+      await getOauthClient(settings.merged.security.auth.selectedType, config);
+    }
+
+    if (config.getExperimentalZedIntegration()) {
+      return runZedIntegration(config, settings, extensions, argv);
+    }
+
+    let input = config.getQuestion();
+    const startupWarnings = [
+      ...(await getStartupWarnings()),
+      ...(await getUserStartupWarnings()),
+    ];
+
+    // Render UI, passing necessary config values. Check that there is no command line question.
+    if (config.isInteractive()) {
+      // Need kitty detection to be complete before we can start the interactive UI.
+      await kittyProtocolDetectionComplete;
+      await startInteractiveUI(
+        config,
+        settings,
+        startupWarnings,
+        process.cwd(),
+        initializationResult,
+      );
+      return;
+    }
+
+    await config.initialize();
+
+    // If not a TTY, read from stdin
+    // This is for cases where the user pipes input directly into the command
+    if (!process.stdin.isTTY) {
+      const stdinData = await readStdin();
+      if (stdinData) {
+        input = `${stdinData}\n\n${input}`;
+      }
+    }
+    if (!input) {
+      console.error(
+        `No input provided via stdin. Input can be provided by piping data into gemini or using the --prompt option.`,
+      );
+      process.exit(1);
+    }
+
+    const prompt_id = Math.random().toString(16).slice(2);
+    logUserPrompt(config, {
+      'event.name': 'user_prompt',
+      'event.timestamp': new Date().toISOString(),
+      prompt: input,
+      prompt_id,
+      auth_type: config.getContentGeneratorConfig()?.authType,
+      prompt_length: input.length,
     });
-    process.on('SIGINT', () => {
-      process.stdin.setRawMode(wasRaw);
-    });
 
-    // Detect and enable Kitty keyboard protocol once at startup.
-    kittyProtocolDetectionComplete = detectAndEnableKittyProtocol();
-  }
-
-  setMaxSizedBoxDebugging(isDebugMode);
-
-  const initializationResult = await initializeApp(config, settings);
-
-  if (
-    settings.merged.security?.auth?.selectedType ===
-      AuthType.LOGIN_WITH_GOOGLE &&
-    config.isBrowserLaunchSuppressed()
-  ) {
-    // Do oauth before app renders to make copying the link possible.
-    await getOauthClient(settings.merged.security.auth.selectedType, config);
-  }
-
-  if (config.getExperimentalZedIntegration()) {
-    return runZedIntegration(config, settings, extensions, argv);
-  }
-
-  let input = config.getQuestion();
-  const startupWarnings = [
-    ...(await getStartupWarnings()),
-    ...(await getUserStartupWarnings()),
-  ];
-
-  // Render UI, passing necessary config values. Check that there is no command line question.
-  if (config.isInteractive()) {
-    // Need kitty detection to be complete before we can start the interactive UI.
-    await kittyProtocolDetectionComplete;
-    await startInteractiveUI(
+    const nonInteractiveConfig = await validateNonInteractiveAuth(
+      settings.merged.security?.auth?.selectedType,
+      settings.merged.security?.auth?.useExternal,
       config,
       settings,
-      startupWarnings,
-      process.cwd(),
-      initializationResult,
     );
-    return;
-  }
 
-  await config.initialize();
-
-  // If not a TTY, read from stdin
-  // This is for cases where the user pipes input directly into the command
-  if (!process.stdin.isTTY) {
-    const stdinData = await readStdin();
-    if (stdinData) {
-      input = `${stdinData}\n\n${input}`;
+    if (config.getDebugMode()) {
+      console.log('Session ID: %s', sessionId);
     }
+
+    await runNonInteractive(nonInteractiveConfig, settings, input, prompt_id);
+    // Call cleanup before process.exit, which causes cleanup to not run
+    await runExitCleanup();
+    process.exit(0);
   }
-  if (!input) {
-    console.error(
-      `No input provided via stdin. Input can be provided by piping data into gemini or using the --prompt option.`,
-    );
-    process.exit(1);
-  }
-
-  const prompt_id = Math.random().toString(16).slice(2);
-  logUserPrompt(config, {
-    'event.name': 'user_prompt',
-    'event.timestamp': new Date().toISOString(),
-    prompt: input,
-    prompt_id,
-    auth_type: config.getContentGeneratorConfig()?.authType,
-    prompt_length: input.length,
-  });
-
-  const nonInteractiveConfig = await validateNonInteractiveAuth(
-    settings.merged.security?.auth?.selectedType,
-    settings.merged.security?.auth?.useExternal,
-    config,
-    settings,
-  );
-
-  if (config.getDebugMode()) {
-    console.log('Session ID: %s', sessionId);
-  }
-
-  await runNonInteractive(nonInteractiveConfig, settings, input, prompt_id);
-  // Call cleanup before process.exit, which causes cleanup to not run
-  await runExitCleanup();
-  process.exit(0);
 }
 
 function setWindowTitle(title: string, settings: LoadedSettings) {
