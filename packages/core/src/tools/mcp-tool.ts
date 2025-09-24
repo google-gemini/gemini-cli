@@ -57,6 +57,36 @@ type McpContentBlock =
   | McpResourceBlock
   | McpResourceLinkBlock;
 
+// This list is based on the supported file formats for Gemini 2.5 Pro.
+// Source: https://cloud.google.com/vertex-ai/generative-ai/docs/models/gemini/2-5-pro
+const SUPPORTED_MIME_TYPES = new Set([
+  'image/png',
+  'image/jpeg',
+  'image/webp',
+  'application/pdf',
+  'text/plain',
+  'video/x-flv',
+  'video/quicktime',
+  'video/mpeg',
+  'video/mpegs',
+  'video/mpg',
+  'video/mp4',
+  'video/webm',
+  'video/wmv',
+  'video/3gpp',
+  'audio/x-aac',
+  'audio/flac',
+  'audio/mp3',
+  'audio/m4a',
+  'audio/mpeg',
+  'audio/mpga',
+  'audio/mp4',
+  'audio/opus',
+  'audio/pcm',
+  'audio/wav',
+  'audio/webm',
+]);
+
 class DiscoveredMCPToolInvocation extends BaseToolInvocation<
   ToolParams,
   ToolResult
@@ -187,6 +217,8 @@ class DiscoveredMCPToolInvocation extends BaseToolInvocation<
       };
     }
 
+    validateMcpContent(rawResponseParts);
+
     const transformedParts = transformMcpContentToParts(rawResponseParts);
 
     return {
@@ -305,6 +337,37 @@ function transformResourceLinkBlock(block: McpResourceLinkBlock): Part {
   return {
     text: `Resource Link: ${block.title || block.name} at ${block.uri}`,
   };
+}
+
+/**
+ * Validates the MCP content blocks and replaces unsupported mime types with an error message.
+ * @param sdkResponse The raw Part[] array from `mcpTool.callTool()`.
+ */
+function validateMcpContent(sdkResponse: Part[]): void {
+  const funcResponse = sdkResponse?.[0]?.functionResponse;
+  const mcpContent = funcResponse?.response?.['content'] as McpContentBlock[];
+
+  if (!Array.isArray(mcpContent)) {
+    return;
+  }
+
+  for (let i = 0; i < mcpContent.length; i++) {
+    const block = mcpContent[i];
+    let mimeType: string | undefined;
+
+    if (block.type === 'image' || block.type === 'audio') {
+      mimeType = block.mimeType;
+    } else if (block.type === 'resource' && block.resource.blob) {
+      mimeType = block.resource.mimeType || 'application/octet-stream';
+    }
+
+    if (mimeType && !SUPPORTED_MIME_TYPES.has(mimeType)) {
+      mcpContent[i] = {
+        type: 'text',
+        text: `[Tool returned unsupported mimetype: ${mimeType}]`,
+      };
+    }
+  }
 }
 
 /**

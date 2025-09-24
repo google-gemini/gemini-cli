@@ -431,17 +431,11 @@ describe('DiscoveredMCPTool', () => {
 
       expect(toolResult.llmContent).toEqual([
         {
-          text: `[Tool '${serverToolName}' provided the following embedded resource with mime-type: application/octet-stream]`,
-        },
-        {
-          inlineData: {
-            mimeType: 'application/octet-stream',
-            data: 'BASE64_BINARY_DATA',
-          },
+          text: '[Tool returned unsupported mimetype: application/octet-stream]',
         },
       ]);
       expect(toolResult.returnDisplay).toBe(
-        '[Embedded Resource: application/octet-stream]',
+        '[Tool returned unsupported mimetype: application/octet-stream]',
       );
     });
 
@@ -726,6 +720,109 @@ describe('DiscoveredMCPTool', () => {
         controller.abort();
         expect(controller.signal.aborted).toBe(true);
       });
+    });
+  });
+
+  describe('MIME type validation', () => {
+    it('should block an unsupported image MIME type', async () => {
+      const params = { param: 'unsupported' };
+      const sdkResponse: Part[] = [
+        {
+          functionResponse: {
+            name: serverToolName,
+            response: {
+              content: [
+                {
+                  type: 'image',
+                  data: 'BASE64_IMAGE_DATA',
+                  mimeType: 'image/tiff', // Unsupported
+                },
+              ],
+            },
+          },
+        },
+      ];
+      mockCallTool.mockResolvedValue(sdkResponse);
+
+      const invocation = tool.build(params);
+      const toolResult = await invocation.execute(new AbortController().signal);
+
+      expect(toolResult.llmContent).toEqual([
+        { text: '[Tool returned unsupported mimetype: image/tiff]' },
+      ]);
+      expect(toolResult.returnDisplay).toBe(
+        '[Tool returned unsupported mimetype: image/tiff]',
+      );
+    });
+
+    it('should block an unsupported resource blob MIME type', async () => {
+      const params = { param: 'unsupported' };
+      const sdkResponse: Part[] = [
+        {
+          functionResponse: {
+            name: serverToolName,
+            response: {
+              content: [
+                {
+                  type: 'resource',
+                  resource: {
+                    blob: 'BASE64_BINARY_DATA',
+                    mimeType: 'application/x-font-woff', // Unsupported
+                  },
+                },
+              ],
+            },
+          },
+        },
+      ];
+      mockCallTool.mockResolvedValue(sdkResponse);
+
+      const invocation = tool.build(params);
+      const toolResult = await invocation.execute(new AbortController().signal);
+
+      expect(toolResult.llmContent).toEqual([
+        {
+          text: '[Tool returned unsupported mimetype: application/x-font-woff]',
+        },
+      ]);
+      expect(toolResult.returnDisplay).toBe(
+        '[Tool returned unsupported mimetype: application/x-font-woff]',
+      );
+    });
+
+    it('should block a resource with no MIME type (defaults to unsupported octet-stream)', async () => {
+      const params = { param: 'unsupported' };
+      const sdkResponse: Part[] = [
+        {
+          functionResponse: {
+            name: serverToolName,
+            response: {
+              content: [
+                {
+                  type: 'resource',
+                  resource: {
+                    blob: 'BASE64_BINARY_DATA',
+                    // No mimeType property
+                  },
+                },
+              ],
+            },
+          },
+        },
+      ];
+      mockCallTool.mockResolvedValue(sdkResponse);
+
+      const invocation = tool.build(params);
+      const toolResult = await invocation.execute(new AbortController().signal);
+
+      expect(toolResult.llmContent).toEqual([
+        {
+          text: '[Tool returned unsupported mimetype: application/octet-stream]',
+        },
+      ]);
+      expect(toolResult.returnDisplay).toBe(
+        '[Tool returned unsupported mimetype: application/octet-stream]',
+      );
     });
   });
 
