@@ -8,6 +8,12 @@ inputs:
   github-secret:
     description: 'Github secret'
     required: true
+  dockerhub-username:
+    description: 'Dockerhub username'
+    required: true
+  dockerhub-token:
+    description: 'Dockerhub PAT w/ R+W'
+    required: true
   github-sha:
     description: 'Github Commit SHA Hash'
     required: true
@@ -38,9 +44,9 @@ runs:
     - name: 'Log in to GitHub Container Registry'
       uses: 'docker/login-action@v3'
       with:
-        registry: 'ghcr.io'
-        username: '${{ inputs.github-actor }}'
-        password: '${{ inputs.github-secret }}'
+        registry: 'docker.io'
+        username: '${{ inputs.dockerhub-username }}'
+        password: '${{ inputs.dockerhub-token }}'
     - name: 'determine image tag'
       id: 'image_tag'
       shell: 'bash'
@@ -63,7 +69,7 @@ runs:
         GEMINI_SANDBOX: 'docker'
       run: |-
         npm run build:sandbox -- \
-          --image ghcr.io/${{ github.repository}}/sandbox:${{ steps.image_tag.outputs.FINAL_TAG }} \
+          --image google/gemini-cli-sandbox:${{ steps.image_tag.outputs.FINAL_TAG }} \
           --output-file final_image_uri.txt
         echo "uri=$(cat final_image_uri.txt)" >> $GITHUB_OUTPUT
     - name: 'publish'
