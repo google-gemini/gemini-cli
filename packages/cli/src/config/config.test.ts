@@ -503,7 +503,7 @@ describe('loadCliConfig', () => {
     });
 
     it('should prioritize --context-file flag over settings', async () => {
-      vi.spyOn(fs, 'statSync').mockReturnValue({
+      vi.spyOn(fs.promises, 'stat').mockResolvedValue({
         isDirectory: () => false,
       } as fs.Stats);
       process.argv = ['node', 'script.js', '--context-file', 'cli.md'];
