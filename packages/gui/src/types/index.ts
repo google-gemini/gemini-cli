@@ -70,6 +70,38 @@ export interface UniversalStreamEvent {
   timestamp?: number;
 }
 
+export interface ChartConfig {
+  type: 'line' | 'bar' | 'area' | 'candlestick' | 'pie' | 'scatter';
+  title: string;
+  data: Record<string, string | number | boolean>[];
+  xKey: string;
+  yKey?: string;
+  yKeys?: string[];
+  options?: {
+    width?: number;
+    height?: number;
+    colors?: string[];
+    showGrid?: boolean;
+    showTooltip?: boolean;
+    showLegend?: boolean;
+    strokeWidth?: number;
+    fillOpacity?: number;
+  };
+}
+
+export interface VisualizationData {
+  type: 'quotes' | 'ohlc_bars' | 'technical_indicators' | 'screener_results' | 'signals';
+  title: string;
+  data: Record<string, string | number | boolean>[];
+  metadata?: {
+    symbols?: string[];
+    timeframe?: string;
+    indicators?: string[];
+    source?: string;
+    [key: string]: string | number | boolean | string[] | undefined;
+  };
+}
+
 export interface ToolResponseData {
   operation: string;
   summary: string;
@@ -88,6 +120,7 @@ export interface ToolResponseData {
     worksheet?: string;
   };
   nextActions?: string[];
+  visualizations?: VisualizationData[];
 }
 
 export interface RoleDefinition {
