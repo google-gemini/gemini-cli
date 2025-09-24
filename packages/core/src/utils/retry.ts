@@ -84,6 +84,8 @@ export async function retryWithBackoff<T>(
   } = {
     ...DEFAULT_RETRY_OPTIONS,
     ...options,
+    // Explicitly use default if maxAttempts is null or undefined in options.
+    maxAttempts: options?.maxAttempts ?? DEFAULT_RETRY_OPTIONS.maxAttempts,
   };
 
   let attempt = 0;
