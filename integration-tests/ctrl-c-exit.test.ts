@@ -35,7 +35,19 @@ describe('Ctrl+C exit', () => {
     // Send second Ctrl+C
     ptyProcess.write('\x03');
 
-    const result = await promise;
+    const timeout = new Promise((_, reject) =>
+      setTimeout(
+        () =>
+          reject(
+            new Error(
+              `Test timed out: process did not exit within 10000ms. Output: ${output}`,
+            ),
+          ),
+        10000,
+      ),
+    );
+
+    const result = await Promise.race([promise, timeout]);
 
     // Expect a graceful exit (code 0)
     expect(
@@ -50,5 +62,46 @@ describe('Ctrl+C exit', () => {
     // eslint-disable-next-line no-control-regex
     const cleanOutput = output.replace(/\x1b\[[0-9;]*m/g, '');
     expect(cleanOutput).toContain(quittingMessage);
+  });
+
+  it('should not hang and eventually exit if Ctrl+C is sent multiple times', async () => {
+    const rig = new TestRig();
+    await rig.setup(
+      'should not hang and eventually exit if Ctrl+C is sent multiple times',
+    );
+
+    const { ptyProcess, promise } = rig.runInteractive();
+
+    let output = '';
+    ptyProcess.onData((data) => {
+      output += data;
+    });
+
+    // Wait for the app to be ready by looking for the initial prompt indicator
+    await rig.poll(() => output.includes('▶'), 5000, 100);
+
+    // Send multiple Ctrl+C signals to ensure exit
+    ptyProcess.write('\x03');
+    ptyProcess.write('\x03');
+    ptyProcess.write('\x03');
+
+    const timeout = new Promise((_, reject) =>
+      setTimeout(
+        () =>
+          reject(
+            new Error(
+              `Test timed out: process did not exit within 10000ms. Output: ${output}`,
+            ),
+          ),
+        10000,
+      ),
+    );
+
+    // Race the process promise against a timeout.
+    // If the process doesn't exit, the timeout will reject and fail the test.
+    const result = await Promise.race([promise, timeout]);
+
+    // We expect the process to have exited. The result object indicates this.
+    expect(result).toBeDefined();
   });
 });
