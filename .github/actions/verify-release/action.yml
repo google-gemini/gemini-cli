@@ -25,6 +25,7 @@ runs:
     - name: 'Checkout'
       uses: 'actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955' # ratchet:actions/checkout@v4
       with:
+        path: 'verify'
         ref: '${{ github.event.inputs.ref }}'
         fetch-depth: 0
 
@@ -34,13 +35,13 @@ runs:
         timeout_seconds: 900
         retry_wait_seconds: 30
         max_attempts: 10
-        command: |-
-          npm install --prefer-online --no-cache -g ${{ inputs.npm-package }}
+        command: 'cd ./verify && pkg="${{ inputs.npm-package }}" && npm install --prefer-online --no-cache -g "$pkg"'
 
     # This provides a very basic smoke test for Gemini CLI
     - name: 'Run Gemini CLI'
       id: 'gemini_cli'
       shell: 'bash'
+      working-directory: './verify'
       run: |-
         echo "gemini_version=$(gemini --version)" >> $GITHUB_OUTPUT
 
@@ -48,6 +49,7 @@ runs:
     - name: 'Fail workflow if version does not match'
       if: '${{ steps.gemini_cli.outputs.gemini_version != inputs.expected-version }}'
       shell: 'bash'
+      working-directory: './verify'
       run: |-
         echo '❌ Got ${{ steps.gemini_cli.outputs.gemini_version }} from ${{ inputs.npm-package }}'
         echo '❌ Expected Version ${{ inputs.expected-version }}'
