@@ -13,6 +13,13 @@ on:
   pull_request_target:
     types: ['labeled']
   merge_group:
+  workflow_dispatch:
+    inputs:
+      branch_ref:
+        description: 'Branch to run on'
+        required: true
+        default: 'main'
+        type: 'string'
 
 concurrency:
   group: '${{ github.workflow }}-${{ github.head_ref || github.ref }}'
@@ -31,6 +38,8 @@ jobs:
     steps:
       - name: 'Checkout'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
+        with:
+          ref: '${{ github.event.inputs.branch_ref || github.ref }}'
 
       - name: 'Set up Node.js'
         uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions-node@v4
@@ -83,6 +92,8 @@ jobs:
       - name: 'Checkout (internal)'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
         if: "github.event_name != 'pull_request_target'"
+        with:
+          ref: '${{ github.event.inputs.branch_ref || github.ref }}'
 
       - name: 'Download build artifacts'
         uses: 'actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093'
@@ -131,10 +142,9 @@ jobs:
       fail-fast: false
       matrix:
         os:
-          - 'macos-latest'
+          - 'macos-12'
         node-version:
           - '20.x'
-
     steps:
       - name: 'Checkout (fork)'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
@@ -146,6 +156,8 @@ jobs:
       - name: 'Checkout (internal)'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
         if: "github.event_name != 'pull_request_target'"
+        with:
+          ref: '${{ github.event.inputs.branch_ref || github.ref }}'
 
       - name: 'Download build artifacts'
         uses: 'actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093'
@@ -197,6 +209,8 @@ jobs:
       - name: 'Checkout (internal)'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
         if: "github.event_name != 'pull_request_target'"
+        with:
+          ref: '${{ github.event.inputs.branch_ref || github.ref }}'
 
       - name: 'Set up Node.js 20.x'
         uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions-node@v4

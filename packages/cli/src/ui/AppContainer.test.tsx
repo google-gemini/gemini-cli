@@ -54,6 +54,7 @@ vi.mock('./hooks/useThemeCommand.js');
 vi.mock('./auth/useAuth.js');
 vi.mock('./hooks/useEditorSettings.js');
 vi.mock('./hooks/useSettingsCommand.js');
+vi.mock('./hooks/useModelCommand.js');
 vi.mock('./hooks/slashCommandProcessor.js');
 vi.mock('./hooks/useConsoleMessages.js');
 vi.mock('./hooks/useTerminalSize.js', () => ({
@@ -86,6 +87,7 @@ import { useThemeCommand } from './hooks/useThemeCommand.js';
 import { useAuthCommand } from './auth/useAuth.js';
 import { useEditorSettings } from './hooks/useEditorSettings.js';
 import { useSettingsCommand } from './hooks/useSettingsCommand.js';
+import { useModelCommand } from './hooks/useModelCommand.js';
 import { useSlashCommandProcessor } from './hooks/slashCommandProcessor.js';
 import { useConsoleMessages } from './hooks/useConsoleMessages.js';
 import { useGeminiStream } from './hooks/useGeminiStream.js';
@@ -116,6 +118,7 @@ describe('AppContainer State Management', () => {
   const mockedUseAuthCommand = useAuthCommand as Mock;
   const mockedUseEditorSettings = useEditorSettings as Mock;
   const mockedUseSettingsCommand = useSettingsCommand as Mock;
+  const mockedUseModelCommand = useModelCommand as Mock;
   const mockedUseSlashCommandProcessor = useSlashCommandProcessor as Mock;
   const mockedUseConsoleMessages = useConsoleMessages as Mock;
   const mockedUseGeminiStream = useGeminiStream as Mock;
@@ -171,6 +174,11 @@ describe('AppContainer State Management', () => {
       isSettingsDialogOpen: false,
       openSettingsDialog: vi.fn(),
       closeSettingsDialog: vi.fn(),
+    });
+    mockedUseModelCommand.mockReturnValue({
+      isModelDialogOpen: false,
+      openModelDialog: vi.fn(),
+      closeModelDialog: vi.fn(),
     });
     mockedUseSlashCommandProcessor.mockReturnValue({
       handleSlashCommand: vi.fn(),
@@ -763,6 +771,50 @@ describe('AppContainer State Management', () => {
       expect(mockHandleSlashCommand).not.toHaveBeenCalledWith('/quit');
 
       vi.useRealTimers();
+    });
+  });
+
+  describe('Model Dialog Integration', () => {
+    it('should provide isModelDialogOpen in the UIStateContext', () => {
+      mockedUseModelCommand.mockReturnValue({
+        isModelDialogOpen: true,
+        openModelDialog: vi.fn(),
+        closeModelDialog: vi.fn(),
+      });
+
+      render(
+        <AppContainer
+          config={mockConfig}
+          settings={mockSettings}
+          version="1.0.0"
+          initializationResult={mockInitResult}
+        />,
+      );
+
+      expect(capturedUIState.isModelDialogOpen).toBe(true);
+    });
+
+    it('should provide model dialog actions in the UIActionsContext', () => {
+      const mockCloseModelDialog = vi.fn();
+
+      mockedUseModelCommand.mockReturnValue({
+        isModelDialogOpen: false,
+        openModelDialog: vi.fn(),
+        closeModelDialog: mockCloseModelDialog,
+      });
+
+      render(
+        <AppContainer
+          config={mockConfig}
+          settings={mockSettings}
+          version="1.0.0"
+          initializationResult={mockInitResult}
+        />,
+      );
+
+      // Verify that the actions are correctly passed through context
+      capturedUIActions.closeModelDialog();
+      expect(mockCloseModelDialog).toHaveBeenCalled();
     });
   });
 });
