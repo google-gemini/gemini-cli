@@ -109,11 +109,12 @@ Choose the authentication method that best fits your needs:
 
 ### Option 1: Login with Google (OAuth login using your Google Account)
 
-**✨ Best for:** 
--  Individual developers.
--  Google AI Pro and AI Ultra subscribers.
--  Anyone who has a Gemini Code Assist license.
-  
+**✨ Best for:**
+
+- Individual developers.
+- Google AI Pro and AI Ultra subscribers.
+- Anyone who has a Gemini Code Assist license.
+
 _See [quota limits and terms of service](https://cloud.google.com/gemini/docs/quotas) for details._
 
 **Benefits:**

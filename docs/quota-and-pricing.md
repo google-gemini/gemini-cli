@@ -53,24 +53,24 @@ Learn more at [Vertex AI Express Mode Limits](https://cloud.google.com/vertex-ai
 
 If you use up your initial number of requests, you can continue to benefit from Gemini CLI by upgrading to one of the following subscriptions:
 
-- [Google AI Pro and AI Ultra](https://cloud.google.com/products/gemini/pricing) by signing up at [Set up Gemini Code Assist](https://goo.gle/set-up-gemini-code-assist). This is recommended for individual developers. Quotas and pricing are based on a fixed price subscription. 
+- [Google AI Pro and AI Ultra](https://cloud.google.com/products/gemini/pricing) by signing up at [Set up Gemini Code Assist](https://goo.gle/set-up-gemini-code-assist). This is recommended for individual developers. Quotas and pricing are based on a fixed price subscription.
 
-    For predictable costs, you can log in with Google.
-    
-    Learn more at [Gemini Code Assist Quotas and Limits](https://developers.google.com/gemini-code-assist/resources/quotas)
+  For predictable costs, you can log in with Google.
+
+  Learn more at [Gemini Code Assist Quotas and Limits](https://developers.google.com/gemini-code-assist/resources/quotas)
 
 - [Purchase a Gemini Code Assist Subscription through Google Cloud ](https://cloud.google.com/gemini/docs/codeassist/overview) by signing up in the Google Cloud console. Learn more at [Set up Gemini Code Assist] (https://cloud.google.com/gemini/docs/discover/set-up-gemini) Quotas and pricing are based on a fixed price subscription with assigned license seats. For predictable costs, you can sign in with Google.
 
-    This includes:
-    - Gemini Code Assist Standard edition:
-      - 1500 model requests / user / day
-      - 120 model requests / user / minute
-    - Gemini Code Assist Enterprise edition:
-      - 2000 model requests / user / day
-      - 120 model requests / user / minute
-    - Model requests will be made across the Gemini model family as determined by Gemini CLI.
+  This includes:
+  - Gemini Code Assist Standard edition:
+    - 1500 model requests / user / day
+    - 120 model requests / user / minute
+  - Gemini Code Assist Enterprise edition:
+    - 2000 model requests / user / day
+    - 120 model requests / user / minute
+  - Model requests will be made across the Gemini model family as determined by Gemini CLI.
 
-    [Learn more about Gemini Code Assist Standard and Enterprise license limits](https://developers.google.com/gemini-code-assist/resources/quotas#quotas-for-agent-mode-gemini-cli).
+  [Learn more about Gemini Code Assist Standard and Enterprise license limits](https://developers.google.com/gemini-code-assist/resources/quotas#quotas-for-agent-mode-gemini-cli).
 
 ## Pay As You Go
 
