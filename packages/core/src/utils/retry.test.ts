@@ -9,6 +9,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { HttpError } from './retry.js';
 import { retryWithBackoff } from './retry.js';
 import { setSimulate429 } from './testUtils.js';
+import { TerminalQuotaError, RetryableQuotaError } from '../quota-errors.js';
 
 // Helper to create a mock function that fails a certain number of times
 const createFailingFunction = (
@@ -71,6 +72,7 @@ describe('retryWithBackoff', () => {
     expect(mockFn).toHaveBeenCalledTimes(3);
   });
 
+  /* eslint-disable vitest/valid-expect */
   it('should throw an error if all attempts fail', async () => {
     const mockFn = createFailingFunction(3);
 
@@ -80,26 +82,24 @@ describe('retryWithBackoff', () => {
       initialDelayMs: 10,
     });
 
-    // 2. IMPORTANT: Attach the rejection expectation to the promise *immediately*.
-    //    This ensures a 'catch' handler is present before the promise can reject.
-    //    The result is a new promise that resolves when the assertion is met.
-    // eslint-disable-next-line vitest/valid-expect
+    // 2. Set up the rejection expectation *before* running timers.
     const assertionPromise = expect(promise).rejects.toThrow(
       'Simulated error attempt 3',
     );
 
     // 3. Now, advance the timers. This will trigger the retries and the
-    //    eventual rejection. The handler attached in step 2 will catch it.
+    //    eventual rejection.
     await vi.runAllTimersAsync();
 
-    // 4. Await the assertion promise itself to ensure the test was successful.
+    // 4. Await the assertion to ensure the rejection was caught.
     await assertionPromise;
 
     // 5. Finally, assert the number of calls.
     expect(mockFn).toHaveBeenCalledTimes(3);
   });
+  /* eslint-enable vitest/valid-expect */
 
-  it('should default to 5 maxAttempts if no options are provided', async () => {
+  it('should default to 10 maxAttempts if no options are provided', async () => {
     // This function will fail more than 5 times to ensure all retries are used.
     const mockFn = createFailingFunction(10);
 
@@ -108,12 +108,12 @@ describe('retryWithBackoff', () => {
     // Expect it to fail with the error from the 5th attempt.
     // eslint-disable-next-line vitest/valid-expect
     const assertionPromise = expect(promise).rejects.toThrow(
-      'Simulated error attempt 5',
+      'Simulated error attempt 10',
     );
     await vi.runAllTimersAsync();
     await assertionPromise;
 
-    expect(mockFn).toHaveBeenCalledTimes(5);
+    expect(mockFn).toHaveBeenCalledTimes(10);
   });
 
   it('should not retry if shouldRetry returns false', async () => {
@@ -143,6 +143,7 @@ describe('retryWithBackoff', () => {
     expect(mockFn).not.toHaveBeenCalled();
   });
 
+  /* eslint-disable vitest/valid-expect */
   it('should use default shouldRetry if not provided, retrying on 429', async () => {
     const mockFn = vi.fn(async () => {
       const error = new Error('Too Many Requests') as any;
@@ -155,18 +156,18 @@ describe('retryWithBackoff', () => {
       initialDelayMs: 10,
     });
 
-    // Attach the rejection expectation *before* running timers
     const assertionPromise =
-      expect(promise).rejects.toThrow('Too Many Requests'); // eslint-disable-line vitest/valid-expect
+      expect(promise).rejects.toThrow('Too Many Requests');
 
     // Run timers to trigger retries and eventual rejection
     await vi.runAllTimersAsync();
 
-    // Await the assertion
+    // Await the rejection assertion.
     await assertionPromise;
 
     expect(mockFn).toHaveBeenCalledTimes(2);
   });
+  /* eslint-enable vitest/valid-expect */
 
   it('should use default shouldRetry if not provided, not retrying on 400', async () => {
     const mockFn = vi.fn(async () => {
@@ -210,6 +211,7 @@ describe('retryWithBackoff', () => {
     expect(delays[2]).toBeLessThanOrEqual(250 * 1.3);
   });
 
+  /* eslint-disable vitest/valid-expect */
   it('should handle jitter correctly, ensuring varied delays', async () => {
     let mockFn = createFailingFunction(5);
     const setTimeoutSpy = vi.spyOn(global, 'setTimeout');
@@ -224,11 +226,9 @@ describe('retryWithBackoff', () => {
 
     // We expect rejections as mockFn fails 5 times
     const promise1 = runRetry();
-    // Attach the rejection expectation *before* running timers
-    // eslint-disable-next-line vitest/valid-expect
-    const assertionPromise1 = expect(promise1).rejects.toThrow();
+    const assertion1 = expect(promise1).rejects.toThrow();
     await vi.runAllTimersAsync(); // Advance for the delay in the first runRetry
-    await assertionPromise1;
+    await assertion1;
 
     const firstDelaySet = setTimeoutSpy.mock.calls.map(
       (call) => call[1] as number,
@@ -239,11 +239,9 @@ describe('retryWithBackoff', () => {
     mockFn = createFailingFunction(5); // Re-initialize with 5 failures
 
     const promise2 = runRetry();
-    // Attach the rejection expectation *before* running timers
-    // eslint-disable-next-line vitest/valid-expect
-    const assertionPromise2 = expect(promise2).rejects.toThrow();
+    const assertion2 = expect(promise2).rejects.toThrow();
     await vi.runAllTimersAsync(); // Advance for the delay in the second runRetry
-    await assertionPromise2;
+    await assertion2;
 
     const secondDelaySet = setTimeoutSpy.mock.calls.map(
       (call) => call[1] as number,
@@ -265,17 +263,16 @@ describe('retryWithBackoff', () => {
       expect(d).toBeLessThanOrEqual(100 * 1.3);
     });
   });
+  /* eslint-enable vitest/valid-expect */
 
   describe('Flash model fallback for OAuth users', () => {
-    it('should trigger fallback for OAuth personal users after persistent 429 errors', async () => {
+    it('should trigger fallback for OAuth personal users on TerminalQuotaError', async () => {
       const fallbackCallback = vi.fn().mockResolvedValue('gemini-2.5-flash');
 
       let fallbackOccurred = false;
       const mockFn = vi.fn().mockImplementation(async () => {
         if (!fallbackOccurred) {
-          const error: HttpError = new Error('Rate limit exceeded');
-          error.status = 429;
-          throw error;
+          throw new TerminalQuotaError('Daily limit reached', {} as any);
         }
         return 'success';
       });
@@ -283,153 +280,41 @@ describe('retryWithBackoff', () => {
       const promise = retryWithBackoff(mockFn, {
         maxAttempts: 3,
         initialDelayMs: 100,
-        onPersistent429: async (authType?: string) => {
+        onPersistent429: async (authType?: string, error?: unknown) => {
           fallbackOccurred = true;
-          return await fallbackCallback(authType);
+          return await fallbackCallback(authType, error);
         },
         authType: 'oauth-personal',
       });
 
-      // Advance all timers to complete retries
-      await vi.runAllTimersAsync();
-
-      // Should succeed after fallback
-      await expect(promise).resolves.toBe('success');
-
-      // Verify callback was called with correct auth type
-      expect(fallbackCallback).toHaveBeenCalledWith('oauth-personal');
-
-      // Should retry again after fallback
-      expect(mockFn).toHaveBeenCalledTimes(3); // 2 initial attempts + 1 after fallback
-    });
-
-    it('should NOT trigger fallback for API key users', async () => {
-      const fallbackCallback = vi.fn();
-
-      const mockFn = vi.fn(async () => {
-        const error: HttpError = new Error('Rate limit exceeded');
-        error.status = 429;
-        throw error;
-      });
-
-      const promise = retryWithBackoff(mockFn, {
-        maxAttempts: 3,
-        initialDelayMs: 100,
-        onPersistent429: fallbackCallback,
-        authType: 'gemini-api-key',
-      });
-
-      // Handle the promise properly to avoid unhandled rejections
-      const resultPromise = promise.catch((error) => error);
-      await vi.runAllTimersAsync();
-      const result = await resultPromise;
-
-      // Should fail after all retries without fallback
-      expect(result).toBeInstanceOf(Error);
-      expect(result.message).toBe('Rate limit exceeded');
-
-      // Callback should not be called for API key users
-      expect(fallbackCallback).not.toHaveBeenCalled();
-    });
-
-    it('should reset attempt counter and continue after successful fallback', async () => {
-      let fallbackCalled = false;
-      const fallbackCallback = vi.fn().mockImplementation(async () => {
-        fallbackCalled = true;
-        return 'gemini-2.5-flash';
-      });
-
-      const mockFn = vi.fn().mockImplementation(async () => {
-        if (!fallbackCalled) {
-          const error: HttpError = new Error('Rate limit exceeded');
-          error.status = 429;
-          throw error;
-        }
-        return 'success';
-      });
-
-      const promise = retryWithBackoff(mockFn, {
-        maxAttempts: 3,
-        initialDelayMs: 100,
-        onPersistent429: fallbackCallback,
-        authType: 'oauth-personal',
-      });
-
       await vi.runAllTimersAsync();
 
       await expect(promise).resolves.toBe('success');
-      expect(fallbackCallback).toHaveBeenCalledOnce();
-    });
-
-    it('should continue with original error if fallback is rejected', async () => {
-      const fallbackCallback = vi.fn().mockResolvedValue(null); // User rejected fallback
-
-      const mockFn = vi.fn(async () => {
-        const error: HttpError = new Error('Rate limit exceeded');
-        error.status = 429;
-        throw error;
-      });
-
-      const promise = retryWithBackoff(mockFn, {
-        maxAttempts: 3,
-        initialDelayMs: 100,
-        onPersistent429: fallbackCallback,
-        authType: 'oauth-personal',
-      });
-
-      // Handle the promise properly to avoid unhandled rejections
-      const resultPromise = promise.catch((error) => error);
-      await vi.runAllTimersAsync();
-      const result = await resultPromise;
-
-      // Should fail with original error when fallback is rejected
-      expect(result).toBeInstanceOf(Error);
-      expect(result.message).toBe('Rate limit exceeded');
       expect(fallbackCallback).toHaveBeenCalledWith(
         'oauth-personal',
-        expect.any(Error),
+        expect.any(TerminalQuotaError),
       );
+      expect(mockFn).toHaveBeenCalledTimes(2);
     });
 
-    it('should handle mixed error types (only count consecutive 429s)', async () => {
-      const fallbackCallback = vi.fn().mockResolvedValue('gemini-2.5-flash');
-      let attempts = 0;
-      let fallbackOccurred = false;
-
+    /* eslint-disable vitest/valid-expect */
+    it('should use retryDelayMs from RetryableQuotaError', async () => {
+      const setTimeoutSpy = vi.spyOn(global, 'setTimeout');
       const mockFn = vi.fn().mockImplementation(async () => {
-        attempts++;
-        if (fallbackOccurred) {
-          return 'success';
-        }
-        if (attempts === 1) {
-          // First attempt: 500 error (resets consecutive count)
-          const error: HttpError = new Error('Server error');
-          error.status = 500;
-          throw error;
-        } else {
-          // Remaining attempts: 429 errors
-          const error: HttpError = new Error('Rate limit exceeded');
-          error.status = 429;
-          throw error;
-        }
+        throw new RetryableQuotaError('Per-minute limit', {} as any, 12.345);
       });
 
       const promise = retryWithBackoff(mockFn, {
-        maxAttempts: 5,
+        maxAttempts: 2,
         initialDelayMs: 100,
-        onPersistent429: async (authType?: string) => {
-          fallbackOccurred = true;
-          return await fallbackCallback(authType);
-        },
-        authType: 'oauth-personal',
       });
 
+      const assertionPromise = expect(promise).rejects.toThrow();
       await vi.runAllTimersAsync();
+      await assertionPromise;
 
-      await expect(promise).resolves.toBe('success');
-
-      // Should trigger fallback after 2 consecutive 429s (attempts 2-3)
-      expect(fallbackCallback).toHaveBeenCalledWith('oauth-personal');
+      expect(setTimeoutSpy).toHaveBeenCalledWith(expect.any(Function), 12345);
     });
+    /* eslint-enable vitest/valid-expect */
   });
 });
