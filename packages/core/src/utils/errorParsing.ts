@@ -163,6 +163,210 @@ function titleForType(type: ParsedErrorType): string {
   }
 }
 
+// ----------------------------
+// Internal helpers and parsers
+// ----------------------------
+
+type ErrorOrigin = 'structured' | 'json' | 'text' | 'unknown';
+
+type ParseContext = {
+  authType?: AuthType;
+  userTier?: UserTierId;
+  currentModel?: string;
+  fallbackModel?: string;
+};
+
+type NormalizedInput = {
+  message: string;
+  httpStatus?: number;
+  apiStatus?: string;
+  apiCode?: number;
+  origin: ErrorOrigin;
+  rawError: unknown;
+};
+
+function buildParsedError(
+  base: NormalizedInput,
+  type: ParsedErrorType,
+  extra?: Partial<ParsedError>,
+): ParsedError {
+  return {
+    type,
+    title: titleForType(type),
+    message: base.message,
+    rawError: base.rawError,
+    httpStatus: base.httpStatus,
+    apiStatus: base.apiStatus,
+    apiCode: base.apiCode,
+    origin: base.origin,
+    ...(extra || {}),
+  };
+}
+
+function normalizeStructuredError(error: {
+  message: string;
+  status?: number;
+}): NormalizedInput {
+  return {
+    message: error.message,
+    httpStatus: error.status,
+    origin: 'structured',
+    rawError: error,
+  };
+}
+
+function unwrapNestedApiMessage(message: string): string {
+  try {
+    const nested = JSON.parse(message) as unknown;
+    if (isApiError(nested)) {
+      return nested.error.message;
+    }
+  } catch {
+    // not nested JSON, return as-is
+  }
+  return message;
+}
+
+function normalizeApiJsonError(
+  apiErr: { error: { code: number; message: string; status: string } },
+  rawError: unknown,
+): NormalizedInput {
+  const unwrapped = unwrapNestedApiMessage(apiErr.error.message);
+  return {
+    message: unwrapped,
+    apiCode: apiErr.error.code,
+    apiStatus: apiErr.error.status,
+    origin: 'json',
+    rawError,
+  };
+}
+
+function extractApiErrorFromString(
+  text: string,
+): {
+  apiError: { error: { code: number; message: string; status: string } };
+} | null {
+  // Prefer an anchor for API error payloads if present
+  const anchor = text.indexOf('{"error":');
+  const start = anchor >= 0 ? anchor : text.indexOf('{');
+  if (start === -1) return null;
+
+  // Try to trim trailing noise after JSON by cutting to the last closing brace
+  const lastClose = text.lastIndexOf('}');
+  const candidate =
+    lastClose > start
+      ? text.substring(start, lastClose + 1)
+      : text.substring(start);
+
+  try {
+    const parsed = JSON.parse(candidate) as unknown;
+    if (isApiError(parsed)) {
+      return {
+        apiError: parsed as {
+          error: { code: number; message: string; status: string };
+        },
+      };
+    }
+  } catch {
+    // fallthrough
+  }
+  return null;
+}
+
+function dispatchByStatus(
+  normalized: NormalizedInput,
+  detectionTarget: unknown,
+  ctx: ParseContext,
+): ParsedError {
+  const status = normalized.httpStatus ?? normalized.apiCode;
+  switch (status) {
+    case 429:
+      return parse429(normalized, detectionTarget, ctx);
+    case 401:
+      return parse401(normalized);
+    case 403:
+      return parse403(normalized);
+    case 500:
+      return parse500(normalized);
+    case 502:
+      return parse502(normalized);
+    case 503:
+      return parse503(normalized);
+    default:
+      return parseDefault(normalized);
+  }
+}
+
+// Per-status parsers
+function parse429(
+  base: NormalizedInput,
+  detectionTarget: unknown,
+  ctx: ParseContext,
+): ParsedError {
+  const type = classifyParsedErrorTypeFor429(detectionTarget);
+  const rateLimitNotice = getRateLimitMessage(
+    ctx.authType,
+    detectionTarget,
+    ctx.userTier,
+    ctx.currentModel,
+    ctx.fallbackModel,
+  );
+  return buildParsedError(base, type, { rateLimitNotice });
+}
+
+function parse401(base: NormalizedInput): ParsedError {
+  return buildParsedError(base, ParsedErrorType.AUTH);
+}
+
+function parse403(base: NormalizedInput): ParsedError {
+  return buildParsedError(base, ParsedErrorType.AUTH);
+}
+
+function parse500(base: NormalizedInput): ParsedError {
+  return buildParsedError(base, ParsedErrorType.GENERIC);
+}
+
+function parse502(base: NormalizedInput): ParsedError {
+  return buildParsedError(base, ParsedErrorType.GENERIC);
+}
+
+function parse503(base: NormalizedInput): ParsedError {
+  return buildParsedError(base, ParsedErrorType.GENERIC);
+}
+
+function parseDefault(base: NormalizedInput): ParsedError {
+  return buildParsedError(base, ParsedErrorType.GENERIC);
+}
+
+function parseStructured(
+  error: { message: string; status?: number },
+  ctx: ParseContext,
+): ParsedError {
+  const normalized = normalizeStructuredError(error);
+  if (typeof error.status === 'number') {
+    return dispatchByStatus(normalized, error, ctx);
+  }
+  return parseDefault(normalized);
+}
+
+function parseStringError(errorText: string, ctx: ParseContext): ParsedError {
+  const extracted = extractApiErrorFromString(errorText);
+  if (extracted) {
+    const normalized = normalizeApiJsonError(extracted.apiError, errorText);
+    return dispatchByStatus(normalized, extracted.apiError, ctx);
+  }
+
+  // Plain text fallback
+  return buildParsedError(
+    { message: errorText, origin: 'text', rawError: errorText },
+    ParsedErrorType.GENERIC,
+  );
+}
+
+// ----------------------------
+// Public API
+// ----------------------------
+
 export function parseError(
   error: unknown,
   authType?: AuthType,
@@ -170,136 +374,27 @@ export function parseError(
   currentModel?: string,
   fallbackModel?: string,
 ): ParsedError {
-  // Handle structured errors first
+  const ctx: ParseContext = { authType, userTier, currentModel, fallbackModel };
+
+  // 1) Structured error path
   if (isStructuredError(error)) {
-    if (error.status === 429) {
-      const type = classifyParsedErrorTypeFor429(error);
-      const rateLimitNotice = getRateLimitMessage(
-        authType,
-        error,
-        userTier,
-        currentModel,
-        fallbackModel,
-      );
-      return {
-        type,
-        title: titleForType(type),
-        message: error.message,
-        rawError: error,
-        httpStatus: error.status,
-        origin: 'structured',
-        rateLimitNotice,
-      };
-    }
-    if (error.status === 401 || error.status === 403) {
-      return {
-        type: ParsedErrorType.AUTH,
-        title: titleForType(ParsedErrorType.AUTH),
-        message: error.message,
-        rawError: error,
-        httpStatus: error.status,
-        origin: 'structured',
-      };
-    }
-    return {
-      type: ParsedErrorType.GENERIC,
-      title: titleForType(ParsedErrorType.GENERIC),
-      message: error.message,
-      rawError: error,
-      httpStatus: error.status,
-      origin: 'structured',
-    };
+    return parseStructured(error, ctx);
   }
 
-  // The error message might be a string containing a JSON object.
+  // 2) String path (might contain JSON API error)
   if (typeof error === 'string') {
-    const jsonStart = error.indexOf('{');
-    if (jsonStart === -1) {
-      return {
-        type: ParsedErrorType.GENERIC,
-        title: titleForType(ParsedErrorType.GENERIC),
-        message: error,
-        rawError: error,
-        origin: 'text',
-      };
-    }
-
-    const jsonString = error.substring(jsonStart);
-    try {
-      const parsedError = JSON.parse(jsonString) as unknown;
-      if (isApiError(parsedError)) {
-        let finalMessage = parsedError.error.message;
-        try {
-          // See if the message is a stringified JSON with another error
-          const nestedError = JSON.parse(finalMessage) as unknown;
-          if (isApiError(nestedError)) {
-            finalMessage = nestedError.error.message;
-          }
-        } catch (_e) {
-          // Not nested JSON, keep original message
-        }
-
-        if (parsedError.error.code === 429) {
-          const type = classifyParsedErrorTypeFor429(parsedError);
-          const rateLimitNotice = getRateLimitMessage(
-            authType,
-            parsedError,
-            userTier,
-            currentModel,
-            fallbackModel,
-          );
-          return {
-            type,
-            title: titleForType(type),
-            message: finalMessage,
-            rawError: error,
-            apiCode: parsedError.error.code,
-            apiStatus: parsedError.error.status,
-            origin: 'json',
-            rateLimitNotice,
-          };
-        }
-        if (parsedError.error.code === 401 || parsedError.error.code === 403) {
-          return {
-            type: ParsedErrorType.AUTH,
-            title: titleForType(ParsedErrorType.AUTH),
-            message: finalMessage,
-            rawError: error,
-            apiCode: parsedError.error.code,
-            apiStatus: parsedError.error.status,
-            origin: 'json',
-          };
-        }
-        return {
-          type: ParsedErrorType.GENERIC,
-          title: titleForType(ParsedErrorType.GENERIC),
-          message: finalMessage,
-          rawError: error,
-          apiCode: parsedError.error.code,
-          apiStatus: parsedError.error.status,
-          origin: 'json',
-        };
-      }
-    } catch (_e) {
-      // Not a valid JSON, fall through and return original message below
-    }
-
-    return {
-      type: ParsedErrorType.GENERIC,
-      title: titleForType(ParsedErrorType.GENERIC),
-      message: error,
-      rawError: error,
-      origin: 'text',
-    };
+    return parseStringError(error, ctx);
   }
 
-  return {
-    type: ParsedErrorType.GENERIC,
-    title: titleForType(ParsedErrorType.GENERIC),
-    message: 'An unknown error occurred.',
-    rawError: error,
-    origin: 'unknown',
-  };
+  // 3) Unknown path
+  return buildParsedError(
+    {
+      message: 'An unknown error occurred.',
+      origin: 'unknown',
+      rawError: error,
+    },
+    ParsedErrorType.GENERIC,
+  );
 }
 
 export function parseAndFormatApiError(
