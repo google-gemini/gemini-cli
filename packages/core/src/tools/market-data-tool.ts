@@ -6,6 +6,7 @@
 
 import type { Config } from '../config/config.js';
 import type { ToolResult } from './tools.js';
+import type { VisualizationData, ToolResponseData } from '../providers/types.js';
 import { BasePythonTool } from './base-python-tool.js';
 
 export interface MarketDataTool3Params {
@@ -111,6 +112,7 @@ interface MarketDataTool3Result extends ToolResult {
     summary: string;
     metadata?: Record<string, unknown>;
   };
+  structuredData?: ToolResponseData;
 }
 
 export class MarketDataTool extends BasePythonTool<MarketDataTool3Params, MarketDataTool3Result> {
@@ -168,7 +170,7 @@ export class MarketDataTool extends BasePythonTool<MarketDataTool3Params, Market
           indicator_types: {
             type: 'array',
             items: { type: 'string' },
-            description: 'Technical indicators: SMA, EMA, RSI, MACD, Bollinger, Stochastic, ADX, ATR, VWAP, OBV, Williams_R',
+            description: 'Technical indicators: SMA, EMA, RSI, MACD, Bollinger, Stochastic, ADX, ATR, VWAP, OBV, Williams_R, CCI, ROC',
           },
           screener_filters: {
             type: 'object',
@@ -277,21 +279,117 @@ except ImportError:
     SELENIUM_AVAILABLE = False
 
 class TechnicalIndicators:
-    """Advanced technical indicator calculations"""
+    """Advanced technical indicator calculations using ta library"""
 
     @staticmethod
     def calculate_all_indicators(df: pd.DataFrame, indicator_types: List[str]) -> Dict[str, float]:
-        """Calculate all requested technical indicators"""
+        """Calculate all requested technical indicators using ta library"""
         indicators = {}
 
         if len(df) < 2:
             return indicators
 
         try:
-            close = df['Close'] if 'Close' in df.columns else df['close']
-            high = df['High'] if 'High' in df.columns else df['high']
-            low = df['Low'] if 'Low' in df.columns else df['low']
-            volume = df['Volume'] if 'Volume' in df.columns else df['volume']
+            # Standardize column names for ta library
+            if 'Close' in df.columns:
+                df = df.rename(columns={'Close': 'close', 'High': 'high', 'Low': 'low', 'Volume': 'volume', 'Open': 'open'})
+
+            close = df['close']
+            high = df['high'] if 'high' in df.columns else close
+            low = df['low'] if 'low' in df.columns else close
+            volume = df['volume'] if 'volume' in df.columns else pd.Series([1] * len(df))
+            open_price = df['open'] if 'open' in df.columns else close
+
+            # Use ta library for all calculations
+            if not TA_AVAILABLE:
+                # Fallback to basic calculations if ta library not available
+                return TechnicalIndicators._calculate_basic_indicators(df, indicator_types)
+
+            for indicator in indicator_types:
+                try:
+                    if indicator == 'SMA' and len(close) >= 20:
+                        indicators['SMA_20'] = float(ta.trend.sma_indicator(close, window=20).iloc[-1])
+                        if len(close) >= 50:
+                            indicators['SMA_50'] = float(ta.trend.sma_indicator(close, window=50).iloc[-1])
+
+                    elif indicator == 'EMA' and len(close) >= 20:
+                        indicators['EMA_20'] = float(ta.trend.ema_indicator(close, window=20).iloc[-1])
+                        if len(close) >= 50:
+                            indicators['EMA_50'] = float(ta.trend.ema_indicator(close, window=50).iloc[-1])
+
+                    elif indicator == 'RSI' and len(close) >= 14:
+                        rsi_indicator = ta.momentum.RSIIndicator(close, window=14)
+                        indicators['RSI'] = float(rsi_indicator.rsi().iloc[-1])
+
+                    elif indicator == 'MACD' and len(close) >= 26:
+                        macd_indicator = ta.trend.MACD(close)
+                        indicators['MACD'] = float(macd_indicator.macd().iloc[-1])
+                        indicators['MACD_Signal'] = float(macd_indicator.macd_signal().iloc[-1])
+                        indicators['MACD_Histogram'] = float(macd_indicator.macd_diff().iloc[-1])
+
+                    elif indicator == 'Bollinger' and len(close) >= 20:
+                        bb_indicator = ta.volatility.BollingerBands(close, window=20, window_dev=2)
+                        indicators['BB_Upper'] = float(bb_indicator.bollinger_hband().iloc[-1])
+                        indicators['BB_Middle'] = float(bb_indicator.bollinger_mavg().iloc[-1])
+                        indicators['BB_Lower'] = float(bb_indicator.bollinger_lband().iloc[-1])
+
+                    elif indicator == 'Stochastic' and len(close) >= 14:
+                        stoch_indicator = ta.momentum.StochasticOscillator(high, low, close, window=14, smooth_window=3)
+                        indicators['Stoch_K'] = float(stoch_indicator.stoch().iloc[-1])
+                        indicators['Stoch_D'] = float(stoch_indicator.stoch_signal().iloc[-1])
+
+                    elif indicator == 'ADX' and len(close) >= 14:
+                        adx_indicator = ta.trend.ADXIndicator(high, low, close, window=14)
+                        indicators['ADX'] = float(adx_indicator.adx().iloc[-1])
+                        indicators['ADX_Positive'] = float(adx_indicator.adx_pos().iloc[-1])
+                        indicators['ADX_Negative'] = float(adx_indicator.adx_neg().iloc[-1])
+
+                    elif indicator == 'ATR' and len(close) >= 14:
+                        atr_indicator = ta.volatility.AverageTrueRange(high, low, close, window=14)
+                        indicators['ATR'] = float(atr_indicator.average_true_range().iloc[-1])
+
+                    elif indicator == 'VWAP' and len(close) >= 1:
+                        vwap_indicator = ta.volume.VolumeSMAIndicator(close, volume, window=len(close))
+                        # Alternative VWAP calculation using ta library approach
+                        typical_price = (high + low + close) / 3
+                        vwap = (typical_price * volume).cumsum() / volume.cumsum()
+                        indicators['VWAP'] = float(vwap.iloc[-1])
+
+                    elif indicator == 'OBV' and len(close) >= 1:
+                        obv_indicator = ta.volume.OnBalanceVolumeIndicator(close, volume)
+                        indicators['OBV'] = float(obv_indicator.on_balance_volume().iloc[-1])
+
+                    elif indicator == 'Williams_R' and len(close) >= 14:
+                        williams_r = ta.momentum.WilliamsRIndicator(high, low, close, lbp=14)
+                        indicators['Williams_R'] = float(williams_r.williams_r().iloc[-1])
+
+                    elif indicator == 'CCI' and len(close) >= 20:
+                        cci_indicator = ta.trend.CCIIndicator(high, low, close, window=20)
+                        indicators['CCI'] = float(cci_indicator.cci().iloc[-1])
+
+                    elif indicator == 'ROC' and len(close) >= 10:
+                        roc_indicator = ta.momentum.ROCIndicator(close, window=10)
+                        indicators['ROC'] = float(roc_indicator.roc().iloc[-1])
+
+                except Exception as e:
+                    print(f"Error calculating {indicator} with ta library: {e}")
+                    continue
+
+        except Exception as e:
+            print(f"Error in indicator calculation: {e}")
+
+        return indicators
+
+    @staticmethod
+    def _calculate_basic_indicators(df: pd.DataFrame, indicator_types: List[str]) -> Dict[str, float]:
+        """Fallback basic indicator calculations when ta library is not available"""
+        indicators = {}
+
+        try:
+            close = df['close'] if 'close' in df.columns else df['Close']
+            high = df['high'] if 'high' in df.columns else df['High']
+            low = df['low'] if 'low' in df.columns else df['Low']
+            volume = df['volume'] if 'volume' in df.columns else df['Volume']
 
             for indicator in indicator_types:
                 try:
@@ -307,55 +405,20 @@ class TechnicalIndicators:
 
                     elif indicator == 'RSI' and len(close) >= 14:
                         delta = close.diff()
-                        gain = (delta.where(delta > 0, 0)).rolling(14).mean()
-                        loss = (-delta.where(delta < 0, 0)).rolling(14).mean()
-                        rs = gain / loss
-                        indicators['RSI'] = float(100 - (100 / (1 + rs)).iloc[-1])
-
-                    elif indicator == 'MACD' and len(close) >= 26:
-                        ema_12 = close.ewm(span=12).mean()
-                        ema_26 = close.ewm(span=26).mean()
-                        macd = ema_12 - ema_26
-                        signal = macd.ewm(span=9).mean()
-                        indicators['MACD'] = float(macd.iloc[-1])
-                        indicators['MACD_Signal'] = float(signal.iloc[-1])
-                        indicators['MACD_Histogram'] = float((macd - signal).iloc[-1])
-
-                    elif indicator == 'Bollinger' and len(close) >= 20:
-                        bb_sma = close.rolling(20).mean()
-                        bb_std = close.rolling(20).std()
-                        indicators['BB_Upper'] = float((bb_sma + 2 * bb_std).iloc[-1])
-                        indicators['BB_Middle'] = float(bb_sma.iloc[-1])
-                        indicators['BB_Lower'] = float((bb_sma - 2 * bb_std).iloc[-1])
-
-                    elif indicator == 'Stochastic' and len(close) >= 14:
-                        low_14 = low.rolling(14).min()
-                        high_14 = high.rolling(14).max()
-                        k_percent = 100 * ((close - low_14) / (high_14 - low_14))
-                        indicators['Stoch_K'] = float(k_percent.iloc[-1])
-                        indicators['Stoch_D'] = float(k_percent.rolling(3).mean().iloc[-1])
-
-                    elif indicator == 'ATR' and len(close) >= 14:
-                        tr1 = high - low
-                        tr2 = abs(high - close.shift())
-                        tr3 = abs(low - close.shift())
-                        tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
-                        indicators['ATR'] = float(tr.rolling(14).mean().iloc[-1])
-
-                    elif indicator == 'VWAP' and len(close) >= 1:
-                        vwap = (close * volume).cumsum() / volume.cumsum()
-                        indicators['VWAP'] = float(vwap.iloc[-1])
-
-                    elif indicator == 'OBV' and len(close) >= 1:
-                        obv = ((close > close.shift()) * volume).cumsum()
-                        indicators['OBV'] = float(obv.iloc[-1])
+                        gain = delta.where(delta > 0, 0)
+                        loss = -delta.where(delta < 0, 0)
+                        avg_gain = gain.ewm(alpha=1/14, adjust=False).mean()
+                        avg_loss = loss.ewm(alpha=1/14, adjust=False).mean()
+                        rs = avg_gain / avg_loss
+                        rsi = 100 - (100 / (1 + rs))
+                        indicators['RSI'] = float(rsi.iloc[-1])
 
                 except Exception as e:
-                    print(f"Error calculating {indicator}: {e}")
+                    print(f"Error calculating basic {indicator}: {e}")
                     continue
 
         except Exception as e:
-            print(f"Error in indicator calculation: {e}")
+            print(f"Error in basic indicator calculation: {e}")
 
         return indicators
 
@@ -413,7 +476,7 @@ class MarketDataAPI:
         # TradingView URLs for futures data
         self.tradingview_futures_urls = {
             'N225': 'https://cn.tradingview.com/symbols/FOREXCOM-JP225/',
-            'SP500': 'https://cn.tradingview.com/symbols/SPX/?exchange=SP',
+            'SP500': 'https://cn.tradingview.com/symbols/SP500/?exchange=VANTAGE',
             'NASDAQ': 'https://cn.tradingview.com/symbols/IG-NASDAQ/',
             'USDJPY': 'https://cn.tradingview.com/symbols/USDJPY/?exchange=FX'
         }
@@ -565,7 +628,9 @@ class MarketDataAPI:
 
             ticker = yf.Ticker(symbol)
             info = ticker.info
-            hist = ticker.history(period="2d")
+            # Set end date to tomorrow to include latest data
+            end_date = datetime.now() + timedelta(days=1)
+            hist = ticker.history(period="2d", end=end_date)
 
             # Check if data is empty - symbol might not exist
             if len(hist) == 0:
@@ -646,9 +711,15 @@ class MarketDataAPI:
         """Calculate indicators using yfinance data"""
         try:
             ticker = yf.Ticker(symbol)
-            df = ticker.history(period="6mo")
+            # Set end date to tomorrow to include latest data
+            end_date = datetime.now() + timedelta(days=1)
+
+            # Determine required data period for indicators
+            required_period = self._get_extended_period_for_indicators("3mo", indicator_types)
+            df = ticker.history(period=required_period, end=end_date)
 
             if len(df) > 0:
+                print(f"Using {len(df)} data points for indicator calculation (period: {required_period})")
                 return self.ti.calculate_all_indicators(df, indicator_types)
         except Exception as e:
             print(f"Error getting indicators for {symbol}: {e}")
@@ -671,7 +742,9 @@ class MarketDataAPI:
                     print(f"Detected forex pair, using: {symbol}")
 
                 ticker = yf.Ticker(symbol)
-                df = ticker.history(period=period, interval=interval)
+                # Set end date to tomorrow to include latest data
+                end_date = datetime.now() + timedelta(days=1)
+                df = ticker.history(period=period, interval=interval, end=end_date)
 
                 # Check if data is empty - symbol might not exist
                 if df.empty:
@@ -712,7 +785,20 @@ class MarketDataAPI:
 
                 # Add indicators to the latest bar if requested
                 if include_indicators and indicator_types and bars and len(df) > 0:
-                    indicators = self.ti.calculate_all_indicators(df, indicator_types)
+                    # For technical indicators, we need more data than just the requested period
+                    # Get extended period for indicator calculations
+                    extended_period = self._get_extended_period_for_indicators(period, indicator_types)
+                    if extended_period != period:
+                        print(f"Getting extended data ({extended_period}) for indicator calculation...")
+                        extended_df = ticker.history(period=extended_period, interval=interval, end=end_date)
+                        if len(extended_df) > len(df):
+                            df_for_indicators = extended_df
+                        else:
+                            df_for_indicators = df
+                    else:
+                        df_for_indicators = df
+
+                    indicators = self.ti.calculate_all_indicators(df_for_indicators, indicator_types)
                     if indicators and bars:
                         bars[-1]['indicators'] = indicators
 
@@ -949,6 +1035,48 @@ class MarketDataAPI:
             'DAX': 40
         }
         return counts.get(index_type, 0)
+
+    def _get_extended_period_for_indicators(self, requested_period: str, indicator_types: List[str]) -> str:
+        """Get extended period needed for technical indicator calculations"""
+        # Map requested periods to minimum data points needed
+        period_to_days = {
+            '1d': 1, '5d': 5, '1mo': 30, '3mo': 90, '6mo': 180,
+            '1y': 365, '2y': 730, '5y': 1825, '10y': 3650, 'max': 7300
+        }
+
+        # Check what indicators need more data
+        needs_extended = False
+        min_days_needed = 30  # Default minimum
+
+        for indicator in indicator_types:
+            if indicator in ['MACD']:
+                min_days_needed = max(min_days_needed, 60)  # Need ~2 months for MACD
+                needs_extended = True
+            elif indicator in ['SMA', 'EMA'] and '50' in str(indicator):
+                min_days_needed = max(min_days_needed, 75)  # Need ~2.5 months for SMA/EMA 50
+                needs_extended = True
+            elif indicator in ['ADX', 'ATR', 'RSI', 'Stochastic']:
+                min_days_needed = max(min_days_needed, 45)  # Need ~1.5 months
+                needs_extended = True
+
+        if not needs_extended:
+            return requested_period
+
+        # Get current period days
+        current_days = period_to_days.get(requested_period, 30)
+
+        # If current period is sufficient, use it
+        if current_days >= min_days_needed:
+            return requested_period
+
+        # Otherwise, find the next suitable period
+        suitable_periods = ['3mo', '6mo', '1y', '2y']
+        for period in suitable_periods:
+            if period_to_days[period] >= min_days_needed:
+                print(f"Extended period {period} selected for indicators (need {min_days_needed} days)")
+                return period
+
+        return '6mo'  # Default fallback
 
     def scrape_tradingview_data(self, symbol_key: str) -> Dict[str, Any]:
         """Scrape real-time futures data from TradingView"""
@@ -1192,7 +1320,9 @@ class MarketDataAPI:
 
                         # Get basic info to verify symbol exists
                         info = ticker.info
-                        hist = ticker.history(period="2d")
+                        # Set end date to tomorrow to include latest data
+                        end_date = datetime.now() + timedelta(days=1)
+                        hist = ticker.history(period="2d", end=end_date)
 
                         if not hist.empty and info and 'symbol' in info:
                             # Use the actual symbol from info to avoid duplicates
@@ -1252,7 +1382,9 @@ class MarketDataAPI:
         for symbol in symbols:
             try:
                 ticker = yf.Ticker(symbol)
-                df = ticker.history(period=f"{timeframe}d")
+                # Set end date to tomorrow to include latest data
+                end_date = datetime.now() + timedelta(days=1)
+                df = ticker.history(period=f"{timeframe}d", end=end_date)
 
                 if len(df) > 1:
                     calculated = self.ti.calculate_all_indicators(df, indicator_types)
@@ -1721,15 +1853,245 @@ print(json.dumps(result, ensure_ascii=False, indent=2, default=str))
 
       displayContent += '\n*🚀 **Powered by**: tvscreener (real-time screening) + yfinance (historical data & indicators)*\n';
 
+      // Generate visualizations for frontend
+      const visualizations: VisualizationData[] = [];
+
+      // Convert quotes to visualization
+      if (quotes && quotes.length > 0) {
+        const validQuotes = quotes.filter((q: QuoteData) => !('error' in q));
+        if (validQuotes.length > 0) {
+          visualizations.push({
+            type: 'quotes',
+            title: 'Market Quotes',
+            data: validQuotes.map((q: QuoteData) => ({
+              symbol: q.symbol,
+              price: q.price,
+              change: q.change,
+              change_percent: q.change_percent,
+              volume: q.volume,
+              market_cap: q.market_cap || 0,
+              pe_ratio: q.pe_ratio || 0,
+              source: q.source || 'unknown'
+            })),
+            metadata: {
+              symbols: validQuotes.map((q: QuoteData) => q.symbol),
+              source: 'market_data_tool'
+            }
+          });
+        }
+      }
+
+      // Convert historical bars to visualization
+      if (bars && bars.length > 0) {
+        const validBars = bars.filter((b: HistoricalBar) => !('error' in b));
+        if (validBars.length > 0) {
+          // Group bars by symbol for OHLC visualization
+          visualizations.push({
+            type: 'ohlc_bars',
+            title: 'Historical OHLC Data',
+            data: validBars.map((b: HistoricalBar) => ({
+              symbol: b.symbol,
+              datetime: b.datetime,
+              open: b.open,
+              high: b.high,
+              low: b.low,
+              close: b.close,
+              volume: b.volume,
+              source: b.source || 'yfinance'
+            })),
+            metadata: {
+              symbols: [...new Set(validBars.map((b: HistoricalBar) => b.symbol))].map(String),
+              timeframe: params.period || '1d',
+              source: 'yfinance'
+            }
+          });
+
+          // Extract technical indicators from bars if present
+          const barsWithIndicators = validBars.filter((b: HistoricalBar) => b.indicators && Object.keys(b.indicators).length > 0);
+          if (barsWithIndicators.length > 0) {
+            const indicatorData: Array<Record<string, string | number | boolean>> = [];
+
+            barsWithIndicators.forEach((bar: HistoricalBar) => {
+              if (bar.indicators) {
+                Object.entries(bar.indicators).forEach(([indicator, value]) => {
+                  indicatorData.push({
+                    date: bar.datetime,
+                    indicator,
+                    value,
+                    symbol: bar.symbol
+                  });
+                });
+              }
+            });
+
+            if (indicatorData.length > 0) {
+              visualizations.push({
+                type: 'technical_indicators',
+                title: 'Technical Indicators',
+                data: indicatorData,
+                metadata: {
+                  symbols: [...new Set(barsWithIndicators.map((b: HistoricalBar) => b.symbol))].map(String),
+                  indicators: [...new Set(indicatorData.map(d => String(d['indicator'])))],
+                  source: 'calculated'
+                }
+              });
+            }
+          }
+        }
+      }
+
+      // Convert screener results to visualization
+      if (screener_results && screener_results.length > 0) {
+        visualizations.push({
+          type: 'screener_results',
+          title: 'Stock Screener Results',
+          data: screener_results.map((r: ScreenerResult) => ({
+            symbol: r.symbol,
+            description: r.name,
+            price: r.price,
+            change_percent: r.change_percent,
+            volume: r.volume,
+            market_cap: r.market_cap,
+            sector: r.sector || 'Unknown',
+            pe_ratio: r.pe_ratio || 0,
+            market: r.market || 'stocks'
+          })),
+          metadata: {
+            symbols: screener_results.map((r: ScreenerResult) => r.symbol),
+            source: 'tvscreener'
+          }
+        });
+      }
+
+      // Convert standalone technical indicators to visualization
+      if (technical_indicators && technical_indicators.length > 0) {
+        const indicatorData = technical_indicators.map((ti: TechnicalIndicator) => ({
+          date: new Date().toISOString(),
+          indicator: ti.indicator_name,
+          value: ti.value,
+          symbol: ti.symbol,
+          signal: ti.signal || 'NEUTRAL',
+          timeframe: ti.timeframe
+        }));
+
+        // Check if we already have technical indicators visualization from bars
+        const hasIndicatorsFromBars = visualizations.some(v => v.type === 'technical_indicators');
+
+        if (!hasIndicatorsFromBars) {
+          visualizations.push({
+            type: 'technical_indicators',
+            title: 'Technical Analysis',
+            data: indicatorData,
+            metadata: {
+              symbols: [...new Set(technical_indicators.map((ti: TechnicalIndicator) => ti.symbol))].map(String),
+              indicators: [...new Set(technical_indicators.map((ti: TechnicalIndicator) => ti.indicator_name))].map(String),
+              timeframe: technical_indicators[0]?.timeframe || '30d'
+            }
+          });
+        }
+      }
+
+      // Convert index data to visualization (can be treated as quotes)
+      if (indices && indices.length > 0) {
+        visualizations.push({
+          type: 'quotes',
+          title: 'Major Indices',
+          data: indices.map((idx: IndexData) => ({
+            symbol: idx.symbol,
+            name: idx.name,
+            price: idx.price,
+            change: idx.change,
+            change_percent: idx.change_percent,
+            volume: idx.volume,
+            open: idx.open,
+            high: idx.high,
+            low: idx.low,
+            source: idx.source || 'mixed'
+          })),
+          metadata: {
+            symbols: indices.map((idx: IndexData) => idx.symbol),
+            source: 'market_data_tool'
+          }
+        });
+      }
+
+      // Handle special operations (n225, sp500, nasdaq, usdjpy)
+      const specialData = n225_data || sp500_data || nasdaq_data || usdjpy_data;
+      if (specialData) {
+        const dataKey = Object.keys(specialData)[0];
+        const data = specialData[dataKey];
+
+        if (data && !data.error) {
+          // Add futures/spot data as quotes
+          const quoteData: Array<Record<string, string | number | boolean>> = [];
+
+          if (data.futures && !data.futures.error) {
+            quoteData.push({
+              symbol: `${data.symbol} (Futures)`,
+              price: data.futures.current_price || data.futures.price || 0,
+              change: data.futures.change || 0,
+              change_percent: data.futures.change_percent || 0,
+              volume: data.futures.volume || 0,
+              source: 'tradingview_futures'
+            });
+          }
+
+          if (data.spot && !data.spot.error) {
+            quoteData.push({
+              symbol: `${data.symbol} (Spot)`,
+              price: data.spot.current_price || data.spot.price || 0,
+              change: data.spot.change || 0,
+              change_percent: data.spot.change_percent || 0,
+              volume: data.spot.volume || 0,
+              source: 'yfinance_spot'
+            });
+          }
+
+          if (data.forex && !data.forex.error) {
+            quoteData.push({
+              symbol: data.symbol,
+              price: data.forex.current_price || data.forex.price || 0,
+              change: data.forex.change || 0,
+              change_percent: data.forex.change_percent || 0,
+              volume: data.forex.volume || 0,
+              source: 'forex'
+            });
+          }
+
+          if (quoteData.length > 0) {
+            visualizations.push({
+              type: 'quotes',
+              title: data.name || data.symbol,
+              data: quoteData,
+              metadata: {
+                symbols: [data.symbol],
+                source: 'mixed'
+              }
+            });
+          }
+        }
+      }
+
+      // Create structured data for frontend
+      const structuredData: ToolResponseData = {
+        operation: params.op,
+        summary,
+        visualizations,
+        // Include minimal details for debugging if needed
+        details: {
+          hasQuotes: quotes && quotes.length > 0,
+          hasBars: bars && bars.length > 0,
+          hasScreenerResults: screener_results && screener_results.length > 0,
+          hasIndices: indices && indices.length > 0,
+          hasTechnicalIndicators: technical_indicators && technical_indicators.length > 0,
+          timestamp: new Date().toISOString()
+        }
+      };
+
       return {
         llmContent: displayContent,
         returnDisplay: displayContent,
-        structuredData: {
-          operation: params.op,
-          summary,
-          details: { quotes, bars, search_results, screener_results, indices, technical_indicators,
-                    n225_data, sp500_data, nasdaq_data, usdjpy_data, metadata }
-        },
+        structuredData,
       };
 
     } catch (error) {
