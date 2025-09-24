@@ -563,7 +563,7 @@ describe('loadCliConfig', () => {
     });
 
     it('should throw an error if --context-file path is inaccessible', async () => {
-      vi.spyOn(fs, 'statSync').mockImplementation(() => {
+      vi.spyOn(fs.promises, 'stat').mockImplementation(async () => {
         const error = new Error('EACCES: permission denied');
         (error as NodeJS.ErrnoException).code = 'EACCES';
         throw error;
