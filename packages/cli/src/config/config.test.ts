@@ -516,7 +516,7 @@ describe('loadCliConfig', () => {
     });
 
     it('should prioritize -f flag over settings', async () => {
-      vi.spyOn(fs, 'statSync').mockReturnValue({
+      vi.spyOn(fs.promises, 'stat').mockResolvedValue({
         isDirectory: () => false,
       } as fs.Stats);
       process.argv = ['node', 'script.js', '-f', 'cli.md'];
