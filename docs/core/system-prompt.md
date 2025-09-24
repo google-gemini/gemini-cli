@@ -12,7 +12,7 @@ The core system instructions that guide Gemini CLI can be completely replaced wi
 
 ## How to enable
 
-You can set the environment variable temporarily in your shell, or persist it via a `.gemini/.env` file. See docs under `docs/cli/authentication.md` → “Persisting Environment Variables with `.env` Files”.
+You can set the environment variable temporarily in your shell, or persist it via a `.gemini/.env` file. See [`docs/cli/authentication.md` → “Persisting Environment Variables with `.env` Files”](../cli/authentication.md#persisting-environment-variables-with-env-files).
 
 - Use the project default path (`.gemini/system.md`):
   - `GEMINI_SYSTEM_MD=true` or `GEMINI_SYSTEM_MD=1`
