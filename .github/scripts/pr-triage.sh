@@ -28,8 +28,11 @@ find_issue_reference() {
     fi
 
     if [[ -z "${issue}" ]]; then
-        issue=$(echo "${text}" | grep -oE '#[0-9]+' | head -1 | tr -d '#'
-            || echo "")
+        issue=$({ 
+            echo "${text}" | grep -ioE '(closes?|fixes?|resolves?)\s+#[0-9]+' | grep -oE '#[0-9]+' | tr -d '#'
+            echo "${text}" | grep -oE '#[0-9]+' | tr -d '#'
+        } | head -n 1)
+        issue=${issue:-""}
     fi
 
     echo "${issue}"
