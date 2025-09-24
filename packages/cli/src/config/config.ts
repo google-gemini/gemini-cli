@@ -86,6 +86,7 @@ export interface CliArgs {
   useWriteTodos: boolean | undefined;
   promptWords: string[] | undefined;
   outputFormat: string | undefined;
+  contextFile: string | undefined;
 }
 
 export async function parseArguments(settings: Settings): Promise<CliArgs> {
@@ -300,6 +301,12 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
           'prompt',
           'Use the positional prompt instead. This flag will be removed in a future version.',
         )
+        .option('context-file', {
+          alias: 'f',
+          type: 'string',
+          description:
+            'Specifies the read/write memory file for the session, overriding any settings.',
+        })
         .check((argv) => {
           const promptWords = argv['promptWords'] as string[] | undefined;
           if (argv['prompt'] && promptWords && promptWords.length > 0) {
@@ -435,7 +442,36 @@ export async function loadCliConfig(
   // TODO(b/343434939): This is a bit of a hack. The contextFileName should ideally be passed
   // directly to the Config constructor in core, and have core handle setGeminiMdFilename.
   // However, loadHierarchicalGeminiMemory is called *before* createServerConfig.
-  if (settings.context?.fileName) {
+  if (argv.contextFile) {
+    const resolved = resolvePath(argv.contextFile);
+    try {
+      const stats = fs.statSync(resolved);
+      if (stats.isDirectory()) {
+        throw new FatalConfigError(
+          `Path specified by --context-file is a directory: ${argv.contextFile}`,
+        );
+      }
+    } catch (error: unknown) {
+      if (error && typeof error === 'object' && 'code' in error) {
+        const code = (error as { code: string }).code;
+        if (code === 'ENOENT') {
+          throw new FatalConfigError(
+            `File specified by --context-file does not exist: ${argv.contextFile}`,
+          );
+        }
+        if (code === 'EACCES') {
+          throw new FatalConfigError(
+            `Permission denied for file specified by --context-file: ${argv.contextFile}`,
+          );
+        }
+      }
+      const message = error instanceof Error ? error.message : String(error);
+      throw new FatalConfigError(
+        `Error accessing path specified by --context-file: ${message}`,
+      );
+    }
+    setServerGeminiMdFilename(resolved);
+  } else if (settings.context?.fileName) {
     setServerGeminiMdFilename(settings.context.fileName);
   } else {
     // Reset to default if not provided in settings.
