@@ -4,25 +4,25 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { afterEach, describe, expect, it, vi } from 'vitest';
-import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
-import {
-  populateMcpServerCommand,
-  createTransport,
-  isEnabled,
-  hasValidTypes,
-  McpClient,
-  hasNetworkTransport,
-} from './mcp-client.js';
+import * as GenAiLib from '@google/genai';
+import * as ClientLib from '@modelcontextprotocol/sdk/client/index.js';
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
 import * as SdkClientStdioLib from '@modelcontextprotocol/sdk/client/stdio.js';
-import * as ClientLib from '@modelcontextprotocol/sdk/client/index.js';
-import * as GenAiLib from '@google/genai';
-import { GoogleCredentialProvider } from '../mcp/google-auth-provider.js';
+import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AuthProviderType, type Config } from '../config/config.js';
+import { GoogleCredentialProvider } from '../mcp/google-auth-provider.js';
 import type { PromptRegistry } from '../prompts/prompt-registry.js';
-import type { ToolRegistry } from './tool-registry.js';
 import type { WorkspaceContext } from '../utils/workspaceContext.js';
+import {
+  createTransport,
+  hasNetworkTransport,
+  hasValidTypes,
+  isEnabled,
+  McpClient,
+  populateMcpServerCommand,
+} from './mcp-client.js';
+import type { ToolRegistry } from './tool-registry.js';
 
 vi.mock('@modelcontextprotocol/sdk/client/stdio.js');
 vi.mock('@modelcontextprotocol/sdk/client/index.js');
@@ -563,6 +563,42 @@ describe('mcp-client', () => {
       const schema = {
         type: 'object',
         properties: {},
+      };
+      expect(hasValidTypes(schema)).toBe(true);
+    });
+
+    it('should return true for schema with defs and refs', () => {
+      const schema = {
+        $defs: {
+          NestedMessage: {
+            properties: {
+              foo: {
+                type: 'string',
+              },
+            },
+            type: 'object',
+          },
+        },
+        properties: {
+          bar: {
+            $ref: '#/$defs/NestedMessage',
+          },
+        },
+        type: 'object',
+      };
+      expect(hasValidTypes(schema)).toBe(true);
+    });
+
+    it('should return true for schema with extra properties', () => {
+      const schema = {
+        type: 'object',
+        properties: {
+          example_enum: {
+            type: 'string',
+            enum: ['FOO', 'BAR'],
+            'x-google-enum-descriptions': ['a foo', 'a bar'],
+          },
+        },
       };
       expect(hasValidTypes(schema)).toBe(true);
     });
