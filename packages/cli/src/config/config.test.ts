@@ -529,7 +529,7 @@ describe('loadCliConfig', () => {
     });
 
     it('should throw an error if --context-file is a directory', async () => {
-      vi.spyOn(fs, 'statSync').mockReturnValue({
+      vi.spyOn(fs.promises, 'stat').mockResolvedValue({
         isDirectory: () => true,
       } as fs.Stats);
 
