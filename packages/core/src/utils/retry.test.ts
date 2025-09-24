@@ -103,10 +103,7 @@ describe('retryWithBackoff', () => {
     // This function will fail more than 5 times to ensure all retries are used.
     const mockFn = createFailingFunction(10);
 
-    const promise = retryWithBackoff(mockFn, {
-      // No maxAttempts provided, should use default.
-      initialDelayMs: 1,
-    });
+    const promise = retryWithBackoff(mockFn);
 
     // Expect it to fail with the error from the 5th attempt.
     // eslint-disable-next-line vitest/valid-expect
