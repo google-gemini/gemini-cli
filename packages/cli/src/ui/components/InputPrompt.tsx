@@ -48,7 +48,7 @@ const isVscodeTerminal = process.env['TERM_PROGRAM'] === 'vscode';
 export function isTerminalPasteTrusted(
   kittyProtocolSupported: boolean,
 ): boolean {
-  return kittyProtocolSupported || isVscodeTerminal;
+  return kittyProtocolSupported || process.env['TERM_PROGRAM'] === 'vscode';
 }
 
 export interface InputPromptProps {
