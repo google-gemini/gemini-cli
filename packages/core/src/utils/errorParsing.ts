@@ -17,45 +17,79 @@ import {
 import { UserTierId } from '../code_assist/types.js';
 import { AuthType } from '../core/contentGenerator.js';
 
-// Free Tier message functions
-const getRateLimitErrorMessageGoogleFree = (
-  fallbackModel: string = DEFAULT_GEMINI_FLASH_MODEL,
-) =>
-  `\nPossible quota limitations in place or slow response times detected. Switching to the ${fallbackModel} model for the rest of this session.`;
+// Common strings and URL constants
+const AI_STUDIO_API_KEY_URL = 'https://aistudio.google.com/apikey';
+const GEMINI_CODE_ASSIST_UPGRADE_URL =
+  'https://goo.gle/set-up-gemini-code-assist';
+const APPRECIATION_NOTE =
+  'We appreciate you for choosing Gemini Code Assist and the Gemini CLI.';
+const DEFAULT_FALLBACK_PREFIX =
+  'Possible quota limitations in place or slow response times detected.';
 
-const getRateLimitErrorMessageGoogleProQuotaFree = (
-  currentModel: string = DEFAULT_GEMINI_MODEL,
-  fallbackModel: string = DEFAULT_GEMINI_FLASH_MODEL,
-) =>
-  `\nYou have reached your daily ${currentModel} quota limit. You will be switched to the ${fallbackModel} model for the rest of this session. To increase your limits, upgrade to get higher limits at https://goo.gle/set-up-gemini-code-assist, or use /auth to switch to using a paid API key from AI Studio at https://aistudio.google.com/apikey`;
-
-const getRateLimitErrorMessageGoogleGenericQuotaFree = () =>
-  `\nYou have reached your daily quota limit. To increase your limits, upgrade to get higher limits at https://goo.gle/set-up-gemini-code-assist, or use /auth to switch to using a paid API key from AI Studio at https://aistudio.google.com/apikey`;
-
-// Legacy/Standard Tier message functions
-const getRateLimitErrorMessageGooglePaid = (
-  fallbackModel: string = DEFAULT_GEMINI_FLASH_MODEL,
-) =>
-  `\nPossible quota limitations in place or slow response times detected. Switching to the ${fallbackModel} model for the rest of this session. We appreciate you for choosing Gemini Code Assist and the Gemini CLI.`;
-
-const getRateLimitErrorMessageGoogleProQuotaPaid = (
-  currentModel: string = DEFAULT_GEMINI_MODEL,
-  fallbackModel: string = DEFAULT_GEMINI_FLASH_MODEL,
-) =>
-  `\nYou have reached your daily ${currentModel} quota limit. You will be switched to the ${fallbackModel} model for the rest of this session. We appreciate you for choosing Gemini Code Assist and the Gemini CLI. To continue accessing the ${currentModel} model today, consider using /auth to switch to using a paid API key from AI Studio at https://aistudio.google.com/apikey`;
-
-const getRateLimitErrorMessageGoogleGenericQuotaPaid = (
-  currentModel: string = DEFAULT_GEMINI_MODEL,
-) =>
-  `\nYou have reached your daily quota limit. We appreciate you for choosing Gemini Code Assist and the Gemini CLI. To continue accessing the ${currentModel} model today, consider using /auth to switch to using a paid API key from AI Studio at https://aistudio.google.com/apikey`;
 const RATE_LIMIT_ERROR_MESSAGE_USE_GEMINI =
-  '\nPlease wait and try again later. To increase your limits, request a quota increase through AI Studio, or switch to another /auth method';
+  'Please wait and try again later. To increase your limits, request a quota increase through AI Studio, or switch to another /auth method';
 const RATE_LIMIT_ERROR_MESSAGE_VERTEX =
-  '\nPlease wait and try again later. To increase your limits, request a quota increase through Vertex, or switch to another /auth method';
-const getRateLimitErrorMessageDefault = (
-  fallbackModel: string = DEFAULT_GEMINI_FLASH_MODEL,
-) =>
-  `\nPossible quota limitations in place or slow response times detected. Switching to the ${fallbackModel} model for the rest of this session.`;
+  'Please wait and try again later. To increase your limits, request a quota increase through Vertex, or switch to another /auth method';
+
+// Quota classification for clearer control flow
+enum QuotaKind {
+  NONE = 'none',
+  GENERIC = 'generic',
+  PRO = 'pro',
+}
+
+function classifyQuota(error: unknown): QuotaKind {
+  if (isProQuotaExceededError(error)) return QuotaKind.PRO;
+  if (isGenericQuotaExceededError(error)) return QuotaKind.GENERIC;
+  return QuotaKind.NONE;
+}
+
+function isPaidUserTier(userTier?: UserTierId): boolean {
+  return userTier === UserTierId.LEGACY || userTier === UserTierId.STANDARD;
+}
+
+// Builds the Google Login rate limit message (no leading newline)
+type FormatGoogleLoginRateLimitMessageOptions = {
+  quota: QuotaKind;
+  isPaidTier: boolean;
+  currentModel?: string;
+  fallbackModel?: string;
+};
+
+function formatGoogleLoginRateLimitMessage({
+  quota,
+  isPaidTier,
+  currentModel = DEFAULT_GEMINI_MODEL,
+  fallbackModel = DEFAULT_GEMINI_FLASH_MODEL,
+}: FormatGoogleLoginRateLimitMessageOptions): string {
+  let message: string;
+
+  switch (quota) {
+    case QuotaKind.PRO:
+      message = `You have reached your daily ${currentModel} quota limit. You will be switched to the ${fallbackModel} model for the rest of this session.`;
+      break;
+    case QuotaKind.GENERIC:
+      message = 'You have reached your daily quota limit.';
+      break;
+    case QuotaKind.NONE:
+    default:
+      message = `${DEFAULT_FALLBACK_PREFIX} Switching to the ${fallbackModel} model for the rest of this session.`;
+      break;
+  }
+
+  if (isPaidTier) {
+    message += ` ${APPRECIATION_NOTE}`;
+    if (quota === QuotaKind.PRO || quota === QuotaKind.GENERIC) {
+      message += ` To continue accessing the ${currentModel} model today, consider using /auth to switch to using a paid API key from AI Studio at ${AI_STUDIO_API_KEY_URL}`;
+    }
+  } else {
+    if (quota === QuotaKind.PRO || quota === QuotaKind.GENERIC) {
+      message += ` To increase your limits, upgrade to get higher limits at ${GEMINI_CODE_ASSIST_UPGRADE_URL}, or use /auth to switch to using a paid API key from AI Studio at ${AI_STUDIO_API_KEY_URL}`;
+    }
+  }
+
+  return message;
+}
 
 function getRateLimitMessage(
   authType?: AuthType,
@@ -64,40 +98,29 @@ function getRateLimitMessage(
   currentModel?: string,
   fallbackModel?: string,
 ): string {
+  const sanitizedCurrent = currentModel || DEFAULT_GEMINI_MODEL;
+  const sanitizedFallback = fallbackModel || DEFAULT_GEMINI_FLASH_MODEL;
+
   switch (authType) {
     case AuthType.LOGIN_WITH_GOOGLE: {
-      // Determine if user is on a paid tier (Legacy or Standard) - default to FREE if not specified
-      const isPaidTier =
-        userTier === UserTierId.LEGACY || userTier === UserTierId.STANDARD;
-
-      if (isProQuotaExceededError(error)) {
-        return isPaidTier
-          ? getRateLimitErrorMessageGoogleProQuotaPaid(
-              currentModel || DEFAULT_GEMINI_MODEL,
-              fallbackModel,
-            )
-          : getRateLimitErrorMessageGoogleProQuotaFree(
-              currentModel || DEFAULT_GEMINI_MODEL,
-              fallbackModel,
-            );
-      } else if (isGenericQuotaExceededError(error)) {
-        return isPaidTier
-          ? getRateLimitErrorMessageGoogleGenericQuotaPaid(
-              currentModel || DEFAULT_GEMINI_MODEL,
-            )
-          : getRateLimitErrorMessageGoogleGenericQuotaFree();
-      } else {
-        return isPaidTier
-          ? getRateLimitErrorMessageGooglePaid(fallbackModel)
-          : getRateLimitErrorMessageGoogleFree(fallbackModel);
-      }
+      const quota = classifyQuota(error);
+      const isPaidTier = isPaidUserTier(userTier);
+      return (
+        '\n' +
+        formatGoogleLoginRateLimitMessage({
+          quota,
+          isPaidTier,
+          currentModel: sanitizedCurrent,
+          fallbackModel: sanitizedFallback,
+        })
+      );
     }
     case AuthType.USE_GEMINI:
-      return RATE_LIMIT_ERROR_MESSAGE_USE_GEMINI;
+      return '\n' + RATE_LIMIT_ERROR_MESSAGE_USE_GEMINI;
     case AuthType.USE_VERTEX_AI:
-      return RATE_LIMIT_ERROR_MESSAGE_VERTEX;
+      return '\n' + RATE_LIMIT_ERROR_MESSAGE_VERTEX;
     default:
-      return getRateLimitErrorMessageDefault(fallbackModel);
+      return `\n${DEFAULT_FALLBACK_PREFIX} Switching to the ${sanitizedFallback} model for the rest of this session.`;
   }
 }
 
