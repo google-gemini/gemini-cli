@@ -6,7 +6,7 @@
 
 import type React from 'react';
 import { useState } from 'react';
-import { Bot, Sparkles, MessageSquare, Zap, FolderPlus, Settings, BookOpen, Lightbulb, ChevronDown, ChevronUp, Folder, Plus, X, Check } from 'lucide-react';
+import { Bot, Sparkles, MessageSquare, Zap, FolderPlus, Settings, BookOpen, Lightbulb, ChevronDown, ChevronUp, Folder, Plus } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { useAppStore } from '@/stores/appStore';

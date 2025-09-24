@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/Button';
 import { StatusIndicator } from './StatusIndicator';
 import { MarkdownRenderer } from './MarkdownRenderer';
 import ToolConfirmationMessage from './ToolConfirmationMessage';
+import { SmartVisualization } from '@/components/charts/SmartVisualization';
 import { multiModelService } from '@/services/multiModelService';
 import { useChatStore } from '@/stores/chatStore';
 import type { ChatMessage, ToolCallConfirmationDetails, ToolConfirmationOutcome, ToolCall } from '@/types';
@@ -790,6 +791,13 @@ const ToolResponseDisplay: React.FC<{ toolResponse: ParsedToolResponse }> = ({ t
                     </div>
                   ))}
                 </div>
+              </div>
+            )}
+
+            {/* Visualizations */}
+            {toolResponse.structuredData.visualizations && toolResponse.structuredData.visualizations.length > 0 && (
+              <div className="pt-4 border-t border-border/30">
+                <SmartVisualization visualizations={toolResponse.structuredData.visualizations} />
               </div>
             )}
           </div>
