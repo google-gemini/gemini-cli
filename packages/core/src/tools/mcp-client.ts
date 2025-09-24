@@ -5,19 +5,19 @@
  */
 
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
+import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import type { SSEClientTransportOptions } from '@modelcontextprotocol/sdk/client/sse.js';
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
-import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import type { StreamableHTTPClientTransportOptions } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
-import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import type {
-  GetPromptResult,
   Prompt,
+  GetPromptResult,
 } from '@modelcontextprotocol/sdk/types.js';
 import {
-  GetPromptResultSchema,
   ListPromptsResultSchema,
+  GetPromptResultSchema,
   ListRootsRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
 import { parse } from 'shell-quote';
@@ -28,18 +28,18 @@ import { DiscoveredMCPTool } from './mcp-tool.js';
 
 import type { FunctionDeclaration } from '@google/genai';
 import { mcpToTool } from '@google/genai';
+import type { ToolRegistry } from './tool-registry.js';
+import type { PromptRegistry } from '../prompts/prompt-registry.js';
+import { MCPOAuthProvider } from '../mcp/oauth-provider.js';
+import { OAuthUtils } from '../mcp/oauth-utils.js';
+import { MCPOAuthTokenStorage } from '../mcp/oauth-token-storage.js';
+import { getErrorMessage } from '../utils/errors.js';
 import { basename } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { MCPOAuthProvider } from '../mcp/oauth-provider.js';
-import { MCPOAuthTokenStorage } from '../mcp/oauth-token-storage.js';
-import { OAuthUtils } from '../mcp/oauth-utils.js';
-import type { PromptRegistry } from '../prompts/prompt-registry.js';
-import { getErrorMessage } from '../utils/errors.js';
 import type {
   Unsubscribe,
   WorkspaceContext,
 } from '../utils/workspaceContext.js';
-import type { ToolRegistry } from './tool-registry.js';
 
 export const MCP_DEFAULT_TIMEOUT_MSEC = 10 * 60 * 1000; // default to 10 minutes
 
@@ -658,7 +658,6 @@ export async function discoverTools(
           continue;
         }
 
-        /*
         if (!hasValidTypes(funcDecl.parametersJsonSchema)) {
           console.warn(
             `Skipping tool '${funcDecl.name}' from MCP server '${mcpServerName}' ` +
@@ -667,7 +666,6 @@ export async function discoverTools(
           );
           continue;
         }
-        */
 
         discoveredTools.push(
           new DiscoveredMCPTool(

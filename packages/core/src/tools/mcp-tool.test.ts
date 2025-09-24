@@ -5,14 +5,14 @@
  */
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import type { CallableTool, Part } from '@google/genai';
 import type { Mocked } from 'vitest';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { safeJsonStringify } from '../utils/safeJsonStringify.js';
 import { DiscoveredMCPTool, generateValidName } from './mcp-tool.js'; // Added getStringifiedResultForDisplay
-import { ToolErrorType } from './tool-error.js';
 import type { ToolResult } from './tools.js';
 import { ToolConfirmationOutcome } from './tools.js'; // Added ToolConfirmationOutcome
+import type { CallableTool, Part } from '@google/genai';
+import { ToolErrorType } from './tool-error.js';
 
 // Mock @google/genai mcpToTool and CallableTool
 // We only need to mock the parts of CallableTool that DiscoveredMCPTool uses.
@@ -97,33 +97,6 @@ describe('DiscoveredMCPTool', () => {
       expect(tool.schema.description).toBe(baseDescription);
       expect(tool.schema.parameters).toBeUndefined();
       expect(tool.schema.parametersJsonSchema).toEqual(inputSchema);
-      expect(tool.serverToolName).toBe(serverToolName);
-    });
-
-    it('should accept json schema with extra properties', () => {
-      const schemaWithExtraProperty: Record<string, unknown> = {
-        type: 'object' as const,
-        properties: {
-          enum_param: {
-            type: 'string',
-            enum: ['foo', 'bar'],
-            description: 'A test enum parameter.',
-            'x-google-enum-descriptions': ['a foo', 'a bar'],
-          },
-        },
-      };
-      tool = new DiscoveredMCPTool(
-        mockCallableToolInstance,
-        serverName,
-        serverToolName,
-        baseDescription,
-        schemaWithExtraProperty,
-      );
-      expect(tool.name).toBe(serverToolName);
-      expect(tool.schema.name).toBe(serverToolName);
-      expect(tool.schema.description).toBe(baseDescription);
-      expect(tool.schema.parameters).toBeUndefined();
-      expect(tool.schema.parametersJsonSchema).toEqual(schemaWithExtraProperty);
       expect(tool.serverToolName).toBe(serverToolName);
     });
   });
@@ -223,7 +196,9 @@ describe('DiscoveredMCPTool', () => {
           },
         ];
         mockCallTool.mockResolvedValue(mockMcpToolResponseParts);
-        const expectedErrorMessage = `MCP tool '${serverToolName}' reported tool error for function call: ${safeJsonStringify(
+        const expectedErrorMessage = `MCP tool '${
+          serverToolName
+        }' reported tool error for function call: ${safeJsonStringify(
           functionCall,
         )} with response: ${safeJsonStringify(mockMcpToolResponseParts)}`;
         const invocation = tool.build(params);
