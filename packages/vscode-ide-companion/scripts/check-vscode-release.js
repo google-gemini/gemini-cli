@@ -15,7 +15,11 @@ function checkRelease() {
       { encoding: 'utf-8' },
     );
     const files = gcloudOutput.trim().split('\n');
-    const vsixFiles = files.filter((file) => file.endsWith('.vsix'));
+    const vsixFiles = files.filter((file) =>
+      /signed-gemini-cli-vscode-ide-companion-\d+\.\d+\.\d+-[a-f0-9]{7}\.vsix$/.test(
+        file,
+      ),
+    );
 
     if (vsixFiles.length === 0) {
       console.error('No .vsix files found in the bucket.');
@@ -25,15 +29,20 @@ function checkRelease() {
     vsixFiles.sort();
     const latestFile = vsixFiles[vsixFiles.length - 1];
     const fileName = latestFile.split('/').pop();
-    const match = /gemini-cli-vscode-ide-companion-.*-(.*)\.vsix/.exec(
-      fileName,
-    );
+    const match =
+      /signed-gemini-cli-vscode-ide-companion-(\d+\.\d+\.\d+)-([a-f0-9]{7})\.vsix$/.exec(
+        fileName,
+      );
 
-    if (!match || !match[1]) {
-      console.error(`Could not extract commit hash from filename: ${fileName}`);
+    if (!match || !match[1] || !match[2]) {
+      console.error(
+        `Could not extract version and commit hash from filename: ${fileName}`,
+      );
       process.exit(1);
     }
-    const lastReleaseCommit = match[1];
+    const lastReleaseVersion = match[1];
+    const lastReleaseCommit = match[2];
+    console.log(`Last release version: ${lastReleaseVersion}`);
     console.log(`Last release commit hash: ${lastReleaseCommit}`);
 
     // Step 2: Check for new commits
