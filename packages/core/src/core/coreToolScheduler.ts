@@ -799,6 +799,15 @@ export class CoreToolScheduler {
             );
           }
         } catch (error) {
+          if (signal.aborted) {
+            this.setStatusInternal(
+              reqInfo.callId,
+              'cancelled',
+              'Tool call cancelled by user.',
+            );
+            continue;
+          }
+
           this.setStatusInternal(
             reqInfo.callId,
             'error',
