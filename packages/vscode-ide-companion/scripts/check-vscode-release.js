@@ -9,7 +9,7 @@ import { execSync } from 'node:child_process';
 function checkRelease() {
   try {
     // Step 1: Find the commit hash of the last release
-    const bucketUri = 'gs://gemini-cli-vscode-extension/release/3p/signed';
+    const bucketUri = 'gs://gemini-cli-vscode-extension/release/1p/signed';
     const gcloudOutput = execSync(
       `gcloud storage ls --recursive ${bucketUri}`,
       { encoding: 'utf-8' },
