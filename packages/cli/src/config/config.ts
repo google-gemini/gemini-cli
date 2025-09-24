@@ -445,7 +445,7 @@ export async function loadCliConfig(
   if (argv.contextFile) {
     const resolved = resolvePath(argv.contextFile);
     try {
-      const stats = fs.statSync(resolved);
+      const stats = await fs.promises.stat(resolved);
       if (stats.isDirectory()) {
         throw new FatalConfigError(
           `Path specified by --context-file is a directory: ${argv.contextFile}`,
