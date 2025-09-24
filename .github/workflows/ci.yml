@@ -16,11 +16,11 @@ on:
         description: 'Branch to run on'
         required: true
         default: 'main'
-        type: string
+        type: 'string'
 
 concurrency:
   group: '${{ github.workflow }}-${{ github.head_ref || github.ref }}'
-  cancel-in-progress: |-
+  cancel-in-progress: | # yamllint disable-line rule:quoted-strings
     ${{ github.ref != 'refs/heads/main' && !startsWith(github.ref, 'refs/heads/release/') }}
 
 permissions:
