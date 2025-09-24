@@ -14,7 +14,7 @@ import { ApprovalMode } from '@google/gemini-cli-core';
 import * as path from 'node:path';
 import type { CommandContext, SlashCommand } from '../commands/types.js';
 import { CommandKind } from '../commands/types.js';
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import type { UseShellHistoryReturn } from '../hooks/useShellHistory.js';
 import { useShellHistory } from '../hooks/useShellHistory.js';
 import type { UseCommandCompletionReturn } from '../hooks/useCommandCompletion.js';
@@ -24,6 +24,7 @@ import { useInputHistory } from '../hooks/useInputHistory.js';
 import type { UseReverseSearchCompletionReturn } from '../hooks/useReverseSearchCompletion.js';
 import { useReverseSearchCompletion } from '../hooks/useReverseSearchCompletion.js';
 import * as clipboardUtils from '../utils/clipboardUtils.js';
+import { useKittyKeyboardProtocol } from '../hooks/useKittyKeyboardProtocol.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
 import stripAnsi from 'strip-ansi';
 import chalk from 'chalk';
@@ -33,6 +34,7 @@ vi.mock('../hooks/useCommandCompletion.js');
 vi.mock('../hooks/useInputHistory.js');
 vi.mock('../hooks/useReverseSearchCompletion.js');
 vi.mock('../utils/clipboardUtils.js');
+vi.mock('../hooks/useKittyKeyboardProtocol.js');
 
 const mockSlashCommands: SlashCommand[] = [
   {
@@ -97,6 +99,7 @@ describe('InputPrompt', () => {
   const mockedUseReverseSearchCompletion = vi.mocked(
     useReverseSearchCompletion,
   );
+  const mockedUseKittyKeyboardProtocol = vi.mocked(useKittyKeyboardProtocol);
 
   beforeEach(() => {
     vi.resetAllMocks();
@@ -1531,18 +1534,31 @@ describe('InputPrompt', () => {
   });
 
   describe('paste auto-submission protection', () => {
-    it('should prevent auto-submission immediately after paste with newlines', async () => {
+    let originalTermProgram: string | undefined;
+
+    beforeEach(() => {
+      originalTermProgram = process.env['TERM_PROGRAM'];
+      // Default to a non-vscode terminal for tests
+      delete process.env['TERM_PROGRAM'];
+      // Default to kitty protocol not supported
+      mockedUseKittyKeyboardProtocol.mockReturnValue({ supported: false });
+    });
+
+    afterEach(() => {
+      process.env['TERM_PROGRAM'] = originalTermProgram;
+    });
+
+    it('should prevent auto-submission immediately after an unsafe paste', async () => {
+      // isTerminalPasteTrusted will be false due to beforeEach setup.
+      props.buffer.text = 'some command';
+
       const { stdin, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
       );
       await wait();
 
-      // First type some text manually
-      stdin.write('test command');
-      await wait();
-
       // Simulate a paste operation (this should set the paste protection)
-      stdin.write(`\x1b[200~\npasted content\x1b[201~`);
+      stdin.write(`\x1b[200~pasted content\x1b[201~`);
       await wait();
 
       // Simulate an Enter key press immediately after paste
@@ -1551,13 +1567,14 @@ describe('InputPrompt', () => {
 
       // Verify that onSubmit was NOT called due to recent paste protection
       expect(props.onSubmit).not.toHaveBeenCalled();
-
+      // It should call newline() instead
+      expect(props.buffer.newline).toHaveBeenCalled();
       unmount();
     });
 
-    it('should allow submission after paste protection timeout', async () => {
-      // Set up buffer with text for submission
-      props.buffer.text = 'test command';
+    it('should allow submission after unsafe paste protection timeout', async () => {
+      // isTerminalPasteTrusted will be false due to beforeEach setup.
+      props.buffer.text = 'pasted text';
 
       const { stdin, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
@@ -1565,21 +1582,56 @@ describe('InputPrompt', () => {
       await wait();
 
       // Simulate a paste operation (this sets the protection)
-      stdin.write(`\x1b[200~\npasted\x1b[201~`);
-      await wait();
-
+      stdin.write('\x1b[200~pasted text\x1b[201~');
       // Wait for the protection timeout to naturally expire
-      await new Promise((resolve) => setTimeout(resolve, 600));
+      await wait(20);
 
       // Now Enter should work normally
       stdin.write('\r');
       await wait();
 
-      // Verify that onSubmit was called after the timeout
-      expect(props.onSubmit).toHaveBeenCalledWith('test command');
+      expect(props.onSubmit).toHaveBeenCalledWith('pasted text');
+      expect(props.buffer.newline).not.toHaveBeenCalled();
 
       unmount();
     });
+
+    it.each([
+      {
+        name: 'kitty',
+        setup: () =>
+          mockedUseKittyKeyboardProtocol.mockReturnValue({ supported: true }),
+      },
+      {
+        name: 'vscode',
+        setup: () => {
+          process.env['TERM_PROGRAM'] = 'vscode';
+        },
+      },
+    ])(
+      'should allow immediate submission for a trusted paste ($name)',
+      async ({ setup }) => {
+        setup();
+        props.buffer.text = 'pasted command';
+
+        const { stdin, unmount } = renderWithProviders(
+          <InputPrompt {...props} />,
+        );
+        await wait();
+
+        // Simulate a paste operation
+        stdin.write('\x1b[200~some pasted stuff\x1b[201~');
+        await wait();
+
+        // Simulate an Enter key press immediately after paste
+        stdin.write('\r');
+        await wait();
+
+        // Verify that onSubmit was called
+        expect(props.onSubmit).toHaveBeenCalledWith('pasted command');
+        unmount();
+      },
+    );
 
     it('should not interfere with normal Enter key submission when no recent paste', async () => {
       // Set up buffer with text before rendering to ensure submission works
