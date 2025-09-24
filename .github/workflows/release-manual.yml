@@ -39,7 +39,7 @@ on:
 
 jobs:
   release:
-    runs-on: 'ubuntu-latest'
+    runs-on: 'self-hosted'
     permissions:
       contents: 'write'
       packages: 'write'
@@ -50,6 +50,9 @@ jobs:
         with:
           ref: '${{ github.event.inputs.ref }}'
           fetch-depth: 0
+
+      - name: 'Debug Inputs'
+        run: 'echo "${{ toJSON(inputs) }}"'
 
       - name: 'Setup Node.js'
         uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020'
@@ -68,8 +71,7 @@ jobs:
           echo "PREVIOUS_TAG=$(git describe --tags --abbrev=0)" >> "${GITHUB_OUTPUT}"
 
       - name: 'Run Tests'
-        if: |-
-          ${{ github.event.inputs.force_skip_tests != true }}
+        if: "${{github.event.inputs.force_skip_tests != 'true'}}"
         uses: './.github/actions/run-tests'
         with:
           gemini_api_key: '${{ secrets.GEMINI_API_KEY }}'
@@ -77,6 +79,7 @@ jobs:
       - name: 'Publish Release'
         uses: './.github/actions/publish-release'
         with:
+          force-skip-tests: '${{ github.event.inputs.force_skip_tests }}'
           release-version: '${{ steps.release_info.outputs.RELEASE_VERSION }}'
           release-tag: '${{ github.event.inputs.version }}'
           npm-tag: '${{ github.event.inputs.npm_channel }}'
