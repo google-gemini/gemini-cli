@@ -164,13 +164,22 @@ process_pr() {
             IFS=',' read -ra ISSUE_LABEL_ARRAY <<< "${ISSUE_LABELS}"
             IFS=',' read -ra PR_LABEL_ARRAY <<< "${PR_LABELS}"
 
-            local LABELS_TO_ADD=""
             for label in "${ISSUE_LABEL_ARRAY[@]}"; do
-                if [[ -n "${label}" ]] && [[ " ${PR_LABEL_ARRAY[*]} " != *" ${label} "* ]]; then
-                    if [[ -z "${LABELS_TO_ADD}" ]]; then
-                        LABELS_TO_ADD="${label}"
-                    else
-                        LABELS_TO_ADD="${LABELS_TO_ADD},${label}"
+                if [[ -n "${label}" ]]; then
+                    local found=false
+                    for pr_label in "${PR_LABEL_ARRAY[@]}"; do
+                        if [[ "${label}" == "${pr_label}" ]]; then
+                            found=true
+                            break
+                        fi
+                    done
+
+                    if [[ "${found}" == "false" ]]; then
+                        if [[ -z "${LABELS_TO_ADD}" ]]; then
+                            LABELS_TO_ADD="${label}"
+                        else
+                            LABELS_TO_ADD="${LABELS_TO_ADD},${label}"
+                        fi
                     fi
                 fi
             done
