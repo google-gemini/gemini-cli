@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-
 export interface RoleDefinition {
   id: string;
   name: string;
@@ -21,4 +20,4 @@ export interface RoleContext {
   additionalInstructions?: string;
 }
 
-export type RoleCategory = 'development' | 'office' | 'creative' | 'education' | 'custom';
+export type RoleCategory = 'development' | 'office' | 'creative' | 'education' | 'finance' | 'custom';
