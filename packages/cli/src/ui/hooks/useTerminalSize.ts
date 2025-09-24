@@ -6,7 +6,7 @@
 
 import { useEffect, useState } from 'react';
 
-const TERMINAL_PADDING_X = 8;
+const TERMINAL_PADDING_X = 4;
 
 export function useTerminalSize(): { columns: number; rows: number } {
   const [size, setSize] = useState({
