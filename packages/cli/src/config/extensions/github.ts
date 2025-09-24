@@ -16,7 +16,8 @@ import * as https from 'node:https';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { execSync } from 'node:child_process';
-import { loadExtension } from '../extension.js';
+import { EXTENSIONS_CONFIG_FILENAME, loadExtension } from '../extension.js';
+import { quote } from 'shell-quote';
 
 function getGitHubToken(): string | undefined {
   return process.env['GITHUB_TOKEN'];
@@ -86,7 +87,7 @@ export function parseGitHubRepoForReleases(source: string): {
   const parsedUrl = URL.parse(source, 'https://github.com');
   // The pathname should be "/owner/repo".
   const parts = parsedUrl?.pathname.substring(1).split('/');
-  if (parts?.length !== 2) {
+  if (parts?.length !== 2 || parsedUrl?.host !== 'github.com') {
     throw new Error(
       `Invalid GitHub repository source: ${source}. Expected "owner/repo" or a github repo uri.`,
     );
@@ -219,11 +220,14 @@ export async function checkForExtensionUpdate(
     return;
   }
 }
-
+export interface GitHubDownloadResult {
+  tagName: string;
+  type: 'git' | 'github-release';
+}
 export async function downloadFromGitHubRelease(
   installMetadata: ExtensionInstallMetadata,
   destination: string,
-): Promise<string> {
+): Promise<GitHubDownloadResult> {
   const { source, ref } = installMetadata;
   const { owner, repo } = parseGitHubRepoForReleases(source);
 
@@ -269,26 +273,39 @@ export async function downloadFromGitHubRelease(
 
     extractFile(downloadedAssetPath, destination);
 
-    const files = await fs.promises.readdir(destination);
-    const extractedDirName = files.find((file) => {
-      const filePath = path.join(destination, file);
-      return fs.statSync(filePath).isDirectory();
+    // For regular github releases, the repository is put inside of a top level
+    // directory. In this case we should see exactly two file in the destination
+    // dir, the archive and the directory. If we see that, validate that the
+    // dir has a gemini extension configuration file and then move all files
+    // from the directory up one level into the destination directory.
+    const entries = await fs.promises.readdir(destination, {
+      withFileTypes: true,
     });
-
-    if (extractedDirName) {
-      const extractedDirPath = path.join(destination, extractedDirName);
-      const extractedDirFiles = await fs.promises.readdir(extractedDirPath);
-      for (const file of extractedDirFiles) {
-        await fs.promises.rename(
-          path.join(extractedDirPath, file),
-          path.join(destination, file),
-        );
+    if (entries.length === 2) {
+      const lonelyDir = entries.find((entry) => entry.isDirectory());
+      if (
+        lonelyDir &&
+        fs.existsSync(
+          path.join(destination, lonelyDir.name, EXTENSIONS_CONFIG_FILENAME),
+        )
+      ) {
+        const dirPathToExtract = path.join(destination, lonelyDir.name);
+        const extractedDirFiles = await fs.promises.readdir(dirPathToExtract);
+        for (const file of extractedDirFiles) {
+          await fs.promises.rename(
+            path.join(dirPathToExtract, file),
+            path.join(destination, file),
+          );
+        }
+        await fs.promises.rmdir(dirPathToExtract);
       }
-      await fs.promises.rmdir(extractedDirPath);
     }
 
     await fs.promises.unlink(downloadedAssetPath);
-    return releaseData.tag_name;
+    return {
+      tagName: releaseData.tag_name,
+      type: 'github-release',
+    };
   } catch (error) {
     throw new Error(
       `Failed to download release from ${installMetadata.source}: ${getErrorMessage(error)}`,
@@ -401,10 +418,12 @@ async function downloadFile(url: string, dest: string): Promise<void> {
 }
 
 function extractFile(file: string, dest: string) {
+  const safeFile = quote([file]);
+  const safeDest = quote([dest]);
   if (file.endsWith('.tar.gz')) {
-    execSync(`tar -xzf ${file} -C ${dest}`);
+    execSync(`tar -xzf ${safeFile} -C ${safeDest}`);
   } else if (file.endsWith('.zip')) {
-    execSync(`unzip ${file} -d ${dest}`);
+    execSync(`unzip ${safeFile} -d ${safeDest}`);
   } else {
     throw new Error(`Unsupported file extension for extraction: ${file}`);
   }

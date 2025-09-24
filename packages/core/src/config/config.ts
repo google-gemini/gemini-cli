@@ -1031,7 +1031,7 @@ export class Config {
         // This first implementation is only focused on the general case of
         // the tool registry.
         const messageBusEnabled = this.getEnableMessageBusIntegration();
-        if (this.debugMode) {
+        if (this.debugMode && messageBusEnabled) {
           console.log(
             `[DEBUG] enableMessageBusIntegration setting: ${messageBusEnabled}`,
           );
@@ -1039,7 +1039,7 @@ export class Config {
         const toolArgs = messageBusEnabled
           ? [...args, this.getMessageBus()]
           : args;
-        if (this.debugMode) {
+        if (this.debugMode && messageBusEnabled) {
           console.log(
             `[DEBUG] Registering ${className} with messageBus: ${messageBusEnabled ? 'YES' : 'NO'}`,
           );
