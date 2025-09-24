@@ -57,8 +57,9 @@ export interface InputPromptProps {
 }
 
 // The input content, input container, and input suggestions list may have different widths
+export const SCROLLBAR_CLEARANCE = 2; // Reserve 2 characters for scrollbar/margin
+
 export const calculatePromptWidths = (terminalWidth: number) => {
-  const SCROLLBAR_CLEARANCE = 2; // Reserve 2 characters for scrollbar/margin
   const FRAME_PADDING_AND_BORDER = 4; // Border (2) + padding (2)
   const PROMPT_PREFIX_WIDTH = 2; // '> ' or '! '
   const MIN_CONTENT_WIDTH = 2;

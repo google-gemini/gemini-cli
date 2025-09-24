@@ -58,7 +58,10 @@ import { useSlashCommandProcessor } from './hooks/slashCommandProcessor.js';
 import { useVimMode } from './contexts/VimModeContext.js';
 import { useConsoleMessages } from './hooks/useConsoleMessages.js';
 import { useTerminalSize } from './hooks/useTerminalSize.js';
-import { calculatePromptWidths } from './components/InputPrompt.js';
+import {
+  calculatePromptWidths,
+  SCROLLBAR_CLEARANCE,
+} from './components/InputPrompt.js';
 import { useStdin, useStdout } from 'ink';
 import ansiEscapes from 'ansi-escapes';
 import * as fs from 'node:fs';
@@ -252,7 +255,7 @@ export const AppContainer = (props: AppContainerProps) => {
       calculatePromptWidths(terminalWidth);
     return { inputWidth, suggestionsWidth };
   }, [terminalWidth]);
-  const mainAreaWidth = terminalWidth - 2; // Reserve 2 characters for scrollbar/margin
+  const mainAreaWidth = terminalWidth - SCROLLBAR_CLEARANCE;
   const staticAreaMaxItemHeight = Math.max(terminalHeight * 4, 100);
 
   const isValidPath = useCallback((filePath: string): boolean => {
