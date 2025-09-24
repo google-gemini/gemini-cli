@@ -180,6 +180,36 @@ describe('BaseLlmClient', () => {
         customPromptId,
       );
     });
+
+    it('should pass maxAttempts to retryWithBackoff when provided', async () => {
+      const mockResponse = createMockResponse('{"color": "cyan"}');
+      mockGenerateContent.mockResolvedValue(mockResponse);
+      const customMaxAttempts = 3;
+
+      const options: GenerateJsonOptions = {
+        ...defaultOptions,
+        maxAttempts: customMaxAttempts,
+      };
+
+      await client.generateJson(options);
+
+      expect(retryWithBackoff).toHaveBeenCalledTimes(1);
+      expect(retryWithBackoff).toHaveBeenCalledWith(expect.any(Function), {
+        maxAttempts: customMaxAttempts,
+      });
+    });
+
+    it('should call retryWithBackoff without maxAttempts when not provided', async () => {
+      const mockResponse = createMockResponse('{"color": "indigo"}');
+      mockGenerateContent.mockResolvedValue(mockResponse);
+
+      // No maxAttempts in defaultOptions
+      await client.generateJson(defaultOptions);
+
+      expect(retryWithBackoff).toHaveBeenCalledWith(expect.any(Function), {
+        maxAttempts: undefined,
+      });
+    });
   });
 
   describe('generateJson - Response Cleaning', () => {

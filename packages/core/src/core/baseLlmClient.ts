@@ -51,6 +51,10 @@ export interface GenerateJsonOptions {
    * A unique ID for the prompt, used for logging/telemetry correlation.
    */
   promptId: string;
+  /**
+   * The maximum number of attempts for the request.
+   */
+  maxAttempts?: number;
 }
 
 /**
@@ -78,6 +82,7 @@ export class BaseLlmClient {
       abortSignal,
       systemInstruction,
       promptId,
+      maxAttempts,
     } = options;
 
     const requestConfig: GenerateContentConfig = {
@@ -100,7 +105,7 @@ export class BaseLlmClient {
           promptId,
         );
 
-      const result = await retryWithBackoff(apiCall);
+      const result = await retryWithBackoff(apiCall, { maxAttempts });
 
       let text = getResponseText(result)?.trim();
       if (!text) {
