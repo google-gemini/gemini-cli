@@ -27,6 +27,10 @@ import { PythonEmbeddedTool } from './python-embedded-tool.js';
 import { XlwingsTool } from './xlwings-tool.js';
 import { MarkItDownTool } from './markitdown-tool.js';
 import { GeminiSearchTool } from './gemini-search-tool.js';
+import { JPXInvestorTool } from './jpx-investor-tool.js';
+import { EconomicCalendarTool } from './economic-calendar-tool.js';
+import { MarketDataTool } from './market-data-tool.js';
+import { EconomicNewsTool } from './economic-news-tool.js';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type ToolClass = any;
@@ -87,6 +91,21 @@ const ROLE_TOOLSET_MAP: Record<string, ToolClass[]> = {
     // WebSearchTool,
     XlwingsTool,
     MarkItDownTool
+  ],
+  financial_analyst: [
+    // ReadFileTool,
+    // WriteFileTool,
+    // EditTool,
+    // ShellTool,
+    GeminiSearchTool,
+    WebTool,
+    PythonEmbeddedTool,
+    JPXInvestorTool,
+    EconomicCalendarTool,
+    MarketDataTool,
+    EconomicNewsTool,
+    // MarkItDownTool,
+    MemoryTool
   ]
 };
 
