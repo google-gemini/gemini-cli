@@ -21,9 +21,10 @@ import {
   METRIC_CONTENT_RETRY_FAILURE_COUNT,
   METRIC_MODEL_ROUTING_LATENCY,
   METRIC_MODEL_ROUTING_FAILURE_COUNT,
+  METRIC_MODEL_SLASH_COMMAND_CALL_COUNT,
 } from './constants.js';
 import type { Config } from '../config/config.js';
-import type { ModelRoutingEvent } from './types.js';
+import type { ModelRoutingEvent, ModelSlashCommandEvent } from './types.js';
 
 export enum FileOperation {
   CREATE = 'create',
@@ -44,6 +45,7 @@ let contentRetryCounter: Counter | undefined;
 let contentRetryFailureCounter: Counter | undefined;
 let modelRoutingLatencyHistogram: Histogram | undefined;
 let modelRoutingFailureCounter: Counter | undefined;
+let modelSlashCommandCallCounter: Counter | undefined;
 let isMetricsInitialized = false;
 
 function getCommonAttributes(config: Config): Attributes {
@@ -127,6 +129,13 @@ export function initializeMetrics(config: Config): void {
     METRIC_MODEL_ROUTING_FAILURE_COUNT,
     {
       description: 'Counts model routing failures.',
+      valueType: ValueType.INT,
+    },
+  );
+  modelSlashCommandCallCounter = meter.createCounter(
+    METRIC_MODEL_SLASH_COMMAND_CALL_COUNT,
+    {
+      description: 'Counts model slash command calls.',
       valueType: ValueType.INT,
     },
   );
@@ -285,6 +294,17 @@ export function recordContentRetry(config: Config): void {
 export function recordContentRetryFailure(config: Config): void {
   if (!contentRetryFailureCounter || !isMetricsInitialized) return;
   contentRetryFailureCounter.add(1, getCommonAttributes(config));
+}
+
+export function recordModelSlashCommand(
+  config: Config,
+  event: ModelSlashCommandEvent,
+): void {
+  if (!modelSlashCommandCallCounter || !isMetricsInitialized) return;
+  modelSlashCommandCallCounter.add(1, {
+    ...getCommonAttributes(config),
+    'slash_command.model.model_name': event.model_name,
+  });
 }
 
 export function recordModelRoutingMetrics(

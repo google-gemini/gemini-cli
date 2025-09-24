@@ -26,6 +26,6 @@ jobs:
       - name: 'Verify release'
         uses: './.github/actions/verify-release'
         with:
-          npm-package: '${github.event.inputs.npm-package}'
-          expected-version: '${github.event.inputs.version}'
-          ref: '${github.event.inputs.ref}'
+          npm-package: '${{github.event.inputs.npm-package}}'
+          expected-version: '${{github.event.inputs.version}}'
+          ref: '${{github.event.inputs.ref}}'

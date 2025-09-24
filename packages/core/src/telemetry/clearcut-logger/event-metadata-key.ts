@@ -362,6 +362,9 @@ export enum EventMetadataKey {
   // Logs the setting scope for an extension enablement.
   GEMINI_CLI_EXTENSION_ENABLE_SETTING_SCOPE = 102,
 
+  // Logs the setting scope for an extension disablement.
+  GEMINI_CLI_EXTENSION_DISABLE_SETTING_SCOPE = 107,
+
   // ==========================================================================
   // Tool Output Truncated Event Keys
   // ===========================================================================
@@ -398,4 +401,7 @@ export enum EventMetadataKey {
 
   // Logs the source of the decision.
   GEMINI_CLI_ROUTING_DECISION_SOURCE = 101,
+
+  // Logs an event when the user uses the /model command.
+  GEMINI_CLI_MODEL_SLASH_COMMAND = 103,
 }
