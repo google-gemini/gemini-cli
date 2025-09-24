@@ -790,7 +790,7 @@ export class CodePatternAnalyzer {
 
     if (n1 === 0 || n2 === 0) return 0;
 
-    return (n1 * Math.log2(n1) + n2 * Math.log2(n2)) * (N1 + N2) * Math.log2(N1 + N2);
+    return (N1 + N2) * Math.log2(n1 + n2);
   }
 
   /**
