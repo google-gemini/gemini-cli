@@ -241,9 +241,7 @@ function normalizeApiJsonError(
   };
 }
 
-function extractApiErrorFromString(
-  text: string,
-): {
+function extractApiErrorFromString(text: string): {
   apiError: { error: { code: number; message: string; status: string } };
 } | null {
   // Prefer an anchor for API error payloads if present
