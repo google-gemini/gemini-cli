@@ -19,6 +19,11 @@ export {
   isTelemetrySdkInitialized,
 } from './sdk.js';
 export {
+  resolveTelemetrySettings,
+  parseBooleanEnvFlag,
+  parseTelemetryTargetValue,
+} from './config.js';
+export {
   GcpTraceExporter,
   GcpMetricExporter,
   GcpLogExporter,
@@ -36,6 +41,9 @@ export {
   logKittySequenceOverflow,
   logChatCompression,
   logToolOutputTruncated,
+  logExtensionEnable,
+  logExtensionInstallEvent,
+  logExtensionUninstall,
 } from './loggers.js';
 export type { SlashCommandEvent, ChatCompressionEvent } from './types.js';
 export {
@@ -66,3 +74,33 @@ export {
   recordUserActivity,
   isUserActive,
 } from './activity-detector.js';
+export {
+  // Core metrics functions
+  recordToolCallMetrics,
+  recordTokenUsageMetrics,
+  recordApiResponseMetrics,
+  recordApiErrorMetrics,
+  recordFileOperationMetric,
+  recordInvalidChunk,
+  recordContentRetry,
+  recordContentRetryFailure,
+  recordModelRoutingMetrics,
+  // Performance monitoring functions
+  recordStartupPerformance,
+  recordMemoryUsage,
+  recordCpuUsage,
+  recordToolQueueDepth,
+  recordToolExecutionBreakdown,
+  recordTokenEfficiency,
+  recordApiRequestBreakdown,
+  recordPerformanceScore,
+  recordPerformanceRegression,
+  recordBaselineComparison,
+  isPerformanceMonitoringActive,
+  // Performance monitoring types
+  PerformanceMetricType,
+  MemoryMetricType,
+  ToolExecutionPhase,
+  ApiRequestPhase,
+  FileOperation,
+} from './metrics.js';

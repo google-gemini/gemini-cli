@@ -74,6 +74,14 @@ export async function retryWithBackoff<T>(
   fn: () => Promise<T>,
   options?: Partial<RetryOptions>,
 ): Promise<T> {
+  if (options?.maxAttempts !== undefined && options.maxAttempts <= 0) {
+    throw new Error('maxAttempts must be a positive number.');
+  }
+
+  const cleanOptions = options
+    ? Object.fromEntries(Object.entries(options).filter(([_, v]) => v != null))
+    : {};
+
   const {
     maxAttempts,
     initialDelayMs,
@@ -83,7 +91,7 @@ export async function retryWithBackoff<T>(
     shouldRetry,
   } = {
     ...DEFAULT_RETRY_OPTIONS,
-    ...options,
+    ...cleanOptions,
   };
 
   let attempt = 0;

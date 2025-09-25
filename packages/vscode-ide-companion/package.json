@@ -2,7 +2,7 @@
   "name": "gemini-cli-vscode-ide-companion",
   "displayName": "Gemini CLI Companion",
   "description": "Enable Gemini CLI with direct access to your IDE workspace.",
-  "version": "0.7.0-nightly.20250918.2722473a",
+  "version": "0.8.0-nightly.20250925.b1da8c21",
   "publisher": "google",
   "icon": "assets/icon.png",
   "repository": {
@@ -96,18 +96,21 @@
   "main": "./dist/extension.cjs",
   "type": "module",
   "scripts": {
-    "vscode:prepublish": "npm run generate:notices && npm run check-types && npm run lint && node esbuild.js --production",
-    "build": "npm run compile",
-    "compile": "npm run check-types && npm run lint && node esbuild.js",
-    "watch": "npm-run-all -p watch:*",
+    "prepackage": "npm run generate:notices && npm run check-types && npm run lint && npm run build:prod",
+    "build": "npm run build:dev",
+    "build:dev": "npm run check-types && npm run lint && node esbuild.js",
+    "build:prod": "node esbuild.js --production",
+    "generate:notices": "node ./scripts/generate-notices.js",
+    "prepare": "npm run generate:notices",
+    "check-types": "tsc --noEmit",
+    "lint": "eslint src",
+    "watch": "npm-run-all2 -p watch:*",
     "watch:esbuild": "node esbuild.js --watch",
     "watch:tsc": "tsc --noEmit --watch --project tsconfig.json",
     "package": "vsce package --no-dependencies",
-    "generate:notices": "node ./scripts/generate-notices.js",
-    "check-types": "tsc --noEmit",
-    "lint": "eslint src",
     "test": "vitest run",
-    "test:ci": "vitest run --coverage"
+    "test:ci": "vitest run --coverage",
+    "validate:notices": "node ./scripts/validate-notices.js"
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",
