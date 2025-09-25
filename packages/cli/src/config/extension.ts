@@ -623,7 +623,7 @@ async function maybeRequestConsentOrFail(
     }
   }
   if (!(await requestConsent(extensionConsent))) {
-    throw new Error('Installation cancelled by user.');
+    throw new Error('Installation cancelled.');
   }
 }
 
