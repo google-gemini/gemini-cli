@@ -11,6 +11,47 @@ function escapeForRegex(value) {
   return value.replace(/[.*+?^${}()|[\]\\-]/g, '\\$&');
 }
 
+const KEYWORD_PREFIX =
+  '(?:fix(?:es|ed)?|close[sd]?|resolve[sd]?|address(?:es|ed)?)\\s*(?:[:\\-=]|is)?\\s*';
+
+const DEFAULT_TRANSFORM = (match) => match[1];
+
+const FALLBACK_PATTERNS = [
+  {
+    regex: new RegExp(`${KEYWORD_PREFIX}issue\\s+#?(\\d+)`, 'i'),
+    transform: DEFAULT_TRANSFORM,
+  },
+  {
+    regex: new RegExp(`${KEYWORD_PREFIX}GH-(\\d+)`, 'i'),
+    transform: DEFAULT_TRANSFORM,
+  },
+  {
+    regex: new RegExp('(?:link|close[sd]?)\\s*(?:[:\\-=])?\\s*((?:t|T)[-\\s]?(\\d+))', 'i'),
+    transform: (match) => `T-${match[2]}`,
+  },
+  {
+    regex: new RegExp('(?:issue|bug)\\s+#?(\\d+)', 'i'),
+    transform: DEFAULT_TRANSFORM,
+  },
+  {
+    regex: new RegExp('GH-(\\d+)', 'i'),
+    transform: DEFAULT_TRANSFORM,
+  },
+  {
+    regex: new RegExp('#(\\d+)', 'i'),
+    transform: DEFAULT_TRANSFORM,
+  },
+];
+
+const REPO_PREFIXES = ['', KEYWORD_PREFIX];
+
+const REPO_SUFFIX_BUILDERS = [
+  (repo) => `https://github\\.com/${repo}/issues/(\\d+)`,
+  (repo) => `${repo}#(\\d+)`,
+];
+
+const repoPatternCache = new Map();
+
 /**
  * Attempt to find a linked issue reference within the provided text.
  *
@@ -24,34 +65,34 @@ export function findLinkedIssue(text, repository) {
   }
 
   const search = `${text}`;
-  const patterns = [];
+
   const repo = repository?.trim();
-  const keywordPrefix =
-    '(?:fix(?:es|ed)?|close[sd]?|resolve[sd]?|address(?:es|ed)?)\\s*(?:[:\\-=]|is)?\\s*';
+  let patternsToSearch = FALLBACK_PATTERNS;
 
   if (repo) {
-    const escapedRepo = escapeForRegex(repo);
-    patterns.push(new RegExp(`https://github\\.com/${escapedRepo}/issues/(\\d+)`, 'i'));
-    patterns.push(new RegExp(`${escapedRepo}#(\\d+)`, 'i'));
-    patterns.push(new RegExp(`${keywordPrefix}${escapedRepo}#(\\d+)`, 'i'));
-    patterns.push(
-      new RegExp(
-        `${keywordPrefix}https://github\\.com/${escapedRepo}/issues/(\\d+)`,
-        'i',
-      ),
-    );
+    let repoPatterns = repoPatternCache.get(repo);
+    if (!repoPatterns) {
+      const escapedRepo = escapeForRegex(repo);
+      repoPatterns = REPO_PREFIXES.flatMap((prefix) =>
+        REPO_SUFFIX_BUILDERS.map((suffixBuilder) => ({
+          regex: new RegExp(`${prefix}${suffixBuilder(escapedRepo)}`, 'i'),
+          transform: DEFAULT_TRANSFORM,
+        })),
+      );
+      repoPatternCache.set(repo, repoPatterns);
+    }
+
+    patternsToSearch = [...repoPatterns, ...FALLBACK_PATTERNS];
   }
 
-  patterns.push(new RegExp(`${keywordPrefix}issue\\s+#?(\\d+)`, 'i'));
-  patterns.push(new RegExp(`${keywordPrefix}GH-(\\d+)`, 'i'));
-  patterns.push(/(?:issue|bug)\s+#?(\d+)/i);
-  patterns.push(/GH-(\d+)/i);
-  patterns.push(/#(\d+)/);
+  for (const { regex, transform } of patternsToSearch) {
+    const match = search.match(regex);
+    if (match?.[1]) {
+      const identifier = transform(match);
+      if (identifier) {
+        return identifier;
+      }
 
-  for (const pattern of patterns) {
-    const match = search.match(pattern);
-    if (match && match[1]) {
-      return match[1];
     }
   }
 

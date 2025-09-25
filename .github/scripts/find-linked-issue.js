@@ -16,8 +16,28 @@ async function readStdin() {
   return chunks.join('');
 }
 
+const args = process.argv.slice(2);
+let repository = '';
+
+for (let index = 0; index < args.length; index += 1) {
+  const arg = args[index];
+  if (arg === '--repo') {
+    repository = args[index + 1] ?? '';
+    break;
+  }
+
+  if (arg.startsWith('--repo=')) {
+    repository = arg.slice('--repo='.length);
+    break;
+  }
+}
+
+if (!repository) {
+  repository = process.env['GITHUB_REPOSITORY'] ?? '';
+}
+
 const text = await readStdin();
-const repository = process.env['GITHUB_REPOSITORY'] ?? '';
+
 const issue = findLinkedIssue(text, repository);
 
 if (issue) {
