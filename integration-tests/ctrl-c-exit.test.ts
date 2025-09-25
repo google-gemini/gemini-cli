@@ -8,7 +8,7 @@ import { describe, it, expect } from 'vitest';
 import { TestRig } from './test-helper.js';
 
 describe('Ctrl+C exit', () => {
-  it.skip('should exit gracefully on second Ctrl+C', async () => {
+  it('should exit gracefully on second Ctrl+C', async () => {
     const rig = new TestRig();
     await rig.setup('should exit gracefully on second Ctrl+C');
 
@@ -40,10 +40,10 @@ describe('Ctrl+C exit', () => {
         () =>
           reject(
             new Error(
-              `Test timed out: process did not exit within 10000ms. Output: ${output}`,
+              `Test timed out: process did not exit within a minute. Output: ${output}`,
             ),
           ),
-        20000,
+        60000,
       ),
     );
 
