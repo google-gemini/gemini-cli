@@ -8,6 +8,7 @@ import { Box, Text } from 'ink';
 import type { RadioSelectItem } from './shared/RadioButtonSelect.js';
 import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
 import { useKeypress } from '../hooks/useKeypress.js';
+import { useTerminalSize } from '../hooks/useTerminalSize.js';
 import { theme } from '../semantic-colors.js';
 
 export type LoopDetectionConfirmationResult = {
@@ -21,6 +22,7 @@ interface LoopDetectionConfirmationProps {
 export function LoopDetectionConfirmation({
   onComplete,
 }: LoopDetectionConfirmationProps) {
+  const { columns } = useTerminalSize();
   useKeypress(
     (key) => {
       if (key.name === 'escape') {
@@ -52,8 +54,7 @@ export function LoopDetectionConfirmation({
       flexDirection="column"
       borderStyle="round"
       borderColor={theme.status.warning}
-      width="100%"
-      marginLeft={1}
+      width={columns - 2}
     >
       <Box paddingX={1} paddingY={0} flexDirection="column">
         <Box minHeight={1}>

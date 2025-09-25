@@ -193,7 +193,6 @@ export const useSlashCommandProcessor = (
         addItem,
         clear: () => {
           clearItems();
-          console.clear();
           refreshStatic();
         },
         loadHistory,

@@ -11,6 +11,7 @@ import { theme } from '../semantic-colors.js';
 import type { RadioSelectItem } from './shared/RadioButtonSelect.js';
 import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
 import { useKeypress } from '../hooks/useKeypress.js';
+import { useTerminalSize } from '../hooks/useTerminalSize.js';
 import * as process from 'node:process';
 import * as path from 'node:path';
 import { relaunchApp } from '../../utils/processUtils.js';
@@ -50,6 +51,7 @@ export const FolderTrustDialog: React.FC<FolderTrustDialogProps> = ({
     { isActive: !isRestarting },
   );
 
+  const { columns } = useTerminalSize();
   const dirName = path.basename(process.cwd());
   const parentFolder = path.basename(path.dirname(process.cwd()));
 
@@ -75,8 +77,7 @@ export const FolderTrustDialog: React.FC<FolderTrustDialogProps> = ({
         borderStyle="round"
         borderColor={theme.status.warning}
         padding={1}
-        width="100%"
-        marginLeft={1}
+        width={columns - 2}
       >
         <Box flexDirection="column" marginBottom={1}>
           <Text bold color={theme.text.primary}>

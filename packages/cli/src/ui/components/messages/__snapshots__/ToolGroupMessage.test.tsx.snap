@@ -103,3 +103,31 @@ exports[`<ToolGroupMessage /> > Height Calculation > calculates available height
  │MockTool[tool-3]: ✓ test-tool - A tool for testing (medium)                                       │
  ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;
+
+exports[`<ToolGroupMessage /> Border Color Logic uses gray border when all tools are successful and no shell commands 1`] = `""`;
+
+exports[`<ToolGroupMessage /> Border Color Logic uses yellow border for shell commands even when successful 1`] = `""`;
+
+exports[`<ToolGroupMessage /> Border Color Logic uses yellow border when tools are pending 1`] = `""`;
+
+exports[`<ToolGroupMessage /> Confirmation Handling shows confirmation dialog for first confirming tool only 1`] = `""`;
+
+exports[`<ToolGroupMessage /> Golden Snapshots renders empty tool calls array 1`] = `""`;
+
+exports[`<ToolGroupMessage /> Golden Snapshots renders mixed tool calls including shell command 1`] = `""`;
+
+exports[`<ToolGroupMessage /> Golden Snapshots renders multiple tool calls with different statuses 1`] = `""`;
+
+exports[`<ToolGroupMessage /> Golden Snapshots renders shell command with yellow border 1`] = `""`;
+
+exports[`<ToolGroupMessage /> Golden Snapshots renders single successful tool call 1`] = `""`;
+
+exports[`<ToolGroupMessage /> Golden Snapshots renders tool call awaiting confirmation 1`] = `""`;
+
+exports[`<ToolGroupMessage /> Golden Snapshots renders when not focused 1`] = `""`;
+
+exports[`<ToolGroupMessage /> Golden Snapshots renders with limited terminal height 1`] = `""`;
+
+exports[`<ToolGroupMessage /> Golden Snapshots renders with narrow terminal width 1`] = `""`;
+
+exports[`<ToolGroupMessage /> Height Calculation calculates available height correctly with multiple tools with results 1`] = `""`;

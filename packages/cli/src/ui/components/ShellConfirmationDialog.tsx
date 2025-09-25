@@ -12,6 +12,7 @@ import { RenderInline } from '../utils/InlineMarkdownRenderer.js';
 import type { RadioSelectItem } from './shared/RadioButtonSelect.js';
 import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
 import { useKeypress } from '../hooks/useKeypress.js';
+import { useTerminalSize } from '../hooks/useTerminalSize.js';
 
 export interface ShellConfirmationRequest {
   commands: string[];
@@ -28,6 +29,7 @@ export interface ShellConfirmationDialogProps {
 export const ShellConfirmationDialog: React.FC<
   ShellConfirmationDialogProps
 > = ({ request }) => {
+  const { columns } = useTerminalSize();
   const { commands, onConfirm } = request;
 
   useKeypress(
@@ -70,8 +72,7 @@ export const ShellConfirmationDialog: React.FC<
       borderStyle="round"
       borderColor={theme.status.warning}
       padding={1}
-      width="100%"
-      marginLeft={1}
+      width={columns - 2}
     >
       <Box flexDirection="column" marginBottom={1}>
         <Text bold color={theme.text.primary}>

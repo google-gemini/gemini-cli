@@ -5,6 +5,7 @@
  */
 
 import { Box, Text } from 'ink';
+import { MaxSizedBox } from './shared/MaxSizedBox.js';
 import { IdeIntegrationNudge } from '../IdeIntegrationNudge.js';
 import { LoopDetectionConfirmation } from './LoopDetectionConfirmation.js';
 import { FolderTrustDialog } from './FolderTrustDialog.js';
@@ -124,32 +125,52 @@ export const DialogManager = ({ addItem }: DialogManagerProps) => {
             <Text color={theme.status.error}>{uiState.themeError}</Text>
           </Box>
         )}
-        <ThemeDialog
-          onSelect={uiActions.handleThemeSelect}
-          onHighlight={uiActions.handleThemeHighlight}
-          settings={settings}
-          availableTerminalHeight={
+        <MaxSizedBox
+          maxHeight={
             constrainHeight ? terminalHeight - staticExtraHeight : undefined
           }
-          terminalWidth={mainAreaWidth}
-        />
+        >
+          <ThemeDialog
+            onSelect={uiActions.handleThemeSelect}
+            onHighlight={uiActions.handleThemeHighlight}
+            settings={settings}
+            availableTerminalHeight={
+              constrainHeight ? terminalHeight - staticExtraHeight : undefined
+            }
+            terminalWidth={mainAreaWidth}
+          />
+        </MaxSizedBox>
       </Box>
     );
   }
   if (uiState.isSettingsDialogOpen) {
     return (
       <Box flexDirection="column">
-        <SettingsDialog
-          settings={settings}
-          onSelect={() => uiActions.closeSettingsDialog()}
-          onRestartRequest={() => process.exit(0)}
-          availableTerminalHeight={terminalHeight - staticExtraHeight}
-        />
+        <MaxSizedBox
+          maxHeight={
+            constrainHeight ? terminalHeight - staticExtraHeight : undefined
+          }
+        >
+          <SettingsDialog
+            settings={settings}
+            onSelect={() => uiActions.closeSettingsDialog()}
+            onRestartRequest={() => process.exit(0)}
+            availableTerminalHeight={terminalHeight - staticExtraHeight}
+          />
+        </MaxSizedBox>
       </Box>
     );
   }
   if (uiState.isModelDialogOpen) {
-    return <ModelDialog onClose={uiActions.closeModelDialog} />;
+    return (
+      <MaxSizedBox
+        maxHeight={
+          constrainHeight ? terminalHeight - staticExtraHeight : undefined
+        }
+      >
+        <ModelDialog onClose={uiActions.closeModelDialog} />
+      </MaxSizedBox>
+    );
   }
   if (uiState.isAuthenticating) {
     return (
@@ -163,13 +184,19 @@ export const DialogManager = ({ addItem }: DialogManagerProps) => {
   if (uiState.isAuthDialogOpen) {
     return (
       <Box flexDirection="column">
-        <AuthDialog
-          config={config}
-          settings={settings}
-          setAuthState={uiActions.setAuthState}
-          authError={uiState.authError}
-          onAuthError={uiActions.onAuthError}
-        />
+        <MaxSizedBox
+          maxHeight={
+            constrainHeight ? terminalHeight - staticExtraHeight : undefined
+          }
+        >
+          <AuthDialog
+            config={config}
+            settings={settings}
+            setAuthState={uiActions.setAuthState}
+            authError={uiState.authError}
+            onAuthError={uiActions.onAuthError}
+          />
+        </MaxSizedBox>
       </Box>
     );
   }
@@ -181,11 +208,17 @@ export const DialogManager = ({ addItem }: DialogManagerProps) => {
             <Text color={theme.status.error}>{uiState.editorError}</Text>
           </Box>
         )}
-        <EditorSettingsDialog
-          onSelect={uiActions.handleEditorSelect}
-          settings={settings}
-          onExit={uiActions.exitEditorDialog}
-        />
+        <MaxSizedBox
+          maxHeight={
+            constrainHeight ? terminalHeight - staticExtraHeight : undefined
+          }
+        >
+          <EditorSettingsDialog
+            onSelect={uiActions.handleEditorSelect}
+            settings={settings}
+            onExit={uiActions.exitEditorDialog}
+          />
+        </MaxSizedBox>
       </Box>
     );
   }

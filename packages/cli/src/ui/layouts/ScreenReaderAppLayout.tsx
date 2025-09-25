@@ -20,11 +20,11 @@ export const ScreenReaderAppLayout: React.FC = () => {
   const footerProps = useFooterProps();
 
   return (
-    <Box flexDirection="column" width="90%" height="100%">
+    <Box flexDirection="column" width="100%" height="100%">
       <Notifications />
       <Footer {...footerProps} />
       <Box flexGrow={1} overflow="hidden">
-        <MainContent />
+        <MainContent key={uiState.historyRemountKey} />
       </Box>
       {uiState.dialogsVisible ? (
         <DialogManager addItem={uiState.historyManager.addItem} />

@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Box, Static } from 'ink';
+import { Box } from 'ink';
 import { HistoryList } from './HistoryList.js';
 import { PendingHistoryList } from './PendingHistoryList.js';
 import { ShowMoreLines } from './ShowMoreLines.js';
@@ -13,11 +13,13 @@ import { useUIState } from '../contexts/UIStateContext.js';
 import { useAppContext } from '../contexts/AppContext.js';
 import { AppHeader } from './AppHeader.js';
 import { useLayoutConfig } from '../hooks/useLayoutConfig.js';
+import { useTerminalSize } from '../hooks/useTerminalSize.js';
 
 export const MainContent = () => {
   const { version } = useAppContext();
   const uiState = useUIState();
   const layout = useLayoutConfig();
+  const { columns: terminalWidth } = useTerminalSize();
   const {
     pendingHistoryItems,
     mainAreaWidth,
@@ -26,6 +28,7 @@ export const MainContent = () => {
   } = uiState;
 
   // In screen reader mode, use regular layout without Static component
+
   if (!layout.shouldUseStatic) {
     return (
       <OverflowProvider>
@@ -33,7 +36,7 @@ export const MainContent = () => {
           <AppHeader version={version} />
           <HistoryList
             history={uiState.history}
-            terminalWidth={mainAreaWidth}
+            terminalWidth={terminalWidth}
             staticAreaMaxItemHeight={staticAreaMaxItemHeight}
             slashCommands={uiState.slashCommands}
           />
@@ -53,21 +56,17 @@ export const MainContent = () => {
   // Default mode with Static component
   return (
     <>
-      <Static
-        key={uiState.historyRemountKey}
-        items={[
-          <AppHeader key="app-header" version={version} />,
+      <OverflowProvider>
+        <Box flexDirection="column">
+          <AppHeader version={version} />
           <HistoryList
-            key="history-list"
             history={uiState.history}
-            terminalWidth={mainAreaWidth}
+            terminalWidth={terminalWidth}
             staticAreaMaxItemHeight={staticAreaMaxItemHeight}
             slashCommands={uiState.slashCommands}
-          />,
-        ]}
-      >
-        {(item) => item}
-      </Static>
+          />
+        </Box>
+      </OverflowProvider>
       <OverflowProvider>
         <Box flexDirection="column">
           <PendingHistoryList

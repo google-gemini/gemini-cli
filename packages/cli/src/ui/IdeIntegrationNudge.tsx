@@ -9,6 +9,7 @@ import { Box, Text } from 'ink';
 import type { RadioSelectItem } from './components/shared/RadioButtonSelect.js';
 import { RadioButtonSelect } from './components/shared/RadioButtonSelect.js';
 import { useKeypress } from './hooks/useKeypress.js';
+import { useTerminalSize } from './hooks/useTerminalSize.js';
 import { theme } from './semantic-colors.js';
 
 export type IdeIntegrationNudgeResult = {
@@ -25,6 +26,7 @@ export function IdeIntegrationNudge({
   ide,
   onComplete,
 }: IdeIntegrationNudgeProps) {
+  const { columns } = useTerminalSize();
   useKeypress(
     (key) => {
       if (key.name === 'escape') {
@@ -81,8 +83,7 @@ export function IdeIntegrationNudge({
       borderStyle="round"
       borderColor={theme.status.warning}
       padding={1}
-      width="100%"
-      marginLeft={1}
+      width={columns - 2}
     >
       <Box marginBottom={1} flexDirection="column">
         <Text>

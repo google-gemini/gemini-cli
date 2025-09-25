@@ -17,8 +17,8 @@ export const DefaultAppLayout: React.FC = () => {
   const uiState = useUIState();
 
   return (
-    <Box flexDirection="column" width="90%">
-      <MainContent />
+    <Box flexDirection="column" width="100%">
+      <MainContent key={uiState.historyRemountKey} />
 
       <Box flexDirection="column" ref={uiState.mainControlsRef}>
         <Notifications />

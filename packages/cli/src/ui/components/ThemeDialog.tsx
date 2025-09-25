@@ -140,7 +140,7 @@ export function ThemeDialog({
     1,
   );
 
-  const DIALOG_PADDING = 2;
+  const DIALOG_PADDING = 1;
   const selectThemeHeight = themeItems.length + 1;
   const TAB_TO_SELECT_HEIGHT = 2;
   availableTerminalHeight = availableTerminalHeight ?? Number.MAX_SAFE_INTEGER;
