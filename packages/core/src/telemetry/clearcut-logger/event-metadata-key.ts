@@ -233,6 +233,18 @@ export enum EventMetadataKey {
   // Logs user removed lines in edit/write tool response.
   GEMINI_CLI_USER_REMOVED_LINES = 50,
 
+  // Logs AI added characters in edit/write tool response.
+  GEMINI_CLI_AI_ADDED_CHARS = 103,
+
+  // Logs AI removed characters in edit/write tool response.
+  GEMINI_CLI_AI_REMOVED_CHARS = 104,
+
+  // Logs user added characters in edit/write tool response.
+  GEMINI_CLI_USER_ADDED_CHARS = 105,
+
+  // Logs user removed characters in edit/write tool response.
+  GEMINI_CLI_USER_REMOVED_CHARS = 106,
+
   // ==========================================================================
   // Kitty Sequence Overflow Event Keys
   // ===========================================================================
@@ -403,5 +415,5 @@ export enum EventMetadataKey {
   GEMINI_CLI_ROUTING_DECISION_SOURCE = 101,
 
   // Logs an event when the user uses the /model command.
-  GEMINI_CLI_MODEL_SLASH_COMMAND = 103,
+  GEMINI_CLI_MODEL_SLASH_COMMAND = 108,
 }
