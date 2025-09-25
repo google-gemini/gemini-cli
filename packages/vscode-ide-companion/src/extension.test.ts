@@ -7,13 +7,18 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as vscode from 'vscode';
 import { activate } from './extension.js';
-import { DetectedIde, detectIdeFromEnv } from '@google/gemini-cli-core';
+import {
+  IDE_DEFINITIONS,
+  detectIdeFromEnv,
+} from '@google/gemini-cli-core/src/ide/detect-ide.js';
 
-vi.mock('@google/gemini-cli-core', async () => {
-  const actual = await vi.importActual('@google/gemini-cli-core');
+vi.mock('@google/gemini-cli-core/src/ide/detect-ide.js', async () => {
+  const actual = await vi.importActual(
+    '@google/gemini-cli-core/src/ide/detect-ide.js',
+  );
   return {
     ...actual,
-    detectIdeFromEnv: vi.fn(() => DetectedIde.VSCode),
+    detectIdeFromEnv: vi.fn(() => IDE_DEFINITIONS.vscode),
   };
 });
 
@@ -198,10 +203,10 @@ describe('activate', () => {
 
     it.each([
       {
-        ide: DetectedIde.CloudShell,
+        ide: IDE_DEFINITIONS.cloudshell,
       },
-      { ide: DetectedIde.FirebaseStudio },
-    ])('does not show the notification for $ide', async ({ ide }) => {
+      { ide: IDE_DEFINITIONS.firebasestudio },
+    ])('does not show the notification for $ide.name', async ({ ide }) => {
       vi.mocked(detectIdeFromEnv).mockReturnValue(ide);
       vi.mocked(context.globalState.get).mockReturnValue(undefined);
       const showInformationMessageMock = vi.mocked(
