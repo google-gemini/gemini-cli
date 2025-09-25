@@ -916,6 +916,18 @@ This extension will run the following MCP servers:
         installExtension({ source: sourceExtDir, type: 'local' }, false),
       ).resolves.toBe('my-local-extension');
     });
+
+    it('should throw an error for invalid extension names', async () => {
+      const sourceExtDir = createExtension({
+        extensionsDir: tempHomeDir,
+        name: 'bad_name',
+        version: '1.0.0',
+      });
+
+      await expect(
+        installExtension({ source: sourceExtDir, type: 'local' }),
+      ).rejects.toThrow('Invalid extension name: "bad_name"');
+    });
   });
 
   describe('uninstallExtension', () => {
