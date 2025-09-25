@@ -13,5 +13,12 @@
   "[javascript]": {
     "editor.defaultFormatter": "esbenp.prettier-vscode"
   },
-  "vitest.disableWorkspaceWarning": true
+  "vitest.disableWorkspaceWarning": true,
+  "github.copilot.advanced": {
+    "authPermissions": "default"
+  },
+  "dotnetAcquisitionExtension.allowInvalidPaths": true,
+  "dotnetAcquisitionExtension.enablePreviewFeatures": true,
+  "dotnetAcquisitionExtension.highVerbosity": true,
+  "debug.javascript.autoAttachFilter": "always"
 }
