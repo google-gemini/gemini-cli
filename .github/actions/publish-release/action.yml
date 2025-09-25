@@ -44,11 +44,6 @@ inputs:
 runs:
   using: 'composite'
   steps:
-    - name: '📝 Print Inputs'
-      shell: 'bash'
-      run: |
-        echo "${{ toJSON(inputs) }}"
-
     - name: '👤 Configure Git User'
       working-directory: '${{ inputs.working-directory }}'
       shell: 'bash'
@@ -150,12 +145,6 @@ runs:
         dry-run: '${{ inputs.dry-run }}'
         wombat-token-core: '${{ inputs.wombat-token-core }}'
         wombat-token-cli: '${{ inputs.wombat-token-cli }}'
-
-    - name: 'Install deps'
-      working-directory: '${{ inputs.working-directory }}'
-      shell: 'bash'
-      run: |
-        npm install
 
     - name: '🎁 Bundle'
       working-directory: '${{ inputs.working-directory }}'
