@@ -63,6 +63,7 @@ import {
   relaunchAppInChildProcess,
   relaunchOnExitCode,
 } from './utils/relaunch.js';
+import { loadSandboxConfig } from './config/sandboxConfig.js';
 
 export function validateDnsResolutionOrder(
   order: string | undefined,
@@ -206,9 +207,6 @@ export async function main() {
 
   const argv = await parseArguments(settings.merged);
 
-  // Cleanup sessions after config initialization
-  await cleanupExpiredSessions(config, settings.merged);
-
   // Check for invalid input combinations early to prevent crashes
   if (argv.promptInteractive && !process.stdin.isTTY) {
     console.error(
@@ -344,6 +342,9 @@ export async function main() {
       sessionId,
       argv,
     );
+
+    // Cleanup sessions after config initialization
+    await cleanupExpiredSessions(config, settings.merged);
 
     if (config.getListExtensions()) {
       console.log('Installed extensions:');
