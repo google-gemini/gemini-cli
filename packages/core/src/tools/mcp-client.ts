@@ -575,34 +575,10 @@ export async function connectAndDiscover(
  */
 export function hasValidTypes(schema: unknown): boolean {
   if (typeof schema !== 'object' || schema === null) {
-    // Not a schema object we can validate, or not a schema at all.
-    // Treat as valid as it has no properties to be invalid.
     return true;
   }
 
   const s = schema as Record<string, unknown>;
-
-  if (!s['type']) {
-    // These keywords contain an array of schemas that should be validated.
-    //
-    // If no top level type was given, then they must each have a type.
-    let hasSubSchema = false;
-    const schemaArrayKeywords = ['anyOf', 'allOf', 'oneOf'];
-    for (const keyword of schemaArrayKeywords) {
-      const subSchemas = s[keyword];
-      if (Array.isArray(subSchemas)) {
-        hasSubSchema = true;
-        for (const subSchema of subSchemas) {
-          if (!hasValidTypes(subSchema)) {
-            return false;
-          }
-        }
-      }
-    }
-
-    // If the node itself is missing a type and had no subschemas, then it isn't valid.
-    if (!hasSubSchema) return false;
-  }
 
   if (s['type'] === 'object' && s['properties']) {
     if (typeof s['properties'] === 'object' && s['properties'] !== null) {
@@ -617,6 +593,18 @@ export function hasValidTypes(schema: unknown): boolean {
   if (s['type'] === 'array' && s['items']) {
     if (!hasValidTypes(s['items'])) {
       return false;
+    }
+  }
+
+  const schemaArrayKeywords = ['anyOf', 'allOf', 'oneOf'];
+  for (const keyword of schemaArrayKeywords) {
+    const subSchemas = s[keyword];
+    if (Array.isArray(subSchemas)) {
+      for (const subSchema of subSchemas) {
+        if (!hasValidTypes(subSchema)) {
+          return false;
+        }
+      }
     }
   }
 
