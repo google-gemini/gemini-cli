@@ -13,7 +13,7 @@ import type {
 import type { ContentGenerator } from '../core/contentGenerator.js';
 import {
   GeminiChat,
-  EmptyStreamError,
+  InvalidStreamError,
   StreamEventType,
   type StreamEvent,
 } from './geminiChat.js';
@@ -22,6 +22,9 @@ import { setSimulate429 } from '../utils/testUtils.js';
 import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
 import { AuthType } from './contentGenerator.js';
 import { type RetryOptions } from '../utils/retry.js';
+import type { ToolRegistry } from '../tools/tool-registry.js';
+import { Kind } from '../tools/tools.js';
+import { uiTelemetryService } from '../telemetry/uiTelemetry.js';
 
 // Mock fs module to prevent actual file system operations during tests
 const mockFileSystem = new Map<string, string>();
@@ -66,17 +69,20 @@ vi.mock('../fallback/handler.js', () => ({
   handleFallback: mockHandleFallback,
 }));
 
-const { mockLogInvalidChunk, mockLogContentRetry, mockLogContentRetryFailure } =
-  vi.hoisted(() => ({
-    mockLogInvalidChunk: vi.fn(),
-    mockLogContentRetry: vi.fn(),
-    mockLogContentRetryFailure: vi.fn(),
-  }));
+const { mockLogContentRetry, mockLogContentRetryFailure } = vi.hoisted(() => ({
+  mockLogContentRetry: vi.fn(),
+  mockLogContentRetryFailure: vi.fn(),
+}));
 
 vi.mock('../telemetry/loggers.js', () => ({
-  logInvalidChunk: mockLogInvalidChunk,
   logContentRetry: mockLogContentRetry,
   logContentRetryFailure: mockLogContentRetryFailure,
+}));
+
+vi.mock('../telemetry/uiTelemetry.js', () => ({
+  uiTelemetryService: {
+    setLastPromptTokenCount: vi.fn(),
+  },
 }));
 
 describe('GeminiChat', () => {
@@ -87,6 +93,7 @@ describe('GeminiChat', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(uiTelemetryService.setLastPromptTokenCount).mockClear();
     mockContentGenerator = {
       generateContent: vi.fn(),
       generateContentStream: vi.fn(),
@@ -230,7 +237,7 @@ describe('GeminiChat', () => {
             /* consume stream */
           }
         })(),
-      ).rejects.toThrow(EmptyStreamError);
+      ).rejects.toThrow(InvalidStreamError);
     });
 
     it('should succeed if the stream ends with an invalid part but has a finishReason and contained a valid part', async () => {
@@ -444,7 +451,7 @@ describe('GeminiChat', () => {
         'This is the visible text that should not be lost.',
       );
     });
-    it('should add a placeholder model turn when a tool call is followed by an empty stream response', async () => {
+    it('should throw an error when a tool call is followed by an empty stream response', async () => {
       // 1. Setup: A history where the model has just made a function call.
       const initialHistory: Content[] = [
         {
@@ -493,23 +500,164 @@ describe('GeminiChat', () => {
         },
         'prompt-id-stream-1',
       );
-      for await (const _ of stream) {
-        // This loop consumes the stream to trigger the internal logic.
-      }
 
-      // 4. Assert: The history should now have four valid, alternating turns.
-      const history = chat.getHistory();
-      expect(history.length).toBe(4);
+      // 4. Assert: The stream processing should throw an InvalidStreamError.
+      await expect(
+        (async () => {
+          for await (const _ of stream) {
+            // This loop consumes the stream to trigger the internal logic.
+          }
+        })(),
+      ).rejects.toThrow(InvalidStreamError);
+    });
 
-      // The final turn must be the empty model placeholder.
-      const lastTurn = history[3]!;
-      expect(lastTurn.role).toBe('model');
-      expect(lastTurn?.parts?.length).toBe(0);
+    it('should succeed when there is a tool call without finish reason', async () => {
+      // Setup: Stream with tool call but no finish reason
+      const streamWithToolCall = (async function* () {
+        yield {
+          candidates: [
+            {
+              content: {
+                role: 'model',
+                parts: [
+                  {
+                    functionCall: {
+                      name: 'test_function',
+                      args: { param: 'value' },
+                    },
+                  },
+                ],
+              },
+              // No finishReason
+            },
+          ],
+        } as unknown as GenerateContentResponse;
+      })();
 
-      // The second-to-last turn must be the function response we sent.
-      const secondToLastTurn = history[2]!;
-      expect(secondToLastTurn.role).toBe('user');
-      expect(secondToLastTurn?.parts![0]!.functionResponse).toBeDefined();
+      vi.mocked(mockContentGenerator.generateContentStream).mockResolvedValue(
+        streamWithToolCall,
+      );
+
+      const stream = await chat.sendMessageStream(
+        'test-model',
+        { message: 'test' },
+        'prompt-id-1',
+      );
+
+      // Should not throw an error
+      await expect(
+        (async () => {
+          for await (const _ of stream) {
+            // consume stream
+          }
+        })(),
+      ).resolves.not.toThrow();
+    });
+
+    it('should throw InvalidStreamError when no tool call and no finish reason', async () => {
+      // Setup: Stream with text but no finish reason and no tool call
+      const streamWithoutFinishReason = (async function* () {
+        yield {
+          candidates: [
+            {
+              content: {
+                role: 'model',
+                parts: [{ text: 'some response' }],
+              },
+              // No finishReason
+            },
+          ],
+        } as unknown as GenerateContentResponse;
+      })();
+
+      vi.mocked(mockContentGenerator.generateContentStream).mockResolvedValue(
+        streamWithoutFinishReason,
+      );
+
+      const stream = await chat.sendMessageStream(
+        'test-model',
+        { message: 'test' },
+        'prompt-id-1',
+      );
+
+      await expect(
+        (async () => {
+          for await (const _ of stream) {
+            // consume stream
+          }
+        })(),
+      ).rejects.toThrow(InvalidStreamError);
+    });
+
+    it('should throw InvalidStreamError when no tool call and empty response text', async () => {
+      // Setup: Stream with finish reason but empty response (only thoughts)
+      const streamWithEmptyResponse = (async function* () {
+        yield {
+          candidates: [
+            {
+              content: {
+                role: 'model',
+                parts: [{ thought: 'thinking...' }],
+              },
+              finishReason: 'STOP',
+            },
+          ],
+        } as unknown as GenerateContentResponse;
+      })();
+
+      vi.mocked(mockContentGenerator.generateContentStream).mockResolvedValue(
+        streamWithEmptyResponse,
+      );
+
+      const stream = await chat.sendMessageStream(
+        'test-model',
+        { message: 'test' },
+        'prompt-id-1',
+      );
+
+      await expect(
+        (async () => {
+          for await (const _ of stream) {
+            // consume stream
+          }
+        })(),
+      ).rejects.toThrow(InvalidStreamError);
+    });
+
+    it('should succeed when there is finish reason and response text', async () => {
+      // Setup: Stream with both finish reason and text content
+      const validStream = (async function* () {
+        yield {
+          candidates: [
+            {
+              content: {
+                role: 'model',
+                parts: [{ text: 'valid response' }],
+              },
+              finishReason: 'STOP',
+            },
+          ],
+        } as unknown as GenerateContentResponse;
+      })();
+
+      vi.mocked(mockContentGenerator.generateContentStream).mockResolvedValue(
+        validStream,
+      );
+
+      const stream = await chat.sendMessageStream(
+        'test-model',
+        { message: 'test' },
+        'prompt-id-1',
+      );
+
+      // Should not throw an error
+      await expect(
+        (async () => {
+          for await (const _ of stream) {
+            // consume stream
+          }
+        })(),
+      ).resolves.not.toThrow();
     });
 
     it('should call generateContentStream with the correct parameters', async () => {
@@ -527,6 +675,11 @@ describe('GeminiChat', () => {
             },
           ],
           text: () => 'response',
+          usageMetadata: {
+            promptTokenCount: 42,
+            candidatesTokenCount: 15,
+            totalTokenCount: 57,
+          },
         } as unknown as GenerateContentResponse;
       })();
       vi.mocked(mockContentGenerator.generateContentStream).mockResolvedValue(
@@ -554,6 +707,14 @@ describe('GeminiChat', () => {
           config: {},
         },
         'prompt-id-1',
+      );
+
+      // Verify that token counting is called when usageMetadata is present
+      expect(uiTelemetryService.setLastPromptTokenCount).toHaveBeenCalledWith(
+        42,
+      );
+      expect(uiTelemetryService.setLastPromptTokenCount).toHaveBeenCalledTimes(
+        1,
       );
     });
   });
@@ -667,7 +828,6 @@ describe('GeminiChat', () => {
       }
 
       // Assertions
-      expect(mockLogInvalidChunk).toHaveBeenCalledTimes(1);
       expect(mockLogContentRetry).toHaveBeenCalledTimes(1);
       expect(mockLogContentRetryFailure).not.toHaveBeenCalled();
       expect(mockContentGenerator.generateContentStream).toHaveBeenCalledTimes(
@@ -698,6 +858,9 @@ describe('GeminiChat', () => {
         role: 'model',
         parts: [{ text: 'Successful response' }],
       });
+
+      // Verify that token counting is not called when usageMetadata is missing
+      expect(uiTelemetryService.setLastPromptTokenCount).not.toHaveBeenCalled();
     });
 
     it('should fail after all retries on persistent invalid content and report metrics', async () => {
@@ -726,14 +889,13 @@ describe('GeminiChat', () => {
         for await (const _ of stream) {
           // Must loop to trigger the internal logic that throws.
         }
-      }).rejects.toThrow(EmptyStreamError);
+      }).rejects.toThrow(InvalidStreamError);
 
-      // Should be called 3 times (initial + 2 retries)
+      // Should be called 2 times (initial + 1 retry)
       expect(mockContentGenerator.generateContentStream).toHaveBeenCalledTimes(
-        3,
+        2,
       );
-      expect(mockLogInvalidChunk).toHaveBeenCalledTimes(3);
-      expect(mockLogContentRetry).toHaveBeenCalledTimes(2);
+      expect(mockLogContentRetry).toHaveBeenCalledTimes(1);
       expect(mockLogContentRetryFailure).toHaveBeenCalledTimes(1);
 
       // History should be clean, as if the failed turn never happened.
@@ -971,6 +1133,259 @@ describe('GeminiChat', () => {
       );
     }
     expect(turn4.parts[0].text).toBe('second response');
+  });
+
+  describe('stopBeforeSecondMutator', () => {
+    beforeEach(() => {
+      // Common setup for these tests: mock the tool registry.
+      const mockToolRegistry = {
+        getTool: vi.fn((toolName: string) => {
+          if (toolName === 'edit') {
+            return { kind: Kind.Edit };
+          }
+          return { kind: Kind.Other };
+        }),
+      } as unknown as ToolRegistry;
+      vi.mocked(mockConfig.getToolRegistry).mockReturnValue(mockToolRegistry);
+    });
+
+    it('should stop streaming before a second mutator tool call', async () => {
+      const responses = [
+        {
+          candidates: [
+            { content: { role: 'model', parts: [{ text: 'First part. ' }] } },
+          ],
+        },
+        {
+          candidates: [
+            {
+              content: {
+                role: 'model',
+                parts: [{ functionCall: { name: 'edit', args: {} } }],
+              },
+            },
+          ],
+        },
+        {
+          candidates: [
+            {
+              content: {
+                role: 'model',
+                parts: [{ functionCall: { name: 'fetch', args: {} } }],
+              },
+            },
+          ],
+        },
+        // This chunk contains the second mutator and should be clipped.
+        {
+          candidates: [
+            {
+              content: {
+                role: 'model',
+                parts: [
+                  { functionCall: { name: 'edit', args: {} } },
+                  { text: 'some trailing text' },
+                ],
+              },
+            },
+          ],
+        },
+        // This chunk should never be reached.
+        {
+          candidates: [
+            {
+              content: {
+                role: 'model',
+                parts: [{ text: 'This should not appear.' }],
+              },
+            },
+          ],
+        },
+      ] as unknown as GenerateContentResponse[];
+
+      vi.mocked(mockContentGenerator.generateContentStream).mockResolvedValue(
+        (async function* () {
+          for (const response of responses) {
+            yield response;
+          }
+        })(),
+      );
+
+      const stream = await chat.sendMessageStream(
+        'test-model',
+        { message: 'test message' },
+        'prompt-id-mutator-test',
+      );
+      for await (const _ of stream) {
+        // Consume the stream to trigger history recording.
+      }
+
+      const history = chat.getHistory();
+      expect(history.length).toBe(2);
+
+      const modelTurn = history[1]!;
+      expect(modelTurn.role).toBe('model');
+      expect(modelTurn?.parts?.length).toBe(3);
+      expect(modelTurn?.parts![0]!.text).toBe('First part. ');
+      expect(modelTurn.parts![1]!.functionCall?.name).toBe('edit');
+      expect(modelTurn.parts![2]!.functionCall?.name).toBe('fetch');
+    });
+
+    it('should not stop streaming if only one mutator is present', async () => {
+      const responses = [
+        {
+          candidates: [
+            { content: { role: 'model', parts: [{ text: 'Part 1. ' }] } },
+          ],
+        },
+        {
+          candidates: [
+            {
+              content: {
+                role: 'model',
+                parts: [{ functionCall: { name: 'edit', args: {} } }],
+              },
+            },
+          ],
+        },
+        {
+          candidates: [
+            {
+              content: {
+                role: 'model',
+                parts: [{ text: 'Part 2.' }],
+              },
+              finishReason: 'STOP',
+            },
+          ],
+        },
+      ] as unknown as GenerateContentResponse[];
+
+      vi.mocked(mockContentGenerator.generateContentStream).mockResolvedValue(
+        (async function* () {
+          for (const response of responses) {
+            yield response;
+          }
+        })(),
+      );
+
+      const stream = await chat.sendMessageStream(
+        'test-model',
+        { message: 'test message' },
+        'prompt-id-one-mutator',
+      );
+      for await (const _ of stream) {
+        /* consume */
+      }
+
+      const history = chat.getHistory();
+      const modelTurn = history[1]!;
+      expect(modelTurn?.parts?.length).toBe(3);
+      expect(modelTurn.parts![1]!.functionCall?.name).toBe('edit');
+      expect(modelTurn.parts![2]!.text).toBe('Part 2.');
+    });
+
+    it('should clip the chunk containing the second mutator, preserving prior parts', async () => {
+      const responses = [
+        {
+          candidates: [
+            {
+              content: {
+                role: 'model',
+                parts: [{ functionCall: { name: 'edit', args: {} } }],
+              },
+            },
+          ],
+        },
+        // This chunk has a valid part before the second mutator.
+        // The valid part should be kept, the rest of the chunk discarded.
+        {
+          candidates: [
+            {
+              content: {
+                role: 'model',
+                parts: [
+                  { text: 'Keep this text. ' },
+                  { functionCall: { name: 'edit', args: {} } },
+                  { text: 'Discard this text.' },
+                ],
+              },
+              finishReason: 'STOP',
+            },
+          ],
+        },
+      ] as unknown as GenerateContentResponse[];
+
+      const stream = (async function* () {
+        for (const response of responses) {
+          yield response;
+        }
+      })();
+
+      vi.mocked(mockContentGenerator.generateContentStream).mockResolvedValue(
+        stream,
+      );
+
+      const resultStream = await chat.sendMessageStream(
+        'test-model',
+        { message: 'test' },
+        'prompt-id-clip-chunk',
+      );
+      for await (const _ of resultStream) {
+        /* consume */
+      }
+
+      const history = chat.getHistory();
+      const modelTurn = history[1]!;
+      expect(modelTurn?.parts?.length).toBe(2);
+      expect(modelTurn.parts![0]!.functionCall?.name).toBe('edit');
+      expect(modelTurn.parts![1]!.text).toBe('Keep this text. ');
+    });
+
+    it('should handle two mutators in the same chunk (parallel call scenario)', async () => {
+      const responses = [
+        {
+          candidates: [
+            {
+              content: {
+                role: 'model',
+                parts: [
+                  { text: 'Some text. ' },
+                  { functionCall: { name: 'edit', args: {} } },
+                  { functionCall: { name: 'edit', args: {} } },
+                ],
+              },
+              finishReason: 'STOP',
+            },
+          ],
+        },
+      ] as unknown as GenerateContentResponse[];
+
+      const stream = (async function* () {
+        for (const response of responses) {
+          yield response;
+        }
+      })();
+
+      vi.mocked(mockContentGenerator.generateContentStream).mockResolvedValue(
+        stream,
+      );
+
+      const resultStream = await chat.sendMessageStream(
+        'test-model',
+        { message: 'test' },
+        'prompt-id-parallel-mutators',
+      );
+      for await (const _ of resultStream) {
+        /* consume */
+      }
+
+      const history = chat.getHistory();
+      const modelTurn = history[1]!;
+      expect(modelTurn?.parts?.length).toBe(2);
+      expect(modelTurn.parts![0]!.text).toBe('Some text. ');
+      expect(modelTurn.parts![1]!.functionCall?.name).toBe('edit');
+    });
   });
 
   describe('Model Resolution', () => {

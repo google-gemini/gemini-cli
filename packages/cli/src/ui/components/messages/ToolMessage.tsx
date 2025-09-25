@@ -14,7 +14,11 @@ import { AnsiOutputText } from '../AnsiOutput.js';
 import { GeminiRespondingSpinner } from '../GeminiRespondingSpinner.js';
 import { MaxSizedBox } from '../shared/MaxSizedBox.js';
 import { ShellInputPrompt } from '../ShellInputPrompt.js';
-import { SHELL_COMMAND_NAME, TOOL_STATUS } from '../../constants.js';
+import {
+  SHELL_COMMAND_NAME,
+  SHELL_NAME,
+  TOOL_STATUS,
+} from '../../constants.js';
 import { theme } from '../../semantic-colors.js';
 import type { AnsiOutput, Config } from '@google/gemini-cli-core';
 
@@ -34,7 +38,7 @@ export interface ToolMessageProps extends IndividualToolCallDisplay {
   emphasis?: TextEmphasis;
   renderOutputAsMarkdown?: boolean;
   activeShellPtyId?: number | null;
-  shellFocused?: boolean;
+  embeddedShellFocused?: boolean;
   config?: Config;
 }
 
@@ -48,7 +52,7 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
   emphasis = 'medium',
   renderOutputAsMarkdown = true,
   activeShellPtyId,
-  shellFocused,
+  embeddedShellFocused,
   ptyId,
   config,
 }) => {
@@ -56,7 +60,12 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
     (name === SHELL_COMMAND_NAME || name === 'Shell') &&
     status === ToolCallStatus.Executing &&
     ptyId === activeShellPtyId &&
-    shellFocused;
+    embeddedShellFocused;
+
+  const isThisShellFocusable =
+    (name === SHELL_COMMAND_NAME || name === 'Shell') &&
+    status === ToolCallStatus.Executing &&
+    config?.getShouldUseNodePtyShell();
 
   const availableHeight = availableTerminalHeight
     ? Math.max(
@@ -83,16 +92,18 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
   return (
     <Box paddingX={1} paddingY={0} flexDirection="column">
       <Box minHeight={1}>
-        <ToolStatusIndicator status={status} />
+        <ToolStatusIndicator status={status} name={name} />
         <ToolInfo
           name={name}
           status={status}
           description={description}
           emphasis={emphasis}
         />
-        {isThisShellFocused && (
-          <Box marginLeft={1}>
-            <Text color={theme.text.accent}>[Focused]</Text>
+        {isThisShellFocusable && (
+          <Box marginLeft={1} flexShrink={0}>
+            <Text color={theme.text.accent}>
+              {isThisShellFocused ? '(Focused)' : '(ctrl+f to focus)'}
+            </Text>
           </Box>
         )}
         {emphasis === 'high' && <TrailingIndicator />}
@@ -118,7 +129,7 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
                 </Box>
               </MaxSizedBox>
             ) : typeof resultDisplay === 'object' &&
-              !Array.isArray(resultDisplay) ? (
+              'fileDiff' in resultDisplay ? (
               <DiffRenderer
                 diffContent={resultDisplay.fileDiff}
                 filename={resultDisplay.fileName}
@@ -138,7 +149,7 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
         <Box paddingLeft={STATUS_INDICATOR_WIDTH} marginTop={1}>
           <ShellInputPrompt
             activeShellPtyId={activeShellPtyId ?? null}
-            focus={shellFocused}
+            focus={embeddedShellFocused}
           />
         </Box>
       )}
@@ -148,43 +159,50 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
 
 type ToolStatusIndicatorProps = {
   status: ToolCallStatus;
+  name: string;
 };
 
 const ToolStatusIndicator: React.FC<ToolStatusIndicatorProps> = ({
   status,
-}) => (
-  <Box minWidth={STATUS_INDICATOR_WIDTH}>
-    {status === ToolCallStatus.Pending && (
-      <Text color={theme.status.success}>{TOOL_STATUS.PENDING}</Text>
-    )}
-    {status === ToolCallStatus.Executing && (
-      <GeminiRespondingSpinner
-        spinnerType="toggle"
-        nonRespondingDisplay={TOOL_STATUS.EXECUTING}
-      />
-    )}
-    {status === ToolCallStatus.Success && (
-      <Text color={theme.status.success} aria-label={'Success:'}>
-        {TOOL_STATUS.SUCCESS}
-      </Text>
-    )}
-    {status === ToolCallStatus.Confirming && (
-      <Text color={theme.status.warning} aria-label={'Confirming:'}>
-        {TOOL_STATUS.CONFIRMING}
-      </Text>
-    )}
-    {status === ToolCallStatus.Canceled && (
-      <Text color={theme.status.warning} aria-label={'Canceled:'} bold>
-        {TOOL_STATUS.CANCELED}
-      </Text>
-    )}
-    {status === ToolCallStatus.Error && (
-      <Text color={theme.status.error} aria-label={'Error:'} bold>
-        {TOOL_STATUS.ERROR}
-      </Text>
-    )}
-  </Box>
-);
+  name,
+}) => {
+  const isShell = name === SHELL_COMMAND_NAME || name === SHELL_NAME;
+  const statusColor = isShell ? theme.ui.symbol : theme.status.warning;
+
+  return (
+    <Box minWidth={STATUS_INDICATOR_WIDTH}>
+      {status === ToolCallStatus.Pending && (
+        <Text color={theme.status.success}>{TOOL_STATUS.PENDING}</Text>
+      )}
+      {status === ToolCallStatus.Executing && (
+        <GeminiRespondingSpinner
+          spinnerType="toggle"
+          nonRespondingDisplay={TOOL_STATUS.EXECUTING}
+        />
+      )}
+      {status === ToolCallStatus.Success && (
+        <Text color={theme.status.success} aria-label={'Success:'}>
+          {TOOL_STATUS.SUCCESS}
+        </Text>
+      )}
+      {status === ToolCallStatus.Confirming && (
+        <Text color={statusColor} aria-label={'Confirming:'}>
+          {TOOL_STATUS.CONFIRMING}
+        </Text>
+      )}
+      {status === ToolCallStatus.Canceled && (
+        <Text color={statusColor} aria-label={'Canceled:'} bold>
+          {TOOL_STATUS.CANCELED}
+        </Text>
+      )}
+      {status === ToolCallStatus.Error && (
+        <Text color={theme.status.error} aria-label={'Error:'} bold>
+          {TOOL_STATUS.ERROR}
+        </Text>
+      )}
+    </Box>
+  );
+};
 
 type ToolInfo = {
   name: string;
