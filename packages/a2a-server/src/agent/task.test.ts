@@ -49,7 +49,7 @@ describe('Task', () => {
       },
     ];
 
-    const originalRequests = JSON.parse(JSON.stringify(requests));
+    const originalRequests = structuredClone(requests);
     const abortController = new AbortController();
 
     await task.scheduleToolCalls(requests, abortController.signal);

@@ -813,7 +813,7 @@ describe('mergeMcpServers', () => {
         contextFiles: [],
       },
     ];
-    const originalSettings = JSON.parse(JSON.stringify(settings));
+    const originalSettings = structuredClone(settings);
     process.argv = ['node', 'script.js'];
     const argv = await parseArguments({} as Settings);
     await loadCliConfig(settings, extensions, 'test-session', argv);
@@ -1019,7 +1019,7 @@ describe('mergeExcludeTools', () => {
         contextFiles: [],
       },
     ];
-    const originalSettings = JSON.parse(JSON.stringify(settings));
+    const originalSettings = structuredClone(settings);
     process.argv = ['node', 'script.js'];
     const argv = await parseArguments({} as Settings);
     await loadCliConfig(settings, extensions, 'test-session', argv);

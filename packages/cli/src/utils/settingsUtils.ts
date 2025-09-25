@@ -347,7 +347,7 @@ export function setPendingSettingValue(
   pendingSettings: Settings,
 ): Settings {
   const path = key.split('.');
-  const newSettings = JSON.parse(JSON.stringify(pendingSettings));
+  const newSettings = structuredClone(pendingSettings);
   setNestedValue(newSettings, path, value);
   return newSettings;
 }

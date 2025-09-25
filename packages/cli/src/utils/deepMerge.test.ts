@@ -87,8 +87,8 @@ describe('customDeepMerge', () => {
   it('should not mutate the original source objects', () => {
     const target = { a: { x: 1 }, b: [1, 2] };
     const source = { a: { y: 2 }, b: [3, 4] };
-    const originalTarget = JSON.parse(JSON.stringify(target));
-    const originalSource = JSON.parse(JSON.stringify(source));
+    const originalTarget = structuredClone(target);
+    const originalSource = structuredClone(source);
     const getMergeStrategy = () => undefined;
 
     customDeepMerge(getMergeStrategy, target, source);
@@ -100,8 +100,8 @@ describe('customDeepMerge', () => {
   it('should not mutate sources when merging multiple levels deep', () => {
     const s1 = { data: { common: { val: 'from s1' }, s1_only: true } };
     const s2 = { data: { common: { val: 'from s2' }, s2_only: true } };
-    const s1_original = JSON.parse(JSON.stringify(s1));
-    const s2_original = JSON.parse(JSON.stringify(s2));
+    const s1_original = structuredClone(s1);
+    const s2_original = structuredClone(s2);
 
     const getMergeStrategy = () => undefined;
     const result = customDeepMerge(getMergeStrategy, s1, s2);
