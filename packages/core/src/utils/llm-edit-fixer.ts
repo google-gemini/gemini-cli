@@ -116,7 +116,7 @@ export async function FixLLMEditWithInstruction(
     );
   }
 
-  const cacheKey = `${instruction}---${old_string}---${new_string}--${current_content}--${error}`;
+  const cacheKey = JSON.stringify([instruction, old_string, new_string, current_content, error]);
   const cachedResult = editCorrectionWithInstructionCache.get(cacheKey);
   if (cachedResult) {
     return cachedResult;
