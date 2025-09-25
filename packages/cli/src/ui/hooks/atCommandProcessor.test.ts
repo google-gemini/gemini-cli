@@ -71,6 +71,9 @@ describe('handleAtCommand', () => {
       getPromptRegistry: () => ({
         getPromptsByServer: () => [],
       }),
+      getResourceRegistry: () => ({
+        findResourcesMatching: () => [],
+      }),
       getDebugMode: () => false,
       getFileExclusions: () => ({
         getCoreIgnorePatterns: () => COMMON_IGNORE_PATTERNS,

@@ -14,11 +14,15 @@ import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/
 import type {
   Prompt,
   GetPromptResult,
+  Resource,
+  ResourceContents,
 } from '@modelcontextprotocol/sdk/types.js';
 import {
   ListPromptsResultSchema,
   GetPromptResultSchema,
   ListRootsRequestSchema,
+  ListResourcesResultSchema,
+  ReadResourceResultSchema,
 } from '@modelcontextprotocol/sdk/types.js';
 import { parse } from 'shell-quote';
 import type { Config, MCPServerConfig } from '../config/config.js';
@@ -30,6 +34,7 @@ import type { FunctionDeclaration } from '@google/genai';
 import { mcpToTool } from '@google/genai';
 import type { ToolRegistry } from './tool-registry.js';
 import type { PromptRegistry } from '../prompts/prompt-registry.js';
+import type { ResourceRegistry } from '../resources/resource-registry.js';
 import { MCPOAuthProvider } from '../mcp/oauth-provider.js';
 import { OAuthUtils } from '../mcp/oauth-utils.js';
 import { MCPOAuthTokenStorage } from '../mcp/oauth-token-storage.js';
@@ -89,6 +94,7 @@ export class McpClient {
     private readonly serverConfig: MCPServerConfig,
     private readonly toolRegistry: ToolRegistry,
     private readonly promptRegistry: PromptRegistry,
+    private readonly resourceRegistry: ResourceRegistry,
     private readonly workspaceContext: WorkspaceContext,
     private readonly debugMode: boolean,
   ) {
@@ -144,7 +150,7 @@ export class McpClient {
   }
 
   /**
-   * Discovers tools and prompts from the MCP server.
+   * Discovers tools, prompts, and resources from the MCP server.
    */
   async discover(cliConfig: Config): Promise<void> {
     if (this.status !== MCPServerStatus.CONNECTED) {
@@ -153,9 +159,10 @@ export class McpClient {
 
     const prompts = await this.discoverPrompts();
     const tools = await this.discoverTools(cliConfig);
+    const resources = await this.discoverResources();
 
-    if (prompts.length === 0 && tools.length === 0) {
-      throw new Error('No prompts or tools found on the server.');
+    if (prompts.length === 0 && tools.length === 0 && resources.length === 0) {
+      throw new Error('No prompts, tools, or resources found on the server.');
     }
 
     for (const tool of tools) {
@@ -202,6 +209,14 @@ export class McpClient {
 
   private async discoverPrompts(): Promise<Prompt[]> {
     return discoverPrompts(this.serverName, this.client, this.promptRegistry);
+  }
+
+  private async discoverResources(): Promise<Resource[]> {
+    return discoverResources(
+      this.serverName,
+      this.client,
+      this.resourceRegistry,
+    );
   }
 }
 
@@ -747,6 +762,87 @@ export async function discoverPrompts(
       );
     }
     return [];
+  }
+}
+
+/**
+ * Discovers resources from the MCP server.
+ * It retrieves resource declarations from the client and registers them with the resource registry.
+ *
+ * @param mcpServerName The name of the MCP server.
+ * @param mcpClient The active MCP client instance.
+ * @param resourceRegistry The resource registry to register discovered resources.
+ */
+export async function discoverResources(
+  mcpServerName: string,
+  mcpClient: Client,
+  resourceRegistry: ResourceRegistry,
+): Promise<Resource[]> {
+  try {
+    // Only request resources if the server supports them.
+    if (mcpClient.getServerCapabilities()?.resources == null) return [];
+
+    const response = await mcpClient.request(
+      { method: 'resources/list', params: {} },
+      ListResourcesResultSchema,
+    );
+
+    for (const resource of response.resources) {
+      resourceRegistry.registerResource({
+        ...resource,
+        serverName: mcpServerName,
+        read: () => readMcpResource(mcpServerName, mcpClient, resource.uri),
+      });
+    }
+    return response.resources;
+  } catch (error) {
+    // It's okay if this fails, not all servers will have resources.
+    // Don't log an error if the method is not found, which is a common case.
+    if (
+      error instanceof Error &&
+      !error.message?.includes('Method not found')
+    ) {
+      console.error(
+        `Error discovering resources from ${mcpServerName}: ${getErrorMessage(
+          error,
+        )}`,
+      );
+    }
+    return [];
+  }
+}
+
+/**
+ * Reads a resource from a connected MCP client.
+ *
+ * @param mcpServerName The name of the MCP server.
+ * @param mcpClient The active MCP client instance.
+ * @param resourceUri The URI of the resource to read.
+ * @returns A promise that resolves to the resource contents.
+ */
+export async function readMcpResource(
+  mcpServerName: string,
+  mcpClient: Client,
+  resourceUri: string,
+): Promise<ResourceContents> {
+  try {
+    const response = await mcpClient.request(
+      { method: 'resources/read', params: { uri: resourceUri } },
+      ReadResourceResultSchema,
+    );
+
+    if (response.contents.length === 0) {
+      throw new Error(`No content found for resource: ${resourceUri}`);
+    }
+
+    // Return the first content item (MCP supports multiple, but we'll use the first one)
+    return response.contents[0];
+  } catch (error) {
+    throw new Error(
+      `Failed to read resource ${resourceUri} from server ${mcpServerName}: ${getErrorMessage(
+        error,
+      )}`,
+    );
   }
 }
 

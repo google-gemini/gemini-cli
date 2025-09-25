@@ -179,6 +179,7 @@ export class ToolRegistry {
       this.config.getMcpServerCommand(),
       this,
       this.config.getPromptRegistry(),
+      this.config.getResourceRegistry(),
       this.config.getDebugMode(),
       this.config.getWorkspaceContext(),
       eventEmitter,
