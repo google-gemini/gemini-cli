@@ -26,8 +26,10 @@ jobs:
       - name: 'Push'
         uses: './.github/actions/push-sandbox'
         with:
+          dockerhub-username: '${{ secrets.DOCKER_SERVICE_ACCOUNT_NAME }}'
+          dockerhub-token: '${{ secrets.DOCKER_SERVICE_ACCOUNT_KEY }}'
           github-actor: '${{ github.actor }}'
           github-secret: '${{ secrets.GITHUB_TOKEN }}'
-          github-sha: '${{ github.event.inputs.ref || github.sha }}'
+          github-sha: '${{ github.sha }}'
           github-ref-name: '${{github.event.inputs.ref}}'
           dry-run: '${{ github.event.inputs.dry-run }}'
