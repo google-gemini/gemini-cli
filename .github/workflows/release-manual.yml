@@ -48,7 +48,13 @@ jobs:
       - name: 'Checkout'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
         with:
+          fetch-depth: 0
+
+      - name: 'Checkout Release Code'
+        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
+        with:
           ref: '${{ github.event.inputs.ref }}'
+          path: 'release'
           fetch-depth: 0
 
       - name: 'Debug Inputs'
@@ -61,10 +67,12 @@ jobs:
           cache: 'npm'
 
       - name: 'Install Dependencies'
+        working-directory: './release'
         run: 'npm ci'
 
       - name: 'Prepare Release Info'
         id: 'release_info'
+        working-directory: './release'
         run: |
           RELEASE_VERSION="${{ github.event.inputs.version }}"
           echo "RELEASE_VERSION=${RELEASE_VERSION#v}" >> "${GITHUB_OUTPUT}"
@@ -75,6 +83,7 @@ jobs:
         uses: './.github/actions/run-tests'
         with:
           gemini_api_key: '${{ secrets.GEMINI_API_KEY }}'
+          working-directory: './release'
 
       - name: 'Publish Release'
         uses: './.github/actions/publish-release'
@@ -89,3 +98,4 @@ jobs:
           dry-run: '${{ github.event.inputs.dry_run }}'
           previous-tag: '${{ steps.release_info.outputs.PREVIOUS_TAG }}'
           skip-github-release: '${{ github.event.inputs.skip_github_release }}'
+          working-directory: './release'
