@@ -12,6 +12,7 @@ import { env } from 'node:process';
 import { DEFAULT_GEMINI_MODEL } from '../packages/core/src/config/models.js';
 import fs from 'node:fs';
 import * as pty from '@lydell/node-pty';
+import * as os from 'node:os';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -729,13 +730,24 @@ export class TestRig {
   } {
     const commandArgs = [this.bundlePath, '--yolo', ...args];
 
-    const ptyProcess = pty.spawn('node', commandArgs, {
+    const isWindows = os.platform() === 'win32';
+
+    const options: pty.IPtyForkOptions = {
       name: 'xterm-color',
       cols: 80,
       rows: 30,
       cwd: this.testDir!,
-      env: process.env as { [key: string]: string },
-    });
+      env: Object.fromEntries(
+        Object.entries(process.env).filter(([, v]) => v !== undefined),
+      ) as { [key: string]: string },
+    };
+
+    if (isWindows) {
+      // node-pty on Windows requires a shell to be specified when using winpty.
+      options.shell = process.env.COMSPEC || 'cmd.exe';
+    }
+
+    const ptyProcess = pty.spawn(process.execPath, commandArgs, options);
 
     let output = '';
     ptyProcess.onData((data) => {
