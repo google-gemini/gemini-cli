@@ -1,4 +1,4 @@
-# 🚀 PR #1: Enhanced CLI Performance & Streamlined Command Processing
+# PR #1: Enhanced CLI Performance & Streamlined Command Processing
 
 **Labels:** `performance`, `optimization`, `cli-improvement`, `efficiency`, `user-experience`, `needs-canary`, `risk:low`, `area:cli`
 
@@ -221,28 +221,6 @@ packages/core/src/services/fileSystemService.ts (modified)
 packages/core/src/tools/edit.ts (modified)
 ```
 
-## Security Enhancements
-
-### Command Injection Protection
-Based on the **PROTOC environment variable vulnerability** (Google Nearby SDK), we've implemented comprehensive command injection detection:
-
-**Critical Security Patterns Added:**
-```typescript
-// PROTOC-style environment variable injection
-/\$\{[^}]+\}\s+[a-zA-Z0-9_-]/gi,  // Critical: Unsanitized env vars in commands
-
-// Build tool environment variable injection
-/(protoc|gcc|clang|python|node|npm|npx|bash|sh)\s+\$\{[^}]+\}/gi,  // Critical: Supply chain risk
-
-// Backtick environment variable execution
-/`\$\{[^}]+\}`/gi,  // Critical: Env vars in command substitution
-
-// General environment variable validation
-/\$\{[A-Z_][A-Z0-9_]*\}[^'"\s]*[a-zA-Z0-9_-]/gi,  // High: Missing quotes/validation
-```
-
-**Impact:** Prevents supply chain attacks via environment variable manipulation, protecting against RCE in build pipelines.
-
 ## Checklist
 
 - [x] Performance benchmarks established and met
@@ -252,7 +230,6 @@ Based on the **PROTOC environment variable vulnerability** (Google Nearby SDK), 
 - [x] Documentation updated with performance tips
 - [x] Rollback plan documented
 - [x] Telemetry for performance metrics ready
-- [x] **Security enhancements implemented** (PROTOC vulnerability protection)
 
 ## Performance Impact
 
@@ -261,20 +238,8 @@ Based on the **PROTOC environment variable vulnerability** (Google Nearby SDK), 
 - Path resolution: Reduced I/O overhead
 - System reliability: Better error handling and validation
 - User productivity: Smarter confirmation prompts
-- **Security hardening: Command injection protection**
 
 ## Related Issues
 
-Addresses: Performance bottlenecks in CLI execution, complex command handling inefficiencies, supply chain security vulnerabilities (PROTOC-style attacks)
-Part of: Performance enhancement initiative with security hardening
-
-## 🎯 Gemini Code Assist Issues - ALL RESOLVED
-
-- ✅ **Cryptographic integrity** - SHA-256 hashing ensures collision-resistant data integrity
-- ✅ **VFS instance sharing** - Singleton pattern ensures application-wide consistency
-- ✅ **Agent type safety** - Unique CODE_GENERATION enum prevents collisions
-- ✅ **ESM compliance** - Dynamic imports replace require() for proper module loading
-- ✅ **Type safety** - Proper return type annotations for all methods
-- ✅ **Supply chain security** - PROTOC-style command injection protection implemented
-
-**Security-enhanced and ready to merge! 🚀🛡️**
+Addresses: Performance bottlenecks in CLI execution, complex command handling inefficiencies
+Part of: Performance enhancement initiative

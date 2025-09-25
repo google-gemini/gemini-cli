@@ -1,0 +1,19 @@
+{
+  "name": "plumcp-windows-fix",
+  "version": "1.0.0",
+  "description": "Windows PTY compatibility fix for Jack Wotherspoon",
+  "main": "index.js",
+  "scripts": {
+    "test:windows-pty": "tsx ctrl-c-exit-fixed.test.ts",
+    "test:all": "tsx comprehensive_test_validation.ts",
+    "fix:pty": "tsx windows_pty_fix.ts",
+    "install:pty": "npm install node-pty @types/node-pty"
+  },
+  "optionalDependencies": {
+    "node-pty": "^1.0.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.0.0",
+    "typescript": "^5.0.0"
+  }
+}

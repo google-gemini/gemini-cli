@@ -1,0 +1,111 @@
+{
+  "name": "@google-gemini-cli/mcp",
+  "version": "1.0.0",
+  "description": "PLUMCP (Plugin Model Control Program) - Advanced MCP ecosystem for gemini-cli with intelligent plugin orchestration",
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    },
+    "./core": {
+      "types": "./dist/core/index.d.ts",
+      "import": "./dist/core/index.mjs",
+      "require": "./dist/core/index.js"
+    },
+    "./plugins": {
+      "types": "./dist/plugins/index.d.ts",
+      "import": "./dist/plugins/index.mjs",
+      "require": "./dist/plugins/index.js"
+    },
+    "./orchestration": {
+      "types": "./dist/orchestration/index.d.ts",
+      "import": "./dist/orchestration/index.mjs",
+      "require": "./dist/orchestration/index.js"
+    },
+    "./testing": {
+      "types": "./dist/testing/index.d.ts",
+      "import": "./dist/testing/index.mjs",
+      "require": "./dist/testing/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "test": "node ../../run_plumcp_tests.ts",
+    "test:watch": "node --watch ../../run_plumcp_tests.ts",
+    "demo": "node ../../plumcp_demo.ts",
+    "lint": "eslint src --ext .ts",
+    "lint:fix": "eslint src --ext .ts --fix",
+    "type-check": "tsc --noEmit"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "plugin-system",
+    "orchestration",
+    "gemini-cli",
+    "ai-orchestration",
+    "context-management",
+    "plugin-architecture"
+  ],
+  "author": "Google Gemini CLI Team",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/google-gemini/gemini-cli.git",
+    "directory": "packages/mcp"
+  },
+  "bugs": {
+    "url": "https://github.com/google-gemini/gemini-cli/issues"
+  },
+  "homepage": "https://github.com/google-gemini/gemini-cli/tree/main/packages/mcp#readme",
+  "dependencies": {
+    "@google-relay/mcp-server": "^1.0.0",
+    "comment-json": "^4.2.3",
+    "@joshua.litt/get-ripgrep": "^1.0.0",
+    "node:crypto": "*",
+    "node:fs": "*",
+    "node:path": "*",
+    "node:os": "*"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0",
+    "tsup": "^8.0.0",
+    "eslint": "^8.0.0",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0"
+  },
+  "peerDependencies": {
+    "@google-gemini-cli/core": "workspace:*"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "docs"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "tsup": {
+    "entry": [
+      "src/index.ts",
+      "src/core/index.ts",
+      "src/plugins/index.ts",
+      "src/orchestration/index.ts",
+      "src/testing/index.ts"
+    ],
+    "format": ["cjs", "esm"],
+    "dts": true,
+    "splitting": false,
+    "clean": true,
+    "sourcemap": true
+  }
+}
