@@ -34,6 +34,7 @@ export const useExtensionUpdates = (
         extensionsUpdateState,
         setExtensionsUpdateState,
       );
+      let extensionsWithUpdatesCount = 0;
       for (const extension of extensions) {
         const prevState = extensionsUpdateState.get(extension.name);
         const currentState = updateState.get(extension.name);
@@ -67,14 +68,17 @@ export const useExtensionUpdates = (
               );
             });
         } else {
-          addItem(
-            {
-              type: MessageType.INFO,
-              text: `Extension ${extension.name} has an update available, run "/extensions update ${extension.name}" to install it.`,
-            },
-            Date.now(),
-          );
+          extensionsWithUpdatesCount++;
         }
+      }
+      if (extensionsWithUpdatesCount > 0) {
+        addItem(
+          {
+            type: MessageType.INFO,
+            text: `You have ${extensionsWithUpdatesCount} extensions with updates available, run "/extensions list" for more information.`,
+          },
+          Date.now(),
+        );
       }
     } finally {
       setIsChecking(false);
