@@ -755,11 +755,8 @@ Important Rules:
     this.isCleanedUp = true;
 
     try {
-      // Stop MCP clients to close persistent connections
-      await this.toolRegistry['mcpClientManager'].stop();
-
-      // Clear the tools map to release references
-      this.toolRegistry['tools'].clear();
+      // Delegate cleanup to the ToolRegistry
+      await this.toolRegistry.cleanup();
     } catch (error) {
       console.warn('Error during subagent cleanup:', error);
       // Don't throw - cleanup should be best effort

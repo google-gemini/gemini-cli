@@ -476,4 +476,14 @@ export class ToolRegistry {
   getTool(name: string): AnyDeclarativeTool | undefined {
     return this.tools.get(name);
   }
+
+  /**
+   * Cleans up resources held by this ToolRegistry instance.
+   * This includes stopping MCP clients and clearing tool registry resources.
+   * Should be called when the ToolRegistry is no longer needed to prevent memory leaks.
+   */
+  async cleanup(): Promise<void> {
+    await this.mcpClientManager.stop();
+    this.tools.clear();
+  }
 }

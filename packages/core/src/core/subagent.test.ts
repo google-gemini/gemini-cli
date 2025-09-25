@@ -849,17 +849,15 @@ describe('subagent.ts', () => {
         );
 
         // Spy on cleanup methods
-        const mcpStopSpy = vi.spyOn(
-          scope['toolRegistry']['mcpClientManager'],
-          'stop',
+        const toolRegistryCleanupSpy = vi.spyOn(
+          scope['toolRegistry'],
+          'cleanup',
         );
-        const toolsClearSpy = vi.spyOn(scope['toolRegistry']['tools'], 'clear');
 
         await scope.runNonInteractive(new ContextState());
 
         expect(scope.output.terminate_reason).toBe(SubagentTerminateMode.GOAL);
-        expect(mcpStopSpy).toHaveBeenCalledTimes(1);
-        expect(toolsClearSpy).toHaveBeenCalledTimes(1);
+        expect(toolRegistryCleanupSpy).toHaveBeenCalledTimes(1);
         expect(scope['isCleanedUp']).toBe(true);
       });
 
@@ -878,19 +876,17 @@ describe('subagent.ts', () => {
         );
 
         // Spy on cleanup methods
-        const mcpStopSpy = vi.spyOn(
-          scope['toolRegistry']['mcpClientManager'],
-          'stop',
+        const toolRegistryCleanupSpy = vi.spyOn(
+          scope['toolRegistry'],
+          'cleanup',
         );
-        const toolsClearSpy = vi.spyOn(scope['toolRegistry']['tools'], 'clear');
 
         await expect(
           scope.runNonInteractive(new ContextState()),
         ).rejects.toThrow('LLM Error');
 
         expect(scope.output.terminate_reason).toBe(SubagentTerminateMode.ERROR);
-        expect(mcpStopSpy).toHaveBeenCalledTimes(1);
-        expect(toolsClearSpy).toHaveBeenCalledTimes(1);
+        expect(toolRegistryCleanupSpy).toHaveBeenCalledTimes(1);
         expect(scope['isCleanedUp']).toBe(true);
       });
 
@@ -908,8 +904,8 @@ describe('subagent.ts', () => {
         );
 
         // Mock cleanup to throw an error
-        const mcpStopSpy = vi
-          .spyOn(scope['toolRegistry']['mcpClientManager'], 'stop')
+        const toolRegistryCleanupSpy = vi
+          .spyOn(scope['toolRegistry'], 'cleanup')
           .mockRejectedValue(new Error('Cleanup failed'));
         const consoleWarnSpy = vi
           .spyOn(console, 'warn')
@@ -918,7 +914,7 @@ describe('subagent.ts', () => {
         await scope.runNonInteractive(new ContextState());
 
         expect(scope.output.terminate_reason).toBe(SubagentTerminateMode.GOAL);
-        expect(mcpStopSpy).toHaveBeenCalledTimes(1);
+        expect(toolRegistryCleanupSpy).toHaveBeenCalledTimes(1);
         expect(consoleWarnSpy).toHaveBeenCalledWith(
           'Error during subagent cleanup:',
           expect.any(Error),
@@ -939,19 +935,17 @@ describe('subagent.ts', () => {
           defaultRunConfig,
         );
 
-        const mcpStopSpy = vi.spyOn(
-          scope['toolRegistry']['mcpClientManager'],
-          'stop',
+        const toolRegistryCleanupSpy = vi.spyOn(
+          scope['toolRegistry'],
+          'cleanup',
         );
-        const toolsClearSpy = vi.spyOn(scope['toolRegistry']['tools'], 'clear');
 
         // Call cleanup directly multiple times
         await scope.cleanup();
         await scope.cleanup();
         await scope.cleanup();
 
-        expect(mcpStopSpy).toHaveBeenCalledTimes(1);
-        expect(toolsClearSpy).toHaveBeenCalledTimes(1);
+        expect(toolRegistryCleanupSpy).toHaveBeenCalledTimes(1);
         expect(scope['isCleanedUp']).toBe(true);
       });
 
@@ -1019,10 +1013,16 @@ describe('subagent.ts', () => {
         );
 
         const registeredTools = scope['toolRegistry']['tools'];
+        const toolRegistryCleanupSpy = vi.spyOn(
+          scope['toolRegistry'],
+          'cleanup',
+        );
+
         expect(registeredTools.size).toBeGreaterThan(0);
 
         await scope.cleanup();
 
+        expect(toolRegistryCleanupSpy).toHaveBeenCalledTimes(1);
         expect(registeredTools.size).toBe(0);
         expect(scope['isCleanedUp']).toBe(true);
       });
