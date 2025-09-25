@@ -1133,6 +1133,12 @@ This extension will run the following MCP servers:
 
   describe('disableExtension', () => {
     it('should disable an extension at the user scope', () => {
+      createExtension({
+        extensionsDir: userExtensionsDir,
+        name: 'my-extension',
+        version: '1.0.0',
+      });
+
       disableExtension('my-extension', SettingScope.User);
       expect(
         isEnabled({
@@ -1144,6 +1150,12 @@ This extension will run the following MCP servers:
     });
 
     it('should disable an extension at the workspace scope', () => {
+      createExtension({
+        extensionsDir: userExtensionsDir,
+        name: 'my-extension',
+        version: '1.0.0',
+      });
+
       disableExtension(
         'my-extension',
         SettingScope.Workspace,
@@ -1166,6 +1178,12 @@ This extension will run the following MCP servers:
     });
 
     it('should handle disabling the same extension twice', () => {
+      createExtension({
+        extensionsDir: userExtensionsDir,
+        name: 'my-extension',
+        version: '1.0.0',
+      });
+
       disableExtension('my-extension', SettingScope.User);
       disableExtension('my-extension', SettingScope.User);
       expect(
@@ -1184,6 +1202,12 @@ This extension will run the following MCP servers:
     });
 
     it('should log a disable event', () => {
+      createExtension({
+        extensionsDir: userExtensionsDir,
+        name: 'ext1',
+        version: '1.0.0',
+      });
+
       disableExtension('ext1', SettingScope.Workspace);
 
       expect(mockLogExtensionDisable).toHaveBeenCalled();
