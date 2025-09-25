@@ -75,15 +75,20 @@ jobs:
           GH_TOKEN: '${{ steps.generate_token.outputs.token }}'
         continue-on-error: true
         run: |
-          # Capture output and display it in logs using tee
-          {
-            node scripts/releasing/create-patch-pr.js --commit=${{ github.event.inputs.commit }} --channel=${{ github.event.inputs.channel }} --dry-run=${{ github.event.inputs.dry_run }}
-            echo "EXIT_CODE=$?" >> "$GITHUB_OUTPUT"
-          } 2>&1 | tee >(
-            echo "LOG_CONTENT<<EOF" >> "$GITHUB_ENV"
-            cat >> "$GITHUB_ENV"
-            echo "EOF" >> "$GITHUB_ENV"
-          )
+          # Use a temporary file to store the log
+          LOG_FILE=$(mktemp)
+
+          # Run the script and tee the output to the log file
+          node scripts/releasing/create-patch-pr.js --commit=${{ github.event.inputs.commit }} --channel=${{ github.event.inputs.channel }} --dry-run=${{ github.event.inputs.dry_run }} 2>&1 | tee "${LOG_FILE}"
+
+          # Capture the exit code of the node script (the first command in the pipe)
+          EXIT_CODE=${PIPESTATUS[0]}
+          echo "EXIT_CODE=${EXIT_CODE}" >> "$GITHUB_OUTPUT"
+
+          # Store the log content in an environment variable for the comment step
+          echo "LOG_CONTENT<<EOF" >> "$GITHUB_ENV"
+          cat "${LOG_FILE}" >> "$GITHUB_ENV"
+          echo "EOF" >> "$GITHUB_ENV"
 
       - name: 'Comment on Original PR'
         if: 'always() && inputs.original_pr'
