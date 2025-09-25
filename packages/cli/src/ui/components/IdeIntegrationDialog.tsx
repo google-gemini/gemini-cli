@@ -57,7 +57,7 @@ function getDetailedIdeStatus(
   const connection = ideClient.getConnectionStatus();
   switch (connection.status) {
     case IDEConnectionStatus.Connected: {
-      let details = `Connected to ${ideClient.getDetectedIdeDisplayName()}. Native diffing and context awareness are active.`;
+      let details = `Connected to ${ideClient.getDetectedIdeDisplayName()}.`;
       if (showFileList) {
         const context = ideContextStore.get();
         const openFiles = context?.workspaceState?.openFiles;

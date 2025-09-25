@@ -946,7 +946,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
             historyManager.addItem(
               {
                 type: MessageType.INFO,
-                text: '🔴 Disconnected: IDE integration disabled. To enable it, run /ide integration.',
+                text: '🔴 Disconnected: IDE integration disabled. To enable it, run /ide integration and select enable.',
               },
               Date.now(),
             );
@@ -1047,7 +1047,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
 
             switch (currentStatus) {
               case IDEConnectionStatus.Connected: {
-                statusMessage = `🟢 Connected to ${ideClient.getDetectedIdeDisplayName()}. Native diffing and context awareness are active.`;
+                statusMessage = `🟢 Connected to ${ideClient.getDetectedIdeDisplayName()}. `;
                 const context = ideContextStore.get();
                 const openFiles = context?.workspaceState?.openFiles;
                 if (openFiles && openFiles.length > 0) {

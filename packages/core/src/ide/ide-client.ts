@@ -83,7 +83,7 @@ export class IdeClient {
   private state: IDEConnectionState = {
     status: IDEConnectionStatus.Disconnected,
     details:
-      'IDE integration is currently disabled. To enable it, run /ide integration.',
+      'IDE integration is currently disabled. To enable it, run /ide integration and select enable.',
   };
   private currentIde: IdeInfo | undefined;
   private ideProcessInfo: { pid: number; command: string } | undefined;
@@ -402,7 +402,7 @@ export class IdeClient {
     this.diffResponses.clear();
     this.setState(
       IDEConnectionStatus.Disconnected,
-      'IDE integration disabled. To enable it, run /ide integration.',
+      'IDE integration disabled. To enable it, run /ide integration and select enable.',
     );
     this.client?.close();
   }
