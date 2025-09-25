@@ -88,28 +88,7 @@ export interface CliArgs {
 }
 
 export async function parseArguments(settings: Settings): Promise<CliArgs> {
-  // Use raw argv once for consistency below.
   const rawArgv = hideBin(process.argv);
-
-  // Early help/version check to prevent bundle crashes
-  const wantsHelp = rawArgv.includes('-h') || rawArgv.includes('--help');
-  const wantsVersion = rawArgv.includes('-v') || rawArgv.includes('--version');
-
-  if (wantsHelp) {
-    // Keep output short to avoid cliui completely.
-    console.log(
-      'Usage: gemini [options] [command]\n' +
-        '\nGemini CLI — one-shot by default; use -i/--prompt-interactive or @commands for interactive.\n',
-    );
-    process.exit(0);
-  }
-
-  if (wantsVersion) {
-    console.log(await getCliVersion());
-    process.exit(0);
-  }
-
-  // Disable yargs built-in help/version to prevent cliui crashes
   const yargsInstance = yargs(rawArgv)
     .locale('en')
     .scriptName('gemini')
@@ -190,7 +169,7 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
       yargsInstance
         .positional('query', {
           description:
-            'Positional prompt. Defaults to one-shot; use -i or @commands for interactive.',
+            'Positional prompt. Defaults to one-shot; use -i/--prompt-interactive for interactive.',
         })
         .option('model', {
           alias: 'm',
@@ -351,9 +330,6 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
           return true;
         }),
     )
-    // We handle help/version above — keep yargs from wiring its own handlers.
-    .help(false)
-    .version(false)
     // Register MCP subcommands
     .command(mcpCommand);
 
@@ -361,17 +337,18 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
     yargsInstance.command(extensionsCommand);
   }
 
-  yargsInstance.strict().demandCommand(0, 0); // Allow base command to run with no subcommands
+  yargsInstance
+    .version(await getCliVersion()) // This will enable the --version flag based on package.json
+    .alias('v', 'version')
+    .help()
+    .alias('h', 'help')
+    .strict()
+    .demandCommand(0, 0); // Allow base command to run with no subcommands
 
   yargsInstance.wrap(yargsInstance.terminalWidth());
   const result = await yargsInstance.parse();
 
-  // Belt & suspenders: if help/version slipped through, do not run any mapping.
-  // (Normally yargs exits on --help/--version; this prevents cliui-related crashes in mixed cases.)
-  const resultRecord = result as Record<string, unknown>;
-  if (resultRecord['help'] || resultRecord['version']) {
-    return result as unknown as CliArgs;
-  }
+  // If yargs handled --help/--version it will have exited; nothing to do here.
 
   // Handle case where MCP subcommands are executed - they should exit the process
   // and not return to main CLI logic
@@ -389,13 +366,11 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
     ? queryArg.join(' ')
     : queryArg;
 
-  // Route positional args: explicit -i flag -> interactive, @commands -> interactive, else -> one-shot
+  // Route positional args: explicit -i flag -> interactive; else -> one-shot (even for @commands)
   if (q && !result['prompt']) {
     const hasExplicitInteractive =
       result['promptInteractive'] === '' || !!result['promptInteractive'];
     if (hasExplicitInteractive) {
-      result['promptInteractive'] = q;
-    } else if (/^@\S/.test(q.trim())) {
       result['promptInteractive'] = q;
     } else {
       result['prompt'] = q;
