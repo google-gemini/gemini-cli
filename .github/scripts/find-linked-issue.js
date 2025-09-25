@@ -37,6 +37,7 @@ if (!repository) {
 }
 
 const text = await readStdin();
+
 const issue = findLinkedIssue(text, repository);
 
 if (issue) {

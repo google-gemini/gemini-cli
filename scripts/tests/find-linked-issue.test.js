@@ -35,6 +35,7 @@ describe('findLinkedIssue', () => {
     expect(findLinkedIssue('Fixes GH-321', REPO)).toBe('321');
   });
 
+
   it('detects Height task references introduced with link or close keywords', () => {
     expect(findLinkedIssue('Link T-987', REPO)).toBe('T-987');
     expect(findLinkedIssue('Please LINK T 654 before merging', REPO)).toBe('T-654');

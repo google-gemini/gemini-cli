@@ -21,6 +21,7 @@ find_issue_reference() {
     if [[ -n "${NODE_PATH}" ]] && [[ -f "${SCRIPT_DIR}/find-linked-issue.js" ]]; then
         # Use the helper script to perform robust parsing. Ignore failures and
         # fall back to the legacy pattern matching below.
+
         issue="$(
             "${NODE_PATH}" "${SCRIPT_DIR}/find-linked-issue.js" --repo "${GITHUB_REPOSITORY:-}" \
                 <<<"${text}" 2>/dev/null || true
@@ -33,6 +34,7 @@ find_issue_reference() {
             echo "${text}" | grep -oE '#[0-9]+' | tr -d '#'
         } | head -n 1)
         issue=${issue:-""}
+
     fi
 
     echo "${issue}"
@@ -58,6 +60,7 @@ process_pr() {
         echo "   ⚠️ Could not fetch PR #${PR_NUMBER} details"
         return 1
     fi
+
 
     local PR_TITLE=""
     if ! PR_TITLE=$(gh pr view "${PR_NUMBER}" --repo "${GITHUB_REPOSITORY}" --json title -q .title 2>/dev/null); then

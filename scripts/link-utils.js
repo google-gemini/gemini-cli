@@ -65,6 +65,7 @@ export function findLinkedIssue(text, repository) {
   }
 
   const search = `${text}`;
+
   const repo = repository?.trim();
   let patternsToSearch = FALLBACK_PATTERNS;
 
@@ -91,6 +92,7 @@ export function findLinkedIssue(text, repository) {
       if (identifier) {
         return identifier;
       }
+
     }
   }
 
