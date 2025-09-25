@@ -14,6 +14,7 @@ import {
   checkForAllExtensionUpdates,
   updateExtension,
 } from '../../config/extensions/update.js';
+import { requestConsentInteractive } from '../../config/extension.js';
 
 export const useExtensionUpdates = (
   extensions: GeminiCLIExtension[],
@@ -40,13 +41,19 @@ export const useExtensionUpdates = (
           continue;
         }
         if (extension.installMetadata?.autoUpdate) {
-          updateExtension(extension, cwd, currentState, (newState) => {
-            setExtensionsUpdateState((prev) => {
-              const finalState = new Map(prev);
-              finalState.set(extension.name, newState);
-              return finalState;
-            });
-          })
+          updateExtension(
+            extension,
+            cwd,
+            (description) => requestConsentInteractive(description, addItem),
+            currentState,
+            (newState) => {
+              setExtensionsUpdateState((prev) => {
+                const finalState = new Map(prev);
+                finalState.set(extension.name, newState);
+                return finalState;
+              });
+            },
+          )
             .then((result) => {
               if (!result) return;
               addItem(
