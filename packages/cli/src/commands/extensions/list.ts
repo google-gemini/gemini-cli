@@ -5,7 +5,12 @@
  */
 
 import type { CommandModule } from 'yargs';
-import { loadUserExtensions, toOutputString } from '../../config/extension.js';
+import {
+  loadUserExtensions,
+  toOutputString,
+  ExtensionStorage,
+} from '../../config/extension.js';
+import { ExtensionEnablementManager } from '../../config/extensions/extensionEnablement.js';
 import { getErrorMessage } from '../../utils/errors.js';
 
 export async function handleList() {
@@ -15,9 +20,16 @@ export async function handleList() {
       console.log('No extensions installed.');
       return;
     }
+    const manager = new ExtensionEnablementManager(
+      ExtensionStorage.getUserExtensionsDir(),
+    );
+    const cwd = process.cwd();
     console.log(
       extensions
-        .map((extension, _): string => toOutputString(extension))
+        .map((extension): string => {
+          const isEnabled = manager.isEnabled(extension.config.name, cwd);
+          return toOutputString(extension, isEnabled);
+        })
         .join('\n\n'),
     );
   } catch (error) {
