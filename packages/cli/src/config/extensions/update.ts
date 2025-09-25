@@ -130,17 +130,15 @@ export async function checkForAllExtensionUpdates(
   >,
   cwd: string = process.cwd(),
 ): Promise<Map<string, ExtensionUpdateState>> {
+  let newStates: Map<string, ExtensionUpdateState> = new Map();
   for (const extension of extensions) {
     const initialState = extensionsUpdateState.get(extension.name);
     if (initialState === undefined) {
       if (!extension.installMetadata) {
         setExtensionsUpdateState((prev) => {
-          extensionsUpdateState = new Map(prev);
-          extensionsUpdateState.set(
-            extension.name,
-            ExtensionUpdateState.NOT_UPDATABLE,
-          );
-          return extensionsUpdateState;
+          newStates = new Map(prev);
+          newStates.set(extension.name, ExtensionUpdateState.NOT_UPDATABLE);
+          return newStates;
         });
         continue;
       }
@@ -148,14 +146,14 @@ export async function checkForAllExtensionUpdates(
         extension,
         (updatedState) => {
           setExtensionsUpdateState((prev) => {
-            extensionsUpdateState = new Map(prev);
-            extensionsUpdateState.set(extension.name, updatedState);
-            return extensionsUpdateState;
+            newStates = new Map(prev);
+            newStates.set(extension.name, updatedState);
+            return newStates;
           });
         },
         cwd,
       );
     }
   }
-  return extensionsUpdateState;
+  return newStates;
 }

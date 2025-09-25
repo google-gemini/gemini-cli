@@ -7,7 +7,7 @@
 import type { GeminiCLIExtension } from '@google/gemini-cli-core';
 import { getErrorMessage } from '../../utils/errors.js';
 import { ExtensionUpdateState } from '../state/extensions.js';
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
 import { MessageType } from '../types.js';
 import {
@@ -23,8 +23,12 @@ export const useExtensionUpdates = (
   const [extensionsUpdateState, setExtensionsUpdateState] = useState(
     new Map<string, ExtensionUpdateState>(),
   );
-  useMemo(() => {
-    const checkUpdates = async () => {
+  const [isChecking, setIsChecking] = useState(false);
+
+  (async () => {
+    if (isChecking) return;
+    setIsChecking(true);
+    try {
       const updateState = await checkForAllExtensionUpdates(
         extensions,
         extensionsUpdateState,
@@ -72,15 +76,11 @@ export const useExtensionUpdates = (
           );
         }
       }
-    };
-    checkUpdates();
-  }, [
-    extensions,
-    extensionsUpdateState,
-    setExtensionsUpdateState,
-    addItem,
-    cwd,
-  ]);
+    } finally {
+      setIsChecking(false);
+    }
+  })();
+
   return {
     extensionsUpdateState,
     setExtensionsUpdateState,
