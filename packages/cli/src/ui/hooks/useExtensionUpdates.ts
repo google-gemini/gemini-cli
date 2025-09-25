@@ -7,7 +7,7 @@
 import type { GeminiCLIExtension } from '@google/gemini-cli-core';
 import { getErrorMessage } from '../../utils/errors.js';
 import { ExtensionUpdateState } from '../state/extensions.js';
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
 import { MessageType } from '../types.js';
 import {
@@ -24,13 +24,18 @@ export const useExtensionUpdates = (
   const [extensionsUpdateState, setExtensionsUpdateState] = useState(
     new Map<string, ExtensionUpdateState>(),
   );
-  useMemo(() => {
-    const checkUpdates = async () => {
+  const [isChecking, setIsChecking] = useState(false);
+
+  (async () => {
+    if (isChecking) return;
+    setIsChecking(true);
+    try {
       const updateState = await checkForAllExtensionUpdates(
         extensions,
         extensionsUpdateState,
         setExtensionsUpdateState,
       );
+      let extensionsWithUpdatesCount = 0;
       for (const extension of extensions) {
         const prevState = extensionsUpdateState.get(extension.name);
         const currentState = updateState.get(extension.name);
@@ -70,24 +75,24 @@ export const useExtensionUpdates = (
               );
             });
         } else {
-          addItem(
-            {
-              type: MessageType.INFO,
-              text: `Extension ${extension.name} has an update available, run "/extensions update ${extension.name}" to install it.`,
-            },
-            Date.now(),
-          );
+          extensionsWithUpdatesCount++;
         }
       }
-    };
-    checkUpdates();
-  }, [
-    extensions,
-    extensionsUpdateState,
-    setExtensionsUpdateState,
-    addItem,
-    cwd,
-  ]);
+      if (extensionsWithUpdatesCount > 0) {
+        const s = extensionsWithUpdatesCount > 1 ? 's' : '';
+        addItem(
+          {
+            type: MessageType.INFO,
+            text: `You have ${extensionsWithUpdatesCount} extension${s} with an update available, run "/extensions list" for more information.`,
+          },
+          Date.now(),
+        );
+      }
+    } finally {
+      setIsChecking(false);
+    }
+  })();
+
   return {
     extensionsUpdateState,
     setExtensionsUpdateState,
