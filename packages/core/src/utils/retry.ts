@@ -78,17 +78,13 @@ export async function retryWithBackoff<T>(
     throw new Error('maxAttempts must be a positive number.');
   }
 
-  const {
-    maxAttempts,
-    initialDelayMs,
-    maxDelayMs,
-    onPersistent429,
-    authType,
-    shouldRetry,
-  } = {
-    ...DEFAULT_RETRY_OPTIONS,
-    ...options,
-  };
+  const maxAttempts = options?.maxAttempts ?? DEFAULT_RETRY_OPTIONS.maxAttempts;
+  const initialDelayMs =
+    options?.initialDelayMs ?? DEFAULT_RETRY_OPTIONS.initialDelayMs;
+  const maxDelayMs = options?.maxDelayMs ?? DEFAULT_RETRY_OPTIONS.maxDelayMs;
+  const onPersistent429 = options?.onPersistent429;
+  const authType = options?.authType;
+  const shouldRetry = options?.shouldRetry ?? DEFAULT_RETRY_OPTIONS.shouldRetry;
 
   let attempt = 0;
   let currentDelay = initialDelayMs;
