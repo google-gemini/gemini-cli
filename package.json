@@ -52,7 +52,7 @@
     "telemetry": "node scripts/telemetry.js",
     "check:lockfile": "node scripts/check-lockfile.js",
     "clean": "node scripts/clean.js",
-    "pre-commit": "lint-staged"
+    "pre-commit": "node scripts/pre-commit.js"
   },
   "bin": {
     "gemini": "bundle/gemini.js"
@@ -91,6 +91,7 @@
     "npm-run-all": "^4.1.5",
     "prettier": "^3.5.3",
     "react-devtools-core": "^4.28.5",
+    "semver": "^7.7.2",
     "tsx": "^4.20.3",
     "typescript-eslint": "^8.30.1",
     "vitest": "^3.2.4",

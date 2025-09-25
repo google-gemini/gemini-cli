@@ -11,6 +11,12 @@ on:
       - 'release/**'
   merge_group:
   workflow_dispatch:
+    inputs:
+      branch_ref:
+        description: 'Branch to run on'
+        required: true
+        default: 'main'
+        type: 'string'
 
 concurrency:
   group: '${{ github.workflow }}-${{ github.head_ref || github.ref }}'
@@ -34,6 +40,7 @@ jobs:
       - name: 'Checkout'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
         with:
+          ref: '${{ github.event.inputs.branch_ref || github.ref }}'
           fetch-depth: 1
 
       - name: 'Set up Node.js'
@@ -201,6 +208,8 @@ jobs:
     steps:
       - name: 'Checkout'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
+        with:
+          ref: '${{ github.event.inputs.branch_ref || github.ref }}'
 
       - name: 'Initialize CodeQL'
         uses: 'github/codeql-action/init@df559355d593797519d70b90fc8edd5db049e7a2' # ratchet:github/codeql-action/init@v3
@@ -223,6 +232,7 @@ jobs:
       - name: 'Checkout'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
         with:
+          ref: '${{ github.event.inputs.branch_ref || github.ref }}'
           fetch-depth: 1
 
       - uses: 'preactjs/compressed-size-action@946a292cd35bd1088e0d7eb92b69d1a8d5b5d76a'
@@ -241,6 +251,8 @@ jobs:
     steps:
       - name: 'Checkout'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
+        with:
+          ref: '${{ github.event.inputs.branch_ref || github.ref }}'
 
       - name: 'Set up Node.js 20.x'
         uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions/setup-node@v4
