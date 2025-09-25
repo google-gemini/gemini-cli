@@ -77,7 +77,7 @@ describe('mcp-client', () => {
       expect(mockedMcpToTool).toHaveBeenCalledOnce();
     });
 
-    it('should skip tools if a parameter is missing a type', async () => {
+    it('should not skip tools even if a parameter is missing a type', async () => {
       const consoleWarnSpy = vi
         .spyOn(console, 'warn')
         .mockImplementation(() => {});
@@ -136,12 +136,8 @@ describe('mcp-client', () => {
       );
       await client.connect();
       await client.discover({} as Config);
-      expect(mockedToolRegistry.registerTool).toHaveBeenCalledOnce();
-      expect(consoleWarnSpy).toHaveBeenCalledOnce();
-      expect(consoleWarnSpy).toHaveBeenCalledWith(
-        `Skipping tool 'invalidTool' from MCP server 'test-server' because it has ` +
-          `missing types in its parameter schema. Please file an issue with the owner of the MCP server.`,
-      );
+      expect(mockedToolRegistry.registerTool).toHaveBeenCalledTimes(2);
+      expect(consoleWarnSpy).not.toHaveBeenCalled();
       consoleWarnSpy.mockRestore();
     });
 
