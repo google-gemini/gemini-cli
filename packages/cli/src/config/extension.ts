@@ -549,6 +549,14 @@ async function requestConsent(extensionConfig: ExtensionConfig) {
   }
 }
 
+export function validateName(name: string) {
+  if (!/^[a-zA-Z0-9-]+$/.test(name)) {
+    throw new Error(
+      `Invalid extension name: "${name}". Only letters (a-z, A-Z), numbers (0-9), and dashes (-) are allowed.`,
+    );
+  }
+}
+
 export function loadExtensionConfig(
   context: LoadExtensionContext,
 ): ExtensionConfig {
@@ -570,6 +578,7 @@ export function loadExtensionConfig(
         `Invalid configuration in ${configFilePath}: missing ${!config.name ? '"name"' : '"version"'}`,
       );
     }
+    validateName(config.name);
     return config;
   } catch (e) {
     throw new Error(

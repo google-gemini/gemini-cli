@@ -457,6 +457,28 @@ describe('extension tests', () => {
       const loadedConfig = extensions[0].config;
       expect(loadedConfig.mcpServers?.['test-server'].trust).toBeUndefined();
     });
+
+    it('should throw an error for invalid extension names', () => {
+      const consoleSpy = vi
+        .spyOn(console, 'error')
+        .mockImplementation(() => {});
+      const badExtDir = createExtension({
+        extensionsDir: userExtensionsDir,
+        name: 'bad_name',
+        version: '1.0.0',
+      });
+
+      const extension = loadExtension({
+        extensionDir: badExtDir,
+        workspaceDir: tempWorkspaceDir,
+      });
+
+      expect(extension).toBeNull();
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Invalid extension name: "bad_name"'),
+      );
+      consoleSpy.mockRestore();
+    });
   });
 
   describe('annotateActiveExtensions', () => {
