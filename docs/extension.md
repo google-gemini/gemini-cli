@@ -19,7 +19,7 @@ You can install an extension using `gemini extensions install` with either a Git
 Note that we create a copy of the installed extension, so you will need to run `gemini extensions update` to pull in changes from both locally-defined extensions and those on GitHub.
 
 ```
-gemini extensions install https://github.com/google-gemini/gemini-cli-security
+gemini extensions install https://github.com/gemini-cli-extensions/security
 ```
 
 This will install the Gemini CLI Security extension, which offers support for a `/security:analyze` command.
