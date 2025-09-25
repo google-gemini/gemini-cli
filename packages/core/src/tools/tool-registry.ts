@@ -181,6 +181,7 @@ export class ToolRegistry {
       this.config.getPromptRegistry(),
       this.config.getDebugMode(),
       this.config.getWorkspaceContext(),
+      this.config.getVersion(),
       eventEmitter,
     );
   }
