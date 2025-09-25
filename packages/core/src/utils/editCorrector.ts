@@ -177,7 +177,7 @@ export async function ensureCorrectEdit(
   baseLlmClient: BaseLlmClient,
   abortSignal: AbortSignal,
 ): Promise<CorrectedEditResult> {
-  const cacheKey = `${currentContent}\0${originalParams.old_string}\0${originalParams.new_string}`;
+  const cacheKey = JSON.stringify([currentContent, originalParams.old_string, originalParams.new_string]);
   const cachedResult = editCorrectionCache.get(cacheKey);
   if (cachedResult) {
     return cachedResult;
