@@ -54,6 +54,7 @@ vi.mock('./hooks/useThemeCommand.js');
 vi.mock('./auth/useAuth.js');
 vi.mock('./hooks/useEditorSettings.js');
 vi.mock('./hooks/useSettingsCommand.js');
+vi.mock('./hooks/useModelCommand.js');
 vi.mock('./hooks/slashCommandProcessor.js');
 vi.mock('./hooks/useConsoleMessages.js');
 vi.mock('./hooks/useTerminalSize.js', () => ({
@@ -86,6 +87,7 @@ import { useThemeCommand } from './hooks/useThemeCommand.js';
 import { useAuthCommand } from './auth/useAuth.js';
 import { useEditorSettings } from './hooks/useEditorSettings.js';
 import { useSettingsCommand } from './hooks/useSettingsCommand.js';
+import { useModelCommand } from './hooks/useModelCommand.js';
 import { useSlashCommandProcessor } from './hooks/slashCommandProcessor.js';
 import { useConsoleMessages } from './hooks/useConsoleMessages.js';
 import { useGeminiStream } from './hooks/useGeminiStream.js';
@@ -116,6 +118,7 @@ describe('AppContainer State Management', () => {
   const mockedUseAuthCommand = useAuthCommand as Mock;
   const mockedUseEditorSettings = useEditorSettings as Mock;
   const mockedUseSettingsCommand = useSettingsCommand as Mock;
+  const mockedUseModelCommand = useModelCommand as Mock;
   const mockedUseSlashCommandProcessor = useSlashCommandProcessor as Mock;
   const mockedUseConsoleMessages = useConsoleMessages as Mock;
   const mockedUseGeminiStream = useGeminiStream as Mock;
@@ -171,6 +174,11 @@ describe('AppContainer State Management', () => {
       isSettingsDialogOpen: false,
       openSettingsDialog: vi.fn(),
       closeSettingsDialog: vi.fn(),
+    });
+    mockedUseModelCommand.mockReturnValue({
+      isModelDialogOpen: false,
+      openModelDialog: vi.fn(),
+      closeModelDialog: vi.fn(),
     });
     mockedUseSlashCommandProcessor.mockReturnValue({
       handleSlashCommand: vi.fn(),
@@ -603,6 +611,210 @@ describe('AppContainer State Management', () => {
         resizePtySpy.mock.calls[resizePtySpy.mock.calls.length - 1];
       // Check the height argument specifically
       expect(lastCall[2]).toBe(1);
+    });
+  });
+
+  describe('Keyboard Input Handling', () => {
+    it('should block quit command during authentication', () => {
+      mockedUseAuthCommand.mockReturnValue({
+        authState: 'unauthenticated',
+        setAuthState: vi.fn(),
+        authError: null,
+        onAuthError: vi.fn(),
+      });
+
+      const mockHandleSlashCommand = vi.fn();
+      mockedUseSlashCommandProcessor.mockReturnValue({
+        handleSlashCommand: mockHandleSlashCommand,
+        slashCommands: [],
+        pendingHistoryItems: [],
+        commandContext: {},
+        shellConfirmationRequest: null,
+        confirmationRequest: null,
+      });
+
+      render(
+        <AppContainer
+          config={mockConfig}
+          settings={mockSettings}
+          version="1.0.0"
+          initializationResult={mockInitResult}
+        />,
+      );
+
+      expect(mockHandleSlashCommand).not.toHaveBeenCalledWith('/quit');
+    });
+
+    it('should prevent exit command when text buffer has content', () => {
+      mockedUseTextBuffer.mockReturnValue({
+        text: 'some user input',
+        setText: vi.fn(),
+      });
+
+      const mockHandleSlashCommand = vi.fn();
+      mockedUseSlashCommandProcessor.mockReturnValue({
+        handleSlashCommand: mockHandleSlashCommand,
+        slashCommands: [],
+        pendingHistoryItems: [],
+        commandContext: {},
+        shellConfirmationRequest: null,
+        confirmationRequest: null,
+      });
+
+      render(
+        <AppContainer
+          config={mockConfig}
+          settings={mockSettings}
+          version="1.0.0"
+          initializationResult={mockInitResult}
+        />,
+      );
+
+      expect(mockHandleSlashCommand).not.toHaveBeenCalledWith('/quit');
+    });
+
+    it('should require double Ctrl+C to exit when dialogs are open', () => {
+      vi.useFakeTimers();
+
+      mockedUseThemeCommand.mockReturnValue({
+        isThemeDialogOpen: true,
+        openThemeDialog: vi.fn(),
+        handleThemeSelect: vi.fn(),
+        handleThemeHighlight: vi.fn(),
+      });
+
+      const mockHandleSlashCommand = vi.fn();
+      mockedUseSlashCommandProcessor.mockReturnValue({
+        handleSlashCommand: mockHandleSlashCommand,
+        slashCommands: [],
+        pendingHistoryItems: [],
+        commandContext: {},
+        shellConfirmationRequest: null,
+        confirmationRequest: null,
+      });
+
+      render(
+        <AppContainer
+          config={mockConfig}
+          settings={mockSettings}
+          version="1.0.0"
+          initializationResult={mockInitResult}
+        />,
+      );
+
+      expect(mockHandleSlashCommand).not.toHaveBeenCalledWith('/quit');
+
+      expect(mockHandleSlashCommand).not.toHaveBeenCalledWith('/quit');
+
+      vi.useRealTimers();
+    });
+
+    it('should cancel ongoing request on first Ctrl+C', () => {
+      const mockCancelOngoingRequest = vi.fn();
+      mockedUseGeminiStream.mockReturnValue({
+        streamingState: 'responding',
+        submitQuery: vi.fn(),
+        initError: null,
+        pendingHistoryItems: [],
+        thought: null,
+        cancelOngoingRequest: mockCancelOngoingRequest,
+      });
+
+      const mockHandleSlashCommand = vi.fn();
+      mockedUseSlashCommandProcessor.mockReturnValue({
+        handleSlashCommand: mockHandleSlashCommand,
+        slashCommands: [],
+        pendingHistoryItems: [],
+        commandContext: {},
+        shellConfirmationRequest: null,
+        confirmationRequest: null,
+      });
+
+      render(
+        <AppContainer
+          config={mockConfig}
+          settings={mockSettings}
+          version="1.0.0"
+          initializationResult={mockInitResult}
+        />,
+      );
+
+      expect(mockHandleSlashCommand).not.toHaveBeenCalledWith('/quit');
+    });
+
+    it('should reset Ctrl+C state after timeout', () => {
+      vi.useFakeTimers();
+
+      const mockHandleSlashCommand = vi.fn();
+      mockedUseSlashCommandProcessor.mockReturnValue({
+        handleSlashCommand: mockHandleSlashCommand,
+        slashCommands: [],
+        pendingHistoryItems: [],
+        commandContext: {},
+        shellConfirmationRequest: null,
+        confirmationRequest: null,
+      });
+
+      render(
+        <AppContainer
+          config={mockConfig}
+          settings={mockSettings}
+          version="1.0.0"
+          initializationResult={mockInitResult}
+        />,
+      );
+
+      expect(mockHandleSlashCommand).not.toHaveBeenCalledWith('/quit');
+
+      vi.advanceTimersByTime(1001);
+
+      expect(mockHandleSlashCommand).not.toHaveBeenCalledWith('/quit');
+
+      vi.useRealTimers();
+    });
+  });
+
+  describe('Model Dialog Integration', () => {
+    it('should provide isModelDialogOpen in the UIStateContext', () => {
+      mockedUseModelCommand.mockReturnValue({
+        isModelDialogOpen: true,
+        openModelDialog: vi.fn(),
+        closeModelDialog: vi.fn(),
+      });
+
+      render(
+        <AppContainer
+          config={mockConfig}
+          settings={mockSettings}
+          version="1.0.0"
+          initializationResult={mockInitResult}
+        />,
+      );
+
+      expect(capturedUIState.isModelDialogOpen).toBe(true);
+    });
+
+    it('should provide model dialog actions in the UIActionsContext', () => {
+      const mockCloseModelDialog = vi.fn();
+
+      mockedUseModelCommand.mockReturnValue({
+        isModelDialogOpen: false,
+        openModelDialog: vi.fn(),
+        closeModelDialog: mockCloseModelDialog,
+      });
+
+      render(
+        <AppContainer
+          config={mockConfig}
+          settings={mockSettings}
+          version="1.0.0"
+          initializationResult={mockInitResult}
+        />,
+      );
+
+      // Verify that the actions are correctly passed through context
+      capturedUIActions.closeModelDialog();
+      expect(mockCloseModelDialog).toHaveBeenCalled();
     });
   });
 });

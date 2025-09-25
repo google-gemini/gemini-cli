@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, type MockInstance } from 'vitest';
+import { describe, it, expect, vi, type MockInstance } from 'vitest';
 import { handleInstall, installCommand } from './install.js';
 import yargs from 'yargs';
 
@@ -27,10 +27,25 @@ describe('extensions install command', () => {
   });
 
   it('should fail if both git source and local path are provided', () => {
-    const validationParser = yargs([]).command(installCommand).fail(false);
+    const validationParser = yargs([])
+      .command(installCommand)
+      .fail(false)
+      .locale('en');
     expect(() =>
       validationParser.parse('install some-url --path /some/path'),
     ).toThrow('Arguments source and path are mutually exclusive');
+  });
+
+  it('should fail if both auto update and local path are provided', () => {
+    const validationParser = yargs([])
+      .command(installCommand)
+      .fail(false)
+      .locale('en');
+    expect(() =>
+      validationParser.parse(
+        'install some-url --path /some/path --auto-update',
+      ),
+    ).toThrow('Arguments path and auto-update are mutually exclusive');
   });
 });
 
@@ -97,6 +112,18 @@ describe('handleInstall', () => {
       'The source "test://google.com" is not a valid URL format.',
     );
     expect(processSpy).toHaveBeenCalledWith(1);
+  });
+
+  it('should install an extension from a sso source', async () => {
+    mockInstallExtension.mockResolvedValue('sso-extension');
+
+    await handleInstall({
+      source: 'sso://google.com',
+    });
+
+    expect(consoleLogSpy).toHaveBeenCalledWith(
+      'Extension "sso-extension" installed successfully and enabled.',
+    );
   });
 
   it('should install an extension from a local path', async () => {
