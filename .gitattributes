@@ -5,7 +5,7 @@
 
 # Explicitly declare files that must have LF line endings for proper execution
 # on Unix-like systems.
-*.sh eol=lf
+*.sh eol=lf 
 *.bash eol=lf
 Makefile eol=lf
 
