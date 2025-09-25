@@ -207,7 +207,7 @@ describe('BaseLlmClient', () => {
       await client.generateJson(defaultOptions);
 
       expect(retryWithBackoff).toHaveBeenCalledWith(expect.any(Function), {
-        maxAttempts: undefined,
+        maxAttempts: 5,
       });
     });
   });
