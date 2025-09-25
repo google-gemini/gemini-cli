@@ -105,7 +105,9 @@ export class BaseLlmClient {
           promptId,
         );
 
-      const result = await retryWithBackoff(apiCall, { maxAttempts });
+      const result = await retryWithBackoff(apiCall, {
+        maxAttempts: maxAttempts ?? 5,
+      });
 
       let text = getResponseText(result)?.trim();
       if (!text) {
