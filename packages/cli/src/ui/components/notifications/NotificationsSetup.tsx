@@ -6,12 +6,10 @@
 
 import type React from 'react';
 import { useState } from 'react';
-import { Box, Text, useInput } from 'ink';
+import { Text } from 'ink';
 import * as os from 'node:os';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { RadioButtonSelect } from '../shared/RadioButtonSelect.js';
-import type { RadioSelectItem } from '../shared/RadioButtonSelect.js';
 import {
   getNotificationSettings,
   setGlobalNotificationsEnabled,
@@ -19,6 +17,10 @@ import {
 } from '../../../notifications/manager.js';
 import { type LoadedSettings } from '../../../config/settings.js';
 import type { NotificationEventType } from '../../../notifications/types.js';
+import { Global } from './setup/Global.js';
+import { Event } from './setup/Event.js';
+import { CustomPath } from './setup/CustomPath.js';
+import { SoundWarning } from './setup/SoundWarning.js';
 
 const getSystemSoundPath = (
   eventType: NotificationEventType,
@@ -33,7 +35,6 @@ const getSystemSoundPath = (
         ? '/usr/share/sounds/freedesktop/stereo/dialog-warning.oga'
         : '/usr/share/sounds/freedesktop/stereo/message.oga';
     case 'win32':
-      // Windows system sounds are not file paths, they are aliases
       return undefined;
     default:
       return undefined;
@@ -52,29 +53,32 @@ export const NotificationsSetup: React.FC<NotificationsSetupProps> = ({
   const [_currentSettings, setCurrentSettings] = useState(
     getNotificationSettings(),
   );
-  const [step, setStep] = useState('global'); // 'global', 'inputRequired', 'taskComplete', 'idleAlert', 'customSoundPath', 'done', 'soundWarning'
+  const [step, setStep] = useState('global');
   const [currentEventType, setCurrentEventType] =
     useState<NotificationEventType | null>(null); // To keep track of which event triggered the warning
-  const [customSoundPathInput, setCustomSoundPathInput] = useState('');
   const [customPathError, setCustomPathError] = useState<string | null>(null);
 
-  useInput((input, key) => {
-    if (step === 'customSoundPath') {
-      if (key.return) {
-        handleCustomSoundPath(customSoundPathInput);
-      } else if (key.backspace || key.delete) {
-        setCustomSoundPathInput(customSoundPathInput.slice(0, -1));
-      } else if (!key.meta && !key.ctrl) {
-        setCustomSoundPathInput(customSoundPathInput + input);
-      }
+  const advanceStep = (currentStep: NotificationEventType | 'global') => {
+    const orderedEventTypes: Array<NotificationEventType | 'global'> = [
+      'global',
+      'inputRequired',
+      'taskComplete',
+      'idleAlert',
+    ];
+    const currentIndex = orderedEventTypes.indexOf(currentStep);
+    if (currentIndex !== -1 && currentIndex < orderedEventTypes.length - 1) {
+      setStep(orderedEventTypes[currentIndex + 1]);
+    } else {
+      setStep('done');
+      onComplete();
     }
-  });
+  };
 
   const handleGlobalEnable = (value: boolean) => {
     setGlobalNotificationsEnabled(value, settings);
     setCurrentSettings(getNotificationSettings());
     if (value) {
-      setStep('inputRequired');
+      advanceStep('global');
     } else {
       onComplete();
     }
@@ -87,31 +91,15 @@ export const NotificationsSetup: React.FC<NotificationsSetupProps> = ({
     updateNotificationEventSettings(eventType, { enabled: value }, settings);
     setCurrentSettings(getNotificationSettings());
 
-    if (value) {
-      if (os.platform() !== 'win32') {
-        const systemSoundPath = getSystemSoundPath(eventType);
-        if (systemSoundPath && !fs.existsSync(systemSoundPath)) {
-          setCurrentEventType(eventType);
-          setStep('soundWarning');
-          return; // Stop here and show warning
-        }
+    if (value && os.platform() !== 'win32') {
+      const systemSoundPath = getSystemSoundPath(eventType);
+      if (systemSoundPath && !fs.existsSync(systemSoundPath)) {
+        setCurrentEventType(eventType);
+        setStep('soundWarning');
+        return;
       }
     }
-
-    const orderedEventTypes: NotificationEventType[] = [
-      'inputRequired',
-      'taskComplete',
-      'idleAlert',
-    ];
-    const currentIndex = orderedEventTypes.indexOf(
-      eventType as NotificationEventType,
-    );
-    if (currentIndex !== -1 && currentIndex < orderedEventTypes.length - 1) {
-      setStep(orderedEventTypes[currentIndex + 1]);
-    } else {
-      setStep('done');
-      onComplete();
-    }
+    advanceStep(eventType);
   };
 
   const handleSoundWarningResponse = (
@@ -126,40 +114,26 @@ export const NotificationsSetup: React.FC<NotificationsSetupProps> = ({
         settings,
       );
       setCurrentSettings(getNotificationSettings());
+      advanceStep(currentEventType);
     } else if (response === 'custom') {
       setStep('customSoundPath');
-      return;
-    }
-
-    // Move to the next step after handling the warning
-    const orderedEventTypes: NotificationEventType[] = [
-      'inputRequired',
-      'taskComplete',
-      'idleAlert',
-    ];
-    const currentIndex = orderedEventTypes.indexOf(currentEventType);
-    if (currentIndex !== -1 && currentIndex < orderedEventTypes.length - 1) {
-      setStep(orderedEventTypes[currentIndex + 1]);
     } else {
-      setStep('done');
-      onComplete();
+      advanceStep(currentEventType);
     }
-    setCurrentEventType(null); // Clear the current event type
   };
 
   const handleCustomSoundPath = (rawPath: string) => {
     if (!currentEventType) return;
 
-    // Resolve path, expanding tilde to home directory
     const resolvedPath = rawPath.startsWith('~')
       ? path.join(os.homedir(), rawPath.slice(1))
       : path.resolve(rawPath);
 
     if (!fs.existsSync(resolvedPath)) {
       setCustomPathError(`File not found: ${resolvedPath}`);
-      return; // Stop and wait for user to correct the path
+      return;
     }
-    setCustomPathError(null); // Clear error on success
+    setCustomPathError(null);
 
     updateNotificationEventSettings(
       currentEventType,
@@ -167,132 +141,50 @@ export const NotificationsSetup: React.FC<NotificationsSetupProps> = ({
       settings,
     );
     setCurrentSettings(getNotificationSettings());
-
-    // Move to the next step
-    const orderedEventTypes: NotificationEventType[] = [
-      'inputRequired',
-      'taskComplete',
-      'idleAlert',
-    ];
-    const currentIndex = orderedEventTypes.indexOf(currentEventType);
-    if (currentIndex !== -1 && currentIndex < orderedEventTypes.length - 1) {
-      setStep(orderedEventTypes[currentIndex + 1]);
-    } else {
-      setStep('done');
-      onComplete();
-    }
-    setCurrentEventType(null); // Clear the current event type
+    advanceStep(currentEventType);
   };
-
-  const globalOptions: Array<RadioSelectItem<boolean>> = [
-    {
-      label: 'Yes, enable audio notifications',
-      value: true,
-    },
-    {
-      label: 'No, disable audio notifications',
-      value: false,
-    },
-  ];
-
-  const eventOptions: Array<RadioSelectItem<boolean>> = [
-    {
-      label: 'Yes',
-      value: true,
-    },
-    {
-      label: 'No',
-      value: false,
-    },
-  ];
 
   if (step === 'done') {
     return <Text>Notification setup complete!</Text>;
   }
 
   if (step === 'global') {
-    return (
-      <Box flexDirection="column" padding={1}>
-        <Text bold>Audio Notification Setup</Text>
-        <Box marginTop={1}>
-          <Text>Do you want to enable audio notifications?</Text>
-        </Box>
-        <RadioButtonSelect
-          items={globalOptions}
-          onSelect={handleGlobalEnable}
-          isFocused
-        />
-      </Box>
-    );
+    return <Global onSelect={handleGlobalEnable} />;
   }
 
-  if (step === 'soundWarning') {
+  if (step === 'soundWarning' && currentEventType) {
     return (
-      <Box flexDirection="column" padding={1}>
-        <Text bold color="red">
-          Warning: System Sound Not Found!
-        </Text>
-        <Box marginTop={1}>
-          <Text>
-            The default system sound for &quot;{currentEventType}&quot; was not
-            found on your system:
-          </Text>
-          <Text>{getSystemSoundPath(currentEventType!)}</Text>
-        </Box>
-        <Box marginTop={1}>
-          <Text>What would you like to do?</Text>
-        </Box>
-        <RadioButtonSelect
-          items={[
-            { label: 'Disable this notification', value: 'disable' },
-            { label: 'Use a custom sound', value: 'custom' },
-            {
-              label: 'Continue anyway (notification might not play)',
-              value: 'continue',
-            },
-          ]}
-          onSelect={handleSoundWarningResponse}
-          isFocused
-        />
-      </Box>
-    );
-  }
-
-  if (step === 'customSoundPath') {
-    return (
-      <Box flexDirection="column" padding={1}>
-        <Text bold>Audio Notification Setup</Text>
-        <Box marginTop={1}>
-          <Text>
-            Enter the path to your custom sound file for &quot;
-            {currentEventType}&quot;:
-          </Text>
-        </Box>
-        <Box>
-          <Text>{customSoundPathInput}</Text>
-        </Box>
-        {customPathError && (
-          <Box marginTop={1}>
-            <Text color="red">{customPathError}</Text>
-          </Box>
-        )}
-      </Box>
-    );
-  }
-
-  const eventType = step as NotificationEventType;
-
-  return (
-    <Box flexDirection="column" padding={1}>
-      <Text bold>Audio Notification Setup</Text>
-      <Box marginTop={1}>
-        <Text>Enable notification for &quot;{eventType}&quot;?</Text>
-      </Box>
-      <RadioButtonSelect
-        items={eventOptions}
-        onSelect={(value) => handleEventEnable(eventType, value)}
-        isFocused
+      <SoundWarning
+        eventType={currentEventType}
+        soundPath={getSystemSoundPath(currentEventType)!}
+        onSelect={handleSoundWarningResponse}
       />
-    </Box>
-  );
+    );
+  }
+
+  if (step === 'customSoundPath' && currentEventType) {
+    return (
+      <CustomPath
+        eventType={currentEventType}
+        onSubmit={handleCustomSoundPath}
+        error={customPathError}
+      />
+    );
+  }
+
+  if (
+    step === 'inputRequired' ||
+    step === 'taskComplete' ||
+    step === 'idleAlert'
+  ) {
+    const eventType = step as NotificationEventType;
+    return (
+      <Event
+        eventType={eventType}
+        onSelect={(value) => handleEventEnable(eventType, value)}
+      />
+    );
+  }
+
+  return null;
 };
