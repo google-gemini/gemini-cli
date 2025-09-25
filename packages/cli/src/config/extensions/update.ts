@@ -130,7 +130,9 @@ export async function checkForAllExtensionUpdates(
   >,
   cwd: string = process.cwd(),
 ): Promise<Map<string, ExtensionUpdateState>> {
-  let newStates: Map<string, ExtensionUpdateState> = new Map();
+  let newStates: Map<string, ExtensionUpdateState> = new Map(
+    extensionsUpdateState,
+  );
   for (const extension of extensions) {
     const initialState = extensionsUpdateState.get(extension.name);
     if (initialState === undefined) {
