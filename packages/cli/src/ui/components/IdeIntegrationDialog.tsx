@@ -45,7 +45,10 @@ function formatFileList(openFiles: File[]): string {
   return `\n\nOpen files:\n${fileList}${infoMessage}`;
 }
 
-function getDetailedIdeStatus(ideClient: IdeClient): {
+function getDetailedIdeStatus(
+  ideClient: IdeClient,
+  showFileList: boolean = false,
+): {
   statusIcon: string;
   statusText: string;
   details: string;
@@ -54,11 +57,13 @@ function getDetailedIdeStatus(ideClient: IdeClient): {
   const connection = ideClient.getConnectionStatus();
   switch (connection.status) {
     case IDEConnectionStatus.Connected: {
-      let details = `Connected to ${ideClient.getDetectedIdeDisplayName()}. IDE integration features are active.`;
-      const context = ideContextStore.get();
-      const openFiles = context?.workspaceState?.openFiles;
-      if (openFiles && openFiles.length > 0) {
-        details += formatFileList(openFiles);
+      let details = `Connected to ${ideClient.getDetectedIdeDisplayName()}. Native diffing and context awareness are active.`;
+      if (showFileList) {
+        const context = ideContextStore.get();
+        const openFiles = context?.workspaceState?.openFiles;
+        if (openFiles && openFiles.length > 0) {
+          details += formatFileList(openFiles);
+        }
       }
       return {
         statusIcon: '🟢',
@@ -75,10 +80,9 @@ function getDetailedIdeStatus(ideClient: IdeClient): {
         messageType: 'info',
       };
     default: {
-      let details = `IDE companion extension is not connected.`;
-      if (connection?.details) {
-        details += ` ${connection.details}`;
-      }
+      const details = connection?.details
+        ? connection.details
+        : `IDE companion extension is not connected.`;
       return {
         statusIcon: '🔴',
         statusText: 'Disconnected',
@@ -128,29 +132,34 @@ export function IdeIntegrationDialog({
   }
 
   const { status } = ideClient.getConnectionStatus();
-  const { statusIcon, statusText, details, messageType } = getDetailedIdeStatus(ideClient);
+  const { statusIcon, statusText, details, messageType } = getDetailedIdeStatus(
+    ideClient,
+    false,
+  );
 
   // Determine available actions based on status
-  const availableActions: Array<{ label: string; value: string; disabled?: boolean }> = [];
+  const availableActions: Array<{
+    label: string;
+    value: string;
+    disabled?: boolean;
+  }> = [];
 
   switch (status) {
     case IDEConnectionStatus.Connected:
       availableActions.push(
         { label: 'Status', value: 'status' },
-        { label: 'Disable integration', value: 'disable' }
+        { label: 'Disable integration', value: 'disable' },
       );
       break;
     case IDEConnectionStatus.Connecting:
-      availableActions.push(
-        { label: 'Status', value: 'status' }
-      );
+      availableActions.push({ label: 'Status', value: 'status' });
       break;
     default:
       // When disconnected, always show both enable and install options
       availableActions.push(
         { label: 'Status', value: 'status' },
         { label: 'Enable integration', value: 'enable' },
-        { label: 'Install companion extension', value: 'install' }
+        { label: 'Install companion extension', value: 'install' },
       );
       break;
   }
@@ -170,15 +179,24 @@ export function IdeIntegrationDialog({
       <Box marginTop={1} marginBottom={1} flexDirection="column">
         <Box marginBottom={1}>
           <Text>
-            <Text color={messageType === 'error' ? theme.status.error : theme.text.primary}>
-              {statusIcon} Status: {statusText}
+            <Text
+              color={
+                messageType === 'error'
+                  ? theme.status.error
+                  : theme.text.primary
+              }
+            >
+              {statusIcon} {statusText}
             </Text>
           </Text>
         </Box>
         <Box>
           <Text color={theme.text.secondary}>
             {details.split('\n').map((line, index) => (
-              <Text key={index}>{line}{index < details.split('\n').length - 1 ? '\n' : ''}</Text>
+              <Text key={index}>
+                {line}
+                {index < details.split('\n').length - 1 ? '\n' : ''}
+              </Text>
             ))}
           </Text>
         </Box>
@@ -202,8 +220,7 @@ export function IdeIntegrationDialog({
         <Text color={theme.text.secondary}>
           {availableActions.length > 0
             ? '(Use Enter to select, Escape to exit)'
-            : '(Press Escape to exit)'
-          }
+            : '(Press Escape to exit)'}
         </Text>
       </Box>
     </Box>

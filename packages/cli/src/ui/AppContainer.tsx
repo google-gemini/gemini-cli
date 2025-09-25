@@ -1247,7 +1247,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
             historyManager.addItem(
               {
                 type: MessageType.INFO,
-                text: '🔴 Disconnected: IDE integration disabled.',
+                text: '🔴 Disconnected: IDE integration disabled. To enable it, run /ide integration.',
               },
               Date.now(),
             );
@@ -1348,7 +1348,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
 
             switch (currentStatus) {
               case IDEConnectionStatus.Connected: {
-                statusMessage = `🟢 Connected to ${ideClient.getDetectedIdeDisplayName()}. IDE integration features are active.`;
+                statusMessage = `🟢 Connected to ${ideClient.getDetectedIdeDisplayName()}. Native diffing and context awareness are active.`;
                 const context = ideContextStore.get();
                 const openFiles = context?.workspaceState?.openFiles;
                 if (openFiles && openFiles.length > 0) {
@@ -1386,10 +1386,9 @@ Logging in with Google... Please restart Gemini CLI to continue.
                 break;
               default: {
                 const connection = ideClient.getConnectionStatus();
-                statusMessage = `🔴 IDE companion extension is not connected`;
-                if (connection?.details) {
-                  statusMessage += `. Details: ${connection.details}`;
-                }
+                statusMessage = connection?.details
+                  ? `🔴 Disconnected: ${connection.details}`
+                  : `🔴 Disconnected: IDE companion extension is not connected`;
                 break;
               }
             }
