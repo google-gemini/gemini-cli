@@ -1,5 +1,5 @@
 {
-  "name": "mcp-server2",
+  "name": "mcp-server-example",
   "version": "1.0.0",
   "mcpServers": {
     "nodeServer": {
