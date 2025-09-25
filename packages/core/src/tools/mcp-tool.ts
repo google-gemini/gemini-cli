@@ -59,6 +59,7 @@ type McpContentBlock =
 
 // This list is based on the supported file formats for Gemini 2.5 Pro.
 // Source: https://cloud.google.com/vertex-ai/generative-ai/docs/models/gemini/2-5-pro
+//         https://cloud.google.com/vertex-ai/generative-ai/docs/models/gemini/2-5-flash
 const SUPPORTED_MIME_TYPES = new Set([
   'image/png',
   'image/jpeg',
