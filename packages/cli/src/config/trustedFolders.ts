@@ -8,6 +8,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { homedir } from 'node:os';
 import {
+  FatalConfigError,
   getErrorMessage,
   isWithinRoot,
   ideContextStore,
@@ -114,9 +115,23 @@ export class LoadedTrustedFolders {
   }
 }
 
+let loadedTrustedFolders: LoadedTrustedFolders | undefined;
+
+/**
+ * FOR TESTING PURPOSES ONLY.
+ * Resets the in-memory cache of the trusted folders configuration.
+ */
+export function resetTrustedFoldersForTesting(): void {
+  loadedTrustedFolders = undefined;
+}
+
 export function loadTrustedFolders(): LoadedTrustedFolders {
+  if (loadedTrustedFolders) {
+    return loadedTrustedFolders;
+  }
+
   const errors: TrustedFoldersError[] = [];
-  const userConfig: Record<string, TrustLevel> = {};
+  let userConfig: Record<string, TrustLevel> = {};
 
   const userPath = getTrustedFoldersPath();
 
@@ -124,12 +139,19 @@ export function loadTrustedFolders(): LoadedTrustedFolders {
   try {
     if (fs.existsSync(userPath)) {
       const content = fs.readFileSync(userPath, 'utf-8');
-      const parsed = JSON.parse(stripJsonComments(content)) as Record<
-        string,
-        TrustLevel
-      >;
-      if (parsed) {
-        Object.assign(userConfig, parsed);
+      const parsed: unknown = JSON.parse(stripJsonComments(content));
+
+      if (
+        typeof parsed !== 'object' ||
+        parsed === null ||
+        Array.isArray(parsed)
+      ) {
+        errors.push({
+          message: 'Trusted folders file is not a valid JSON object.',
+          path: userPath,
+        });
+      } else {
+        userConfig = parsed as Record<string, TrustLevel>;
       }
     }
   } catch (error: unknown) {
@@ -139,10 +161,11 @@ export function loadTrustedFolders(): LoadedTrustedFolders {
     });
   }
 
-  return new LoadedTrustedFolders(
+  loadedTrustedFolders = new LoadedTrustedFolders(
     { path: userPath, config: userConfig },
     errors,
   );
+  return loadedTrustedFolders;
 }
 
 export function saveTrustedFolders(
@@ -181,11 +204,12 @@ function getWorkspaceTrustFromLocalConfig(
   }
 
   if (folders.errors.length > 0) {
-    for (const error of folders.errors) {
-      console.error(
-        `Error loading trusted folders config from ${error.path}: ${error.message}`,
-      );
-    }
+    const errorMessages = folders.errors.map(
+      (error) => `Error in ${error.path}: ${error.message}`,
+    );
+    throw new FatalConfigError(
+      `${errorMessages.join('\n')}\nPlease fix the configuration file and try again.`,
+    );
   }
 
   const isTrusted = folders.isPathTrusted(process.cwd());

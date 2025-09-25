@@ -9,7 +9,9 @@ import { mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { env } from 'node:process';
+import { DEFAULT_GEMINI_MODEL } from '../packages/core/src/config/models.js';
 import fs from 'node:fs';
+import * as pty from '@lydell/node-pty';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -151,6 +153,7 @@ export class TestRig {
         otlpEndpoint: '',
         outfile: telemetryPath,
       },
+      model: DEFAULT_GEMINI_MODEL,
       sandbox: env.GEMINI_SANDBOX !== 'false' ? env.GEMINI_SANDBOX : false,
       ...options.settings, // Allow tests to override/add settings
     };
@@ -769,5 +772,40 @@ export class TestRig {
       }
     }
     return lastApiRequest;
+  }
+
+  runInteractive(...args: string[]): {
+    ptyProcess: pty.IPty;
+    promise: Promise<{ exitCode: number; signal?: number; output: string }>;
+  } {
+    const commandArgs = [this.bundlePath, '--yolo', ...args];
+
+    const ptyProcess = pty.spawn('node', commandArgs, {
+      name: 'xterm-color',
+      cols: 80,
+      rows: 30,
+      cwd: this.testDir!,
+      env: process.env as { [key: string]: string },
+    });
+
+    let output = '';
+    ptyProcess.onData((data) => {
+      output += data;
+      if (env.KEEP_OUTPUT === 'true' || env.VERBOSE === 'true') {
+        process.stdout.write(data);
+      }
+    });
+
+    const promise = new Promise<{
+      exitCode: number;
+      signal?: number;
+      output: string;
+    }>((resolve) => {
+      ptyProcess.onExit(({ exitCode, signal }) => {
+        resolve({ exitCode, signal, output });
+      });
+    });
+
+    return { ptyProcess, promise };
   }
 }

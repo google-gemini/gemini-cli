@@ -143,7 +143,7 @@ describe('useExtensionUpdates', () => {
       expect(addItem).toHaveBeenCalledWith(
         {
           type: MessageType.INFO,
-          text: 'Extension test-extension has an update available, run "/extensions update test-extension" to install it.',
+          text: 'You have 1 extension with an update available, run "/extensions list" for more information.',
         },
         expect.any(Number),
       );

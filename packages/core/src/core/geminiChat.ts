@@ -15,6 +15,7 @@ import {
   type Part,
   type Tool,
   FinishReason,
+  ApiError,
 } from '@google/genai';
 import { toParts } from '../code_assist/converter.js';
 import { createUserContent } from '@google/genai';
@@ -63,7 +64,7 @@ interface ContentRetryOptions {
 }
 
 const INVALID_CONTENT_RETRY_OPTIONS: ContentRetryOptions = {
-  maxAttempts: 3, // 1 initial call + 2 retries
+  maxAttempts: 2, // 1 initial call + 1 retry
   initialDelayMs: 500,
 };
 
@@ -298,6 +299,7 @@ export class GeminiChat {
                     attempt,
                     (error as InvalidStreamError).type,
                     INVALID_CONTENT_RETRY_OPTIONS.initialDelayMs,
+                    model,
                   ),
                 );
                 await new Promise((res) =>
@@ -321,6 +323,7 @@ export class GeminiChat {
               new ContentRetryFailureEvent(
                 INVALID_CONTENT_RETRY_OPTIONS.maxAttempts,
                 (lastError as InvalidStreamError).type,
+                model,
               ),
             );
           }
@@ -374,10 +377,11 @@ export class GeminiChat {
 
     const streamResponse = await retryWithBackoff(apiCall, {
       shouldRetry: (error: unknown) => {
-        if (error instanceof Error && error.message) {
+        if (error instanceof ApiError && error.message) {
+          if (error.status === 400) return false;
           if (isSchemaDepthError(error.message)) return false;
-          if (error.message.includes('429')) return true;
-          if (error.message.match(/5\d{2}/)) return true;
+          if (error.status === 429) return true;
+          if (error.status >= 500 && error.status < 600) return true;
         }
         return false;
       },
