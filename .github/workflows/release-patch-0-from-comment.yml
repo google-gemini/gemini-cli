@@ -1,4 +1,4 @@
-name: 'Release: Patch from Comment'
+name: 'Release: Patch (0) from Comment'
 
 on:
   issue_comment:
