@@ -141,6 +141,7 @@ export async function FixLLMEditWithInstruction(
     model: DEFAULT_GEMINI_FLASH_MODEL,
     systemInstruction: EDIT_SYS_PROMPT,
     promptId,
+    maxAttempts: 1,
   })) as unknown as SearchReplaceEdit;
 
   editCorrectionWithInstructionCache.set(cacheKey, result);
