@@ -384,15 +384,13 @@ export async function requestConsentNonInteractive(
  * @returns boolean, whether they consented or not.
  */
 export async function requestConsentInteractive(
-  consentDescription: string,
+  _consentDescription: string,
   addHistoryItem: UseHistoryManagerReturn['addItem'],
 ): Promise<boolean> {
   addHistoryItem(
     {
       type: 'info',
-      text:
-        consentDescription +
-        '\n\nConsenting to updates not implemented in interactive mode, please use `gemini extensions update <extension>` to update this extension.',
+      text: 'Tried to update an extension but it has some changes that require consent, please use `gemini extensions update`.',
     },
     Date.now(),
   );
