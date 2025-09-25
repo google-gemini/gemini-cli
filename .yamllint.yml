@@ -1,5 +1,5 @@
 rules:
-  anchors:
+  anchors: 
     forbid-duplicated-anchors: true
     forbid-undeclared-aliases: true
     forbid-unused-anchors: true
