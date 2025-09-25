@@ -367,12 +367,10 @@ describe('IdeClient', () => {
       expect(result).toEqual(validConfig);
       expect(validateSpy).toHaveBeenCalledWith(
         '/invalid/workspace',
-        'VS Code',
         '/test/workspace/sub-dir',
       );
       expect(validateSpy).toHaveBeenCalledWith(
         '/test/workspace',
-        'VS Code',
         '/test/workspace/sub-dir',
       );
     });

@@ -1,0 +1,49 @@
+name: 'Release: Rollback change'
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'The package version to tag (e.g., 0.5.0-preview-2). This version must already exist on the npm registry.'
+        required: true
+        type: 'string'
+      channel:
+        description: 'The npm dist-tag to apply (e.g., latest, preview, nightly).'
+        required: true
+        type: 'choice'
+        options:
+          - 'latest'
+          - 'preview'
+          - 'nightly'
+          - 'dev'
+        default: 'dev'
+      ref:
+        description: 'The branch, tag, or SHA to run from.'
+        required: false
+        type: 'string'
+        default: 'main'
+      dry-run:
+        description: 'Whether to run in dry-run mode.'
+        required: false
+        type: 'boolean'
+        default: true
+
+jobs:
+  change-tags:
+    runs-on: 'ubuntu-latest'
+    permissions:
+      packages: 'write'
+      issues: 'write'
+    steps:
+      - name: 'Checkout repository'
+        uses: 'actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955' # ratchet:actions/checkout@v4
+        with:
+          ref: '${{ github.event.inputs.ref }}'
+          fetch-depth: 0
+
+      - name: 'Setup Node.js'
+        uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020'
+        with:
+          node-version-file: '.nvmrc'
+          registry-url: 'https://wombat-dressing-room.appspot.com'
+          scope: '@google'
