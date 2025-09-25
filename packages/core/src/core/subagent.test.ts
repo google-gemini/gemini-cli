@@ -831,5 +831,201 @@ describe('subagent.ts', () => {
         expect(scope.output.terminate_reason).toBe(SubagentTerminateMode.ERROR);
       });
     });
+
+    describe('Resource Cleanup', () => {
+      const promptConfig: PromptConfig = { systemPrompt: 'Execute task.' };
+
+      it('should cleanup resources after successful execution', async () => {
+        const { config } = await createMockConfig();
+
+        mockSendMessageStream.mockImplementation(createMockStream(['stop']));
+
+        const scope = await SubAgentScope.create(
+          'test-agent',
+          config,
+          promptConfig,
+          defaultModelConfig,
+          defaultRunConfig,
+        );
+
+        // Spy on cleanup methods
+        const mcpStopSpy = vi.spyOn(
+          scope['toolRegistry']['mcpClientManager'],
+          'stop',
+        );
+        const toolsClearSpy = vi.spyOn(scope['toolRegistry']['tools'], 'clear');
+
+        await scope.runNonInteractive(new ContextState());
+
+        expect(scope.output.terminate_reason).toBe(SubagentTerminateMode.GOAL);
+        expect(mcpStopSpy).toHaveBeenCalledTimes(1);
+        expect(toolsClearSpy).toHaveBeenCalledTimes(1);
+        expect(scope['isCleanedUp']).toBe(true);
+      });
+
+      it('should cleanup resources after error and abort pending operations', async () => {
+        const { config } = await createMockConfig();
+
+        // Mock an error during execution
+        mockSendMessageStream.mockRejectedValue(new Error('LLM Error'));
+
+        const scope = await SubAgentScope.create(
+          'test-agent',
+          config,
+          promptConfig,
+          defaultModelConfig,
+          defaultRunConfig,
+        );
+
+        // Spy on cleanup methods
+        const mcpStopSpy = vi.spyOn(
+          scope['toolRegistry']['mcpClientManager'],
+          'stop',
+        );
+        const toolsClearSpy = vi.spyOn(scope['toolRegistry']['tools'], 'clear');
+
+        await expect(
+          scope.runNonInteractive(new ContextState()),
+        ).rejects.toThrow('LLM Error');
+
+        expect(scope.output.terminate_reason).toBe(SubagentTerminateMode.ERROR);
+        expect(mcpStopSpy).toHaveBeenCalledTimes(1);
+        expect(toolsClearSpy).toHaveBeenCalledTimes(1);
+        expect(scope['isCleanedUp']).toBe(true);
+      });
+
+      it('should handle cleanup errors gracefully', async () => {
+        const { config } = await createMockConfig();
+
+        mockSendMessageStream.mockImplementation(createMockStream(['stop']));
+
+        const scope = await SubAgentScope.create(
+          'test-agent',
+          config,
+          promptConfig,
+          defaultModelConfig,
+          defaultRunConfig,
+        );
+
+        // Mock cleanup to throw an error
+        const mcpStopSpy = vi
+          .spyOn(scope['toolRegistry']['mcpClientManager'], 'stop')
+          .mockRejectedValue(new Error('Cleanup failed'));
+        const consoleWarnSpy = vi
+          .spyOn(console, 'warn')
+          .mockImplementation(() => {});
+
+        await scope.runNonInteractive(new ContextState());
+
+        expect(scope.output.terminate_reason).toBe(SubagentTerminateMode.GOAL);
+        expect(mcpStopSpy).toHaveBeenCalledTimes(1);
+        expect(consoleWarnSpy).toHaveBeenCalledWith(
+          'Error during subagent cleanup:',
+          expect.any(Error),
+        );
+        expect(scope['isCleanedUp']).toBe(true);
+
+        consoleWarnSpy.mockRestore();
+      });
+
+      it('should not cleanup twice if called multiple times', async () => {
+        const { config } = await createMockConfig();
+
+        const scope = await SubAgentScope.create(
+          'test-agent',
+          config,
+          promptConfig,
+          defaultModelConfig,
+          defaultRunConfig,
+        );
+
+        const mcpStopSpy = vi.spyOn(
+          scope['toolRegistry']['mcpClientManager'],
+          'stop',
+        );
+        const toolsClearSpy = vi.spyOn(scope['toolRegistry']['tools'], 'clear');
+
+        // Call cleanup directly multiple times
+        await scope.cleanup();
+        await scope.cleanup();
+        await scope.cleanup();
+
+        expect(mcpStopSpy).toHaveBeenCalledTimes(1);
+        expect(toolsClearSpy).toHaveBeenCalledTimes(1);
+        expect(scope['isCleanedUp']).toBe(true);
+      });
+
+      it('should abort pending operations when error occurs during execution', async () => {
+        const { config } = await createMockConfig();
+
+        let abortController: AbortController | undefined;
+
+        // Mock sendMessageStream to capture abort controller and then throw
+        mockSendMessageStream.mockImplementation(
+          async (
+            _model: unknown,
+            params: { config: { abortSignal: AbortController } },
+          ) => {
+            abortController = params.config.abortSignal;
+            throw new Error('Simulated execution error');
+          },
+        );
+
+        const scope = await SubAgentScope.create(
+          'test-agent',
+          config,
+          promptConfig,
+          defaultModelConfig,
+          defaultRunConfig,
+        );
+
+        await expect(
+          scope.runNonInteractive(new ContextState()),
+        ).rejects.toThrow('Simulated execution error');
+
+        // Verify abort was called
+        expect(abortController).toBeDefined();
+        expect(scope.output.terminate_reason).toBe(SubagentTerminateMode.ERROR);
+      });
+
+      it('should cleanup tool registry resources created during initialization', async () => {
+        const { config } = await createMockConfig();
+
+        // Mock tools.getTool to return a tool for testing
+        const mockTool = {
+          name: 'test-tool',
+          schema: { parametersJsonSchema: { required: [] } },
+          build: () => ({
+            shouldConfirmExecute: async () => null,
+          }),
+        };
+
+        vi.spyOn(config, 'getToolRegistry').mockResolvedValue({
+          getTool: vi.fn().mockReturnValue(mockTool),
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        } as any);
+
+        const scope = await SubAgentScope.create(
+          'test-agent',
+          config,
+          promptConfig,
+          defaultModelConfig,
+          defaultRunConfig,
+          {
+            toolConfig: {
+              tools: ['test-tool'],
+            },
+          },
+        );
+
+        const registeredTools = scope['toolRegistry']['tools'];
+        expect(registeredTools.size).toBeGreaterThan(0);
+
+        await scope.cleanup();
+
+        expect(registeredTools.size).toBe(0);
+        expect(scope['isCleanedUp']).toBe(true);
+      });
+    });
   });
 });
