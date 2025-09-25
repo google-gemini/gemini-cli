@@ -72,10 +72,11 @@ export const useExtensionUpdates = (
         }
       }
       if (extensionsWithUpdatesCount > 0) {
+        const s = extensionsWithUpdatesCount > 1 ? 's' : '';
         addItem(
           {
             type: MessageType.INFO,
-            text: `You have ${extensionsWithUpdatesCount} extensions with updates available, run "/extensions list" for more information.`,
+            text: `You have ${extensionsWithUpdatesCount} extension${s} with an update available, run "/extensions list" for more information.`,
           },
           Date.now(),
         );
