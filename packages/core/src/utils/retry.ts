@@ -78,6 +78,10 @@ export async function retryWithBackoff<T>(
     throw new Error('maxAttempts must be a positive number.');
   }
 
+  const cleanOptions = options
+    ? Object.fromEntries(Object.entries(options).filter(([_, v]) => v != null))
+    : {};
+
   const {
     maxAttempts,
     initialDelayMs,
@@ -87,7 +91,7 @@ export async function retryWithBackoff<T>(
     shouldRetry,
   } = {
     ...DEFAULT_RETRY_OPTIONS,
-    ...options,
+    ...cleanOptions,
   };
 
   let attempt = 0;
