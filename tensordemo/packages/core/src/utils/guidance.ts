@@ -122,8 +122,11 @@ export class GuidanceSystem {
           const namedMatches = namedImports.match(/(\w+)(?:\s+as\s+(\w+))?/g);
           if (namedMatches) {
             for (const match of namedMatches) {
-              const [, original, alias] = match.match(/(\w+)(?:\s+as\s+(\w+))?/);
-              identifiers.push(alias || original);
+              const matchResult = match.match(/(\w+)(?:\s+as\s+(\w+))?/);
+              if (matchResult) {
+                const [, original, alias] = matchResult;
+                identifiers.push(alias || original);
+              }
             }
           }
         }

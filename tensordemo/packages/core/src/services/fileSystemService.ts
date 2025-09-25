@@ -786,7 +786,7 @@ export class VirtualFileSystem {
       if (metrics.healthScore > 0.8) {
         metrics.status = 'healthy';
       } else if (metrics.healthScore > 0.5) {
-        metrics.status = 'warning';
+        metrics.status = 'degraded';
       } else {
         metrics.status = 'unhealthy';
       }
