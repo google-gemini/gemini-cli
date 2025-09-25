@@ -1,0 +1,801 @@
+---
+alwaysApply: true
+description: Comprehensive development workflow automation for reliability improvements including CI/CD, testing, and deployment
+---
+
+# Development Workflow Automation
+
+## 🎯 **Automated Development Pipeline**
+
+This rule implements comprehensive automation for the entire development workflow, from code analysis to deployment, ensuring consistent quality and rapid iteration for reliability improvements.
+
+---
+
+## 🤖 **CI/CD Pipeline Automation**
+
+### **Automated Testing Pipeline**
+```yaml
+# GitHub Actions workflow for comprehensive testing
+name: Reliability Testing Pipeline
+on: [pull_request, push, workflow_dispatch]
+
+env:
+  NODE_VERSION: '18'
+  TEST_TIMEOUT: 300000  # 5 minutes
+  COVERAGE_THRESHOLD: 90
+  PERFORMANCE_THRESHOLD: 95
+
+jobs:
+  # Pre-flight checks
+  pre-flight:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type checking
+        run: npx tsc --noEmit
+
+      - name: Lint code
+        run: npm run lint
+
+      - name: Security scan
+        run: npm run security:scan
+
+      - name: Cache pre-flight results
+        uses: actions/cache@v3
+        with:
+          key: preflight-${{ github.sha }}
+          path: preflight-results.json
+
+  # Unit tests
+  unit-tests:
+    needs: pre-flight
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        shard: [1, 2, 3, 4]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run unit tests
+        run: npm run test:unit -- --shard=${{ matrix.shard }}/4 --coverage
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./coverage/unit/coverage-final.json
+          flags: unit-tests
+          name: unit-coverage
+
+  # Integration tests
+  integration-tests:
+    needs: unit-tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_DB: testdb
+          POSTGRES_USER: testuser
+          POSTGRES_PASSWORD: testpass
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run database migrations
+        run: npm run db:migrate
+
+      - name: Run integration tests
+        run: npm run test:integration
+        env:
+          DATABASE_URL: postgresql://testuser:testpass@localhost:5432/testdb
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v3
+        with:
+          name: integration-test-results
+          path: test-results/integration/
+
+  # Performance tests
+  performance-tests:
+    needs: integration-tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run performance benchmarks
+        run: npm run test:performance
+
+      - name: Compare with baseline
+        run: npm run test:performance:compare
+
+      - name: Generate performance report
+        run: npm run test:performance:report
+
+      - name: Upload performance results
+        uses: actions/upload-artifact@v3
+        with:
+          name: performance-report
+          path: performance-report.json
+
+  # Security tests
+  security-tests:
+    needs: performance-tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run security scan
+        uses: securecodewarrior/github-action-sast-scan@v1
+        with:
+          scw-token: ${{ secrets.SCW_TOKEN }}
+          project-name: gemini-cli-reliability
+
+      - name: Run dependency audit
+        run: npm audit --audit-level=moderate
+
+      - name: Run SAST
+        run: npm run security:sast
+
+      - name: Generate security report
+        run: npm run security:report
+
+  # Cross-platform tests
+  cross-platform:
+    needs: security-tests
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        node-version: ['18', '20']
+        exclude:
+          - os: macos-latest
+            node-version: '20'
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm run test:ci
+        env:
+          CI: true
+          OS: ${{ matrix.os }}
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v3
+        with:
+          name: test-results-${{ matrix.os }}-${{ matrix.node-version }}
+          path: test-results/
+
+  # Quality gate
+  quality-gate:
+    needs: [cross-platform, security-tests]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/download-artifact@v3
+        with:
+          name: preflight-${{ github.sha }}
+          path: preflight-results/
+
+      - name: Check test coverage
+        run: |
+          if [ $(cat preflight-results/coverage) -lt ${{ env.COVERAGE_THRESHOLD }} ]; then
+            echo "Coverage below threshold: ${{ env.COVERAGE_THRESHOLD }}%"
+            exit 1
+          fi
+
+      - name: Check performance regression
+        run: |
+          if [ $(cat preflight-results/performance-score) -lt ${{ env.PERFORMANCE_THRESHOLD }} ]; then
+            echo "Performance regression detected"
+            exit 1
+          fi
+
+      - name: Check security issues
+        run: |
+          if [ $(cat preflight-results/security-issues) -gt 0 ]; then
+            echo "Security issues found"
+            exit 1
+          fi
+
+  # Deployment preparation
+  deployment-prep:
+    needs: quality-gate
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate deployment package
+        run: npm run build:production
+
+      - name: Run smoke tests
+        run: npm run test:smoke
+
+      - name: Create deployment artifact
+        run: npm run package:deployment
+
+      - name: Upload deployment package
+        uses: actions/upload-artifact@v3
+        with:
+          name: deployment-package
+          path: deployment/
+          retention-days: 30
+```
+
+---
+
+## 🔧 **Automated Code Quality Tools**
+
+### **Pre-commit Hooks**
+```bash
+#!/bin/bash
+# .git/hooks/pre-commit
+
+# Run linting
+echo "🔍 Running code quality checks..."
+npm run lint
+if [ $? -ne 0 ]; then
+  echo "❌ Linting failed. Please fix the issues above."
+  exit 1
+fi
+
+# Run type checking
+echo "📝 Running type check..."
+npx tsc --noEmit
+if [ $? -ne 0 ]; then
+  echo "❌ Type check failed. Please fix the issues above."
+  exit 1
+fi
+
+# Run security scan
+echo "🔒 Running security scan..."
+npm run security:quick-scan
+if [ $? -ne 0 ]; then
+  echo "❌ Security issues found. Please review and fix."
+  exit 1
+fi
+
+# Run tests
+echo "🧪 Running tests..."
+npm run test:pre-commit
+if [ $? -ne 0 ]; then
+  echo "❌ Tests failed. Please fix the failing tests."
+  exit 1
+fi
+
+echo "✅ All checks passed!"
+exit 0
+```
+
+### **Automated Code Review**
+```typescript
+export class AutomatedCodeReviewer {
+  private rules = new Map<string, ReviewRule>();
+
+  constructor() {
+    this.initializeReviewRules();
+  }
+
+  private initializeReviewRules(): void {
+    // Code style rules
+    this.rules.set('naming-conventions', {
+      name: 'naming-conventions',
+      category: 'style',
+      severity: 'medium',
+      check: (code: string, filePath: string) => this.checkNamingConventions(code, filePath)
+    });
+
+    // Security rules
+    this.rules.set('security-issues', {
+      name: 'security-issues',
+      category: 'security',
+      severity: 'high',
+      check: (code: string, filePath: string) => this.checkSecurityIssues(code, filePath)
+    });
+
+    // Performance rules
+    this.rules.set('performance-issues', {
+      name: 'performance-issues',
+      category: 'performance',
+      severity: 'medium',
+      check: (code: string, filePath: string) => this.checkPerformanceIssues(code, filePath)
+    });
+
+    // Complexity rules
+    this.rules.set('complexity-issues', {
+      name: 'complexity-issues',
+      category: 'maintainability',
+      severity: 'low',
+      check: (code: string, filePath: string) => this.checkComplexityIssues(code, filePath)
+    });
+  }
+
+  async reviewCode(code: string, filePath: string): Promise<ReviewResult> {
+    const issues: ReviewIssue[] = [];
+    const suggestions: ReviewSuggestion[] = [];
+
+    // Run all rules
+    for (const rule of this.rules.values()) {
+      try {
+        const result = await rule.check(code, filePath);
+
+        if (result.issues) {
+          issues.push(...result.issues);
+        }
+
+        if (result.suggestions) {
+          suggestions.push(...result.suggestions);
+        }
+      } catch (error) {
+        issues.push({
+          rule: rule.name,
+          severity: 'high',
+          message: `Rule check failed: ${error}`,
+          line: 0,
+          column: 0
+        });
+      }
+    }
+
+    // Calculate overall score
+    const score = this.calculateReviewScore(issues);
+
+    return {
+      filePath,
+      score,
+      issues,
+      suggestions,
+      summary: this.generateReviewSummary(issues, suggestions)
+    };
+  }
+
+  private calculateReviewScore(issues: ReviewIssue[]): number {
+    const weights = { high: 3, medium: 2, low: 1 };
+    const totalWeight = issues.reduce((sum, issue) => sum + weights[issue.severity], 0);
+
+    if (totalWeight === 0) return 100;
+
+    const maxScore = 100;
+    const penalty = Math.min(maxScore, totalWeight * 10);
+
+    return Math.max(0, maxScore - penalty);
+  }
+
+  private async checkSecurityIssues(code: string, filePath: string): Promise<RuleResult> {
+    const issues: ReviewIssue[] = [];
+    const suggestions: ReviewSuggestion[] = [];
+
+    // Check for common security issues
+    const securityPatterns = [
+      { pattern: /eval\s*\(/g, message: 'Use of eval() can lead to code injection' },
+      { pattern: /innerHTML\s*=\s*.*\+/g, message: 'Potential XSS vulnerability' },
+      { pattern: /console\.log.*password/g, message: 'Logging sensitive information' }
+    ];
+
+    for (const { pattern, message } of securityPatterns) {
+      const matches = [...code.matchAll(pattern)];
+      for (const match of matches) {
+        issues.push({
+          rule: 'security-issues',
+          severity: 'high',
+          message,
+          line: this.getLineNumber(code, match.index || 0),
+          column: this.getColumnNumber(code, match.index || 0)
+        });
+      }
+    }
+
+    return { issues, suggestions };
+  }
+
+  private getLineNumber(code: string, index: number): number {
+    return code.substring(0, index).split('\n').length;
+  }
+
+  private getColumnNumber(code: string, index: number): number {
+    const lines = code.substring(0, index).split('\n');
+    return lines[lines.length - 1].length + 1;
+  }
+}
+```
+
+---
+
+## 📊 **Automated Reporting & Analytics**
+
+### **Comprehensive Test Reporting**
+```typescript
+export class AutomatedReportingSystem {
+  private reporters = new Map<string, ReportGenerator>();
+
+  constructor() {
+    this.initializeReporters();
+  }
+
+  private initializeReporters(): void {
+    this.reporters.set('coverage', new CoverageReporter());
+    this.reporters.set('performance', new PerformanceReporter());
+    this.reporters.set('security', new SecurityReporter());
+    this.reporters.set('quality', new QualityReporter());
+  }
+
+  async generateFullReport(): Promise<ComprehensiveReport> {
+    const reportPromises = Array.from(this.reporters.values()).map(
+      reporter => reporter.generateReport()
+    );
+
+    const reports = await Promise.all(reportPromises);
+
+    return {
+      timestamp: new Date(),
+      summary: this.generateSummary(reports),
+      sections: {
+        coverage: reports.find(r => r.type === 'coverage'),
+        performance: reports.find(r => r.type === 'performance'),
+        security: reports.find(r => r.type === 'security'),
+        quality: reports.find(r => r.type === 'quality')
+      },
+      recommendations: this.generateRecommendations(reports),
+      trends: this.analyzeTrends(reports)
+    };
+  }
+
+  private generateSummary(reports: Report[]): ReportSummary {
+    const totalTests = reports.reduce((sum, r) => sum + (r.metrics?.tests || 0), 0);
+    const passedTests = reports.reduce((sum, r) => sum + (r.metrics?.passed || 0), 0);
+    const failedTests = totalTests - passedTests;
+
+    const avgCoverage = reports.find(r => r.type === 'coverage')?.metrics?.coverage || 0;
+    const avgPerformance = reports.find(r => r.type === 'performance')?.metrics?.score || 0;
+    const securityScore = reports.find(r => r.type === 'security')?.metrics?.score || 0;
+
+    return {
+      overallStatus: failedTests === 0 ? 'passing' : 'failing',
+      totalTests,
+      passedTests,
+      failedTests,
+      successRate: totalTests > 0 ? (passedTests / totalTests) * 100 : 0,
+      coverage: avgCoverage,
+      performance: avgPerformance,
+      security: securityScore
+    };
+  }
+
+  private generateRecommendations(reports: Report[]): Recommendation[] {
+    const recommendations: Recommendation[] = [];
+
+    // Coverage recommendations
+    const coverageReport = reports.find(r => r.type === 'coverage');
+    if (coverageReport && (coverageReport.metrics?.coverage || 0) < 85) {
+      recommendations.push({
+        category: 'coverage',
+        priority: 'high',
+        title: 'Improve test coverage',
+        description: 'Test coverage is below 85%. Add more unit tests.',
+        actions: ['Add unit tests for uncovered code', 'Focus on critical paths']
+      });
+    }
+
+    // Performance recommendations
+    const performanceReport = reports.find(r => r.type === 'performance');
+    if (performanceReport && (performanceReport.metrics?.score || 0) < 90) {
+      recommendations.push({
+        category: 'performance',
+        priority: 'medium',
+        title: 'Optimize performance',
+        description: 'Performance score is below 90%. Review bottlenecks.',
+        actions: ['Profile slow operations', 'Optimize database queries']
+      });
+    }
+
+    // Security recommendations
+    const securityReport = reports.find(r => r.type === 'security');
+    if (securityReport && (securityReport.metrics?.score || 0) < 95) {
+      recommendations.push({
+        category: 'security',
+        priority: 'high',
+        title: 'Address security issues',
+        description: 'Security score is below 95%. Fix vulnerabilities.',
+        actions: ['Fix reported vulnerabilities', 'Update dependencies']
+      });
+    }
+
+    return recommendations;
+  }
+}
+```
+
+### **Real-time Dashboard Updates**
+```typescript
+export class DashboardUpdater {
+  private webhooks = new Map<string, WebhookConfig>();
+
+  constructor() {
+    this.initializeWebhooks();
+  }
+
+  private initializeWebhooks(): void {
+    this.webhooks.set('github', {
+      url: process.env.GITHUB_WEBHOOK_URL,
+      events: ['push', 'pull_request', 'workflow_run'],
+      secret: process.env.GITHUB_WEBHOOK_SECRET
+    });
+
+    this.webhooks.set('slack', {
+      url: process.env.SLACK_WEBHOOK_URL,
+      events: ['deployment', 'alert'],
+      secret: process.env.SLACK_WEBHOOK_SECRET
+    });
+  }
+
+  async updateDashboards(report: ComprehensiveReport): Promise<void> {
+    // Update GitHub status checks
+    await this.updateGitHubStatus(report);
+
+    // Update Slack notifications
+    await this.updateSlackNotifications(report);
+
+    // Update internal dashboards
+    await this.updateInternalDashboards(report);
+
+    // Send email reports if needed
+    if (report.summary.overallStatus === 'failing') {
+      await this.sendFailureNotification(report);
+    }
+  }
+
+  private async updateGitHubStatus(report: ComprehensiveReport): Promise<void> {
+    const status = report.summary.overallStatus === 'passing' ? 'success' : 'failure';
+
+    // Update commit status
+    await this.githubAPI.post('/repos/:owner/:repo/statuses/:sha', {
+      state: status,
+      target_url: `${process.env.DASHBOARD_URL}/reports/${report.id}`,
+      description: `Tests ${status === 'success' ? 'passed' : 'failed'}`,
+      context: 'continuous-integration/reliability'
+    });
+  }
+
+  private async updateSlackNotifications(report: ComprehensiveReport): Promise<void> {
+    if (!this.webhooks.get('slack')) return;
+
+    const message = {
+      channel: '#reliability-improvements',
+      username: 'Reliability Bot',
+      icon_emoji: ':rocket:',
+      attachments: [
+        {
+          color: report.summary.overallStatus === 'passing' ? 'good' : 'danger',
+          title: 'Reliability Report',
+          title_link: `${process.env.DASHBOARD_URL}/reports/${report.id}`,
+          fields: [
+            {
+              title: 'Status',
+              value: report.summary.overallStatus,
+              short: true
+            },
+            {
+              title: 'Test Success Rate',
+              value: `${report.summary.successRate.toFixed(1)}%`,
+              short: true
+            },
+            {
+              title: 'Coverage',
+              value: `${report.summary.coverage.toFixed(1)}%`,
+              short: true
+            },
+            {
+              title: 'Performance Score',
+              value: `${report.summary.performance.toFixed(1)}%`,
+              short: true
+            }
+          ],
+          footer: 'Reliability Improvements',
+          ts: Math.floor(Date.now() / 1000)
+        }
+      ]
+    };
+
+    await this.sendWebhook('slack', message);
+  }
+}
+```
+
+---
+
+## 🚀 **Deployment Automation**
+
+### **Automated Deployment Pipeline**
+```typescript
+export class DeploymentAutomation {
+  private stages = ['build', 'test', 'security', 'performance', 'deploy'];
+  private currentStage = 0;
+
+  async runDeployment(): Promise<DeploymentResult> {
+    console.log('🚀 Starting automated deployment');
+
+    for (let i = 0; i < this.stages.length; i++) {
+      this.currentStage = i;
+      const stage = this.stages[i];
+
+      try {
+        await this.executeStage(stage);
+        console.log(`✅ Stage ${stage} completed successfully`);
+      } catch (error) {
+        console.error(`❌ Stage ${stage} failed: ${error}`);
+        await this.handleDeploymentFailure(stage, error);
+        return { success: false, stage, error: error.message };
+      }
+    }
+
+    console.log('🎉 Deployment completed successfully');
+    return { success: true, stage: 'completed' };
+  }
+
+  private async executeStage(stage: string): Promise<void> {
+    switch (stage) {
+      case 'build':
+        await this.executeBuildStage();
+        break;
+      case 'test':
+        await this.executeTestStage();
+        break;
+      case 'security':
+        await this.executeSecurityStage();
+        break;
+      case 'performance':
+        await this.executePerformanceStage();
+        break;
+      case 'deploy':
+        await this.executeDeployStage();
+        break;
+      default:
+        throw new Error(`Unknown deployment stage: ${stage}`);
+    }
+  }
+
+  private async executeBuildStage(): Promise<void> {
+    console.log('📦 Building application...');
+
+    // Install dependencies
+    await this.runCommand('npm ci');
+
+    // Run build
+    await this.runCommand('npm run build:production');
+
+    // Verify build artifacts
+    await this.verifyBuildArtifacts();
+  }
+
+  private async executeTestStage(): Promise<void> {
+    console.log('🧪 Running comprehensive tests...');
+
+    // Run all test suites
+    await this.runCommand('npm run test:comprehensive');
+
+    // Verify test results
+    await this.verifyTestResults();
+  }
+
+  private async executeSecurityStage(): Promise<void> {
+    console.log('🔒 Running security validation...');
+
+    // Security scan
+    await this.runCommand('npm run security:full-scan');
+
+    // Dependency audit
+    await this.runCommand('npm audit --audit-level=high');
+
+    // Verify no critical vulnerabilities
+    await this.verifySecurityClearance();
+  }
+
+  private async executePerformanceStage(): Promise<void> {
+    console.log('⚡ Running performance validation...');
+
+    // Performance benchmarks
+    await this.runCommand('npm run test:performance');
+
+    // Load testing
+    await this.runCommand('npm run test:load');
+
+    // Verify performance requirements
+    await this.verifyPerformanceRequirements();
+  }
+
+  private async executeDeployStage(): Promise<void> {
+    console.log('🚀 Deploying to production...');
+
+    // Pre-deployment checks
+    await this.runPreDeploymentChecks();
+
+    // Deploy application
+    await this.deployApplication();
+
+    // Post-deployment verification
+    await this.runPostDeploymentVerification();
+
+    // Update deployment status
+    await this.updateDeploymentStatus('completed');
+  }
+
+  private async runCommand(command: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+      exec(command, (error, stdout, stderr) => {
+        if (error) {
+          reject(new Error(`Command failed: ${command}\n${stderr}`));
+        } else {
+          console.log(stdout);
+          resolve();
+        }
+      });
+    });
+  }
+}
+```
+
+---
+
+## 🎯 **Success Metrics & Validation**
+
+### **Automation Goals**
+- ✅ **Zero Manual Intervention**: Fully automated pipeline
+- ✅ **<10 Minute Build Time**: Rapid feedback loops
+- ✅ **100% Test Coverage**: Comprehensive validation
+- ✅ **Zero Security Vulnerabilities**: Secure by default
+- ✅ **99.9% Deployment Success**: Reliable deployments
+
+### **Quality Gates**
+- ✅ **Code Quality**: Maintainability index > 80
+- ✅ **Test Coverage**: >90% coverage required
+- ✅ **Security Score**: >95 security score required
+- ✅ **Performance**: All benchmarks within thresholds
+- ✅ **Compliance**: All standards met
+
+This comprehensive development workflow automation ensures consistent quality, rapid iteration, and reliable deployments for all reliability improvements.

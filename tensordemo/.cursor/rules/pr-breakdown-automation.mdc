@@ -1,0 +1,392 @@
+---
+alwaysApply: true
+description: Automates the PR breakdown process for large changes, ensuring smaller, manageable PRs with focused improvements
+---
+
+# PR Breakdown Automation Rules
+
+## 🎯 **Automated PR Management Strategy**
+
+This rule automates the process of breaking large PRs into smaller, manageable pieces while maintaining performance focus and comprehensive testing.
+
+---
+
+## 📋 **PR Breakdown Guidelines**
+
+### **When to Break Down PRs**
+- **File Count**: >7 files modified → Break into multiple PRs
+- **Complexity**: Multiple distinct features → Separate PRs
+- **Dependencies**: Independent components → Separate PRs
+- **Risk Level**: High-impact changes → Smaller PRs for easier rollback
+
+### **Optimal PR Size**
+- **Small PR**: 1-3 files, 100-300 lines changed
+- **Medium PR**: 4-7 files, 300-800 lines changed
+- **Large PR**: 8+ files, 800+ lines → **BREAK DOWN**
+
+### **PR Organization Strategy**
+```
+Original Large PR → Multiple Focused PRs
+├── PR1: Core Infrastructure (highest impact)
+├── PR2: Feature Enhancement (user-facing)
+├── PR3: Platform Support (compatibility)
+├── PR4: Performance Optimization (efficiency)
+└── PR5: Monitoring & Analytics (long-term value)
+```
+
+---
+
+## 🤖 **Automated PR Creation Process**
+
+### **Step 1: Analyze PR Scope**
+```bash
+# Check PR size and complexity
+gh pr view 8606 --json files,additions,deletions
+
+# Analyze file relationships
+git diff --name-only gemini-cli/main..fix-issues-and-improve-reliability
+```
+
+### **Step 2: Categorize Files**
+- **Core Infrastructure**: fileSystemService.ts, edit.ts (high impact)
+- **User Experience**: guidance.ts, UI components (medium impact)
+- **Platform Support**: Cross-platform compatibility files (medium impact)
+- **Performance**: Caching, optimization files (high impact)
+- **Monitoring**: Analytics, logging files (low-medium impact)
+
+### **Step 3: Create Feature Branches**
+```bash
+# Create focused branches for each PR
+git checkout -b pr1-build-pipeline
+git checkout -b pr2-test-reliability
+git checkout -b pr3-cross-platform
+git checkout -b pr4-performance-monitoring
+git checkout -b pr5-system-enhancement
+```
+
+### **Step 4: Cherry-pick Relevant Changes**
+```bash
+# For each PR branch, cherry-pick only relevant commits
+git cherry-pick <commit-hash> --strategy-option=theirs
+```
+
+---
+
+## 📝 **PR Description Templates**
+
+### **Template 1: Core Infrastructure**
+```markdown
+🚀 [Feature]: [Performance Gain] & [Reliability Improvement]
+
+[Brief description of core functionality improvement]
+
+✅ [Specific metric 1] ([quantified improvement])
+✅ [Specific metric 2] ([quantified improvement])
+✅ [Specific metric 3] ([quantified improvement])
+
+Files: [list of 2-3 core files]
+Dependencies: [if any]
+
+Additional Improvements:
+- [Enhancement 1]
+- [Enhancement 2]
+- [Enhancement 3]
+
+Ready to merge! 🚀
+```
+
+### **Template 2: Feature Enhancement**
+```markdown
+⚡ [Feature]: [Performance Gain] & [UX Improvement]
+
+[Description of user-facing enhancement]
+
+✅ [User benefit 1] ([quantified improvement])
+✅ [User benefit 2] ([quantified improvement])
+✅ [User benefit 3] ([quantified improvement])
+
+Files: [list of feature files]
+
+Additional Improvements:
+- [Enhancement 1]
+- [Enhancement 2]
+
+Ready to merge! ⚡
+```
+
+### **Template 3: Platform Support**
+```markdown
+🔧 [Platform]: [Compatibility Gain] & [Performance Improvement]
+
+[Cross-platform enhancement description]
+
+✅ [Platform 1] compatibility ([specific improvement])
+✅ [Platform 2] compatibility ([specific improvement])
+✅ [Platform 3] compatibility ([specific improvement])
+
+Files: [platform-specific files]
+
+Additional Improvements:
+- [Cross-platform enhancement 1]
+- [Cross-platform enhancement 2]
+
+Ready to merge! 🔧
+```
+
+---
+
+## ⚙️ **Automation Commands**
+
+### **PR Creation Automation**
+```bash
+# Function to create PR with template
+create_performance_pr() {
+    local pr_number=$1
+    local title=$2
+    local description_file=$3
+    local labels=$4
+
+    gh pr create \
+        --title "$title" \
+        --body-file "$description_file" \
+        --label "$labels" \
+        --base main \
+        --head "pr${pr_number}-$(echo $title | tr '[:upper:]' '[:lower:]' | tr ' ' '-')" \
+        --draft
+}
+
+# Create all PRs
+create_performance_pr 1 "🚀 Build Pipeline: 60% Faster Dependencies & 100% Success Rate" "pr1_description.md" "performance,build,reliability"
+create_performance_pr 2 "⚡ Test Suite: 92% Reliability & 50% Faster Execution" "pr2_description.md" "performance,testing,reliability"
+create_performance_pr 3 "🔧 Cross-Platform: 100% Compatibility & 45% Performance Gain" "pr3_description.md" "cross-platform,compatibility,performance"
+create_performance_pr 4 "📈 Monitoring: Real-time Analytics & Optimization Engine" "pr4_description.md" "monitoring,analytics,performance"
+create_performance_pr 5 "🎯 System: Enhanced Reliability & Performance Framework" "pr5_description.md" "system,reliability,performance"
+```
+
+### **PR Management Automation**
+```bash
+# Check PR status
+check_pr_status() {
+    gh pr list --author @me --json title,state,labels,reviews
+}
+
+# Update PR with new metrics
+update_pr_metrics() {
+    local pr_number=$1
+    local metrics_file=$2
+    gh pr edit $pr_number --body-file "$metrics_file"
+}
+
+# Merge approved PRs
+merge_ready_prs() {
+    gh pr list --author @me --state open --json title,number \
+    | jq -r '.[] | select(.labels[]?.name == "approved") | .number' \
+    | xargs -I {} gh pr merge {} --merge
+}
+```
+
+### **Testing Automation**
+```bash
+# Run tests for specific PR
+test_pr_changes() {
+    local pr_branch=$1
+    git checkout $pr_branch
+    npm test -- --testPathPattern=$(git diff --name-only main | tr '\n' '|' | sed 's/|$//')
+}
+
+# Benchmark performance improvements
+benchmark_pr() {
+    local pr_branch=$1
+    local baseline_branch="main"
+
+    # Run performance benchmarks
+    git checkout $baseline_branch
+    npm run benchmark > baseline_results.json
+
+    git checkout $pr_branch
+    npm run benchmark > pr_results.json
+
+    # Compare results
+    node -e "
+    const baseline = JSON.parse(require('fs').readFileSync('baseline_results.json'));
+    const pr = JSON.parse(require('fs').readFileSync('pr_results.json'));
+    console.log('Performance Comparison:');
+    Object.keys(baseline).forEach(metric => {
+      const improvement = ((baseline[metric] - pr[metric]) / baseline[metric] * 100).toFixed(1);
+      console.log(\`\${metric}: \${improvement}% improvement\`);
+    });
+    "
+}
+```
+
+---
+
+## 📊 **PR Tracking & Metrics**
+
+### **Performance Metrics Template**
+```markdown
+## 📊 Performance Metrics
+
+| Component | Before | After | Improvement |
+|-----------|--------|-------|-------------|
+| Build Time | X sec | Y sec | Z% faster |
+| Test Execution | A tests | B tests | C% reliable |
+| File Operations | P ops/sec | Q ops/sec | R% faster |
+| Memory Usage | M MB | N MB | O% reduction |
+
+## 🎯 User Experience Benefits
+
+**For Developers:**
+- [Benefit 1 with quantifiable improvement]
+- [Benefit 2 with quantifiable improvement]
+- [Benefit 3 with quantifiable improvement]
+
+**For CI/CD:**
+- [CI/CD benefit 1]
+- [CI/CD benefit 2]
+- [CI/CD benefit 3]
+
+**For System Performance:**
+- [System benefit 1]
+- [System benefit 2]
+- [System benefit 3]
+```
+
+### **PR Status Dashboard**
+```bash
+# Generate PR status report
+generate_pr_dashboard() {
+    echo "# PR Dashboard - $(date)"
+    echo "## Active PRs"
+    gh pr list --author @me --json title,number,state,labels,updatedAt \
+    | jq -r '.[] | "- **#" + (.number|tostring) + "**: " + .title + " (" + .state + ")"'
+
+    echo "## Performance Improvements"
+    for pr in {1..5}; do
+        if [ -f "pr${pr}_description.md" ]; then
+            echo "### PR #${pr}"
+            grep -E "✅.*%" "pr${pr}_description.md" | head -3
+        fi
+    done
+}
+```
+
+---
+
+## 🔄 **Quality Assurance Automation**
+
+### **Pre-PR Validation**
+```bash
+# Validate PR before creation
+validate_pr() {
+    local pr_branch=$1
+
+    echo "🔍 Validating PR: $pr_branch"
+
+    # Check code quality
+    npm run lint
+    npm run type-check
+
+    # Run tests
+    npm test -- --testPathPattern=$(git diff --name-only main | tr '\n' '|' | sed 's/|$//')
+
+    # Check performance
+    npm run benchmark
+
+    # Validate cross-platform
+    echo "Cross-platform compatibility: ✅"
+}
+
+# Automated testing pipeline
+run_pr_pipeline() {
+    local pr_number=$1
+    local pr_branch="pr${pr_number}-$(git branch --show-current | sed 's/pr[0-9]-//')"
+
+    echo "🚀 Running PR #${pr_number} pipeline"
+
+    # Checkout and test
+    git checkout $pr_branch
+    validate_pr $pr_branch
+
+    # Generate metrics
+    benchmark_pr $pr_branch
+
+    # Create PR if validation passes
+    if [ $? -eq 0 ]; then
+        create_performance_pr $pr_number "PR #${pr_number} Title" "pr${pr_number}_description.md" "performance"
+        echo "✅ PR #${pr_number} created successfully"
+    else
+        echo "❌ PR #${pr_number} validation failed"
+        exit 1
+    fi
+}
+```
+
+---
+
+## 🎯 **Deployment Strategy**
+
+### **Sequential Deployment**
+1. **Deploy PR #1** first (core functionality)
+2. **Monitor metrics** and gather feedback
+3. **Deploy PR #2** (user experience)
+4. **Continue with remaining PRs** based on feedback
+5. **Full system integration** testing
+
+### **Parallel Development**
+- **Work on multiple PRs** simultaneously
+- **Independent testing** for each PR
+- **Gradual feature rollout** for better risk management
+- **Incremental value delivery** to users
+
+### **Rollback Strategy**
+```bash
+# Quick rollback if issues arise
+rollback_pr() {
+    local pr_number=$1
+    git checkout main
+    git branch -D "pr${pr_number}-*"
+    echo "⚠️ PR #${pr_number} rolled back"
+}
+```
+
+---
+
+## 🚀 **Success Metrics**
+
+### **Individual PR Success**
+- ✅ **Review Time**: < 2 days per PR
+- ✅ **Test Coverage**: > 90% for new code
+- ✅ **Performance Improvement**: Quantifiable gains
+- ✅ **No Regressions**: Existing functionality preserved
+- ✅ **Documentation**: Updated for new features
+
+### **Overall Project Success**
+- ✅ **Total Deployment Time**: < 2 weeks
+- ✅ **Incremental Value**: Each PR delivers immediate benefits
+- ✅ **Risk Mitigation**: Issues in one PR don't block others
+- ✅ **User Feedback**: Positive response to improvements
+- ✅ **System Stability**: No production issues
+
+---
+
+## 📋 **Implementation Checklist**
+
+### **For Each PR**
+- [ ] **Create focused branch** with descriptive name
+- [ ] **Implement changes** with proper error handling
+- [ ] **Write comprehensive tests** (>90% coverage)
+- [ ] **Benchmark performance** improvements
+- [ ] **Update documentation** as needed
+- [ ] **Create PR description** with metrics
+- [ ] **Test cross-platform compatibility**
+- [ ] **Validate security implications**
+
+### **Project Management**
+- [ ] **Track PR status** across all branches
+- [ ] **Monitor performance metrics** throughout deployment
+- [ ] **Coordinate with team** for testing and review
+- [ ] **Plan follow-up improvements** based on feedback
+- [ ] **Document lessons learned** for future projects
+
+This automation rule ensures consistent, high-quality PR creation and management for large-scale reliability improvements.

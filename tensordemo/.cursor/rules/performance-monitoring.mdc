@@ -1,0 +1,713 @@
+---
+alwaysApply: true
+description: Real-time performance monitoring and analytics system for tracking reliability improvements and system health
+---
+
+# Performance Monitoring & Analytics
+
+## 🎯 **Real-Time System Observability**
+
+This rule implements comprehensive performance monitoring and analytics for reliability improvements, providing real-time visibility into system health, performance metrics, and optimization opportunities.
+
+---
+
+## 📊 **System Health Monitoring**
+
+### **Multi-Dimensional Monitoring**
+```typescript
+export class SystemHealthMonitor {
+  private metrics = new Map<string, HealthMetric>();
+  private alerts = new Map<string, AlertRule>();
+  private readonly monitoringInterval = 10000; // 10 seconds
+  private monitorTimer?: NodeJS.Timeout;
+
+  constructor() {
+    this.initializeDefaultMetrics();
+    this.initializeAlertRules();
+  }
+
+  private initializeDefaultMetrics(): void {
+    // Performance Metrics
+    this.metrics.set('cpu_usage', {
+      name: 'cpu_usage',
+      type: 'percentage',
+      threshold: 80,
+      criticalThreshold: 95,
+      unit: '%'
+    });
+
+    this.metrics.set('memory_usage', {
+      name: 'memory_usage',
+      type: 'percentage',
+      threshold: 85,
+      criticalThreshold: 95,
+      unit: '%'
+    });
+
+    this.metrics.set('disk_usage', {
+      name: 'disk_usage',
+      type: 'percentage',
+      threshold: 90,
+      criticalThreshold: 95,
+      unit: '%'
+    });
+
+    // Application Metrics
+    this.metrics.set('response_time', {
+      name: 'response_time',
+      type: 'duration',
+      threshold: 200,
+      criticalThreshold: 1000,
+      unit: 'ms'
+    });
+
+    this.metrics.set('throughput', {
+      name: 'throughput',
+      type: 'rate',
+      threshold: 1000,
+      criticalThreshold: 100,
+      unit: 'req/sec'
+    });
+
+    this.metrics.set('error_rate', {
+      name: 'error_rate',
+      type: 'percentage',
+      threshold: 5,
+      criticalThreshold: 10,
+      unit: '%'
+    });
+
+    // Reliability Metrics
+    this.metrics.set('availability', {
+      name: 'availability',
+      type: 'percentage',
+      threshold: 99.9,
+      criticalThreshold: 99.0,
+      unit: '%'
+    });
+
+    this.metrics.set('mttr', {
+      name: 'mttr',
+      type: 'duration',
+      threshold: 300, // 5 minutes
+      criticalThreshold: 1800, // 30 minutes
+      unit: 'seconds'
+    });
+  }
+
+  startMonitoring(): void {
+    this.monitorTimer = setInterval(() => {
+      this.collectMetrics();
+      this.analyzeTrends();
+      this.checkAlerts();
+      this.generateHealthReport();
+    }, this.monitoringInterval);
+  }
+
+  stopMonitoring(): void {
+    if (this.monitorTimer) {
+      clearInterval(this.monitorTimer);
+      this.monitorTimer = undefined;
+    }
+  }
+
+  private async collectMetrics(): Promise<void> {
+    const timestamp = Date.now();
+
+    // System metrics
+    await this.updateSystemMetrics(timestamp);
+
+    // Application metrics
+    await this.updateApplicationMetrics(timestamp);
+
+    // Reliability metrics
+    await this.updateReliabilityMetrics(timestamp);
+
+    // Custom metrics
+    await this.updateCustomMetrics(timestamp);
+  }
+
+  private async updateSystemMetrics(timestamp: number): Promise<void> {
+    const systemMetrics = await this.getSystemMetrics();
+
+    for (const [name, value] of Object.entries(systemMetrics)) {
+      this.updateMetric(name, value, timestamp);
+    }
+  }
+
+  private async updateApplicationMetrics(timestamp: number): Promise<void> {
+    const appMetrics = await this.getApplicationMetrics();
+
+    for (const [name, value] of Object.entries(appMetrics)) {
+      this.updateMetric(name, value, timestamp);
+    }
+  }
+
+  private async updateReliabilityMetrics(timestamp: number): Promise<void> {
+    const reliabilityMetrics = await this.getReliabilityMetrics();
+
+    for (const [name, value] of Object.entries(reliabilityMetrics)) {
+      this.updateMetric(name, value, timestamp);
+    }
+  }
+
+  private updateMetric(name: string, value: number, timestamp: number): void {
+    if (!this.metrics.has(name)) {
+      console.warn(`Unknown metric: ${name}`);
+      return;
+    }
+
+    const metric = this.metrics.get(name)!;
+    const metricData = metric.data || [];
+
+    // Add new measurement
+    metricData.push({ timestamp, value });
+
+    // Keep only last 1000 measurements
+    if (metricData.length > 1000) {
+      metricData.shift();
+    }
+
+    metric.data = metricData;
+    metric.lastUpdated = timestamp;
+    metric.currentValue = value;
+
+    // Update status
+    if (value >= metric.criticalThreshold) {
+      metric.status = 'critical';
+    } else if (value >= metric.threshold) {
+      metric.status = 'warning';
+    } else {
+      metric.status = 'healthy';
+    }
+
+    // Check for significant changes
+    if (metricData.length >= 2) {
+      const previousValue = metricData[metricData.length - 2].value;
+      const changePercent = Math.abs((value - previousValue) / previousValue) * 100;
+
+      if (changePercent > 20) {
+        metric.trend = value > previousValue ? 'degrading' : 'improving';
+        this.logSignificantChange(name, value, previousValue, changePercent);
+      }
+    }
+  }
+}
+```
+
+### **Alert Management System**
+```typescript
+export class AlertManager {
+  private activeAlerts = new Map<string, Alert>();
+  private alertHistory = new Map<string, Alert[]>();
+
+  async checkAlerts(): Promise<Alert[]> {
+    const newAlerts: Alert[] = [];
+    const timestamp = Date.now();
+
+    for (const [metricName, metric] of this.monitor.metrics) {
+      const alert = await this.evaluateMetricAlert(metricName, metric, timestamp);
+
+      if (alert) {
+        newAlerts.push(alert);
+        this.activeAlerts.set(alert.id, alert);
+      }
+    }
+
+    // Clean up resolved alerts
+    await this.cleanupResolvedAlerts();
+
+    return newAlerts;
+  }
+
+  private async evaluateMetricAlert(
+    metricName: string,
+    metric: HealthMetric,
+    timestamp: number
+  ): Promise<Alert | null> {
+    if (!metric.data || metric.data.length === 0) {
+      return null;
+    }
+
+    const latestValue = metric.data[metric.data.length - 1].value;
+
+    // Check critical threshold
+    if (latestValue >= metric.criticalThreshold) {
+      return {
+        id: `${metricName}-critical-${timestamp}`,
+        metric: metricName,
+        severity: 'critical',
+        message: `${metricName} is critically high: ${latestValue}${metric.unit}`,
+        value: latestValue,
+        threshold: metric.criticalThreshold,
+        timestamp,
+        status: 'active'
+      };
+    }
+
+    // Check warning threshold
+    if (latestValue >= metric.threshold) {
+      return {
+        id: `${metricName}-warning-${timestamp}`,
+        metric: metricName,
+        severity: 'warning',
+        message: `${metricName} is above threshold: ${latestValue}${metric.unit}`,
+        value: latestValue,
+        threshold: metric.threshold,
+        timestamp,
+        status: 'active'
+      };
+    }
+
+    // Check for significant changes
+    if (this.detectSignificantChange(metric)) {
+      const change = this.calculateChange(metric);
+
+      return {
+        id: `${metricName}-change-${timestamp}`,
+        metric: metricName,
+        severity: 'info',
+        message: `${metricName} changed significantly: ${change.percent.toFixed(1)}%`,
+        value: latestValue,
+        threshold: 0,
+        timestamp,
+        status: 'active'
+      };
+    }
+
+    return null;
+  }
+
+  private detectSignificantChange(metric: HealthMetric): boolean {
+    if (!metric.data || metric.data.length < 10) {
+      return false;
+    }
+
+    const recent = metric.data.slice(-5);
+    const previous = metric.data.slice(-10, -5);
+
+    const recentAvg = recent.reduce((sum, m) => sum + m.value, 0) / recent.length;
+    const previousAvg = previous.reduce((sum, m) => sum + m.value, 0) / previous.length;
+
+    const changePercent = Math.abs((recentAvg - previousAvg) / previousAvg) * 100;
+
+    return changePercent > 15; // 15% significant change
+  }
+
+  private calculateChange(metric: HealthMetric): { value: number; percent: number } {
+    if (!metric.data || metric.data.length < 10) {
+      return { value: 0, percent: 0 };
+    }
+
+    const recent = metric.data.slice(-5);
+    const previous = metric.data.slice(-10, -5);
+
+    const recentAvg = recent.reduce((sum, m) => sum + m.value, 0) / recent.length;
+    const previousAvg = previous.reduce((sum, m) => sum + m.value, 0) / previous.length;
+
+    const valueChange = recentAvg - previousAvg;
+    const percentChange = (valueChange / previousAvg) * 100;
+
+    return { value: valueChange, percent: percentChange };
+  }
+}
+```
+
+---
+
+## 📈 **Performance Analytics Engine**
+
+### **Trend Analysis & Prediction**
+```typescript
+export class AnalyticsEngine {
+  private models = new Map<string, PredictionModel>();
+  private readonly analysisInterval = 300000; // 5 minutes
+
+  async analyzeTrends(): Promise<AnalyticsReport> {
+    const trends = new Map<string, TrendAnalysis>();
+    const predictions = new Map<string, Prediction>();
+    const insights = new Map<string, Insight>();
+
+    for (const [metricName, metric] of this.monitor.metrics) {
+      if (metric.data && metric.data.length >= 20) {
+        // Analyze trend
+        const trend = await this.analyzeTrend(metricName, metric.data);
+        trends.set(metricName, trend);
+
+        // Generate prediction
+        const prediction = await this.predictMetric(metricName, metric.data);
+        predictions.set(metricName, prediction);
+
+        // Generate insights
+        const insight = await this.generateInsight(metricName, trend, prediction);
+        insights.set(metricName, insight);
+      }
+    }
+
+    return {
+      timestamp: new Date(),
+      trends,
+      predictions,
+      insights,
+      recommendations: await this.generateRecommendations(trends, predictions)
+    };
+  }
+
+  private async analyzeTrend(metricName: string, data: MetricPoint[]): Promise<TrendAnalysis> {
+    // Linear regression analysis
+    const n = data.length;
+    const x = data.map((_, i) => i);
+    const y = data.map(d => d.value);
+
+    const sumX = x.reduce((sum, val) => sum + val, 0);
+    const sumY = y.reduce((sum, val) => sum + val, 0);
+    const sumXY = x.reduce((sum, val, i) => sum + val * y[i], 0);
+    const sumXX = x.reduce((sum, val) => sum + val * val, 0);
+
+    const slope = (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX);
+    const intercept = (sumY - slope * sumX) / n;
+
+    // Calculate R-squared
+    const yMean = sumY / n;
+    const totalSumSquares = y.reduce((sum, val) => sum + Math.pow(val - yMean, 2), 0);
+    const residualSumSquares = y.reduce((sum, val, i) =>
+      sum + Math.pow(val - (slope * i + intercept), 2), 0);
+    const rSquared = 1 - (residualSumSquares / totalSumSquares);
+
+    // Determine trend direction and strength
+    let direction: 'improving' | 'degrading' | 'stable';
+    let strength: 'weak' | 'moderate' | 'strong';
+
+    if (Math.abs(slope) < 0.01) {
+      direction = 'stable';
+      strength = 'weak';
+    } else if (Math.abs(slope) < 0.1) {
+      direction = slope > 0 ? 'degrading' : 'improving';
+      strength = 'weak';
+    } else if (Math.abs(slope) < 1) {
+      direction = slope > 0 ? 'degrading' : 'improving';
+      strength = 'moderate';
+    } else {
+      direction = slope > 0 ? 'degrading' : 'improving';
+      strength = 'strong';
+    }
+
+    return {
+      metric: metricName,
+      direction,
+      strength,
+      slope,
+      intercept,
+      rSquared,
+      confidence: Math.min(1, rSquared * 100)
+    };
+  }
+
+  private async predictMetric(metricName: string, data: MetricPoint[]): Promise<Prediction> {
+    // Simple linear regression prediction
+    const trend = await this.analyzeTrend(metricName, data);
+
+    const lastTimestamp = Math.max(...data.map(d => d.timestamp));
+    const lastIndex = data.length - 1;
+
+    // Predict next 5 intervals (50 seconds)
+    const predictions = [];
+    for (let i = 1; i <= 5; i++) {
+      const predictedTimestamp = lastTimestamp + (i * 10000);
+      const predictedValue = trend.slope * (lastIndex + i) + trend.intercept;
+
+      predictions.push({
+        timestamp: predictedTimestamp,
+        value: Math.max(0, predictedValue), // Ensure non-negative
+        confidence: trend.confidence / 100
+      });
+    }
+
+    return {
+      metric: metricName,
+      predictions,
+      trend: trend.direction,
+      confidence: trend.confidence / 100
+    };
+  }
+}
+```
+
+### **Anomaly Detection System**
+```typescript
+export class AnomalyDetector {
+  private models = new Map<string, AnomalyModel>();
+
+  async detectAnomalies(): Promise<AnomalyReport> {
+    const anomalies: Anomaly[] = [];
+    const timestamp = Date.now();
+
+    for (const [metricName, metric] of this.monitor.metrics) {
+      if (metric.data && metric.data.length >= 30) {
+        const anomaly = await this.detectAnomaly(metricName, metric.data, timestamp);
+
+        if (anomaly) {
+          anomalies.push(anomaly);
+        }
+      }
+    }
+
+    return {
+      timestamp,
+      anomalies,
+      totalAnomalies: anomalies.length,
+      severityDistribution: this.calculateSeverityDistribution(anomalies)
+    };
+  }
+
+  private async detectAnomaly(
+    metricName: string,
+    data: MetricPoint[],
+    timestamp: number
+  ): Promise<Anomaly | null> {
+    // Calculate baseline statistics
+    const values = data.map(d => d.value);
+    const mean = values.reduce((sum, val) => sum + val, 0) / values.length;
+    const variance = values.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / values.length;
+    const stdDev = Math.sqrt(variance);
+
+    // Get recent values for comparison
+    const recentValues = values.slice(-10);
+    const recentMean = recentValues.reduce((sum, val) => sum + val, 0) / recentValues.length;
+    const recentStdDev = Math.sqrt(
+      recentValues.reduce((sum, val) => sum + Math.pow(val - recentMean, 2), 0) / recentValues.length
+    );
+
+    // Calculate z-score for recent mean
+    const zScore = Math.abs((recentMean - mean) / stdDev);
+
+    // Check for anomaly
+    if (zScore > 3.0) { // 3-sigma rule
+      return {
+        metric: metricName,
+        currentValue: recentMean,
+        expectedValue: mean,
+        deviation: zScore,
+        severity: this.calculateSeverity(zScore),
+        timestamp,
+        description: `${metricName} deviated significantly from baseline`,
+        recommendation: this.generateRecommendation(metricName, zScore)
+      };
+    }
+
+    return null;
+  }
+
+  private calculateSeverity(zScore: number): 'low' | 'medium' | 'high' | 'critical' {
+    if (zScore > 5.0) return 'critical';
+    if (zScore > 4.0) return 'high';
+    if (zScore > 3.0) return 'medium';
+    return 'low';
+  }
+
+  private generateRecommendation(metricName: string, zScore: number): string {
+    if (zScore > 5.0) {
+      return `Critical anomaly in ${metricName}. Immediate investigation required.`;
+    } else if (zScore > 4.0) {
+      return `High-severity anomaly in ${metricName}. Review system logs and performance.`;
+    } else if (zScore > 3.0) {
+      return `Medium-severity anomaly in ${metricName}. Monitor for trends.`;
+    } else {
+      return `Low-severity anomaly in ${metricName}. Continue monitoring.`;
+    }
+  }
+}
+```
+
+---
+
+## 📊 **Real-Time Dashboard**
+
+### **Health Dashboard API**
+```typescript
+export class HealthDashboard {
+  private wsConnections = new Set<WebSocket>();
+
+  async getCurrentHealth(): Promise<HealthStatus> {
+    const metrics = Array.from(this.monitor.metrics.values());
+    const alerts = Array.from(this.alertManager.activeAlerts.values());
+
+    // Calculate overall health score
+    const healthyMetrics = metrics.filter(m => m.status === 'healthy').length;
+    const warningMetrics = metrics.filter(m => m.status === 'warning').length;
+    const criticalMetrics = metrics.filter(m => m.status === 'critical').length;
+
+    const totalMetrics = metrics.length;
+    const healthScore = (healthyMetrics / totalMetrics) * 100;
+
+    return {
+      timestamp: new Date(),
+      overallScore: Math.round(healthScore),
+      status: criticalMetrics > 0 ? 'critical' :
+              warningMetrics > 0 ? 'warning' : 'healthy',
+      metrics: {
+        healthy: healthyMetrics,
+        warning: warningMetrics,
+        critical: criticalMetrics,
+        total: totalMetrics
+      },
+      alerts: {
+        active: alerts.length,
+        critical: alerts.filter(a => a.severity === 'critical').length,
+        warning: alerts.filter(a => a.severity === 'warning').length,
+        info: alerts.filter(a => a.severity === 'info').length
+      },
+      topIssues: this.getTopIssues(metrics, alerts)
+    };
+  }
+
+  private getTopIssues(metrics: HealthMetric[], alerts: Alert[]): Issue[] {
+    const issues: Issue[] = [];
+
+    // Add critical metrics
+    for (const metric of metrics) {
+      if (metric.status === 'critical') {
+        issues.push({
+          type: 'metric',
+          name: metric.name,
+          severity: 'critical',
+          description: `${metric.name} is at critical level: ${metric.currentValue}${metric.unit}`,
+          timestamp: metric.lastUpdated || Date.now()
+        });
+      }
+    }
+
+    // Add active alerts
+    for (const alert of alerts) {
+      if (alert.severity === 'critical') {
+        issues.push({
+          type: 'alert',
+          name: alert.metric,
+          severity: 'critical',
+          description: alert.message,
+          timestamp: alert.timestamp
+        });
+      }
+    }
+
+    // Sort by severity and timestamp
+    return issues
+      .sort((a, b) => {
+        const severityOrder = { critical: 3, high: 2, medium: 1, low: 0 };
+        const aSeverity = severityOrder[a.severity as keyof typeof severityOrder] || 0;
+        const bSeverity = severityOrder[b.severity as keyof typeof severityOrder] || 0;
+
+        if (aSeverity !== bSeverity) {
+          return bSeverity - aSeverity;
+        }
+
+        return b.timestamp - a.timestamp;
+      })
+      .slice(0, 10); // Top 10 issues
+  }
+
+  // WebSocket broadcasting for real-time updates
+  broadcastHealthUpdate(): void {
+    this.getCurrentHealth().then(health => {
+      const update = {
+        type: 'health_update',
+        data: health,
+        timestamp: new Date()
+      };
+
+      for (const ws of this.wsConnections) {
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify(update));
+        }
+      }
+    });
+  }
+}
+```
+
+### **Metrics Visualization**
+```typescript
+export class MetricsVisualizer {
+  async generateMetricsChart(
+    metricName: string,
+    timeRange: number
+  ): Promise<ChartData> {
+    const metric = this.monitor.metrics.get(metricName);
+    if (!metric || !metric.data) {
+      throw new Error(`Metric ${metricName} not found`);
+    }
+
+    const cutoff = Date.now() - timeRange;
+    const relevantData = metric.data.filter(d => d.timestamp >= cutoff);
+
+    return {
+      metric: metricName,
+      data: relevantData,
+      chartType: this.getChartType(metric.type),
+      title: `${metricName} - Last ${this.formatTimeRange(timeRange)}`,
+      yAxisLabel: `${metricName} (${metric.unit})`,
+      xAxisLabel: 'Time'
+    };
+  }
+
+  async generateComparisonChart(
+    metricNames: string[],
+    timeRange: number
+  ): Promise<ComparisonChartData> {
+    const datasets = await Promise.all(
+      metricNames.map(name => this.generateMetricsChart(name, timeRange))
+    );
+
+    return {
+      title: 'Metrics Comparison',
+      datasets: datasets.map(d => ({
+        label: d.metric,
+        data: d.data.map(p => ({ x: p.timestamp, y: p.value }))
+      })),
+      xAxisLabel: 'Time',
+      yAxisLabel: 'Value'
+    };
+  }
+
+  private getChartType(metricType: string): 'line' | 'bar' | 'area' {
+    switch (metricType) {
+      case 'percentage':
+      case 'rate':
+        return 'line';
+      case 'count':
+        return 'bar';
+      case 'duration':
+        return 'area';
+      default:
+        return 'line';
+    }
+  }
+
+  private formatTimeRange(milliseconds: number): string {
+    if (milliseconds < 60000) return 'minute';
+    if (milliseconds < 3600000) return 'hour';
+    if (milliseconds < 86400000) return 'day';
+    return 'week';
+  }
+}
+```
+
+---
+
+## 🎯 **Success Metrics & KPIs**
+
+### **Performance Monitoring Goals**
+- ✅ **99.9% Uptime**: Continuous system availability
+- ✅ **<100ms Alert Response**: Rapid issue detection and response
+- ✅ **<1% False Positives**: Accurate alerting without noise
+- ✅ **Real-time Visibility**: Live monitoring with <5s latency
+- ✅ **Predictive Analytics**: 85%+ accuracy in trend prediction
+
+### **System Health Indicators**
+- ✅ **CPU Usage**: <80% average, <95% peak
+- ✅ **Memory Usage**: <85% average, <95% peak
+- ✅ **Error Rate**: <1% for critical operations
+- ✅ **Response Time**: <200ms for all requests
+- ✅ **Throughput**: >1000 requests/second sustained
+
+This comprehensive performance monitoring system provides real-time visibility into system health, predictive analytics, and automated alerting for optimal reliability and performance.
