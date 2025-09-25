@@ -948,12 +948,9 @@ Logging in with Google... Please restart Gemini CLI to continue.
         if (Object.keys(mcpServers || {}).length > 0) {
           handleSlashCommand(newValue ? '/mcp desc' : '/mcp nodesc');
         }
-      } else if (
-        keyMatchers[Command.TOGGLE_IDE_CONTEXT_DETAIL](key) &&
-        config.getIdeMode() &&
-        ideContextState
-      ) {
-        handleSlashCommand('/ide status');
+      } else if (keyMatchers[Command.TOGGLE_IDE_CONTEXT_DETAIL](key)) {
+        // Reuse the existing status action from the IDE integration dialog
+        uiActions.handleIdeIntegrationAction('status');
       } else if (
         keyMatchers[Command.SHOW_MORE_LINES](key) &&
         !enteringConstrainHeightMode
@@ -972,7 +969,6 @@ Logging in with Google... Please restart Gemini CLI to continue.
       showToolDescriptions,
       setShowToolDescriptions,
       config,
-      ideContextState,
       handleExit,
       ctrlCPressedOnce,
       setCtrlCPressedOnce,
@@ -986,6 +982,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       activePtyId,
       embeddedShellFocused,
       settings.merged.general?.debugKeystrokeLogging,
+      uiActions,
     ],
   );
 
