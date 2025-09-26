@@ -29,7 +29,10 @@ export enum ParsedErrorType {
 export interface ParsedError {
   type: ParsedErrorType;
   title: string;
-  message: string;
+  // Custom user-friendly message (optional, falls back to errorMessage)
+  customMessage?: string;
+  // Original error message from server
+  errorMessage: string;
   rawError: unknown;
   // HTTP status for structured errors (e.g., 429)
   httpStatus?: number;
@@ -38,8 +41,6 @@ export interface ParsedError {
   apiCode?: number; // e.g., 429
   // Source of the parsed error (useful for formatting decisions)
   origin?: 'structured' | 'json' | 'text' | 'unknown';
-  // Optional appended advice (includes leading newline) for rate limiting
-  rateLimitNotice?: string;
 }
 
 // Common strings and URL constants
@@ -188,18 +189,18 @@ type NormalizedInput = {
 function buildParsedError(
   base: NormalizedInput,
   type: ParsedErrorType,
-  extra?: Partial<ParsedError>,
+  customMessage?: string,
 ): ParsedError {
   return {
     type,
     title: titleForType(type),
-    message: base.message,
+    customMessage,
+    errorMessage: base.message,
     rawError: base.rawError,
     httpStatus: base.httpStatus,
     apiStatus: base.apiStatus,
     apiCode: base.apiCode,
     origin: base.origin,
-    ...(extra || {}),
   };
 }
 
@@ -278,12 +279,12 @@ function dispatchByStatus(
 ): ParsedError {
   const status = normalized.httpStatus ?? normalized.apiCode;
   switch (status) {
-    case 429:
-      return parse429(normalized, detectionTarget, ctx);
     case 401:
       return parse401(normalized);
     case 403:
       return parse403(normalized);
+    case 429:
+      return parse429(normalized, detectionTarget, ctx);
     case 500:
       return parse500(normalized);
     case 502:
@@ -296,21 +297,6 @@ function dispatchByStatus(
 }
 
 // Per-status parsers
-function parse429(
-  base: NormalizedInput,
-  detectionTarget: unknown,
-  ctx: ParseContext,
-): ParsedError {
-  const type = classifyParsedErrorTypeFor429(detectionTarget);
-  const rateLimitNotice = getRateLimitMessage(
-    ctx.authType,
-    detectionTarget,
-    ctx.userTier,
-    ctx.currentModel,
-    ctx.fallbackModel,
-  );
-  return buildParsedError(base, type, { rateLimitNotice });
-}
 
 function parse401(base: NormalizedInput): ParsedError {
   return buildParsedError(base, ParsedErrorType.AUTH);
@@ -318,6 +304,30 @@ function parse401(base: NormalizedInput): ParsedError {
 
 function parse403(base: NormalizedInput): ParsedError {
   return buildParsedError(base, ParsedErrorType.AUTH);
+}
+
+function parse429(
+  base: NormalizedInput,
+  detectionTarget: unknown,
+  ctx: ParseContext,
+): ParsedError {
+  const type = classifyParsedErrorTypeFor429(detectionTarget);
+
+  // Generate custom message for 429 errors based on type and context
+  const rateLimitMessage = getRateLimitMessage(
+    ctx.authType,
+    detectionTarget,
+    ctx.userTier,
+    ctx.currentModel,
+    ctx.fallbackModel,
+  );
+
+  // Remove leading newline since it's now part of the message itself
+  const customMessage = rateLimitMessage.startsWith('\n')
+    ? rateLimitMessage.slice(1)
+    : rateLimitMessage;
+
+  return buildParsedError(base, type, customMessage);
 }
 
 function parse500(base: NormalizedInput): ParsedError {
@@ -395,6 +405,10 @@ export function parseError(
   );
 }
 
+/**
+ * @deprecated Use parseError() for structured error handling.
+ * This function is maintained for backward compatibility only.
+ */
 export function parseAndFormatApiError(
   error: unknown,
   authType?: AuthType,
@@ -414,13 +428,21 @@ export function parseAndFormatApiError(
   // - Always prefix with [API Error: ...]
   // - Include (Status: ...) only for API JSON errors
   // - Append rate limit advice (with leading newline) after the bracketed text
-  let text = `[API Error: ${parsed.message}`;
+  let text = `[API Error: ${parsed.errorMessage}`;
   if (parsed.origin === 'json') {
     text += ` (Status: ${parsed.apiStatus})`;
   }
   text += ']';
-  if (parsed.rateLimitNotice) {
-    text += parsed.rateLimitNotice;
+
+  // For 429 errors with custom messages, append with newline
+  if (
+    parsed.customMessage &&
+    (parsed.type === ParsedErrorType.PRO_QUOTA ||
+      parsed.type === ParsedErrorType.GENERIC_QUOTA ||
+      parsed.type === ParsedErrorType.RATE_LIMIT)
+  ) {
+    text += '\n' + parsed.customMessage;
   }
+
   return text;
 }

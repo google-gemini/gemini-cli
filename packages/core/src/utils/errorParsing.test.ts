@@ -381,11 +381,11 @@ describe('parseError (structured output)', () => {
     expect(parsed.origin).toBe('json');
     expect(parsed.apiCode).toBe(429);
     expect(parsed.apiStatus).toBe('RESOURCE_EXHAUSTED');
-    expect(parsed.rateLimitNotice).toBeTruthy();
-    expect(parsed.rateLimitNotice!).toContain(
+    expect(parsed.customMessage).toBeTruthy();
+    expect(parsed.customMessage!).toContain(
       'You have reached your daily gemini-2.5-pro quota limit',
     );
-    expect(parsed.rateLimitNotice!).toContain('upgrade to get higher limits');
+    expect(parsed.customMessage!).toContain('upgrade to get higher limits');
   });
 
   it('parses JSON 429 generic rate-limit', () => {
@@ -404,8 +404,8 @@ describe('parseError (structured output)', () => {
     expect(parsed.origin).toBe('json');
     expect(parsed.apiCode).toBe(429);
     expect(parsed.apiStatus).toBe('RESOURCE_EXHAUSTED');
-    expect(parsed.rateLimitNotice).toBeTruthy();
-    expect(parsed.rateLimitNotice!).toContain(
+    expect(parsed.customMessage).toBeTruthy();
+    expect(parsed.customMessage!).toContain(
       'Possible quota limitations in place or slow response times detected. Switching to the gemini-2.5-flash model',
     );
   });
@@ -415,7 +415,7 @@ describe('parseError (structured output)', () => {
     expect(parsed.type).toBe(ParsedErrorType.AUTH);
     expect(parsed.origin).toBe('structured');
     expect(parsed.httpStatus).toBe(401);
-    expect(parsed.rateLimitNotice).toBeUndefined();
+    expect(parsed.customMessage).toBeUndefined();
   });
 
   it('parses plain string as generic text-origin error', () => {
@@ -423,15 +423,15 @@ describe('parseError (structured output)', () => {
     const parsed = parseError(msg);
     expect(parsed.type).toBe(ParsedErrorType.GENERIC);
     expect(parsed.origin).toBe('text');
-    expect(parsed.message).toBe(msg);
+    expect(parsed.errorMessage).toBe(msg);
     expect(parsed.httpStatus).toBeUndefined();
-    expect(parsed.rateLimitNotice).toBeUndefined();
+    expect(parsed.customMessage).toBeUndefined();
   });
 
   it('parses unknown input as generic unknown-origin error', () => {
     const parsed = parseError(12345);
     expect(parsed.type).toBe(ParsedErrorType.GENERIC);
     expect(parsed.origin).toBe('unknown');
-    expect(parsed.message).toBe('An unknown error occurred.');
+    expect(parsed.errorMessage).toBe('An unknown error occurred.');
   });
 });
