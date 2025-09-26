@@ -584,6 +584,14 @@ export async function start_sandbox(
     }
     args.push('--name', containerName, '--hostname', containerName);
 
+    // copy GEMINI_CLI_TEST_VAR for integration tests
+    if (process.env['GEMINI_CLI_TEST_VAR']) {
+      args.push(
+        '--env',
+        `GEMINI_CLI_TEST_VAR=${process.env['GEMINI_CLI_TEST_VAR']}`,
+      );
+    }
+
     // copy GEMINI_API_KEY(s)
     if (process.env['GEMINI_API_KEY']) {
       args.push('--env', `GEMINI_API_KEY=${process.env['GEMINI_API_KEY']}`);

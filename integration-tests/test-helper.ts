@@ -213,6 +213,7 @@ export class TestRig {
     const child = spawn('node', commandArgs, {
       cwd: this.testDir!,
       stdio: 'pipe',
+      env: process.env,
     });
 
     let stdout = '';
