@@ -99,3 +99,15 @@ jobs:
           previous-tag: '${{ steps.release_info.outputs.PREVIOUS_TAG }}'
           skip-github-release: '${{ github.event.inputs.skip_github_release }}'
           working-directory: './release'
+
+      - name: 'Create Issue on Failure'
+        if: '${{ failure() && github.event.inputs.dry_run == false }}'
+        env:
+          GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+          RELEASE_TAG: '${{ github.event.inputs.version }}'
+          DETAILS_URL: '${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}'
+        run: |
+          gh issue create \
+            --title 'Manual Release Failed for ${RELEASE_TAG} on $(date +'%Y-%m-%d')' \
+            --body 'The manual release workflow failed. See the full run for details: ${DETAILS_URL}' \
+            --label 'kind/bug,release-failure,priority/p0'

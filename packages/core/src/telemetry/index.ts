@@ -74,3 +74,33 @@ export {
   recordUserActivity,
   isUserActive,
 } from './activity-detector.js';
+export {
+  // Core metrics functions
+  recordToolCallMetrics,
+  recordTokenUsageMetrics,
+  recordApiResponseMetrics,
+  recordApiErrorMetrics,
+  recordFileOperationMetric,
+  recordInvalidChunk,
+  recordContentRetry,
+  recordContentRetryFailure,
+  recordModelRoutingMetrics,
+  // Performance monitoring functions
+  recordStartupPerformance,
+  recordMemoryUsage,
+  recordCpuUsage,
+  recordToolQueueDepth,
+  recordToolExecutionBreakdown,
+  recordTokenEfficiency,
+  recordApiRequestBreakdown,
+  recordPerformanceScore,
+  recordPerformanceRegression,
+  recordBaselineComparison,
+  isPerformanceMonitoringActive,
+  // Performance monitoring types
+  PerformanceMetricType,
+  MemoryMetricType,
+  ToolExecutionPhase,
+  ApiRequestPhase,
+  FileOperation,
+} from './metrics.js';

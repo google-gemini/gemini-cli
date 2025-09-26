@@ -81,7 +81,8 @@
     "src/ui/utils/computeStats.test.ts",
     "src/ui/themes/theme.test.ts",
     "src/validateNonInterActiveAuth.test.ts",
-    "src/services/prompt-processors/shellProcessor.test.ts"
+    "src/services/prompt-processors/shellProcessor.test.ts",
+    "src/commands/extensions/examples/**"
   ],
   "references": [{ "path": "../core" }]
 }
