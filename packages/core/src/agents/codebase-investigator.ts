@@ -9,9 +9,7 @@ import { LSTool } from '../tools/ls.js';
 import { ReadFileTool } from '../tools/read-file.js';
 import { GlobTool } from '../tools/glob.js';
 import { GrepTool } from '../tools/grep.js';
-import {
-  /*DEFAULT_GEMINI_MODEL,*/ DEFAULT_GEMINI_FLASH_MODEL,
-} from '../config/models.js';
+import { DEFAULT_GEMINI_MODEL } from '../config/models.js';
 
 /**
  * A Proof-of-Concept subagent specialized in analyzing codebase structure,
@@ -44,7 +42,7 @@ export const CodebaseInvestigatorAgent: AgentDefinition = {
   },
 
   modelConfig: {
-    model: DEFAULT_GEMINI_FLASH_MODEL,
+    model: DEFAULT_GEMINI_MODEL,
     temp: 0.2,
     top_p: 1.0,
     thinkingBudget: -1,
