@@ -16,12 +16,12 @@ export const resetCommand: SlashCommand = {
     const geminiClient = context.services.config?.getGeminiClient();
 
     if (geminiClient) {
-      context.ui.setDebugMessage('Resetting terminal and resetting chat.');
+      context.ui.setDebugMessage('Resetting chat session.');
       // If resetChat fails, the exception will propagate and halt the command,
       // which is the correct behavior to signal a failure to the user.
       await geminiClient.resetChat();
     } else {
-      context.ui.setDebugMessage('Resetting terminal.');
+      context.ui.setDebugMessage('Could not find an active session to reset.');
     }
 
     uiTelemetryService.setLastPromptTokenCount(0);
