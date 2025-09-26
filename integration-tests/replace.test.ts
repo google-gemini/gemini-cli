@@ -120,6 +120,12 @@ describe('replace', () => {
 
     // If the model tried to replace, that specific attempt must have failed.
     if (replaceAttempt) {
+      if (replaceAttempt.toolRequest.success) {
+        console.error(
+          'The replace tool succeeded when it was expected to fail',
+        );
+        console.error('Tool call args:', replaceAttempt.toolRequest.args);
+      }
       expect(
         replaceAttempt.toolRequest.success,
         'If replace is called, it must fail',
