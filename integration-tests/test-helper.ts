@@ -213,6 +213,7 @@ export class TestRig {
     const child = spawn('node', commandArgs, {
       cwd: this.testDir!,
       stdio: 'pipe',
+      env: process.env,
     });
 
     let stdout = '';
@@ -299,6 +300,57 @@ export class TestRig {
             result += `\n\nStdErr:\n${stderr}`;
           }
 
+          resolve(result);
+        } else {
+          reject(new Error(`Process exited with code ${code}:\n${stderr}`));
+        }
+      });
+    });
+
+    return promise;
+  }
+
+  runCommand(
+    args: string[],
+    options: { stdin?: string } = {},
+  ): Promise<string> {
+    const commandArgs = [this.bundlePath, ...args];
+
+    const child = spawn('node', commandArgs, {
+      cwd: this.testDir!,
+      stdio: 'pipe',
+    });
+
+    let stdout = '';
+    let stderr = '';
+
+    if (options.stdin) {
+      child.stdin!.write(options.stdin);
+      child.stdin!.end();
+    }
+
+    child.stdout!.on('data', (data: Buffer) => {
+      stdout += data;
+      if (env.KEEP_OUTPUT === 'true' || env.VERBOSE === 'true') {
+        process.stdout.write(data);
+      }
+    });
+
+    child.stderr!.on('data', (data: Buffer) => {
+      stderr += data;
+      if (env.KEEP_OUTPUT === 'true' || env.VERBOSE === 'true') {
+        process.stderr.write(data);
+      }
+    });
+
+    const promise = new Promise<string>((resolve, reject) => {
+      child.on('close', (code: number) => {
+        if (code === 0) {
+          this._lastRunStdout = stdout;
+          let result = stdout;
+          if (stderr) {
+            result += `\n\nStdErr:\n${stderr}`;
+          }
           resolve(result);
         } else {
           reject(new Error(`Process exited with code ${code}:\n${stderr}`));
