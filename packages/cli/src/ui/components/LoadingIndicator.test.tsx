@@ -233,6 +233,21 @@ describe('<LoadingIndicator />', () => {
     expect(output).not.toContain('This should not be displayed');
   });
 
+  it('should truncate long primary text instead of wrapping', () => {
+    const { lastFrame } = renderWithContext(
+      <LoadingIndicator
+        {...defaultProps}
+        currentLoadingPhrase={
+          'This is an extremely long loading phrase that should be truncated in the UI to keep the primary line concise.'
+        }
+      />,
+      StreamingState.Responding,
+      80,
+    );
+
+    expect(lastFrame()).toMatchSnapshot();
+  });
+
   describe('responsive layout', () => {
     it('should render on a single line on a wide terminal', () => {
       const { lastFrame } = renderWithContext(
