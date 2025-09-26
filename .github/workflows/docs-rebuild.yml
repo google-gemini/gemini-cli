@@ -1,17 +1,15 @@
-name: Trigger Docs Rebuild
-
+name: 'Trigger Docs Rebuild'
 on:
   push:
     branches:
-      - main
+      - 'main'
     paths:
       - 'docs/**'
-
 jobs:
   trigger-rebuild:
-    runs-on: ubuntu-latest
+    runs-on: 'ubuntu-latest'
     steps:
-      - name: Trigger rebuild
+      - name: 'Trigger rebuild'
         run: |
           curl -X POST \
             -H "Content-Type: application/json" \
