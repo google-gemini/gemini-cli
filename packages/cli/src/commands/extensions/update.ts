@@ -8,6 +8,7 @@ import type { CommandModule } from 'yargs';
 import {
   loadExtensions,
   annotateActiveExtensions,
+  requestConsentNonInteractive,
 } from '../../config/extension.js';
 import {
   updateAllUpdatableExtensions,
@@ -62,6 +63,7 @@ export async function handleUpdate(args: UpdateArgs) {
       const updatedExtensionInfo = (await updateExtension(
         extension,
         workingDir,
+        requestConsentNonInteractive,
         updateState,
         () => {},
       ))!;
@@ -83,6 +85,7 @@ export async function handleUpdate(args: UpdateArgs) {
     try {
       let updateInfos = await updateAllUpdatableExtensions(
         workingDir,
+        requestConsentNonInteractive,
         extensions,
         await checkForAllExtensionUpdates(extensions, new Map(), (_) => {}),
         () => {},

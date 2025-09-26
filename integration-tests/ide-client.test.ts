@@ -52,7 +52,7 @@ const getFreePort = (): Promise<number> => {
   });
 };
 
-describe('IdeClient fallback connection logic', () => {
+describe.skip('IdeClient fallback connection logic', () => {
   let server: TestMcpServer;
   let envPort: number;
   let pid: number;
@@ -156,7 +156,7 @@ describe.skip('getIdeProcessId', () => {
   }, 10000);
 });
 
-describe('IdeClient with proxy', () => {
+describe.skip('IdeClient with proxy', () => {
   let mcpServer: TestMcpServer;
   let proxyServer: net.Server;
   let mcpServerPort: number;

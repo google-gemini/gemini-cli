@@ -7,14 +7,18 @@
 import { render } from 'ink-testing-library';
 import { describe, it, expect, vi } from 'vitest';
 import { HistoryItemDisplay } from './HistoryItemDisplay.js';
-import type { HistoryItem } from '../types.js';
+import { type HistoryItem, ToolCallStatus } from '../types.js';
 import { MessageType } from '../types.js';
 import { SessionStatsProvider } from '../contexts/SessionContext.js';
-import type { Config } from '@google/gemini-cli-core';
+import type {
+  Config,
+  ToolExecuteConfirmationDetails,
+} from '@google/gemini-cli-core';
+import { ToolGroupMessage } from './messages/ToolGroupMessage.js';
 
 // Mock child components
 vi.mock('./messages/ToolGroupMessage.js', () => ({
-  ToolGroupMessage: () => <div />,
+  ToolGroupMessage: vi.fn(() => <div />),
 }));
 
 describe('<HistoryItemDisplay />', () => {
@@ -125,5 +129,65 @@ describe('<HistoryItemDisplay />', () => {
       </SessionStatsProvider>,
     );
     expect(lastFrame()).toContain('Agent powering down. Goodbye!');
+  });
+
+  it('should escape ANSI codes in text content', () => {
+    const historyItem: HistoryItem = {
+      id: 1,
+      type: 'user',
+      text: 'Hello, \u001b[31mred\u001b[0m world!',
+    };
+
+    const { lastFrame } = render(
+      <HistoryItemDisplay
+        item={historyItem}
+        terminalWidth={80}
+        isPending={false}
+      />,
+    );
+
+    // The ANSI codes should be escaped for display.
+    expect(lastFrame()).toContain('Hello, \\u001b[31mred\\u001b[0m world!');
+    // The raw ANSI codes should not be present.
+    expect(lastFrame()).not.toContain('Hello, \u001b[31mred\u001b[0m world!');
+  });
+
+  it('should escape ANSI codes in tool confirmation details', () => {
+    const historyItem: HistoryItem = {
+      id: 1,
+      type: 'tool_group',
+      tools: [
+        {
+          callId: '123',
+          name: 'run_shell_command',
+          description: 'Run a shell command',
+          resultDisplay: 'blank',
+          status: ToolCallStatus.Confirming,
+          confirmationDetails: {
+            type: 'exec',
+            title: 'Run Shell Command',
+            command: 'echo "\u001b[31mhello\u001b[0m"',
+            rootCommand: 'echo',
+            onConfirm: async () => {},
+          },
+        },
+      ],
+    };
+
+    render(
+      <HistoryItemDisplay
+        item={historyItem}
+        terminalWidth={80}
+        isPending={false}
+      />,
+    );
+
+    const passedProps = vi.mocked(ToolGroupMessage).mock.calls[0][0];
+    const confirmationDetails = passedProps.toolCalls[0]
+      .confirmationDetails as ToolExecuteConfirmationDetails;
+
+    expect(confirmationDetails.command).toBe(
+      'echo "\\u001b[31mhello\\u001b[0m"',
+    );
   });
 });
