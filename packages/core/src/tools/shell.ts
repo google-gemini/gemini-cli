@@ -324,7 +324,7 @@ function getShellToolDescription(): string {
 
 function getCommandDescription(): string {
   const cmd_substitution_warning =
-    '\n*** WARNING: Command substitution using $(), <(), or >() is not allowed for security reasons.';
+    '\n*** WARNING: Command substitution using $(), `` ` ``, <(), or >() is not allowed for security reasons.';
   if (os.platform() === 'win32') {
     return (
       'Exact command to execute as `cmd.exe /c <command>`' +
