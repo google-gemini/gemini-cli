@@ -125,6 +125,7 @@ jobs:
           ROLLBACK_TAG_NAME="${{ steps.origin_tag.outputs.ORIGIN_TAG }}-rollback"
           echo "ROLLBACK_TAG=$ROLLBACK_TAG_NAME" >> "$GITHUB_OUTPUT"
           git tag "$ROLLBACK_TAG_NAME" "${{ steps.origin_hash.outputs.ORIGIN_HASH }}"
+          git push origin --tags
 
       - name: 'Verify Rollback Tag Added'
         if: "${{ github.event.inputs.dry-run == 'false' }}"
