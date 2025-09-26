@@ -20,13 +20,12 @@ import {
 import { useSettings } from '../contexts/SettingsContext.js';
 import { isWorkspaceTrusted } from '../../config/trustedFolders.js';
 
+export type RestartReason = 'NONE' | 'CONNECTION_CHANGE' | 'TRUST_CHANGE';
+
 /**
  * This hook listens for trust status updates from the IDE companion extension.
- * It provides the current trust status from the IDE and a flag indicating
- * if a restart is needed because the trust state has changed.
- *
- * It also listens for connection status changes and will return `undefined`
- * for the trust status if the IDE is disconnected.
+ * It provides the current trust status from the IDE and a reason if a restart
+ * is needed because the trust state has changed.
  */
 export function useIdeTrustListener() {
   const settings = useSettings();
@@ -34,24 +33,32 @@ export function useIdeTrustListener() {
     IDEConnectionStatus.Disconnected,
   );
   const previousTrust = useRef<boolean | undefined>(undefined);
+  const [restartReason, setRestartReason] = useState<RestartReason>('NONE');
+  const [needsRestart, setNeedsRestart] = useState(false);
 
   const subscribe = useCallback((onStoreChange: () => void) => {
     const handleStatusChange = (state: IDEConnectionState) => {
       setConnectionStatus(state.status);
+      setRestartReason('CONNECTION_CHANGE');
       // Also notify useSyncExternalStore that the data has changed
+      onStoreChange();
+    };
+
+    const handleTrustChange = () => {
+      setRestartReason('TRUST_CHANGE');
       onStoreChange();
     };
 
     (async () => {
       const ideClient = await IdeClient.getInstance();
-      ideClient.addTrustChangeListener(onStoreChange);
+      ideClient.addTrustChangeListener(handleTrustChange);
       ideClient.addStatusChangeListener(handleStatusChange);
       setConnectionStatus(ideClient.getConnectionStatus().status);
     })();
     return () => {
       (async () => {
         const ideClient = await IdeClient.getInstance();
-        ideClient.removeTrustChangeListener(onStoreChange);
+        ideClient.removeTrustChangeListener(handleTrustChange);
         ideClient.removeStatusChangeListener(handleStatusChange);
       })();
     };
@@ -65,7 +72,6 @@ export function useIdeTrustListener() {
   };
 
   const isIdeTrusted = useSyncExternalStore(subscribe, getSnapshot);
-  const [needsRestart, setNeedsRestart] = useState(false);
 
   useEffect(() => {
     const currentTrust = isWorkspaceTrusted(settings.merged).isTrusted;
@@ -80,5 +86,5 @@ export function useIdeTrustListener() {
     previousTrust.current = currentTrust;
   }, [isIdeTrusted, settings.merged]);
 
-  return { isIdeTrusted, needsRestart };
+  return { isIdeTrusted, needsRestart, restartReason };
 }

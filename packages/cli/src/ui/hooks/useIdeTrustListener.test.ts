@@ -89,6 +89,7 @@ describe('useIdeTrustListener', () => {
 
     expect(result.current.isIdeTrusted).toBe(undefined);
     expect(result.current.needsRestart).toBe(false);
+    expect(result.current.restartReason).toBe('NONE');
   });
 
   it('should NOT set needsRestart when connecting for the first time', async () => {
@@ -118,6 +119,7 @@ describe('useIdeTrustListener', () => {
 
     expect(result.current.isIdeTrusted).toBe(true);
     expect(result.current.needsRestart).toBe(false);
+    expect(result.current.restartReason).toBe('CONNECTION_CHANGE');
   });
 
   it('should set needsRestart when IDE trust changes', async () => {
@@ -155,6 +157,7 @@ describe('useIdeTrustListener', () => {
 
     expect(result.current.isIdeTrusted).toBe(false);
     expect(result.current.needsRestart).toBe(true);
+    expect(result.current.restartReason).toBe('TRUST_CHANGE');
   });
 
   it('should set needsRestart when IDE disconnects', async () => {
@@ -190,6 +193,7 @@ describe('useIdeTrustListener', () => {
 
     expect(result.current.isIdeTrusted).toBe(undefined);
     expect(result.current.needsRestart).toBe(true);
+    expect(result.current.restartReason).toBe('CONNECTION_CHANGE');
   });
 
   it('should NOT set needsRestart if trust value does not change', async () => {

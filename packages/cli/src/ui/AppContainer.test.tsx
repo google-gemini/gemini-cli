@@ -212,6 +212,7 @@ describe('AppContainer State Management', () => {
     });
     mockedUseIdeTrustListener.mockReturnValue({
       needsRestart: false,
+      restartReason: 'NONE',
     });
     mockedUseMessageQueue.mockReturnValue({
       messageQueue: [],
