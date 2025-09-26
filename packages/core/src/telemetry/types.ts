@@ -589,34 +589,6 @@ export class ModelRoutingEvent implements BaseTelemetryEvent {
   }
 }
 
-export type TelemetryEvent =
-  | StartSessionEvent
-  | EndSessionEvent
-  | UserPromptEvent
-  | ToolCallEvent
-  | ApiRequestEvent
-  | ApiErrorEvent
-  | ApiResponseEvent
-  | FlashFallbackEvent
-  | LoopDetectedEvent
-  | LoopDetectionDisabledEvent
-  | NextSpeakerCheckEvent
-  | KittySequenceOverflowEvent
-  | MalformedJsonResponseEvent
-  | IdeConnectionEvent
-  | ConversationFinishedEvent
-  | SlashCommandEvent
-  | ResearchOptInEvent
-  | FileOperationEvent
-  | InvalidChunkEvent
-  | ContentRetryEvent
-  | ContentRetryFailureEvent
-  | ExtensionEnableEvent
-  | ExtensionInstallEvent
-  | ExtensionUninstallEvent
-  | ModelRoutingEvent
-  | ToolOutputTruncatedEvent;
-
 export class ExtensionInstallEvent implements BaseTelemetryEvent {
   'event.name': 'extension_install';
   'event.timestamp': string;
