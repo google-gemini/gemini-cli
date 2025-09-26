@@ -35,7 +35,7 @@ Slash commands provide meta-level control over the CLI itself.
       - **Usage** `/chat share file.md` or `/chat share file.json`. If no filename is provided, then the CLI will generate one.
 
 - **`/clear`**
-  - **Description:** Clear the terminal screen, including the visible session history and scrollback within the CLI. The underlying session data (for history recall) might be preserved depending on the exact implementation, but the visual display is cleared.
+  - **Description:** Clear the terminal screen. This does not clear the conversation history.
   - **Keyboard shortcut:** Press **Ctrl+L** at any time to perform a clear action.
 
 - **`/compress`**
@@ -126,8 +126,8 @@ Slash commands provide meta-level control over the CLI itself.
 - **`/quit`** (or **` /exit`**)
   - **Description:** Exit Gemini CLI.
 
-- **`/restart`**
-  - **Description:** Restart the session. This is equivalent to the `/clear` command.
+- **`/reset`**
+  - **Description:** Clears the conversation history and resets the session. This is useful when you want to start a fresh conversation.
 
 - **`/vim`**
   - **Description:** Toggle vim mode on or off. When vim mode is enabled, the input area supports vim-style navigation and editing commands in both NORMAL and INSERT modes.

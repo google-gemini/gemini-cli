@@ -10,7 +10,17 @@ import { type CommandContext } from './types.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
 
 // Mock the telemetry service
+vi.mock('@google/gemini-cli-core', async () => {
+  const actual = await vi.importActual('@google/gemini-cli-core');
+  return {
+    ...actual,
+    uiTelemetryService: {
+      setLastPromptTokenCount: vi.fn(),
+    },
+  };
+});
 
+import { uiTelemetryService } from '@google/gemini-cli-core';
 import type { GeminiClient } from '@google/gemini-cli-core';
 
 describe('resetCommand', () => {
@@ -41,11 +51,13 @@ describe('resetCommand', () => {
     await resetCommand.action(mockContext, '');
 
     expect(mockContext.ui.setDebugMessage).toHaveBeenCalledWith(
-      'Restarting terminal and resetting chat.',
+      'Resetting terminal and resetting chat.',
     );
     expect(mockContext.ui.setDebugMessage).toHaveBeenCalledTimes(1);
 
     expect(mockResetChat).toHaveBeenCalledTimes(1);
+    expect(uiTelemetryService.setLastPromptTokenCount).toHaveBeenCalledWith(0);
+    expect(uiTelemetryService.setLastPromptTokenCount).toHaveBeenCalledTimes(1);
   });
 
   it('should not attempt to reset chat if config service is not available', async () => {
@@ -62,8 +74,10 @@ describe('resetCommand', () => {
     await resetCommand.action(nullConfigContext, '');
 
     expect(nullConfigContext.ui.setDebugMessage).toHaveBeenCalledWith(
-      'Restarting terminal.',
+      'Resetting terminal.',
     );
     expect(mockResetChat).not.toHaveBeenCalled();
+    expect(uiTelemetryService.setLastPromptTokenCount).toHaveBeenCalledWith(0);
+    expect(uiTelemetryService.setLastPromptTokenCount).toHaveBeenCalledTimes(1);
   });
 });
