@@ -36,7 +36,12 @@ async function copyDirectory(template: string, path: string) {
 
   const examplePath = join(EXAMPLES_PATH, template);
   await mkdir(path, { recursive: true });
-  await cp(examplePath, path, { recursive: true });
+  const entries = await readdir(examplePath, { withFileTypes: true });
+  for (const entry of entries) {
+    const srcPath = join(examplePath, entry.name);
+    const destPath = join(path, entry.name);
+    await cp(srcPath, destPath, { recursive: true });
+  }
 }
 
 async function handleNew(args: NewArgs) {
