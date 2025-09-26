@@ -679,21 +679,7 @@ export class GeminiClient {
       };
     }
 
-    const { totalTokens: originalTokenCount } =
-      await this.getContentGeneratorOrFail().countTokens({
-        model,
-        contents: curatedHistory,
-      });
-    if (originalTokenCount === undefined) {
-      console.warn(`Could not determine token count for model ${model}.`);
-      this.hasFailedCompressionAttempt = !force && true;
-      return {
-        originalTokenCount: 0,
-        newTokenCount: 0,
-        compressionStatus:
-          CompressionStatus.COMPRESSION_FAILED_TOKEN_COUNT_ERROR,
-      };
-    }
+    const originalTokenCount = uiTelemetryService.getLastPromptTokenCount();
 
     const contextPercentageThreshold =
       this.config.getChatCompression()?.contextPercentageThreshold;
