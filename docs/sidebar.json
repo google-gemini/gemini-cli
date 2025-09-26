@@ -9,7 +9,7 @@
   },
   {
     "label": "CLI",
-"items": [
+    "items": [
       { "label": "Introduction", "slug": "docs/cli" },
       { "label": "Authentication", "slug": "docs/cli/authentication" },
       { "label": "Commands", "slug": "docs/cli/commands" },
@@ -34,7 +34,8 @@
     "label": "Core",
     "items": [
       { "label": "Introduction", "slug": "docs/core" },
-      { "label": "Tools API", "slug": "docs/core/tools-api" }
+      { "label": "Tools API", "slug": "docs/core/tools-api" },
+      { "label": "Memory Import Processor", "slug": "docs/core/memport" }
     ]
   },
   {
@@ -46,7 +47,9 @@
       { "label": "Shell", "slug": "docs/tools/shell" },
       { "label": "Web Fetch", "slug": "docs/tools/web-fetch" },
       { "label": "Web Search", "slug": "docs/tools/web-search" },
-      { "label": "Memory", "slug": "docs/tools/memory" }
+      { "label": "Memory", "slug": "docs/tools/memory" },
+      { "label": "MCP Servers", "slug": "docs/tools/mcp-server" },
+      { "label": "Sandboxing", "slug": "docs/sandbox" }
     ]
   },
   {
