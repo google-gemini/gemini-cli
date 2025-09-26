@@ -6,7 +6,8 @@
 
 import type { AnyDeclarativeTool, AnyToolInvocation } from '../index.js';
 import { isTool } from '../index.js';
-import { SHELL_TOOL_NAMES } from './shell-utils.js';
+
+const SHELL_TOOL_NAMES = ['run_shell_command', 'ShellTool'];
 
 /**
  * Checks if a tool invocation matches any of a list of patterns.
@@ -60,7 +61,7 @@ export function doesToolInvocationMatch(
 
     if (
       'command' in invocation.params &&
-      toolNames.some((name) => SHELL_TOOL_NAMES.includes(name))
+      toolNames.includes('run_shell_command')
     ) {
       const argValue = String(
         (invocation.params as { command: string }).command,
