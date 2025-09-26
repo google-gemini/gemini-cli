@@ -20,7 +20,7 @@
       { "label": "Headless Mode", "slug": "docs/headless" },
       { "label": "IDE Integration", "slug": "docs/ide-integration" },
       {
-        "label": "IDE Companion Extension Spec",
+        "label": "IDE Companion Spec",
         "slug": "docs/ide-companion-spec"
       },
       { "label": "Telemetry", "slug": "docs/telemetry" },
@@ -63,7 +63,7 @@
     "label": "Support",
     "items": [
       { "label": "Troubleshooting", "slug": "docs/troubleshooting" },
-      { "label": "Terms of Service and Privacy", "slug": "docs/tos-privacy" }
+      { "label": "Terms of Service", "slug": "docs/tos-privacy" }
     ]
   }
 ]
