@@ -126,8 +126,6 @@ jobs:
         if: "runner.os == 'macOS'"
         run: |
           npm cache clean --force
-          npm install --no-save @rollup/rollup-darwin-arm64 || true
-
       - name: 'Run E2E tests (non-Windows)'
         if: "runner.os != 'Windows'"
         env:
@@ -135,7 +133,7 @@ jobs:
           KEEP_OUTPUT: 'true'
           SANDBOX: 'sandbox:none'
           VERBOSE: 'true'
-        run: 'npx vitest run --root ./integration-tests'
+        run: 'npm run test:integration:sandbox:none'
 
   e2e_windows:
     name: 'Slow E2E - Win'
@@ -204,7 +202,7 @@ jobs:
           UV_THREADPOOL_SIZE: '32'
           NODE_ENV: 'test'
         shell: 'pwsh'
-        run: 'npx vitest run --root ./integration-tests'
+        run: 'npm run test:integration:sandbox:none'
 
   e2e:
     name: 'E2E'

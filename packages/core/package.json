@@ -13,7 +13,7 @@
     "lint": "eslint . --ext .ts,.tsx",
     "format": "prettier --write .",
     "test": "vitest run",
-    "test:ci": "vitest run --coverage",
+    "test:ci": "vitest run",
     "typecheck": "tsc --noEmit"
   },
   "files": [
