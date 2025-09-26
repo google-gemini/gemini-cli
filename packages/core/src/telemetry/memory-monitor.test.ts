@@ -14,6 +14,7 @@ import {
   recordCurrentMemoryUsage,
   startGlobalMemoryMonitoring,
   stopGlobalMemoryMonitoring,
+  _resetGlobalMemoryMonitorForTests,
 } from './memory-monitor.js';
 import type { Config } from '../config/config.js';
 import { recordMemoryUsage, isPerformanceMonitoringActive } from './metrics.js';
@@ -128,11 +129,7 @@ describe('MemoryMonitor', () => {
     vi.restoreAllMocks();
     vi.useRealTimers();
 
-    // Clean up global monitor
-    const globalMonitor = getMemoryMonitor();
-    if (globalMonitor) {
-      globalMonitor.destroy();
-    }
+    _resetGlobalMemoryMonitorForTests();
   });
 
   describe('MemoryMonitor Class', () => {
@@ -491,20 +488,8 @@ describe('MemoryMonitor', () => {
 
     describe('getMemoryMonitor', () => {
       it('should return null when not initialized', () => {
-        // Clean up any existing monitor first
-        const existing = getMemoryMonitor();
-        if (existing) {
-          existing.destroy();
-        }
-
-        // Force re-import to reset module state
-        vi.resetModules();
-
-        // Re-import the functions
-        return import('./memory-monitor.js').then((module) => {
-          const monitor = module.getMemoryMonitor();
-          expect(monitor).toBeNull();
-        });
+        _resetGlobalMemoryMonitorForTests();
+        expect(getMemoryMonitor()).toBeNull();
       });
 
       it('should return initialized monitor', () => {
@@ -564,8 +549,6 @@ describe('MemoryMonitor', () => {
     describe('stopGlobalMemoryMonitoring', () => {
       it('should stop global monitoring when monitor exists', () => {
         startGlobalMemoryMonitoring(mockConfig, 1000);
-        const callsBeforeStop = mockRecordMemoryUsage.mock.calls.length;
-
         stopGlobalMemoryMonitoring(mockConfig);
 
         // Verify final snapshot
@@ -577,9 +560,9 @@ describe('MemoryMonitor', () => {
         );
 
         // Verify no more periodic snapshots
+        const callsAfterStop = mockRecordMemoryUsage.mock.calls.length;
         vi.advanceTimersByTime(2000);
-        const finalCallCount = mockRecordMemoryUsage.mock.calls.length;
-        expect(finalCallCount).toBe(callsBeforeStop + 4); // +4 for final snapshot (4 metrics)
+        expect(mockRecordMemoryUsage.mock.calls.length).toBe(callsAfterStop);
       });
 
       it('should handle stop when no global monitor exists', () => {
@@ -620,7 +603,7 @@ describe('MemoryMonitor', () => {
 
       const monitor = new MemoryMonitor();
 
-      // Should not throw error even if metric recording fails
+      // Should propagate error if metric recording fails
       expect(() => monitor.takeSnapshot('test', mockConfig)).toThrow(
         'Metric recording error',
       );

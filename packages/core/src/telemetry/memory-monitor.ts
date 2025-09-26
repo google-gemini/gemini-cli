@@ -417,3 +417,13 @@ export function stopGlobalMemoryMonitoring(config?: Config): void {
     globalMemoryMonitor.stop(config);
   }
 }
+
+/**
+ * Reset the global memory monitor singleton (test-only helper).
+ */
+export function _resetGlobalMemoryMonitorForTests(): void {
+  if (globalMemoryMonitor) {
+    globalMemoryMonitor.destroy();
+  }
+  globalMemoryMonitor = null;
+}
