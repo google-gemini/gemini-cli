@@ -1485,7 +1485,7 @@ describe('loadCliConfig model selection', () => {
       argv,
     );
 
-    expect(config.getModel()).toBe('gemini-2.5-pro');
+    expect(config.getModel()).toBe(DEFAULT_GEMINI_MODEL_AUTO);
   });
 
   it('always prefers model from argvs', async () => {
@@ -1803,7 +1803,7 @@ describe('loadCliConfig useRipgrep', () => {
       const argv = await parseArguments({} as Settings);
       const settings: Settings = {};
       const config = await loadCliConfig(settings, [], 'test-session', argv);
-      expect(config.getUseModelRouter()).toBe(false);
+      expect(config.getUseModelRouter()).toBe(true);
     });
 
     it('should be true when useModelRouter is set to true in settings', async () => {
@@ -1935,6 +1935,51 @@ describe('loadCliConfig tool exclusions', () => {
     expect(config.getExcludeTools()).not.toContain('run_shell_command');
     expect(config.getExcludeTools()).not.toContain('replace');
     expect(config.getExcludeTools()).not.toContain('write_file');
+  });
+
+  it('should not exclude shell tool in non-interactive mode when --allowed-tools="ShellTool" is set', async () => {
+    process.stdin.isTTY = false;
+    process.argv = [
+      'node',
+      'script.js',
+      '-p',
+      'test',
+      '--allowed-tools',
+      'ShellTool',
+    ];
+    const argv = await parseArguments({} as Settings);
+    const config = await loadCliConfig({}, [], 'test-session', argv);
+    expect(config.getExcludeTools()).not.toContain(ShellTool.Name);
+  });
+
+  it('should not exclude shell tool in non-interactive mode when --allowed-tools="run_shell_command" is set', async () => {
+    process.stdin.isTTY = false;
+    process.argv = [
+      'node',
+      'script.js',
+      '-p',
+      'test',
+      '--allowed-tools',
+      'run_shell_command',
+    ];
+    const argv = await parseArguments({} as Settings);
+    const config = await loadCliConfig({}, [], 'test-session', argv);
+    expect(config.getExcludeTools()).not.toContain(ShellTool.Name);
+  });
+
+  it('should not exclude shell tool in non-interactive mode when --allowed-tools="ShellTool(wc)" is set', async () => {
+    process.stdin.isTTY = false;
+    process.argv = [
+      'node',
+      'script.js',
+      '-p',
+      'test',
+      '--allowed-tools',
+      'ShellTool(wc)',
+    ];
+    const argv = await parseArguments({} as Settings);
+    const config = await loadCliConfig({}, [], 'test-session', argv);
+    expect(config.getExcludeTools()).not.toContain(ShellTool.Name);
   });
 });
 
