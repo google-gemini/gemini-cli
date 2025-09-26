@@ -51,7 +51,7 @@ describe('resetCommand', () => {
     await resetCommand.action(mockContext, '');
 
     expect(mockContext.ui.setDebugMessage).toHaveBeenCalledWith(
-      'Resetting terminal and resetting chat.',
+      'Resetting chat session.',
     );
     expect(mockContext.ui.setDebugMessage).toHaveBeenCalledTimes(1);
 
