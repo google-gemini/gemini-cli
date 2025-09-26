@@ -34,11 +34,10 @@ export interface ParsedError {
   // Original error message from server
   errorMessage: string;
   rawError: unknown;
-  // HTTP status for structured errors (e.g., 429)
-  httpStatus?: number;
-  // API error fields for JSON error payloads
-  apiStatus?: string; // e.g., 'RESOURCE_EXHAUSTED'
-  apiCode?: number; // e.g., 429
+  // Unified HTTP status for structured or JSON errors (e.g., 429)
+  statusCode?: number;
+  // API error status string for JSON error payloads (e.g., 'RESOURCE_EXHAUSTED')
+  apiStatus?: string;
   // Source of the parsed error (useful for formatting decisions)
   origin?: 'structured' | 'json' | 'text' | 'unknown';
 }
@@ -124,22 +123,19 @@ function getRateLimitMessage(
     case AuthType.LOGIN_WITH_GOOGLE: {
       const quotaType = classifyParsedErrorTypeFor429(error);
       const isPaidTier = isPaidUserTier(userTier);
-      return (
-        '\n' +
-        formatGoogleLoginRateLimitMessage({
-          quotaType,
-          isPaidTier,
-          currentModel: sanitizedCurrent,
-          fallbackModel: sanitizedFallback,
-        })
-      );
+      return formatGoogleLoginRateLimitMessage({
+        quotaType,
+        isPaidTier,
+        currentModel: sanitizedCurrent,
+        fallbackModel: sanitizedFallback,
+      });
     }
     case AuthType.USE_GEMINI:
-      return '\n' + RATE_LIMIT_ERROR_MESSAGE_USE_GEMINI;
+      return RATE_LIMIT_ERROR_MESSAGE_USE_GEMINI;
     case AuthType.USE_VERTEX_AI:
-      return '\n' + RATE_LIMIT_ERROR_MESSAGE_VERTEX;
+      return RATE_LIMIT_ERROR_MESSAGE_VERTEX;
     default:
-      return `\n${DEFAULT_FALLBACK_PREFIX} Switching to the ${sanitizedFallback} model for the rest of this session.`;
+      return `${DEFAULT_FALLBACK_PREFIX} Switching to the ${sanitizedFallback} model for the rest of this session.`;
   }
 }
 
@@ -179,9 +175,8 @@ type ParseContext = {
 
 type NormalizedInput = {
   message: string;
-  httpStatus?: number;
+  statusCode?: number;
   apiStatus?: string;
-  apiCode?: number;
   origin: ErrorOrigin;
   rawError: unknown;
 };
@@ -197,9 +192,8 @@ function buildParsedError(
     customMessage,
     errorMessage: base.message,
     rawError: base.rawError,
-    httpStatus: base.httpStatus,
+    statusCode: base.statusCode,
     apiStatus: base.apiStatus,
-    apiCode: base.apiCode,
     origin: base.origin,
   };
 }
@@ -210,7 +204,7 @@ function normalizeStructuredError(error: {
 }): NormalizedInput {
   return {
     message: error.message,
-    httpStatus: error.status,
+    statusCode: error.status,
     origin: 'structured',
     rawError: error,
   };
@@ -235,7 +229,7 @@ function normalizeApiJsonError(
   const unwrapped = unwrapNestedApiMessage(apiErr.error.message);
   return {
     message: unwrapped,
-    apiCode: apiErr.error.code,
+    statusCode: apiErr.error.code,
     apiStatus: apiErr.error.status,
     origin: 'json',
     rawError,
@@ -250,12 +244,25 @@ function extractApiErrorFromString(text: string): {
   const start = anchor >= 0 ? anchor : text.indexOf('{');
   if (start === -1) return null;
 
-  // Try to trim trailing noise after JSON by cutting to the last closing brace
-  const lastClose = text.lastIndexOf('}');
-  const candidate =
-    lastClose > start
-      ? text.substring(start, lastClose + 1)
-      : text.substring(start);
+  let braceCount = 0;
+  let end = -1;
+
+  for (let i = start; i < text.length; i++) {
+    if (text[i] === '{') {
+      braceCount++;
+    } else if (text[i] === '}') {
+      braceCount--;
+    }
+
+    if (braceCount === 0) {
+      end = i;
+      break;
+    }
+  }
+
+  if (end === -1) return null;
+
+  const candidate = text.substring(start, end + 1);
 
   try {
     const parsed = JSON.parse(candidate) as unknown;
@@ -277,8 +284,7 @@ function dispatchByStatus(
   detectionTarget: unknown,
   ctx: ParseContext,
 ): ParsedError {
-  const status = normalized.httpStatus ?? normalized.apiCode;
-  switch (status) {
+  switch (normalized.statusCode) {
     case 401:
       return parse401(normalized);
     case 403:
@@ -314,18 +320,13 @@ function parse429(
   const type = classifyParsedErrorTypeFor429(detectionTarget);
 
   // Generate custom message for 429 errors based on type and context
-  const rateLimitMessage = getRateLimitMessage(
+  const customMessage = getRateLimitMessage(
     ctx.authType,
     detectionTarget,
     ctx.userTier,
     ctx.currentModel,
     ctx.fallbackModel,
   );
-
-  // Remove leading newline since it's now part of the message itself
-  const customMessage = rateLimitMessage.startsWith('\n')
-    ? rateLimitMessage.slice(1)
-    : rateLimitMessage;
 
   return buildParsedError(base, type, customMessage);
 }

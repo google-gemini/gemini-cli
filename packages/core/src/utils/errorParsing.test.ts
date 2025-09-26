@@ -379,7 +379,7 @@ describe('parseError (structured output)', () => {
 
     expect(parsed.type).toBe(ParsedErrorType.PRO_QUOTA);
     expect(parsed.origin).toBe('json');
-    expect(parsed.apiCode).toBe(429);
+    expect(parsed.statusCode).toBe(429);
     expect(parsed.apiStatus).toBe('RESOURCE_EXHAUSTED');
     expect(parsed.customMessage).toBeTruthy();
     expect(parsed.customMessage!).toContain(
@@ -402,7 +402,7 @@ describe('parseError (structured output)', () => {
 
     expect(parsed.type).toBe(ParsedErrorType.RATE_LIMIT);
     expect(parsed.origin).toBe('json');
-    expect(parsed.apiCode).toBe(429);
+    expect(parsed.statusCode).toBe(429);
     expect(parsed.apiStatus).toBe('RESOURCE_EXHAUSTED');
     expect(parsed.customMessage).toBeTruthy();
     expect(parsed.customMessage!).toContain(
@@ -414,7 +414,7 @@ describe('parseError (structured output)', () => {
     const parsed = parseError({ message: 'Unauthorized', status: 401 });
     expect(parsed.type).toBe(ParsedErrorType.AUTH);
     expect(parsed.origin).toBe('structured');
-    expect(parsed.httpStatus).toBe(401);
+    expect(parsed.statusCode).toBe(401);
     expect(parsed.customMessage).toBeUndefined();
   });
 
@@ -424,7 +424,7 @@ describe('parseError (structured output)', () => {
     expect(parsed.type).toBe(ParsedErrorType.GENERIC);
     expect(parsed.origin).toBe('text');
     expect(parsed.errorMessage).toBe(msg);
-    expect(parsed.httpStatus).toBeUndefined();
+    expect(parsed.statusCode).toBeUndefined();
     expect(parsed.customMessage).toBeUndefined();
   });
 
@@ -433,5 +433,15 @@ describe('parseError (structured output)', () => {
     expect(parsed.type).toBe(ParsedErrorType.GENERIC);
     expect(parsed.origin).toBe('unknown');
     expect(parsed.errorMessage).toBe('An unknown error occurred.');
+  });
+
+  it('should correctly parse a JSON error with trailing text', () => {
+    const errorMessage =
+      '[API Error: Quota exceeded. {"error":{"message":"Daily limit reached","status":"RESOURCE_EXHAUSTED","code":429}} Please try again tomorrow.]';
+    const parsed = parseError(errorMessage);
+    expect(parsed.type).toBe(ParsedErrorType.RATE_LIMIT);
+    expect(parsed.origin).toBe('json');
+    expect(parsed.statusCode).toBe(429);
+    expect(parsed.errorMessage).toBe('Daily limit reached');
   });
 });
