@@ -18,6 +18,7 @@ import {
   ToolConfirmationOutcome,
 } from './tools.js';
 import type { CallableTool, FunctionCall, Part } from '@google/genai';
+import { isMimeTypeSupported } from '../utils/mimeUtils.js';
 import { ToolErrorType } from './tool-error.js';
 import type { Config } from '../config/config.js';
 
@@ -56,37 +57,6 @@ type McpContentBlock =
   | McpMediaBlock
   | McpResourceBlock
   | McpResourceLinkBlock;
-
-// This list is based on the supported file formats for Gemini 2.5 Pro.
-// Source: https://cloud.google.com/vertex-ai/generative-ai/docs/models/gemini/2-5-pro
-//         https://cloud.google.com/vertex-ai/generative-ai/docs/models/gemini/2-5-flash
-const SUPPORTED_MIME_TYPES = new Set([
-  'image/png',
-  'image/jpeg',
-  'image/webp',
-  'application/pdf',
-  'text/plain',
-  'video/x-flv',
-  'video/quicktime',
-  'video/mpeg',
-  'video/mpegs',
-  'video/mpg',
-  'video/mp4',
-  'video/webm',
-  'video/wmv',
-  'video/3gpp',
-  'audio/x-aac',
-  'audio/flac',
-  'audio/mp3',
-  'audio/m4a',
-  'audio/mpeg',
-  'audio/mpga',
-  'audio/mp4',
-  'audio/opus',
-  'audio/pcm',
-  'audio/wav',
-  'audio/webm',
-]);
 
 class DiscoveredMCPToolInvocation extends BaseToolInvocation<
   ToolParams,
@@ -218,7 +188,7 @@ class DiscoveredMCPToolInvocation extends BaseToolInvocation<
       };
     }
 
-    validateMcpContent(rawResponseParts);
+    sanitizeMcpContentInPlace(rawResponseParts);
 
     const transformedParts = transformMcpContentToParts(rawResponseParts);
 
@@ -341,32 +311,35 @@ function transformResourceLinkBlock(block: McpResourceLinkBlock): Part {
 }
 
 /**
- * Validates the MCP content blocks and replaces unsupported mime types with an error message.
+ * Sanitizes the MCP content blocks in place, replacing unsupported mime types
+ * with an error message.
  * @param sdkResponse The raw Part[] array from `mcpTool.callTool()`.
  */
-function validateMcpContent(sdkResponse: Part[]): void {
-  const funcResponse = sdkResponse?.[0]?.functionResponse;
-  const mcpContent = funcResponse?.response?.['content'] as McpContentBlock[];
+function sanitizeMcpContentInPlace(sdkResponse: Part[]): void {
+  for (let j = 0; j < sdkResponse.length; j++) {
+    const funcResponse = sdkResponse[j]?.functionResponse;
+    const mcpContent = funcResponse?.response?.['content'] as McpContentBlock[];
 
-  if (!Array.isArray(mcpContent)) {
-    return;
-  }
-
-  for (let i = 0; i < mcpContent.length; i++) {
-    const block = mcpContent[i];
-    let mimeType: string | undefined;
-
-    if (block.type === 'image' || block.type === 'audio') {
-      mimeType = block.mimeType;
-    } else if (block.type === 'resource' && block.resource.blob) {
-      mimeType = block.resource.mimeType || 'application/octet-stream';
+    if (!Array.isArray(mcpContent)) {
+      return;
     }
 
-    if (mimeType && !SUPPORTED_MIME_TYPES.has(mimeType)) {
-      mcpContent[i] = {
-        type: 'text',
-        text: `[Tool returned unsupported mimetype: ${mimeType}]`,
-      };
+    for (let i = 0; i < mcpContent.length; i++) {
+      const block = mcpContent[i];
+      let mimeType: string | undefined;
+
+      if (block.type === 'image' || block.type === 'audio') {
+        mimeType = block.mimeType;
+      } else if (block.type === 'resource' && block.resource.blob) {
+        mimeType = block.resource.mimeType || 'application/octet-stream';
+      }
+
+      if (mimeType && !isMimeTypeSupported(mimeType)) {
+        mcpContent[i] = {
+          type: 'text',
+          text: `[Tool returned unsupported mimetype: ${mimeType}]`,
+        };
+      }
     }
   }
 }
