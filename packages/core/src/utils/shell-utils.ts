@@ -11,7 +11,7 @@ import { quote } from 'shell-quote';
 import { doesToolInvocationMatch } from './tool-utils.js';
 import { spawn, type SpawnOptionsWithoutStdio } from 'node:child_process';
 
-const SHELL_TOOL_NAMES = ['run_shell_command', 'ShellTool'];
+export const SHELL_TOOL_NAMES = ['run_shell_command', 'ShellTool'];
 
 /**
  * An identifier for the shell type.
