@@ -27,19 +27,10 @@ inputs:
   previous-tag:
     description: 'The previous tag to use for generating release notes.'
     required: true
-  skip-github-release:
-    description: 'Whether to skip creating a GitHub release.'
-    type: 'boolean'
-    required: false
-    default: false
   working-directory:
     description: 'The working directory to run the steps in.'
     required: false
     default: '.'
-  force-skip-tests:
-    description: 'Skip tests and validation'
-    required: false
-    default: false
 
 runs:
   using: 'composite'
@@ -112,7 +103,6 @@ runs:
           --dry-run="${{ inputs.dry-run }}" \
           --workspace="@google/gemini-cli-core" \
           --tag="${{ inputs.npm-tag }}"
-          --no-tag
 
     - name: '🔗 Install latest core package'
       working-directory: '${{ inputs.working-directory }}'
@@ -133,25 +123,6 @@ runs:
           --dry-run="${{ inputs.dry-run }}" \
           --workspace="@google/gemini-cli" \
           --tag="${{ inputs.npm-tag }}"
-          --no-tag
-
-    - name: '🔬 Verify NPM release by version'
-      uses: './.github/actions/verify-release'
-      if: "${{ inputs.dry-run == 'false' && inputs.force-skip-tests == 'false' }}"
-      with:
-        npm-package: '@google/gemini-cli@${{ inputs.release-version }}'
-        expected-version: '${{ inputs.release-version }}'
-        ref: '${{ steps.release_branch.outputs.BRANCH_NAME }}'
-
-    - name: '🏷️ Tag release'
-      uses: './.github/actions/tag-npm-release'
-      if: "${{ inputs.dry-run == 'false' }}"
-      with:
-        channel: '${{ inputs.npm-tag }}'
-        version: '${{ inputs.release-version }}'
-        dry-run: '${{ inputs.dry-run }}'
-        wombat-token-core: '${{ inputs.wombat-token-core }}'
-        wombat-token-cli: '${{ inputs.wombat-token-cli }}'
 
     - name: '🎁 Bundle'
       working-directory: '${{ inputs.working-directory }}'
@@ -161,8 +132,7 @@ runs:
 
     - name: '🎉 Create GitHub Release'
       working-directory: '${{ inputs.working-directory }}'
-      if: "${{ inputs.dry-run == 'false' && inputs.skip-github-release == 'false' }}"
-      if: "${{ inputs.dry-run == 'false' && inputs.skip-github-release == 'false' && inputs.npm-tag != 'dev' }}"
+      if: "${{ inputs.dry-run == 'false' }}"
       env:
         GITHUB_TOKEN: '${{ inputs.github-token }}'
       shell: 'bash'
