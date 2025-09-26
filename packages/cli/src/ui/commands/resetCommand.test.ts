@@ -74,7 +74,7 @@ describe('resetCommand', () => {
     await resetCommand.action(nullConfigContext, '');
 
     expect(nullConfigContext.ui.setDebugMessage).toHaveBeenCalledWith(
-      'Resetting terminal.',
+      'Could not find an active session to reset.',
     );
     expect(mockResetChat).not.toHaveBeenCalled();
     expect(uiTelemetryService.setLastPromptTokenCount).toHaveBeenCalledWith(0);
