@@ -18,15 +18,22 @@ import { EditorSettingsDialog } from './EditorSettingsDialog.js';
 import { PrivacyNotice } from '../privacy/PrivacyNotice.js';
 import { WorkspaceMigrationDialog } from './WorkspaceMigrationDialog.js';
 import { ProQuotaDialog } from './ProQuotaDialog.js';
+import { PermissionsModifyTrustDialog } from './PermissionsModifyTrustDialog.js';
+import { ModelDialog } from './ModelDialog.js';
 import { theme } from '../semantic-colors.js';
 import { useUIState } from '../contexts/UIStateContext.js';
 import { useUIActions } from '../contexts/UIActionsContext.js';
 import { useConfig } from '../contexts/ConfigContext.js';
 import { useSettings } from '../contexts/SettingsContext.js';
 import process from 'node:process';
+import { type UseHistoryManagerReturn } from '../hooks/useHistoryManager.js';
+
+interface DialogManagerProps {
+  addItem: UseHistoryManagerReturn['addItem'];
+}
 
 // Props for DialogManager
-export const DialogManager = () => {
+export const DialogManager = ({ addItem }: DialogManagerProps) => {
   const config = useConfig();
   const settings = useSettings();
 
@@ -141,6 +148,9 @@ export const DialogManager = () => {
       </Box>
     );
   }
+  if (uiState.isModelDialogOpen) {
+    return <ModelDialog onClose={uiActions.closeModelDialog} />;
+  }
   if (uiState.isAuthenticating) {
     return (
       <AuthInProgress
@@ -184,6 +194,15 @@ export const DialogManager = () => {
       <PrivacyNotice
         onExit={() => uiActions.exitPrivacyNotice()}
         config={config}
+      />
+    );
+  }
+
+  if (uiState.isPermissionsDialogOpen) {
+    return (
+      <PermissionsModifyTrustDialog
+        onExit={uiActions.closePermissionsDialog}
+        addItem={addItem}
       />
     );
   }

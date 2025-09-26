@@ -143,7 +143,7 @@ describe('useExtensionUpdates', () => {
       expect(addItem).toHaveBeenCalledWith(
         {
           type: MessageType.INFO,
-          text: 'Extension test-extension has an update available, run "/extensions update test-extension" to install it.',
+          text: 'You have 1 extension with an update available, run "/extensions list" for more information.',
         },
         expect.any(Number),
       );
@@ -187,7 +187,10 @@ describe('useExtensionUpdates', () => {
         JSON.stringify({ name: 'test-extension', version: '1.1.0' }),
       );
     });
-    vi.mocked(isWorkspaceTrusted).mockReturnValue(true);
+    vi.mocked(isWorkspaceTrusted).mockReturnValue({
+      isTrusted: true,
+      source: 'file',
+    });
 
     renderHook(() => useExtensionUpdates([extension], addItem, tempHomeDir));
 
