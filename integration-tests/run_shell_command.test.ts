@@ -226,8 +226,8 @@ describe('run_shell_command', () => {
       foundToolCall,
       'Expected to find a run_shell_command tool call',
     ).toBeTruthy();
+  });
 
-    
   it('should propagate environment variables to the child process', async () => {
     const rig = new TestRig();
     await rig.setup('should propagate environment variables');
@@ -276,6 +276,13 @@ describe('run_shell_command', () => {
       printDebugInfo(rig, result, {
         'Found tool call': foundToolCall,
         'Contains fileName': result.includes(fileName),
+      });
+    }
+
+    expect(
+      foundToolCall,
+      'Expected to find a run_shell_command tool call',
+    ).toBeTruthy();
 
     validateModelOutput(result, fileName, 'Platform-specific listing test');
     expect(result).toContain(fileName);
