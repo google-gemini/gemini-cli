@@ -70,10 +70,10 @@ jobs:
           set -e
           STABLE_JSON=$(node scripts/get-release-version.js --type=stable ${{ github.event.inputs.stable_version_override && format('--stable_version_override={0}', github.event.inputs.stable_version_override) || '' }})
           PREVIEW_JSON=$(node scripts/get-release-version.js --type=preview ${{ github.event.inputs.preview_version_override && format('--preview_version_override={0}', github.event.inputs.preview_version_override) || '' }})
-          NIGHTLY_JSON=$(node scripts/get-release-version.js --type=nightly)
+          NIGHTLY_JSON=$(node scripts/get-release-version.js --type=promote-nightly)
           echo "STABLE_JSON_COMMAND=node scripts/get-release-version.js --type=stable ${{ github.event.inputs.stable_version_override && format('--stable_version_override={0}', github.event.inputs.stable_version_override) || '' }}"
           echo "PREVIEW_JSON_COMMAND=node scripts/get-release-version.js --type=preview ${{ github.event.inputs.preview_version_override && format('--preview_version_override={0}', github.event.inputs.preview_version_override) || '' }}"
-          echo "NIGHTLY_JSON_COMMAND=node scripts/get-release-version.js --type=nightly"
+          echo "NIGHTLY_JSON_COMMAND=node scripts/get-release-version.js --type=promote-nightly"
           echo "STABLE_JSON: ${STABLE_JSON}"
           echo "PREVIEW_JSON: ${PREVIEW_JSON}"
           echo "NIGHTLY_JSON: ${NIGHTLY_JSON}"
@@ -320,8 +320,7 @@ jobs:
           branch-name: '${{ steps.release_branch.outputs.BRANCH_NAME }}'
           pr-title: 'chore(release): bump version to ${{ needs.calculate-versions.outputs.NEXT_NIGHTLY_VERSION }}'
           pr-body: 'Automated version bump to prepare for the next nightly release.'
-          app-id: '${{ secrets.APP_ID }}'
-          private-key: '${{ secrets.PRIVATE_KEY }}'
+          github-token: '${{ secrets.GEMINI_CLI_ROBOT_GITHUB_PAT }}'
           dry-run: '${{ github.event.inputs.dry_run }}'
 
       - name: 'Create Issue on Failure'
