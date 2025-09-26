@@ -5,17 +5,18 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { ReadFileTool, ReadFileToolParams } from './read-file.js';
+import type { ReadFileToolParams } from './read-file.js';
+import { ReadFileTool } from './read-file.js';
 import { ToolErrorType } from './tool-error.js';
-import path from 'path';
-import os from 'os';
-import fs from 'fs';
-import fsp from 'fs/promises';
-import { Config } from '../config/config.js';
+import path from 'node:path';
+import os from 'node:os';
+import fs from 'node:fs';
+import fsp from 'node:fs/promises';
+import type { Config } from '../config/config.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import { StandardFileSystemService } from '../services/fileSystemService.js';
 import { createMockWorkspaceContext } from '../test-utils/mockWorkspaceContext.js';
-import { ToolInvocation, ToolResult } from './tools.js';
+import type { ToolInvocation, ToolResult } from './tools.js';
 
 vi.mock('../telemetry/loggers.js', () => ({
   logFileOperation: vi.fn(),
@@ -37,6 +38,9 @@ describe('ReadFileTool', () => {
       getFileSystemService: () => new StandardFileSystemService(),
       getTargetDir: () => tempRootDir,
       getWorkspaceContext: () => createMockWorkspaceContext(tempRootDir),
+      storage: {
+        getProjectTempDir: () => path.join(tempRootDir, '.temp'),
+      },
     } as unknown as Config;
     tool = new ReadFileTool(mockConfigInstance);
   });
@@ -72,6 +76,24 @@ describe('ReadFileTool', () => {
       };
       expect(() => tool.build(params)).toThrow(
         /File path must be within one of the workspace directories/,
+      );
+    });
+
+    it('should allow access to files in project temp directory', () => {
+      const tempDir = path.join(tempRootDir, '.temp');
+      const params: ReadFileToolParams = {
+        absolute_path: path.join(tempDir, 'temp-file.txt'),
+      };
+      const result = tool.build(params);
+      expect(typeof result).not.toBe('string');
+    });
+
+    it('should show temp directory in error message when path is outside workspace and temp dir', () => {
+      const params: ReadFileToolParams = {
+        absolute_path: '/completely/outside/path.txt',
+      };
+      expect(() => tool.build(params)).toThrow(
+        /File path must be within one of the workspace directories.*or within the project temp directory/,
       );
     });
 
@@ -406,6 +428,24 @@ describe('ReadFileTool', () => {
       expect(result.returnDisplay).toBe(
         'Read lines 6-8 of 20 from paginated.txt',
       );
+    });
+
+    it('should successfully read files from project temp directory', async () => {
+      const tempDir = path.join(tempRootDir, '.temp');
+      await fsp.mkdir(tempDir, { recursive: true });
+      const tempFilePath = path.join(tempDir, 'temp-output.txt');
+      const tempFileContent = 'This is temporary output content';
+      await fsp.writeFile(tempFilePath, tempFileContent, 'utf-8');
+
+      const params: ReadFileToolParams = { absolute_path: tempFilePath };
+      const invocation = tool.build(params) as ToolInvocation<
+        ReadFileToolParams,
+        ToolResult
+      >;
+
+      const result = await invocation.execute(abortSignal);
+      expect(result.llmContent).toBe(tempFileContent);
+      expect(result.returnDisplay).toBe('');
     });
 
     describe('with .geminiignore', () => {

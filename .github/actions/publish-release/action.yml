@@ -36,15 +36,25 @@ inputs:
     description: 'The working directory to run the steps in.'
     required: false
     default: '.'
+<<<<<<< HEAD
+=======
+  force-skip-tests:
+    description: 'Skip tests and validation'
+    required: false
+    default: false
+>>>>>>> upstream/main
 
 runs:
   using: 'composite'
   steps:
+<<<<<<< HEAD
     - name: '📝 Print Inputs'
       shell: 'bash'
       run: |
         echo "${{ toJSON(inputs) }}"
 
+=======
+>>>>>>> upstream/main
     - name: '👤 Configure Git User'
       working-directory: '${{ inputs.working-directory }}'
       shell: 'bash'
@@ -107,7 +117,11 @@ runs:
         npm publish \
           --dry-run="${{ inputs.dry-run }}" \
           --workspace="@google/gemini-cli-core" \
+<<<<<<< HEAD
           --tag="${{ inputs.npm-tag }}"
+=======
+          --no-tag
+>>>>>>> upstream/main
 
     - name: '🔗 Install latest core package'
       working-directory: '${{ inputs.working-directory }}'
@@ -127,7 +141,29 @@ runs:
         npm publish \
           --dry-run="${{ inputs.dry-run }}" \
           --workspace="@google/gemini-cli" \
+<<<<<<< HEAD
           --tag="${{ inputs.npm-tag }}"
+=======
+          --no-tag
+
+    - name: '🔬 Verify NPM release by version'
+      uses: './.github/actions/verify-release'
+      if: "${{ inputs.dry-run == 'false' && inputs.force-skip-tests == 'false' }}"
+      with:
+        npm-package: '@google/gemini-cli@${{ inputs.release-version }}'
+        expected-version: '${{ inputs.release-version }}'
+        ref: '${{ steps.release_branch.outputs.BRANCH_NAME }}'
+
+    - name: '🏷️ Tag release'
+      uses: './.github/actions/tag-npm-release'
+      if: "${{ inputs.dry-run == 'false' }}"
+      with:
+        channel: '${{ inputs.npm-tag }}'
+        version: '${{ inputs.release-version }}'
+        dry-run: '${{ inputs.dry-run }}'
+        wombat-token-core: '${{ inputs.wombat-token-core }}'
+        wombat-token-cli: '${{ inputs.wombat-token-cli }}'
+>>>>>>> upstream/main
 
     - name: '🎁 Bundle'
       working-directory: '${{ inputs.working-directory }}'
@@ -137,7 +173,11 @@ runs:
 
     - name: '🎉 Create GitHub Release'
       working-directory: '${{ inputs.working-directory }}'
+<<<<<<< HEAD
       if: "${{ inputs.dry-run == 'false' && inputs.skip-github-release == 'false' }}"
+=======
+      if: "${{ inputs.dry-run == 'false' && inputs.skip-github-release == 'false' && inputs.npm-tag != 'dev' }}"
+>>>>>>> upstream/main
       env:
         GITHUB_TOKEN: '${{ inputs.github-token }}'
       shell: 'bash'

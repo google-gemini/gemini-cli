@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { FileSystemService } from '@google/gemini-cli-core';
-import * as acp from './acp.js';
+import type { FileSystemService } from '@google/gemini-cli-core';
+import type * as acp from './acp.js';
 
 /**
  * ACP client-based implementation of FileSystemService

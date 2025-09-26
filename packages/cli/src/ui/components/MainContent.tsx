@@ -55,7 +55,11 @@ export const MainContent = () => {
               isPending={true}
               isFocused={!uiState.isEditorDialogOpen}
               activeShellPtyId={uiState.activePtyId}
+<<<<<<< HEAD
               shellFocused={uiState.shellFocused}
+=======
+              embeddedShellFocused={uiState.embeddedShellFocused}
+>>>>>>> upstream/main
             />
           ))}
           <ShowMoreLines constrainHeight={uiState.constrainHeight} />

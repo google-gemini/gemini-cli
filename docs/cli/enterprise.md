@@ -6,23 +6,31 @@ This document outlines configuration patterns and best practices for deploying a
 
 ## Centralized Configuration: The System Settings File
 
-The most powerful tool for enterprise administration is the system-wide `settings.json` file. This file allows you to define a baseline configuration that applies to all users on a machine. For a complete overview of configuration options, see the [Configuration documentation](./configuration.md). Settings from system, user, and project-level `settings.json` files are merged together. For most settings, the system-wide configuration takes precedence, overriding any conflicting user or project-level settings. However, some settings, like `customThemes`, `mcpServers`, and `includeDirectories`, are merged from all configuration files, and if there are conflicting values (e.g., both workspace and system settings have a 'github' MCP server defined), the system value will take precedence.
+The most powerful tools for enterprise administration are the system-wide settings files. These files allow you to define a baseline configuration (`system-defaults.json`) and a set of overrides (`settings.json`) that apply to all users on a machine. For a complete overview of configuration options, see the [Configuration documentation](./configuration.md).
+
+Settings are merged from four files. The precedence order for single-value settings (like `theme`) is:
+
+1. System Defaults (`system-defaults.json`)
+2. User Settings (`~/.gemini/settings.json`)
+3. Workspace Settings (`<project>/.gemini/settings.json`)
+4. System Overrides (`settings.json`)
+
+This means the System Overrides file has the final say. For settings that are arrays (`includeDirectories`) or objects (`mcpServers`), the values are merged.
 
 **Example of Merging and Precedence:**
 
 Here is how settings from different levels are combined.
 
-- **System `settings.json`:**
+- **System Defaults `system-defaults.json`:**
 
   ```json
   {
-    "theme": "system-enforced-theme",
-    "mcpServers": {
-      "corp-server": {
-        "command": "/usr/local/bin/corp-server-prod"
-      }
+    "ui": {
+      "theme": "default-corporate-theme"
     },
-    "includeDirectories": ["/etc/gemini-cli/global-context"]
+    "context": {
+      "includeDirectories": ["/etc/gemini-cli/common-context"]
+    }
   }
   ```
 
@@ -30,7 +38,9 @@ Here is how settings from different levels are combined.
 
   ```json
   {
-    "theme": "user-preferred-dark-theme",
+    "ui": {
+      "theme": "user-preferred-dark-theme"
+    },
     "mcpServers": {
       "corp-server": {
         "command": "/usr/local/bin/corp-server-dev"
@@ -39,20 +49,44 @@ Here is how settings from different levels are combined.
         "command": "npm start --prefix ~/tools/my-tool"
       }
     },
-    "includeDirectories": ["~/gemini-context"]
+    "context": {
+      "includeDirectories": ["~/gemini-context"]
+    }
   }
   ```
 
 - **Workspace `settings.json` (`<project>/.gemini/settings.json`):**
+
   ```json
   {
-    "theme": "project-specific-light-theme",
+    "ui": {
+      "theme": "project-specific-light-theme"
+    },
     "mcpServers": {
       "project-tool": {
         "command": "npm start"
       }
     },
-    "includeDirectories": ["./project-context"]
+    "context": {
+      "includeDirectories": ["./project-context"]
+    }
+  }
+  ```
+
+- **System Overrides `settings.json`:**
+  ```json
+  {
+    "ui": {
+      "theme": "system-enforced-theme"
+    },
+    "mcpServers": {
+      "corp-server": {
+        "command": "/usr/local/bin/corp-server-prod"
+      }
+    },
+    "context": {
+      "includeDirectories": ["/etc/gemini-cli/global-context"]
+    }
   }
   ```
 
@@ -61,7 +95,9 @@ This results in the following merged configuration:
 - **Final Merged Configuration:**
   ```json
   {
-    "theme": "system-enforced-theme",
+    "ui": {
+      "theme": "system-enforced-theme"
+    },
     "mcpServers": {
       "corp-server": {
         "command": "/usr/local/bin/corp-server-prod"
@@ -73,19 +109,22 @@ This results in the following merged configuration:
         "command": "npm start"
       }
     },
-    "includeDirectories": [
-      "/etc/gemini-cli/global-context",
-      "~/gemini-context",
-      "./project-context"
-    ]
+    "context": {
+      "includeDirectories": [
+        "/etc/gemini-cli/common-context",
+        "~/gemini-context",
+        "./project-context",
+        "/etc/gemini-cli/global-context"
+      ]
+    }
   }
   ```
 
 **Why:**
 
-- **`theme`**: The value from the system settings is used, overriding both user and workspace settings.
-- **`mcpServers`**: The objects are merged. The `corp-server` definition from the system settings takes precedence over the user's definition. The unique `user-tool` and `project-tool` are included.
-- **`includeDirectories`**: The arrays are concatenated in the order of System, User, and then Workspace.
+- **`theme`**: The value from the system overrides (`system-enforced-theme`) is used, as it has the highest precedence.
+- **`mcpServers`**: The objects are merged. The `corp-server` definition from the system overrides takes precedence over the user's definition. The unique `user-tool` and `project-tool` are included.
+- **`includeDirectories`**: The arrays are concatenated in the order of System Defaults, User, Workspace, and then System Overrides.
 
 - **Location**:
   - **Linux**: `/etc/gemini-cli/settings.json`
@@ -98,7 +137,7 @@ By using the system settings file, you can enforce the security and configuratio
 
 ## Restricting Tool Access
 
-You can significantly enhance security by controlling which tools the Gemini model can use. This is achieved through the `coreTools` and `excludeTools` settings. For a list of available tools, see the [Tools documentation](../tools/index.md).
+You can significantly enhance security by controlling which tools the Gemini model can use. This is achieved through the `tools.core` and `tools.exclude` settings. For a list of available tools, see the [Tools documentation](../tools/index.md).
 
 ### Allowlisting with `coreTools`
 
@@ -108,7 +147,9 @@ The most secure approach is to explicitly add the tools and commands that users 
 
 ```json
 {
-  "coreTools": ["ReadFileTool", "GlobTool", "ShellTool(ls)"]
+  "tools": {
+    "core": ["ReadFileTool", "GlobTool", "ShellTool(ls)"]
+  }
 }
 ```
 
@@ -120,7 +161,9 @@ Alternatively, you can add specific tools that are considered dangerous in your 
 
 ```json
 {
-  "excludeTools": ["ShellTool(rm -rf)"]
+  "tools": {
+    "exclude": ["ShellTool(rm -rf)"]
+  }
 }
 ```
 
@@ -153,7 +196,9 @@ Following the principle of least privilege, it is highly recommended to use `inc
 
 ```json
 {
-  "allowMCPServers": ["third-party-analyzer"],
+  "mcp": {
+    "allowed": ["third-party-analyzer"]
+  },
   "mcpServers": {
     "third-party-analyzer": {
       "command": "/usr/local/bin/start-3p-analyzer.sh",
@@ -168,7 +213,7 @@ Following the principle of least privilege, it is highly recommended to use `inc
 To create a secure, centrally-managed catalog of tools, the system administrator **must** do both of the following in the system-level `settings.json` file:
 
 1.  **Define the full configuration** for every approved server in the `mcpServers` object. This ensures that even if a user defines a server with the same name, the secure system-level definition will take precedence.
-2.  **Add the names** of those servers to an allowlist using the `allowMCPServers` setting. This is a critical security step that prevents users from running any servers that are not on this list. If this setting is omitted, the CLI will merge and allow any server defined by the user.
+2.  **Add the names** of those servers to an allowlist using the `mcp.allowed` setting. This is a critical security step that prevents users from running any servers that are not on this list. If this setting is omitted, the CLI will merge and allow any server defined by the user.
 
 **Example System `settings.json`:**
 
@@ -179,7 +224,9 @@ To create a secure, centrally-managed catalog of tools, the system administrator
 
 ```json
 {
-  "allowMCPServers": ["corp-data-api", "source-code-analyzer"],
+  "mcp": {
+    "allowed": ["corp-data-api", "source-code-analyzer"]
+  },
   "mcpServers": {
     "corp-data-api": {
       "command": "/usr/local/bin/start-corp-api.sh",
@@ -192,16 +239,16 @@ To create a secure, centrally-managed catalog of tools, the system administrator
 }
 ```
 
-This pattern is more secure because it uses both definition and an allowlist. Any server a user defines will either be overridden by the system definition (if it has the same name) or blocked because its name is not in the `allowMCPServers` list.
+This pattern is more secure because it uses both definition and an allowlist. Any server a user defines will either be overridden by the system definition (if it has the same name) or blocked because its name is not in the `mcp.allowed` list.
 
 ### Less Secure Pattern: Omitting the Allowlist
 
-If the administrator defines the `mcpServers` object but fails to also specify the `allowMCPServers` allowlist, users may add their own servers.
+If the administrator defines the `mcpServers` object but fails to also specify the `mcp.allowed` allowlist, users may add their own servers.
 
 **Example System `settings.json`:**
 
 This configuration defines servers but does not enforce the allowlist.
-The administrator has NOT included the "allowMCPServers" setting.
+The administrator has NOT included the "mcp.allowed" setting.
 
 ```json
 {
@@ -213,7 +260,7 @@ The administrator has NOT included the "allowMCPServers" setting.
 }
 ```
 
-In this scenario, a user can add their own server in their local `settings.json`. Because there is no `allowMCPServers` list to filter the merged results, the user's server will be added to the list of available tools and allowed to run.
+In this scenario, a user can add their own server in their local `settings.json`. Because there is no `mcp.allowed` list to filter the merged results, the user's server will be added to the list of available tools and allowed to run.
 
 ## Enforcing Sandboxing for Security
 
@@ -223,7 +270,9 @@ To mitigate the risk of potentially harmful operations, you can enforce the use 
 
 ```json
 {
-  "sandbox": "docker"
+  "tools": {
+    "sandbox": "docker"
+  }
 }
 ```
 
@@ -268,42 +317,59 @@ For auditing and monitoring purposes, you can configure Gemini CLI to send telem
 
 **Note:** Ensure that `logPrompts` is set to `false` in an enterprise setting to avoid collecting potentially sensitive information from user prompts.
 
+## Authentication
+
+You can enforce a specific authentication method for all users by setting the `enforcedAuthType` in the system-level `settings.json` file. This prevents users from choosing a different authentication method. See the [Authentication docs](./authentication.md) for more details.
+
+**Example:** Enforce the use of Google login for all users.
+
+```json
+{
+  "enforcedAuthType": "oauth-personal"
+}
+```
+
+If a user has a different authentication method configured, they will be prompted to switch to the enforced method. In non-interactive mode, the CLI will exit with an error if the configured authentication method does not match the enforced one.
+
 ## Putting It All Together: Example System `settings.json`
 
 Here is an example of a system `settings.json` file that combines several of the patterns discussed above to create a secure, controlled environment for Gemini CLI.
 
 ```json
 {
-  "sandbox": "docker",
-
-  "coreTools": [
-    "ReadFileTool",
-    "GlobTool",
-    "ShellTool(ls)",
-    "ShellTool(cat)",
-    "ShellTool(grep)"
-  ],
-
+  "tools": {
+    "sandbox": "docker",
+    "core": [
+      "ReadFileTool",
+      "GlobTool",
+      "ShellTool(ls)",
+      "ShellTool(cat)",
+      "ShellTool(grep)"
+    ]
+  },
+  "mcp": {
+    "allowed": ["corp-tools"]
+  },
   "mcpServers": {
     "corp-tools": {
       "command": "/opt/gemini-tools/start.sh",
       "timeout": 5000
     }
   },
-  "allowMCPServers": ["corp-tools"],
-
   "telemetry": {
     "enabled": true,
     "target": "gcp",
     "otlpEndpoint": "https://telemetry-prod.example.com:4317",
     "logPrompts": false
   },
-
-  "bugCommand": {
-    "urlTemplate": "https://servicedesk.example.com/new-ticket?title={title}&details={info}"
+  "advanced": {
+    "bugCommand": {
+      "urlTemplate": "https://servicedesk.example.com/new-ticket?title={title}&details={info}"
+    }
   },
-
-  "usageStatisticsEnabled": false
+  "privacy": {
+    "usageStatisticsEnabled": false
+  }
 }
 ```
 

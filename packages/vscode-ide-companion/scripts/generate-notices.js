@@ -4,9 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import fs from 'fs/promises';
-import path from 'path';
-import { fileURLToPath } from 'url';
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const projectRoot = path.resolve(
   path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..'),
@@ -50,6 +50,8 @@ async function getDependencyLicense(depName, depVersion) {
       'LICENSE.md',
       'LICENSE.txt',
       'LICENSE-MIT.txt',
+      'license.md',
+      'license',
     ].filter(Boolean);
 
     let licenseFile;

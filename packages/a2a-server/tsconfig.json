@@ -2,7 +2,11 @@
   "extends": "../../tsconfig.json",
   "compilerOptions": {
     "outDir": "dist",
+<<<<<<< HEAD
     "lib": ["DOM", "DOM.Iterable", "ES2021"],
+=======
+    "lib": ["DOM", "DOM.Iterable", "ES2023"],
+>>>>>>> upstream/main
     "composite": true,
     "types": ["node", "vitest/globals"]
   },

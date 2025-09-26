@@ -19,6 +19,7 @@ vi.mock('node:fs', () => ({
 // Mock crypto
 vi.mock('node:crypto', () => ({
   randomBytes: vi.fn(() => ({ toString: () => 'mockedid' })),
+  randomUUID: vi.fn(() => 'mocked-uuid'),
 }));
 
 // Mock telemetry

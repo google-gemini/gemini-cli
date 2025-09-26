@@ -6,7 +6,8 @@
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { retryWithBackoff, HttpError } from './retry.js';
+import type { HttpError } from './retry.js';
+import { retryWithBackoff } from './retry.js';
 import { setSimulate429 } from './testUtils.js';
 
 // Helper to create a mock function that fails a certain number of times
@@ -82,6 +83,7 @@ describe('retryWithBackoff', () => {
     // 2. IMPORTANT: Attach the rejection expectation to the promise *immediately*.
     //    This ensures a 'catch' handler is present before the promise can reject.
     //    The result is a new promise that resolves when the assertion is met.
+    // eslint-disable-next-line vitest/valid-expect
     const assertionPromise = expect(promise).rejects.toThrow(
       'Simulated error attempt 3',
     );
@@ -95,6 +97,40 @@ describe('retryWithBackoff', () => {
 
     // 5. Finally, assert the number of calls.
     expect(mockFn).toHaveBeenCalledTimes(3);
+  });
+
+  it('should default to 5 maxAttempts if no options are provided', async () => {
+    // This function will fail more than 5 times to ensure all retries are used.
+    const mockFn = createFailingFunction(10);
+
+    const promise = retryWithBackoff(mockFn);
+
+    // Expect it to fail with the error from the 5th attempt.
+    // eslint-disable-next-line vitest/valid-expect
+    const assertionPromise = expect(promise).rejects.toThrow(
+      'Simulated error attempt 5',
+    );
+    await vi.runAllTimersAsync();
+    await assertionPromise;
+
+    expect(mockFn).toHaveBeenCalledTimes(5);
+  });
+
+  it('should default to 5 maxAttempts if options.maxAttempts is undefined', async () => {
+    // This function will fail more than 5 times to ensure all retries are used.
+    const mockFn = createFailingFunction(10);
+
+    const promise = retryWithBackoff(mockFn, { maxAttempts: undefined });
+
+    // Expect it to fail with the error from the 5th attempt.
+    // eslint-disable-next-line vitest/valid-expect
+    const assertionPromise = expect(promise).rejects.toThrow(
+      'Simulated error attempt 5',
+    );
+    await vi.runAllTimersAsync();
+    await assertionPromise;
+
+    expect(mockFn).toHaveBeenCalledTimes(5);
   });
 
   it('should not retry if shouldRetry returns false', async () => {
@@ -112,6 +148,18 @@ describe('retryWithBackoff', () => {
     expect(mockFn).toHaveBeenCalledTimes(1);
   });
 
+  it('should throw an error if maxAttempts is not a positive number', async () => {
+    const mockFn = createFailingFunction(1);
+
+    // Test with 0
+    await expect(retryWithBackoff(mockFn, { maxAttempts: 0 })).rejects.toThrow(
+      'maxAttempts must be a positive number.',
+    );
+
+    // The function should not be called at all if validation fails
+    expect(mockFn).not.toHaveBeenCalled();
+  });
+
   it('should use default shouldRetry if not provided, retrying on 429', async () => {
     const mockFn = vi.fn(async () => {
       const error = new Error('Too Many Requests') as any;
@@ -126,7 +174,7 @@ describe('retryWithBackoff', () => {
 
     // Attach the rejection expectation *before* running timers
     const assertionPromise =
-      expect(promise).rejects.toThrow('Too Many Requests');
+      expect(promise).rejects.toThrow('Too Many Requests'); // eslint-disable-line vitest/valid-expect
 
     // Run timers to trigger retries and eventual rejection
     await vi.runAllTimersAsync();
@@ -194,6 +242,7 @@ describe('retryWithBackoff', () => {
     // We expect rejections as mockFn fails 5 times
     const promise1 = runRetry();
     // Attach the rejection expectation *before* running timers
+    // eslint-disable-next-line vitest/valid-expect
     const assertionPromise1 = expect(promise1).rejects.toThrow();
     await vi.runAllTimersAsync(); // Advance for the delay in the first runRetry
     await assertionPromise1;
@@ -208,6 +257,7 @@ describe('retryWithBackoff', () => {
 
     const promise2 = runRetry();
     // Attach the rejection expectation *before* running timers
+    // eslint-disable-next-line vitest/valid-expect
     const assertionPromise2 = expect(promise2).rejects.toThrow();
     await vi.runAllTimersAsync(); // Advance for the delay in the second runRetry
     await assertionPromise2;

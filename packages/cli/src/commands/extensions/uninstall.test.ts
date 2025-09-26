@@ -10,7 +10,14 @@ import yargs from 'yargs';
 
 describe('extensions uninstall command', () => {
   it('should fail if no source is provided', () => {
+<<<<<<< HEAD
     const validationParser = yargs([]).command(uninstallCommand).fail(false);
+=======
+    const validationParser = yargs([])
+      .command(uninstallCommand)
+      .fail(false)
+      .locale('en');
+>>>>>>> upstream/main
     expect(() => validationParser.parse('uninstall')).toThrow(
       'Not enough non-option arguments: got 0, need at least 1',
     );

@@ -19,7 +19,9 @@ This documentation is organized into the following sections:
   - **[Checkpointing](./checkpointing.md):** Documentation for the checkpointing feature.
   - **[Extensions](./extension.md):** How to extend the CLI with new functionality.
   - **[IDE Integration](./ide-integration.md):** Connect the CLI to your editor.
+  - **[IDE Companion Extension Spec](./ide-companion-spec.md):** Spec for building IDE companion extensions.
   - **[Telemetry](./telemetry.md):** Overview of telemetry in the CLI.
+  - **[Trusted Folders](./trusted-folders.md):** An overview of the Trusted Folders security feature.
 - **Core Details:** Documentation for `packages/core`.
   - **[Core Introduction](./core/index.md):** Overview of the core component.
   - **[Tools API](./core/tools-api.md):** Information on how the core manages and exposes tools.

@@ -20,29 +20,78 @@ import process from 'node:process';
 import { isGitRepository } from '../utils/gitUtils.js';
 import { MemoryTool, GEMINI_CONFIG_DIR } from '../tools/memoryTool.js';
 
+export function resolvePathFromEnv(envVar?: string): {
+  isSwitch: boolean;
+  value: string | null;
+  isDisabled: boolean;
+} {
+  // Handle the case where the environment variable is not set, empty, or just whitespace.
+  const trimmedEnvVar = envVar?.trim();
+  if (!trimmedEnvVar) {
+    return { isSwitch: false, value: null, isDisabled: false };
+  }
+
+  const lowerEnvVar = trimmedEnvVar.toLowerCase();
+  // Check if the input is a common boolean-like string.
+  if (['0', 'false', '1', 'true'].includes(lowerEnvVar)) {
+    // If so, identify it as a "switch" and return its value.
+    const isDisabled = ['0', 'false'].includes(lowerEnvVar);
+    return { isSwitch: true, value: lowerEnvVar, isDisabled };
+  }
+
+  // If it's not a switch, treat it as a potential file path.
+  let customPath = trimmedEnvVar;
+
+  // Safely expand the tilde (~) character to the user's home directory.
+  if (customPath.startsWith('~/') || customPath === '~') {
+    try {
+      const home = os.homedir(); // This is the call that can throw an error.
+      if (customPath === '~') {
+        customPath = home;
+      } else {
+        customPath = path.join(home, customPath.slice(2));
+      }
+    } catch (error) {
+      // If os.homedir() fails, we catch the error instead of crashing.
+      console.warn(
+        `Could not resolve home directory for path: ${trimmedEnvVar}`,
+        error,
+      );
+      // Return null to indicate the path resolution failed.
+      return { isSwitch: false, value: null, isDisabled: false };
+    }
+  }
+
+  // Return it as a non-switch with the fully resolved absolute path.
+  return {
+    isSwitch: false,
+    value: path.resolve(customPath),
+    isDisabled: false,
+  };
+}
+
 export function getCoreSystemPrompt(userMemory?: string): string {
-  // if GEMINI_SYSTEM_MD is set (and not 0|false), override system prompt from file
-  // default path is .gemini/system.md but can be modified via custom path in GEMINI_SYSTEM_MD
+  // A flag to indicate whether the system prompt override is active.
   let systemMdEnabled = false;
+  // The default path for the system prompt file. This can be overridden.
   let systemMdPath = path.resolve(path.join(GEMINI_CONFIG_DIR, 'system.md'));
-  const systemMdVar = process.env['GEMINI_SYSTEM_MD'];
-  if (systemMdVar) {
-    const systemMdVarLower = systemMdVar.toLowerCase();
-    if (!['0', 'false'].includes(systemMdVarLower)) {
-      systemMdEnabled = true; // enable system prompt override
-      if (!['1', 'true'].includes(systemMdVarLower)) {
-        let customPath = systemMdVar;
-        if (customPath.startsWith('~/')) {
-          customPath = path.join(os.homedir(), customPath.slice(2));
-        } else if (customPath === '~') {
-          customPath = os.homedir();
-        }
-        systemMdPath = path.resolve(customPath); // use custom path from GEMINI_SYSTEM_MD
-      }
-      // require file to exist when override is enabled
-      if (!fs.existsSync(systemMdPath)) {
-        throw new Error(`missing system prompt file '${systemMdPath}'`);
-      }
+  // Resolve the environment variable to get either a path or a switch value.
+  const systemMdResolution = resolvePathFromEnv(
+    process.env['GEMINI_SYSTEM_MD'],
+  );
+
+  // Proceed only if the environment variable is set and is not disabled.
+  if (systemMdResolution.value && !systemMdResolution.isDisabled) {
+    systemMdEnabled = true;
+
+    // We update systemMdPath to this new custom path.
+    if (!systemMdResolution.isSwitch) {
+      systemMdPath = systemMdResolution.value;
+    }
+
+    // require file to exist when override is enabled
+    if (!fs.existsSync(systemMdPath)) {
+      throw new Error(`missing system prompt file '${systemMdPath}'`);
     }
   }
   const basePrompt = systemMdEnabled
@@ -57,7 +106,7 @@ You are an interactive CLI agent specializing in software engineering tasks. You
 - **Style & Structure:** Mimic the style (formatting, naming), structure, framework choices, typing, and architectural patterns of existing code in the project.
 - **Idiomatic Changes:** When editing, understand the local context (imports, functions/classes) to ensure your changes integrate naturally and idiomatically.
 - **Comments:** Add code comments sparingly. Focus on *why* something is done, especially for complex logic, rather than *what* is done. Only add high-value comments if necessary for clarity or if requested by the user. Do not edit comments that are separate from the code you are changing. *NEVER* talk to the user or describe your changes through comments.
-- **Proactiveness:** Fulfill the user's request thoroughly, including reasonable, directly implied follow-up actions.
+- **Proactiveness:** Fulfill the user's request thoroughly. When adding features or fixing bugs, this includes adding tests to ensure quality. Consider all created files, especially tests, to be permanent artifacts unless the user says otherwise.
 - **Confirm Ambiguity/Expansion:** Do not take significant actions beyond the clear scope of the request without confirming with the user. If asked *how* to do something, explain first, don't just do it.
 - **Explaining Changes:** After completing a code modification or file operation *do not* provide summaries unless asked.
 - **Path Construction:** Before using any file system tool (e.g., ${ReadFileTool.Name}' or '${WriteFileTool.Name}'), you must construct the full absolute path for the file_path argument. Always combine the absolute path of the project's root directory with the file's path relative to the root. For example, if the project root is /path/to/project/ and the file is foo/bar/baz.txt, the final path you must use is /path/to/project/foo/bar/baz.txt. If the user provides a relative path, you must resolve it against the root directory to create an absolute path.
@@ -68,10 +117,11 @@ You are an interactive CLI agent specializing in software engineering tasks. You
 ## Software Engineering Tasks
 When requested to perform tasks like fixing bugs, adding features, refactoring, or explaining code, follow this sequence:
 1. **Understand:** Think about the user's request and the relevant codebase context. Use '${GrepTool.Name}' and '${GlobTool.Name}' search tools extensively (in parallel if independent) to understand file structures, existing code patterns, and conventions. Use '${ReadFileTool.Name}' and '${ReadManyFilesTool.Name}' to understand context and validate any assumptions you may have.
-2. **Plan:** Build a coherent and grounded (based on the understanding in step 1) plan for how you intend to resolve the user's task. Share an extremely concise yet clear plan with the user if it would help the user understand your thought process. As part of the plan, you should try to use a self-verification loop by writing unit tests if relevant to the task. Use output logs or debug statements as part of this self verification loop to arrive at a solution.
+2. **Plan:** Build a coherent and grounded (based on the understanding in step 1) plan for how you intend to resolve the user's task. Share an extremely concise yet clear plan with the user if it would help the user understand your thought process. As part of the plan, you should use an iterative development process that includes writing unit tests to verify your changes. Use output logs or debug statements as part of this process to arrive at a solution.
 3. **Implement:** Use the available tools (e.g., '${EditTool.Name}', '${WriteFileTool.Name}', '${NotebookEditTool.Name}', '${ShellTool.Name}' ...) to act on the plan, strictly adhering to the project's established conventions (detailed under 'Core Mandates').
 4. **Verify (Tests):** If applicable and feasible, verify the changes using the project's testing procedures. Identify the correct test commands and frameworks by examining 'README' files, build/package configuration (e.g., 'package.json'), or existing test execution patterns. NEVER assume standard test commands.
 5. **Verify (Standards):** VERY IMPORTANT: After making code changes, execute the project-specific build, linting and type-checking commands (e.g., 'tsc', 'npm run lint', 'ruff check .') that you have identified for this project (or obtained from the user). This ensures code quality and adherence to standards. If unsure about these commands, you can ask the user if they'd like you to run them and if so how to.
+6. **Finalize:** After all verification passes, consider the task complete. Do not remove or revert any changes or created files (like tests). Await the user's next instruction.
 
 ## New Applications
 
@@ -268,25 +318,19 @@ Your core function is efficient and safe assistance. Balance extreme conciseness
 `.trim();
 
   // if GEMINI_WRITE_SYSTEM_MD is set (and not 0|false), write base system prompt to file
-  const writeSystemMdVar = process.env['GEMINI_WRITE_SYSTEM_MD'];
-  if (writeSystemMdVar) {
-    const writeSystemMdVarLower = writeSystemMdVar.toLowerCase();
-    if (!['0', 'false'].includes(writeSystemMdVarLower)) {
-      if (['1', 'true'].includes(writeSystemMdVarLower)) {
-        fs.mkdirSync(path.dirname(systemMdPath), { recursive: true });
-        fs.writeFileSync(systemMdPath, basePrompt); // write to default path, can be modified via GEMINI_SYSTEM_MD
-      } else {
-        let customPath = writeSystemMdVar;
-        if (customPath.startsWith('~/')) {
-          customPath = path.join(os.homedir(), customPath.slice(2));
-        } else if (customPath === '~') {
-          customPath = os.homedir();
-        }
-        const resolvedPath = path.resolve(customPath);
-        fs.mkdirSync(path.dirname(resolvedPath), { recursive: true });
-        fs.writeFileSync(resolvedPath, basePrompt); // write to custom path from GEMINI_WRITE_SYSTEM_MD
-      }
-    }
+  const writeSystemMdResolution = resolvePathFromEnv(
+    process.env['GEMINI_WRITE_SYSTEM_MD'],
+  );
+
+  // Check if the feature is enabled. This proceeds only if the environment
+  // variable is set and is not explicitly '0' or 'false'.
+  if (writeSystemMdResolution.value && !writeSystemMdResolution.isDisabled) {
+    const writePath = writeSystemMdResolution.isSwitch
+      ? systemMdPath
+      : writeSystemMdResolution.value;
+
+    fs.mkdirSync(path.dirname(writePath), { recursive: true });
+    fs.writeFileSync(writePath, basePrompt);
   }
 
   const memorySuffix =

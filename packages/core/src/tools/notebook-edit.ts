@@ -10,9 +10,9 @@ import {
   BaseDeclarativeTool,
   BaseToolInvocation,
   Kind,
-  ToolInvocation,
-  ToolLocation,
-  ToolResult,
+  type ToolInvocation,
+  type ToolLocation,
+  type ToolResult,
 } from './tools.js';
 import { isNodeError, getErrorMessage } from '../utils/errors.js';
 import { ToolErrorType } from './tool-error.js';
@@ -173,7 +173,6 @@ class NotebookEditToolInvocation extends BaseToolInvocation<
           lines,
           'application/json',
           '.ipynb',
-          undefined,
           'jupyter',
         ),
       );
@@ -558,7 +557,8 @@ export class NotebookEditTool extends BaseDeclarativeTool<
           },
           position: {
             type: 'number' as const,
-            description: 'Position to insert new cell (0-based, defaults to end)',
+            description:
+              'Position to insert new cell (0-based, defaults to end)',
           },
           source_index: {
             type: 'number' as const,

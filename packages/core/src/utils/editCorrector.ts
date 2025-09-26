@@ -4,9 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Content, GenerateContentConfig } from '@google/genai';
-import { GeminiClient } from '../core/client.js';
-import { EditToolParams, EditTool } from '../tools/edit.js';
+import type { Content, GenerateContentConfig } from '@google/genai';
+import type { GeminiClient } from '../core/client.js';
+import type { BaseLlmClient } from '../core/baseLlmClient.js';
+import type { EditToolParams } from '../tools/edit.js';
+import { EditTool } from '../tools/edit.js';
 import { WriteFileTool } from '../tools/write-file.js';
 import { ReadFileTool } from '../tools/read-file.js';
 import { ReadManyFilesTool } from '../tools/read-many-files.js';
@@ -17,14 +19,27 @@ import {
   isFunctionResponse,
   isFunctionCall,
 } from '../utils/messageInspectors.js';
-import * as fs from 'fs';
+import * as fs from 'node:fs';
+import { promptIdContext } from './promptIdContext.js';
 
-const EditModel = DEFAULT_GEMINI_FLASH_LITE_MODEL;
-const EditConfig: GenerateContentConfig = {
+const EDIT_MODEL = DEFAULT_GEMINI_FLASH_LITE_MODEL;
+const EDIT_CONFIG: GenerateContentConfig = {
   thinkingConfig: {
     thinkingBudget: 0,
   },
 };
+
+const CODE_CORRECTION_SYSTEM_PROMPT = `
+You are an expert code-editing assistant. Your task is to analyze a failed edit attempt and provide a corrected version of the text snippets.
+The correction should be as minimal as possible, staying very close to the original.
+Focus ONLY on fixing issues like whitespace, indentation, line endings, or incorrect escaping.
+Do NOT invent a completely new edit. Your job is to fix the provided parameters to make the edit succeed.
+Return ONLY the corrected snippet in the specified JSON format.
+`.trim();
+
+function getPromptId(): string {
+  return promptIdContext.getStore() ?? `edit-corrector-${Date.now()}`;
+}
 
 const MAX_CACHE_SIZE = 50;
 
@@ -158,7 +173,8 @@ export async function ensureCorrectEdit(
   filePath: string,
   currentContent: string,
   originalParams: EditToolParams, // This is the EditToolParams from edit.ts, without \'corrected\'
-  client: GeminiClient,
+  geminiClient: GeminiClient,
+  baseLlmClient: BaseLlmClient,
   abortSignal: AbortSignal,
 ): Promise<CorrectedEditResult> {
   const cacheKey = `${currentContent}---${originalParams.old_string}---${originalParams.new_string}`;
@@ -180,7 +196,7 @@ export async function ensureCorrectEdit(
   if (occurrences === expectedReplacements) {
     if (newStringPotentiallyEscaped) {
       finalNewString = await correctNewStringEscaping(
-        client,
+        baseLlmClient,
         finalOldString,
         originalParams.new_string,
         abortSignal,
@@ -227,7 +243,7 @@ export async function ensureCorrectEdit(
       finalOldString = unescapedOldStringAttempt;
       if (newStringPotentiallyEscaped) {
         finalNewString = await correctNewString(
-          client,
+          baseLlmClient,
           originalParams.old_string, // original old
           unescapedOldStringAttempt, // corrected old
           originalParams.new_string, // original new (which is potentially escaped)
@@ -241,7 +257,7 @@ export async function ensureCorrectEdit(
         // our system has done
         const lastEditedByUsTime = await findLastEditTimestamp(
           filePath,
-          client,
+          geminiClient,
         );
 
         // Add a 1-second buffer to account for timing inaccuracies. If the file
@@ -264,7 +280,7 @@ export async function ensureCorrectEdit(
       }
 
       const llmCorrectedOldString = await correctOldStringMismatch(
-        client,
+        baseLlmClient,
         currentContent,
         unescapedOldStringAttempt,
         abortSignal,
@@ -283,7 +299,7 @@ export async function ensureCorrectEdit(
             originalParams.new_string,
           );
           finalNewString = await correctNewString(
-            client,
+            baseLlmClient,
             originalParams.old_string, // original old
             llmCorrectedOldString, // corrected old
             baseNewStringForLLMCorrection, // base new for correction
@@ -334,7 +350,7 @@ export async function ensureCorrectEdit(
 
 export async function ensureCorrectFileContent(
   content: string,
-  client: GeminiClient,
+  baseLlmClient: BaseLlmClient,
   abortSignal: AbortSignal,
 ): Promise<string> {
   const cachedResult = fileContentCorrectionCache.get(content);
@@ -351,7 +367,7 @@ export async function ensureCorrectFileContent(
 
   const correctedContent = await correctStringEscaping(
     content,
-    client,
+    baseLlmClient,
     abortSignal,
   );
   fileContentCorrectionCache.set(content, correctedContent);
@@ -372,7 +388,7 @@ const OLD_STRING_CORRECTION_SCHEMA: Record<string, unknown> = {
 };
 
 export async function correctOldStringMismatch(
-  geminiClient: GeminiClient,
+  baseLlmClient: BaseLlmClient,
   fileContent: string,
   problematicSnippet: string,
   abortSignal: AbortSignal,
@@ -401,13 +417,15 @@ Return ONLY the corrected target snippet in the specified JSON format with the k
   const contents: Content[] = [{ role: 'user', parts: [{ text: prompt }] }];
 
   try {
-    const result = await geminiClient.generateJson(
+    const result = await baseLlmClient.generateJson({
       contents,
-      OLD_STRING_CORRECTION_SCHEMA,
+      schema: OLD_STRING_CORRECTION_SCHEMA,
       abortSignal,
-      EditModel,
-      EditConfig,
-    );
+      model: EDIT_MODEL,
+      config: EDIT_CONFIG,
+      systemInstruction: CODE_CORRECTION_SYSTEM_PROMPT,
+      promptId: getPromptId(),
+    });
 
     if (
       result &&
@@ -449,7 +467,7 @@ const NEW_STRING_CORRECTION_SCHEMA: Record<string, unknown> = {
  * Adjusts the new_string to align with a corrected old_string, maintaining the original intent.
  */
 export async function correctNewString(
-  geminiClient: GeminiClient,
+  baseLlmClient: BaseLlmClient,
   originalOldString: string,
   correctedOldString: string,
   originalNewString: string,
@@ -489,13 +507,15 @@ Return ONLY the corrected string in the specified JSON format with the key 'corr
   const contents: Content[] = [{ role: 'user', parts: [{ text: prompt }] }];
 
   try {
-    const result = await geminiClient.generateJson(
+    const result = await baseLlmClient.generateJson({
       contents,
-      NEW_STRING_CORRECTION_SCHEMA,
+      schema: NEW_STRING_CORRECTION_SCHEMA,
       abortSignal,
-      EditModel,
-      EditConfig,
-    );
+      model: EDIT_MODEL,
+      config: EDIT_CONFIG,
+      systemInstruction: CODE_CORRECTION_SYSTEM_PROMPT,
+      promptId: getPromptId(),
+    });
 
     if (
       result &&
@@ -529,7 +549,7 @@ const CORRECT_NEW_STRING_ESCAPING_SCHEMA: Record<string, unknown> = {
 };
 
 export async function correctNewStringEscaping(
-  geminiClient: GeminiClient,
+  baseLlmClient: BaseLlmClient,
   oldString: string,
   potentiallyProblematicNewString: string,
   abortSignal: AbortSignal,
@@ -558,13 +578,15 @@ Return ONLY the corrected string in the specified JSON format with the key 'corr
   const contents: Content[] = [{ role: 'user', parts: [{ text: prompt }] }];
 
   try {
-    const result = await geminiClient.generateJson(
+    const result = await baseLlmClient.generateJson({
       contents,
-      CORRECT_NEW_STRING_ESCAPING_SCHEMA,
+      schema: CORRECT_NEW_STRING_ESCAPING_SCHEMA,
       abortSignal,
-      EditModel,
-      EditConfig,
-    );
+      model: EDIT_MODEL,
+      config: EDIT_CONFIG,
+      systemInstruction: CODE_CORRECTION_SYSTEM_PROMPT,
+      promptId: getPromptId(),
+    });
 
     if (
       result &&
@@ -602,7 +624,7 @@ const CORRECT_STRING_ESCAPING_SCHEMA: Record<string, unknown> = {
 
 export async function correctStringEscaping(
   potentiallyProblematicString: string,
-  client: GeminiClient,
+  baseLlmClient: BaseLlmClient,
   abortSignal: AbortSignal,
 ): Promise<string> {
   const prompt = `
@@ -624,13 +646,15 @@ Return ONLY the corrected string in the specified JSON format with the key 'corr
   const contents: Content[] = [{ role: 'user', parts: [{ text: prompt }] }];
 
   try {
-    const result = await client.generateJson(
+    const result = await baseLlmClient.generateJson({
       contents,
-      CORRECT_STRING_ESCAPING_SCHEMA,
+      schema: CORRECT_STRING_ESCAPING_SCHEMA,
       abortSignal,
-      EditModel,
-      EditConfig,
-    );
+      model: EDIT_MODEL,
+      config: EDIT_CONFIG,
+      systemInstruction: CODE_CORRECTION_SYSTEM_PROMPT,
+      promptId: getPromptId(),
+    });
 
     if (
       result &&

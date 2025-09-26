@@ -5,19 +5,14 @@
  */
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import {
-  describe,
-  it,
-  expect,
-  vi,
-  beforeEach,
-  afterEach,
-  Mocked,
-} from 'vitest';
-import { Config, ConfigParameters, ApprovalMode } from '../config/config.js';
+import type { Mocked } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import type { ConfigParameters } from '../config/config.js';
+import { Config, ApprovalMode } from '../config/config.js';
 import { ToolRegistry, DiscoveredTool } from './tool-registry.js';
 import { DiscoveredMCPTool } from './mcp-tool.js';
-import { FunctionDeclaration, CallableTool, mcpToTool } from '@google/genai';
+import type { FunctionDeclaration, CallableTool } from '@google/genai';
+import { mcpToTool } from '@google/genai';
 import { spawn } from 'node:child_process';
 
 import fs from 'node:fs';
@@ -176,6 +171,24 @@ describe('ToolRegistry', () => {
 
       // Assert that the returned array is sorted by displayName
       expect(displayNames).toEqual(['Tool A', 'Tool B', 'Tool C']);
+    });
+  });
+
+  describe('getAllToolNames', () => {
+    it('should return all registered tool names', () => {
+      // Register tools with displayNames in non-alphabetical order
+      const toolC = new MockTool('c-tool', 'Tool C');
+      const toolA = new MockTool('a-tool', 'Tool A');
+      const toolB = new MockTool('b-tool', 'Tool B');
+
+      toolRegistry.registerTool(toolC);
+      toolRegistry.registerTool(toolA);
+      toolRegistry.registerTool(toolB);
+
+      const toolNames = toolRegistry.getAllToolNames();
+
+      // Assert that the returned array contains all tool names
+      expect(toolNames).toEqual(['c-tool', 'a-tool', 'b-tool']);
     });
   });
 

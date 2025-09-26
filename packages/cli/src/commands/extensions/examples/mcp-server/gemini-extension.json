@@ -1,10 +1,19 @@
 {
+<<<<<<< HEAD
   "name": "mcp-server",
+=======
+  "name": "mcp-server-example",
+>>>>>>> upstream/main
   "version": "1.0.0",
   "mcpServers": {
     "nodeServer": {
       "command": "node",
+<<<<<<< HEAD
       "args": ["${extensionPath}${/}example.ts"]
+=======
+      "args": ["${extensionPath}${/}dist${/}example.js"],
+      "cwd": "${extensionPath}"
+>>>>>>> upstream/main
     }
   }
 }

@@ -26,9 +26,15 @@ exports[`SettingsDialog > Snapshot Tests > should render default state correctly
 │                                                                                                  │
 │                                                                                                  │
 │   Apply To                                                                                       │
+<<<<<<< HEAD
 │ ● 1. User Settings                                                                               │
 │   2. Workspace Settings                                                                          │
 │   3. System Settings                                                                             │
+=======
+│ ● User Settings                                                                                  │
+│   Workspace Settings                                                                             │
+│   System Settings                                                                                │
+>>>>>>> upstream/main
 │                                                                                                  │
 │ (Use Enter to select, Tab to change focus)                                                       │
 │                                                                                                  │
@@ -61,9 +67,15 @@ exports[`SettingsDialog > Snapshot Tests > should render focused on scope select
 │                                                                                                  │
 │                                                                                                  │
 │   Apply To                                                                                       │
+<<<<<<< HEAD
 │ ● 1. User Settings                                                                               │
 │   2. Workspace Settings                                                                          │
 │   3. System Settings                                                                             │
+=======
+│ ● User Settings                                                                                  │
+│   Workspace Settings                                                                             │
+│   System Settings                                                                                │
+>>>>>>> upstream/main
 │                                                                                                  │
 │ (Use Enter to select, Tab to change focus)                                                       │
 │                                                                                                  │
@@ -96,9 +108,15 @@ exports[`SettingsDialog > Snapshot Tests > should render with accessibility sett
 │                                                                                                  │
 │                                                                                                  │
 │   Apply To                                                                                       │
+<<<<<<< HEAD
 │ ● 1. User Settings                                                                               │
 │   2. Workspace Settings                                                                          │
 │   3. System Settings                                                                             │
+=======
+│ ● User Settings                                                                                  │
+│   Workspace Settings                                                                             │
+│   System Settings                                                                                │
+>>>>>>> upstream/main
 │                                                                                                  │
 │ (Use Enter to select, Tab to change focus)                                                       │
 │                                                                                                  │
@@ -131,9 +149,15 @@ exports[`SettingsDialog > Snapshot Tests > should render with all boolean settin
 │                                                                                                  │
 │                                                                                                  │
 │   Apply To                                                                                       │
+<<<<<<< HEAD
 │ ● 1. User Settings                                                                               │
 │   2. Workspace Settings                                                                          │
 │   3. System Settings                                                                             │
+=======
+│ ● User Settings                                                                                  │
+│   Workspace Settings                                                                             │
+│   System Settings                                                                                │
+>>>>>>> upstream/main
 │                                                                                                  │
 │ (Use Enter to select, Tab to change focus)                                                       │
 │                                                                                                  │
@@ -166,9 +190,15 @@ exports[`SettingsDialog > Snapshot Tests > should render with different scope se
 │                                                                                                  │
 │                                                                                                  │
 │   Apply To                                                                                       │
+<<<<<<< HEAD
 │ ● 1. User Settings                                                                               │
 │   2. Workspace Settings                                                                          │
 │   3. System Settings                                                                             │
+=======
+│ ● User Settings                                                                                  │
+│   Workspace Settings                                                                             │
+│   System Settings                                                                                │
+>>>>>>> upstream/main
 │                                                                                                  │
 │ (Use Enter to select, Tab to change focus)                                                       │
 │                                                                                                  │
@@ -201,9 +231,15 @@ exports[`SettingsDialog > Snapshot Tests > should render with different scope se
 │                                                                                                  │
 │                                                                                                  │
 │   Apply To                                                                                       │
+<<<<<<< HEAD
 │ ● 1. User Settings                                                                               │
 │   2. Workspace Settings                                                                          │
 │   3. System Settings                                                                             │
+=======
+│ ● User Settings                                                                                  │
+│   Workspace Settings                                                                             │
+│   System Settings                                                                                │
+>>>>>>> upstream/main
 │                                                                                                  │
 │ (Use Enter to select, Tab to change focus)                                                       │
 │                                                                                                  │
@@ -236,9 +272,15 @@ exports[`SettingsDialog > Snapshot Tests > should render with file filtering set
 │                                                                                                  │
 │                                                                                                  │
 │   Apply To                                                                                       │
+<<<<<<< HEAD
 │ ● 1. User Settings                                                                               │
 │   2. Workspace Settings                                                                          │
 │   3. System Settings                                                                             │
+=======
+│ ● User Settings                                                                                  │
+│   Workspace Settings                                                                             │
+│   System Settings                                                                                │
+>>>>>>> upstream/main
 │                                                                                                  │
 │ (Use Enter to select, Tab to change focus)                                                       │
 │                                                                                                  │
@@ -271,9 +313,15 @@ exports[`SettingsDialog > Snapshot Tests > should render with mixed boolean and 
 │                                                                                                  │
 │                                                                                                  │
 │   Apply To                                                                                       │
+<<<<<<< HEAD
 │ ● 1. User Settings                                                                               │
 │   2. Workspace Settings                                                                          │
 │   3. System Settings                                                                             │
+=======
+│ ● User Settings                                                                                  │
+│   Workspace Settings                                                                             │
+│   System Settings                                                                                │
+>>>>>>> upstream/main
 │                                                                                                  │
 │ (Use Enter to select, Tab to change focus)                                                       │
 │                                                                                                  │
@@ -306,9 +354,15 @@ exports[`SettingsDialog > Snapshot Tests > should render with tools and security
 │                                                                                                  │
 │                                                                                                  │
 │   Apply To                                                                                       │
+<<<<<<< HEAD
 │ ● 1. User Settings                                                                               │
 │   2. Workspace Settings                                                                          │
 │   3. System Settings                                                                             │
+=======
+│ ● User Settings                                                                                  │
+│   Workspace Settings                                                                             │
+│   System Settings                                                                                │
+>>>>>>> upstream/main
 │                                                                                                  │
 │ (Use Enter to select, Tab to change focus)                                                       │
 │                                                                                                  │
@@ -341,9 +395,15 @@ exports[`SettingsDialog > Snapshot Tests > should render with various boolean se
 │                                                                                                  │
 │                                                                                                  │
 │   Apply To                                                                                       │
+<<<<<<< HEAD
 │ ● 1. User Settings                                                                               │
 │   2. Workspace Settings                                                                          │
 │   3. System Settings                                                                             │
+=======
+│ ● User Settings                                                                                  │
+│   Workspace Settings                                                                             │
+│   System Settings                                                                                │
+>>>>>>> upstream/main
 │                                                                                                  │
 │ (Use Enter to select, Tab to change focus)                                                       │
 │                                                                                                  │

@@ -8,6 +8,10 @@ import type { CommandModule } from 'yargs';
 import {
   loadExtensions,
   annotateActiveExtensions,
+<<<<<<< HEAD
+=======
+  requestConsentNonInteractive,
+>>>>>>> upstream/main
 } from '../../config/extension.js';
 import {
   updateAllUpdatableExtensions,
@@ -35,6 +39,7 @@ export async function handleUpdate(args: UpdateArgs) {
     allExtensions.map((e) => e.config.name),
     workingDir,
   );
+<<<<<<< HEAD
 
   if (args.all) {
     try {
@@ -57,6 +62,9 @@ export async function handleUpdate(args: UpdateArgs) {
     }
   }
   if (args.name)
+=======
+  if (args.name) {
+>>>>>>> upstream/main
     try {
       const extension = extensions.find(
         (extension) => extension.name === args.name,
@@ -83,6 +91,10 @@ export async function handleUpdate(args: UpdateArgs) {
       const updatedExtensionInfo = (await updateExtension(
         extension,
         workingDir,
+<<<<<<< HEAD
+=======
+        requestConsentNonInteractive,
+>>>>>>> upstream/main
         updateState,
         () => {},
       ))!;
@@ -99,10 +111,39 @@ export async function handleUpdate(args: UpdateArgs) {
     } catch (error) {
       console.error(getErrorMessage(error));
     }
+<<<<<<< HEAD
 }
 
 export const updateCommand: CommandModule = {
   command: 'update [--all] [name]',
+=======
+  }
+  if (args.all) {
+    try {
+      let updateInfos = await updateAllUpdatableExtensions(
+        workingDir,
+        requestConsentNonInteractive,
+        extensions,
+        await checkForAllExtensionUpdates(extensions, new Map(), (_) => {}),
+        () => {},
+      );
+      updateInfos = updateInfos.filter(
+        (info) => info.originalVersion !== info.updatedVersion,
+      );
+      if (updateInfos.length === 0) {
+        console.log('No extensions to update.');
+        return;
+      }
+      console.log(updateInfos.map((info) => updateOutput(info)).join('\n'));
+    } catch (error) {
+      console.error(getErrorMessage(error));
+    }
+  }
+}
+
+export const updateCommand: CommandModule = {
+  command: 'update [<name>] [--all]',
+>>>>>>> upstream/main
   describe:
     'Updates all extensions or a named extension to the latest version.',
   builder: (yargs) =>

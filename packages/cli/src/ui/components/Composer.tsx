@@ -19,7 +19,10 @@ import { OverflowProvider } from '../contexts/OverflowContext.js';
 import { theme } from '../semantic-colors.js';
 import { isNarrowWidth } from '../utils/isNarrowWidth.js';
 import { useUIState } from '../contexts/UIStateContext.js';
+<<<<<<< HEAD
 import { useFocusState } from '../contexts/FocusContext.js';
+=======
+>>>>>>> upstream/main
 import { useUIActions } from '../contexts/UIActionsContext.js';
 import { useVimMode } from '../contexts/VimModeContext.js';
 import { useConfig } from '../contexts/ConfigContext.js';
@@ -32,7 +35,10 @@ export const Composer = () => {
   const config = useConfig();
   const settings = useSettings();
   const uiState = useUIState();
+<<<<<<< HEAD
   const isFocused = useFocusState();
+=======
+>>>>>>> upstream/main
   const uiActions = useUIActions();
   const { vimEnabled, vimMode } = useVimMode();
   const terminalWidth = process.stdout.columns;
@@ -69,7 +75,11 @@ export const Composer = () => {
 
   return (
     <Box flexDirection="column">
+<<<<<<< HEAD
       {!uiState.shellFocused && (
+=======
+      {!uiState.embeddedShellFocused && (
+>>>>>>> upstream/main
         <LoadingIndicator
           thought={
             uiState.streamingState === StreamingState.WaitingForConfirmation ||
@@ -167,9 +177,15 @@ export const Composer = () => {
           setShellModeActive={uiActions.setShellModeActive}
           approvalMode={showAutoAcceptIndicator}
           onEscapePromptChange={uiActions.onEscapePromptChange}
+<<<<<<< HEAD
           focus={isFocused}
           vimHandleInput={uiActions.vimHandleInput}
           isShellFocused={uiState.shellFocused}
+=======
+          focus={true}
+          vimHandleInput={uiActions.vimHandleInput}
+          isEmbeddedShellFocused={uiState.embeddedShellFocused}
+>>>>>>> upstream/main
           placeholder={
             vimEnabled
               ? "  Press 'i' for INSERT mode and 'Esc' for NORMAL mode."

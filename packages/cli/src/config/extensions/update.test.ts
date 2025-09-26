@@ -55,6 +55,7 @@ vi.mock('../trustedFolders.js', async (importOriginal) => {
   };
 });
 
+<<<<<<< HEAD
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const actual =
     await importOriginal<typeof import('@google/gemini-cli-core')>();
@@ -69,6 +70,18 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
       })),
     },
     Config: vi.fn(),
+=======
+const mockLogExtensionInstallEvent = vi.hoisted(() => vi.fn());
+const mockLogExtensionUninstall = vi.hoisted(() => vi.fn());
+
+vi.mock('@google/gemini-cli-core', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('@google/gemini-cli-core')>();
+  return {
+    ...actual,
+    logExtensionInstallEvent: mockLogExtensionInstallEvent,
+    logExtensionUninstall: mockLogExtensionUninstall,
+>>>>>>> upstream/main
     ExtensionInstallEvent: vi.fn(),
     ExtensionUninstallEvent: vi.fn(),
   };
@@ -91,7 +104,14 @@ describe('update tests', () => {
     // Clean up before each test
     fs.rmSync(userExtensionsDir, { recursive: true, force: true });
     fs.mkdirSync(userExtensionsDir, { recursive: true });
+<<<<<<< HEAD
     vi.mocked(isWorkspaceTrusted).mockReturnValue(true);
+=======
+    vi.mocked(isWorkspaceTrusted).mockReturnValue({
+      isTrusted: true,
+      source: 'file',
+    });
+>>>>>>> upstream/main
     vi.spyOn(process, 'cwd').mockReturnValue(tempWorkspaceDir);
     Object.values(mockGit).forEach((fn) => fn.mockReset());
   });
@@ -141,6 +161,10 @@ describe('update tests', () => {
       const updateInfo = await updateExtension(
         extension,
         tempHomeDir,
+<<<<<<< HEAD
+=======
+        async (_) => true,
+>>>>>>> upstream/main
         ExtensionUpdateState.UPDATE_AVAILABLE,
         () => {},
       );
@@ -198,6 +222,10 @@ describe('update tests', () => {
       await updateExtension(
         extension,
         tempHomeDir,
+<<<<<<< HEAD
+=======
+        async (_) => true,
+>>>>>>> upstream/main
         ExtensionUpdateState.UPDATE_AVAILABLE,
         setExtensionUpdateState,
       );
@@ -240,6 +268,10 @@ describe('update tests', () => {
         updateExtension(
           extension,
           tempHomeDir,
+<<<<<<< HEAD
+=======
+          async (_) => true,
+>>>>>>> upstream/main
           ExtensionUpdateState.UPDATE_AVAILABLE,
           setExtensionUpdateState,
         ),
@@ -341,17 +373,37 @@ describe('update tests', () => {
       expect(result).toBe(ExtensionUpdateState.UP_TO_DATE);
     });
 
+<<<<<<< HEAD
     it('should return NotUpdatable for a non-git extension', async () => {
       const extensionDir = createExtension({
         extensionsDir: userExtensionsDir,
         name: 'local-extension',
         version: '1.0.0',
         installMetadata: { source: '/local/path', type: 'local' },
+=======
+    it('should return UpToDate for a local extension with no updates', async () => {
+      const localExtensionSourcePath = path.join(tempHomeDir, 'local-source');
+      const sourceExtensionDir = createExtension({
+        extensionsDir: localExtensionSourcePath,
+        name: 'my-local-ext',
+        version: '1.0.0',
+      });
+
+      const installedExtensionDir = createExtension({
+        extensionsDir: userExtensionsDir,
+        name: 'local-extension',
+        version: '1.0.0',
+        installMetadata: { source: sourceExtensionDir, type: 'local' },
+>>>>>>> upstream/main
       });
       const extension = annotateActiveExtensions(
         [
           loadExtension({
+<<<<<<< HEAD
             extensionDir,
+=======
+            extensionDir: installedExtensionDir,
+>>>>>>> upstream/main
             workspaceDir: tempWorkspaceDir,
           })!,
         ],
@@ -369,9 +421,57 @@ describe('update tests', () => {
             extensionState = newState;
           }
         },
+<<<<<<< HEAD
       );
       const result = results.get('local-extension');
       expect(result).toBe(ExtensionUpdateState.NOT_UPDATABLE);
+=======
+        tempWorkspaceDir,
+      );
+      const result = results.get('local-extension');
+      expect(result).toBe(ExtensionUpdateState.UP_TO_DATE);
+    });
+
+    it('should return UpdateAvailable for a local extension with updates', async () => {
+      const localExtensionSourcePath = path.join(tempHomeDir, 'local-source');
+      const sourceExtensionDir = createExtension({
+        extensionsDir: localExtensionSourcePath,
+        name: 'my-local-ext',
+        version: '1.1.0',
+      });
+
+      const installedExtensionDir = createExtension({
+        extensionsDir: userExtensionsDir,
+        name: 'local-extension',
+        version: '1.0.0',
+        installMetadata: { source: sourceExtensionDir, type: 'local' },
+      });
+      const extension = annotateActiveExtensions(
+        [
+          loadExtension({
+            extensionDir: installedExtensionDir,
+            workspaceDir: tempWorkspaceDir,
+          })!,
+        ],
+        [],
+        process.cwd(),
+      )[0];
+      let extensionState = new Map();
+      const results = await checkForAllExtensionUpdates(
+        [extension],
+        extensionState,
+        (newState) => {
+          if (typeof newState === 'function') {
+            newState(extensionState);
+          } else {
+            extensionState = newState;
+          }
+        },
+        tempWorkspaceDir,
+      );
+      const result = results.get('local-extension');
+      expect(result).toBe(ExtensionUpdateState.UPDATE_AVAILABLE);
+>>>>>>> upstream/main
     });
 
     it('should return Error when git check fails', async () => {

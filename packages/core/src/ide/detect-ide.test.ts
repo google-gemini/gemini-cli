@@ -4,65 +4,111 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, afterEach, vi } from 'vitest';
-import { detectIde, DetectedIde } from './detect-ide.js';
+import { describe, it, expect, vi, afterEach } from 'vitest';
+import { detectIde, IDE_DEFINITIONS } from './detect-ide.js';
 
 describe('detectIde', () => {
+  const ideProcessInfo = { pid: 123, command: 'some/path/to/code' };
+  const ideProcessInfoNoCode = { pid: 123, command: 'some/path/to/fork' };
+
   afterEach(() => {
     vi.unstubAllEnvs();
   });
 
-  it.each([
-    {
-      env: {},
-      expected: DetectedIde.VSCode,
-    },
-    {
-      env: { __COG_BASHRC_SOURCED: '1' },
-      expected: DetectedIde.Devin,
-    },
-    {
-      env: { REPLIT_USER: 'test' },
-      expected: DetectedIde.Replit,
-    },
-    {
-      env: { CURSOR_TRACE_ID: 'test' },
-      expected: DetectedIde.Cursor,
-    },
-    {
-      env: { CODESPACES: 'true' },
-      expected: DetectedIde.Codespaces,
-    },
-    {
-      env: { EDITOR_IN_CLOUD_SHELL: 'true' },
-      expected: DetectedIde.CloudShell,
-    },
-    {
-      env: { CLOUD_SHELL: 'true' },
-      expected: DetectedIde.CloudShell,
-    },
-    {
-      env: { TERM_PRODUCT: 'Trae' },
-      expected: DetectedIde.Trae,
-    },
-    {
-      env: { FIREBASE_DEPLOY_AGENT: 'true' },
-      expected: DetectedIde.FirebaseStudio,
-    },
-    {
-      env: { MONOSPACE_ENV: 'true' },
-      expected: DetectedIde.FirebaseStudio,
-    },
-  ])('detects the IDE for $expected', ({ env, expected }) => {
-    vi.stubEnv('TERM_PROGRAM', 'vscode');
-    for (const [key, value] of Object.entries(env)) {
-      vi.stubEnv(key, value);
-    }
-    expect(detectIde()).toBe(expected);
+  it('should return undefined if TERM_PROGRAM is not vscode', () => {
+    vi.stubEnv('TERM_PROGRAM', '');
+    expect(detectIde(ideProcessInfo)).toBeUndefined();
   });
 
-  it('returns undefined for non-vscode', () => {
-    vi.stubEnv('TERM_PROGRAM', 'definitely-not-vscode');
-    expect(detectIde()).toBeUndefined();
+  it('should detect Devin', () => {
+    vi.stubEnv('TERM_PROGRAM', 'vscode');
+    vi.stubEnv('__COG_BASHRC_SOURCED', '1');
+    expect(detectIde(ideProcessInfo)).toBe(IDE_DEFINITIONS.devin);
+  });
+
+  it('should detect Replit', () => {
+    vi.stubEnv('TERM_PROGRAM', 'vscode');
+    vi.stubEnv('REPLIT_USER', 'testuser');
+    expect(detectIde(ideProcessInfo)).toBe(IDE_DEFINITIONS.replit);
+  });
+
+  it('should detect Cursor', () => {
+    vi.stubEnv('TERM_PROGRAM', 'vscode');
+    vi.stubEnv('CURSOR_TRACE_ID', 'some-id');
+    expect(detectIde(ideProcessInfo)).toBe(IDE_DEFINITIONS.cursor);
+  });
+
+  it('should detect Codespaces', () => {
+    vi.stubEnv('TERM_PROGRAM', 'vscode');
+    vi.stubEnv('CODESPACES', 'true');
+    expect(detectIde(ideProcessInfo)).toBe(IDE_DEFINITIONS.codespaces);
+  });
+
+  it('should detect Cloud Shell via EDITOR_IN_CLOUD_SHELL', () => {
+    vi.stubEnv('TERM_PROGRAM', 'vscode');
+    vi.stubEnv('EDITOR_IN_CLOUD_SHELL', 'true');
+    expect(detectIde(ideProcessInfo)).toBe(IDE_DEFINITIONS.cloudshell);
+  });
+
+  it('should detect Cloud Shell via CLOUD_SHELL', () => {
+    vi.stubEnv('TERM_PROGRAM', 'vscode');
+    vi.stubEnv('CLOUD_SHELL', 'true');
+    expect(detectIde(ideProcessInfo)).toBe(IDE_DEFINITIONS.cloudshell);
+  });
+
+  it('should detect Trae', () => {
+    vi.stubEnv('TERM_PROGRAM', 'vscode');
+    vi.stubEnv('TERM_PRODUCT', 'Trae');
+    expect(detectIde(ideProcessInfo)).toBe(IDE_DEFINITIONS.trae);
+  });
+
+  it('should detect Firebase Studio via MONOSPACE_ENV', () => {
+    vi.stubEnv('TERM_PROGRAM', 'vscode');
+    vi.stubEnv('MONOSPACE_ENV', 'true');
+    expect(detectIde(ideProcessInfo)).toBe(IDE_DEFINITIONS.firebasestudio);
+  });
+
+  it('should detect VSCode when no other IDE is detected and command includes "code"', () => {
+    vi.stubEnv('TERM_PROGRAM', 'vscode');
+    vi.stubEnv('MONOSPACE_ENV', '');
+    expect(detectIde(ideProcessInfo)).toBe(IDE_DEFINITIONS.vscode);
+  });
+
+  it('should detect VSCodeFork when no other IDE is detected and command does not include "code"', () => {
+    vi.stubEnv('TERM_PROGRAM', 'vscode');
+    vi.stubEnv('MONOSPACE_ENV', '');
+    expect(detectIde(ideProcessInfoNoCode)).toBe(IDE_DEFINITIONS.vscodefork);
+  });
+});
+
+describe('detectIde with ideInfoFromFile', () => {
+  const ideProcessInfo = { pid: 123, command: 'some/path/to/code' };
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('should use the name and displayName from the file', () => {
+    const ideInfoFromFile = {
+      name: 'custom-ide',
+      displayName: 'Custom IDE',
+    };
+    expect(detectIde(ideProcessInfo, ideInfoFromFile)).toEqual(ideInfoFromFile);
+  });
+
+  it('should fall back to env detection if name is missing', () => {
+    const ideInfoFromFile = { displayName: 'Custom IDE' };
+    vi.stubEnv('TERM_PROGRAM', 'vscode');
+    expect(detectIde(ideProcessInfo, ideInfoFromFile)).toBe(
+      IDE_DEFINITIONS.vscode,
+    );
+  });
+
+  it('should fall back to env detection if displayName is missing', () => {
+    const ideInfoFromFile = { name: 'custom-ide' };
+    vi.stubEnv('TERM_PROGRAM', 'vscode');
+    expect(detectIde(ideProcessInfo, ideInfoFromFile)).toBe(
+      IDE_DEFINITIONS.vscode,
+    );
   });
 });
