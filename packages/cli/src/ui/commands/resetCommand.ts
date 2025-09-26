@@ -20,10 +20,9 @@ export const resetCommand: SlashCommand = {
       // If resetChat fails, the exception will propagate and halt the command,
       // which is the correct behavior to signal a failure to the user.
       await geminiClient.resetChat();
+      uiTelemetryService.setLastPromptTokenCount(0);
     } else {
       context.ui.setDebugMessage('Could not find an active session to reset.');
     }
-
-    uiTelemetryService.setLastPromptTokenCount(0);
   },
 };
