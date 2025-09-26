@@ -188,13 +188,16 @@ class DiscoveredMCPToolInvocation extends BaseToolInvocation<
       };
     }
 
-    sanitizeMcpContentInPlace(rawResponseParts);
+    const sanitizedRawResponseParts =
+      returnSanitizedMcpContent(rawResponseParts);
 
-    const transformedParts = transformMcpContentToParts(rawResponseParts);
+    const transformedParts = transformMcpContentToParts(
+      sanitizedRawResponseParts,
+    );
 
     return {
       llmContent: transformedParts,
-      returnDisplay: getStringifiedResultForDisplay(rawResponseParts),
+      returnDisplay: getStringifiedResultForDisplay(sanitizedRawResponseParts),
     };
   }
 
@@ -311,21 +314,25 @@ function transformResourceLinkBlock(block: McpResourceLinkBlock): Part {
 }
 
 /**
- * Sanitizes the MCP content blocks in place, replacing unsupported mime types
- * with an error message.
+ * Sanitizes the MCP content blocks, replacing unsupported mime types
+ * with an error message. If no sanitization is needed, the original
+ * response is returned. Otherwise, a sanitized copy is returned.
  * @param sdkResponse The raw Part[] array from `mcpTool.callTool()`.
+ * @returns A sanitized Part[] array.
  */
-function sanitizeMcpContentInPlace(sdkResponse: Part[]): void {
-  for (let j = 0; j < sdkResponse.length; j++) {
-    const funcResponse = sdkResponse[j]?.functionResponse;
+export function returnSanitizedMcpContent(sdkResponse: Part[]): Part[] {
+  let sanitizedResponse: Part[] | null = null;
+
+  for (let partIndex = 0; partIndex < sdkResponse.length; partIndex++) {
+    const funcResponse = sdkResponse[partIndex]?.functionResponse;
     const mcpContent = funcResponse?.response?.['content'] as McpContentBlock[];
 
     if (!Array.isArray(mcpContent)) {
-      return;
+      continue;
     }
 
-    for (let i = 0; i < mcpContent.length; i++) {
-      const block = mcpContent[i];
+    for (let blockIndex = 0; blockIndex < mcpContent.length; blockIndex++) {
+      const block = mcpContent[blockIndex];
       let mimeType: string | undefined;
 
       if (block.type === 'image' || block.type === 'audio') {
@@ -335,13 +342,26 @@ function sanitizeMcpContentInPlace(sdkResponse: Part[]): void {
       }
 
       if (mimeType && !isMimeTypeSupported(mimeType)) {
-        mcpContent[i] = {
-          type: 'text',
-          text: `[Tool returned unsupported mimetype: ${mimeType}]`,
-        };
+        if (!sanitizedResponse) {
+          // Lazily create a deep copy the first time we need to mutate.
+          sanitizedResponse = structuredClone(sdkResponse);
+        }
+
+        // The structure of sanitizedResponse mirrors sdkResponse, so we can use the same indices.
+        const sanitizedMcpContent =
+          sanitizedResponse[partIndex]?.functionResponse?.response?.['content'];
+
+        if (Array.isArray(sanitizedMcpContent)) {
+          sanitizedMcpContent[blockIndex] = {
+            type: 'text',
+            text: `[Tool returned unsupported mimetype: ${mimeType}]`,
+          };
+        }
       }
     }
   }
+
+  return sanitizedResponse ?? sdkResponse;
 }
 
 /**
