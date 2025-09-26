@@ -5,6 +5,8 @@
  */
 
 import { describe, it, expect } from 'vitest';
+import { existsSync } from 'node:fs';
+import * as path from 'node:path';
 import { TestRig, printDebugInfo, validateModelOutput } from './test-helper.js';
 
 describe('file-system', () => {
@@ -204,41 +206,55 @@ describe('file-system', () => {
     expect(newFileContent).toBe(expectedContent);
   });
 
-  it('should fail gracefully when replacing in a non-existent file', async () => {
+  it('should fail safely when trying to edit a non-existent file', async () => {
     const rig = new TestRig();
     await rig.setup(
-      'should fail gracefully when replacing in a non-existent file',
+      'should fail safely when trying to edit a non-existent file',
     );
     const fileName = 'non_existent.txt';
 
-    const result = await rig.run(`In ${fileName}, replace "a" with "b"`);
+    await rig.run(`In ${fileName}, replace "a" with "b"`);
 
     await rig.waitForTelemetryReady();
-
     const toolLogs = rig.readToolLogs();
 
-    const toolAttempt = toolLogs.find(
-      (log) =>
-        log.toolRequest.name === 'read_file' ||
-        log.toolRequest.name === 'replace',
+    const readAttempt = toolLogs.find(
+      (log) => log.toolRequest.name === 'read_file',
+    );
+    const writeAttempt = toolLogs.find(
+      (log) => log.toolRequest.name === 'write_file',
+    );
+    const successfulReplace = toolLogs.find(
+      (log) => log.toolRequest.name === 'replace' && log.toolRequest.success,
     );
 
-    if (!toolAttempt) {
-      printDebugInfo(rig, result);
-      expect.fail(
-        'Expected to find a replace or read_file call, but none was found.',
-      );
+    // The model can either investigate (and fail) or do nothing.
+    // If it chose to investigate by reading, that read must have failed.
+    if (readAttempt) {
+      expect(
+        readAttempt.toolRequest.success,
+        'If model tries to read the file, that attempt must fail',
+      ).toBe(false);
     }
 
-    if (toolAttempt.toolRequest.success) {
-      console.error(
-        'Expected tool call to fail for non-existent file, but it succeeded.',
-      );
-    }
-
+    // CRITICAL: Verify that no matter what the model did, it never successfully
+    // wrote or replaced anything. This handles all cases, including when no
+    // tools are called at all.
     expect(
-      toolAttempt.toolRequest.success,
-      'Expected replace or read_file tool to fail',
-    ).toBe(false);
+      writeAttempt,
+      'write_file should not have been called',
+    ).toBeUndefined();
+    expect(
+      successfulReplace,
+      'A successful replace should not have occurred',
+    ).toBeUndefined();
+
+    // Final verification: ensure the file was not created.
+    const filePath = path.join(rig.testDir!, fileName);
+    const fileExists = existsSync(filePath);
+    rig.cleanup(); // Manual cleanup since we created a file for the check
+    expect(fileExists, 'The non-existent file should not be created').toBe(
+      false,
+    );
   });
 });
