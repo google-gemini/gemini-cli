@@ -38,6 +38,13 @@ describe('App', () => {
     quittingMessages: null,
     dialogsVisible: false,
     mainControlsRef: { current: null },
+    historyManager: {
+      addItem: vi.fn(),
+      history: [],
+      updateItem: vi.fn(),
+      clearItems: vi.fn(),
+      loadHistory: vi.fn(),
+    },
   };
 
   it('should render main content and composer when not quitting', () => {
@@ -82,5 +89,37 @@ describe('App', () => {
     expect(lastFrame()).toContain('MainContent');
     expect(lastFrame()).toContain('Notifications');
     expect(lastFrame()).toContain('DialogManager');
+  });
+
+  it('should show Ctrl+C exit prompt when dialogs are visible and ctrlCPressedOnce is true', () => {
+    const ctrlCUIState = {
+      ...mockUIState,
+      dialogsVisible: true,
+      ctrlCPressedOnce: true,
+    } as UIState;
+
+    const { lastFrame } = render(
+      <UIStateContext.Provider value={ctrlCUIState}>
+        <App />
+      </UIStateContext.Provider>,
+    );
+
+    expect(lastFrame()).toContain('Press Ctrl+C again to exit.');
+  });
+
+  it('should show Ctrl+D exit prompt when dialogs are visible and ctrlDPressedOnce is true', () => {
+    const ctrlDUIState = {
+      ...mockUIState,
+      dialogsVisible: true,
+      ctrlDPressedOnce: true,
+    } as UIState;
+
+    const { lastFrame } = render(
+      <UIStateContext.Provider value={ctrlDUIState}>
+        <App />
+      </UIStateContext.Provider>,
+    );
+
+    expect(lastFrame()).toContain('Press Ctrl+D again to exit.');
   });
 });

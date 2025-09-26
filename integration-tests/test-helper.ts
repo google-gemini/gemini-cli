@@ -9,7 +9,9 @@ import { mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { env } from 'node:process';
+import { DEFAULT_GEMINI_MODEL } from '../packages/core/src/config/models.js';
 import fs from 'node:fs';
+import * as pty from '@lydell/node-pty';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -151,6 +153,7 @@ export class TestRig {
         otlpEndpoint: '',
         outfile: telemetryPath,
       },
+      model: DEFAULT_GEMINI_MODEL,
       sandbox: env.GEMINI_SANDBOX !== 'false' ? env.GEMINI_SANDBOX : false,
       ...options.settings, // Allow tests to override/add settings
     };
@@ -210,6 +213,7 @@ export class TestRig {
     const child = spawn('node', commandArgs, {
       cwd: this.testDir!,
       stdio: 'pipe',
+      env: process.env,
     });
 
     let stdout = '';
@@ -296,6 +300,57 @@ export class TestRig {
             result += `\n\nStdErr:\n${stderr}`;
           }
 
+          resolve(result);
+        } else {
+          reject(new Error(`Process exited with code ${code}:\n${stderr}`));
+        }
+      });
+    });
+
+    return promise;
+  }
+
+  runCommand(
+    args: string[],
+    options: { stdin?: string } = {},
+  ): Promise<string> {
+    const commandArgs = [this.bundlePath, ...args];
+
+    const child = spawn('node', commandArgs, {
+      cwd: this.testDir!,
+      stdio: 'pipe',
+    });
+
+    let stdout = '';
+    let stderr = '';
+
+    if (options.stdin) {
+      child.stdin!.write(options.stdin);
+      child.stdin!.end();
+    }
+
+    child.stdout!.on('data', (data: Buffer) => {
+      stdout += data;
+      if (env.KEEP_OUTPUT === 'true' || env.VERBOSE === 'true') {
+        process.stdout.write(data);
+      }
+    });
+
+    child.stderr!.on('data', (data: Buffer) => {
+      stderr += data;
+      if (env.KEEP_OUTPUT === 'true' || env.VERBOSE === 'true') {
+        process.stderr.write(data);
+      }
+    });
+
+    const promise = new Promise<string>((resolve, reject) => {
+      child.on('close', (code: number) => {
+        if (code === 0) {
+          this._lastRunStdout = stdout;
+          let result = stdout;
+          if (stderr) {
+            result += `\n\nStdErr:\n${stderr}`;
+          }
           resolve(result);
         } else {
           reject(new Error(`Process exited with code ${code}:\n${stderr}`));
@@ -718,5 +773,40 @@ export class TestRig {
       }
     }
     return lastApiRequest;
+  }
+
+  runInteractive(...args: string[]): {
+    ptyProcess: pty.IPty;
+    promise: Promise<{ exitCode: number; signal?: number; output: string }>;
+  } {
+    const commandArgs = [this.bundlePath, '--yolo', ...args];
+
+    const ptyProcess = pty.spawn('node', commandArgs, {
+      name: 'xterm-color',
+      cols: 80,
+      rows: 30,
+      cwd: this.testDir!,
+      env: process.env as { [key: string]: string },
+    });
+
+    let output = '';
+    ptyProcess.onData((data) => {
+      output += data;
+      if (env.KEEP_OUTPUT === 'true' || env.VERBOSE === 'true') {
+        process.stdout.write(data);
+      }
+    });
+
+    const promise = new Promise<{
+      exitCode: number;
+      signal?: number;
+      output: string;
+    }>((resolve) => {
+      ptyProcess.onExit(({ exitCode, signal }) => {
+        resolve({ exitCode, signal, output });
+      });
+    });
+
+    return { ptyProcess, promise };
   }
 }

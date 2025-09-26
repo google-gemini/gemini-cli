@@ -118,7 +118,7 @@ export class LoggingContentGenerator implements ContentGenerator {
       const durationMs = Date.now() - startTime;
       this._logApiResponse(
         durationMs,
-        response.modelVersion || '',
+        response.modelVersion || req.model,
         userPromptId,
         response.usageMetadata,
         JSON.stringify(response),
@@ -147,13 +147,19 @@ export class LoggingContentGenerator implements ContentGenerator {
       throw error;
     }
 
-    return this.loggingStreamWrapper(stream, startTime, userPromptId);
+    return this.loggingStreamWrapper(
+      stream,
+      startTime,
+      userPromptId,
+      req.model,
+    );
   }
 
   private async *loggingStreamWrapper(
     stream: AsyncGenerator<GenerateContentResponse>,
     startTime: number,
     userPromptId: string,
+    model: string,
   ): AsyncGenerator<GenerateContentResponse> {
     const responses: GenerateContentResponse[] = [];
 
@@ -170,7 +176,7 @@ export class LoggingContentGenerator implements ContentGenerator {
       const durationMs = Date.now() - startTime;
       this._logApiResponse(
         durationMs,
-        responses[0]?.modelVersion || '',
+        responses[0]?.modelVersion || model,
         userPromptId,
         lastUsageMetadata,
         JSON.stringify(responses),
@@ -180,7 +186,7 @@ export class LoggingContentGenerator implements ContentGenerator {
       this._logApiError(
         durationMs,
         error,
-        responses[0]?.modelVersion || '',
+        responses[0]?.modelVersion || model,
         userPromptId,
       );
       throw error;
