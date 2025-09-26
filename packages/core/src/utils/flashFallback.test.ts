@@ -6,7 +6,7 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { Config } from '../config/config.js';
-import fs from 'node:fs';
+import * as fs from 'node:fs';
 import {
   setSimulate429,
   disableSimulationAfterFallback,

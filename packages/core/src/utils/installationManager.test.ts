@@ -9,7 +9,7 @@ import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { InstallationManager } from './installationManager.js';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
-import path from 'node:path';
+import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
 
 vi.mock('node:fs', async (importOriginal) => {

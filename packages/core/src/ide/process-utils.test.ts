@@ -14,7 +14,7 @@ import {
   type Mock,
 } from 'vitest';
 import { getIdeProcessInfo } from './process-utils.js';
-import os from 'node:os';
+import * as os from 'node:os';
 
 const mockedExec = vi.hoisted(() => vi.fn());
 vi.mock('node:util', () => ({

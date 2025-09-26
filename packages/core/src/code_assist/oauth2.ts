@@ -11,11 +11,11 @@ import {
   CodeChallengeMethod,
 } from 'google-auth-library';
 import * as http from 'node:http';
-import url from 'node:url';
-import crypto from 'node:crypto';
+import * as url from 'node:url';
+import * as crypto from 'node:crypto';
 import * as net from 'node:net';
 import open from 'open';
-import path from 'node:path';
+import * as path from 'node:path';
 import { promises as fs } from 'node:fs';
 import type { Config } from '../config/config.js';
 import { getErrorMessage, FatalAuthenticationError } from '../utils/errors.js';

@@ -7,9 +7,9 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import type { GrepToolParams } from './grep.js';
 import { GrepTool } from './grep.js';
-import path from 'node:path';
-import fs from 'node:fs/promises';
-import os from 'node:os';
+import * as path from 'node:path';
+import * as fs from 'node:fs/promises';
+import * as os from 'node:os';
 import type { Config } from '../config/config.js';
 import { createMockWorkspaceContext } from '../test-utils/mockWorkspaceContext.js';
 import { ToolErrorType } from './tool-error.js';

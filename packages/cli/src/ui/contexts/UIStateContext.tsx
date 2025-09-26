@@ -35,16 +35,11 @@ export interface ProQuotaDialogRequest {
   resolve: (intent: FallbackIntent) => void;
 }
 
-<<<<<<< HEAD
-export interface UIState {
-  history: HistoryItem[];
-=======
 import { type UseHistoryManagerReturn } from '../hooks/useHistoryManager.js';
 
 export interface UIState {
   history: HistoryItem[];
   historyManager: UseHistoryManagerReturn;
->>>>>>> upstream/main
   isThemeDialogOpen: boolean;
   themeError: string | null;
   isAuthenticating: boolean;
@@ -58,11 +53,8 @@ export interface UIState {
   debugMessage: string;
   quittingMessages: HistoryItem[] | null;
   isSettingsDialogOpen: boolean;
-<<<<<<< HEAD
-=======
   isModelDialogOpen: boolean;
   isPermissionsDialogOpen: boolean;
->>>>>>> upstream/main
   slashCommands: readonly SlashCommand[];
   pendingSlashCommandHistoryItems: HistoryItemWithoutId[];
   commandContext: CommandContext;
@@ -123,11 +115,7 @@ export interface UIState {
   isRestarting: boolean;
   extensionsUpdateState: Map<string, ExtensionUpdateState>;
   activePtyId: number | undefined;
-<<<<<<< HEAD
-  shellFocused: boolean;
-=======
   embeddedShellFocused: boolean;
->>>>>>> upstream/main
 }
 
 export const UIStateContext = createContext<UIState | null>(null);

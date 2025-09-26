@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import crypto from 'node:crypto';
+import * as crypto from 'node:crypto';
 
 const crawlCache = new Map<string, string[]>();
 const cacheTimers = new Map<string, NodeJS.Timeout>();

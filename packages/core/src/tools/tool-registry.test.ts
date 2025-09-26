@@ -15,7 +15,7 @@ import type { FunctionDeclaration, CallableTool } from '@google/genai';
 import { mcpToTool } from '@google/genai';
 import { spawn } from 'node:child_process';
 
-import fs from 'node:fs';
+import * as fs from 'node:fs';
 import { MockTool } from '../test-utils/tools.js';
 
 import { McpClientManager } from './mcp-client-manager.js';

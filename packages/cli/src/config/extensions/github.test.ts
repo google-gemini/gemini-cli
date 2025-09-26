@@ -128,11 +128,8 @@ describe('git extension helpers', () => {
         version: '1.0.0',
         isActive: true,
         installMetadata: {
-<<<<<<< HEAD
           type: 'local',
-=======
           type: 'link',
->>>>>>> upstream/main
           source: '',
         },
       };
@@ -310,8 +307,6 @@ describe('git extension helpers', () => {
       );
     });
 
-<<<<<<< HEAD
-=======
     it('should fail on a non-GitHub URL', () => {
       const source = 'https://example.com/owner/repo.git';
       expect(() => parseGitHubRepoForReleases(source)).toThrow(
@@ -319,7 +314,6 @@ describe('git extension helpers', () => {
       );
     });
 
->>>>>>> upstream/main
     it('should parse owner and repo from a shorthand string', () => {
       const source = 'owner/repo';
       const { owner, repo } = parseGitHubRepoForReleases(source);

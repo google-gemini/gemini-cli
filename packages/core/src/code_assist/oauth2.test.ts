@@ -19,7 +19,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import http from 'node:http';
 import open from 'open';
-import crypto from 'node:crypto';
+import * as crypto from 'node:crypto';
 import * as os from 'node:os';
 import { AuthType } from '../core/contentGenerator.js';
 import type { Config } from '../config/config.js';

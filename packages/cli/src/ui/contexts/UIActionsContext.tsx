@@ -31,11 +31,8 @@ export interface UIActions {
   exitEditorDialog: () => void;
   exitPrivacyNotice: () => void;
   closeSettingsDialog: () => void;
-<<<<<<< HEAD
-=======
   closeModelDialog: () => void;
   closePermissionsDialog: () => void;
->>>>>>> upstream/main
   setShellModeActive: (value: boolean) => void;
   vimHandleInput: (key: Key) => boolean;
   handleIdePromptComplete: (result: IdeIntegrationNudgeResult) => void;

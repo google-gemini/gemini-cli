@@ -15,10 +15,10 @@ import {
 } from 'vitest';
 
 import * as actualNodeFs from 'node:fs'; // For setup/teardown
-import fs from 'node:fs';
-import fsPromises from 'node:fs/promises';
-import path from 'node:path';
-import os from 'node:os';
+import * as fs from 'node:fs';
+import * as fsPromises from 'node:fs/promises';
+import * as path from 'node:path';
+import * as os from 'node:os';
 // eslint-disable-next-line import/no-internal-modules
 import mime from 'mime/lite';
 

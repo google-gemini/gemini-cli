@@ -18,22 +18,15 @@ import { EditorSettingsDialog } from './EditorSettingsDialog.js';
 import { PrivacyNotice } from '../privacy/PrivacyNotice.js';
 import { WorkspaceMigrationDialog } from './WorkspaceMigrationDialog.js';
 import { ProQuotaDialog } from './ProQuotaDialog.js';
-<<<<<<< HEAD
-=======
 import { PermissionsModifyTrustDialog } from './PermissionsModifyTrustDialog.js';
 import { ModelDialog } from './ModelDialog.js';
->>>>>>> upstream/main
 import { theme } from '../semantic-colors.js';
 import { useUIState } from '../contexts/UIStateContext.js';
 import { useUIActions } from '../contexts/UIActionsContext.js';
 import { useConfig } from '../contexts/ConfigContext.js';
 import { useSettings } from '../contexts/SettingsContext.js';
 import process from 'node:process';
-<<<<<<< HEAD
 
-// Props for DialogManager
-export const DialogManager = () => {
-=======
 import { type UseHistoryManagerReturn } from '../hooks/useHistoryManager.js';
 
 interface DialogManagerProps {
@@ -42,7 +35,6 @@ interface DialogManagerProps {
 
 // Props for DialogManager
 export const DialogManager = ({ addItem }: DialogManagerProps) => {
->>>>>>> upstream/main
   const config = useConfig();
   const settings = useSettings();
 
@@ -157,12 +149,9 @@ export const DialogManager = ({ addItem }: DialogManagerProps) => {
       </Box>
     );
   }
-<<<<<<< HEAD
-=======
   if (uiState.isModelDialogOpen) {
     return <ModelDialog onClose={uiActions.closeModelDialog} />;
   }
->>>>>>> upstream/main
   if (uiState.isAuthenticating) {
     return (
       <AuthInProgress
@@ -210,8 +199,6 @@ export const DialogManager = ({ addItem }: DialogManagerProps) => {
     );
   }
 
-<<<<<<< HEAD
-=======
   if (uiState.isPermissionsDialogOpen) {
     return (
       <PermissionsModifyTrustDialog
@@ -221,6 +208,5 @@ export const DialogManager = ({ addItem }: DialogManagerProps) => {
     );
   }
 
->>>>>>> upstream/main
   return null;
 };

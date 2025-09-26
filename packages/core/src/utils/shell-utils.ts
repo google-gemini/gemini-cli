@@ -6,7 +6,7 @@
 
 import type { AnyToolInvocation } from '../index.js';
 import type { Config } from '../config/config.js';
-import os from 'node:os';
+import * as os from 'node:os';
 import { quote } from 'shell-quote';
 import { doesToolInvocationMatch } from './tool-utils.js';
 import { spawn, type SpawnOptionsWithoutStdio } from 'node:child_process';

@@ -91,11 +91,7 @@ describe('<ExtensionsList />', () => {
     },
     {
       state: ExtensionUpdateState.ERROR,
-<<<<<<< HEAD
       expectedText: '(error checking for updates)',
-=======
-      expectedText: '(error)',
->>>>>>> upstream/main
     },
     {
       state: ExtensionUpdateState.UP_TO_DATE,

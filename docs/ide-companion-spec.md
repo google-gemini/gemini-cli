@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # Gemini CLI Companion Extension: Interface Specification
 
 > Last Updated: September 15, 2025
@@ -12,7 +11,6 @@ Gemini CLI and the IDE extension communicate through a local communication chann
 ### 1. Transport Layer: MCP over HTTP
 
 The extension **MUST** run a local HTTP server that implements the **Model Context Protocol (MCP)**.
-=======
 # Gemini CLI Companion Plugin: Interface Specification
 
 > Last Updated: September 15, 2025
@@ -26,7 +24,6 @@ Gemini CLI and the IDE plugin communicate through a local communication channel.
 ### 1. Transport Layer: MCP over HTTP
 
 The plugin **MUST** run a local HTTP server that implements the **Model Context Protocol (MCP)**.
->>>>>>> upstream/main
 
 - **Protocol:** The server must be a valid MCP server. We recommend using an existing MCP SDK for your language of choice if available.
 - **Endpoint:** The server should expose a single endpoint (e.g., `/mcp`) for all MCP communication.
@@ -34,7 +31,6 @@ The plugin **MUST** run a local HTTP server that implements the **Model Context 
 
 ### 2. Discovery Mechanism: The Port File
 
-<<<<<<< HEAD
 For Gemini CLI to connect, it needs to discover which IDE instance it's running in and what port your server is using. The extension **MUST** facilitate this by creating a "discovery file."
 
 - **How the CLI Finds the File:** The CLI determines the Process ID (PID) of the IDE it's running in by traversing the process tree. It then looks for a discovery file that contains this PID in its name.
@@ -73,7 +69,6 @@ To enable context awareness, the extension **MAY** provide the CLI with real-tim
 ### `ide/contextUpdate` Notification
 
 The extension **MAY** send an `ide/contextUpdate` [notification](https://modelcontextprotocol.io/specification/2025-06-18/basic/index#notifications) to the CLI whenever the user's context changes.
-=======
 For Gemini CLI to connect, it needs to discover which IDE instance it's running in and what port your server is using. The plugin **MUST** facilitate this by creating a "discovery file."
 
 - **How the CLI Finds the File:** The CLI determines the Process ID (PID) of the IDE it's running in by traversing the process tree. It then looks for a discovery file that contains this PID in its name.
@@ -112,7 +107,6 @@ To enable context awareness, the plugin **MAY** provide the CLI with real-time i
 ### `ide/contextUpdate` Notification
 
 The plugin **MAY** send an `ide/contextUpdate` [notification](https://modelcontextprotocol.io/specification/2025-06-18/basic/index#notifications) to the CLI whenever the user's context changes.
->>>>>>> upstream/main
 
 - **Triggering Events:** This notification should be sent (with a recommended debounce of 50ms) when:
   - A file is opened, closed, or focused.
@@ -151,7 +145,6 @@ The plugin **MAY** send an `ide/contextUpdate` [notification](https://modelconte
 
 After receiving the `IdeContext` object, the CLI performs several normalization and truncation steps before sending the information to the model.
 
-<<<<<<< HEAD
 - **File Ordering:** The CLI uses the `timestamp` field to determine the most recently used files. It sorts the `openFiles` list based on this value. Therefore, your extension **MUST** provide an accurate Unix timestamp for when a file was last focused.
 - **Active File:** The CLI considers only the most recent file (after sorting) to be the "active" file. It will ignore the `isActive` flag on all other files and clear their `cursor` and `selectedText` fields. Your extension should focus on setting `isActive: true` and providing cursor/selection details only for the currently focused file.
 - **Truncation:** To manage token limits, the CLI truncates both the file list (to 10 files) and the `selectedText` (to 16KB).
@@ -165,7 +158,6 @@ To enable interactive code modifications, the extension **MAY** expose a diffing
 ### `openDiff` Tool
 
 The extension **MUST** register an `openDiff` tool on its MCP server.
-=======
 - **File Ordering:** The CLI uses the `timestamp` field to determine the most recently used files. It sorts the `openFiles` list based on this value. Therefore, your plugin **MUST** provide an accurate Unix timestamp for when a file was last focused.
 - **Active File:** The CLI considers only the most recent file (after sorting) to be the "active" file. It will ignore the `isActive` flag on all other files and clear their `cursor` and `selectedText` fields. Your plugin should focus on setting `isActive: true` and providing cursor/selection details only for the currently focused file.
 - **Truncation:** To manage token limits, the CLI truncates both the file list (to 10 files) and the `selectedText` (to 16KB).
@@ -179,7 +171,6 @@ To enable interactive code modifications, the plugin **MAY** expose a diffing in
 ### `openDiff` Tool
 
 The plugin **MUST** register an `openDiff` tool on its MCP server.
->>>>>>> upstream/main
 
 - **Description:** This tool instructs the IDE to open a modifiable diff view for a specific file.
 - **Request (`OpenDiffRequest`):** The tool is invoked via a `tools/call` request. The `arguments` field within the request's `params` **MUST** be an `OpenDiffRequest` object.
@@ -201,11 +192,8 @@ The plugin **MUST** register an `openDiff` tool on its MCP server.
 
 ### `closeDiff` Tool
 
-<<<<<<< HEAD
 The extension **MUST** register a `closeDiff` tool on its MCP server.
-=======
 The plugin **MUST** register a `closeDiff` tool on its MCP server.
->>>>>>> upstream/main
 
 - **Description:** This tool instructs the IDE to close an open diff view for a specific file.
 - **Request (`CloseDiffRequest`):** The tool is invoked via a `tools/call` request. The `arguments` field within the request's `params` **MUST** be an `CloseDiffRequest` object.
@@ -223,11 +211,8 @@ The plugin **MUST** register a `closeDiff` tool on its MCP server.
 
 ### `ide/diffAccepted` Notification
 
-<<<<<<< HEAD
 When the user accepts the changes in a diff view (e.g., by clicking an "Apply" or "Save" button), the extension **MUST** send an `ide/diffAccepted` notification to the CLI.
-=======
 When the user accepts the changes in a diff view (e.g., by clicking an "Apply" or "Save" button), the plugin **MUST** send an `ide/diffAccepted` notification to the CLI.
->>>>>>> upstream/main
 
 - **Payload:** The notification parameters **MUST** include the file path and the final content of the file. The content may differ from the original `newContent` if the user made manual edits in the diff view.
 
@@ -242,11 +227,8 @@ When the user accepts the changes in a diff view (e.g., by clicking an "Apply" o
 
 ### `ide/diffRejected` Notification
 
-<<<<<<< HEAD
 When the user rejects the changes (e.g., by closing the diff view without accepting), the extension **MUST** send an `ide/diffRejected` notification to the CLI.
-=======
 When the user rejects the changes (e.g., by closing the diff view without accepting), the plugin **MUST** send an `ide/diffRejected` notification to the CLI.
->>>>>>> upstream/main
 
 - **Payload:** The notification parameters **MUST** include the file path of the rejected diff.
 
@@ -257,7 +239,6 @@ When the user rejects the changes (e.g., by closing the diff view without accept
   }
   ```
 
-<<<<<<< HEAD
 ## IV. Supporting Additional IDEs
 
 To add support for a new IDE, two main components in the Gemini CLI codebase need to be updated: the detection logic and the installer logic.
@@ -291,7 +272,6 @@ The extension **MUST** manage its resources and the discovery file correctly bas
   1.  Start the MCP server.
   2.  Create the discovery file.
 - **On Deactivation (IDE shutdown/extension disabled):**
-=======
 ## IV. The Lifecycle Interface
 
 The plugin **MUST** manage its resources and the discovery file correctly based on the IDE's lifecycle.
@@ -300,6 +280,5 @@ The plugin **MUST** manage its resources and the discovery file correctly based 
   1.  Start the MCP server.
   2.  Create the discovery file.
 - **On Deactivation (IDE shutdown/plugin disabled):**
->>>>>>> upstream/main
   1.  Stop the MCP server.
   2.  Delete the discovery file.

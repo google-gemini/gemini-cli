@@ -20,7 +20,7 @@
     "incremental": true,
     "declaration": true,
     "allowSyntheticDefaultImports": true,
-    "verbatimModuleSyntax": true,
+    "downlevelIteration": true,
     "lib": ["ES2023"],
     "module": "NodeNext",
     "moduleResolution": "nodenext",

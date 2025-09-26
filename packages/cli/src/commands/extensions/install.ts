@@ -5,14 +5,11 @@
  */
 
 import type { CommandModule } from 'yargs';
-<<<<<<< HEAD
 import { installExtension } from '../../config/extension.js';
-=======
 import {
   installExtension,
   requestConsentNonInteractive,
 } from '../../config/extension.js';
->>>>>>> upstream/main
 import type { ExtensionInstallMetadata } from '@google/gemini-cli-core';
 
 import { getErrorMessage } from '../../utils/errors.js';
@@ -27,10 +24,7 @@ interface InstallArgs {
 export async function handleInstall(args: InstallArgs) {
   try {
     let installMetadata: ExtensionInstallMetadata;
-<<<<<<< HEAD
 
-=======
->>>>>>> upstream/main
     if (args.source) {
       const { source } = args;
       if (
@@ -59,14 +53,11 @@ export async function handleInstall(args: InstallArgs) {
       throw new Error('Either --source or --path must be provided.');
     }
 
-<<<<<<< HEAD
     const name = await installExtension(installMetadata, true);
-=======
     const name = await installExtension(
       installMetadata,
       requestConsentNonInteractive,
     );
->>>>>>> upstream/main
     console.log(`Extension "${name}" installed successfully and enabled.`);
   } catch (error) {
     console.error(getErrorMessage(error));
@@ -75,11 +66,8 @@ export async function handleInstall(args: InstallArgs) {
 }
 
 export const installCommand: CommandModule = {
-<<<<<<< HEAD
   command: 'install [source]',
-=======
   command: 'install [<source>] [--path] [--ref] [--auto-update]',
->>>>>>> upstream/main
   describe: 'Installs an extension from a git repository URL or a local path.',
   builder: (yargs) =>
     yargs

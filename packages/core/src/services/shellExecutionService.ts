@@ -9,11 +9,11 @@ import type { PtyImplementation } from '../utils/getPty.js';
 import { getPty } from '../utils/getPty.js';
 import { spawn as cpSpawn } from 'node:child_process';
 import { TextDecoder } from 'node:util';
-import os from 'node:os';
+import * as os from 'node:os';
 import type { IPty } from '@lydell/node-pty';
 import { getCachedEncodingForBuffer } from '../utils/systemEncoding.js';
 import { isBinary } from '../utils/textUtils.js';
-import pkg from '@xterm/headless';
+import * as pkg from '@xterm/headless';
 import {
   serializeTerminalToObject,
   type AnsiOutput,

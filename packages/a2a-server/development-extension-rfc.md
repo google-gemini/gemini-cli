@@ -273,11 +273,7 @@ message DevelopmentToolEvent {
   // The tier of the user (optional).
   string user_tier = 3;
 
-<<<<<<< HEAD
-  // An unexpected error occured in the agent execution (optional).
-=======
   // An unexpected error occurred in the agent execution (optional).
->>>>>>> upstream/main
   string error = 4;
 }
 ```

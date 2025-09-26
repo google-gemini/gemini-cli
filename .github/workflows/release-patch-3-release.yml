@@ -144,15 +144,12 @@ jobs:
           echo "  Previous Tag: ${{ steps.patch_version.outputs.PREVIOUS_TAG }}"
 
       - name: 'Run Tests'
-<<<<<<< HEAD
         uses: './.github/actions/run-tests'
         with:
           force_skip_tests: '${{ github.event.inputs.force_skip_tests }}'
-=======
         if: "${{github.event.inputs.force_skip_tests != 'true'}}"
         uses: './.github/actions/run-tests'
         with:
->>>>>>> upstream/main
           gemini_api_key: '${{ secrets.GEMINI_API_KEY }}'
           working-directory: './release'
 

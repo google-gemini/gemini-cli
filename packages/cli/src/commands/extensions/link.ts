@@ -5,14 +5,11 @@
  */
 
 import type { CommandModule } from 'yargs';
-<<<<<<< HEAD
 import { installExtension } from '../../config/extension.js';
-=======
 import {
   installExtension,
   requestConsentNonInteractive,
 } from '../../config/extension.js';
->>>>>>> upstream/main
 import type { ExtensionInstallMetadata } from '@google/gemini-cli-core';
 
 import { getErrorMessage } from '../../utils/errors.js';
@@ -27,14 +24,11 @@ export async function handleLink(args: InstallArgs) {
       source: args.path,
       type: 'link',
     };
-<<<<<<< HEAD
     const extensionName = await installExtension(installMetadata);
-=======
     const extensionName = await installExtension(
       installMetadata,
       requestConsentNonInteractive,
     );
->>>>>>> upstream/main
     console.log(
       `Extension "${extensionName}" linked successfully and enabled.`,
     );

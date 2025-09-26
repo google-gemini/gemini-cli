@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import path from 'node:path';
+import * as path from 'node:path';
 import picomatch from 'picomatch';
 import type { Ignore } from './ignore.js';
 import { loadIgnoreRules } from './ignore.js';

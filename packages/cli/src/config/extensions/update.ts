@@ -16,10 +16,7 @@ import {
   loadExtension,
   loadInstallMetadata,
   ExtensionStorage,
-<<<<<<< HEAD
-=======
   loadExtensionConfig,
->>>>>>> upstream/main
 } from '../extension.js';
 import { checkForExtensionUpdate } from './github.js';
 
@@ -32,10 +29,7 @@ export interface ExtensionUpdateInfo {
 export async function updateExtension(
   extension: GeminiCLIExtension,
   cwd: string = process.cwd(),
-<<<<<<< HEAD
-=======
   requestConsent: (consent: string) => Promise<boolean>,
->>>>>>> upstream/main
   currentState: ExtensionUpdateState,
   setExtensionUpdateState: (updateState: ExtensionUpdateState) => void,
 ): Promise<ExtensionUpdateInfo | undefined> {
@@ -60,10 +54,8 @@ export async function updateExtension(
   const tempDir = await ExtensionStorage.createTmpDir();
   try {
     await copyExtension(extension.path, tempDir);
-<<<<<<< HEAD
     await uninstallExtension(extension.name, cwd);
     await installExtension(installMetadata, false, cwd);
-=======
     const previousExtensionConfig = await loadExtensionConfig({
       extensionDir: extension.path,
       workspaceDir: cwd,
@@ -75,7 +67,6 @@ export async function updateExtension(
       cwd,
       previousExtensionConfig,
     );
->>>>>>> upstream/main
 
     const updatedExtensionStorage = new ExtensionStorage(extension.name);
     const updatedExtension = loadExtension({
@@ -107,10 +98,7 @@ export async function updateExtension(
 
 export async function updateAllUpdatableExtensions(
   cwd: string = process.cwd(),
-<<<<<<< HEAD
-=======
   requestConsent: (consent: string) => Promise<boolean>,
->>>>>>> upstream/main
   extensions: GeminiCLIExtension[],
   extensionsState: Map<string, ExtensionUpdateState>,
   setExtensionsUpdateState: Dispatch<
@@ -129,10 +117,7 @@ export async function updateAllUpdatableExtensions(
           updateExtension(
             extension,
             cwd,
-<<<<<<< HEAD
-=======
             requestConsent,
->>>>>>> upstream/main
             extensionsState.get(extension.name)!,
             (updateState) => {
               setExtensionsUpdateState((prev) => {
@@ -158,41 +143,16 @@ export async function checkForAllExtensionUpdates(
   setExtensionsUpdateState: Dispatch<
     SetStateAction<Map<string, ExtensionUpdateState>>
   >,
-<<<<<<< HEAD
-): Promise<Map<string, ExtensionUpdateState>> {
-=======
   cwd: string = process.cwd(),
 ): Promise<Map<string, ExtensionUpdateState>> {
   let newStates: Map<string, ExtensionUpdateState> = new Map(
     extensionsUpdateState,
   );
->>>>>>> upstream/main
   for (const extension of extensions) {
     const initialState = extensionsUpdateState.get(extension.name);
     if (initialState === undefined) {
       if (!extension.installMetadata) {
         setExtensionsUpdateState((prev) => {
-<<<<<<< HEAD
-          extensionsUpdateState = new Map(prev);
-          extensionsUpdateState.set(
-            extension.name,
-            ExtensionUpdateState.NOT_UPDATABLE,
-          );
-          return extensionsUpdateState;
-        });
-        continue;
-      }
-      await checkForExtensionUpdate(extension, (updatedState) => {
-        setExtensionsUpdateState((prev) => {
-          extensionsUpdateState = new Map(prev);
-          extensionsUpdateState.set(extension.name, updatedState);
-          return extensionsUpdateState;
-        });
-      });
-    }
-  }
-  return extensionsUpdateState;
-=======
           newStates = new Map(prev);
           newStates.set(extension.name, ExtensionUpdateState.NOT_UPDATABLE);
           return newStates;
@@ -201,7 +161,7 @@ export async function checkForAllExtensionUpdates(
       }
       await checkForExtensionUpdate(
         extension,
-        (updatedState) => {
+        (updatedState: ExtensionUpdateState) => {
           setExtensionsUpdateState((prev) => {
             newStates = new Map(prev);
             newStates.set(extension.name, updatedState);
@@ -213,5 +173,4 @@ export async function checkForAllExtensionUpdates(
     }
   }
   return newStates;
->>>>>>> upstream/main
 }

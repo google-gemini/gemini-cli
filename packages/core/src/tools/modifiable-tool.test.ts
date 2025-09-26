@@ -14,9 +14,9 @@ import {
   isModifiableDeclarativeTool,
 } from './modifiable-tool.js';
 import type { EditorType } from '../utils/editor.js';
-import fs from 'node:fs';
+import * as fs from 'node:fs';
 import fsp from 'node:fs/promises';
-import os from 'node:os';
+import * as os from 'node:os';
 import * as path from 'node:path';
 
 // Mock dependencies
