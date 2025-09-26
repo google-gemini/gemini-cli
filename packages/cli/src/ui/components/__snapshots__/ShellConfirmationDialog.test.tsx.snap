@@ -1,50 +1,21 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
 exports[`ShellConfirmationDialog > renders correctly 1`] = `
-" ╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
- │                                                                                                  │
- │ Shell Command Execution                                                                          │
- │ A custom command wants to run the following shell commands:                                      │
- │                                                                                                  │
- │ ╭──────────────────────────────────────────────────────────────────────────────────────────────╮ │
- │ │ ls -la                                                                                       │ │
- │ │ echo "hello"                                                                                 │ │
- │ ╰──────────────────────────────────────────────────────────────────────────────────────────────╯ │
- │                                                                                                  │
- │ Do you want to proceed?                                                                          │
- │                                                                                                  │
- │ ● 1. Yes, allow once                                                                             │
- │   2. Yes, allow always for this session                                                          │
- │   3. No (esc)                                                                                    │
- │                                                                                                  │
- ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
-`;
-
-exports[`ShellConfirmationDialog renders correctly 1`] = `
-"
-  ERROR  Cannot destructure property 'columns' from null or undefined value
-
- packages/cli/src/ui/components/ShellConfirmationDialog.tsx:32:23
-
- 29: export const ShellConfirmationDialog: React.FC<
- 30:   ShellConfirmationDialogProps
- 31: > = ({ request }) => {
- 32:   const { columns } = useTerminalSize();
- 33:   const { commands, onConfirm } = request;
- 34:
- 35:   useKeypress(
-
- - ShellConfirmationDialog (packages/cli/src/ui/components/ShellConfirmationDialog.tsx:32:23)
- -react-stack-bottom-fram (node_modules/react-reconciler/cjs/react-reconciler.development.js:15859:
-                         20)
- - renderWithHooks (node_modules/react-reconciler/cjs/react-reconciler.development.js:3221:22)
- -updateFunctionComponent (node_modules/react-reconciler/cjs/react-reconciler.development.js:6475:1
-                         9)
- - runWithFiberInDEV (node_modules/react-reconciler/cjs/react-reconciler.development.js:1738:13)
- - performUnitOfWork (node_modules/react-reconciler/cjs/react-reconciler.development.js:12834:22)
- - workLoopSync (node_modules/react-reconciler/cjs/react-reconciler.development.js:12644:41)
- - renderRootSync (node_modules/react-reconciler/cjs/react-reconciler.development.js:12624:11)
- - performWorkOnRoot (node_modules/react-reconciler/cjs/react-reconciler.development.js:12135:44)
- - performSyncWorkOnRoot (node_modules/react-reconciler/cjs/react-reconciler.development.js:2446:7)
-"
+"╭────────────────────────────────────────────────────────────────────────────────────────────────╮
+│                                                                                                │
+│ Shell Command Execution                                                                        │
+│ A custom command wants to run the following shell commands:                                    │
+│                                                                                                │
+│ ╭────────────────────────────────────────────────────────────────────────────────────────────╮ │
+│ │ ls -la                                                                                     │ │
+│ │ echo "hello"                                                                               │ │
+│ ╰────────────────────────────────────────────────────────────────────────────────────────────╯ │
+│                                                                                                │
+│ Do you want to proceed?                                                                        │
+│                                                                                                │
+│ ● 1. Yes, allow once                                                                           │
+│   2. Yes, allow always for this session                                                        │
+│   3. No (esc)                                                                                  │
+│                                                                                                │
+╰────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;

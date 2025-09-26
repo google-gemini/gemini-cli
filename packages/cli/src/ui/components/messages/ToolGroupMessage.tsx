@@ -108,7 +108,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
               <ToolMessage
                 {...tool}
                 availableTerminalHeight={availableTerminalHeightPerToolMessage}
-                terminalWidth={terminalWidth}
+                terminalWidth={terminalWidth - 4}
                 emphasis={
                   isConfirming
                     ? 'high'
@@ -131,7 +131,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
                   availableTerminalHeight={
                     availableTerminalHeightPerToolMessage
                   }
-                  terminalWidth={terminalWidth}
+                  terminalWidth={terminalWidth - 4}
                 />
               )}
             {tool.outputFile && (

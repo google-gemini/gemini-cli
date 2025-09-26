@@ -1,42 +1,13 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
 exports[`LoopDetectionConfirmation > renders correctly 1`] = `
-" ╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
- │ ?  A potential loop was detected                                                                 │
- │                                                                                                  │
- │ This can happen due to repetitive tool calls or other model behavior. Do you want to keep loop   │
- │ detection enabled or disable it for this session?                                                │
- │                                                                                                  │
- │ ● 1. Keep loop detection enabled (esc)                                                           │
- │   2. Disable loop detection for this session                                                     │
- ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
-`;
-
-exports[`LoopDetectionConfirmation renders correctly 1`] = `
-"
-  ERROR  Cannot destructure property 'columns' from null or undefined value
-
- packages/cli/src/ui/components/LoopDetectionConfirmation.tsx:25:23
-
- 22: export function LoopDetectionConfirmation({
- 23:   onComplete,
- 24: }: LoopDetectionConfirmationProps) {
- 25:   const { columns } = useTerminalSize();
- 26:   useKeypress(
- 27:     (key) => {
- 28:       if (key.name === 'escape') {
-
- - LoopDetectionConfirmation (packages/cli/src/ui/components/LoopDetectionConfirmation.tsx:25:23)
- -react-stack-bottom-fram (node_modules/react-reconciler/cjs/react-reconciler.development.js:15859:
-                         20)
- - renderWithHooks (node_modules/react-reconciler/cjs/react-reconciler.development.js:3221:22)
- -updateFunctionComponent (node_modules/react-reconciler/cjs/react-reconciler.development.js:6475:1
-                         9)
- - runWithFiberInDEV (node_modules/react-reconciler/cjs/react-reconciler.development.js:1738:13)
- - performUnitOfWork (node_modules/react-reconciler/cjs/react-reconciler.development.js:12834:22)
- - workLoopSync (node_modules/react-reconciler/cjs/react-reconciler.development.js:12644:41)
- - renderRootSync (node_modules/react-reconciler/cjs/react-reconciler.development.js:12624:11)
- - performWorkOnRoot (node_modules/react-reconciler/cjs/react-reconciler.development.js:12135:44)
- - performSyncWorkOnRoot (node_modules/react-reconciler/cjs/react-reconciler.development.js:2446:7)
-"
+"╭────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ ?  A potential loop was detected                                                               │
+│                                                                                                │
+│ This can happen due to repetitive tool calls or other model behavior. Do you want to keep loop │
+│  detection enabled or disable it for this session?                                             │
+│                                                                                                │
+│ ● 1. Keep loop detection enabled (esc)                                                         │
+│   2. Disable loop detection for this session                                                   │
+╰────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;
