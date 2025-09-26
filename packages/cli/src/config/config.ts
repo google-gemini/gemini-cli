@@ -31,7 +31,6 @@ import {
   ShellTool,
   EditTool,
   WriteFileTool,
-  SHELL_TOOL_NAMES,
   resolveTelemetrySettings,
   FatalConfigError,
 } from '@google/gemini-cli-core';
@@ -397,36 +396,6 @@ export async function loadHierarchicalGeminiMemory(
   );
 }
 
-/**
- * Creates a filter function to determine if a tool should be excluded.
- *
- * In non-interactive mode, we want to disable tools that require user
- * interaction to prevent the CLI from hanging. This function creates a predicate
- * that returns `true` if a tool should be excluded.
- *
- * A tool is excluded if it's not in the `allowedToolsSet`. The shell tool
- * has a special case: it's not excluded if any of its subcommands
- * are in the `allowedTools` list.
- *
- * @param allowedTools A list of explicitly allowed tool names.
- * @param allowedToolsSet A set of explicitly allowed tool names for quick lookups.
- * @returns A function that takes a tool name and returns `true` if it should be excluded.
- */
-function createToolExclusionFilter(
-  allowedTools: string[],
-  allowedToolsSet: Set<string>,
-) {
-  return (tool: string): boolean => {
-    if (tool === ShellTool.Name) {
-      // If any of the allowed tools is ShellTool (even with subcommands), don't exclude it.
-      return !allowedTools.some((allowed) =>
-        SHELL_TOOL_NAMES.some((shellName) => allowed.startsWith(shellName)),
-      );
-    }
-    return !allowedToolsSet.has(tool);
-  };
-}
-
 export function isDebugMode(argv: CliArgs): boolean {
   return (
     argv.debug ||
@@ -558,9 +527,6 @@ export async function loadCliConfig(
 
   const policyEngineConfig = createPolicyEngineConfig(settings, approvalMode);
 
-  const allowedTools = argv.allowedTools || settings.tools?.allowed || [];
-  const allowedToolsSet = new Set(allowedTools);
-
   // Fix: If promptWords are provided, always use non-interactive mode
   const hasPromptWords = argv.promptWords && argv.promptWords.length > 0;
   const interactive =
@@ -569,22 +535,14 @@ export async function loadCliConfig(
   // In non-interactive mode, exclude tools that require a prompt.
   const extraExcludes: string[] = [];
   if (!interactive && !argv.experimentalAcp) {
-    const defaultExcludes = [ShellTool.Name, EditTool.Name, WriteFileTool.Name];
-    const autoEditExcludes = [ShellTool.Name];
-
-    const toolExclusionFilter = createToolExclusionFilter(
-      allowedTools,
-      allowedToolsSet,
-    );
-
     switch (approvalMode) {
       case ApprovalMode.DEFAULT:
         // In default non-interactive mode, all tools that require approval are excluded.
-        extraExcludes.push(...defaultExcludes.filter(toolExclusionFilter));
+        extraExcludes.push(ShellTool.Name, EditTool.Name, WriteFileTool.Name);
         break;
       case ApprovalMode.AUTO_EDIT:
         // In auto-edit non-interactive mode, only tools that still require a prompt are excluded.
-        extraExcludes.push(...autoEditExcludes.filter(toolExclusionFilter));
+        extraExcludes.push(ShellTool.Name);
         break;
       case ApprovalMode.YOLO:
         // No extra excludes for YOLO mode.
@@ -656,7 +614,7 @@ export async function loadCliConfig(
     question,
     fullContext: argv.allFiles || false,
     coreTools: settings.tools?.core || undefined,
-    allowedTools: allowedTools.length > 0 ? allowedTools : undefined,
+    allowedTools: argv.allowedTools || settings.tools?.allowed || undefined,
     policyEngineConfig,
     excludeTools,
     toolDiscoveryCommand: settings.tools?.discoveryCommand,
