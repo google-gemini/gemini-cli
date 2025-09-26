@@ -406,8 +406,12 @@ export function parseError(
 }
 
 /**
- * @deprecated Use parseError() for structured error handling.
- * This function is maintained for backward compatibility only.
+ * @deprecated Use parseError() for structured error handling. This function
+ * is maintained for backward compatibility only.
+ *
+ * Consumers should migrate to calling `parseError()` and then using the returned
+ * `ParsedError` object to format messages as needed. The `customMessage`
+ * property, when present, is the preferred user-facing message.
  */
 export function parseAndFormatApiError(
   error: unknown,
