@@ -306,6 +306,7 @@ jobs:
     needs:
       - 'lint'
       - 'test_linux'
+      - 'test_slow_platforms'
       - 'codeql'
       - 'bundle_size'
     runs-on: 'gemini-cli-ubuntu-16-core'
@@ -314,6 +315,7 @@ jobs:
         run: |
           if [[ (${{ needs.lint.result }} != 'success' && ${{ needs.lint.result }} != 'skipped') || \
                (${{ needs.test_linux.result }} != 'success' && ${{ needs.test_linux.result }} != 'skipped') || \
+               (${{ needs.test_slow_platforms.result }} != 'success' && ${{ needs.test_slow_platforms.result }} != 'skipped') || \
                (${{ needs.codeql.result }} != 'success' && ${{ needs.codeql.result }} != 'skipped') || \
                (${{ needs.bundle_size.result }} != 'success' && ${{ needs.bundle_size.result }} != 'skipped') ]]; then
             echo "One or more CI jobs failed."
