@@ -58,7 +58,10 @@ import { useSlashCommandProcessor } from './hooks/slashCommandProcessor.js';
 import { useVimMode } from './contexts/VimModeContext.js';
 import { useConsoleMessages } from './hooks/useConsoleMessages.js';
 import { useTerminalSize } from './hooks/useTerminalSize.js';
-import { calculatePromptWidths } from './components/InputPrompt.js';
+import {
+  calculatePromptWidths,
+  SCROLLBAR_CLEARANCE,
+} from './components/InputPrompt.js';
 import { useStdin, useStdout } from 'ink';
 import ansiEscapes from 'ansi-escapes';
 import * as fs from 'node:fs';
@@ -114,7 +117,7 @@ interface AppContainerProps {
  * The fraction of the terminal width to allocate to the shell.
  * This provides horizontal padding.
  */
-const SHELL_WIDTH_FRACTION = 0.89;
+const SHELL_WIDTH_FRACTION = 1.0;
 
 /**
  * The number of lines to subtract from the available terminal height
@@ -252,7 +255,7 @@ export const AppContainer = (props: AppContainerProps) => {
       calculatePromptWidths(terminalWidth);
     return { inputWidth, suggestionsWidth };
   }, [terminalWidth]);
-  const mainAreaWidth = Math.floor(terminalWidth * 0.9);
+  const mainAreaWidth = terminalWidth - SCROLLBAR_CLEARANCE;
   const staticAreaMaxItemHeight = Math.max(terminalHeight * 4, 100);
 
   const isValidPath = useCallback((filePath: string): boolean => {
