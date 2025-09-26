@@ -56,7 +56,7 @@
   },
   "overrides": {
     "wrap-ansi": "9.0.2",
-    "ansi-regex": "6.2.2",
+    "ansi-regex": "5.0.1",
     "cliui": {
       "wrap-ansi": "7.0.0"
     }
@@ -105,6 +105,7 @@
     "yargs": "^17.7.2"
   },
   "dependencies": {
+    "@testing-library/dom": "^10.4.1",
     "simple-git": "^3.28.0"
   },
   "optionalDependencies": {
