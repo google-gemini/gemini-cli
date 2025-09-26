@@ -54,6 +54,13 @@
     "clean": "node scripts/clean.js",
     "pre-commit": "node scripts/pre-commit.js"
   },
+  "overrides": {
+    "wrap-ansi": "9.0.2",
+    "ansi-regex": "6.2.2",
+    "cliui": {
+      "wrap-ansi": "7.0.0"
+    }
+  },
   "bin": {
     "gemini": "bundle/gemini.js"
   },
@@ -108,12 +115,6 @@
     "@lydell/node-pty-win32-arm64": "1.1.0",
     "@lydell/node-pty-win32-x64": "1.1.0",
     "node-pty": "^1.0.0"
-  },
-  "overrides": {
-    "wrap-ansi": "9.0.2",
-    "cliui": {
-      "wrap-ansi": "7.0.0"
-    }
   },
   "lint-staged": {
     "*.{js,jsx,ts,tsx}": [
