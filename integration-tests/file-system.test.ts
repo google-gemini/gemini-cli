@@ -213,7 +213,7 @@ describe('file-system', () => {
     );
     const fileName = 'non_existent.txt';
 
-    await rig.run(`In ${fileName}, replace "a" with "b"`);
+    const result = await rig.run(`In ${fileName}, replace "a" with "b"`);
 
     await rig.waitForTelemetryReady();
     const toolLogs = rig.readToolLogs();
@@ -230,6 +230,12 @@ describe('file-system', () => {
 
     // The model can either investigate (and fail) or do nothing.
     // If it chose to investigate by reading, that read must have failed.
+    if (readAttempt && readAttempt.toolRequest.success) {
+      console.error(
+        'A read_file attempt succeeded for a non-existent file when it should have failed.',
+      );
+      printDebugInfo(rig, result);
+    }
     if (readAttempt) {
       expect(
         readAttempt.toolRequest.success,
@@ -238,12 +244,22 @@ describe('file-system', () => {
     }
 
     // CRITICAL: Verify that no matter what the model did, it never successfully
-    // wrote or replaced anything. This handles all cases, including when no
-    // tools are called at all.
+    // wrote or replaced anything.
+    if (writeAttempt) {
+      console.error(
+        'A write_file attempt was made when no file should be written.',
+      );
+      printDebugInfo(rig, result);
+    }
     expect(
       writeAttempt,
       'write_file should not have been called',
     ).toBeUndefined();
+
+    if (successfulReplace) {
+      console.error('A successful replace occurred when it should not have.');
+      printDebugInfo(rig, result);
+    }
     expect(
       successfulReplace,
       'A successful replace should not have occurred',
@@ -252,7 +268,10 @@ describe('file-system', () => {
     // Final verification: ensure the file was not created.
     const filePath = path.join(rig.testDir!, fileName);
     const fileExists = existsSync(filePath);
-    rig.cleanup(); // Manual cleanup since we created a file for the check
+    if (fileExists) {
+      console.error('The file was created when it should not exist.');
+      console.error('File path:', filePath);
+    }
     expect(fileExists, 'The non-existent file should not be created').toBe(
       false,
     );

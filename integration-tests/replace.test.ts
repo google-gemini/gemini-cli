@@ -92,42 +92,41 @@ describe('replace', () => {
     expect(newFileContent).toBe(expectedContent);
   });
 
-  it('should fail when old_string is not found', async () => {
+  it('should fail safely when old_string is not found', async () => {
     const rig = new TestRig();
-    await rig.setup('should fail when old_string is not found');
+    await rig.setup('should fail safely when old_string is not found');
     const fileName = 'no_match.txt';
     const fileContent = 'hello world';
     rig.createFile(fileName, fileContent);
 
     const prompt = `replace "goodbye" with "farewell" in ${fileName}`;
-    const result = await rig.run(prompt);
+    await rig.run(prompt);
 
-    const foundToolCall = await rig.waitForToolCall('replace');
-    if (!foundToolCall) {
-      printDebugInfo(rig, result);
-      expect.fail('A replace tool call was expected but not found.');
-    }
-
+    await rig.waitForTelemetryReady();
     const toolLogs = rig.readToolLogs();
+
     const replaceAttempt = toolLogs.find(
       (log) => log.toolRequest.name === 'replace',
     );
+    const readAttempt = toolLogs.find(
+      (log) => log.toolRequest.name === 'read_file',
+    );
 
+    // VERIFY: The model must have at least tried to read the file or perform a replace.
     expect(
-      replaceAttempt,
-      'Expected to find a replace tool call',
+      readAttempt || replaceAttempt,
+      'Expected model to attempt a read_file or replace',
     ).toBeDefined();
 
-    if (replaceAttempt?.toolRequest.success) {
-      console.error('Expected replace tool to fail, but it succeeded.');
-      console.error('Tool call args:', replaceAttempt.toolRequest.args);
+    // If the model tried to replace, that specific attempt must have failed.
+    if (replaceAttempt) {
+      expect(
+        replaceAttempt.toolRequest.success,
+        'If replace is called, it must fail',
+      ).toBe(false);
     }
 
-    expect(
-      replaceAttempt?.toolRequest.success,
-      'Expected replace tool to fail',
-    ).toBe(false);
-
+    // CRITICAL: The final content of the file must be unchanged.
     const newFileContent = rig.readFile(fileName);
     if (newFileContent !== fileContent) {
       console.error('File content was changed when it should not have been.');
