@@ -112,6 +112,23 @@ export function validateModelOutput(
   return true;
 }
 
+interface ParsedLog {
+  attributes?: {
+    'event.name'?: string;
+    function_name?: string;
+    function_args?: string;
+    success?: boolean;
+    duration_ms?: number;
+  };
+  scopeMetrics?: {
+    metrics: {
+      descriptor: {
+        name: string;
+      };
+    }[];
+  }[];
+}
+
 export class TestRig {
   bundlePath: string;
   testDir: string | null;
@@ -418,37 +435,12 @@ export class TestRig {
 
     return this.poll(
       () => {
-        const logFilePath = join(this.testDir!, 'telemetry.log');
-
-        if (!logFilePath || !fs.existsSync(logFilePath)) {
-          return false;
-        }
-
-        const content = readFileSync(logFilePath, 'utf-8');
-        const jsonObjects = content
-          .split(/}\n{/)
-          .map((obj, index, array) => {
-            // Add back the braces we removed during split
-            if (index > 0) obj = '{' + obj;
-            if (index < array.length - 1) obj = obj + '}';
-            return obj.trim();
-          })
-          .filter((obj) => obj);
-
-        for (const jsonStr of jsonObjects) {
-          try {
-            const logData = JSON.parse(jsonStr);
-            if (
-              logData.attributes &&
-              logData.attributes['event.name'] === `gemini_cli.${eventName}`
-            ) {
-              return true;
-            }
-          } catch {
-            // ignore
-          }
-        }
-        return false;
+        const logs = this._readAndParseTelemetryLog();
+        return logs.some(
+          (logData) =>
+            logData.attributes &&
+            logData.attributes['event.name'] === `gemini_cli.${eventName}`,
+        );
       },
       timeout,
       100,
@@ -645,6 +637,45 @@ export class TestRig {
     return logs;
   }
 
+  private _readAndParseTelemetryLog(): ParsedLog[] {
+    // Telemetry is always written to the test directory
+    const logFilePath = join(this.testDir!, 'telemetry.log');
+
+    if (!logFilePath || !fs.existsSync(logFilePath)) {
+      return [];
+    }
+
+    const content = readFileSync(logFilePath, 'utf-8');
+
+    // Split the content into individual JSON objects
+    // They are separated by "}\n{"
+    const jsonObjects = content
+      .split(/}\n{/)
+      .map((obj, index, array) => {
+        // Add back the braces we removed during split
+        if (index > 0) obj = '{' + obj;
+        if (index < array.length - 1) obj = obj + '}';
+        return obj.trim();
+      })
+      .filter((obj) => obj);
+
+    const logs: ParsedLog[] = [];
+
+    for (const jsonStr of jsonObjects) {
+      try {
+        const logData = JSON.parse(jsonStr);
+        logs.push(logData);
+      } catch (e) {
+        // Skip objects that aren't valid JSON
+        if (env.VERBOSE === 'true') {
+          console.error('Failed to parse telemetry object:', e);
+        }
+      }
+    }
+
+    return logs;
+  }
+
   readToolLogs() {
     // For Podman, first check if telemetry file exists and has content
     // If not, fall back to parsing from stdout
@@ -674,33 +705,7 @@ export class TestRig {
       }
     }
 
-    // Telemetry is always written to the test directory
-    const logFilePath = join(this.testDir!, 'telemetry.log');
-
-    if (!logFilePath) {
-      console.warn(`TELEMETRY_LOG_FILE environment variable not set`);
-      return [];
-    }
-
-    // Check if file exists, if not return empty array (file might not be created yet)
-    if (!fs.existsSync(logFilePath)) {
-      return [];
-    }
-
-    const content = readFileSync(logFilePath, 'utf-8');
-
-    // Split the content into individual JSON objects
-    // They are separated by "}\n{"
-    const jsonObjects = content
-      .split(/}\n{/)
-      .map((obj, index, array) => {
-        // Add back the braces we removed during split
-        if (index > 0) obj = '{' + obj;
-        if (index < array.length - 1) obj = obj + '}';
-        return obj.trim();
-      })
-      .filter((obj) => obj);
-
+    const parsedLogs = this._readAndParseTelemetryLog();
     const logs: {
       toolRequest: {
         name: string;
@@ -710,29 +715,21 @@ export class TestRig {
       };
     }[] = [];
 
-    for (const jsonStr of jsonObjects) {
-      try {
-        const logData = JSON.parse(jsonStr);
-        // Look for tool call logs
-        if (
-          logData.attributes &&
-          logData.attributes['event.name'] === 'gemini_cli.tool_call'
-        ) {
-          const toolName = logData.attributes.function_name;
-          logs.push({
-            toolRequest: {
-              name: toolName,
-              args: logData.attributes.function_args,
-              success: logData.attributes.success,
-              duration_ms: logData.attributes.duration_ms,
-            },
-          });
-        }
-      } catch (e) {
-        // Skip objects that aren't valid JSON
-        if (env.VERBOSE === 'true') {
-          console.error('Failed to parse telemetry object:', e);
-        }
+    for (const logData of parsedLogs) {
+      // Look for tool call logs
+      if (
+        logData.attributes &&
+        logData.attributes['event.name'] === 'gemini_cli.tool_call'
+      ) {
+        const toolName = logData.attributes.function_name;
+        logs.push({
+          toolRequest: {
+            name: toolName,
+            args: logData.attributes.function_args,
+            success: logData.attributes.success,
+            duration_ms: logData.attributes.duration_ms,
+          },
+        });
       }
     }
 
@@ -740,39 +737,29 @@ export class TestRig {
   }
 
   readLastApiRequest(): Record<string, unknown> | null {
-    // Telemetry is always written to the test directory
-    const logFilePath = join(this.testDir!, 'telemetry.log');
+    const logs = this._readAndParseTelemetryLog();
+    const apiRequests = logs.filter(
+      (logData) =>
+        logData.attributes &&
+        logData.attributes['event.name'] === 'gemini_cli.api_request',
+    );
+    return apiRequests.pop() || null;
+  }
 
-    if (!logFilePath || !fs.existsSync(logFilePath)) {
-      return null;
-    }
-
-    const content = readFileSync(logFilePath, 'utf-8');
-    const jsonObjects = content
-      .split(/}\n{/)
-      .map((obj, index, array) => {
-        if (index > 0) obj = '{' + obj;
-        if (index < array.length - 1) obj = obj + '}';
-        return obj.trim();
-      })
-      .filter((obj) => obj);
-
-    let lastApiRequest = null;
-
-    for (const jsonStr of jsonObjects) {
-      try {
-        const logData = JSON.parse(jsonStr);
-        if (
-          logData.attributes &&
-          logData.attributes['event.name'] === 'gemini_cli.api_request'
-        ) {
-          lastApiRequest = logData;
+  readMetric(metricName: string): Record<string, unknown> | null {
+    const logs = this._readAndParseTelemetryLog();
+    for (const logData of logs) {
+      if (logData.scopeMetrics) {
+        for (const scopeMetric of logData.scopeMetrics) {
+          for (const metric of scopeMetric.metrics) {
+            if (metric.descriptor.name === `gemini_cli.${metricName}`) {
+              return metric;
+            }
+          }
         }
-      } catch {
-        // ignore
       }
     }
-    return lastApiRequest;
+    return null;
   }
 
   runInteractive(...args: string[]): {
