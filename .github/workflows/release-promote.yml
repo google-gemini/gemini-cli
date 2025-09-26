@@ -141,9 +141,9 @@ jobs:
         run: 'npm ci'
 
       - name: 'Run Tests'
+        if: "${{github.event.inputs.force_skip_tests != 'true'}}"
         uses: './.github/actions/run-tests'
         with:
-          force_skip_tests: '${{ github.event.inputs.force_skip_tests }}'
           gemini_api_key: '${{ secrets.GEMINI_API_KEY }}'
           working-directory: './release'
 
@@ -303,9 +303,6 @@ jobs:
           DRY_RUN: '${{ github.event.inputs.dry_run }}'
         run: |-
           git add package.json packages/*/package.json
-          if [ -f npm-shrinkwrap.json ]; then
-            git add npm-shrinkwrap.json
-          fi
           if [ -f package-lock.json ]; then
             git add package-lock.json
           fi
