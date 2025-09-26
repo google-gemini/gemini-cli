@@ -123,8 +123,11 @@ Slash commands provide meta-level control over the CLI itself.
 - **`/privacy`**
   - **Description:** Display the Privacy Notice and allow users to select whether they consent to the collection of their data for service improvement purposes.
 
-- **`/quit`** (or **`/exit`**)
+- **`/quit`** (or **` /exit`**)
   - **Description:** Exit Gemini CLI.
+
+- **`/restart`**
+  - **Description:** Restart the session. This is equivalent to the `/clear` command.
 
 - **`/vim`**
   - **Description:** Toggle vim mode on or off. When vim mode is enabled, the input area supports vim-style navigation and editing commands in both NORMAL and INSERT modes.

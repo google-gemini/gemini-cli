@@ -5,7 +5,7 @@
  */
 
 import { vi, describe, it, expect, beforeEach } from 'vitest';
-import { clearCommand } from './clearCommand.js';
+import { resetCommand } from './resetCommand.js';
 import { type CommandContext } from './types.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
 
@@ -13,7 +13,7 @@ import { createMockCommandContext } from '../../test-utils/mockCommandContext.js
 
 import type { GeminiClient } from '@google/gemini-cli-core';
 
-describe('clearCommand', () => {
+describe('resetCommand', () => {
   let mockContext: CommandContext;
   let mockResetChat: ReturnType<typeof vi.fn>;
 
@@ -33,23 +33,24 @@ describe('clearCommand', () => {
     });
   });
 
-  it('should set debug message and clear UI', async () => {
-    if (!clearCommand.action) {
-      throw new Error('clearCommand must have an action.');
+  it('should set debug message, reset chat, and reset telemetry when config is available', async () => {
+    if (!resetCommand.action) {
+      throw new Error('resetCommand must have an action.');
     }
 
-    await clearCommand.action(mockContext, '');
+    await resetCommand.action(mockContext, '');
 
     expect(mockContext.ui.setDebugMessage).toHaveBeenCalledWith(
-      'Clearing terminal.',
+      'Restarting terminal and resetting chat.',
     );
     expect(mockContext.ui.setDebugMessage).toHaveBeenCalledTimes(1);
-    expect(mockContext.ui.clear).toHaveBeenCalledTimes(1);
+
+    expect(mockResetChat).toHaveBeenCalledTimes(1);
   });
 
-  it('should still clear UI if config service is not available', async () => {
-    if (!clearCommand.action) {
-      throw new Error('clearCommand must have an action.');
+  it('should not attempt to reset chat if config service is not available', async () => {
+    if (!resetCommand.action) {
+      throw new Error('resetCommand must have an action.');
     }
 
     const nullConfigContext = createMockCommandContext({
@@ -58,12 +59,11 @@ describe('clearCommand', () => {
       },
     });
 
-    await clearCommand.action(nullConfigContext, '');
+    await resetCommand.action(nullConfigContext, '');
 
     expect(nullConfigContext.ui.setDebugMessage).toHaveBeenCalledWith(
-      'Clearing terminal.',
+      'Restarting terminal.',
     );
     expect(mockResetChat).not.toHaveBeenCalled();
-    expect(nullConfigContext.ui.clear).toHaveBeenCalledTimes(1);
   });
 });
