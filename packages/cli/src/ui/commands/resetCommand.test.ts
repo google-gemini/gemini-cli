@@ -77,7 +77,6 @@ describe('resetCommand', () => {
       'Could not find an active session to reset.',
     );
     expect(mockResetChat).not.toHaveBeenCalled();
-    expect(uiTelemetryService.setLastPromptTokenCount).toHaveBeenCalledWith(0);
-    expect(uiTelemetryService.setLastPromptTokenCount).toHaveBeenCalledTimes(1);
+    expect(uiTelemetryService.setLastPromptTokenCount).not.toHaveBeenCalled();
   });
 });
