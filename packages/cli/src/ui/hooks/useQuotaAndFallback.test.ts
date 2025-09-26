@@ -82,11 +82,12 @@ describe('useQuotaAndFallback', () => {
   });
 
   it('should register a fallback handler on initialization', () => {
+    vi.spyOn(mockConfig, 'getUserTier').mockReturnValue(UserTierId.FREE);
+
     renderHook(() =>
       useQuotaAndFallback({
         config: mockConfig,
         historyManager: mockHistoryManager,
-        userTier: UserTierId.FREE,
         setAuthState: mockSetAuthState,
         setModelSwitchedFromQuotaError: mockSetModelSwitchedFromQuotaError,
       }),
@@ -101,16 +102,15 @@ describe('useQuotaAndFallback', () => {
     const getRegisteredHandler = (
       userTier: UserTierId = UserTierId.FREE,
     ): FallbackModelHandler => {
-      renderHook(
-        (props) =>
-          useQuotaAndFallback({
-            config: mockConfig,
-            historyManager: mockHistoryManager,
-            userTier: props.userTier,
-            setAuthState: mockSetAuthState,
-            setModelSwitchedFromQuotaError: mockSetModelSwitchedFromQuotaError,
-          }),
-        { initialProps: { userTier } },
+      vi.spyOn(mockConfig, 'getUserTier').mockReturnValue(userTier);
+
+      renderHook(() =>
+        useQuotaAndFallback({
+          config: mockConfig,
+          historyManager: mockHistoryManager,
+          setAuthState: mockSetAuthState,
+          setModelSwitchedFromQuotaError: mockSetModelSwitchedFromQuotaError,
+        }),
       );
       return setFallbackHandlerSpy.mock.calls[0][0] as FallbackModelHandler;
     };
@@ -205,21 +205,17 @@ describe('useQuotaAndFallback', () => {
         });
       }
 
-      it('should use config.getUserTier as fallback when userTier prop is undefined', async () => {
+      it('should use config.getUserTier for determining user tier', async () => {
         // Arrange
-        vi.spyOn(mockConfig, 'getUserTier').mockReturnValue(
-          UserTierId.STANDARD,
-        );
+        const getUserTierSpy = vi
+          .spyOn(mockConfig, 'getUserTier')
+          .mockReturnValue(UserTierId.STANDARD);
         mockedIsGenericQuotaExceededError.mockReturnValue(true);
 
-        // The getRegisteredHandler helper has a default value for userTier,
-        // so we call renderHook directly to ensure we are testing the
-        // truly `undefined` case.
         renderHook(() =>
           useQuotaAndFallback({
             config: mockConfig,
             historyManager: mockHistoryManager,
-            userTier: undefined,
             setAuthState: mockSetAuthState,
             setModelSwitchedFromQuotaError: mockSetModelSwitchedFromQuotaError,
           }),
@@ -235,6 +231,7 @@ describe('useQuotaAndFallback', () => {
         );
 
         // Assert
+        expect(getUserTierSpy).toHaveBeenCalled();
         expect(result).toBe('stop');
         expect(mockHistoryManager.addItem).toHaveBeenCalledTimes(1);
         const message = (mockHistoryManager.addItem as Mock).mock.calls[0][0]
@@ -254,11 +251,12 @@ describe('useQuotaAndFallback', () => {
       });
 
       it('should set an interactive request and wait for user choice', async () => {
+        vi.spyOn(mockConfig, 'getUserTier').mockReturnValue(UserTierId.FREE);
+
         const { result } = renderHook(() =>
           useQuotaAndFallback({
             config: mockConfig,
             historyManager: mockHistoryManager,
-            userTier: UserTierId.FREE,
             setAuthState: mockSetAuthState,
             setModelSwitchedFromQuotaError: mockSetModelSwitchedFromQuotaError,
           }),
@@ -294,11 +292,12 @@ describe('useQuotaAndFallback', () => {
       });
 
       it('should handle race conditions by stopping subsequent requests', async () => {
+        vi.spyOn(mockConfig, 'getUserTier').mockReturnValue(UserTierId.FREE);
+
         const { result } = renderHook(() =>
           useQuotaAndFallback({
             config: mockConfig,
             historyManager: mockHistoryManager,
-            userTier: UserTierId.FREE,
             setAuthState: mockSetAuthState,
             setModelSwitchedFromQuotaError: mockSetModelSwitchedFromQuotaError,
           }),
@@ -344,11 +343,12 @@ describe('useQuotaAndFallback', () => {
     });
 
     it('should do nothing if there is no pending pro quota request', () => {
+      vi.spyOn(mockConfig, 'getUserTier').mockReturnValue(UserTierId.FREE);
+
       const { result } = renderHook(() =>
         useQuotaAndFallback({
           config: mockConfig,
           historyManager: mockHistoryManager,
-          userTier: UserTierId.FREE,
           setAuthState: mockSetAuthState,
           setModelSwitchedFromQuotaError: mockSetModelSwitchedFromQuotaError,
         }),
@@ -363,11 +363,12 @@ describe('useQuotaAndFallback', () => {
     });
 
     it('should resolve intent to "auth" and trigger auth state update', async () => {
+      vi.spyOn(mockConfig, 'getUserTier').mockReturnValue(UserTierId.FREE);
+
       const { result } = renderHook(() =>
         useQuotaAndFallback({
           config: mockConfig,
           historyManager: mockHistoryManager,
-          userTier: UserTierId.FREE,
           setAuthState: mockSetAuthState,
           setModelSwitchedFromQuotaError: mockSetModelSwitchedFromQuotaError,
         }),
@@ -393,11 +394,12 @@ describe('useQuotaAndFallback', () => {
     });
 
     it('should resolve intent to "retry" and add info message on continue', async () => {
+      vi.spyOn(mockConfig, 'getUserTier').mockReturnValue(UserTierId.FREE);
+
       const { result } = renderHook(() =>
         useQuotaAndFallback({
           config: mockConfig,
           historyManager: mockHistoryManager,
-          userTier: UserTierId.FREE,
           setAuthState: mockSetAuthState,
           setModelSwitchedFromQuotaError: mockSetModelSwitchedFromQuotaError,
         }),
