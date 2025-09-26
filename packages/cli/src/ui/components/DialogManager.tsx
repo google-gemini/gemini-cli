@@ -26,6 +26,7 @@ import { useUIActions } from '../contexts/UIActionsContext.js';
 import { useConfig } from '../contexts/ConfigContext.js';
 import { useSettings } from '../contexts/SettingsContext.js';
 import process from 'node:process';
+
 import { type UseHistoryManagerReturn } from '../hooks/useHistoryManager.js';
 
 interface DialogManagerProps {

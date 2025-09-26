@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import path from 'node:path';
+import * as path from 'node:path';
 import { promises as fs } from 'node:fs';
 import type { Content } from '@google/genai';
 import type { Storage } from '../config/storage.js';

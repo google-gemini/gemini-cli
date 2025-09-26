@@ -8,8 +8,8 @@ import { type Config } from '../config/config.js';
 import { type Status } from '../core/coreToolScheduler.js';
 import { type ThoughtSummary } from '../utils/thoughtUtils.js';
 import { getProjectHash } from '../utils/paths.js';
-import path from 'node:path';
-import fs from 'node:fs';
+import * as path from 'node:path';
+import * as fs from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import type {
   PartListUnion,

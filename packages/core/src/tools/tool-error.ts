@@ -67,4 +67,8 @@ export enum ToolErrorType {
 
   // WebSearch-specific Errors
   WEB_SEARCH_FAILED = 'web_search_failed',
+
+  // Notebook-specific Errors
+  INVALID_FILE_FORMAT = 'invalid_file_format',
+  INVALID_OPERATION = 'invalid_operation',
 }

@@ -5,7 +5,7 @@
  */
 
 import { execSync } from 'node:child_process';
-import os from 'node:os';
+import * as os from 'node:os';
 import { detect as chardetDetect } from 'chardet';
 
 // Cache for system encoding to avoid repeated detection

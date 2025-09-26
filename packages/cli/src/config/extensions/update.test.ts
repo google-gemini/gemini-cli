@@ -55,6 +55,20 @@ vi.mock('../trustedFolders.js', async (importOriginal) => {
   };
 });
 
+vi.mock('@google/gemini-cli-core', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('@google/gemini-cli-core')>();
+  const mockLogExtensionInstallEvent = vi.fn();
+  const mockLogExtensionUninstallEvent = vi.fn();
+  return {
+    ...actual,
+    ClearcutLogger: {
+      getInstance: vi.fn(() => ({
+        logExtensionInstallEvent: mockLogExtensionInstallEvent,
+        logExtensionUninstallEvent: mockLogExtensionUninstallEvent,
+      })),
+    },
+    Config: vi.fn(),
 const mockLogExtensionInstallEvent = vi.hoisted(() => vi.fn());
 const mockLogExtensionUninstall = vi.hoisted(() => vi.fn());
 
@@ -87,6 +101,7 @@ describe('update tests', () => {
     // Clean up before each test
     fs.rmSync(userExtensionsDir, { recursive: true, force: true });
     fs.mkdirSync(userExtensionsDir, { recursive: true });
+    vi.mocked(isWorkspaceTrusted).mockReturnValue(true);
     vi.mocked(isWorkspaceTrusted).mockReturnValue({
       isTrusted: true,
       source: 'file',
@@ -343,6 +358,12 @@ describe('update tests', () => {
       expect(result).toBe(ExtensionUpdateState.UP_TO_DATE);
     });
 
+    it('should return NotUpdatable for a non-git extension', async () => {
+      const extensionDir = createExtension({
+        extensionsDir: userExtensionsDir,
+        name: 'local-extension',
+        version: '1.0.0',
+        installMetadata: { source: '/local/path', type: 'local' },
     it('should return UpToDate for a local extension with no updates', async () => {
       const localExtensionSourcePath = path.join(tempHomeDir, 'local-source');
       const sourceExtensionDir = createExtension({
@@ -360,6 +381,7 @@ describe('update tests', () => {
       const extension = annotateActiveExtensions(
         [
           loadExtension({
+            extensionDir,
             extensionDir: installedExtensionDir,
             workspaceDir: tempWorkspaceDir,
           })!,
@@ -378,6 +400,9 @@ describe('update tests', () => {
             extensionState = newState;
           }
         },
+      );
+      const result = results.get('local-extension');
+      expect(result).toBe(ExtensionUpdateState.NOT_UPDATABLE);
         tempWorkspaceDir,
       );
       const result = results.get('local-extension');

@@ -54,6 +54,8 @@ export async function updateExtension(
   const tempDir = await ExtensionStorage.createTmpDir();
   try {
     await copyExtension(extension.path, tempDir);
+    await uninstallExtension(extension.name, cwd);
+    await installExtension(installMetadata, false, cwd);
     const previousExtensionConfig = await loadExtensionConfig({
       extensionDir: extension.path,
       workspaceDir: cwd,
@@ -159,7 +161,7 @@ export async function checkForAllExtensionUpdates(
       }
       await checkForExtensionUpdate(
         extension,
-        (updatedState) => {
+        (updatedState: ExtensionUpdateState) => {
           setExtensionsUpdateState((prev) => {
             newStates = new Map(prev);
             newStates.set(extension.name, updatedState);

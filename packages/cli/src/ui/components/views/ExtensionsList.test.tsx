@@ -91,7 +91,7 @@ describe('<ExtensionsList />', () => {
     },
     {
       state: ExtensionUpdateState.ERROR,
-      expectedText: '(error)',
+      expectedText: '(error checking for updates)',
     },
     {
       state: ExtensionUpdateState.UP_TO_DATE,

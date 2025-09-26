@@ -23,11 +23,8 @@ export function WorkspaceMigrationDialog(props: {
   const [failedExtensions, setFailedExtensions] = useState<string[]>([]);
   onOpen();
   const onMigrate = async () => {
-    const failed = await performWorkspaceExtensionMigration(
-      workspaceExtensions,
-      // We aren't updating extensions, just moving them around, don't need to ask for consent.
-      async (_) => true,
-    );
+    const failed =
+      await performWorkspaceExtensionMigration(workspaceExtensions);
     setFailedExtensions(failed);
     setMigrationComplete(true);
   };

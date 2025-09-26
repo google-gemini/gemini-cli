@@ -9,6 +9,9 @@ import { handleInstall, installCommand } from './install.js';
 import yargs from 'yargs';
 
 const mockInstallExtension = vi.hoisted(() => vi.fn());
+
+vi.mock('../../config/extension.js', () => ({
+  installExtension: mockInstallExtension,
 const mockRequestConsentNonInteractive = vi.hoisted(() => vi.fn());
 
 vi.mock('../../config/extension.js', () => ({
@@ -29,6 +32,7 @@ describe('extensions install command', () => {
   });
 
   it('should fail if both git source and local path are provided', () => {
+    const validationParser = yargs([]).command(installCommand).fail(false);
     const validationParser = yargs([])
       .command(installCommand)
       .fail(false)
@@ -39,6 +43,7 @@ describe('extensions install command', () => {
   });
 
   it('should fail if both auto update and local path are provided', () => {
+    const validationParser = yargs([]).command(installCommand).fail(false);
     const validationParser = yargs([])
       .command(installCommand)
       .fail(false)

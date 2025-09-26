@@ -27,6 +27,7 @@ describe('extensions new command', () => {
   });
 
   it('should fail if no path is provided', async () => {
+    const parser = yargs([]).command(newCommand).fail(false);
     const parser = yargs([]).command(newCommand).fail(false).locale('en');
     await expect(parser.parseAsync('new')).rejects.toThrow(
       'Not enough non-option arguments: got 0, need at least 2',
@@ -34,6 +35,7 @@ describe('extensions new command', () => {
   });
 
   it('should fail if no template is provided', async () => {
+    const parser = yargs([]).command(newCommand).fail(false);
     const parser = yargs([]).command(newCommand).fail(false).locale('en');
     await expect(parser.parseAsync('new /some/path')).rejects.toThrow(
       'Not enough non-option arguments: got 1, need at least 2',
@@ -53,6 +55,8 @@ describe('extensions new command', () => {
       recursive: true,
     });
     expect(mockedFs.cp).toHaveBeenCalledWith(
+      expect.stringContaining('context'),
+      '/some/path',
       expect.stringContaining('context/context'),
       '/some/path/context',
       { recursive: true },

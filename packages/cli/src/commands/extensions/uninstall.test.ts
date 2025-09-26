@@ -10,6 +10,7 @@ import yargs from 'yargs';
 
 describe('extensions uninstall command', () => {
   it('should fail if no source is provided', () => {
+    const validationParser = yargs([]).command(uninstallCommand).fail(false);
     const validationParser = yargs([])
       .command(uninstallCommand)
       .fail(false)

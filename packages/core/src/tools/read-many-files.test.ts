@@ -9,9 +9,9 @@ import type { Mock } from 'vitest';
 import { mockControl } from '../__mocks__/fs/promises.js';
 import { ReadManyFilesTool } from './read-many-files.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
-import path from 'node:path';
-import fs from 'node:fs'; // Actual fs for setup
-import os from 'node:os';
+import * as path from 'node:path';
+import * as fs from 'node:fs'; // Actual fs for setup
+import * as os from 'node:os';
 import type { Config } from '../config/config.js';
 import { WorkspaceContext } from '../utils/workspaceContext.js';
 import { StandardFileSystemService } from '../services/fileSystemService.js';

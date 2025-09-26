@@ -6,9 +6,9 @@
 
 import type { EditorType } from '../utils/editor.js';
 import { openDiff } from '../utils/editor.js';
-import os from 'node:os';
-import path from 'node:path';
-import fs from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
+import * as fs from 'node:fs';
 import * as Diff from 'diff';
 import { DEFAULT_DIFF_OPTIONS } from './diffOptions.js';
 import { isNodeError } from '../utils/errors.js';

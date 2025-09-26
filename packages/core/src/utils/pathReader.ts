@@ -5,7 +5,7 @@
  */
 
 import { promises as fs } from 'node:fs';
-import path from 'node:path';
+import * as path from 'node:path';
 import { glob } from 'glob';
 import type { PartUnion } from '@google/genai';
 import { processSingleFileContent } from './fileUtils.js';

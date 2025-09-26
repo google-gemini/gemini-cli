@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import fsPromises from 'node:fs/promises';
+import * as fsPromises from 'node:fs/promises';
 import * as nodePath from 'node:path';
 import * as os from 'node:os';
 import { getFolderStructure } from './getFolderStructure.js';

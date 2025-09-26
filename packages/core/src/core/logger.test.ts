@@ -22,11 +22,11 @@ import {
 } from './logger.js';
 import { Storage } from '../config/storage.js';
 import { promises as fs, existsSync } from 'node:fs';
-import path from 'node:path';
+import * as path from 'node:path';
 import type { Content } from '@google/genai';
 
-import crypto from 'node:crypto';
-import os from 'node:os';
+import * as crypto from 'node:crypto';
+import * as os from 'node:os';
 
 const GEMINI_DIR_NAME = '.gemini';
 const TMP_DIR_NAME = 'tmp';
