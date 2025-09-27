@@ -50,6 +50,7 @@ const extensionToLanguageMap: { [key: string]: string } = {
   '.scss': 'Sass',
   '.json': 'JSON',
   '.xml': 'XML',
+  '.xaml': 'XAML',
   '.yaml': 'YAML',
   '.yml': 'YAML',
   '.md': 'Markdown',
