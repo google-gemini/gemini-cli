@@ -10,6 +10,7 @@ import {
   DEFAULT_TOKEN_CONFIG,
   TokenStatus,
   isTokenLimitExceededError,
+  isTokenLimitError,
   extractTokenInfo,
   getTokenLimitErrorMessage,
   estimateTokenCount,
@@ -100,6 +101,31 @@ describe('Token Error Handling', () => {
       const errorString =
         'The input token count (5911388) exceeds the maximum number of tokens allowed (1048576).';
       expect(isTokenLimitExceededError(errorString)).toBe(true);
+    });
+
+    it('should detect token limit errors (boolean version)', () => {
+      const errorString =
+        'The input token count (5911388) exceeds the maximum number of tokens allowed (1048576).';
+      expect(isTokenLimitError(errorString)).toBe(true);
+
+      // Test with Error object
+      const errorObj = new Error(
+        'The input token count (5911388) exceeds the maximum number of tokens allowed (1048576).',
+      );
+      expect(isTokenLimitError(errorObj)).toBe(true);
+
+      // Test with nested error object
+      const nestedError = {
+        error: {
+          message:
+            'The input token count (5911388) exceeds the maximum number of tokens allowed (1048576).',
+        },
+      };
+      expect(isTokenLimitError(nestedError)).toBe(true);
+
+      // Test non-token error
+      const nonTokenError = new Error('Some other error');
+      expect(isTokenLimitError(nonTokenError)).toBe(false);
     });
 
     it('should extract token information from error', () => {

@@ -10,6 +10,7 @@ import {
   TokenStatus,
   DEFAULT_TOKEN_CONFIG,
   estimateTokenCount,
+  isTokenLimitError,
 } from './tokenErrorHandling.js';
 
 export enum CompressionStrategy {
@@ -326,7 +327,7 @@ export class TokenErrorRetryHandler {
         lastError = error as Error;
 
         // Check if it's a token limit error
-        if (this.isTokenLimitError(error)) {
+        if (isTokenLimitError(error)) {
           this.logger?.(
             `⚠️  Token limit error occurred (attempt ${attempt + 1}/${retryOptions.maxRetries})`,
           );
@@ -348,43 +349,6 @@ export class TokenErrorRetryHandler {
     throw new Error(
       `Unable to resolve token limit error after ${retryOptions.maxRetries} attempts: ${lastError?.message}`,
     );
-  }
-
-  /**
-   * Check if an error is a token limit error
-   */
-  private isTokenLimitError(error: unknown): boolean {
-    if (typeof error === 'string') {
-      return (
-        error.includes('exceeds the maximum number of tokens allowed') ||
-        (error.includes('INVALID_ARGUMENT') && error.includes('token count'))
-      );
-    }
-
-    if (error && typeof error === 'object') {
-      const errorObj = error as Record<string, unknown>;
-
-      // Check Error.message
-      if (errorObj.message && typeof errorObj.message === 'string') {
-        const message = errorObj.message;
-        return (
-          message.includes('exceeds the maximum number of tokens allowed') ||
-          (message.includes('INVALID_ARGUMENT') &&
-            message.includes('token count'))
-        );
-      }
-
-      if (errorObj.error && typeof errorObj.error === 'object') {
-        const errorError = errorObj.error as Record<string, unknown>;
-        if (typeof errorError.message === 'string') {
-          return errorError.message.includes(
-            'exceeds the maximum number of tokens allowed',
-          );
-        }
-      }
-    }
-
-    return false;
   }
 
   /**
