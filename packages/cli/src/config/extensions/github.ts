@@ -132,10 +132,29 @@ export async function checkForExtensionUpdate(
       setExtensionUpdateState(ExtensionUpdateState.ERROR);
       return;
     }
-    if (newExtension.config.version !== extension.version) {
+    // For local extensions, compare the source version with the installed version
+    // The installed version is stored in the extension's metadata and may be outdated
+    const installedExtension = loadExtension({
+      extensionDir: extension.path,
+      workspaceDir: cwd,
+    });
+    if (!installedExtension) {
+      console.error(
+        `Failed to load installed extension "${extension.name}" from path: ${extension.path}`,
+      );
+      setExtensionUpdateState(ExtensionUpdateState.ERROR);
+      return;
+    }
+    if (newExtension.config.version !== installedExtension.config.version) {
+      console.log(
+        `🔍 UPDATE DETECTED: Source version ${newExtension.config.version} != Installed version ${installedExtension.config.version}`,
+      );
       setExtensionUpdateState(ExtensionUpdateState.UPDATE_AVAILABLE);
       return;
     }
+    console.log(
+      `✅ NO UPDATE: Source version ${newExtension.config.version} == Installed version ${installedExtension.config.version}`,
+    );
     setExtensionUpdateState(ExtensionUpdateState.UP_TO_DATE);
     return;
   }

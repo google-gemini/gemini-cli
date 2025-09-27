@@ -10,6 +10,7 @@ import {
   type ExtensionUpdateInfo,
   updateExtension,
 } from '../../config/extensions/update.js';
+import { checkForExtensionUpdate } from '../../config/extensions/github.js';
 import { getErrorMessage } from '../../utils/errors.js';
 import { ExtensionUpdateState } from '../state/extensions.js';
 import { MessageType } from '../types.js';
@@ -76,13 +77,30 @@ async function updateAction(context: CommandContext, args: string) {
           );
           continue;
         }
+
+        // First check if update is needed
+        let updateState: ExtensionUpdateState | undefined;
+        await checkForExtensionUpdate(extension, (newState) => {
+          updateState = newState;
+        });
+
+        if (updateState !== ExtensionUpdateState.UPDATE_AVAILABLE) {
+          context.ui.addItem(
+            {
+              type: MessageType.INFO,
+              text: `Extension "${name}" is already up to date.`,
+            },
+            Date.now(),
+          );
+          continue;
+        }
+
         const updateInfo = await updateExtension(
           extension,
           workingDir,
           (description) =>
             requestConsentInteractive(description, context.ui.addItem),
-          context.ui.extensionsUpdateState.get(extension.name) ??
-            ExtensionUpdateState.UNKNOWN,
+          updateState,
           (updateState) => {
             context.ui.setExtensionsUpdateState((prev) => {
               const newState = new Map(prev);
