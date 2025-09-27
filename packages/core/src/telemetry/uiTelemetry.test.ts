@@ -21,7 +21,7 @@ import type {
 } from '../core/coreToolScheduler.js';
 import { ToolErrorType } from '../tools/tool-error.js';
 import { ToolConfirmationOutcome } from '../tools/tools.js';
-import { MockTool } from '../test-utils/tools.js';
+import { MockTool } from '../test-utils/mock-tool.js';
 
 const createFakeCompletedToolCall = (
   name: string,
@@ -37,7 +37,7 @@ const createFakeCompletedToolCall = (
     isClientInitiated: false,
     prompt_id: 'prompt-id-1',
   };
-  const tool = new MockTool(name);
+  const tool = new MockTool({ name });
 
   if (success) {
     return {

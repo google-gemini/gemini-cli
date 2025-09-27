@@ -16,7 +16,7 @@ import { mcpToTool } from '@google/genai';
 import { spawn } from 'node:child_process';
 
 import fs from 'node:fs';
-import { MockTool } from '../test-utils/tools.js';
+import { MockTool } from '../test-utils/mock-tool.js';
 
 import { McpClientManager } from './mcp-client-manager.js';
 import { ToolErrorType } from './tool-error.js';
@@ -149,7 +149,7 @@ describe('ToolRegistry', () => {
 
   describe('registerTool', () => {
     it('should register a new tool', () => {
-      const tool = new MockTool();
+      const tool = new MockTool({ name: 'mock-tool' });
       toolRegistry.registerTool(tool);
       expect(toolRegistry.getTool('mock-tool')).toBe(tool);
     });
@@ -158,9 +158,9 @@ describe('ToolRegistry', () => {
   describe('getAllTools', () => {
     it('should return all registered tools sorted alphabetically by displayName', () => {
       // Register tools with displayNames in non-alphabetical order
-      const toolC = new MockTool('c-tool', 'Tool C');
-      const toolA = new MockTool('a-tool', 'Tool A');
-      const toolB = new MockTool('b-tool', 'Tool B');
+      const toolC = new MockTool({ name: 'c-tool', displayName: 'Tool C' });
+      const toolA = new MockTool({ name: 'a-tool', displayName: 'Tool A' });
+      const toolB = new MockTool({ name: 'b-tool', displayName: 'Tool B' });
 
       toolRegistry.registerTool(toolC);
       toolRegistry.registerTool(toolA);
@@ -177,9 +177,9 @@ describe('ToolRegistry', () => {
   describe('getAllToolNames', () => {
     it('should return all registered tool names', () => {
       // Register tools with displayNames in non-alphabetical order
-      const toolC = new MockTool('c-tool', 'Tool C');
-      const toolA = new MockTool('a-tool', 'Tool A');
-      const toolB = new MockTool('b-tool', 'Tool B');
+      const toolC = new MockTool({ name: 'c-tool', displayName: 'Tool C' });
+      const toolA = new MockTool({ name: 'a-tool', displayName: 'Tool A' });
+      const toolB = new MockTool({ name: 'b-tool', displayName: 'Tool B' });
 
       toolRegistry.registerTool(toolC);
       toolRegistry.registerTool(toolA);
@@ -194,7 +194,7 @@ describe('ToolRegistry', () => {
 
   describe('getToolsByServer', () => {
     it('should return an empty array if no tools match the server name', () => {
-      toolRegistry.registerTool(new MockTool());
+      toolRegistry.registerTool(new MockTool({ name: 'mock-tool' }));
       expect(toolRegistry.getToolsByServer('any-mcp-server')).toEqual([]);
     });
 
@@ -231,7 +231,7 @@ describe('ToolRegistry', () => {
         'd4',
         {},
       );
-      const nonMcpTool = new MockTool('regular-tool');
+      const nonMcpTool = new MockTool({ name: 'regular-tool' });
 
       toolRegistry.registerTool(mcpTool1_c);
       toolRegistry.registerTool(mcpTool1_a);
