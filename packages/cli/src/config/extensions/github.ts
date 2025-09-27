@@ -134,23 +134,32 @@ export async function checkForExtensionUpdate(
     }
     // For local extensions, compare the source version with the installed version
     // The installed version is stored in the extension's metadata and may be outdated
-    const installedExtension = loadExtension({
-      extensionDir: extension.path,
-      workspaceDir: cwd,
-    });
-    if (!installedExtension) {
+    try {
+      const installedExtension = loadExtension({
+        extensionDir: extension.path,
+        workspaceDir: cwd,
+      });
+      if (!installedExtension) {
+        console.error(
+          `Failed to load installed extension "${extension.name}" from path: ${extension.path}`,
+        );
+        setExtensionUpdateState(ExtensionUpdateState.ERROR);
+        return;
+      }
+      if (newExtension.config.version !== installedExtension.config.version) {
+        setExtensionUpdateState(ExtensionUpdateState.UPDATE_AVAILABLE);
+        return;
+      }
+      setExtensionUpdateState(ExtensionUpdateState.UP_TO_DATE);
+      return;
+    } catch (error) {
       console.error(
         `Failed to load installed extension "${extension.name}" from path: ${extension.path}`,
+        error,
       );
       setExtensionUpdateState(ExtensionUpdateState.ERROR);
       return;
     }
-    if (newExtension.config.version !== installedExtension.config.version) {
-      setExtensionUpdateState(ExtensionUpdateState.UPDATE_AVAILABLE);
-      return;
-    }
-    setExtensionUpdateState(ExtensionUpdateState.UP_TO_DATE);
-    return;
   }
   if (
     !installMetadata ||
