@@ -9,6 +9,9 @@
 const mockEnsureCorrectEdit = vi.hoisted(() => vi.fn());
 const mockGenerateJson = vi.hoisted(() => vi.fn());
 const mockOpenDiff = vi.hoisted(() => vi.fn());
+const mockFileStateTracker = vi.hoisted(() => ({
+  checkFreshness: vi.fn(),
+}));
 
 import { IdeClient } from '../ide/ide-client.js';
 
@@ -20,6 +23,10 @@ vi.mock('../ide/ide-client.js', () => ({
 
 vi.mock('../utils/editCorrector.js', () => ({
   ensureCorrectEdit: mockEnsureCorrectEdit,
+}));
+
+vi.mock('../utils/fileStateTracker.js', () => ({
+  FileStateTracker: vi.fn().mockImplementation(() => mockFileStateTracker),
 }));
 
 vi.mock('../core/client.js', () => ({
@@ -1072,6 +1079,144 @@ describe('EditTool', () => {
 
       expect(params.old_string).toBe(initialContent);
       expect(params.new_string).toBe(modifiedContent);
+    });
+  });
+
+  describe('File Freshness Checking', () => {
+    it('should proceed normally when file is unchanged', async () => {
+      const filePath = path.join(rootDir, 'test.txt');
+      const originalContent = 'Hello, World!';
+      fs.writeFileSync(filePath, originalContent);
+
+      const params: EditToolParams = {
+        file_path: filePath,
+        old_string: 'Hello',
+        new_string: 'Hi',
+      };
+
+      mockEnsureCorrectEdit.mockResolvedValueOnce({
+        params: { ...params, old_string: 'Hello', new_string: 'Hi' },
+        occurrences: 1,
+      });
+
+      const invocation = tool.build(params);
+      const result = await invocation.execute(new AbortController().signal);
+
+      expect(result.error).toBeUndefined();
+      expect(result.llmContent).toContain('Successfully modified file');
+    });
+
+    it('should automatically re-read file when modified externally', async () => {
+      const filePath = path.join(rootDir, 'test.txt');
+      const originalContent = 'Hello, World!';
+      fs.writeFileSync(filePath, originalContent);
+
+      const params: EditToolParams = {
+        file_path: filePath,
+        old_string: 'Hello',
+        new_string: 'Hi',
+      };
+
+      const originalState = {
+        content: originalContent,
+        mtime: fs.statSync(filePath).mtime,
+        size: originalContent.length,
+      };
+
+      const modifiedContent = 'Hello, Universe!';
+      const currentState = {
+        content: modifiedContent,
+        mtime: new Date(fs.statSync(filePath).mtime.getTime() + 1000), // 1 second later
+        size: modifiedContent.length,
+      };
+
+      // Mock FileStateTracker to return stale results, which will trigger re-read
+      mockFileStateTracker.getFileState.mockResolvedValueOnce(originalState);
+      mockFileStateTracker.checkFreshness.mockResolvedValueOnce({
+        isFresh: false,
+        originalState,
+        currentState,
+        changeDescription: 'file content changed',
+      });
+
+      // Mock ensureCorrectEdit to be called twice - once with old content, once with new
+      mockEnsureCorrectEdit
+        .mockResolvedValueOnce({
+          params: { ...params, old_string: 'Hello', new_string: 'Hi' },
+          occurrences: 1,
+        })
+        .mockResolvedValueOnce({
+          params: { ...params, old_string: 'Hello', new_string: 'Hi' },
+          occurrences: 1,
+        });
+
+      const invocation = tool.build(params);
+      const result = await invocation.execute(new AbortController().signal);
+
+      expect(result.error).toBeUndefined();
+      expect(result.llmContent).toContain('Successfully modified file');
+      expect(mockEnsureCorrectEdit).toHaveBeenCalledTimes(2); // Should be called twice due to re-read
+    });
+
+    it('should handle file deletion gracefully', async () => {
+      const filePath = path.join(rootDir, 'test.txt');
+      const originalContent = 'Hello, World!';
+      fs.writeFileSync(filePath, originalContent);
+
+      const params: EditToolParams = {
+        file_path: filePath,
+        old_string: 'Hello',
+        new_string: 'Hi',
+      };
+
+      const originalState = {
+        content: originalContent,
+        mtime: fs.statSync(filePath).mtime,
+        size: originalContent.length,
+      };
+
+      // Mock FileStateTracker to simulate file deletion during execution
+      mockFileStateTracker.getFileState.mockResolvedValueOnce(originalState);
+      mockFileStateTracker.checkFreshness.mockResolvedValueOnce({
+        isFresh: false,
+        originalState,
+        currentState: undefined,
+        changeDescription: 'file was deleted',
+      });
+
+      // Mock ensureCorrectEdit to handle the case where the file doesn't exist
+      mockEnsureCorrectEdit.mockResolvedValueOnce({
+        params: { ...params, old_string: 'Hello', new_string: 'Hi' },
+        occurrences: 1,
+      });
+
+      const invocation = tool.build(params);
+      const result = await invocation.execute(new AbortController().signal);
+
+      expect(result.error).toBeUndefined();
+      expect(result.llmContent).toContain('Successfully modified file');
+      expect(mockEnsureCorrectEdit).toHaveBeenCalledTimes(1);
+    });
+
+    it('should proceed normally for new files', async () => {
+      const filePath = path.join(rootDir, 'new-test.txt');
+
+      const params: EditToolParams = {
+        file_path: filePath,
+        old_string: '',
+        new_string: 'New file content',
+      };
+
+      mockEnsureCorrectEdit.mockResolvedValueOnce({
+        params: { ...params, old_string: '', new_string: 'New file content' },
+        occurrences: 1,
+      });
+
+      const invocation = tool.build(params);
+      const result = await invocation.execute(new AbortController().signal);
+
+      expect(result.error).toBeUndefined();
+      expect(result.llmContent).toContain('Created new file');
     });
   });
 });

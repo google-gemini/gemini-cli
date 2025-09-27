@@ -35,6 +35,11 @@ export enum ToolErrorType {
   EDIT_NO_CHANGE = 'edit_no_change',
   EDIT_NO_CHANGE_LLM_JUDGEMENT = 'edit_no_change_llm_judgement',
 
+  // File Freshness Errors
+  FILE_STALE = 'file_stale',
+  FILE_CONFLICT_DETECTED = 'file_conflict_detected',
+  FILE_EXTERNAL_CHANGE = 'file_external_change',
+
   // Glob-specific Errors
   GLOB_EXECUTION_ERROR = 'glob_execution_error',
 
