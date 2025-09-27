@@ -449,4 +449,129 @@ describe('retryWithBackoff', () => {
       expect(fallbackCallback).toHaveBeenCalledWith('oauth-personal');
     });
   });
+
+  describe('429 delay handling', () => {
+    it('should use delay from RetryInfo when present', async () => {
+      const errorWithRetryInfo = new Error('Too Many Requests') as HttpError & {
+        response: any;
+      };
+      errorWithRetryInfo.status = 429;
+      errorWithRetryInfo.response = {
+        status: 429,
+        data: {
+          error: {
+            details: [
+              {
+                '@type': 'type.googleapis.com/google.rpc.RetryInfo',
+                retryDelay: '12.345s',
+              },
+            ],
+          },
+        },
+      };
+
+      const mockFn = vi.fn().mockRejectedValue(errorWithRetryInfo);
+      const setTimeoutSpy = vi.spyOn(global, 'setTimeout');
+
+      const promise = retryWithBackoff(mockFn, {
+        maxAttempts: 2,
+        initialDelayMs: 100,
+      });
+      // eslint-disable-next-line vitest/valid-expect
+      const assertionPromise = expect(promise).rejects.toBe(errorWithRetryInfo);
+
+      await vi.runAllTimersAsync();
+      await assertionPromise;
+
+      expect(mockFn).toHaveBeenCalledTimes(2);
+      expect(setTimeoutSpy).toHaveBeenCalledWith(expect.any(Function), 12345);
+    });
+
+    it('should prioritize RetryInfo over Retry-After header', async () => {
+      const errorWithBoth = new Error('Too Many Requests') as HttpError & {
+        response: any;
+      };
+      errorWithBoth.status = 429;
+      errorWithBoth.response = {
+        status: 429,
+        headers: { 'retry-after': '60' },
+        data: {
+          error: {
+            details: [
+              {
+                '@type': 'type.googleapis.com/google.rpc.RetryInfo',
+                retryDelay: '12.345s',
+              },
+            ],
+          },
+        },
+      };
+
+      const mockFn = vi.fn().mockRejectedValue(errorWithBoth);
+      const setTimeoutSpy = vi.spyOn(global, 'setTimeout');
+
+      const promise = retryWithBackoff(mockFn, {
+        maxAttempts: 2,
+        initialDelayMs: 100,
+      });
+      // eslint-disable-next-line vitest/valid-expect
+      const assertionPromise = expect(promise).rejects.toBe(errorWithBoth);
+
+      await vi.runAllTimersAsync();
+      await assertionPromise;
+
+      expect(mockFn).toHaveBeenCalledTimes(2);
+      expect(setTimeoutSpy).toHaveBeenCalledWith(expect.any(Function), 12345);
+    });
+
+    it('should use delay from Retry-After header when RetryInfo is not present', async () => {
+      const errorWithHeader = new Error('Too Many Requests') as HttpError & {
+        response: any;
+      };
+      errorWithHeader.status = 429;
+      errorWithHeader.response = {
+        status: 429,
+        headers: { 'retry-after': '30' },
+      };
+
+      const mockFn = vi.fn().mockRejectedValue(errorWithHeader);
+      const setTimeoutSpy = vi.spyOn(global, 'setTimeout');
+
+      const promise = retryWithBackoff(mockFn, {
+        maxAttempts: 2,
+        initialDelayMs: 100,
+      });
+      // eslint-disable-next-line vitest/valid-expect
+      const assertionPromise = expect(promise).rejects.toBe(errorWithHeader);
+
+      await vi.runAllTimersAsync();
+      await assertionPromise;
+
+      expect(mockFn).toHaveBeenCalledTimes(2);
+      expect(setTimeoutSpy).toHaveBeenCalledWith(expect.any(Function), 30000);
+    });
+
+    it('should use exponential backoff when no delay information is present', async () => {
+      const error429 = new Error('Too Many Requests') as HttpError;
+      error429.status = 429;
+
+      const mockFn = vi.fn().mockRejectedValue(error429);
+      const setTimeoutSpy = vi.spyOn(global, 'setTimeout');
+
+      const promise = retryWithBackoff(mockFn, {
+        maxAttempts: 2,
+        initialDelayMs: 100,
+      });
+      // eslint-disable-next-line vitest/valid-expect
+      const assertionPromise = expect(promise).rejects.toBe(error429);
+
+      await vi.runAllTimersAsync();
+      await assertionPromise;
+
+      expect(mockFn).toHaveBeenCalledTimes(2);
+      const delay = setTimeoutSpy.mock.calls[0][1] as number;
+      expect(delay).toBeGreaterThanOrEqual(100 * 0.7);
+      expect(delay).toBeLessThanOrEqual(100 * 1.3);
+    });
+  });
 });
