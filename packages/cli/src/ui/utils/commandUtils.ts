@@ -44,8 +44,52 @@ export const isSlashCommand = (query: string): boolean => {
   return true;
 };
 
+/**
+ * Checks for environment variables that indicate an SSH session or
+ * a terminal multiplexer like tmux or screen. In these cases, OSC 52
+ * is the preferred method for clipboard access.
+ * @returns True if in a remote or multiplexed session, false otherwise.
+ */
+export const isRemoteOrMultiplexedSession = (): boolean =>
+  process.env['SSH_CONNECTION'] !== undefined ||
+  process.env['SSH_TTY'] !== undefined ||
+  process.env['TMUX'] !== undefined ||
+  (process.env['TERM'] !== undefined &&
+    process.env['TERM'].startsWith('screen'));
+
+/**
+ * Copies text to the clipboard using the OSC 52 escape sequence.
+ * This is the preferred method for use in remote terminals (like SSH) or with
+ * multiplexers (like tmux) that support it, allowing the local
+ * machine's clipboard to be set from a remote session.
+ *
+ * @param text The text to copy.
+ */
+export const copyViaOSC52 = (text: string): Promise<void> =>
+  new Promise((resolve, reject) => {
+    const base64Text = Buffer.from(text).toString('base64');
+    // OSC 52 sequence: `\x1b]52;c;BASE64_TEXT\x07`
+    // - `\x1b]` is the Operating System Command introducer.
+    // - `52` specifies the clipboard operation.
+    // - `;c;` designates the system clipboard.
+    // - `\x07` is the "bell" character, which terminates the sequence.
+    const osc52Sequence = `\x1b]52;c;${base64Text}\x07`;
+    process.stdout.write(osc52Sequence, (err) => {
+      if (err) {
+        return reject(err);
+      }
+      resolve();
+    });
+  });
+
 // Copies a string snippet to the clipboard for different platforms
 export const copyToClipboard = async (text: string): Promise<void> => {
+  // In remote or multiplexed sessions, OSC 52 is the most reliable way
+  // to access the user's local (system) clipboard. We prioritize it.
+  if (isRemoteOrMultiplexedSession()) {
+    return await copyViaOSC52(text);
+  }
+
   const run = (cmd: string, args: string[], options?: SpawnOptions) =>
     new Promise<void>((resolve, reject) => {
       const child = options ? spawn(cmd, args, options) : spawn(cmd, args);
