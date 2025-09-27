@@ -73,7 +73,7 @@ export function RadioButtonSelect<T>({
         // Handle special theme display case for ThemeDialog compatibility
         if (item.themeNameDisplay && item.themeTypeDisplay) {
           return (
-            <Text color={titleColor} wrap="truncate">
+            <Text color={titleColor} wrap="truncate" key={item.key}>
               {item.themeNameDisplay}{' '}
               <Text color={theme.text.secondary}>{item.themeTypeDisplay}</Text>
             </Text>

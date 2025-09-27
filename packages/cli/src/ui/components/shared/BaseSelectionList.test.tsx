@@ -36,9 +36,9 @@ describe('BaseSelectionList', () => {
   const mockRenderItem = vi.fn();
 
   const items = [
-    { value: 'A', label: 'Item A' },
-    { value: 'B', label: 'Item B', disabled: true },
-    { value: 'C', label: 'Item C' },
+    { value: 'A', label: 'Item A', key: 'A' },
+    { value: 'B', label: 'Item B', disabled: true, key: 'B' },
+    { value: 'C', label: 'Item C', key: 'C' },
   ];
 
   // Helper to render the component with default props
@@ -46,7 +46,7 @@ describe('BaseSelectionList', () => {
     props: Partial<
       BaseSelectionListProps<
         string,
-        { value: string; label: string; disabled?: boolean }
+        { value: string; label: string; disabled?: boolean; key: string }
       >
     > = {},
     activeIndex: number = 0,
@@ -58,14 +58,14 @@ describe('BaseSelectionList', () => {
 
     mockRenderItem.mockImplementation(
       (
-        item: { value: string; label: string; disabled?: boolean },
+        item: { value: string; label: string; disabled?: boolean; key: string },
         context: RenderItemContext,
       ) => <Text color={context.titleColor}>{item.label}</Text>,
     );
 
     const defaultProps: BaseSelectionListProps<
       string,
-      { value: string; label: string; disabled?: boolean }
+      { value: string; label: string; disabled?: boolean; key: string }
     > = {
       items,
       onSelect: mockOnSelect,
@@ -224,6 +224,7 @@ describe('BaseSelectionList', () => {
       const longList = Array.from({ length: 15 }, (_, i) => ({
         value: `Item ${i + 1}`,
         label: `Item ${i + 1}`,
+        key: `Item ${i + 1}`,
       }));
 
       // We must increase maxItemsToShow (default 10) to see the 10th item and beyond
@@ -257,6 +258,7 @@ describe('BaseSelectionList', () => {
     const longList = Array.from({ length: 10 }, (_, i) => ({
       value: `Item ${i + 1}`,
       label: `Item ${i + 1}`,
+      key: `Item ${i + 1}`,
     }));
     const MAX_ITEMS = 3;
 
@@ -264,7 +266,7 @@ describe('BaseSelectionList', () => {
       // Define the props used for the initial render and subsequent rerenders
       const componentProps: BaseSelectionListProps<
         string,
-        { value: string; label: string }
+        { value: string; label: string; key: string }
       > = {
         items: longList,
         maxItemsToShow: MAX_ITEMS,
@@ -438,6 +440,7 @@ describe('BaseSelectionList', () => {
     const longList = Array.from({ length: 10 }, (_, i) => ({
       value: `Item ${i + 1}`,
       label: `Item ${i + 1}`,
+      key: `Item ${i + 1}`,
     }));
     const MAX_ITEMS = 3;
 

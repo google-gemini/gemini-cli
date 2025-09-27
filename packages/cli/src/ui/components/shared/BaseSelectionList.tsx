@@ -128,7 +128,7 @@ export function BaseSelectionList<
         )}.`;
 
         return (
-          <Box key={itemIndex} alignItems="flex-start">
+          <Box key={item.key} alignItems="flex-start">
             {/* Radio button indicator */}
             <Box minWidth={2} flexShrink={0}>
               <Text
