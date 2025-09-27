@@ -159,7 +159,7 @@ export function EditorSettingsDialog({
         </Text>
         <Box flexDirection="column" gap={1} marginTop={1}>
           <Text color={theme.text.secondary}>
-            These editors are currently supported. Please note that some editors
+            These editors are currently supported for basic diff viewing and editing. Please note that some editors
             cannot be used in sandbox mode.
           </Text>
           <Text color={theme.text.secondary}>
