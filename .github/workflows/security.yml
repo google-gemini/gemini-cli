@@ -1,0 +1,37 @@
+name: security-ci
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+jobs:
+  secret-scans:
+    name: Secret Scans (TruffleHog + Gitleaks)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: TruffleHog (verified)
+        uses: trufflesecurity/trufflehog@v3
+        with:
+          extra_args: "--only-verified --fail"
+      - name: Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        with:
+          args: "detect --source . --no-git -v --exit-code 1"
+
+  sast-semgrep:
+    name: SAST (Semgrep CI ruleset)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: returntocorp/semgrep-action@v1
+        with:
+          config: p/ci
+
