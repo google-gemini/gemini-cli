@@ -12,6 +12,12 @@ import { useUIState } from '../contexts/UIStateContext.js';
 import { useAppContext } from '../contexts/AppContext.js';
 import { AppHeader } from './AppHeader.js';
 
+// Limit Gemini messages to a very high number of lines to mitigate performance
+// issues in the worst case if we somehow get an enormous response from Gemini.
+// This threshold is arbitrary but should be high enough to never impact normal
+// usage.
+const MAX_GEMINI_MESSAGE_LINES = 65536;
+
 export const MainContent = () => {
   const { version } = useAppContext();
   const uiState = useUIState();
@@ -32,6 +38,7 @@ export const MainContent = () => {
             <HistoryItemDisplay
               terminalWidth={mainAreaWidth}
               availableTerminalHeight={staticAreaMaxItemHeight}
+              availableTerminalHeightGemini={MAX_GEMINI_MESSAGE_LINES}
               key={h.id}
               item={h}
               isPending={false}
