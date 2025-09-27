@@ -7,6 +7,7 @@
  */
 
 import { execSync } from 'node:child_process';
+import { appendFileSync } from 'node:fs';
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
 
@@ -44,9 +45,16 @@ async function main() {
 
   const releaseInfo = getLatestReleaseInfo(channel);
   const latestTag = releaseInfo.currentTag;
+  const nextVersion = releaseInfo.nextVersion;
+
+  // Expose versions for subsequent steps
+  if (process.env.GITHUB_OUTPUT) {
+    appendFileSync(process.env.GITHUB_OUTPUT, `base_version=${latestTag}\n`);
+    appendFileSync(process.env.GITHUB_OUTPUT, `new_version=${nextVersion}\n`);
+  }
 
   const releaseBranch = `release/${latestTag}`;
-  const hotfixBranch = `hotfix/${latestTag}/${channel}/cherry-pick-${commit.substring(0, 7)}`;
+  const hotfixBranch = `hotfix/${latestTag}/${nextVersion}/${channel}/cherry-pick-${commit.substring(0, 7)}`;
 
   // Create the release branch from the tag if it doesn't exist.
   if (!branchExists(releaseBranch)) {
@@ -184,11 +192,14 @@ async function main() {
   console.log(
     `Creating pull request from ${hotfixBranch} to ${releaseBranch}...`,
   );
-  let prTitle = `fix(patch): cherry-pick ${commit.substring(0, 7)} to ${releaseBranch}`;
-  let prBody = `This PR automatically cherry-picks commit ${commit} to patch the ${channel} release.`;
+  let prTitle = `fix(patch): cherry-pick ${commit.substring(0, 7)} to ${nextVersion} (from ${latestTag})`;
+  let prBody = `This PR automatically cherry-picks commit \`${commit.substring(
+    0,
+    7,
+  )}\` to create patch release **${nextVersion}** for the \`${channel}\` release channel, based on version \`${latestTag}\`.`;
 
   if (hasConflicts) {
-    prTitle = `fix(patch): cherry-pick ${commit.substring(0, 7)} to ${releaseBranch} [CONFLICTS]`;
+    prTitle = `fix(patch): cherry-pick ${commit.substring(0, 7)} to ${nextVersion} (from ${latestTag}) [CONFLICTS]`;
     prBody += `
 
 ## ⚠️ Merge Conflicts Detected

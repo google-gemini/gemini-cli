@@ -78,6 +78,8 @@ async function main() {
   const repository =
     argv.repository || process.env.REPOSITORY || 'google-gemini/gemini-cli';
   const runId = argv.runId || process.env.GITHUB_RUN_ID || '0';
+  const baseVersion = argv.baseVersion || process.env.BASE_VERSION;
+  const newVersion = argv.newVersion || process.env.NEW_VERSION;
 
   // Validate required parameters
   if (!runId || runId === '0') {
@@ -107,6 +109,8 @@ async function main() {
     console.log(`  - Channel: ${channel} → npm tag: ${npmTag}`);
     console.log(`  - Repository: ${repository}`);
     console.log(`  - Run ID: ${runId}`);
+    console.log(`  - Base Version: ${baseVersion}`);
+    console.log(`  - New Version: ${newVersion}`);
   }
 
   let commentBody;
@@ -211,6 +215,8 @@ A patch branch [\`${branch}\`](https://github.com/${repository}/tree/${branch}) 
 
 **📋 Patch Details:**
 - **Channel**: \`${channel}\` → will publish to npm tag \`${npmTag}\`
+- **Base Version**: \`${baseVersion}\`
+- **New Version**: \`${newVersion}\`
 - **Commit**: \`${commit}\`
 - **Hotfix Branch**: [\`${branch}\`](https://github.com/${repository}/tree/${branch})
 - **Hotfix PR**: [#${mockPrNumber}](${mockPrUrl})${hasConflicts ? '\n- **⚠️ Status**: Cherry-pick conflicts detected - manual resolution required' : ''}
@@ -266,6 +272,8 @@ ${hasConflicts ? '4' : '3'}. You'll receive updates here when the release comple
 
 **📋 Patch Details:**
 - **Channel**: \`${channel}\` → will publish to npm tag \`${npmTag}\`
+- **Base Version**: \`${baseVersion}\`
+- **New Version**: \`${newVersion}\`
 - **Commit**: \`${commit}\`
 - **Hotfix Branch**: [\`${branch}\`](https://github.com/${repository}/tree/${branch})
 - **Hotfix PR**: [#${pr.number}](${pr.url})${hasConflicts ? '\n- **⚠️ Status**: Cherry-pick conflicts detected - manual resolution required' : ''}
