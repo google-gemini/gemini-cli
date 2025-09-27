@@ -8,12 +8,11 @@ import type React from 'react';
 import { Text, Box } from 'ink';
 import { theme } from '../../semantic-colors.js';
 import { BaseSelectionList } from './BaseSelectionList.js';
+import type { SelectionListItem } from '../../hooks/useSelectionList.js';
 
-export interface DescriptiveRadioSelectItem<T> {
-  value: T;
+export interface DescriptiveRadioSelectItem<T> extends SelectionListItem<T> {
   title: string;
   description: string;
-  disabled?: boolean;
 }
 
 export interface DescriptiveRadioButtonSelectProps<T> {

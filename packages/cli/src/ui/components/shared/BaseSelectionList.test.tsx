@@ -35,7 +35,6 @@ describe('BaseSelectionList', () => {
   const mockOnHighlight = vi.fn();
   const mockRenderItem = vi.fn();
 
-  // Define standard test items
   const items = [
     { value: 'A', label: 'Item A' },
     { value: 'B', label: 'Item B', disabled: true },
@@ -44,7 +43,12 @@ describe('BaseSelectionList', () => {
 
   // Helper to render the component with default props
   const renderComponent = (
-    props: Partial<BaseSelectionListProps<string, { label: string }>> = {},
+    props: Partial<
+      BaseSelectionListProps<
+        string,
+        { value: string; label: string; disabled?: boolean }
+      >
+    > = {},
     activeIndex: number = 0,
   ) => {
     vi.mocked(useSelectionList).mockReturnValue({
@@ -53,12 +57,16 @@ describe('BaseSelectionList', () => {
     });
 
     mockRenderItem.mockImplementation(
-      (item: (typeof items)[0], context: RenderItemContext) => (
-        <Text color={context.titleColor}>{item.label}</Text>
-      ),
+      (
+        item: { value: string; label: string; disabled?: boolean },
+        context: RenderItemContext,
+      ) => <Text color={context.titleColor}>{item.label}</Text>,
     );
 
-    const defaultProps: BaseSelectionListProps<string, { label: string }> = {
+    const defaultProps: BaseSelectionListProps<
+      string,
+      { value: string; label: string; disabled?: boolean }
+    > = {
       items,
       onSelect: mockOnSelect,
       onHighlight: mockOnHighlight,
@@ -254,14 +262,16 @@ describe('BaseSelectionList', () => {
 
     const renderScrollableList = (initialActiveIndex: number = 0) => {
       // Define the props used for the initial render and subsequent rerenders
-      const componentProps: BaseSelectionListProps<string, { label: string }> =
-        {
-          items: longList,
-          maxItemsToShow: MAX_ITEMS,
-          onSelect: mockOnSelect,
-          onHighlight: mockOnHighlight,
-          renderItem: mockRenderItem,
-        };
+      const componentProps: BaseSelectionListProps<
+        string,
+        { value: string; label: string }
+      > = {
+        items: longList,
+        maxItemsToShow: MAX_ITEMS,
+        onSelect: mockOnSelect,
+        onHighlight: mockOnHighlight,
+        renderItem: mockRenderItem,
+      };
 
       vi.mocked(useSelectionList).mockReturnValue({
         activeIndex: initialActiveIndex,
