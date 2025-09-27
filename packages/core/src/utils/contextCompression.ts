@@ -91,7 +91,7 @@ export class ContextCompressor {
       role: 'system',
       parts: [
         {
-          text: `[이전 대화 요약] ${olderMessages.length}개의 메시지가 요약되었습니다. 필요한 경우 더 자세한 정보를 요청해주세요.`,
+          text: `[Previous conversation summarized] ${olderMessages.length} messages have been summarized. Please ask for more details if needed.`,
         },
       ],
     };
@@ -314,13 +314,6 @@ export class TokenErrorRetryHandler {
 
         // Make the API call with compressed content
         const result = await apiCall(currentContent);
-
-        // Update token usage on success
-        this.tokenManager.updateTokenUsage({
-          promptTokens: estimateTokenCount(currentContent),
-          completionTokens: 0, // This would be updated with actual response
-          totalTokens: estimateTokenCount(currentContent),
-        });
 
         return result;
       } catch (error) {

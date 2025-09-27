@@ -111,11 +111,26 @@ export function isTokenLimitExceededError(
   }
 
   if (error && typeof error === 'object') {
-    const errorObj = error as unknown as { error?: { message?: string } };
-    if (errorObj.error?.message) {
-      return errorObj.error.message.includes(
-        'exceeds the maximum number of tokens allowed',
+    const errorObj = error as Record<string, unknown>;
+
+    // Check Error.message
+    if (errorObj['message'] && typeof errorObj['message'] === 'string') {
+      const message = errorObj['message'];
+      return (
+        message.includes('exceeds the maximum number of tokens allowed') ||
+        (message.includes('INVALID_ARGUMENT') &&
+          message.includes('token count'))
       );
+    }
+
+    // Check nested error.message
+    if (errorObj['error'] && typeof errorObj['error'] === 'object') {
+      const errorError = errorObj['error'] as Record<string, unknown>;
+      if (typeof errorError['message'] === 'string') {
+        return errorError['message'].includes(
+          'exceeds the maximum number of tokens allowed',
+        );
+      }
     }
   }
 

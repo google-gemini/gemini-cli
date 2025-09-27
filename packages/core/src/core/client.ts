@@ -27,6 +27,7 @@ import { GeminiChat } from './geminiChat.js';
 import { retryWithBackoff } from '../utils/retry.js';
 import { getErrorMessage } from '../utils/errors.js';
 import { tokenLimit } from './tokenLimits.js';
+import { estimateTokenCount } from '../utils/tokenErrorHandling.js';
 import type { ChatRecordingService } from '../services/chatRecordingService.js';
 import type { ContentGenerator } from './contentGenerator.js';
 import {
@@ -874,26 +875,8 @@ export class GeminiClient {
    * Check if projected content would exceed token limits
    */
   checkTokenLimit(contents: Content[]): TokenStatus {
-    const estimatedTokens = this.estimateTokenCount(contents);
+    const estimatedTokens = estimateTokenCount(contents);
     return this.tokenManager.checkTokenLimit(estimatedTokens);
-  }
-
-  /**
-   * Estimate token count for content (rough estimation)
-   */
-  private estimateTokenCount(contents: Content[]): number {
-    let totalTokens = 0;
-
-    for (const content of contents) {
-      for (const part of content.parts || []) {
-        if (part.text) {
-          // Rough estimation: ~4 characters per token
-          totalTokens += Math.ceil(part.text.length / 4);
-        }
-      }
-    }
-
-    return totalTokens;
   }
 }
 
