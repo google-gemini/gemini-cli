@@ -5,7 +5,7 @@
  */
 
 import { render } from 'ink-testing-library';
-import { describe, it, expect, vi, type Mock } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { Footer } from './Footer.js';
 import * as useTerminalSize from '../hooks/useTerminalSize.js';
 import { tildeifyPath } from '@google/gemini-cli-core';
@@ -13,18 +13,11 @@ import path from 'node:path';
 import { type UIState, UIStateContext } from '../contexts/UIStateContext.js';
 import { ConfigContext } from '../contexts/ConfigContext.js';
 import { SettingsContext } from '../contexts/SettingsContext.js';
-import { useVimMode } from '../contexts/VimModeContext.js';
 import type { LoadedSettings } from '../../config/settings.js';
+import { VimModeProvider } from '../contexts/VimModeContext.js';
 
 vi.mock('../hooks/useTerminalSize.js');
 const useTerminalSizeMock = vi.mocked(useTerminalSize.useTerminalSize);
-
-vi.mock('../contexts/VimModeContext.js');
-const mockedUseVimMode = useVimMode as Mock;
-mockedUseVimMode.mockReturnValue({
-  isVimEnabled: false,
-  toggleVimEnabled: vi.fn(),
-});
 
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const original =
@@ -93,9 +86,11 @@ const renderWithWidth = (
   return render(
     <ConfigContext.Provider value={createMockConfig() as never}>
       <SettingsContext.Provider value={settings}>
-        <UIStateContext.Provider value={uiState}>
-          <Footer />
-        </UIStateContext.Provider>
+        <VimModeProvider settings={settings}>
+          <UIStateContext.Provider value={uiState}>
+            <Footer />
+          </UIStateContext.Provider>
+        </VimModeProvider>
       </SettingsContext.Provider>
     </ConfigContext.Provider>,
   );
