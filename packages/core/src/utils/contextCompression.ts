@@ -350,7 +350,6 @@ export class TokenErrorRetryHandler {
       `Unable to resolve token limit error after ${retryOptions.maxRetries} attempts: ${lastError?.message}`,
     );
   }
-
   /**
    * Get current token manager
    */
