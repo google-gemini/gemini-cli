@@ -774,6 +774,16 @@ const SETTINGS_SCHEMA = {
         description: 'The number of lines to keep when truncating tool output.',
         showInDialog: true,
       },
+      enableMessageBusIntegration: {
+        type: 'boolean',
+        label: 'Enable Message Bus Integration',
+        category: 'Tools',
+        requiresRestart: true,
+        default: false,
+        description:
+          'Enable policy-based tool confirmation via message bus integration. When enabled, tools will automatically respect policy engine decisions (ALLOW/DENY/ASK_USER) without requiring individual tool implementations.',
+        showInDialog: true,
+      },
     },
   },
 
@@ -976,10 +986,10 @@ const SETTINGS_SCHEMA = {
         label: 'Use Model Router',
         category: 'Experimental',
         requiresRestart: true,
-        default: false,
+        default: true,
         description:
           'Enable model routing to route requests to the best model based on complexity.',
-        showInDialog: false,
+        showInDialog: true,
       },
     },
   },
