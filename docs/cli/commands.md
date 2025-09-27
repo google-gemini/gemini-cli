@@ -28,7 +28,7 @@ Slash commands provide meta-level control over the CLI itself.
     - **`list`**
       - **Description:** Lists available tags for chat state resumption.
     - **`delete`**
-      - **Description:** Deletes a saved conversation checkpoint.
+      - **Description:** Deletes a saved conversation checkpoint. A confirmation prompt is shown before deletion to prevent accidental data loss.
       - **Usage:** `/chat delete <tag>`
     - **`share`**
       - **Description** Writes the current conversation to a provided Markdown or JSON file.
