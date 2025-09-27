@@ -7,6 +7,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { newCommand } from './new.js';
 import yargs from 'yargs';
+import path from 'node:path';
 import * as fsPromises from 'node:fs/promises';
 
 vi.mock('node:fs/promises');
@@ -49,22 +50,22 @@ describe('extensions new command', () => {
 
     await parser.parseAsync('new /some/path context');
 
-    expect(mockedFs.mkdir).toHaveBeenCalledWith('/some/path', {
+    expect(mockedFs.mkdir).toHaveBeenCalledWith(path.normalize('/some/path'), {
       recursive: true,
     });
     expect(mockedFs.cp).toHaveBeenCalledWith(
-      expect.stringContaining('context/context'),
-      '/some/path/context',
+      expect.stringContaining(path.join('context', 'context')),
+      path.normalize('/some/path/context'),
       { recursive: true },
     );
     expect(mockedFs.cp).toHaveBeenCalledWith(
-      expect.stringContaining('context/custom-commands'),
-      '/some/path/custom-commands',
+      expect.stringContaining(path.join('context', 'custom-commands')),
+      path.normalize('/some/path/custom-commands'),
       { recursive: true },
     );
     expect(mockedFs.cp).toHaveBeenCalledWith(
-      expect.stringContaining('context/mcp-server'),
-      '/some/path/mcp-server',
+      expect.stringContaining(path.join('context', 'mcp-server')),
+      path.normalize('/some/path/mcp-server'),
       { recursive: true },
     );
   });
