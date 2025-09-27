@@ -670,6 +670,28 @@ describe('useSelectionList', () => {
       expect(result.current.activeIndex).toBe(2);
     });
 
+    it('should respect a new initialIndex even after user interaction', () => {
+      const { result, rerender } = renderHook(
+        ({ initialIndex }: { initialIndex: number }) =>
+          useSelectionList({
+            items,
+            onSelect: mockOnSelect,
+            initialIndex,
+          }),
+        { initialProps: { initialIndex: 0 } },
+      );
+
+      // User navigates, changing the active index
+      pressKey('down');
+      expect(result.current.activeIndex).toBe(2);
+
+      // The component re-renders with a new initial index
+      rerender({ initialIndex: 3 });
+
+      // The hook should now respect the new initial index
+      expect(result.current.activeIndex).toBe(3);
+    });
+
     it('should validate index when initialIndex prop changes to a disabled item', () => {
       const { result, rerender } = renderHook(
         ({ initialIndex }: { initialIndex: number }) =>
@@ -860,6 +882,37 @@ describe('useSelectionList', () => {
       rerender({ items: newItems });
 
       // Should find next valid index since current became disabled
+      expect(result.current.activeIndex).toBe(2);
+    });
+
+    it('should update selection when a new item is added to the start of the list', () => {
+      const initialItems = [
+        { value: 'A', key: 'A' },
+        { value: 'B', key: 'B' },
+        { value: 'C', key: 'C' },
+      ];
+
+      const { result, rerender } = renderHook(
+        ({ items: testItems }: { items: Array<SelectionListItem<string>> }) =>
+          useSelectionList({
+            onSelect: mockOnSelect,
+            items: testItems,
+          }),
+        { initialProps: { items: initialItems } },
+      );
+
+      pressKey('down');
+      expect(result.current.activeIndex).toBe(1);
+
+      const newItems = [
+        { value: 'D', key: 'D' },
+        { value: 'A', key: 'A' },
+        { value: 'B', key: 'B' },
+        { value: 'C', key: 'C' },
+      ];
+
+      rerender({ items: newItems });
+
       expect(result.current.activeIndex).toBe(2);
     });
   });
