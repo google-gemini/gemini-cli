@@ -8,7 +8,7 @@ import { useRef, useState, forwardRef, useImperativeHandle, useCallback, useEffe
 import { useVirtualizer } from '@tanstack/react-virtual';
 import type React from 'react';
 import { format } from 'date-fns';
-import { Bot, User, AlertCircle, ChevronDown, ChevronRight, BookTemplate, Play, CheckSquare, Target, Brain, FileText, Activity, ListTodo } from 'lucide-react';
+import { User, AlertCircle, ChevronDown, ChevronRight, BookTemplate, Target, Brain, FileText, Activity, ListTodo, ArrowDown, Hammer } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { Card, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -298,6 +298,7 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(({
   const { currentOperation } = useChatStore();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const [showScrollButton, setShowScrollButton] = useState(false);
 
   // Expose methods to parent component
   useImperativeHandle(ref, () => ({
@@ -364,6 +365,71 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(({
     }
   }, []);
 
+  // Continuous scrolling when button is clicked during streaming
+  const scrollToBottomContinuous = useCallback(() => {
+    let scrollInterval: NodeJS.Timeout | null = null;
+
+    const startScrolling = () => {
+      // Initial scroll
+      scrollToBottom(true);
+
+      // If streaming, keep scrolling until complete
+      if (isStreaming || isThinking) {
+        scrollInterval = setInterval(() => {
+          if (containerRef.current) {
+            const { scrollTop, scrollHeight, clientHeight } = containerRef.current;
+            const isAtBottom = scrollHeight - scrollTop - clientHeight < 10;
+
+            // If not at bottom, scroll down
+            if (!isAtBottom) {
+              scrollToBottom(true);
+            }
+
+            // Stop scrolling if no longer streaming
+            if (!isStreaming && !isThinking && scrollInterval) {
+              clearInterval(scrollInterval);
+            }
+          }
+        }, 100);
+
+        // Clean up interval after max 10 seconds or when streaming stops
+        setTimeout(() => {
+          if (scrollInterval) {
+            clearInterval(scrollInterval);
+          }
+        }, 10000);
+      }
+    };
+
+    startScrolling();
+
+    // Return cleanup function
+    return () => {
+      if (scrollInterval) {
+        clearInterval(scrollInterval);
+      }
+    };
+  }, [isStreaming, isThinking, scrollToBottom]);
+
+  // Check if scrolled to bottom
+  const handleScroll = useCallback(() => {
+    if (containerRef.current) {
+      const { scrollTop, scrollHeight, clientHeight } = containerRef.current;
+      const isAtBottom = scrollHeight - scrollTop - clientHeight < 100;
+      setShowScrollButton(!isAtBottom);
+    }
+  }, []);
+
+  // Add scroll listener
+  useEffect(() => {
+    const container = containerRef.current;
+    if (container) {
+      container.addEventListener('scroll', handleScroll);
+      handleScroll(); // Check initial state
+      return () => container.removeEventListener('scroll', handleScroll);
+    }
+  }, [handleScroll]);
+
   // Auto-scroll when messages change (new user message, new assistant response)
   useEffect(() => {
     // Small delay to ensure DOM has updated with new content
@@ -377,12 +443,12 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(({
   // Auto-scroll when streaming content updates
   useEffect(() => {
     if (isStreaming && streamingContent) {
-      // More frequent updates during streaming for smoother experience
-      const timeoutId = setTimeout(() => {
+      // Use requestAnimationFrame for smoother scrolling during streaming
+      const scrollRAF = requestAnimationFrame(() => {
         scrollToBottom(true);
-      }, 50);
+      });
 
-      return () => clearTimeout(timeoutId);
+      return () => cancelAnimationFrame(scrollRAF);
     }
   }, [isStreaming, streamingContent, scrollToBottom]);
 
@@ -409,19 +475,20 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(({
   }, [isThinking, scrollToBottom]);
 
   return (
-    <div
-      ref={containerRef}
-      className="flex-1 overflow-y-auto p-4 min-h-0"
-      data-message-container
-    >
-      {/* Virtualization container */}
+    <>
       <div
-        style={{
-          height: `${virtualizer.getTotalSize()}px`,
-          width: '100%',
-          position: 'relative',
-        }}
+        ref={containerRef}
+        className="flex-1 overflow-y-auto p-4 min-h-0"
+        data-message-container
       >
+        {/* Virtualization container */}
+        <div
+          style={{
+            height: `${virtualizer.getTotalSize()}px`,
+            width: '100%',
+            position: 'relative',
+          }}
+        >
         {virtualizer.getVirtualItems().map((virtualItem) => {
           const message = messages[virtualItem.index];
 
@@ -485,8 +552,28 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(({
         </div>
       )}
 
-      <div ref={messagesEndRef} />
-    </div>
+        <div ref={messagesEndRef} />
+      </div>
+
+      {/* Scroll to bottom button */}
+      {showScrollButton && (
+        <button
+          onClick={() => {
+            if (isStreaming || isThinking) {
+              // During streaming, use continuous scrolling
+              scrollToBottomContinuous();
+            } else {
+              // Normal scroll when not streaming
+              scrollToBottom(true);
+            }
+          }}
+          className="absolute bottom-28 right-6 z-50 bg-primary text-primary-foreground rounded-full p-3 shadow-lg hover:bg-primary/90 transition-all duration-200 hover:scale-110 animate-in fade-in slide-in-from-bottom-2"
+          aria-label="Scroll to bottom"
+        >
+          <ArrowDown size={20} />
+        </button>
+      )}
+    </>
   );
 });
 
@@ -526,7 +613,7 @@ const ThinkingSection: React.FC<{ thinkingSections: string[] }> = ({ thinkingSec
 };
 
 // Component to display tool calls with expandable parameters
-const ToolCallDisplay: React.FC<{ toolCall: ToolCall }> = ({ toolCall }) => {
+const ToolCallDisplay: React.FC<{ toolCall: ToolCall; timestamp?: Date }> = ({ toolCall, timestamp }) => {
   const [isExpanded, setIsExpanded] = useState(false);
 
   // Get key parameters for compact display
@@ -588,8 +675,8 @@ const ToolCallDisplay: React.FC<{ toolCall: ToolCall }> = ({ toolCall }) => {
         {/* Tool call header with tool name and operation */}
         <div className="flex items-center justify-between p-3 bg-muted/30 border-b border-border/30">
           <div className="flex items-center gap-3">
-            <div className="flex items-center gap-1 text-xs font-bold text-foreground/80 border border-border/50 rounded px-2 py-1">
-              <Play size={10} />
+            <div className="flex items-center gap-2 text-sm font-bold text-green-600 dark:text-green-400">
+              <Hammer size={14} />
               <span>Call</span>
             </div>
             <span className="font-bold text-base text-foreground">{toolCall.name}</span>
@@ -659,6 +746,14 @@ const ToolCallDisplay: React.FC<{ toolCall: ToolCall }> = ({ toolCall }) => {
             )}
           </div>
         )}
+        {/* Timestamp */}
+        {timestamp && (
+          <div className="pt-2 mt-2 pb-3 border-t border-border/20 text-xs text-muted-foreground px-3">
+            <time dateTime={timestamp.toISOString()} title={format(timestamp, 'yyyy-MM-dd HH:mm:ss')}>
+              {format(timestamp, 'MM-dd HH:mm')}
+            </time>
+          </div>
+        )}
       </div>
 
       {toolCall.result && (
@@ -671,7 +766,7 @@ const ToolCallDisplay: React.FC<{ toolCall: ToolCall }> = ({ toolCall }) => {
 };
 
 // Component to display tool responses with expandable content
-const ToolResponseDisplay: React.FC<{ toolResponse: ParsedToolResponse }> = ({ toolResponse }) => {
+const ToolResponseDisplay: React.FC<{ toolResponse: ParsedToolResponse; timestamp?: Date }> = ({ toolResponse, timestamp }) => {
   const [isExpanded, setIsExpanded] = useState(false);
 
 
@@ -688,30 +783,37 @@ const ToolResponseDisplay: React.FC<{ toolResponse: ParsedToolResponse }> = ({ t
   if (toolResponse.structuredData) {
     const getResultStatusColor = (success?: boolean) => {
       if (success === true) {
-        return "text-emerald-600 dark:text-emerald-400";
+        return "text-green-600 dark:text-green-400";
       } else if (success === false) {
         return "text-red-600 dark:text-red-400";
       }
-      return "text-muted-foreground";
+      return "text-green-600 dark:text-green-400";
     };
 
     const getResultStatusText = (success?: boolean) => {
       if (success === true) {
-        return "✅ Success";
+        return "Success";
       } else if (success === false) {
-        return "❌ Failed";
+        return "Failed";
       }
-      return "✅ Completed";
+      return "Completed";
     };
 
     return (
       <div className="mb-3 last:mb-0">
-        <div className="bg-muted/20 rounded-lg border border-green-200/50 dark:border-green-700/30 overflow-hidden">
+        <div className="flex gap-3 max-w-4xl ml-auto flex-row-reverse">
+          {/* Avatar */}
+          <div className="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center bg-secondary">
+            <User size={20} />
+          </div>
+
+          {/* Tool response content */}
+          <div className="bg-muted/20 rounded-lg border border-green-200/50 dark:border-green-700/30 overflow-hidden max-w-3xl">
           {/* Tool response header - similar to tool call design */}
           <div className="flex items-center justify-between p-3 bg-muted/30 border-b border-border/30">
             <div className="flex items-center gap-3">
-              <div className="flex items-center gap-1 text-xs font-bold text-foreground/80 border border-border/50 rounded px-2 py-1">
-                <CheckSquare size={10} />
+              <div className="flex items-center gap-2 text-sm font-bold text-green-600 dark:text-green-400">
+                <Hammer size={14} />
                 <span>Result</span>
               </div>
               <span className="font-bold text-base text-foreground">{toolResponse.toolName}</span>
@@ -800,7 +902,17 @@ const ToolResponseDisplay: React.FC<{ toolResponse: ParsedToolResponse }> = ({ t
                 <SmartVisualization visualizations={toolResponse.structuredData.visualizations} />
               </div>
             )}
+
+            {/* Timestamp */}
+            {timestamp && (
+              <div className="pt-2 mt-2 border-t border-border/20 text-xs text-muted-foreground">
+                <time dateTime={timestamp.toISOString()} title={format(timestamp, 'yyyy-MM-dd HH:mm:ss')}>
+                  {format(timestamp, 'MM-dd HH:mm')}
+                </time>
+              </div>
+            )}
           </div>
+        </div>
         </div>
       </div>
     );
@@ -821,13 +933,19 @@ const ToolResponseDisplay: React.FC<{ toolResponse: ParsedToolResponse }> = ({ t
   const operation = extractOperationFromContent(toolResponse.content);
 
   return (
-    <div className="flex justify-center">
+    <div className="flex gap-3 max-w-4xl ml-auto flex-row-reverse">
+      {/* Avatar */}
+      <div className="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center bg-secondary">
+        <User size={20} />
+      </div>
+
+      {/* Tool response content */}
       <div className="bg-muted/20 rounded-lg border border-green-200/50 dark:border-green-700/30 overflow-hidden max-w-3xl">
         {/* Enhanced tool response header */}
         <div className="flex items-center justify-between p-3 bg-muted/30 border-b border-border/30">
           <div className="flex items-center gap-3">
-            <div className="flex items-center gap-1 text-xs font-bold text-foreground/80 border border-border/50 rounded px-2 py-1">
-              <CheckSquare size={10} />
+            <div className="flex items-center gap-2 text-sm font-bold text-green-600 dark:text-green-400">
+              <Hammer size={14} />
               <span>Result</span>
             </div>
             <span className="font-bold text-base text-foreground">{toolResponse.toolName}</span>
@@ -839,10 +957,10 @@ const ToolResponseDisplay: React.FC<{ toolResponse: ParsedToolResponse }> = ({ t
           </div>
           <div className="flex items-center gap-2">
             <span className={cn("text-xs font-medium",
-              toolResponse.success === true ? "text-emerald-600 dark:text-emerald-400" :
-              toolResponse.success === false ? "text-red-600 dark:text-red-400" : "text-muted-foreground")}>
-              {toolResponse.success === true ? "✅ Success" :
-               toolResponse.success === false ? "❌ Failed" : "✅ Completed"}
+              toolResponse.success === true ? "text-green-600 dark:text-green-400" :
+              toolResponse.success === false ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400")}>
+              {toolResponse.success === true ? "Success" :
+               toolResponse.success === false ? "Failed" : "Completed"}
             </span>
             {toolResponse.toolCallId && (
               <span className="font-mono text-xs opacity-50">#{toolResponse.toolCallId.slice(-6)}</span>
@@ -867,6 +985,15 @@ const ToolResponseDisplay: React.FC<{ toolResponse: ParsedToolResponse }> = ({ t
               className=""
             />
           </div>
+
+          {/* Timestamp */}
+          {timestamp && (
+            <div className="pt-2 mt-2 border-t border-border/20 text-xs text-muted-foreground">
+              <time dateTime={timestamp.toISOString()} title={format(timestamp, 'yyyy-MM-dd HH:mm:ss')}>
+                {format(timestamp, 'MM-dd HH:mm')}
+              </time>
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -1026,7 +1153,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isStreaming, onS
   if (isSystem) {
     return (
       <div className="flex justify-center">
-        <div className="bg-muted rounded-lg px-3 py-2 text-sm text-muted-foreground max-w-2xl">
+        <div className="bg-muted/50 rounded-lg px-3 py-2 text-sm text-muted-foreground max-w-2xl border border-yellow-200/50 dark:border-yellow-700/30">
           <MarkdownRenderer
             content={message.content}
             className=""
@@ -1037,26 +1164,47 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isStreaming, onS
   }
 
   if (isTool && toolResponse) {
-    return <ToolResponseDisplay toolResponse={toolResponse} />;
+    return <ToolResponseDisplay toolResponse={toolResponse} timestamp={message.timestamp} />;
+  }
+
+  // If message has tool calls, display them directly without bubble wrapper
+  if (message.toolCalls && message.toolCalls.length > 0) {
+    return (
+      <div className="flex gap-3 max-w-4xl">
+        {/* Avatar */}
+        <div className="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center bg-secondary">
+          <Brain size={20} />
+        </div>
+
+        {/* Tool calls content */}
+        <div className="space-y-3">
+          {message.toolCalls.map((toolCall, index) => (
+            <ToolCallDisplay key={index} toolCall={toolCall} timestamp={message.timestamp} />
+          ))}
+        </div>
+      </div>
+    );
   }
 
   return (
     <div className={cn("flex gap-3 max-w-4xl group", isUser ? "ml-auto flex-row-reverse" : "")}>
       {/* Avatar */}
       <div className={cn(
-        "flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center",
-        isUser ? "bg-primary text-primary-foreground" : "bg-secondary"
+        "flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center bg-secondary"
       )}>
-        {isUser ? <User size={16} /> : <Bot size={16} />}
+        {isUser ? <User size={20} /> : <Brain size={20} />}
       </div>
 
       {/* Message content */}
       <div className={cn("flex-1 min-w-0", isUser ? "text-right" : "")}>
         <Card className={cn(
-          "inline-block text-left max-w-full",
-          isUser ? "bg-primary text-primary-foreground" : ""
+          "inline-block text-left max-w-full bg-muted/50",
+          "border",
+          isUser ? "border-blue-200/50 dark:border-blue-700/30" :
+          message.role === 'system' ? "border-yellow-200/50 dark:border-yellow-700/30" :
+          "border-green-200/50 dark:border-green-700/30"
         )}>
-          <CardContent className="p-3">
+          <CardContent className="px-4 py-0">
             {message.error ? (
               <div className="flex items-center gap-2 text-destructive">
                 <AlertCircle size={16} />
@@ -1088,7 +1236,6 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isStreaming, onS
                           <MarkdownRenderer
                             content={contentWithoutSnapshot}
                             className="px-3 py-2"
-                            isUserMessage={false}
                           />
                         )}
                       </>
@@ -1109,8 +1256,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isStreaming, onS
                         {contentWithoutSnapshot && (
                           <MarkdownRenderer
                             content={contentWithoutSnapshot}
-                            className="px-3 py-2"
-                            isUserMessage={isUser}
+                            className="px-3 py-0"
                           />
                         )}
                       </>
@@ -1119,26 +1265,15 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isStreaming, onS
                 })()}
               </div>
             )}
-            
-            {/* Tool calls */}
-            {message.toolCalls && message.toolCalls.length > 0 && (
-              <div className="mt-3 pt-3 border-t border-border/50">
-                <div className="text-xs text-muted-foreground mb-2">Tool Calls:</div>
-                {message.toolCalls.map((toolCall, index) => (
-                  <ToolCallDisplay key={index} toolCall={toolCall} />
-                ))}
-              </div>
-            )}
 
             {/* Timestamp and Actions */}
             <div className={cn(
-              "text-xs mt-2 pt-2 border-t border-border/20",
-              isUser ? "text-primary-foreground/70" : "text-muted-foreground"
+              "text-xs mt-2 pt-2 pb-3 border-t border-border/20 text-muted-foreground"
             )}>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-1">
                   <time dateTime={message.timestamp.toISOString()} title={format(message.timestamp, 'yyyy-MM-dd HH:mm:ss')}>
-                    {format(message.timestamp, 'HH:mm')}
+                    {format(message.timestamp, 'MM-dd HH:mm')}
                   </time>
                   {isStreaming && <span className="animate-pulse">●</span>}
                 </div>
@@ -1150,8 +1285,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isStreaming, onS
                     size="icon"
                     onClick={() => onSaveAsTemplate?.(message)}
                     className={cn(
-                      "h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity",
-                      isUser ? "hover:bg-primary-foreground/20 text-primary-foreground/50 hover:text-primary-foreground" : "hover:bg-muted"
+                      "h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-muted"
                     )}
                     title="Save as template"
                   >
