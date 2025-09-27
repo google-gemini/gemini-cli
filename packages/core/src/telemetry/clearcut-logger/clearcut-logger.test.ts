@@ -104,6 +104,8 @@ beforeAll(() => {
 
 afterEach(() => {
   server.resetHandlers();
+  // Clear CURSOR_TRACE_ID to prevent interference with IDE detection tests
+  delete process.env['CURSOR_TRACE_ID'];
 });
 
 afterAll(() => {
