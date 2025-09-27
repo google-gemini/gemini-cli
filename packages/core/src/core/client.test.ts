@@ -131,7 +131,7 @@ async function fromAsync<T>(promise: AsyncGenerator<T>): Promise<readonly T[]> {
   return results;
 }
 
-describe('findIndexAfterFraction', () => {
+describe('findCompressSplitPoint', () => {
   it('should throw an error for non-positive numbers', () => {
     expect(() => findCompressSplitPoint([], 0)).toThrow(
       'Fraction must be between 0 and 1',
@@ -156,7 +156,7 @@ describe('findIndexAfterFraction', () => {
       { role: 'model', parts: [{ text: 'This is the fourth message.' }] }, // JSON length: 68 (80%)
       { role: 'user', parts: [{ text: 'This is the fifth message.' }] }, // JSON length: 65 (100%)
     ];
-    expect(findCompressSplitPoint(history, 0.5)).toBe(2);
+    expect(findCompressSplitPoint(history, 0.5)).toBe(4);
   });
 
   it('should handle a fraction of last index', () => {

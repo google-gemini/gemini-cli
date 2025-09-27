@@ -83,7 +83,6 @@ export function findCompressSplitPoint(
   let lastSplitPoint = 0; // 0 is always valid (compress nothing)
   let cumulativeCharCount = 0;
   for (let i = 0; i < contents.length; i++) {
-    cumulativeCharCount += charCounts[i];
     const content = contents[i];
     if (
       content.role === 'user' &&
@@ -94,6 +93,7 @@ export function findCompressSplitPoint(
       }
       lastSplitPoint = i;
     }
+    cumulativeCharCount += charCounts[i];
   }
 
   // We found no split points after targetCharCount.
