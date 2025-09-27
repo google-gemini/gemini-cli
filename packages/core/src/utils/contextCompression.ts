@@ -234,7 +234,7 @@ export class ContextCompressor {
       (msg) => msg.role === 'assistant',
     ).length;
 
-    return `[대화 히스토리 요약] 이전에 ${userMessages}개의 사용자 메시지와 ${assistantMessages}개의 어시스턴트 응답이 있었습니다. 필요한 경우 더 자세한 내용을 요청해주세요.`;
+    return `[Conversation history summary] There were ${userMessages} user messages and ${assistantMessages} assistant responses. Please ask for more details if needed.`;
   }
 }
 
@@ -242,10 +242,16 @@ export class TokenErrorRetryHandler {
   private readonly compressor: ContextCompressor;
   private readonly tokenManager: TokenManager;
   private readonly defaultOptions: RetryOptions;
+  private readonly logger?: (message: string) => void;
 
-  constructor(tokenManager?: TokenManager, options?: Partial<RetryOptions>) {
+  constructor(
+    tokenManager?: TokenManager,
+    options?: Partial<RetryOptions>,
+    logger?: (message: string) => void,
+  ) {
     this.tokenManager = tokenManager || new TokenManager(DEFAULT_TOKEN_CONFIG);
     this.compressor = new ContextCompressor(this.tokenManager);
+    this.logger = logger;
     this.defaultOptions = {
       maxRetries: 3,
       backoffMultiplier: 1.5,
@@ -299,7 +305,7 @@ export class TokenErrorRetryHandler {
           );
           currentContent = compressionResult.compressedContent;
 
-          console.log(
+          this.logger?.(
             `🔄 Context compressed due to token limit. (${compressionResult.strategy}, ${compressionResult.tokensSaved} tokens saved)`,
           );
         }
@@ -320,7 +326,7 @@ export class TokenErrorRetryHandler {
 
         // Check if it's a token limit error
         if (this.isTokenLimitError(error)) {
-          console.log(
+          this.logger?.(
             `⚠️  Token limit error occurred (attempt ${attempt + 1}/${retryOptions.maxRetries})`,
           );
 

@@ -271,14 +271,14 @@ export function formatTokenUsage(
   const { current, max, usagePercent, status } = stats;
 
   let statusIcon = '✅';
-  let statusText = '정상';
+  let statusText = 'Normal';
 
   if (status === TokenStatus.WARNING) {
     statusIcon = '⚠️';
-    statusText = '주의';
+    statusText = 'Warning';
   } else if (status === TokenStatus.LIMIT_EXCEEDED) {
     statusIcon = '🚨';
-    statusText = '위험';
+    statusText = 'Danger';
   }
 
   return `${statusIcon} Token usage: ${current.toLocaleString()} / ${max.toLocaleString()} (${usagePercent}%) - ${statusText}`;

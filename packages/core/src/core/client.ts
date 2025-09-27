@@ -164,7 +164,11 @@ export class GeminiClient {
 
     // Initialize token management system
     this.tokenManager = new TokenManager(DEFAULT_TOKEN_CONFIG);
-    this.tokenErrorRetryHandler = new TokenErrorRetryHandler(this.tokenManager);
+    this.tokenErrorRetryHandler = new TokenErrorRetryHandler(
+      this.tokenManager,
+      undefined,
+      this.config.getDebugMode() ? console.log : undefined,
+    );
     this.contextCompressor = new ContextCompressor(this.tokenManager);
   }
 
