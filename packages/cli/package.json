@@ -7,14 +7,14 @@
     "url": "git+https://github.com/google-gemini/gemini-cli.git"
   },
   "type": "module",
-  "main": "dist/index.js",
+  "main": "gemini.js",
   "bin": {
-    "gemini": "dist/index.js"
+    "gemini": "gemini.js"
   },
   "scripts": {
     "build": "node ../../scripts/build_package.js",
-    "start": "node dist/index.js",
-    "debug": "node --inspect-brk dist/index.js",
+    "start": "node gemini.js",
+    "debug": "node --inspect-brk gemini.js",
     "lint": "eslint . --ext .ts,.tsx",
     "format": "prettier --write .",
     "test": "vitest run",
@@ -22,7 +22,8 @@
     "typecheck": "tsc --noEmit"
   },
   "files": [
-    "dist"
+    "gemini.js",
+    "node_modules/"
   ],
   "config": {
     "sandboxImageUri": "us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:0.8.0-nightly.20250925.b1da8c21"

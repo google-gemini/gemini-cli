@@ -17,7 +17,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { copyFileSync, existsSync, mkdirSync } from 'node:fs';
+import {
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  statSync,
+} from 'node:fs';
 import { dirname, join, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { glob } from 'glob';
@@ -25,6 +31,26 @@ import { glob } from 'glob';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = join(__dirname, '..');
 const bundleDir = join(root, 'bundle');
+const rootNodeModules = join(root, 'node_modules');
+const bundleNodeModules = join(bundleDir, 'node_modules');
+
+function copyRecursiveSync(src, dest) {
+  const exists = existsSync(src);
+  if (!exists) {
+    return;
+  }
+  const stats = statSync(src);
+  const isDirectory = stats.isDirectory();
+  if (isDirectory) {
+    mkdirSync(dest, { recursive: true });
+    for (const childItemName of readdirSync(src)) {
+      copyRecursiveSync(join(src, childItemName), join(dest, childItemName));
+    }
+  } else {
+    mkdirSync(dirname(dest), { recursive: true });
+    copyFileSync(src, dest);
+  }
+}
 
 // Create the bundle directory if it doesn't exist
 if (!existsSync(bundleDir)) {
@@ -35,6 +61,19 @@ if (!existsSync(bundleDir)) {
 const sbFiles = glob.sync('packages/**/*.sb', { cwd: root });
 for (const file of sbFiles) {
   copyFileSync(join(root, file), join(bundleDir, basename(file)));
+}
+
+// Copy node-pty dependencies
+const nodePtyDeps = [
+  'node-pty',
+  ...glob.sync('@lydell/node-pty-*', { cwd: rootNodeModules }),
+];
+
+for (const dep of nodePtyDeps) {
+  const src = join(rootNodeModules, dep);
+  const dest = join(bundleNodeModules, dep);
+  console.log(`Copying ${dep} to bundle/node_modules/`);
+  copyRecursiveSync(src, dest);
 }
 
 console.log('Assets copied to bundle/');
