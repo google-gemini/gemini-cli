@@ -71,6 +71,7 @@ export interface StructuredError {
 
 export interface GeminiErrorEventValue {
   error: StructuredError;
+  request?: PartListUnion;
 }
 
 export interface GeminiFinishedEventValue {
@@ -325,7 +326,10 @@ export class Turn {
         status,
       };
       await this.chat.maybeIncludeSchemaDepthContext(structuredError);
-      yield { type: GeminiEventType.Error, value: { error: structuredError } };
+      yield {
+        type: GeminiEventType.Error,
+        value: { error: structuredError, request: req },
+      };
       return;
     }
   }
