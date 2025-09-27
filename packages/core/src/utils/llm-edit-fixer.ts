@@ -118,7 +118,15 @@ export async function FixLLMEditWithInstruction(
   }
 
   const cacheKey = createHash('sha256')
-    .update(JSON.stringify([current_content, old_string, new_string]))
+    .update(
+      JSON.stringify([
+        current_content,
+        old_string,
+        new_string,
+        instruction,
+        error,
+      ]),
+    )
     .digest('hex');
   const cachedResult = editCorrectionWithInstructionCache.get(cacheKey);
   if (cachedResult) {
