@@ -51,16 +51,12 @@ export class StandardFileSystemService implements FileSystemService {
   }
 
   findFiles(fileName: string, searchPaths: readonly string[]): string[] {
-    const foundFiles: string[] = [];
-    for (const searchPath of searchPaths) {
-      let pattern = path.resolve(searchPath, '**', fileName);
-      pattern = pattern.replace(/\\/g, '/');
-      const matches = globSync(pattern, {
+    return searchPaths.flatMap((searchPath) => {
+      const pattern = path.posix.join(searchPath, '**', fileName);
+      return globSync(pattern, {
         nodir: true,
         absolute: true,
       });
-      foundFiles.push(...matches);
-    }
-    return foundFiles;
+    });
   }
 }
