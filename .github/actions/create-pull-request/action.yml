@@ -15,37 +15,33 @@ inputs:
     description: 'The branch to merge into.'
     required: true
     default: 'main'
-  app-id:
-    description: 'The ID of the GitHub App.'
-    required: true
-  private-key:
-    description: 'The private key of the GitHub App.'
+  github-token:
+    description: 'The GitHub token to use for creating the pull request.'
     required: true
   dry-run:
     description: 'Whether to run in dry-run mode.'
     required: false
     default: 'false'
+  working-directory:
+    description: 'The working directory to run the commands in.'
+    required: false
+    default: '.'
 
 runs:
   using: 'composite'
   steps:
-    - name: 'Generate GitHub App Token'
-      id: 'generate_token'
-      if: "inputs.dry-run == 'false'"
-      uses: 'actions/create-github-app-token@a8d616148505b5069dccd32f177bb87d7f39123b'
-      with:
-        app-id: '${{ inputs.app-id }}'
-        private-key: '${{ inputs.private-key }}'
-        permission-pull-requests: 'write'
-        permission-contents: 'write'
-
     - name: 'Create and Approve Pull Request'
       if: "inputs.dry-run == 'false'"
       env:
-        GH_TOKEN: '${{ steps.generate_token.outputs.token }}'
+        GH_TOKEN: '${{ inputs.github-token }}'
       shell: 'bash'
+      working-directory: '${{ inputs.working-directory }}'
       run: |
         set -e
+        if ! git ls-remote --exit-code --heads origin "${{ inputs.branch-name }}"; then
+          echo "::error::Branch '${{ inputs.branch-name }}' does not exist on the remote repository."
+          exit 1
+        fi
         PR_URL=$(gh pr create \
           --title "${{ inputs.pr-title }}" \
           --body "${{ inputs.pr-body }}" \

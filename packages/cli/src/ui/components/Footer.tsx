@@ -19,43 +19,50 @@ import { DebugProfiler } from './DebugProfiler.js';
 import { useTerminalSize } from '../hooks/useTerminalSize.js';
 import { isNarrowWidth } from '../utils/isNarrowWidth.js';
 
-export interface FooterProps {
-  model: string;
-  targetDir: string;
-  branchName?: string;
-  debugMode: boolean;
-  debugMessage: string;
-  corgiMode: boolean;
-  errorCount: number;
-  showErrorDetails: boolean;
-  showMemoryUsage?: boolean;
-  promptTokenCount: number;
-  nightly: boolean;
-  vimMode?: string;
-  isTrustedFolder?: boolean;
-  hideCWD?: boolean;
-  hideSandboxStatus?: boolean;
-  hideModelInfo?: boolean;
-}
+import { useUIState } from '../contexts/UIStateContext.js';
+import { useConfig } from '../contexts/ConfigContext.js';
+import { useSettings } from '../contexts/SettingsContext.js';
+import { useVimMode } from '../contexts/VimModeContext.js';
 
-export const Footer: React.FC<FooterProps> = ({
-  model,
-  targetDir,
-  branchName,
-  debugMode,
-  debugMessage,
-  corgiMode,
-  errorCount,
-  showErrorDetails,
-  showMemoryUsage,
-  promptTokenCount,
-  nightly,
-  vimMode,
-  isTrustedFolder,
-  hideCWD = false,
-  hideSandboxStatus = false,
-  hideModelInfo = false,
-}) => {
+export const Footer: React.FC = () => {
+  const uiState = useUIState();
+  const config = useConfig();
+  const settings = useSettings();
+  const { vimEnabled, vimMode } = useVimMode();
+
+  const {
+    model,
+    targetDir,
+    debugMode,
+    branchName,
+    debugMessage,
+    corgiMode,
+    errorCount,
+    showErrorDetails,
+    promptTokenCount,
+    nightly,
+    isTrustedFolder,
+  } = {
+    model: config.getModel(),
+    targetDir: config.getTargetDir(),
+    debugMode: config.getDebugMode(),
+    branchName: uiState.branchName,
+    debugMessage: uiState.debugMessage,
+    corgiMode: uiState.corgiMode,
+    errorCount: uiState.errorCount,
+    showErrorDetails: uiState.showErrorDetails,
+    promptTokenCount: uiState.sessionStats.lastPromptTokenCount,
+    nightly: uiState.nightly,
+    isTrustedFolder: uiState.isTrustedFolder,
+  };
+
+  const showMemoryUsage =
+    config.getDebugMode() || settings.merged.ui?.showMemoryUsage || false;
+  const hideCWD = settings.merged.ui?.footer?.hideCWD || false;
+  const hideSandboxStatus =
+    settings.merged.ui?.footer?.hideSandboxStatus || false;
+  const hideModelInfo = settings.merged.ui?.footer?.hideModelInfo || false;
+
   const { columns: terminalWidth } = useTerminalSize();
 
   const isNarrow = isNarrowWidth(terminalWidth);
@@ -67,6 +74,7 @@ export const Footer: React.FC<FooterProps> = ({
     : shortenPath(tildeifyPath(targetDir), pathLength);
 
   const justifyContent = hideCWD && hideModelInfo ? 'center' : 'space-between';
+  const displayVimMode = vimEnabled ? vimMode : undefined;
 
   return (
     <Box
@@ -75,10 +83,12 @@ export const Footer: React.FC<FooterProps> = ({
       flexDirection={isNarrow ? 'column' : 'row'}
       alignItems={isNarrow ? 'flex-start' : 'center'}
     >
-      {(debugMode || vimMode || !hideCWD) && (
+      {(debugMode || displayVimMode || !hideCWD) && (
         <Box>
           {debugMode && <DebugProfiler />}
-          {vimMode && <Text color={theme.text.secondary}>[{vimMode}] </Text>}
+          {displayVimMode && (
+            <Text color={theme.text.secondary}>[{displayVimMode}] </Text>
+          )}
           {!hideCWD &&
             (nightly ? (
               <Gradient colors={theme.ui.gradient}>

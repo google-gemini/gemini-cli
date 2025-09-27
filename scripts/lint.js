@@ -164,7 +164,7 @@ export function runYamllint() {
 
 export function runPrettier() {
   console.log('\nRunning Prettier...');
-  if (!runCommand('prettier --check .')) {
+  if (!runCommand('prettier --write .')) {
     process.exit(1);
   }
 }
