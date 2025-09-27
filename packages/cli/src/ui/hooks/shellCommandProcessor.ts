@@ -139,6 +139,22 @@ export const useShellCommandProcessor = (
 
         onDebugMessage(`Executing in ${targetDir}: ${commandToExecute}`);
 
+        const processLine = (line: string) => {
+          const parts = line.split('\r');
+          let result = parts[0];
+          for (let i = 1; i < parts.length; i++) {
+            const part = parts[i];
+            result = part + result.substring(part.length);
+          }
+          return result;
+        };
+
+        const processCarriageReturns = (input: string) => {
+          const lines = input.split('\n');
+          const processedLines = lines.map(processLine);
+          return processedLines.join('\n');
+        };
+
         try {
           const activeTheme = themeManager.getActiveTheme();
           const shellExecutionConfig = {
@@ -258,6 +274,10 @@ export const useShellCommandProcessor = (
               }
 
               let finalOutput = mainContent;
+              // node-pty handles CR for us
+              if (result.executionMethod === 'child_process') {
+                finalOutput = processCarriageReturns(finalOutput);
+              }
               let finalStatus = ToolCallStatus.Success;
 
               if (result.error) {
