@@ -603,6 +603,22 @@ Content of file[1]
         'Successfully read and concatenated content from **1 file(s)**',
       );
     });
+
+    it('should resolve glob patterns with special characters', async () => {
+      const filePath = 'src/app/[locale]/(auth)/page.tsx';
+      createFile(filePath, 'Auth page content');
+      const params = { paths: ['src/app/[locale]/(auth)/**'] };
+      const invocation = tool.build(params);
+      const result = await invocation.execute(new AbortController().signal);
+      const expectedPath = path.join(tempRootDir, filePath);
+      expect(result.llmContent).toEqual([
+        `--- ${expectedPath} ---\n\nAuth page content\n\n`,
+        `\n--- End of content ---`,
+      ]);
+      expect(result.returnDisplay).toContain(
+        'Successfully read and concatenated content from **1 file(s)**',
+      );
+    });
   });
 
   describe('Error handling', () => {
