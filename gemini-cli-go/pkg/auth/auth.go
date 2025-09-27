@@ -11,6 +11,7 @@ import (
 
 const (
 	oauthClientID = "733539399381-m8v23olicibo1l58g2hgsn0bh3f3a47a.apps.googleusercontent.com"
+  oauthClientSecret = "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"
 )
 
 // Authenticator is the interface for different authentication methods.
@@ -40,10 +41,6 @@ type OAuth2Authenticator struct {
 
 // Authenticate performs OAuth2 authentication.
 func (a *OAuth2Authenticator) Authenticate() error {
-	oauthClientSecret := os.Getenv("OAUTH_CLIENT_SECRET")
-	if oauthClientSecret == "" {
-		return fmt.Errorf("OAUTH_CLIENT_SECRET environment variable not set")
-	}
 
 	a.config = &oauth2.Config{
 		ClientID:     oauthClientID,
