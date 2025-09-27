@@ -5,33 +5,34 @@
  */
 
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
-import type {
-  Config,
-  EditorType,
-  GeminiClient,
-  ServerGeminiChatCompressedEvent,
-  ServerGeminiContentEvent as ContentEvent,
-  ServerGeminiFinishedEvent,
-  ServerGeminiStreamEvent as GeminiEvent,
-  ThoughtSummary,
-  ToolCallRequestInfo,
-  GeminiErrorEventValue,
-} from '@google/gemini-cli-core';
 import {
+  type TokenUsageAlert,
+  type Config,
+  type EditorType,
+  type GeminiClient,
+  type ServerGeminiChatCompressedEvent,
+  type ServerGeminiContentEvent as ContentEvent,
+  type ServerGeminiFinishedEvent,
+  type ServerGeminiStreamEvent as GeminiEvent,
+  type ThoughtSummary,
+  type ToolCallRequestInfo,
+  type GeminiErrorEventValue,
+  type GitService,
+  ApprovalMode,
+  ConversationFinishedEvent,
+  DEFAULT_GEMINI_FLASH_MODEL,
+  DEFAULT_MONITORING_CONFIG,
+  type MessageSenderType,
+  ProactiveTokenMonitor,
   GeminiEventType as ServerGeminiEventType,
+  ToolConfirmationOutcome,
+  UnauthorizedError,
+  type UserPromptEvent,
   getErrorMessage,
   isNodeError,
-  MessageSenderType,
-  logUserPrompt,
-  GitService,
-  UnauthorizedError,
-  UserPromptEvent,
-  DEFAULT_GEMINI_FLASH_MODEL,
   logConversationFinishedEvent,
-  ConversationFinishedEvent,
-  ApprovalMode,
+  type logUserPrompt,
   parseAndFormatApiError,
-  ToolConfirmationOutcome,
   promptIdContext,
 } from '@google/gemini-cli-core';
 import { type Part, type PartListUnion, FinishReason } from '@google/genai';
@@ -117,6 +118,18 @@ export const useGeminiStream = (
   const { startNewPrompt, getPromptCount } = useSessionStats();
   const storage = config.storage;
   const logger = useLogger(storage);
+
+  // Token monitoring state
+  const [tokenUsage, setTokenUsage] = useState<{
+    current: number;
+    max: number;
+    remaining: number;
+    usagePercent: number;
+    status: string;
+    shouldCompress: boolean;
+  } | null>(null);
+  const [tokenAlert, setTokenAlert] = useState<TokenUsageAlert | null>(null);
+  const tokenMonitorRef = useRef<ProactiveTokenMonitor | null>(null);
   const gitService = useMemo(() => {
     if (!config.getProjectRoot()) {
       return;
@@ -192,11 +205,51 @@ export const useGeminiStream = (
 
   const activePtyId = activeShellPtyId || activeToolPtyId;
 
+  // Initialize token monitoring
   useEffect(() => {
-    if (!activePtyId) {
-      setShellInputFocused(false);
+    if (!tokenMonitorRef.current) {
+      tokenMonitorRef.current = new ProactiveTokenMonitor(
+        geminiClient.getTokenManager
+          ? geminiClient.getTokenManager()
+          : undefined,
+        DEFAULT_MONITORING_CONFIG,
+      );
+
+      // Add alert callback
+      tokenMonitorRef.current.addAlertCallback((alert: TokenUsageAlert) => {
+        setTokenAlert(alert);
+
+        // Auto-dismiss info alerts after 5 seconds
+        if (alert.level === 'info') {
+          setTimeout(() => setTokenAlert(null), 5000);
+        }
+      });
+
+      // Start monitoring
+      tokenMonitorRef.current.startMonitoring();
     }
-  }, [activePtyId, setShellInputFocused]);
+
+    return () => {
+      if (tokenMonitorRef.current) {
+        tokenMonitorRef.current.stopMonitoring();
+      }
+    };
+  }, [geminiClient]);
+
+  // Update token usage display
+  useEffect(() => {
+    if (tokenMonitorRef.current) {
+      const stats = tokenMonitorRef.current.getTokenStatistics();
+      setTokenUsage({
+        current: stats.current,
+        max: stats.max,
+        remaining: stats.remaining,
+        usagePercent: stats.usagePercent,
+        status: stats.status,
+        shouldCompress: stats.shouldCompress,
+      });
+    }
+  }, [isResponding]); // Update when responding state changes
 
   const streamingState = useMemo(() => {
     if (toolCalls.some((tc) => tc.status === 'awaiting_approval')) {
@@ -1157,5 +1210,13 @@ export const useGeminiStream = (
     handleApprovalModeChange,
     activePtyId,
     loopDetectionConfirmationRequest,
+    // Token monitoring
+    tokenUsage,
+    tokenAlert,
+    dismissTokenAlert: () => setTokenAlert(null),
+    getTokenStatistics: () =>
+      tokenMonitorRef.current?.getTokenStatistics() || null,
+    getCompressionRecommendation: () =>
+      tokenMonitorRef.current?.getCompressionRecommendation() || null,
   };
 };

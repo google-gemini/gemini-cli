@@ -50,6 +50,15 @@ import type { IdeContext, File } from '../ide/types.js';
 import { handleFallback } from '../fallback/handler.js';
 import type { RoutingContext } from '../routing/routingStrategy.js';
 import { uiTelemetryService } from '../telemetry/uiTelemetry.js';
+import {
+  TokenManager,
+  DEFAULT_TOKEN_CONFIG,
+  type TokenStatus,
+} from '../utils/tokenErrorHandling.js';
+import {
+  ContextCompressor,
+  TokenErrorRetryHandler,
+} from '../utils/contextCompression.js';
 
 export function isThinkingSupported(model: string) {
   return model.startsWith('gemini-2.5') || model === DEFAULT_GEMINI_MODEL_AUTO;
@@ -144,9 +153,19 @@ export class GeminiClient {
    */
   private hasFailedCompressionAttempt = false;
 
+  // Token management system
+  private readonly tokenManager: TokenManager;
+  private readonly tokenErrorRetryHandler: TokenErrorRetryHandler;
+  private readonly contextCompressor: ContextCompressor;
+
   constructor(private readonly config: Config) {
     this.loopDetector = new LoopDetectionService(config);
     this.lastPromptId = this.config.getSessionId();
+
+    // Initialize token management system
+    this.tokenManager = new TokenManager(DEFAULT_TOKEN_CONFIG);
+    this.tokenErrorRetryHandler = new TokenErrorRetryHandler(this.tokenManager);
+    this.contextCompressor = new ContextCompressor(this.tokenManager);
   }
 
   async initialize() {
@@ -602,32 +621,53 @@ export class GeminiClient {
         systemInstruction,
       };
 
-      const apiCall = () => {
-        const modelToUse = this.config.isInFallbackMode()
-          ? DEFAULT_GEMINI_FLASH_MODEL
-          : model;
-        currentAttemptModel = modelToUse;
+      // Use token error retry handler for automatic compression and retry
+      const result = await this.tokenErrorRetryHandler.handleTokenLimitError(
+        contents,
+        async (compressedContents: Content[]) => {
+          const modelToUse = this.config.isInFallbackMode()
+            ? DEFAULT_GEMINI_FLASH_MODEL
+            : model;
+          currentAttemptModel = modelToUse;
 
-        return this.getContentGeneratorOrFail().generateContent(
-          {
-            model: modelToUse,
-            config: requestConfig,
-            contents,
-          },
-          this.lastPromptId,
-        );
-      };
-      const onPersistent429Callback = async (
-        authType?: string,
-        error?: unknown,
-      ) =>
-        // Pass the captured model to the centralized handler.
-        await handleFallback(this.config, currentAttemptModel, authType, error);
+          const apiCall = () =>
+            this.getContentGeneratorOrFail().generateContent(
+              {
+                model: modelToUse,
+                config: requestConfig,
+                contents: compressedContents,
+              },
+              this.lastPromptId,
+            );
 
-      const result = await retryWithBackoff(apiCall, {
-        onPersistent429: onPersistent429Callback,
-        authType: this.config.getContentGeneratorConfig()?.authType,
-      });
+          const onPersistent429Callback = async (
+            authType?: string,
+            error?: unknown,
+          ) =>
+            // Pass the captured model to the centralized handler.
+            await handleFallback(
+              this.config,
+              currentAttemptModel,
+              authType,
+              error,
+            );
+
+          return await retryWithBackoff(apiCall, {
+            onPersistent429: onPersistent429Callback,
+            authType: this.config.getContentGeneratorConfig()?.authType,
+          });
+        },
+      );
+
+      // Update token usage if we have usage metadata
+      if (result.usageMetadata) {
+        this.tokenManager.updateTokenUsage({
+          promptTokens: result.usageMetadata.promptTokenCount || 0,
+          completionTokens: result.usageMetadata.candidatesTokenCount || 0,
+          totalTokens: result.usageMetadata.totalTokenCount || 0,
+        });
+      }
+
       return result;
     } catch (error: unknown) {
       if (abortSignal.aborted) {
@@ -800,6 +840,61 @@ export class GeminiClient {
       newTokenCount,
       compressionStatus: CompressionStatus.COMPRESSED,
     };
+  }
+
+  /**
+   * Get current token usage information
+   */
+  getTokenUsage(): {
+    current: number;
+    remaining: number;
+    shouldCompress: boolean;
+  } {
+    return {
+      current: this.tokenManager.getCurrentUsage(),
+      remaining: this.tokenManager.getRemainingCapacity(),
+      shouldCompress: this.tokenManager.shouldCompress(),
+    };
+  }
+
+  /**
+   * Get the underlying token manager (for advanced usage)
+   */
+  getTokenManager(): TokenManager {
+    return this.tokenManager;
+  }
+
+  /**
+   * Reset token usage (useful for new sessions)
+   */
+  resetTokenUsage(): void {
+    this.tokenManager.resetTokenUsage();
+  }
+
+  /**
+   * Check if projected content would exceed token limits
+   */
+  checkTokenLimit(contents: Content[]): TokenStatus {
+    const estimatedTokens = this.estimateTokenCount(contents);
+    return this.tokenManager.checkTokenLimit(estimatedTokens);
+  }
+
+  /**
+   * Estimate token count for content (rough estimation)
+   */
+  private estimateTokenCount(contents: Content[]): number {
+    let totalTokens = 0;
+
+    for (const content of contents) {
+      for (const part of content.parts) {
+        if (part.text) {
+          // Rough estimation: ~4 characters per token
+          totalTokens += Math.ceil(part.text.length / 4);
+        }
+      }
+    }
+
+    return totalTokens;
   }
 }
 
