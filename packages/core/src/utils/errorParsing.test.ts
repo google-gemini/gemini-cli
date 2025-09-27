@@ -5,7 +5,11 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { parseAndFormatApiError } from './errorParsing.js';
+import {
+  parseAndFormatApiError,
+  parseError,
+  ParsedErrorType,
+} from './errorParsing.js';
 import { isProQuotaExceededError } from './quotaErrorDetection.js';
 import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
 import { UserTierId } from '../code_assist/types.js';
@@ -357,5 +361,87 @@ describe('parseAndFormatApiError', () => {
       'We appreciate you for choosing Gemini Code Assist and the Gemini CLI',
     );
     expect(result).not.toContain('upgrade to get higher limits');
+  });
+});
+
+describe('parseError (structured output)', () => {
+  it('parses JSON 429 as Pro quota (Google login)', () => {
+    const errorMessage =
+      'got status: 429 Too Many Requests. {"error":{"code":429,"message":"Quota exceeded for quota metric \'Gemini 2.5 Pro Requests\' and limit \'RequestsPerDay\' of service \'generativelanguage.googleapis.com\' for consumer \'project_number:123456789\'.","status":"RESOURCE_EXHAUSTED"}}';
+
+    const parsed = parseError(
+      errorMessage,
+      AuthType.LOGIN_WITH_GOOGLE,
+      undefined,
+      'gemini-2.5-pro',
+      DEFAULT_GEMINI_FLASH_MODEL,
+    );
+
+    expect(parsed.type).toBe(ParsedErrorType.PRO_QUOTA);
+    expect(parsed.origin).toBe('json');
+    expect(parsed.statusCode).toBe(429);
+    expect(parsed.apiStatus).toBe('RESOURCE_EXHAUSTED');
+    expect(parsed.customMessage).toBeTruthy();
+    expect(parsed.customMessage!).toContain(
+      'You have reached your daily gemini-2.5-pro quota limit',
+    );
+    expect(parsed.customMessage!).toContain('upgrade to get higher limits');
+  });
+
+  it('parses JSON 429 generic rate-limit', () => {
+    const errorMessage =
+      'got status: 429 Too Many Requests. {"error":{"code":429,"message":"Rate limit exceeded","status":"RESOURCE_EXHAUSTED"}}';
+
+    const parsed = parseError(
+      errorMessage,
+      undefined,
+      undefined,
+      'gemini-2.5-pro',
+      DEFAULT_GEMINI_FLASH_MODEL,
+    );
+
+    expect(parsed.type).toBe(ParsedErrorType.RATE_LIMIT);
+    expect(parsed.origin).toBe('json');
+    expect(parsed.statusCode).toBe(429);
+    expect(parsed.apiStatus).toBe('RESOURCE_EXHAUSTED');
+    expect(parsed.customMessage).toBeTruthy();
+    expect(parsed.customMessage!).toContain(
+      'Possible quota limitations in place or slow response times detected. Switching to the gemini-2.5-flash model',
+    );
+  });
+
+  it('parses structured 401 as auth error', () => {
+    const parsed = parseError({ message: 'Unauthorized', status: 401 });
+    expect(parsed.type).toBe(ParsedErrorType.AUTH);
+    expect(parsed.origin).toBe('structured');
+    expect(parsed.statusCode).toBe(401);
+    expect(parsed.customMessage).toBeUndefined();
+  });
+
+  it('parses plain string as generic text-origin error', () => {
+    const msg = 'This is a plain old error message';
+    const parsed = parseError(msg);
+    expect(parsed.type).toBe(ParsedErrorType.GENERIC);
+    expect(parsed.origin).toBe('text');
+    expect(parsed.errorMessage).toBe(msg);
+    expect(parsed.statusCode).toBeUndefined();
+    expect(parsed.customMessage).toBeUndefined();
+  });
+
+  it('parses unknown input as generic unknown-origin error', () => {
+    const parsed = parseError(12345);
+    expect(parsed.type).toBe(ParsedErrorType.GENERIC);
+    expect(parsed.origin).toBe('unknown');
+    expect(parsed.errorMessage).toBe('An unknown error occurred.');
+  });
+
+  it('should correctly parse a JSON error with trailing text', () => {
+    const errorMessage =
+      '[API Error: Quota exceeded. {"error":{"message":"Daily limit reached","status":"RESOURCE_EXHAUSTED","code":429}} Please try again tomorrow.]';
+    const parsed = parseError(errorMessage);
+    expect(parsed.type).toBe(ParsedErrorType.RATE_LIMIT);
+    expect(parsed.origin).toBe('json');
+    expect(parsed.statusCode).toBe(429);
+    expect(parsed.errorMessage).toBe('Daily limit reached');
   });
 });
