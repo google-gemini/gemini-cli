@@ -374,6 +374,8 @@ describe('InputPrompt', () => {
   });
 
   describe('clipboard image paste', () => {
+    const isMac = process.platform === 'darwin';
+
     beforeEach(() => {
       vi.mocked(clipboardUtils.clipboardHasImage).mockResolvedValue(false);
       vi.mocked(clipboardUtils.saveClipboardImage).mockResolvedValue(null);
@@ -382,7 +384,18 @@ describe('InputPrompt', () => {
       );
     });
 
-    it('should handle Ctrl+V when clipboard has an image', async () => {
+    const simulatePaste = (stdin: NodeJS.WriteStream) => {
+      if (isMac) {
+        // On macOS, Cmd+V is a generic paste event.
+        stdin.write('\x1b[200~');
+        stdin.write('\x1b[201~');
+      } else {
+        // On other platforms, it's Ctrl+V.
+        stdin.write('\x16');
+      }
+    };
+
+    it('should handle paste when clipboard has an image', async () => {
       vi.mocked(clipboardUtils.clipboardHasImage).mockResolvedValue(true);
       vi.mocked(clipboardUtils.saveClipboardImage).mockResolvedValue(
         '/test/.gemini-clipboard/clipboard-123.png',
@@ -393,8 +406,7 @@ describe('InputPrompt', () => {
       );
       await wait();
 
-      // Send Ctrl+V
-      stdin.write('\x16'); // Ctrl+V
+      simulatePaste(stdin);
       await wait();
 
       expect(clipboardUtils.clipboardHasImage).toHaveBeenCalled();
@@ -416,7 +428,7 @@ describe('InputPrompt', () => {
       );
       await wait();
 
-      stdin.write('\x16'); // Ctrl+V
+      simulatePaste(stdin);
       await wait();
 
       expect(clipboardUtils.clipboardHasImage).toHaveBeenCalled();
@@ -434,7 +446,7 @@ describe('InputPrompt', () => {
       );
       await wait();
 
-      stdin.write('\x16'); // Ctrl+V
+      simulatePaste(stdin);
       await wait();
 
       expect(clipboardUtils.saveClipboardImage).toHaveBeenCalled();
@@ -462,7 +474,7 @@ describe('InputPrompt', () => {
       );
       await wait();
 
-      stdin.write('\x16'); // Ctrl+V
+      simulatePaste(stdin);
       await wait();
 
       // Should insert at cursor position with spaces
@@ -492,7 +504,7 @@ describe('InputPrompt', () => {
       );
       await wait();
 
-      stdin.write('\x16'); // Ctrl+V
+      simulatePaste(stdin);
       await wait();
 
       expect(consoleErrorSpy).toHaveBeenCalledWith(
