@@ -6,12 +6,19 @@
 
 import { describe, it, expect, vi } from 'vitest';
 import { render } from 'ink-testing-library';
-import { Text } from 'ink';
+import { Text, useIsScreenReaderEnabled } from 'ink';
 import { App } from './App.js';
 import { UIStateContext, type UIState } from './contexts/UIStateContext.js';
 import { StreamingState } from './types.js';
 
-// Mock components to isolate App component testing
+vi.mock('ink', async (importOriginal) => {
+  const original = await importOriginal<typeof import('ink')>();
+  return {
+    ...original,
+    useIsScreenReaderEnabled: vi.fn(),
+  };
+});
+
 vi.mock('./components/MainContent.js', () => ({
   MainContent: () => <Text>MainContent</Text>,
 }));
@@ -32,12 +39,23 @@ vi.mock('./components/QuittingDisplay.js', () => ({
   QuittingDisplay: () => <Text>Quitting...</Text>,
 }));
 
+vi.mock('./components/Footer.js', () => ({
+  Footer: () => <Text>Footer</Text>,
+}));
+
 describe('App', () => {
   const mockUIState: Partial<UIState> = {
     streamingState: StreamingState.Idle,
     quittingMessages: null,
     dialogsVisible: false,
     mainControlsRef: { current: null },
+    historyManager: {
+      addItem: vi.fn(),
+      history: [],
+      updateItem: vi.fn(),
+      clearItems: vi.fn(),
+      loadHistory: vi.fn(),
+    },
   };
 
   it('should render main content and composer when not quitting', () => {
@@ -114,5 +132,31 @@ describe('App', () => {
     );
 
     expect(lastFrame()).toContain('Press Ctrl+D again to exit.');
+  });
+
+  it('should render ScreenReaderAppLayout when screen reader is enabled', () => {
+    (useIsScreenReaderEnabled as vi.Mock).mockReturnValue(true);
+
+    const { lastFrame } = render(
+      <UIStateContext.Provider value={mockUIState as UIState}>
+        <App />
+      </UIStateContext.Provider>,
+    );
+
+    expect(lastFrame()).toContain(
+      'Notifications\nFooter\nMainContent\nComposer',
+    );
+  });
+
+  it('should render DefaultAppLayout when screen reader is not enabled', () => {
+    (useIsScreenReaderEnabled as vi.Mock).mockReturnValue(false);
+
+    const { lastFrame } = render(
+      <UIStateContext.Provider value={mockUIState as UIState}>
+        <App />
+      </UIStateContext.Provider>,
+    );
+
+    expect(lastFrame()).toContain('MainContent\nNotifications\nComposer');
   });
 });

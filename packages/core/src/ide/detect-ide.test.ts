@@ -80,3 +80,35 @@ describe('detectIde', () => {
     expect(detectIde(ideProcessInfoNoCode)).toBe(IDE_DEFINITIONS.vscodefork);
   });
 });
+
+describe('detectIde with ideInfoFromFile', () => {
+  const ideProcessInfo = { pid: 123, command: 'some/path/to/code' };
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('should use the name and displayName from the file', () => {
+    const ideInfoFromFile = {
+      name: 'custom-ide',
+      displayName: 'Custom IDE',
+    };
+    expect(detectIde(ideProcessInfo, ideInfoFromFile)).toEqual(ideInfoFromFile);
+  });
+
+  it('should fall back to env detection if name is missing', () => {
+    const ideInfoFromFile = { displayName: 'Custom IDE' };
+    vi.stubEnv('TERM_PROGRAM', 'vscode');
+    expect(detectIde(ideProcessInfo, ideInfoFromFile)).toBe(
+      IDE_DEFINITIONS.vscode,
+    );
+  });
+
+  it('should fall back to env detection if displayName is missing', () => {
+    const ideInfoFromFile = { name: 'custom-ide' };
+    vi.stubEnv('TERM_PROGRAM', 'vscode');
+    expect(detectIde(ideProcessInfo, ideInfoFromFile)).toBe(
+      IDE_DEFINITIONS.vscode,
+    );
+  });
+});

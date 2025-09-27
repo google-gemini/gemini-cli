@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Box, Text } from 'ink';
+import { Box, Text, useIsScreenReaderEnabled } from 'ink';
 import { useMemo } from 'react';
 import { LoadingIndicator } from './LoadingIndicator.js';
 import { ContextSummaryDisplay } from './ContextSummaryDisplay.js';
@@ -12,14 +12,13 @@ import { AutoAcceptIndicator } from './AutoAcceptIndicator.js';
 import { ShellModeIndicator } from './ShellModeIndicator.js';
 import { DetailedMessagesDisplay } from './DetailedMessagesDisplay.js';
 import { InputPrompt, calculatePromptWidths } from './InputPrompt.js';
-import { Footer, type FooterProps } from './Footer.js';
+import { Footer } from './Footer.js';
 import { ShowMoreLines } from './ShowMoreLines.js';
 import { QueuedMessageDisplay } from './QueuedMessageDisplay.js';
 import { OverflowProvider } from '../contexts/OverflowContext.js';
 import { theme } from '../semantic-colors.js';
 import { isNarrowWidth } from '../utils/isNarrowWidth.js';
 import { useUIState } from '../contexts/UIStateContext.js';
-import { useFocusState } from '../contexts/FocusContext.js';
 import { useUIActions } from '../contexts/UIActionsContext.js';
 import { useVimMode } from '../contexts/VimModeContext.js';
 import { useConfig } from '../contexts/ConfigContext.js';
@@ -31,10 +30,10 @@ import { ConfigInitDisplay } from '../components/ConfigInitDisplay.js';
 export const Composer = () => {
   const config = useConfig();
   const settings = useSettings();
+  const isScreenReaderEnabled = useIsScreenReaderEnabled();
   const uiState = useUIState();
-  const isFocused = useFocusState();
   const uiActions = useUIActions();
-  const { vimEnabled, vimMode } = useVimMode();
+  const { vimEnabled } = useVimMode();
   const terminalWidth = process.stdout.columns;
   const isNarrow = isNarrowWidth(terminalWidth);
   const debugConsoleMaxHeight = Math.floor(Math.max(terminalWidth * 0.2, 5));
@@ -47,29 +46,9 @@ export const Composer = () => {
     [uiState.terminalWidth],
   );
 
-  // Build footer props from context values
-  const footerProps: Omit<FooterProps, 'vimMode'> = {
-    model: config.getModel(),
-    targetDir: config.getTargetDir(),
-    debugMode: config.getDebugMode(),
-    branchName: uiState.branchName,
-    debugMessage: uiState.debugMessage,
-    corgiMode: uiState.corgiMode,
-    errorCount: uiState.errorCount,
-    showErrorDetails: uiState.showErrorDetails,
-    showMemoryUsage:
-      config.getDebugMode() || settings.merged.ui?.showMemoryUsage || false,
-    promptTokenCount: uiState.sessionStats.lastPromptTokenCount,
-    nightly: uiState.nightly,
-    isTrustedFolder: uiState.isTrustedFolder,
-    hideCWD: settings.merged.ui?.footer?.hideCWD || false,
-    hideSandboxStatus: settings.merged.ui?.footer?.hideSandboxStatus || false,
-    hideModelInfo: settings.merged.ui?.footer?.hideModelInfo || false,
-  };
-
   return (
     <Box flexDirection="column">
-      {!uiState.shellFocused && (
+      {!uiState.embeddedShellFocused && (
         <LoadingIndicator
           thought={
             uiState.streamingState === StreamingState.WaitingForConfirmation ||
@@ -167,9 +146,9 @@ export const Composer = () => {
           setShellModeActive={uiActions.setShellModeActive}
           approvalMode={showAutoAcceptIndicator}
           onEscapePromptChange={uiActions.onEscapePromptChange}
-          focus={isFocused}
+          focus={true}
           vimHandleInput={uiActions.vimHandleInput}
-          isShellFocused={uiState.shellFocused}
+          isEmbeddedShellFocused={uiState.embeddedShellFocused}
           placeholder={
             vimEnabled
               ? "  Press 'i' for INSERT mode and 'Esc' for NORMAL mode."
@@ -178,9 +157,7 @@ export const Composer = () => {
         />
       )}
 
-      {!settings.merged.ui?.hideFooter && (
-        <Footer {...footerProps} vimMode={vimEnabled ? vimMode : undefined} />
-      )}
+      {!settings.merged.ui?.hideFooter && !isScreenReaderEnabled && <Footer />}
     </Box>
   );
 };
