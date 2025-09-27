@@ -1,13 +1,16 @@
 import React, { useState } from 'react';
-import { 
-  Globe, 
-  Palette, 
-  Bot, 
-  Zap,
+import {
+  Globe,
+  Sun,
+  Moon,
+  Monitor,
+  Brain,
   Settings,
   User,
   Key,
-  CheckCircle
+  CheckCircle,
+  PanelRightClose,
+  PanelRightOpen
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { ModelSelector } from '@/components/chat/ModelSelector';
@@ -15,7 +18,12 @@ import { RoleSelector } from '@/components/chat/RoleSelector';
 // Removed WorkspaceSelector import - now in Sidebar
 import { useAppStore } from '@/stores/appStore';
 
-export const Header: React.FC = () => {
+interface HeaderProps {
+  isRightSidebarOpen: boolean;
+  onToggleRightSidebar: () => void;
+}
+
+export const Header: React.FC<HeaderProps> = ({ isRightSidebarOpen, onToggleRightSidebar }) => {
   const {
     currentProvider,
     currentModel,
@@ -33,13 +41,13 @@ export const Header: React.FC = () => {
   const getProviderIcon = () => {
     switch (currentProvider) {
       case 'gemini':
-        return <Bot size={16} className="text-blue-500" />;
+        return <Brain size={16} className="text-blue-500" />;
       case 'openai':
-        return <Bot size={16} className="text-green-500" />;
+        return <Brain size={16} className="text-green-500" />;
       case 'lm_studio':
-        return <Bot size={16} className="text-purple-500" />;
+        return <Brain size={16} className="text-purple-500" />;
       default:
-        return <Bot size={16} />;
+        return <Brain size={16} />;
     }
   };
 
@@ -47,7 +55,25 @@ export const Header: React.FC = () => {
     const themes = ['light', 'dark', 'system'] as const;
     const currentIndex = themes.indexOf(theme);
     const nextIndex = (currentIndex + 1) % themes.length;
-    setTheme(themes[nextIndex]);
+    const newTheme = themes[nextIndex];
+
+    // Prevent double calls by checking if theme is actually different
+    if (newTheme !== theme) {
+      setTheme(newTheme);
+    }
+  };
+
+  const getThemeIcon = () => {
+    switch (theme) {
+      case 'light':
+        return <Sun size={16} />;
+      case 'dark':
+        return <Moon size={16} />;
+      case 'system':
+        return <Monitor size={16} />;
+      default:
+        return <Sun size={16} />;
+    }
   };
 
   const getAuthStatus = () => {
@@ -75,11 +101,14 @@ export const Header: React.FC = () => {
           <Button
             variant="ghost"
             size="sm"
-            className="gap-2 h-8"
+            className="gap-2 h-8 px-3"
             onClick={() => setShowModelSelector(true)}
           >
             {getProviderIcon()}
-            <span className="text-sm font-medium">{currentModel}</span>
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs text-muted-foreground">Model:</span>
+              <span className="text-sm font-medium">{currentModel}</span>
+            </div>
           </Button>
         </div>
 
@@ -98,11 +127,14 @@ export const Header: React.FC = () => {
           <Button
             variant="ghost"
             size="sm"
-            className="gap-2 h-8"
+            className="gap-2 h-8 px-3"
             onClick={() => setShowRoleSelector(true)}
           >
             <User size={16} />
-            <span className="text-sm">{currentRole.replace('_', ' ')}</span>
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs text-muted-foreground">Role:</span>
+              <span className="text-sm">{currentRole.replace('_', ' ')}</span>
+            </div>
           </Button>
         </div>
 
@@ -146,9 +178,9 @@ export const Header: React.FC = () => {
           size="icon"
           onClick={toggleTheme}
           className="h-8 w-8"
-          title={`Current theme: ${theme}`}
+          title={`Current theme: ${theme} (click to cycle)`}
         >
-          <Palette size={16} />
+          {getThemeIcon()}
         </Button>
 
         <Button
@@ -165,15 +197,17 @@ export const Header: React.FC = () => {
           size="icon"
           className="h-8 w-8"
         >
-          <Zap size={16} />
+          <Settings size={16} />
         </Button>
 
         <Button
           variant="ghost"
           size="icon"
           className="h-8 w-8"
+          onClick={onToggleRightSidebar}
+          title={`${isRightSidebarOpen ? 'Hide' : 'Show'} sidebar`}
         >
-          <Settings size={16} />
+          {isRightSidebarOpen ? <PanelRightClose size={16} /> : <PanelRightOpen size={16} />}
         </Button>
       </div>
     </header>
