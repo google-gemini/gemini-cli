@@ -167,6 +167,11 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
     )
     .command('$0 [promptWords...]', 'Launch Gemini CLI', (yargsInstance) =>
       yargsInstance
+        .positional('promptWords', {
+          describe: 'Prompt words to process',
+          type: 'string',
+          array: true,
+        })
         .option('model', {
           alias: 'm',
           type: 'string',
@@ -248,6 +253,7 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
           alias: 'e',
           type: 'array',
           string: true,
+          nargs: 1,
           description:
             'A list of extensions to use. If not provided, all extensions are used.',
           coerce: (extensions: string[]) =>

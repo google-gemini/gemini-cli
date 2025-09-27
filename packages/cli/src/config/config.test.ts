@@ -2011,6 +2011,16 @@ describe('loadCliConfig interactive', () => {
     expect(config.isInteractive()).toBe(false);
   });
 
+  it('should not be interactive if positional prompt words are provided with extensions flag', async () => {
+    process.stdin.isTTY = true;
+    process.argv = ['node', 'script.js', '-e', 'none', 'hello'];
+    const argv = await parseArguments({} as Settings);
+    const config = await loadCliConfig({}, [], 'test-session', argv);
+    expect(config.isInteractive()).toBe(false);
+    expect(argv.promptWords).toEqual(['hello']);
+    expect(argv.extensions).toEqual(['none']);
+  });
+
   it('should be interactive if no positional prompt words are provided with flags', async () => {
     process.stdin.isTTY = true;
     process.argv = ['node', 'script.js', '--model', 'gemini-1.5-pro'];
