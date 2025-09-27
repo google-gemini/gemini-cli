@@ -46,6 +46,8 @@ import {
 } from './core/initializer.js';
 import { validateAuthMethod } from './config/auth.js';
 import { setMaxSizedBoxDebugging } from './ui/components/shared/MaxSizedBox.js';
+import { runZedIntegration } from './zed-integration/zedIntegration.js';
+import { cleanupExpiredSessions } from './utils/sessionCleanup.js';
 import { validateNonInteractiveAuth } from './validateNonInterActiveAuth.js';
 import { detectAndEnableKittyProtocol } from './ui/utils/kittyProtocolDetector.js';
 import { checkForUpdates } from './ui/utils/updateCheck.js';
@@ -61,6 +63,7 @@ import {
   relaunchAppInChildProcess,
   relaunchOnExitCode,
 } from './utils/relaunch.js';
+import { loadSandboxConfig } from './config/sandboxConfig.js';
 
 export function validateDnsResolutionOrder(
   order: string | undefined,
@@ -109,9 +112,6 @@ function getNodeMemoryArgs(isDebugMode: boolean): string[] {
 
   return [];
 }
-
-import { runZedIntegration } from './zed-integration/zedIntegration.js';
-import { loadSandboxConfig } from './config/sandboxConfig.js';
 
 export function setupUnhandledRejectionHandler() {
   let unhandledRejectionOccurred = false;
@@ -342,6 +342,9 @@ export async function main() {
       sessionId,
       argv,
     );
+
+    // Cleanup sessions after config initialization
+    await cleanupExpiredSessions(config, settings.merged);
 
     if (config.getListExtensions()) {
       console.log('Installed extensions:');
