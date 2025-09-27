@@ -197,16 +197,18 @@ export const RoleSelector: React.FC<RoleSelectorProps> = ({ onClose }) => {
               </div>
             )}
 
-            {/* Add Custom Role */}
-            <div className="pt-2 border-t border-border">
-              <Button
-                variant="ghost"
-                className="w-full justify-start gap-3 h-auto p-3"
-              >
-                <Plus size={16} />
-                <span className="text-sm">Create Custom Role</span>
-              </Button>
-            </div>
+            {/* Add Custom Role - Temporarily hidden */}
+            {false && (
+              <div className="pt-2 border-t border-border">
+                <Button
+                  variant="ghost"
+                  className="w-full justify-start gap-3 h-auto p-3"
+                >
+                  <Plus size={16} />
+                  <span className="text-sm">Create Custom Role</span>
+                </Button>
+              </div>
+            )}
           </>
         )}
       </CardContent>
