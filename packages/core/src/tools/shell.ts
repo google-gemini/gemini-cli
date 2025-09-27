@@ -323,10 +323,18 @@ function getShellToolDescription(): string {
 }
 
 function getCommandDescription(): string {
+  const cmd_substitution_warning =
+    '\n*** WARNING: Command substitution using $(), `` ` ``, <(), or >() is not allowed for security reasons.';
   if (os.platform() === 'win32') {
-    return 'Exact command to execute as `cmd.exe /c <command>`';
+    return (
+      'Exact command to execute as `cmd.exe /c <command>`' +
+      cmd_substitution_warning
+    );
   } else {
-    return 'Exact bash command to execute as `bash -c <command>`';
+    return (
+      'Exact bash command to execute as `bash -c <command>`' +
+      cmd_substitution_warning
+    );
   }
 }
 
