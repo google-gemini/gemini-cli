@@ -743,12 +743,12 @@ export class GeminiClient {
     this.forceFullIdeContext = true;
 
     // Estimate token count 1 token ≈ 4 characters
-    const compressedHistory = chat.getHistory();
-    const totalChars = compressedHistory.reduce(
-      (total, content) => total + JSON.stringify(content).length,
-      0,
+    const newTokenCount = Math.floor(
+      chat
+        .getHistory()
+        .reduce((total, content) => total + JSON.stringify(content).length, 0) /
+        4,
     );
-    const newTokenCount = Math.floor(totalChars / 4);
 
     logChatCompression(
       this.config,
