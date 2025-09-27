@@ -101,7 +101,7 @@ export const ChatArea = forwardRef<ChatAreaHandle, ChatAreaProps>(({ onTemplateR
   const showEmptyState = !activeSession || (activeSession && activeSession.messages.length === 0);
 
   return (
-    <div className="flex-1 flex flex-col h-full min-h-0 overflow-hidden">
+    <div className="flex-1 flex flex-col h-full min-h-0 overflow-hidden relative">
       {/* Error notification */}
       {error && (
         <div className="mx-4 mt-4 p-3 bg-destructive/10 border border-destructive/20 rounded-lg flex items-start gap-3">
@@ -134,16 +134,18 @@ export const ChatArea = forwardRef<ChatAreaHandle, ChatAreaProps>(({ onTemplateR
       {showEmptyState ? (
         <EmptyState onPromptSelect={handlePromptSelect} />
       ) : (
-        <MessageList
-          ref={messageListRef}
-          messages={activeSession!.messages}
-          isStreaming={isStreaming}
-          isThinking={isThinking}
-          streamingContent={streamingMessage}
-          toolConfirmation={toolConfirmation}
-          onToolConfirm={handleToolConfirmation}
-          onTemplateSaved={onTemplateRefresh}
-        />
+        <>
+          <MessageList
+            ref={messageListRef}
+            messages={activeSession!.messages}
+            isStreaming={isStreaming}
+            isThinking={isThinking}
+            streamingContent={streamingMessage}
+            toolConfirmation={toolConfirmation}
+            onToolConfirm={handleToolConfirmation}
+            onTemplateSaved={onTemplateRefresh}
+          />
+        </>
       )}
       
       {/* Tool mode status bar */}
