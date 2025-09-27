@@ -742,23 +742,13 @@ export class GeminiClient {
     ]);
     this.forceFullIdeContext = true;
 
-    const { totalTokens: newTokenCount } =
-      await this.getContentGeneratorOrFail().countTokens({
-        model,
-        contents: chat.getHistory(),
-      });
-    if (newTokenCount === undefined) {
-      console.warn('Could not determine compressed history token count.');
-      this.hasFailedCompressionAttempt = !force && true;
-      return {
-        originalTokenCount,
-        newTokenCount: originalTokenCount,
-        compressionStatus:
-          CompressionStatus.COMPRESSION_FAILED_TOKEN_COUNT_ERROR,
-      };
-    }
-
-    uiTelemetryService.setLastPromptTokenCount(newTokenCount);
+    // Estimate token count 1 token ≈ 4 characters
+    const compressedHistory = chat.getHistory();
+    const totalChars = compressedHistory.reduce(
+      (total, content) => total + JSON.stringify(content).length,
+      0,
+    );
+    const newTokenCount = Math.floor(totalChars / 4);
 
     logChatCompression(
       this.config,
@@ -769,7 +759,6 @@ export class GeminiClient {
     );
 
     if (newTokenCount > originalTokenCount) {
-      this.getChat().setHistory(curatedHistory);
       this.hasFailedCompressionAttempt = !force && true;
       return {
         originalTokenCount,
@@ -779,6 +768,7 @@ export class GeminiClient {
       };
     } else {
       this.chat = chat; // Chat compression successful, set new state.
+      uiTelemetryService.setLastPromptTokenCount(newTokenCount);
     }
 
     return {
