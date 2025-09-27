@@ -146,15 +146,9 @@ export async function checkForExtensionUpdate(
       return;
     }
     if (newExtension.config.version !== installedExtension.config.version) {
-      console.log(
-        `🔍 UPDATE DETECTED: Source version ${newExtension.config.version} != Installed version ${installedExtension.config.version}`,
-      );
       setExtensionUpdateState(ExtensionUpdateState.UPDATE_AVAILABLE);
       return;
     }
-    console.log(
-      `✅ NO UPDATE: Source version ${newExtension.config.version} == Installed version ${installedExtension.config.version}`,
-    );
     setExtensionUpdateState(ExtensionUpdateState.UP_TO_DATE);
     return;
   }
