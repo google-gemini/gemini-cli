@@ -974,6 +974,60 @@ This extension will run the following MCP servers:
       expect(mockRequestConsent).not.toHaveBeenCalled();
     });
 
+    it('should prompt for settings if promptForSettings is true', async () => {
+      const sourceDir = fs.mkdtempSync(
+        path.join(os.tmpdir(), 'gemini-cli-test-source-'),
+      );
+      const sourceExtDir = createExtension({
+        extensionsDir: sourceDir,
+        name: 'my-local-extension',
+        version: '1.0.0',
+        settings: [
+          {
+            name: 'API Key',
+            description: 'Your API key for the service.',
+            envVar: 'MY_API_KEY',
+          },
+        ],
+      });
+
+      await installExtension(
+        { source: sourceExtDir, type: 'local' },
+        async (_) => true,
+        process.cwd(),
+        undefined,
+        true, // Prompt for settings
+      );
+
+      expect(mockQuestion).toHaveBeenCalled();
+      fs.rmSync(sourceDir, { recursive: true, force: true });
+    });
+
+    it('should not prompt for settings if promptForSettings is false', async () => {
+      const sourceExtDir = createExtension({
+        extensionsDir: tempHomeDir,
+        name: 'my-local-extension',
+        version: '1.0.0',
+        settings: [
+          {
+            name: 'API Key',
+            description: 'Your API key for the service.',
+            envVar: 'MY_API_KEY',
+          },
+        ],
+      });
+
+      await installExtension(
+        { source: sourceExtDir, type: 'local' },
+        async (_) => true,
+        process.cwd(),
+        undefined,
+        false, // Do not prompt for settings
+      );
+
+      expect(mockQuestion).not.toHaveBeenCalled();
+    });
+
     it('should throw an error for invalid extension names', async () => {
       const sourceExtDir = createExtension({
         extensionsDir: tempHomeDir,

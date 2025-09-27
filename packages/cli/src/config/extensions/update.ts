@@ -17,8 +17,10 @@ import {
   loadInstallMetadata,
   ExtensionStorage,
   loadExtensionConfig,
+  EXTENSION_SETTINGS_FILENAME,
 } from '../extension.js';
 import { checkForExtensionUpdate } from './github.js';
+import * as path from 'node:path';
 
 export interface ExtensionUpdateInfo {
   name: string;
@@ -58,13 +60,34 @@ export async function updateExtension(
       extensionDir: extension.path,
       workspaceDir: cwd,
     });
+
+    const extensionStorage = new ExtensionStorage(extension.name);
+    const extensionDir = extensionStorage.getExtensionDir();
+    const settingsPath = path.join(extensionDir, EXTENSION_SETTINGS_FILENAME);
+    const tempSettingsPath = path.join(tempDir, EXTENSION_SETTINGS_FILENAME);
+
+    if (fs.existsSync(settingsPath)) {
+      await fs.promises.copyFile(settingsPath, tempSettingsPath);
+    }
+
     await uninstallExtension(extension.name, cwd);
     await installExtension(
       installMetadata,
       requestConsent,
       cwd,
       previousExtensionConfig,
+      false, // Do not prompt for settings
     );
+
+    if (fs.existsSync(tempSettingsPath)) {
+      const updatedExtensionStorage = new ExtensionStorage(extension.name);
+      const updatedExtensionDir = updatedExtensionStorage.getExtensionDir();
+      const updatedSettingsPath = path.join(
+        updatedExtensionDir,
+        EXTENSION_SETTINGS_FILENAME,
+      );
+      await fs.promises.copyFile(tempSettingsPath, updatedSettingsPath);
+    }
 
     const updatedExtensionStorage = new ExtensionStorage(extension.name);
     const updatedExtension = loadExtension({

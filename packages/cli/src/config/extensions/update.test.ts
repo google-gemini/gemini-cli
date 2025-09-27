@@ -211,6 +211,57 @@ describe('update tests', () => {
       );
     });
 
+    it('should preserve the .env file when updating', async () => {
+      const extensionName = 'test-extension-with-env';
+      const extensionDir = createExtension({
+        extensionsDir: userExtensionsDir,
+        name: extensionName,
+        version: '1.0.0',
+        installMetadata: {
+          source: 'https://some.git/repo',
+          type: 'git',
+        },
+      });
+      const envFilePath = path.join(extensionDir, '.env');
+      fs.writeFileSync(envFilePath, 'API_KEY=original_secret');
+
+      mockGit.clone.mockImplementation(async (_, destination) => {
+        fs.mkdirSync(path.join(mockGit.path(), destination), {
+          recursive: true,
+        });
+        fs.writeFileSync(
+          path.join(mockGit.path(), destination, EXTENSIONS_CONFIG_FILENAME),
+          JSON.stringify({ name: extensionName, version: '1.1.0' }),
+        );
+      });
+      mockGit.getRemotes.mockResolvedValue([{ name: 'origin' }]);
+
+      const setExtensionUpdateState = vi.fn();
+      const extension = annotateActiveExtensions(
+        [
+          loadExtension({
+            extensionDir,
+            workspaceDir: tempWorkspaceDir,
+          })!,
+        ],
+        [],
+        process.cwd(),
+      )[0];
+      await updateExtension(
+        extension,
+        tempHomeDir,
+        async (_) => true,
+        ExtensionUpdateState.UPDATE_AVAILABLE,
+        setExtensionUpdateState,
+      );
+
+      const updatedExtensionDir = path.join(userExtensionsDir, extensionName);
+      const updatedEnvPath = path.join(updatedExtensionDir, '.env');
+      expect(fs.existsSync(updatedEnvPath)).toBe(true);
+      const updatedEnvContent = fs.readFileSync(updatedEnvPath, 'utf-8');
+      expect(updatedEnvContent).toBe('API_KEY=original_secret');
+    });
+
     it('should call setExtensionUpdateState with ERROR on failure', async () => {
       const extensionName = 'test-extension';
       const extensionDir = createExtension({
