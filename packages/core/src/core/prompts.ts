@@ -143,9 +143,10 @@ export function getCoreSystemPrompt(userMemory?: string): string {
     basePrompt = fs.readFileSync(systemMdPath, 'utf8');
   } else {
     // Otherwise, use the new default: the project-local persona.md.
-    const personaPath = path.resolve(
+    const personaPath = path.join(
       __dirname,
-      './goal-oriented-prompt/persona.md',
+      'goal-oriented-prompt',
+      'persona.md',
     );
 
     if (!fs.existsSync(personaPath)) {
