@@ -60,13 +60,13 @@ describe('<ContextSummaryDisplay />', () => {
     expect(actualLines).toEqual(expectedLines);
   });
 
-  it('should switch layout at the 80-column breakpoint', () => {
-    // At 80 columns, should be on one line
-    const { lastFrame: wideFrame } = renderWithWidth(80, baseProps);
+  it('should switch layout at the 70-column breakpoint', () => {
+    // At 70 columns, should be on one line
+    const { lastFrame: wideFrame } = renderWithWidth(70, baseProps);
     expect(wideFrame().includes('\n')).toBe(false);
 
-    // At 79 columns, should be on multiple lines
-    const { lastFrame: narrowFrame } = renderWithWidth(79, baseProps);
+    // At 69 columns, should be on multiple lines
+    const { lastFrame: narrowFrame } = renderWithWidth(69, baseProps);
     expect(narrowFrame().includes('\n')).toBe(true);
     expect(narrowFrame().split('\n').length).toBe(4);
   });

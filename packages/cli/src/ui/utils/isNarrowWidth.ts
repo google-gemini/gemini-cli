@@ -5,5 +5,5 @@
  */
 
 export function isNarrowWidth(width: number): boolean {
-  return width < 80;
+  return width < 70;
 }
