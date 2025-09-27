@@ -95,10 +95,20 @@ const extensionToLanguageMap: { [key: string]: string } = {
 };
 
 export function getLanguageFromFilePath(filePath: string): string | undefined {
+  const filename = path.basename(filePath).toLowerCase();
+
+  // Handle dotfiles like .editorconfig
+  if (filename.startsWith('.')) {
+    const lang = extensionToLanguageMap[filename];
+    if (lang) return lang;
+  }
+
   const extension = path.extname(filePath).toLowerCase();
+  // Handle regular extensions
   if (extension) {
     return extensionToLanguageMap[extension];
   }
-  const filename = path.basename(filePath).toLowerCase();
+
+  // Handle files without extensions like Dockerfile
   return extensionToLanguageMap[`.${filename}`];
 }

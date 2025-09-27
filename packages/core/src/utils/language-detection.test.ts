@@ -170,13 +170,12 @@ describe('language-detection', () => {
     });
 
     it('should handle special filename patterns', () => {
-      // These files don't have extensions, so they return undefined
-      expect(getLanguageFromFilePath('.editorconfig')).toBeUndefined();
-      expect(getLanguageFromFilePath('.prettierrc')).toBeUndefined();
-      expect(getLanguageFromFilePath('.eslintrc')).toBeUndefined();
-      expect(getLanguageFromFilePath('.babelrc')).toBeUndefined();
-      expect(getLanguageFromFilePath('.tsconfig')).toBeUndefined();
-      expect(getLanguageFromFilePath('.flow')).toBeUndefined();
+      expect(getLanguageFromFilePath('.editorconfig')).toBe('EditorConfig');
+      expect(getLanguageFromFilePath('.prettierrc')).toBe('Prettier');
+      expect(getLanguageFromFilePath('.eslintrc')).toBe('ESLint');
+      expect(getLanguageFromFilePath('.babelrc')).toBe('Babel');
+      expect(getLanguageFromFilePath('.tsconfig')).toBe('TypeScript');
+      expect(getLanguageFromFilePath('.flow')).toBe('Flow');
     });
   });
 });
