@@ -189,7 +189,9 @@ export const setupGithubCommand: SlashCommand = {
 
     // Print out a message
     const commands = [];
-    commands.push('set -eEuo pipefail');
+    if (process.platform !== 'win32') {
+      commands.push('set -eEuo pipefail');
+    }
     commands.push(
       `echo "Successfully downloaded ${GITHUB_WORKFLOW_PATHS.length} workflows and updated .gitignore. Follow the steps in ${readmeUrl} (skipping the /setup-github step) to complete setup."`,
     );
