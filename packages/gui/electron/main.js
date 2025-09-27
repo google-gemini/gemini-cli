@@ -929,3 +929,32 @@ ipcMain.handle('set-approval-mode', async (_, mode) => {
     throw error
   }
 })
+
+// Direct Excel tool call handler
+ipcMain.handle('multimodel-call-excel-tool', async (_, operation, params) => {
+  try {
+    const system = await ensureInitialized()
+    const { ExcelTool } = require('@google/gemini-cli-core')
+    const excelTool = new ExcelTool(system.getConfig())
+
+    switch (operation) {
+      case 'listApps':
+        return await excelTool.listApps()
+      case 'listWorkbooks':
+        return await excelTool.listWorkbooks()
+      case 'listWorksheets':
+        return await excelTool.listWorksheets(params?.workbookName)
+      default:
+        return {
+          success: false,
+          error: `Unknown Excel operation: ${operation}`
+        }
+    }
+  } catch (error) {
+    console.error('Failed to call Excel tool:', error)
+    return {
+      success: false,
+      error: error.message
+    }
+  }
+})

@@ -1,3 +1,9 @@
+/**
+ * @license
+ * Copyright 2025 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 const { contextBridge, ipcRenderer } = require('electron')
 
 // Define the API interface that will be exposed to the renderer process
@@ -115,6 +121,8 @@ const electronAPI = {
     setOAuthPreference: (providerType) => ipcRenderer.invoke('set-oauth-preference', providerType),
     getApprovalMode: () => ipcRenderer.invoke('get-approval-mode'),
     setApprovalMode: (mode) => ipcRenderer.invoke('set-approval-mode', mode),
+    // Direct Excel tool calls
+    callExcelTool: (operation, params) => ipcRenderer.invoke('multimodel-call-excel-tool', operation, params),
     // Tool confirmation
     onToolConfirmationRequest: (callback) => {
       ipcRenderer.on('tool-confirmation-request', callback);
