@@ -6,7 +6,7 @@
 
 import { expect, test } from 'vitest';
 import { TestRig } from './test-helper.js';
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 const extension = `{
