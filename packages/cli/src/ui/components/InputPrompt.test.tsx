@@ -1979,7 +1979,7 @@ describe('InputPrompt', () => {
       expect(clean(stdout.lastFrame())).toContain('→');
 
       stdin.write('\u001B[C');
-      await wait();
+      await wait(200);
       expect(clean(stdout.lastFrame())).toContain('←');
       expect(stdout.lastFrame()).toMatchSnapshot(
         'command-search-expanded-match',
