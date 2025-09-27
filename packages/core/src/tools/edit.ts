@@ -32,7 +32,8 @@ import type {
   ModifiableDeclarativeTool,
   ModifyContext,
 } from './modifiable-tool.js';
-import { IdeClient, IDEConnectionStatus } from '../ide/ide-client.js';
+import { IdeClient } from '../ide/ide-client.js';
+import { safeLiteralReplace } from '../utils/textUtils.js';
 
 export function applyReplacement(
   currentContent: string | null,
@@ -51,7 +52,9 @@ export function applyReplacement(
   if (oldString === '' && !isNewFile) {
     return currentContent;
   }
-  return currentContent.replaceAll(oldString, newString);
+
+  // Use intelligent replacement that handles $ sequences safely
+  return safeLiteralReplace(currentContent, oldString, newString);
 }
 
 /**
@@ -161,6 +164,7 @@ class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
         currentContent,
         params,
         this.config.getGeminiClient(),
+        this.config.getBaseLlmClient(),
         abortSignal,
       );
       finalOldString = correctedEdit.params.old_string;
@@ -247,6 +251,9 @@ class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
     try {
       editData = await this.calculateEdit(this.params, abortSignal);
     } catch (error) {
+      if (abortSignal.aborted) {
+        throw error;
+      }
       const errorMsg = error instanceof Error ? error.message : String(error);
       console.log(`Error preparing edit: ${errorMsg}`);
       return false;
@@ -268,8 +275,7 @@ class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
     );
     const ideClient = await IdeClient.getInstance();
     const ideConfirmation =
-      this.config.getIdeMode() &&
-      ideClient?.getConnectionStatus().status === IDEConnectionStatus.Connected
+      this.config.getIdeMode() && ideClient.isDiffingEnabled()
         ? ideClient.openDiff(this.params.file_path, editData.newContent)
         : undefined;
 
@@ -333,6 +339,9 @@ class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
     try {
       editData = await this.calculateEdit(this.params, signal);
     } catch (error) {
+      if (signal.aborted) {
+        throw error;
+      }
       const errorMsg = error instanceof Error ? error.message : String(error);
       return {
         llmContent: `Error preparing edit: ${errorMsg}`,

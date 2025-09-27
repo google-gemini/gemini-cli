@@ -80,7 +80,7 @@ export interface CustomTheme {
 export const lightTheme: ColorsTheme = {
   type: 'light',
   Background: '#FAFAFA',
-  Foreground: '#3C3C43',
+  Foreground: '',
   LightBlue: '#89BDCD',
   AccentBlue: '#3B82F6',
   AccentPurple: '#8B5CF6',
@@ -98,7 +98,7 @@ export const lightTheme: ColorsTheme = {
 export const darkTheme: ColorsTheme = {
   type: 'dark',
   Background: '#1E1E2E',
-  Foreground: '#CDD6F4',
+  Foreground: '',
   LightBlue: '#ADD8E6',
   AccentBlue: '#89B4FA',
   AccentPurple: '#CBA6F7',
@@ -174,8 +174,8 @@ export class Theme {
         focused: this.colors.AccentBlue,
       },
       ui: {
-        comment: this.colors.Comment,
-        symbol: this.colors.Gray,
+        comment: this.colors.Gray,
+        symbol: this.colors.AccentCyan,
         gradient: this.colors.GradientColors,
       },
       status: {
@@ -410,31 +410,31 @@ export function createCustomTheme(customTheme: CustomTheme): Theme {
 
   const semanticColors: SemanticColors = {
     text: {
-      primary: colors.Foreground,
-      secondary: colors.Gray,
-      link: colors.AccentBlue,
-      accent: colors.AccentPurple,
+      primary: customTheme.text?.primary ?? colors.Foreground,
+      secondary: customTheme.text?.secondary ?? colors.Gray,
+      link: customTheme.text?.link ?? colors.AccentBlue,
+      accent: customTheme.text?.accent ?? colors.AccentPurple,
     },
     background: {
-      primary: colors.Background,
+      primary: customTheme.background?.primary ?? colors.Background,
       diff: {
-        added: colors.DiffAdded,
-        removed: colors.DiffRemoved,
+        added: customTheme.background?.diff?.added ?? colors.DiffAdded,
+        removed: customTheme.background?.diff?.removed ?? colors.DiffRemoved,
       },
     },
     border: {
-      default: colors.Gray,
-      focused: colors.AccentBlue,
+      default: customTheme.border?.default ?? colors.Gray,
+      focused: customTheme.border?.focused ?? colors.AccentBlue,
     },
     ui: {
-      comment: colors.Comment,
-      symbol: colors.Gray,
-      gradient: colors.GradientColors,
+      comment: customTheme.ui?.comment ?? colors.Comment,
+      symbol: customTheme.ui?.symbol ?? colors.Gray,
+      gradient: customTheme.ui?.gradient ?? colors.GradientColors,
     },
     status: {
-      error: colors.AccentRed,
-      success: colors.AccentGreen,
-      warning: colors.AccentYellow,
+      error: customTheme.status?.error ?? colors.AccentRed,
+      success: customTheme.status?.success ?? colors.AccentGreen,
+      warning: customTheme.status?.warning ?? colors.AccentYellow,
     },
   };
 

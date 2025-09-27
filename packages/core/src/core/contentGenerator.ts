@@ -14,7 +14,6 @@ import type {
 } from '@google/genai';
 import { GoogleGenAI } from '@google/genai';
 import { createCodeAssistContentGenerator } from '../code_assist/codeAssist.js';
-import { DEFAULT_GEMINI_MODEL } from '../config/models.js';
 import type { Config } from '../config/config.js';
 
 import type { UserTierId } from '../code_assist/types.js';
@@ -50,7 +49,6 @@ export enum AuthType {
 }
 
 export type ContentGeneratorConfig = {
-  model: string;
   apiKey?: string;
   vertexai?: boolean;
   authType?: AuthType;
@@ -66,11 +64,7 @@ export function createContentGeneratorConfig(
   const googleCloudProject = process.env['GOOGLE_CLOUD_PROJECT'] || undefined;
   const googleCloudLocation = process.env['GOOGLE_CLOUD_LOCATION'] || undefined;
 
-  // Use runtime model from config if available; otherwise, fall back to parameter or default
-  const effectiveModel = config.getModel() || DEFAULT_GEMINI_MODEL;
-
   const contentGeneratorConfig: ContentGeneratorConfig = {
-    model: effectiveModel,
     authType,
     proxy: config?.getProxy(),
   };

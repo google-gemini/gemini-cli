@@ -24,6 +24,13 @@ import type {
   InvalidChunkEvent,
   ContentRetryEvent,
   ContentRetryFailureEvent,
+  ExtensionInstallEvent,
+  ToolOutputTruncatedEvent,
+  ExtensionUninstallEvent,
+  ModelRoutingEvent,
+  ExtensionEnableEvent,
+  ModelSlashCommandEvent,
+  ExtensionDisableEvent,
 } from '../types.js';
 import { EventMetadataKey } from './event-metadata-key.js';
 import type { Config } from '../../config/config.js';
@@ -32,7 +39,7 @@ import { UserAccountManager } from '../../utils/userAccountManager.js';
 import { safeJsonStringify } from '../../utils/safeJsonStringify.js';
 import { FixedDeque } from 'mnemonist';
 import { GIT_COMMIT_INFO, CLI_VERSION } from '../../generated/git-commit.js';
-import { DetectedIde, detectIdeFromEnv } from '../../ide/detect-ide.js';
+import { IDE_DEFINITIONS, detectIdeFromEnv } from '../../ide/detect-ide.js';
 
 export enum EventNames {
   START_SESSION = 'start_session',
@@ -44,7 +51,9 @@ export enum EventNames {
   API_ERROR = 'api_error',
   END_SESSION = 'end_session',
   FLASH_FALLBACK = 'flash_fallback',
+  RIPGREP_FALLBACK = 'ripgrep_fallback',
   LOOP_DETECTED = 'loop_detected',
+  LOOP_DETECTION_DISABLED = 'loop_detection_disabled',
   NEXT_SPEAKER_CHECK = 'next_speaker_check',
   SLASH_COMMAND = 'slash_command',
   MALFORMED_JSON_RESPONSE = 'malformed_json_response',
@@ -55,6 +64,13 @@ export enum EventNames {
   INVALID_CHUNK = 'invalid_chunk',
   CONTENT_RETRY = 'content_retry',
   CONTENT_RETRY_FAILURE = 'content_retry_failure',
+  EXTENSION_ENABLE = 'extension_enable',
+  EXTENSION_DISABLE = 'extension_disable',
+  EXTENSION_INSTALL = 'extension_install',
+  EXTENSION_UNINSTALL = 'extension_uninstall',
+  TOOL_OUTPUT_TRUNCATED = 'tool_output_truncated',
+  MODEL_ROUTING = 'model_routing',
+  MODEL_SLASH_COMMAND = 'model_slash_command',
 }
 
 export interface LogResponse {
@@ -101,7 +117,7 @@ function determineSurface(): string {
   } else if (process.env['GITHUB_SHA']) {
     return 'GitHub';
   } else if (process.env['TERM_PROGRAM'] === 'vscode') {
-    return detectIdeFromEnv() || DetectedIde.VSCode;
+    return detectIdeFromEnv().name || IDE_DEFINITIONS.vscode.name;
   } else {
     return 'SURFACE_NOT_SET';
   }
@@ -461,14 +477,26 @@ export class ClearcutLogger {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_TOOL_TYPE,
         value: JSON.stringify(event.tool_type),
       },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_TOOL_CALL_CONTENT_LENGTH,
+        value: JSON.stringify(event.content_length),
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_TOOL_CALL_MCP_SERVER_NAME,
+        value: JSON.stringify(event.mcp_server_name),
+      },
     ];
 
     if (event.metadata) {
       const metadataMapping: { [key: string]: EventMetadataKey } = {
         model_added_lines: EventMetadataKey.GEMINI_CLI_AI_ADDED_LINES,
         model_removed_lines: EventMetadataKey.GEMINI_CLI_AI_REMOVED_LINES,
+        model_added_chars: EventMetadataKey.GEMINI_CLI_AI_ADDED_CHARS,
+        model_removed_chars: EventMetadataKey.GEMINI_CLI_AI_REMOVED_CHARS,
         user_added_lines: EventMetadataKey.GEMINI_CLI_USER_ADDED_LINES,
         user_removed_lines: EventMetadataKey.GEMINI_CLI_USER_REMOVED_LINES,
+        user_added_chars: EventMetadataKey.GEMINI_CLI_USER_ADDED_CHARS,
+        user_removed_chars: EventMetadataKey.GEMINI_CLI_USER_REMOVED_CHARS,
       };
 
       for (const [key, gemini_cli_key] of Object.entries(metadataMapping)) {
@@ -549,10 +577,6 @@ export class ClearcutLogger {
         value: JSON.stringify(event.duration_ms),
       },
       {
-        gemini_cli_key: EventMetadataKey.GEMINI_CLI_API_ERROR_MESSAGE,
-        value: JSON.stringify(event.error),
-      },
-      {
         gemini_cli_key:
           EventMetadataKey.GEMINI_CLI_API_RESPONSE_INPUT_TOKEN_COUNT,
         value: JSON.stringify(event.input_token_count),
@@ -631,6 +655,13 @@ export class ClearcutLogger {
     });
   }
 
+  logRipgrepFallbackEvent(): void {
+    this.enqueueLogEvent(this.createLogEvent(EventNames.RIPGREP_FALLBACK, []));
+    this.flushToClearcut().catch((error) => {
+      console.debug('Error flushing to Clearcut:', error);
+    });
+  }
+
   logLoopDetectedEvent(event: LoopDetectedEvent): void {
     const data: EventValue[] = [
       {
@@ -640,6 +671,15 @@ export class ClearcutLogger {
     ];
 
     this.enqueueLogEvent(this.createLogEvent(EventNames.LOOP_DETECTED, data));
+    this.flushIfNeeded();
+  }
+
+  logLoopDetectionDisabledEvent(): void {
+    const data: EventValue[] = [];
+
+    this.enqueueLogEvent(
+      this.createLogEvent(EventNames.LOOP_DETECTION_DISABLED, data),
+    );
     this.flushIfNeeded();
   }
 
@@ -791,6 +831,10 @@ export class ClearcutLogger {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_CONTENT_RETRY_DELAY_MS,
         value: String(event.retry_delay_ms),
       },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_API_REQUEST_MODEL,
+        value: event.model,
+      },
     ];
 
     this.enqueueLogEvent(this.createLogEvent(EventNames.CONTENT_RETRY, data));
@@ -809,6 +853,10 @@ export class ClearcutLogger {
           EventMetadataKey.GEMINI_CLI_CONTENT_RETRY_FAILURE_FINAL_ERROR_TYPE,
         value: event.final_error_type,
       },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_API_REQUEST_MODEL,
+        value: event.model,
+      },
     ];
 
     if (event.total_duration_ms) {
@@ -821,6 +869,166 @@ export class ClearcutLogger {
 
     this.enqueueLogEvent(
       this.createLogEvent(EventNames.CONTENT_RETRY_FAILURE, data),
+    );
+    this.flushIfNeeded();
+  }
+
+  logExtensionInstallEvent(event: ExtensionInstallEvent): void {
+    const data: EventValue[] = [
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_EXTENSION_NAME,
+        value: event.extension_name,
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_EXTENSION_VERSION,
+        value: event.extension_version,
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_EXTENSION_SOURCE,
+        value: event.extension_source,
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_EXTENSION_INSTALL_STATUS,
+        value: event.status,
+      },
+    ];
+
+    this.enqueueLogEvent(
+      this.createLogEvent(EventNames.EXTENSION_INSTALL, data),
+    );
+    this.flushIfNeeded();
+  }
+
+  logExtensionUninstallEvent(event: ExtensionUninstallEvent): void {
+    const data: EventValue[] = [
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_EXTENSION_NAME,
+        value: event.extension_name,
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_EXTENSION_UNINSTALL_STATUS,
+        value: event.status,
+      },
+    ];
+
+    this.enqueueLogEvent(
+      this.createLogEvent(EventNames.EXTENSION_UNINSTALL, data),
+    );
+    this.flushIfNeeded();
+  }
+
+  logToolOutputTruncatedEvent(event: ToolOutputTruncatedEvent): void {
+    const data: EventValue[] = [
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_TOOL_CALL_NAME,
+        value: JSON.stringify(event.tool_name),
+      },
+      {
+        gemini_cli_key:
+          EventMetadataKey.GEMINI_CLI_TOOL_OUTPUT_TRUNCATED_ORIGINAL_LENGTH,
+        value: JSON.stringify(event.original_content_length),
+      },
+      {
+        gemini_cli_key:
+          EventMetadataKey.GEMINI_CLI_TOOL_OUTPUT_TRUNCATED_TRUNCATED_LENGTH,
+        value: JSON.stringify(event.truncated_content_length),
+      },
+      {
+        gemini_cli_key:
+          EventMetadataKey.GEMINI_CLI_TOOL_OUTPUT_TRUNCATED_THRESHOLD,
+        value: JSON.stringify(event.threshold),
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_TOOL_OUTPUT_TRUNCATED_LINES,
+        value: JSON.stringify(event.lines),
+      },
+    ];
+
+    this.enqueueLogEvent(
+      this.createLogEvent(EventNames.TOOL_OUTPUT_TRUNCATED, data),
+    );
+    this.flushIfNeeded();
+  }
+
+  logModelRoutingEvent(event: ModelRoutingEvent): void {
+    const data: EventValue[] = [
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_ROUTING_DECISION,
+        value: event.decision_model,
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_ROUTING_DECISION_SOURCE,
+        value: event.decision_source,
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_ROUTING_LATENCY_MS,
+        value: event.routing_latency_ms.toString(),
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_ROUTING_FAILURE,
+        value: event.failed.toString(),
+      },
+    ];
+
+    if (event.error_message) {
+      data.push({
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_ROUTING_FAILURE_REASON,
+        value: event.error_message,
+      });
+    }
+
+    this.enqueueLogEvent(this.createLogEvent(EventNames.MODEL_ROUTING, data));
+    this.flushIfNeeded();
+  }
+
+  logExtensionEnableEvent(event: ExtensionEnableEvent): void {
+    const data: EventValue[] = [
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_EXTENSION_NAME,
+        value: event.extension_name,
+      },
+      {
+        gemini_cli_key:
+          EventMetadataKey.GEMINI_CLI_EXTENSION_ENABLE_SETTING_SCOPE,
+        value: event.setting_scope,
+      },
+    ];
+
+    this.enqueueLogEvent(
+      this.createLogEvent(EventNames.EXTENSION_ENABLE, data),
+    );
+    this.flushIfNeeded();
+  }
+
+  logModelSlashCommandEvent(event: ModelSlashCommandEvent): void {
+    const data: EventValue[] = [
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_MODEL_SLASH_COMMAND,
+        value: event.model_name,
+      },
+    ];
+
+    this.enqueueLogEvent(
+      this.createLogEvent(EventNames.MODEL_SLASH_COMMAND, data),
+    );
+    this.flushIfNeeded();
+  }
+
+  logExtensionDisableEvent(event: ExtensionDisableEvent): void {
+    const data: EventValue[] = [
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_EXTENSION_NAME,
+        value: event.extension_name,
+      },
+      {
+        gemini_cli_key:
+          EventMetadataKey.GEMINI_CLI_EXTENSION_DISABLE_SETTING_SCOPE,
+        value: event.setting_scope,
+      },
+    ];
+
+    this.enqueueLogEvent(
+      this.createLogEvent(EventNames.EXTENSION_DISABLE, data),
     );
     this.flushIfNeeded();
   }
@@ -874,7 +1082,10 @@ export class ClearcutLogger {
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_USER_SETTINGS,
         value: safeJsonStringify([
-          { smart_edit_enabled: this.config?.getUseSmartEdit() ?? false },
+          {
+            smart_edit_enabled: this.config?.getUseSmartEdit() ?? false,
+            model_router_enabled: this.config?.getUseModelRouter() ?? false,
+          },
         ]),
       },
     ];

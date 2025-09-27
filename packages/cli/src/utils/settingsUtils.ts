@@ -12,18 +12,19 @@ import type {
 import type {
   SettingDefinition,
   SettingsSchema,
+  SettingsType,
+  SettingsValue,
 } from '../config/settingsSchema.js';
-import { SETTINGS_SCHEMA } from '../config/settingsSchema.js';
+import { getSettingsSchema } from '../config/settingsSchema.js';
 
 // The schema is now nested, but many parts of the UI and logic work better
 // with a flattened structure and dot-notation keys. This section flattens the
 // schema into a map for easier lookups.
 
-function flattenSchema(
-  schema: SettingsSchema,
-  prefix = '',
-): Record<string, SettingDefinition & { key: string }> {
-  let result: Record<string, SettingDefinition & { key: string }> = {};
+type FlattenedSchema = Record<string, SettingDefinition & { key: string }>;
+
+function flattenSchema(schema: SettingsSchema, prefix = ''): FlattenedSchema {
+  let result: FlattenedSchema = {};
   for (const key in schema) {
     const newKey = prefix ? `${prefix}.${key}` : key;
     const definition = schema[key];
@@ -35,7 +36,19 @@ function flattenSchema(
   return result;
 }
 
-const FLATTENED_SCHEMA = flattenSchema(SETTINGS_SCHEMA);
+let _FLATTENED_SCHEMA: FlattenedSchema | undefined;
+
+/** Returns a flattened schema, the first call is memoized for future requests. */
+export function getFlattenedSchema() {
+  return (
+    _FLATTENED_SCHEMA ??
+    (_FLATTENED_SCHEMA = flattenSchema(getSettingsSchema()))
+  );
+}
+
+function clearFlattenedSchema() {
+  _FLATTENED_SCHEMA = undefined;
+}
 
 /**
  * Get all settings grouped by category
@@ -49,7 +62,7 @@ export function getSettingsByCategory(): Record<
     Array<SettingDefinition & { key: string }>
   > = {};
 
-  Object.values(FLATTENED_SCHEMA).forEach((definition) => {
+  Object.values(getFlattenedSchema()).forEach((definition) => {
     const category = definition.category;
     if (!categories[category]) {
       categories[category] = [];
@@ -66,28 +79,28 @@ export function getSettingsByCategory(): Record<
 export function getSettingDefinition(
   key: string,
 ): (SettingDefinition & { key: string }) | undefined {
-  return FLATTENED_SCHEMA[key];
+  return getFlattenedSchema()[key];
 }
 
 /**
  * Check if a setting requires restart
  */
 export function requiresRestart(key: string): boolean {
-  return FLATTENED_SCHEMA[key]?.requiresRestart ?? false;
+  return getFlattenedSchema()[key]?.requiresRestart ?? false;
 }
 
 /**
  * Get the default value for a setting
  */
-export function getDefaultValue(key: string): SettingDefinition['default'] {
-  return FLATTENED_SCHEMA[key]?.default;
+export function getDefaultValue(key: string): SettingsValue {
+  return getFlattenedSchema()[key]?.default;
 }
 
 /**
  * Get all setting keys that require restart
  */
 export function getRestartRequiredSettings(): string[] {
-  return Object.values(FLATTENED_SCHEMA)
+  return Object.values(getFlattenedSchema())
     .filter((definition) => definition.requiresRestart)
     .map((definition) => definition.key);
 }
@@ -121,7 +134,7 @@ export function getEffectiveValue(
   key: string,
   settings: Settings,
   mergedSettings: Settings,
-): SettingDefinition['default'] {
+): SettingsValue {
   const definition = getSettingDefinition(key);
   if (!definition) {
     return undefined;
@@ -132,13 +145,13 @@ export function getEffectiveValue(
   // Check the current scope's settings first
   let value = getNestedValue(settings as Record<string, unknown>, path);
   if (value !== undefined) {
-    return value as SettingDefinition['default'];
+    return value as SettingsValue;
   }
 
   // Check the merged settings for an inherited value
   value = getNestedValue(mergedSettings as Record<string, unknown>, path);
   if (value !== undefined) {
-    return value as SettingDefinition['default'];
+    return value as SettingsValue;
   }
 
   // Return default value if no value is set anywhere
@@ -149,16 +162,16 @@ export function getEffectiveValue(
  * Get all setting keys from the schema
  */
 export function getAllSettingKeys(): string[] {
-  return Object.keys(FLATTENED_SCHEMA);
+  return Object.keys(getFlattenedSchema());
 }
 
 /**
  * Get settings by type
  */
 export function getSettingsByType(
-  type: SettingDefinition['type'],
+  type: SettingsType,
 ): Array<SettingDefinition & { key: string }> {
-  return Object.values(FLATTENED_SCHEMA).filter(
+  return Object.values(getFlattenedSchema()).filter(
     (definition) => definition.type === type,
   );
 }
@@ -171,7 +184,7 @@ export function getSettingsRequiringRestart(): Array<
     key: string;
   }
 > {
-  return Object.values(FLATTENED_SCHEMA).filter(
+  return Object.values(getFlattenedSchema()).filter(
     (definition) => definition.requiresRestart,
   );
 }
@@ -180,21 +193,21 @@ export function getSettingsRequiringRestart(): Array<
  * Validate if a setting key exists in the schema
  */
 export function isValidSettingKey(key: string): boolean {
-  return key in FLATTENED_SCHEMA;
+  return key in getFlattenedSchema();
 }
 
 /**
  * Get the category for a setting
  */
 export function getSettingCategory(key: string): string | undefined {
-  return FLATTENED_SCHEMA[key]?.category;
+  return getFlattenedSchema()[key]?.category;
 }
 
 /**
  * Check if a setting should be shown in the settings dialog
  */
 export function shouldShowInDialog(key: string): boolean {
-  return FLATTENED_SCHEMA[key]?.showInDialog ?? true; // Default to true for backward compatibility
+  return getFlattenedSchema()[key]?.showInDialog ?? true; // Default to true for backward compatibility
 }
 
 /**
@@ -209,7 +222,7 @@ export function getDialogSettingsByCategory(): Record<
     Array<SettingDefinition & { key: string }>
   > = {};
 
-  Object.values(FLATTENED_SCHEMA)
+  Object.values(getFlattenedSchema())
     .filter((definition) => definition.showInDialog !== false)
     .forEach((definition) => {
       const category = definition.category;
@@ -226,9 +239,9 @@ export function getDialogSettingsByCategory(): Record<
  * Get settings by type that should be shown in the dialog
  */
 export function getDialogSettingsByType(
-  type: SettingDefinition['type'],
+  type: SettingsType,
 ): Array<SettingDefinition & { key: string }> {
-  return Object.values(FLATTENED_SCHEMA).filter(
+  return Object.values(getFlattenedSchema()).filter(
     (definition) =>
       definition.type === type && definition.showInDialog !== false,
   );
@@ -238,7 +251,7 @@ export function getDialogSettingsByType(
  * Get all setting keys that should be shown in the dialog
  */
 export function getDialogSettingKeys(): string[] {
-  return Object.values(FLATTENED_SCHEMA)
+  return Object.values(getFlattenedSchema())
     .filter((definition) => definition.showInDialog !== false)
     .map((definition) => definition.key);
 }
@@ -344,7 +357,7 @@ export function setPendingSettingValue(
  */
 export function setPendingSettingValueAny(
   key: string,
-  value: unknown,
+  value: SettingsValue,
   pendingSettings: Settings,
 ): Settings {
   const path = key.split('.');
@@ -415,25 +428,30 @@ export function getDisplayValue(
   pendingSettings?: Settings,
 ): string {
   // Prioritize pending changes if user has modified this setting
-  let value: boolean;
+  const definition = getSettingDefinition(key);
+
+  let value: SettingsValue;
   if (pendingSettings && settingExistsInScope(key, pendingSettings)) {
     // Show the value from the pending (unsaved) edits when it exists
-    value = getSettingValue(key, pendingSettings, {});
+    value = getEffectiveValue(key, pendingSettings, {});
   } else if (settingExistsInScope(key, settings)) {
     // Show the value defined at the current scope if present
-    value = getSettingValue(key, settings, {});
+    value = getEffectiveValue(key, settings, {});
   } else {
     // Fall back to the schema default when the key is unset in this scope
-    const defaultValue = getDefaultValue(key);
-    value = typeof defaultValue === 'boolean' ? defaultValue : false;
+    value = getDefaultValue(key);
   }
 
-  const valueString = String(value);
+  let valueString = String(value);
+
+  if (definition?.type === 'enum' && definition.options) {
+    const option = definition.options?.find((option) => option.value === value);
+    valueString = option?.label ?? `${value}`;
+  }
 
   // Check if value is different from default OR if it's in modified settings OR if there are pending changes
   const defaultValue = getDefaultValue(key);
-  const isChangedFromDefault =
-    typeof defaultValue === 'boolean' ? value !== defaultValue : value === true;
+  const isChangedFromDefault = value !== defaultValue;
   const isInModifiedSettings = modifiedSettings.has(key);
 
   // Mark as modified if setting exists in current scope OR is in modified settings
@@ -476,3 +494,5 @@ export function getEffectiveDisplayValue(
 ): boolean {
   return getSettingValue(key, settings, mergedSettings);
 }
+
+export const TEST_ONLY = { clearFlattenedSchema };

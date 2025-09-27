@@ -15,6 +15,7 @@ import {
 } from 'vitest';
 
 import * as actualNodeFs from 'node:fs'; // For setup/teardown
+import fs from 'node:fs';
 import fsPromises from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
@@ -28,6 +29,7 @@ import {
   processSingleFileContent,
   detectBOM,
   readFileWithEncoding,
+  fileExists,
 } from './fileUtils.js';
 import { StandardFileSystemService } from '../services/fileSystemService.js';
 
@@ -130,6 +132,25 @@ describe('fileUtils', () => {
       const pathToCheckSuper = path.resolve('/project/root');
       const rootSuper = path.resolve('/project/root/sub');
       expect(isWithinRoot(pathToCheckSuper, rootSuper)).toBe(false);
+    });
+  });
+
+  describe('fileExists', () => {
+    it('should return true if the file exists', async () => {
+      const testFile = path.join(tempRootDir, 'exists.txt');
+      actualNodeFs.writeFileSync(testFile, 'content');
+      await expect(fileExists(testFile)).resolves.toBe(true);
+    });
+
+    it('should return false if the file does not exist', async () => {
+      const testFile = path.join(tempRootDir, 'does-not-exist.txt');
+      await expect(fileExists(testFile)).resolves.toBe(false);
+    });
+
+    it('should return true for a directory that exists', async () => {
+      const testDir = path.join(tempRootDir, 'exists-dir');
+      actualNodeFs.mkdirSync(testDir);
+      await expect(fileExists(testDir)).resolves.toBe(true);
     });
   });
 
@@ -934,22 +955,30 @@ describe('fileUtils', () => {
     });
 
     it('should return an error if the file size exceeds 20MB', async () => {
-      // Create a file just over 20MB
-      const twentyOneMB = 21 * 1024 * 1024;
-      const buffer = Buffer.alloc(twentyOneMB, 0x61); // Fill with 'a'
-      actualNodeFs.writeFileSync(testTextFilePath, buffer);
+      // Create a small test file
+      actualNodeFs.writeFileSync(testTextFilePath, 'test content');
 
-      const result = await processSingleFileContent(
-        testTextFilePath,
-        tempRootDir,
-        new StandardFileSystemService(),
-      );
+      // Spy on fs.promises.stat to return a large file size
+      const statSpy = vi.spyOn(fs.promises, 'stat').mockResolvedValueOnce({
+        size: 21 * 1024 * 1024,
+        isDirectory: () => false,
+      } as fs.Stats);
 
-      expect(result.error).toContain('File size exceeds the 20MB limit');
-      expect(result.returnDisplay).toContain(
-        'File size exceeds the 20MB limit',
-      );
-      expect(result.llmContent).toContain('File size exceeds the 20MB limit');
+      try {
+        const result = await processSingleFileContent(
+          testTextFilePath,
+          tempRootDir,
+          new StandardFileSystemService(),
+        );
+
+        expect(result.error).toContain('File size exceeds the 20MB limit');
+        expect(result.returnDisplay).toContain(
+          'File size exceeds the 20MB limit',
+        );
+        expect(result.llmContent).toContain('File size exceeds the 20MB limit');
+      } finally {
+        statSpy.mockRestore();
+      }
     });
   });
 });

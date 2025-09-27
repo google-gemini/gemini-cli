@@ -1,0 +1,57 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`InputPrompt > command search (Ctrl+R when not in shell) > expands and collapses long suggestion via Right/Left arrows > command-search-collapsed-match 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ (r:)    Type your message or @path/to/file                                                       │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+ lllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllll →
+ lllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllll
+ ..."
+`;
+
+exports[`InputPrompt > command search (Ctrl+R when not in shell) > expands and collapses long suggestion via Right/Left arrows > command-search-expanded-match 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ (r:)    Type your message or @path/to/file                                                       │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+ lllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllll ←
+ lllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllll
+ llllllllllllllllllllllllllllllllllllllllllllllllll"
+`;
+
+exports[`InputPrompt > command search (Ctrl+R when not in shell) > renders match window and expanded view (snapshots) > command-search-collapsed-match 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ (r:)  commit                                                                                     │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+ git commit -m "feat: add search" in src/app"
+`;
+
+exports[`InputPrompt > command search (Ctrl+R when not in shell) > renders match window and expanded view (snapshots) > command-search-expanded-match 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ (r:)  commit                                                                                     │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+ git commit -m "feat: add search" in src/app"
+`;
+
+exports[`InputPrompt > snapshots > should not show inverted cursor when shell is focused 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ >   Type your message or @path/to/file                                                           │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
+`;
+
+exports[`InputPrompt > snapshots > should render correctly in shell mode 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ !   Type your message or @path/to/file                                                           │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
+`;
+
+exports[`InputPrompt > snapshots > should render correctly in yolo mode 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ *   Type your message or @path/to/file                                                           │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
+`;
+
+exports[`InputPrompt > snapshots > should render correctly when accepting edits 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ >   Type your message or @path/to/file                                                           │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
+`;

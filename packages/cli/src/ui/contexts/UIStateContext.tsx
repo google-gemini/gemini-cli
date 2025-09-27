@@ -11,6 +11,7 @@ import type {
   ConsoleMessageItem,
   ShellConfirmationRequest,
   ConfirmationRequest,
+  LoopDetectionConfirmationRequest,
   HistoryItemWithoutId,
   StreamingState,
 } from '../types.js';
@@ -20,17 +21,29 @@ import type {
   IdeContext,
   ApprovalMode,
   UserTierId,
-  DetectedIde,
+  IdeInfo,
+  FallbackIntent,
 } from '@google/gemini-cli-core';
 import type { DOMElement } from 'ink';
 import type { SessionStatsState } from '../contexts/SessionContext.js';
 import type { UpdateObject } from '../utils/updateCheck.js';
+import type { ExtensionUpdateState } from '../state/extensions.js';
+
+export interface ProQuotaDialogRequest {
+  failedModel: string;
+  fallbackModel: string;
+  resolve: (intent: FallbackIntent) => void;
+}
+
+import { type UseHistoryManagerReturn } from '../hooks/useHistoryManager.js';
 
 export interface UIState {
   history: HistoryItem[];
+  historyManager: UseHistoryManagerReturn;
   isThemeDialogOpen: boolean;
   themeError: string | null;
   isAuthenticating: boolean;
+  isConfigInitialized: boolean;
   authError: string | null;
   isAuthDialogOpen: boolean;
   editorError: string | null;
@@ -40,11 +53,14 @@ export interface UIState {
   debugMessage: string;
   quittingMessages: HistoryItem[] | null;
   isSettingsDialogOpen: boolean;
+  isModelDialogOpen: boolean;
+  isPermissionsDialogOpen: boolean;
   slashCommands: readonly SlashCommand[];
   pendingSlashCommandHistoryItems: HistoryItemWithoutId[];
   commandContext: CommandContext;
   shellConfirmationRequest: ShellConfirmationRequest | null;
   confirmationRequest: ConfirmationRequest | null;
+  loopDetectionConfirmationRequest: LoopDetectionConfirmationRequest | null;
   geminiMdFileCount: number;
   streamingState: StreamingState;
   initError: string | null;
@@ -67,7 +83,6 @@ export interface UIState {
   ctrlCPressedOnce: boolean;
   ctrlDPressedOnce: boolean;
   showEscapePrompt: boolean;
-  isFocused: boolean;
   elapsedTime: number;
   currentLoadingPhrase: string;
   historyRemountKey: number;
@@ -78,9 +93,8 @@ export interface UIState {
   workspaceExtensions: any[]; // Extension[]
   // Quota-related state
   userTier: UserTierId | undefined;
-  isProQuotaDialogOpen: boolean;
+  proQuotaRequest: ProQuotaDialogRequest | null;
   currentModel: string;
-  // New fields for complete state management
   contextFileNames: string[];
   errorCount: number;
   availableTerminalHeight: number | undefined;
@@ -95,10 +109,13 @@ export interface UIState {
   terminalWidth: number;
   terminalHeight: number;
   mainControlsRef: React.MutableRefObject<DOMElement | null>;
-  currentIDE: DetectedIde | null;
+  currentIDE: IdeInfo | null;
   updateInfo: UpdateObject | null;
   showIdeRestartPrompt: boolean;
   isRestarting: boolean;
+  extensionsUpdateState: Map<string, ExtensionUpdateState>;
+  activePtyId: number | undefined;
+  embeddedShellFocused: boolean;
 }
 
 export const UIStateContext = createContext<UIState | null>(null);

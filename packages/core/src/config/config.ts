@@ -6,9 +6,13 @@
 
 import * as path from 'node:path';
 import process from 'node:process';
-import type { ContentGeneratorConfig } from '../core/contentGenerator.js';
+import type {
+  ContentGenerator,
+  ContentGeneratorConfig,
+} from '../core/contentGenerator.js';
 import {
   AuthType,
+  createContentGenerator,
   createContentGeneratorConfig,
 } from '../core/contentGenerator.js';
 import { PromptRegistry } from '../prompts/prompt-registry.js';
@@ -16,7 +20,7 @@ import { ToolRegistry } from '../tools/tool-registry.js';
 import { LSTool } from '../tools/ls.js';
 import { ReadFileTool } from '../tools/read-file.js';
 import { GrepTool } from '../tools/grep.js';
-import { RipGrepTool } from '../tools/ripGrep.js';
+import { canUseRipgrep, RipGrepTool } from '../tools/ripGrep.js';
 import { GlobTool } from '../tools/glob.js';
 import { EditTool } from '../tools/edit.js';
 import { SmartEditTool } from '../tools/smart-edit.js';
@@ -27,6 +31,7 @@ import { ReadManyFilesTool } from '../tools/read-many-files.js';
 import { MemoryTool, setGeminiMdFilename } from '../tools/memoryTool.js';
 import { WebSearchTool } from '../tools/web-search.js';
 import { GeminiClient } from '../core/client.js';
+import { BaseLlmClient } from '../core/baseLlmClient.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import { GitService } from '../services/gitService.js';
 import type { TelemetryTarget } from '../telemetry/index.js';
@@ -34,7 +39,9 @@ import {
   initializeTelemetry,
   DEFAULT_TELEMETRY_TARGET,
   DEFAULT_OTLP_ENDPOINT,
+  uiTelemetryService,
 } from '../telemetry/index.js';
+import { tokenLimit } from '../core/tokenLimits.js';
 import { StartSessionEvent } from '../telemetry/index.js';
 import {
   DEFAULT_GEMINI_EMBEDDING_MODEL,
@@ -42,21 +49,32 @@ import {
 } from './models.js';
 import { shouldAttemptBrowserLaunch } from '../utils/browser.js';
 import type { MCPOAuthConfig } from '../mcp/oauth-provider.js';
-import { IdeClient } from '../ide/ide-client.js';
-import { ideContext } from '../ide/ideContext.js';
-import type { Content } from '@google/genai';
+import { ideContextStore } from '../ide/ideContext.js';
+import { WriteTodosTool } from '../tools/write-todos.js';
 import type { FileSystemService } from '../services/fileSystemService.js';
 import { StandardFileSystemService } from '../services/fileSystemService.js';
-import { logCliConfiguration, logIdeConnection } from '../telemetry/loggers.js';
-import { IdeConnectionEvent, IdeConnectionType } from '../telemetry/types.js';
+import {
+  logCliConfiguration,
+  logRipgrepFallback,
+} from '../telemetry/loggers.js';
+import { RipgrepFallbackEvent } from '../telemetry/types.js';
+import type { FallbackModelHandler } from '../fallback/types.js';
+import { ModelRouterService } from '../routing/modelRouterService.js';
+import { OutputFormat } from '../output/types.js';
 
 // Re-export OAuth config type
 export type { MCPOAuthConfig, AnyToolInvocation };
 import type { AnyToolInvocation } from '../tools/tools.js';
 import { WorkspaceContext } from '../utils/workspaceContext.js';
 import { Storage } from './storage.js';
+import type { ShellExecutionConfig } from '../services/shellExecutionService.js';
 import { FileExclusions } from '../utils/ignorePatterns.js';
 import type { EventEmitter } from 'node:events';
+import { MessageBus } from '../confirmation-bus/message-bus.js';
+import { PolicyEngine } from '../policy/policy-engine.js';
+import type { PolicyEngineConfig } from '../policy/types.js';
+import type { UserTierId } from '../code_assist/types.js';
+import { ProxyAgent, setGlobalDispatcher } from 'undici';
 
 export enum ApprovalMode {
   DEFAULT = 'default',
@@ -88,6 +106,11 @@ export interface TelemetrySettings {
   otlpProtocol?: 'grpc' | 'http';
   logPrompts?: boolean;
   outfile?: string;
+  useCollector?: boolean;
+}
+
+export interface OutputSettings {
+  format?: OutputFormat;
 }
 
 export interface GeminiCLIExtension {
@@ -95,20 +118,27 @@ export interface GeminiCLIExtension {
   version: string;
   isActive: boolean;
   path: string;
+  installMetadata?: ExtensionInstallMetadata;
 }
-export interface FileFilteringOptions {
-  respectGitIgnore: boolean;
-  respectGeminiIgnore: boolean;
+
+export interface ExtensionInstallMetadata {
+  source: string;
+  type: 'git' | 'local' | 'link' | 'github-release';
+  releaseTag?: string; // Only present for github-release installs.
+  ref?: string;
+  autoUpdate?: boolean;
 }
-// For memory files
-export const DEFAULT_MEMORY_FILE_FILTERING_OPTIONS: FileFilteringOptions = {
-  respectGitIgnore: false,
-  respectGeminiIgnore: true,
-};
-// For all other files
-export const DEFAULT_FILE_FILTERING_OPTIONS: FileFilteringOptions = {
-  respectGitIgnore: true,
-  respectGeminiIgnore: true,
+
+import type { FileFilteringOptions } from './constants.js';
+import {
+  DEFAULT_MEMORY_FILE_FILTERING_OPTIONS,
+  DEFAULT_FILE_FILTERING_OPTIONS,
+} from './constants.js';
+
+export type { FileFilteringOptions };
+export {
+  DEFAULT_MEMORY_FILE_FILTERING_OPTIONS,
+  DEFAULT_FILE_FILTERING_OPTIONS,
 };
 
 export const DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD = 4_000_000;
@@ -151,12 +181,6 @@ export interface SandboxConfig {
   command: 'docker' | 'podman' | 'sandbox-exec';
   image: string;
 }
-
-export type FlashFallbackHandler = (
-  currentModel: string,
-  fallbackModel: string,
-  error?: unknown,
-) => Promise<boolean | string | null>;
 
 export interface ConfigParameters {
   sessionId: string;
@@ -212,12 +236,19 @@ export interface ConfigParameters {
   useRipgrep?: boolean;
   shouldUseNodePtyShell?: boolean;
   skipNextSpeakerCheck?: boolean;
+  shellExecutionConfig?: ShellExecutionConfig;
   extensionManagement?: boolean;
   enablePromptCompletion?: boolean;
   truncateToolOutputThreshold?: number;
   truncateToolOutputLines?: number;
+  enableToolOutputTruncation?: boolean;
   eventEmitter?: EventEmitter;
   useSmartEdit?: boolean;
+  useWriteTodos?: boolean;
+  policyEngineConfig?: PolicyEngineConfig;
+  output?: OutputSettings;
+  useModelRouter?: boolean;
+  enableMessageBusIntegration?: boolean;
 }
 
 export class Config {
@@ -226,6 +257,7 @@ export class Config {
   private readonly sessionId: string;
   private fileSystemService: FileSystemService;
   private contentGeneratorConfig!: ContentGeneratorConfig;
+  private contentGenerator!: ContentGenerator;
   private readonly embeddingModel: string;
   private readonly sandbox: SandboxConfig | undefined;
   private readonly targetDir: string;
@@ -248,6 +280,8 @@ export class Config {
   private readonly telemetrySettings: TelemetrySettings;
   private readonly usageStatisticsEnabled: boolean;
   private geminiClient!: GeminiClient;
+  private baseLlmClient!: BaseLlmClient;
+  private modelRouterService: ModelRouterService;
   private readonly fileFiltering: {
     respectGitIgnore: boolean;
     respectGeminiIgnore: boolean;
@@ -260,7 +294,7 @@ export class Config {
   private readonly proxy: string | undefined;
   private readonly cwd: string;
   private readonly bugCommand: BugCommandSettings | undefined;
-  private readonly model: string;
+  private model: string;
   private readonly extensionContextFilePaths: string[];
   private readonly noBrowser: boolean;
   private readonly folderTrustFeature: boolean;
@@ -275,7 +309,7 @@ export class Config {
     name: string;
     extensionName: string;
   }>;
-  flashFallbackHandler?: FlashFallbackHandler;
+  fallbackModelHandler?: FallbackModelHandler;
   private quotaErrorOccurred: boolean = false;
   private readonly summarizeToolOutput:
     | Record<string, SummarizeToolOutputSettings>
@@ -288,15 +322,23 @@ export class Config {
   private readonly useRipgrep: boolean;
   private readonly shouldUseNodePtyShell: boolean;
   private readonly skipNextSpeakerCheck: boolean;
+  private shellExecutionConfig: ShellExecutionConfig;
   private readonly extensionManagement: boolean = true;
   private readonly enablePromptCompletion: boolean = false;
   private readonly truncateToolOutputThreshold: number;
   private readonly truncateToolOutputLines: number;
+  private readonly enableToolOutputTruncation: boolean;
   private initialized: boolean = false;
   readonly storage: Storage;
   private readonly fileExclusions: FileExclusions;
   private readonly eventEmitter?: EventEmitter;
   private readonly useSmartEdit: boolean;
+  private readonly useWriteTodos: boolean;
+  private readonly messageBus: MessageBus;
+  private readonly policyEngine: PolicyEngine;
+  private readonly outputSettings: OutputSettings;
+  private readonly useModelRouter: boolean;
+  private readonly enableMessageBusIntegration: boolean;
 
   constructor(params: ConfigParameters) {
     this.sessionId = params.sessionId;
@@ -331,6 +373,7 @@ export class Config {
       otlpProtocol: params.telemetry?.otlpProtocol,
       logPrompts: params.telemetry?.logPrompts ?? true,
       outfile: params.telemetry?.outfile,
+      useCollector: params.telemetry?.useCollector,
     };
     this.usageStatisticsEnabled = params.usageStatisticsEnabled ?? true;
 
@@ -364,20 +407,37 @@ export class Config {
     this.chatCompression = params.chatCompression;
     this.interactive = params.interactive ?? false;
     this.trustedFolder = params.trustedFolder;
-    this.useRipgrep = params.useRipgrep ?? false;
+    this.useRipgrep = params.useRipgrep ?? true;
     this.shouldUseNodePtyShell = params.shouldUseNodePtyShell ?? false;
-    this.skipNextSpeakerCheck = params.skipNextSpeakerCheck ?? false;
+    this.skipNextSpeakerCheck = params.skipNextSpeakerCheck ?? true;
+    this.shellExecutionConfig = {
+      terminalWidth: params.shellExecutionConfig?.terminalWidth ?? 80,
+      terminalHeight: params.shellExecutionConfig?.terminalHeight ?? 24,
+      showColor: params.shellExecutionConfig?.showColor ?? false,
+      pager: params.shellExecutionConfig?.pager ?? 'cat',
+    };
     this.truncateToolOutputThreshold =
       params.truncateToolOutputThreshold ??
       DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD;
     this.truncateToolOutputLines =
       params.truncateToolOutputLines ?? DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES;
+    this.enableToolOutputTruncation =
+      params.enableToolOutputTruncation ?? false;
     this.useSmartEdit = params.useSmartEdit ?? true;
+    this.useWriteTodos = params.useWriteTodos ?? false;
+    this.useModelRouter = params.useModelRouter ?? false;
+    this.enableMessageBusIntegration =
+      params.enableMessageBusIntegration ?? false;
     this.extensionManagement = params.extensionManagement ?? true;
     this.storage = new Storage(this.targetDir);
     this.enablePromptCompletion = params.enablePromptCompletion ?? false;
     this.fileExclusions = new FileExclusions(this);
     this.eventEmitter = params.eventEmitter;
+    this.policyEngine = new PolicyEngine(params.policyEngineConfig);
+    this.messageBus = new MessageBus(this.policyEngine);
+    this.outputSettings = {
+      format: params.output?.format ?? OutputFormat.TEXT,
+    };
 
     if (params.contextFileName) {
       setGeminiMdFilename(params.contextFileName);
@@ -386,6 +446,12 @@ export class Config {
     if (this.telemetrySettings.enabled) {
       initializeTelemetry(this);
     }
+
+    if (this.getProxy()) {
+      setGlobalDispatcher(new ProxyAgent(this.getProxy() as string));
+    }
+    this.geminiClient = new GeminiClient(this);
+    this.modelRouterService = new ModelRouterService(this);
   }
 
   /**
@@ -397,11 +463,6 @@ export class Config {
     }
     this.initialized = true;
 
-    if (this.getIdeMode()) {
-      await (await IdeClient.getInstance()).connect();
-      logIdeConnection(this, new IdeConnectionEvent(IdeConnectionType.START));
-    }
-
     // Initialize centralized FileDiscoveryService
     this.getFileService();
     if (this.getCheckpointingEnabled()) {
@@ -409,45 +470,69 @@ export class Config {
     }
     this.promptRegistry = new PromptRegistry();
     this.toolRegistry = await this.createToolRegistry();
-    logCliConfiguration(this, new StartSessionEvent(this, this.toolRegistry));
+
+    await this.geminiClient.initialize();
+  }
+
+  getContentGenerator(): ContentGenerator {
+    return this.contentGenerator;
   }
 
   async refreshAuth(authMethod: AuthType) {
-    // Save the current conversation history before creating a new client
-    let existingHistory: Content[] = [];
-    if (this.geminiClient && this.geminiClient.isInitialized()) {
-      existingHistory = this.geminiClient.getHistory();
+    // Vertex and Genai have incompatible encryption and sending history with
+    // throughtSignature from Genai to Vertex will fail, we need to strip them
+    if (
+      this.contentGeneratorConfig?.authType === AuthType.USE_GEMINI &&
+      authMethod === AuthType.LOGIN_WITH_GOOGLE
+    ) {
+      // Restore the conversation history to the new client
+      this.geminiClient.stripThoughtsFromHistory();
     }
 
-    // Create new content generator config
     const newContentGeneratorConfig = createContentGeneratorConfig(
       this,
       authMethod,
     );
-
-    // Create and initialize new client in local variable first
-    const newGeminiClient = new GeminiClient(this);
-    await newGeminiClient.initialize(newContentGeneratorConfig);
-
-    // Vertex and Genai have incompatible encryption and sending history with
-    // throughtSignature from Genai to Vertex will fail, we need to strip them
-    const fromGenaiToVertex =
-      this.contentGeneratorConfig?.authType === AuthType.USE_GEMINI &&
-      authMethod === AuthType.LOGIN_WITH_GOOGLE;
-
+    this.contentGenerator = await createContentGenerator(
+      newContentGeneratorConfig,
+      this,
+      this.getSessionId(),
+    );
     // Only assign to instance properties after successful initialization
     this.contentGeneratorConfig = newContentGeneratorConfig;
-    this.geminiClient = newGeminiClient;
 
-    // Restore the conversation history to the new client
-    if (existingHistory.length > 0) {
-      this.geminiClient.setHistory(existingHistory, {
-        stripThoughts: fromGenaiToVertex,
-      });
-    }
+    // Initialize BaseLlmClient now that the ContentGenerator is available
+    this.baseLlmClient = new BaseLlmClient(this.contentGenerator, this);
 
     // Reset the session flag since we're explicitly changing auth and using default model
     this.inFallbackMode = false;
+
+    // Logging the cli configuration here as the auth related configuration params would have been loaded by this point
+    logCliConfiguration(this, new StartSessionEvent(this, this.toolRegistry));
+  }
+
+  getUserTier(): UserTierId | undefined {
+    return this.contentGenerator?.userTier;
+  }
+
+  /**
+   * Provides access to the BaseLlmClient for stateless LLM operations.
+   */
+  getBaseLlmClient(): BaseLlmClient {
+    if (!this.baseLlmClient) {
+      // Handle cases where initialization might be deferred or authentication failed
+      if (this.contentGenerator) {
+        this.baseLlmClient = new BaseLlmClient(
+          this.getContentGenerator(),
+          this,
+        );
+      } else {
+        throw new Error(
+          'BaseLlmClient not initialized. Ensure authentication has occurred and ContentGenerator is ready.',
+        );
+      }
+    }
+    return this.baseLlmClient;
   }
 
   getSessionId(): string {
@@ -463,13 +548,16 @@ export class Config {
   }
 
   getModel(): string {
-    return this.contentGeneratorConfig?.model || this.model;
+    return this.model;
   }
 
   setModel(newModel: string): void {
-    if (this.contentGeneratorConfig) {
-      this.contentGeneratorConfig.model = newModel;
+    // Do not allow Pro usage if the user is in fallback mode.
+    if (newModel.includes('pro') && this.isInFallbackMode()) {
+      return;
     }
+
+    this.model = newModel;
   }
 
   isInFallbackMode(): boolean {
@@ -480,8 +568,8 @@ export class Config {
     this.inFallbackMode = active;
   }
 
-  setFlashFallbackHandler(handler: FlashFallbackHandler): void {
-    this.flashFallbackHandler = handler;
+  setFallbackModelHandler(handler: FallbackModelHandler): void {
+    this.fallbackModelHandler = handler;
   }
 
   getMaxSessionTurns(): number {
@@ -635,8 +723,16 @@ export class Config {
     return this.telemetrySettings.outfile;
   }
 
+  getTelemetryUseCollector(): boolean {
+    return this.telemetrySettings.useCollector ?? false;
+  }
+
   getGeminiClient(): GeminiClient {
     return this.geminiClient;
+  }
+
+  getModelRouterService(): ModelRouterService {
+    return this.modelRouterService;
   }
 
   getEnableRecursiveFileSearch(): boolean {
@@ -768,7 +864,7 @@ export class Config {
     // restarts in the more common path. If the user chooses to mark the folder
     // as untrusted, the CLI will restart and we will have the trust value
     // reloaded.
-    const context = ideContext.getIdeContext();
+    const context = ideContextStore.get();
     if (context?.workspaceState?.isTrusted !== undefined) {
       return context.workspaceState.isTrusted;
     }
@@ -814,6 +910,20 @@ export class Config {
     return this.skipNextSpeakerCheck;
   }
 
+  getShellExecutionConfig(): ShellExecutionConfig {
+    return this.shellExecutionConfig;
+  }
+
+  setShellExecutionConfig(config: ShellExecutionConfig): void {
+    this.shellExecutionConfig = {
+      terminalWidth:
+        config.terminalWidth ?? this.shellExecutionConfig.terminalWidth,
+      terminalHeight:
+        config.terminalHeight ?? this.shellExecutionConfig.terminalHeight,
+      showColor: config.showColor ?? this.shellExecutionConfig.showColor,
+      pager: config.pager ?? this.shellExecutionConfig.pager,
+    };
+  }
   getScreenReader(): boolean {
     return this.accessibility.screenReader ?? false;
   }
@@ -822,8 +932,17 @@ export class Config {
     return this.enablePromptCompletion;
   }
 
+  getEnableToolOutputTruncation(): boolean {
+    return this.enableToolOutputTruncation;
+  }
+
   getTruncateToolOutputThreshold(): number {
-    return this.truncateToolOutputThreshold;
+    return Math.min(
+      // Estimate remaining context window in characters (1 token ~= 4 chars).
+      4 *
+        (tokenLimit(this.model) - uiTelemetryService.getLastPromptTokenCount()),
+      this.truncateToolOutputThreshold,
+    );
   }
 
   getTruncateToolOutputLines(): number {
@@ -832,6 +951,20 @@ export class Config {
 
   getUseSmartEdit(): boolean {
     return this.useSmartEdit;
+  }
+
+  getUseWriteTodos(): boolean {
+    return this.useWriteTodos;
+  }
+
+  getOutputFormat(): OutputFormat {
+    return this.outputSettings?.format
+      ? this.outputSettings.format
+      : OutputFormat.TEXT;
+  }
+
+  getUseModelRouter(): boolean {
+    return this.useModelRouter;
   }
 
   async getGitService(): Promise<GitService> {
@@ -844,6 +977,18 @@ export class Config {
 
   getFileExclusions(): FileExclusions {
     return this.fileExclusions;
+  }
+
+  getMessageBus(): MessageBus {
+    return this.messageBus;
+  }
+
+  getPolicyEngine(): PolicyEngine {
+    return this.policyEngine;
+  }
+
+  getEnableMessageBusIntegration(): boolean {
+    return this.enableMessageBusIntegration;
   }
 
   async createToolRegistry(): Promise<ToolRegistry> {
@@ -879,7 +1024,24 @@ export class Config {
       }
 
       if (isEnabled) {
-        registry.registerTool(new ToolClass(...args));
+        // Pass message bus to tools when feature flag is enabled
+        // This first implementation is only focused on the general case of
+        // the tool registry.
+        const messageBusEnabled = this.getEnableMessageBusIntegration();
+        if (this.debugMode && messageBusEnabled) {
+          console.log(
+            `[DEBUG] enableMessageBusIntegration setting: ${messageBusEnabled}`,
+          );
+        }
+        const toolArgs = messageBusEnabled
+          ? [...args, this.getMessageBus()]
+          : args;
+        if (this.debugMode && messageBusEnabled) {
+          console.log(
+            `[DEBUG] Registering ${className} with messageBus: ${messageBusEnabled ? 'YES' : 'NO'}`,
+          );
+        }
+        registry.registerTool(new ToolClass(...toolArgs));
       }
     };
 
@@ -887,7 +1049,19 @@ export class Config {
     registerCoreTool(ReadFileTool, this);
 
     if (this.getUseRipgrep()) {
-      registerCoreTool(RipGrepTool, this);
+      let useRipgrep = false;
+      let errorString: undefined | string = undefined;
+      try {
+        useRipgrep = await canUseRipgrep();
+      } catch (error: unknown) {
+        errorString = String(error);
+      }
+      if (useRipgrep) {
+        registerCoreTool(RipGrepTool, this);
+      } else {
+        logRipgrepFallback(this, new RipgrepFallbackEvent(errorString));
+        registerCoreTool(GrepTool, this);
+      }
     } else {
       registerCoreTool(GrepTool, this);
     }
@@ -904,6 +1078,9 @@ export class Config {
     registerCoreTool(ShellTool, this);
     registerCoreTool(MemoryTool);
     registerCoreTool(WebSearchTool, this);
+    if (this.getUseWriteTodos()) {
+      registerCoreTool(WriteTodosTool, this);
+    }
 
     await registry.discoverAllTools();
     return registry;
