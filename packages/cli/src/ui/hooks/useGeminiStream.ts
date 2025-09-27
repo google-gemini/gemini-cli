@@ -209,9 +209,8 @@ export const useGeminiStream = (
           tc.status === 'executing' ||
           tc.status === 'scheduled' ||
           tc.status === 'validating' ||
-          ((tc.status === 'success' ||
-            tc.status === 'error' ||
-            tc.status === 'cancelled') &&
+          tc.status === 'error' ||
+          ((tc.status === 'success' || tc.status === 'cancelled') &&
             !(tc as TrackedCompletedToolCall | TrackedCancelledToolCall)
               .responseSubmittedToGemini),
       )
