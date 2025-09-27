@@ -37,13 +37,48 @@ describe('Core System Prompt (prompts.ts)', () => {
     vi.resetAllMocks();
     vi.stubEnv('GEMINI_SYSTEM_MD', undefined);
     vi.stubEnv('GEMINI_WRITE_SYSTEM_MD', undefined);
+
+    // Mock the persona file for all tests in this suite by default
+    vi.mocked(fs.existsSync).mockReturnValue(true);
+    vi.mocked(fs.readFileSync).mockImplementation((path) => {
+      if (typeof path === 'string' && path.includes('persona.md')) {
+        return `
+### **1. Core Identity**
+*   **Persona:** You are an expert senior engineering collaborator.
+{{SANDBOX_INFO}}
+{{GIT_INFO}}
+### **7. Example Interaction**
+[tool_call: {{TOOL_GLOB}} for path 'tests/test_auth.py']
+{{EXAMPLE_GIT_INFO}}
+`;
+      }
+      // For GEMINI_SYSTEM_MD tests that provide their own content
+      return 'custom system prompt';
+    });
+  });
+
+  it('should load and template persona.md when GEMINI_SYSTEM_MD is not set', () => {
+    const personaContent =
+      'This is the persona with a placeholder for {{TOOL_GLOB}}.';
+    // We don't need to mock the exact path here, just the behavior.
+    vi.mocked(fs.existsSync).mockReturnValue(true);
+    vi.mocked(fs.readFileSync).mockReturnValue(personaContent);
+
+    const prompt = getCoreSystemPrompt();
+
+    // Check that it tried to read a file.
+    expect(fs.readFileSync).toHaveBeenCalled();
+    // Check that the content is from our mock.
+    expect(prompt).toContain('This is the persona');
+    // Check that the placeholder was replaced.
+    expect(prompt).toContain('glob');
+    expect(prompt).not.toContain('{{TOOL_GLOB}}');
   });
 
   it('should return the base prompt when no userMemory is provided', () => {
     vi.stubEnv('SANDBOX', undefined);
     const prompt = getCoreSystemPrompt();
     expect(prompt).not.toContain('---\n\n'); // Separator should not be present
-    expect(prompt).toContain('You are an interactive CLI agent'); // Check for core content
     expect(prompt).toMatchSnapshot(); // Use snapshot for base prompt structure
   });
 
@@ -51,7 +86,6 @@ describe('Core System Prompt (prompts.ts)', () => {
     vi.stubEnv('SANDBOX', undefined);
     const prompt = getCoreSystemPrompt('');
     expect(prompt).not.toContain('---\n\n');
-    expect(prompt).toContain('You are an interactive CLI agent');
     expect(prompt).toMatchSnapshot();
   });
 
@@ -59,7 +93,6 @@ describe('Core System Prompt (prompts.ts)', () => {
     vi.stubEnv('SANDBOX', undefined);
     const prompt = getCoreSystemPrompt('   \n  \t ');
     expect(prompt).not.toContain('---\n\n');
-    expect(prompt).toContain('You are an interactive CLI agent');
     expect(prompt).toMatchSnapshot();
   });
 
@@ -70,7 +103,6 @@ describe('Core System Prompt (prompts.ts)', () => {
     const prompt = getCoreSystemPrompt(memory);
 
     expect(prompt.endsWith(expectedSuffix)).toBe(true);
-    expect(prompt).toContain('You are an interactive CLI agent'); // Ensure base prompt follows
     expect(prompt).toMatchSnapshot(); // Snapshot the combined prompt
   });
 
@@ -93,7 +125,7 @@ describe('Core System Prompt (prompts.ts)', () => {
   });
 
   it('should include non-sandbox instructions when SANDBOX env var is not set', () => {
-    vi.stubEnv('SANDBOX', undefined); // Ensure it's not set
+    vi.stubEnv('SANDBOX', undefined); // Ensure it\'s not set
     const prompt = getCoreSystemPrompt();
     expect(prompt).toContain('# Outside of Sandbox');
     expect(prompt).not.toContain('# Sandbox');
@@ -121,14 +153,14 @@ describe('Core System Prompt (prompts.ts)', () => {
     it('should use default prompt when GEMINI_SYSTEM_MD is "false"', () => {
       vi.stubEnv('GEMINI_SYSTEM_MD', 'false');
       const prompt = getCoreSystemPrompt();
-      expect(fs.readFileSync).not.toHaveBeenCalled();
+      expect(fs.readFileSync).toHaveBeenCalled();
       expect(prompt).not.toContain('custom system prompt');
     });
 
     it('should use default prompt when GEMINI_SYSTEM_MD is "0"', () => {
       vi.stubEnv('GEMINI_SYSTEM_MD', '0');
       const prompt = getCoreSystemPrompt();
-      expect(fs.readFileSync).not.toHaveBeenCalled();
+      expect(fs.readFileSync).toHaveBeenCalled();
       expect(prompt).not.toContain('custom system prompt');
     });
 
@@ -296,7 +328,7 @@ describe('resolvePathFromEnv helper function', () => {
     });
 
     it('should return null for whitespace only', () => {
-      const result = resolvePathFromEnv('   \n\t  ');
+      const result = resolvePathFromEnv('   \n  \t ');
       expect(result).toEqual({
         isSwitch: false,
         value: null,
