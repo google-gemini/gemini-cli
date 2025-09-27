@@ -31,7 +31,6 @@ You will be given:
 1.  **Minimal Correction:** Your new \`search\` string must be a close variation of the original. Focus on fixing issues like whitespace, indentation, line endings, or small contextual differences.
 2.  **Explain the Fix:** Your \`explanation\` MUST state exactly why the original \`search\` failed and how your new \`search\` string resolves that specific failure. (e.g., "The original search failed due to incorrect indentation; the new search corrects the indentation to match the source file.").
 3.  **Preserve the \`replace\` String:** Do NOT modify the \`replace\` string unless the instruction explicitly requires it and it was the source of the error. Your primary focus is fixing the \`search\` string.
-4.  **No Changes Case:** CRUCIAL: if the change is already present in the file,  set \`noChangesRequired\` to True and explain why in the \`explanation\`. It is crucial that you only do this if the changes outline in \`replace\` are alredy in the file and suits the instruction!! 
 5.  **Exactness:** The final \`search\` field must be the EXACT literal text from the file. Do not escape characters.
 `;
 
@@ -67,7 +66,6 @@ Based on the error and the file content, provide a corrected \`search\` string t
 export interface SearchReplaceEdit {
   search: string;
   replace: string;
-  noChangesRequired: boolean;
   explanation: string;
 }
 
@@ -77,7 +75,6 @@ const SearchReplaceEditSchema = {
     explanation: { type: Type.STRING },
     search: { type: Type.STRING },
     replace: { type: Type.STRING },
-    noChangesRequired: { type: Type.BOOLEAN },
   },
   required: ['search', 'replace', 'explanation'],
 };

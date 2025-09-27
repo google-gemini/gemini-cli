@@ -297,21 +297,6 @@ class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
       abortSignal,
     );
 
-    if (fixedEdit.noChangesRequired) {
-      return {
-        currentContent,
-        newContent: currentContent,
-        occurrences: 0,
-        isNewFile: false,
-        error: {
-          display: `No changes required. The file already meets the specified conditions.`,
-          raw: `A secondary check by an LLM determined that no changes were necessary to fulfill the instruction. Explanation: ${fixedEdit.explanation}. Original error with the parameters given: ${initialError.raw}`,
-          type: ToolErrorType.EDIT_NO_CHANGE_LLM_JUDGEMENT,
-        },
-        originalLineEnding,
-      };
-    }
-
     const secondAttemptResult = await calculateReplacement({
       params: {
         ...params,
