@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import * as os from 'node:os';
 import * as fsPromises from 'node:fs/promises';
 import React from 'react';
 import { Text } from 'ink';
@@ -318,6 +319,9 @@ const shareCommand: SlashCommand = {
       filePathArg = `gemini-conversation-${Date.now()}.json`;
     }
 
+    if (filePathArg.startsWith('~/')) {
+      filePathArg = path.join(os.homedir(), filePathArg.slice(2));
+    }
     const filePath = path.resolve(filePathArg);
     const extension = path.extname(filePath);
     if (extension !== '.md' && extension !== '.json') {
