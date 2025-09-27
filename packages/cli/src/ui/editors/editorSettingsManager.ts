@@ -19,6 +19,7 @@ export interface EditorDisplay {
 export const EDITOR_DISPLAY_NAMES: Record<EditorType, string> = {
   cursor: 'Cursor',
   emacs: 'Emacs',
+  micro: 'Micro',
   neovim: 'Neovim',
   vim: 'Vim',
   vscode: 'VS Code',
