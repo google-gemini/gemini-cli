@@ -258,6 +258,8 @@ export const requestPermissionResponseSchema = z.object({
 export const fileSystemCapabilitySchema = z.object({
   readTextFile: z.boolean(),
   writeTextFile: z.boolean(),
+  unlink: z.boolean(),
+  mkdir: z.boolean(),
 });
 
 export const envVariableSchema = z.object({
