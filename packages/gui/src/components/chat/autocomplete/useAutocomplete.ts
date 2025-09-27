@@ -191,10 +191,10 @@ function getCursorPosition(textarea: HTMLTextAreaElement, _index: number) {
   const textareaRect = textarea.getBoundingClientRect();
   const style = getComputedStyle(textarea);
 
-  // For now, use a simple position calculation
-  // Position the dropdown right below the textarea
+  // Position the dropdown higher to align with Excel menu (bottom-12 = 48px from bottom)
+  // Adjust top position to be 48px higher than the textarea bottom
   return {
-    top: textareaRect.bottom + window.scrollY,
+    top: textareaRect.bottom + window.scrollY - 30,
     left: textareaRect.left + window.scrollX + parseInt(style.paddingLeft, 10),
     height: 20
   };

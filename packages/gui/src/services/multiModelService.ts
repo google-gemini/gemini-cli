@@ -71,6 +71,8 @@ interface ElectronAPI {
     setOAuthPreference: (providerType: string) => Promise<{ success: boolean; error?: string }>;
     getApprovalMode: () => Promise<'default' | 'autoEdit' | 'yolo'>;
     setApprovalMode: (mode: 'default' | 'autoEdit' | 'yolo') => Promise<void>;
+    // Direct Excel tool calls
+    callExcelTool: (operation: string, params?: Record<string, unknown>) => Promise<{ success: boolean; data?: unknown; error?: string; workbooks?: Array<{name: string, saved: boolean}>; worksheets?: Array<{index: number, name: string}>; apps?: unknown[] }>;
   };
 }
 
@@ -642,6 +644,67 @@ class MultiModelService {
     }
 
     await this.api.setApprovalMode(mode);
+  }
+
+  // Excel tool methods using direct Excel tool
+  async getExcelWorkbooks(): Promise<{ success: boolean; workbooks: Array<{name: string; path?: string}>; error?: string }> {
+    if (!this.initialized) {
+      throw new Error('MultiModelService not initialized');
+    }
+
+    try {
+      const result = await this.api.callExcelTool('listWorkbooks');
+
+      if (result.success && result.workbooks) {
+        return {
+          success: true,
+          workbooks: result.workbooks
+        };
+      }
+
+      return {
+        success: false,
+        workbooks: [],
+        error: result.error || 'Failed to get workbooks from Excel tool'
+      };
+    } catch (error) {
+      console.error('Error getting Excel workbooks:', error);
+      return {
+        success: false,
+        workbooks: [],
+        error: error instanceof Error ? error.message : 'Unknown error'
+      };
+    }
+  }
+
+  async getExcelWorksheets(workbook: string): Promise<{ success: boolean; worksheets: Array<{index: number, name: string}>; error?: string }> {
+    if (!this.initialized) {
+      throw new Error('MultiModelService not initialized');
+    }
+
+    try {
+      const result = await this.api.callExcelTool('listWorksheets', { workbookName: workbook });
+
+      if (result.success && result.worksheets) {
+        return {
+          success: true,
+          worksheets: result.worksheets
+        };
+      }
+
+      return {
+        success: false,
+        worksheets: [],
+        error: result.error || 'Failed to get worksheets from Excel tool'
+      };
+    } catch (error) {
+      console.error('Error getting Excel worksheets:', error);
+      return {
+        success: false,
+        worksheets: [],
+        error: error instanceof Error ? error.message : 'Unknown error'
+      };
+    }
   }
 }
 
