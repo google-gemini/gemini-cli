@@ -132,6 +132,12 @@ export class WriteTodosTool extends BaseDeclarativeTool<
   ToolResult
 > {
   static readonly Name: string = 'write_todos_list';
+  private static readonly VALID_STATUSES = [
+    'pending',
+    'in_progress',
+    'completed',
+    'cancelled',
+  ] as const;
 
   constructor() {
     super(
@@ -157,7 +163,7 @@ export class WriteTodosTool extends BaseDeclarativeTool<
                 status: {
                   type: 'string',
                   description: 'The current status of the task.',
-                  enum: ['pending', 'in_progress', 'completed'],
+                  enum: [...WriteTodosTool.VALID_STATUSES],
                 },
               },
               required: ['description', 'status'],
@@ -184,8 +190,12 @@ export class WriteTodosTool extends BaseDeclarativeTool<
       if (typeof todo.description !== 'string' || !todo.description.trim()) {
         return 'Each todo must have a non-empty description string';
       }
-      if (!['pending', 'in_progress', 'completed'].includes(todo.status)) {
-        return 'Each todo must have a valid status (pending, in_progress, or completed)';
+      if (
+        !(WriteTodosTool.VALID_STATUSES as readonly string[]).includes(
+          todo.status,
+        )
+      ) {
+        return `Each todo must have a valid status (${WriteTodosTool.VALID_STATUSES.join(', ')})`;
       }
     }
 
