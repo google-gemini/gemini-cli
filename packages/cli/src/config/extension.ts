@@ -146,6 +146,7 @@ function getTelemetryConfig(cwd: string) {
 }
 
 export function loadExtensions(
+  extensionEnablementManager: ExtensionEnablementManager,
   workspaceDir: string = process.cwd(),
 ): Extension[] {
   const settings = loadSettings(workspaceDir).merged;
@@ -160,14 +161,11 @@ export function loadExtensions(
   }
 
   const uniqueExtensions = new Map<string, Extension>();
-  const manager = new ExtensionEnablementManager(
-    ExtensionStorage.getUserExtensionsDir(),
-  );
 
   for (const extension of allExtensions) {
     if (
       !uniqueExtensions.has(extension.config.name) &&
-      manager.isEnabled(extension.config.name, workspaceDir)
+      extensionEnablementManager.isEnabled(extension.config.name, workspaceDir)
     ) {
       uniqueExtensions.set(extension.config.name, extension);
     }
@@ -323,64 +321,17 @@ function getContextFileNames(config: ExtensionConfig): string[] {
  */
 export function annotateActiveExtensions(
   extensions: Extension[],
-  enabledExtensionNames: string[],
   workspaceDir: string,
+  manager: ExtensionEnablementManager,
 ): GeminiCLIExtension[] {
-  const manager = new ExtensionEnablementManager(
-    ExtensionStorage.getUserExtensionsDir(),
-  );
-  const annotatedExtensions: GeminiCLIExtension[] = [];
-  if (enabledExtensionNames.length === 0) {
-    return extensions.map((extension) => ({
-      name: extension.config.name,
-      version: extension.config.version,
-      isActive: manager.isEnabled(extension.config.name, workspaceDir),
-      path: extension.path,
-      installMetadata: extension.installMetadata,
-    }));
-  }
-
-  const lowerCaseEnabledExtensions = new Set(
-    enabledExtensionNames.map((e) => e.trim().toLowerCase()),
-  );
-
-  if (
-    lowerCaseEnabledExtensions.size === 1 &&
-    lowerCaseEnabledExtensions.has('none')
-  ) {
-    return extensions.map((extension) => ({
-      name: extension.config.name,
-      version: extension.config.version,
-      isActive: false,
-      path: extension.path,
-      installMetadata: extension.installMetadata,
-    }));
-  }
-
-  const notFoundNames = new Set(lowerCaseEnabledExtensions);
-
-  for (const extension of extensions) {
-    const lowerCaseName = extension.config.name.toLowerCase();
-    const isActive = lowerCaseEnabledExtensions.has(lowerCaseName);
-
-    if (isActive) {
-      notFoundNames.delete(lowerCaseName);
-    }
-
-    annotatedExtensions.push({
-      name: extension.config.name,
-      version: extension.config.version,
-      isActive,
-      path: extension.path,
-      installMetadata: extension.installMetadata,
-    });
-  }
-
-  for (const requestedName of notFoundNames) {
-    console.error(`Extension not found: ${requestedName}`);
-  }
-
-  return annotatedExtensions;
+  manager.validateExtensionOverrides(extensions);
+  return extensions.map((extension) => ({
+    name: extension.config.name,
+    version: extension.config.version,
+    isActive: manager.isEnabled(extension.config.name, workspaceDir),
+    path: extension.path,
+    installMetadata: extension.installMetadata,
+  }));
 }
 
 /**
@@ -711,6 +662,7 @@ export async function uninstallExtension(
   }
   const manager = new ExtensionEnablementManager(
     ExtensionStorage.getUserExtensionsDir(),
+    [extensionName],
   );
   manager.remove(extensionName);
   const storage = new ExtensionStorage(extensionName);
@@ -789,6 +741,7 @@ export function disableExtension(
 
   const manager = new ExtensionEnablementManager(
     ExtensionStorage.getUserExtensionsDir(),
+    [name],
   );
   const scopePath = scope === SettingScope.Workspace ? cwd : os.homedir();
   manager.disable(name, true, scopePath);
