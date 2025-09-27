@@ -1,14 +1,15 @@
 import React, { useState } from 'react';
-import { 
-  MessageSquare, 
-  Plus, 
-  ChevronLeft, 
+import {
+  MessageSquare,
+  Plus,
+  ChevronLeft,
   ChevronRight,
   Search,
   MoreHorizontal,
   Trash2,
   AlertTriangle,
 } from 'lucide-react';
+import { format, isToday, isYesterday, isThisWeek, isThisYear } from 'date-fns';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Card } from '@/components/ui/Card';
@@ -42,6 +43,40 @@ export const Sidebar: React.FC = () => {
     )
     .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime()); // Sort by updatedAt descending (newest first)
 
+  // Group sessions by time periods
+  const getTimeGroup = (date: Date) => {
+    if (isToday(date)) return 'Today';
+    if (isYesterday(date)) return 'Yesterday';
+    if (isThisWeek(date)) return 'This Week';
+    if (isThisYear(date)) return format(date, 'MMMM yyyy');
+    return format(date, 'yyyy');
+  };
+
+  const groupedSessions = filteredSessions.reduce((groups, session) => {
+    const group = getTimeGroup(session.updatedAt);
+    if (!groups[group]) {
+      groups[group] = [];
+    }
+    groups[group].push(session);
+    return groups;
+  }, {} as Record<string, typeof filteredSessions>);
+
+  // Define the order of time groups
+  const groupOrder = ['Today', 'Yesterday', 'This Week'];
+  const sortedGroups = Object.keys(groupedSessions).sort((a, b) => {
+    const aIndex = groupOrder.indexOf(a);
+    const bIndex = groupOrder.indexOf(b);
+
+    if (aIndex !== -1 && bIndex !== -1) {
+      return aIndex - bIndex;
+    }
+    if (aIndex !== -1) return -1;
+    if (bIndex !== -1) return 1;
+
+    // For other groups (months/years), sort by most recent first
+    return b.localeCompare(a);
+  });
+
   const createNewSession = async () => {
     const newSession: ChatSession = {
       id: `session-${Date.now()}`,
@@ -74,25 +109,35 @@ export const Sidebar: React.FC = () => {
 
   const handleDeleteSession = async (sessionId: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    
+
+    // Get session title for confirmation message
+    const session = sessions.find(s => s.id === sessionId);
+    const sessionTitle = session?.title || 'Untitled Chat';
+
+    // Show confirmation dialog
+    const confirmed = confirm(`Are you sure you want to delete the chat "${sessionTitle}"? This action cannot be undone.`);
+    if (!confirmed) {
+      return;
+    }
+
     const isActiveSession = activeSessionId === sessionId;
     const hasOtherSessions = sessions.length > 1;
-    
+
     // Find another session to switch to before deleting (if needed)
     let nextSession = null;
     if (isActiveSession && hasOtherSessions) {
       const otherSessions = sessions.filter(s => s.id !== sessionId);
       nextSession = otherSessions[0];
     }
-    
+
     // Remove from frontend store (automatically handles activeSessionId cleanup)
     removeSession(sessionId);
-    
+
     // Notify backend to delete session
     try {
       await multiModelService.deleteSession(sessionId);
       console.log('Backend session deleted:', sessionId);
-      
+
       // If this was the active session and we have another session to switch to
       if (isActiveSession && nextSession) {
         console.log('Switching to next available session:', nextSession.id);
@@ -238,48 +283,58 @@ export const Sidebar: React.FC = () => {
 
       {/* Session List */}
       <div className="flex-1 overflow-y-auto px-4">
-        <div className="space-y-2">
-          {filteredSessions.map((session) => (
-            <Card
-              key={session.id}
-              className={cn(
-                "p-3 cursor-pointer hover:bg-accent/50 transition-colors group",
-                session.id === activeSessionId && "bg-accent border-primary/50"
-              )}
-              onClick={() => handleSessionClick(session.id)}
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex-1 min-w-0">
-                  <div className="font-medium truncate text-sm">
-                    {session.title}
-                  </div>
-                  <div className="text-xs text-muted-foreground mt-1">
-                    {session.messages.length} messages
-                  </div>
-                  <div className="text-xs text-muted-foreground">
-                    {session.updatedAt.toLocaleDateString()}
-                  </div>
-                </div>
-                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-6 w-6"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <MoreHorizontal size={12} />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-6 w-6 text-destructive hover:text-destructive"
-                    onClick={(e) => handleDeleteSession(session.id, e)}
-                  >
-                    <Trash2 size={12} />
-                  </Button>
-                </div>
+        <div className="space-y-4">
+          {sortedGroups.map((groupName) => (
+            <div key={groupName} className="space-y-2">
+              {/* Time Group Header */}
+              <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider px-2 py-1">
+                {groupName}
               </div>
-            </Card>
+
+              {/* Sessions in this group */}
+              {groupedSessions[groupName].map((session) => (
+                <Card
+                  key={session.id}
+                  className={cn(
+                    "p-3 cursor-pointer hover:bg-accent/50 transition-colors group",
+                    session.id === activeSessionId && "bg-accent border-primary/50"
+                  )}
+                  onClick={() => handleSessionClick(session.id)}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium truncate text-sm">
+                        {session.title}
+                      </div>
+                      <div className="text-xs text-muted-foreground mt-1">
+                        {session.messages.length} messages
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {format(session.updatedAt, 'MM-dd HH:mm')}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <MoreHorizontal size={12} />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6 text-destructive hover:text-destructive"
+                        onClick={(e) => handleDeleteSession(session.id, e)}
+                      >
+                        <Trash2 size={12} />
+                      </Button>
+                    </div>
+                  </div>
+                </Card>
+              ))}
+            </div>
           ))}
         </div>
       </div>
