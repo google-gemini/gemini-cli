@@ -12,6 +12,7 @@ import {
   isTokenLimitExceededError,
   extractTokenInfo,
   getTokenLimitErrorMessage,
+  estimateTokenCount,
 } from '../utils/tokenErrorHandling.js';
 import {
   ContextCompressor,
@@ -124,6 +125,33 @@ describe('Token Error Handling', () => {
       expect(message).toContain('⚠️');
       expect(message).toContain('5,911,388');
       expect(message).toContain('1,048,576');
+    });
+
+    it('should estimate token count correctly', () => {
+      const content = [
+        { role: 'user' as const, parts: [{ text: 'Hello world' }] },
+        { role: 'assistant' as const, parts: [{ text: 'Hi there!' }] },
+      ];
+
+      const estimatedTokens = estimateTokenCount(content);
+      // "Hello world" = 11 chars → Math.ceil(11/4) = 3 tokens
+      // "Hi there!" = 9 chars → Math.ceil(9/4) = 3 tokens
+      // Total = 6 tokens
+      expect(estimatedTokens).toBe(6);
+    });
+
+    it('should handle empty content', () => {
+      const content: Content[] = [];
+      const estimatedTokens = estimateTokenCount(content);
+      expect(estimatedTokens).toBe(0);
+    });
+
+    it('should handle content without text parts', () => {
+      const content = [
+        { role: 'user' as const, parts: [{ functionCall: { name: 'test' } }] },
+      ];
+      const estimatedTokens = estimateTokenCount(content);
+      expect(estimatedTokens).toBe(0);
     });
   });
 });

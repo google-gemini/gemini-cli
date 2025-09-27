@@ -7,6 +7,7 @@
 import { AuthType } from '../core/contentGenerator.js';
 import { UserTierId } from '../code_assist/types.js';
 import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
+import type { Content } from '@google/genai';
 
 export interface TokenLimitError {
   readonly kind: 'token-limit-exceeded';
@@ -196,3 +197,25 @@ export const DEFAULT_TOKEN_CONFIG: TokenManagerConfig = {
   warningThreshold: 0.8, // Warn at 80%
   compressionThreshold: 0.7, // Compress at 70%
 };
+
+/**
+ * Estimate token count for content (rough estimation)
+ * This is a shared utility function to avoid duplication across modules.
+ *
+ * @param content Array of Content objects to estimate tokens for
+ * @returns Estimated token count
+ */
+export function estimateTokenCount(content: Content[]): number {
+  let totalTokens = 0;
+
+  for (const msg of content) {
+    for (const part of msg.parts) {
+      if (part.text) {
+        // Rough estimation: ~4 characters per token
+        totalTokens += Math.ceil(part.text.length / 4);
+      }
+    }
+  }
+
+  return totalTokens;
+}

@@ -8,6 +8,7 @@ import {
   TokenManager,
   TokenStatus,
   DEFAULT_TOKEN_CONFIG,
+  estimateTokenCount,
 } from './tokenErrorHandling.js';
 import type { Content } from '@google/genai';
 
@@ -142,7 +143,7 @@ export class ProactiveTokenMonitor {
    * Check if content would exceed limits before sending
    */
   checkContentBeforeSend(contents: Content[]): TokenStatus {
-    const estimatedTokens = this.estimateTokenCount(contents);
+    const estimatedTokens = estimateTokenCount(contents);
     return this.tokenManager.checkTokenLimit(estimatedTokens);
   }
 
@@ -224,24 +225,6 @@ export class ProactiveTokenMonitor {
         console.error('Error in token alert callback:', error);
       }
     });
-  }
-
-  /**
-   * Estimate token count for content (rough estimation)
-   */
-  private estimateTokenCount(contents: Content[]): number {
-    let totalTokens = 0;
-
-    for (const content of contents) {
-      for (const part of content.parts) {
-        if (part.text) {
-          // Rough estimation: ~4 characters per token
-          totalTokens += Math.ceil(part.text.length / 4);
-        }
-      }
-    }
-
-    return totalTokens;
   }
 
   /**

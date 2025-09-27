@@ -9,6 +9,7 @@ import {
   TokenManager,
   TokenStatus,
   DEFAULT_TOKEN_CONFIG,
+  estimateTokenCount,
 } from './tokenErrorHandling.js';
 
 export enum CompressionStrategy {
@@ -280,7 +281,7 @@ export class TokenErrorRetryHandler {
     for (let attempt = 0; attempt < retryOptions.maxRetries; attempt++) {
       try {
         // Check if we need compression before making the API call
-        const estimatedTokens = this.estimateTokenCount(currentContent);
+        const estimatedTokens = estimateTokenCount(currentContent);
         const status = this.tokenManager.checkTokenLimit(estimatedTokens);
 
         if (status === TokenStatus.LIMIT_EXCEEDED) {
@@ -315,9 +316,9 @@ export class TokenErrorRetryHandler {
 
         // Update token usage on success
         this.tokenManager.updateTokenUsage({
-          promptTokens: this.estimateTokenCount(currentContent),
+          promptTokens: estimateTokenCount(currentContent),
           completionTokens: 0, // This would be updated with actual response
-          totalTokens: this.estimateTokenCount(currentContent),
+          totalTokens: estimateTokenCount(currentContent),
         });
 
         return result;
@@ -384,24 +385,6 @@ export class TokenErrorRetryHandler {
     }
 
     return false;
-  }
-
-  /**
-   * Rough estimation of token count (this should be replaced with actual tokenizer)
-   */
-  private estimateTokenCount(content: Content[]): number {
-    let totalTokens = 0;
-
-    for (const msg of content) {
-      for (const part of msg.parts) {
-        if (part.text) {
-          // Rough estimation: ~4 characters per token
-          totalTokens += Math.ceil(part.text.length / 4);
-        }
-      }
-    }
-
-    return totalTokens;
   }
 
   /**
