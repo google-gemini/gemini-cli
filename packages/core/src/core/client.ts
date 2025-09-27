@@ -55,10 +55,7 @@ import {
   DEFAULT_TOKEN_CONFIG,
   type TokenStatus,
 } from '../utils/tokenErrorHandling.js';
-import {
-  ContextCompressor,
-  TokenErrorRetryHandler,
-} from '../utils/contextCompression.js';
+import { TokenErrorRetryHandler } from '../utils/contextCompression.js';
 
 export function isThinkingSupported(model: string) {
   return model.startsWith('gemini-2.5') || model === DEFAULT_GEMINI_MODEL_AUTO;
@@ -156,7 +153,6 @@ export class GeminiClient {
   // Token management system
   private readonly tokenManager: TokenManager;
   private readonly tokenErrorRetryHandler: TokenErrorRetryHandler;
-  private readonly contextCompressor: ContextCompressor;
 
   constructor(private readonly config: Config) {
     this.loopDetector = new LoopDetectionService(config);
@@ -169,7 +165,6 @@ export class GeminiClient {
       undefined,
       this.config.getDebugMode() ? console.log : undefined,
     );
-    this.contextCompressor = new ContextCompressor(this.tokenManager);
   }
 
   async initialize() {
@@ -890,7 +885,7 @@ export class GeminiClient {
     let totalTokens = 0;
 
     for (const content of contents) {
-      for (const part of content.parts) {
+      for (const part of content.parts || []) {
         if (part.text) {
           // Rough estimation: ~4 characters per token
           totalTokens += Math.ceil(part.text.length / 4);

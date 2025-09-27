@@ -138,8 +138,8 @@ export function isTokenLimitError(error: unknown): boolean {
     const errorObj = error as Record<string, unknown>;
 
     // Check Error.message
-    if (errorObj.message && typeof errorObj.message === 'string') {
-      const message = errorObj.message;
+    if (errorObj['message'] && typeof errorObj['message'] === 'string') {
+      const message = errorObj['message'];
       return (
         message.includes('exceeds the maximum number of tokens allowed') ||
         (message.includes('INVALID_ARGUMENT') &&
@@ -147,10 +147,10 @@ export function isTokenLimitError(error: unknown): boolean {
       );
     }
 
-    if (errorObj.error && typeof errorObj.error === 'object') {
-      const errorError = errorObj.error as Record<string, unknown>;
-      if (typeof errorError.message === 'string') {
-        return errorError.message.includes(
+    if (errorObj['error'] && typeof errorObj['error'] === 'object') {
+      const errorError = errorObj['error'] as Record<string, unknown>;
+      if (typeof errorError['message'] === 'string') {
+        return errorError['message'].includes(
           'exceeds the maximum number of tokens allowed',
         );
       }
@@ -247,7 +247,7 @@ export function estimateTokenCount(content: Content[]): number {
   let totalTokens = 0;
 
   for (const msg of content) {
-    for (const part of msg.parts) {
+    for (const part of msg.parts || []) {
       if (part.text) {
         // Rough estimation: ~4 characters per token
         totalTokens += Math.ceil(part.text.length / 4);

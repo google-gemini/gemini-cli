@@ -34,17 +34,16 @@ export interface ContextCompressionResult {
   readonly strategy: CompressionStrategy;
 }
 
-export interface RetryOptions {
+export interface TokenRetryOptions {
   readonly maxRetries: number;
   readonly backoffMultiplier: number;
   readonly compressionStrategies: CompressionStrategy[];
 }
 
 export class ContextCompressor {
-  private readonly tokenManager: TokenManager;
-
-  constructor(tokenManager?: TokenManager) {
-    this.tokenManager = tokenManager || new TokenManager(DEFAULT_TOKEN_CONFIG);
+  constructor(_tokenManager?: TokenManager) {
+    // TokenManager is passed but not used in this class
+    // It's only used in TokenErrorRetryHandler
   }
 
   /**
@@ -149,12 +148,13 @@ export class ContextCompressor {
     // Compress older messages more aggressively
     const compressedOlderMessages = olderMessages.map((msg) => ({
       ...msg,
-      parts: msg.parts.map((part) => ({
-        ...part,
-        text: part.text
-          ? this.compressText(part.text, options.summaryRatio)
-          : part.text,
-      })),
+      parts:
+        msg.parts?.map((part) => ({
+          ...part,
+          text: part.text
+            ? this.compressText(part.text, options.summaryRatio)
+            : part.text,
+        })) || [],
     }));
 
     const compressedContent = [...compressedOlderMessages, ...recentMessages];
@@ -243,12 +243,12 @@ export class ContextCompressor {
 export class TokenErrorRetryHandler {
   private readonly compressor: ContextCompressor;
   private readonly tokenManager: TokenManager;
-  private readonly defaultOptions: RetryOptions;
+  private readonly defaultOptions: TokenRetryOptions;
   private readonly logger?: (message: string) => void;
 
   constructor(
     tokenManager?: TokenManager,
-    options?: Partial<RetryOptions>,
+    options?: Partial<TokenRetryOptions>,
     logger?: (message: string) => void,
   ) {
     this.tokenManager = tokenManager || new TokenManager(DEFAULT_TOKEN_CONFIG);
@@ -273,7 +273,7 @@ export class TokenErrorRetryHandler {
   async handleTokenLimitError<T>(
     content: Content[],
     apiCall: (compressedContent: Content[]) => Promise<T>,
-    options?: Partial<RetryOptions>,
+    options?: Partial<TokenRetryOptions>,
   ): Promise<T> {
     const retryOptions = { ...this.defaultOptions, ...options };
     let lastError: Error | null = null;
