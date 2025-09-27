@@ -25,6 +25,7 @@ This documentation is organized into the following sections:
 - **Core Details:** Documentation for `packages/core`.
   - **[Core Introduction](./core/index.md):** Overview of the core component.
   - **[Tools API](./core/tools-api.md):** Information on how the core manages and exposes tools.
+  - **[System Prompt Override](./core/system-prompt.md):** Replace built-in system instructions using `GEMINI_SYSTEM_MD`.
 - **Tools:**
   - **[Tools Overview](./tools/index.md):** Overview of the available tools.
   - **[File System Tools](./tools/file-system.md):** Documentation for the `read_file` and `write_file` tools.
