@@ -4,17 +4,38 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useRef, useCallback, useImperativeHandle, forwardRef } from 'react';
+import { useState, useRef, useCallback, useImperativeHandle, forwardRef, useEffect } from 'react';
 import type React from 'react';
-import { Send, StopCircle, Paperclip, Mic } from 'lucide-react';
+import { Send, StopCircle, Folder, FileSpreadsheet, ChevronDown, Loader2, RefreshCw, Plus, FolderPlus, BookTemplate, Edit, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Textarea } from '@/components/ui/Textarea';
 import { useAppStore } from '@/stores/appStore';
 import { useChatStore } from '@/stores/chatStore';
 import { multiModelService } from '@/services/multiModelService';
+import { useWorkspaceDirectories } from '@/hooks';
 import { cn } from '@/utils/cn';
 import type { ChatMessage, UniversalMessage } from '@/types';
 import { AutocompleteDropdown, useAutocomplete } from './autocomplete';
+
+interface Template {
+  id: string;
+  name?: string;
+  content?: string;
+  template?: string;
+  isBuiltin?: boolean;
+}
+
+interface ElectronAPI {
+  dialog?: {
+    showOpenDialog: (options: {
+      properties: string[];
+      title: string;
+    }) => Promise<{
+      canceled: boolean;
+      filePaths: string[];
+    }>;
+  };
+}
 
 interface MessageInputProps {
   disabled?: boolean;
@@ -29,10 +50,263 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(({ di
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const streamCleanupRef = useRef<(() => void) | null>(null);
+  const [showExcelMenu, setShowExcelMenu] = useState(false);
+  const [workbooks, setWorkbooks] = useState<Array<{name: string; path?: string}>>([]);
+  const [worksheets, setWorksheets] = useState<{ [workbook: string]: Array<{index: number, name: string}> }>({});
+  const [expandedWorkbooks, setExpandedWorkbooks] = useState<{ [workbook: string]: boolean }>({});
+  const [isLoadingWorkbooks, setIsLoadingWorkbooks] = useState(false);
+  const [loadingWorksheets, setLoadingWorksheets] = useState<{ [workbook: string]: boolean }>({});
+  const [workbooksCache, setWorkbooksCache] = useState<Array<{name: string; path?: string}> | null>(null);
+  const [lastCacheTime, setLastCacheTime] = useState<number>(0);
+  const [showWorkspaceMenu, setShowWorkspaceMenu] = useState(false);
+  const [showTemplateMenu, setShowTemplateMenu] = useState(false);
+  const [templates, setTemplates] = useState<Template[]>([]);
+  const [loadingTemplates, setLoadingTemplates] = useState(false);
+  const [editingTemplate, setEditingTemplate] = useState<Template | null>(null);
+  const [editContent, setEditContent] = useState('');
+  const excelMenuRef = useRef<HTMLDivElement>(null);
+  const workspaceMenuRef = useRef<HTMLDivElement>(null);
+  const templateMenuRef = useRef<HTMLDivElement>(null);
   
   const { activeSessionId, updateSession } = useAppStore();
-  const { isStreaming, isThinking, setStreamingMessage, setError, setCompressionNotification, setCurrentOperation } = useChatStore();
-  
+  const { isStreaming, isThinking, currentOperation, setStreamingMessage, setError, setCompressionNotification, setCurrentOperation } = useChatStore();
+  const { directories: workspaceDirectories, loading: loadingDirectories, addDirectory: addWorkspaceDirectory } = useWorkspaceDirectories();
+
+  // Close menus when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (excelMenuRef.current && !excelMenuRef.current.contains(event.target as Node)) {
+        setShowExcelMenu(false);
+      }
+      if (workspaceMenuRef.current && !workspaceMenuRef.current.contains(event.target as Node)) {
+        setShowWorkspaceMenu(false);
+      }
+      if (templateMenuRef.current && !templateMenuRef.current.contains(event.target as Node)) {
+        setShowTemplateMenu(false);
+      }
+    };
+
+    if (showExcelMenu || showWorkspaceMenu || showTemplateMenu) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [showExcelMenu, showWorkspaceMenu, showTemplateMenu]);
+
+  // Load Excel workbooks (with optional force refresh)
+  const loadWorkbooks = async (forceRefresh: boolean = false) => {
+    const now = Date.now();
+    const cacheAge = now - lastCacheTime;
+    const CACHE_DURATION = 30 * 1000; // 30 seconds
+
+    if (!forceRefresh && workbooksCache && cacheAge < CACHE_DURATION) {
+      console.log('Using cached workbooks data');
+      setWorkbooks(workbooksCache);
+      return true;
+    }
+
+    try {
+      console.log('Fetching Excel workbooks...');
+      setIsLoadingWorkbooks(true);
+      const result = await multiModelService.getExcelWorkbooks();
+      console.log('Excel workbooks result:', result);
+      if (result.success) {
+        setWorkbooks(result.workbooks);
+        setWorkbooksCache(result.workbooks);
+        setLastCacheTime(now);
+        return true;
+      } else {
+        console.error('Failed to load Excel workbooks:', result.error);
+        setError(result.error || 'Failed to load Excel workbooks');
+        return false;
+      }
+    } catch (error) {
+      console.error('Error calling getExcelWorkbooks:', error);
+      setError('Failed to connect to Excel');
+      return false;
+    } finally {
+      setIsLoadingWorkbooks(false);
+    }
+  };
+
+  // Load Excel workbooks when menu is opened
+  const handleExcelButtonClick = async () => {
+    console.log('Excel button clicked, showExcelMenu:', showExcelMenu);
+    if (!showExcelMenu) {
+      const success = await loadWorkbooks();
+      if (success) {
+        setShowExcelMenu(true);
+      }
+    } else {
+      setShowExcelMenu(false);
+    }
+  };
+
+  // Handle refresh button click
+  const handleRefreshWorkbooks = async (e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent menu from closing
+    await loadWorkbooks(true); // Force refresh
+  };
+
+  // Handle workspace directory button click
+  const handleWorkspaceButtonClick = () => {
+    console.log('Workspace button clicked, showWorkspaceMenu:', showWorkspaceMenu);
+    setShowWorkspaceMenu(!showWorkspaceMenu);
+  };
+
+  // Handle workspace directory selection
+  const handleWorkspaceSelect = (directoryPath: string) => {
+    const text = directoryPath;
+    setMessage(prev => prev ? prev + ' ' + text : text);
+    setShowWorkspaceMenu(false);
+    textareaRef.current?.focus();
+  };
+
+  // Handle adding new workspace directory
+  const handleAddDirectory = async () => {
+    try {
+      const globalWithElectron = globalThis as unknown as { electronAPI?: ElectronAPI };
+      if (globalWithElectron.electronAPI?.dialog?.showOpenDialog) {
+        const result = await globalWithElectron.electronAPI.dialog.showOpenDialog({
+          properties: ['openDirectory'],
+          title: 'Select Working Directory'
+        });
+
+        if (!result.canceled && result.filePaths.length > 0) {
+          const directoryPath = result.filePaths[0];
+          await addWorkspaceDirectory(directoryPath);
+          console.log('Added working directory:', directoryPath);
+        }
+      } else {
+        // Fallback for non-Electron environments
+        const directory = prompt('Enter directory path:');
+        if (directory?.trim()) {
+          await addWorkspaceDirectory(directory.trim());
+          console.log('Added working directory:', directory.trim());
+        }
+      }
+    } catch (error) {
+      console.error('Failed to add directory:', error);
+      setError('Failed to add directory');
+    }
+  };
+
+  // Handle template button click
+  const handleTemplateButtonClick = async () => {
+    console.log('Template button clicked, showTemplateMenu:', showTemplateMenu);
+    if (!showTemplateMenu) {
+      try {
+        setLoadingTemplates(true);
+        const backendTemplates = await multiModelService.getAllTemplatesAsync();
+        const customTemplates = backendTemplates.filter(template => !template.isBuiltin);
+        setTemplates(customTemplates);
+        setShowTemplateMenu(true);
+        console.log('Templates loaded:', customTemplates.length, 'custom templates');
+      } catch (error) {
+        console.error('Error loading templates:', error);
+        setError('Failed to load templates');
+      } finally {
+        setLoadingTemplates(false);
+      }
+    } else {
+      setShowTemplateMenu(false);
+    }
+  };
+
+  // Handle template selection
+  const handleTemplateSelect = (template: Template) => {
+    const content = template.content || template.template || '';
+    setMessage(content);
+    setShowTemplateMenu(false);
+    textareaRef.current?.focus();
+  };
+
+  // Handle template editing
+  const handleTemplateEdit = (e: React.MouseEvent, template: Template) => {
+    e.stopPropagation();
+    setEditingTemplate(template);
+    setEditContent(template.content || template.template || '');
+    setShowTemplateMenu(false);
+  };
+
+  // Save template edits
+  const handleSaveTemplateEdit = async () => {
+    if (!editingTemplate) return;
+
+    try {
+      await multiModelService.updateCustomTemplate(editingTemplate.id, { content: editContent });
+      // Refresh templates list
+      const backendTemplates = await multiModelService.getAllTemplatesAsync();
+      const customTemplates = backendTemplates.filter(t => !t.isBuiltin);
+      setTemplates(customTemplates);
+      setEditingTemplate(null);
+      setEditContent('');
+    } catch (error) {
+      console.error('Error updating template:', error);
+      setError('Failed to update template');
+    }
+  };
+
+  // Cancel template editing
+  const handleCancelTemplateEdit = () => {
+    setEditingTemplate(null);
+    setEditContent('');
+  };
+
+  // Handle template deletion
+  const handleTemplateDelete = async (e: React.MouseEvent, template: Template) => {
+    e.stopPropagation();
+    if (confirm(`Are you sure you want to delete the template "${template.name || 'Untitled'}"?`)) {
+      try {
+        await multiModelService.deleteCustomTemplate(template.id);
+        // Refresh templates list
+        const backendTemplates = await multiModelService.getAllTemplatesAsync();
+        const customTemplates = backendTemplates.filter(t => !t.isBuiltin);
+        setTemplates(customTemplates);
+      } catch (error) {
+        console.error('Error deleting template:', error);
+        setError('Failed to delete template');
+      }
+    }
+  };
+
+  // Toggle workbook expansion and load worksheets
+  const handleWorkbookClick = async (workbook: {name: string; path?: string}) => {
+    const workbookKey = workbook.name;
+    const isExpanded = expandedWorkbooks[workbookKey];
+
+    if (!isExpanded && !worksheets[workbookKey]) {
+      // Load worksheets if not already loaded
+      setLoadingWorksheets(prev => ({ ...prev, [workbookKey]: true }));
+      try {
+        const result = await multiModelService.getExcelWorksheets(workbook.name);
+        if (result.success) {
+          setWorksheets(prev => ({
+            ...prev,
+            [workbookKey]: result.worksheets
+          }));
+        }
+      } catch (error) {
+        console.error('Failed to load worksheets:', error);
+      } finally {
+        setLoadingWorksheets(prev => ({ ...prev, [workbookKey]: false }));
+      }
+    }
+
+    // Toggle expansion
+    setExpandedWorkbooks(prev => ({
+      ...prev,
+      [workbookKey]: !isExpanded
+    }));
+  };
+
+  // Handle worksheet selection
+  const handleWorksheetSelect = (workbook: string, worksheet: string) => {
+    const text = `${workbook} - ${worksheet}`;
+    setMessage(prev => prev ? prev + ' ' + text : text);
+    setShowExcelMenu(false);
+    textareaRef.current?.focus();
+  };
+
   const adjustTextareaHeight = useCallback(() => {
     const textarea = textareaRef.current;
     if (!textarea) return;
@@ -40,7 +314,8 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(({ di
     textarea.style.height = 'auto';
     const scrollHeight = textarea.scrollHeight;
     const maxHeight = 200; // max height in pixels
-    textarea.style.height = Math.min(scrollHeight, maxHeight) + 'px';
+    const newHeight = Math.min(scrollHeight, maxHeight);
+    textarea.style.height = newHeight + 'px';
   }, []);
 
   useImperativeHandle(ref, () => ({
@@ -458,18 +733,9 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(({ di
   };
 
   return (
-    <div className="border-t border-border bg-card p-4">
+    <div className="p-4">
       <div className="max-w-4xl mx-auto">
-        <div className="flex items-end gap-3">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-10 w-10"
-            disabled={disabled}
-          >
-            <Paperclip size={16} />
-          </Button>
-
+        <div className="flex items-center gap-3">
           <div className="flex-1 relative">
             <Textarea
               ref={textareaRef}
@@ -480,11 +746,278 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(({ di
               onClick={handleTextareaClick}
               disabled={disabled || isStreaming || isThinking}
               className={cn(
-                "min-h-[44px] max-h-[200px] resize-none pr-12",
-                "focus:ring-1 focus:ring-primary/50"
+                "min-h-[44px] max-h-[200px] resize-none",
+                "focus:ring-1 focus:ring-primary/50",
+                "rounded-lg",
+                "transition-all duration-200 ease-in-out",
+                // Custom scrollbar styling
+                "[&::-webkit-scrollbar]:w-2",
+                "[&::-webkit-scrollbar-track]:bg-transparent",
+                "[&::-webkit-scrollbar-thumb]:bg-muted-foreground/20",
+                "[&::-webkit-scrollbar-thumb]:rounded-full",
+                "[&::-webkit-scrollbar-thumb:hover]:bg-muted-foreground/30"
               )}
-              style={{ height: 'auto' }}
+              style={{
+                height: 'auto',
+                paddingTop: '11px',
+                paddingBottom: '13px',
+                paddingLeft: '16px',
+                paddingRight: '100px', // space for buttons in top-right
+                fontSize: '14px',
+                lineHeight: '20px'
+              }}
             />
+
+            {/* Internal buttons container - fixed at top-right */}
+            <div className="absolute right-2 top-1 flex items-center gap-1">
+              {/* Excel button with dropdown menu */}
+              <div className="relative" ref={excelMenuRef}>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 rounded"
+                  disabled={disabled || isLoadingWorkbooks}
+                  onClick={handleExcelButtonClick}
+                  title="Excel Workbooks"
+                >
+                  {isLoadingWorkbooks ? (
+                    <Loader2 size={14} className="animate-spin" />
+                  ) : (
+                    <FileSpreadsheet size={14} />
+                  )}
+                </Button>
+
+                {showExcelMenu && (
+                  <div className="absolute bottom-12 right-0 bg-card border border-border rounded-lg shadow-lg min-w-64 max-h-80 overflow-y-auto z-50">
+                    <div className="p-2">
+                      {isLoadingWorkbooks ? (
+                        <div className="flex items-center px-2 py-4 text-sm text-muted-foreground">
+                          <Loader2 size={16} className="mr-2 animate-spin" />
+                          Loading Excel workbooks...
+                        </div>
+                      ) : workbooks.length > 0 ? (
+                        <>
+                          <div className="flex items-center justify-between mb-2 px-2">
+                            <div className="text-sm font-medium text-foreground">Excel Workbooks</div>
+                            <button
+                              onClick={handleRefreshWorkbooks}
+                              disabled={isLoadingWorkbooks}
+                              className="p-1 hover:bg-muted rounded transition-colors"
+                              title="Refresh workbooks list"
+                            >
+                              <RefreshCw
+                                size={12}
+                                className={cn(
+                                  "text-muted-foreground hover:text-foreground",
+                                  isLoadingWorkbooks && "animate-spin"
+                                )}
+                              />
+                            </button>
+                          </div>
+                          {workbooks.map((workbook, index) => (
+                            <div key={index} className="mb-1">
+                              <button
+                                className="w-full text-left px-2 py-1.5 text-sm hover:bg-muted rounded flex items-center justify-between group"
+                                onClick={() => handleWorkbookClick(workbook)}
+                              >
+                                <span
+                                  className="font-medium text-foreground truncate"
+                                  title={workbook.path || workbook.name}
+                                >
+                                  {workbook.name}
+                                </span>
+                                {loadingWorksheets[workbook.name] ? (
+                                  <Loader2 size={14} className="text-muted-foreground animate-spin" />
+                                ) : (
+                                  <ChevronDown
+                                    size={14}
+                                    className={cn(
+                                      "text-muted-foreground transition-transform",
+                                      expandedWorkbooks[workbook.name] ? "rotate-180" : ""
+                                    )}
+                                  />
+                                )}
+                              </button>
+
+                              {expandedWorkbooks[workbook.name] && (
+                                <div className="ml-4 mt-1 space-y-0.5">
+                                  {loadingWorksheets[workbook.name] ? (
+                                    <div className="flex items-center px-2 py-1 text-xs text-muted-foreground">
+                                      <Loader2 size={12} className="mr-2 animate-spin" />
+                                      Loading worksheets...
+                                    </div>
+                                  ) : worksheets[workbook.name] ? (
+                                    worksheets[workbook.name].map((worksheet) => (
+                                      <button
+                                        key={worksheet.index}
+                                        className="w-full text-left px-2 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded"
+                                        onClick={() => handleWorksheetSelect(workbook.path || workbook.name, worksheet.name)}
+                                      >
+                                        {worksheet.index}: {worksheet.name}
+                                      </button>
+                                    ))
+                                  ) : null}
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </>
+                      ) : (
+                        <div className="text-sm text-muted-foreground px-2">
+                          No Excel workbooks are currently open
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Workspace directory button */}
+              <div className="relative" ref={workspaceMenuRef}>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 rounded"
+                  disabled={disabled}
+                  onClick={handleWorkspaceButtonClick}
+                  title="Workspace Directories"
+                >
+                  <Folder size={14} />
+                </Button>
+
+                {showWorkspaceMenu && (
+                  <div className="absolute bottom-12 right-0 bg-card border border-border rounded-lg shadow-lg min-w-64 max-h-80 overflow-y-auto z-50">
+                    <div className="p-2">
+                      <div className="flex items-center justify-between mb-2 px-2">
+                        <div className="text-sm font-medium text-foreground">Workspace Directories</div>
+                        <button
+                          onClick={handleAddDirectory}
+                          className="p-1 hover:bg-muted rounded transition-colors"
+                          title="Add workspace directory"
+                        >
+                          <Plus
+                            size={12}
+                            className="text-muted-foreground hover:text-foreground"
+                          />
+                        </button>
+                      </div>
+                      {loadingDirectories ? (
+                        <div className="flex items-center px-2 py-4 text-sm text-muted-foreground">
+                          <Loader2 size={16} className="mr-2 animate-spin" />
+                          Loading directories...
+                        </div>
+                      ) : workspaceDirectories.length > 0 ? (
+                        <div className="space-y-1">
+                          {workspaceDirectories.map((directory, index) => (
+                            <button
+                              key={index}
+                              className="w-full text-left px-2 py-1.5 text-sm hover:bg-muted rounded flex items-center gap-2"
+                              onClick={() => handleWorkspaceSelect(directory)}
+                            >
+                              <Folder size={14} className="text-muted-foreground flex-shrink-0" />
+                              <span className="truncate" title={directory}>
+                                {directory}
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          <div className="text-sm text-muted-foreground px-2 py-2">
+                            No workspace directories configured.
+                          </div>
+                          <button
+                            onClick={handleAddDirectory}
+                            className="w-full px-2 py-2 text-sm text-primary hover:bg-muted rounded flex items-center gap-2 justify-center"
+                          >
+                            <FolderPlus size={14} />
+                            Add Directory
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Template button */}
+              <div className="relative" ref={templateMenuRef}>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 rounded"
+                  disabled={disabled || loadingTemplates}
+                  onClick={handleTemplateButtonClick}
+                  title="Prompt Templates"
+                >
+                  {loadingTemplates ? (
+                    <Loader2 size={14} className="animate-spin" />
+                  ) : (
+                    <BookTemplate size={14} />
+                  )}
+                </Button>
+
+                {showTemplateMenu && (
+                  <div className="absolute bottom-12 right-0 bg-card border border-border rounded-lg shadow-lg min-w-96 max-h-80 overflow-y-auto z-50">
+                    <div className="p-2">
+                      <div className="flex items-center justify-between mb-2 px-2">
+                        <div className="text-sm font-medium text-foreground">Prompt Templates</div>
+                      </div>
+                      {loadingTemplates ? (
+                        <div className="flex items-center px-2 py-4 text-sm text-muted-foreground">
+                          <Loader2 size={16} className="mr-2 animate-spin" />
+                          Loading templates...
+                        </div>
+                      ) : templates.length > 0 ? (
+                        <div className="space-y-1">
+                          {templates.map((template, index) => (
+                            <div key={index} className="group relative">
+                              <button
+                                className="w-full text-left px-2 py-2 text-sm hover:bg-muted rounded pr-16"
+                                onClick={() => handleTemplateSelect(template)}
+                                title={template.name || `Template ${index + 1}`}
+                              >
+                                <div className="text-foreground line-clamp-3 whitespace-pre-wrap text-xs leading-relaxed">
+                                  {(template.content || template.template || '').substring(0, 200)}
+                                  {(template.content || template.template || '').length > 200 ? '...' : ''}
+                                </div>
+                                {template.name && (
+                                  <div className="text-xs text-muted-foreground truncate mt-1 font-medium">
+                                    {template.name}
+                                  </div>
+                                )}
+                              </button>
+
+                              {/* Action buttons */}
+                              <div className="absolute top-1 right-1 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button
+                                  onClick={(e) => handleTemplateEdit(e, template)}
+                                  className="p-1 hover:bg-muted-foreground/10 rounded text-muted-foreground hover:text-foreground transition-colors"
+                                  title="Edit template"
+                                >
+                                  <Edit size={12} />
+                                </button>
+                                <button
+                                  onClick={(e) => handleTemplateDelete(e, template)}
+                                  className="p-1 hover:bg-destructive/10 rounded text-muted-foreground hover:text-destructive transition-colors"
+                                  title="Delete template"
+                                >
+                                  <Trash2 size={12} />
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-sm text-muted-foreground px-2 py-2">
+                          No custom templates found.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
 
             <AutocompleteDropdown
               items={autocomplete.items}
@@ -503,37 +1036,65 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(({ di
             />
           </div>
 
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-10 w-10"
-            disabled={disabled}
-          >
-            <Mic size={16} />
-          </Button>
 
-          {isStreaming || isThinking ? (
+          {isStreaming || isThinking || currentOperation !== null ? (
             <Button
               variant="destructive"
               size="icon"
               onClick={handleStopGeneration}
               disabled={false}
-              className="h-10 w-10"
+              className="h-[44px] w-[44px] rounded-lg flex items-center justify-center"
             >
-              <StopCircle size={16} />
+              <StopCircle size={18} />
             </Button>
           ) : (
             <Button
               onClick={handleSendMessage}
               disabled={!message.trim() || disabled}
               size="icon"
-              className="h-10 w-10"
+              className="h-[44px] w-[44px] rounded-lg flex items-center justify-center"
             >
-              <Send size={16} />
+              <Send size={18} />
             </Button>
           )}
         </div>
       </div>
+
+      {/* Template Edit Modal */}
+      {editingTemplate && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100]">
+          <div className="bg-card border border-border rounded-lg shadow-lg w-full max-w-2xl mx-4">
+            <div className="p-4 border-b border-border">
+              <h3 className="text-lg font-medium text-foreground">
+                Edit Template: {editingTemplate.name || 'Untitled'}
+              </h3>
+            </div>
+            <div className="p-4">
+              <Textarea
+                value={editContent}
+                onChange={(e) => setEditContent(e.target.value)}
+                placeholder="Enter template content..."
+                className="min-h-[200px] resize-none"
+                autoFocus
+              />
+            </div>
+            <div className="p-4 border-t border-border flex justify-end gap-2">
+              <Button
+                variant="ghost"
+                onClick={handleCancelTemplateEdit}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleSaveTemplateEdit}
+                disabled={editContent.trim() === ''}
+              >
+                Save Changes
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 });
