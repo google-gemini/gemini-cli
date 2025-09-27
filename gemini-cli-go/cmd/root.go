@@ -1,8 +1,14 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"os"
+
+	"github.com/google-gemini/gemini-cli-go/pkg/auth"
+	"github.com/google-gemini/gemini-cli-go/pkg/config"
+	"github.com/google/generative-ai-go/genai"
+	"google.golang.org/api/option"
 
 	"github.com/spf13/cobra"
 )
@@ -11,6 +17,74 @@ var rootCmd = &cobra.Command{
 	Use:   "gemini",
 	Short: "A CLI for interacting with the Gemini API",
 	Long:  `A command-line interface for Google's Gemini API.`,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		prompt, _ := cmd.Flags().GetString("prompt")
+		if prompt == "" {
+			// If no prompt, just show help (for now)
+			return cmd.Help()
+		}
+
+		// Load configuration
+		cfg, err := config.Load()
+		if err != nil {
+			return fmt.Errorf("failed to load config: %w", err)
+		}
+
+		// Get auth type from config, default to oauth2
+		authType := "oauth2"
+		if cfg.Security != nil && cfg.Security.Auth != nil && cfg.Security.Auth.SelectedType != "" {
+			authType = cfg.Security.Auth.SelectedType
+		}
+
+		// Authenticate
+		authenticator, err := auth.NewAuthenticator(authType)
+		if err != nil {
+			return err
+		}
+		if err := authenticator.Authenticate(); err != nil {
+			// We can't proceed without auth in non-interactive mode
+			return fmt.Errorf("authentication failed: %w", err)
+		}
+		token, err := authenticator.GetToken()
+		if err != nil {
+			return err
+		}
+
+		// Get model from config or flag
+		modelName, _ := cmd.Flags().GetString("model")
+		if modelName == "" && cfg.Model != nil && cfg.Model.Name != "" {
+			modelName = cfg.Model.Name
+		}
+		if modelName == "" {
+			modelName = "gemini-pro" // A sensible default
+		}
+
+		// Create the client
+		ctx := context.Background()
+		client, err := genai.NewClient(ctx, option.WithAPIKey(token))
+		if err != nil {
+			return fmt.Errorf("failed to create client: %w", err)
+		}
+		defer client.Close()
+
+		// Send the prompt
+		model := client.GenerativeModel(modelName)
+		resp, err := model.GenerateContent(ctx, genai.Text(prompt))
+		if err != nil {
+			return fmt.Errorf("failed to generate content: %w", err)
+		}
+
+		// Print the response
+		for _, cand := range resp.Candidates {
+			for _, part := range cand.Content.Parts {
+				if txt, ok := part.(genai.Text); ok {
+					fmt.Println(txt)
+				}
+			}
+		}
+
+		return nil
+	},
 }
 
 func Execute() {
