@@ -148,47 +148,67 @@ describe('useShellHistory', () => {
     mockedFs.readFile.mockResolvedValue('cmd1\ncmd2\ncmd3');
     const { result } = renderHook(() => useShellHistory(MOCKED_PROJECT_ROOT));
 
-    // Wait for history to be loaded: ['cmd3', 'cmd2', 'cmd1']
-    await waitFor(() => expect(mockedFs.readFile).toHaveBeenCalled());
+    // Wait for the file to be read
+    await waitFor(() => {
+      expect(mockedFs.readFile).toHaveBeenCalled();
+    });
 
+    // Initial state: history = ['cmd3', 'cmd2', 'cmd1'], historyIndex = -1
+
+    // First call to getPreviousCommand should return the most recent command
     let command: string | null = null;
-
     act(() => {
-      command = result.current.getPreviousCommand();
+      command = result.current.getPreviousCommand(); // historyIndex becomes 0
     });
     expect(command).toBe('cmd3');
 
+    // Second call should move to the previous command
     act(() => {
-      command = result.current.getPreviousCommand();
+      command = result.current.getPreviousCommand(); // historyIndex becomes 1
     });
     expect(command).toBe('cmd2');
 
+    // Third call should move to the first command
     act(() => {
-      command = result.current.getPreviousCommand();
+      command = result.current.getPreviousCommand(); // historyIndex becomes 2
     });
     expect(command).toBe('cmd1');
 
-    // Should stay at the oldest command
+    // Fourth call should stay at the first command (can't go further back)
     act(() => {
-      command = result.current.getPreviousCommand();
+      command = result.current.getPreviousCommand(); // historyIndex stays 2
     });
     expect(command).toBe('cmd1');
 
+    // Now test getNextCommand - should go forward through history
     act(() => {
-      command = result.current.getNextCommand();
+      command = result.current.getNextCommand(); // historyIndex becomes 1
     });
     expect(command).toBe('cmd2');
 
+    // Go to the most recent command
     act(() => {
-      command = result.current.getNextCommand();
+      command = result.current.getNextCommand(); // historyIndex becomes 0
     });
     expect(command).toBe('cmd3');
 
-    // Should return to the "new command" line (represented as empty string)
+    // Next should return null (back to new command)
     act(() => {
-      command = result.current.getNextCommand();
+      command = result.current.getNextCommand(); // historyIndex becomes -1, returns ''
     });
     expect(command).toBe('');
+
+    // Should stay at the "new command" state and return null
+    act(() => {
+      command = result.current.getNextCommand(); // historyIndex is already -1, returns null
+    });
+    expect(command).toBeNull();
+
+    // Go back to the most recent command
+    act(() => {
+      command = result.current.getPreviousCommand(); // historyIndex becomes 0
+    });
+    expect(command).toBe('cmd3');
   });
 
   it('should not add empty or whitespace-only commands to history', async () => {
