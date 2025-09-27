@@ -42,6 +42,7 @@ const ESC = '\u001B';
 export const PASTE_MODE_PREFIX = `${ESC}[200~`;
 export const PASTE_MODE_SUFFIX = `${ESC}[201~`;
 export const DRAG_COMPLETION_TIMEOUT_MS = 100; // Broadcast full path after 100ms if no more input
+export const KITTY_SEQUENCE_TIMEOUT_MS = 50; // Flush incomplete kitty sequences after 50ms
 export const SINGLE_QUOTE = "'";
 export const DOUBLE_QUOTE = '"';
 
@@ -134,8 +135,41 @@ export function KeypressProvider({
     let isPaste = false;
     let pasteBuffer = Buffer.alloc(0);
     let kittySequenceBuffer = '';
+    let kittySequenceTimeout: NodeJS.Timeout | null = null;
     let backslashTimeout: NodeJS.Timeout | null = null;
     let waitingForEnterAfterBackslash = false;
+
+    // Check if a buffer could potentially be a valid kitty sequence or its prefix
+    const couldBeKittySequence = (buffer: string): boolean => {
+      // Empty buffer could be anything
+      if (!buffer) return true;
+
+      // Must start with ESC[
+      if (!buffer.startsWith(`${ESC}[`)) return false;
+
+      // Too short to determine
+      if (buffer.length < 3) return true;
+
+      // Check for known kitty sequence patterns:
+      // 1. ESC[<digit> - could be CSI-u or tilde-coded
+      // 2. ESC[1;<digit> - parameterized functional
+      // 3. ESC[<letter> - legacy functional keys
+      // 4. ESC[Z - reverse tab
+      const afterCSI = buffer.slice(2);
+
+      // Check if it starts with a digit (could be CSI-u or parameterized)
+      if (/^\d/.test(afterCSI)) return true;
+
+      // Check for known single-letter sequences
+      if (/^[ABCDHFPQRSZ]/.test(afterCSI)) return true;
+
+      // Check for 1; pattern (parameterized sequences)
+      if (/^1;\d/.test(afterCSI)) return true;
+
+      // Anything else starting with ESC[ that doesn't match our patterns
+      // is likely not a kitty sequence we handle
+      return false;
+    };
 
     // Parse a single complete kitty sequence from the start (prefix) of the
     // buffer and return both the Key and the number of characters consumed.
@@ -492,6 +526,11 @@ export function KeypressProvider({
           );
         }
         kittySequenceBuffer = '';
+        // Also clear any pending kitty timeout
+        if (kittySequenceTimeout) {
+          clearTimeout(kittySequenceTimeout);
+          kittySequenceTimeout = null;
+        }
         if (key.sequence === `${ESC}${KITTY_CTRL_C}`) {
           broadcast({
             name: 'c',
@@ -509,14 +548,22 @@ export function KeypressProvider({
       }
 
       if (kittyProtocolEnabled) {
-        if (
-          kittySequenceBuffer ||
-          (key.sequence.startsWith(`${ESC}[`) &&
-            !key.sequence.startsWith(PASTE_MODE_PREFIX) &&
-            !key.sequence.startsWith(PASTE_MODE_SUFFIX) &&
-            !key.sequence.startsWith(FOCUS_IN) &&
-            !key.sequence.startsWith(FOCUS_OUT))
-        ) {
+        // Clear any pending timeout when new input arrives
+        if (kittySequenceTimeout) {
+          clearTimeout(kittySequenceTimeout);
+          kittySequenceTimeout = null;
+        }
+
+        // Check if this could start a kitty sequence
+        const startsWithCSI = key.sequence.startsWith(`${ESC}[`);
+        const isExcluded = [
+          PASTE_MODE_PREFIX,
+          PASTE_MODE_SUFFIX,
+          FOCUS_IN,
+          FOCUS_OUT,
+        ].some((prefix) => key.sequence.startsWith(prefix));
+
+        if (kittySequenceBuffer || (startsWithCSI && !isExcluded)) {
           kittySequenceBuffer += key.sequence;
 
           if (debugKeystrokeLogging) {
@@ -526,77 +573,99 @@ export function KeypressProvider({
             );
           }
 
-          // Try to peel off as many complete sequences as are available at the
-          // start of the buffer. This handles batched inputs cleanly. If the
-          // prefix is incomplete or invalid, skip to the next CSI introducer
-          // (ESC[) so that a following valid sequence can still be parsed.
+          // Try immediate parsing
+          let remainingBuffer = kittySequenceBuffer;
           let parsedAny = false;
-          while (kittySequenceBuffer) {
-            const parsed = parseKittyPrefix(kittySequenceBuffer);
-            if (!parsed) {
-              // Look for the next potential CSI start beyond index 0
-              const nextStart = kittySequenceBuffer.indexOf(`${ESC}[`, 1);
-              if (nextStart > 0) {
-                if (debugKeystrokeLogging) {
-                  console.log(
-                    '[DEBUG] Skipping incomplete/invalid CSI prefix:',
-                    kittySequenceBuffer.slice(0, nextStart),
-                  );
-                }
-                kittySequenceBuffer = kittySequenceBuffer.slice(nextStart);
-                continue;
-              }
-              break;
-            }
-            if (debugKeystrokeLogging) {
-              const parsedSequence = kittySequenceBuffer.slice(
-                0,
-                parsed.length,
-              );
-              if (kittySequenceBuffer.length > parsed.length) {
-                console.log(
-                  '[DEBUG] Kitty sequence parsed successfully (prefix):',
-                  parsedSequence,
-                );
-              } else {
+
+          while (remainingBuffer) {
+            const parsed = parseKittyPrefix(remainingBuffer);
+
+            if (parsed) {
+              if (debugKeystrokeLogging) {
+                const parsedSequence = remainingBuffer.slice(0, parsed.length);
                 console.log(
                   '[DEBUG] Kitty sequence parsed successfully:',
                   parsedSequence,
                 );
               }
-            }
-            // Consume the parsed prefix and broadcast it.
-            kittySequenceBuffer = kittySequenceBuffer.slice(parsed.length);
-            broadcast(parsed.key);
-            parsedAny = true;
-          }
-          if (parsedAny) return;
+              broadcast(parsed.key);
+              remainingBuffer = remainingBuffer.slice(parsed.length);
+              parsedAny = true;
+            } else {
+              // Check if buffer could become a valid kitty sequence
+              const couldBeValid = couldBeKittySequence(remainingBuffer);
 
-          if (config?.getDebugMode() || debugKeystrokeLogging) {
-            const codes = Array.from(kittySequenceBuffer).map((ch) =>
-              ch.charCodeAt(0),
-            );
-            console.warn('Kitty sequence buffer has char codes:', codes);
+              if (!couldBeValid) {
+                // Not a kitty sequence - flush as regular input immediately
+                if (debugKeystrokeLogging) {
+                  console.log(
+                    '[DEBUG] Not a kitty sequence, flushing:',
+                    remainingBuffer,
+                  );
+                }
+                broadcast({
+                  name: '',
+                  ctrl: false,
+                  meta: false,
+                  shift: false,
+                  paste: false,
+                  sequence: remainingBuffer,
+                });
+                remainingBuffer = '';
+              } else if (remainingBuffer.length > MAX_KITTY_SEQUENCE_LENGTH) {
+                // Buffer overflow - log and clear
+                if (debugKeystrokeLogging) {
+                  console.log(
+                    '[DEBUG] Kitty buffer overflow, clearing:',
+                    remainingBuffer,
+                  );
+                }
+                if (config) {
+                  const event = new KittySequenceOverflowEvent(
+                    remainingBuffer.length,
+                    remainingBuffer,
+                  );
+                  logKittySequenceOverflow(config, event);
+                }
+                // Flush as regular input
+                broadcast({
+                  name: '',
+                  ctrl: false,
+                  meta: false,
+                  shift: false,
+                  paste: false,
+                  sequence: remainingBuffer,
+                });
+                remainingBuffer = '';
+              } else {
+                // Could be valid but incomplete - set timeout
+                kittySequenceTimeout = setTimeout(() => {
+                  if (kittySequenceBuffer) {
+                    if (debugKeystrokeLogging) {
+                      console.log(
+                        '[DEBUG] Kitty sequence timeout, flushing:',
+                        kittySequenceBuffer,
+                      );
+                    }
+                    broadcast({
+                      name: '',
+                      ctrl: false,
+                      meta: false,
+                      shift: false,
+                      paste: false,
+                      sequence: kittySequenceBuffer,
+                    });
+                    kittySequenceBuffer = '';
+                  }
+                  kittySequenceTimeout = null;
+                }, KITTY_SEQUENCE_TIMEOUT_MS);
+                break;
+              }
+            }
           }
 
-          if (kittySequenceBuffer.length > MAX_KITTY_SEQUENCE_LENGTH) {
-            if (debugKeystrokeLogging) {
-              console.log(
-                '[DEBUG] Kitty buffer overflow, clearing:',
-                kittySequenceBuffer,
-              );
-            }
-            if (config) {
-              const event = new KittySequenceOverflowEvent(
-                kittySequenceBuffer.length,
-                kittySequenceBuffer,
-              );
-              logKittySequenceOverflow(config, event);
-            }
-            kittySequenceBuffer = '';
-          } else {
-            return;
-          }
+          kittySequenceBuffer = remainingBuffer;
+          if (parsedAny || kittySequenceBuffer) return;
         }
       }
 
@@ -690,6 +759,25 @@ export function KeypressProvider({
       if (backslashTimeout) {
         clearTimeout(backslashTimeout);
         backslashTimeout = null;
+      }
+
+      // Clear kitty sequence timeout
+      if (kittySequenceTimeout) {
+        clearTimeout(kittySequenceTimeout);
+        kittySequenceTimeout = null;
+      }
+
+      // Flush any pending kitty sequence data
+      if (kittySequenceBuffer) {
+        broadcast({
+          name: '',
+          ctrl: false,
+          meta: false,
+          shift: false,
+          paste: false,
+          sequence: kittySequenceBuffer,
+        });
+        kittySequenceBuffer = '';
       }
 
       // Flush any pending paste data to avoid data loss on exit.
