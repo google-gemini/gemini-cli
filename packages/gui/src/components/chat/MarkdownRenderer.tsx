@@ -10,7 +10,6 @@ import { cn } from '@/utils/cn';
 interface MarkdownRendererProps {
   content: string;
   className?: string;
-  isUserMessage?: boolean; // To handle user message styling
 }
 
 interface ParsedContent {
@@ -29,8 +28,7 @@ interface ParsedContent {
 
 export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
   content,
-  className,
-  isUserMessage = false
+  className
 }) => {
   // Parse markdown-like content into structured format
   const parseContent = (text: string): ParsedContent[] => {
@@ -247,7 +245,7 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
               item.level === 2 && "text-base",
               item.level === 3 && "text-sm",
               // Theme-aware text colors
-              isUserMessage ? "text-primary-foreground" : "text-foreground"
+              "text-foreground"
             );
 
             switch (level) {
@@ -315,13 +313,13 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
                 <div className="flex items-start gap-3">
                   <span className={cn(
                     "mt-1 flex-shrink-0",
-                    isUserMessage ? "text-primary-foreground/70" : "text-foreground/70"
+                    "text-foreground/70"
                   )}>
                     {item.isNumbered ? `${listNumber || 1}.` : '•'}
                   </span>
                   <span className={cn(
                     "leading-6",
-                    isUserMessage ? "text-primary-foreground/90" : "text-foreground/90"
+                    "text-foreground/90"
                   )}>
                     {renderInlineFormatting(item.content)}
                   </span>
@@ -335,7 +333,7 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
             <div key={key} className="my-4 p-4 bg-green-500/10 border-l-4 border-green-500 rounded-r-lg">
               <div className={cn(
                 "leading-6",
-                isUserMessage ? "text-primary-foreground" : "text-foreground"
+                "text-foreground"
               )}>
                 {renderInlineFormatting(item.content)}
               </div>
@@ -347,7 +345,7 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
             <div key={key} className="my-4 text-center">
               <div className={cn(
                 "inline-block px-4 py-2 bg-muted rounded-lg font-mono",
-                isUserMessage ? "text-primary-foreground" : "text-foreground"
+                "text-foreground"
               )}>
                 {item.content}
               </div>
@@ -373,7 +371,7 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
                             alignment?.[idx] === 'center' && "text-center",
                             alignment?.[idx] === 'right' && "text-right",
                             (!alignment || alignment[idx] === 'left') && "text-left",
-                            isUserMessage ? "text-primary-foreground" : "text-foreground"
+                            "text-foreground"
                           )}
                         >
                           {renderInlineFormatting(header)}
@@ -392,7 +390,7 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
                               alignment?.[cellIdx] === 'center' && "text-center",
                               alignment?.[cellIdx] === 'right' && "text-right",
                               (!alignment || alignment[cellIdx] === 'left') && "text-left",
-                              isUserMessage ? "text-primary-foreground/90" : "text-foreground/90"
+                              "text-foreground/90"
                             )}
                           >
                             {renderInlineFormatting(cell || '')}
@@ -411,7 +409,7 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
           return (
             <p key={key} className={cn(
               "my-4 leading-7",
-              isUserMessage ? "text-primary-foreground/90" : "text-foreground/90"
+              "text-foreground/90"
             )}>
               {renderInlineFormatting(item.content)}
             </p>
@@ -438,14 +436,14 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
           return (
             <strong key={`${lineIndex}-${partIndex}`} className={cn(
               "font-bold",
-              isUserMessage ? "text-primary-foreground" : "text-foreground"
+              "text-foreground"
             )}>
               {part.slice(2, -2)}
             </strong>
           );
         }
         return <span key={`${lineIndex}-${partIndex}`} className={cn(
-          isUserMessage ? "text-primary-foreground" : "text-foreground"
+          "text-foreground"
         )}>{part}</span>;
       });
 
