@@ -4,8 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { AnyDeclarativeTool, AnyToolInvocation } from '../index.js';
 import { isTool } from '../index.js';
+import type { AnyDeclarativeTool, AnyToolInvocation } from '../tools/tools.js';
+import { splitCommands } from './shell-utils.js';
 
 const SHELL_TOOL_NAMES = ['run_shell_command', 'ShellTool'];
 
@@ -33,44 +34,68 @@ export function doesToolInvocationMatch(
     toolNames = [toolOrToolName as string];
   }
 
-  if (toolNames.some((name) => SHELL_TOOL_NAMES.includes(name))) {
+  const isShellTool = toolNames.some((name) => SHELL_TOOL_NAMES.includes(name));
+  if (isShellTool) {
     toolNames = [...new Set([...toolNames, ...SHELL_TOOL_NAMES])];
   }
 
-  for (const pattern of patterns) {
-    const openParen = pattern.indexOf('(');
+  // Special handling for shell commands to deal with chained commands.
+  if (isShellTool && 'command' in invocation.params) {
+    const command = String((invocation.params as { command: string }).command);
+    const subCommands = splitCommands(command);
 
-    if (openParen === -1) {
-      // No arguments, just a tool name
-      if (toolNames.includes(pattern)) {
-        return true;
-      }
-      continue;
-    }
-
-    const patternToolName = pattern.substring(0, openParen);
-    if (!toolNames.includes(patternToolName)) {
-      continue;
-    }
-
-    if (!pattern.endsWith(')')) {
-      continue;
-    }
-
-    const argPattern = pattern.substring(openParen + 1, pattern.length - 1);
-
-    if (
-      'command' in invocation.params &&
-      toolNames.includes('run_shell_command')
-    ) {
-      const argValue = String(
-        (invocation.params as { command: string }).command,
+    // Every single subcommand must be on the allowlist.
+    return subCommands.every((subCommand) => {
+      const subInvocation = {
+        params: { command: subCommand },
+      } as unknown as AnyToolInvocation;
+      return patterns.some((pattern) =>
+        isSingleCommandAllowed(pattern, toolNames, subInvocation),
       );
-      if (argValue === argPattern || argValue.startsWith(argPattern + ' ')) {
-        return true;
-      }
+    });
+  }
+
+  // Default behavior for all other tools.
+  for (const pattern of patterns) {
+    if (isSingleCommandAllowed(pattern, toolNames, invocation)) {
+      return true;
     }
   }
 
+  return false;
+}
+
+function isSingleCommandAllowed(
+  pattern: string,
+  toolNames: string[],
+  invocation: AnyToolInvocation,
+): boolean {
+  const openParen = pattern.indexOf('(');
+
+  if (openParen === -1) {
+    // No arguments, just a tool name
+    return toolNames.includes(pattern);
+  }
+
+  const patternToolName = pattern.substring(0, openParen);
+  if (!toolNames.includes(patternToolName)) {
+    return false;
+  }
+
+  if (!pattern.endsWith(')')) {
+    return false;
+  }
+
+  const argPattern = pattern.substring(openParen + 1, pattern.length - 1);
+
+  if ('command' in invocation.params) {
+    const argValue = String((invocation.params as { command: string }).command);
+    // The command must either match the pattern exactly, or start with the
+    // pattern followed by a space. This prevents partial matches on chained
+    // commands, e.g., `echo foo` matching `echo foo | echo "evil"`.
+    if (argValue === argPattern || argValue.startsWith(argPattern + ' ')) {
+      return true;
+    }
+  }
   return false;
 }

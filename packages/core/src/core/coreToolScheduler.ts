@@ -1119,7 +1119,11 @@ export class CoreToolScheduler {
         call.status === 'cancelled',
     );
 
-    if (this.toolCalls.length > 0 && allCallsAreTerminal) {
+    if (
+      this.toolCalls.length > 0 &&
+      allCallsAreTerminal &&
+      !this.toolCalls.some((call) => call.status === 'awaiting_approval')
+    ) {
       const completedCalls = [...this.toolCalls] as CompletedToolCall[];
       this.toolCalls = [];
 
@@ -1132,7 +1136,6 @@ export class CoreToolScheduler {
         await this.onAllToolCallsComplete(completedCalls);
         this.isFinalizingToolCalls = false;
       }
-      this.notifyToolCallsUpdate();
       // After completion, process the next item in the queue.
       if (this.requestQueue.length > 0) {
         const next = this.requestQueue.shift()!;

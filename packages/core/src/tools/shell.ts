@@ -33,9 +33,12 @@ import { formatMemoryUsage } from '../utils/formatters.js';
 import type { AnsiOutput } from '../utils/terminalSerializer.js';
 import {
   getCommandRoots,
-  isCommandAllowed,
   stripShellWrapper,
+  splitCommands,
+  detectCommandSubstitution,
 } from '../utils/shell-utils.js';
+import { doesToolInvocationMatch } from '../utils/tool-utils.js';
+import type { AnyToolInvocation } from './tools.js';
 
 export const OUTPUT_UPDATE_INTERVAL_MS = 1000;
 
@@ -75,13 +78,30 @@ export class ShellToolInvocation extends BaseToolInvocation<
     _abortSignal: AbortSignal,
   ): Promise<ToolCallConfirmationDetails | false> {
     const command = stripShellWrapper(this.params.command);
-    const rootCommands = [...new Set(getCommandRoots(command))];
-    const commandsToConfirm = rootCommands.filter(
-      (command) => !this.allowlist.has(command),
-    );
+    const allCommands = splitCommands(command);
+    const globalAllowlist = this.config.getAllowedTools() || [];
+
+    const commandsToConfirm = allCommands.filter((cmd) => {
+      const invocation = {
+        params: { command: cmd },
+      } as unknown as AnyToolInvocation;
+
+      // Check if the command is on the global allowlist.
+      const isGloballyAllowed = doesToolInvocationMatch(
+        'run_shell_command',
+        invocation,
+        globalAllowlist,
+      );
+
+      // Check if the command is on the session allowlist (from "Always Allow").
+      const rootCommand = getCommandRoots([cmd].join(' '))[0];
+      const isSessionAllowed = this.allowlist.has(rootCommand);
+
+      return !isGloballyAllowed && !isSessionAllowed;
+    });
 
     if (commandsToConfirm.length === 0) {
-      return false; // already approved and allowlisted
+      return false; // All parts are approved.
     }
 
     const confirmationDetails: ToolExecuteConfirmationDetails = {
@@ -91,7 +111,10 @@ export class ShellToolInvocation extends BaseToolInvocation<
       rootCommand: commandsToConfirm.join(', '),
       onConfirm: async (outcome: ToolConfirmationOutcome) => {
         if (outcome === ToolConfirmationOutcome.ProceedAlways) {
-          commandsToConfirm.forEach((command) => this.allowlist.add(command));
+          // Add only the root of the commands that were confirmed to the session allowlist.
+          getCommandRoots(commandsToConfirm.join(' ')).forEach((root) =>
+            this.allowlist.add(root),
+          );
         }
       },
     };
@@ -379,22 +402,15 @@ export class ShellTool extends BaseDeclarativeTool<
   protected override validateToolParamValues(
     params: ShellToolParams,
   ): string | null {
-    const commandCheck = isCommandAllowed(params.command, this.config);
-    if (!commandCheck.allowed) {
-      if (!commandCheck.reason) {
-        console.error(
-          'Unexpected: isCommandAllowed returned false without a reason',
-        );
-        return `Command is not allowed: ${params.command}`;
-      }
-      return commandCheck.reason;
+    const { command } = params;
+    if (detectCommandSubstitution(command)) {
+      return 'Command substitution using $(), <(), or >() is not allowed for security reasons';
     }
-    if (!params.command.trim()) {
+
+    if (!command.trim()) {
       return 'Command cannot be empty.';
     }
-    if (getCommandRoots(params.command).length === 0) {
-      return 'Could not identify command root to obtain permission from user.';
-    }
+
     if (params.directory) {
       if (!path.isAbsolute(params.directory)) {
         return 'Directory must be an absolute path.';

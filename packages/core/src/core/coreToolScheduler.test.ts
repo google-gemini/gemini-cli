@@ -33,6 +33,7 @@ import type { Part, PartListUnion } from '@google/genai';
 import { MockModifiableTool, MockTool } from '../test-utils/tools.js';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
+import { ShellTool, ShellToolInvocation } from '../tools/shell.js';
 
 vi.mock('fs/promises', () => ({
   writeFile: vi.fn(),
@@ -214,7 +215,6 @@ describe('CoreToolScheduler', () => {
       tools: new Map(),
       discovery: {},
       registerTool: () => {},
-      getToolByName: () => declarativeTool,
       getToolByDisplayName: () => declarativeTool,
       getTools: () => [],
       discoverTools: async () => {},
@@ -406,7 +406,6 @@ describe('CoreToolScheduler with payload', () => {
       tools: new Map(),
       discovery: {},
       registerTool: () => {},
-      getToolByName: () => declarativeTool,
       getToolByDisplayName: () => declarativeTool,
       getTools: () => [],
       discoverTools: async () => {},
@@ -729,7 +728,6 @@ describe('CoreToolScheduler edit cancellation', () => {
       tools: new Map(),
       discovery: {},
       registerTool: () => {},
-      getToolByName: () => mockEditTool,
       getToolByDisplayName: () => mockEditTool,
       getTools: () => [],
       discoverTools: async () => {},
@@ -824,7 +822,6 @@ describe('CoreToolScheduler YOLO mode', () => {
 
     const mockToolRegistry = {
       getTool: () => declarativeTool,
-      getToolByName: () => declarativeTool,
       // Other properties are not needed for this test but are included for type consistency.
       getFunctionDeclarations: () => [],
       tools: new Map(),
@@ -933,7 +930,6 @@ describe('CoreToolScheduler request queueing', () => {
 
     const mockToolRegistry = {
       getTool: () => declarativeTool,
-      getToolByName: () => declarativeTool,
       getFunctionDeclarations: () => [],
       tools: new Map(),
       discovery: {},
@@ -1061,7 +1057,6 @@ describe('CoreToolScheduler request queueing', () => {
 
     const toolRegistry = {
       getTool: () => declarativeTool,
-      getToolByName: () => declarativeTool,
       getFunctionDeclarations: () => [],
       tools: new Map(),
       discovery: {},
@@ -1163,7 +1158,6 @@ describe('CoreToolScheduler request queueing', () => {
     const declarativeTool = mockTool;
     const mockToolRegistry = {
       getTool: () => declarativeTool,
-      getToolByName: () => declarativeTool,
       getFunctionDeclarations: () => [],
       tools: new Map(),
       discovery: {},
@@ -1290,7 +1284,6 @@ describe('CoreToolScheduler request queueing', () => {
       tools: new Map(),
       config: mockConfig,
       mcpClientManager: undefined,
-      getToolByName: () => testTool,
       getToolByDisplayName: () => testTool,
       getTools: () => [],
       discoverTools: async () => {},
@@ -1610,5 +1603,298 @@ describe('truncateAndSaveToFile', () => {
       expectedPath,
       expectedFileContent,
     );
+  });
+});
+
+describe('CoreToolScheduler Security', () => {
+  it('should await approval for a piped shell command if the prefix is on the allowlist but the suffix is not', async () => {
+    const executeSpy = vi
+      .spyOn(ShellToolInvocation.prototype, 'execute')
+      .mockResolvedValue({ llmContent: 'mocked', returnDisplay: 'mocked' });
+
+    const mockToolRegistry = {
+      getTool: vi.fn(),
+    } as Partial<ToolRegistry> as ToolRegistry;
+
+    const mockConfig = {
+      getToolRegistry: () => mockToolRegistry,
+      getAllowedTools: () => ['run_shell_command(echo foo)'],
+      getApprovalMode: () => ApprovalMode.DEFAULT,
+      getSessionId: () => 'test-session-id',
+      getUsageStatisticsEnabled: () => false,
+      getDebugMode: () => false,
+      getContentGeneratorConfig: () => ({
+        model: 'test-model',
+        authType: 'oauth-personal',
+      }),
+      storage: {
+        getProjectTempDir: () => '/tmp',
+      },
+      getUseSmartEdit: () => false,
+      getEnableToolOutputTruncation: () => false,
+      getGeminiClient: () => null,
+      getExcludeTools: () => [],
+      getCoreTools: () => [],
+      getWorkspaceContext: () => ({
+        getDirectories: () => [],
+      }),
+      getTargetDir: () => '/tmp',
+      getShouldUseNodePtyShell: () => false,
+      getSummarizeToolOutputConfig: () => ({}),
+      getShellExecutionConfig: () => ({}),
+    } as unknown as Config;
+
+    const shellTool = new ShellTool(mockConfig);
+
+    // Now that shellTool is created, we can set the mocks for the registry.
+    (mockToolRegistry.getTool as Mock).mockReturnValue(shellTool);
+
+    const onAllToolCallsComplete = vi.fn();
+    const onToolCallsUpdate = vi.fn();
+
+    const scheduler = new CoreToolScheduler({
+      config: mockConfig,
+      onAllToolCallsComplete,
+      onToolCallsUpdate,
+      getPreferredEditor: () => 'vscode',
+      onEditorClose: vi.fn(),
+    });
+
+    const request = {
+      callId: 'sec-test-1',
+      name: ShellTool.Name,
+      args: { command: 'echo foo | echo "evil"' },
+      isClientInitiated: false,
+      prompt_id: 'prompt-sec-test',
+    };
+
+    scheduler.schedule([request], new AbortController().signal);
+
+    await vi.waitFor(() => {
+      const lastCall = onToolCallsUpdate.mock.calls.at(-1);
+      const toolCalls = lastCall?.[0] as ToolCall[] | undefined;
+      expect(toolCalls).not.toBeUndefined();
+      expect(toolCalls!.length).toBeGreaterThan(0);
+      expect(toolCalls![0].status).toBe('awaiting_approval');
+    });
+
+    expect(executeSpy).not.toHaveBeenCalled();
+  });
+
+  it('should execute a piped shell command in YOLO mode even if the suffix is not on the allowlist', async () => {
+    const executeSpy = vi
+      .spyOn(ShellToolInvocation.prototype, 'execute')
+      .mockResolvedValue({ llmContent: 'mocked', returnDisplay: 'mocked' });
+
+    const mockToolRegistry = {
+      getTool: vi.fn(),
+    } as Partial<ToolRegistry> as ToolRegistry;
+
+    const mockConfig = {
+      getToolRegistry: () => mockToolRegistry,
+      getAllowedTools: () => ['run_shell_command(echo foo)'],
+      getApprovalMode: () => ApprovalMode.YOLO,
+      getSessionId: () => 'test-session-id',
+      getUsageStatisticsEnabled: () => false,
+      getDebugMode: () => false,
+      getContentGeneratorConfig: () => ({
+        model: 'test-model',
+        authType: 'oauth-personal',
+      }),
+      storage: {
+        getProjectTempDir: () => '/tmp',
+      },
+      getUseSmartEdit: () => false,
+      getEnableToolOutputTruncation: () => false,
+      getGeminiClient: () => null,
+      getExcludeTools: () => [],
+      getCoreTools: () => [],
+      getWorkspaceContext: () => ({
+        getDirectories: () => [],
+      }),
+      getTargetDir: () => '/tmp',
+      getShouldUseNodePtyShell: () => false,
+      getSummarizeToolOutputConfig: () => ({}),
+      getShellExecutionConfig: () => ({}),
+    } as unknown as Config;
+
+    const shellTool = new ShellTool(mockConfig);
+
+    // Now that shellTool is created, we can set the mocks for the registry.
+    (mockToolRegistry.getTool as Mock).mockReturnValue(shellTool);
+
+    const onAllToolCallsComplete = vi.fn();
+    const onToolCallsUpdate = vi.fn();
+
+    const scheduler = new CoreToolScheduler({
+      config: mockConfig,
+      onAllToolCallsComplete,
+      onToolCallsUpdate,
+      getPreferredEditor: () => 'vscode',
+      onEditorClose: vi.fn(),
+    });
+
+    const request = {
+      callId: 'sec-test-yolo',
+      name: ShellTool.Name,
+      args: { command: 'echo foo | echo "evil"' },
+      isClientInitiated: false,
+      prompt_id: 'prompt-sec-test-yolo',
+    };
+
+    scheduler.schedule([request], new AbortController().signal);
+
+    await vi.waitFor(() => {
+      const lastCall = onToolCallsUpdate.mock.calls.at(-1);
+      const toolCalls = lastCall?.[0] as ToolCall[] | undefined;
+      expect(toolCalls).not.toBeUndefined();
+      expect(toolCalls!.length).toBeGreaterThan(0);
+      expect(executeSpy).toHaveBeenCalled();
+    });
+  });
+
+  it('should await approval for a command with && if the second part is not on the allowlist', async () => {
+    const executeSpy = vi
+      .spyOn(ShellToolInvocation.prototype, 'execute')
+      .mockResolvedValue({ llmContent: 'mocked', returnDisplay: 'mocked' });
+
+    const mockToolRegistry = {
+      getTool: vi.fn(),
+    } as Partial<ToolRegistry> as ToolRegistry;
+
+    const mockConfig = {
+      getToolRegistry: () => mockToolRegistry,
+      getAllowedTools: () => ['run_shell_command(echo foo)'],
+      getApprovalMode: () => ApprovalMode.DEFAULT,
+      getSessionId: () => 'test-session-id',
+      getUsageStatisticsEnabled: () => false,
+      getDebugMode: () => false,
+      getContentGeneratorConfig: () => ({
+        model: 'test-model',
+        authType: 'oauth-personal',
+      }),
+      storage: {
+        getProjectTempDir: () => '/tmp',
+      },
+      getUseSmartEdit: () => false,
+      getEnableToolOutputTruncation: () => false,
+      getGeminiClient: () => null,
+      getExcludeTools: () => [],
+      getCoreTools: () => [],
+      getWorkspaceContext: () => ({
+        getDirectories: () => [],
+      }),
+      getTargetDir: () => '/tmp',
+      getShouldUseNodePtyShell: () => false,
+      getSummarizeToolOutputConfig: () => ({}),
+      getShellExecutionConfig: () => ({}),
+    } as unknown as Config;
+
+    const shellTool = new ShellTool(mockConfig);
+
+    // Now that shellTool is created, we can set the mocks for the registry.
+    (mockToolRegistry.getTool as Mock).mockReturnValue(shellTool);
+
+    const onAllToolCallsComplete = vi.fn();
+    const onToolCallsUpdate = vi.fn();
+
+    const scheduler = new CoreToolScheduler({
+      config: mockConfig,
+      onAllToolCallsComplete,
+      onToolCallsUpdate,
+      getPreferredEditor: () => 'vscode',
+      onEditorClose: vi.fn(),
+    });
+
+    const request = {
+      callId: 'sec-test-2',
+      name: ShellTool.Name,
+      args: { command: 'echo foo && echo "evil"' },
+      isClientInitiated: false,
+      prompt_id: 'prompt-sec-test-2',
+    };
+
+    scheduler.schedule([request], new AbortController().signal);
+
+    await vi.waitFor(() => {
+      const lastCall = onToolCallsUpdate.mock.calls.at(-1);
+      const toolCalls = lastCall?.[0] as ToolCall[] | undefined;
+      expect(toolCalls).not.toBeUndefined();
+      expect(toolCalls!.length).toBeGreaterThan(0);
+      expect(toolCalls![0].status).toBe('awaiting_approval');
+    });
+
+    expect(executeSpy).not.toHaveBeenCalled();
+  });
+
+  it('should auto-approve a chained command if all parts are on the allowlist', async () => {
+    const executeSpy = vi
+      .spyOn(ShellToolInvocation.prototype, 'execute')
+      .mockResolvedValue({ llmContent: 'mocked', returnDisplay: 'mocked' });
+
+    const mockToolRegistry = {
+      getTool: vi.fn(),
+    } as Partial<ToolRegistry> as ToolRegistry;
+
+    const mockConfig = {
+      getToolRegistry: () => mockToolRegistry,
+      getAllowedTools: () => [
+        'run_shell_command(echo foo)',
+        'run_shell_command(echo bar)',
+      ],
+      getApprovalMode: () => ApprovalMode.DEFAULT,
+      getSessionId: () => 'test-session-id',
+      getUsageStatisticsEnabled: () => false,
+      getDebugMode: () => false,
+      getContentGeneratorConfig: () => ({
+        model: 'test-model',
+        authType: 'oauth-personal',
+      }),
+      storage: {
+        getProjectTempDir: () => '/tmp',
+      },
+      getUseSmartEdit: () => false,
+      getEnableToolOutputTruncation: () => false,
+      getGeminiClient: () => null,
+      getExcludeTools: () => [],
+      getCoreTools: () => [],
+      getWorkspaceContext: () => ({
+        getDirectories: () => [],
+      }),
+      getTargetDir: () => '/tmp',
+      getShouldUseNodePtyShell: () => false,
+      getSummarizeToolOutputConfig: () => ({}),
+      getShellExecutionConfig: () => ({}),
+    } as unknown as Config;
+
+    const shellTool = new ShellTool(mockConfig);
+
+    // Now that shellTool is created, we can set the mocks for the registry.
+    (mockToolRegistry.getTool as Mock).mockReturnValue(shellTool);
+
+    const onAllToolCallsComplete = vi.fn();
+    const onToolCallsUpdate = vi.fn();
+
+    const scheduler = new CoreToolScheduler({
+      config: mockConfig,
+      onAllToolCallsComplete,
+      onToolCallsUpdate,
+      getPreferredEditor: () => 'vscode',
+      onEditorClose: vi.fn(),
+    });
+
+    const request = {
+      callId: 'sec-test-3',
+      name: ShellTool.Name,
+      args: { command: 'echo foo && echo bar' },
+      isClientInitiated: false,
+      prompt_id: 'prompt-sec-test-3',
+    };
+
+    scheduler.schedule([request], new AbortController().signal);
+
+    await vi.waitFor(() => {
+      expect(executeSpy).toHaveBeenCalled();
+    });
   });
 });
