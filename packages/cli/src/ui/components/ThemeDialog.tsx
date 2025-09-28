@@ -206,6 +206,7 @@ def fibonacci(n):
           'python',
           codeBlockHeight,
           colorizeCodeWidth,
+          previewTheme,
         )}
         <Box marginTop={1} />
         <DiffRenderer
