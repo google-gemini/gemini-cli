@@ -264,7 +264,6 @@ export const AppContainer = (props: AppContainerProps) => {
   const isValidPath = useCallback((filePath: string): boolean => {
     try {
       return fs.existsSync(filePath) && fs.statSync(filePath).isFile();
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
     } catch (_) {
       return false;
     }
@@ -286,7 +285,7 @@ export const AppContainer = (props: AppContainerProps) => {
         .filter(
           (item): item is HistoryItem & { type: 'user'; text: string } =>
             item.type === 'user' &&
-            typeof item.text === 'string' &&
+            // typeof item.text === 'string' &&
             item.text.trim() !== '',
         )
         .map((item) => item.text)
