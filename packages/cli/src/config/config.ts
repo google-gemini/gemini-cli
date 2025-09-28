@@ -531,7 +531,10 @@ export async function loadCliConfig(
   const hasPromptWords = argv.promptWords && argv.promptWords.length > 0;
   const interactive =
     !!argv.promptInteractive ||
-    (process.stdin.isTTY && !hasPromptWords && !argv.prompt);
+    (process.stdin.isTTY &&
+      !hasPromptWords &&
+      !argv.prompt &&
+      !argv.experimentalAcp);
   // In non-interactive mode, exclude tools that require a prompt.
   const extraExcludes: string[] = [];
   if (!interactive && !argv.experimentalAcp) {
