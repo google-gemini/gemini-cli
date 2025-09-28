@@ -36,7 +36,9 @@ const mockLoadServerHierarchicalMemory = loadServerHierarchicalMemory as Mock;
 describe('memoryCommand', () => {
   let mockContext: CommandContext;
 
-  const getSubCommand = (name: 'show' | 'add' | 'refresh'): SlashCommand => {
+  const getSubCommand = (
+    name: 'show' | 'add' | 'refresh' | 'list',
+  ): SlashCommand => {
     const subCommand = memoryCommand.subCommands?.find(
       (cmd) => cmd.name === name,
     );
@@ -176,7 +178,7 @@ describe('memoryCommand', () => {
 
       mockContext = createMockCommandContext({
         services: {
-          config: Promise.resolve(mockConfig),
+          config: mockConfig,
           settings: {
             merged: {
               memoryDiscoveryMaxDirs: 1000,
@@ -287,6 +289,56 @@ describe('memoryCommand', () => {
       );
 
       expect(loadServerHierarchicalMemory).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('/memory list', () => {
+    let listCommand: SlashCommand;
+    let mockGetGeminiMdfilePaths: Mock;
+
+    beforeEach(() => {
+      listCommand = getSubCommand('list');
+      mockGetGeminiMdfilePaths = vi.fn();
+      mockContext = createMockCommandContext({
+        services: {
+          config: {
+            getGeminiMdFilePaths: mockGetGeminiMdfilePaths,
+          },
+        },
+      });
+    });
+
+    it('should display a message if no GEMINI.md files are found', async () => {
+      if (!listCommand.action) throw new Error('Command has no action');
+
+      mockGetGeminiMdfilePaths.mockReturnValue([]);
+
+      await listCommand.action(mockContext, '');
+
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
+        {
+          type: MessageType.INFO,
+          text: 'No GEMINI.md files found.',
+        },
+        expect.any(Number),
+      );
+    });
+
+    it('should display the file count and paths if they exist', async () => {
+      if (!listCommand.action) throw new Error('Command has no action');
+
+      const filePaths = ['/path/one/GEMINI.md', '/path/two/GEMINI.md'];
+      mockGetGeminiMdfilePaths.mockReturnValue(filePaths);
+
+      await listCommand.action(mockContext, '');
+
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
+        {
+          type: MessageType.INFO,
+          text: `Found 2 GEMINI.md file(s):\n\n${filePaths.join('\n')}`,
+        },
+        expect.any(Number),
+      );
     });
   });
 });
