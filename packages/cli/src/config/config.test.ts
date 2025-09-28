@@ -2458,4 +2458,11 @@ describe('Telemetry configuration via environment variables', () => {
     );
     expect(config.getTelemetryLogPromptsEnabled()).toBe(false);
   });
+  it('should not be interactive if --experimental-acp is set, even in a TTY', async () => {
+    process.stdin.isTTY = true;
+    process.argv = ['node', 'script.js', '--experimental-acp'];
+    const argv = await parseArguments({} as Settings);
+    const config = await loadCliConfig({}, [], 'test-session', argv);
+    expect(config.isInteractive()).toBe(false);
+  });
 });
