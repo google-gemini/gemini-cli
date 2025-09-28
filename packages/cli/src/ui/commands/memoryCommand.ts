@@ -83,7 +83,7 @@ export const memoryCommand: SlashCommand = {
         try {
           const config = await context.services.config;
           if (config) {
-            const { memoryContent, fileCount } =
+            const { memoryContent, fileCount, filePaths } =
               await loadServerHierarchicalMemory(
                 config.getWorkingDir(),
                 config.shouldLoadMemoryFromIncludeDirectories()
@@ -100,6 +100,7 @@ export const memoryCommand: SlashCommand = {
               );
             config.setUserMemory(memoryContent);
             config.setGeminiMdFileCount(fileCount);
+            config.setGeminiMdFilePaths(filePaths);
 
             const successMessage =
               memoryContent.length > 0
