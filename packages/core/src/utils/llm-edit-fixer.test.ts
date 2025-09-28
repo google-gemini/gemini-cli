@@ -40,7 +40,6 @@ describe('FixLLMEditWithInstruction', () => {
   const mockApiResponse: SearchReplaceEdit = {
     search: '<h1>Old Title</h1>',
     replace: '<h1>New Title</h1>',
-    noChangesRequired: false,
     explanation: 'The original search was correct.',
   };
 
