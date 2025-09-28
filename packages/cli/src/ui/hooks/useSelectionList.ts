@@ -250,19 +250,25 @@ export function useSelectionList<T>({
     dispatch({ type: 'INITIALIZE', payload: { initialIndex, items } });
   }, [initialIndex, items]);
 
+  const onSelectRef = useRef(onSelect);
+  onSelectRef.current = onSelect;
+
+  const onHighlightRef = useRef(onHighlight);
+  onHighlightRef.current = onHighlight;
+
   // Handle side effects based on state changes
   useEffect(() => {
     let needsClear = false;
 
     if (state.pendingHighlight && items[state.activeIndex]) {
-      onHighlight?.(items[state.activeIndex]!.value);
+      onHighlightRef.current?.(items[state.activeIndex]!.value);
       needsClear = true;
     }
 
     if (state.pendingSelect && items[state.activeIndex]) {
       const currentItem = items[state.activeIndex];
       if (currentItem && !currentItem.disabled) {
-        onSelect(currentItem.value);
+        onSelectRef.current(currentItem.value);
       }
       needsClear = true;
     }
@@ -270,14 +276,7 @@ export function useSelectionList<T>({
     if (needsClear) {
       dispatch({ type: 'CLEAR_PENDING_FLAGS' });
     }
-  }, [
-    state.pendingHighlight,
-    state.pendingSelect,
-    state.activeIndex,
-    items,
-    onHighlight,
-    onSelect,
-  ]);
+  }, [state.pendingHighlight, state.pendingSelect, state.activeIndex, items]);
 
   useEffect(
     () => () => {
