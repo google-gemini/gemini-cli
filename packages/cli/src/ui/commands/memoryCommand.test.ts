@@ -318,7 +318,7 @@ describe('memoryCommand', () => {
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
         {
           type: MessageType.INFO,
-          text: 'No GEMINI.md files found.',
+          text: 'No GEMINI.md files in use.',
         },
         expect.any(Number),
       );
@@ -335,7 +335,7 @@ describe('memoryCommand', () => {
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
         {
           type: MessageType.INFO,
-          text: `Found 2 GEMINI.md file(s):\n\n${filePaths.join('\n')}`,
+          text: `There are 2 GEMINI.md file(s) in use:\n\n${filePaths.join('\n')}`,
         },
         expect.any(Number),
       );
