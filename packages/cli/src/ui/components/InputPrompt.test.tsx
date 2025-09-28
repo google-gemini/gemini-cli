@@ -197,6 +197,10 @@ describe('InputPrompt', () => {
       mockReverseSearchCompletion,
     );
 
+    mockedUseKittyKeyboardProtocol.mockReturnValue({
+      supported: false,
+    });
+
     props = {
       buffer: mockBuffer,
       onSubmit: vi.fn(),
@@ -1537,6 +1541,7 @@ describe('InputPrompt', () => {
     let originalTermProgram: string | undefined;
 
     beforeEach(() => {
+      vi.useFakeTimers();
       originalTermProgram = process.env['TERM_PROGRAM'];
       // Default to a non-vscode terminal for tests
       delete process.env['TERM_PROGRAM'];
@@ -1545,6 +1550,7 @@ describe('InputPrompt', () => {
     });
 
     afterEach(() => {
+      vi.useRealTimers();
       process.env['TERM_PROGRAM'] = originalTermProgram;
     });
 
@@ -1555,15 +1561,15 @@ describe('InputPrompt', () => {
       const { stdin, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
       );
-      await wait();
+      await vi.runAllTimersAsync();
 
       // Simulate a paste operation (this should set the paste protection)
       stdin.write(`\x1b[200~pasted content\x1b[201~`);
-      await wait();
+      await vi.runAllTimersAsync();
 
       // Simulate an Enter key press immediately after paste
       stdin.write('\r');
-      await wait();
+      await vi.runAllTimersAsync();
 
       // Verify that onSubmit was NOT called due to recent paste protection
       expect(props.onSubmit).not.toHaveBeenCalled();
@@ -1579,16 +1585,22 @@ describe('InputPrompt', () => {
       const { stdin, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
       );
-      await wait();
+      await vi.runAllTimersAsync();
 
       // Simulate a paste operation (this sets the protection)
-      stdin.write('\x1b[200~pasted text\x1b[201~');
-      // Wait for the protection timeout to naturally expire
-      await wait(20);
+      act(() => {
+        stdin.write('\x1b[200~pasted text\x1b[201~');
+      });
+      await vi.runAllTimersAsync();
+
+      // Advance timers past the protection timeout
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(40);
+      });
 
       // Now Enter should work normally
       stdin.write('\r');
-      await wait();
+      await vi.runAllTimersAsync();
 
       expect(props.onSubmit).toHaveBeenCalledWith('pasted text');
       expect(props.buffer.newline).not.toHaveBeenCalled();
@@ -1617,15 +1629,15 @@ describe('InputPrompt', () => {
         const { stdin, unmount } = renderWithProviders(
           <InputPrompt {...props} />,
         );
-        await wait();
+        await vi.runAllTimersAsync();
 
         // Simulate a paste operation
         stdin.write('\x1b[200~some pasted stuff\x1b[201~');
-        await wait();
+        await vi.runAllTimersAsync();
 
         // Simulate an Enter key press immediately after paste
         stdin.write('\r');
-        await wait();
+        await vi.runAllTimersAsync();
 
         // Verify that onSubmit was called
         expect(props.onSubmit).toHaveBeenCalledWith('pasted command');
@@ -1640,11 +1652,11 @@ describe('InputPrompt', () => {
       const { stdin, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
       );
-      await wait();
+      await vi.runAllTimersAsync();
 
       // Press Enter without any recent paste
       stdin.write('\r');
-      await wait();
+      await vi.runAllTimersAsync();
 
       // Verify that onSubmit was called normally
       expect(props.onSubmit).toHaveBeenCalledWith('normal command');
