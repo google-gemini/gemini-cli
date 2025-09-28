@@ -289,7 +289,7 @@ export const useSlashCommandProcessor = (
 
       const trimmed = rawQuery.trim();
 
-      const isFeedback = ['/thanks', '/good', '/ack', ':)', '👍'].includes(
+      const isFeedback = [':)', '👍'].includes(
         trimmed,
       );
 
