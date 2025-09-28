@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Box, useIsScreenReaderEnabled, useStdout } from 'ink';
+import { useIsScreenReaderEnabled, useStdout } from 'ink';
 import { useUIState } from './contexts/UIStateContext.js';
 import { StreamingContext } from './contexts/StreamingContext.js';
 import { QuittingDisplay } from './components/QuittingDisplay.js';
