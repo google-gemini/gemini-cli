@@ -22,7 +22,7 @@ const __dirname = path.dirname(__filename);
 // --- ---
 
 // Determine the monorepo root (assuming eslint.config.js is at the root)
-const projectRoot = __dirname;
+// const projectRoot = __dirname;
 
 export default tseslint.config(
   {
@@ -113,9 +113,9 @@ export default tseslint.config(
       '@typescript-eslint/no-unused-vars': [
         'error',
         {
-          argsIgnorePattern: '^_',
-          varsIgnorePattern: '^_',
-          caughtErrorsIgnorePattern: '^_',
+          argsIgnorePattern: '^ _',
+          varsIgnorePattern: '^ _',
+          caughtErrorsIgnorePattern: '^ _',
         },
       ],
       'import/no-internal-modules': [
@@ -206,9 +206,9 @@ export default tseslint.config(
       '@typescript-eslint/no-unused-vars': [
         'error',
         {
-          argsIgnorePattern: '^_',
-          varsIgnorePattern: '^_',
-          caughtErrorsIgnorePattern: '^_',
+          argsIgnorePattern: '^ _',
+          varsIgnorePattern: '^ _',
+          caughtErrorsIgnorePattern: '^ _',
         },
       ],
     },
@@ -258,9 +258,9 @@ export default tseslint.config(
       '@typescript-eslint/no-unused-vars': [
         'error',
         {
-          argsIgnorePattern: '^_',
-          varsIgnorePattern: '^_',
-          caughtErrorsIgnorePattern: '^_',
+          argsIgnorePattern: '^ _',
+          varsIgnorePattern: '^ _',
+          caughtErrorsIgnorePattern: '^ _',
         },
       ],
     },
