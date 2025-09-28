@@ -47,6 +47,7 @@ describe('McpClientManager', () => {
       {} as PromptRegistry,
       false,
       {} as WorkspaceContext,
+      '1.0.0',
     );
     await manager.discoverAllMcpTools({
       isTrustedFolder: () => true,
@@ -74,6 +75,7 @@ describe('McpClientManager', () => {
       {} as PromptRegistry,
       false,
       {} as WorkspaceContext,
+      '1.0.0',
     );
     await manager.discoverAllMcpTools({
       isTrustedFolder: () => false,

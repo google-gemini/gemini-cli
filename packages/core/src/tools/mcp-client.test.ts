@@ -35,6 +35,46 @@ describe('mcp-client', () => {
   });
 
   describe('McpClient', () => {
+    it('should create client with correct name and version', () => {
+      const mockClient = vi.fn();
+      vi.mocked(ClientLib.Client).mockImplementation(mockClient);
+
+      new McpClient(
+        'test-server',
+        { command: 'test-command' },
+        {} as ToolRegistry,
+        {} as PromptRegistry,
+        {} as WorkspaceContext,
+        false,
+        '2.1.0',
+      );
+
+      expect(mockClient).toHaveBeenCalledWith({
+        name: 'gemini-cli',
+        version: '2.1.0',
+      });
+    });
+
+    it('should use "unknown" version when not provided', () => {
+      const mockClient = vi.fn();
+      vi.mocked(ClientLib.Client).mockImplementation(mockClient);
+
+      new McpClient(
+        'test-server',
+        { command: 'test-command' },
+        {} as ToolRegistry,
+        {} as PromptRegistry,
+        {} as WorkspaceContext,
+        false,
+        undefined,
+      );
+
+      expect(mockClient).toHaveBeenCalledWith({
+        name: 'gemini-cli',
+        version: 'unknown',
+      });
+    });
+
     it('should discover tools', async () => {
       const mockedClient = {
         connect: vi.fn(),
@@ -71,6 +111,7 @@ describe('mcp-client', () => {
         {} as PromptRegistry,
         {} as WorkspaceContext,
         false,
+        '1.0.0',
       );
       await client.connect();
       await client.discover({} as Config);
@@ -133,6 +174,7 @@ describe('mcp-client', () => {
         {} as PromptRegistry,
         {} as WorkspaceContext,
         false,
+        '1.0.0',
       );
       await client.connect();
       await client.discover({} as Config);
@@ -173,6 +215,7 @@ describe('mcp-client', () => {
         {} as PromptRegistry,
         {} as WorkspaceContext,
         false,
+        '1.0.0',
       );
       await client.connect();
       await expect(client.discover({} as Config)).rejects.toThrow(
