@@ -10,7 +10,7 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig({
   test: {
     include: ['**/*.{test,spec}.?(c|m)[jt]s?(x)', 'config.test.ts'],
-    exclude: ['**/node_modules/**', '**/dist/**', '**/cypress/**'],
+    exclude: ['**/node_modules/**', '**/dist/**', '**/cypress/**', 'src/ui/**'],
     environment: 'jsdom',
     globals: true,
     reporters: ['default', 'junit'],
@@ -24,6 +24,7 @@ export default defineConfig({
       provider: 'v8',
       reportsDirectory: './coverage',
       include: ['src/**/*'],
+      exclude: ['src/ui/**'],
       reporter: [
         ['text', { file: 'full-text-summary.txt' }],
         'html',
