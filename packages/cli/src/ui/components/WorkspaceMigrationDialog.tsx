@@ -98,8 +98,8 @@ export function WorkspaceMigrationDialog(props: {
       <Box marginTop={1}>
         <RadioButtonSelect
           items={[
-            { label: 'Install all', value: 'migrate' },
-            { label: 'Skip', value: 'skip' },
+            { label: 'Install all', value: 'migrate', key: 'migrate' },
+            { label: 'Skip', value: 'skip', key: 'skip' },
           ]}
           onSelect={(value: string) => {
             if (value === 'migrate') {

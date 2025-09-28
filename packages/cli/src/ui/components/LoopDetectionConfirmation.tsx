@@ -38,12 +38,14 @@ export function LoopDetectionConfirmation({
       value: {
         userSelection: 'keep',
       },
+      key: 'Keep loop detection enabled (esc)',
     },
     {
       label: 'Disable loop detection for this session',
       value: {
         userSelection: 'disable',
       },
+      key: 'Disable loop detection for this session',
     },
   ];
 

@@ -53,14 +53,17 @@ export const ShellConfirmationDialog: React.FC<
     {
       label: 'Yes, allow once',
       value: ToolConfirmationOutcome.ProceedOnce,
+      key: 'Yes, allow once',
     },
     {
       label: 'Yes, allow always for this session',
       value: ToolConfirmationOutcome.ProceedAlways,
+      key: 'Yes, allow always for this session',
     },
     {
       label: 'No (esc)',
       value: ToolConfirmationOutcome.Cancel,
+      key: 'No (esc)',
     },
   ];
 
