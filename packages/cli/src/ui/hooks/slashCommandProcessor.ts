@@ -288,21 +288,43 @@ export const useSlashCommandProcessor = (
       }
 
       const trimmed = rawQuery.trim();
+
+      const isFeedback = ['/thanks', '/good', '/ack', ':)', '👍'].includes(
+        trimmed,
+      );
+
+      if (isFeedback) {
+        addItem(
+          {
+            type: MessageType.INFO,
+            text: 'Feedback received. Thank you!',
+          },
+          Date.now(),
+        );
+        return { type: 'handled' };
+      }
+
       if (!trimmed.startsWith('/') && !trimmed.startsWith('?')) {
         return false;
       }
 
       setIsProcessing(true);
 
-      const userMessageTimestamp = Date.now();
-      addItem({ type: MessageType.USER, text: trimmed }, userMessageTimestamp);
-
-      let hasError = false;
       const {
         commandToExecute,
         args,
         canonicalPath: resolvedCommandPath,
       } = parseSlashCommand(trimmed, commands);
+
+      if (!commandToExecute?.isFeedback) {
+        const userMessageTimestamp = Date.now();
+        addItem(
+          { type: MessageType.USER, text: trimmed },
+          userMessageTimestamp,
+        );
+      }
+
+      let hasError = false;
 
       const subcommand =
         resolvedCommandPath.length > 1

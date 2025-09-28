@@ -46,7 +46,7 @@ export const linkCommand: CommandModule = {
         describe: 'The name of the extension to link.',
         type: 'string',
       })
-      .check((_) => true),
+      .check(() => true),
   handler: async (argv) => {
     await handleLink({
       path: argv['path'] as string,

@@ -264,7 +264,8 @@ export const AppContainer = (props: AppContainerProps) => {
   const isValidPath = useCallback((filePath: string): boolean => {
     try {
       return fs.existsSync(filePath) && fs.statSync(filePath).isFile();
-    } catch (_e) {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    } catch (_) {
       return false;
     }
   }, []);
@@ -995,7 +996,9 @@ Logging in with Google... Please restart Gemini CLI to continue.
     if (streamingState === StreamingState.Idle) {
       title = originalTitleRef.current;
     } else {
-      const statusText = thought?.subject?.replace(/[\r\n]+/g, ' ').substring(0, 80);
+      const statusText = thought?.subject
+        ?.replace(/[\r\n]+/g, ' ')
+        .substring(0, 80);
       title = statusText || originalTitleRef.current;
     }
 
