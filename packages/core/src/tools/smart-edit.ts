@@ -32,6 +32,11 @@ import { IdeClient } from '../ide/ide-client.js';
 import { FixLLMEditWithInstruction } from '../utils/llm-edit-fixer.js';
 import { applyReplacement } from './edit.js';
 import { safeLiteralReplace } from '../utils/textUtils.js';
+import { type GeminiClient } from '../core/client.js';
+import {
+  isFunctionCall,
+  isFunctionResponse,
+} from '../utils/messageInspectors.js';
 
 interface ReplacementContext {
   params: EditToolParams;
@@ -44,6 +49,60 @@ interface ReplacementResult {
   occurrences: number;
   finalOldString: string;
   finalNewString: string;
+}
+
+/**
+ * Extracts the timestamp from the .id value, which is in format
+ * <tool.name>-<timestamp>-<uuid>
+ * @param fcnId the ID value of a functionCall or functionResponse object
+ * @returns -1 if the timestamp could not be extracted, else the timestamp (as a number)
+ */
+function getTimestampFromFunctionId(fcnId: string): number {
+  const idParts = fcnId.split('-');
+  if (idParts.length > 2) {
+    const timestamp = parseInt(idParts[1], 10);
+    if (!isNaN(timestamp)) {
+      return timestamp;
+    }
+  }
+  return -1;
+}
+
+/**
+ * Will look through the gemini client history and determine when the most recent
+ * edit to a target file occurred. If no edit happened, it will return -1
+ * @param filePath the path to the file
+ * @param client the geminiClient, so that we can get the history
+ * @returns a DateTime (as a number) of when the last edit occurred, or -1 if no edit was found.
+ */
+async function findLastEditTimestamp(
+  filePath: string,
+  client: GeminiClient,
+): Promise<number> {
+  const history = (await client.getHistory()) ?? [];
+
+  // Iterate backwards to find the most recent relevant action.
+  for (const entry of history.slice().reverse()) {
+    if (!entry.parts) continue;
+
+    for (const part of entry.parts) {
+      let id: string | undefined;
+      let content: unknown;
+
+      if (isFunctionCall(entry) && part.functionCall?.name) {
+        id = part.functionCall.id;
+        content = part.functionCall.args;
+      } else if (isFunctionResponse(entry) && part.functionResponse?.name) {
+        id = part.functionResponse.id;
+        content = part.functionResponse.response;
+      }
+
+      if (id && JSON.stringify(content).includes(filePath)) {
+        return getTimestampFromFunctionId(id);
+      }
+    }
+  }
+  return -1;
 }
 
 function restoreTrailingNewline(
@@ -287,11 +346,33 @@ class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
     abortSignal: AbortSignal,
     originalLineEnding: '\r\n' | '\n',
   ): Promise<CalculatedEdit> {
+    // In order to keep from clobbering edits made outside our system,
+    // check if there was a more recent edit to the file by the user or another
+    // external process.
+    let errorForLlmEditFixer = initialError.raw;
+    const lastEditedByUsTime = await findLastEditTimestamp(
+      params.file_path,
+      this.config.getGeminiClient(),
+    );
+
+    // Add a 2-second buffer to account for timing inaccuracies. If the file
+    // was modified more than a second after the last edit tool was run, we
+    // can send the LLM edit fixer a custom message and the newest file content.
+    if (lastEditedByUsTime > 0) {
+      const stats = fs.statSync(params.file_path);
+      const diff = stats.mtimeMs - lastEditedByUsTime;
+      if (diff > 2000) {
+        currentContent = await this.config
+          .getFileSystemService()
+          .readTextFile(params.file_path);
+        errorForLlmEditFixer = `The initial edit attempt failed with the following error: "${initialError.raw}". However, the file has been modified by either the user or an external process since that edit attempt. The file content provided to you is the latest version. Please base your correction on this new content.`;
+      }
+    }
     const fixedEdit = await FixLLMEditWithInstruction(
       params.instruction,
       params.old_string,
       params.new_string,
-      initialError.raw,
+      errorForLlmEditFixer,
       currentContent,
       this.config.getBaseLlmClient(),
       abortSignal,
