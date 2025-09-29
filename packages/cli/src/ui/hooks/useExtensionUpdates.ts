@@ -7,7 +7,7 @@
 import type { GeminiCLIExtension } from '@google/gemini-cli-core';
 import { getErrorMessage } from '../../utils/errors.js';
 import { ExtensionUpdateState } from '../state/extensions.js';
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
 import { MessageType, type ConfirmationRequest } from '../types.js';
 import {
@@ -32,19 +32,22 @@ export const useExtensionUpdates = (
         onConfirm: (confirmed: boolean) => void;
       }>
     >([]);
-  const addConfirmUpdateExtensionRequest = (original: ConfirmationRequest) => {
-    const wrappedRequest = {
-      prompt: original.prompt,
-      onConfirm: (confirmed: boolean) => {
-        // Remove it from the outstanding list of requests by identity.
-        setConfirmUpdateExtensionRequests((prev) =>
-          prev.filter((r) => r !== wrappedRequest),
-        );
-        original.onConfirm(confirmed);
-      },
-    };
-    setConfirmUpdateExtensionRequests((prev) => [...prev, wrappedRequest]);
-  };
+  const addConfirmUpdateExtensionRequest = useCallback(
+    (original: ConfirmationRequest) => {
+      const wrappedRequest = {
+        prompt: original.prompt,
+        onConfirm: (confirmed: boolean) => {
+          // Remove it from the outstanding list of requests by identity.
+          setConfirmUpdateExtensionRequests((prev) =>
+            prev.filter((r) => r !== wrappedRequest),
+          );
+          original.onConfirm(confirmed);
+        },
+      };
+      setConfirmUpdateExtensionRequests((prev) => [...prev, wrappedRequest]);
+    },
+    [setConfirmUpdateExtensionRequests],
+  );
 
   (async () => {
     if (isChecking) return;
