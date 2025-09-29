@@ -408,7 +408,7 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
         default:
           return (
             <p key={key} className={cn(
-              "my-4 leading-7",
+              "my-4 leading-7 text-left",
               "text-foreground/90"
             )}>
               {renderInlineFormatting(item.content)}
@@ -429,41 +429,81 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
     const lines = processedText.split('<br>');
 
     return lines.map((line, lineIndex) => {
-      // Handle bold text within each line
-      const parts = line.split(/(\*\*[^*]+\*\*)/g);
-      const formattedParts = parts.map((part, partIndex) => {
-        if (part.startsWith('**') && part.endsWith('**')) {
-          return (
-            <strong key={`${lineIndex}-${partIndex}`} className={cn(
-              "font-bold",
-              "text-foreground"
-            )}>
-              {part.slice(2, -2)}
-            </strong>
-          );
-        }
-        return <span key={`${lineIndex}-${partIndex}`} className={cn(
-          "text-foreground"
-        )}>{part}</span>;
-      });
+      // Handle URL detection and linking
+      const processedLine = processLineWithUrls(line);
 
       // Add line break after each line except the last
       if (lineIndex < lines.length - 1) {
         return (
           <React.Fragment key={lineIndex}>
-            {formattedParts}
+            {processedLine}
             <br />
           </React.Fragment>
         );
       }
-      return <React.Fragment key={lineIndex}>{formattedParts}</React.Fragment>;
+      return <React.Fragment key={lineIndex}>{processedLine}</React.Fragment>;
+    });
+  };
+
+  const processLineWithUrls = (line: string) => {
+    // URL regex pattern to detect various URL formats
+    const urlRegex = /(https?:\/\/[^\s]+|www\.[^\s]+|[a-zA-Z0-9][a-zA-Z0-9-]{1,61}[a-zA-Z0-9]\.[a-zA-Z]{2,}[^\s]*)/g;
+
+    // Split the line by URLs while keeping the URLs
+    const parts = line.split(urlRegex);
+
+    return parts.map((part, partIndex) => {
+      // Check if this part is a URL
+      if (urlRegex.test(part)) {
+        // Ensure URL has protocol
+        const href = part.startsWith('http') ? part : `https://${part}`;
+
+        return (
+          <a
+            key={`url-${partIndex}`}
+            href={href}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={cn(
+              "text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300",
+              "underline hover:no-underline",
+              "break-all", // Allow breaking long URLs
+              "inline" // Ensure inline display, not block
+            )}
+          >
+            {part}
+          </a>
+        );
+      }
+
+      // Handle bold text within non-URL parts
+      const boldParts = part.split(/(\*\*[^*]+\*\*)/g);
+      return boldParts.map((boldPart, boldIndex) => {
+        if (boldPart.startsWith('**') && boldPart.endsWith('**')) {
+          return (
+            <strong key={`bold-${partIndex}-${boldIndex}`} className={cn(
+              "font-bold",
+              "text-foreground"
+            )}>
+              {boldPart.slice(2, -2)}
+            </strong>
+          );
+        }
+        return (
+          <span key={`text-${partIndex}-${boldIndex}`} className={cn(
+            "text-foreground"
+          )}>
+            {boldPart}
+          </span>
+        );
+      });
     });
   };
 
   const parsedContent = parseContent(content);
 
   return (
-    <div className={cn("max-w-none", className)}>
+    <div className={cn("max-w-none text-left", className)}>
       {renderContent(parsedContent)}
     </div>
   );
