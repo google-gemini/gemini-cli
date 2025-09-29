@@ -615,7 +615,7 @@ export class ShellExecutionService {
       // process.kill with signal 0 is a way to check for the existence of a process.
       // It doesn't actually send a signal.
       return process.kill(pid, 0);
-    } catch (e) {
+    } catch (_) {
       return false;
     }
   }
