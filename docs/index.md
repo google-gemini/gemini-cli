@@ -11,7 +11,7 @@ Gemini CLI brings the capabilities of Gemini models to your terminal in an inter
 This documentation is organized into the following sections:
 
 ### Get started
-- **[Gemini CLI quickstart](./get-started/index.md):** Let's get started with Gemini CLI.
+- **[Gemini CLI Quickstart](./get-started/index.md):** Let's get started with Gemini CLI.
 - **[Deployment](./get-started/deployment.md):** Install and run Gemini CLI.
 - **[Authentication](./get-started/authentication.md):** Authenticate Gemini CLI.
 - **[Configuration](./get-started/configuration.md):** Information on configuring the CLI.
@@ -40,13 +40,17 @@ This documentation is organized into the following sections:
 - **[Web Search Tool](./tools/web-search.md):** Documentation for the `google_web_search` tool.
 - **[Memory Tool](./tools/memory.md):** Documentation for the `save_memory` tool.
 
-### Other topics
-- **[Execution and Deployment](./get-started/deployment.md):** Information for running Gemini CLI.
-- **[Architecture Overview](./architecture.md):** Understand the high-level design of Gemini CLI, including its components and how they interact.
-- **[Checkpointing](./cli/checkpointing.md):** Documentation for the checkpointing feature.
+### Extensions
 - **[Extensions](./extensions/index.md):** How to extend the CLI with new functionality.
+- **[Extension Releasing](./extensions/extension-releasing.md):** How to release Gemini CLI extensions.
+
+### IDE integration
 - **[IDE Integration](./ide-integration/index.md):** Connect the CLI to your editor.
 - **[IDE Companion Extension Spec](./ide-integration/ide-companion-spec.md):** Spec for building IDE companion extensions.
+
+### Other topics
+- **[Architecture Overview](./architecture.md):** Understand the high-level design of Gemini CLI, including its components and how they interact.
+- **[Checkpointing](./cli/checkpointing.md):** Documentation for the checkpointing feature.
 - **[Telemetry](./cli/telemetry.md):** Overview of telemetry in the CLI.
 - **[Trusted Folders](./cli/trusted-folders.md):** An overview of the Trusted Folders security feature.
 - **[Contributing & Development Guide](../CONTRIBUTING.md):** Information for contributors and developers, including setup, building, testing, and coding conventions.
