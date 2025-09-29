@@ -551,13 +551,13 @@ export async function installExtension(
 function extensionConsentString(extensionConfig: ExtensionConfig): string {
   const output: string[] = [];
   const mcpServerEntries = Object.entries(extensionConfig.mcpServers || {});
-  output.push('Extensions may introduce unexpected behavior.');
+  output.push(`Installing extension "${extensionConfig.name}".`);
   output.push(
-    'Ensure you have investigated the extension source and trust the author.',
+    '**Extensions may introduce unexpected behavior. Ensure you have investigated the extension source and trust the author.**',
   );
 
   if (mcpServerEntries.length) {
-    output.push('This extension will run the following MCP servers:');
+    output.push(`This extension will run the following MCP servers:`);
     for (const [key, mcpServer] of mcpServerEntries) {
       const isLocal = !!mcpServer.command;
       const source =
