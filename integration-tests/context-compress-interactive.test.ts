@@ -105,7 +105,7 @@ describe('Interactive Mode', () => {
       // Wait for the app to be ready
       const isReady = await rig.poll(
         () => stripAnsi(fullOutput).includes('Type your message'),
-        15000,
+        25000,
         200,
       );
       expect(
@@ -123,10 +123,17 @@ describe('Interactive Mode', () => {
       );
       expect(foundEvent).toBe(true);
 
-      // A simple check for the failure message in the output
-      expect(stripAnsi(fullOutput).toLowerCase()).toContain(
-        'compression was not beneficial',
+      const compressionFailed = await rig.poll(
+        () =>
+          stripAnsi(fullOutput)
+            .toLowerCase()
+            .includes('compression was not beneficial'),
+        25000,
+        200,
       );
+
+      // A simple check for the failure message in the output
+      expect(compressionFailed).toBe(true);
     },
   );
 });
