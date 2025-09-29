@@ -163,6 +163,8 @@ describe('useReactToolScheduler in YOLO Mode', () => {
     // Check that execute WAS called
     expect(mockToolRequiresConfirmation.execute).toHaveBeenCalledWith(
       request.args,
+      expect.any(AbortSignal),
+      undefined,
     );
 
     // Check that onComplete was called with success
@@ -309,7 +311,11 @@ describe('useReactToolScheduler', () => {
       await vi.runAllTimersAsync();
     });
 
-    expect(mockTool.execute).toHaveBeenCalledWith(request.args);
+    expect(mockTool.execute).toHaveBeenCalledWith(
+      request.args,
+      expect.any(AbortSignal),
+      undefined,
+    );
     expect(onComplete).toHaveBeenCalledWith([
       expect.objectContaining({
         status: 'success',

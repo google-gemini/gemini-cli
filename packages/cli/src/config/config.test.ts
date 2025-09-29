@@ -2723,7 +2723,16 @@ describe('loadCliConfig interactive', () => {
     process.stdin.isTTY = true;
     process.argv = ['node', 'script.js', '-e', 'none', 'hello'];
     const argv = await parseArguments({} as Settings);
-    const config = await loadCliConfig({}, [], 'test-session', argv);
+    const config = await loadCliConfig(
+      {},
+      [],
+      new ExtensionEnablementManager(
+        ExtensionStorage.getUserExtensionsDir(),
+        argv.extensions,
+      ),
+      'test-session',
+      argv,
+    );
     expect(config.isInteractive()).toBe(false);
     expect(argv.promptWords).toEqual(['hello']);
     expect(argv.extensions).toEqual(['none']);
