@@ -12,6 +12,7 @@ import { env } from 'node:process';
 import { DEFAULT_GEMINI_MODEL } from '../packages/core/src/config/models.js';
 import fs from 'node:fs';
 import * as pty from '@lydell/node-pty';
+import stripAnsi from 'strip-ansi';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -112,21 +113,26 @@ export function validateModelOutput(
   return true;
 }
 
-export function stripAnsi(str: string): string {
-  const ansiRegex = new RegExp(
-    // eslint-disable-next-line no-control-regex
-    '[\\u001B\\u009B][[\\]()#;?]*.{0,2}(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]',
-    'g',
-  );
-  return str.replace(ansiRegex, '');
-}
-
 // Simulates typing a string one character at a time to avoid paste detection.
-export async function type(ptyProcess: pty.IPty, text: string, delay = 5) {
+export async function type(ptyProcess: pty.IPty, text: string) {
+  const delay = 5;
   for (const char of text) {
     ptyProcess.write(char);
     await new Promise((resolve) => setTimeout(resolve, delay));
   }
+}
+
+export async function waitForText(
+  rig: TestRig,
+  fullOutput: string,
+  text: string,
+  waitTime: number,
+) {
+  return await rig.poll(
+    () => stripAnsi(fullOutput).toLowerCase().includes(text.toLowerCase()),
+    waitTime,
+    200,
+  );
 }
 
 interface ParsedLog {
