@@ -909,6 +909,8 @@ Logging in with Google... Please restart Gemini CLI to continue.
         return;
       } else if (keyMatchers[Command.EXIT](key)) {
         if (buffer.text.length > 0) {
+          //Clear the current input instead of exiting
+          buffer.setText('');
           return;
         }
         handleExit(ctrlDPressedOnce, setCtrlDPressedOnce, ctrlDTimerRef);
