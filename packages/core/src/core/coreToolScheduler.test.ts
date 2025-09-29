@@ -109,6 +109,65 @@ class TestApprovalInvocation extends BaseToolInvocation<
   }
 }
 
+class AbortDuringConfirmationInvocation extends BaseToolInvocation<
+  Record<string, unknown>,
+  ToolResult
+> {
+  constructor(
+    private readonly abortController: AbortController,
+    private readonly abortError: Error,
+    params: Record<string, unknown>,
+  ) {
+    super(params);
+  }
+
+  override async shouldConfirmExecute(
+    _signal: AbortSignal,
+  ): Promise<ToolCallConfirmationDetails | false> {
+    this.abortController.abort();
+    throw this.abortError;
+  }
+
+  async execute(_abortSignal: AbortSignal): Promise<ToolResult> {
+    throw new Error('execute should not be called when confirmation fails');
+  }
+
+  getDescription(): string {
+    return 'Abort during confirmation invocation';
+  }
+}
+
+class AbortDuringConfirmationTool extends BaseDeclarativeTool<
+  Record<string, unknown>,
+  ToolResult
+> {
+  constructor(
+    private readonly abortController: AbortController,
+    private readonly abortError: Error,
+  ) {
+    super(
+      'abortDuringConfirmationTool',
+      'Abort During Confirmation Tool',
+      'A tool that aborts while confirming execution.',
+      Kind.Other,
+      {
+        type: 'object',
+        properties: {},
+      },
+    );
+  }
+
+  protected createInvocation(
+    params: Record<string, unknown>,
+  ): ToolInvocation<Record<string, unknown>, ToolResult> {
+    return new AbortDuringConfirmationInvocation(
+      this.abortController,
+      this.abortError,
+      params,
+    );
+  }
+}
+
 async function waitForStatus(
   onToolCallsUpdate: Mock,
   status: 'awaiting_approval' | 'executing' | 'success' | 'error' | 'cancelled',
@@ -176,6 +235,10 @@ describe('CoreToolScheduler', () => {
         model: 'test-model',
         authType: 'oauth-personal',
       }),
+      getShellExecutionConfig: () => ({
+        terminalWidth: 90,
+        terminalHeight: 30,
+      }),
       storage: {
         getProjectTempDir: () => '/tmp',
       },
@@ -184,6 +247,7 @@ describe('CoreToolScheduler', () => {
       getTruncateToolOutputLines: () => DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
       getToolRegistry: () => mockToolRegistry,
       getUseSmartEdit: () => false,
+      getUseModelRouter: () => false,
       getGeminiClient: () => null, // No client needed for these tests
     } as unknown as Config;
 
@@ -213,12 +277,92 @@ describe('CoreToolScheduler', () => {
     expect(completedCalls[0].status).toBe('cancelled');
   });
 
+  it('should mark tool call as cancelled when abort happens during confirmation error', async () => {
+    const abortController = new AbortController();
+    const abortError = new Error('Abort requested during confirmation');
+    const declarativeTool = new AbortDuringConfirmationTool(
+      abortController,
+      abortError,
+    );
+
+    const mockToolRegistry = {
+      getTool: () => declarativeTool,
+      getFunctionDeclarations: () => [],
+      tools: new Map(),
+      discovery: {},
+      registerTool: () => {},
+      getToolByName: () => declarativeTool,
+      getToolByDisplayName: () => declarativeTool,
+      getTools: () => [],
+      discoverTools: async () => {},
+      getAllTools: () => [],
+      getToolsByServer: () => [],
+    } as unknown as ToolRegistry;
+
+    const onAllToolCallsComplete = vi.fn();
+    const onToolCallsUpdate = vi.fn();
+
+    const mockConfig = {
+      getSessionId: () => 'test-session-id',
+      getUsageStatisticsEnabled: () => true,
+      getDebugMode: () => false,
+      getApprovalMode: () => ApprovalMode.DEFAULT,
+      getAllowedTools: () => [],
+      getContentGeneratorConfig: () => ({
+        model: 'test-model',
+        authType: 'oauth-personal',
+      }),
+      getShellExecutionConfig: () => ({
+        terminalWidth: 90,
+        terminalHeight: 30,
+      }),
+      storage: {
+        getProjectTempDir: () => '/tmp',
+      },
+      getTruncateToolOutputThreshold: () =>
+        DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
+      getTruncateToolOutputLines: () => DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
+      getToolRegistry: () => mockToolRegistry,
+      getUseSmartEdit: () => false,
+      getUseModelRouter: () => false,
+      getGeminiClient: () => null,
+    } as unknown as Config;
+
+    const scheduler = new CoreToolScheduler({
+      config: mockConfig,
+      onAllToolCallsComplete,
+      onToolCallsUpdate,
+      getPreferredEditor: () => 'vscode',
+      onEditorClose: vi.fn(),
+    });
+
+    const request = {
+      callId: 'abort-1',
+      name: 'abortDuringConfirmationTool',
+      args: {},
+      isClientInitiated: false,
+      prompt_id: 'prompt-id-abort',
+    };
+
+    await scheduler.schedule([request], abortController.signal);
+
+    expect(onAllToolCallsComplete).toHaveBeenCalled();
+    const completedCalls = onAllToolCallsComplete.mock
+      .calls[0][0] as ToolCall[];
+    expect(completedCalls[0].status).toBe('cancelled');
+    const statuses = onToolCallsUpdate.mock.calls.flatMap((call) =>
+      (call[0] as ToolCall[]).map((toolCall) => toolCall.status),
+    );
+    expect(statuses).not.toContain('error');
+  });
+
   describe('getToolSuggestion', () => {
     it('should suggest the top N closest tool names for a typo', () => {
       // Create mocked tool registry
       const mockConfig = {
         getToolRegistry: () => mockToolRegistry,
         getUseSmartEdit: () => false,
+        getUseModelRouter: () => false,
         getGeminiClient: () => null, // No client needed for these tests
       } as unknown as Config;
       const mockToolRegistry = {
@@ -283,6 +427,10 @@ describe('CoreToolScheduler with payload', () => {
         model: 'test-model',
         authType: 'oauth-personal',
       }),
+      getShellExecutionConfig: () => ({
+        terminalWidth: 90,
+        terminalHeight: 30,
+      }),
       storage: {
         getProjectTempDir: () => '/tmp',
       },
@@ -291,6 +439,7 @@ describe('CoreToolScheduler with payload', () => {
       getTruncateToolOutputLines: () => DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
       getToolRegistry: () => mockToolRegistry,
       getUseSmartEdit: () => false,
+      getUseModelRouter: () => false,
       getGeminiClient: () => null, // No client needed for these tests
     } as unknown as Config;
 
@@ -601,11 +750,16 @@ describe('CoreToolScheduler edit cancellation', () => {
         model: 'test-model',
         authType: 'oauth-personal',
       }),
+      getShellExecutionConfig: () => ({
+        terminalWidth: 90,
+        terminalHeight: 30,
+      }),
       storage: {
         getProjectTempDir: () => '/tmp',
       },
       getToolRegistry: () => mockToolRegistry,
       getUseSmartEdit: () => false,
+      getUseModelRouter: () => false,
       getGeminiClient: () => null, // No client needed for these tests
     } as unknown as Config;
 
@@ -697,6 +851,10 @@ describe('CoreToolScheduler YOLO mode', () => {
         model: 'test-model',
         authType: 'oauth-personal',
       }),
+      getShellExecutionConfig: () => ({
+        terminalWidth: 90,
+        terminalHeight: 30,
+      }),
       storage: {
         getProjectTempDir: () => '/tmp',
       },
@@ -705,6 +863,7 @@ describe('CoreToolScheduler YOLO mode', () => {
         DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
       getTruncateToolOutputLines: () => DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
       getUseSmartEdit: () => false,
+      getUseModelRouter: () => false,
       getGeminiClient: () => null, // No client needed for these tests
     } as unknown as Config;
 
@@ -799,6 +958,10 @@ describe('CoreToolScheduler request queueing', () => {
         model: 'test-model',
         authType: 'oauth-personal',
       }),
+      getShellExecutionConfig: () => ({
+        terminalWidth: 90,
+        terminalHeight: 30,
+      }),
       storage: {
         getProjectTempDir: () => '/tmp',
       },
@@ -807,6 +970,7 @@ describe('CoreToolScheduler request queueing', () => {
       getTruncateToolOutputLines: () => DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
       getToolRegistry: () => mockToolRegistry,
       getUseSmartEdit: () => false,
+      getUseModelRouter: () => false,
       getGeminiClient: () => null, // No client needed for these tests
     } as unknown as Config;
 
@@ -924,6 +1088,12 @@ describe('CoreToolScheduler request queueing', () => {
         model: 'test-model',
         authType: 'oauth-personal',
       }),
+      getShellExecutionConfig: () => ({
+        terminalWidth: 80,
+        terminalHeight: 24,
+      }),
+      getTerminalWidth: vi.fn(() => 80),
+      getTerminalHeight: vi.fn(() => 24),
       storage: {
         getProjectTempDir: () => '/tmp',
       },
@@ -931,6 +1101,7 @@ describe('CoreToolScheduler request queueing', () => {
         DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
       getTruncateToolOutputLines: () => DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
       getUseSmartEdit: () => false,
+      getUseModelRouter: () => false,
       getGeminiClient: () => null, // No client needed for these tests
     } as unknown as Config;
 
@@ -1016,6 +1187,10 @@ describe('CoreToolScheduler request queueing', () => {
         model: 'test-model',
         authType: 'oauth-personal',
       }),
+      getShellExecutionConfig: () => ({
+        terminalWidth: 90,
+        terminalHeight: 30,
+      }),
       storage: {
         getProjectTempDir: () => '/tmp',
       },
@@ -1024,6 +1199,7 @@ describe('CoreToolScheduler request queueing', () => {
       getTruncateToolOutputLines: () => DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
       getToolRegistry: () => mockToolRegistry,
       getUseSmartEdit: () => false,
+      getUseModelRouter: () => false,
       getGeminiClient: () => null, // No client needed for these tests
     } as unknown as Config;
 
@@ -1084,6 +1260,10 @@ describe('CoreToolScheduler request queueing', () => {
       setApprovalMode: (mode: ApprovalMode) => {
         approvalMode = mode;
       },
+      getShellExecutionConfig: () => ({
+        terminalWidth: 90,
+        terminalHeight: 30,
+      }),
       storage: {
         getProjectTempDir: () => '/tmp',
       },
@@ -1091,6 +1271,7 @@ describe('CoreToolScheduler request queueing', () => {
         DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
       getTruncateToolOutputLines: () => DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
       getUseSmartEdit: () => false,
+      getUseModelRouter: () => false,
       getGeminiClient: () => null, // No client needed for these tests
     } as unknown as Config;
 

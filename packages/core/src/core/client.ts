@@ -5,7 +5,6 @@
  */
 
 import type {
-  EmbedContentParameters,
   GenerateContentConfig,
   PartListUnion,
   Content,
@@ -27,71 +26,88 @@ import { reportError } from '../utils/errorReporting.js';
 import { GeminiChat } from './geminiChat.js';
 import { retryWithBackoff } from '../utils/retry.js';
 import { getErrorMessage } from '../utils/errors.js';
-import { isFunctionResponse } from '../utils/messageInspectors.js';
 import { tokenLimit } from './tokenLimits.js';
 import type { ChatRecordingService } from '../services/chatRecordingService.js';
 import type { ContentGenerator } from './contentGenerator.js';
-import { AuthType } from './contentGenerator.js';
 import {
   DEFAULT_GEMINI_FLASH_MODEL,
+  DEFAULT_GEMINI_MODEL,
+  DEFAULT_GEMINI_MODEL_AUTO,
   DEFAULT_THINKING_MODE,
+  getEffectiveModel,
 } from '../config/models.js';
 import { LoopDetectionService } from '../services/loopDetectionService.js';
-import { ideContext } from '../ide/ideContext.js';
+import { ideContextStore } from '../ide/ideContext.js';
 import {
   logChatCompression,
   logNextSpeakerCheck,
-  logMalformedJsonResponse,
 } from '../telemetry/loggers.js';
 import {
   makeChatCompressionEvent,
-  MalformedJsonResponseEvent,
   NextSpeakerCheckEvent,
 } from '../telemetry/types.js';
-import type { IdeContext, File } from '../ide/ideContext.js';
+import type { IdeContext, File } from '../ide/types.js';
+import { handleFallback } from '../fallback/handler.js';
+import type { RoutingContext } from '../routing/routingStrategy.js';
+import { uiTelemetryService } from '../telemetry/uiTelemetry.js';
 
 export function isThinkingSupported(model: string) {
-  if (model.startsWith('gemini-2.5')) return true;
-  return false;
+  return model.startsWith('gemini-2.5') || model === DEFAULT_GEMINI_MODEL_AUTO;
 }
 
 export function isThinkingDefault(model: string) {
-  if (model.startsWith('gemini-2.5-flash-lite')) return false;
-  if (model.startsWith('gemini-2.5')) return true;
-  return false;
+  if (model.startsWith('gemini-2.5-flash-lite')) {
+    return false;
+  }
+  return model.startsWith('gemini-2.5') || model === DEFAULT_GEMINI_MODEL_AUTO;
 }
 
 /**
- * Returns the index of the content after the fraction of the total characters in the history.
+ * Returns the index of the oldest item to keep when compressing. May return
+ * contents.length which indicates that everything should be compressed.
  *
  * Exported for testing purposes.
  */
-export function findIndexAfterFraction(
-  history: Content[],
+export function findCompressSplitPoint(
+  contents: Content[],
   fraction: number,
 ): number {
   if (fraction <= 0 || fraction >= 1) {
     throw new Error('Fraction must be between 0 and 1');
   }
 
-  const contentLengths = history.map(
-    (content) => JSON.stringify(content).length,
-  );
+  const charCounts = contents.map((content) => JSON.stringify(content).length);
+  const totalCharCount = charCounts.reduce((a, b) => a + b, 0);
+  const targetCharCount = totalCharCount * fraction;
 
-  const totalCharacters = contentLengths.reduce(
-    (sum, length) => sum + length,
-    0,
-  );
-  const targetCharacters = totalCharacters * fraction;
-
-  let charactersSoFar = 0;
-  for (let i = 0; i < contentLengths.length; i++) {
-    charactersSoFar += contentLengths[i];
-    if (charactersSoFar >= targetCharacters) {
-      return i;
+  let lastSplitPoint = 0; // 0 is always valid (compress nothing)
+  let cumulativeCharCount = 0;
+  for (let i = 0; i < contents.length; i++) {
+    const content = contents[i];
+    if (
+      content.role === 'user' &&
+      !content.parts?.some((part) => !!part.functionResponse)
+    ) {
+      if (cumulativeCharCount >= targetCharCount) {
+        return i;
+      }
+      lastSplitPoint = i;
     }
+    cumulativeCharCount += charCounts[i];
   }
-  return contentLengths.length;
+
+  // We found no split points after targetCharCount.
+  // Check if it's safe to compress everything.
+  const lastContent = contents[contents.length - 1];
+  if (
+    lastContent?.role === 'model' &&
+    !lastContent?.parts?.some((part) => part.functionCall)
+  ) {
+    return contents.length;
+  }
+
+  // Can't compress everything so just compress at last splitpoint.
+  return lastSplitPoint;
 }
 
 const MAX_TURNS = 100;
@@ -118,6 +134,7 @@ export class GeminiClient {
 
   private readonly loopDetector: LoopDetectionService;
   private lastPromptId: string;
+  private currentSequenceModel: string | null = null;
   private lastSentIdeContext: IdeContext | undefined;
   private forceFullIdeContext = true;
 
@@ -186,6 +203,10 @@ export class GeminiClient {
     return this.chat?.getChatRecordingService();
   }
 
+  getLoopDetectionService(): LoopDetectionService {
+    return this.loopDetector;
+  }
+
   async addDirectoryContext(): Promise<void> {
     if (!this.chat) {
       return;
@@ -221,23 +242,21 @@ export class GeminiClient {
       const userMemory = this.config.getUserMemory();
       const systemInstruction = getCoreSystemPrompt(userMemory);
       const model = this.config.getModel();
-      const generateContentConfigWithThinking = isThinkingSupported(model)
-        ? {
-            ...this.generateContentConfig,
-            thinkingConfig: {
-              thinkingBudget: -1,
-              includeThoughts: true,
-              ...(!isThinkingDefault(model)
-                ? { thinkingBudget: DEFAULT_THINKING_MODE }
-                : {}),
-            },
-          }
-        : this.generateContentConfig;
+
+      const config: GenerateContentConfig = { ...this.generateContentConfig };
+
+      if (isThinkingSupported(model)) {
+        config.thinkingConfig = {
+          includeThoughts: true,
+          thinkingBudget: DEFAULT_THINKING_MODE,
+        };
+      }
+
       return new GeminiChat(
         this.config,
         {
           systemInstruction,
-          ...generateContentConfigWithThinking,
+          ...config,
           tools,
         },
         history,
@@ -257,7 +276,7 @@ export class GeminiClient {
     contextParts: string[];
     newIdeContext: IdeContext | undefined;
   } {
-    const currentIdeContext = ideContext.getIdeContext();
+    const currentIdeContext = ideContextStore.get();
     if (!currentIdeContext) {
       return { contextParts: [], newIdeContext: undefined };
     }
@@ -426,11 +445,11 @@ export class GeminiClient {
     signal: AbortSignal,
     prompt_id: string,
     turns: number = MAX_TURNS,
-    originalModel?: string,
   ): AsyncGenerator<ServerGeminiStreamEvent, Turn> {
     if (this.lastPromptId !== prompt_id) {
       this.loopDetector.reset(prompt_id);
       this.lastPromptId = prompt_id;
+      this.currentSequenceModel = null;
     }
     this.sessionTurnCount++;
     if (
@@ -446,10 +465,7 @@ export class GeminiClient {
       return new Turn(this.getChat(), prompt_id);
     }
 
-    // Track the original model from the first call to detect model switching
-    const initialModel = originalModel || this.config.getModel();
-
-    const compressed = await this.tryCompressChat(prompt_id);
+    const compressed = await this.tryCompressChat(prompt_id, false);
 
     if (compressed.compressionStatus === CompressionStatus.COMPRESSED) {
       yield { type: GeminiEventType.ChatCompressed, value: compressed };
@@ -484,16 +500,39 @@ export class GeminiClient {
 
     const turn = new Turn(this.getChat(), prompt_id);
 
+    const controller = new AbortController();
+    const linkedSignal = AbortSignal.any([signal, controller.signal]);
+
     const loopDetected = await this.loopDetector.turnStarted(signal);
     if (loopDetected) {
       yield { type: GeminiEventType.LoopDetected };
       return turn;
     }
 
-    const resultStream = turn.run(request, signal);
+    const routingContext: RoutingContext = {
+      history: this.getChat().getHistory(/*curated=*/ true),
+      request,
+      signal,
+    };
+
+    let modelToUse: string;
+
+    // Determine Model (Stickiness vs. Routing)
+    if (this.currentSequenceModel) {
+      modelToUse = this.currentSequenceModel;
+    } else {
+      const router = await this.config.getModelRouterService();
+      const decision = await router.route(routingContext);
+      modelToUse = decision.model;
+      // Lock the model for the rest of the sequence
+      this.currentSequenceModel = modelToUse;
+    }
+
+    const resultStream = turn.run(modelToUse, request, linkedSignal);
     for await (const event of resultStream) {
       if (this.loopDetector.addAndCheck(event)) {
         yield { type: GeminiEventType.LoopDetected };
+        controller.abort();
         return turn;
       }
       yield event;
@@ -502,11 +541,8 @@ export class GeminiClient {
       }
     }
     if (!turn.pendingToolCalls.length && signal && !signal.aborted) {
-      // Check if model was switched during the call (likely due to quota error)
-      const currentModel = this.config.getModel();
-      if (currentModel !== initialModel) {
-        // Model was switched (likely due to quota error fallback)
-        // Don't continue with recursive call to prevent unwanted Flash execution
+      // Check if next speaker check is needed
+      if (this.config.getQuotaErrorOccurred()) {
         return turn;
       }
 
@@ -516,8 +552,9 @@ export class GeminiClient {
 
       const nextSpeakerCheck = await checkNextSpeaker(
         this.getChat(),
-        this,
+        this.config.getBaseLlmClient(),
         signal,
+        prompt_id,
       );
       logNextSpeakerCheck(
         this.config,
@@ -536,117 +573,10 @@ export class GeminiClient {
           signal,
           prompt_id,
           boundedTurns - 1,
-          initialModel,
         );
       }
     }
     return turn;
-  }
-
-  async generateJson(
-    contents: Content[],
-    schema: Record<string, unknown>,
-    abortSignal: AbortSignal,
-    model: string,
-    config: GenerateContentConfig = {},
-  ): Promise<Record<string, unknown>> {
-    try {
-      const userMemory = this.config.getUserMemory();
-      const systemInstruction = getCoreSystemPrompt(userMemory);
-      const requestConfig = {
-        abortSignal,
-        ...this.generateContentConfig,
-        ...config,
-      };
-
-      const apiCall = () =>
-        this.getContentGeneratorOrFail().generateContent(
-          {
-            model,
-            config: {
-              ...requestConfig,
-              systemInstruction,
-              responseJsonSchema: schema,
-              responseMimeType: 'application/json',
-            },
-            contents,
-          },
-          this.lastPromptId,
-        );
-
-      const result = await retryWithBackoff(apiCall, {
-        onPersistent429: async (authType?: string, error?: unknown) =>
-          await this.handleFlashFallback(authType, error),
-        authType: this.config.getContentGeneratorConfig()?.authType,
-      });
-
-      let text = getResponseText(result);
-      if (!text) {
-        const error = new Error(
-          'API returned an empty response for generateJson.',
-        );
-        await reportError(
-          error,
-          'Error in generateJson: API returned an empty response.',
-          contents,
-          'generateJson-empty-response',
-        );
-        throw error;
-      }
-
-      const prefix = '```json';
-      const suffix = '```';
-      if (text.startsWith(prefix) && text.endsWith(suffix)) {
-        logMalformedJsonResponse(
-          this.config,
-          new MalformedJsonResponseEvent(model),
-        );
-        text = text
-          .substring(prefix.length, text.length - suffix.length)
-          .trim();
-      }
-
-      try {
-        return JSON.parse(text);
-      } catch (parseError) {
-        await reportError(
-          parseError,
-          'Failed to parse JSON response from generateJson.',
-          {
-            responseTextFailedToParse: text,
-            originalRequestContents: contents,
-          },
-          'generateJson-parse',
-        );
-        throw new Error(
-          `Failed to parse API response as JSON: ${getErrorMessage(
-            parseError,
-          )}`,
-        );
-      }
-    } catch (error) {
-      if (abortSignal.aborted) {
-        throw error;
-      }
-
-      // Avoid double reporting for the empty response case handled above
-      if (
-        error instanceof Error &&
-        error.message === 'API returned an empty response for generateJson.'
-      ) {
-        throw error;
-      }
-
-      await reportError(
-        error,
-        'Error generating JSON content via API.',
-        contents,
-        'generateJson-api',
-      );
-      throw new Error(
-        `Failed to generate JSON content: ${getErrorMessage(error)}`,
-      );
-    }
   }
 
   async generateContent(
@@ -655,6 +585,8 @@ export class GeminiClient {
     abortSignal: AbortSignal,
     model: string,
   ): Promise<GenerateContentResponse> {
+    let currentAttemptModel: string = model;
+
     const configToUse: GenerateContentConfig = {
       ...this.generateContentConfig,
       ...generationConfig,
@@ -670,19 +602,30 @@ export class GeminiClient {
         systemInstruction,
       };
 
-      const apiCall = () =>
-        this.getContentGeneratorOrFail().generateContent(
+      const apiCall = () => {
+        const modelToUse = this.config.isInFallbackMode()
+          ? DEFAULT_GEMINI_FLASH_MODEL
+          : model;
+        currentAttemptModel = modelToUse;
+
+        return this.getContentGeneratorOrFail().generateContent(
           {
-            model,
+            model: modelToUse,
             config: requestConfig,
             contents,
           },
           this.lastPromptId,
         );
+      };
+      const onPersistent429Callback = async (
+        authType?: string,
+        error?: unknown,
+      ) =>
+        // Pass the captured model to the centralized handler.
+        await handleFallback(this.config, currentAttemptModel, authType, error);
 
       const result = await retryWithBackoff(apiCall, {
-        onPersistent429: async (authType?: string, error?: unknown) =>
-          await this.handleFlashFallback(authType, error),
+        onPersistent429: onPersistent429Callback,
         authType: this.config.getContentGeneratorConfig()?.authType,
       });
       return result;
@@ -693,7 +636,7 @@ export class GeminiClient {
 
       await reportError(
         error,
-        `Error generating content via API with model ${model}.`,
+        `Error generating content via API with model ${currentAttemptModel}.`,
         {
           requestContents: contents,
           requestConfig: configToUse,
@@ -701,50 +644,27 @@ export class GeminiClient {
         'generateContent-api',
       );
       throw new Error(
-        `Failed to generate content with model ${model}: ${getErrorMessage(error)}`,
+        `Failed to generate content with model ${currentAttemptModel}: ${getErrorMessage(error)}`,
       );
     }
-  }
-
-  async generateEmbedding(texts: string[]): Promise<number[][]> {
-    if (!texts || texts.length === 0) {
-      return [];
-    }
-    const embedModelParams: EmbedContentParameters = {
-      model: this.config.getEmbeddingModel(),
-      contents: texts,
-    };
-
-    const embedContentResponse =
-      await this.getContentGeneratorOrFail().embedContent(embedModelParams);
-    if (
-      !embedContentResponse.embeddings ||
-      embedContentResponse.embeddings.length === 0
-    ) {
-      throw new Error('No embeddings found in API response.');
-    }
-
-    if (embedContentResponse.embeddings.length !== texts.length) {
-      throw new Error(
-        `API returned a mismatched number of embeddings. Expected ${texts.length}, got ${embedContentResponse.embeddings.length}.`,
-      );
-    }
-
-    return embedContentResponse.embeddings.map((embedding, index) => {
-      const values = embedding.values;
-      if (!values || values.length === 0) {
-        throw new Error(
-          `API returned an empty embedding for input text at index ${index}: "${texts[index]}"`,
-        );
-      }
-      return values;
-    });
   }
 
   async tryCompressChat(
     prompt_id: string,
     force: boolean = false,
   ): Promise<ChatCompressionInfo> {
+    // If the model is 'auto', we will use a placeholder model to check.
+    // Compression occurs before we choose a model, so calling `count_tokens`
+    // before the model is chosen would result in an error.
+    const configModel = this.config.getModel();
+    let model: string =
+      configModel === DEFAULT_GEMINI_MODEL_AUTO
+        ? DEFAULT_GEMINI_MODEL
+        : configModel;
+
+    // Check if the model needs to be a fallback
+    model = getEffectiveModel(this.config.isInFallbackMode(), model);
+
     const curatedHistory = this.getChat().getHistory(true);
 
     // Regardless of `force`, don't do anything if the history is empty.
@@ -759,23 +679,7 @@ export class GeminiClient {
       };
     }
 
-    const model = this.config.getModel();
-
-    const { totalTokens: originalTokenCount } =
-      await this.getContentGeneratorOrFail().countTokens({
-        model,
-        contents: curatedHistory,
-      });
-    if (originalTokenCount === undefined) {
-      console.warn(`Could not determine token count for model ${model}.`);
-      this.hasFailedCompressionAttempt = !force && true;
-      return {
-        originalTokenCount: 0,
-        newTokenCount: 0,
-        compressionStatus:
-          CompressionStatus.COMPRESSION_FAILED_TOKEN_COUNT_ERROR,
-      };
-    }
+    const originalTokenCount = uiTelemetryService.getLastPromptTokenCount();
 
     const contextPercentageThreshold =
       this.config.getChatCompression()?.contextPercentageThreshold;
@@ -793,36 +697,38 @@ export class GeminiClient {
       }
     }
 
-    let compressBeforeIndex = findIndexAfterFraction(
+    const splitPoint = findCompressSplitPoint(
       curatedHistory,
       1 - COMPRESSION_PRESERVE_THRESHOLD,
     );
-    // Find the first user message after the index. This is the start of the next turn.
-    while (
-      compressBeforeIndex < curatedHistory.length &&
-      (curatedHistory[compressBeforeIndex]?.role === 'model' ||
-        isFunctionResponse(curatedHistory[compressBeforeIndex]))
-    ) {
-      compressBeforeIndex++;
-    }
 
-    const historyToCompress = curatedHistory.slice(0, compressBeforeIndex);
-    const historyToKeep = curatedHistory.slice(compressBeforeIndex);
+    const historyToCompress = curatedHistory.slice(0, splitPoint);
+    const historyToKeep = curatedHistory.slice(splitPoint);
 
-    this.getChat().setHistory(historyToCompress);
-
-    const { text: summary } = await this.getChat().sendMessage(
-      {
-        message: {
-          text: 'First, reason in your scratchpad. Then, generate the <state_snapshot>.',
+    const summaryResponse = await this.config
+      .getContentGenerator()
+      .generateContent(
+        {
+          model,
+          contents: [
+            ...historyToCompress,
+            {
+              role: 'user',
+              parts: [
+                {
+                  text: 'First, reason in your scratchpad. Then, generate the <state_snapshot>.',
+                },
+              ],
+            },
+          ],
+          config: {
+            systemInstruction: { text: getCompressionPrompt() },
+          },
         },
-        config: {
-          systemInstruction: { text: getCompressionPrompt() },
-          maxOutputTokens: originalTokenCount,
-        },
-      },
-      prompt_id,
-    );
+        prompt_id,
+      );
+    const summary = getResponseText(summaryResponse) ?? '';
+
     const chat = await this.startChat([
       {
         role: 'user',
@@ -836,22 +742,13 @@ export class GeminiClient {
     ]);
     this.forceFullIdeContext = true;
 
-    const { totalTokens: newTokenCount } =
-      await this.getContentGeneratorOrFail().countTokens({
-        // model might change after calling `sendMessage`, so we get the newest value from config
-        model: this.config.getModel(),
-        contents: chat.getHistory(),
-      });
-    if (newTokenCount === undefined) {
-      console.warn('Could not determine compressed history token count.');
-      this.hasFailedCompressionAttempt = !force && true;
-      return {
-        originalTokenCount,
-        newTokenCount: originalTokenCount,
-        compressionStatus:
-          CompressionStatus.COMPRESSION_FAILED_TOKEN_COUNT_ERROR,
-      };
-    }
+    // Estimate token count 1 token ≈ 4 characters
+    const newTokenCount = Math.floor(
+      chat
+        .getHistory()
+        .reduce((total, content) => total + JSON.stringify(content).length, 0) /
+        4,
+    );
 
     logChatCompression(
       this.config,
@@ -862,7 +759,6 @@ export class GeminiClient {
     );
 
     if (newTokenCount > originalTokenCount) {
-      this.getChat().setHistory(curatedHistory);
       this.hasFailedCompressionAttempt = !force && true;
       return {
         originalTokenCount,
@@ -872,6 +768,7 @@ export class GeminiClient {
       };
     } else {
       this.chat = chat; // Chat compression successful, set new state.
+      uiTelemetryService.setLastPromptTokenCount(newTokenCount);
     }
 
     return {
@@ -879,53 +776,6 @@ export class GeminiClient {
       newTokenCount,
       compressionStatus: CompressionStatus.COMPRESSED,
     };
-  }
-
-  /**
-   * Handles falling back to Flash model when persistent 429 errors occur for OAuth users.
-   * Uses a fallback handler if provided by the config; otherwise, returns null.
-   */
-  private async handleFlashFallback(
-    authType?: string,
-    error?: unknown,
-  ): Promise<string | null> {
-    // Only handle fallback for OAuth users
-    if (authType !== AuthType.LOGIN_WITH_GOOGLE) {
-      return null;
-    }
-
-    const currentModel = this.config.getModel();
-    const fallbackModel = DEFAULT_GEMINI_FLASH_MODEL;
-
-    // Don't fallback if already using Flash model
-    if (currentModel === fallbackModel) {
-      return null;
-    }
-
-    // Check if config has a fallback handler (set by CLI package)
-    const fallbackHandler = this.config.flashFallbackHandler;
-    if (typeof fallbackHandler === 'function') {
-      try {
-        const accepted = await fallbackHandler(
-          currentModel,
-          fallbackModel,
-          error,
-        );
-        if (accepted !== false && accepted !== null) {
-          this.config.setModel(fallbackModel);
-          this.config.setFallbackMode(true);
-          return fallbackModel;
-        }
-        // Check if the model was switched manually in the handler
-        if (this.config.getModel() === fallbackModel) {
-          return null; // Model was switched but don't continue with current prompt
-        }
-      } catch (error) {
-        console.warn('Flash fallback handler failed:', error);
-      }
-    }
-
-    return null;
   }
 }
 

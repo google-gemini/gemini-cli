@@ -12,7 +12,7 @@ import { ToolCallStatus } from '../../types.js';
 import { ToolMessage } from './ToolMessage.js';
 import { ToolConfirmationMessage } from './ToolConfirmationMessage.js';
 import { theme } from '../../semantic-colors.js';
-import { SHELL_COMMAND_NAME } from '../../constants.js';
+import { SHELL_COMMAND_NAME, SHELL_NAME } from '../../constants.js';
 import { useConfig } from '../../contexts/ConfigContext.js';
 
 interface ToolGroupMessageProps {
@@ -21,6 +21,9 @@ interface ToolGroupMessageProps {
   availableTerminalHeight?: number;
   terminalWidth: number;
   isFocused?: boolean;
+  activeShellPtyId?: number | null;
+  embeddedShellFocused?: boolean;
+  onShellInputSubmit?: (input: string) => void;
 }
 
 // Main component renders the border and maps the tools using ToolMessage
@@ -29,14 +32,30 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
   availableTerminalHeight,
   terminalWidth,
   isFocused = true,
+  activeShellPtyId,
+  embeddedShellFocused,
 }) => {
-  const config = useConfig();
+  const isEmbeddedShellFocused =
+    embeddedShellFocused &&
+    toolCalls.some(
+      (t) =>
+        t.ptyId === activeShellPtyId && t.status === ToolCallStatus.Executing,
+    );
+
   const hasPending = !toolCalls.every(
     (t) => t.status === ToolCallStatus.Success,
   );
-  const isShellCommand = toolCalls.some((t) => t.name === SHELL_COMMAND_NAME);
+
+  const config = useConfig();
+  const isShellCommand = toolCalls.some(
+    (t) => t.name === SHELL_COMMAND_NAME || t.name === SHELL_NAME,
+  );
   const borderColor =
-    hasPending || isShellCommand ? theme.status.warning : theme.border.default;
+    isShellCommand || isEmbeddedShellFocused
+      ? theme.ui.symbol
+      : hasPending
+        ? theme.status.warning
+        : theme.border.default;
 
   const staticHeight = /* border */ 2 + /* marginBottom */ 1;
   // This is a bit of a magic number, but it accounts for the border and
@@ -79,7 +98,9 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
       */
       width="100%"
       marginLeft={1}
-      borderDimColor={hasPending}
+      borderDimColor={
+        hasPending && (!isShellCommand || !isEmbeddedShellFocused)
+      }
       borderColor={borderColor}
       gap={1}
     >
@@ -89,12 +110,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
           <Box key={tool.callId} flexDirection="column" minHeight={1}>
             <Box flexDirection="row" alignItems="center">
               <ToolMessage
-                callId={tool.callId}
-                name={tool.name}
-                description={tool.description}
-                resultDisplay={tool.resultDisplay}
-                status={tool.status}
-                confirmationDetails={tool.confirmationDetails}
+                {...tool}
                 availableTerminalHeight={availableTerminalHeightPerToolMessage}
                 terminalWidth={innerWidth}
                 emphasis={
@@ -104,7 +120,9 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
                       ? 'low'
                       : 'medium'
                 }
-                renderOutputAsMarkdown={tool.renderOutputAsMarkdown}
+                activeShellPtyId={activeShellPtyId}
+                embeddedShellFocused={embeddedShellFocused}
+                config={config}
               />
             </Box>
             {tool.status === ToolCallStatus.Confirming &&
@@ -122,7 +140,9 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
               )}
             {tool.outputFile && (
               <Box marginX={1}>
-                <Text>Output too long and was saved to: {tool.outputFile}</Text>
+                <Text color={theme.text.primary}>
+                  Output too long and was saved to: {tool.outputFile}
+                </Text>
               </Box>
             )}
           </Box>

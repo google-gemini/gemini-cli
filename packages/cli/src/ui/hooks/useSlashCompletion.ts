@@ -7,7 +7,11 @@
 import { useState, useEffect, useMemo } from 'react';
 import { AsyncFzf } from 'fzf';
 import type { Suggestion } from '../components/SuggestionsDisplay.js';
-import type { CommandContext, SlashCommand } from '../commands/types.js';
+import {
+  CommandKind,
+  type CommandContext,
+  type SlashCommand,
+} from '../commands/types.js';
 
 // Type alias for improved type safety based on actual fzf result structure
 type FzfCommandResult = {
@@ -93,9 +97,13 @@ function useCommandParser(
       const found: SlashCommand | undefined = currentLevel.find((cmd) =>
         matchesCommand(cmd, part),
       );
+
       if (found) {
         leafCommand = found;
         currentLevel = found.subCommands as readonly SlashCommand[] | undefined;
+        if (found.kind === CommandKind.MCP_PROMPT) {
+          break;
+        }
       } else {
         leafCommand = null;
         currentLevel = [];
@@ -194,7 +202,17 @@ function useCommandSuggestions(
           const depth = commandPathParts.length;
           const argString = rawParts.slice(depth).join(' ');
           const results =
-            (await leafCommand.completion(commandContext, argString)) || [];
+            (await leafCommand.completion(
+              {
+                ...commandContext,
+                invocation: {
+                  raw: `/${rawParts.join(' ')}`,
+                  name: leafCommand.name,
+                  args: argString,
+                },
+              },
+              argString,
+            )) || [];
 
           if (!signal.aborted) {
             const finalSuggestions = results.map((s) => ({
@@ -467,14 +485,20 @@ export function useSlashCompletion(props: UseSlashCompletionProps): {
   );
   const { isPerfectMatch } = usePerfectMatch(parserResult);
 
-  // Update external state - this is now much simpler and focused
+  // Clear internal state when disabled
   useEffect(() => {
-    if (!enabled || query === null) {
+    if (!enabled) {
       setSuggestions([]);
       setIsLoadingSuggestions(false);
       setIsPerfectMatch(false);
       setCompletionStart(-1);
       setCompletionEnd(-1);
+    }
+  }, [enabled, setSuggestions, setIsLoadingSuggestions, setIsPerfectMatch]);
+
+  // Update external state only when enabled
+  useEffect(() => {
+    if (!enabled || query === null) {
       return;
     }
 

@@ -14,6 +14,7 @@ import {
   MCPServerStatus,
   isNodeError,
   parseAndFormatApiError,
+  safeLiteralReplace,
 } from '@google/gemini-cli-core';
 import type {
   ToolConfirmationPayload,
@@ -25,6 +26,7 @@ import type {
   ToolCallConfirmationDetails,
   Config,
   UserTierId,
+  AnsiOutput,
 } from '@google/gemini-cli-core';
 import type { RequestContext } from '@a2a-js/sdk/server';
 import { type ExecutionEventBus } from '@a2a-js/sdk/server';
@@ -88,12 +90,11 @@ export class Task {
     this.eventBus = eventBus;
     this.completedToolCalls = [];
     this._resetToolCompletionPromise();
-    this.config.setFlashFallbackHandler(
-      async (currentModel: string, fallbackModel: string): Promise<boolean> => {
-        config.setModel(fallbackModel); // gemini-cli-core sets to DEFAULT_GEMINI_FLASH_MODEL
-        // Switch model for future use but return false to stop current retry
-        return false;
-      },
+    this.config.setFallbackModelHandler(
+      // For a2a-server, we want to automatically switch to the fallback model
+      // for future requests without retrying the current one. The 'stop'
+      // intent achieves this.
+      async () => 'stop',
     );
   }
 
@@ -133,7 +134,7 @@ export class Task {
       id: this.id,
       contextId: this.contextId,
       taskState: this.taskState,
-      model: this.config.getContentGeneratorConfig().model,
+      model: this.config.getModel(),
       mcpServers: servers,
       availableTools,
     };
@@ -285,20 +286,29 @@ export class Task {
 
   private _schedulerOutputUpdate(
     toolCallId: string,
-    outputChunk: string,
+    outputChunk: string | AnsiOutput,
   ): void {
+    let outputAsText: string;
+    if (typeof outputChunk === 'string') {
+      outputAsText = outputChunk;
+    } else {
+      outputAsText = outputChunk
+        .map((line) => line.map((token) => token.text).join(''))
+        .join('\n');
+    }
+
     logger.info(
       '[Task] Scheduler output update for tool call ' +
         toolCallId +
         ': ' +
-        outputChunk,
+        outputAsText,
     );
     const artifact: Artifact = {
       artifactId: `tool-${toolCallId}-output`,
       parts: [
         {
           kind: 'text',
-          text: outputChunk,
+          text: outputAsText,
         } as Part,
       ],
     };
@@ -509,7 +519,9 @@ export class Task {
     if (oldString === '' && !isNewFile) {
       return currentContent;
     }
-    return currentContent.replaceAll(oldString, newString);
+
+    // Use intelligent replacement that handles $ sequences safely
+    return safeLiteralReplace(currentContent, oldString, newString);
   }
 
   async scheduleToolCalls(

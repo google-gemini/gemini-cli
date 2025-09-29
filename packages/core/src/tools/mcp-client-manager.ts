@@ -66,22 +66,11 @@ export class McpClientManager {
       this.mcpServerCommand,
     );
 
-    const serverEntries = Object.entries(servers);
-    const total = serverEntries.length;
-
-    this.eventEmitter?.emit('mcp-servers-discovery-start', { count: total });
-
     this.discoveryState = MCPDiscoveryState.IN_PROGRESS;
 
-    const discoveryPromises = serverEntries.map(
-      async ([name, config], index) => {
-        const current = index + 1;
-        this.eventEmitter?.emit('mcp-server-connecting', {
-          name,
-          current,
-          total,
-        });
-
+    this.eventEmitter?.emit('mcp-client-update', this.clients);
+    const discoveryPromises = Object.entries(servers).map(
+      async ([name, config]) => {
         const client = new McpClient(
           name,
           config,
@@ -92,21 +81,13 @@ export class McpClientManager {
         );
         this.clients.set(name, client);
 
+        this.eventEmitter?.emit('mcp-client-update', this.clients);
         try {
           await client.connect();
           await client.discover(cliConfig);
-          this.eventEmitter?.emit('mcp-server-connected', {
-            name,
-            current,
-            total,
-          });
+          this.eventEmitter?.emit('mcp-client-update', this.clients);
         } catch (error) {
-          this.eventEmitter?.emit('mcp-server-error', {
-            name,
-            current,
-            total,
-            error,
-          });
+          this.eventEmitter?.emit('mcp-client-update', this.clients);
           // Log the error but don't let a single failed server stop the others
           console.error(
             `Error during discovery for server '${name}': ${getErrorMessage(

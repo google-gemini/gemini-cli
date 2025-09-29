@@ -5,7 +5,9 @@
  */
 
 import stripAnsi from 'strip-ansi';
+import ansiRegex from 'ansi-regex';
 import { stripVTControlCharacters } from 'node:util';
+import stringWidth from 'string-width';
 
 /**
  * Calculates the maximum width of a multi-line ASCII art string.
@@ -26,10 +28,39 @@ export const getAsciiArtWidth = (asciiArt: string): number => {
  *  code units so that surrogate‑pair emoji count as one "column".)
  * ---------------------------------------------------------------------- */
 
+// Cache for code points to reduce GC pressure
+const codePointsCache = new Map<string, string[]>();
+const MAX_STRING_LENGTH_TO_CACHE = 1000;
+
 export function toCodePoints(str: string): string[] {
-  // [...str] or Array.from both iterate by UTF‑32 code point, handling
-  // surrogate pairs correctly.
-  return Array.from(str);
+  // ASCII fast path - check if all chars are ASCII (0-127)
+  let isAscii = true;
+  for (let i = 0; i < str.length; i++) {
+    if (str.charCodeAt(i) > 127) {
+      isAscii = false;
+      break;
+    }
+  }
+  if (isAscii) {
+    return str.split('');
+  }
+
+  // Cache short strings
+  if (str.length <= MAX_STRING_LENGTH_TO_CACHE) {
+    const cached = codePointsCache.get(str);
+    if (cached) {
+      return cached;
+    }
+  }
+
+  const result = Array.from(str);
+
+  // Cache result (unlimited like Ink)
+  if (str.length <= MAX_STRING_LENGTH_TO_CACHE) {
+    codePointsCache.set(str, result);
+  }
+
+  return result;
 }
 
 export function cpLen(str: string): number {
@@ -85,4 +116,101 @@ export function stripUnsafeCharacters(str: string): string {
       return true;
     })
     .join('');
+}
+
+// String width caching for performance optimization
+const stringWidthCache = new Map<string, number>();
+
+/**
+ * Cached version of stringWidth function for better performance
+ * Follows Ink's approach with unlimited cache (no eviction)
+ */
+export const getCachedStringWidth = (str: string): number => {
+  // ASCII printable chars have width 1
+  if (/^[\x20-\x7E]*$/.test(str)) {
+    return str.length;
+  }
+
+  if (stringWidthCache.has(str)) {
+    return stringWidthCache.get(str)!;
+  }
+
+  const width = stringWidth(str);
+  stringWidthCache.set(str, width);
+
+  return width;
+};
+
+/**
+ * Clear the string width cache
+ */
+export const clearStringWidthCache = (): void => {
+  stringWidthCache.clear();
+};
+
+const regex = ansiRegex();
+
+/* Recursively traverses a JSON-like structure (objects, arrays, primitives)
+ * and escapes all ANSI control characters found in any string values.
+ *
+ * This function is designed to be robust, handling deeply nested objects and
+ * arrays. It applies a regex-based replacement to all string values to
+ * safely escape control characters.
+ *
+ * To optimize performance, this function uses a "copy-on-write" strategy.
+ * It avoids allocating new objects or arrays if no nested string values
+ * required escaping, returning the original object reference in such cases.
+ *
+ * @param obj The JSON-like value (object, array, string, etc.) to traverse.
+ * @returns A new value with all nested string fields escaped, or the
+ * original `obj` reference if no changes were necessary.
+ */
+export function escapeAnsiCtrlCodes<T>(obj: T): T {
+  if (typeof obj === 'string') {
+    if (obj.search(regex) === -1) {
+      return obj; // No changes return original string
+    }
+
+    regex.lastIndex = 0; // needed for global regex
+    return obj.replace(regex, (match) =>
+      JSON.stringify(match).slice(1, -1),
+    ) as T;
+  }
+
+  if (obj === null || typeof obj !== 'object') {
+    return obj;
+  }
+
+  if (Array.isArray(obj)) {
+    let newArr: unknown[] | null = null;
+
+    for (let i = 0; i < obj.length; i++) {
+      const value = obj[i];
+      const escapedValue = escapeAnsiCtrlCodes(value);
+      if (escapedValue !== value) {
+        if (newArr === null) {
+          newArr = [...obj];
+        }
+        newArr[i] = escapedValue;
+      }
+    }
+    return (newArr !== null ? newArr : obj) as T;
+  }
+
+  let newObj: T | null = null;
+  const keys = Object.keys(obj);
+
+  for (const key of keys) {
+    const value = (obj as Record<string, unknown>)[key];
+    const escapedValue = escapeAnsiCtrlCodes(value);
+
+    if (escapedValue !== value) {
+      if (newObj === null) {
+        newObj = { ...obj };
+      }
+      (newObj as Record<string, unknown>)[key] = escapedValue;
+    }
+  }
+
+  return newObj !== null ? newObj : obj;
 }

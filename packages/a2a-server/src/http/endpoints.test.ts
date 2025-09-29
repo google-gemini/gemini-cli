@@ -7,13 +7,16 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import request from 'supertest';
 import type express from 'express';
-import { createApp, updateCoderAgentCardUrl } from './app.js';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
 import type { Server } from 'node:http';
-import type { TaskMetadata } from '../types.js';
 import type { AddressInfo } from 'node:net';
+
+import { createApp, updateCoderAgentCardUrl } from './app.js';
+import type { TaskMetadata } from '../types.js';
+import { createMockConfig } from '../utils/testing_utils.js';
+import type { Config } from '@google/gemini-cli-core';
 
 // Mock the logger to avoid polluting test output
 // Comment out to help debug
@@ -54,6 +57,16 @@ vi.mock('../agent/task.js', () => {
     }));
   }
   return { Task: MockTask };
+});
+
+vi.mock('../config/config.js', async () => {
+  const actual = await vi.importActual('../config/config.js');
+  return {
+    ...actual,
+    loadConfig: vi
+      .fn()
+      .mockImplementation(async () => createMockConfig({}) as Config),
+  };
 });
 
 describe('Agent Server Endpoints', () => {

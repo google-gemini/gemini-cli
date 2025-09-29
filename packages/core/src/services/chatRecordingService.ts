@@ -6,7 +6,7 @@
 
 import { type Config } from '../config/config.js';
 import { type Status } from '../core/coreToolScheduler.js';
-import { type ThoughtSummary } from '../core/turn.js';
+import { type ThoughtSummary } from '../utils/thoughtUtils.js';
 import { getProjectHash } from '../utils/paths.js';
 import path from 'node:path';
 import fs from 'node:fs';
@@ -195,6 +195,7 @@ export class ChatRecordingService {
    * Records a message in the conversation.
    */
   recordMessage(message: {
+    model: string;
     type: ConversationRecordExtra['type'];
     content: PartListUnion;
   }): void {
@@ -209,7 +210,7 @@ export class ChatRecordingService {
             ...msg,
             thoughts: this.queuedThoughts,
             tokens: this.queuedTokens,
-            model: this.config.getModel(),
+            model: message.model,
           });
           this.queuedThoughts = [];
           this.queuedTokens = null;
@@ -279,7 +280,7 @@ export class ChatRecordingService {
    * Adds tool calls to the last message in the conversation (which should be by Gemini).
    * This method enriches tool calls with metadata from the ToolRegistry.
    */
-  recordToolCalls(toolCalls: ToolCallRecord[]): void {
+  recordToolCalls(model: string, toolCalls: ToolCallRecord[]): void {
     if (!this.conversationFile) return;
 
     // Enrich tool calls with metadata from the ToolRegistry
@@ -318,7 +319,7 @@ export class ChatRecordingService {
             type: 'gemini' as const,
             toolCalls: enrichedToolCalls,
             thoughts: this.queuedThoughts,
-            model: this.config.getModel(),
+            model,
           };
           // If there are any queued thoughts join them to this message.
           if (this.queuedThoughts.length > 0) {

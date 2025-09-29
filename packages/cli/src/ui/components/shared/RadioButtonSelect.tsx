@@ -5,19 +5,17 @@
  */
 
 import type React from 'react';
-import { useEffect, useState, useRef } from 'react';
-import { Text, Box } from 'ink';
-import { Colors } from '../../colors.js';
-import { useKeypress } from '../../hooks/useKeypress.js';
+import { Text } from 'ink';
+import { theme } from '../../semantic-colors.js';
+import { BaseSelectionList } from './BaseSelectionList.js';
+import type { SelectionListItem } from '../../hooks/useSelectionList.js';
 
 /**
  * Represents a single option for the RadioButtonSelect.
  * Requires a label for display and a value to be returned on selection.
  */
-export interface RadioSelectItem<T> {
+export interface RadioSelectItem<T> extends SelectionListItem<T> {
   label: string;
-  value: T;
-  disabled?: boolean;
   themeNameDisplay?: string;
   themeTypeDisplay?: string;
 }
@@ -61,178 +59,33 @@ export function RadioButtonSelect<T>({
   maxItemsToShow = 10,
   showNumbers = true,
 }: RadioButtonSelectProps<T>): React.JSX.Element {
-  const [activeIndex, setActiveIndex] = useState(initialIndex);
-  const [scrollOffset, setScrollOffset] = useState(0);
-  const [numberInput, setNumberInput] = useState('');
-  const numberInputTimer = useRef<NodeJS.Timeout | null>(null);
-  useEffect(() => {
-    const newScrollOffset = Math.max(
-      0,
-      Math.min(activeIndex - maxItemsToShow + 1, items.length - maxItemsToShow),
-    );
-    if (activeIndex < scrollOffset) {
-      setScrollOffset(activeIndex);
-    } else if (activeIndex >= scrollOffset + maxItemsToShow) {
-      setScrollOffset(newScrollOffset);
-    }
-  }, [activeIndex, items.length, scrollOffset, maxItemsToShow]);
-
-  useEffect(
-    () => () => {
-      if (numberInputTimer.current) {
-        clearTimeout(numberInputTimer.current);
-      }
-    },
-    [],
-  );
-
-  useKeypress(
-    (key) => {
-      const { sequence, name } = key;
-      const isNumeric = showNumbers && /^[0-9]$/.test(sequence);
-
-      // Any key press that is not a digit should clear the number input buffer.
-      if (!isNumeric && numberInputTimer.current) {
-        clearTimeout(numberInputTimer.current);
-        setNumberInput('');
-      }
-
-      if (name === 'k' || name === 'up') {
-        const newIndex = activeIndex > 0 ? activeIndex - 1 : items.length - 1;
-        setActiveIndex(newIndex);
-        onHighlight?.(items[newIndex]!.value);
-        return;
-      }
-
-      if (name === 'j' || name === 'down') {
-        const newIndex = activeIndex < items.length - 1 ? activeIndex + 1 : 0;
-        setActiveIndex(newIndex);
-        onHighlight?.(items[newIndex]!.value);
-        return;
-      }
-
-      if (name === 'return') {
-        onSelect(items[activeIndex]!.value);
-        return;
-      }
-
-      // Handle numeric input for selection.
-      if (isNumeric) {
-        if (numberInputTimer.current) {
-          clearTimeout(numberInputTimer.current);
-        }
-
-        const newNumberInput = numberInput + sequence;
-        setNumberInput(newNumberInput);
-
-        const targetIndex = Number.parseInt(newNumberInput, 10) - 1;
-
-        // A single '0' is not a valid selection since items are 1-indexed.
-        if (newNumberInput === '0') {
-          numberInputTimer.current = setTimeout(() => setNumberInput(''), 350);
-          return;
-        }
-
-        if (targetIndex >= 0 && targetIndex < items.length) {
-          const targetItem = items[targetIndex]!;
-          setActiveIndex(targetIndex);
-          onHighlight?.(targetItem.value);
-
-          // If the typed number can't be a prefix for another valid number,
-          // select it immediately. Otherwise, wait for more input.
-          const potentialNextNumber = Number.parseInt(newNumberInput + '0', 10);
-          if (potentialNextNumber > items.length) {
-            onSelect(targetItem.value);
-            setNumberInput('');
-          } else {
-            numberInputTimer.current = setTimeout(() => {
-              onSelect(targetItem.value);
-              setNumberInput('');
-            }, 350); // Debounce time for multi-digit input.
-          }
-        } else {
-          // The typed number is out of bounds, clear the buffer
-          setNumberInput('');
-        }
-      }
-    },
-    { isActive: !!(isFocused && items.length > 0) },
-  );
-
-  const visibleItems = items.slice(scrollOffset, scrollOffset + maxItemsToShow);
-
   return (
-    <Box flexDirection="column">
-      {showScrollArrows && (
-        <Text color={scrollOffset > 0 ? Colors.Foreground : Colors.Gray}>
-          ▲
-        </Text>
-      )}
-      {visibleItems.map((item, index) => {
-        const itemIndex = scrollOffset + index;
-        const isSelected = activeIndex === itemIndex;
-
-        let textColor = Colors.Foreground;
-        let numberColor = Colors.Foreground;
-        if (isSelected) {
-          textColor = Colors.AccentGreen;
-          numberColor = Colors.AccentGreen;
-        } else if (item.disabled) {
-          textColor = Colors.Gray;
-          numberColor = Colors.Gray;
+    <BaseSelectionList<T, RadioSelectItem<T>>
+      items={items}
+      initialIndex={initialIndex}
+      onSelect={onSelect}
+      onHighlight={onHighlight}
+      isFocused={isFocused}
+      showNumbers={showNumbers}
+      showScrollArrows={showScrollArrows}
+      maxItemsToShow={maxItemsToShow}
+      renderItem={(item, { titleColor }) => {
+        // Handle special theme display case for ThemeDialog compatibility
+        if (item.themeNameDisplay && item.themeTypeDisplay) {
+          return (
+            <Text color={titleColor} wrap="truncate" key={item.key}>
+              {item.themeNameDisplay}{' '}
+              <Text color={theme.text.secondary}>{item.themeTypeDisplay}</Text>
+            </Text>
+          );
         }
-
-        if (!showNumbers) {
-          numberColor = Colors.Gray;
-        }
-
-        const numberColumnWidth = String(items.length).length;
-        const itemNumberText = `${String(itemIndex + 1).padStart(
-          numberColumnWidth,
-        )}.`;
-
+        // Regular label display
         return (
-          <Box key={item.label} alignItems="center">
-            <Box minWidth={2} flexShrink={0}>
-              <Text
-                color={isSelected ? Colors.AccentGreen : Colors.Foreground}
-                aria-hidden
-              >
-                {isSelected ? '●' : ' '}
-              </Text>
-            </Box>
-            <Box
-              marginRight={1}
-              flexShrink={0}
-              minWidth={itemNumberText.length}
-              aria-state={{ checked: isSelected }}
-            >
-              <Text color={numberColor}>{itemNumberText}</Text>
-            </Box>
-            {item.themeNameDisplay && item.themeTypeDisplay ? (
-              <Text color={textColor} wrap="truncate">
-                {item.themeNameDisplay}{' '}
-                <Text color={Colors.Gray}>{item.themeTypeDisplay}</Text>
-              </Text>
-            ) : (
-              <Text color={textColor} wrap="truncate">
-                {item.label}
-              </Text>
-            )}
-          </Box>
+          <Text color={titleColor} wrap="truncate">
+            {item.label}
+          </Text>
         );
-      })}
-      {showScrollArrows && (
-        <Text
-          color={
-            scrollOffset + maxItemsToShow < items.length
-              ? Colors.Foreground
-              : Colors.Gray
-          }
-        >
-          ▼
-        </Text>
-      )}
-    </Box>
+      }}
+    />
   );
 }

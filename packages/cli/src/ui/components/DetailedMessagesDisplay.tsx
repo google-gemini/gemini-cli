@@ -6,7 +6,7 @@
 
 import type React from 'react';
 import { Box, Text } from 'ink';
-import { Colors } from '../colors.js';
+import { theme } from '../semantic-colors.js';
 import type { ConsoleMessageItem } from '../types.js';
 import { MaxSizedBox } from './shared/MaxSizedBox.js';
 
@@ -31,31 +31,32 @@ export const DetailedMessagesDisplay: React.FC<
       flexDirection="column"
       marginTop={1}
       borderStyle="round"
-      borderColor={Colors.Gray}
+      borderColor={theme.border.default}
       paddingX={1}
       width={width}
     >
       <Box marginBottom={1}>
-        <Text bold color={Colors.Foreground}>
-          Debug Console <Text color={Colors.Gray}>(ctrl+o to close)</Text>
+        <Text bold color={theme.text.primary}>
+          Debug Console{' '}
+          <Text color={theme.text.secondary}>(ctrl+o to close)</Text>
         </Text>
       </Box>
       <MaxSizedBox maxHeight={maxHeight} maxWidth={width - borderAndPadding}>
         {messages.map((msg, index) => {
-          let textColor = Colors.Foreground;
+          let textColor = theme.text.primary;
           let icon = '\u2139'; // Information source (ℹ)
 
           switch (msg.type) {
             case 'warn':
-              textColor = Colors.AccentYellow;
+              textColor = theme.status.warning;
               icon = '\u26A0'; // Warning sign (⚠)
               break;
             case 'error':
-              textColor = Colors.AccentRed;
+              textColor = theme.status.error;
               icon = '\u2716'; // Heavy multiplication x (✖)
               break;
             case 'debug':
-              textColor = Colors.Gray; // Or Colors.Gray
+              textColor = theme.text.secondary; // Or theme.text.secondary
               icon = '\u{1F50D}'; // Left-pointing magnifying glass (🔍)
               break;
             case 'log':
@@ -70,7 +71,7 @@ export const DetailedMessagesDisplay: React.FC<
               <Text color={textColor} wrap="wrap">
                 {msg.content}
                 {msg.count && msg.count > 1 && (
-                  <Text color={Colors.Gray}> (x{msg.count})</Text>
+                  <Text color={theme.text.secondary}> (x{msg.count})</Text>
                 )}
               </Text>
             </Box>

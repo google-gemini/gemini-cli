@@ -76,6 +76,13 @@ Settings are organized into categories. All settings should be placed within the
   - **Description:** Enable session checkpointing for recovery.
   - **Default:** `false`
 
+#### `output`
+
+- **`output.format`** (string):
+  - **Description:** The format of the CLI output.
+  - **Default:** `"text"`
+  - **Values:** `"text"`, `"json"`
+
 #### `ui`
 
 - **`ui.theme`** (string):
@@ -112,7 +119,7 @@ Settings are organized into categories. All settings should be placed within the
 
 - **`ui.showCitations`** (boolean):
   - **Description:** Show citations for generated text in the chat.
-  - **Default:** `false`
+  - **Default:** `true`
 
 - **`ui.accessibility.disableLoadingPhrases`** (boolean):
   - **Description:** Disable loading phrases for accessibility.
@@ -196,9 +203,9 @@ Settings are organized into categories. All settings should be placed within the
   - **Description:** Sandbox execution environment (can be a boolean or a path string).
   - **Default:** `undefined`
 
-- **`tools.usePty`** (boolean):
-  - **Description:** Use node-pty for shell command execution. Fallback to child_process still applies.
-  - **Default:** `false`
+- **`tools.shell.enableInteractiveShell`** (boolean):
+
+  Use `node-pty` for an interactive shell experience. Fallback to `child_process` still applies. Defaults to `false`.
 
 - **`tools.core`** (array of strings):
   - **Description:** This can be used to restrict the set of built-in tools [with an allowlist](./enterprise.md#restricting-tool-access). See [Built-in Tools](../core/tools-api.md#built-in-tools) for a list of core tools. The match semantics are the same as `tools.allowed`.
@@ -302,6 +309,7 @@ Configures logging and metrics collection for Gemini CLI. For more information, 
   - **`otlpProtocol`** (string): The protocol for the OTLP Exporter (`grpc` or `http`).
   - **`logPrompts`** (boolean): Whether or not to include the content of user prompts in the logs.
   - **`outfile`** (string): The file to write telemetry to when `target` is `local`.
+  - **`useCollector`** (boolean): Whether to use an external OTLP collector.
 
 ### Example `settings.json`
 
@@ -410,6 +418,27 @@ The CLI automatically loads environment variables from an `.env` file. The loadi
 - **`OTLP_GOOGLE_CLOUD_PROJECT`**:
   - Your Google Cloud Project ID for Telemetry in Google Cloud
   - Example: `export OTLP_GOOGLE_CLOUD_PROJECT="YOUR_PROJECT_ID"`.
+- **`GEMINI_TELEMETRY_ENABLED`**:
+  - Set to `true` or `1` to enable telemetry. Any other value is treated as disabling it.
+  - Overrides the `telemetry.enabled` setting.
+- **`GEMINI_TELEMETRY_TARGET`**:
+  - Sets the telemetry target (`local` or `gcp`).
+  - Overrides the `telemetry.target` setting.
+- **`GEMINI_TELEMETRY_OTLP_ENDPOINT`**:
+  - Sets the OTLP endpoint for telemetry.
+  - Overrides the `telemetry.otlpEndpoint` setting.
+- **`GEMINI_TELEMETRY_OTLP_PROTOCOL`**:
+  - Sets the OTLP protocol (`grpc` or `http`).
+  - Overrides the `telemetry.otlpProtocol` setting.
+- **`GEMINI_TELEMETRY_LOG_PROMPTS`**:
+  - Set to `true` or `1` to enable or disable logging of user prompts. Any other value is treated as disabling it.
+  - Overrides the `telemetry.logPrompts` setting.
+- **`GEMINI_TELEMETRY_OUTFILE`**:
+  - Sets the file path to write telemetry to when the target is `local`.
+  - Overrides the `telemetry.outfile` setting.
+- **`GEMINI_TELEMETRY_USE_COLLECTOR`**:
+  - Set to `true` or `1` to enable or disable using an external OTLP collector. Any other value is treated as disabling it.
+  - Overrides the `telemetry.useCollector` setting.
 - **`GOOGLE_CLOUD_LOCATION`**:
   - Your Google Cloud Project Location (e.g., us-central1).
   - Required for using Vertex AI in non express mode.
@@ -442,11 +471,18 @@ Arguments passed directly when running the CLI can override other configurations
   - Example: `npm start -- --model gemini-1.5-pro-latest`
 - **`--prompt <your_prompt>`** (**`-p <your_prompt>`**):
   - Used to pass a prompt directly to the command. This invokes Gemini CLI in a non-interactive mode.
+  - For scripting examples, use the `--output-format json` flag to get structured output.
 - **`--prompt-interactive <your_prompt>`** (**`-i <your_prompt>`**):
   - Starts an interactive session with the provided prompt as the initial input.
   - The prompt is processed within the interactive session, not before it.
   - Cannot be used when piping input from stdin.
   - Example: `gemini -i "explain this code"`
+- **`--output-format <format>`**:
+  - **Description:** Specifies the format of the CLI output for non-interactive mode.
+  - **Values:**
+    - `text`: (Default) The standard human-readable output.
+    - `json`: A machine-readable JSON output.
+  - **Note:** For structured output and scripting, use the `--output-format json` flag.
 - **`--sandbox`** (**`-s`**):
   - Enables sandbox mode for this session.
 - **`--sandbox-image`**:
