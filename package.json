@@ -8,10 +8,9 @@
   "workspaces": [
     "packages/*"
   ],
-  "private": "true",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Pengo0215/penggo-cli"
+    "url": "git+https://github.com/Pengo0215/penggo-cli.git"
   },
   "config": {
     "sandboxImageUri": "us-docker.pkg.dev/penggo-code-dev/penggo-cli/sandbox:0.8.0-nightly.20250925.b1da8c21"
@@ -62,7 +61,7 @@
     }
   },
   "bin": {
-    "gemini": "bundle/gemini.js"
+    "penggo": "bundle/gemini.js"
   },
   "files": [
     "bundle/",
