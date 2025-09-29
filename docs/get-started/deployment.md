@@ -1,6 +1,6 @@
 # Gemini CLI Execution and Deployment
 
-This document describes how to run Gemini CLI and its deployment architecture. You can run Gemini CLI:
+This document describes how to run Gemini CLI and its deployment architecture.
 
 ## Running Gemini CLI
 
