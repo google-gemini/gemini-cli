@@ -34,7 +34,7 @@ This guide provides solutions to common issues and debugging tips, including top
     1. In your home directory: `~/.gemini/settings.json`.
     2. In your project's root directory: `./.gemini/settings.json`.
 
-    Refer to [Gemini CLI Configuration](./cli/configuration.md) for more details.
+    Refer to [Gemini CLI Configuration](./get-started/configuration.md) for more details.
 
 - **Q: Why don't I see cached token counts in my stats output?**
   - A: Cached token information is only displayed when cached tokens are being used. This feature is available for API key users (Gemini API key or Google Cloud Vertex AI) but not for OAuth users (such as Google Personal/Enterprise accounts like Google Gmail or Google Workspace, respectively). This is because the Gemini Code Assist API does not support cached content creation. You can still view your total token usage using the `/stats` command in Gemini CLI.
@@ -62,7 +62,7 @@ This guide provides solutions to common issues and debugging tips, including top
 
 - **Error: "Operation not permitted", "Permission denied", or similar.**
   - **Cause:** When sandboxing is enabled, Gemini CLI may attempt operations that are restricted by your sandbox configuration, such as writing outside the project directory or system temp directory.
-  - **Solution:** Refer to the [Configuration: Sandboxing](./cli/configuration.md#sandboxing) documentation for more information, including how to customize your sandbox configuration.
+  - **Solution:** Refer to the [Configuration: Sandboxing](./cli/sandbox.md) documentation for more information, including how to customize your sandbox configuration.
 
 - **Gemini CLI is not running in interactive mode in "CI" environments**
   - **Issue:** The Gemini CLI does not enter interactive mode (no prompt appears) if an environment variable starting with `CI_` (e.g., `CI_TOKEN`) is set. This is because the `is-in-ci` package, used by the underlying UI framework, detects these variables and assumes a non-interactive CI environment.

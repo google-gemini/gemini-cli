@@ -74,7 +74,7 @@ To ensure Gemini CLI can automatically find the correct release asset for each p
 
 Archives must be fully contained extensions and have all the standard requirements - specifically the `gemini-extension.json` file must be at the root of the archive.
 
-The rest of the layout should look exactly the same as a typical extension, see [extensions.md](extension.md).
+The rest of the layout should look exactly the same as a typical extension, see [extensions.md](./index.md).
 
 #### Example GitHub Actions workflow
 
