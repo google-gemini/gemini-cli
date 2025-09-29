@@ -7,10 +7,11 @@
  */
 
 import { execSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
 
-async function main() {
+export async function main() {
   const argv = await yargs(hideBin(process.argv))
     .option('commit', {
       alias: 'c',
@@ -134,7 +135,23 @@ async function main() {
       execSync(`git cherry-pick ${commit}`, { stdio: 'pipe' });
       console.log(`✅ Cherry-pick successful - no conflicts detected`);
     } catch (error) {
-      // Check if this is a cherry-pick conflict
+      const output = (error.stdout || '') + (error.stderr || '');
+
+      // Case 1: Commit is empty, which is not an error.
+      if (output.includes('The previous cherry-pick is now empty')) {
+        console.log(`✅ Commit ${commit} is empty and has been skipped.`);
+        process.exit(0);
+      }
+
+      // Case 2: Commit has already been applied.
+      if (output.match(/nothing to commit/)) {
+        console.log(
+          `✅ Commit ${commit} has already been applied to ${releaseBranch}. No patch needed.`,
+        );
+        process.exit(0);
+      }
+
+      // Case 3: It's a real error, check for merge conflicts.
       try {
         const status = execSync('git status --porcelain', { encoding: 'utf8' });
         const conflictFiles = status
@@ -164,11 +181,11 @@ async function main() {
           execSync(`git commit --no-edit`);
           console.log(`✅ Committed cherry-pick with conflict markers`);
         } else {
-          // Re-throw if it's not a conflict error
+          // It's not a conflict, so re-throw the original error.
           throw error;
         }
       } catch (_statusError) {
-        // Re-throw original error if we can't determine the status
+        // If `git status` fails, we can't determine the cause, so re-throw.
         throw error;
       }
     }
@@ -278,7 +295,11 @@ function getLatestReleaseInfo(channel) {
   }
 }
 
-main().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+const isMain = process.argv[1] === fileURLToPath(import.meta.url);
+
+if (isMain) {
+  main().catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });
+}
