@@ -11,6 +11,7 @@ Gemini CLI brings the capabilities of Gemini models to your terminal in an inter
 This documentation is organized into the following sections:
 
 ### Get started
+
 - **[Gemini CLI Quickstart](./get-started/index.md):** Let's get started with Gemini CLI.
 - **[Deployment](./get-started/deployment.md):** Install and run Gemini CLI.
 - **[Authentication](./get-started/authentication.md):** Authenticate Gemini CLI.
@@ -18,6 +19,7 @@ This documentation is organized into the following sections:
 - **[Examples](./get-started/examples.md):** Example usage of Gemini CLI.
 
 ### CLI
+
 - **[CLI overview](./cli/index.md):** Overview of the command-line interface.
 - **[Commands](./cli/commands.md):** Description of available CLI commands.
 - **[Enterprise](./cli/enterprise.md):** Gemini CLI for enterprise.
@@ -26,11 +28,13 @@ This documentation is organized into the following sections:
 - **[Tutorials](./cli/tutorials.md):** Tutorials for Gemini CLI.
 
 ### Core
+
 - **[Gemini CLI core overview](./core/index.md):** Information about Gemini CLI core.
 - **[Memport](./core/memport.md):** Using the Memory Import Processor.
 - **[Tools API](./core/tools-api.md):** Information on how the core manages and exposes tools.
 
 ### Tools
+
 - **[Gemini CLI tools overview](./tools/index.md):** Information about Gemini CLI's tools.
 - **[File System Tools](./tools/file-system.md):** Documentation for the `read_file` and `write_file` tools.
 - **[MCP servers](./tools/mcp-server.md):** Using MCP servers with Gemini CLI.
@@ -41,14 +45,17 @@ This documentation is organized into the following sections:
 - **[Memory Tool](./tools/memory.md):** Documentation for the `save_memory` tool.
 
 ### Extensions
+
 - **[Extensions](./extensions/index.md):** How to extend the CLI with new functionality.
 - **[Extension Releasing](./extensions/extension-releasing.md):** How to release Gemini CLI extensions.
 
 ### IDE integration
+
 - **[IDE Integration](./ide-integration/index.md):** Connect the CLI to your editor.
 - **[IDE Companion Extension Spec](./ide-integration/ide-companion-spec.md):** Spec for building IDE companion extensions.
 
 ### Other topics
+
 - **[Architecture Overview](./architecture.md):** Understand the high-level design of Gemini CLI, including its components and how they interact.
 - **[Checkpointing](./cli/checkpointing.md):** Documentation for the checkpointing feature.
 - **[Telemetry](./cli/telemetry.md):** Overview of telemetry in the CLI.

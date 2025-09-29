@@ -9,16 +9,18 @@ Instead of repeating instructions in every prompt, you can define them once in a
 The CLI implements a hierarchical system by loading context files from several locations. The CLI then concatenates the contents of all found files and sends them to the model with every prompt. The CLI loads files in the following order:
 
 1.  **Global context file:**
-    -   **Location:** `~/.gemini/GEMINI.md` (in your user home directory).
-    -   **Scope:** Provides default instructions for all your projects.
+
+    - **Location:** `~/.gemini/GEMINI.md` (in your user home directory).
+    - **Scope:** Provides default instructions for all your projects.
 
 2.  **Project root and ancestor context files:**
-    -   **Location:** The CLI searches for a `GEMINI.md` file in your current working directory and then in each parent directory up to the project root (identified by a `.git` folder).
-    -   **Scope:** Provides context relevant to the entire project.
+
+    - **Location:** The CLI searches for a `GEMINI.md` file in your current working directory and then in each parent directory up to the project root (identified by a `.git` folder).
+    - **Scope:** Provides context relevant to the entire project.
 
 3.  **Sub-directory context files:**
-    -   **Location:** The CLI also scans for `GEMINI.md` files in subdirectories below your current working directory. It respects rules in `.gitignore` and `.geminiignore`.
-    -   **Scope:** Lets you write highly specific instructions for a particular component or module.
+    - **Location:** The CLI also scans for `GEMINI.md` files in subdirectories below your current working directory. It respects rules in `.gitignore` and `.geminiignore`.
+    - **Scope:** Lets you write highly specific instructions for a particular component or module.
 
 The CLI footer displays the number of loaded context files, which gives you a quick visual cue of the active instructional context.
 
@@ -46,15 +48,16 @@ Here is an example of what you can include in a `GEMINI.md` file at the root of 
 
 You can interact with the loaded context files by using the `/memory` command.
 
--   **`/memory show`**: Displays the full, concatenated content of the current hierarchical memory. This lets you inspect the exact instructional context being provided to the model.
--   **`/memory refresh`**: Forces a re-scan and reload of all `GEMINI.md` files from all configured locations.
--   **`/memory add <text>`**: Appends your text to your global `~/.gemini/GEMINI.md` file. This lets you add persistent memories on the fly.
+- **`/memory show`**: Displays the full, concatenated content of the current hierarchical memory. This lets you inspect the exact instructional context being provided to the model.
+- **`/memory refresh`**: Forces a re-scan and reload of all `GEMINI.md` files from all configured locations.
+- **`/memory add <text>`**: Appends your text to your global `~/.gemini/GEMINI.md` file. This lets you add persistent memories on the fly.
 
 ## Modularizing context with imports
 
 You can break down large `GEMINI.md` files into smaller, more manageable components by importing content from other files using the `@file.md` syntax. This feature supports both relative and absolute paths.
 
 **Example `GEMINI.md` with imports:**
+
 ```markdown
 # Main GEMINI.md file
 
@@ -74,6 +77,7 @@ For more details, see the [Memory Import Processor](../core/memport.md) document
 While `GEMINI.md` is the default filename, you can configure this in your `settings.json` file. To specify a different name or a list of names, use the `context.fileName` property.
 
 **Example `settings.json`:**
+
 ```json
 {
   "context": {

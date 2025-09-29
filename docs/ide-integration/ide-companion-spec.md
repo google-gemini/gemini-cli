@@ -39,6 +39,7 @@ For Gemini CLI to connect, it needs to discover which IDE instance it's running 
     }
   }
   ```
+
   - `port` (number, required): The port of the MCP server.
   - `workspacePath` (string, required): A list of all open workspace root paths, delimited by the OS-specific path separator (`:` for Linux/macOS, `;` for Windows). The CLI uses this path to ensure it's running in the same project folder that's open in the IDE. If the CLI's current working directory is not a sub-directory of `workspacePath`, the connection will be rejected. Your plugin **MUST** provide the correct, absolute path(s) to the root of the open workspace(s).
   - `authToken` (string, required): A secret token for securing the connection. The CLI will include this token in an `Authorization: Bearer <token>` header on all requests.
@@ -121,6 +122,7 @@ The plugin **MUST** register an `openDiff` tool on its MCP server.
   ```
 
 - **Response (`CallToolResult`):** The tool **MUST** immediately return a `CallToolResult` to acknowledge the request and report whether the diff view was successfully opened.
+
   - On Success: If the diff view was opened successfully, the response **MUST** contain empty content (i.e., `content: []`).
   - On Failure: If an error prevented the diff view from opening, the response **MUST** have `isError: true` and include a `TextContent` block in the `content` array describing the error.
 

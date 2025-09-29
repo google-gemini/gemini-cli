@@ -9,9 +9,11 @@ Slash commands provide meta-level control over the CLI itself.
 ### Built-in Commands
 
 - **`/bug`**
+
   - **Description:** File an issue about Gemini CLI. By default, the issue is filed within the GitHub repository for Gemini CLI. The string you enter after `/bug` will become the headline for the bug being filed. The default `/bug` behavior can be modified using the `advanced.bugCommand` setting in your `.gemini/settings.json` files.
 
 - **`/chat`**
+
   - **Description:** Save and resume conversation history for branching conversation state interactively, or resuming a previous state from a later session.
   - **Sub-commands:**
     - **`save`**
@@ -35,19 +37,23 @@ Slash commands provide meta-level control over the CLI itself.
       - **Usage** `/chat share file.md` or `/chat share file.json`. If no filename is provided, then the CLI will generate one.
 
 - **`/clear`**
+
   - **Description:** Clear the terminal screen, including the visible session history and scrollback within the CLI. The underlying session data (for history recall) might be preserved depending on the exact implementation, but the visual display is cleared.
   - **Keyboard shortcut:** Press **Ctrl+L** at any time to perform a clear action.
 
 - **`/compress`**
+
   - **Description:** Replace the entire chat context with a summary. This saves on tokens used for future tasks while retaining a high level summary of what has happened.
 
 - **`/copy`**
+
   - **Description:** Copies the last output produced by Gemini CLI to your clipboard, for easy sharing or reuse.
   - **Note:** This command requires platform-specific clipboard tools to be installed.
     - On Linux, it requires `xclip` or `xsel`. You can typically install them using your system's package manager.
     - On macOS, it requires `pbcopy`, and on Windows, it requires `clip`. These tools are typically pre-installed on their respective systems.
 
 - **`/directory`** (or **`/dir`**)
+
   - **Description:** Manage workspace directories for multi-directory support.
   - **Sub-commands:**
     - **`add`**:
@@ -59,15 +65,19 @@ Slash commands provide meta-level control over the CLI itself.
       - **Usage:** `/directory show`
 
 - **`/editor`**
+
   - **Description:** Open a dialog for selecting supported editors.
 
 - **`/extensions`**
+
   - **Description:** Lists all active extensions in the current Gemini CLI session. See [Gemini CLI Extensions](../extensions/index.md).
 
 - **`/help`** (or **`/?`**)
+
   - **Description:** Display help information about Gemini CLI, including available commands and their usage.
 
 - **`/mcp`**
+
   - **Description:** List configured Model Context Protocol (MCP) servers, their connection status, server details, and available tools.
   - **Sub-commands:**
     - **`desc`** or **`descriptions`**:
@@ -79,6 +89,7 @@ Slash commands provide meta-level control over the CLI itself.
   - **Keyboard Shortcut:** Press **Ctrl+T** at any time to toggle between showing and hiding tool descriptions.
 
 - **`/memory`**
+
   - **Description:** Manage the AI's instructional context (hierarchical memory loaded from `GEMINI.md` files).
   - **Sub-commands:**
     - **`add`**:
@@ -90,28 +101,35 @@ Slash commands provide meta-level control over the CLI itself.
     - **Note:** For more details on how `GEMINI.md` files contribute to hierarchical memory, see the [CLI Configuration documentation](../get-started/configuration.md).
 
 - **`/restore`**
+
   - **Description:** Restores the project files to the state they were in just before a tool was executed. This is particularly useful for undoing file edits made by a tool. If run without a tool call ID, it will list available checkpoints to restore from.
   - **Usage:** `/restore [tool_call_id]`
   - **Note:** Only available if the CLI is invoked with the `--checkpointing` option or configured via [settings](../get-started/configuration.md). See [Checkpointing documentation](../checkpointing.md) for more details.
 
 - **`/settings`**
+
   - **Description:** Open the settings editor to view and modify Gemini CLI settings.
   - **Details:** This command provides a user-friendly interface for changing settings that control the behavior and appearance of Gemini CLI. It is equivalent to manually editing the `.gemini/settings.json` file, but with validation and guidance to prevent errors.
   - **Usage:** Simply run `/settings` and the editor will open. You can then browse or search for specific settings, view their current values, and modify them as desired. Changes to some settings are applied immediately, while others require a restart.
 
 - **`/stats`**
+
   - **Description:** Display detailed statistics for the current Gemini CLI session, including token usage, cached token savings (when available), and session duration. Note: Cached token information is only displayed when cached tokens are being used, which occurs with API key authentication but not with OAuth authentication at this time.
 
 - [**`/theme`**](./themes.md)
+
   - **Description:** Open a dialog that lets you change the visual theme of Gemini CLI.
 
 - **`/auth`**
+
   - **Description:** Open a dialog that lets you change the authentication method.
 
 - **`/about`**
+
   - **Description:** Show version info. Please share this information when filing issues.
 
 - [**`/tools`**](../tools/index.md)
+
   - **Description:** Display a list of tools that are currently available within Gemini CLI.
   - **Usage:** `/tools [desc]`
   - **Sub-commands:**
@@ -121,12 +139,15 @@ Slash commands provide meta-level control over the CLI itself.
       - **Description:** Hide tool descriptions, showing only the tool names.
 
 - **`/privacy`**
+
   - **Description:** Display the Privacy Notice and allow users to select whether they consent to the collection of their data for service improvement purposes.
 
 - **`/quit`** (or **`/exit`**)
+
   - **Description:** Exit Gemini CLI.
 
 - **`/vim`**
+
   - **Description:** Toggle vim mode on or off. When vim mode is enabled, the input area supports vim-style navigation and editing commands in both NORMAL and INSERT modes.
   - **Features:**
     - **NORMAL mode:** Navigate with `h`, `j`, `k`, `l`; jump by words with `w`, `b`, `e`; go to line start/end with `0`, `$`, `^`; go to specific lines with `G` (or `gg` for first line)
@@ -388,6 +409,7 @@ Gemini CLI will then execute the multi-line prompt defined in your TOML file.
 These shortcuts apply directly to the input prompt for text manipulation.
 
 - **Undo:**
+
   - **Keyboard shortcut:** Press **Ctrl+z** to undo the last action in the input prompt.
 
 - **Redo:**
@@ -398,6 +420,7 @@ These shortcuts apply directly to the input prompt for text manipulation.
 At commands are used to include the content of files or directories as part of your prompt to Gemini. These commands include git-aware filtering.
 
 - **`@<path_to_file_or_directory>`**
+
   - **Description:** Inject the content of the specified file or files into your current prompt. This is useful for asking questions about specific code, text, or collections of files.
   - **Examples:**
     - `@path/to/your/file.txt Explain this text.`
@@ -425,12 +448,14 @@ At commands are used to include the content of files or directories as part of y
 The `!` prefix lets you interact with your system's shell directly from within Gemini CLI.
 
 - **`!<shell_command>`**
+
   - **Description:** Execute the given `<shell_command>` using `bash` on Linux/macOS or `cmd.exe` on Windows. Any output or errors from the command are displayed in the terminal.
   - **Examples:**
     - `!ls -la` (executes `ls -la` and returns to Gemini CLI)
     - `!git status` (executes `git status` and returns to Gemini CLI)
 
 - **`!` (Toggle shell mode)**
+
   - **Description:** Typing `!` on its own toggles shell mode.
     - **Entering shell mode:**
       - When active, shell mode uses a different coloring and a "Shell Mode Indicator".

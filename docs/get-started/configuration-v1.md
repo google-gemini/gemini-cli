@@ -53,11 +53,13 @@ In addition to a project settings file, a project's `.gemini` directory can cont
 ### Available settings in `settings.json`:
 
 - **`contextFileName`** (string or array of strings):
+
   - **Description:** Specifies the filename for context files (e.g., `GEMINI.md`, `AGENTS.md`). Can be a single filename or a list of accepted filenames.
   - **Default:** `GEMINI.md`
   - **Example:** `"contextFileName": "AGENTS.md"`
 
 - **`bugCommand`** (object):
+
   - **Description:** Overrides the default URL for the `/bug` command.
   - **Default:** `"urlTemplate": "https://github.com/google-gemini/gemini-cli/issues/new?template=bug_report.yml&title={title}&info={info}"`
   - **Properties:**
@@ -96,16 +98,19 @@ If you are experiencing performance issues with file searching (e.g., with `@` c
 3.  **Disable Recursive File Search:** As a last resort, you can disable recursive file search entirely by setting `enableRecursiveFileSearch` to `false`. This will be the fastest option as it avoids a recursive crawl of your project. However, it means you will need to type the full path to files when using `@` completions.
 
 - **`coreTools`** (array of strings):
+
   - **Description:** Allows you to specify a list of core tool names that should be made available to the model. This can be used to restrict the set of built-in tools. See [Built-in Tools](../core/tools-api.md#built-in-tools) for a list of core tools. You can also specify command-specific restrictions for tools that support it, like the `ShellTool`. For example, `"coreTools": ["ShellTool(ls -l)"]` will only allow the `ls -l` command to be executed.
   - **Default:** All tools available for use by the Gemini model.
   - **Example:** `"coreTools": ["ReadFileTool", "GlobTool", "ShellTool(ls)"]`.
 
 - **`allowedTools`** (array of strings):
+
   - **Default:** `undefined`
   - **Description:** A list of tool names that will bypass the confirmation dialog. This is useful for tools that you trust and use frequently. The match semantics are the same as `coreTools`.
   - **Example:** `"allowedTools": ["ShellTool(git status)"]`.
 
 - **`excludeTools`** (array of strings):
+
   - **Description:** Allows you to specify a list of core tool names that should be excluded from the model. A tool listed in both `excludeTools` and `coreTools` is excluded. You can also specify command-specific restrictions for tools that support it, like the `ShellTool`. For example, `"excludeTools": ["ShellTool(rm -rf)"]` will block the `rm -rf` command.
   - **Default**: No tools excluded.
   - **Example:** `"excludeTools": ["run_shell_command", "findFiles"]`.
@@ -114,43 +119,51 @@ If you are experiencing performance issues with file searching (e.g., with `@` c
     that can be executed.
 
 - **`allowMCPServers`** (array of strings):
+
   - **Description:** Allows you to specify a list of MCP server names that should be made available to the model. This can be used to restrict the set of MCP servers to connect to. Note that this will be ignored if `--allowed-mcp-server-names` is set.
   - **Default:** All MCP servers are available for use by the Gemini model.
   - **Example:** `"allowMCPServers": ["myPythonServer"]`.
   - **Security Note:** This uses simple string matching on MCP server names, which can be modified. If you're a system administrator looking to prevent users from bypassing this, consider configuring the `mcpServers` at the system settings level such that the user will not be able to configure any MCP servers of their own. This should not be used as an airtight security mechanism.
 
 - **`excludeMCPServers`** (array of strings):
+
   - **Description:** Allows you to specify a list of MCP server names that should be excluded from the model. A server listed in both `excludeMCPServers` and `allowMCPServers` is excluded. Note that this will be ignored if `--allowed-mcp-server-names` is set.
   - **Default**: No MCP servers excluded.
   - **Example:** `"excludeMCPServers": ["myNodeServer"]`.
   - **Security Note:** This uses simple string matching on MCP server names, which can be modified. If you're a system administrator looking to prevent users from bypassing this, consider configuring the `mcpServers` at the system settings level such that the user will not be able to configure any MCP servers of their own. This should not be used as an airtight security mechanism.
 
 - **`autoAccept`** (boolean):
+
   - **Description:** Controls whether the CLI automatically accepts and executes tool calls that are considered safe (e.g., read-only operations) without explicit user confirmation. If set to `true`, the CLI will bypass the confirmation prompt for tools deemed safe.
   - **Default:** `false`
   - **Example:** `"autoAccept": true`
 
 - **`theme`** (string):
+
   - **Description:** Sets the visual [theme](./themes.md) for Gemini CLI.
   - **Default:** `"Default"`
   - **Example:** `"theme": "GitHub"`
 
 - **`vimMode`** (boolean):
+
   - **Description:** Enables or disables vim mode for input editing. When enabled, the input area supports vim-style navigation and editing commands with NORMAL and INSERT modes. The vim mode status is displayed in the footer and persists between sessions.
   - **Default:** `false`
   - **Example:** `"vimMode": true`
 
 - **`sandbox`** (boolean or string):
+
   - **Description:** Controls whether and how to use sandboxing for tool execution. If set to `true`, Gemini CLI uses a pre-built `gemini-cli-sandbox` Docker image. For more information, see [Sandboxing](#sandboxing).
   - **Default:** `false`
   - **Example:** `"sandbox": "docker"`
 
 - **`toolDiscoveryCommand`** (string):
+
   - **Description:** Defines a custom shell command for discovering tools from your project. The shell command must return on `stdout` a JSON array of [function declarations](https://ai.google.dev/gemini-api/docs/function-calling#function-declarations). Tool wrappers are optional.
   - **Default:** Empty
   - **Example:** `"toolDiscoveryCommand": "bin/get_tools"`
 
 - **`toolCallCommand`** (string):
+
   - **Description:** Defines a custom shell command for calling a specific tool that was discovered using `toolDiscoveryCommand`. The shell command must meet the following criteria:
     - It must take function `name` (exactly as in [function declaration](https://ai.google.dev/gemini-api/docs/function-calling#function-declarations)) as first command line argument.
     - It must read function arguments as JSON on `stdin`, analogous to [`functionCall.args`](https://cloud.google.com/vertex-ai/generative-ai/docs/model-reference/inference#functioncall).
@@ -159,6 +172,7 @@ If you are experiencing performance issues with file searching (e.g., with `@` c
   - **Example:** `"toolCallCommand": "bin/call_tool"`
 
 - **`mcpServers`** (object):
+
   - **Description:** Configures connections to one or more Model-Context Protocol (MCP) servers for discovering and using custom tools. Gemini CLI attempts to connect to each configured MCP server to discover available tools. If multiple MCP servers expose a tool with the same name, the tool names will be prefixed with the server alias you defined in the configuration (e.g., `serverAlias__actualToolName`) to avoid conflicts. Note that the system might strip certain schema properties from MCP tool definitions for compatibility. At least one of `command`, `url`, or `httpUrl` must be provided. If multiple are specified, the order of precedence is `httpUrl`, then `url`, then `command`.
   - **Default:** Empty
   - **Properties:**
@@ -216,12 +230,14 @@ If you are experiencing performance issues with file searching (e.g., with `@` c
     ```
 
 - **`checkpointing`** (object):
+
   - **Description:** Configures the checkpointing feature, which allows you to save and restore conversation and file states. See the [Checkpointing documentation](../checkpointing.md) for more details.
   - **Default:** `{"enabled": false}`
   - **Properties:**
     - **`enabled`** (boolean): When `true`, the `/restore` command is available.
 
 - **`preferredEditor`** (string):
+
   - **Description:** Specifies the preferred editor to use for viewing diffs.
   - **Default:** `vscode`
   - **Example:** `"preferredEditor": "vscode"`
@@ -244,6 +260,7 @@ If you are experiencing performance issues with file searching (e.g., with `@` c
     }
     ```
 - **`usageStatisticsEnabled`** (boolean):
+
   - **Description:** Enables or disables the collection of usage statistics. See [Usage Statistics](#usage-statistics) for more information.
   - **Default:** `true`
   - **Example:**
@@ -252,6 +269,7 @@ If you are experiencing performance issues with file searching (e.g., with `@` c
     ```
 
 - **`hideTips`** (boolean):
+
   - **Description:** Enables or disables helpful tips in the CLI interface.
   - **Default:** `false`
   - **Example:**
@@ -261,6 +279,7 @@ If you are experiencing performance issues with file searching (e.g., with `@` c
     ```
 
 - **`hideBanner`** (boolean):
+
   - **Description:** Enables or disables the startup banner (ASCII art logo) in the CLI interface.
   - **Default:** `false`
   - **Example:**
@@ -270,6 +289,7 @@ If you are experiencing performance issues with file searching (e.g., with `@` c
     ```
 
 - **`maxSessionTurns`** (number):
+
   - **Description:** Sets the maximum number of turns for a session. If the session exceeds this limit, the CLI will stop processing and start a new chat.
   - **Default:** `-1` (unlimited)
   - **Example:**
@@ -278,6 +298,7 @@ If you are experiencing performance issues with file searching (e.g., with `@` c
     ```
 
 - **`summarizeToolOutput`** (object):
+
   - **Description:** Enables or disables the summarization of tool output. You can specify the token budget for the summarization using the `tokenBudget` setting.
   - Note: Currently only the `run_shell_command` tool is supported.
   - **Default:** `{}` (Disabled by default)
@@ -291,6 +312,7 @@ If you are experiencing performance issues with file searching (e.g., with `@` c
     ```
 
 - **`excludedProjectEnvVars`** (array of strings):
+
   - **Description:** Specifies environment variables that should be excluded from being loaded from project `.env` files. This prevents project-specific environment variables (like `DEBUG=true`) from interfering with gemini-cli behavior. Variables from `.gemini/.env` files are never excluded.
   - **Default:** `["DEBUG", "DEBUG_MODE"]`
   - **Example:**
@@ -299,6 +321,7 @@ If you are experiencing performance issues with file searching (e.g., with `@` c
     ```
 
 - **`includeDirectories`** (array of strings):
+
   - **Description:** Specifies an array of additional absolute or relative paths to include in the workspace context. Missing directories will be skipped with a warning by default. Paths can use `~` to refer to the user's home directory. This setting can be combined with the `--include-directories` command-line flag.
   - **Default:** `[]`
   - **Example:**
@@ -311,6 +334,7 @@ If you are experiencing performance issues with file searching (e.g., with `@` c
     ```
 
 - **`loadMemoryFromIncludeDirectories`** (boolean):
+
   - **Description:** Controls the behavior of the `/memory refresh` command. If set to `true`, `GEMINI.md` files should be loaded from all directories that are added. If set to `false`, `GEMINI.md` should only be loaded from the current directory.
   - **Default:** `false`
   - **Example:**
@@ -319,6 +343,7 @@ If you are experiencing performance issues with file searching (e.g., with `@` c
     ```
 
 - **`chatCompression`** (object):
+
   - **Description:** Controls the settings for chat history compression, both automatic and
     when manually invoked through the /compress command.
   - **Properties:**
@@ -331,6 +356,7 @@ If you are experiencing performance issues with file searching (e.g., with `@` c
     ```
 
 - **`showLineNumbers`** (boolean):
+
   - **Description:** Controls whether line numbers are displayed in code blocks in the CLI output.
   - **Default:** `true`
   - **Example:**

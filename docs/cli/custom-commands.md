@@ -26,6 +26,7 @@ You must write your command definition files in the TOML format with a `.toml` f
 - `description` (String, Optional): A brief, one-line description of what the command does. This text appears next to your command in the `/help` menu.
 
 **Example `review.toml`:**
+
 ```toml
 description = "Provides a basic code review on the provided context."
 prompt = "Please provide a code review for the code I have provided in the context."
@@ -40,14 +41,18 @@ You can make your commands more powerful by making the prompts dynamic. You can 
 If your `prompt` contains the `{{args}}` placeholder, the CLI replaces that placeholder with the text you type after the command name. This lets you create flexible commands that operate on your input.
 
 **Example (`review.toml`):**
+
 ```toml
 description = "Reviews the specified file."
 prompt = "Please provide a code review for the following file: {{args}}"
 ```
+
 **To use this command, run:**
+
 ```
 > /review src/components/Button.tsx
 ```
+
 The model receives the prompt: `Please provide a code review for the following file: src/components/Button.tsx`.
 
 ### Injecting shell command output with `!{...}`
@@ -57,6 +62,7 @@ You can execute a shell command and inject its standard output directly into you
 For security, the CLI shows you the exact command it is about to run and asks for your confirmation before proceeding.
 
 **Example (`review.toml` evolution):**
+
 ```toml
 description = "Reviews a file, including linting results."
 prompt = """
@@ -66,10 +72,13 @@ Also, consider the following linting report in your review:
 
 **Linter Output:**
 ```
+
 !{eslint {{args}}}
+
 ```
 """
 ```
+
 When you run `/review src/main.js`, the CLI first executes `eslint src/main.js` and injects its output into the prompt.
 
 ### Injecting file content with `@{...}`
@@ -77,6 +86,7 @@ When you run `/review src/main.js`, the CLI first executes `eslint src/main.js` 
 You can embed the content of a file directly into your prompt by using the `@{...}` syntax. This is useful for creating commands that analyze or operate on specific files. The command is workspace-aware and supports multimodal content like images and PDFs.
 
 **Example (`review.toml` final evolution):**
+
 ```toml
 description = "Reviews a file against the project's coding standards."
 prompt = """
@@ -90,8 +100,11 @@ Ensure your review checks for adherence to our official coding standards, includ
 ---
 """
 ```
+
 **To use this command, run:**
+
 ```
 > /review @src/utils.ts
 ```
+
 This command injects the project's coding standards and the content of `src/utils.ts` into the prompt.

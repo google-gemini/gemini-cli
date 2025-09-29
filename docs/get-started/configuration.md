@@ -2,10 +2,10 @@
 
 > **Note on Configuration Format, 9/17/25:** The format of the `settings.json` file has been updated to a new, more organized structure.
 >
->  - The new format will be supported in the stable release starting **[09/10/25]**.
->  - Automatic migration from the old format to the new format will begin on **[09/17/25]**.
+> - The new format will be supported in the stable release starting **[09/10/25]**.
+> - Automatic migration from the old format to the new format will begin on **[09/17/25]**.
 >
->  For details on the previous format, please see the [v1 Configuration documentation](./configuration-v1.md).
+> For details on the previous format, please see the [v1 Configuration documentation](./configuration-v1.md).
 
 Gemini CLI offers several ways to configure its behavior, including environment variables, command-line arguments, and settings files. This document outlines the different configuration methods and available settings.
 
@@ -55,18 +55,22 @@ Settings are organized into categories. All settings should be placed within the
 #### `general`
 
 - **`general.preferredEditor`** (string):
+
   - **Description:** The preferred editor to open files in.
   - **Default:** `undefined`
 
 - **`general.vimMode`** (boolean):
+
   - **Description:** Enable Vim keybindings.
   - **Default:** `false`
 
 - **`general.disableAutoUpdate`** (boolean):
+
   - **Description:** Disable automatic updates.
   - **Default:** `false`
 
 - **`general.disableUpdateNag`** (boolean):
+
   - **Description:** Disable update notification prompts.
   - **Default:** `false`
 
@@ -84,38 +88,47 @@ Settings are organized into categories. All settings should be placed within the
 #### `ui`
 
 - **`ui.theme`** (string):
+
   - **Description:** The color theme for the UI. See [Themes](../cli/themes.md) for available options.
   - **Default:** `undefined`
 
 - **`ui.customThemes`** (object):
+
   - **Description:** Custom theme definitions.
   - **Default:** `{}`
 
 - **`ui.hideWindowTitle`** (boolean):
+
   - **Description:** Hide the window title bar.
   - **Default:** `false`
 
 - **`ui.hideTips`** (boolean):
+
   - **Description:** Hide helpful tips in the UI.
   - **Default:** `false`
 
 - **`ui.hideBanner`** (boolean):
+
   - **Description:** Hide the application banner.
   - **Default:** `false`
 
 - **`ui.hideFooter`** (boolean):
+
   - **Description:** Hide the footer from the UI.
   - **Default:** `false`
 
 - **`ui.showMemoryUsage`** (boolean):
+
   - **Description:** Display memory usage information in the UI.
   - **Default:** `false`
 
 - **`ui.showLineNumbers`** (boolean):
+
   - **Description:** Show line numbers in the chat.
   - **Default:** `false`
 
 - **`ui.showCitations`** (boolean):
+
   - **Description:** Show citations for generated text in the chat.
   - **Default:** `true`
 
@@ -130,6 +143,7 @@ Settings are organized into categories. All settings should be placed within the
 #### `ide`
 
 - **`ide.enabled`** (boolean):
+
   - **Description:** Enable IDE integration mode.
   - **Default:** `false`
 
@@ -146,18 +160,22 @@ Settings are organized into categories. All settings should be placed within the
 #### `model`
 
 - **`model.name`** (string):
+
   - **Description:** The Gemini model to use for conversations.
   - **Default:** `undefined`
 
 - **`model.maxSessionTurns`** (number):
+
   - **Description:** Maximum number of user/model/tool turns to keep in a session. -1 means unlimited.
   - **Default:** `-1`
 
 - **`model.summarizeToolOutput`** (object):
+
   - **Description:** Enables or disables the summarization of tool output. You can specify the token budget for the summarization using the `tokenBudget` setting. Note: Currently only the `run_shell_command` tool is supported. For example `{"run_shell_command": {"tokenBudget": 2000}}`
   - **Default:** `undefined`
 
 - **`model.chatCompression.contextPercentageThreshold`** (number):
+
   - **Description:** Sets the threshold for chat history compression as a percentage of the model's total token limit. This is a value between 0 and 1 that applies to both automatic compression and the manual `/compress` command. For example, a value of `0.6` will trigger compression when the chat history exceeds 60% of the token limit.
   - **Default:** `0.7`
 
@@ -168,30 +186,37 @@ Settings are organized into categories. All settings should be placed within the
 #### `context`
 
 - **`context.fileName`** (string or array of strings):
+
   - **Description:** The name of the context file(s).
   - **Default:** `undefined`
 
 - **`context.importFormat`** (string):
+
   - **Description:** The format to use when importing memory.
   - **Default:** `undefined`
 
 - **`context.discoveryMaxDirs`** (number):
+
   - **Description:** Maximum number of directories to search for memory.
   - **Default:** `200`
 
 - **`context.includeDirectories`** (array):
+
   - **Description:** Additional directories to include in the workspace context. Missing directories will be skipped with a warning.
   - **Default:** `[]`
 
 - **`context.loadFromIncludeDirectories`** (boolean):
+
   - **Description:** Controls the behavior of the `/memory refresh` command. If set to `true`, `GEMINI.md` files should be loaded from all directories that are added. If set to `false`, `GEMINI.md` should only be loaded from the current directory.
   - **Default:** `false`
 
 - **`context.fileFiltering.respectGitIgnore`** (boolean):
+
   - **Description:** Respect .gitignore files when searching.
   - **Default:** `true`
 
 - **`context.fileFiltering.respectGeminiIgnore`** (boolean):
+
   - **Description:** Respect .geminiignore files when searching.
   - **Default:** `true`
 
@@ -202,6 +227,7 @@ Settings are organized into categories. All settings should be placed within the
 #### `tools`
 
 - **`tools.sandbox`** (boolean or string):
+
   - **Description:** Sandbox execution environment (can be a boolean or a path string).
   - **Default:** `undefined`
 
@@ -210,18 +236,22 @@ Settings are organized into categories. All settings should be placed within the
   Use `node-pty` for an interactive shell experience. Fallback to `child_process` still applies. Defaults to `false`.
 
 - **`tools.core`** (array of strings):
+
   - **Description:** This can be used to restrict the set of built-in tools [with an allowlist](../cli/enterprise.md#restricting-tool-access). See [Built-in Tools](../core/tools-api.md#built-in-tools) for a list of core tools. The match semantics are the same as `tools.allowed`.
   - **Default:** `undefined`
 
 - **`tools.exclude`** (array of strings):
+
   - **Description:** Tool names to exclude from discovery.
   - **Default:** `undefined`
 
 - **`tools.allowed`** (array of strings):
+
   - **Description:** A list of tool names that will bypass the confirmation dialog. This is useful for tools that you trust and use frequently. For example, `["run_shell_command(git)", "run_shell_command(npm test)"]` will skip the confirmation dialog to run any `git` and `npm test` commands. See [Shell Tool command restrictions](../tools/shell.md#command-restrictions) for details on prefix matching, command chaining, etc.
   - **Default:** `undefined`
 
 - **`tools.discoveryCommand`** (string):
+
   - **Description:** Command to run for tool discovery.
   - **Default:** `undefined`
 
@@ -235,10 +265,12 @@ Settings are organized into categories. All settings should be placed within the
 #### `mcp`
 
 - **`mcp.serverCommand`** (string):
+
   - **Description:** Command to start an MCP server.
   - **Default:** `undefined`
 
 - **`mcp.allowed`** (array of strings):
+
   - **Description:** An allowlist of MCP servers to allow.
   - **Default:** `undefined`
 
@@ -249,14 +281,17 @@ Settings are organized into categories. All settings should be placed within the
 #### `security`
 
 - **`security.folderTrust.enabled`** (boolean):
+
   - **Description:** Setting to track whether Folder trust is enabled.
   - **Default:** `false`
 
 - **`security.auth.selectedType`** (string):
+
   - **Description:** The currently selected authentication type.
   - **Default:** `undefined`
 
 - **`security.auth.enforcedType`** (string):
+
   - **Description:** The required auth type (useful for enterprises).
   - **Default:** `undefined`
 
@@ -267,14 +302,17 @@ Settings are organized into categories. All settings should be placed within the
 #### `advanced`
 
 - **`advanced.autoConfigureMemory`** (boolean):
+
   - **Description:** Automatically configure Node.js memory limits.
   - **Default:** `false`
 
 - **`advanced.dnsResolutionOrder`** (string):
+
   - **Description:** The DNS resolution order.
   - **Default:** `undefined`
 
 - **`advanced.excludedEnvVars`** (array of strings):
+
   - **Description:** Environment variables to exclude from project context.
   - **Default:** `["DEBUG","DEBUG_MODE"]`
 

@@ -3,7 +3,7 @@
 Gemini CLI requires authentication using Google's services. Before using Gemini CLI, you'll need to configure **one** of the following authentication methods:
 
 - Interactive mode:
-  - Recommended: Login with Google 
+  - Recommended: Login with Google
   - Use Gemini API key
   - Use Vertex AI
 - Headless (non-interactive) mode:
@@ -33,15 +33,15 @@ If you are running Gemini CLI on your local machine, the simplest method is logg
 
 1. Select **Login with Google**. Gemini CLI will open a login prompt using your web browser.
 
-    If you are a **Google AI Pro** or **Google AI Ultra** subscriber, login with the Google account associated with your subscription.
+   If you are a **Google AI Pro** or **Google AI Ultra** subscriber, login with the Google account associated with your subscription.
 
 2. Follow the on-screen instructions. Your credentials will be cached locally for future sessions.
-  
-    > **Note:** This method requires a web browser on a machine that can communicate with the terminal running the CLI (e.g., your local machine). The browser will be redirected to a `localhost` URL that the CLI listens on during setup.
+
+   > **Note:** This method requires a web browser on a machine that can communicate with the terminal running the CLI (e.g., your local machine). The browser will be redirected to a `localhost` URL that the CLI listens on during setup.
 
 #### (Optional) Set your GOOGLE_CLOUD_PROJECT
 
-When you log in using a Google account, you may be prompted to select a `GOOGLE_CLOUD_PROJECT`. 
+When you log in using a Google account, you may be prompted to select a `GOOGLE_CLOUD_PROJECT`.
 
 This can be necessary if you are:
 
@@ -91,6 +91,7 @@ If you intend to use Google Cloud's Vertex AI platform, you have several authent
 - A Google Cloud API key.
 
 #### First: Set required environment variables
+
 Regardless of your method of authentication, you'll typically need to set the following variables: `GOOGLE_CLOUD_PROJECT` and `GOOGLE_CLOUD_LOCATION`.
 
 To set these variables:
@@ -100,7 +101,6 @@ To set these variables:
 export GOOGLE_CLOUD_PROJECT="YOUR_PROJECT_ID"
 export GOOGLE_CLOUD_LOCATION="YOUR_PROJECT_LOCATION"
 ```
-
 
 #### A. Vertex AI - Application Default Credentials (ADC) using `gcloud`
 
@@ -120,6 +120,7 @@ unset GOOGLE_API_KEY GEMINI_API_KEY
     ```
 
     See [Set up Application Default Credentials](https://cloud.google.com/docs/authentication/provide-credentials-adc) for details.
+
 3.  Ensure `GOOGLE_CLOUD_PROJECT` and `GOOGLE_CLOUD_LOCATION` are set.
 
 #### B. Vertex AI - Service Account JSON key
@@ -148,7 +149,7 @@ unset GOOGLE_API_KEY GEMINI_API_KEY
 
 1.  Obtain a Google Cloud API key: [Get an API Key](https://cloud.google.com/vertex-ai/generative-ai/docs/start/api-keys?usertype=newuser).
 2.  Set the `GOOGLE_API_KEY` environment variable:
-    
+
     ```bash
     # Replace YOUR_GOOGLE_API_KEY with your Vertex AI API key
     export GOOGLE_API_KEY="YOUR_GOOGLE_API_KEY"
@@ -175,7 +176,7 @@ To avoid setting environment variables in every terminal session, you can:
 2.  **Use a `.env` file:** Create a `.gemini/.env` file in your project directory or home directory. Gemini CLI automatically loads variables from the first `.env` file it finds, searching up from the current directory, then in `~/.gemini/.env` or `~/.env`. `.gemini/.env` is recommended.
 
     Example for user-wide settings:
-    
+
     ```bash
     mkdir -p ~/.gemini
     cat >> ~/.gemini/.env <<'EOF'
@@ -192,9 +193,9 @@ When running in scripts or CI/CD pipelines where no user interaction is possible
 
 1.  **Gemini API Key:** Set `GEMINI_API_KEY`.
 2.  **Vertex AI:**
-    *   Set `GOOGLE_GENAI_USE_VERTEXAI=true`.
-    *   **With Google Cloud API Key:** Set `GOOGLE_API_KEY`.
-    *   **With ADC:** Ensure ADC is configured (e.g., via a service account with `GOOGLE_APPLICATION_CREDENTIALS`) and set `GOOGLE_CLOUD_PROJECT` and `GOOGLE_CLOUD_LOCATION`.
+    - Set `GOOGLE_GENAI_USE_VERTEXAI=true`.
+    - **With Google Cloud API Key:** Set `GOOGLE_API_KEY`.
+    - **With ADC:** Ensure ADC is configured (e.g., via a service account with `GOOGLE_APPLICATION_CREDENTIALS`) and set `GOOGLE_CLOUD_PROJECT` and `GOOGLE_CLOUD_LOCATION`.
 
 The CLI will exit with an error in non-interactive mode if no suitable environment variables are found.
 

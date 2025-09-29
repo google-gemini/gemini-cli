@@ -62,6 +62,7 @@ If you use up your initial number of requests, you can continue to benefit from 
 - [Purchase a Gemini Code Assist Subscription through Google Cloud ](https://cloud.google.com/gemini/docs/codeassist/overview) by signing up in the Google Cloud console. Learn more at [Set up Gemini Code Assist] (https://cloud.google.com/gemini/docs/discover/set-up-gemini) Quotas and pricing are based on a fixed price subscription with assigned license seats. For predictable costs, you can sign in with Google.
 
   This includes:
+
   - Gemini Code Assist Standard edition:
     - 1500 model requests / user / day
     - 120 model requests / user / minute
