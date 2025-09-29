@@ -8,7 +8,7 @@ This document lists the available keyboard shortcuts in the Gemini CLI.
 | -------- | --------------------------------------------------------------------------------------------------------------------- |
 | `Esc`    | Close dialogs and suggestions.                                                                                        |
 | `Ctrl+C` | Cancel the ongoing request and clear the input. Press twice to exit the application.                                  |
-| `Ctrl+D` | Exit the application if the input is empty. Press twice to confirm.                                                   |
+| `Ctrl+D` | Clear the input if not empty. Exit the application if the input is empty (press twice to confirm).                    |
 | `Ctrl+L` | Clear the screen.                                                                                                     |
 | `Ctrl+O` | Toggle the display of the debug console.                                                                              |
 | `Ctrl+S` | Allows long responses to print fully, disabling truncation. Use your terminal's scrollback to view the entire output. |
@@ -30,7 +30,7 @@ This document lists the available keyboard shortcuts in the Gemini CLI.
 | `Ctrl+B` / `Left Arrow`                            | Move the cursor one character to the left.                                                                                          |
 | `Ctrl+C`                                           | Clear the input prompt                                                                                                              |
 | `Esc` (double press)                               | Clear the input prompt.                                                                                                             |
-| `Ctrl+D` / `Delete`                                | Delete the character to the right of the cursor.                                                                                    |
+| `Ctrl+D` / `Delete`                                | Clear the input if not empty. If empty, exit application (press twice to confirm). Delete key deletes the character to the right.   |
 | `Ctrl+E` / `End`                                   | Move the cursor to the end of the line.                                                                                             |
 | `Ctrl+F` / `Right Arrow`                           | Move the cursor one character to the right.                                                                                         |
 | `Ctrl+H` / `Backspace`                             | Delete the character to the left of the cursor.                                                                                     |
