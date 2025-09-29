@@ -113,11 +113,15 @@ describe('Interactive Mode', () => {
         'CLI did not start up in interactive mode correctly',
       ).toBe(true);
       fullOutput = '';
-      await type(ptyProcess, 'hi', 501);
+      await type(
+        ptyProcess,
+        'say hello in spanish using less than 5 letters.',
+        501,
+      );
       await type(ptyProcess, '\r', 501);
 
       await rig.poll(
-        () => stripAnsi(fullOutput).includes('Type your message'),
+        () => stripAnsi(fullOutput).toLowerCase().includes('hola'),
         25000,
         200,
       );
