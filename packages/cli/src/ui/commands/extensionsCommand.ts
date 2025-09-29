@@ -149,7 +149,6 @@ const updateExtensionsCommand: SlashCommand = {
       name.startsWith(partialArg),
     );
 
-    //
     if ('--all'.startsWith(partialArg) || 'all'.startsWith(partialArg)) {
       suggestions.unshift('--all');
     }
