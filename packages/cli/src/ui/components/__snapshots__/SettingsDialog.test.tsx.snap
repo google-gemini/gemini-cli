@@ -22,10 +22,6 @@ exports[`SettingsDialog > Snapshot Tests > should render default state correctly
 │                                                                                                  │
 │   Hide Window Title                                    false                                     │
 │                                                                                                  │
-│   Show Status in Title                                 false                                     │
-│                                                                                                  │
-│   Hide Tips                                            false                                     │
-│                                                                                                  │
 │ ▼                                                                                                │
 │                                                                                                  │
 │                                                                                                  │
@@ -60,10 +56,6 @@ exports[`SettingsDialog > Snapshot Tests > should render focused on scope select
 │   Output Format                                        Text                                      │
 │                                                                                                  │
 │   Hide Window Title                                    false                                     │
-│                                                                                                  │
-│   Show Status in Title                                 false                                     │
-│                                                                                                  │
-│   Hide Tips                                            false                                     │
 │                                                                                                  │
 │ ▼                                                                                                │
 │                                                                                                  │
@@ -100,10 +92,6 @@ exports[`SettingsDialog > Snapshot Tests > should render with accessibility sett
 │                                                                                                  │
 │   Hide Window Title                                    false                                     │
 │                                                                                                  │
-│   Show Status in Title                                 false                                     │
-│                                                                                                  │
-│   Hide Tips                                            false                                     │
-│                                                                                                  │
 │ ▼                                                                                                │
 │                                                                                                  │
 │                                                                                                  │
@@ -138,10 +126,6 @@ exports[`SettingsDialog > Snapshot Tests > should render with all boolean settin
 │   Output Format                                        Text                                      │
 │                                                                                                  │
 │   Hide Window Title                                    false*                                    │
-│                                                                                                  │
-│   Show Status in Title                                 false                                     │
-│                                                                                                  │
-│   Hide Tips                                            false*                                    │
 │                                                                                                  │
 │ ▼                                                                                                │
 │                                                                                                  │
@@ -178,10 +162,6 @@ exports[`SettingsDialog > Snapshot Tests > should render with different scope se
 │                                                                                                  │
 │   Hide Window Title                                    false                                     │
 │                                                                                                  │
-│   Show Status in Title                                 false                                     │
-│                                                                                                  │
-│   Hide Tips                                            false                                     │
-│                                                                                                  │
 │ ▼                                                                                                │
 │                                                                                                  │
 │                                                                                                  │
@@ -216,10 +196,6 @@ exports[`SettingsDialog > Snapshot Tests > should render with different scope se
 │   Output Format                                        Text                                      │
 │                                                                                                  │
 │   Hide Window Title                                    false                                     │
-│                                                                                                  │
-│   Show Status in Title                                 false                                     │
-│                                                                                                  │
-│   Hide Tips                                            false                                     │
 │                                                                                                  │
 │ ▼                                                                                                │
 │                                                                                                  │
@@ -256,10 +232,6 @@ exports[`SettingsDialog > Snapshot Tests > should render with file filtering set
 │                                                                                                  │
 │   Hide Window Title                                    false                                     │
 │                                                                                                  │
-│   Show Status in Title                                 false                                     │
-│                                                                                                  │
-│   Hide Tips                                            false                                     │
-│                                                                                                  │
 │ ▼                                                                                                │
 │                                                                                                  │
 │                                                                                                  │
@@ -294,10 +266,6 @@ exports[`SettingsDialog > Snapshot Tests > should render with mixed boolean and 
 │   Output Format                                        Text                                      │
 │                                                                                                  │
 │   Hide Window Title                                    false*                                    │
-│                                                                                                  │
-│   Show Status in Title                                 false                                     │
-│                                                                                                  │
-│   Hide Tips                                            false                                     │
 │                                                                                                  │
 │ ▼                                                                                                │
 │                                                                                                  │
@@ -334,10 +302,6 @@ exports[`SettingsDialog > Snapshot Tests > should render with tools and security
 │                                                                                                  │
 │   Hide Window Title                                    false                                     │
 │                                                                                                  │
-│   Show Status in Title                                 false                                     │
-│                                                                                                  │
-│   Hide Tips                                            false                                     │
-│                                                                                                  │
 │ ▼                                                                                                │
 │                                                                                                  │
 │                                                                                                  │
@@ -372,10 +336,6 @@ exports[`SettingsDialog > Snapshot Tests > should render with various boolean se
 │   Output Format                                        Text                                      │
 │                                                                                                  │
 │   Hide Window Title                                    true*                                     │
-│                                                                                                  │
-│   Show Status in Title                                 false                                     │
-│                                                                                                  │
-│   Hide Tips                                            true*                                     │
 │                                                                                                  │
 │ ▼                                                                                                │
 │                                                                                                  │
