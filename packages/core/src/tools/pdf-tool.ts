@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { existsSync, promises as fs, createWriteStream } from 'node:fs';
+import { existsSync, promises as fs, createWriteStream, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { Worker } from 'node:worker_threads';
 import { fileURLToPath } from 'node:url';
@@ -153,10 +153,10 @@ class PDFInvocation extends BaseToolInvocation<PDFParams, PDFResult> {
     
     try {
       // Validate file exists for read operations
-      if (['extracttext', 'search', 'info', 'split'].includes(op)) { 
+      if (['extracttext', 'search', 'info', 'split'].includes(op)) {
         // Commented out operations: 'metadata', 'forms', 'protect', 'optimize', 'convert', 'annotate', 'watermark', 'compress'
         if (!existsSync(file)) {
-          return this.createErrorResult(`PDF file not found: ${file}`);
+          return this.createFileNotFoundError(file);
         }
       }
 
@@ -1130,6 +1130,92 @@ ${pageStructureDisplay}`,
       llmContent: `pdf(${this.params.op}): ${message}`,
       returnDisplay: `pdf(${this.params.op}): ${message}`,
     };
+  }
+
+  private createFileNotFoundError(file: string): PDFResult {
+    try {
+      const dirPath = path.dirname(file);
+      const fileName = path.basename(file);
+      const fileNameLower = fileName.toLowerCase();
+
+      let suggestions: string[] = [];
+
+      // Try to find similar files in the same directory
+      if (existsSync(dirPath)) {
+        const files = readdirSync(dirPath);
+        const pdfFiles = files.filter((f: string) =>
+          f.toLowerCase().endsWith('.pdf') &&
+          f.toLowerCase() !== fileNameLower
+        );
+
+        // Look for files with similar names (fuzzy matching)
+        const similarFiles = pdfFiles.filter((f: string) => {
+          const fLower = f.toLowerCase();
+          const baseFileName = fileNameLower.replace('.pdf', '');
+          const baseF = fLower.replace('.pdf', '');
+
+          // Check for substring matches, ignoring spaces and special characters
+          const normalizedInput = baseFileName.replace(/[\s\-\(\)\[\]]/g, '');
+          const normalizedFile = baseF.replace(/[\s\-\(\)\[\]]/g, '');
+
+          return normalizedFile.includes(normalizedInput.substring(0, 10)) ||
+                 normalizedInput.includes(normalizedFile.substring(0, 10)) ||
+                 this.calculateSimilarity(normalizedInput, normalizedFile) > 0.6;
+        });
+
+        suggestions = similarFiles.slice(0, 3).map(f => path.join(dirPath, f));
+      }
+
+      let errorMessage = `PDF file not found: ${file}`;
+
+      if (suggestions.length > 0) {
+        errorMessage += '\n\nDid you mean one of these files?';
+        suggestions.forEach((suggestion, index) => {
+          errorMessage += `\n${index + 1}. ${suggestion}`;
+        });
+        errorMessage += '\n\nTip: Check for extra spaces, special characters, or slight differences in the filename.';
+      } else if (existsSync(dirPath)) {
+        errorMessage += `\n\nDirectory exists but no similar PDF files found in: ${dirPath}`;
+      } else {
+        errorMessage += `\n\nDirectory does not exist: ${dirPath}`;
+      }
+
+      return this.createErrorResult(errorMessage);
+
+    } catch (error) {
+      // Fallback to simple error if file system operations fail
+      return this.createErrorResult(`PDF file not found: ${file}`);
+    }
+  }
+
+  private calculateSimilarity(str1: string, str2: string): number {
+    const longer = str1.length > str2.length ? str1 : str2;
+    const shorter = str1.length > str2.length ? str2 : str1;
+
+    if (longer.length === 0) return 1.0;
+
+    const editDistance = this.levenshteinDistance(longer, shorter);
+    return (longer.length - editDistance) / longer.length;
+  }
+
+  private levenshteinDistance(str1: string, str2: string): number {
+    const matrix = Array(str2.length + 1).fill(null).map(() => Array(str1.length + 1).fill(null));
+
+    for (let i = 0; i <= str1.length; i++) matrix[0][i] = i;
+    for (let j = 0; j <= str2.length; j++) matrix[j][0] = j;
+
+    for (let j = 1; j <= str2.length; j++) {
+      for (let i = 1; i <= str1.length; i++) {
+        const substitutionCost = str1[i - 1] === str2[j - 1] ? 0 : 1;
+        matrix[j][i] = Math.min(
+          matrix[j][i - 1] + 1,
+          matrix[j - 1][i] + 1,
+          matrix[j - 1][i - 1] + substitutionCost
+        );
+      }
+    }
+
+    return matrix[str2.length][str1.length];
   }
 
   private isEncryptionError(errorMessage: string): boolean {
