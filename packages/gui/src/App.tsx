@@ -145,7 +145,7 @@ export const App: React.FC = () => {
               updatedAt: sessionInfo.lastUpdated,
               provider: currentProvider as ModelProviderType,
               model: currentModel,
-              roleId: currentRole
+              roleId: sessionInfo.roleId || currentRole // Use session's roleId if available, fallback to current role
             };
             
             useAppStore.getState().addSession(session);

@@ -17,6 +17,9 @@ let templateManager = null
 let isInitialized = false
 let initializationPromise = null
 
+// Track active streams and their AbortControllers for proper cancellation
+const activeStreams = new Map() // streamId -> { abortController, startTime }
+
 const createWindow = () => {
   // Create the browser window.
   const mainWindow = new BrowserWindow({
@@ -460,11 +463,11 @@ ipcMain.handle('multimodel-clear-history', async () => {
 })
 
 // Session management handlers
-ipcMain.handle('multimodel-create-session', async (_, sessionId, title = 'New Chat') => {
+ipcMain.handle('multimodel-create-session', async (_, sessionId, title = 'New Chat', roleId) => {
   try {
     const system = await ensureInitialized()
-    SessionManager.getInstance().createSession(sessionId, title)
-    // console.log('MultiModel createSession called:', sessionId, title)
+    SessionManager.getInstance().createSession(sessionId, title, roleId)
+    // console.log('MultiModel createSession called:', sessionId, title, 'roleId:', roleId)
     return { success: true }
   } catch (error) {
     console.error('Failed to create session:', error)
@@ -563,6 +566,18 @@ ipcMain.handle('multimodel-update-session-title', async (_, sessionId, newTitle)
   }
 })
 
+ipcMain.handle('multimodel-set-session-role', async (_, sessionId, roleId) => {
+  try {
+    const system = await ensureInitialized()
+    SessionManager.getInstance().setSessionRole(sessionId, roleId)
+    // console.log('MultiModel setSessionRole called:', sessionId, roleId)
+    return { success: true }
+  } catch (error) {
+    console.error('Failed to set session role:', error)
+    throw error
+  }
+})
+
 
 // Add message sending handler
 ipcMain.handle('multimodel-send-message', async (_, messages, signal) => {
@@ -589,6 +604,34 @@ ipcMain.handle('multimodel-send-message', async (_, messages, signal) => {
   } catch (error) {
     console.error('Failed to send message:', error)
     throw error
+  }
+})
+
+// Handle stream cancellation from frontend
+ipcMain.handle('multimodel-cancel-stream', async (event, streamId) => {
+  try {
+    const streamInfo = activeStreams.get(streamId)
+    if (streamInfo) {
+      console.log(`Cancelling stream: ${streamId}`)
+      // Abort the stream and any ongoing tool calls
+      streamInfo.abortController.abort('User cancelled stream')
+      // Remove from active streams
+      activeStreams.delete(streamId)
+
+      // Send cancellation event to frontend
+      event.sender.send('multimodel-stream-error', {
+        streamId,
+        error: 'Stream cancelled by user'
+      })
+
+      return { success: true, message: 'Stream cancelled successfully' }
+    } else {
+      console.warn(`Stream ${streamId} not found in active streams`)
+      return { success: false, message: 'Stream not found' }
+    }
+  } catch (error) {
+    console.error('Failed to cancel stream:', error)
+    return { success: false, message: error.message }
   }
 })
 
@@ -649,7 +692,13 @@ ipcMain.handle('multimodel-send-message-stream', async (event, messages, streamI
     
     // Create an AbortController for the signal
     const abortController = new AbortController()
-    
+
+    // Register the stream for cancellation tracking
+    activeStreams.set(streamId, {
+      abortController,
+      startTime: Date.now()
+    })
+
     try {
       // Use streaming approach
       const streamGenerator = system.sendMessageStream(universalMessages, abortController.signal)
@@ -657,8 +706,14 @@ ipcMain.handle('multimodel-send-message-stream', async (event, messages, streamI
       let fullContent = ''
       
       for await (const chunk of streamGenerator) {
+        // Check if stream was cancelled
+        if (abortController.signal.aborted) {
+          console.log(`Stream ${streamId} was cancelled, stopping processing`)
+          break
+        }
+
         // // console.log('Stream chunk received:', chunk.type, chunk.content?.substring(0, 50))
-        
+
         // Handle different event types
         if (chunk.type === 'compression') {
           // Send compression event
@@ -712,9 +767,9 @@ ipcMain.handle('multimodel-send-message-stream', async (event, messages, streamI
       }
       
       event.sender.send('multimodel-stream-complete', completionData)
-      
+
       return { success: true, totalContent: fullContent }
-      
+
     } catch (streamError) {
       console.error('[Main] Stream error occurred:', streamError)
 
@@ -763,6 +818,10 @@ ipcMain.handle('multimodel-send-message-stream', async (event, messages, streamI
     }
 
     throw error
+  } finally {
+    // Always clean up the stream from active streams tracking
+    activeStreams.delete(streamId)
+    console.log(`Stream ${streamId} removed from active streams`)
   }
 })
 
@@ -944,6 +1003,8 @@ ipcMain.handle('multimodel-call-excel-tool', async (_, operation, params) => {
         return await excelTool.listWorkbooks()
       case 'listWorksheets':
         return await excelTool.listWorksheets(params?.workbookName)
+      case 'getSelection':
+        return await excelTool.getSelection(params?.workbookName)
       default:
         return {
           success: false,

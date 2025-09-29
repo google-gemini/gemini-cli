@@ -38,6 +38,11 @@ const electronAPI = {
         // Real-time streaming with callback
         startStream: (onChunk, onComplete, onError) => {
           const cleanup = () => {
+            // Notify backend to cancel the stream and any ongoing tool calls
+            ipcRenderer.invoke('multimodel-cancel-stream', streamId).catch(error => {
+              console.warn('Failed to cancel stream on backend:', error);
+            });
+            // Remove event listeners
             ipcRenderer.removeAllListeners('multimodel-stream-chunk');
             ipcRenderer.removeAllListeners('multimodel-stream-complete');
             ipcRenderer.removeAllListeners('multimodel-stream-error');
@@ -104,7 +109,7 @@ const electronAPI = {
     updateCustomTemplate: (id, updates) => ipcRenderer.invoke('multimodel-update-custom-template', id, updates),
     deleteCustomTemplate: (id) => ipcRenderer.invoke('multimodel-delete-custom-template', id),
     // Session management
-    createSession: (sessionId, title) => ipcRenderer.invoke('multimodel-create-session', sessionId, title),
+    createSession: (sessionId, title, roleId) => ipcRenderer.invoke('multimodel-create-session', sessionId, title, roleId),
     switchSession: (sessionId) => ipcRenderer.invoke('multimodel-switch-session', sessionId),
     deleteSession: (sessionId) => ipcRenderer.invoke('multimodel-delete-session', sessionId),
     deleteAllSessions: () => ipcRenderer.invoke('multimodel-delete-all-sessions'),
@@ -112,6 +117,7 @@ const electronAPI = {
     getDisplayMessages: (sessionId) => ipcRenderer.invoke('multimodel-get-display-messages', sessionId),
     getSessionsInfo: () => ipcRenderer.invoke('multimodel-get-sessions-info'),
     updateSessionTitle: (sessionId, newTitle) => ipcRenderer.invoke('multimodel-update-session-title', sessionId, newTitle),
+    setSessionRole: (sessionId, roleId) => ipcRenderer.invoke('multimodel-set-session-role', sessionId, roleId),
     // OAuth authentication
     startOAuthFlow: (providerType) => ipcRenderer.invoke('oauth-start-flow', providerType),
     getOAuthStatus: (providerType) => ipcRenderer.invoke('oauth-get-status', providerType),
