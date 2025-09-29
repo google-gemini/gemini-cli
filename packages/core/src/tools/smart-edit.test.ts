@@ -241,7 +241,6 @@ describe('SmartEditTool', () => {
       expect(result.occurrences).toBe(0);
     });
   });
-
   describe('correctPath', () => {
     it('should correct a relative path if it is unambiguous', () => {
       const testFile = 'unique.txt';
