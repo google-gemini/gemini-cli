@@ -423,6 +423,15 @@ describe('memoryImportProcessor', () => {
       );
     });
 
+    it('should not import when @ is inside an inline code block', async () => {
+      const content =
+        'We should not ` @import` when the symbol is inside an inline code string.';
+      const testRootDir = testPath('test', 'project');
+      const result = await processImports(content, testRootDir);
+      expect(result.content).toBe(content);
+      expect(result.importTree.imports).toBeUndefined();
+    });
+
     it('should allow imports from parent and subdirectories within project root', async () => {
       const content =
         'Parent import: @../parent.md Subdir import: @./components/sub.md';
