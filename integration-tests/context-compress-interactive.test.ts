@@ -5,25 +5,7 @@
  */
 
 import { expect, describe, it, beforeEach, afterEach } from 'vitest';
-import { TestRig } from './test-helper.js';
-import type * as pty from '@lydell/node-pty';
-
-function stripAnsi(str: string): string {
-  const ansiRegex = new RegExp(
-    // eslint-disable-next-line no-control-regex
-    '[\\u001B\\u009B][[\\]()#;?]*.{0,2}(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]',
-    'g',
-  );
-  return str.replace(ansiRegex, '');
-}
-
-// Simulates typing a string one character at a time to avoid paste detection.
-async function type(ptyProcess: pty.IPty, text: string, delay = 5) {
-  for (const char of text) {
-    ptyProcess.write(char);
-    await new Promise((resolve) => setTimeout(resolve, delay));
-  }
-}
+import { stripAnsi, TestRig, type } from './test-helper.js';
 
 describe('Interactive Mode', () => {
   let rig: TestRig;
@@ -38,7 +20,6 @@ describe('Interactive Mode', () => {
 
   it('should trigger chat compression with /compress command', async () => {
     await rig.setup('interactive-compress-test');
-    process.env['VERBOSE'] = 'true';
     const { ptyProcess } = rig.runInteractive();
 
     // 1. Wait for the app to be ready
@@ -72,7 +53,7 @@ describe('Interactive Mode', () => {
 
     const foundEvent = await rig.waitForTelemetryEvent(
       'chat_compression',
-      120000,
+      90000,
     );
     expect(foundEvent, 'chat_compression telemetry event was not found').toBe(
       true,
@@ -81,7 +62,7 @@ describe('Interactive Mode', () => {
 
   it('should handle compression failure on token inflation', async () => {
     await rig.setup('interactive-compress-test');
-    process.env['VERBOSE'] = 'true';
+
     const { ptyProcess } = rig.runInteractive();
 
     // 1. Wait for the app to be ready
@@ -95,15 +76,12 @@ describe('Interactive Mode', () => {
     expect(isReady, 'CLI did not start up in interactive mode correctly').toBe(
       true,
     );
-
-    await type(
-      ptyProcess,
-      'return only the name of the scientist who discovered theory of relativity',
-    );
+    fullOutput = '';
+    await type(ptyProcess, 'hi');
     await type(ptyProcess, '\r');
 
     await rig.poll(
-      () => stripAnsi(fullOutput).toLowerCase().includes('einstein'),
+      () => stripAnsi(fullOutput).includes('Type your message'),
       25000,
       200,
     );
@@ -114,7 +92,7 @@ describe('Interactive Mode', () => {
 
     const foundEvent = await rig.waitForTelemetryEvent(
       'chat_compression',
-      120000,
+      90000,
     );
     expect(foundEvent).toBe(true);
 

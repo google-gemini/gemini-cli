@@ -112,6 +112,23 @@ export function validateModelOutput(
   return true;
 }
 
+export function stripAnsi(str: string): string {
+  const ansiRegex = new RegExp(
+    // eslint-disable-next-line no-control-regex
+    '[\\u001B\\u009B][[\\]()#;?]*.{0,2}(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]',
+    'g',
+  );
+  return str.replace(ansiRegex, '');
+}
+
+// Simulates typing a string one character at a time to avoid paste detection.
+export async function type(ptyProcess: pty.IPty, text: string, delay = 5) {
+  for (const char of text) {
+    ptyProcess.write(char);
+    await new Promise((resolve) => setTimeout(resolve, delay));
+  }
+}
+
 interface ParsedLog {
   attributes?: {
     'event.name'?: string;
