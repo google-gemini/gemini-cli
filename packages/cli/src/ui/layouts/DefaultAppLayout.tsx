@@ -13,11 +13,13 @@ import { Composer } from '../components/Composer.js';
 import { ExitWarning } from '../components/ExitWarning.js';
 import { useUIState } from '../contexts/UIStateContext.js';
 
-export const DefaultAppLayout: React.FC = () => {
+export const DefaultAppLayout: React.FC<{ width?: string }> = ({
+  width = '90%',
+}) => {
   const uiState = useUIState();
 
   return (
-    <Box flexDirection="column" width="90%">
+    <Box flexDirection="column" width={width}>
       <MainContent />
 
       <Box flexDirection="column" ref={uiState.mainControlsRef}>

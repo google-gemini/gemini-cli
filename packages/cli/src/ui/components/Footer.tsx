@@ -10,14 +10,11 @@ import { theme } from '../semantic-colors.js';
 import { shortenPath, tildeifyPath } from '@google/gemini-cli-core';
 import { ConsoleSummaryDisplay } from './ConsoleSummaryDisplay.js';
 import process from 'node:process';
-import path from 'node:path';
 import Gradient from 'ink-gradient';
 import { MemoryUsageDisplay } from './MemoryUsageDisplay.js';
 import { ContextUsageDisplay } from './ContextUsageDisplay.js';
 import { DebugProfiler } from './DebugProfiler.js';
-
 import { useTerminalSize } from '../hooks/useTerminalSize.js';
-import { isNarrowWidth } from '../utils/isNarrowWidth.js';
 
 import { useUIState } from '../contexts/UIStateContext.js';
 import { useConfig } from '../contexts/ConfigContext.js';
@@ -65,13 +62,8 @@ export const Footer: React.FC = () => {
 
   const { columns: terminalWidth } = useTerminalSize();
 
-  const isNarrow = isNarrowWidth(terminalWidth);
-
-  // Adjust path length based on terminal width
-  const pathLength = Math.max(20, Math.floor(terminalWidth * 0.4));
-  const displayPath = isNarrow
-    ? path.basename(tildeifyPath(targetDir))
-    : shortenPath(tildeifyPath(targetDir), pathLength);
+  const pathLength = Math.max(20, Math.floor(terminalWidth * 0.25));
+  const displayPath = shortenPath(tildeifyPath(targetDir), pathLength);
 
   const justifyContent = hideCWD && hideModelInfo ? 'center' : 'space-between';
   const displayVimMode = vimEnabled ? vimMode : undefined;
@@ -80,8 +72,8 @@ export const Footer: React.FC = () => {
     <Box
       justifyContent={justifyContent}
       width="100%"
-      flexDirection={isNarrow ? 'column' : 'row'}
-      alignItems={isNarrow ? 'flex-start' : 'center'}
+      flexDirection="row"
+      alignItems="center"
     >
       {(debugMode || displayVimMode || !hideCWD) && (
         <Box>
@@ -116,12 +108,10 @@ export const Footer: React.FC = () => {
       {/* Middle Section: Centered Trust/Sandbox Info */}
       {!hideSandboxStatus && (
         <Box
-          flexGrow={isNarrow || hideCWD || hideModelInfo ? 0 : 1}
+          flexGrow={1}
           alignItems="center"
-          justifyContent={isNarrow || hideCWD ? 'flex-start' : 'center'}
+          justifyContent="center"
           display="flex"
-          paddingX={isNarrow ? 0 : 1}
-          paddingTop={isNarrow ? 1 : 0}
         >
           {isTrustedFolder === false ? (
             <Text color={theme.status.warning}>untrusted</Text>
@@ -139,35 +129,33 @@ export const Footer: React.FC = () => {
             </Text>
           ) : (
             <Text color={theme.status.error}>
-              no sandbox <Text color={theme.text.secondary}>(see /docs)</Text>
+              no sandbox
+              {terminalWidth >= 100 && (
+                <Text color={theme.text.secondary}> (see /docs)</Text>
+              )}
             </Text>
           )}
         </Box>
       )}
 
       {/* Right Section: Gemini Label and Console Summary */}
-      {(!hideModelInfo ||
-        showMemoryUsage ||
-        corgiMode ||
-        (!showErrorDetails && errorCount > 0)) && (
-        <Box alignItems="center" paddingTop={isNarrow ? 1 : 0}>
-          {!hideModelInfo && (
-            <Box alignItems="center">
-              <Text color={theme.text.accent}>
-                {isNarrow ? '' : ' '}
-                {model}{' '}
-                <ContextUsageDisplay
-                  promptTokenCount={promptTokenCount}
-                  model={model}
-                />
-              </Text>
-              {showMemoryUsage && <MemoryUsageDisplay />}
-            </Box>
-          )}
+      {!hideModelInfo && (
+        <Box alignItems="center" justifyContent="flex-end">
+          <Box alignItems="center">
+            <Text color={theme.text.accent}>
+              {model}{' '}
+              <ContextUsageDisplay
+                promptTokenCount={promptTokenCount}
+                model={model}
+                terminalWidth={terminalWidth}
+              />
+            </Text>
+            {showMemoryUsage && <MemoryUsageDisplay />}
+          </Box>
           <Box alignItems="center" paddingLeft={2}>
             {corgiMode && (
               <Text>
-                {!hideModelInfo && <Text color={theme.ui.comment}>| </Text>}
+                <Text color={theme.ui.symbol}>| </Text>
                 <Text color={theme.status.error}>▼</Text>
                 <Text color={theme.text.primary}>(´</Text>
                 <Text color={theme.status.error}>ᴥ</Text>
@@ -177,7 +165,7 @@ export const Footer: React.FC = () => {
             )}
             {!showErrorDetails && errorCount > 0 && (
               <Box>
-                {!hideModelInfo && <Text color={theme.ui.comment}>| </Text>}
+                <Text color={theme.ui.symbol}>| </Text>
                 <ConsoleSummaryDisplay errorCount={errorCount} />
               </Box>
             )}
