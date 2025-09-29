@@ -114,6 +114,7 @@ export function getDiffCommand(
 
   switch (editor) {
     case 'vscode':
+    case 'vscodeinsiders': // Add this line
     case 'vscodium':
     case 'windsurf':
     case 'cursor':
