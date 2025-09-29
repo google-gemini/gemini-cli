@@ -905,18 +905,18 @@ describe('XlwingsTool - REAL EXECUTION TESTS - ALL 67 OPERATIONS', () => {
       }
     }, 15000);
 
-    // 41. find_range
-    it('should execute find_range operation', async () => {
-      const params = { op: 'find_range' as const, search_term: 'Alice', worksheet: 'Sheet1' };
+    // 41. search
+    it('should execute search operation', async () => {
+      const params = { op: 'search' as const, search_term: 'Alice', worksheet: 'Sheet1' };
       try {
         const invocation = xlwingsTool['createInvocation'](params);
         const result = await invocation.execute(new AbortController().signal);
-        saveLLMOutput('find_range', String(result.returnDisplay || result.llmContent), result.success);
+        saveLLMOutput('search', String(result.returnDisplay || result.llmContent), result.success);
         expect(typeof result.returnDisplay || result.llmContent).toBe('string');
         expect(typeof result.success).toBe('boolean');
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
-        saveLLMOutput('find_range', errorMessage, false);
+        saveLLMOutput('search', errorMessage, false);
         throw error;
       }
     }, 15000);

@@ -115,7 +115,7 @@ interface XlwingsParams {
   // Range operations
   'read_range' | 'write_range' | 'clear_range' | 'formula_range' | 'format_range' |
   'get_cell_info' | 'insert_range' | 'delete_range' |
-  'copy_paste_range' | 'replace_range' | 'find_range' | 'get_used_range' | 'sort_range' |
+  'copy_paste_range' | 'replace_range' | 'search' | 'get_used_range' | 'sort_range' |
   'merge_range' | 'unmerge_range' | 'get_sheet_info' |
   // Filter operations
   'add_filter' | 'remove_filter' | 'get_filter_info' |
@@ -904,6 +904,31 @@ interface XlwingsResult extends ToolResult {
   shape_created?: boolean;
   shape_modified?: boolean;
   shape_deleted?: boolean;
+
+  // Direct search result properties (from Python search implementation)
+  search_term?: string;
+  total_matches?: number;
+  execution_time_seconds?: number;
+  match_summary?: string;
+  match_locations?: string[];
+  detailed_matches?: Array<{
+    worksheet: string;
+    cell_address: string;
+    row_range?: string;
+    row: number;
+    column: number;
+    column_name: string;
+    matched_value: string;
+    match_type: string;
+    row_data: Record<string, string>;
+    context?: Array<{
+      row: number;
+      data: string[];
+      is_match: boolean;
+    }>;
+  }>;
+  searched_worksheets?: string[];
+  auto_selected?: string;
 }
 
 /**
@@ -981,6 +1006,25 @@ export class XlwingsTool extends BasePythonTool<XlwingsParams, XlwingsResult> {
     return `(${r}, ${g}, ${b})`;
   }
 
+  private static readonly VALID_OPERATIONS = [
+    'read_range', 'write_range', 'clear_range', 'formula_range', 'format_range',
+    'get_cell_info', 'insert_range', 'delete_range', 'copy_paste_range', 'replace_range',
+    'search', 'get_used_range', 'sort_range', 'merge_range', 'unmerge_range',
+    'get_sheet_info', 'set_row_height', 'set_column_width', 'get_row_height', 'get_column_width',
+    'add_comment', 'edit_comment', 'delete_comment', 'list_comments', 'create_chart',
+    'update_chart', 'delete_chart', 'list_charts', 'create_shape', 'create_textbox',
+    'list_shapes', 'modify_shape', 'delete_shape', 'move_shape', 'resize_shape',
+    'add_sheet', 'alter_sheet', 'delete_sheet', 'move_sheet', 'copy_sheet',
+    'list_workbooks', 'list_sheets', 'get_selection', 'set_selection', 'create_workbook',
+    'add_filter', 'remove_filter', 'get_filter_info', 'open_workbook', 'save_workbook',
+    'close_workbook', 'get_last_row', 'get_last_column', 'convert_data_types',
+    'add_vba_module', 'run_vba_macro', 'update_vba_code', 'list_vba_modules', 'delete_vba_module',
+    'insert_image', 'list_images', 'delete_image', 'resize_image', 'move_image',
+    'save_chart_as_image', 'export_workbook_to_pdf', 'export_worksheet_to_pdf',
+    'list_apps', 'insert_row', 'insert_column', 'delete_row', 'delete_column',
+    'show_excel', 'hide_excel'
+  ];
+
   constructor(config: Config) {
     super(
       'xlwings-tools',
@@ -993,10 +1037,10 @@ export class XlwingsTool extends BasePythonTool<XlwingsParams, XlwingsResult> {
         properties: {
           op: {
             type: 'string',
-            enum: ['read_range', 'write_range', 'clear_range', 'formula_range', 'format_range', 'get_cell_info', 'insert_range', 'delete_range', 'copy_paste_range', 'replace_range', 'find_range', 'get_used_range', 'sort_range', 'merge_range', 'unmerge_range', 
-              'get_sheet_info', 'set_row_height', 'set_column_width', 'get_row_height', 'get_column_width', 'add_comment', 'edit_comment', 'delete_comment', 'list_comments', 'create_chart', 'update_chart', 'delete_chart', 'list_charts', 'create_shape', 
-              'create_textbox', 'list_shapes', 'modify_shape', 'delete_shape', 'move_shape', 'resize_shape', 'add_sheet', 'alter_sheet', 'delete_sheet', 'move_sheet', 'copy_sheet', 'list_workbooks', 'list_sheets', 'get_selection', 'set_selection', 'create_workbook', 'add_filter', 'remove_filter', 'get_filter_info', 
-              'open_workbook', 'save_workbook', 'close_workbook', 'get_last_row', 'get_last_column', 'convert_data_types', 'add_vba_module', 'run_vba_macro', 'update_vba_code', 'list_vba_modules', 'delete_vba_module', 'insert_image', 'list_images', 'delete_image', 
+            enum: ['read_range', 'write_range', 'clear_range', 'formula_range', 'format_range', 'get_cell_info', 'insert_range', 'delete_range', 'copy_paste_range', 'replace_range', 'search', 'get_used_range', 'sort_range', 'merge_range', 'unmerge_range',
+              'get_sheet_info', 'set_row_height', 'set_column_width', 'get_row_height', 'get_column_width', 'add_comment', 'edit_comment', 'delete_comment', 'list_comments', 'create_chart', 'update_chart', 'delete_chart', 'list_charts', 'create_shape',
+              'create_textbox', 'list_shapes', 'modify_shape', 'delete_shape', 'move_shape', 'resize_shape', 'add_sheet', 'alter_sheet', 'delete_sheet', 'move_sheet', 'copy_sheet', 'list_workbooks', 'list_sheets', 'get_selection', 'set_selection', 'create_workbook', 'add_filter', 'remove_filter', 'get_filter_info',
+              'open_workbook', 'save_workbook', 'close_workbook', 'get_last_row', 'get_last_column', 'convert_data_types', 'add_vba_module', 'run_vba_macro', 'update_vba_code', 'list_vba_modules', 'delete_vba_module', 'insert_image', 'list_images', 'delete_image',
               'resize_image', 'move_image', /* 'save_range_as_image', */ 'save_chart_as_image', 'export_workbook_to_pdf', 'export_worksheet_to_pdf', 'list_apps', 'insert_row', 'insert_column', 'delete_row', 'delete_column', 'show_excel', 'hide_excel'],
             description: 'Operation to perform. Key operations: get_sheet_info (recommended for table analysis), get_used_range (basic range info), get_cell_info (detailed single cell analysis), sort_range (use get_sheet_info first to identify data boundaries)'
           },
@@ -1674,6 +1718,26 @@ export class XlwingsTool extends BasePythonTool<XlwingsParams, XlwingsResult> {
     );
   }
 
+  override validateToolParams(params: XlwingsParams): string | null {
+    // Check if params is an object
+    if (typeof params !== 'object' || params === null) {
+      return 'Value of params must be an object';
+    }
+
+    // Check if op field exists
+    if (!params.op) {
+      return 'params/op is required';
+    }
+
+    // Check if op is a valid operation
+    if (!XlwingsTool.VALID_OPERATIONS.includes(params.op)) {
+      return `Invalid operation "${params.op}". Valid operations are: ${XlwingsTool.VALID_OPERATIONS.join(', ')}. Note: Use "search" for searching operations.`;
+    }
+
+    // Let parent handle other validations
+    return super.validateToolParams(params);
+  }
+
   protected generatePythonCode(params: XlwingsParams): string {
     return this.buildPythonScript(params);
   }
@@ -1696,7 +1760,7 @@ export class XlwingsTool extends BasePythonTool<XlwingsParams, XlwingsResult> {
           result.structuredData = this.generateStructuredResponseData(result, params);
 
           // Check if this operation has optimized success response
-          const optimizedOps = ['get_sheet_info', 'sort_range', 'read_range', 'find_range', 'get_cell_info', 'create_shape', 'list_shapes', 'create_textbox', 'modify_shape', 'write_range', 'format_range', 'delete_sheet', 'set_column_width', 'set_row_height'];
+          const optimizedOps = ['get_sheet_info', 'sort_range', 'read_range', 'search', 'get_cell_info', 'create_shape', 'list_shapes', 'create_textbox', 'modify_shape', 'write_range', 'format_range', 'delete_sheet', 'set_column_width', 'set_row_height'];
           if (optimizedOps.includes(result.operation || params.op)) {
             // Use new helpful success response generator
             llmContent = this.generateHelpfulSuccessResponse(result, params);
@@ -2938,7 +3002,7 @@ def get_worksheet(wb, worksheet_name=None):
         return this.generateSaveRangeAsImageLogic(params); */
       case 'save_chart_as_image':
         return this.generateSaveChartAsImageLogic(params);
-      case 'find_range':
+      case 'search':
         return this.generateSearchDataLogic(params);
       case 'sort_range':
         return this.generateSortRangeLogic(params);
@@ -3966,14 +4030,13 @@ try:
     target_app = None
     target_opened_by_us = False
     target_created_by_us = False
-    
+
     if "${targetWorkbookPath}" and "${targetWorkbookPath}" != "${sourceWorkbookPath}":
         # Cross-workbook operation
         target_wb, target_app, target_opened_by_us, target_created_by_us = get_workbook_smart(
             "${targetWorkbookPath}",
             preferred_app=source_app,  # Prefer same instance as source
-            auto_open=True,
-            create_if_missing=True  # Create target workbook if it doesn't exist
+            create_if_not_exist=True  # Create target workbook if it doesn't exist
         )
         
         if not target_wb:
@@ -10075,29 +10138,24 @@ except Exception as e:
     const searchFormulasPython = searchFormulas ? 'True' : 'False';
     const autoSelectPython = autoSelect ? 'True' : 'False';
     const targetWorksheet = params.worksheet || '';
-    
+
     if (!searchTerm) {
       return 'raise ValueError("search.term is required for search_data operation")';
     }
     
     return `
+import re
+import time
+start_time = time.time()
+
 # Connect to Excel
 app = xw.apps.active if xw.apps else None
 if not app:
     result = {
         "success": False,
-        "operation": "generic_operation",
+        "operation": "search",
         "error_type": "no_excel_application",
-        "error_message": "No active Excel application found. Please open Excel first.",
-        "context": {
-            "required": "active_excel_application"
-        },
-        "suggested_actions": [
-            "Open Excel application first",
-            "Ensure Excel is running and accessible",
-            "Try opening any workbook in Excel to activate the application",
-            "Restart Excel if it's not responding"
-        ]
+        "error_message": "No active Excel application found. Please open Excel first."
     }
     print(json.dumps(result))
     exit()
@@ -10115,187 +10173,203 @@ target_worksheet = ${this.formatPythonString(targetWorksheet)}
 matches = []
 searched_worksheets = []
 
+def column_to_letter(col_num):
+    """Convert column number to Excel column letter (1-based)"""
+    result = ""
+    while col_num > 0:
+        col_num -= 1
+        result = chr(65 + col_num % 26) + result
+        col_num //= 26
+    return result
+
+def get_row_range_address(ws, row, start_col, end_col):
+    """Get row range address like A25:D25"""
+    start_letter = column_to_letter(start_col)
+    end_letter = column_to_letter(end_col)
+    return f"{start_letter}{row}:{end_letter}{row}"
+
+def get_context_data(ws, row, used_range, context_rows=2):
+    """Get context data around the matched row"""
+    start_row = max(used_range.row, row - context_rows)
+    end_row = min(used_range.row + used_range.rows.count - 1, row + context_rows)
+
+    context_data = []
+    for r in range(start_row, end_row + 1):
+        try:
+            row_range = ws.range((r, used_range.column), (r, used_range.column + used_range.columns.count - 1))
+            row_values = row_range.value
+            if isinstance(row_values, list):
+                row_data = [str(v or "") for v in row_values]
+            else:
+                row_data = [str(row_values or "")]
+
+            context_data.append({
+                "row": r,
+                "data": row_data,
+                "is_match": r == row
+            })
+        except:
+            continue
+
+    return context_data
+
 try:
     # Determine which worksheets to search
     worksheets_to_search = []
     if target_worksheet:
-        # Search specific worksheet
         try:
             ws = wb.sheets[target_worksheet]
             worksheets_to_search = [ws]
         except:
             result = {
                 "success": False,
-                "operation": "chart_operation",
+                "operation": "search",
                 "error_type": "target_worksheet_not_found",
-                "error_message": f"Worksheet '{target_worksheet}' not found",
-                "context": {
-                    "target_worksheet": target_worksheet,
-                    "workbook": wb.name if wb else "${params.workbook || ''}"
-                },
-                "suggested_actions": [
-                    "Check the target worksheet name spelling",
-                    "Ensure the target worksheet exists in the workbook",
-                    "Use list_sheets() to see available worksheets",
-                    "Create the target worksheet if it doesn't exist"
-                ]
+                "error_message": f"Worksheet '{target_worksheet}' not found"
             }
             print(json.dumps(result))
             exit()
     else:
-        # Search all worksheets
         worksheets_to_search = wb.sheets
-    
-    # Search through worksheets
+
+    # Search through worksheets using optimized batch reading
     for ws in worksheets_to_search:
         searched_worksheets.append(ws.name)
         try:
-            # Get used range
             used_range = ws.used_range
             if not used_range:
                 continue
-                
-            # Get range dimensions for iteration
-            range_rows = used_range.rows.count
-            range_cols = used_range.columns.count
 
-            # Get first row as headers for column name search
-            first_row_range = ws.range((used_range.row, used_range.column), (used_range.row, used_range.column + range_cols - 1))
-            headers = [str(cell or "") for cell in first_row_range.value] if range_cols > 1 else [str(first_row_range.value or "")]
+            # Read all data at once for performance
+            all_data = used_range.value
+            if all_data is None:
+                continue
 
+            # Ensure data is 2D list
+            if not isinstance(all_data, list):
+                all_data = [[all_data]]
+            elif len(all_data) > 0 and not isinstance(all_data[0], list):
+                all_data = [[item] for item in all_data]
+
+            range_rows = len(all_data)
+            range_cols = len(all_data[0]) if range_rows > 0 else 0
+
+            if range_rows == 0 or range_cols == 0:
+                continue
+
+            # Get headers from first row
+            headers = [str(cell or "") for cell in all_data[0]] if range_rows > 0 else []
 
             # Determine search columns
             search_cols = []
             if search_column is not None:
                 if isinstance(search_column, str):
-                    # Search by column name
                     try:
                         col_index = headers.index(search_column)
                         search_cols = [col_index]
                     except ValueError:
-                        # Column name not found, skip this worksheet
                         continue
                 else:
-                    # Search by column index
-                    if 0 <= search_column < len(headers):
+                    if 0 <= search_column < range_cols:
                         search_cols = [search_column]
             else:
-                # Search all columns
-                search_cols = list(range(len(headers))) if headers else []
+                search_cols = list(range(range_cols))
 
-            # Iterate through each cell individually
-            for row_idx in range(range_rows):
+            search_lower = search_term.lower()
+
+            # Search through data efficiently
+            for row_idx, row_data in enumerate(all_data):
                 for col_idx in search_cols:
-                    if col_idx >= range_cols:
+                    if col_idx >= len(row_data):
                         continue
 
-                    # Calculate actual Excel row/col (1-based)
-                    excel_row = used_range.row + row_idx
-                    excel_col = used_range.column + col_idx
+                    cell_value = str(row_data[col_idx] or "").lower()
 
-                    # Get individual cell
-                    cell = ws.range((excel_row, excel_col))
-                    cell_value = str(cell.value or "").lower()
-                    cell_formula = str(cell.formula or "").lower()
+                    # Quick string matching
+                    if not cell_value.strip():
+                        continue
 
-                    search_lower = search_term.lower()
+                    value_match = (search_lower == cell_value or
+                                 search_lower in cell_value) and \
+                                 (len(search_term) >= 2 or search_lower == cell_value)
 
-                    # Check if search term matches value or formula
-                    value_match = False
-                    formula_match = False
+                    if value_match:
+                        excel_row = used_range.row + row_idx
+                        excel_col = used_range.column + col_idx
 
-                    if cell_value.strip():  # Only check non-empty cells
-                        # For exact matches or when cell contains the full search term
-                        exact_match = search_lower == cell_value
-                        contains_match = search_lower in cell_value
+                        # Generate addresses
+                        match_address = f"{column_to_letter(excel_col)}{excel_row}"
+                        row_range_address = get_row_range_address(ws, excel_row,
+                                                                used_range.column,
+                                                                used_range.column + range_cols - 1)
 
-                        if exact_match or contains_match:
-                            # Additional check: avoid matching single characters in longer strings
-                            # unless the search term is reasonably long or matches exactly
-                            if len(search_term) >= 2 or exact_match:
-                                value_match = True
-
-
-                    if search_formulas and cell_formula.strip():
-                        formula_exact = search_lower == cell_formula
-                        formula_contains = search_lower in cell_formula
-
-
-                        if formula_exact or formula_contains:
-                            if len(search_term) >= 2 or formula_exact:
-                                formula_match = True
-
-                    if value_match or formula_match:
-                        # Convert to Excel address (A1 notation)
-                        col_letter = ''
-                        temp_col = excel_col
-                        while temp_col > 0:
-                            temp_col -= 1
-                            col_letter = chr(65 + temp_col % 26) + col_letter
-                            temp_col //= 26
-
-                        address = f"{col_letter}{excel_row}"
-
-                        # Get the entire row data for context by reading the whole row
-                        row_range = ws.range((excel_row, used_range.column), (excel_row, used_range.column + range_cols - 1))
-                        row_values = [str(cell or "") for cell in row_range.value] if range_cols > 1 else [str(row_range.value or "")]
-
+                        # Create row data mapping
                         row_context = {}
                         for i, header in enumerate(headers):
-                            if i < len(row_values):
-                                row_context[header or f"Col{i+1}"] = row_values[i]
+                            if i < len(row_data):
+                                row_context[header or f"Col{i+1}"] = str(row_data[i] or "")
+
+                        # Get context around the match
+                        context_data = get_context_data(ws, excel_row, used_range)
 
                         match_info = {
                             "worksheet": ws.name,
-                            "address": address,
+                            "cell_address": match_address,
+                            "row_range": row_range_address,
                             "row": excel_row,
                             "column": excel_col,
                             "column_name": headers[col_idx] if col_idx < len(headers) else f"Col{col_idx+1}",
-                            "matched_value": str(cell.value or ""),
-                            "matched_formula": str(cell.formula or ""),
-                            "match_type": "formula" if formula_match else "value",
-                            "row_data": row_context
+                            "matched_value": str(row_data[col_idx] or ""),
+                            "match_type": "value",
+                            "row_data": row_context,
+                            "context": context_data
                         }
                         matches.append(match_info)
 
-        
         except Exception as ws_error:
-            # Continue with next worksheet if current one fails
             continue
     
     # Auto-select if only one match and auto_select is True
     selected_address = None
     if auto_select and len(matches) == 1:
         match = matches[0]
-        # Switch to the worksheet
-        target_ws = wb.sheets[match["worksheet"]]
-        target_ws.activate()
-        
-        # Select the cell
-        target_ws.range(match["address"]).select()
-        selected_address = f"{match['worksheet']}!{match['address']}"
-    
+        try:
+            target_ws = wb.sheets[match["worksheet"]]
+            target_ws.activate()
+            target_ws.range(match["cell_address"]).select()
+            selected_address = f"{match['worksheet']}!{match['cell_address']}"
+        except:
+            pass
+
+    # Calculate execution time
+    execution_time = time.time() - start_time
+
+    # Generate summary
+    match_locations = []
+    for match in matches:
+        match_locations.append(f"{match['worksheet']}!{match['cell_address']}")
 
     result = {
         "success": True,
-        "operation": "find_range",
+        "operation": "search",
         "workbook": wb.name,
-        "search_operations": {
-            "search_term": search_term,
-            "search_formulas": search_formulas,
-            "total_matches": len(matches),
-            "matches": matches,
-            "searched_worksheets": searched_worksheets,
-            "auto_selected": selected_address if auto_select and len(matches) == 1 else None
-        }
+        "search_term": search_term,
+        "total_matches": len(matches),
+        "execution_time_seconds": round(execution_time, 3),
+        "match_summary": f"Found {len(matches)} match{'es' if len(matches) != 1 else ''} for '{search_term}'",
+        "match_locations": match_locations,
+        "detailed_matches": matches,
+        "searched_worksheets": searched_worksheets,
+        "auto_selected": selected_address
     }
     print(json.dumps(result))
-    
+
 except Exception as e:
     result = {
         "success": False,
-        "operation": "find_range",
-        "xlwings_error": str(e)
+        "operation": "search",
+        "error": str(e),
+        "execution_time_seconds": round(time.time() - start_time, 3)
     }
     print(json.dumps(result))`;
   }
@@ -11565,7 +11639,7 @@ print(json.dumps(result))`;
         return this.generateSortRangeSuccessResponse(result, params);
       case 'read_range':
         return this.generateReadRangeSuccessResponse(result, params);
-      case 'find_range':
+      case 'search':
         return this.generateFindRangeSuccessResponse(result, params);
       case 'create_shape':
         return this.generateCreateShapeSuccessResponse(result, params);
@@ -11939,35 +12013,76 @@ print(json.dumps(result))`;
   private generateFindRangeSuccessResponse(result: XlwingsResult, _params: XlwingsParams): string {
     let response = '';
 
-    // Use search_operations data structure (returned by Python code) instead of find_replace_operations
-    if (result.search_operations?.matches && result.search_operations.matches.length > 0) {
-      response = `Found **${result.search_operations.matches.length} matches** for search criteria.`;
+    // Handle new search result format from Python code
+    const totalMatches = result.total_matches || 0;
+    const searchTerm = result.search_term || '';
+    const detailedMatches = result.detailed_matches || [];
+    const matchLocations = result.match_locations || [];
+    const searchedWorksheets = result.searched_worksheets || [];
+    const executionTime = result.execution_time_seconds || 0;
+    const autoSelected = result.auto_selected;
 
-      const addresses = result.search_operations.matches.map(match => `${match.worksheet}!${match.address}`);
-      response += `\n\n**Found at:** ${addresses.slice(0, 5).join(', ')}`;
+    if (totalMatches > 0) {
+      response = `Found **${totalMatches} match${totalMatches === 1 ? '' : 'es'}** for "${searchTerm}" in ${executionTime}s`;
 
-      if (result.search_operations.matches.length > 5) {
-        response += ` and ${result.search_operations.matches.length - 5} more locations`;
+      if (autoSelected) {
+        response += ` (selected ${autoSelected})`;
+      }
+
+      response += `.\n\n**Match Locations:**\n`;
+      matchLocations.slice(0, 10).forEach((location: string, index: number) => {
+        const match = detailedMatches[index];
+        if (match) {
+          response += `${index + 1}. **${location}** - ${match.column_name}: "${match.matched_value}"\n`;
+          if (match.row_range) {
+            response += `   📋 Row range: ${match.row_range}\n`;
+          }
+
+          // Show context information if available
+          if (match.context && match.context.length > 0) {
+            response += `   📋 **Context (nearby rows):**\n`;
+            match.context.forEach((contextRow) => {
+              const prefix = contextRow.is_match ? '   ➤ ' : '     ';
+              const rowLabel = contextRow.is_match ? `Row ${contextRow.row} (MATCH)` : `Row ${contextRow.row}`;
+              response += `${prefix}${rowLabel}: ${contextRow.data.slice(0, 3).join(' | ')}\n`;
+            });
+          }
+        } else {
+          response += `${index + 1}. ${location}\n`;
+        }
+      });
+
+      if (totalMatches > 10) {
+        response += `... and ${totalMatches - 10} more matches\n`;
+      }
+
+      // Show sample row data for first match
+      if (detailedMatches.length > 0 && detailedMatches[0].row_data) {
+        response += `\n**Sample Row Data:**\n`;
+        const rowData = detailedMatches[0].row_data;
+        Object.entries(rowData).slice(0, 5).forEach(([key, value]) => {
+          response += `- ${key}: ${value}\n`;
+        });
       }
     } else {
-      response = `No matches found for "${result.search_operations?.search_term}".`;
+      response = `No matches found for "${searchTerm}".`;
 
-      // Add search range information
-      const searchedWorksheets = result.search_operations?.searched_worksheets || [];
       if (searchedWorksheets.length > 0) {
         response += `\n\n**Search Details:**\n`;
-        response += `- Search term: "${result.search_operations?.search_term}"\n`;
         response += `- Searched worksheets: ${searchedWorksheets.join(', ')}\n`;
-        response += `- Search formulas: ${result.search_operations?.search_formulas ? 'Yes' : 'No'}\n`;
+        response += `- Execution time: ${executionTime}s\n`;
       }
     }
-    
-    response += `\n\n## Next actions:\n`;
-    const firstMatch = result.search_operations?.matches?.[0];
-    const defaultRange = firstMatch ? `${firstMatch.worksheet}!${firstMatch.address}` : 'A1';
-    response += `- **Read found data:** read_range(range: "${defaultRange}")\n`;
-    response += `- **Expand search:** Try different search terms or use get_sheet_info() to analyze data structure`;
-    
+
+    response += `\n\n## Next Actions:\n`;
+    if (totalMatches > 0) {
+      const firstMatch = detailedMatches[0];
+      const defaultRange = firstMatch ? `${firstMatch.worksheet}!${firstMatch.row_range || firstMatch.cell_address}` : 'A1';
+      response += `- **Read match data:** read_range(range: "${defaultRange}")\n`;
+      response += `- **Navigate to match:** Use Excel to go to ${matchLocations[0]}\n`;
+    }
+    response += `- **Refine search:** Try different search terms or use get_sheet_info() to analyze data structure`;
+
     return response;
   }
 
