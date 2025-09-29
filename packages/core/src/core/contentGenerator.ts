@@ -138,12 +138,13 @@ export async function createContentGenerator(
       };
     }
     const httpOptions = { headers };
-
     const googleGenAI = new GoogleGenAI({
       apiKey: config.apiKey === '' ? undefined : config.apiKey,
       vertexai: config.vertexai,
       httpOptions,
-    });
+      baseUrl: process.env['GOOGLE_GENAI_BASE_URL'],
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any);
     return new LoggingContentGenerator(googleGenAI.models, gcConfig);
   }
   throw new Error(
