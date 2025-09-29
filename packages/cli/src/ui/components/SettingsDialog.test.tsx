@@ -22,7 +22,6 @@
  */
 
 import { render } from 'ink-testing-library';
-import { waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { SettingsDialog } from './SettingsDialog.js';
 import { LoadedSettings, SettingScope } from '../../config/settings.js';
@@ -152,7 +151,31 @@ vi.mock('../../utils/settingsUtils.js', async () => {
 // const originalConsoleError = console.error;
 
 describe('SettingsDialog', () => {
+  // Simple delay function for remaining tests that need gradual migration
   const wait = (ms = 50) => new Promise((resolve) => setTimeout(resolve, ms));
+
+  // Custom waitFor utility for ink testing environment (not compatible with @testing-library/react)
+  const waitFor = async (
+    predicate: () => void,
+    options: { timeout?: number; interval?: number } = {},
+  ) => {
+    const { timeout = 1000, interval = 10 } = options;
+    const start = Date.now();
+    let lastError: unknown;
+    while (Date.now() - start < timeout) {
+      try {
+        predicate();
+        return;
+      } catch (e) {
+        lastError = e;
+      }
+      await new Promise((resolve) => setTimeout(resolve, interval));
+    }
+    if (lastError) {
+      throw lastError;
+    }
+    throw new Error('waitFor timed out');
+  };
 
   beforeEach(() => {
     // Reset keypress mock state (variables are commented out)
@@ -319,7 +342,7 @@ describe('SettingsDialog', () => {
 
       await wait();
 
-      expect(lastFrame()).toContain('● Folder Trust');
+      expect(lastFrame()).toContain('● Use Model Router');
 
       unmount();
     });
@@ -337,21 +360,36 @@ describe('SettingsDialog', () => {
         </KeypressProvider>
       );
 
-      const { stdin, unmount } = render(component);
+      const { stdin, unmount, lastFrame } = render(component);
 
-      // Press Enter to toggle current setting
-      stdin.write(TerminalKeys.DOWN_ARROW as string);
-      await wait();
-      stdin.write(TerminalKeys.ENTER as string);
-      await wait();
+      // Wait for initial render and verify we're on Vim Mode (first setting)
+      await waitFor(() => {
+        expect(lastFrame()).toContain('● Vim Mode');
+      });
 
-      // Wait for the mock to be called with more generous timeout for Windows
-      await waitFor(
-        () => {
-          expect(vi.mocked(saveModifiedSettings)).toHaveBeenCalled();
-        },
-        { timeout: 1000 },
-      );
+      // Navigate to Disable Auto Update setting and verify we're there
+      act(() => {
+        stdin.write(TerminalKeys.DOWN_ARROW as string);
+      });
+      await waitFor(() => {
+        expect(lastFrame()).toContain('● Disable Auto Update');
+      });
+
+      // Toggle the setting
+      act(() => {
+        stdin.write(TerminalKeys.ENTER as string);
+      });
+      // Wait for the setting change to be processed
+      await waitFor(() => {
+        expect(
+          vi.mocked(saveModifiedSettings).mock.calls.length,
+        ).toBeGreaterThan(0);
+      });
+
+      // Wait for the mock to be called
+      await waitFor(() => {
+        expect(vi.mocked(saveModifiedSettings)).toHaveBeenCalled();
+      });
 
       expect(vi.mocked(saveModifiedSettings)).toHaveBeenCalledWith(
         new Set<string>(['general.disableAutoUpdate']),
@@ -428,12 +466,9 @@ describe('SettingsDialog', () => {
         await wait();
         stdin.write(TerminalKeys.ENTER as string);
         await wait();
-        await waitFor(
-          () => {
-            expect(vi.mocked(saveModifiedSettings)).toHaveBeenCalled();
-          },
-          { timeout: 1000 },
-        );
+        await waitFor(() => {
+          expect(vi.mocked(saveModifiedSettings)).toHaveBeenCalled();
+        });
 
         expect(vi.mocked(saveModifiedSettings)).toHaveBeenCalledWith(
           new Set<string>(['ui.theme']),
@@ -468,12 +503,9 @@ describe('SettingsDialog', () => {
         await wait();
         stdin.write(TerminalKeys.ENTER as string);
         await wait();
-        await waitFor(
-          () => {
-            expect(vi.mocked(saveModifiedSettings)).toHaveBeenCalled();
-          },
-          { timeout: 1000 },
-        );
+        await waitFor(() => {
+          expect(vi.mocked(saveModifiedSettings)).toHaveBeenCalled();
+        });
 
         expect(vi.mocked(saveModifiedSettings)).toHaveBeenCalledWith(
           new Set<string>(['ui.theme']),
@@ -1052,7 +1084,7 @@ describe('SettingsDialog', () => {
       expect(lastFrame()).toContain('Settings'); // Title
       expect(lastFrame()).toContain('● Vim Mode'); // Active setting
       expect(lastFrame()).toContain('Apply To'); // Scope section
-      expect(lastFrame()).toContain('1. User Settings'); // Scope options
+      expect(lastFrame()).toContain('User Settings'); // Scope options (no numbers when settings focused)
       expect(lastFrame()).toContain(
         '(Use Enter to select, Tab to change focus)',
       ); // Help text

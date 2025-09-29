@@ -34,6 +34,7 @@ import {
   EVENT_RIPGREP_FALLBACK,
   EVENT_MODEL_ROUTING,
   EVENT_EXTENSION_ENABLE,
+  EVENT_EXTENSION_DISABLE,
   EVENT_EXTENSION_INSTALL,
   EVENT_EXTENSION_UNINSTALL,
 } from './constants.js';
@@ -51,6 +52,7 @@ import {
   logToolOutputTruncated,
   logModelRouting,
   logExtensionEnable,
+  logExtensionDisable,
   logExtensionInstallEvent,
   logExtensionUninstall,
 } from './loggers.js';
@@ -69,6 +71,7 @@ import {
   ToolOutputTruncatedEvent,
   ModelRoutingEvent,
   ExtensionEnableEvent,
+  ExtensionDisableEvent,
   ExtensionInstallEvent,
   ExtensionUninstallEvent,
 } from './types.js';
@@ -1301,6 +1304,43 @@ describe('loggers', () => {
           'session.id': 'test-session-id',
           'user.email': 'test-user@example.com',
           'event.name': EVENT_EXTENSION_ENABLE,
+          'event.timestamp': '2025-01-01T00:00:00.000Z',
+          extension_name: 'vscode',
+          setting_scope: 'user',
+        },
+      });
+    });
+  });
+
+  describe('logExtensionDisable', () => {
+    const mockConfig = {
+      getSessionId: () => 'test-session-id',
+      getUsageStatisticsEnabled: () => true,
+    } as unknown as Config;
+
+    beforeEach(() => {
+      vi.spyOn(ClearcutLogger.prototype, 'logExtensionDisableEvent');
+    });
+
+    afterEach(() => {
+      vi.resetAllMocks();
+    });
+
+    it('should log extension disable event', () => {
+      const event = new ExtensionDisableEvent('vscode', 'user');
+
+      logExtensionDisable(mockConfig, event);
+
+      expect(
+        ClearcutLogger.prototype.logExtensionDisableEvent,
+      ).toHaveBeenCalledWith(event);
+
+      expect(mockLogger.emit).toHaveBeenCalledWith({
+        body: 'Disabled extension vscode',
+        attributes: {
+          'session.id': 'test-session-id',
+          'user.email': 'test-user@example.com',
+          'event.name': EVENT_EXTENSION_DISABLE,
           'event.timestamp': '2025-01-01T00:00:00.000Z',
           extension_name: 'vscode',
           setting_scope: 'user',
