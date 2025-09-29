@@ -53,6 +53,7 @@ import { useAuthCommand } from './auth/useAuth.js';
 import { useQuotaAndFallback } from './hooks/useQuotaAndFallback.js';
 import { useEditorSettings } from './hooks/useEditorSettings.js';
 import { useSettingsCommand } from './hooks/useSettingsCommand.js';
+import { useModelCommand } from './hooks/useModelCommand.js';
 import { useSlashCommandProcessor } from './hooks/slashCommandProcessor.js';
 import { useVimMode } from './contexts/VimModeContext.js';
 import { useConsoleMessages } from './hooks/useConsoleMessages.js';
@@ -61,6 +62,8 @@ import { calculatePromptWidths } from './components/InputPrompt.js';
 import { useStdin, useStdout } from 'ink';
 import ansiEscapes from 'ansi-escapes';
 import * as fs from 'node:fs';
+import { basename } from 'node:path';
+import { computeWindowTitle } from '../utils/windowTitle.js';
 import { useTextBuffer } from './components/shared/text-buffer.js';
 import { useLogger } from './hooks/useLogger.js';
 import { useGeminiStream } from './hooks/useGeminiStream.js';
@@ -86,7 +89,7 @@ import { useWorkspaceMigration } from './hooks/useWorkspaceMigration.js';
 import { useSessionStats } from './contexts/SessionContext.js';
 import { useGitBranchName } from './hooks/useGitBranchName.js';
 import { useExtensionUpdates } from './hooks/useExtensionUpdates.js';
-import { FocusContext } from './contexts/FocusContext.js';
+import { ShellFocusContext } from './contexts/ShellFocusContext.js';
 
 const CTRL_EXIT_PROMPT_DURATION_MS = 1000;
 
@@ -135,7 +138,7 @@ export const AppContainer = (props: AppContainerProps) => {
     initializationResult.themeError,
   );
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
-  const [shellFocused, setShellFocused] = useState(false);
+  const [embeddedShellFocused, setEmbeddedShellFocused] = useState(false);
 
   const [geminiMdFileCount, setGeminiMdFileCount] = useState<number>(
     initializationResult.geminiMdFileCount,
@@ -156,6 +159,16 @@ export const AppContainer = (props: AppContainerProps) => {
       historyManager.addItem,
       config.getWorkingDir(),
     );
+
+  const [isPermissionsDialogOpen, setPermissionsDialogOpen] = useState(false);
+  const openPermissionsDialog = useCallback(
+    () => setPermissionsDialogOpen(true),
+    [],
+  );
+  const closePermissionsDialog = useCallback(
+    () => setPermissionsDialogOpen(false),
+    [],
+  );
 
   // Helper to determine the effective model, considering the fallback state.
   const getEffectiveModel = useCallback(() => {
@@ -185,6 +198,10 @@ export const AppContainer = (props: AppContainerProps) => {
 
   // Layout measurements
   const mainControlsRef = useRef<DOMElement>(null);
+  const originalTitleRef = useRef(
+    computeWindowTitle(basename(config.getTargetDir())),
+  );
+  const lastTitleRef = useRef<string | null>(null);
   const staticExtraHeight = 3;
 
   useEffect(() => {
@@ -408,6 +425,9 @@ Logging in with Google... Please restart Gemini CLI to continue.
   const { isSettingsDialogOpen, openSettingsDialog, closeSettingsDialog } =
     useSettingsCommand();
 
+  const { isModelDialogOpen, openModelDialog, closeModelDialog } =
+    useModelCommand();
+
   const {
     showWorkspaceMigrationDialog,
     workspaceExtensions,
@@ -424,6 +444,8 @@ Logging in with Google... Please restart Gemini CLI to continue.
       openEditorDialog,
       openPrivacyNotice: () => setShowPrivacyNotice(true),
       openSettingsDialog,
+      openModelDialog,
+      openPermissionsDialog,
       quit: (messages: HistoryItem[]) => {
         setQuittingMessages(messages);
         setTimeout(async () => {
@@ -440,11 +462,13 @@ Logging in with Google... Please restart Gemini CLI to continue.
       openThemeDialog,
       openEditorDialog,
       openSettingsDialog,
+      openModelDialog,
       setQuittingMessages,
       setDebugMessage,
       setShowPrivacyNotice,
       setCorgiMode,
       setExtensionsUpdateState,
+      openPermissionsDialog,
     ],
   );
 
@@ -557,10 +581,10 @@ Logging in with Google... Please restart Gemini CLI to continue.
     setModelSwitchedFromQuotaError,
     refreshStatic,
     () => cancelHandlerRef.current(),
-    setShellFocused,
+    setEmbeddedShellFocused,
     terminalWidth,
     terminalHeight,
-    shellFocused,
+    embeddedShellFocused,
   );
 
   // Auto-accept indicator
@@ -754,7 +778,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
   const [showIdeRestartPrompt, setShowIdeRestartPrompt] = useState(false);
 
   const { isFolderTrustDialogOpen, handleFolderTrustSelect, isRestarting } =
-    useFolderTrust(settings, setIsTrustedFolder, refreshStatic);
+    useFolderTrust(settings, setIsTrustedFolder);
   const { needsRestart: ideNeedsRestart } = useIdeTrustListener();
   const isInitialMount = useRef(true);
 
@@ -833,8 +857,10 @@ Logging in with Google... Please restart Gemini CLI to continue.
     [handleSlashCommand, settings],
   );
 
-  const { elapsedTime, currentLoadingPhrase } =
-    useLoadingIndicator(streamingState);
+  const { elapsedTime, currentLoadingPhrase } = useLoadingIndicator(
+    streamingState,
+    settings.merged.ui?.customWittyPhrases,
+  );
 
   const handleExit = useCallback(
     (
@@ -865,14 +891,27 @@ Logging in with Google... Please restart Gemini CLI to continue.
         console.log('[DEBUG] Keystroke:', JSON.stringify(key));
       }
 
-      const anyDialogOpen =
-        isThemeDialogOpen ||
-        isAuthDialogOpen ||
-        isEditorDialogOpen ||
-        isSettingsDialogOpen ||
-        isFolderTrustDialogOpen ||
-        showPrivacyNotice;
-      if (anyDialogOpen) {
+      if (keyMatchers[Command.QUIT](key)) {
+        if (!ctrlCPressedOnce) {
+          cancelOngoingRequest?.();
+        }
+
+        if (!ctrlCPressedOnce) {
+          setCtrlCPressedOnce(true);
+          ctrlCTimerRef.current = setTimeout(() => {
+            setCtrlCPressedOnce(false);
+            ctrlCTimerRef.current = null;
+          }, CTRL_EXIT_PROMPT_DURATION_MS);
+          return;
+        }
+
+        handleExit(ctrlCPressedOnce, setCtrlCPressedOnce, ctrlCTimerRef);
+        return;
+      } else if (keyMatchers[Command.EXIT](key)) {
+        if (buffer.text.length > 0) {
+          return;
+        }
+        handleExit(ctrlDPressedOnce, setCtrlDPressedOnce, ctrlDTimerRef);
         return;
       }
 
@@ -898,24 +937,14 @@ Logging in with Google... Please restart Gemini CLI to continue.
         ideContextState
       ) {
         handleSlashCommand('/ide status');
-      } else if (keyMatchers[Command.QUIT](key)) {
-        if (!ctrlCPressedOnce) {
-          cancelOngoingRequest?.();
-        }
-        handleExit(ctrlCPressedOnce, setCtrlCPressedOnce, ctrlCTimerRef);
-      } else if (keyMatchers[Command.EXIT](key)) {
-        if (buffer.text.length > 0) {
-          return;
-        }
-        handleExit(ctrlDPressedOnce, setCtrlDPressedOnce, ctrlDTimerRef);
       } else if (
         keyMatchers[Command.SHOW_MORE_LINES](key) &&
         !enteringConstrainHeightMode
       ) {
         setConstrainHeight(false);
       } else if (keyMatchers[Command.TOGGLE_SHELL_INPUT_FOCUS](key)) {
-        if (activePtyId || shellFocused) {
-          setShellFocused((prev) => !prev);
+        if (activePtyId || embeddedShellFocused) {
+          setEmbeddedShellFocused((prev) => !prev);
         }
       }
     },
@@ -937,14 +966,8 @@ Logging in with Google... Please restart Gemini CLI to continue.
       ctrlDTimerRef,
       handleSlashCommand,
       cancelOngoingRequest,
-      isThemeDialogOpen,
-      isAuthDialogOpen,
-      isEditorDialogOpen,
-      isSettingsDialogOpen,
-      isFolderTrustDialogOpen,
-      showPrivacyNotice,
       activePtyId,
-      shellFocused,
+      embeddedShellFocused,
       settings.merged.general?.debugKeystrokeLogging,
     ],
   );
@@ -958,6 +981,42 @@ Logging in with Google... Please restart Gemini CLI to continue.
     },
     { isActive: showIdeRestartPrompt },
   );
+
+  // Update terminal title with Gemini CLI status and thoughts
+  useEffect(() => {
+    // Respect both showStatusInTitle and hideWindowTitle settings
+    if (
+      !settings.merged.ui?.showStatusInTitle ||
+      settings.merged.ui?.hideWindowTitle
+    )
+      return;
+
+    let title;
+    if (streamingState === StreamingState.Idle) {
+      title = originalTitleRef.current;
+    } else {
+      const statusText = thought?.subject
+        ?.replace(/[\r\n]+/g, ' ')
+        .substring(0, 80);
+      title = statusText || originalTitleRef.current;
+    }
+
+    // Pad the title to a fixed width to prevent taskbar icon resizing.
+    const paddedTitle = title.padEnd(80, ' ');
+
+    // Only update the title if it's different from the last value we set
+    if (lastTitleRef.current !== paddedTitle) {
+      lastTitleRef.current = paddedTitle;
+      stdout.write(`\x1b]2;${paddedTitle}\x07`);
+    }
+    // Note: We don't need to reset the window title on exit because Gemini CLI is already doing that elsewhere
+  }, [
+    streamingState,
+    thought,
+    settings.merged.ui?.showStatusInTitle,
+    settings.merged.ui?.hideWindowTitle,
+    stdout,
+  ]);
 
   const filteredConsoleMessages = useMemo(() => {
     if (config.getDebugMode()) {
@@ -986,6 +1045,8 @@ Logging in with Google... Please restart Gemini CLI to continue.
     !!loopDetectionConfirmationRequest ||
     isThemeDialogOpen ||
     isSettingsDialogOpen ||
+    isModelDialogOpen ||
+    isPermissionsDialogOpen ||
     isAuthenticating ||
     isAuthDialogOpen ||
     isEditorDialogOpen ||
@@ -1000,6 +1061,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
   const uiState: UIState = useMemo(
     () => ({
       history: historyManager.history,
+      historyManager,
       isThemeDialogOpen,
       themeError,
       isAuthenticating,
@@ -1013,6 +1075,8 @@ Logging in with Google... Please restart Gemini CLI to continue.
       debugMessage,
       quittingMessages,
       isSettingsDialogOpen,
+      isModelDialogOpen,
+      isPermissionsDialogOpen,
       slashCommands,
       pendingSlashCommandHistoryItems,
       commandContext,
@@ -1072,10 +1136,9 @@ Logging in with Google... Please restart Gemini CLI to continue.
       isRestarting,
       extensionsUpdateState,
       activePtyId,
-      shellFocused,
+      embeddedShellFocused,
     }),
     [
-      historyManager.history,
       isThemeDialogOpen,
       themeError,
       isAuthenticating,
@@ -1089,6 +1152,8 @@ Logging in with Google... Please restart Gemini CLI to continue.
       debugMessage,
       quittingMessages,
       isSettingsDialogOpen,
+      isModelDialogOpen,
+      isPermissionsDialogOpen,
       slashCommands,
       pendingSlashCommandHistoryItems,
       commandContext,
@@ -1148,7 +1213,8 @@ Logging in with Google... Please restart Gemini CLI to continue.
       currentModel,
       extensionsUpdateState,
       activePtyId,
-      shellFocused,
+      historyManager,
+      embeddedShellFocused,
     ],
   );
 
@@ -1163,6 +1229,8 @@ Logging in with Google... Please restart Gemini CLI to continue.
       exitEditorDialog,
       exitPrivacyNotice: () => setShowPrivacyNotice(false),
       closeSettingsDialog,
+      closeModelDialog,
+      closePermissionsDialog,
       setShellModeActive,
       vimHandleInput,
       handleIdePromptComplete,
@@ -1185,6 +1253,8 @@ Logging in with Google... Please restart Gemini CLI to continue.
       handleEditorSelect,
       exitEditorDialog,
       closeSettingsDialog,
+      closeModelDialog,
+      closePermissionsDialog,
       setShellModeActive,
       vimHandleInput,
       handleIdePromptComplete,
@@ -1210,9 +1280,9 @@ Logging in with Google... Please restart Gemini CLI to continue.
               startupWarnings: props.startupWarnings || [],
             }}
           >
-            <FocusContext.Provider value={isFocused}>
+            <ShellFocusContext.Provider value={isFocused}>
               <App />
-            </FocusContext.Provider>
+            </ShellFocusContext.Provider>
           </AppContext.Provider>
         </ConfigContext.Provider>
       </UIActionsContext.Provider>

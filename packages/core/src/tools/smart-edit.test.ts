@@ -241,6 +241,77 @@ describe('SmartEditTool', () => {
       expect(result.occurrences).toBe(0);
     });
   });
+  describe('correctPath', () => {
+    it('should correct a relative path if it is unambiguous', () => {
+      const testFile = 'unique.txt';
+      fs.writeFileSync(path.join(rootDir, testFile), 'content');
+
+      const params: EditToolParams = {
+        file_path: testFile,
+        instruction: 'An instruction',
+        old_string: 'old',
+        new_string: 'new',
+      };
+
+      const validationResult = (tool as any).correctPath(params);
+
+      expect(validationResult).toBeNull();
+      expect(params.file_path).toBe(path.join(rootDir, testFile));
+    });
+
+    it('should correct a partial relative path if it is unambiguous', () => {
+      const subDir = path.join(rootDir, 'sub');
+      fs.mkdirSync(subDir);
+      const testFile = 'file.txt';
+      const partialPath = path.join('sub', testFile);
+      const fullPath = path.join(subDir, testFile);
+      fs.writeFileSync(fullPath, 'content');
+
+      const params: EditToolParams = {
+        file_path: partialPath,
+        instruction: 'An instruction',
+        old_string: 'old',
+        new_string: 'new',
+      };
+
+      const validationResult = (tool as any).correctPath(params);
+
+      expect(validationResult).toBeNull();
+      expect(params.file_path).toBe(fullPath);
+    });
+
+    it('should return an error for a relative path that does not exist', () => {
+      const params: EditToolParams = {
+        file_path: 'test.txt',
+        instruction: 'An instruction',
+        old_string: 'old',
+        new_string: 'new',
+      };
+      const result = (tool as any).correctPath(params);
+      expect(result).toMatch(/File not found for 'test.txt'/);
+    });
+
+    it('should return an error for an ambiguous path', () => {
+      const subDir1 = path.join(rootDir, 'module1');
+      const subDir2 = path.join(rootDir, 'module2');
+      fs.mkdirSync(subDir1, { recursive: true });
+      fs.mkdirSync(subDir2, { recursive: true });
+
+      const ambiguousFile = 'component.ts';
+      fs.writeFileSync(path.join(subDir1, ambiguousFile), 'content 1');
+      fs.writeFileSync(path.join(subDir2, ambiguousFile), 'content 2');
+
+      const params: EditToolParams = {
+        file_path: ambiguousFile,
+        instruction: 'An instruction',
+        old_string: 'old',
+        new_string: 'new',
+      };
+
+      const validationResult = (tool as any).correctPath(params);
+      expect(validationResult).toMatch(/ambiguous and matches multiple files/);
+    });
+  });
 
   describe('validateToolParams', () => {
     it('should return null for valid params', () => {
@@ -253,15 +324,15 @@ describe('SmartEditTool', () => {
       expect(tool.validateToolParams(params)).toBeNull();
     });
 
-    it('should return error for relative path', () => {
+    it('should return an error if path is outside the workspace', () => {
       const params: EditToolParams = {
-        file_path: 'test.txt',
+        file_path: path.join(os.tmpdir(), 'outside.txt'),
         instruction: 'An instruction',
         old_string: 'old',
         new_string: 'new',
       };
       expect(tool.validateToolParams(params)).toMatch(
-        /File path must be absolute/,
+        /must be within one of the workspace directories/,
       );
     });
   });
@@ -272,6 +343,36 @@ describe('SmartEditTool', () => {
 
     beforeEach(() => {
       filePath = path.join(rootDir, testFile);
+    });
+
+    it('should reject when calculateEdit fails after an abort signal', async () => {
+      const params: EditToolParams = {
+        file_path: path.join(rootDir, 'abort-execute.txt'),
+        instruction: 'Abort during execute',
+        old_string: 'old',
+        new_string: 'new',
+      };
+
+      const invocation = tool.build(params);
+      const abortController = new AbortController();
+      const abortError = new Error(
+        'Abort requested during smart edit execution',
+      );
+
+      const calculateSpy = vi
+        .spyOn(invocation as any, 'calculateEdit')
+        .mockImplementation(async () => {
+          if (!abortController.signal.aborted) {
+            abortController.abort();
+          }
+          throw abortError;
+        });
+
+      await expect(invocation.execute(abortController.signal)).rejects.toBe(
+        abortError,
+      );
+
+      calculateSpy.mockRestore();
     });
 
     it('should edit an existing file and return diff with fileName', async () => {
@@ -360,8 +461,12 @@ describe('SmartEditTool', () => {
       const invocation = tool.build(params);
       const result = await invocation.execute(new AbortController().signal);
 
-      expect(result.error?.type).toBe(ToolErrorType.EDIT_NO_CHANGE);
-      expect(result.llmContent).toMatch(/A secondary check determined/);
+      expect(result.error?.type).toBe(
+        ToolErrorType.EDIT_NO_CHANGE_LLM_JUDGEMENT,
+      );
+      expect(result.llmContent).toMatch(
+        /A secondary check by an LLM determined/,
+      );
       expect(fs.readFileSync(filePath, 'utf8')).toBe(initialContent); // File is unchanged
     });
 
@@ -509,6 +614,39 @@ describe('SmartEditTool', () => {
 
       expect(params.old_string).toBe(initialContent);
       expect(params.new_string).toBe(modifiedContent);
+    });
+  });
+
+  describe('shouldConfirmExecute', () => {
+    it('should rethrow calculateEdit errors when the abort signal is triggered', async () => {
+      const filePath = path.join(rootDir, 'abort-confirmation.txt');
+      const params: EditToolParams = {
+        file_path: filePath,
+        instruction: 'Abort during confirmation',
+        old_string: 'old',
+        new_string: 'new',
+      };
+
+      const invocation = tool.build(params);
+      const abortController = new AbortController();
+      const abortError = new Error(
+        'Abort requested during smart edit confirmation',
+      );
+
+      const calculateSpy = vi
+        .spyOn(invocation as any, 'calculateEdit')
+        .mockImplementation(async () => {
+          if (!abortController.signal.aborted) {
+            abortController.abort();
+          }
+          throw abortError;
+        });
+
+      await expect(
+        invocation.shouldConfirmExecute(abortController.signal),
+      ).rejects.toBe(abortError);
+
+      calculateSpy.mockRestore();
     });
   });
 });

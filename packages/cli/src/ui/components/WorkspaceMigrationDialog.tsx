@@ -23,8 +23,11 @@ export function WorkspaceMigrationDialog(props: {
   const [failedExtensions, setFailedExtensions] = useState<string[]>([]);
   onOpen();
   const onMigrate = async () => {
-    const failed =
-      await performWorkspaceExtensionMigration(workspaceExtensions);
+    const failed = await performWorkspaceExtensionMigration(
+      workspaceExtensions,
+      // We aren't updating extensions, just moving them around, don't need to ask for consent.
+      async (_) => true,
+    );
     setFailedExtensions(failed);
     setMigrationComplete(true);
   };
@@ -95,8 +98,8 @@ export function WorkspaceMigrationDialog(props: {
       <Box marginTop={1}>
         <RadioButtonSelect
           items={[
-            { label: 'Install all', value: 'migrate' },
-            { label: 'Skip', value: 'skip' },
+            { label: 'Install all', value: 'migrate', key: 'migrate' },
+            { label: 'Skip', value: 'skip', key: 'skip' },
           ]}
           onSelect={(value: string) => {
             if (value === 'migrate') {

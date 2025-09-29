@@ -10,6 +10,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import {
   EXTENSIONS_CONFIG_FILENAME,
+  ExtensionStorage,
   annotateActiveExtensions,
   loadExtension,
 } from '../../config/extension.js';
@@ -19,6 +20,7 @@ import { GEMINI_DIR, type GeminiCLIExtension } from '@google/gemini-cli-core';
 import { isWorkspaceTrusted } from '../../config/trustedFolders.js';
 import { renderHook, waitFor } from '@testing-library/react';
 import { MessageType } from '../types.js';
+import { ExtensionEnablementManager } from '../../config/extensions/extensionEnablement.js';
 
 const mockGit = {
   clone: vi.fn(),
@@ -56,20 +58,16 @@ vi.mock('../../config/trustedFolders.js', async (importOriginal) => {
   };
 });
 
+const mockLogExtensionInstallEvent = vi.hoisted(() => vi.fn());
+const mockLogExtensionUninstall = vi.hoisted(() => vi.fn());
+
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const actual =
     await importOriginal<typeof import('@google/gemini-cli-core')>();
-  const mockLogExtensionInstallEvent = vi.fn();
-  const mockLogExtensionUninstallEvent = vi.fn();
   return {
     ...actual,
-    ClearcutLogger: {
-      getInstance: vi.fn(() => ({
-        logExtensionInstallEvent: mockLogExtensionInstallEvent,
-        logExtensionUninstallEvent: mockLogExtensionUninstallEvent,
-      })),
-    },
-    Config: vi.fn(),
+    logExtensionInstallEvent: mockLogExtensionInstallEvent,
+    logExtensionUninstall: mockLogExtensionUninstall,
     ExtensionInstallEvent: vi.fn(),
     ExtensionUninstallEvent: vi.fn(),
   };
@@ -147,7 +145,7 @@ describe('useExtensionUpdates', () => {
       expect(addItem).toHaveBeenCalledWith(
         {
           type: MessageType.INFO,
-          text: 'Extension test-extension has an update available, run "/extensions update test-extension" to install it.',
+          text: 'You have 1 extension with an update available, run "/extensions list" for more information.',
         },
         expect.any(Number),
       );
@@ -167,8 +165,8 @@ describe('useExtensionUpdates', () => {
     });
     const extension = annotateActiveExtensions(
       [loadExtension({ extensionDir, workspaceDir: tempHomeDir })!],
-      [],
       tempHomeDir,
+      new ExtensionEnablementManager(ExtensionStorage.getUserExtensionsDir()),
     )[0];
 
     const addItem = vi.fn();
@@ -191,7 +189,10 @@ describe('useExtensionUpdates', () => {
         JSON.stringify({ name: 'test-extension', version: '1.1.0' }),
       );
     });
-    vi.mocked(isWorkspaceTrusted).mockReturnValue(true);
+    vi.mocked(isWorkspaceTrusted).mockReturnValue({
+      isTrusted: true,
+      source: 'file',
+    });
 
     renderHook(() => useExtensionUpdates([extension], addItem, tempHomeDir));
 

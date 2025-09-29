@@ -83,7 +83,6 @@ export function findCompressSplitPoint(
   let lastSplitPoint = 0; // 0 is always valid (compress nothing)
   let cumulativeCharCount = 0;
   for (let i = 0; i < contents.length; i++) {
-    cumulativeCharCount += charCounts[i];
     const content = contents[i];
     if (
       content.role === 'user' &&
@@ -94,6 +93,7 @@ export function findCompressSplitPoint(
       }
       lastSplitPoint = i;
     }
+    cumulativeCharCount += charCounts[i];
   }
 
   // We found no split points after targetCharCount.
@@ -679,21 +679,7 @@ export class GeminiClient {
       };
     }
 
-    const { totalTokens: originalTokenCount } =
-      await this.getContentGeneratorOrFail().countTokens({
-        model,
-        contents: curatedHistory,
-      });
-    if (originalTokenCount === undefined) {
-      console.warn(`Could not determine token count for model ${model}.`);
-      this.hasFailedCompressionAttempt = !force && true;
-      return {
-        originalTokenCount: 0,
-        newTokenCount: 0,
-        compressionStatus:
-          CompressionStatus.COMPRESSION_FAILED_TOKEN_COUNT_ERROR,
-      };
-    }
+    const originalTokenCount = uiTelemetryService.getLastPromptTokenCount();
 
     const contextPercentageThreshold =
       this.config.getChatCompression()?.contextPercentageThreshold;
@@ -756,24 +742,13 @@ export class GeminiClient {
     ]);
     this.forceFullIdeContext = true;
 
-    const { totalTokens: newTokenCount } =
-      await this.getContentGeneratorOrFail().countTokens({
-        // model might change after calling `sendMessage`, so we get the newest value from config
-        model: this.config.getModel(),
-        contents: chat.getHistory(),
-      });
-    if (newTokenCount === undefined) {
-      console.warn('Could not determine compressed history token count.');
-      this.hasFailedCompressionAttempt = !force && true;
-      return {
-        originalTokenCount,
-        newTokenCount: originalTokenCount,
-        compressionStatus:
-          CompressionStatus.COMPRESSION_FAILED_TOKEN_COUNT_ERROR,
-      };
-    }
-
-    uiTelemetryService.setLastPromptTokenCount(newTokenCount);
+    // Estimate token count 1 token ≈ 4 characters
+    const newTokenCount = Math.floor(
+      chat
+        .getHistory()
+        .reduce((total, content) => total + JSON.stringify(content).length, 0) /
+        4,
+    );
 
     logChatCompression(
       this.config,
@@ -784,7 +759,6 @@ export class GeminiClient {
     );
 
     if (newTokenCount > originalTokenCount) {
-      this.getChat().setHistory(curatedHistory);
       this.hasFailedCompressionAttempt = !force && true;
       return {
         originalTokenCount,
@@ -794,6 +768,7 @@ export class GeminiClient {
       };
     } else {
       this.chat = chat; // Chat compression successful, set new state.
+      uiTelemetryService.setLastPromptTokenCount(newTokenCount);
     }
 
     return {
