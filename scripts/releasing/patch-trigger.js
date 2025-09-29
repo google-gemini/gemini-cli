@@ -80,15 +80,19 @@ async function main() {
   console.log(`Processing patch trigger for branch: ${headRef}`);
 
   // Extract base version and channel from hotfix branch name
+  // New NEW format: hotfix/v0.5.3/v0.5.4/preview/cherry-pick-abc -> v0.5.4 and preview
   // New format: hotfix/v0.5.3/preview/cherry-pick-abc -> v0.5.3 and preview
   // Old format: hotfix/v0.5.3/cherry-pick-abc -> v0.5.3 and stable (default)
   const parts = headRef.split('/');
-  const version = parts[1];
+  const [, , version, branchChannel] = parts;
   let channel = 'stable'; // default for old format
 
-  if (parts.length >= 4 && (parts[2] === 'stable' || parts[2] === 'preview')) {
+  if (
+    parts.length >= 5 &&
+    (branchChannel === 'stable' || branchChannel === 'preview')
+  ) {
     // New format with explicit channel
-    channel = parts[2];
+    channel = branchChannel;
   } else if (context.eventName === 'workflow_dispatch') {
     // Manual dispatch, infer from version name
     channel = version.includes('preview') ? 'preview' : 'stable';
