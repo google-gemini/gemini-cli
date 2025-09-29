@@ -263,7 +263,7 @@ gemini
 ### Troubleshooting & Support
 
 - [**Troubleshooting Guide**](./docs/troubleshooting.md) - Common issues and solutions.
-- [**FAQ**](./docs/troubleshooting.md#frequently-asked-questions) - Quick answers.
+- [**FAQ**](./docs/troubleshooting.md#frequently-asked-questions-faqs) - Quick answers.
 - Use `/bug` command to report issues directly from the CLI.
 
 ### Using MCP Servers
