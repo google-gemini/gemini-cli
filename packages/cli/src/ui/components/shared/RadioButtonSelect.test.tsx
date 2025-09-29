@@ -62,9 +62,9 @@ describe('RadioButtonSelect', () => {
   const mockOnHighlight = vi.fn();
 
   const ITEMS: Array<RadioSelectItem<string>> = [
-    { label: 'Option 1', value: 'one' },
-    { label: 'Option 2', value: 'two' },
-    { label: 'Option 3', value: 'three', disabled: true },
+    { label: 'Option 1', value: 'one', key: 'one' },
+    { label: 'Option 2', value: 'two', key: 'two' },
+    { label: 'Option 3', value: 'three', disabled: true, key: 'three' },
   ];
 
   const renderComponent = (
@@ -155,6 +155,7 @@ describe('RadioButtonSelect', () => {
         value: 'a-light',
         themeNameDisplay: 'Theme A',
         themeTypeDisplay: '(Light)',
+        key: 'a-light',
       };
 
       const result = renderItem(themeItem, mockContext);
@@ -186,6 +187,7 @@ describe('RadioButtonSelect', () => {
         label: 'Incomplete Theme',
         value: 'incomplete',
         themeNameDisplay: 'Only Name',
+        key: 'incomplete',
       };
 
       const result = renderItem(partialThemeItem, mockContext);

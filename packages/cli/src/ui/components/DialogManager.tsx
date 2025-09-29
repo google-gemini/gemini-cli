@@ -105,8 +105,8 @@ export const DialogManager = ({ addItem }: DialogManagerProps) => {
         <Box paddingY={1}>
           <RadioButtonSelect
             items={[
-              { label: 'Yes', value: true },
-              { label: 'No', value: false },
+              { label: 'Yes', value: true, key: 'Yes' },
+              { label: 'No', value: false, key: 'No' },
             ]}
             onSelect={(value: boolean) => {
               uiState.confirmationRequest!.onConfirm(value);
