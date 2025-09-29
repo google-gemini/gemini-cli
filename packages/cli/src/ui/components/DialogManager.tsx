@@ -27,6 +27,7 @@ import { useConfig } from '../contexts/ConfigContext.js';
 import { useSettings } from '../contexts/SettingsContext.js';
 import process from 'node:process';
 import { type UseHistoryManagerReturn } from '../hooks/useHistoryManager.js';
+import { IdeTrustChangeDialog } from './IdeTrustChangeDialog.js';
 
 interface DialogManagerProps {
   addItem: UseHistoryManagerReturn['addItem'];
@@ -43,14 +44,7 @@ export const DialogManager = ({ addItem }: DialogManagerProps) => {
     uiState;
 
   if (uiState.showIdeRestartPrompt) {
-    return (
-      <Box borderStyle="round" borderColor={theme.status.warning} paddingX={1}>
-        <Text color={theme.status.warning}>
-          Workspace trust has changed. Press &apos;r&apos; to restart Gemini to
-          apply the changes.
-        </Text>
-      </Box>
-    );
+    return <IdeTrustChangeDialog reason={uiState.ideTrustRestartReason} />;
   }
   if (uiState.showWorkspaceMigrationDialog) {
     return (
