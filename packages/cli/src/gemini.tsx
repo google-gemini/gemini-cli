@@ -26,7 +26,7 @@ import { getStartupWarnings } from './utils/startupWarnings.js';
 import { getUserStartupWarnings } from './utils/userStartupWarnings.js';
 import { ConsolePatcher } from './ui/utils/ConsolePatcher.js';
 import { runNonInteractive } from './nonInteractiveCli.js';
-import { loadExtensions } from './config/extension.js';
+import { ExtensionStorage, loadExtensions } from './config/extension.js';
 import {
   cleanupCheckpoints,
   registerCleanup,
@@ -113,6 +113,7 @@ function getNodeMemoryArgs(isDebugMode: boolean): string[] {
 
 import { runZedIntegration } from './zed-integration/zedIntegration.js';
 import { loadSandboxConfig } from './config/sandboxConfig.js';
+import { ExtensionEnablementManager } from './config/extensions/extensionEnablement.js';
 
 export function setupUnhandledRejectionHandler() {
   let unhandledRejectionOccurred = false;
@@ -266,6 +267,7 @@ export async function main() {
       const partialConfig = await loadCliConfig(
         settings.merged,
         [],
+        new ExtensionEnablementManager(ExtensionStorage.getUserExtensionsDir()),
         sessionId,
         argv,
       );
@@ -336,10 +338,15 @@ export async function main() {
   // to run Gemini CLI. It is now safe to perform expensive initialization that
   // may have side effects.
   {
-    const extensions = loadExtensions();
+    const extensionEnablementManager = new ExtensionEnablementManager(
+      ExtensionStorage.getUserExtensionsDir(),
+      argv.extensions,
+    );
+    const extensions = loadExtensions(extensionEnablementManager);
     const config = await loadCliConfig(
       settings.merged,
       extensions,
+      extensionEnablementManager,
       sessionId,
       argv,
     );

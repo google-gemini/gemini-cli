@@ -10,6 +10,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import {
   EXTENSIONS_CONFIG_FILENAME,
+  ExtensionStorage,
   annotateActiveExtensions,
   loadExtension,
 } from '../../config/extension.js';
@@ -19,6 +20,7 @@ import { GEMINI_DIR, type GeminiCLIExtension } from '@google/gemini-cli-core';
 import { isWorkspaceTrusted } from '../../config/trustedFolders.js';
 import { renderHook, waitFor } from '@testing-library/react';
 import { MessageType } from '../types.js';
+import { ExtensionEnablementManager } from '../../config/extensions/extensionEnablement.js';
 
 const mockGit = {
   clone: vi.fn(),
@@ -163,8 +165,8 @@ describe('useExtensionUpdates', () => {
     });
     const extension = annotateActiveExtensions(
       [loadExtension({ extensionDir, workspaceDir: tempHomeDir })!],
-      [],
       tempHomeDir,
+      new ExtensionEnablementManager(ExtensionStorage.getUserExtensionsDir()),
     )[0];
 
     const addItem = vi.fn();
