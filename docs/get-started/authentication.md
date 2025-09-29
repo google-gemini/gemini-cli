@@ -25,6 +25,8 @@ When you run Gemini CLI through the command-line, Gemini CLI will provide the fo
 > 3. Vertex AI
 ```
 
+The following sections provide instructions for each of these authentication options.
+
 ### Recommended: Login with Google
 
 > **Note:** Use this method if you are a **Google AI Pro** or **Google AI Ultra** subscriber.
@@ -66,7 +68,7 @@ export GOOGLE_CLOUD_PROJECT="YOUR_PROJECT_ID"
 
 To make this setting persistent, see [Persisting Environment Variables](#persisting-environment-variables).
 
-### 2. Gemini API Key
+### Use Gemini API Key
 
 If you don't want to authenticate using your Google account, you can use an API key from Google AI Studio.
 
@@ -82,7 +84,7 @@ To make this setting persistent, see [Persisting Environment Variables](#persist
 
 > **Warning:** Be cautious about how and where you store API keys.
 
-### 3. Vertex AI
+### Use Vertex AI
 
 If you intend to use Google Cloud's Vertex AI platform, you have several authentication options:
 
