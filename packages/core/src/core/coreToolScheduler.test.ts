@@ -903,7 +903,7 @@ describe('CoreToolScheduler YOLO mode', () => {
 
     // Assert
     // 1. The tool's execute method was called directly.
-    expect(executeFn.mock.calls[0][0]).toEqual({ param: 'value' });
+    expect(executeFn).toHaveBeenCalledWith({ param: 'value' });
 
     // 2. The tool call status never entered 'awaiting_approval'.
     const statusUpdates = onToolCallsUpdate.mock.calls
@@ -1020,7 +1020,7 @@ describe('CoreToolScheduler request queueing', () => {
     );
 
     // Ensure the second tool call hasn't been executed yet.
-    expect(executeFn.mock.calls[0][0]).toEqual({ a: 1 });
+    expect(executeFn).toHaveBeenCalledWith({ a: 1 });
 
     // Complete the first tool call.
     resolveFirstCall!({
@@ -1044,7 +1044,7 @@ describe('CoreToolScheduler request queueing', () => {
       // Now the second tool call should have been executed.
       expect(executeFn).toHaveBeenCalledTimes(2);
     });
-    expect(executeFn.mock.calls[1][0]).toEqual({ b: 2 });
+    expect(executeFn).toHaveBeenCalledWith({ b: 2 });
 
     // Wait for the second completion.
     await vi.waitFor(() => {
@@ -1142,7 +1142,7 @@ describe('CoreToolScheduler request queueing', () => {
 
     // Assert
     // 1. The tool's execute method was called directly.
-    expect(executeFn.mock.calls[0][0]).toEqual({ param: 'value' });
+    expect(executeFn).toHaveBeenCalledWith({ param: 'value' });
 
     // 2. The tool call status never entered 'awaiting_approval'.
     const statusUpdates = onToolCallsUpdate.mock.calls
@@ -1256,8 +1256,8 @@ describe('CoreToolScheduler request queueing', () => {
 
     // Ensure the tool was called twice with the correct arguments.
     expect(executeFn).toHaveBeenCalledTimes(2);
-    expect(executeFn.mock.calls[0][0]).toEqual({ a: 1 });
-    expect(executeFn.mock.calls[1][0]).toEqual({ b: 2 });
+    expect(executeFn).toHaveBeenCalledWith({ a: 1 });
+    expect(executeFn).toHaveBeenCalledWith({ b: 2 });
 
     // Ensure completion callbacks were called twice.
     expect(onAllToolCallsComplete).toHaveBeenCalledTimes(2);

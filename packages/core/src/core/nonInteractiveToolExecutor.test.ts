@@ -89,11 +89,7 @@ describe('executeToolCall', () => {
     );
 
     expect(mockToolRegistry.getTool).toHaveBeenCalledWith('testTool');
-    expect(executeFn).toHaveBeenCalledWith(
-      request.args,
-      expect.any(AbortSignal),
-      undefined,
-    );
+    expect(executeFn).toHaveBeenCalledWith(request.args);
     expect(response).toStrictEqual({
       callId: 'call1',
       error: undefined,

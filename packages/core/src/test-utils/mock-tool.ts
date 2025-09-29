@@ -31,7 +31,7 @@ interface MockToolOptions {
   ) => Promise<ToolCallConfirmationDetails | false>;
   execute?: (
     params: { [key: string]: unknown },
-    signal: AbortSignal,
+    signal?: AbortSignal,
     updateOutput?: (output: string) => void,
   ) => Promise<ToolResult>;
   params?: object;
@@ -52,7 +52,11 @@ class MockToolInvocation extends BaseToolInvocation<
     signal: AbortSignal,
     updateOutput?: (output: string) => void,
   ): Promise<ToolResult> {
-    return this.tool.execute(this.params, signal, updateOutput);
+    if (updateOutput) {
+      return this.tool.execute(this.params, signal, updateOutput);
+    } else {
+      return this.tool.execute(this.params);
+    }
   }
 
   override shouldConfirmExecute(
@@ -79,7 +83,7 @@ export class MockTool extends BaseDeclarativeTool<
   ) => Promise<ToolCallConfirmationDetails | false>;
   execute: (
     params: { [key: string]: unknown },
-    signal: AbortSignal,
+    signal?: AbortSignal,
     updateOutput?: (output: string) => void,
   ) => Promise<ToolResult>;
 
