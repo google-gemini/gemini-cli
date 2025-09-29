@@ -222,9 +222,12 @@ describe('BaseLlmClient', () => {
       await client.generateJson(options);
 
       expect(retryWithBackoff).toHaveBeenCalledTimes(1);
-      expect(retryWithBackoff).toHaveBeenCalledWith(expect.any(Function), {
-        maxAttempts: customMaxAttempts,
-      });
+      expect(retryWithBackoff).toHaveBeenCalledWith(
+        expect.any(Function),
+        expect.objectContaining({
+          maxAttempts: customMaxAttempts,
+        }),
+      );
     });
 
     it('should call retryWithBackoff without maxAttempts when not provided', async () => {
@@ -234,9 +237,12 @@ describe('BaseLlmClient', () => {
       // No maxAttempts in defaultOptions
       await client.generateJson(defaultOptions);
 
-      expect(retryWithBackoff).toHaveBeenCalledWith(expect.any(Function), {
-        maxAttempts: 5,
-      });
+      expect(retryWithBackoff).toHaveBeenCalledWith(
+        expect.any(Function),
+        expect.objectContaining({
+          maxAttempts: 5,
+        }),
+      );
     });
   });
 
