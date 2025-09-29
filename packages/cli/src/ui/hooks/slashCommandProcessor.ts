@@ -4,7 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useCallback, useMemo, useEffect, useState } from 'react';
+import {
+  useCallback,
+  useMemo,
+  useEffect,
+  useState,
+  type Dispatch,
+  type SetStateAction,
+} from 'react';
 import { type PartListUnion } from '@google/genai';
 import process from 'node:process';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
@@ -42,12 +49,14 @@ interface SlashCommandProcessorActions {
   openEditorDialog: () => void;
   openPrivacyNotice: () => void;
   openSettingsDialog: () => void;
+  openModelDialog: () => void;
+  openPermissionsDialog: () => void;
   quit: (messages: HistoryItem[]) => void;
   setDebugMessage: (message: string) => void;
   toggleCorgiMode: () => void;
-  setExtensionsUpdateState: (
-    updateState: Map<string, ExtensionUpdateState>,
-  ) => void;
+  setExtensionsUpdateState: Dispatch<
+    SetStateAction<Map<string, ExtensionUpdateState>>
+  >;
 }
 
 /**
@@ -365,6 +374,12 @@ export const useSlashCommandProcessor = (
                       return { type: 'handled' };
                     case 'settings':
                       actions.openSettingsDialog();
+                      return { type: 'handled' };
+                    case 'model':
+                      actions.openModelDialog();
+                      return { type: 'handled' };
+                    case 'permissions':
+                      actions.openPermissionsDialog();
                       return { type: 'handled' };
                     case 'help':
                       return { type: 'handled' };

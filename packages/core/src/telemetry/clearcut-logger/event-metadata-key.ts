@@ -50,6 +50,9 @@ export enum EventMetadataKey {
   // Logs whether the session was configured to respect gitignore files.
   GEMINI_CLI_START_SESSION_RESPECT_GITIGNORE = 12,
 
+  // Logs the output format of the session.
+  GEMINI_CLI_START_SESSION_OUTPUT_FORMAT = 94,
+
   // ==========================================================================
   // User Prompt Event Keys
   // ===========================================================================
@@ -63,6 +66,9 @@ export enum EventMetadataKey {
 
   // Logs the function name.
   GEMINI_CLI_TOOL_CALL_NAME = 14,
+
+  // Logs the MCP server name.
+  GEMINI_CLI_TOOL_CALL_MCP_SERVER_NAME = 95,
 
   // Logs the user's decision about how to handle the tool call.
   GEMINI_CLI_TOOL_CALL_DECISION = 15,
@@ -227,6 +233,18 @@ export enum EventMetadataKey {
   // Logs user removed lines in edit/write tool response.
   GEMINI_CLI_USER_REMOVED_LINES = 50,
 
+  // Logs AI added characters in edit/write tool response.
+  GEMINI_CLI_AI_ADDED_CHARS = 103,
+
+  // Logs AI removed characters in edit/write tool response.
+  GEMINI_CLI_AI_REMOVED_CHARS = 104,
+
+  // Logs user added characters in edit/write tool response.
+  GEMINI_CLI_USER_ADDED_CHARS = 105,
+
+  // Logs user removed characters in edit/write tool response.
+  GEMINI_CLI_USER_REMOVED_CHARS = 106,
+
   // ==========================================================================
   // Kitty Sequence Overflow Event Keys
   // ===========================================================================
@@ -353,6 +371,12 @@ export enum EventMetadataKey {
   // Logs the status of the extension uninstall
   GEMINI_CLI_EXTENSION_UNINSTALL_STATUS = 96,
 
+  // Logs the setting scope for an extension enablement.
+  GEMINI_CLI_EXTENSION_ENABLE_SETTING_SCOPE = 102,
+
+  // Logs the setting scope for an extension disablement.
+  GEMINI_CLI_EXTENSION_DISABLE_SETTING_SCOPE = 107,
+
   // ==========================================================================
   // Tool Output Truncated Event Keys
   // ===========================================================================
@@ -389,4 +413,7 @@ export enum EventMetadataKey {
 
   // Logs the source of the decision.
   GEMINI_CLI_ROUTING_DECISION_SOURCE = 101,
+
+  // Logs an event when the user uses the /model command.
+  GEMINI_CLI_MODEL_SLASH_COMMAND = 108,
 }

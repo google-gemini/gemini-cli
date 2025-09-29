@@ -106,6 +106,11 @@ export type HistoryItemError = HistoryItemBase & {
   text: string;
 };
 
+export type HistoryItemWarning = HistoryItemBase & {
+  type: 'warning';
+  text: string;
+};
+
 export type HistoryItemAbout = HistoryItemBase & {
   type: 'about';
   cliVersion: string;
@@ -170,6 +175,7 @@ export type HistoryItemWithoutId =
   | HistoryItemGeminiContent
   | HistoryItemInfo
   | HistoryItemError
+  | HistoryItemWarning
   | HistoryItemAbout
   | HistoryItemHelp
   | HistoryItemToolGroup
@@ -186,6 +192,7 @@ export type HistoryItem = HistoryItemWithoutId & { id: number };
 export enum MessageType {
   INFO = 'info',
   ERROR = 'error',
+  WARNING = 'warning',
   USER = 'user',
   ABOUT = 'about',
   HELP = 'help',

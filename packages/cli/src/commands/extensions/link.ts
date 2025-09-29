@@ -7,8 +7,9 @@
 import type { CommandModule } from 'yargs';
 import {
   installExtension,
-  type ExtensionInstallMetadata,
+  requestConsentNonInteractive,
 } from '../../config/extension.js';
+import type { ExtensionInstallMetadata } from '@google/gemini-cli-core';
 
 import { getErrorMessage } from '../../utils/errors.js';
 
@@ -22,7 +23,10 @@ export async function handleLink(args: InstallArgs) {
       source: args.path,
       type: 'link',
     };
-    const extensionName = await installExtension(installMetadata);
+    const extensionName = await installExtension(
+      installMetadata,
+      requestConsentNonInteractive,
+    );
     console.log(
       `Extension "${extensionName}" linked successfully and enabled.`,
     );

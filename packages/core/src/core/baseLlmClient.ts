@@ -19,6 +19,8 @@ import { logMalformedJsonResponse } from '../telemetry/loggers.js';
 import { MalformedJsonResponseEvent } from '../telemetry/types.js';
 import { retryWithBackoff } from '../utils/retry.js';
 
+const DEFAULT_MAX_ATTEMPTS = 5;
+
 /**
  * Options for the generateJson utility function.
  */
@@ -51,6 +53,10 @@ export interface GenerateJsonOptions {
    * A unique ID for the prompt, used for logging/telemetry correlation.
    */
   promptId: string;
+  /**
+   * The maximum number of attempts for the request.
+   */
+  maxAttempts?: number;
 }
 
 /**
@@ -78,6 +84,7 @@ export class BaseLlmClient {
       abortSignal,
       systemInstruction,
       promptId,
+      maxAttempts,
     } = options;
 
     const requestConfig: GenerateContentConfig = {
@@ -100,7 +107,9 @@ export class BaseLlmClient {
           promptId,
         );
 
-      const result = await retryWithBackoff(apiCall);
+      const result = await retryWithBackoff(apiCall, {
+        maxAttempts: maxAttempts ?? DEFAULT_MAX_ATTEMPTS,
+      });
 
       let text = getResponseText(result)?.trim();
       if (!text) {
