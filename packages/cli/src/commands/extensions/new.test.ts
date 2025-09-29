@@ -54,18 +54,18 @@ describe('extensions new command', () => {
       recursive: true,
     });
     expect(mockedFs.cp).toHaveBeenCalledWith(
-      expect.stringContaining(path.join('context', 'context')),
-      path.join(`${path.sep}some`, 'path', 'context'),
+      expect.stringContaining(path.normalize('context/context')),
+      path.normalize('/some/path/context'),
       { recursive: true },
     );
     expect(mockedFs.cp).toHaveBeenCalledWith(
-      expect.stringContaining(path.join('context', 'custom-commands')),
-      path.join(`${path.sep}some`, 'path', 'custom-commands'),
+      expect.stringContaining(path.normalize('context/custom-commands')),
+      path.normalize('/some/path/custom-commands'),
       { recursive: true },
     );
     expect(mockedFs.cp).toHaveBeenCalledWith(
-      expect.stringContaining(path.join('context', 'mcp-server')),
-      path.join(`${path.sep}some`, 'path', 'mcp-server'),
+      expect.stringContaining(path.normalize('context/mcp-server')),
+      path.normalize('/some/path/mcp-server'),
       { recursive: true },
     );
   });
