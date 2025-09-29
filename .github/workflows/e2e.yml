@@ -33,10 +33,10 @@ jobs:
     outputs:
       skip: '${{ steps.merge-queue-e2e-skipper.outputs.skip-check }}'
     steps:
-      - id: merge-queue-e2e-skipper
-        uses: cariad-tech/merge-queue-ci-skipper@1032489e59437862c90a08a2c92809c903883772 # ratchet:cariad-tech/merge-queue-ci-skipper@main
+      - id: 'merge-queue-e2e-skipper'
+        uses: 'cariad-tech/merge-queue-ci-skipper@1032489e59437862c90a08a2c92809c903883772' # ratchet:cariad-tech/merge-queue-ci-skipper@main
         with:
-          secret: ${{ secrets.GITHUB_TOKEN }}
+          secret: '${{ secrets.GITHUB_TOKEN }}'
 
   e2e_linux:
     name: 'E2E Test (Linux) - ${{ matrix.sandbox }}'
