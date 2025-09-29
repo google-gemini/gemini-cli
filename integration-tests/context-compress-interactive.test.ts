@@ -24,9 +24,23 @@ describe('Interactive Mode', () => {
       await rig.setup('interactive-compress-test');
       const { ptyProcess } = rig.runInteractive();
 
-      // 1. Wait for the app to be ready
       let fullOutput = '';
       ptyProcess.onData((data) => (fullOutput += data));
+
+      // 1. Wait for the auth dialog to appear
+      const authDialogAppeared = await rig.poll(
+        () =>
+          stripAnsi(fullOutput).includes('How would you like to authenticate'),
+        5000,
+        100,
+      );
+
+      // 2. Press "Enter" to select the default auth option if auth dialog came up
+      if (authDialogAppeared) {
+        ptyProcess.write('\r');
+      }
+
+      // Wait for the app to be ready
       const isReady = await rig.poll(
         () => stripAnsi(fullOutput).includes('Type your message'),
         15000,
@@ -71,9 +85,23 @@ describe('Interactive Mode', () => {
 
       const { ptyProcess } = rig.runInteractive();
 
-      // 1. Wait for the app to be ready
       let fullOutput = '';
       ptyProcess.onData((data) => (fullOutput += data));
+
+      // 1. Wait for the auth dialog to appear
+      const authDialogAppeared = await rig.poll(
+        () =>
+          stripAnsi(fullOutput).includes('How would you like to authenticate'),
+        5000,
+        100,
+      );
+
+      // 2. Press "Enter" to select the default auth option if auth dialog came up
+      if (authDialogAppeared) {
+        ptyProcess.write('\r');
+      }
+
+      // Wait for the app to be ready
       const isReady = await rig.poll(
         () => stripAnsi(fullOutput).includes('Type your message'),
         15000,
