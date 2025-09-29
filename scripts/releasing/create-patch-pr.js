@@ -191,7 +191,7 @@ async function main() {
     `Creating pull request from ${hotfixBranch} to ${releaseBranch}...`,
   );
   let prTitle = `fix(patch): cherry-pick ${commit.substring(0, 7)} to ${releaseBranch}`;
-  let prBody = `This PR automatically cherry-picks commit ${commit} to patch the ${channel} release.`;
+  let prBody = `This PR automatically cherry-picks commit ${commit} to patch version ${releaseInfo.currentTag} in the ${channel} release to create version ${releaseInfo.nextVersion}.`;
 
   if (hasConflicts) {
     prTitle = `fix(patch): cherry-pick ${commit.substring(0, 7)} to ${releaseBranch} [CONFLICTS]`;
