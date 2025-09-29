@@ -17,8 +17,7 @@ import type {
 import { executeToolCall } from '../core/nonInteractiveToolExecutor.js';
 import { ToolRegistry } from '../tools/tool-registry.js';
 import type { ToolCallRequestInfo } from '../core/turn.js';
-// TODO: Evaluate if subagents need environment context (date, OS, etc.).
-// import {getEnvironmentContext} from '../utils/environmentContext.js';
+import { getDirectoryContextString } from '../utils/environmentContext.js';
 import { GlobTool } from '../tools/glob.js';
 import { GrepTool } from '../tools/grep.js';
 import { RipGrepTool } from '../tools/ripGrep.js';
@@ -305,17 +304,9 @@ export class AgentExecutor {
 
     const startHistory = [...(promptConfig.initialMessages ?? [])];
 
-    // TODO: Evaluate if subagents need environment context (date, OS, folder structure)
-    // Currently commented out to reduce token usage - subagents should focus on specific tasks
-    // const envParts = await getEnvironmentContext(this.runtimeContext);
-    // const envHistory: Content[] = [
-    //   { role: 'user', parts: envParts },
-    //   { role: 'model', parts: [{ text: 'Got it. Thanks for the context!' }] },
-    // ];
-
     // Build system instruction from the templated prompt string.
     const systemInstruction = promptConfig.systemPrompt
-      ? this.buildSystemPrompt(inputs)
+      ? await this.buildSystemPrompt(inputs)
       : undefined;
 
     try {
@@ -458,7 +449,7 @@ export class AgentExecutor {
   }
 
   /** Builds the system prompt from the agent definition and inputs. */
-  private buildSystemPrompt(inputs: AgentInputs): string {
+  private async buildSystemPrompt(inputs: AgentInputs): Promise<string> {
     const { promptConfig, outputConfig } = this.definition;
     if (!promptConfig.systemPrompt) {
       return '';
@@ -466,6 +457,10 @@ export class AgentExecutor {
 
     // Inject user inputs into the prompt template.
     let finalPrompt = templateString(promptConfig.systemPrompt, inputs);
+
+    // Append environment context (CWD and folder structure).
+    const dirContext = await getDirectoryContextString(this.runtimeContext);
+    finalPrompt += `\n\n# Environment Context\n${dirContext}`;
 
     // Append completion criteria to guide the model's output.
     if (outputConfig?.completion_criteria) {
@@ -480,6 +475,7 @@ export class AgentExecutor {
 Important Rules:
 * You are running in a non-interactive mode. You CANNOT ask the user for input or clarification.
 * Work systematically using available tools to complete your task.
+* Always use absolute paths for file operations. Construct them using the provided "Environment Context".
 * When you have completed your analysis and are ready to produce the final answer, stop calling tools.`;
 
     return finalPrompt;

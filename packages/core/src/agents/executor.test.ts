@@ -36,6 +36,7 @@ import type {
 } from '@google/genai';
 import type { Config } from '../config/config.js';
 import { MockTool } from '../test-utils/mock-tool.js';
+import { getDirectoryContextString } from '../utils/environmentContext.js';
 
 const { mockSendMessageStream, mockExecuteToolCall } = vi.hoisted(() => ({
   mockSendMessageStream: vi.fn(),
@@ -55,6 +56,8 @@ vi.mock('../core/geminiChat.js', async (importOriginal) => {
 vi.mock('../core/nonInteractiveToolExecutor.js', () => ({
   executeToolCall: mockExecuteToolCall,
 }));
+
+vi.mock('../utils/environmentContext.js');
 
 const MockedGeminiChat = GeminiChat as MockedClass<typeof GeminiChat>;
 
@@ -141,6 +144,10 @@ describe('AgentExecutor', () => {
 
     vi.spyOn(mockConfig, 'getToolRegistry').mockResolvedValue(
       parentToolRegistry,
+    );
+
+    vi.mocked(getDirectoryContextString).mockResolvedValue(
+      'Mocked Environment Context',
     );
 
     activities = [];
@@ -239,9 +246,17 @@ describe('AgentExecutor', () => {
       expect(chatConfig?.systemInstruction).toContain(
         'Achieve the goal: Find files.',
       );
+      // Verify environment context is appended
+      expect(chatConfig?.systemInstruction).toContain(
+        '# Environment Context\nMocked Environment Context',
+      );
       // Verify standard rules are appended
       expect(chatConfig?.systemInstruction).toContain(
         'You are running in a non-interactive mode.',
+      );
+      // Verify absolute path rule is appended
+      expect(chatConfig?.systemInstruction).toContain(
+        'Always use absolute paths for file operations.',
       );
 
       // Verify Extraction Phase Call (Specific arguments)
