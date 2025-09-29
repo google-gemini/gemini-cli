@@ -1386,13 +1386,14 @@ This extension will run the following MCP servers:
     });
 
     const getActiveExtensions = (): GeminiCLIExtension[] => {
-      const extensions = loadExtensions(
-        new ExtensionEnablementManager(ExtensionStorage.getUserExtensionsDir()),
+      const manager = new ExtensionEnablementManager(
+        ExtensionStorage.getUserExtensionsDir(),
       );
+      const extensions = loadExtensions(manager);
       const activeExtensions = annotateActiveExtensions(
         extensions,
-        [],
         tempWorkspaceDir,
+        manager,
       );
       return activeExtensions.filter((e) => e.isActive);
     };
