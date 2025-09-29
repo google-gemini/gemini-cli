@@ -8,6 +8,7 @@ import { useReducer, useRef, useEffect } from 'react';
 import { useKeypress } from './useKeypress.js';
 
 export interface SelectionListItem<T> {
+  key: string;
   value: T;
   disabled?: boolean;
 }
@@ -71,27 +72,6 @@ type SelectionListAction<T> =
 const NUMBER_INPUT_TIMEOUT_MS = 1000;
 
 /**
- * Performs an equality check on two arrays of SelectionListItem<T>.
- *
- * It compares the length of the arrays and then the 'value' and 'disabled'
- * properties of each item.
- */
-const areItemsEqual = <T>(
-  a: Array<SelectionListItem<T>>,
-  b: Array<SelectionListItem<T>>,
-): boolean => {
-  if (a.length !== b.length) {
-    return false;
-  }
-  for (let i = 0; i < a.length; i++) {
-    if (a[i]!.value !== b[i]!.value || a[i]!.disabled !== b[i]!.disabled) {
-      return false;
-    }
-  }
-  return true;
-};
-
-/**
  * Helper function to find the next enabled index in a given direction, supporting wrapping.
  */
 const findNextValidIndex = <T>(
@@ -122,9 +102,18 @@ const findNextValidIndex = <T>(
 const computeInitialIndex = <T>(
   initialIndex: number,
   items: Array<SelectionListItem<T>>,
+  initialKey?: string,
 ): number => {
   if (items.length === 0) {
     return 0;
+  }
+
+  if (initialKey !== undefined) {
+    for (let i = 0; i < items.length; i++) {
+      if (items[i]!.key === initialKey && !items[i]!.disabled) {
+        return i;
+      }
+    }
   }
 
   let targetIndex = initialIndex;
@@ -184,13 +173,17 @@ function selectionListReducer<T>(
 
     case 'INITIALIZE': {
       const { initialIndex, items } = action.payload;
-      if (
-        state.initialIndex === initialIndex &&
-        areItemsEqual(state.items, items)
-      ) {
+      const activeKey =
+        initialIndex === state.initialIndex &&
+        state.activeIndex !== state.initialIndex
+          ? state.items[state.activeIndex]?.key
+          : undefined;
+
+      if (items === state.items && initialIndex === state.initialIndex) {
         return state;
       }
-      const targetIndex = computeInitialIndex(initialIndex, items);
+
+      const targetIndex = computeInitialIndex(initialIndex, items, activeKey);
 
       return {
         ...state,

@@ -10,14 +10,19 @@ import { Text, Box } from 'ink';
 import { theme } from '../../semantic-colors.js';
 import { useSelectionList } from '../../hooks/useSelectionList.js';
 
+import type { SelectionListItem } from '../../hooks/useSelectionList.js';
+
 export interface RenderItemContext {
   isSelected: boolean;
   titleColor: string;
   numberColor: string;
 }
 
-export interface BaseSelectionListProps<T, TItem = Record<string, unknown>> {
-  items: Array<TItem & { value: T; disabled?: boolean }>;
+export interface BaseSelectionListProps<
+  T,
+  TItem extends SelectionListItem<T> = SelectionListItem<T>,
+> {
+  items: TItem[];
   initialIndex?: number;
   onSelect: (value: T) => void;
   onHighlight?: (value: T) => void;
@@ -25,10 +30,7 @@ export interface BaseSelectionListProps<T, TItem = Record<string, unknown>> {
   showNumbers?: boolean;
   showScrollArrows?: boolean;
   maxItemsToShow?: number;
-  renderItem: (
-    item: TItem & { value: T; disabled?: boolean },
-    context: RenderItemContext,
-  ) => React.ReactNode;
+  renderItem: (item: TItem, context: RenderItemContext) => React.ReactNode;
 }
 
 /**
@@ -45,7 +47,10 @@ export interface BaseSelectionListProps<T, TItem = Record<string, unknown>> {
  * Specific components should use this as a base and provide
  * their own renderItem implementation for custom content.
  */
-export function BaseSelectionList<T, TItem = Record<string, unknown>>({
+export function BaseSelectionList<
+  T,
+  TItem extends SelectionListItem<T> = SelectionListItem<T>,
+>({
   items,
   initialIndex = 0,
   onSelect,
@@ -123,7 +128,7 @@ export function BaseSelectionList<T, TItem = Record<string, unknown>>({
         )}.`;
 
         return (
-          <Box key={itemIndex} alignItems="flex-start">
+          <Box key={item.key} alignItems="flex-start">
             {/* Radio button indicator */}
             <Box minWidth={2} flexShrink={0}>
               <Text

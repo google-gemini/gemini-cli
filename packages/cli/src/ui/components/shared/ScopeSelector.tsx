@@ -27,7 +27,10 @@ export function ScopeSelector({
   isFocused,
   initialScope,
 }: ScopeSelectorProps): React.JSX.Element {
-  const scopeItems = getScopeItems();
+  const scopeItems = getScopeItems().map((item) => ({
+    ...item,
+    key: item.value,
+  }));
 
   const initialIndex = scopeItems.findIndex(
     (item) => item.value === initialScope,
