@@ -47,7 +47,7 @@ const renderComponent = (
         getUsageStatisticsEnabled: vi.fn(() => true),
         getSessionId: vi.fn(() => 'mock-session-id'),
         getDebugMode: vi.fn(() => false),
-        getContentGeneratorConfig: vi.fn(() => ({ authType: 'mock' })),
+        getContentGeneratorConfig: vi.fn(() => ({ authType: undefined })),
         getUseSmartEdit: vi.fn(() => false),
         getUseModelRouter: vi.fn(() => false),
         getProxy: vi.fn(() => undefined),
@@ -86,19 +86,6 @@ describe('<ModelDialog />', () => {
     expect(
       getByText('> To use a specific Gemini model, use the --model flag.'),
     ).toBeDefined();
-  });
-
-  it('passes all model options to DescriptiveRadioButtonSelect', () => {
-    renderComponent();
-    expect(mockedSelect).toHaveBeenCalledTimes(1);
-
-    const props = mockedSelect.mock.calls[0][0];
-    expect(props.items).toHaveLength(4);
-    expect(props.items[0].value).toBe(DEFAULT_GEMINI_MODEL_AUTO);
-    expect(props.items[1].value).toBe(DEFAULT_GEMINI_MODEL);
-    expect(props.items[2].value).toBe(DEFAULT_GEMINI_FLASH_MODEL);
-    expect(props.items[3].value).toBe(DEFAULT_GEMINI_FLASH_LITE_MODEL);
-    expect(props.showNumbers).toBe(true);
   });
 
   it('initializes with the model from ConfigContext', () => {

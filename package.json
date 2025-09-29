@@ -1,5 +1,5 @@
 {
-  "name": "@google/gemini-cli",
+  "name": "penggo-cli",
   "version": "0.8.0-nightly.20250925.b1da8c21",
   "engines": {
     "node": ">=20.0.0"
@@ -11,10 +11,10 @@
   "private": "true",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/google-gemini/gemini-cli.git"
+    "url": "git+https://github.com/Pengo0215/penggo-cli"
   },
   "config": {
-    "sandboxImageUri": "us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:0.8.0-nightly.20250925.b1da8c21"
+    "sandboxImageUri": "us-docker.pkg.dev/penggo-code-dev/penggo-cli/sandbox:0.8.0-nightly.20250925.b1da8c21"
   },
   "scripts": {
     "start": "cross-env node scripts/start.js",
@@ -120,7 +120,7 @@
   "lint-staged": {
     "*.{js,jsx,ts,tsx}": [
       "prettier --write",
-      "eslint --fix --max-warnings 0"
+      "eslint --fix --max-warnings 0 --no-warn-ignored"
     ],
     "*.{json,md}": [
       "prettier --write"

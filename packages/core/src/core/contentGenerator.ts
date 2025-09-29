@@ -13,6 +13,7 @@ import type {
   EmbedContentParameters,
 } from '@google/genai';
 import { GoogleGenAI } from '@google/genai';
+import { OpenRouterContentGenerator } from './openRouterContentGenerator.js';
 import { createCodeAssistContentGenerator } from '../code_assist/codeAssist.js';
 import type { Config } from '../config/config.js';
 
@@ -46,6 +47,7 @@ export enum AuthType {
   USE_GEMINI = 'gemini-api-key',
   USE_VERTEX_AI = 'vertex-ai',
   CLOUD_SHELL = 'cloud-shell',
+  USE_OPENROUTER = 'openrouter-api-key',
 }
 
 export type ContentGeneratorConfig = {
@@ -63,6 +65,8 @@ export function createContentGeneratorConfig(
   const googleApiKey = process.env['GOOGLE_API_KEY'] || undefined;
   const googleCloudProject = process.env['GOOGLE_CLOUD_PROJECT'] || undefined;
   const googleCloudLocation = process.env['GOOGLE_CLOUD_LOCATION'] || undefined;
+  const openaiApiKey = process.env['OPENAI_API_KEY'] || undefined;
+  const openaiBaseUrl = process.env['OPENAI_BASE_URL'] || undefined;
 
   const contentGeneratorConfig: ContentGeneratorConfig = {
     authType,
@@ -90,6 +94,13 @@ export function createContentGeneratorConfig(
   ) {
     contentGeneratorConfig.apiKey = googleApiKey;
     contentGeneratorConfig.vertexai = true;
+
+    return contentGeneratorConfig;
+  }
+
+  if (authType === AuthType.USE_OPENROUTER && openaiApiKey) {
+    contentGeneratorConfig.apiKey = openaiApiKey;
+    (contentGeneratorConfig as any).baseUrl = openaiBaseUrl;
 
     return contentGeneratorConfig;
   }
@@ -146,6 +157,17 @@ export async function createContentGenerator(
     });
     return new LoggingContentGenerator(googleGenAI.models, gcConfig);
   }
+
+  if (config.authType === AuthType.USE_OPENROUTER) {
+    return new LoggingContentGenerator(
+      new OpenRouterContentGenerator({
+        apiKey: config.apiKey!,
+        baseUrl: (config as any).baseUrl,
+      }),
+      gcConfig,
+    );
+  }
+
   throw new Error(
     `Error creating contentGenerator: Unsupported authType: ${config.authType}`,
   );

@@ -8,6 +8,16 @@ export const DEFAULT_GEMINI_MODEL = 'gemini-2.5-pro';
 export const DEFAULT_GEMINI_FLASH_MODEL = 'gemini-2.5-flash';
 export const DEFAULT_GEMINI_FLASH_LITE_MODEL = 'gemini-2.5-flash-lite';
 
+// OpenRouter models
+export const OPENROUTER_X_AI_GROK_CODE_FAST_1 =
+  'openrouter/x-ai/grok-code-fast-1';
+export const OPENROUTER_GOOGLE_GEMINI_2_5_PRO =
+  'openrouter/google/gemini-2.5-pro';
+export const OPENROUTER_ANTHROPIC_CLAUDE_3_7_SONNET =
+  'openrouter/anthropic/claude-3.7-sonnet';
+export const OPENROUTER_ANTHROPIC_CLAUDE_SONNET_4 =
+  'openrouter/anthropic/claude-sonnet-4';
+
 export const DEFAULT_GEMINI_MODEL_AUTO = 'auto';
 
 export const DEFAULT_GEMINI_EMBEDDING_MODEL = 'gemini-embedding-001';

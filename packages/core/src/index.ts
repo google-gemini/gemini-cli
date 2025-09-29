@@ -6,6 +6,7 @@
 
 // Export config
 export * from './config/config.js';
+export * from './config/models.js';
 export * from './output/types.js';
 export * from './output/json-formatter.js';
 export * from './policy/types.js';
