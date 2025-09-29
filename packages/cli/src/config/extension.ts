@@ -29,7 +29,6 @@ import { SettingScope, loadSettings } from '../config/settings.js';
 import { getErrorMessage } from '../utils/errors.js';
 import { recursivelyHydrateStrings } from './extensions/variables.js';
 import { isWorkspaceTrusted } from './trustedFolders.js';
-import { resolveEnvVarsInObject } from '../utils/envVarResolver.js';
 import { randomUUID } from 'node:crypto';
 import {
   cloneFromGit,
@@ -39,11 +38,14 @@ import type { LoadExtensionContext } from './extensions/variableSchema.js';
 import { ExtensionEnablementManager } from './extensions/extensionEnablement.js';
 import type { UseHistoryManagerReturn } from '../ui/hooks/useHistoryManager.js';
 import chalk from 'chalk';
+import { resolveEnvVarsInObject } from '../utils/envVarResolver.js';
+import * as dotenv from 'dotenv';
 
 export const EXTENSIONS_DIRECTORY_NAME = path.join(GEMINI_DIR, 'extensions');
 
 export const EXTENSIONS_CONFIG_FILENAME = 'gemini-extension.json';
 export const INSTALL_METADATA_FILENAME = '.gemini-extension-install.json';
+export const EXTENSION_SETTINGS_FILENAME = '.env';
 
 export interface Extension {
   path: string;
@@ -58,6 +60,13 @@ export interface ExtensionConfig {
   mcpServers?: Record<string, MCPServerConfig>;
   contextFileName?: string | string[];
   excludeTools?: string[];
+  settings?: ExtensionSetting[];
+}
+
+export interface ExtensionSetting {
+  name: string;
+  description: string;
+  envVar: string;
 }
 
 export interface ExtensionUpdateInfo {
@@ -220,12 +229,19 @@ export function loadExtension(context: LoadExtensionContext): Extension | null {
   }
 
   try {
+    let customEnv: Record<string, string> = {};
+    const envPath = path.join(effectiveExtensionPath, '.env');
+    if (fs.existsSync(envPath)) {
+      const envFile = fs.readFileSync(envPath, 'utf-8');
+      customEnv = dotenv.parse(envFile);
+    }
+
     let config = loadExtensionConfig({
       extensionDir: effectiveExtensionPath,
       workspaceDir,
     });
 
-    config = resolveEnvVarsInObject(config);
+    config = resolveEnvVarsInObject(config, customEnv);
 
     if (config.mcpServers) {
       config.mcpServers = Object.fromEntries(
@@ -400,11 +416,56 @@ async function promptForContinuationNonInteractive(
   });
 }
 
+async function promptForSetting(setting: ExtensionSetting): Promise<string> {
+  const readline = await import('node:readline');
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout,
+  });
+
+  return new Promise((resolve) => {
+    console.info(chalk.bold(setting.name));
+    console.info(setting.description);
+    rl.question('> ', (answer) => {
+      rl.close();
+      resolve(answer);
+    });
+  });
+}
+
+async function maybePromptForSettings(
+  extensionConfig: ExtensionConfig,
+  destinationPath: string,
+) {
+  const settingsPath = path.join(destinationPath, EXTENSION_SETTINGS_FILENAME);
+  if (fs.existsSync(settingsPath)) {
+    return;
+  }
+
+  if (!extensionConfig.settings) {
+    return;
+  }
+
+  const settings: Record<string, string> = {};
+
+  for (const setting of extensionConfig.settings) {
+    const value = await promptForSetting(setting);
+    settings[setting.envVar] = value;
+  }
+
+  const settingsString = Object.entries(settings)
+    .map(([key, value]) => `${key}=${value}`)
+    .join('\n');
+
+  await fs.promises.writeFile(settingsPath, settingsString);
+}
+
 export async function installExtension(
   installMetadata: ExtensionInstallMetadata,
   requestConsent: (consent: string) => Promise<boolean>,
   cwd: string = process.cwd(),
   previousExtensionConfig?: ExtensionConfig,
+  promptForSettings = true,
 ): Promise<string> {
   const telemetryConfig = getTelemetryConfig(cwd);
   let newExtensionConfig: ExtensionConfig | null = null;
@@ -482,6 +543,9 @@ export async function installExtension(
         previousExtensionConfig,
       );
       await fs.promises.mkdir(destinationPath, { recursive: true });
+      if (promptForSettings) {
+        await maybePromptForSettings(newExtensionConfig, destinationPath);
+      }
 
       if (
         installMetadata.type === 'local' ||
