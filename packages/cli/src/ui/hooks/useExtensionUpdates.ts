@@ -9,7 +9,7 @@ import { getErrorMessage } from '../../utils/errors.js';
 import { ExtensionUpdateState } from '../state/extensions.js';
 import { useState } from 'react';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
-import { MessageType } from '../types.js';
+import { MessageType, type ConfirmationRequest } from '../types.js';
 import {
   checkForAllExtensionUpdates,
   updateExtension,
@@ -25,11 +25,26 @@ export const useExtensionUpdates = (
     new Map<string, ExtensionUpdateState>(),
   );
   const [isChecking, setIsChecking] = useState(false);
-  const [confirmUpdateExtensionRequest, setConfirmUpdateExtensionRequest] =
-    useState<null | {
-      prompt: React.ReactNode;
-      onConfirm: (confirmed: boolean) => void;
-    }>(null);
+  const [confirmUpdateExtensionRequests, setConfirmUpdateExtensionRequests] =
+    useState<
+      Array<{
+        prompt: React.ReactNode;
+        onConfirm: (confirmed: boolean) => void;
+      }>
+    >([]);
+  const addConfirmUpdateExtensionRequest = (original: ConfirmationRequest) => {
+    const wrappedRequest = {
+      prompt: original.prompt,
+      onConfirm: (confirmed: boolean) => {
+        // Remove it from the outstanding list of requests by identity.
+        setConfirmUpdateExtensionRequests((prev) =>
+          prev.filter((r) => r !== wrappedRequest),
+        );
+        original.onConfirm(confirmed);
+      },
+    };
+    setConfirmUpdateExtensionRequests((prev) => [...prev, wrappedRequest]);
+  };
 
   (async () => {
     if (isChecking) return;
@@ -57,7 +72,7 @@ export const useExtensionUpdates = (
             (description) =>
               requestConsentInteractive(
                 description,
-                setConfirmUpdateExtensionRequest,
+                addConfirmUpdateExtensionRequest,
               ),
             currentState,
             (newState) => {
@@ -109,7 +124,7 @@ export const useExtensionUpdates = (
   return {
     extensionsUpdateState,
     setExtensionsUpdateState,
-    confirmUpdateExtensionRequest,
-    setConfirmUpdateExtensionRequest,
+    confirmUpdateExtensionRequests,
+    addConfirmUpdateExtensionRequest,
   };
 };

@@ -156,8 +156,8 @@ export const AppContainer = (props: AppContainerProps) => {
   const {
     extensionsUpdateState,
     setExtensionsUpdateState,
-    confirmUpdateExtensionRequest,
-    setConfirmUpdateExtensionRequest,
+    confirmUpdateExtensionRequests,
+    addConfirmUpdateExtensionRequest,
   } = useExtensionUpdates(
     extensions,
     historyManager.addItem,
@@ -460,7 +460,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       setDebugMessage,
       toggleCorgiMode: () => setCorgiMode((prev) => !prev),
       setExtensionsUpdateState,
-      setConfirmUpdateExtensionRequest,
+      addConfirmUpdateExtensionRequest,
     }),
     [
       setAuthState,
@@ -474,7 +474,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       setCorgiMode,
       setExtensionsUpdateState,
       openPermissionsDialog,
-      setConfirmUpdateExtensionRequest,
+      addConfirmUpdateExtensionRequest,
     ],
   );
 
@@ -1048,7 +1048,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
     isFolderTrustDialogOpen ||
     !!shellConfirmationRequest ||
     !!confirmationRequest ||
-    !!confirmUpdateExtensionRequest ||
+    confirmUpdateExtensionRequests.length > 0 ||
     !!loopDetectionConfirmationRequest ||
     isThemeDialogOpen ||
     isSettingsDialogOpen ||
@@ -1089,7 +1089,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       commandContext,
       shellConfirmationRequest,
       confirmationRequest,
-      confirmUpdateExtensionRequest,
+      confirmUpdateExtensionRequests,
       loopDetectionConfirmationRequest,
       geminiMdFileCount,
       streamingState,
@@ -1167,7 +1167,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       commandContext,
       shellConfirmationRequest,
       confirmationRequest,
-      confirmUpdateExtensionRequest,
+      confirmUpdateExtensionRequests,
       loopDetectionConfirmationRequest,
       geminiMdFileCount,
       streamingState,

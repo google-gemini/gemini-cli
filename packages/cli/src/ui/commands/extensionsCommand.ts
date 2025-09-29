@@ -56,7 +56,7 @@ async function updateAction(context: CommandContext, args: string) {
         (description) =>
           requestConsentInteractive(
             description,
-            context.ui.setConfirmUpdateExtensionRequest,
+            context.ui.addConfirmUpdateExtensionRequest,
           ),
         context.services.config!.getExtensions(),
         context.ui.extensionsUpdateState,
@@ -85,7 +85,7 @@ async function updateAction(context: CommandContext, args: string) {
           (description) =>
             requestConsentInteractive(
               description,
-              context.ui.setConfirmUpdateExtensionRequest,
+              context.ui.addConfirmUpdateExtensionRequest,
             ),
           context.ui.extensionsUpdateState.get(extension.name) ??
             ExtensionUpdateState.UNKNOWN,

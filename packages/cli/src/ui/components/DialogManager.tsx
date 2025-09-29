@@ -111,11 +111,12 @@ export const DialogManager = ({
       />
     );
   }
-  if (uiState.confirmUpdateExtensionRequest) {
+  if (uiState.confirmUpdateExtensionRequests.length > 0) {
+    const request = uiState.confirmUpdateExtensionRequests[0];
     return (
       <ConsentPrompt
-        prompt={uiState.confirmUpdateExtensionRequest.prompt}
-        onConfirm={uiState.confirmUpdateExtensionRequest.onConfirm}
+        prompt={request.prompt}
+        onConfirm={request.onConfirm}
         terminalWidth={terminalWidth}
       />
     );

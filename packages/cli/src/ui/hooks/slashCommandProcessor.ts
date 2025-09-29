@@ -58,9 +58,7 @@ interface SlashCommandProcessorActions {
   setExtensionsUpdateState: Dispatch<
     SetStateAction<Map<string, ExtensionUpdateState>>
   >;
-  setConfirmUpdateExtensionRequest: Dispatch<
-    SetStateAction<ConfirmationRequest | null>
-  >;
+  addConfirmUpdateExtensionRequest: (request: ConfirmationRequest) => void;
 }
 
 /**
@@ -210,8 +208,8 @@ export const useSlashCommandProcessor = (
         reloadCommands,
         extensionsUpdateState,
         setExtensionsUpdateState: actions.setExtensionsUpdateState,
-        setConfirmUpdateExtensionRequest:
-          actions.setConfirmUpdateExtensionRequest,
+        addConfirmUpdateExtensionRequest:
+          actions.addConfirmUpdateExtensionRequest,
       },
       session: {
         stats: session.stats,

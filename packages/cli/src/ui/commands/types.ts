@@ -70,9 +70,7 @@ export interface CommandContext {
     setExtensionsUpdateState: Dispatch<
       SetStateAction<Map<string, ExtensionUpdateState>>
     >;
-    setConfirmUpdateExtensionRequest: (
-      value: ConfirmationRequest | null,
-    ) => void;
+    addConfirmUpdateExtensionRequest: (value: ConfirmationRequest) => void;
   };
   // Session-specific data
   session: {
