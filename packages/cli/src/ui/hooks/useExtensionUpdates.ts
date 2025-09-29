@@ -79,8 +79,12 @@ export const useExtensionUpdates = (
               );
             })
             .catch((error) => {
-              console.error(
-                `Error updating extension "${extension.name}": ${getErrorMessage(error)}.`,
+              addItem(
+                {
+                  type: MessageType.ERROR,
+                  text: getErrorMessage(error),
+                },
+                Date.now(),
               );
             });
         } else {

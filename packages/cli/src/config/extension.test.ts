@@ -954,7 +954,7 @@ This extension will run the following MCP servers:
           { source: sourceExtDir, type: 'local' },
           requestConsentNonInteractive,
         ),
-      ).rejects.toThrow('Installation cancelled.');
+      ).rejects.toThrow('Installation cancelled for "my-local-extension".');
 
       expect(mockQuestion).toHaveBeenCalledWith(
         expect.stringContaining('Do you want to continue? [Y/n]: '),

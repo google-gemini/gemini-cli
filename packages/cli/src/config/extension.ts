@@ -347,7 +347,7 @@ export async function requestConsentNonInteractive(
   consentDescription: string,
 ): Promise<boolean> {
   console.info(consentDescription);
-  const result = await promptForContinuationNonInteractive(
+  const result = await promptForConsentNonInteractive(
     'Do you want to continue? [Y/n]: ',
   );
   return result;
@@ -359,6 +359,7 @@ export async function requestConsentNonInteractive(
  * This should not be called from non-interactive mode as it will not work.
  *
  * @param consentDescription The description of the thing they will be consenting to.
+ * @param setExtensionUpdateConfirmationRequest A function to actually add a prompt to the UI.
  * @returns boolean, whether they consented or not.
  */
 export async function requestConsentInteractive(
@@ -367,15 +368,10 @@ export async function requestConsentInteractive(
     value: ConfirmationRequest | null,
   ) => void,
 ): Promise<boolean> {
-  return await new Promise<boolean>((resolve) => {
-    setExtensionUpdateConfirmationRequest({
-      prompt: consentDescription,
-      onConfirm: (resolvedConfirmed) => {
-        setExtensionUpdateConfirmationRequest(null);
-        resolve(resolvedConfirmed);
-      },
-    });
-  });
+  return await promptForConsentInteractive(
+    consentDescription + '\n\nDo you want to continue?',
+    setExtensionUpdateConfirmationRequest,
+  );
 }
 
 /**
@@ -386,7 +382,7 @@ export async function requestConsentInteractive(
  * @param prompt A yes/no prompt to ask the user
  * @returns Whether or not the user answers 'y' (yes). Defaults to 'yes' on enter.
  */
-async function promptForContinuationNonInteractive(
+async function promptForConsentNonInteractive(
   prompt: string,
 ): Promise<boolean> {
   const readline = await import('node:readline');
@@ -399,6 +395,32 @@ async function promptForContinuationNonInteractive(
     rl.question(prompt, (answer) => {
       rl.close();
       resolve(['y', ''].includes(answer.trim().toLowerCase()));
+    });
+  });
+}
+
+/**
+ * Asks users an interactive yes/no prompt.
+ *
+ * This should not be called from non-interactive mode as it will break the CLI.
+ *
+ * @param prompt A markdown prompt to ask the user
+ * @param setExtensionUpdateConfirmationRequest Function to update the UI state with the confirmation request.
+ * @returns Whether or not the user answers yes.
+ */
+async function promptForConsentInteractive(
+  prompt: string,
+  setExtensionUpdateConfirmationRequest: (
+    value: ConfirmationRequest | null,
+  ) => void,
+): Promise<boolean> {
+  return await new Promise<boolean>((resolve) => {
+    setExtensionUpdateConfirmationRequest({
+      prompt,
+      onConfirm: (resolvedConfirmed) => {
+        setExtensionUpdateConfirmationRequest(null);
+        resolve(resolvedConfirmed);
+      },
     });
   });
 }
@@ -603,7 +625,7 @@ async function maybeRequestConsentOrFail(
     }
   }
   if (!(await requestConsent(extensionConsent))) {
-    throw new Error('Installation cancelled.');
+    throw new Error(`Installation cancelled for "${extensionConfig.name}".`);
   }
 }
 

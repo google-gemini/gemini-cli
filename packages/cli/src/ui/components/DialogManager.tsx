@@ -27,13 +27,18 @@ import { useConfig } from '../contexts/ConfigContext.js';
 import { useSettings } from '../contexts/SettingsContext.js';
 import process from 'node:process';
 import { type UseHistoryManagerReturn } from '../hooks/useHistoryManager.js';
+import { MarkdownDisplay } from '../utils/MarkdownDisplay.js';
 
 interface DialogManagerProps {
   addItem: UseHistoryManagerReturn['addItem'];
+  terminalWidth: number;
 }
 
 // Props for DialogManager
-export const DialogManager = ({ addItem }: DialogManagerProps) => {
+export const DialogManager = ({
+  addItem,
+  terminalWidth,
+}: DialogManagerProps) => {
   const config = useConfig();
   const settings = useSettings();
 
@@ -118,9 +123,19 @@ export const DialogManager = ({ addItem }: DialogManagerProps) => {
   }
   if (uiState.confirmUpdateExtensionRequest) {
     return (
-      <Box flexDirection="column">
-        <Text>{uiState.confirmUpdateExtensionRequest.prompt}</Text>
-        <Box paddingY={1}>
+      <Box
+        borderStyle="round"
+        borderColor={theme.border.default}
+        flexDirection="column"
+        paddingY={1}
+        paddingX={2}
+      >
+        <MarkdownDisplay
+          isPending={true}
+          text={uiState.confirmUpdateExtensionRequest.prompt as string}
+          terminalWidth={terminalWidth}
+        ></MarkdownDisplay>
+        <Box marginTop={1}>
           <RadioButtonSelect
             items={[
               { label: 'Yes', value: true, key: 'Yes' },
