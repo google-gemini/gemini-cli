@@ -25,6 +25,11 @@ export const useExtensionUpdates = (
     new Map<string, ExtensionUpdateState>(),
   );
   const [isChecking, setIsChecking] = useState(false);
+  const [confirmUpdateExtensionRequest, setConfirmUpdateExtensionRequest] =
+    useState<null | {
+      prompt: React.ReactNode;
+      onConfirm: (confirmed: boolean) => void;
+    }>(null);
 
   (async () => {
     if (isChecking) return;
@@ -49,7 +54,11 @@ export const useExtensionUpdates = (
           updateExtension(
             extension,
             cwd,
-            (description) => requestConsentInteractive(description, addItem),
+            (description) =>
+              requestConsentInteractive(
+                description,
+                setConfirmUpdateExtensionRequest,
+              ),
             currentState,
             (newState) => {
               setExtensionsUpdateState((prev) => {
@@ -96,5 +105,7 @@ export const useExtensionUpdates = (
   return {
     extensionsUpdateState,
     setExtensionsUpdateState,
+    confirmUpdateExtensionRequest,
+    setConfirmUpdateExtensionRequest,
   };
 };

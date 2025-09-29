@@ -37,8 +37,8 @@ import {
 } from './extensions/github.js';
 import type { LoadExtensionContext } from './extensions/variableSchema.js';
 import { ExtensionEnablementManager } from './extensions/extensionEnablement.js';
-import type { UseHistoryManagerReturn } from '../ui/hooks/useHistoryManager.js';
 import chalk from 'chalk';
+import type { ConfirmationRequest } from '../ui/types.js';
 
 export const EXTENSIONS_DIRECTORY_NAME = path.join(GEMINI_DIR, 'extensions');
 
@@ -362,17 +362,20 @@ export async function requestConsentNonInteractive(
  * @returns boolean, whether they consented or not.
  */
 export async function requestConsentInteractive(
-  _consentDescription: string,
-  addHistoryItem: UseHistoryManagerReturn['addItem'],
+  consentDescription: string,
+  setExtensionUpdateConfirmationRequest: (
+    value: ConfirmationRequest | null,
+  ) => void,
 ): Promise<boolean> {
-  addHistoryItem(
-    {
-      type: 'info',
-      text: 'Tried to update an extension but it has some changes that require consent, please use `gemini extensions update`.',
-    },
-    Date.now(),
-  );
-  return false;
+  return await new Promise<boolean>((resolve) => {
+    setExtensionUpdateConfirmationRequest({
+      prompt: consentDescription,
+      onConfirm: (resolvedConfirmed) => {
+        setExtensionUpdateConfirmationRequest(null);
+        resolve(resolvedConfirmed);
+      },
+    });
+  });
 }
 
 /**

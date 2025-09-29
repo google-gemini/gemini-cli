@@ -116,6 +116,24 @@ export const DialogManager = ({ addItem }: DialogManagerProps) => {
       </Box>
     );
   }
+  if (uiState.confirmUpdateExtensionRequest) {
+    return (
+      <Box flexDirection="column">
+        <Text>{uiState.confirmUpdateExtensionRequest.prompt}</Text>
+        <Box paddingY={1}>
+          <RadioButtonSelect
+            items={[
+              { label: 'Yes', value: true, key: 'Yes' },
+              { label: 'No', value: false, key: 'No' },
+            ]}
+            onSelect={(value: boolean) => {
+              uiState.confirmUpdateExtensionRequest!.onConfirm(value);
+            }}
+          />
+        </Box>
+      </Box>
+    );
+  }
   if (uiState.isThemeDialogOpen) {
     return (
       <Box flexDirection="column">

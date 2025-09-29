@@ -32,6 +32,7 @@ import type {
   HistoryItemWithoutId,
   SlashCommandProcessorResult,
   HistoryItem,
+  ConfirmationRequest,
 } from '../types.js';
 import { MessageType } from '../types.js';
 import type { LoadedSettings } from '../../config/settings.js';
@@ -56,6 +57,9 @@ interface SlashCommandProcessorActions {
   toggleCorgiMode: () => void;
   setExtensionsUpdateState: Dispatch<
     SetStateAction<Map<string, ExtensionUpdateState>>
+  >;
+  setConfirmUpdateExtensionRequest: Dispatch<
+    SetStateAction<ConfirmationRequest | null>
   >;
 }
 
@@ -206,6 +210,8 @@ export const useSlashCommandProcessor = (
         reloadCommands,
         extensionsUpdateState,
         setExtensionsUpdateState: actions.setExtensionsUpdateState,
+        setConfirmUpdateExtensionRequest:
+          actions.setConfirmUpdateExtensionRequest,
       },
       session: {
         stats: session.stats,
