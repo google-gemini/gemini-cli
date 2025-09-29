@@ -129,6 +129,11 @@ export class EconomicNewsTool extends BasePythonTool<EconomicNewsParams, Economi
     );
   }
 
+  protected override requiresConfirmation(_params: EconomicNewsParams): boolean {
+    // Economic news tool only reads news data, no confirmation needed
+    return false;
+  }
+
   protected generatePythonCode(params: EconomicNewsParams): string {
     const { op, category, sources, hours_back, max_articles, sentiment_filter, keywords, countries, search_mode, extract_full_content, sort_by } = params;
 

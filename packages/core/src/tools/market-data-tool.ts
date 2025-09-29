@@ -203,6 +203,11 @@ export class MarketDataTool extends BasePythonTool<MarketDataTool3Params, Market
     );
   }
 
+  protected override requiresConfirmation(_params: MarketDataTool3Params): boolean {
+    // Market data tool only reads market data, no confirmation needed
+    return false;
+  }
+
   protected generatePythonCode(params: MarketDataTool3Params): string {
     const {
       op,

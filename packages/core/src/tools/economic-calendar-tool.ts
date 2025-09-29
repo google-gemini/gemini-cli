@@ -69,6 +69,11 @@ export class EconomicCalendarTool extends BasePythonTool<EconomicCalendarParams,
     );
   }
 
+  protected override requiresConfirmation(_params: EconomicCalendarParams): boolean {
+    // Economic calendar tool only reads economic data, no confirmation needed
+    return false;
+  }
+
   protected generatePythonCode(params: EconomicCalendarParams): string {
     const { op, hours_ahead, countries } = params;
 
