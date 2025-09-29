@@ -600,9 +600,23 @@ export class ShellExecutionService {
    * @param input The string to write to the terminal.
    */
   static writeToPty(pid: number, input: string): void {
+    if (!this.isPtyActive(pid)) {
+      return;
+    }
+
     const activePty = this.activePtys.get(pid);
     if (activePty) {
       activePty.ptyProcess.write(input);
+    }
+  }
+
+  static isPtyActive(pid: number): boolean {
+    try {
+      // process.kill with signal 0 is a way to check for the existence of a process.
+      // It doesn't actually send a signal.
+      return process.kill(pid, 0);
+    } catch (e) {
+      return false;
     }
   }
 
@@ -614,6 +628,10 @@ export class ShellExecutionService {
    * @param rows The new number of rows.
    */
   static resizePty(pid: number, cols: number, rows: number): void {
+    if (!this.isPtyActive(pid)) {
+      return;
+    }
+
     const activePty = this.activePtys.get(pid);
     if (activePty) {
       try {
@@ -638,6 +656,10 @@ export class ShellExecutionService {
    * @param lines The number of lines to scroll.
    */
   static scrollPty(pid: number, lines: number): void {
+    if (!this.isPtyActive(pid)) {
+      return;
+    }
+
     const activePty = this.activePtys.get(pid);
     if (activePty) {
       try {
