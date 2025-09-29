@@ -80,7 +80,7 @@ export interface CustomTheme {
 export const lightTheme: ColorsTheme = {
   type: 'light',
   Background: '#FAFAFA',
-  Foreground: '#3C3C43',
+  Foreground: '',
   LightBlue: '#89BDCD',
   AccentBlue: '#3B82F6',
   AccentPurple: '#8B5CF6',
@@ -98,7 +98,7 @@ export const lightTheme: ColorsTheme = {
 export const darkTheme: ColorsTheme = {
   type: 'dark',
   Background: '#1E1E2E',
-  Foreground: '#CDD6F4',
+  Foreground: '',
   LightBlue: '#ADD8E6',
   AccentBlue: '#89B4FA',
   AccentPurple: '#CBA6F7',

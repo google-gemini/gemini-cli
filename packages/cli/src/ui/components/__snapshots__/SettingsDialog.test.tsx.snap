@@ -18,17 +18,17 @@ exports[`SettingsDialog > Snapshot Tests > should render default state correctly
 │                                                                                                  │
 │   Hide Window Title                                    false                                     │
 │                                                                                                  │
-│   Hide Tips                                            false                                     │
+│   Show Status in Title                                 false                                     │
 │                                                                                                  │
-│   Hide Banner                                          false                                     │
+│   Hide Tips                                            false                                     │
 │                                                                                                  │
 │ ▼                                                                                                │
 │                                                                                                  │
 │                                                                                                  │
 │   Apply To                                                                                       │
-│ ● 1. User Settings                                                                               │
-│   2. Workspace Settings                                                                          │
-│   3. System Settings                                                                             │
+│ ● User Settings                                                                                  │
+│   Workspace Settings                                                                             │
+│   System Settings                                                                                │
 │                                                                                                  │
 │ (Use Enter to select, Tab to change focus)                                                       │
 │                                                                                                  │
@@ -53,17 +53,17 @@ exports[`SettingsDialog > Snapshot Tests > should render focused on scope select
 │                                                                                                  │
 │   Hide Window Title                                    false                                     │
 │                                                                                                  │
-│   Hide Tips                                            false                                     │
+│   Show Status in Title                                 false                                     │
 │                                                                                                  │
-│   Hide Banner                                          false                                     │
+│   Hide Tips                                            false                                     │
 │                                                                                                  │
 │ ▼                                                                                                │
 │                                                                                                  │
 │                                                                                                  │
 │   Apply To                                                                                       │
-│ ● 1. User Settings                                                                               │
-│   2. Workspace Settings                                                                          │
-│   3. System Settings                                                                             │
+│ ● User Settings                                                                                  │
+│   Workspace Settings                                                                             │
+│   System Settings                                                                                │
 │                                                                                                  │
 │ (Use Enter to select, Tab to change focus)                                                       │
 │                                                                                                  │
@@ -88,17 +88,17 @@ exports[`SettingsDialog > Snapshot Tests > should render with accessibility sett
 │                                                                                                  │
 │   Hide Window Title                                    false                                     │
 │                                                                                                  │
-│   Hide Tips                                            false                                     │
+│   Show Status in Title                                 false                                     │
 │                                                                                                  │
-│   Hide Banner                                          false                                     │
+│   Hide Tips                                            false                                     │
 │                                                                                                  │
 │ ▼                                                                                                │
 │                                                                                                  │
 │                                                                                                  │
 │   Apply To                                                                                       │
-│ ● 1. User Settings                                                                               │
-│   2. Workspace Settings                                                                          │
-│   3. System Settings                                                                             │
+│ ● User Settings                                                                                  │
+│   Workspace Settings                                                                             │
+│   System Settings                                                                                │
 │                                                                                                  │
 │ (Use Enter to select, Tab to change focus)                                                       │
 │                                                                                                  │
@@ -123,17 +123,17 @@ exports[`SettingsDialog > Snapshot Tests > should render with all boolean settin
 │                                                                                                  │
 │   Hide Window Title                                    false*                                    │
 │                                                                                                  │
-│   Hide Tips                                            false*                                    │
+│   Show Status in Title                                 false                                     │
 │                                                                                                  │
-│   Hide Banner                                          false                                     │
+│   Hide Tips                                            false*                                    │
 │                                                                                                  │
 │ ▼                                                                                                │
 │                                                                                                  │
 │                                                                                                  │
 │   Apply To                                                                                       │
-│ ● 1. User Settings                                                                               │
-│   2. Workspace Settings                                                                          │
-│   3. System Settings                                                                             │
+│ ● User Settings                                                                                  │
+│   Workspace Settings                                                                             │
+│   System Settings                                                                                │
 │                                                                                                  │
 │ (Use Enter to select, Tab to change focus)                                                       │
 │                                                                                                  │
@@ -158,17 +158,17 @@ exports[`SettingsDialog > Snapshot Tests > should render with different scope se
 │                                                                                                  │
 │   Hide Window Title                                    false                                     │
 │                                                                                                  │
-│   Hide Tips                                            false                                     │
+│   Show Status in Title                                 false                                     │
 │                                                                                                  │
-│   Hide Banner                                          false                                     │
+│   Hide Tips                                            false                                     │
 │                                                                                                  │
 │ ▼                                                                                                │
 │                                                                                                  │
 │                                                                                                  │
 │   Apply To                                                                                       │
-│ ● 1. User Settings                                                                               │
-│   2. Workspace Settings                                                                          │
-│   3. System Settings                                                                             │
+│ ● User Settings                                                                                  │
+│   Workspace Settings                                                                             │
+│   System Settings                                                                                │
 │                                                                                                  │
 │ (Use Enter to select, Tab to change focus)                                                       │
 │                                                                                                  │
@@ -193,17 +193,17 @@ exports[`SettingsDialog > Snapshot Tests > should render with different scope se
 │                                                                                                  │
 │   Hide Window Title                                    false                                     │
 │                                                                                                  │
-│   Hide Tips                                            false                                     │
+│   Show Status in Title                                 false                                     │
 │                                                                                                  │
-│   Hide Banner                                          false                                     │
+│   Hide Tips                                            false                                     │
 │                                                                                                  │
 │ ▼                                                                                                │
 │                                                                                                  │
 │                                                                                                  │
 │   Apply To                                                                                       │
-│ ● 1. User Settings                                                                               │
-│   2. Workspace Settings                                                                          │
-│   3. System Settings                                                                             │
+│ ● User Settings                                                                                  │
+│   Workspace Settings                                                                             │
+│   System Settings                                                                                │
 │                                                                                                  │
 │ (Use Enter to select, Tab to change focus)                                                       │
 │                                                                                                  │
@@ -228,17 +228,17 @@ exports[`SettingsDialog > Snapshot Tests > should render with file filtering set
 │                                                                                                  │
 │   Hide Window Title                                    false                                     │
 │                                                                                                  │
-│   Hide Tips                                            false                                     │
+│   Show Status in Title                                 false                                     │
 │                                                                                                  │
-│   Hide Banner                                          false                                     │
+│   Hide Tips                                            false                                     │
 │                                                                                                  │
 │ ▼                                                                                                │
 │                                                                                                  │
 │                                                                                                  │
 │   Apply To                                                                                       │
-│ ● 1. User Settings                                                                               │
-│   2. Workspace Settings                                                                          │
-│   3. System Settings                                                                             │
+│ ● User Settings                                                                                  │
+│   Workspace Settings                                                                             │
+│   System Settings                                                                                │
 │                                                                                                  │
 │ (Use Enter to select, Tab to change focus)                                                       │
 │                                                                                                  │
@@ -263,17 +263,17 @@ exports[`SettingsDialog > Snapshot Tests > should render with mixed boolean and 
 │                                                                                                  │
 │   Hide Window Title                                    false*                                    │
 │                                                                                                  │
-│   Hide Tips                                            false                                     │
+│   Show Status in Title                                 false                                     │
 │                                                                                                  │
-│   Hide Banner                                          false                                     │
+│   Hide Tips                                            false                                     │
 │                                                                                                  │
 │ ▼                                                                                                │
 │                                                                                                  │
 │                                                                                                  │
 │   Apply To                                                                                       │
-│ ● 1. User Settings                                                                               │
-│   2. Workspace Settings                                                                          │
-│   3. System Settings                                                                             │
+│ ● User Settings                                                                                  │
+│   Workspace Settings                                                                             │
+│   System Settings                                                                                │
 │                                                                                                  │
 │ (Use Enter to select, Tab to change focus)                                                       │
 │                                                                                                  │
@@ -298,17 +298,17 @@ exports[`SettingsDialog > Snapshot Tests > should render with tools and security
 │                                                                                                  │
 │   Hide Window Title                                    false                                     │
 │                                                                                                  │
-│   Hide Tips                                            false                                     │
+│   Show Status in Title                                 false                                     │
 │                                                                                                  │
-│   Hide Banner                                          false                                     │
+│   Hide Tips                                            false                                     │
 │                                                                                                  │
 │ ▼                                                                                                │
 │                                                                                                  │
 │                                                                                                  │
 │   Apply To                                                                                       │
-│ ● 1. User Settings                                                                               │
-│   2. Workspace Settings                                                                          │
-│   3. System Settings                                                                             │
+│ ● User Settings                                                                                  │
+│   Workspace Settings                                                                             │
+│   System Settings                                                                                │
 │                                                                                                  │
 │ (Use Enter to select, Tab to change focus)                                                       │
 │                                                                                                  │
@@ -333,17 +333,17 @@ exports[`SettingsDialog > Snapshot Tests > should render with various boolean se
 │                                                                                                  │
 │   Hide Window Title                                    true*                                     │
 │                                                                                                  │
-│   Hide Tips                                            true*                                     │
+│   Show Status in Title                                 false                                     │
 │                                                                                                  │
-│   Hide Banner                                          false                                     │
+│   Hide Tips                                            true*                                     │
 │                                                                                                  │
 │ ▼                                                                                                │
 │                                                                                                  │
 │                                                                                                  │
 │   Apply To                                                                                       │
-│ ● 1. User Settings                                                                               │
-│   2. Workspace Settings                                                                          │
-│   3. System Settings                                                                             │
+│ ● User Settings                                                                                  │
+│   Workspace Settings                                                                             │
+│   System Settings                                                                                │
 │                                                                                                  │
 │ (Use Enter to select, Tab to change focus)                                                       │
 │                                                                                                  │

@@ -28,6 +28,16 @@ vi.mock('../ui/commands/ideCommand.js', async () => {
 vi.mock('../ui/commands/restoreCommand.js', () => ({
   restoreCommand: vi.fn(),
 }));
+vi.mock('../ui/commands/permissionsCommand.js', async () => {
+  const { CommandKind } = await import('../ui/commands/types.js');
+  return {
+    permissionsCommand: {
+      name: 'permissions',
+      description: 'Permissions command',
+      kind: CommandKind.BUILT_IN,
+    },
+  };
+});
 
 import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
 import { BuiltinCommandLoader } from './BuiltinCommandLoader.js';
@@ -49,6 +59,9 @@ vi.mock('../ui/commands/extensionsCommand.js', () => ({
 }));
 vi.mock('../ui/commands/helpCommand.js', () => ({ helpCommand: {} }));
 vi.mock('../ui/commands/memoryCommand.js', () => ({ memoryCommand: {} }));
+vi.mock('../ui/commands/modelCommand.js', () => ({
+  modelCommand: { name: 'model' },
+}));
 vi.mock('../ui/commands/privacyCommand.js', () => ({ privacyCommand: {} }));
 vi.mock('../ui/commands/quitCommand.js', () => ({ quitCommand: {} }));
 vi.mock('../ui/commands/statsCommand.js', () => ({ statsCommand: {} }));
@@ -69,7 +82,10 @@ describe('BuiltinCommandLoader', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mockConfig = { some: 'config' } as unknown as Config;
+    mockConfig = {
+      getFolderTrust: vi.fn().mockReturnValue(true),
+      getUseModelRouter: () => false,
+    } as unknown as Config;
 
     restoreCommandMock.mockReturnValue({
       name: 'restore',
@@ -122,5 +138,42 @@ describe('BuiltinCommandLoader', () => {
 
     const mcpCmd = commands.find((c) => c.name === 'mcp');
     expect(mcpCmd).toBeDefined();
+  });
+
+  it('should include permissions command when folder trust is enabled', async () => {
+    const loader = new BuiltinCommandLoader(mockConfig);
+    const commands = await loader.loadCommands(new AbortController().signal);
+    const permissionsCmd = commands.find((c) => c.name === 'permissions');
+    expect(permissionsCmd).toBeDefined();
+  });
+
+  it('should exclude permissions command when folder trust is disabled', async () => {
+    (mockConfig.getFolderTrust as Mock).mockReturnValue(false);
+    const loader = new BuiltinCommandLoader(mockConfig);
+    const commands = await loader.loadCommands(new AbortController().signal);
+    const permissionsCmd = commands.find((c) => c.name === 'permissions');
+    expect(permissionsCmd).toBeUndefined();
+  });
+
+  it('should include modelCommand when getUseModelRouter is true', async () => {
+    const mockConfigWithModelRouter = {
+      ...mockConfig,
+      getUseModelRouter: () => true,
+    } as unknown as Config;
+    const loader = new BuiltinCommandLoader(mockConfigWithModelRouter);
+    const commands = await loader.loadCommands(new AbortController().signal);
+    const modelCmd = commands.find((c) => c.name === 'model');
+    expect(modelCmd).toBeDefined();
+  });
+
+  it('should not include modelCommand when getUseModelRouter is false', async () => {
+    const mockConfigWithoutModelRouter = {
+      ...mockConfig,
+      getUseModelRouter: () => false,
+    } as unknown as Config;
+    const loader = new BuiltinCommandLoader(mockConfigWithoutModelRouter);
+    const commands = await loader.loadCommands(new AbortController().signal);
+    const modelCmd = commands.find((c) => c.name === 'model');
+    expect(modelCmd).toBeUndefined();
   });
 });
