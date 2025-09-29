@@ -162,6 +162,12 @@ const saveCommand: SlashCommand = {
       };
     }
   },
+  completion: async (context, partialArg) => {
+    const chatDetails = await getSavedChatTags(context, true);
+    return chatDetails
+      .map((chat) => chat.name)
+      .filter((name) => name.startsWith(partialArg));
+  },
 };
 
 const resumeCommand: SlashCommand = {
