@@ -5,7 +5,7 @@
  */
 
 import { expect, describe, it, beforeEach, afterEach } from 'vitest';
-import { TestRig, type, waitForText } from './test-helper.js';
+import { TestRig, type } from './test-helper.js';
 
 describe('Interactive Mode', () => {
   let rig: TestRig;
@@ -26,11 +26,9 @@ describe('Interactive Mode', () => {
     let fullOutput = '';
     ptyProcess.onData((data) => (fullOutput += data));
 
-    const authDialogAppeared = await waitForText(
-      rig,
-      fullOutput,
+    const authDialogAppeared = await rig.waitForText(
       'How would you like to authenticate',
-      15000,
+      5000,
     );
 
     // Press "Enter" to select the default auth option if auth dialog came up
@@ -39,12 +37,7 @@ describe('Interactive Mode', () => {
     }
 
     // Wait for the app to be ready
-    const isReady = await waitForText(
-      rig,
-      fullOutput,
-      'Type your message',
-      15000,
-    );
+    const isReady = await rig.waitForText('Type your message', 15000);
     expect(isReady, 'CLI did not start up in interactive mode correctly').toBe(
       true,
     );
@@ -55,7 +48,7 @@ describe('Interactive Mode', () => {
     await type(ptyProcess, longPrompt);
     await type(ptyProcess, '\r');
 
-    await waitForText(rig, fullOutput, 'einstein', 25000);
+    await rig.waitForText('einstein', 25000);
 
     await type(ptyProcess, '/compress');
     // Add a small delay to allow React to re-render the command list.
@@ -79,11 +72,9 @@ describe('Interactive Mode', () => {
     let fullOutput = '';
     ptyProcess.onData((data) => (fullOutput += data));
 
-    const authDialogAppeared = await waitForText(
-      rig,
-      fullOutput,
+    const authDialogAppeared = await rig.waitForText(
       'How would you like to authenticate',
-      15000,
+      5000,
     );
 
     // 2. Press "Enter" to select the default auth option if auth dialog came up
@@ -92,13 +83,7 @@ describe('Interactive Mode', () => {
     }
 
     // Wait for the app to be ready
-    const isReady = await waitForText(
-      rig,
-      fullOutput,
-      'Type your message',
-      25000,
-    );
-
+    const isReady = await rig.waitForText('Type your message', 25000);
     expect(isReady, 'CLI did not start up in interactive mode correctly').toBe(
       true,
     );
@@ -113,9 +98,7 @@ describe('Interactive Mode', () => {
     );
     expect(foundEvent).toBe(true);
 
-    const compressionFailed = await waitForText(
-      rig,
-      fullOutput,
+    const compressionFailed = await rig.waitForText(
       'compression was not beneficial',
       25000,
     );
