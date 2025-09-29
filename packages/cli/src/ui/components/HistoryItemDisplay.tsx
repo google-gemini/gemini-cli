@@ -26,6 +26,9 @@ import { SessionSummaryDisplay } from './SessionSummaryDisplay.js';
 import { Help } from './Help.js';
 import type { SlashCommand } from '../commands/types.js';
 import { ExtensionsList } from './views/ExtensionsList.js';
+import { getMCPServerStatus } from '@google/gemini-cli-core';
+import { ToolsList } from './views/ToolsList.js';
+import { McpStatus } from './views/McpStatus.js';
 
 interface HistoryItemDisplayProps {
   item: HistoryItem;
@@ -127,6 +130,16 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
         <CompressionMessage compression={itemForDisplay.compression} />
       )}
       {itemForDisplay.type === 'extensions_list' && <ExtensionsList />}
+      {itemForDisplay.type === 'tools_list' && (
+        <ToolsList
+          terminalWidth={terminalWidth}
+          tools={itemForDisplay.tools}
+          showDescriptions={itemForDisplay.showDescriptions}
+        />
+      )}
+      {itemForDisplay.type === 'mcp_status' && (
+        <McpStatus {...itemForDisplay} serverStatus={getMCPServerStatus} />
+      )}
     </Box>
   );
 };
