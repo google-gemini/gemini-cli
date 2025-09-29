@@ -174,11 +174,9 @@ Here is a paragraph.
 - List item 1
 - List item 2
 
-\
-\
+\`\`\`
 some code
-\
-\
+\`\`\`
 
 Another paragraph.
 `.replace(/\n/g, eol);
