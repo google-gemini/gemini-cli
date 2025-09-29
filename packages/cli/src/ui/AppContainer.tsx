@@ -42,6 +42,12 @@ import {
   AuthType,
   clearCachedCredentialFile,
   ShellExecutionService,
+  getIdeInstaller,
+  IDEConnectionStatus,
+  logIdeConnection,
+  IdeConnectionEvent,
+  IdeConnectionType,
+  GEMINI_CLI_COMPANION_EXTENSION_NAME,
 } from '@google/gemini-cli-core';
 import { validateAuthMethod } from '../config/auth.js';
 import { loadHierarchicalGeminiMemory } from '../config/config.js';
@@ -93,6 +99,20 @@ import { ShellFocusContext } from './contexts/ShellFocusContext.js';
 
 const CTRL_EXIT_PROMPT_DURATION_MS = 1000;
 
+async function setIdeModeAndSyncConnection(
+  config: Config,
+  value: boolean,
+): Promise<void> {
+  config.setIdeMode(value);
+  const ideClient = await IdeClient.getInstance();
+  if (value) {
+    await ideClient.connect();
+    logIdeConnection(config, new IdeConnectionEvent(IdeConnectionType.SESSION));
+  } else {
+    await ideClient.disconnect();
+  }
+}
+
 function isToolExecuting(pendingHistoryItems: HistoryItemWithoutId[]) {
   return pendingHistoryItems.some((item) => {
     if (item && item.type === 'tool_group') {
@@ -134,6 +154,8 @@ export const AppContainer = (props: AppContainerProps) => {
     HistoryItem[] | null
   >(null);
   const [showPrivacyNotice, setShowPrivacyNotice] = useState<boolean>(false);
+  const [isIdeIntegrationDialogOpen, setIsIdeIntegrationDialogOpen] =
+    useState<boolean>(false);
   const [themeError, setThemeError] = useState<string | null>(
     initializationResult.themeError,
   );
@@ -446,6 +468,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       openAuthDialog: () => setAuthState(AuthState.Updating),
       openThemeDialog,
       openEditorDialog,
+      openIdeIntegrationDialog: () => setIsIdeIntegrationDialogOpen(true),
       openPrivacyNotice: () => setShowPrivacyNotice(true),
       openSettingsDialog,
       openModelDialog,
@@ -893,6 +916,259 @@ Logging in with Google... Please restart Gemini CLI to continue.
     [handleSlashCommand],
   );
 
+  const uiActions: UIActions = useMemo(
+    () => ({
+      handleThemeSelect,
+      handleThemeHighlight,
+      handleAuthSelect,
+      setAuthState,
+      onAuthError,
+      handleEditorSelect,
+      exitEditorDialog,
+      handleIdeIntegrationAction: async (action: string) => {
+        const ideClient = await IdeClient.getInstance();
+        const currentIDE = ideClient.getCurrentIde();
+
+        setIsIdeIntegrationDialogOpen(false);
+
+        switch (action) {
+          case 'enable': {
+            settings.setValue(SettingScope.User, 'ide.enabled', true);
+            await setIdeModeAndSyncConnection(config, true);
+
+            // Check final status after enabling
+            const enabledStatus = ideClient.getConnectionStatus();
+            let enableMessage = '';
+            if (enabledStatus.status === IDEConnectionStatus.Connected) {
+              enableMessage = `🟢 Connected: IDE integration enabled and connected to ${ideClient.getDetectedIdeDisplayName()}.`;
+            } else {
+              enableMessage = `🟡 IDE integration enabled but not yet connected. ${enabledStatus.details || 'Attempting to connect...'}`;
+            }
+
+            historyManager.addItem(
+              {
+                type: MessageType.INFO,
+                text: enableMessage,
+              },
+              Date.now(),
+            );
+            break;
+          }
+
+          case 'disable':
+            settings.setValue(SettingScope.User, 'ide.enabled', false);
+            await setIdeModeAndSyncConnection(config, false);
+            historyManager.addItem(
+              {
+                type: MessageType.INFO,
+                text: '🔴 Disconnected: IDE integration disabled. To enable it, run /ide integration and select enable.',
+              },
+              Date.now(),
+            );
+            break;
+
+          case 'install': {
+            if (!currentIDE || !ideClient.getDetectedIdeDisplayName()) {
+              historyManager.addItem(
+                {
+                  type: MessageType.ERROR,
+                  text: `IDE integration is not supported in your current environment.`,
+                },
+                Date.now(),
+              );
+              return;
+            }
+
+            const installer = getIdeInstaller(currentIDE);
+            if (!installer) {
+              historyManager.addItem(
+                {
+                  type: MessageType.ERROR,
+                  text: `No installer is available for ${ideClient.getDetectedIdeDisplayName()}. Please install the '${GEMINI_CLI_COMPANION_EXTENSION_NAME}' extension manually from the marketplace.`,
+                },
+                Date.now(),
+              );
+              return;
+            }
+
+            historyManager.addItem(
+              {
+                type: MessageType.INFO,
+                text: `Installing IDE companion...`,
+              },
+              Date.now(),
+            );
+
+            try {
+              const result = await installer.install();
+              historyManager.addItem(
+                {
+                  type: result.success ? MessageType.INFO : MessageType.ERROR,
+                  text: result.message,
+                },
+                Date.now(),
+              );
+
+              if (result.success) {
+                settings.setValue(SettingScope.User, 'ide.enabled', true);
+
+                // Poll for up to 5 seconds for the extension to activate
+                for (let i = 0; i < 10; i++) {
+                  await setIdeModeAndSyncConnection(config, true);
+                  if (
+                    ideClient.getConnectionStatus().status ===
+                    IDEConnectionStatus.Connected
+                  ) {
+                    break;
+                  }
+                  await new Promise((resolve) => setTimeout(resolve, 500));
+                }
+
+                const connection = ideClient.getConnectionStatus();
+                if (connection.status === IDEConnectionStatus.Connected) {
+                  historyManager.addItem(
+                    {
+                      type: MessageType.INFO,
+                      text: `🟢 Connected to ${ideClient.getDetectedIdeDisplayName()}`,
+                    },
+                    Date.now(),
+                  );
+                } else {
+                  historyManager.addItem(
+                    {
+                      type: MessageType.ERROR,
+                      text: `Failed to automatically enable IDE integration. To fix this, run the CLI in a new terminal window.`,
+                    },
+                    Date.now(),
+                  );
+                }
+              }
+            } catch (error) {
+              historyManager.addItem(
+                {
+                  type: MessageType.ERROR,
+                  text: `Installation failed: ${error instanceof Error ? error.message : String(error)}`,
+                },
+                Date.now(),
+              );
+            }
+            break;
+          }
+
+          case 'status': {
+            // Send detailed status information as a message
+            const { status: currentStatus } = ideClient.getConnectionStatus();
+            let statusMessage = '';
+
+            switch (currentStatus) {
+              case IDEConnectionStatus.Connected: {
+                statusMessage = `🟢 Connected to ${ideClient.getDetectedIdeDisplayName()}. `;
+                const context = ideContextStore.get();
+                const openFiles = context?.workspaceState?.openFiles;
+                if (openFiles && openFiles.length > 0) {
+                  // Add the full file list like the original status command
+                  const basenameCounts = new Map<string, number>();
+                  for (const file of openFiles) {
+                    const basename = file.path.split('/').pop() || file.path;
+                    basenameCounts.set(
+                      basename,
+                      (basenameCounts.get(basename) || 0) + 1,
+                    );
+                  }
+
+                  const fileList = openFiles
+                    .map((file) => {
+                      const basename = file.path.split('/').pop() || file.path;
+                      const isDuplicate =
+                        (basenameCounts.get(basename) || 0) > 1;
+                      const parentDir =
+                        file.path.split('/').slice(-2, -1)[0] || '';
+                      const displayName = isDuplicate
+                        ? `${basename} (/${parentDir})`
+                        : basename;
+
+                      return `  - ${displayName}${file.isActive ? ' (active)' : ''}`;
+                    })
+                    .join('\n');
+
+                  statusMessage += `\n\nOpen files:\n${fileList}\n\n(Note: The file list is limited to a number of recently accessed files within your workspace and only includes local files on disk)`;
+                }
+                break;
+              }
+              case IDEConnectionStatus.Connecting:
+                statusMessage = `🟡 Connecting to IDE companion extension...`;
+                break;
+              default: {
+                const connection = ideClient.getConnectionStatus();
+                statusMessage = connection?.details
+                  ? `🔴 Disconnected: ${connection.details}`
+                  : `🔴 Disconnected: IDE companion extension is not connected`;
+                break;
+              }
+            }
+
+            historyManager.addItem(
+              {
+                type: MessageType.INFO,
+                text: statusMessage,
+              },
+              Date.now(),
+            );
+            break;
+          }
+
+          default:
+            console.warn('Unknown IDE integration action:', action);
+        }
+      },
+      exitIdeIntegrationDialog: () => setIsIdeIntegrationDialogOpen(false),
+      exitPrivacyNotice: () => setShowPrivacyNotice(false),
+      closeSettingsDialog,
+      closeModelDialog,
+      closePermissionsDialog,
+      setShellModeActive,
+      vimHandleInput,
+      handleIdePromptComplete,
+      handleFolderTrustSelect,
+      setConstrainHeight,
+      onEscapePromptChange: handleEscapePromptChange,
+      refreshStatic,
+      handleFinalSubmit,
+      handleClearScreen,
+      onWorkspaceMigrationDialogOpen,
+      onWorkspaceMigrationDialogClose,
+      handleProQuotaChoice,
+    }),
+    [
+      handleThemeSelect,
+      handleThemeHighlight,
+      handleAuthSelect,
+      setAuthState,
+      onAuthError,
+      handleEditorSelect,
+      exitEditorDialog,
+      setIsIdeIntegrationDialogOpen,
+      closeSettingsDialog,
+      closeModelDialog,
+      closePermissionsDialog,
+      setShellModeActive,
+      vimHandleInput,
+      handleIdePromptComplete,
+      handleFolderTrustSelect,
+      setConstrainHeight,
+      handleEscapePromptChange,
+      refreshStatic,
+      handleFinalSubmit,
+      handleClearScreen,
+      onWorkspaceMigrationDialogOpen,
+      onWorkspaceMigrationDialogClose,
+      handleProQuotaChoice,
+      config,
+      historyManager,
+      settings,
+    ],
+  );
+
   const handleGlobalKeypress = useCallback(
     (key: Key) => {
       // Debug log keystrokes if enabled
@@ -940,12 +1216,9 @@ Logging in with Google... Please restart Gemini CLI to continue.
         if (Object.keys(mcpServers || {}).length > 0) {
           handleSlashCommand(newValue ? '/mcp desc' : '/mcp nodesc');
         }
-      } else if (
-        keyMatchers[Command.TOGGLE_IDE_CONTEXT_DETAIL](key) &&
-        config.getIdeMode() &&
-        ideContextState
-      ) {
-        handleSlashCommand('/ide status');
+      } else if (keyMatchers[Command.TOGGLE_IDE_CONTEXT_DETAIL](key)) {
+        // Reuse the existing status action from the IDE integration dialog
+        uiActions.handleIdeIntegrationAction('status');
       } else if (
         keyMatchers[Command.SHOW_MORE_LINES](key) &&
         !enteringConstrainHeightMode
@@ -964,7 +1237,6 @@ Logging in with Google... Please restart Gemini CLI to continue.
       showToolDescriptions,
       setShowToolDescriptions,
       config,
-      ideContextState,
       handleExit,
       ctrlCPressedOnce,
       setCtrlCPressedOnce,
@@ -978,6 +1250,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       activePtyId,
       embeddedShellFocused,
       settings.merged.general?.debugKeystrokeLogging,
+      uiActions,
     ],
   );
 
@@ -1052,6 +1325,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
     isAuthenticating ||
     isAuthDialogOpen ||
     isEditorDialogOpen ||
+    isIdeIntegrationDialogOpen ||
     showPrivacyNotice ||
     showIdeRestartPrompt ||
     !!proQuotaRequest;
@@ -1073,6 +1347,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       isAuthDialogOpen,
       editorError,
       isEditorDialogOpen,
+      isIdeIntegrationDialogOpen,
       showPrivacyNotice,
       corgiMode,
       debugMessage,
@@ -1152,6 +1427,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       isAuthDialogOpen,
       editorError,
       isEditorDialogOpen,
+      isIdeIntegrationDialogOpen,
       showPrivacyNotice,
       corgiMode,
       debugMessage,
@@ -1222,58 +1498,6 @@ Logging in with Google... Please restart Gemini CLI to continue.
       activePtyId,
       historyManager,
       embeddedShellFocused,
-    ],
-  );
-
-  const uiActions: UIActions = useMemo(
-    () => ({
-      handleThemeSelect,
-      handleThemeHighlight,
-      handleAuthSelect,
-      setAuthState,
-      onAuthError,
-      handleEditorSelect,
-      exitEditorDialog,
-      exitPrivacyNotice: () => setShowPrivacyNotice(false),
-      closeSettingsDialog,
-      closeModelDialog,
-      closePermissionsDialog,
-      setShellModeActive,
-      vimHandleInput,
-      handleIdePromptComplete,
-      handleFolderTrustSelect,
-      setConstrainHeight,
-      onEscapePromptChange: handleEscapePromptChange,
-      refreshStatic,
-      handleFinalSubmit,
-      handleClearScreen,
-      onWorkspaceMigrationDialogOpen,
-      onWorkspaceMigrationDialogClose,
-      handleProQuotaChoice,
-    }),
-    [
-      handleThemeSelect,
-      handleThemeHighlight,
-      handleAuthSelect,
-      setAuthState,
-      onAuthError,
-      handleEditorSelect,
-      exitEditorDialog,
-      closeSettingsDialog,
-      closeModelDialog,
-      closePermissionsDialog,
-      setShellModeActive,
-      vimHandleInput,
-      handleIdePromptComplete,
-      handleFolderTrustSelect,
-      setConstrainHeight,
-      handleEscapePromptChange,
-      refreshStatic,
-      handleFinalSubmit,
-      handleClearScreen,
-      onWorkspaceMigrationDialogOpen,
-      onWorkspaceMigrationDialogClose,
-      handleProQuotaChoice,
     ],
   );
 

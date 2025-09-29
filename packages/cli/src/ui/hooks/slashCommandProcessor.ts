@@ -48,6 +48,7 @@ interface SlashCommandProcessorActions {
   openAuthDialog: () => void;
   openThemeDialog: () => void;
   openEditorDialog: () => void;
+  openIdeIntegrationDialog: () => void;
   openPrivacyNotice: () => void;
   openSettingsDialog: () => void;
   openModelDialog: () => void;
@@ -372,6 +373,9 @@ export const useSlashCommandProcessor = (
                       return { type: 'handled' };
                     case 'editor':
                       actions.openEditorDialog();
+                      return { type: 'handled' };
+                    case 'ide-integration':
+                      actions.openIdeIntegrationDialog();
                       return { type: 'handled' };
                     case 'privacy':
                       actions.openPrivacyNotice();

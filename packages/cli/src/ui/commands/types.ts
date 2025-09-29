@@ -121,7 +121,8 @@ export interface OpenDialogActionReturn {
     | 'privacy'
     | 'settings'
     | 'model'
-    | 'permissions';
+    | 'permissions'
+    | 'ide-integration';
 }
 
 /**
