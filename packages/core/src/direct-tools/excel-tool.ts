@@ -29,6 +29,7 @@ export interface ExcelToolResult {
   apps?: ExcelAppInfo[];
   workbooks?: WorkbookInfo[];
   worksheets?: WorksheetInfo[];
+  selection?: string;
 }
 
 /**
@@ -222,6 +223,71 @@ try:
                 "success": True,
                 "workbook": target_workbook,
                 "worksheets": worksheets
+            }
+
+    print(json.dumps(result), flush=True)
+
+except Exception as e:
+    result = {
+        "success": False,
+        "error": str(e)
+    }
+    print(json.dumps(result), flush=True)
+`;
+
+    return this.executePythonCode(pythonCode);
+  }
+
+  /**
+   * Get the current selection in the specified workbook
+   */
+  async getSelection(workbookName: string): Promise<ExcelToolResult> {
+    const pythonCode = `
+import xlwings as xw
+import json
+
+try:
+    workbook_name = "${workbookName.replace(/"/g, '\\"')}"
+
+    # Find the workbook
+    workbook = None
+    for app in xw.apps:
+        for wb in app.books:
+            if wb.name == workbook_name:
+                workbook = wb
+                break
+        if workbook:
+            break
+
+    if not workbook:
+        result = {
+            "success": False,
+            "error": f"Workbook '{workbook_name}' not found"
+        }
+    else:
+        # Get the active sheet and selection
+        try:
+            active_sheet = workbook.app.selection.sheet
+            selection = workbook.app.selection
+
+            # Get the address of the selection
+            address = selection.address
+
+            # Get the full path of the workbook
+            workbook_path = workbook.fullname  # This gives the complete file path
+            sheet_name = active_sheet.name
+
+            # Format: full_path!sheet_name!address
+            full_address = f"{workbook_path}!{sheet_name}!{address}"
+
+            result = {
+                "success": True,
+                "selection": full_address
+            }
+        except Exception as e:
+            result = {
+                "success": False,
+                "error": f"Failed to get selection: {str(e)}"
             }
 
     print(json.dumps(result), flush=True)

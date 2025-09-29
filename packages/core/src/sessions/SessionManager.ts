@@ -28,6 +28,7 @@ export interface SessionInfo {
   title: string;
   messageCount: number;
   lastUpdated: Date;
+  roleId?: string;
 }
 
 export interface SessionManagerOptions {
@@ -165,17 +166,19 @@ export class SessionManager {
   /**
    * Create a new session
    */
-  createSession(sessionId: string, title: string = 'New Chat'): void {
+  createSession(sessionId: string, title: string = 'New Chat', roleId?: string): void {
     this.ensureInitialized();
-    console.log(`[SessionManager] Creating session: ${sessionId}`);
-    
+    console.log(`[SessionManager] Creating session: ${sessionId} with roleId: ${roleId}`);
+
     const newSession: SessionData = {
       id: sessionId,
       title,
       lastUpdated: new Date(),
       createdAt: new Date(),
       conversationHistory: [],
-      metadata: {}
+      metadata: {
+        roleId
+      }
     };
     
     this.sessions.set(sessionId, newSession);
@@ -266,11 +269,12 @@ export class SessionManager {
     const sessionsInfo = Array.from(this.sessions.values()).map(session => ({
       id: session.id,
       title: session.title,
-      messageCount: session.conversationHistory.filter(msg => 
-        !msg.content.startsWith('Tool response:') && 
+      messageCount: session.conversationHistory.filter(msg =>
+        !msg.content.startsWith('Tool response:') &&
         !msg.content.startsWith('Tool execution completed successfully')
       ).length, // Count display messages only
-      lastUpdated: session.lastUpdated
+      lastUpdated: session.lastUpdated,
+      roleId: session.metadata?.roleId
     }));
     
     // Sort by lastUpdated (most recent first)
@@ -303,6 +307,14 @@ export class SessionManager {
       session.lastUpdated = new Date();
       this.saveSession(session);
     }
+  }
+
+  /**
+   * Set session role
+   */
+  setSessionRole(sessionId: string, roleId: string): void {
+    console.log(`[SessionManager] Setting role ${roleId} for session ${sessionId}`);
+    this.updateSessionMetadata(sessionId, { roleId });
   }
 
   /**

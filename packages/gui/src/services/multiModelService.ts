@@ -51,14 +51,15 @@ interface ElectronAPI {
     updateCustomTemplate: (id: string, updates: Partial<Omit<PresetTemplate, 'id' | 'isBuiltin'>>) => Promise<void>;
     deleteCustomTemplate: (id: string) => Promise<void>;
     // Session management
-    createSession: (sessionId: string, title?: string) => Promise<void>;
+    createSession: (sessionId: string, title?: string, roleId?: string) => Promise<void>;
     switchSession: (sessionId: string) => Promise<void>;
     deleteSession: (sessionId: string) => Promise<void>;
     deleteAllSessions: () => Promise<void>;
     getCurrentSessionId: () => Promise<string | null>;
     getDisplayMessages: (sessionId?: string) => Promise<UniversalMessage[]>;
-    getSessionsInfo: () => Promise<Array<{id: string, title: string, messageCount: number, lastUpdated: Date}>>;
+    getSessionsInfo: () => Promise<Array<{id: string, title: string, messageCount: number, lastUpdated: Date, roleId?: string}>>;
     updateSessionTitle: (sessionId: string, newTitle: string) => Promise<void>;
+    setSessionRole: (sessionId: string, roleId: string) => Promise<void>;
     // Tool confirmation
     onToolConfirmationRequest: (callback: (event: unknown, data: { streamId: string; confirmationDetails: ToolCallConfirmationDetails }) => void) => () => void;
     sendToolConfirmationResponse: (outcome: string) => Promise<{ success: boolean }>;
@@ -72,7 +73,7 @@ interface ElectronAPI {
     getApprovalMode: () => Promise<'default' | 'autoEdit' | 'yolo'>;
     setApprovalMode: (mode: 'default' | 'autoEdit' | 'yolo') => Promise<void>;
     // Direct Excel tool calls
-    callExcelTool: (operation: string, params?: Record<string, unknown>) => Promise<{ success: boolean; data?: unknown; error?: string; workbooks?: Array<{name: string, saved: boolean}>; worksheets?: Array<{index: number, name: string}>; apps?: unknown[] }>;
+    callExcelTool: (operation: string, params?: Record<string, unknown>) => Promise<{ success: boolean; data?: unknown; error?: string; workbooks?: Array<{name: string, saved: boolean}>; worksheets?: Array<{index: number, name: string}>; apps?: unknown[]; selection?: string }>;
   };
 }
 
@@ -517,12 +518,12 @@ class MultiModelService {
   }
 
   // Session management methods
-  async createSession(sessionId: string, title?: string): Promise<void> {
+  async createSession(sessionId: string, title?: string, roleId?: string): Promise<void> {
     if (!this.initialized) {
       throw new Error('MultiModelService not initialized');
     }
 
-    await this.api.createSession(sessionId, title);
+    await this.api.createSession(sessionId, title, roleId);
   }
 
   async switchSession(sessionId: string): Promise<void> {
@@ -565,7 +566,7 @@ class MultiModelService {
     return await this.api.getDisplayMessages(sessionId);
   }
 
-  async getSessionsInfo(): Promise<Array<{id: string, title: string, messageCount: number, lastUpdated: Date}>> {
+  async getSessionsInfo(): Promise<Array<{id: string, title: string, messageCount: number, lastUpdated: Date, roleId?: string}>> {
     if (!this.initialized) {
       return [];
     }
@@ -579,6 +580,14 @@ class MultiModelService {
     }
 
     await this.api.updateSessionTitle(sessionId, newTitle);
+  }
+
+  async setSessionRole(sessionId: string, roleId: string): Promise<void> {
+    if (!this.initialized) {
+      throw new Error('MultiModelService not initialized');
+    }
+
+    await this.api.setSessionRole(sessionId, roleId);
   }
 
   // OAuth authentication methods
@@ -702,6 +711,34 @@ class MultiModelService {
       return {
         success: false,
         worksheets: [],
+        error: error instanceof Error ? error.message : 'Unknown error'
+      };
+    }
+  }
+
+  async getExcelSelection(workbook: string): Promise<{ success: boolean; selection?: string; error?: string }> {
+    if (!this.initialized) {
+      throw new Error('MultiModelService not initialized');
+    }
+
+    try {
+      const result = await this.api.callExcelTool('getSelection', { workbookName: workbook });
+
+      if (result.success && result.selection) {
+        return {
+          success: true,
+          selection: result.selection
+        };
+      }
+
+      return {
+        success: false,
+        error: result.error || 'Failed to get selection from Excel'
+      };
+    } catch (error) {
+      console.error('Error getting Excel selection:', error);
+      return {
+        success: false,
         error: error instanceof Error ? error.message : 'Unknown error'
       };
     }
