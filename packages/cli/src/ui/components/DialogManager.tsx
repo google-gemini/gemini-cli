@@ -9,7 +9,7 @@ import { IdeIntegrationNudge } from '../IdeIntegrationNudge.js';
 import { LoopDetectionConfirmation } from './LoopDetectionConfirmation.js';
 import { FolderTrustDialog } from './FolderTrustDialog.js';
 import { ShellConfirmationDialog } from './ShellConfirmationDialog.js';
-import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
+import { ConsentPrompt } from './ConsentPrompt.js';
 import { ThemeDialog } from './ThemeDialog.js';
 import { SettingsDialog } from './SettingsDialog.js';
 import { AuthInProgress } from '../auth/AuthInProgress.js';
@@ -31,10 +31,14 @@ import { IdeTrustChangeDialog } from './IdeTrustChangeDialog.js';
 
 interface DialogManagerProps {
   addItem: UseHistoryManagerReturn['addItem'];
+  terminalWidth: number;
 }
 
 // Props for DialogManager
-export const DialogManager = ({ addItem }: DialogManagerProps) => {
+export const DialogManager = ({
+  addItem,
+  terminalWidth,
+}: DialogManagerProps) => {
   const config = useConfig();
   const settings = useSettings();
 
@@ -94,20 +98,21 @@ export const DialogManager = ({ addItem }: DialogManagerProps) => {
   }
   if (uiState.confirmationRequest) {
     return (
-      <Box flexDirection="column">
-        {uiState.confirmationRequest.prompt}
-        <Box paddingY={1}>
-          <RadioButtonSelect
-            items={[
-              { label: 'Yes', value: true, key: 'Yes' },
-              { label: 'No', value: false, key: 'No' },
-            ]}
-            onSelect={(value: boolean) => {
-              uiState.confirmationRequest!.onConfirm(value);
-            }}
-          />
-        </Box>
-      </Box>
+      <ConsentPrompt
+        prompt={uiState.confirmationRequest.prompt}
+        onConfirm={uiState.confirmationRequest.onConfirm}
+        terminalWidth={terminalWidth}
+      />
+    );
+  }
+  if (uiState.confirmUpdateExtensionRequests.length > 0) {
+    const request = uiState.confirmUpdateExtensionRequests[0];
+    return (
+      <ConsentPrompt
+        prompt={request.prompt}
+        onConfirm={request.onConfirm}
+        terminalWidth={terminalWidth}
+      />
     );
   }
   if (uiState.isThemeDialogOpen) {

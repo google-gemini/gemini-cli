@@ -25,5 +25,6 @@ export function createNonInteractiveUI(): CommandContext['ui'] {
     reloadCommands: () => {},
     extensionsUpdateState: new Map(),
     setExtensionsUpdateState: (_updateState) => {},
+    addConfirmUpdateExtensionRequest: (_request) => {},
   };
 }

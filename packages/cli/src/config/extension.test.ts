@@ -898,8 +898,8 @@ describe('extension tests', () => {
       ).resolves.toBe('my-local-extension');
 
       expect(consoleInfoSpy).toHaveBeenCalledWith(
-        `Extensions may introduce unexpected behavior.
-Ensure you have investigated the extension source and trust the author.
+        `Installing extension "my-local-extension".
+**Extensions may introduce unexpected behavior. Ensure you have investigated the extension source and trust the author.**
 This extension will run the following MCP servers:
   * test-server (local): node server.js
   * test-server-2 (remote): https://google.com`,
@@ -954,7 +954,7 @@ This extension will run the following MCP servers:
           { source: sourceExtDir, type: 'local' },
           requestConsentNonInteractive,
         ),
-      ).rejects.toThrow('Installation cancelled.');
+      ).rejects.toThrow('Installation cancelled for "my-local-extension".');
 
       expect(mockQuestion).toHaveBeenCalledWith(
         expect.stringContaining('Do you want to continue? [Y/n]: '),

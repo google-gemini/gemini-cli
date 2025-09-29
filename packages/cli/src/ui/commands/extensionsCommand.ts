@@ -54,7 +54,10 @@ async function updateAction(context: CommandContext, args: string) {
         context.services.config!.getWorkingDir(),
         // We don't have the ability to prompt for consent yet in this flow.
         (description) =>
-          requestConsentInteractive(description, context.ui.addItem),
+          requestConsentInteractive(
+            description,
+            context.ui.addConfirmUpdateExtensionRequest,
+          ),
         context.services.config!.getExtensions(),
         context.ui.extensionsUpdateState,
         context.ui.setExtensionsUpdateState,
@@ -80,7 +83,10 @@ async function updateAction(context: CommandContext, args: string) {
           extension,
           workingDir,
           (description) =>
-            requestConsentInteractive(description, context.ui.addItem),
+            requestConsentInteractive(
+              description,
+              context.ui.addConfirmUpdateExtensionRequest,
+            ),
           context.ui.extensionsUpdateState.get(extension.name) ??
             ExtensionUpdateState.UNKNOWN,
           (updateState) => {
