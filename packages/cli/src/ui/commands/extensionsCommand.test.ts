@@ -261,72 +261,70 @@ describe('extensionsCommand', () => {
         throw new Error('Update completion not found');
       }
 
-      it('should return matching extension names', async () => {
-        const extensionOne: GeminiCLIExtension = {
-          name: 'ext-one',
-          version: '1.0.0',
-          isActive: true,
-          path: '/test/dir/ext-one',
-          installMetadata: {
-            type: 'git',
-            autoUpdate: false,
-            source: 'https://github.com/some/extension.git',
-          },
-        };
-        const extensionTwo: GeminiCLIExtension = {
-          name: 'another-ext',
-          version: '1.0.0',
-          isActive: true,
-          path: '/test/dir/another-ext',
-          installMetadata: {
-            type: 'git',
-            autoUpdate: false,
-            source: 'https://github.com/some/extension.git',
-          },
-        };
-        mockGetExtensions.mockReturnValue([extensionOne, extensionTwo]);
-        const suggestions = await updateCompletion(mockContext, 'ext');
-        expect(suggestions).toEqual(['ext-one']);
-      });
+      const extensionOne: GeminiCLIExtension = {
+        name: 'ext-one',
+        version: '1.0.0',
+        isActive: true,
+        path: '/test/dir/ext-one',
+        installMetadata: {
+          type: 'git',
+          autoUpdate: false,
+          source: 'https://github.com/some/extension.git',
+        },
+      };
+      const extensionTwo: GeminiCLIExtension = {
+        name: 'another-ext',
+        version: '1.0.0',
+        isActive: true,
+        path: '/test/dir/another-ext',
+        installMetadata: {
+          type: 'git',
+          autoUpdate: false,
+          source: 'https://github.com/some/extension.git',
+        },
+      };
+      const allExt: GeminiCLIExtension = {
+        name: 'all-ext',
+        version: '1.0.0',
+        isActive: true,
+        path: '/test/dir/all-ext',
+        installMetadata: {
+          type: 'git',
+          autoUpdate: false,
+          source: 'https://github.com/some/extension.git',
+        },
+      };
 
-      it('should return --all when partialArg matches', async () => {
-        mockGetExtensions.mockReturnValue([]);
-        const suggestions = await updateCompletion(mockContext, '--al');
-        expect(suggestions).toEqual(['--all']);
-      });
-
-      it('should return both extension names and --all when both match', async () => {
-        const extensionOne: GeminiCLIExtension = {
-          name: 'all-ext',
-          version: '1.0.0',
-          isActive: true,
-          path: '/test/dir/all-ext',
-          installMetadata: {
-            type: 'git',
-            autoUpdate: false,
-            source: 'https://github.com/some/extension.git',
-          },
-        };
-        mockGetExtensions.mockReturnValue([extensionOne]);
-        const suggestions = await updateCompletion(mockContext, 'all');
-        expect(suggestions).toEqual(['--all', 'all-ext']);
-      });
-
-      it('should return an empty array if no matches', async () => {
-        const extensionOne: GeminiCLIExtension = {
-          name: 'ext-one',
-          version: '1.0.0',
-          isActive: true,
-          path: '/test/dir/ext-one',
-          installMetadata: {
-            type: 'git',
-            autoUpdate: false,
-            source: 'https://github.com/some/extension.git',
-          },
-        };
-        mockGetExtensions.mockReturnValue([extensionOne]);
-        const suggestions = await updateCompletion(mockContext, 'nomatch');
-        expect(suggestions).toEqual([]);
+      it.each([
+        {
+          description: 'should return matching extension names',
+          extensions: [extensionOne, extensionTwo],
+          partialArg: 'ext',
+          expected: ['ext-one'],
+        },
+        {
+          description: 'should return --all when partialArg matches',
+          extensions: [],
+          partialArg: '--al',
+          expected: ['--all'],
+        },
+        {
+          description:
+            'should return both extension names and --all when both match',
+          extensions: [allExt],
+          partialArg: 'all',
+          expected: ['--all', 'all-ext'],
+        },
+        {
+          description: 'should return an empty array if no matches',
+          extensions: [extensionOne],
+          partialArg: 'nomatch',
+          expected: [],
+        },
+      ])('$description', async ({ extensions, partialArg, expected }) => {
+        mockGetExtensions.mockReturnValue(extensions);
+        const suggestions = await updateCompletion(mockContext, partialArg);
+        expect(suggestions).toEqual(expected);
       });
     });
   });
