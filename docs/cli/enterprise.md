@@ -7,7 +7,6 @@ This document outlines configuration patterns and best practices for deploying a
 ## Centralized Configuration: The System Settings File
 
 The most powerful tools for enterprise administration are the system-wide settings files. These files allow you to define a baseline configuration (`system-defaults.json`) and a set of overrides (`settings.json`) that apply to all users on a machine. For a complete overview of configuration options, see the [Configuration documentation](../get-started/configuration.md).
-The most powerful tools for enterprise administration are the system-wide settings files. These files allow you to define a baseline configuration (`system-defaults.json`) and a set of overrides (`settings.json`) that apply to all users on a machine. For a complete overview of configuration options, see the [Configuration documentation](../get-started/configuration.md).
 
 Settings are merged from four files. The precedence order for single-value settings (like `theme`) is:
 
