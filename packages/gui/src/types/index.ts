@@ -180,7 +180,7 @@ export interface ChatSession {
   messages: ChatMessage[];
   provider: ModelProviderType;
   model: string;
-  roleId: string;
+  roleId?: string;
 }
 
 export interface ChatMessage {
