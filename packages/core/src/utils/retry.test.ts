@@ -137,10 +137,11 @@ describe('retryWithBackoff', () => {
     const mockFn = vi.fn(async () => {
       throw new NonRetryableError('Non-retryable error');
     });
-    const shouldRetry = (error: Error) => !(error instanceof NonRetryableError);
+    const shouldRetryOnError = (error: Error) =>
+      !(error instanceof NonRetryableError);
 
     const promise = retryWithBackoff(mockFn, {
-      shouldRetry,
+      shouldRetryOnError,
       initialDelayMs: 10,
     });
 
