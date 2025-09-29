@@ -13,6 +13,8 @@ describe('detectIde', () => {
 
   afterEach(() => {
     vi.unstubAllEnvs();
+    // Explicitly clear CURSOR_TRACE_ID to prevent interference
+    delete process.env['CURSOR_TRACE_ID'];
   });
 
   it('should return undefined if TERM_PROGRAM is not vscode', () => {
@@ -86,6 +88,8 @@ describe('detectIde with ideInfoFromFile', () => {
 
   afterEach(() => {
     vi.unstubAllEnvs();
+    // Explicitly clear CURSOR_TRACE_ID to prevent interference
+    delete process.env['CURSOR_TRACE_ID'];
   });
 
   it('should use the name and displayName from the file', () => {

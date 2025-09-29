@@ -9,6 +9,7 @@ import {
   updateAllUpdatableExtensions,
   updateExtension,
 } from '../../config/extensions/update.js';
+import { checkForExtensionUpdate } from '../../config/extensions/github.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
 import { MessageType } from '../types.js';
 import { extensionsCommand } from './extensionsCommand.js';
@@ -28,6 +29,10 @@ vi.mock('../../config/extensions/update.js', () => ({
   updateAllUpdatableExtensions: vi.fn(),
 }));
 
+vi.mock('../../config/extensions/github.js', () => ({
+  checkForExtensionUpdate: vi.fn(),
+}));
+
 const mockUpdateExtension = updateExtension as MockedFunction<
   typeof updateExtension
 >;
@@ -36,6 +41,10 @@ const mockUpdateAllUpdatableExtensions =
   updateAllUpdatableExtensions as MockedFunction<
     typeof updateAllUpdatableExtensions
   >;
+
+const mockCheckForExtensionUpdate = checkForExtensionUpdate as MockedFunction<
+  typeof checkForExtensionUpdate
+>;
 
 const mockGetExtensions = vi.fn();
 
@@ -172,6 +181,13 @@ describe('extensionsCommand', () => {
         extension.name,
         ExtensionUpdateState.UPDATE_AVAILABLE,
       );
+
+      // Mock checkForExtensionUpdate to return UPDATE_AVAILABLE
+      mockCheckForExtensionUpdate.mockImplementation((ext, callback) => {
+        callback(ExtensionUpdateState.UPDATE_AVAILABLE);
+        return Promise.resolve();
+      });
+
       await updateAction(mockContext, 'ext-one');
       expect(mockUpdateExtension).toHaveBeenCalledWith(
         extension,
@@ -238,6 +254,13 @@ describe('extensionsCommand', () => {
           originalVersion: '2.0.0',
           updatedVersion: '2.0.1',
         });
+
+      // Mock checkForExtensionUpdate to return UPDATE_AVAILABLE for both extensions
+      mockCheckForExtensionUpdate.mockImplementation((ext, callback) => {
+        callback(ExtensionUpdateState.UPDATE_AVAILABLE);
+        return Promise.resolve();
+      });
+
       await updateAction(mockContext, 'ext-one ext-two');
       expect(mockUpdateExtension).toHaveBeenCalledTimes(2);
       expect(mockContext.ui.setPendingItem).toHaveBeenCalledWith({
