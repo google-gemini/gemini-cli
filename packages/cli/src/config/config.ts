@@ -45,6 +45,7 @@ import { appEvents } from '../utils/events.js';
 
 import { isWorkspaceTrusted } from './trustedFolders.js';
 import { createPolicyEngineConfig } from './policy.js';
+import type { ExtensionEnablementManager } from './extensions/extensionEnablement.js';
 
 // Simple console logger for now - replace with actual logger if available
 const logger = {
@@ -414,6 +415,7 @@ export function isDebugMode(argv: CliArgs): boolean {
 export async function loadCliConfig(
   settings: Settings,
   extensions: Extension[],
+  extensionEnablementManager: ExtensionEnablementManager,
   sessionId: string,
   argv: CliArgs,
   cwd: string = process.cwd(),
@@ -429,8 +431,8 @@ export async function loadCliConfig(
 
   const allExtensions = annotateActiveExtensions(
     extensions,
-    argv.extensions || [],
     cwd,
+    extensionEnablementManager,
   );
 
   const activeExtensions = extensions.filter(
