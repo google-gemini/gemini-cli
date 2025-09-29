@@ -6,7 +6,7 @@
 
 import { useState, useRef, useCallback, useImperativeHandle, forwardRef, useEffect } from 'react';
 import type React from 'react';
-import { Send, StopCircle, Folder, FileSpreadsheet, ChevronDown, Loader2, RefreshCw, Plus, FolderPlus, BookTemplate, Edit, Trash2 } from 'lucide-react';
+import { Send, StopCircle, Folder, FileSpreadsheet, ChevronDown, Loader2, RefreshCw, Plus, FolderPlus, BookTemplate, Edit, Trash2, Copy, Square } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Textarea } from '@/components/ui/Textarea';
 import { useAppStore } from '@/stores/appStore';
@@ -14,7 +14,7 @@ import { useChatStore } from '@/stores/chatStore';
 import { multiModelService } from '@/services/multiModelService';
 import { useWorkspaceDirectories } from '@/hooks';
 import { cn } from '@/utils/cn';
-import type { ChatMessage, UniversalMessage } from '@/types';
+import type { ChatMessage, UniversalMessage, RoleDefinition } from '@/types';
 import { AutocompleteDropdown, useAutocomplete } from './autocomplete';
 
 interface Template {
@@ -56,6 +56,7 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(({ di
   const [expandedWorkbooks, setExpandedWorkbooks] = useState<{ [workbook: string]: boolean }>({});
   const [isLoadingWorkbooks, setIsLoadingWorkbooks] = useState(false);
   const [loadingWorksheets, setLoadingWorksheets] = useState<{ [workbook: string]: boolean }>({});
+  const [loadingSelection, setLoadingSelection] = useState<{ [workbook: string]: boolean }>({});
   const [workbooksCache, setWorkbooksCache] = useState<Array<{name: string; path?: string}> | null>(null);
   const [lastCacheTime, setLastCacheTime] = useState<number>(0);
   const [showWorkspaceMenu, setShowWorkspaceMenu] = useState(false);
@@ -68,7 +69,13 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(({ di
   const workspaceMenuRef = useRef<HTMLDivElement>(null);
   const templateMenuRef = useRef<HTMLDivElement>(null);
   
-  const { activeSessionId, updateSession } = useAppStore();
+  const {
+    activeSessionId,
+    updateSession,
+    currentRole,
+    builtinRoles,
+    customRoles
+  } = useAppStore();
   const { isStreaming, isThinking, currentOperation, setStreamingMessage, setError, setCompressionNotification, setCurrentOperation } = useChatStore();
   const { directories: workspaceDirectories, loading: loadingDirectories, addDirectory: addWorkspaceDirectory } = useWorkspaceDirectories();
 
@@ -301,10 +308,41 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(({ di
 
   // Handle worksheet selection
   const handleWorksheetSelect = (workbook: string, worksheet: string) => {
-    const text = `${workbook} - ${worksheet}`;
+    const text = `${workbook}!${worksheet}`;
     setMessage(prev => prev ? prev + ' ' + text : text);
     setShowExcelMenu(false);
     textareaRef.current?.focus();
+  };
+
+  // Handle workbook path selection (new function)
+  const handleWorkbookSelect = (workbookPath: string) => {
+    setMessage(prev => prev ? prev + ' ' + workbookPath : workbookPath);
+    setShowExcelMenu(false);
+    textareaRef.current?.focus();
+  };
+
+  // Handle get selection from Excel
+  const handleGetExcelSelection = async (workbookName: string) => {
+    // Set loading state
+    setLoadingSelection(prev => ({ ...prev, [workbookName]: true }));
+
+    try {
+      const result = await multiModelService.getExcelSelection(workbookName);
+      if (result.success && result.selection) {
+        // Selection already contains full path, sheet name, and address
+        const selectionText = result.selection;
+        setMessage(prev => prev ? prev + ' ' + selectionText : selectionText);
+        setShowExcelMenu(false);
+        textareaRef.current?.focus();
+      } else {
+        console.error('Failed to get Excel selection:', result);
+      }
+    } catch (error) {
+      console.error('Error getting Excel selection:', error);
+    } finally {
+      // Clear loading state
+      setLoadingSelection(prev => ({ ...prev, [workbookName]: false }));
+    }
   };
 
   const adjustTextareaHeight = useCallback(() => {
@@ -385,8 +423,149 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(({ di
     }, 0);
   };
 
+  // Role compatibility check helper
+  const checkRoleCompatibility = async (sessionId: string, currentRoleId: string) => {
+    const session = useAppStore.getState().sessions.find(s => s.id === sessionId);
+
+    // If session has no roleId, it's compatible (will be set on first message)
+    if (!session?.roleId) return { isCompatible: true, sessionRole: null, currentRole: null };
+
+    if (!currentRoleId) return { isCompatible: true, sessionRole: null, currentRole: null };
+
+    const sessionRole = builtinRoles.find(r => r.id === session.roleId) ||
+                       customRoles.find(r => r.id === session.roleId);
+    const currentRole = builtinRoles.find(r => r.id === currentRoleId) ||
+                       customRoles.find(r => r.id === currentRoleId);
+
+    const isCompatible = session.roleId === currentRoleId;
+
+    return {
+      isCompatible,
+      sessionRole,
+      currentRole,
+      sessionRoleId: session.roleId,
+      currentRoleId
+    };
+  };
+
+  // Show role conflict dialog
+  const showRoleConflictDialog = (sessionRole: RoleDefinition, currentRole: RoleDefinition) =>
+    new Promise<'switch' | 'continue' | 'cancel'>((resolve) => {
+      const sessionRoleName = sessionRole?.name || 'Unknown Role';
+      const currentRoleName = currentRole?.name || 'Unknown Role';
+
+      const dialog = document.createElement('div');
+      dialog.className = 'fixed inset-0 bg-black/50 flex items-center justify-center z-[1000]';
+      dialog.innerHTML = `
+        <div class="bg-card border border-border rounded-lg shadow-lg w-full max-w-md mx-4 text-foreground">
+          <div class="p-4 border-b border-border">
+            <h3 class="text-lg font-medium text-foreground">Role Compatibility Warning</h3>
+          </div>
+          <div class="p-4 space-y-3">
+            <p class="text-sm text-muted-foreground">
+              This session was created with a different role. Tool calls may not work correctly.
+            </p>
+            <div class="space-y-2">
+              <div class="flex items-center gap-2">
+                <span class="text-xs font-medium text-muted-foreground">Session Role:</span>
+                <span class="text-sm font-medium">${sessionRoleName}</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <span class="text-xs font-medium text-muted-foreground">Current Role:</span>
+                <span class="text-sm font-medium">${currentRoleName}</span>
+              </div>
+            </div>
+          </div>
+          <div class="p-4 border-t border-border flex justify-end gap-2">
+            <button id="cancel-btn" class="px-3 py-2 text-sm rounded-md border border-border hover:bg-muted transition-colors">
+              Cancel
+            </button>
+            <button id="continue-btn" class="px-3 py-2 text-sm rounded-md bg-orange-100 dark:bg-orange-900/50 text-orange-800 dark:text-orange-200 hover:bg-orange-200 dark:hover:bg-orange-900 transition-colors">
+              Continue Anyway
+            </button>
+            <button id="switch-btn" class="px-3 py-2 text-sm rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors">
+              Switch to ${sessionRoleName}
+            </button>
+          </div>
+        </div>
+      `;
+
+      document.body.appendChild(dialog);
+
+      const cleanup = () => document.body.removeChild(dialog);
+
+      dialog.querySelector('#cancel-btn')?.addEventListener('click', () => {
+        cleanup();
+        resolve('cancel');
+      });
+
+      dialog.querySelector('#continue-btn')?.addEventListener('click', () => {
+        cleanup();
+        resolve('continue');
+      });
+
+      dialog.querySelector('#switch-btn')?.addEventListener('click', () => {
+        cleanup();
+        resolve('switch');
+      });
+
+      // Close on backdrop click
+      dialog.addEventListener('click', (e) => {
+        if (e.target === dialog) {
+          cleanup();
+          resolve('cancel');
+        }
+      });
+    });
+
   const handleSendMessage = async () => {
     if (!message.trim() || !activeSessionId || isStreaming || isThinking) return;
+
+    // Check if this is the first message in the session (session has no roleId set)
+    const session = useAppStore.getState().sessions.find(s => s.id === activeSessionId);
+    const isFirstMessage = !session?.roleId;
+
+    if (isFirstMessage) {
+      // Set roleId for the session on first message
+      try {
+        // Update frontend session with current role
+        const { updateSession } = useAppStore.getState();
+        updateSession(activeSessionId, { roleId: currentRole });
+
+        // Update backend session metadata
+        await multiModelService.setSessionRole(activeSessionId, currentRole);
+        console.log(`Set role ${currentRole} for new session ${activeSessionId}`);
+      } catch (error) {
+        console.error('Failed to set session role:', error);
+        setError('Failed to set session role. Please try again.');
+        return;
+      }
+    } else {
+      // Check role compatibility for existing sessions
+      const compatibility = await checkRoleCompatibility(activeSessionId, currentRole);
+
+      if (!compatibility.isCompatible && compatibility.sessionRole && compatibility.currentRole) {
+        const action = await showRoleConflictDialog(compatibility.sessionRole, compatibility.currentRole);
+
+        if (action === 'cancel') {
+          return; // User cancelled, don't send message
+        } else if (action === 'switch') {
+          // Switch to session's role
+          try {
+            await multiModelService.switchRole(compatibility.sessionRoleId);
+            // Update frontend state to sync with backend
+            const { setCurrentRole } = useAppStore.getState();
+            setCurrentRole(compatibility.sessionRoleId);
+            console.log(`Switched role to ${compatibility.sessionRole.name} for session compatibility`);
+          } catch (error) {
+            console.error('Failed to switch role:', error);
+            setError('Failed to switch role. Please try again.');
+            return;
+          }
+        }
+        // If action === 'continue', proceed with current role
+      }
+    }
 
     const userMessage: ChatMessage = {
       id: `msg-${Date.now()}`,
@@ -420,6 +599,10 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(({ di
     setStreamingMessage('');
     setError(null);
 
+    // Move these variables outside try block so they can be accessed in catch/finally
+    let assistantContent = '';
+    let currentAssistantMessageId: string | null = null;
+
     try {
       const session = useAppStore.getState().sessions.find(s => s.id === activeSessionId);
       if (!session) return;
@@ -442,8 +625,6 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(({ di
       // Save the cancel function for stop button
       streamCleanupRef.current = cancel;
 
-      let assistantContent = '';
-      let currentAssistantMessageId: string | null = null;
       let hasCreatedInitialMessage = false;
 
       for await (const event of stream) {
@@ -688,10 +869,29 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(({ di
             }
           }, 500); // 500ms delay to ensure backend processing is complete
           break;
-        } 
+        }
         else if (event.type === 'error') {
           const errorMessage = event.error instanceof Error ? event.error.message : (event.error || 'An error occurred');
           console.error('Stream error:', errorMessage, event);
+
+          // Save any streaming content before it's lost
+          if (assistantContent && currentAssistantMessageId) {
+            const currentSession = useAppStore.getState().sessions.find(s => s.id === activeSessionId);
+            if (currentSession) {
+              const existingMessage = currentSession.messages.find(m => m.id === currentAssistantMessageId);
+              if (existingMessage) {
+                const updatedMessage = { ...existingMessage, content: assistantContent };
+                const updatedMessages = currentSession.messages.map(m =>
+                  m.id === currentAssistantMessageId ? updatedMessage : m
+                );
+                updateSession(activeSessionId, {
+                  messages: updatedMessages,
+                  updatedAt: new Date()
+                });
+              }
+            }
+          }
+
           setError(errorMessage);
           break;
         }
@@ -699,6 +899,25 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(({ di
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'An error occurred';
       console.error('Message sending failed:', errorMessage, error);
+
+      // Save any streaming content before it's lost
+      if (assistantContent && currentAssistantMessageId) {
+        const currentSession = useAppStore.getState().sessions.find(s => s.id === activeSessionId);
+        if (currentSession) {
+          const existingMessage = currentSession.messages.find(m => m.id === currentAssistantMessageId);
+          if (existingMessage) {
+            const updatedMessage = { ...existingMessage, content: assistantContent };
+            const updatedMessages = currentSession.messages.map(m =>
+              m.id === currentAssistantMessageId ? updatedMessage : m
+            );
+            updateSession(activeSessionId, {
+              messages: updatedMessages,
+              updatedAt: new Date()
+            });
+          }
+        }
+      }
+
       setError(errorMessage);
     } finally {
       // console.log('[MessageInput] Finally block - resetting states');
@@ -707,6 +926,9 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(({ di
       // Clear abort controller and stream cleanup
       abortControllerRef.current = null;
       streamCleanupRef.current = null;
+      // Reset assistant content tracking
+      assistantContent = '';
+      currentAssistantMessageId = null;
     }
   };
 
@@ -816,28 +1038,52 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(({ di
                           </div>
                           {workbooks.map((workbook, index) => (
                             <div key={index} className="mb-1">
-                              <button
-                                className="w-full text-left px-2 py-1.5 text-sm hover:bg-muted rounded flex items-center justify-between group"
-                                onClick={() => handleWorkbookClick(workbook)}
-                              >
-                                <span
-                                  className="font-medium text-foreground truncate"
-                                  title={workbook.path || workbook.name}
+                              <div className="flex items-center gap-1">
+                                {/* Clickable workbook name to expand/collapse worksheets */}
+                                <button
+                                  className="flex-1 text-left px-2 py-1.5 text-sm hover:bg-muted rounded flex items-center gap-2"
+                                  onClick={() => handleWorkbookClick(workbook)}
+                                  title="Click to show worksheets"
                                 >
-                                  {workbook.name}
-                                </span>
-                                {loadingWorksheets[workbook.name] ? (
-                                  <Loader2 size={14} className="text-muted-foreground animate-spin" />
-                                ) : (
-                                  <ChevronDown
-                                    size={14}
-                                    className={cn(
-                                      "text-muted-foreground transition-transform",
-                                      expandedWorkbooks[workbook.name] ? "rotate-180" : ""
-                                    )}
-                                  />
-                                )}
-                              </button>
+                                  {loadingWorksheets[workbook.name] ? (
+                                    <Loader2 size={14} className="text-muted-foreground animate-spin flex-shrink-0" />
+                                  ) : (
+                                    <ChevronDown
+                                      size={14}
+                                      className={cn(
+                                        "text-muted-foreground transition-transform flex-shrink-0",
+                                        expandedWorkbooks[workbook.name] ? "rotate-180" : ""
+                                      )}
+                                    />
+                                  )}
+                                  <span className="font-medium text-foreground truncate">
+                                    {workbook.name}
+                                  </span>
+                                </button>
+
+                                {/* Get selection button */}
+                                <button
+                                  className="p-1.5 hover:bg-muted rounded group"
+                                  onClick={() => handleGetExcelSelection(workbook.name)}
+                                  disabled={loadingSelection[workbook.name]}
+                                  title="Get current selection"
+                                >
+                                  {loadingSelection[workbook.name] ? (
+                                    <Loader2 size={14} className="text-muted-foreground animate-spin" />
+                                  ) : (
+                                    <Square size={14} className="text-muted-foreground group-hover:text-foreground" />
+                                  )}
+                                </button>
+
+                                {/* Copy path button */}
+                                <button
+                                  className="p-1.5 hover:bg-muted rounded group"
+                                  onClick={() => handleWorkbookSelect(workbook.path || workbook.name)}
+                                  title={`Insert path: ${workbook.path || workbook.name}`}
+                                >
+                                  <Copy size={14} className="text-muted-foreground group-hover:text-foreground" />
+                                </button>
+                              </div>
 
                               {expandedWorkbooks[workbook.name] && (
                                 <div className="ml-4 mt-1 space-y-0.5">
@@ -848,13 +1094,18 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(({ di
                                     </div>
                                   ) : worksheets[workbook.name] ? (
                                     worksheets[workbook.name].map((worksheet) => (
-                                      <button
-                                        key={worksheet.index}
-                                        className="w-full text-left px-2 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded"
-                                        onClick={() => handleWorksheetSelect(workbook.path || workbook.name, worksheet.name)}
-                                      >
-                                        {worksheet.index}: {worksheet.name}
-                                      </button>
+                                      <div key={worksheet.index} className="flex items-center gap-1">
+                                        <span className="flex-1 text-left px-2 py-1 text-xs text-muted-foreground">
+                                          {worksheet.index}: {worksheet.name}
+                                        </span>
+                                        <button
+                                          className="p-1 hover:bg-muted/50 rounded group"
+                                          onClick={() => handleWorksheetSelect(workbook.path || workbook.name, worksheet.name)}
+                                          title={`Insert: ${workbook.path || workbook.name}!${worksheet.name}`}
+                                        >
+                                          <Copy size={10} className="text-muted-foreground group-hover:text-foreground" />
+                                        </button>
+                                      </div>
                                     ))
                                   ) : null}
                                 </div>
