@@ -30,7 +30,11 @@ import {
   ApprovalMode,
 } from '../index.js';
 import type { Part, PartListUnion } from '@google/genai';
-import { MockModifiableTool, MockTool } from '../test-utils/tools.js';
+import {
+  MockModifiableTool,
+  MockTool,
+  MOCK_TOOL_SHOULD_CONFIRM_EXECUTE,
+} from '../test-utils/mock-tool.js';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 
@@ -205,8 +209,10 @@ async function waitForStatus(
 
 describe('CoreToolScheduler', () => {
   it('should cancel a tool call if the signal is aborted before confirmation', async () => {
-    const mockTool = new MockTool();
-    mockTool.shouldConfirm = true;
+    const mockTool = new MockTool({
+      name: 'mockTool',
+      shouldConfirmExecute: MOCK_TOOL_SHOULD_CONFIRM_EXECUTE,
+    });
     const declarativeTool = mockTool;
     const mockToolRegistry = {
       getTool: () => declarativeTool,
@@ -399,6 +405,7 @@ describe('CoreToolScheduler', () => {
 describe('CoreToolScheduler with payload', () => {
   it('should update args and diff and execute tool when payload is provided', async () => {
     const mockTool = new MockModifiableTool();
+    mockTool.executeFn = vi.fn();
     const declarativeTool = mockTool;
     const mockToolRegistry = {
       getTool: () => declarativeTool,
@@ -813,13 +820,15 @@ describe('CoreToolScheduler edit cancellation', () => {
 describe('CoreToolScheduler YOLO mode', () => {
   it('should execute tool requiring confirmation directly without waiting', async () => {
     // Arrange
-    const mockTool = new MockTool();
-    mockTool.executeFn.mockReturnValue({
+    const executeFn = vi.fn().mockResolvedValue({
       llmContent: 'Tool executed',
       returnDisplay: 'Tool executed',
     });
-    // This tool would normally require confirmation.
-    mockTool.shouldConfirm = true;
+    const mockTool = new MockTool({
+      name: 'mockTool',
+      execute: executeFn,
+      shouldConfirmExecute: MOCK_TOOL_SHOULD_CONFIRM_EXECUTE,
+    });
     const declarativeTool = mockTool;
 
     const mockToolRegistry = {
@@ -894,7 +903,7 @@ describe('CoreToolScheduler YOLO mode', () => {
 
     // Assert
     // 1. The tool's execute method was called directly.
-    expect(mockTool.executeFn).toHaveBeenCalledWith({ param: 'value' });
+    expect(executeFn).toHaveBeenCalledWith({ param: 'value' });
 
     // 2. The tool call status never entered 'awaiting_approval'.
     const statusUpdates = onToolCallsUpdate.mock.calls
@@ -927,8 +936,8 @@ describe('CoreToolScheduler request queueing', () => {
       resolveFirstCall = resolve;
     });
 
-    const mockTool = new MockTool();
-    mockTool.executeFn.mockImplementation(() => firstCallPromise);
+    const executeFn = vi.fn().mockImplementation(() => firstCallPromise);
+    const mockTool = new MockTool({ name: 'mockTool', execute: executeFn });
     const declarativeTool = mockTool;
 
     const mockToolRegistry = {
@@ -1011,8 +1020,7 @@ describe('CoreToolScheduler request queueing', () => {
     );
 
     // Ensure the second tool call hasn't been executed yet.
-    expect(mockTool.executeFn).toHaveBeenCalledTimes(1);
-    expect(mockTool.executeFn).toHaveBeenCalledWith({ a: 1 });
+    expect(executeFn).toHaveBeenCalledWith({ a: 1 });
 
     // Complete the first tool call.
     resolveFirstCall!({
@@ -1034,9 +1042,9 @@ describe('CoreToolScheduler request queueing', () => {
 
     await vi.waitFor(() => {
       // Now the second tool call should have been executed.
-      expect(mockTool.executeFn).toHaveBeenCalledTimes(2);
+      expect(executeFn).toHaveBeenCalledTimes(2);
     });
-    expect(mockTool.executeFn).toHaveBeenCalledWith({ b: 2 });
+    expect(executeFn).toHaveBeenCalledWith({ b: 2 });
 
     // Wait for the second completion.
     await vi.waitFor(() => {
@@ -1050,13 +1058,15 @@ describe('CoreToolScheduler request queueing', () => {
 
   it('should auto-approve a tool call if it is on the allowedTools list', async () => {
     // Arrange
-    const mockTool = new MockTool('mockTool');
-    mockTool.executeFn.mockReturnValue({
+    const executeFn = vi.fn().mockResolvedValue({
       llmContent: 'Tool executed',
       returnDisplay: 'Tool executed',
     });
-    // This tool would normally require confirmation.
-    mockTool.shouldConfirm = true;
+    const mockTool = new MockTool({
+      name: 'mockTool',
+      execute: executeFn,
+      shouldConfirmExecute: MOCK_TOOL_SHOULD_CONFIRM_EXECUTE,
+    });
     const declarativeTool = mockTool;
 
     const toolRegistry = {
@@ -1132,7 +1142,7 @@ describe('CoreToolScheduler request queueing', () => {
 
     // Assert
     // 1. The tool's execute method was called directly.
-    expect(mockTool.executeFn).toHaveBeenCalledWith({ param: 'value' });
+    expect(executeFn).toHaveBeenCalledWith({ param: 'value' });
 
     // 2. The tool call status never entered 'awaiting_approval'.
     const statusUpdates = onToolCallsUpdate.mock.calls
@@ -1159,7 +1169,11 @@ describe('CoreToolScheduler request queueing', () => {
   });
 
   it('should handle two synchronous calls to schedule', async () => {
-    const mockTool = new MockTool();
+    const executeFn = vi.fn().mockResolvedValue({
+      llmContent: 'Tool executed',
+      returnDisplay: 'Tool executed',
+    });
+    const mockTool = new MockTool({ name: 'mockTool', execute: executeFn });
     const declarativeTool = mockTool;
     const mockToolRegistry = {
       getTool: () => declarativeTool,
@@ -1241,9 +1255,9 @@ describe('CoreToolScheduler request queueing', () => {
     await Promise.all([schedulePromise1, schedulePromise2]);
 
     // Ensure the tool was called twice with the correct arguments.
-    expect(mockTool.executeFn).toHaveBeenCalledTimes(2);
-    expect(mockTool.executeFn).toHaveBeenCalledWith({ a: 1 });
-    expect(mockTool.executeFn).toHaveBeenCalledWith({ b: 2 });
+    expect(executeFn).toHaveBeenCalledTimes(2);
+    expect(executeFn).toHaveBeenCalledWith({ a: 1 });
+    expect(executeFn).toHaveBeenCalledWith({ b: 2 });
 
     // Ensure completion callbacks were called twice.
     expect(onAllToolCallsComplete).toHaveBeenCalledTimes(2);
