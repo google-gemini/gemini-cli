@@ -1,6 +1,6 @@
 {
   "name": "penggo-cli",
-  "version": "0.8.0-nightly.20250925.b1da8c21",
+  "version": "0.0.1",
   "engines": {
     "node": ">=20.0.0"
   },
