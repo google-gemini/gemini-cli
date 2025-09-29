@@ -83,6 +83,14 @@ export abstract class BasePythonTool<
   }
 
   /**
+   * Determine if this tool requires confirmation before execution
+   * Override this method in subclasses to skip confirmation for safe operations
+   */
+  protected requiresConfirmation(_params: TParams): boolean {
+    return true;
+  }
+
+  /**
    * Get the embedded Python path (same logic as PythonEmbeddedTool)
    */
   protected getEmbeddedPythonPath(): string {
@@ -154,6 +162,11 @@ class BasePythonToolInvocation<
   override async shouldConfirmExecute(
     _abortSignal: AbortSignal,
   ): Promise<ToolCallConfirmationDetails | false> {
+    // Check if tool requires confirmation
+    if (!this.tool['requiresConfirmation'](this.params)) {
+      return false;
+    }
+
     // Check if Python execution is already allowed
     const rootCommand = `${this.tool.name}_python`;
     if (this.allowlist.has(rootCommand)) {
