@@ -579,7 +579,7 @@ function extensionConsentString(extensionConfig: ExtensionConfig): string {
   );
 
   if (mcpServerEntries.length) {
-    output.push(`This extension will run the following MCP servers:`);
+    output.push('This extension will run the following MCP servers:');
     for (const [key, mcpServer] of mcpServerEntries) {
       const isLocal = !!mcpServer.command;
       const source =
