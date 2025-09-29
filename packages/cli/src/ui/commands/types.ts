@@ -6,7 +6,11 @@
 
 import type { Dispatch, ReactNode, SetStateAction } from 'react';
 import type { Content, PartListUnion } from '@google/genai';
-import type { HistoryItemWithoutId, HistoryItem } from '../types.js';
+import type {
+  HistoryItemWithoutId,
+  HistoryItem,
+  ConfirmationRequest,
+} from '../types.js';
 import type { Config, GitService, Logger } from '@google/gemini-cli-core';
 import type { LoadedSettings } from '../../config/settings.js';
 import type { UseHistoryManagerReturn } from '../hooks/useHistoryManager.js';
@@ -66,6 +70,7 @@ export interface CommandContext {
     setExtensionsUpdateState: Dispatch<
       SetStateAction<Map<string, ExtensionUpdateState>>
     >;
+    addConfirmUpdateExtensionRequest: (value: ConfirmationRequest) => void;
   };
   // Session-specific data
   session: {

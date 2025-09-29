@@ -26,7 +26,10 @@ export const DefaultAppLayout: React.FC<{ width?: string }> = ({
         <Notifications />
 
         {uiState.dialogsVisible ? (
-          <DialogManager addItem={uiState.historyManager.addItem} />
+          <DialogManager
+            terminalWidth={uiState.terminalWidth}
+            addItem={uiState.historyManager.addItem}
+          />
         ) : (
           <Composer />
         )}
