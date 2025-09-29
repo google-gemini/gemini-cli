@@ -141,6 +141,7 @@ export class ExtensionEnablementManager {
    */
   isEnabled(extensionName: string, currentPath: string): boolean {
     // If we have a single override called 'none', this disables all extensions.
+    // Typically, this comes from the user passing `-e none`.
     if (
       this.enabledExtensionNamesOverride.length === 1 &&
       this.enabledExtensionNamesOverride[0] === 'none'
