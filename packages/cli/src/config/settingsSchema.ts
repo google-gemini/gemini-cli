@@ -761,7 +761,7 @@ const SETTINGS_SCHEMA = {
         label: 'Enable Tool Output Truncation',
         category: 'General',
         requiresRestart: true,
-        default: false,
+        default: true,
         description: 'Enable truncation of large tool outputs.',
         showInDialog: true,
       },
