@@ -305,8 +305,8 @@ class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
         isNewFile: false,
         error: {
           display: `No changes required. The file already meets the specified conditions.`,
-          raw: `A secondary check determined that no changes were necessary to fulfill the instruction. Explanation: ${fixedEdit.explanation}. Original error with the parameters given: ${initialError.raw}`,
-          type: ToolErrorType.EDIT_NO_CHANGE,
+          raw: `A secondary check by an LLM determined that no changes were necessary to fulfill the instruction. Explanation: ${fixedEdit.explanation}. Original error with the parameters given: ${initialError.raw}`,
+          type: ToolErrorType.EDIT_NO_CHANGE_LLM_JUDGEMENT,
         },
         originalLineEnding,
       };
@@ -490,6 +490,9 @@ class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
     try {
       editData = await this.calculateEdit(this.params, abortSignal);
     } catch (error) {
+      if (abortSignal.aborted) {
+        throw error;
+      }
       const errorMsg = error instanceof Error ? error.message : String(error);
       console.log(`Error preparing edit: ${errorMsg}`);
       return false;
@@ -575,6 +578,9 @@ class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
     try {
       editData = await this.calculateEdit(this.params, signal);
     } catch (error) {
+      if (signal.aborted) {
+        throw error;
+      }
       const errorMsg = error instanceof Error ? error.message : String(error);
       return {
         llmContent: `Error preparing edit: ${errorMsg}`,
@@ -750,6 +756,58 @@ A good instruction should concisely answer:
   }
 
   /**
+   * Quickly checks if the file path can be resolved directly against the workspace root.
+   * @param filePath The relative file path to check.
+   * @returns The absolute path if the file exists, otherwise null.
+   */
+  private findDirectPath(filePath: string): string | null {
+    const directPath = path.join(this.config.getTargetDir(), filePath);
+    return fs.existsSync(directPath) ? directPath : null;
+  }
+
+  /**
+   * Searches for a file across all configured workspace directories.
+   * @param filePath The file path (can be partial) to search for.
+   * @returns A list of absolute paths for all matching files found.
+   */
+  private findAmbiguousPaths(filePath: string): string[] {
+    const workspaceContext = this.config.getWorkspaceContext();
+    const fileSystem = this.config.getFileSystemService();
+    const searchPaths = workspaceContext.getDirectories();
+    return fileSystem.findFiles(filePath, searchPaths);
+  }
+
+  /**
+   * Attempts to correct a relative file path to an absolute path.
+   * This function modifies `params.file_path` in place if successful.
+   * @param params The tool parameters containing the file_path to correct.
+   * @returns An error message string if correction fails, otherwise null.
+   */
+  private correctPath(params: EditToolParams): string | null {
+    const directPath = this.findDirectPath(params.file_path);
+    if (directPath) {
+      params.file_path = directPath;
+      return null;
+    }
+
+    const foundFiles = this.findAmbiguousPaths(params.file_path);
+
+    if (foundFiles.length === 0) {
+      return `File not found for '${params.file_path}' and path is not absolute.`;
+    }
+
+    if (foundFiles.length > 1) {
+      return (
+        `The file path '${params.file_path}' is too ambiguous and matches multiple files. ` +
+        `Please provide a more specific path. Matches: ${foundFiles.join(', ')}`
+      );
+    }
+
+    params.file_path = foundFiles[0];
+    return null;
+  }
+
+  /**
    * Validates the parameters for the Edit tool
    * @param params Parameters to validate
    * @returns Error message string or null if valid
@@ -762,7 +820,9 @@ A good instruction should concisely answer:
     }
 
     if (!path.isAbsolute(params.file_path)) {
-      return `File path must be absolute: ${params.file_path}`;
+      // Attempt to auto-correct to an absolute path
+      const error = this.correctPath(params);
+      if (error) return error;
     }
 
     const workspaceContext = this.config.getWorkspaceContext();
