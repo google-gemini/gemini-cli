@@ -22,6 +22,7 @@ describe('Interactive Mode', () => {
     'should trigger chat compression with /compress command',
     async () => {
       await rig.setup('interactive-compress-test');
+
       const { ptyProcess } = rig.runInteractive();
 
       let fullOutput = '';
@@ -52,10 +53,10 @@ describe('Interactive Mode', () => {
       ).toBe(true);
 
       const longPrompt =
-        'Dont do anything except returning a long paragragh with the <name of the scientist who discovered theory of relativity> at the end to indicate end of response. This is a moderately long sentence designed to exceed the very low compression threshold we have set for this specific test case. This is a moderately long sentence designed to exceed the very low compression threshold we have set for this specific test case. This is a moderately long sentence designed to exceed the very low compression threshold we have set for this specific test case. This is a moderately long sentence designed to exceed the very low compression threshold we have set for this specific test case. This is a moderately long sentence designed to exceed the very low compression threshold we have set for this specific test case. This is a moderately long sentence designed to exceed the very low compression threshold we have set for this specific test case. This is a moderately long sentence designed to exceed the very low compression threshold we have set for this specific test case. This is a moderately long sentence designed to exceed the very low compression threshold we have set for this specific test case. This is a moderately long sentence designed to exceed the very low compression threshold we have set for this specific test case.';
+        'Dont do anything except returning a 1000 token long paragragh with the <name of the scientist who discovered theory of relativity> at the end to indicate end of response. This is a moderately long sentence.';
 
-      await type(ptyProcess, longPrompt);
-      await type(ptyProcess, '\r');
+      await type(ptyProcess, longPrompt, 501);
+      await type(ptyProcess, '\r', 501);
 
       await rig.poll(
         () => stripAnsi(fullOutput).toLowerCase().includes('einstein'),
@@ -63,10 +64,10 @@ describe('Interactive Mode', () => {
         200,
       );
 
-      await type(ptyProcess, '/compress');
+      await type(ptyProcess, '/compress', 501);
       // Add a small delay to allow React to re-render the command list.
       await new Promise((resolve) => setTimeout(resolve, 100));
-      await type(ptyProcess, '\r');
+      await type(ptyProcess, '\r', 501);
 
       const foundEvent = await rig.waitForTelemetryEvent(
         'chat_compression',
@@ -112,8 +113,8 @@ describe('Interactive Mode', () => {
         'CLI did not start up in interactive mode correctly',
       ).toBe(true);
       fullOutput = '';
-      await type(ptyProcess, 'hi');
-      await type(ptyProcess, '\r');
+      await type(ptyProcess, 'hi', 501);
+      await type(ptyProcess, '\r', 501);
 
       await rig.poll(
         () => stripAnsi(fullOutput).includes('Type your message'),
@@ -121,9 +122,9 @@ describe('Interactive Mode', () => {
         200,
       );
 
-      await type(ptyProcess, '/compress');
+      await type(ptyProcess, '/compress', 501);
       await new Promise((resolve) => setTimeout(resolve, 100));
-      await type(ptyProcess, '\r');
+      await type(ptyProcess, '\r', 501);
 
       const foundEvent = await rig.waitForTelemetryEvent(
         'chat_compression',
