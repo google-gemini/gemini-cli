@@ -9,7 +9,7 @@ import { IdeIntegrationNudge } from '../IdeIntegrationNudge.js';
 import { LoopDetectionConfirmation } from './LoopDetectionConfirmation.js';
 import { FolderTrustDialog } from './FolderTrustDialog.js';
 import { ShellConfirmationDialog } from './ShellConfirmationDialog.js';
-import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
+import { ConsentPrompt } from './ConsentPrompt.js';
 import { ThemeDialog } from './ThemeDialog.js';
 import { SettingsDialog } from './SettingsDialog.js';
 import { AuthInProgress } from '../auth/AuthInProgress.js';
@@ -27,7 +27,6 @@ import { useConfig } from '../contexts/ConfigContext.js';
 import { useSettings } from '../contexts/SettingsContext.js';
 import process from 'node:process';
 import { type UseHistoryManagerReturn } from '../hooks/useHistoryManager.js';
-import { MarkdownDisplay } from '../utils/MarkdownDisplay.js';
 
 interface DialogManagerProps {
   addItem: UseHistoryManagerReturn['addItem'];
@@ -105,48 +104,20 @@ export const DialogManager = ({
   }
   if (uiState.confirmationRequest) {
     return (
-      <Box flexDirection="column">
-        {uiState.confirmationRequest.prompt}
-        <Box paddingY={1}>
-          <RadioButtonSelect
-            items={[
-              { label: 'Yes', value: true, key: 'Yes' },
-              { label: 'No', value: false, key: 'No' },
-            ]}
-            onSelect={(value: boolean) => {
-              uiState.confirmationRequest!.onConfirm(value);
-            }}
-          />
-        </Box>
-      </Box>
+      <ConsentPrompt
+        prompt={uiState.confirmationRequest.prompt}
+        onConfirm={uiState.confirmationRequest.onConfirm}
+        terminalWidth={terminalWidth}
+      />
     );
   }
   if (uiState.confirmUpdateExtensionRequest) {
     return (
-      <Box
-        borderStyle="round"
-        borderColor={theme.border.default}
-        flexDirection="column"
-        paddingY={1}
-        paddingX={2}
-      >
-        <MarkdownDisplay
-          isPending={true}
-          text={uiState.confirmUpdateExtensionRequest.prompt as string}
-          terminalWidth={terminalWidth}
-        ></MarkdownDisplay>
-        <Box marginTop={1}>
-          <RadioButtonSelect
-            items={[
-              { label: 'Yes', value: true, key: 'Yes' },
-              { label: 'No', value: false, key: 'No' },
-            ]}
-            onSelect={(value: boolean) => {
-              uiState.confirmUpdateExtensionRequest!.onConfirm(value);
-            }}
-          />
-        </Box>
-      </Box>
+      <ConsentPrompt
+        prompt={uiState.confirmUpdateExtensionRequest.prompt}
+        onConfirm={uiState.confirmUpdateExtensionRequest.onConfirm}
+        terminalWidth={terminalWidth}
+      />
     );
   }
   if (uiState.isThemeDialogOpen) {
