@@ -41,6 +41,7 @@
     <!-- Add your actions here -->
     <action id="RunGeminiCLI" class="com.google.gemini.cli.RunGeminiCLIAction" text="Run Gemini CLI"
       description="Run Gemini CLI in integrated terminal" icon="/icons/gemini-icon.svg">
+      <add-to-group group-id="MainToolbarRight" anchor="last"/>
       <add-to-group group-id="ProjectViewToolbar" anchor="last"/>
       <add-to-group group-id="ToolsMenu" anchor="last"/>
       <keyboard-shortcut keymap="$default" first-keystroke="ctrl alt G"/>
