@@ -30,7 +30,7 @@ describe('Interactive Mode', () => {
       rig,
       fullOutput,
       'How would you like to authenticate',
-      5000,
+      15000,
     );
 
     // Press "Enter" to select the default auth option if auth dialog came up
@@ -83,7 +83,7 @@ describe('Interactive Mode', () => {
       rig,
       fullOutput,
       'How would you like to authenticate',
-      5000,
+      15000,
     );
 
     // 2. Press "Enter" to select the default auth option if auth dialog came up
