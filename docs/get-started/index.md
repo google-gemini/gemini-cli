@@ -2,17 +2,6 @@
 
 Welcome to Gemini CLI! This guide will help you install, configure, and start using the Gemini CLI to enhance your workflow right from your terminal.
 
-Begin with the quickstart:
-
-- Quickstart: Install, authenticate, configure, and use Gemini CLI
-
-Alternatively, dive deeper into the following areas:
-
-- Gemini CLI Execution and Deployment
-- Gemini CLI Authentication Setup
-- Gemini CLI Configuration
-- Gemini CLI Examples
-
 ## Quickstart: Install, authenticate, configure, and use Gemini CLI
 
 Gemini CLI brings the power of advanced language models directly to your command line interface. As an AI-powered assistant, Gemini CLI can help you with a variety of tasks, from understanding and generating code to reviewing and editing documents. 
