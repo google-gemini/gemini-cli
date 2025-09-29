@@ -169,12 +169,18 @@ export class MCPServerConfig {
     // OAuth configuration
     readonly oauth?: MCPOAuthConfig,
     readonly authProviderType?: AuthProviderType,
+    // Service Account Configuration
+    /* targetAudience format: CLIENT_ID.apps.googleusercontent.com */
+    readonly targetAudience?: string,
+    /* targetServiceAccount format: <service-account-name>@<project-num>.iam.gserviceaccount.com */
+    readonly targetServiceAccount?: string,
   ) {}
 }
 
 export enum AuthProviderType {
   DYNAMIC_DISCOVERY = 'dynamic_discovery',
   GOOGLE_CREDENTIALS = 'google_credentials',
+  SERVICE_ACCOUNT_IMPERSONATION = 'service_account_impersonation',
 }
 
 export interface SandboxConfig {
@@ -421,8 +427,7 @@ export class Config {
       DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD;
     this.truncateToolOutputLines =
       params.truncateToolOutputLines ?? DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES;
-    this.enableToolOutputTruncation =
-      params.enableToolOutputTruncation ?? false;
+    this.enableToolOutputTruncation = params.enableToolOutputTruncation ?? true;
     this.useSmartEdit = params.useSmartEdit ?? true;
     this.useWriteTodos = params.useWriteTodos ?? false;
     this.useModelRouter = params.useModelRouter ?? false;
