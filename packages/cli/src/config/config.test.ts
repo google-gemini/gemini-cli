@@ -6,6 +6,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as os from 'node:os';
+import * as fs from 'node:fs';
 import * as path from 'node:path';
 import {
   ShellTool,
@@ -83,6 +84,8 @@ vi.mock('@google/gemini-cli-core', async () => {
   );
   return {
     ...actualServer,
+    setGeminiMdFilename: vi.fn(),
+    getCurrentGeminiMdFilename: vi.fn(),
     IdeClient: {
       getInstance: vi.fn().mockResolvedValue({
         getConnectionStatus: vi.fn(),
@@ -466,6 +469,115 @@ describe('loadCliConfig', () => {
       const settings: Settings = {};
       const config = await loadCliConfig(settings, [], 'test-session', argv);
       expect(config.getProxy()).toBe('http://localhost:7890');
+    });
+  });
+
+  describe('Context file configuration', () => {
+    beforeEach(() => {
+      // Mocks are now module-level, just clear them before each test
+      vi.clearAllMocks();
+      vi.mocked(ServerConfig.getCurrentGeminiMdFilename).mockReturnValue(
+        'DEFAULT.md',
+      );
+    });
+
+    it('should use default filename when no flag or setting is provided', async () => {
+      process.argv = ['node', 'script.js'];
+      const argv = await parseArguments({} as Settings);
+      const settings: Settings = {};
+      await loadCliConfig(settings, [], 'test-session', argv);
+      expect(ServerConfig.getCurrentGeminiMdFilename).toHaveBeenCalled();
+      expect(ServerConfig.setGeminiMdFilename).toHaveBeenCalledWith(
+        'DEFAULT.md',
+      );
+    });
+
+    it('should use filename from settings when no flag is provided', async () => {
+      process.argv = ['node', 'script.js'];
+      const argv = await parseArguments({} as Settings);
+      const settings: Settings = { context: { fileName: 'settings.md' } };
+      await loadCliConfig(settings, [], 'test-session', argv);
+      expect(ServerConfig.setGeminiMdFilename).toHaveBeenCalledWith(
+        'settings.md',
+      );
+    });
+
+    it('should prioritize --context-file flag over settings', async () => {
+      vi.spyOn(fs.promises, 'stat').mockResolvedValue({
+        isDirectory: () => false,
+      } as fs.Stats);
+      process.argv = ['node', 'script.js', '--context-file', 'cli.md'];
+      const argv = await parseArguments({} as Settings);
+      const settings: Settings = { context: { fileName: 'settings.md' } };
+      await loadCliConfig(settings, [], 'test-session', argv);
+      expect(ServerConfig.setGeminiMdFilename).toHaveBeenCalledWith(
+        expect.stringContaining('cli.md'),
+      );
+    });
+
+    it('should prioritize -f flag over settings', async () => {
+      vi.spyOn(fs.promises, 'stat').mockResolvedValue({
+        isDirectory: () => false,
+      } as fs.Stats);
+      process.argv = ['node', 'script.js', '-f', 'cli.md'];
+      const argv = await parseArguments({} as Settings);
+      const settings: Settings = { context: { fileName: 'settings.md' } };
+      await loadCliConfig(settings, [], 'test-session', argv);
+      expect(ServerConfig.setGeminiMdFilename).toHaveBeenCalledWith(
+        expect.stringContaining('cli.md'),
+      );
+    });
+
+    it('should throw an error if --context-file is a directory', async () => {
+      vi.spyOn(fs.promises, 'stat').mockResolvedValue({
+        isDirectory: () => true,
+      } as fs.Stats);
+
+      process.argv = ['node', 'script.js', '--context-file', 'a-directory'];
+      const argv = await parseArguments({} as Settings);
+      const settings: Settings = {};
+
+      await expect(
+        loadCliConfig(settings, [], 'test-session', argv),
+      ).rejects.toThrow(
+        'Path specified by --context-file is a directory: a-directory',
+      );
+    });
+
+    it('should throw an error if --context-file does not exist', async () => {
+      vi.spyOn(fs.promises, 'stat').mockImplementation(async () => {
+        const error = new Error('ENOENT: no such file or directory');
+        (error as NodeJS.ErrnoException).code = 'ENOENT';
+        throw error;
+      });
+
+      process.argv = ['node', 'script.js', '--context-file', 'new-file.md'];
+      const argv = await parseArguments({} as Settings);
+      const settings: Settings = {};
+
+      await expect(
+        loadCliConfig(settings, [], 'test-session', argv),
+      ).rejects.toThrow(
+        'File specified by --context-file does not exist: new-file.md',
+      );
+    });
+
+    it('should throw an error if --context-file path is inaccessible', async () => {
+      vi.spyOn(fs.promises, 'stat').mockImplementation(async () => {
+        const error = new Error('EACCES: permission denied');
+        (error as NodeJS.ErrnoException).code = 'EACCES';
+        throw error;
+      });
+
+      process.argv = ['node', 'script.js', '--context-file', 'inaccessible.md'];
+      const argv = await parseArguments({} as Settings);
+      const settings: Settings = {};
+
+      await expect(
+        loadCliConfig(settings, [], 'test-session', argv),
+      ).rejects.toThrow(
+        `Permission denied for file specified by --context-file: inaccessible.md`,
+      );
     });
   });
 });
