@@ -8,6 +8,7 @@ import type { CommandModule } from 'yargs';
 import {
   loadExtensions,
   annotateActiveExtensions,
+  ExtensionStorage,
   requestConsentNonInteractive,
 } from '../../config/extension.js';
 import {
@@ -19,6 +20,7 @@ import {
 import { checkForExtensionUpdate } from '../../config/extensions/github.js';
 import { getErrorMessage } from '../../utils/errors.js';
 import { ExtensionUpdateState } from '../../ui/state/extensions.js';
+import { ExtensionEnablementManager } from '../../config/extensions/extensionEnablement.js';
 
 interface UpdateArgs {
   name?: string;
@@ -30,11 +32,17 @@ const updateOutput = (info: ExtensionUpdateInfo) =>
 
 export async function handleUpdate(args: UpdateArgs) {
   const workingDir = process.cwd();
-  const allExtensions = loadExtensions();
+  const extensionEnablementManager = new ExtensionEnablementManager(
+    ExtensionStorage.getUserExtensionsDir(),
+    // Force enable named extensions, otherwise we will only update the enabled
+    // ones.
+    args.name ? [args.name] : [],
+  );
+  const allExtensions = loadExtensions(extensionEnablementManager);
   const extensions = annotateActiveExtensions(
     allExtensions,
-    allExtensions.map((e) => e.config.name),
     workingDir,
+    extensionEnablementManager,
   );
   if (args.name) {
     try {
