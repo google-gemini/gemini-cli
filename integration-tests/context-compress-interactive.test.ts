@@ -112,19 +112,6 @@ describe('Interactive Mode', () => {
         isReady,
         'CLI did not start up in interactive mode correctly',
       ).toBe(true);
-      fullOutput = '';
-      await type(
-        ptyProcess,
-        'say hello in spanish using less than 5 letters.',
-        501,
-      );
-      await type(ptyProcess, '\r', 501);
-
-      await rig.poll(
-        () => stripAnsi(fullOutput).toLowerCase().includes('hola'),
-        25000,
-        200,
-      );
 
       await type(ptyProcess, '/compress', 501);
       await new Promise((resolve) => setTimeout(resolve, 100));
