@@ -146,6 +146,7 @@ function getTelemetryConfig(cwd: string) {
 }
 
 export function loadExtensions(
+  extensionEnablementManager: ExtensionEnablementManager,
   workspaceDir: string = process.cwd(),
 ): Extension[] {
   const settings = loadSettings(workspaceDir).merged;
@@ -160,14 +161,11 @@ export function loadExtensions(
   }
 
   const uniqueExtensions = new Map<string, Extension>();
-  const manager = new ExtensionEnablementManager(
-    ExtensionStorage.getUserExtensionsDir(),
-  );
 
   for (const extension of allExtensions) {
     if (
       !uniqueExtensions.has(extension.config.name) &&
-      manager.isEnabled(extension.config.name, workspaceDir)
+      extensionEnablementManager.isEnabled(extension.config.name, workspaceDir)
     ) {
       uniqueExtensions.set(extension.config.name, extension);
     }
@@ -260,6 +258,32 @@ export function loadExtension(context: LoadExtensionContext): Extension | null {
   }
 }
 
+export function loadExtensionByName(
+  name: string,
+  workspaceDir: string = process.cwd(),
+): Extension | null {
+  const userExtensionsDir = ExtensionStorage.getUserExtensionsDir();
+  if (!fs.existsSync(userExtensionsDir)) {
+    return null;
+  }
+
+  for (const subdir of fs.readdirSync(userExtensionsDir)) {
+    const extensionDir = path.join(userExtensionsDir, subdir);
+    if (!fs.statSync(extensionDir).isDirectory()) {
+      continue;
+    }
+    const extension = loadExtension({ extensionDir, workspaceDir });
+    if (
+      extension &&
+      extension.config.name.toLowerCase() === name.toLowerCase()
+    ) {
+      return extension;
+    }
+  }
+
+  return null;
+}
+
 function filterMcpConfig(original: MCPServerConfig): MCPServerConfig {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { trust, ...rest } = original;
@@ -297,64 +321,17 @@ function getContextFileNames(config: ExtensionConfig): string[] {
  */
 export function annotateActiveExtensions(
   extensions: Extension[],
-  enabledExtensionNames: string[],
   workspaceDir: string,
+  manager: ExtensionEnablementManager,
 ): GeminiCLIExtension[] {
-  const manager = new ExtensionEnablementManager(
-    ExtensionStorage.getUserExtensionsDir(),
-  );
-  const annotatedExtensions: GeminiCLIExtension[] = [];
-  if (enabledExtensionNames.length === 0) {
-    return extensions.map((extension) => ({
-      name: extension.config.name,
-      version: extension.config.version,
-      isActive: manager.isEnabled(extension.config.name, workspaceDir),
-      path: extension.path,
-      installMetadata: extension.installMetadata,
-    }));
-  }
-
-  const lowerCaseEnabledExtensions = new Set(
-    enabledExtensionNames.map((e) => e.trim().toLowerCase()),
-  );
-
-  if (
-    lowerCaseEnabledExtensions.size === 1 &&
-    lowerCaseEnabledExtensions.has('none')
-  ) {
-    return extensions.map((extension) => ({
-      name: extension.config.name,
-      version: extension.config.version,
-      isActive: false,
-      path: extension.path,
-      installMetadata: extension.installMetadata,
-    }));
-  }
-
-  const notFoundNames = new Set(lowerCaseEnabledExtensions);
-
-  for (const extension of extensions) {
-    const lowerCaseName = extension.config.name.toLowerCase();
-    const isActive = lowerCaseEnabledExtensions.has(lowerCaseName);
-
-    if (isActive) {
-      notFoundNames.delete(lowerCaseName);
-    }
-
-    annotatedExtensions.push({
-      name: extension.config.name,
-      version: extension.config.version,
-      isActive,
-      path: extension.path,
-      installMetadata: extension.installMetadata,
-    });
-  }
-
-  for (const requestedName of notFoundNames) {
-    console.error(`Extension not found: ${requestedName}`);
-  }
-
-  return annotatedExtensions;
+  manager.validateExtensionOverrides(extensions);
+  return extensions.map((extension) => ({
+    name: extension.config.name,
+    version: extension.config.version,
+    isActive: manager.isEnabled(extension.config.name, workspaceDir),
+    path: extension.path,
+    installMetadata: extension.installMetadata,
+  }));
 }
 
 /**
@@ -685,6 +662,7 @@ export async function uninstallExtension(
   }
   const manager = new ExtensionEnablementManager(
     ExtensionStorage.getUserExtensionsDir(),
+    [extensionName],
   );
   manager.remove(extensionName);
   const storage = new ExtensionStorage(extensionName);
@@ -701,9 +679,18 @@ export async function uninstallExtension(
 
 export function toOutputString(
   extension: Extension,
-  isEnabled: boolean,
+  workspaceDir: string,
 ): string {
-  const status = isEnabled ? chalk.green('✓') : chalk.red('✗');
+  const manager = new ExtensionEnablementManager(
+    ExtensionStorage.getUserExtensionsDir(),
+  );
+  const userEnabled = manager.isEnabled(extension.config.name, os.homedir());
+  const workspaceEnabled = manager.isEnabled(
+    extension.config.name,
+    workspaceDir,
+  );
+
+  const status = workspaceEnabled ? chalk.green('✓') : chalk.red('✗');
   let output = `${status} ${extension.config.name} (${extension.config.version})`;
   output += `\n Path: ${extension.path}`;
   if (extension.installMetadata) {
@@ -715,6 +702,8 @@ export function toOutputString(
       output += `\n Release tag: ${extension.installMetadata.releaseTag}`;
     }
   }
+  output += `\n Enabled (User): ${userEnabled}`;
+  output += `\n Enabled (Workspace): ${workspaceEnabled}`;
   if (extension.contextFiles.length > 0) {
     output += `\n Context files:`;
     extension.contextFiles.forEach((contextFile) => {
@@ -745,9 +734,14 @@ export function disableExtension(
   if (scope === SettingScope.System || scope === SettingScope.SystemDefaults) {
     throw new Error('System and SystemDefaults scopes are not supported.');
   }
+  const extension = loadExtensionByName(name, cwd);
+  if (!extension) {
+    throw new Error(`Extension with name ${name} does not exist.`);
+  }
 
   const manager = new ExtensionEnablementManager(
     ExtensionStorage.getUserExtensionsDir(),
+    [name],
   );
   const scopePath = scope === SettingScope.Workspace ? cwd : os.homedir();
   manager.disable(name, true, scopePath);
@@ -761,6 +755,10 @@ export function enableExtension(
 ) {
   if (scope === SettingScope.System || scope === SettingScope.SystemDefaults) {
     throw new Error('System and SystemDefaults scopes are not supported.');
+  }
+  const extension = loadExtensionByName(name, cwd);
+  if (!extension) {
+    throw new Error(`Extension with name ${name} does not exist.`);
   }
   const manager = new ExtensionEnablementManager(
     ExtensionStorage.getUserExtensionsDir(),

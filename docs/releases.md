@@ -4,7 +4,7 @@
 
 We will follow https://semver.org/ as closely as possible but will call out when or if we have to deviate from it. Our weekly releases will be minor version increments and any bug or hotfixes between releases will go out as patch versions on the most recent release.
 
-Each Tuesaday ~2000 UTC new Stable and Preview releases will be cut. The promotion flow is:
+Each Tuesday ~2000 UTC new Stable and Preview releases will be cut. The promotion flow is:
 
 - Code is commited to main and pushed each night to nightly
 - After no more than 1 week on main, code is promoted to the `preview` channel
