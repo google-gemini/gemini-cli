@@ -87,6 +87,7 @@ const MIGRATION_MAP: Record<string, string> = {
   folderTrust: 'security.folderTrust.enabled',
   hasSeenIdeIntegrationNudge: 'ide.hasSeenNudge',
   hideWindowTitle: 'ui.hideWindowTitle',
+  showStatusInTitle: 'ui.showStatusInTitle',
   hideTips: 'ui.hideTips',
   hideBanner: 'ui.hideBanner',
   hideFooter: 'ui.hideFooter',
