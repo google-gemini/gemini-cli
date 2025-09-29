@@ -19,8 +19,6 @@ interface JPXInvestorParams {
   end_date?: string;
   /** Number of years to download (for download_all) */
   years_back?: number;
-  /** Force re-download files */
-  force_download?: boolean;
 }
 
 interface JPXInvestorResult extends ToolResult {
@@ -98,11 +96,6 @@ export class JPXInvestorTool extends BasePythonTool<JPXInvestorParams, JPXInvest
             maximum: 5,
             description: 'Number of years to download (default: 2)',
             default: 2
-          },
-          force_download: {
-            type: 'boolean',
-            description: 'Force re-download files even if they exist locally',
-            default: false
           }
         },
         required: ['op'],
@@ -114,13 +107,12 @@ export class JPXInvestorTool extends BasePythonTool<JPXInvestorParams, JPXInvest
     );
   }
 
-  protected generatePythonCode(params: JPXInvestorParams): string {
-    // Convert JavaScript boolean to Python boolean
-    const toPythonBool = (value: boolean | undefined, defaultValue: boolean) => {
-      const boolVal = value !== undefined ? value : defaultValue;
-      return boolVal ? 'True' : 'False';
-    };
+  protected override requiresConfirmation(_params: JPXInvestorParams): boolean {
+    // JPX investor tool only reads investor data, no confirmation needed
+    return false;
+  }
 
+  protected generatePythonCode(params: JPXInvestorParams): string {
     return `
 import json
 import os
@@ -508,18 +500,97 @@ class JPXInvestorDataCollector:
             print(f"Failed to get cached data: {e}")
             return []
 
-    def get_latest_data(self, days_back=30, force_download=False, years_back=3):
-        """Get latest investor data"""
+    def check_remote_files(self, years_back=3):
+        """Check what files are available remotely and compare with local files"""
         try:
-            if force_download:
-                self.download_all_available_files(years_back)
-            else:
-                cached_data = self.get_cached_data(days_back)
-                if len(cached_data) < 3:
-                    print("Insufficient local data, downloading latest files")
-                    self.download_all_available_files(years_back)
+            print(f"Checking remote files for last {years_back} years...")
+            remote_files = self.get_excel_file_urls(years_back)
 
+            if not remote_files:
+                print("No remote files found")
+                return []
+
+            new_files = []
+            for file_info in remote_files:
+                filename = file_info['filename']
+                local_path = os.path.join(self.cache_dir, filename)
+
+                if not os.path.exists(local_path):
+                    new_files.append(file_info)
+                    print(f"New file found: {filename}")
+                else:
+                    # Check file size or modification time if needed
+                    # For now, we assume existing files are up to date
+                    print(f"File already exists: {filename}")
+
+            print(f"Found {len(new_files)} new files to download")
+            return new_files
+
+        except Exception as e:
+            print(f"Failed to check remote files: {e}")
+            return []
+
+    def download_new_files(self, years_back=3):
+        """Download only new files that don't exist locally"""
+        try:
+            new_files = self.check_remote_files(years_back)
+
+            if not new_files:
+                print("No new files to download")
+                return 0
+
+            download_count = 0
+            for file_info in new_files:
+                try:
+                    filename = file_info['filename']
+                    url = file_info['url']
+
+                    print(f"Downloading: {filename}")
+
+                    response = self.session.get(url)
+                    response.raise_for_status()
+
+                    output_file = os.path.join(self.cache_dir, filename)
+                    with open(output_file, 'wb') as f:
+                        f.write(response.content)
+
+                    print(f"Downloaded: {filename}")
+                    download_count += 1
+
+                except Exception as e:
+                    print(f"Failed to download {filename}: {e}")
+                    continue
+
+            print(f"Successfully downloaded {download_count} new files")
+            return download_count
+
+        except Exception as e:
+            print(f"Failed to download new files: {e}")
+            return 0
+
+    def get_latest_data_smart(self, days_back=30, years_back=3):
+        """Get latest investor data with smart file checking"""
+        try:
+            # First check if we have sufficient local data
             cached_data = self.get_cached_data(days_back)
+
+            if len(cached_data) < 3:
+                print("Insufficient local data, checking for new files...")
+                download_count = self.download_new_files(years_back)
+                if download_count > 0:
+                    print(f"Downloaded {download_count} new files, refreshing cache...")
+                    cached_data = self.get_cached_data(days_back)
+            else:
+                # Check for new files in the background but don't wait
+                print("Checking for new files in background...")
+                new_file_count = len(self.check_remote_files(years_back))
+                if new_file_count > 0:
+                    print(f"Found {new_file_count} new files available for download")
+                    download_count = self.download_new_files(years_back)
+                    if download_count > 0:
+                        print(f"Downloaded {download_count} new files, refreshing cache...")
+                        cached_data = self.get_cached_data(days_back)
+
             print(f"Successfully retrieved {len(cached_data)} investor data records")
             return cached_data
 
@@ -535,15 +606,13 @@ try:
 
     if op == "download_all":
         years_back = ${params.years_back || 2}
-        force_download = ${toPythonBool(params.force_download, false)}
-        count = collector.download_all_available_files(years_back)
+        count = collector.download_new_files(years_back)
         result = {"download_count": count, "success": True}
 
     elif op == "get_latest":
         days_back = ${params.days_back || 30}
-        force_download = ${toPythonBool(params.force_download, false)}
         years_back = ${params.years_back || 2}
-        data = collector.get_latest_data(days_back, force_download, years_back)
+        data = collector.get_latest_data_smart(days_back, years_back)
         result = {"data": data, "success": True}
 
     elif op == "get_cached":
