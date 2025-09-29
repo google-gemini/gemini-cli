@@ -796,7 +796,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
 
   const { isFolderTrustDialogOpen, handleFolderTrustSelect, isRestarting } =
     useFolderTrust(settings, setIsTrustedFolder);
-  const { needsRestart: ideNeedsRestart } = useIdeTrustListener();
+  const { needsRestart: ideNeedsRestart } = useIdeTrustListener(config);
   const isInitialMount = useRef(true);
 
   useEffect(() => {

@@ -5,14 +5,18 @@
  */
 
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
-import { IdeClient, ideContextStore } from '@google/gemini-cli-core';
+import {
+  type Config,
+  IdeClient,
+  ideContextStore,
+} from '@google/gemini-cli-core';
 
 /**
  * This hook listens for trust status updates from the IDE companion extension.
  * It provides the current trust status from the IDE and a flag indicating
  * if a restart is needed because the trust state has changed.
  */
-export function useIdeTrustListener() {
+export function useIdeTrustListener(config: Config) {
   const subscribe = useCallback((onStoreChange: () => void) => {
     (async () => {
       const ideClient = await IdeClient.getInstance();
@@ -37,11 +41,12 @@ export function useIdeTrustListener() {
     if (
       !needsRestart &&
       initialTrustValue !== undefined &&
-      initialTrustValue !== isIdeTrusted
+      initialTrustValue !== isIdeTrusted &&
+      config.getIdeMode()
     ) {
       setNeedsRestart(true);
     }
-  }, [isIdeTrusted, initialTrustValue, needsRestart]);
+  }, [isIdeTrusted, initialTrustValue, needsRestart, config]);
 
   return { isIdeTrusted, needsRestart };
 }
