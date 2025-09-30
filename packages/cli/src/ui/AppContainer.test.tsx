@@ -70,6 +70,7 @@ vi.mock('./hooks/useBracketedPaste.js');
 vi.mock('./hooks/useKeypress.js');
 vi.mock('./hooks/useLoadingIndicator.js');
 vi.mock('./hooks/useFolderTrust.js');
+vi.mock('./hooks/useIdeTrustListener.js');
 vi.mock('./hooks/useMessageQueue.js');
 vi.mock('./hooks/useAutoAcceptIndicator.js');
 vi.mock('./hooks/useWorkspaceMigration.js');
@@ -96,6 +97,7 @@ import { useConsoleMessages } from './hooks/useConsoleMessages.js';
 import { useGeminiStream } from './hooks/useGeminiStream.js';
 import { useVim } from './hooks/vim.js';
 import { useFolderTrust } from './hooks/useFolderTrust.js';
+import { useIdeTrustListener } from './hooks/useIdeTrustListener.js';
 import { useMessageQueue } from './hooks/useMessageQueue.js';
 import { useAutoAcceptIndicator } from './hooks/useAutoAcceptIndicator.js';
 import { useWorkspaceMigration } from './hooks/useWorkspaceMigration.js';
@@ -127,6 +129,7 @@ describe('AppContainer State Management', () => {
   const mockedUseGeminiStream = useGeminiStream as Mock;
   const mockedUseVim = useVim as Mock;
   const mockedUseFolderTrust = useFolderTrust as Mock;
+  const mockedUseIdeTrustListener = useIdeTrustListener as Mock;
   const mockedUseMessageQueue = useMessageQueue as Mock;
   const mockedUseAutoAcceptIndicator = useAutoAcceptIndicator as Mock;
   const mockedUseWorkspaceMigration = useWorkspaceMigration as Mock;
@@ -221,6 +224,10 @@ describe('AppContainer State Management', () => {
       isFolderTrustDialogOpen: false,
       handleFolderTrustSelect: vi.fn(),
       isRestarting: false,
+    });
+    mockedUseIdeTrustListener.mockReturnValue({
+      needsRestart: false,
+      restartReason: 'NONE',
     });
     mockedUseMessageQueue.mockReturnValue({
       messageQueue: [],
