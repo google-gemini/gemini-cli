@@ -73,17 +73,15 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
   }, [resultDisplay]);
 
   React.useEffect(() => {
-    const interval = setInterval(() => {
-      if (
-        lastUpdateTime &&
-        new Date().getTime() - lastUpdateTime.getTime() > 5000
-      ) {
-        setShowFocusHint(true);
-        clearInterval(interval);
-      }
-    }, 1000); // Check every second
+    if (!lastUpdateTime) {
+      return;
+    }
 
-    return () => clearInterval(interval);
+    const timer = setTimeout(() => {
+      setShowFocusHint(true);
+    }, 5000);
+
+    return () => clearTimeout(timer);
   }, [lastUpdateTime]);
 
   React.useEffect(() => {
