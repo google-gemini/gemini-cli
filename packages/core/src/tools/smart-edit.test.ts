@@ -65,6 +65,7 @@ describe('SmartEditTool', () => {
   let rootDir: string;
   let mockConfig: Config;
   let geminiClient: any;
+  let fileSystemService: StandardFileSystemService;
   let baseLlmClient: BaseLlmClient;
 
   beforeEach(() => {
@@ -82,6 +83,8 @@ describe('SmartEditTool', () => {
       generateJson: mockGenerateJson,
     } as unknown as BaseLlmClient;
 
+    fileSystemService = new StandardFileSystemService();
+
     mockConfig = {
       getGeminiClient: vi.fn().mockReturnValue(geminiClient),
       getBaseLlmClient: vi.fn().mockReturnValue(baseLlmClient),
@@ -89,7 +92,7 @@ describe('SmartEditTool', () => {
       getApprovalMode: vi.fn(),
       setApprovalMode: vi.fn(),
       getWorkspaceContext: () => createMockWorkspaceContext(rootDir),
-      getFileSystemService: () => new StandardFileSystemService(),
+      getFileSystemService: () => fileSystemService,
       getIdeMode: () => false,
       getApiKey: () => 'test-api-key',
       getModel: () => 'test-model',
@@ -475,6 +478,76 @@ describe('SmartEditTool', () => {
 
       const finalContent = fs.readFileSync(filePath, 'utf8');
       expect(finalContent).toBe(newContentWithCRLF);
+    });
+  });
+
+  describe('self-correction with content refresh to pull in external edits', () => {
+    const testFile = 'test.txt';
+    let filePath: string;
+
+    beforeEach(() => {
+      filePath = path.join(rootDir, testFile);
+    });
+
+    it('should use refreshed file content for self-correction if file was modified externally', async () => {
+      const initialContent = 'This is the original content.';
+      const externallyModifiedContent =
+        'This is the externally modified content.';
+      fs.writeFileSync(filePath, initialContent, 'utf8');
+
+      const params: EditToolParams = {
+        file_path: filePath,
+        instruction: 'Replace "content" with "string"',
+        old_string: 'non-existent-text', // This will fail initially
+        new_string: 'string',
+      };
+
+      // Mock `getHistory` to simulate a previous edit by us.
+      const lastEditTime = Date.now() - 5000; // 5 seconds ago
+      (geminiClient.getHistory as Mock).mockResolvedValue([
+        {
+          role: 'model',
+          parts: [
+            {
+              functionCall: {
+                id: `replace-${lastEditTime}-123`,
+                name: 'replace',
+                args: { file_path: filePath },
+              },
+            },
+          ],
+        },
+      ]);
+
+      // Mock `fs.statSync` to make it look like the file was modified recently by someone else.
+      const statSpy = vi.spyOn(fs, 'statSync').mockReturnValue({
+        mtimeMs: Date.now(),
+      } as fs.Stats);
+
+      // Spy on `readTextFile` to confirm it gets called again.
+      const readTextFileSpy = vi
+        .spyOn(fileSystemService, 'readTextFile')
+        .mockResolvedValueOnce(initialContent) // First call in `calculateEdit`
+        .mockResolvedValueOnce(externallyModifiedContent); // Second call in `attemptSelfCorrection`
+
+      const invocation = tool.build(params);
+      await invocation.execute(new AbortController().signal);
+
+      // Assert that the self-correction LLM was called with the new content.
+      expect(readTextFileSpy).toHaveBeenCalledTimes(2);
+      expect(mockFixLLMEditWithInstruction).toHaveBeenCalledWith(
+        expect.any(String), // instruction
+        expect.any(String), // old_string
+        expect.any(String), // new_string
+        expect.stringContaining(
+          'However, the file has been modified by either the user or an external process',
+        ), // errorForLlmEditFixer
+        externallyModifiedContent, // Newly modified content read from file during `attemptSelfCorrection`
+        expect.any(Object), // baseLlmClient
+        expect.any(Object), // abortSignal
+      );
+
+      statSpy.mockRestore();
     });
   });
 
