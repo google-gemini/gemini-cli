@@ -44,12 +44,11 @@ dependencies {
 }
 
 intellijPlatform {
-    pluginConfiguration {
-        ideaVersion {
-            sinceBuild.set("232")
-            untilBuild.set("241.*")
-        }
+  pluginConfiguration {
+    ideaVersion {
+      sinceBuild.set("232")
     }
+  }
 }
 
 
@@ -61,9 +60,9 @@ tasks {
 
   patchPluginXml {
     pluginDescription = providers.fileContents(layout.projectDirectory.file("README.md")).asText.get()
-        .substringAfter("<!-- Plugin description -->")
-        .substringBefore("<!-- Plugin description end -->")
-        .let(::markdownToHTML)
+      .substringAfter("<!-- Plugin description -->")
+      .substringBefore("<!-- Plugin description end -->")
+      .let(::markdownToHTML)
     check(pluginDescription.get().isNotEmpty()) { "Plugin description section not found in README.md" }
   }
 
