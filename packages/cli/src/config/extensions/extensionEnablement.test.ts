@@ -9,6 +9,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { ExtensionEnablementManager, Override } from './extensionEnablement.js';
+import type { Extension } from '../extension.js';
 
 // Helper to create a temporary directory for testing
 function createTestDir() {
@@ -224,6 +225,63 @@ describe('ExtensionEnablementManager', () => {
     expect(manager.isEnabled('ext-test', '/Users/chrstn/gemini-cli')).toBe(
       true,
     );
+  });
+
+  describe('validateExtensionOverrides', () => {
+    let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
+
+    beforeEach(() => {
+      consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    });
+
+    afterEach(() => {
+      consoleErrorSpy.mockRestore();
+    });
+
+    it('should not log an error if enabledExtensionNamesOverride is empty', () => {
+      const manager = new ExtensionEnablementManager(configDir, []);
+      manager.validateExtensionOverrides([]);
+      expect(consoleErrorSpy).not.toHaveBeenCalled();
+    });
+
+    it('should not log an error if all enabledExtensionNamesOverride are valid', () => {
+      const manager = new ExtensionEnablementManager(configDir, [
+        'ext-one',
+        'ext-two',
+      ]);
+      const extensions = [
+        { config: { name: 'ext-one' } },
+        { config: { name: 'ext-two' } },
+      ] as Extension[];
+      manager.validateExtensionOverrides(extensions);
+      expect(consoleErrorSpy).not.toHaveBeenCalled();
+    });
+
+    it('should log an error for each invalid extension name in enabledExtensionNamesOverride', () => {
+      const manager = new ExtensionEnablementManager(configDir, [
+        'ext-one',
+        'ext-invalid',
+        'ext-another-invalid',
+      ]);
+      const extensions = [
+        { config: { name: 'ext-one' } },
+        { config: { name: 'ext-two' } },
+      ] as Extension[];
+      manager.validateExtensionOverrides(extensions);
+      expect(consoleErrorSpy).toHaveBeenCalledTimes(2);
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        'Extension not found: ext-invalid',
+      );
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        'Extension not found: ext-another-invalid',
+      );
+    });
+
+    it('should not log an error if "none" is in enabledExtensionNamesOverride', () => {
+      const manager = new ExtensionEnablementManager(configDir, ['none']);
+      manager.validateExtensionOverrides([]);
+      expect(consoleErrorSpy).not.toHaveBeenCalled();
+    });
   });
 });
 

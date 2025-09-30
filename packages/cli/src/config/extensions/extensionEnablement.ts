@@ -121,6 +121,7 @@ export class ExtensionEnablementManager {
 
   validateExtensionOverrides(extensions: Extension[]) {
     for (const name of this.enabledExtensionNamesOverride) {
+      if (name === 'none') continue;
       if (
         !extensions.some(
           (ext) => ext.config.name.toLowerCase() === name.toLowerCase(),
