@@ -124,6 +124,7 @@ async function main() {
       `  - Channel: ${channel} → npm tag: ${channel === 'stable' ? 'latest' : 'preview'}`,
     );
     console.log(`  - Version: ${version}`);
+    console.log(`  - Commit: ${commitHash}`);
     console.log(`  - Release ref: ${releaseRef}`);
     console.log(`  - Workflow: ${workflowId}`);
     console.log(`  - Dry run: ${isDryRun}`);
