@@ -208,14 +208,12 @@ describe('FixLLMEditWithInstruction', () => {
       const firstResponse: SearchReplaceEdit = {
         search: 'original text',
         replace: 'first replacement',
-        noChangesRequired: false,
         explanation: 'First edit correction',
       };
 
       const secondResponse: SearchReplaceEdit = {
         search: 'different text',
         replace: 'second replacement',
-        noChangesRequired: false,
         explanation: 'Second edit correction',
       };
 
@@ -268,14 +266,12 @@ describe('FixLLMEditWithInstruction', () => {
       const yamlResponse: SearchReplaceEdit = {
         search: '---\ntitle: Old\n---',
         replace: '---\ntitle: New\n---',
-        noChangesRequired: false,
         explanation: 'Updated YAML frontmatter',
       };
 
       const contentResponse: SearchReplaceEdit = {
         search: 'old content',
         replace: 'new content',
-        noChangesRequired: false,
         explanation: 'Updated content',
       };
 
