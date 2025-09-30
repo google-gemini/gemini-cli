@@ -830,6 +830,7 @@ A good instruction should concisely answer:
       const directories = workspaceContext.getDirectories();
       return `File path must be within one of the workspace directories: ${directories.join(', ')}`;
     }
+
     return null;
   }
 
