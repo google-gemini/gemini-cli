@@ -26,6 +26,9 @@ This documentation is organized into the following sections:
 - **[Themes](./cli/themes.md):** Themes for Gemini CLI.
 - **[Token Caching](./cli/token-caching.md):** Token caching and optimization.
 - **[Tutorials](./cli/tutorials.md):** Tutorials for Gemini CLI.
+- **[Checkpointing](./cli/checkpointing.md):** Documentation for the checkpointing feature.
+- **[Telemetry](./cli/telemetry.md):** Overview of telemetry in the CLI.
+- **[Trusted Folders](./cli/trusted-folders.md):** An overview of the Trusted Folders security feature.
 
 ### Core
 
@@ -54,14 +57,11 @@ This documentation is organized into the following sections:
 - **[IDE Integration](./ide-integration/index.md):** Connect the CLI to your editor.
 - **[IDE Companion Extension Spec](./ide-integration/ide-companion-spec.md):** Spec for building IDE companion extensions.
 
-### Other topics
+### About the Gemini CLI project
 
 - **[Architecture Overview](./architecture.md):** Understand the high-level design of Gemini CLI, including its components and how they interact.
-- **[Checkpointing](./cli/checkpointing.md):** Documentation for the checkpointing feature.
-- **[Telemetry](./cli/telemetry.md):** Overview of telemetry in the CLI.
-- **[Trusted Folders](./cli/trusted-folders.md):** An overview of the Trusted Folders security feature.
 - **[Contributing & Development Guide](../CONTRIBUTING.md):** Information for contributors and developers, including setup, building, testing, and coding conventions.
-- **[NPM](./npm.md):** Details on how the project's packages are structured
+- **[NPM](./npm.md):** Details on how the project's packages are structured.
 - **[Troubleshooting Guide](./troubleshooting.md):** Find solutions to common problems and FAQs.
 - **[Terms of Service and Privacy Notice](./tos-privacy.md):** Information on the terms of service and privacy notices applicable to your use of Gemini CLI.
 - **[Releases](./releases.md):** Information on the project's releases and deployment cadence.
