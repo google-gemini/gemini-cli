@@ -27,6 +27,7 @@
     <notificationGroup id="Gemini CLI"
       displayType="BALLOON"/>
     <projectService serviceImplementation="com.google.gemini.cli.GeminiCliProjectService"/>
+    <applicationService serviceImplementation="com.google.gemini.cli.settings.GeminiCliSettingsState"/>
   </extensions>
 
   <applicationListeners>
