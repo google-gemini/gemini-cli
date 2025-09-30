@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { requestConsentInteractive } from '../../config/extension.js';
 import {
   updateAllUpdatableExtensions,
   type ExtensionUpdateInfo,
@@ -51,6 +52,12 @@ async function updateAction(context: CommandContext, args: string) {
     if (all) {
       updateInfos = await updateAllUpdatableExtensions(
         context.services.config!.getWorkingDir(),
+        // We don't have the ability to prompt for consent yet in this flow.
+        (description) =>
+          requestConsentInteractive(
+            description,
+            context.ui.addConfirmUpdateExtensionRequest,
+          ),
         context.services.config!.getExtensions(),
         context.ui.extensionsUpdateState,
         context.ui.setExtensionsUpdateState,
@@ -75,6 +82,11 @@ async function updateAction(context: CommandContext, args: string) {
         const updateInfo = await updateExtension(
           extension,
           workingDir,
+          (description) =>
+            requestConsentInteractive(
+              description,
+              context.ui.addConfirmUpdateExtensionRequest,
+            ),
           context.ui.extensionsUpdateState.get(extension.name) ??
             ExtensionUpdateState.UNKNOWN,
           (updateState) => {
@@ -130,6 +142,19 @@ const updateExtensionsCommand: SlashCommand = {
   description: 'Update extensions. Usage: update <extension-names>|--all',
   kind: CommandKind.BUILT_IN,
   action: updateAction,
+  completion: async (context, partialArg) => {
+    const extensions = context.services.config?.getExtensions() ?? [];
+    const extensionNames = extensions.map((ext) => ext.name);
+    const suggestions = extensionNames.filter((name) =>
+      name.startsWith(partialArg),
+    );
+
+    if ('--all'.startsWith(partialArg) || 'all'.startsWith(partialArg)) {
+      suggestions.unshift('--all');
+    }
+
+    return suggestions;
+  },
 };
 
 export const extensionsCommand: SlashCommand = {
