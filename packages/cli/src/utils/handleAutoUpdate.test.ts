@@ -123,12 +123,16 @@ describe('handleAutoUpdate', () => {
     expect(mockSpawn).not.toHaveBeenCalled();
   });
 
-  it('should suppress update notifications when running via npx', () => {
+  it.each([
+    PackageManager.NPX,
+    PackageManager.PNPX,
+    PackageManager.BUNX,
+  ])('should suppress update notifications when running via %s', (packageManager) => {
     mockGetInstallationInfo.mockReturnValue({
       updateCommand: undefined,
-      updateMessage: 'Running via npx, update not applicable.',
+      updateMessage: `Running via ${packageManager}, update not applicable.`,
       isGlobal: false,
-      packageManager: PackageManager.NPX,
+      packageManager,
     });
 
     handleAutoUpdate(mockUpdateInfo, mockSettings, '/root', mockSpawn);

@@ -33,9 +33,11 @@ export function handleAutoUpdate(
   );
 
   if (
-    installationInfo.packageManager === PackageManager.NPX ||
-    installationInfo.packageManager === PackageManager.PNPX ||
-    installationInfo.packageManager === PackageManager.BUNX
+    [
+      PackageManager.NPX,
+      PackageManager.PNPX,
+      PackageManager.BUNX
+    ].includes(installationInfo.packageManager)
   ) {
     return;
   }
