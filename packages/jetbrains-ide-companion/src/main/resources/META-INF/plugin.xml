@@ -40,7 +40,7 @@
   <actions>
     <!-- Add your actions here -->
     <action id="RunGeminiCLI" class="com.google.gemini.cli.RunGeminiCLIAction" text="Run Gemini CLI"
-      description="Run Gemini CLI in integrated terminal" icon="/icons/gemini-icon.svg">
+      description="Run Gemini CLI in integrated terminal" icon="/icons/icon.svg">
       <add-to-group group-id="MainToolbarRight" anchor="last"/>
       <add-to-group group-id="ProjectViewToolbar" anchor="last"/>
       <add-to-group group-id="ToolsMenu" anchor="last"/>
