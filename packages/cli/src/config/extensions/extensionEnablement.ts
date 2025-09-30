@@ -145,7 +145,7 @@ export class ExtensionEnablementManager {
     // Typically, this comes from the user passing `-e none`.
     if (
       this.enabledExtensionNamesOverride.length === 1 &&
-      this.enabledExtensionNamesOverride[0].toLowerCase() === 'none'
+      this.enabledExtensionNamesOverride[0] === 'none'
     ) {
       return false;
     }
