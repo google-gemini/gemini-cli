@@ -457,7 +457,7 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(({ di
       const dialog = document.createElement('div');
       dialog.className = 'fixed inset-0 bg-black/50 flex items-center justify-center z-[1000]';
       dialog.innerHTML = `
-        <div class="bg-card border border-border rounded-lg shadow-lg w-full max-w-md mx-4 text-foreground">
+        <div class="bg-card border border-border rounded-lg shadow-lg w-full max-w-2xl mx-4 text-foreground">
           <div class="p-4 border-b border-border">
             <h3 class="text-lg font-medium text-foreground">Role Compatibility Warning</h3>
           </div>
@@ -476,17 +476,17 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(({ di
               </div>
             </div>
           </div>
-          <div class="p-4 border-t border-border flex flex-wrap justify-end gap-2">
-            <button id="cancel-btn" class="px-3 py-2 text-sm rounded-md border border-border hover:bg-muted transition-colors">
+          <div class="p-4 border-t border-border flex justify-start gap-3">
+            <button id="cancel-btn" class="px-4 py-2 text-sm rounded-md border border-border hover:bg-muted transition-colors">
               Cancel
             </button>
-            <button id="continue-btn" class="px-3 py-2 text-sm rounded-md bg-orange-100 dark:bg-orange-900/50 text-orange-800 dark:text-orange-200 hover:bg-orange-200 dark:hover:bg-orange-900 transition-colors">
+            <button id="continue-btn" class="px-4 py-2 text-sm rounded-md bg-orange-100 dark:bg-orange-900/50 text-orange-800 dark:text-orange-200 hover:bg-orange-200 dark:hover:bg-orange-900 transition-colors">
               Continue Anyway
             </button>
-            <button id="update-btn" class="px-3 py-2 text-sm rounded-md bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-200 hover:bg-green-200 dark:hover:bg-green-900 transition-colors">
+            <button id="update-btn" class="px-4 py-2 text-sm rounded-md bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-200 hover:bg-green-200 dark:hover:bg-green-900 transition-colors">
               Update Session to ${currentRoleName}
             </button>
-            <button id="switch-btn" class="px-3 py-2 text-sm rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors">
+            <button id="switch-btn" class="px-4 py-2 text-sm rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors">
               Switch to ${sessionRoleName}
             </button>
           </div>
@@ -723,7 +723,7 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(({ di
 
           // Finalize current assistant message streaming first
           if (currentAssistantMessageId && assistantContent.trim()) {
-            // Update the existing message with final content
+            // Update the existing message with final content and add tool call
             const currentSession = useAppStore.getState().sessions.find(s => s.id === activeSessionId);
             if (currentSession) {
               const messageIndex = currentSession.messages.findIndex(m => m.id === currentAssistantMessageId);
@@ -734,7 +734,7 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(({ di
                   content: assistantContent,
                   toolCalls: event.toolCall ? [event.toolCall] : undefined
                 };
-                
+
                 updateSession(activeSessionId, {
                   messages: updatedMessages,
                   updatedAt: new Date()
@@ -742,8 +742,9 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(({ di
               }
             }
 
+            // Clear streaming display and prepare for new content after tool execution
             setStreamingMessage('');
-            // Reset for next message
+            // Reset for new message after tool call
             assistantContent = '';
             currentAssistantMessageId = null;
             hasCreatedInitialMessage = false;
@@ -794,11 +795,9 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(({ di
                 updatedAt: new Date()
               });
             }
-            
-            // Reset state for potential next LLM response
-            assistantContent = '';
-            currentAssistantMessageId = null;
-            hasCreatedInitialMessage = false;
+
+            // Don't reset state here - LLM might continue streaming after tool response
+            // State will be reset only when a new message starts or conversation ends
           }
         }
         else if (event.type === 'compression') {
