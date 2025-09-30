@@ -24,10 +24,21 @@ const PYTHON_URLS = {
 const REQUIRED_PACKAGES = [
   'xlwings',
   'pandas',
+  'numpy',
   'openpyxl',
   'requests',
   'pillow',
-  'markitdown'
+  'markitdown',
+  'chromadb',
+  'tvscreener',
+  'yfinance',
+  'ta',
+  'selenium',
+  'beautifulsoup4',
+  'lxml',
+  'feedparser',
+  'textblob',
+  'trafilatura'
 ];
 
 function log(message) {
