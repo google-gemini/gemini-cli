@@ -84,15 +84,17 @@ async function main() {
   // New format: hotfix/v0.5.3/preview/cherry-pick-abc -> v0.5.3 and preview
   // Old format: hotfix/v0.5.3/cherry-pick-abc -> v0.5.3 and stable (default)
   const parts = headRef.split('/');
-  const [, , version, branchChannel] = parts;
   let channel = 'stable'; // default for old format
+  const version = parts[1];
 
-  if (
-    parts.length >= 5 &&
-    (branchChannel === 'stable' || branchChannel === 'preview')
+  if (parts.length >= 5 && (parts[3] === 'stable' || parts[3] === 'preview')) {
+    channel = parts[3];
+  } else if (
+    parts.length >= 4 &&
+    (parts[2] === 'stable' || parts[2] === 'preview')
   ) {
     // New format with explicit channel
-    channel = branchChannel;
+    channel = parts[2];
   } else if (context.eventName === 'workflow_dispatch') {
     // Manual dispatch, infer from version name
     channel = version.includes('preview') ? 'preview' : 'stable';
