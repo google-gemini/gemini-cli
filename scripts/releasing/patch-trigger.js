@@ -115,6 +115,9 @@ async function main() {
   console.log(`Release ref: ${releaseRef}`);
   console.log(`Workflow ID: ${workflowId}`);
   console.log(`Dry run: ${isDryRun}`);
+  console.log(
+    `Github token: ${process.env.process.env.GITHUB_TOKEN ? 'hasToken' : 'noToken'}`,
+  );
 
   if (testMode) {
     console.log('\n🧪 TEST MODE - No API calls will be made');
