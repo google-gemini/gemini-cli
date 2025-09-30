@@ -7,7 +7,7 @@
 import { describe, it, expect, beforeEach, beforeAll } from 'vitest';
 import { MarkItDownTool } from './markitdown-tool.js';
 import type { Config } from '../config/config.js';
-import { appendFileSync, writeFileSync } from 'fs';
+import { appendFileSync, writeFileSync } from 'node:fs';
 
 // Mock the config
 const mockConfig: Config = {
@@ -95,7 +95,7 @@ def hello_world():
 
 describe('MarkItDownTool - REAL EXECUTION TESTS', () => {
   let markitdownTool: MarkItDownTool;
-  let testFiles: string[] = [];
+  const testFiles: string[] = [];
 
   beforeAll(() => {
     // Initialize the output file for REAL results
@@ -306,7 +306,7 @@ describe('MarkItDownTool - REAL EXECUTION TESTS', () => {
     it('should handle invalid parameters gracefully', async () => {
       try {
         const params = {
-          op: 'invalid_operation' as any,
+          op: 'invalid_operation' as unknown as 'convert',
           file_path: 'C:\\tmp\\test.txt'
         };
 
@@ -336,7 +336,17 @@ describe('MarkItDownTool - REAL EXECUTION TESTS', () => {
 
   describe('Tool configuration and metadata', () => {
     it('should have correct parameter schema', () => {
-      const schema = markitdownTool['parameterSchema'] as any;
+      interface ParameterSchema {
+        type: string;
+        required: string[];
+        properties: {
+          op: { enum: string[] };
+          file_path: { type: string };
+          output_path: { type: string };
+          include_metadata: { type: string };
+        };
+      }
+      const schema = markitdownTool['parameterSchema'] as ParameterSchema;
 
       expect(schema.type).toBe('object');
       expect(schema.required).toContain('op');
