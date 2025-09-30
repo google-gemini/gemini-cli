@@ -8,6 +8,7 @@ build/
 *.iws
 *.ipr
 out/
+.intellijPlatform/
 
 # Mac
 .DS_Store
