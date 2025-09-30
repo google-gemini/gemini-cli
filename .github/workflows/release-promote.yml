@@ -86,13 +86,23 @@ jobs:
           echo "PREVIOUS_STABLE_TAG=$(echo "${STABLE_JSON}" | jq -r .previousReleaseTag)" >> "${GITHUB_OUTPUT}"
           echo "PREVIEW_VERSION=$(echo "${PREVIEW_JSON}" | jq -r .releaseVersion)" >> "${GITHUB_OUTPUT}"
           # shellcheck disable=SC1083
-          echo "PREVIEW_SHA=$(git ls-remote origin '${{ github.event.inputs.ref }}' | awk '{print $1}')" >> "${GITHUB_OUTPUT}"
+          REF="${{ github.event.inputs.ref }}"
+          SHA=$(git ls-remote origin "$REF" | awk '{print $1}')
+          if [ -z "$SHA" ]; then
+            if [[ "$REF" =~ ^[0-9a-f]{7,40}$ ]]; then
+              SHA="$REF"
+            else
+              echo "::error::Could not resolve ref '$REF' to a commit SHA."
+              exit 1
+            fi
+          fi
+          echo "PREVIEW_SHA=$SHA" >> "${GITHUB_OUTPUT}"
           echo "PREVIOUS_PREVIEW_TAG=$(echo "${PREVIEW_JSON}" | jq -r .previousReleaseTag)" >> "${GITHUB_OUTPUT}"
           echo "NEXT_NIGHTLY_VERSION=$(echo "${NIGHTLY_JSON}" | jq -r .releaseVersion)" >> "${GITHUB_OUTPUT}"
           echo "PREVIOUS_NIGHTLY_TAG=$(echo "${NIGHTLY_JSON}" | jq -r .previousReleaseTag)" >> "${GITHUB_OUTPUT}"
           CURRENT_NIGHTLY_TAG=$(git describe --tags --abbrev=0 --match="*nightly*")
           echo "CURRENT_NIGHTLY_TAG=${CURRENT_NIGHTLY_TAG}" >> "${GITHUB_OUTPUT}"
-          echo "NEXT_SHA=$(git ls-remote origin '${{ github.event.inputs.ref }}' | awk '{print $1}')" >> "${GITHUB_OUTPUT}"
+          echo "NEXT_SHA=$SHA" >> "${GITHUB_OUTPUT}"
 
       - name: 'Display Pending Updates'
         run: |
