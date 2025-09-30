@@ -10,11 +10,18 @@ import express from 'express';
 import { type Server as HTTPServer } from 'node:http';
 
 import { randomUUID } from 'node:crypto';
+import type { Tool } from '@modelcontextprotocol/sdk/types.js';
 
 export class TestMcpServer {
   private server: HTTPServer | undefined;
+  public requests: unknown[] = [];
 
-  async start(): Promise<number> {
+  /**
+   * Starts the mock MCP server.
+   * @param tools A map of tool names to their implementations.
+   *   This allows tests to inject custom or failing tool implementations.
+   */
+  async start(tools?: Record<string, Tool>): Promise<number> {
     const app = express();
     app.use(express.json());
     const mcpServer = new McpServer(
@@ -22,7 +29,7 @@ export class TestMcpServer {
         name: 'test-mcp-server',
         version: '1.0.0',
       },
-      { capabilities: {} },
+      { capabilities: { tools } },
     );
 
     const transport = new StreamableHTTPServerTransport({
@@ -31,6 +38,7 @@ export class TestMcpServer {
     mcpServer.connect(transport);
 
     app.post('/mcp', async (req, res) => {
+      this.requests.push(req.body);
       await transport.handleRequest(req, res, req.body);
     });
 
@@ -45,6 +53,10 @@ export class TestMcpServer {
       });
       this.server.on('error', reject);
     });
+  }
+
+  getRequests() {
+    return this.requests;
   }
 
   async stop(): Promise<void> {
