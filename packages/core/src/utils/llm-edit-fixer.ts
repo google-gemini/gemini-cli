@@ -26,6 +26,7 @@ You will be given:
 2. The exact \`search\` and \`replace\` strings that failed.
 3. The error message that was produced.
 4. The full content of the source file.
+5. Potential matching snippets from the file to help you locate the intended edit area.
 
 # Rules for Correction
 1.  **Minimal Correction:** Your new \`search\` string must be a close variation of the original. Focus on fixing issues like whitespace, indentation, line endings, or small contextual differences.
@@ -54,6 +55,11 @@ const EDIT_USER_PROMPT = `
 <error>
 {error}
 </error>
+
+# Potential Match Areas in File
+Here are some snippets from the file that might contain the text you need to match. Use these as a guide.
+{snippets}
+
 
 # Full File Content
 <file_content>
@@ -105,6 +111,7 @@ export async function FixLLMEditWithInstruction(
   new_string: string,
   error: string,
   current_content: string,
+  snippets: string,
   baseLlmClient: BaseLlmClient,
   abortSignal: AbortSignal,
 ): Promise<SearchReplaceEdit> {
@@ -116,7 +123,7 @@ export async function FixLLMEditWithInstruction(
     );
   }
 
-  const cacheKey = `${instruction}---${old_string}---${new_string}--${current_content}--${error}`;
+  const cacheKey = `${instruction}---${old_string}---${new_string}--${current_content}--${error}--${snippets}`;
   const cachedResult = editCorrectionWithInstructionCache.get(cacheKey);
   if (cachedResult) {
     return cachedResult;
@@ -125,6 +132,11 @@ export async function FixLLMEditWithInstruction(
     .replace('{old_string}', old_string)
     .replace('{new_string}', new_string)
     .replace('{error}', error)
+    .replace(
+      '{snippets}',
+      snippets ||
+        'No specific snippets found. Please analyze the full file content.',
+    )
     .replace('{current_content}', current_content);
 
   const contents: Content[] = [

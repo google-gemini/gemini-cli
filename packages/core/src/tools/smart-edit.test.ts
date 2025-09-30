@@ -45,6 +45,7 @@ import {
   SmartEditTool,
   type EditToolParams,
   calculateReplacement,
+  findPotentialMatchSnippets,
 } from './smart-edit.js';
 import { applyReplacement } from './edit.js';
 import { type FileDiff, ToolConfirmationOutcome } from './tools.js';
@@ -239,6 +240,111 @@ describe('SmartEditTool', () => {
       });
       expect(result.newContent).toBe(content);
       expect(result.occurrences).toBe(0);
+    });
+  });
+
+  describe('findPotentialMatchSnippets', () => {
+    it('should return an empty string if old_string is empty', () => {
+      const content = 'line 1\nline 2\nline 3';
+      const result = findPotentialMatchSnippets('', content);
+      expect(result).toBe('');
+    });
+
+    it('should return an empty string if content is empty', () => {
+      const oldString = 'find me';
+      const result = findPotentialMatchSnippets(oldString, '');
+      expect(result).toBe('');
+    });
+
+    it('should return an empty string if no key lines are found', () => {
+      const oldString = 'this is not present';
+      const content = 'line 1\nline 2\nline 3';
+      const result = findPotentialMatchSnippets(oldString, content);
+      expect(result).toBe('');
+    });
+
+    it('should find a snippet for a single-line old_string', () => {
+      const oldString = 'the second line';
+      const content = 'the first line\nthe second line\nthe third line';
+      const result = findPotentialMatchSnippets(oldString, content);
+      const expectedSnippet = `Lines 1-3:
+\`\`\`
+the first line
+the second line
+the third line
+\`\`\``;
+      expect(result).toBe(expectedSnippet);
+    });
+
+    it('should find snippets for a multi-line old_string', () => {
+      const oldString = 'line 2\nline 3\nline 4';
+      const content = 'line 1\nline 2\nline 3\nline 4\nline 5\nline 6\nline 7';
+      const result = findPotentialMatchSnippets(oldString, content);
+      const expectedSnippets = [
+        `Lines 1-4:
+\`\`\`
+line 1
+line 2
+line 3
+line 4
+\`\`\``,
+        `Lines 1-5:
+\`\`\`
+line 1
+line 2
+line 3
+line 4
+line 5
+\`\`\``,
+        `Lines 2-6:
+\`\`\`
+line 2
+line 3
+line 4
+line 5
+line 6
+\`\`\``,
+      ].join('\n\n');
+      expect(result).toBe(expectedSnippets);
+    });
+
+    it('should handle matches at the beginning of the file', () => {
+      const oldString = 'line 1';
+      const content = 'line 1\nline 2\nline 3\nline 4\nline 5';
+      const result = findPotentialMatchSnippets(oldString, content);
+      const expectedSnippet = `Lines 1-3:
+\`\`\`
+line 1
+line 2
+line 3
+\`\`\``;
+      expect(result).toBe(expectedSnippet);
+    });
+
+    it('should handle matches at the end of the file', () => {
+      const oldString = 'line 5';
+      const content = 'line 1\nline 2\nline 3\nline 4\nline 5';
+      const result = findPotentialMatchSnippets(oldString, content);
+      const expectedSnippet = `Lines 3-5:
+\`\`\`
+line 3
+line 4
+line 5
+\`\`\``;
+      expect(result).toBe(expectedSnippet);
+    });
+
+    it('should ignore whitespace differences when searching for key lines', () => {
+      const oldString = '  line 2  ';
+      const content = 'line 1\n    line 2\nline 3';
+      const result = findPotentialMatchSnippets(oldString, content);
+      const expectedSnippet = `Lines 1-3:
+\`\`\`
+line 1
+    line 2
+line 3
+\`\`\``;
+      expect(result).toBe(expectedSnippet);
     });
   });
   describe('correctPath', () => {

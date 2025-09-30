@@ -270,6 +270,48 @@ interface CalculatedEdit {
   originalLineEnding: '\r\n' | '\n';
 }
 
+/**
+ * Finds potential matching snippets in the content based on lines from the old string.
+ * @param oldString The string to find snippets for.
+ * @param content The content to search within.
+ * @returns A formatted string of snippets with line numbers, or an empty string.
+ */
+export function findPotentialMatchSnippets(
+  oldString: string,
+  content: string,
+): string {
+  const oldStringLines = oldString
+    .split('\n')
+    .map((l) => l.trim())
+    .filter(Boolean);
+  if (oldStringLines.length === 0) {
+    return '';
+  }
+
+  const contentLines = content.split('\n');
+  const snippets = new Set<string>();
+
+  // Use a few key lines for searching to find anchors
+  const keyLines = [
+    oldStringLines[0],
+    oldStringLines[Math.floor(oldStringLines.length / 2)],
+    oldStringLines[oldStringLines.length - 1],
+  ];
+
+  for (const keyLine of [...new Set(keyLines)]) {
+    for (let i = 0; i < contentLines.length; i++) {
+      if (contentLines[i].trim() === keyLine) {
+        const start = Math.max(0, i - 2);
+        const end = Math.min(contentLines.length, i + 3);
+        snippets.add(
+          `Lines ${start + 1}-${end}:\n\`\`\`\n${contentLines.slice(start, end).join('\n')}\n\`\`\``,
+        );
+      }
+    }
+  }
+  return Array.from(snippets).join('\n\n');
+}
+
 class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
   constructor(
     private readonly config: Config,
@@ -287,12 +329,17 @@ class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
     abortSignal: AbortSignal,
     originalLineEnding: '\r\n' | '\n',
   ): Promise<CalculatedEdit> {
+    const snippets = findPotentialMatchSnippets(
+      params.old_string,
+      currentContent,
+    );
     const fixedEdit = await FixLLMEditWithInstruction(
       params.instruction,
       params.old_string,
       params.new_string,
       initialError.raw,
       currentContent,
+      snippets,
       this.config.getBaseLlmClient(),
       abortSignal,
     );
