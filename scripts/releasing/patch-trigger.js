@@ -140,7 +140,7 @@ async function main() {
 
       // Split search string into searchArgs to prevent triple escaping on the quoted filters
       const searchArgs =
-        `repo:${context.repo.owner}/${context.repo.repo} is:pr is:all in:comments "Patch PR Created" "${headRef}"`.split(
+        `repo:${context.repo.owner}/${context.repo.repo} is:pr in:comments "Patch PR Created" "${headRef}"`.split(
           ' ',
         );
       console.log('Search args:', searchArgs);
