@@ -5,10 +5,10 @@ import javax.swing.JLabel
 import java.awt.BorderLayout
 
 class GeminiCliToolWindowContent {
-    val contentPanel: JBPanel<*>
+  val contentPanel: JBPanel<*>
 
-    init {
-        contentPanel = JBPanel<JBPanel<*>>(BorderLayout())
-        contentPanel.add(JLabel("Gemini CLI Companion"), BorderLayout.CENTER)
-    }
+  init {
+    contentPanel = JBPanel<JBPanel<*>>(BorderLayout())
+    contentPanel.add(JLabel("Gemini CLI Companion"), BorderLayout.CENTER)
+  }
 }

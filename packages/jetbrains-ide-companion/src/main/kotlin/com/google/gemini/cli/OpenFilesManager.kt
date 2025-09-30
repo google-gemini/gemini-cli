@@ -3,7 +3,6 @@ package com.google.gemini.cli
 
 import com.intellij.ide.impl.isTrusted
 import com.intellij.openapi.Disposable
-import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.editor.EditorFactory
 import com.intellij.openapi.editor.event.CaretEvent
@@ -29,184 +28,184 @@ const val MAX_FILES = 10
 const val MAX_SELECTED_TEXT_LENGTH = 16384 // 16 KiB limit
 
 data class File(
-    var path: String,
-    var timestamp: Long,
-    var isActive: Boolean,
-    var cursor: Cursor? = null,
-    var selectedText: String? = null
+  var path: String,
+  var timestamp: Long,
+  var isActive: Boolean,
+  var cursor: Cursor? = null,
+  var selectedText: String? = null
 )
 
 data class Cursor(
-    val line: Int,
-    val character: Int
+  val line: Int,
+  val character: Int
 )
 
 data class IdeContext(
-    val workspaceState: WorkspaceState?
+  val workspaceState: WorkspaceState?
 )
 
 data class WorkspaceState(
-    val openFiles: List<File>,
-    val isTrusted: Boolean
+  val openFiles: List<File>,
+  val isTrusted: Boolean
 )
 
 interface IdeContextListener : EventListener {
-    fun onIdeContextUpdate()
+  fun onIdeContextUpdate()
 }
 
 class OpenFilesManager(private val project: Project) : Disposable {
-    private val openFiles = mutableListOf<File>()
-    private val connection: MessageBusConnection = project.messageBus.connect(this)
-    private val alarm = Alarm(Alarm.ThreadToUse.POOLED_THREAD, this)
-    private val publisher = project.messageBus.syncPublisher(IDE_CONTEXT_TOPIC)
+  private val openFiles = mutableListOf<File>()
+  private val connection: MessageBusConnection = project.messageBus.connect(this)
+  private val alarm = Alarm(Alarm.ThreadToUse.POOLED_THREAD, this)
+  private val publisher = project.messageBus.syncPublisher(IDE_CONTEXT_TOPIC)
 
-    companion object {
-        private val LOG = Logger.getInstance(OpenFilesManager::class.java)
-        val IDE_CONTEXT_TOPIC = Topic.create("Gemini IDE Context Update", IdeContextListener::class.java)
-    }
+  companion object {
+    private val LOG = Logger.getInstance(OpenFilesManager::class.java)
+    val IDE_CONTEXT_TOPIC = Topic.create("Gemini IDE Context Update", IdeContextListener::class.java)
+  }
 
-    init {
-        LOG.info("Initializing OpenFilesManager for project: ${project.name}")
-        connection.subscribe(FileEditorManagerListener.FILE_EDITOR_MANAGER, object : FileEditorManagerListener {
-            override fun fileOpened(source: FileEditorManager, file: VirtualFile) {
-                LOG.info("File opened: ${file.path}")
-                addOrMoveToFront(file)
-                fireWithDebounce()
-            }
+  init {
+    LOG.info("Initializing OpenFilesManager for project: ${project.name}")
+    connection.subscribe(FileEditorManagerListener.FILE_EDITOR_MANAGER, object : FileEditorManagerListener {
+      override fun fileOpened(source: FileEditorManager, file: VirtualFile) {
+        LOG.info("File opened: ${file.path}")
+        addOrMoveToFront(file)
+        fireWithDebounce()
+      }
 
-            override fun fileClosed(source: FileEditorManager, file: VirtualFile) {
-                LOG.info("File closed: ${file.path}")
-                remove(file)
-                fireWithDebounce()
-            }
+      override fun fileClosed(source: FileEditorManager, file: VirtualFile) {
+        LOG.info("File closed: ${file.path}")
+        remove(file)
+        fireWithDebounce()
+      }
 
-            override fun selectionChanged(event: FileEditorManagerEvent) {
-                event.newFile?.let {
-                    LOG.info("Selection changed to new file: ${it.path}")
-                    addOrMoveToFront(it)
-                    fireWithDebounce()
-                }
-            }
-        })
-
-        EditorFactory.getInstance().eventMulticaster.addCaretListener(object : CaretListener {
-            override fun caretPositionChanged(event: CaretEvent) {
-                val file = event.editor.virtualFile ?: return
-                val activeFile = openFiles.firstOrNull { it.isActive } ?: return
-
-                if (file.path == activeFile.path) {
-                    val logicalPosition = event.newPosition
-                    activeFile.cursor = Cursor(logicalPosition.line + 1, logicalPosition.column)
-                    LOG.info("Caret position changed in ${file.path} to L:${activeFile.cursor?.line} C:${activeFile.cursor?.character}")
-                    fireWithDebounce()
-                }
-            }
-        }, this)
-
-        EditorFactory.getInstance().eventMulticaster.addSelectionListener(object : SelectionListener {
-            override fun selectionChanged(event: SelectionEvent) {
-                val file = event.editor.virtualFile ?: return
-                val activeFile = openFiles.firstOrNull { it.isActive } ?: return
-
-                if (file.path == activeFile.path) {
-                    var selectedText: String? = event.editor.selectionModel.selectedText
-                    if (selectedText != null && selectedText.length > MAX_SELECTED_TEXT_LENGTH) {
-                        selectedText = selectedText.substring(0, MAX_SELECTED_TEXT_LENGTH) + "... [TRUNCATED]"
-                    }
-                    activeFile.selectedText = selectedText
-                    LOG.info("Selection changed in ${file.path}: ${selectedText?.take(50)}...")
-                    fireWithDebounce()
-                }
-            }
-        }, this)
-
-        connection.subscribe(VirtualFileManager.VFS_CHANGES, object : BulkFileListener {
-            override fun after(events: List<VFileEvent>) {
-                var changed = false
-                for (event in events) {
-                    when (event) {
-                        is VFileDeleteEvent -> {
-                            if (openFiles.removeIf { it.path == event.file.path }) {
-                                LOG.info("File deleted and removed from list: ${event.file.path}")
-                                changed = true
-                            }
-                        }
-                        is VFilePropertyChangeEvent -> {
-                            if (event.propertyName == VirtualFile.PROP_NAME) {
-                                val parentPath = event.file.parent?.path
-                                val oldFileName = event.oldValue as? String
-                                if (parentPath != null && oldFileName != null) {
-                                    val oldAbsolutePath = "$parentPath/$oldFileName"
-                                    val file = openFiles.find { it.path == oldAbsolutePath }
-                                    if (file != null) {
-                                        val newAbsolutePath = event.file.path
-                                        file.path = newAbsolutePath
-                                        file.timestamp = System.currentTimeMillis()
-                                        LOG.info("File rename detected and path updated. From: $oldAbsolutePath, To: $newAbsolutePath")
-                                        changed = true
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-                if (changed) {
-                    fireWithDebounce()
-                }
-            }
-        })
-    }
-
-    private fun isFileUri(file: VirtualFile): Boolean {
-        return file.isInLocalFileSystem
-    }
-
-    private fun addOrMoveToFront(file: VirtualFile) {
-        if (!isFileUri(file)) return
-
-        openFiles.find { it.isActive }?.apply {
-            isActive = false
-            cursor = null
-            selectedText = null
+      override fun selectionChanged(event: FileEditorManagerEvent) {
+        event.newFile?.let {
+          LOG.info("Selection changed to new file: ${it.path}")
+          addOrMoveToFront(it)
+          fireWithDebounce()
         }
+      }
+    })
 
-        val index = openFiles.indexOfFirst { it.path == file.path }
-        if (index != -1) {
-            openFiles.removeAt(index)
+    EditorFactory.getInstance().eventMulticaster.addCaretListener(object : CaretListener {
+      override fun caretPositionChanged(event: CaretEvent) {
+        val file = event.editor.virtualFile ?: return
+        val activeFile = openFiles.firstOrNull { it.isActive } ?: return
+
+        if (file.path == activeFile.path) {
+          val logicalPosition = event.newPosition
+          activeFile.cursor = Cursor(logicalPosition.line + 1, logicalPosition.column)
+          LOG.info("Caret position changed in ${file.path} to L:${activeFile.cursor?.line} C:${activeFile.cursor?.character}")
+          fireWithDebounce()
         }
+      }
+    }, this)
 
-        openFiles.add(0, File(
-            path = file.path,
-            timestamp = System.currentTimeMillis(),
-            isActive = true
-        ))
+    EditorFactory.getInstance().eventMulticaster.addSelectionListener(object : SelectionListener {
+      override fun selectionChanged(event: SelectionEvent) {
+        val file = event.editor.virtualFile ?: return
+        val activeFile = openFiles.firstOrNull { it.isActive } ?: return
 
-        if (openFiles.size > MAX_FILES) {
-            openFiles.removeLast()
+        if (file.path == activeFile.path) {
+          var selectedText: String? = event.editor.selectionModel.selectedText
+          if (selectedText != null && selectedText.length > MAX_SELECTED_TEXT_LENGTH) {
+            selectedText = selectedText.substring(0, MAX_SELECTED_TEXT_LENGTH) + "... [TRUNCATED]"
+          }
+          activeFile.selectedText = selectedText
+          LOG.info("Selection changed in ${file.path}: ${selectedText?.take(50)}...")
+          fireWithDebounce()
         }
+      }
+    }, this)
+
+    connection.subscribe(VirtualFileManager.VFS_CHANGES, object : BulkFileListener {
+      override fun after(events: List<VFileEvent>) {
+        var changed = false
+        for (event in events) {
+          when (event) {
+            is VFileDeleteEvent -> {
+              if (openFiles.removeIf { it.path == event.file.path }) {
+                LOG.info("File deleted and removed from list: ${event.file.path}")
+                changed = true
+              }
+            }
+            is VFilePropertyChangeEvent -> {
+              if (event.propertyName == VirtualFile.PROP_NAME) {
+                val parentPath = event.file.parent?.path
+                val oldFileName = event.oldValue as? String
+                if (parentPath != null && oldFileName != null) {
+                  val oldAbsolutePath = "$parentPath/$oldFileName"
+                  val file = openFiles.find { it.path == oldAbsolutePath }
+                  if (file != null) {
+                    val newAbsolutePath = event.file.path
+                    file.path = newAbsolutePath
+                    file.timestamp = System.currentTimeMillis()
+                    LOG.info("File rename detected and path updated. From: $oldAbsolutePath, To: $newAbsolutePath")
+                    changed = true
+                  }
+                }
+              }
+            }
+          }
+        }
+        if (changed) {
+          fireWithDebounce()
+        }
+      }
+    })
+  }
+
+  private fun isFileUri(file: VirtualFile): Boolean {
+    return file.isInLocalFileSystem
+  }
+
+  private fun addOrMoveToFront(file: VirtualFile) {
+    if (!isFileUri(file)) return
+
+    openFiles.find { it.isActive }?.apply {
+      isActive = false
+      cursor = null
+      selectedText = null
     }
 
-    private fun remove(file: VirtualFile) {
-        openFiles.removeIf { it.path == file.path }
+    val index = openFiles.indexOfFirst { it.path == file.path }
+    if (index != -1) {
+      openFiles.removeAt(index)
     }
 
-    private fun fireWithDebounce() {
-        alarm.cancelAllRequests()
-        alarm.addRequest({
-            publisher.onIdeContextUpdate()
-        }, 50)
-    }
+    openFiles.add(0, File(
+      path = file.path,
+      timestamp = System.currentTimeMillis(),
+      isActive = true
+    ))
 
-    fun getState(): IdeContext {
-        return IdeContext(
-            workspaceState = WorkspaceState(
-                openFiles = openFiles.toList(),
-                isTrusted = project.isTrusted()
-            )
-        )
+    if (openFiles.size > MAX_FILES) {
+      openFiles.removeLast()
     }
+  }
 
-    override fun dispose() {
-        connection.disconnect()
-    }
+  private fun remove(file: VirtualFile) {
+    openFiles.removeIf { it.path == file.path }
+  }
+
+  private fun fireWithDebounce() {
+    alarm.cancelAllRequests()
+    alarm.addRequest({
+      publisher.onIdeContextUpdate()
+    }, 50)
+  }
+
+  fun getState(): IdeContext {
+    return IdeContext(
+      workspaceState = WorkspaceState(
+        openFiles = openFiles.toList(),
+        isTrusted = project.isTrusted()
+      )
+    )
+  }
+
+  override fun dispose() {
+    connection.disconnect()
+  }
 }
