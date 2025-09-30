@@ -68,7 +68,7 @@ jobs:
         run: |
           # Capture output and display it in logs using tee
           {
-            node scripts/releasing/create-patch-pr.js --commit=${{ github.event.inputs.commit }} --channel=${{ github.event.inputs.channel }} --dry-run=${{ github.event.inputs.dry_run }}
+            node scripts/releasing/create-patch-pr.js --commit=${{ github.event.inputs.commit }} --channel=${{ github.event.inputs.channel }} --pullRequestNumber=${{ github.event.inputs.original_pr }} --dry-run=${{ github.event.inputs.dry_run }}
             echo "EXIT_CODE=$?" >> "$GITHUB_OUTPUT"
           } 2>&1 | tee >(
             echo "LOG_CONTENT<<EOF" >> "$GITHUB_ENV"

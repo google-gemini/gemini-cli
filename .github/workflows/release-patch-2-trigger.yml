@@ -32,6 +32,11 @@ on:
         required: false
         type: 'boolean'
         default: false
+      test_mode:
+        description: 'Whether or not to run in test mode'
+        required: false
+        type: 'boolean'
+        default: false
 
 jobs:
   trigger-patch-release:
@@ -68,5 +73,6 @@ jobs:
           GITHUB_EVENT_NAME: '${{ github.event_name }}'
           GITHUB_EVENT_PAYLOAD: '${{ toJSON(github.event) }}'
           FORCE_SKIP_TESTS: '${{ github.event.inputs.force_skip_tests }}'
+          TEST_MODE: '${{ github.event.inputs.test_mode }}'
         run: |
-          node scripts/releasing/patch-trigger.js
+          node scripts/releasing/patch-trigger.js --dry-run=${{ github.event.inputs.dry_run }}
