@@ -7,9 +7,9 @@ import com.intellij.openapi.wm.ToolWindowFactory
 import com.intellij.ui.content.ContentFactory
 
 class GeminiCliToolWindowFactory : ToolWindowFactory, DumbAware {
-    override fun createToolWindowContent(project: Project, toolWindow: ToolWindow) {
-        val toolWindowContent = GeminiCliToolWindowContent()
-        val content = ContentFactory.SERVICE.getInstance().createContent(toolWindowContent.contentPanel, "", false)
-        toolWindow.contentManager.addContent(content)
-    }
+  override fun createToolWindowContent(project: Project, toolWindow: ToolWindow) {
+    val toolWindowContent = GeminiCliToolWindowContent()
+    val content = ContentFactory.SERVICE.getInstance().createContent(toolWindowContent.contentPanel, "", false)
+    toolWindow.contentManager.addContent(content)
+  }
 }

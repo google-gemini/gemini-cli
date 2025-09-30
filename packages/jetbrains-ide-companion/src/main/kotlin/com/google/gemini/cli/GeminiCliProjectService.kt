@@ -7,29 +7,33 @@ import com.intellij.openapi.project.Project
 
 @Service(Service.Level.PROJECT)
 class GeminiCliProjectService(private val project: Project) : Disposable {
-    private var openFilesManager: OpenFilesManager? = null
-    private var diffManager: DiffManager? = null
-    private var ideServer: IDEServer? = null
+  private var openFilesManager: OpenFilesManager? = null
+  private var diffManager: DiffManager? = null
+  private var ideServer: IDEServer? = null
 
-    init {
-        openFilesManager = OpenFilesManager(project)
-        diffManager = DiffManager(project)
-        diffManager?.let {
-            ideServer = IDEServer(it)
-            ideServer?.start()
-        }
+  init {
+    openFilesManager = OpenFilesManager(project)
+    diffManager = DiffManager(project)
+    diffManager?.let {
+      ideServer = IDEServer(project, it)
+      ideServer?.start()
     }
+  }
 
-    override fun dispose() {
-        openFilesManager?.dispose()
-        ideServer?.stop()
-    }
+  override fun dispose() {
+    openFilesManager?.dispose()
+    ideServer?.stop()
+  }
 
-    fun notifyDiffAccepted(filePath: String, content: String) {
-        ideServer?.notifyDiffAccepted(filePath, content)
-    }
+  fun getServerPort(): Int? {
+    return ideServer?.getServerPort()
+  }
 
-    fun notifyDiffClosed(filePath: String, content: String) {
-        ideServer?.notifyDiffClosed(filePath, content)
-    }
+  fun notifyDiffAccepted(filePath: String, content: String) {
+    ideServer?.notifyDiffAccepted(filePath, content)
+  }
+
+  fun notifyDiffClosed(filePath: String, content: String) {
+    ideServer?.notifyDiffClosed(filePath, content)
+  }
 }
