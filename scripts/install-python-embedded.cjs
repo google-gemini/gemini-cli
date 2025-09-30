@@ -131,38 +131,97 @@ function extractZip(zipPath, extractDir) {
   }
 }
 
-function setupPip(pythonDir) {
+async function setupPip(pythonDir) {
   log('Setting up pip...');
   const pythonExe = path.join(pythonDir, 'python.exe');
   const getPipPath = path.join(pythonDir, 'get-pip.py');
 
-  // Download get-pip.py if it doesn't exist
-  if (!fs.existsSync(getPipPath)) {
+  // Check if pip is already installed
+  try {
+    execSync(`"${pythonExe}" -m pip --version`, { stdio: 'pipe' });
+    log('pip is already installed');
+    return;
+  } catch {
+    log('pip not found, installing...');
+  }
+
+  // Download get-pip.py if it doesn't exist or is outdated
+  if (!fs.existsSync(getPipPath) || fs.statSync(getPipPath).size < 1000) {
     log('Downloading get-pip.py...');
-    return downloadFile('https://bootstrap.pypa.io/get-pip.py', getPipPath)
-      .then(() => {
-        log('Installing pip...');
-        execSync(`"${pythonExe}" "${getPipPath}"`, { stdio: 'inherit' });
-      });
-  } else {
-    log('get-pip.py already exists, installing pip...');
-    execSync(`"${pythonExe}" "${getPipPath}"`, { stdio: 'inherit' });
+    if (fs.existsSync(getPipPath)) {
+      fs.unlinkSync(getPipPath); // Remove potentially corrupted file
+    }
+    await downloadFile('https://bootstrap.pypa.io/get-pip.py', getPipPath);
+  }
+
+  // Install pip with retry logic
+  let retries = 3;
+  while (retries > 0) {
+    try {
+      log('Installing pip...');
+      execSync(`"${pythonExe}" "${getPipPath}"`, { stdio: 'inherit' });
+
+      // Verify pip installation
+      execSync(`"${pythonExe}" -m pip --version`, { stdio: 'pipe' });
+      log('✅ pip installed successfully');
+      break;
+    } catch (error) {
+      retries--;
+      if (retries === 0) {
+        throw new Error(`Failed to install pip after 3 attempts: ${error.message}`);
+      }
+      log(`Installation failed, retrying... (${retries} attempts remaining)`);
+      // Wait a bit before retry
+      await new Promise(resolve => setTimeout(resolve, 2000));
+    }
   }
 }
 
-function installRequiredPackages(pythonDir) {
+async function installRequiredPackages(pythonDir) {
   log('Installing required Python packages...');
   const pythonExe = path.join(pythonDir, 'python.exe');
 
+  // First, upgrade pip to latest version
+  try {
+    log('Upgrading pip to latest version...');
+    execSync(`"${pythonExe}" -m pip install --upgrade pip`, { stdio: 'inherit' });
+  } catch (err) {
+    log('Warning: Failed to upgrade pip, continuing with current version');
+  }
+
+  const failedPackages = [];
+
   for (const pkg of REQUIRED_PACKAGES) {
     try {
+      // Check if package is already installed
+      try {
+        execSync(`"${pythonExe}" -m pip show ${pkg}`, { stdio: 'pipe' });
+        log(`✅ ${pkg} is already installed`);
+        continue;
+      } catch {
+        // Package not installed, proceed to install
+      }
+
       log(`Installing ${pkg}...`);
-      execSync(`"${pythonExe}" -m pip install ${pkg} --quiet`, { stdio: 'inherit' });
+      // Use --no-cache-dir to avoid cache issues and remove --quiet for better debugging
+      execSync(`"${pythonExe}" -m pip install ${pkg} --no-cache-dir`, { stdio: 'inherit' });
+
+      // Verify installation
+      execSync(`"${pythonExe}" -m pip show ${pkg}`, { stdio: 'pipe' });
       log(`✅ ${pkg} installed successfully`);
-    } catch (error) {
-      error(`Failed to install ${pkg}: ${error.message}`);
+    } catch (err) {
+      error(`Failed to install ${pkg}: ${err.message}`);
+      failedPackages.push(pkg);
       // Continue with other packages
     }
+  }
+
+  if (failedPackages.length > 0) {
+    error(`⚠️ Failed to install the following packages: ${failedPackages.join(', ')}`);
+    error('You may need to install them manually using:');
+    error(`"${pythonExe}" -m pip install ${failedPackages.join(' ')}`);
+  } else {
+    log('✅ All required packages installed successfully!');
   }
 }
 
@@ -171,10 +230,12 @@ function setupPythonPath(pythonDir) {
 
   // Create or update python313._pth file to include site-packages
   const pthFile = path.join(pythonDir, `python${PYTHON_VERSION.replace('.', '').substring(0, 3)}._pth`);
+  // Use platform-specific path separator for Windows
+  const pathSep = process.platform === 'win32' ? '\\' : '/';
   const pthContent = `python${PYTHON_VERSION.replace('.', '').substring(0, 3)}.zip
 .
 Lib
-Lib/site-packages
+Lib${pathSep}site-packages
 
 # Uncomment to run site.main() automatically
 import site
@@ -228,7 +289,7 @@ async function installPythonEmbedded() {
     await setupPip(PYTHON_DIR);
 
     // Install required packages
-    installRequiredPackages(PYTHON_DIR);
+    await installRequiredPackages(PYTHON_DIR);
 
     log('✅ Python embedded environment installation completed successfully!');
 
