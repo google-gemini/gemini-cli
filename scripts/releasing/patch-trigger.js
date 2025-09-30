@@ -138,6 +138,11 @@ async function main() {
       console.log('Looking for original PR using search...');
       const { execFileSync } = await import('node:child_process');
 
+      // Split search string into searchArgs to prevent triple escaping on the quoted filters
+      const searchArgs =
+        `repo:${context.repo.owner}/${context.repo.repo} is:pr is:all in:comments "Patch PR Created" "${headRef}"`.split(
+          ' ',
+        );
       // Use gh CLI to search for PRs with comments referencing the hotfix branch
       const result = execFileSync(
         'gh',
@@ -148,12 +153,7 @@ async function main() {
           'number,title',
           '--limit',
           '1',
-          `repo:${context.repo.owner}/${context.repo.repo}`,
-          'is:pr',
-          'is:all',
-          'in:comments',
-          `"${headRef}"`,
-          `"Patch Created"`,
+          ...searchArgs,
         ],
         {
           encoding: 'utf8',
