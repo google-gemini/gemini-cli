@@ -30,7 +30,7 @@ You will be given:
 # Rules for Correction
 1.  **Minimal Correction:** Your new \`search\` string must be a close variation of the original. Focus on fixing issues like whitespace, indentation, line endings, or small contextual differences.
 2.  **Explain the Fix:** Your \`explanation\` MUST state exactly why the original \`search\` failed and how your new \`search\` string resolves that specific failure. (e.g., "The original search failed due to incorrect indentation; the new search corrects the indentation to match the source file.").
-3.  **Preserve the \`replace\` String:** Do NOT modify the \`replace\` string unless the instruction explicitly requires it and it was the source of the error. Your primary focus is fixing the \`search\` string.
+3.  **Preserve the \`replace\` String:** Do NOT modify the \`replace\` string unless the instruction explicitly requires it and it was the source of the error. Do not escape any characters in \`replace\`. Your primary focus is fixing the \`search\` string.
 4.  **Exactness:** The final \`search\` field must be the EXACT literal text from the file. Do not escape characters.
 `;
 
