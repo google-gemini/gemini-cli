@@ -227,6 +227,42 @@ describe('ExtensionEnablementManager', () => {
     );
   });
 
+  describe('extension overrides (-e <name>)', () => {
+    beforeEach(() => {
+      manager = new ExtensionEnablementManager(configDir, ['ext-test']);
+    });
+
+    it('can enable extensions, case-insensitive', () => {
+      manager.disable('ext-test', true, '/');
+      expect(manager.isEnabled('ext-test', '/')).toBe(true);
+      expect(manager.isEnabled('Ext-Test', '/')).toBe(true);
+      // Double check that it would have been disabled otherwise
+      expect(
+        new ExtensionEnablementManager(configDir).isEnabled('ext-test', '/'),
+      ).toBe(false);
+    });
+
+    it('disable all other extensions', () => {
+      manager = new ExtensionEnablementManager(configDir, ['ext-test']);
+      manager.enable('ext-test-2', true, '/');
+      expect(manager.isEnabled('ext-test-2', '/')).toBe(false);
+      // Double check that it would have been enabled otherwise
+      expect(
+        new ExtensionEnablementManager(configDir).isEnabled('ext-test-2', '/'),
+      ).toBe(true);
+    });
+
+    it('none disables all extensions', () => {
+      manager = new ExtensionEnablementManager(configDir, ['none']);
+      manager.enable('ext-test', true, '/');
+      expect(manager.isEnabled('ext-test', '/path/to/dir')).toBe(false);
+      // Double check that it would have been enabled otherwise
+      expect(
+        new ExtensionEnablementManager(configDir).isEnabled('ext-test', '/'),
+      ).toBe(true);
+    });
+  });
+
   describe('validateExtensionOverrides', () => {
     let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
 

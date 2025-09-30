@@ -152,7 +152,11 @@ export class ExtensionEnablementManager {
 
     // If we have explicit overrides, only enable those extensions.
     if (this.enabledExtensionNamesOverride.length > 0) {
-      return this.enabledExtensionNamesOverride.includes(extensionName);
+      // When checking against overrides ONLY, we use a case insensitive match.
+      // The override names are already lowercased in the constructor.
+      return this.enabledExtensionNamesOverride.includes(
+        extensionName.toLocaleLowerCase(),
+      );
     }
 
     // Otherwise, we use the configuration settings
