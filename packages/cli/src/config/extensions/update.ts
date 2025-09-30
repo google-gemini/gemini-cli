@@ -75,7 +75,7 @@ export async function updateExtension(
       setExtensionUpdateState(ExtensionUpdateState.ERROR);
       throw new Error('Updated extension not found after installation.');
     }
-    const updatedVersion = updatedExtension.config.version;
+    const updatedVersion = updatedExtension.version;
     setExtensionUpdateState(ExtensionUpdateState.UPDATED_NEEDS_RESTART);
     return {
       name: extension.name,
