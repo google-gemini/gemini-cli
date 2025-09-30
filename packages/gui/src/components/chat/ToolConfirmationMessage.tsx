@@ -99,66 +99,150 @@ const ToolConfirmationMessage: React.FC<ToolConfirmationMessageProps> = ({
     </div>
   );
 
-  const renderExecConfirmation = (details: ToolExecuteConfirmationDetails) => (
-    <div className="flex gap-3">
-      {/* Assistant Avatar */}
-      <div className="flex-shrink-0 w-8 h-8 rounded-full bg-secondary flex items-center justify-center">
-        <AlertTriangle className="h-4 w-4 text-red-600" />
-      </div>
-      
-      {/* Message Content */}
-      <div className="flex-1 min-w-0">
-        <Card className="border-red-200 bg-red-50/50 dark:bg-red-950/10 dark:border-red-800/50">
-          <CardContent className="p-4 space-y-3">
-            <div className="flex items-center gap-2 text-sm font-medium text-red-800 dark:text-red-200">
-              <Server className="h-4 w-4" />
-              Tool wants to execute command
-            </div>
-            
-            <div className="bg-white dark:bg-gray-900 rounded-md border border-red-200/50 dark:border-red-800/50">
-              <div className="px-3 py-2 text-xs font-medium text-gray-600 dark:text-gray-400 border-b border-red-200/50 dark:border-red-800/50">
-                Command to execute:
-              </div>
-              <div className="p-3">
-                <code className="text-sm font-mono bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded block">
-                  {details.command}
-                </code>
-              </div>
-            </div>
+  const renderExecConfirmation = (details: ToolExecuteConfirmationDetails) => {
+    // Parse tool information from command and rootCommand
+    const parseToolInfo = () => {
+      const { command, rootCommand } = details;
 
-            <div className="text-sm font-medium text-red-800 dark:text-red-200">
-              Do you want to allow execution of: '{details.rootCommand}'?
-            </div>
-            
-            <div className="flex flex-wrap gap-2">
-              <Button
-                size="sm"
-                onClick={() => handleConfirm(ToolConfirmationOutcome.ProceedOnce)}
-                className="bg-green-600 hover:bg-green-700 text-white"
-              >
-                Allow once
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => handleConfirm(ToolConfirmationOutcome.ProceedAlways)}
-                className="border-green-600 text-green-700 hover:bg-green-50 dark:border-green-500 dark:text-green-400 dark:hover:bg-green-950"
-              >
-                Always allow
-              </Button>
-              <Button
-                size="sm"
-                variant="destructive"
-                onClick={() => handleConfirm(ToolConfirmationOutcome.Cancel)}
-              >
-                Cancel
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+      // Extract tool name from rootCommand (format: toolname_python)
+      const toolName = rootCommand.replace(/_python$/, '');
+
+      // Extract operation from Python code if possible
+      let operation = 'execute';
+      let parameters: string[] = [];
+
+      // Look for operation patterns in the command (using 'op=' parameter)
+      const opMatch = command.match(/op\s*=\s*["']([^"']+)["']/);
+      if (opMatch) {
+        operation = opMatch[1];
+      }
+
+      // Extract requirements if present
+      const reqMatch = command.match(/\(requires:\s*([^)]+)\)/);
+      const requirements = reqMatch ? reqMatch[1].split(', ') : [];
+
+      // Extract key parameters from the code
+      const paramMatches = command.match(/(\w+)\s*=\s*["']([^"']+)["']/g);
+      if (paramMatches) {
+        parameters = paramMatches
+          .filter(p => !p.includes('op ='))
+          .map(p => {
+            const [key, value] = p.split('=');
+            return `${key.trim()}: ${value.replace(/["']/g, '').trim()}`;
+          })
+          .slice(0, 3); // Limit to first 3 parameters
+      }
+
+      return { toolName, operation, requirements, parameters };
+    };
+
+    const { toolName, operation, requirements, parameters } = parseToolInfo();
+
+    return (
+      <div className="flex gap-3">
+        {/* Assistant Avatar */}
+        <div className="flex-shrink-0 w-8 h-8 rounded-full bg-secondary flex items-center justify-center">
+          <AlertTriangle className="h-4 w-4 text-red-600" />
+        </div>
+
+        {/* Message Content */}
+        <div className="flex-1 min-w-0">
+          <Card className="border-red-200 bg-red-50/50 dark:bg-red-950/10 dark:border-red-800/50">
+            <CardContent className="p-4 space-y-3">
+              <div className="flex items-center gap-2 text-sm font-medium text-red-800 dark:text-red-200">
+                <Server className="h-4 w-4" />
+                Tool wants to execute Python code
+              </div>
+
+              {/* Tool Information */}
+              <div className="bg-white dark:bg-gray-900 rounded-md border border-red-200/50 dark:border-red-800/50 p-3 space-y-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Tool:</span>
+                  <span className="px-2 py-1 text-xs bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded border border-blue-300 dark:border-blue-600 font-mono">
+                    {toolName}
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Operation:</span>
+                  <span className="px-2 py-1 text-xs bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300 rounded border border-green-300 dark:border-green-600 font-mono">
+                    {operation}
+                  </span>
+                </div>
+
+                {parameters.length > 0 && (
+                  <div className="flex items-start gap-2">
+                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300 mt-0.5">Parameters:</span>
+                    <div className="flex flex-wrap gap-1">
+                      {parameters.map((param, idx) => (
+                        <span key={idx} className="px-2 py-1 text-xs bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded border border-gray-300 dark:border-gray-600 font-mono">
+                          {param}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {requirements.length > 0 && (
+                  <div className="flex items-start gap-2">
+                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300 mt-0.5">Requires:</span>
+                    <div className="flex flex-wrap gap-1">
+                      {requirements.map((req, idx) => (
+                        <span key={idx} className="px-2 py-1 text-xs bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-300 rounded border border-purple-300 dark:border-purple-600 font-mono">
+                          {req.trim()}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Collapsible Code Section */}
+              <details className="bg-white dark:bg-gray-900 rounded-md border border-red-200/50 dark:border-red-800/50">
+                <summary className="px-3 py-2 text-xs font-medium text-gray-600 dark:text-gray-400 border-b border-red-200/50 dark:border-red-800/50 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                  View Python code
+                </summary>
+                <div className="p-3 max-h-32 overflow-auto">
+                  <code className="text-xs font-mono text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
+                    {details.command}
+                  </code>
+                </div>
+              </details>
+
+              <div className="text-sm font-medium text-red-800 dark:text-red-200">
+                Do you want to allow execution of "{toolName}" tool with operation "{operation}"?
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  size="sm"
+                  onClick={() => handleConfirm(ToolConfirmationOutcome.ProceedOnce)}
+                  className="bg-green-600 hover:bg-green-700 text-white"
+                >
+                  Allow once
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => handleConfirm(ToolConfirmationOutcome.ProceedAlways)}
+                  className="border-green-600 text-green-700 hover:bg-green-50 dark:border-green-500 dark:text-green-400 dark:hover:bg-green-950"
+                >
+                  Always allow
+                </Button>
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  onClick={() => handleConfirm(ToolConfirmationOutcome.Cancel)}
+                >
+                  Cancel
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   const renderMcpConfirmation = (details: ToolMcpConfirmationDetails) => (
     <Card className="border-purple-200 bg-purple-50 dark:bg-purple-950/20 dark:border-purple-800">
