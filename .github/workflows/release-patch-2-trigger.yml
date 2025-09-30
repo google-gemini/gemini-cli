@@ -42,11 +42,10 @@ jobs:
   trigger-patch-release:
     if: "(github.event_name == 'pull_request' && github.event.pull_request.merged == true && startsWith(github.event.pull_request.head.ref, 'hotfix/')) || github.event_name == 'workflow_dispatch'"
     runs-on: 'ubuntu-latest'
-    permissions: write-all
-      # read-all: 'write'
-      # actions: 'write'
-      # contents: 'write'
-      # pull-requests: 'write'
+    permissions:
+      actions: 'write'
+      contents: 'write'
+      pull-requests: 'write'
     steps:
       - name: 'Checkout'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
