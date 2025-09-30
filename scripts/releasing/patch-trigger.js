@@ -143,6 +143,7 @@ async function main() {
         `repo:${context.repo.owner}/${context.repo.repo} is:pr is:all in:comments "Patch PR Created" "${headRef}"`.split(
           ' ',
         );
+      console.log('Search args:', searchArgs);
       // Use gh CLI to search for PRs with comments referencing the hotfix branch
       const result = execFileSync(
         'gh',
