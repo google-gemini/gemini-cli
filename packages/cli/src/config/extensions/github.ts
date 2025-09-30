@@ -132,7 +132,7 @@ export async function checkForExtensionUpdate(
       setExtensionUpdateState(ExtensionUpdateState.ERROR);
       return;
     }
-    if (newExtension.config.version !== extension.version) {
+    if (newExtension.version !== extension.version) {
       setExtensionUpdateState(ExtensionUpdateState.UPDATE_AVAILABLE);
       return;
     }
