@@ -330,10 +330,10 @@ export function annotateActiveExtensions(
   manager: ExtensionEnablementManager,
 ): GeminiCLIExtension[] {
   manager.validateExtensionOverrides(extensions);
-  return extensions.map((extension) => {
-    extension.isActive = manager.isEnabled(extension.name, workspaceDir);
-    return extension;
-  });
+  return extensions.map((extension) => ({
+    ...extension,
+    isActive: manager.isEnabled(extension.name, workspaceDir),
+  }));
 }
 
 /**
