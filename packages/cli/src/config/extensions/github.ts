@@ -423,7 +423,7 @@ function extractFile(file: string, dest: string) {
     args = ['-xzf', file, '-C', dest];
     command = 'tar';
   } else if (file.endsWith('.zip')) {
-    args = ['-xf', file, '-C', dest];
+    args = [file, '-d', dest];
     command = 'unzip';
   } else {
     throw new Error(`Unsupported file extension for extraction: ${file}`);
