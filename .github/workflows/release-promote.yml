@@ -40,6 +40,8 @@ jobs:
       PREVIOUS_PREVIEW_TAG: '${{ steps.versions.outputs.PREVIOUS_PREVIEW_TAG }}'
       NEXT_NIGHTLY_VERSION: '${{ steps.versions.outputs.NEXT_NIGHTLY_VERSION }}'
       PREVIOUS_NIGHTLY_TAG: '${{ steps.versions.outputs.PREVIOUS_NIGHTLY_TAG }}'
+      CURRENT_NIGHTLY_TAG: '${{ steps.versions.outputs.CURRENT_NIGHTLY_TAG }}'
+      NEXT_SHA: '${{ steps.versions.outputs.NEXT_SHA }}'
 
     steps:
       - name: 'Checkout'
