@@ -26,7 +26,7 @@ DO NOT use this tool for simple tasks that can be completed in less than 2 steps
 
 - pending: Work has not begun on a given subtask.
 - in_progress: Marked just prior to beginning work on a given subtask. You should only have one subtask as in_progress at a time.
-- completed: Subtask was succesfully completed with no errors or issues. If the subtask required more steps to complete, update the todo list with the subtasks. All steps should be identified as completed only when they are completed.
+- completed: Subtask was successfully completed with no errors or issues. If the subtask required more steps to complete, update the todo list with the subtasks. All steps should be identified as completed only when they are completed.
 - cancelled: As you update the todo list, some tasks are not required anymore due to the dynamic nature of the task. In this case, mark the subtasks as cancelled.
 
 

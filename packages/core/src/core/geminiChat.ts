@@ -645,7 +645,7 @@ export class GeminiChat {
         if (this.isMutatorFunctionCall(part)) {
           if (foundMutatorFunctionCall) {
             // This is the second mutator call.
-            // Truncate and return immedaitely.
+            // Truncate and return immediately.
             const newChunk = new GenerateContentResponse();
             newChunk.candidates = [
               {
