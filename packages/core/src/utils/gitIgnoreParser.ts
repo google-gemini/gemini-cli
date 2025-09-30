@@ -57,16 +57,29 @@ export class GitIgnoreParser implements GitIgnoreFilter {
   }
 
   isIgnored(filePath: string): boolean {
-    const resolved = path.resolve(this.projectRoot, filePath);
-    const relativePath = path.relative(this.projectRoot, resolved);
+    try {
+      const resolved = path.resolve(this.projectRoot, filePath);
+      const relativePath = path.relative(this.projectRoot, resolved);
 
-    if (relativePath === '' || relativePath.startsWith('..')) {
+      if (relativePath === '' || relativePath.startsWith('..')) {
+        return false;
+      }
+
+      // Check if relativePath is actually still an absolute path (can happen on some systems)
+      if (path.isAbsolute(relativePath)) {
+        // This shouldn't happen with path.relative(), but if it does,
+        // it means the path is outside the project root
+        return false;
+      }
+
+      // Even in windows, Ignore expects forward slashes.
+      const normalizedPath = relativePath.replace(/\\/g, '/');
+      return this.ig.ignores(normalizedPath);
+    } catch (error) {
+      // Handle any errors that might occur with international characters
+      console.warn(`GitIgnore: Failed to process path "${filePath}":`, error);
       return false;
     }
-
-    // Even in windows, Ignore expects forward slashes.
-    const normalizedPath = relativePath.replace(/\\/g, '/');
-    return this.ig.ignores(normalizedPath);
   }
 
   getPatterns(): string[] {
