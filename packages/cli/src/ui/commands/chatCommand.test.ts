@@ -256,6 +256,48 @@ describe('chatCommand', () => {
         content: `Conversation checkpoint saved with tag: ${tag}.`,
       });
     });
+
+    describe('completion', () => {
+      it('should provide completion suggestions', async () => {
+        const fakeFiles = ['checkpoint-alpha.json', 'checkpoint-beta.json'];
+        mockFs.readdir.mockImplementation(
+          (async (_: string): Promise<string[]> =>
+            fakeFiles as string[]) as unknown as typeof fsPromises.readdir,
+        );
+
+        mockFs.stat.mockImplementation(
+          (async (_: string): Promise<Stats> =>
+            ({
+              mtime: new Date(),
+            }) as Stats) as unknown as typeof fsPromises.stat,
+        );
+
+        const result = await saveCommand?.completion?.(mockContext, 'a');
+
+        expect(result).toEqual(['alpha']);
+      });
+
+      it('should suggest filenames sorted by modified time (newest first)', async () => {
+        const fakeFiles = ['checkpoint-test1.json', 'checkpoint-test2.json'];
+        const date = new Date();
+        mockFs.readdir.mockImplementation(
+          (async (_: string): Promise<string[]> =>
+            fakeFiles as string[]) as unknown as typeof fsPromises.readdir,
+        );
+        mockFs.stat.mockImplementation((async (
+          path: string,
+        ): Promise<Stats> => {
+          if (path.endsWith('test1.json')) {
+            return { mtime: date } as Stats;
+          }
+          return { mtime: new Date(date.getTime() + 1000) } as Stats;
+        }) as unknown as typeof fsPromises.stat);
+
+        const result = await saveCommand?.completion?.(mockContext, '');
+        // Sort items by last modified time (newest first)
+        expect(result).toEqual(['test2', 'test1']);
+      });
+    });
   });
 
   describe('resume subcommand', () => {
