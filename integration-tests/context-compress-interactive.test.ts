@@ -33,7 +33,7 @@ describe('Interactive Mode', () => {
         5000,
       );
 
-      // Press "Enter" to select the default auth option if auth dialog came up
+      // select the second option if auth dialog come's up
       if (authDialogAppeared) {
         ptyProcess.write('2');
       }
@@ -54,7 +54,7 @@ describe('Interactive Mode', () => {
       await rig.waitForText('einstein', 25000);
 
       await type(ptyProcess, '/compress');
-      // Add a small delay to allow React to re-render the command list.
+      // A small delay to allow React to re-render the command list.
       await new Promise((resolve) => setTimeout(resolve, 100));
       await type(ptyProcess, '\r');
 
@@ -83,7 +83,7 @@ describe('Interactive Mode', () => {
         5000,
       );
 
-      // 2. Press "Enter" to select the default auth option if auth dialog came up
+      // select the second option if auth dialog come's up
       if (authDialogAppeared) {
         ptyProcess.write('2');
       }
@@ -110,7 +110,6 @@ describe('Interactive Mode', () => {
         25000,
       );
 
-      // A simple check for the failure message in the output
       expect(compressionFailed).toBe(true);
     },
   );
