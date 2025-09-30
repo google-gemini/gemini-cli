@@ -142,6 +142,19 @@ const updateExtensionsCommand: SlashCommand = {
   description: 'Update extensions. Usage: update <extension-names>|--all',
   kind: CommandKind.BUILT_IN,
   action: updateAction,
+  completion: async (context, partialArg) => {
+    const extensions = context.services.config?.getExtensions() ?? [];
+    const extensionNames = extensions.map((ext) => ext.name);
+    const suggestions = extensionNames.filter((name) =>
+      name.startsWith(partialArg),
+    );
+
+    if ('--all'.startsWith(partialArg) || 'all'.startsWith(partialArg)) {
+      suggestions.unshift('--all');
+    }
+
+    return suggestions;
+  },
 };
 
 export const extensionsCommand: SlashCommand = {
