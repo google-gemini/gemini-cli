@@ -833,7 +833,8 @@ export class TestRig {
       options.shell = process.env.COMSPEC || 'cmd.exe';
     }
 
-    const ptyProcess = pty.spawn(command, commandArgs, options);
+    const executable = command === 'node' ? process.execPath : command;
+    const ptyProcess = pty.spawn(executable, commandArgs, options);
 
     ptyProcess.onData((data) => {
       this._interactiveOutput += data;
