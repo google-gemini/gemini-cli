@@ -9,7 +9,7 @@ import type { ChatMessage, CompressionInfo, ToolCallConfirmationDetails } from '
 
 // Status type for different operations
 export type OperationStatus = {
-  type: 'thinking' | 'tool_executing' | 'streaming' | 'compressing';
+  type: 'thinking' | 'tool_executing' | 'streaming' | 'compressing' | 'tool_awaiting_approval';
   message: string;
   details?: string;
   toolName?: string;
