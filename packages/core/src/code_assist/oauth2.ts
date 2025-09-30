@@ -103,18 +103,33 @@ async function initOauthClient(
 
   // If there are cached creds on disk, they always take precedence
   if (await loadCachedCredentials(client)) {
-    // Found valid cached credentials.
-    // Check if we need to retrieve Google Account ID or Email
-    if (!userAccountManager.getCachedGoogleAccount()) {
-      try {
-        await fetchAndCacheUserInfo(client);
-      } catch (error) {
-        // Non-fatal, continue with existing auth.
-        console.warn('Failed to fetch user info:', getErrorMessage(error));
+    // Found cached credentials, but verify they're still valid
+    try {
+      // Attempt to get an access token to verify/refresh credentials
+      // This will automatically refresh the token if it's expired
+      await client.getAccessToken();
+
+      // Check if we need to retrieve Google Account ID or Email
+      if (!userAccountManager.getCachedGoogleAccount()) {
+        try {
+          await fetchAndCacheUserInfo(client);
+        } catch (error) {
+          // Non-fatal, continue with existing auth.
+          console.warn('Failed to fetch user info:', getErrorMessage(error));
+        }
       }
+      console.log('Loaded cached credentials.');
+      return client;
+    } catch (error) {
+      // Cached credentials are invalid or refresh failed
+      // Clear them and continue to interactive auth flow
+      console.warn(
+        'Cached credentials invalid or refresh failed:',
+        getErrorMessage(error),
+      );
+      console.log('Re-authentication required.');
+      // Don't return here, continue to the authentication flow below
     }
-    console.log('Loaded cached credentials.');
-    return client;
   }
 
   // In Google Cloud Shell, we can use Application Default Credentials (ADC)
@@ -162,7 +177,7 @@ async function initOauthClient(
     const webLogin = await authWithWeb(client);
 
     console.log(
-      `\n\nCode Assist login required.\n` +
+      `\n\nCode Assist authentication required.\n` +
         `Attempting to open authentication page in your browser.\n` +
         `Otherwise navigate to:\n\n${webLogin.authUrl}\n\n`,
     );
