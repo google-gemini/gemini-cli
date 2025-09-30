@@ -195,13 +195,32 @@ export class TestRig {
     execSync('sync', { cwd: this.testDir! });
   }
 
+  /**
+   * The command and args to use to invoke Gemini CLI. Allows us to switch
+   * between using the bundled gemini.js (the default) and using the installed
+   * 'gemini' (used to verify npm bundles).
+   */
+  private _getCommandAndArgs(extraInitialArgs: string[] = []): {
+    command: string;
+    initialArgs: string[];
+  } {
+    const isNpmReleaseTest =
+      process.env.INTEGRATION_TEST_USE_INSTALLED_GEMINI === 'true';
+    const command = isNpmReleaseTest ? 'gemini' : 'node';
+    const initialArgs = isNpmReleaseTest
+      ? extraInitialArgs
+      : [this.bundlePath, ...extraInitialArgs];
+    return { command, initialArgs };
+  }
+
   run(
     promptOrOptions:
       | string
       | { prompt?: string; stdin?: string; stdinDoesNotEnd?: boolean },
     ...args: string[]
   ): Promise<string> {
-    const commandArgs = [this.bundlePath, '--yolo'];
+    const { command, initialArgs } = this._getCommandAndArgs(['--yolo']);
+    const commandArgs = [...initialArgs];
     const execOptions: {
       cwd: string;
       encoding: 'utf-8';
@@ -227,7 +246,7 @@ export class TestRig {
 
     commandArgs.push(...args);
 
-    const child = spawn('node', commandArgs, {
+    const child = spawn(command, commandArgs, {
       cwd: this.testDir!,
       stdio: 'pipe',
       env: process.env,
@@ -331,9 +350,10 @@ export class TestRig {
     args: string[],
     options: { stdin?: string } = {},
   ): Promise<string> {
-    const commandArgs = [this.bundlePath, ...args];
+    const { command, initialArgs } = this._getCommandAndArgs();
+    const commandArgs = [...initialArgs, ...args];
 
-    const child = spawn('node', commandArgs, {
+    const child = spawn(command, commandArgs, {
       cwd: this.testDir!,
       stdio: 'pipe',
     });
@@ -766,9 +786,10 @@ export class TestRig {
     ptyProcess: pty.IPty;
     promise: Promise<{ exitCode: number; signal?: number; output: string }>;
   } {
-    const commandArgs = [this.bundlePath, '--yolo', ...args];
+    const { command, initialArgs } = this._getCommandAndArgs(['--yolo']);
+    const commandArgs = [...initialArgs, ...args];
 
-    const ptyProcess = pty.spawn('node', commandArgs, {
+    const ptyProcess = pty.spawn(command, commandArgs, {
       name: 'xterm-color',
       cols: 80,
       rows: 30,
