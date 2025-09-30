@@ -31,6 +31,7 @@ import { JPXInvestorTool } from './jpx-investor-tool.js';
 import { EconomicCalendarTool } from './economic-calendar-tool.js';
 import { MarketDataTool } from './market-data-tool.js';
 import { EconomicNewsTool } from './economic-news-tool.js';
+import { KnowledgeBaseTool } from './knowledge-base-tool.js';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type ToolClass = any;
@@ -49,7 +50,8 @@ const ROLE_TOOLSET_MAP: Record<string, ToolClass[]> = {
     MemoryTool,
     PythonEmbeddedTool,
     XlwingsTool,
-    MarkItDownTool
+    MarkItDownTool,
+    KnowledgeBaseTool
   ],
   office_assistant: [
     LSTool,
@@ -60,6 +62,7 @@ const ROLE_TOOLSET_MAP: Record<string, ToolClass[]> = {
     WebTool,
     XlwingsTool,
     MarkItDownTool,
+    KnowledgeBaseTool,
     PDFTool,
     ZipTool,
     TodoTool,
