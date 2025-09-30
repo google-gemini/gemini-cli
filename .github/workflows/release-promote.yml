@@ -88,7 +88,7 @@ jobs:
           echo "PREVIOUS_STABLE_TAG=$(echo "${STABLE_JSON}" | jq -r .previousReleaseTag)" >> "${GITHUB_OUTPUT}"
           echo "PREVIEW_VERSION=$(echo "${PREVIEW_JSON}" | jq -r .releaseVersion)" >> "${GITHUB_OUTPUT}"
           # shellcheck disable=SC1083
-          echo "PREVIEW_SHA=$(git rev-parse --verify --quiet ${{ github.event.inputs.ref }}^{commit} || git rev-parse --verify ${{ github.event.inputs.ref }})" >> "${GITHUB_OUTPUT}"
+          echo "PREVIEW_SHA=$(git rev-parse HEAD)" >> "${GITHUB_OUTPUT}"
           echo "PREVIOUS_PREVIEW_TAG=$(echo "${PREVIEW_JSON}" | jq -r .previousReleaseTag)" >> "${GITHUB_OUTPUT}"
           echo "NEXT_NIGHTLY_VERSION=$(echo "${NIGHTLY_JSON}" | jq -r .releaseVersion)" >> "${GITHUB_OUTPUT}"
           echo "PREVIOUS_NIGHTLY_TAG=$(echo "${NIGHTLY_JSON}" | jq -r .previousReleaseTag)" >> "${GITHUB_OUTPUT}"
