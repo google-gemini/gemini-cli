@@ -255,7 +255,8 @@ describe('ExtensionEnablementManager', () => {
     it('none disables all extensions', () => {
       manager = new ExtensionEnablementManager(configDir, ['none']);
       manager.enable('ext-test', true, '/');
-      expect(manager.isEnabled('ext-test', '/path/to/dir')).toBe(false); // Double check that it would have been enabled otherwise
+      expect(manager.isEnabled('ext-test', '/path/to/dir')).toBe(false);
+      // Double check that it would have been enabled otherwise
       expect(
         new ExtensionEnablementManager(configDir).isEnabled('ext-test', '/'),
       ).toBe(true);
