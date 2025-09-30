@@ -1,14 +1,12 @@
 # Gemini CLI Authentication Setup
 
-Gemini CLI requires authentication using Google's services. Before using Gemini CLI, you'll need to configure **one** of the following authentication methods:
+Gemini CLI requires authentication using Google's services. Before using Gemini CLI, configure **one** of the following authentication methods:
 
 - Interactive mode:
   - Recommended: Login with Google
   - Use Gemini API key
   - Use Vertex AI
-- Headless (non-interactive) mode:
-  - Use Gemini API key
-  - Use Vertex AI
+- Headless (non-interactive) mode
 - Google Cloud Shell
 
 ## Quick Check: Running in Google Cloud Shell?
@@ -29,9 +27,9 @@ The following sections provide instructions for each of these authentication opt
 
 ### Recommended: Login with Google
 
-> **Note:** Use this method if you are a **Google AI Pro** or **Google AI Ultra** subscriber.
-
 If you are running Gemini CLI on your local machine, the simplest method is logging in with your Google account.
+
+> **Important:** Use this method if you are a **Google AI Pro** or **Google AI Ultra** subscriber.
 
 1. Select **Login with Google**. Gemini CLI will open a login prompt using your web browser.
 
@@ -82,7 +80,7 @@ If you don't want to authenticate using your Google account, you can use an API 
 
 To make this setting persistent, see [Persisting Environment Variables](#persisting-environment-variables).
 
-> **Warning:** Be cautious about how and where you store API keys.
+> **Warning:** Treat API keys, especially for services like Gemini, as sensitive credentials. Protect them to prevent unauthorized access and potential misuse of the service under your account.
 
 ### Use Vertex AI
 
@@ -191,7 +189,9 @@ To avoid setting environment variables in every terminal session, you can:
 
 ## Non-interactive mode / headless environments
 
-When running in scripts or CI/CD pipelines where no user interaction is possible, you cannot use the **Login with Google** interactive flow. You **must** configure authentication using environment variables:
+Non-interative mode / headless environments will use your existing authentication method, if an existing authentication credential is cached. 
+
+If you have not already logged in with an authentication credential (such as a Google account), you **must** configure authentication using environment variables:
 
 1.  **Gemini API Key:** Set `GEMINI_API_KEY`.
 2.  **Vertex AI:**

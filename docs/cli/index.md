@@ -6,15 +6,15 @@ Within Gemini CLI, `packages/cli` is the frontend for users to send and receive 
 
 - **[Commands](./commands.md):** A reference for all built-in slash commands (e.g., `/help`, `/chat`, `/tools`).
 - **[Custom Commands](./custom-commands.md):** Create your own commands and shortcuts for frequently used prompts.
-- **[Headless Mode](./headless.md):** A guide to using Gemini CLI programmatically for scripting and automation.
-- **[Themes](./themes.md):** A guide to customizing the CLI's appearance with different themes.
+- **[Headless Mode](./headless.md):** Use Gemini CLI programmatically for scripting and automation.
+- **[Themes](./themes.md):** Customizing the CLI's appearance with different themes.
 - **[Keyboard Shortcuts](./keyboard-shortcuts.md):** A reference for all keyboard shortcuts to improve your workflow.
 - **[Tutorials](./tutorials.md):** Step-by-step guides for common tasks.
 
 ## Advanced features
 
 - **[Checkpointing](./checkpointing.md):** Automatically save and restore snapshots of your session and files.
-- **[Enterprise Configuration](./enterprise.md):** A guide to deploying and managing Gemini CLI in an enterprise environment.
+- **[Enterprise Configuration](./enterprise.md):** Deploying and manage Gemini CLI in an enterprise environment.
 - **[Sandboxing](./sandbox.md):** Isolate tool execution in a secure, containerized environment.
 - **[Telemetry](./telemetry.md):** Configure observability to monitor usage and performance.
 - **[Token Caching](./token-caching.md):** Optimize API costs by caching tokens.
