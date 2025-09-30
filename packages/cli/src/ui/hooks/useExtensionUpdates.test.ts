@@ -121,6 +121,7 @@ describe('useExtensionUpdates', () => {
           source: 'https://some/repo',
           autoUpdate: false,
         },
+        contextFiles: [],
       },
     ];
     const addItem = vi.fn();
