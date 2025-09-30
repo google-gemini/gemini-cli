@@ -160,8 +160,7 @@ async function main() {
           encoding: 'utf8',
           env: {
             ...process.env,
-            GH_TOKEN: process.env.GH_TOKEN,
-            GITHUB_TOKEN: process.env.GITHUB_TOKEN,
+            GH_TOKEN: process.env.GITHUB_TOKEN,
           },
         },
       );
