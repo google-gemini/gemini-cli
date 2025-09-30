@@ -64,6 +64,7 @@ jobs:
 
       - name: 'Trigger Patch Release'
         env:
+          GH_TOKEN: '${{ secrets.GEMINI_CLI_ROBOT_GITHUB_PAT }}'
           GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
           HEAD_REF: "${{ github.event_name == 'pull_request' && github.event.pull_request.head.ref || github.event.inputs.ref }}"
           PR_BODY: "${{ github.event_name == 'pull_request' && github.event.pull_request.body || '' }}"
