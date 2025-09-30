@@ -11,15 +11,21 @@ import { tokenLimit } from '@google/gemini-cli-core';
 export const ContextUsageDisplay = ({
   promptTokenCount,
   model,
+  terminalWidth,
 }: {
   promptTokenCount: number;
   model: string;
+  terminalWidth: number;
 }) => {
   const percentage = promptTokenCount / tokenLimit(model);
+  const percentageLeft = ((1 - percentage) * 100).toFixed(0);
+
+  const label = terminalWidth < 100 ? '%' : '% context left';
 
   return (
     <Text color={theme.text.secondary}>
-      ({((1 - percentage) * 100).toFixed(0)}% context left)
+      ({percentageLeft}
+      {label})
     </Text>
   );
 };
