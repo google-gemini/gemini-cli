@@ -20,14 +20,20 @@ describe('auth tests', () => {
 
   it('should work with a valid GEMINI_API_KEY', async () => {
     const GEMINI_API_KEY = 'fake-api-key';
-    await rig.setup('auth-gemini-api-key', {
-      env: {
-        GEMINI_API_KEY,
-      },
-    });
+    const originalApiKey = process.env['GEMINI_API_KEY'];
+    process.env['GEMINI_API_KEY'] = GEMINI_API_KEY;
 
-    const result = await rig.run('a prompt');
-    validateModelOutput(result, 'OK', 'Auth with API Key');
+    try {
+      await rig.setup('auth-gemini-api-key');
+      const result = await rig.run('a prompt');
+      validateModelOutput(result, 'OK', 'Auth with API Key');
+    } finally {
+      if (originalApiKey) {
+        process.env['GEMINI_API_KEY'] = originalApiKey;
+      } else {
+        delete process.env['GEMINI_API_KEY'];
+      }
+    }
   });
 
   it('should return an error if no auth is configured', async () => {
@@ -46,62 +52,91 @@ describe('auth tests', () => {
   });
 
   it('should work with Vertex AI', async () => {
-    await rig.setup('auth-vertex-ai', {
-      env: {
-        GOOGLE_GENAI_USE_VERTEXAI: 'true',
-        GOOGLE_CLOUD_PROJECT: 'test-project',
-        GOOGLE_CLOUD_LOCATION: 'us-central1',
-      },
-    });
+    const envVars = {
+      GOOGLE_GENAI_USE_VERTEXAI: 'true',
+      GOOGLE_CLOUD_PROJECT: 'test-project',
+      GOOGLE_CLOUD_LOCATION: 'us-central1',
+    };
+    const originalEnv = Object.fromEntries(
+      Object.keys(envVars).map((key) => [key, process.env[key]]),
+    );
 
-    const result = await rig.run('a prompt');
-    validateModelOutput(result, 'OK', 'Auth with Vertex AI');
+    Object.assign(process.env, envVars);
+
+    try {
+      await rig.setup('auth-vertex-ai');
+
+      const result = await rig.run('a prompt');
+      validateModelOutput(result, 'OK', 'Auth with Vertex AI');
+    } finally {
+      for (const key in envVars) {
+        if (originalEnv[key]) {
+          process.env[key] = originalEnv[key];
+        } else {
+          delete process.env[key];
+        }
+      }
+    }
   });
 
   it('should work with Login with Google', async () => {
     // This test is a bit more involved as it mocks the OAuth flow.
     const mockCode = 'mock-auth-code';
     const mockState = 'mock-state';
+    const oauthPort = 7778; // Use a non-standard port for testing
 
-    await rig.setup('auth-login-with-google', {
-      settings: {
-        security: {
-          auth: {
-            selectedType: 'oauth-personal',
+    // Set a fixed port for the OAuth callback server to avoid flakiness
+    const originalPort = process.env['OAUTH_CALLBACK_PORT'];
+    process.env['OAUTH_CALLBACK_PORT'] = `${oauthPort}`;
+
+    try {
+      await rig.setup('auth-login-with-google', {
+        settings: {
+          security: {
+            auth: {
+              selectedType: 'oauth-personal',
+            },
           },
         },
-      },
-    });
+      });
 
-    // Mock the google-auth-library
-    vi.mock('google-auth-library', () => {
-      const OAuth2Client = vi.fn(() => ({
-        generateAuthUrl: vi.fn(
-          () =>
-            `http://localhost:7777/oauth2callback?code=${mockCode}&state=${mockState}`,
-        ),
-        getToken: vi.fn(() => ({
-          tokens: {
-            access_token: 'mock-access-token',
-            refresh_token: 'mock-refresh-token',
-          },
-        })),
-      }));
-      return { OAuth2Client };
-    });
+      // Mock the google-auth-library
+      vi.mock('google-auth-library', () => {
+        const OAuth2Client = vi.fn(() => ({
+          generateAuthUrl: vi.fn(
+            () =>
+              `https://accounts.google.com/o/oauth2/v2/auth?state=${mockState}`,
+          ),
+          getToken: vi.fn(() => ({
+            tokens: {
+              access_token: 'mock-access-token',
+              refresh_token: 'mock-refresh-token',
+            },
+          })),
+        }));
+        return { OAuth2Client };
+      });
 
-    const { ptyProcess, promise } = rig.runInteractive('a prompt');
+      const { ptyProcess, promise } = rig.runInteractive('a prompt');
 
-    ptyProcess.onData(async (data) => {
-      if (data.includes('http://localhost:7777/oauth2callback')) {
-        // Simulate the OAuth callback
-        await fetch(
-          `http://localhost:7777/oauth2callback?code=${mockCode}&state=${mockState}`,
-        );
+      ptyProcess.onData(async (data) => {
+        if (data.includes('https://accounts.google.com/o/oauth2/v2/auth')) {
+          // App has printed the auth URL, now simulate the OAuth callback
+          await fetch(
+            `http://localhost:${oauthPort}/oauth2callback?code=${mockCode}&state=${mockState}`,
+          );
+        }
+      });
+
+      const result = await promise;
+      validateModelOutput(result.output, 'OK', 'Auth with Login with Google');
+    } finally {
+      // Restore original environment
+      if (originalPort) {
+        process.env['OAUTH_CALLBACK_PORT'] = originalPort;
+      } else {
+        delete process.env['OAUTH_CALLBACK_PORT'];
       }
-    });
-
-    const result = await promise;
-    validateModelOutput(result.output, 'OK', 'Auth with Login with Google');
+    }
   });
 });
