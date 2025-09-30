@@ -189,7 +189,7 @@ export class WriteTodosTool extends BaseDeclarativeTool<
       if (typeof todo !== 'object' || todo === null) {
         return 'Each todo item must be an object';
       }
-      if (typeof todo.description !== 'string' || !todo.description.trim()) {
+      if (!todo.description.trim()) {
         return 'Each todo must have a non-empty description string';
       }
     }
