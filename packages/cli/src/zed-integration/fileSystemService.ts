@@ -38,9 +38,11 @@ export class AcpFileSystemService implements FileSystemService {
       return this.fallback.writeTextFile(filePath, content);
     }
 
+    // Ensure text files end with a newline character (POSIX standard)
+    const contentWithEOL = content.endsWith('\n') ? content : content + '\n';
     await this.client.writeTextFile({
       path: filePath,
-      content,
+      content: contentWithEOL,
       sessionId: this.sessionId,
     });
   }

@@ -51,7 +51,31 @@ describe('StandardFileSystemService', () => {
 
       expect(fs.writeFile).toHaveBeenCalledWith(
         '/test/file.txt',
-        'Hello, World!',
+        'Hello, World!\n',
+        'utf-8',
+      );
+    });
+
+    it('should not add extra newline if content already ends with one', async () => {
+      vi.mocked(fs.writeFile).mockResolvedValue();
+
+      await fileSystem.writeTextFile('/test/file.txt', 'Hello, World!\n');
+
+      expect(fs.writeFile).toHaveBeenCalledWith(
+        '/test/file.txt',
+        'Hello, World!\n',
+        'utf-8',
+      );
+    });
+
+    it('should handle empty content by adding newline', async () => {
+      vi.mocked(fs.writeFile).mockResolvedValue();
+
+      await fileSystem.writeTextFile('/test/file.txt', '');
+
+      expect(fs.writeFile).toHaveBeenCalledWith(
+        '/test/file.txt',
+        '\n',
         'utf-8',
       );
     });

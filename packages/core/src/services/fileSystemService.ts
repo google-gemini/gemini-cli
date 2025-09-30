@@ -47,7 +47,9 @@ export class StandardFileSystemService implements FileSystemService {
   }
 
   async writeTextFile(filePath: string, content: string): Promise<void> {
-    await fs.writeFile(filePath, content, 'utf-8');
+    // Ensure text files end with a newline character (POSIX standard)
+    const contentWithEOL = content.endsWith('\n') ? content : content + '\n';
+    await fs.writeFile(filePath, contentWithEOL, 'utf-8');
   }
 
   findFiles(fileName: string, searchPaths: readonly string[]): string[] {
