@@ -7,9 +7,9 @@
 import type { GeminiCLIExtension } from '@google/gemini-cli-core';
 import { getErrorMessage } from '../../utils/errors.js';
 import { ExtensionUpdateState } from '../state/extensions.js';
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
-import { MessageType } from '../types.js';
+import { MessageType, type ConfirmationRequest } from '../types.js';
 import {
   checkForAllExtensionUpdates,
   updateExtension,
@@ -25,6 +25,29 @@ export const useExtensionUpdates = (
     new Map<string, ExtensionUpdateState>(),
   );
   const [isChecking, setIsChecking] = useState(false);
+  const [confirmUpdateExtensionRequests, setConfirmUpdateExtensionRequests] =
+    useState<
+      Array<{
+        prompt: React.ReactNode;
+        onConfirm: (confirmed: boolean) => void;
+      }>
+    >([]);
+  const addConfirmUpdateExtensionRequest = useCallback(
+    (original: ConfirmationRequest) => {
+      const wrappedRequest = {
+        prompt: original.prompt,
+        onConfirm: (confirmed: boolean) => {
+          // Remove it from the outstanding list of requests by identity.
+          setConfirmUpdateExtensionRequests((prev) =>
+            prev.filter((r) => r !== wrappedRequest),
+          );
+          original.onConfirm(confirmed);
+        },
+      };
+      setConfirmUpdateExtensionRequests((prev) => [...prev, wrappedRequest]);
+    },
+    [setConfirmUpdateExtensionRequests],
+  );
 
   (async () => {
     if (isChecking) return;
@@ -49,7 +72,11 @@ export const useExtensionUpdates = (
           updateExtension(
             extension,
             cwd,
-            (description) => requestConsentInteractive(description, addItem),
+            (description) =>
+              requestConsentInteractive(
+                description,
+                addConfirmUpdateExtensionRequest,
+              ),
             currentState,
             (newState) => {
               setExtensionsUpdateState((prev) => {
@@ -70,8 +97,12 @@ export const useExtensionUpdates = (
               );
             })
             .catch((error) => {
-              console.error(
-                `Error updating extension "${extension.name}": ${getErrorMessage(error)}.`,
+              addItem(
+                {
+                  type: MessageType.ERROR,
+                  text: getErrorMessage(error),
+                },
+                Date.now(),
               );
             });
         } else {
@@ -96,5 +127,7 @@ export const useExtensionUpdates = (
   return {
     extensionsUpdateState,
     setExtensionsUpdateState,
+    confirmUpdateExtensionRequests,
+    addConfirmUpdateExtensionRequest,
   };
 };

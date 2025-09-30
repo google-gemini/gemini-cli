@@ -911,7 +911,10 @@ describe('GeminiChat', () => {
           try {
             return await apiCall();
           } catch (error) {
-            if (options?.shouldRetry && options.shouldRetry(error)) {
+            if (
+              options?.shouldRetryOnError &&
+              options.shouldRetryOnError(error)
+            ) {
               // Try again
               return await apiCall();
             }
