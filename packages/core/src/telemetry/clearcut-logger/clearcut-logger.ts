@@ -39,7 +39,11 @@ import { UserAccountManager } from '../../utils/userAccountManager.js';
 import { safeJsonStringify } from '../../utils/safeJsonStringify.js';
 import { FixedDeque } from 'mnemonist';
 import { GIT_COMMIT_INFO, CLI_VERSION } from '../../generated/git-commit.js';
-import { IDE_DEFINITIONS, detectIdeFromEnv } from '../../ide/detect-ide.js';
+import {
+  IDE_DEFINITIONS,
+  detectIdeFromEnv,
+  isCloudShell,
+} from '../../ide/detect-ide.js';
 
 export enum EventNames {
   START_SESSION = 'start_session',
@@ -114,6 +118,8 @@ export interface LogRequest {
 function determineSurface(): string {
   if (process.env['SURFACE']) {
     return process.env['SURFACE'];
+  } else if (isCloudShell()) {
+    return IDE_DEFINITIONS.cloudshell.name;
   } else if (process.env['GITHUB_SHA']) {
     return 'GitHub';
   } else if (process.env['TERM_PROGRAM'] === 'vscode') {
