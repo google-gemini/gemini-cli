@@ -139,7 +139,7 @@ async function main() {
       const { execFileSync } = await import('node:child_process');
 
       // Use gh CLI to search for PRs with comments referencing the hotfix branch
-      const query = `repo:${context.repo.owner}/${context.repo.repo} is:pr in:comments "Patch PR Created" "${headRef}"`;
+      const query = `repo:${context.repo.owner}/${context.repo.repo} is:pr in:comments "${headRef}"`;
 
       const result = execFileSync(
         'gh',
