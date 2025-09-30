@@ -418,22 +418,25 @@ async function downloadFile(url: string, dest: string): Promise<void> {
 
 function extractFile(file: string, dest: string) {
   let args: string[];
+  let command: 'tar' | 'unzip';
   if (file.endsWith('.tar.gz')) {
     args = ['-xzf', file, '-C', dest];
+    command = 'tar';
   } else if (file.endsWith('.zip')) {
-    args = ['-xf', file, '-C', dest];
+    args = [file, '-d', dest];
+    command = 'unzip';
   } else {
     throw new Error(`Unsupported file extension for extraction: ${file}`);
   }
 
-  const result = spawnSync('tar', args, { stdio: 'pipe' });
+  const result = spawnSync(command, args, { stdio: 'pipe' });
 
   if (result.status !== 0) {
     if (result.error) {
-      throw new Error(`Failed to spawn 'tar': ${result.error.message}`);
+      throw new Error(`Failed to spawn '${command}': ${result.error.message}`);
     }
     throw new Error(
-      `'tar' command failed with exit code ${result.status}: ${result.stderr.toString()}`,
+      `'${command}' command failed with exit code ${result.status}: ${result.stderr.toString()}`,
     );
   }
 }
