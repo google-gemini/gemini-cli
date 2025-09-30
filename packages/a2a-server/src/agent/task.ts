@@ -15,18 +15,17 @@ import {
   isNodeError,
   parseAndFormatApiError,
   safeLiteralReplace,
-} from '@google/gemini-cli-core';
-import type {
-  ToolConfirmationPayload,
-  CompletedToolCall,
-  ToolCall,
-  ToolCallRequestInfo,
-  ServerGeminiErrorEvent,
-  ServerGeminiStreamEvent,
-  ToolCallConfirmationDetails,
-  Config,
-  UserTierId,
-  AnsiOutput,
+  type AnyDeclarativeTool,
+  type ToolCall,
+  type ToolConfirmationPayload,
+  type CompletedToolCall,
+  type ToolCallRequestInfo,
+  type ServerGeminiErrorEvent,
+  type ServerGeminiStreamEvent,
+  type ToolCallConfirmationDetails,
+  type Config,
+  type UserTierId,
+  type AnsiOutput,
 } from '@google/gemini-cli-core';
 import type { RequestContext } from '@a2a-js/sdk/server';
 import { type ExecutionEventBus } from '@a2a-js/sdk/server';
@@ -53,6 +52,8 @@ import type {
   ThoughtSummary,
 } from '../types.js';
 import type { PartUnion, Part as genAiPart } from '@google/genai';
+
+type UnionKeys<T> = T extends T ? keyof T : never;
 
 export class Task {
   id: string;
@@ -436,6 +437,19 @@ export class Task {
     return scheduler;
   }
 
+  private _pickFields<
+    T extends ToolCall | AnyDeclarativeTool,
+    K extends UnionKeys<T>,
+  >(from: T, ...fields: K[]): Partial<T> {
+    const ret = {} as Pick<T, K>;
+    for (const field of fields) {
+      if (field in from) {
+        ret[field] = from[field];
+      }
+    }
+    return ret as Partial<T>;
+  }
+
   private toolStatusMessage(
     tc: ToolCall,
     taskId: string,
@@ -444,33 +458,33 @@ export class Task {
     const messageParts: Part[] = [];
 
     // Create a serializable version of the ToolCall (pick necesssary
-    // properties/avoic methods causing circular reference errors)
-    const serializableToolCall: { [key: string]: unknown } = {
-      request: tc.request,
-      status: tc.status,
-    };
-
-    // For WaitingToolCall type
-    if ('confirmationDetails' in tc) {
-      serializableToolCall['confirmationDetails'] = tc.confirmationDetails;
-    }
+    // properties/avoid methods causing circular reference errors)
+    const serializableToolCall: Partial<ToolCall> = this._pickFields(
+      tc,
+      'request',
+      'status',
+      'confirmationDetails',
+      'liveOutput',
+      'response',
+    );
 
     if (tc.tool) {
-      serializableToolCall['tool'] = {
-        name: tc.tool.name,
-        displayName: tc.tool.displayName,
-        description: tc.tool.description,
-        kind: tc.tool.kind,
-        isOutputMarkdown: tc.tool.isOutputMarkdown,
-        canUpdateOutput: tc.tool.canUpdateOutput,
-        schema: tc.tool.schema,
-        parameterSchema: tc.tool.parameterSchema,
-      };
+      serializableToolCall.tool = this._pickFields(
+        tc.tool,
+        'name',
+        'displayName',
+        'description',
+        'kind',
+        'isOutputMarkdown',
+        'canUpdateOutput',
+        'schema',
+        'parameterSchema',
+      ) as AnyDeclarativeTool;
     }
 
     messageParts.push({
       kind: 'data',
-      data: serializableToolCall as ToolCall,
+      data: serializableToolCall,
     } as Part);
 
     return {
