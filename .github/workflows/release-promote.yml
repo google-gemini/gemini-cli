@@ -92,7 +92,7 @@ jobs:
           echo "PREVIOUS_NIGHTLY_TAG=$(echo "${NIGHTLY_JSON}" | jq -r .previousReleaseTag)" >> "${GITHUB_OUTPUT}"
           CURRENT_NIGHTLY_TAG=$(git describe --tags --abbrev=0 --match="*nightly*")
           echo "CURRENT_NIGHTLY_TAG=${CURRENT_NIGHTLY_TAG}" >> "${GITHUB_OUTPUT}"
-          echo "NEXT_SHA=$(git rev-parse HEAD)" >> "${GITHUB_OUTPUT}"
+          echo "NEXT_SHA=$(git ls-remote origin '${{ github.event.inputs.ref }}' | awk '{print $1}')" >> "${GITHUB_OUTPUT}"
 
       - name: 'Display Pending Updates'
         run: |
