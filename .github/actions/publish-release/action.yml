@@ -40,6 +40,11 @@ inputs:
     description: 'Skip tests and validation'
     required: false
     default: false
+  skip-branch-cleanup:
+    description: 'Whether to skip cleaning up the release branch.'
+    type: 'boolean'
+    required: false
+    default: false
 
 runs:
   using: 'composite'
@@ -74,6 +79,7 @@ runs:
         DRY_RUN: '${{ inputs.dry-run }}'
         RELEASE_TAG: '${{ inputs.release-tag }}'
       run: |-
+        set -e
         git add package.json package-lock.json packages/*/package.json
         git commit -m "chore(release): ${RELEASE_TAG}"
         if [[ "${DRY_RUN}" == "false" ]]; then
@@ -110,7 +116,7 @@ runs:
 
     - name: '🔗 Install latest core package'
       working-directory: '${{ inputs.working-directory }}'
-      if: "${{ inputs.dry-run == 'false' }}"
+      if: "${{ inputs.dry-run != 'true' }}"
       shell: 'bash'
       run: |
         npm install "@google/gemini-cli-core@${{ inputs.release-version }}" \
@@ -130,7 +136,7 @@ runs:
 
     - name: '🔬 Verify NPM release by version'
       uses: './.github/actions/verify-release'
-      if: "${{ inputs.dry-run == 'false' && inputs.force-skip-tests == 'false' }}"
+      if: "${{ inputs.dry-run != 'true' && inputs.force-skip-tests != 'true' }}"
       with:
         npm-package: '@google/gemini-cli@${{ inputs.release-version }}'
         expected-version: '${{ inputs.release-version }}'
@@ -138,7 +144,7 @@ runs:
 
     - name: '🏷️ Tag release'
       uses: './.github/actions/tag-npm-release'
-      if: "${{ inputs.dry-run == 'false' }}"
+      if: "${{ inputs.dry-run != 'true' }}"
       with:
         channel: '${{ inputs.npm-tag }}'
         version: '${{ inputs.release-version }}'
@@ -154,7 +160,7 @@ runs:
 
     - name: '🎉 Create GitHub Release'
       working-directory: '${{ inputs.working-directory }}'
-      if: "${{ inputs.dry-run == 'false' && inputs.skip-github-release == 'false' && inputs.npm-tag != 'dev' }}"
+      if: "${{ inputs.dry-run != 'true' && inputs.skip-github-release != 'true' && inputs.npm-tag != 'dev' }}"
       env:
         GITHUB_TOKEN: '${{ inputs.github-token }}'
       shell: 'bash'
@@ -168,7 +174,7 @@ runs:
 
     - name: '🧹 Clean up release branch'
       working-directory: '${{ inputs.working-directory }}'
-      if: "${{ inputs.dry-run == 'false' }}"
+      if: "${{ inputs.dry-run != 'true' && inputs.skip-branch-cleanup != 'true' }}"
       continue-on-error: true
       shell: 'bash'
       run: |
