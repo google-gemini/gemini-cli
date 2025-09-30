@@ -84,7 +84,7 @@ async function main() {
   // New format: hotfix/v0.5.3/preview/cherry-pick-abc -> v0.5.3 and preview
   // Old format: hotfix/v0.5.3/cherry-pick-abc -> v0.5.3 and stable (default)
   const parts = headRef.split('/');
-  const [, version, branchChannel] = parts;
+  const [, version, branchChannel, commitHash] = parts;
   let channel = 'stable'; // default for old format
 
   if (
@@ -140,7 +140,7 @@ async function main() {
 
       // Split search string into searchArgs to prevent triple escaping on the quoted filters
       const searchArgs =
-        `repo:${context.repo.owner}/${context.repo.repo} is:pr in:comments "Patch PR Created" "${headRef}"`.split(
+        `repo:${context.repo.owner}/${context.repo.repo} is:pr in:comments "Patch PR Created" "${commitHash}"`.split(
           ' ',
         );
       console.log('Search args:', searchArgs);
