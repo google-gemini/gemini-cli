@@ -57,6 +57,8 @@ export interface ShellExecutionConfig {
   showColor?: boolean;
   defaultFg?: string;
   defaultBg?: string;
+  // Used for testing
+  disableDynamicLineTrimming?: boolean;
 }
 
 /**
@@ -383,6 +385,7 @@ export class ShellExecutionService {
         const MAX_SNIFF_SIZE = 4096;
         let sniffedBytes = 0;
         let isWriting = false;
+        let hasStartedOutput = false;
         let renderTimeout: NodeJS.Timeout | null = null;
 
         const render = (finalRender = false) => {
@@ -394,12 +397,20 @@ export class ShellExecutionService {
             if (!isStreamingRawContent) {
               return;
             }
+
+            if (!shellExecutionConfig.disableDynamicLineTrimming) {
+              if (!hasStartedOutput) {
+                const bufferText = getFullBufferText(headlessTerminal);
+                if (bufferText.trim().length === 0) {
+                  return;
+                }
+                hasStartedOutput = true;
+              }
+            }
+
             let newOutput: AnsiOutput;
             if (shellExecutionConfig.showColor) {
-              newOutput = serializeTerminalToObject(headlessTerminal, {
-                defaultFg: shellExecutionConfig.defaultFg,
-                defaultBg: shellExecutionConfig.defaultBg,
-              });
+              newOutput = serializeTerminalToObject(headlessTerminal);
             } else {
               const buffer = headlessTerminal.buffer.active;
               const lines: AnsiOutput = [];
@@ -422,12 +433,32 @@ export class ShellExecutionService {
               newOutput = lines;
             }
 
+            let lastNonEmptyLine = -1;
+            for (let i = newOutput.length - 1; i >= 0; i--) {
+              const line = newOutput[i];
+              if (
+                line
+                  .map((segment) => segment.text)
+                  .join('')
+                  .trim().length > 0
+              ) {
+                lastNonEmptyLine = i;
+                break;
+              }
+            }
+
+            const trimmedOutput = newOutput.slice(0, lastNonEmptyLine + 1);
+
+            const finalOutput = shellExecutionConfig.disableDynamicLineTrimming
+              ? newOutput
+              : trimmedOutput;
+
             // Using stringify for a quick deep comparison.
-            if (JSON.stringify(output) !== JSON.stringify(newOutput)) {
-              output = newOutput;
+            if (JSON.stringify(output) !== JSON.stringify(finalOutput)) {
+              output = finalOutput;
               onOutputEvent({
                 type: 'data',
-                chunk: newOutput,
+                chunk: finalOutput,
               });
             }
           };
@@ -569,9 +600,23 @@ export class ShellExecutionService {
    * @param input The string to write to the terminal.
    */
   static writeToPty(pid: number, input: string): void {
+    if (!this.isPtyActive(pid)) {
+      return;
+    }
+
     const activePty = this.activePtys.get(pid);
     if (activePty) {
       activePty.ptyProcess.write(input);
+    }
+  }
+
+  static isPtyActive(pid: number): boolean {
+    try {
+      // process.kill with signal 0 is a way to check for the existence of a process.
+      // It doesn't actually send a signal.
+      return process.kill(pid, 0);
+    } catch (_) {
+      return false;
     }
   }
 
@@ -583,6 +628,10 @@ export class ShellExecutionService {
    * @param rows The new number of rows.
    */
   static resizePty(pid: number, cols: number, rows: number): void {
+    if (!this.isPtyActive(pid)) {
+      return;
+    }
+
     const activePty = this.activePtys.get(pid);
     if (activePty) {
       try {
@@ -607,6 +656,10 @@ export class ShellExecutionService {
    * @param lines The number of lines to scroll.
    */
   static scrollPty(pid: number, lines: number): void {
+    if (!this.isPtyActive(pid)) {
+      return;
+    }
+
     const activePty = this.activePtys.get(pid);
     if (activePty) {
       try {
