@@ -103,11 +103,11 @@ jobs:
           echo "  - Previous Tag: ${{ steps.versions.outputs.PREVIOUS_STABLE_TAG }}"
           echo ""
           echo "Preview Release: ${{ steps.versions.outputs.PREVIEW_VERSION }}"
-          echo "  - Commit: ${{ steps.versions.outputs.PREVIEW_SHA }}"
+          echo "  - Commit: ${{ steps.versions.outputs.PREVIEW_SHA }} (${{ github.event.inputs.ref }})"
           echo "  - Previous Tag: ${{ steps.versions.outputs.PREVIOUS_PREVIEW_TAG }}"
           echo ""
           echo "Next Nightly Release: ${{ steps.versions.outputs.NEXT_NIGHTLY_VERSION }}"
-          echo "  - Commit: ${{ steps.versions.outputs.NEXT_SHA }}"
+          echo "  - Commit: ${{ steps.versions.outputs.NEXT_SHA }} (${{ github.event.inputs.ref }})"
           echo "  - Previous Tag: ${{ steps.versions.outputs.PREVIOUS_NIGHTLY_TAG }}"
 
   test:
