@@ -12,6 +12,7 @@ import { env } from 'node:process';
 import { DEFAULT_GEMINI_MODEL } from '../packages/core/src/config/models.js';
 import fs from 'node:fs';
 import * as pty from '@lydell/node-pty';
+import stripAnsi from 'strip-ansi';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -112,6 +113,15 @@ export function validateModelOutput(
   return true;
 }
 
+// Simulates typing a string one character at a time to avoid paste detection.
+export async function type(ptyProcess: pty.IPty, text: string) {
+  const delay = 5;
+  for (const char of text) {
+    ptyProcess.write(char);
+    await new Promise((resolve) => setTimeout(resolve, delay));
+  }
+}
+
 interface ParsedLog {
   attributes?: {
     'event.name'?: string;
@@ -134,6 +144,7 @@ export class TestRig {
   testDir: string | null;
   testName?: string;
   _lastRunStdout?: string;
+  _interactiveOutput = '';
 
   constructor() {
     this.bundlePath = join(__dirname, '..', 'bundle/gemini.js');
@@ -782,12 +793,28 @@ export class TestRig {
     return null;
   }
 
+  async waitForText(text: string, timeout?: number): Promise<boolean> {
+    if (!timeout) {
+      timeout = this.getDefaultTimeout();
+    }
+    return this.poll(
+      () =>
+        stripAnsi(this._interactiveOutput)
+          .toLowerCase()
+          .includes(text.toLowerCase()),
+      timeout,
+      200,
+    );
+  }
+
   runInteractive(...args: string[]): {
     ptyProcess: pty.IPty;
     promise: Promise<{ exitCode: number; signal?: number; output: string }>;
   } {
     const { command, initialArgs } = this._getCommandAndArgs(['--yolo']);
     const commandArgs = [...initialArgs, ...args];
+
+    this._interactiveOutput = ''; // Reset output for the new run
 
     const ptyProcess = pty.spawn(command, commandArgs, {
       name: 'xterm-color',
@@ -797,9 +824,8 @@ export class TestRig {
       env: process.env as { [key: string]: string },
     });
 
-    let output = '';
     ptyProcess.onData((data) => {
-      output += data;
+      this._interactiveOutput += data;
       if (env.KEEP_OUTPUT === 'true' || env.VERBOSE === 'true') {
         process.stdout.write(data);
       }
@@ -811,7 +837,7 @@ export class TestRig {
       output: string;
     }>((resolve) => {
       ptyProcess.onExit(({ exitCode, signal }) => {
-        resolve({ exitCode, signal, output });
+        resolve({ exitCode, signal, output: this._interactiveOutput });
       });
     });
 
