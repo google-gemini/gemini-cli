@@ -37,8 +37,8 @@ import {
 } from './extensions/github.js';
 import type { LoadExtensionContext } from './extensions/variableSchema.js';
 import { ExtensionEnablementManager } from './extensions/extensionEnablement.js';
-import type { UseHistoryManagerReturn } from '../ui/hooks/useHistoryManager.js';
 import chalk from 'chalk';
+import type { ConfirmationRequest } from '../ui/types.js';
 
 export const EXTENSIONS_DIRECTORY_NAME = path.join(GEMINI_DIR, 'extensions');
 
@@ -347,7 +347,7 @@ export async function requestConsentNonInteractive(
   consentDescription: string,
 ): Promise<boolean> {
   console.info(consentDescription);
-  const result = await promptForContinuationNonInteractive(
+  const result = await promptForConsentNonInteractive(
     'Do you want to continue? [Y/n]: ',
   );
   return result;
@@ -359,20 +359,17 @@ export async function requestConsentNonInteractive(
  * This should not be called from non-interactive mode as it will not work.
  *
  * @param consentDescription The description of the thing they will be consenting to.
+ * @param setExtensionUpdateConfirmationRequest A function to actually add a prompt to the UI.
  * @returns boolean, whether they consented or not.
  */
 export async function requestConsentInteractive(
-  _consentDescription: string,
-  addHistoryItem: UseHistoryManagerReturn['addItem'],
+  consentDescription: string,
+  addExtensionUpdateConfirmationRequest: (value: ConfirmationRequest) => void,
 ): Promise<boolean> {
-  addHistoryItem(
-    {
-      type: 'info',
-      text: 'Tried to update an extension but it has some changes that require consent, please use `gemini extensions update`.',
-    },
-    Date.now(),
+  return await promptForConsentInteractive(
+    consentDescription + '\n\nDo you want to continue?',
+    addExtensionUpdateConfirmationRequest,
   );
-  return false;
 }
 
 /**
@@ -383,7 +380,7 @@ export async function requestConsentInteractive(
  * @param prompt A yes/no prompt to ask the user
  * @returns Whether or not the user answers 'y' (yes). Defaults to 'yes' on enter.
  */
-async function promptForContinuationNonInteractive(
+async function promptForConsentNonInteractive(
   prompt: string,
 ): Promise<boolean> {
   const readline = await import('node:readline');
@@ -396,6 +393,29 @@ async function promptForContinuationNonInteractive(
     rl.question(prompt, (answer) => {
       rl.close();
       resolve(['y', ''].includes(answer.trim().toLowerCase()));
+    });
+  });
+}
+
+/**
+ * Asks users an interactive yes/no prompt.
+ *
+ * This should not be called from non-interactive mode as it will break the CLI.
+ *
+ * @param prompt A markdown prompt to ask the user
+ * @param setExtensionUpdateConfirmationRequest Function to update the UI state with the confirmation request.
+ * @returns Whether or not the user answers yes.
+ */
+async function promptForConsentInteractive(
+  prompt: string,
+  addExtensionUpdateConfirmationRequest: (value: ConfirmationRequest) => void,
+): Promise<boolean> {
+  return await new Promise<boolean>((resolve) => {
+    addExtensionUpdateConfirmationRequest({
+      prompt,
+      onConfirm: (resolvedConfirmed) => {
+        resolve(resolvedConfirmed);
+      },
     });
   });
 }
@@ -548,9 +568,9 @@ export async function installExtension(
 function extensionConsentString(extensionConfig: ExtensionConfig): string {
   const output: string[] = [];
   const mcpServerEntries = Object.entries(extensionConfig.mcpServers || {});
-  output.push('Extensions may introduce unexpected behavior.');
+  output.push(`Installing extension "${extensionConfig.name}".`);
   output.push(
-    'Ensure you have investigated the extension source and trust the author.',
+    '**Extensions may introduce unexpected behavior. Ensure you have investigated the extension source and trust the author.**',
   );
 
   if (mcpServerEntries.length) {
@@ -600,7 +620,7 @@ async function maybeRequestConsentOrFail(
     }
   }
   if (!(await requestConsent(extensionConsent))) {
-    throw new Error('Installation cancelled.');
+    throw new Error(`Installation cancelled for "${extensionConfig.name}".`);
   }
 }
 
