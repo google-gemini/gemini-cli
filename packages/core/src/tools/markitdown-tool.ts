@@ -19,7 +19,7 @@ export type DocumentFormat = 'pdf' | 'docx' | 'pptx' | 'xlsx';
  */
 export interface MarkItDownParams {
   /** Operation to perform */
-  op: 'convert' | 'extract_text' | 'analyze_structure';
+  op: 'convert' | 'extract_text' | 'analyze_structure' | 'convert_path_only';
 
   /** Path to the document file */
   file_path: string;
@@ -107,8 +107,8 @@ export class MarkItDownTool extends BasePythonTool<MarkItDownParams, MarkItDownR
         properties: {
           op: {
             type: 'string',
-            enum: ['convert', 'extract_text', 'analyze_structure'],
-            description: 'Operation to perform: convert (full conversion to markdown), extract_text (simple text extraction), analyze_structure (document structure analysis)'
+            enum: ['convert', 'extract_text', 'analyze_structure', 'convert_path_only'],
+            description: 'Operation to perform: convert (full conversion to markdown), extract_text (simple text extraction), analyze_structure (document structure analysis), convert_path_only (convert and return only the output path for LLM to use later)'
           },
           file_path: {
             type: 'string',
@@ -239,6 +239,33 @@ try:
                 "markdown_length": len(markdown_content),
                 "preview": markdown_content[:500] if len(markdown_content) > 500 else markdown_content,
                 "full_content": content_to_save if len(content_to_save) <= 50000 else None
+            }
+`;
+    } else if (operation === 'convert_path_only') {
+      pythonCode += `
+            # Convert and save markdown, return only path
+            ${outputPath ? `
+            output_path = r"${outputPath}"
+            ` : `
+            output_path = file_path.rsplit('.', 1)[0] + '.md'
+            `}
+
+            # Apply max length if specified
+            content_to_save = markdown_content
+            ${maxLength > 0 ? `
+            if len(markdown_content) > ${maxLength}:
+                content_to_save = markdown_content[:${maxLength}]
+                content_to_save += f"\\n\\n... (truncated, total length: {len(markdown_content)} characters)"
+            ` : ''}
+
+            # Save markdown file
+            with open(output_path, 'w', encoding='utf-8') as f:
+                f.write(content_to_save)
+
+            result["conversion"] = {
+                "success": True,
+                "output_path": output_path,
+                "markdown_length": len(markdown_content)
             }
 `;
     } else if (operation === 'extract_text') {
@@ -408,6 +435,17 @@ ${preview}${truncated ? '\n...(truncated)' : ''}
 
         result.llmContent = result.conversion?.full_content ||
           `Document converted successfully. Output saved to ${result.conversion?.output_path}. Content length: ${result.conversion?.markdown_length} characters.`;
+
+      } else if (params.op === 'convert_path_only') {
+        result.returnDisplay = `✅ **Document converted successfully!**
+
+📄 **Input:** ${result.input_file?.path}
+📝 **Output:** ${result.conversion?.output_path}
+📊 **Size:** ${result.conversion?.markdown_length} characters
+
+💡 **Path returned for LLM use:** The markdown file has been created and the path is available for further processing.`;
+
+        result.llmContent = `Document converted successfully. Markdown file saved to: ${result.conversion?.output_path}. Length: ${result.conversion?.markdown_length} characters. Use this path to read the content when needed.`;
 
       } else if (params.op === 'extract_text') {
         result.returnDisplay = `✅ **Text extracted successfully!**

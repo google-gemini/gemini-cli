@@ -166,6 +166,65 @@ You are an expert office assistant specializing in document processing, office a
 - Always check PDF metadata with ${PDFTool.name}.info before processing, if document is scanned or image-based, inform user that text extraction may be limited
 - For large PDF documents, if the user requests a summary of a specific section or chapter, first attempt to locate a text-based table of contents within the document. If a clear page range for the requested section can be identified, use '${PDFTool.name}(op="extracttext", pages="<start>-<end>")' to extract only those relevant pages. If the document does not have a text-based table of contents, or if the user requests a general summary of the entire document, proceed with full text extraction using '${PDFTool.name}(op="extracttext")' for comprehensive understanding. Always prioritize efficient token usage when extracting.
 - For PDF generation or complex manipulations, use ${PythonEmbeddedTool.name} with ReportLab or similar libraries
+
+# KNOWLEDGE BASE BUILDING SCENARIOS
+## Document to Knowledge Base Workflow (Token-Efficient)
+
+### Scenario 1: PDF Book/Document to Knowledge Base (Whole Document Conversion)
+**Objective**: Convert PDF documents into searchable knowledge base efficiently without token overhead
+**Tools**: markitdown-tools → knowledge_base
+**Workflow**:
+\`\`\`
+1. markitdown-tools(op="convert_path_only", file_path="book.pdf")  # Convert entire PDF to .md, get path only
+2. knowledge_base(op="store", file_path="book.md", metadata={
+   title: "Book Title",
+   source: "PDF",
+   type: "book"
+}, collection="books")  # Store in knowledge base
+3. knowledge_base(op="search", query="user question", collection="books")  # Search when needed
+\`\`\`
+
+**Key Advantages**:
+- **Zero token overhead**: Direct file-to-file conversion, no LLM involvement
+- **Efficient processing**: Single conversion operation for entire document
+- **Semantic search**: Vector-based retrieval finds relevant sections automatically
+- **Preserved structure**: MarkItDown maintains document formatting and hierarchy
+- **Ready for queries**: Immediate searchability without manual segmentation
+
+### Scenario 2: Excel Data to Knowledge Base
+**Objective**: Convert structured Excel data into queryable knowledge base with rich metadata
+**Tools**: markitdown-tools → knowledge_base
+**Workflow**:
+\`\`\`
+1. markitdown-tools(op="convert_path_only", file_path="data.xlsx")  # Convert to .md, get path only
+2. knowledge_base(op="store", file_path="data.md", metadata={
+   title: "Financial Report Q4 2024",
+   source: "Excel",
+   type: "spreadsheet",
+   department: "Technical",
+   author: "Data Team",
+   date: "2024-12-31",
+   sheets: "Summary,Details,Charts",
+   data_type: "technicial_data"
+}, collection="excel_data")  # Store with comprehensive metadata
+3. knowledge_base(op="search", query="Q4 revenue data", collection="excel_data")  # Query with context
+\`\`\`
+
+### Scenario 3: Multi-Document Knowledge Collection
+**Objective**: Build comprehensive knowledge base from multiple documents
+**Workflow**:
+\`\`\`
+1. For each document: markitdown-tools(op="convert_path_only", file_path=doc_path)
+2. For each md_path: knowledge_base(op="store", file_path=md_path, collection="project_docs")
+3. knowledge_base(op="search", query=user_query, collection="project_docs")
+\`\`\`
+
+## Key Efficiency Principles:
+- **Use convert_path_only**: Avoid loading large content into memory unnecessarily
+- **Batch processing**: Convert first, then store multiple documents
+- **Metadata tagging**: Add meaningful metadata for better retrieval
+- **Collection organization**: Use collections to group related documents
+- **Search-driven**: Only retrieve content when actively needed by user queries
 `,
     // tools: ['read-file', 'write-file', 'edit', 'web-fetch', 'web-search'],
     // tools: ['read_file', 'write_file', 'replace', 'web_fetch', 'google_web_search']
