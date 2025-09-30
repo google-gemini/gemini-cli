@@ -26,6 +26,9 @@ import { SessionSummaryDisplay } from './SessionSummaryDisplay.js';
 import { Help } from './Help.js';
 import type { SlashCommand } from '../commands/types.js';
 import { ExtensionsList } from './views/ExtensionsList.js';
+import { getMCPServerStatus } from '@google/gemini-cli-core';
+import { ToolsList } from './views/ToolsList.js';
+import { McpStatus } from './views/McpStatus.js';
 
 interface HistoryItemDisplayProps {
   item: HistoryItem;
@@ -36,6 +39,7 @@ interface HistoryItemDisplayProps {
   commands?: readonly SlashCommand[];
   activeShellPtyId?: number | null;
   embeddedShellFocused?: boolean;
+  availableTerminalHeightGemini?: number;
 }
 
 export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
@@ -47,6 +51,7 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
   isFocused = true,
   activeShellPtyId,
   embeddedShellFocused,
+  availableTerminalHeightGemini,
 }) => {
   const itemForDisplay = useMemo(() => escapeAnsiCtrlCodes(item), [item]);
 
@@ -63,7 +68,9 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
         <GeminiMessage
           text={itemForDisplay.text}
           isPending={isPending}
-          availableTerminalHeight={availableTerminalHeight}
+          availableTerminalHeight={
+            availableTerminalHeightGemini ?? availableTerminalHeight
+          }
           terminalWidth={terminalWidth}
         />
       )}
@@ -71,7 +78,9 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
         <GeminiMessageContent
           text={itemForDisplay.text}
           isPending={isPending}
-          availableTerminalHeight={availableTerminalHeight}
+          availableTerminalHeight={
+            availableTerminalHeightGemini ?? availableTerminalHeight
+          }
           terminalWidth={terminalWidth}
         />
       )}
@@ -121,6 +130,16 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
         <CompressionMessage compression={itemForDisplay.compression} />
       )}
       {itemForDisplay.type === 'extensions_list' && <ExtensionsList />}
+      {itemForDisplay.type === 'tools_list' && (
+        <ToolsList
+          terminalWidth={terminalWidth}
+          tools={itemForDisplay.tools}
+          showDescriptions={itemForDisplay.showDescriptions}
+        />
+      )}
+      {itemForDisplay.type === 'mcp_status' && (
+        <McpStatus {...itemForDisplay} serverStatus={getMCPServerStatus} />
+      )}
     </Box>
   );
 };

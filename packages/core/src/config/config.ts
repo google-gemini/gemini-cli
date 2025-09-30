@@ -129,19 +129,16 @@ export interface ExtensionInstallMetadata {
   autoUpdate?: boolean;
 }
 
-export interface FileFilteringOptions {
-  respectGitIgnore: boolean;
-  respectGeminiIgnore: boolean;
-}
-// For memory files
-export const DEFAULT_MEMORY_FILE_FILTERING_OPTIONS: FileFilteringOptions = {
-  respectGitIgnore: false,
-  respectGeminiIgnore: true,
-};
-// For all other files
-export const DEFAULT_FILE_FILTERING_OPTIONS: FileFilteringOptions = {
-  respectGitIgnore: true,
-  respectGeminiIgnore: true,
+import type { FileFilteringOptions } from './constants.js';
+import {
+  DEFAULT_MEMORY_FILE_FILTERING_OPTIONS,
+  DEFAULT_FILE_FILTERING_OPTIONS,
+} from './constants.js';
+
+export type { FileFilteringOptions };
+export {
+  DEFAULT_MEMORY_FILE_FILTERING_OPTIONS,
+  DEFAULT_FILE_FILTERING_OPTIONS,
 };
 
 export const DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD = 4_000_000;
@@ -172,12 +169,18 @@ export class MCPServerConfig {
     // OAuth configuration
     readonly oauth?: MCPOAuthConfig,
     readonly authProviderType?: AuthProviderType,
+    // Service Account Configuration
+    /* targetAudience format: CLIENT_ID.apps.googleusercontent.com */
+    readonly targetAudience?: string,
+    /* targetServiceAccount format: <service-account-name>@<project-num>.iam.gserviceaccount.com */
+    readonly targetServiceAccount?: string,
   ) {}
 }
 
 export enum AuthProviderType {
   DYNAMIC_DISCOVERY = 'dynamic_discovery',
   GOOGLE_CREDENTIALS = 'google_credentials',
+  SERVICE_ACCOUNT_IMPERSONATION = 'service_account_impersonation',
 }
 
 export interface SandboxConfig {
@@ -424,8 +427,7 @@ export class Config {
       DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD;
     this.truncateToolOutputLines =
       params.truncateToolOutputLines ?? DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES;
-    this.enableToolOutputTruncation =
-      params.enableToolOutputTruncation ?? false;
+    this.enableToolOutputTruncation = params.enableToolOutputTruncation ?? true;
     this.useSmartEdit = params.useSmartEdit ?? true;
     this.useWriteTodos = params.useWriteTodos ?? false;
     this.useModelRouter = params.useModelRouter ?? false;
