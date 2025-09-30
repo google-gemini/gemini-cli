@@ -423,6 +423,22 @@ describe('memoryImportProcessor', () => {
       );
     });
 
+    it('should not process imports in repeated inline code blocks', async () => {
+      const content = '`@noimport` and `@noimport`';
+      const projectRoot = testPath('test', 'project');
+      const basePath = testPath(projectRoot, 'src');
+
+      const result = await processImports(
+        content,
+        basePath,
+        true,
+        undefined,
+        projectRoot,
+      );
+
+      expect(result.content).toBe(content);
+    });
+
     it('should not import when @ is inside an inline code block', async () => {
       const content =
         'We should not ` @import` when the symbol is inside an inline code string.';

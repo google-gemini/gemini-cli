@@ -155,24 +155,25 @@ function findCodeRegions(content: string): Array<[number, number]> {
   const tokens = marked.lexer(content);
   let offset = 0;
 
-  function walk(token: Token) {
+  function walk(token: Token, baseOffset: number) {
     if (token.type === 'code' || token.type === 'codespan') {
-      const index = content.substring(offset).indexOf(token.raw);
-      if (index !== -1) {
-        const start = offset + index;
-        regions.push([start, start + token.raw.length]);
-      }
+      regions.push([baseOffset, baseOffset + token.raw.length]);
     }
 
     if ('tokens' in token && token.tokens) {
+      let childOffset = 0;
       for (const child of token.tokens) {
-        walk(child);
+        const childIndexInParent = token.raw.indexOf(child.raw, childOffset);
+        if (childIndexInParent !== -1) {
+          walk(child, baseOffset + childIndexInParent);
+          childOffset = childIndexInParent + child.raw.length;
+        }
       }
     }
   }
 
   for (const token of tokens) {
-    walk(token);
+    walk(token, offset);
     offset += token.raw.length;
   }
 
