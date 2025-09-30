@@ -449,8 +449,8 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(({ di
   };
 
   // Show role conflict dialog
-  const showRoleConflictDialog = (sessionRole: RoleDefinition, currentRole: RoleDefinition) =>
-    new Promise<'switch' | 'continue' | 'cancel'>((resolve) => {
+  const showRoleConflictDialog = (sessionRole: RoleDefinition, currentRole: RoleDefinition, sessionId: string, currentRoleId: string) =>
+    new Promise<'switch' | 'continue' | 'cancel' | 'update'>((resolve) => {
       const sessionRoleName = sessionRole?.name || 'Unknown Role';
       const currentRoleName = currentRole?.name || 'Unknown Role';
 
@@ -476,12 +476,15 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(({ di
               </div>
             </div>
           </div>
-          <div class="p-4 border-t border-border flex justify-end gap-2">
+          <div class="p-4 border-t border-border flex flex-wrap justify-end gap-2">
             <button id="cancel-btn" class="px-3 py-2 text-sm rounded-md border border-border hover:bg-muted transition-colors">
               Cancel
             </button>
             <button id="continue-btn" class="px-3 py-2 text-sm rounded-md bg-orange-100 dark:bg-orange-900/50 text-orange-800 dark:text-orange-200 hover:bg-orange-200 dark:hover:bg-orange-900 transition-colors">
               Continue Anyway
+            </button>
+            <button id="update-btn" class="px-3 py-2 text-sm rounded-md bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-200 hover:bg-green-200 dark:hover:bg-green-900 transition-colors">
+              Update Session to ${currentRoleName}
             </button>
             <button id="switch-btn" class="px-3 py-2 text-sm rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors">
               Switch to ${sessionRoleName}
@@ -507,6 +510,23 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(({ di
       dialog.querySelector('#switch-btn')?.addEventListener('click', () => {
         cleanup();
         resolve('switch');
+      });
+
+      dialog.querySelector('#update-btn')?.addEventListener('click', async () => {
+        cleanup();
+        // Update the session's role to the current role
+        try {
+          // Update frontend session with current role
+          const { updateSession } = useAppStore.getState();
+          updateSession(sessionId, { roleId: currentRoleId });
+
+          // Update backend session metadata
+          await multiModelService.setSessionRole(sessionId, currentRoleId);
+          console.log(`Updated session ${sessionId} role to ${currentRoleId}`);
+        } catch (error) {
+          console.error('Failed to update session role:', error);
+        }
+        resolve('update');
       });
 
       // Close on backdrop click
@@ -545,7 +565,12 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(({ di
       const compatibility = await checkRoleCompatibility(activeSessionId, currentRole);
 
       if (!compatibility.isCompatible && compatibility.sessionRole && compatibility.currentRole) {
-        const action = await showRoleConflictDialog(compatibility.sessionRole, compatibility.currentRole);
+        const action = await showRoleConflictDialog(
+          compatibility.sessionRole,
+          compatibility.currentRole,
+          activeSessionId,
+          compatibility.currentRoleId
+        );
 
         if (action === 'cancel') {
           return; // User cancelled, don't send message
@@ -562,6 +587,9 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(({ di
             setError('Failed to switch role. Please try again.');
             return;
           }
+        } else if (action === 'update') {
+          // Session role has been updated to current role, proceed normally
+          console.log(`Session ${activeSessionId} role updated to current role: ${compatibility.currentRole.name}`);
         }
         // If action === 'continue', proceed with current role
       }
