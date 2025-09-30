@@ -84,8 +84,8 @@ async function main() {
   // New format: hotfix/v0.5.3/preview/cherry-pick-abc -> v0.5.3 and preview
   // Old format: hotfix/v0.5.3/cherry-pick-abc -> v0.5.3 and stable (default)
   const parts = headRef.split('/');
-  let channel = 'stable'; // default for old format
   const version = parts[1];
+  let channel = 'stable'; // default for old format
 
   if (parts.length >= 5 && (parts[3] === 'stable' || parts[3] === 'preview')) {
     channel = parts[3];
