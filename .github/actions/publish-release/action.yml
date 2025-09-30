@@ -45,6 +45,9 @@ inputs:
     type: 'boolean'
     required: false
     default: false
+  gemini_api_key:
+    description: 'The API key for running integration tests.'
+    required: true
 
 runs:
   using: 'composite'
@@ -141,6 +144,7 @@ runs:
         npm-package: '@google/gemini-cli@${{ inputs.release-version }}'
         expected-version: '${{ inputs.release-version }}'
         ref: '${{ steps.release_branch.outputs.BRANCH_NAME }}'
+        gemini_api_key: '${{ inputs.gemini_api_key }}'
 
     - name: '🏷️ Tag release'
       uses: './.github/actions/tag-npm-release'
