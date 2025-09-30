@@ -221,6 +221,32 @@ describe('ClearcutLogger', () => {
       });
     });
 
+    it('logs the current surface from Cloud Shell via EDITOR_IN_CLOUD_SHELL', () => {
+      const { logger } = setup({});
+
+      vi.stubEnv('EDITOR_IN_CLOUD_SHELL', 'true');
+
+      const event = logger?.createLogEvent(EventNames.CHAT_COMPRESSION, []);
+
+      expect(event?.event_metadata[0]).toContainEqual({
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_SURFACE,
+        value: 'cloudshell',
+      });
+    });
+
+    it('logs the current surface from Cloud Shell via CLOUD_SHELL', () => {
+      const { logger } = setup({});
+
+      vi.stubEnv('CLOUD_SHELL', 'true');
+
+      const event = logger?.createLogEvent(EventNames.CHAT_COMPRESSION, []);
+
+      expect(event?.event_metadata[0]).toContainEqual({
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_SURFACE,
+        value: 'cloudshell',
+      });
+    });
+
     it('logs default metadata', () => {
       // Define expected values
       const session_id = 'my-session-id';
