@@ -267,7 +267,6 @@ export async function main() {
       const partialConfig = await loadCliConfig(
         settings.merged,
         [],
-        new ExtensionEnablementManager(ExtensionStorage.getUserExtensionsDir()),
         sessionId,
         argv,
       );
@@ -346,7 +345,6 @@ export async function main() {
     const config = await loadCliConfig(
       settings.merged,
       extensions,
-      extensionEnablementManager,
       sessionId,
       argv,
     );

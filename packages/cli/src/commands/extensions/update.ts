@@ -7,7 +7,6 @@
 import type { CommandModule } from 'yargs';
 import {
   loadExtensions,
-  annotateActiveExtensions,
   ExtensionStorage,
   requestConsentNonInteractive,
 } from '../../config/extension.js';
@@ -38,12 +37,7 @@ export async function handleUpdate(args: UpdateArgs) {
     // ones.
     args.name ? [args.name] : [],
   );
-  const allExtensions = loadExtensions(extensionEnablementManager);
-  const extensions = annotateActiveExtensions(
-    allExtensions,
-    workingDir,
-    extensionEnablementManager,
-  );
+  const extensions = loadExtensions(extensionEnablementManager);
   if (args.name) {
     try {
       const extension = extensions.find(

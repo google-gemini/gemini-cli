@@ -15,6 +15,7 @@ import { processImports } from './memoryImportProcessor.js';
 import type { FileFilteringOptions } from '../config/constants.js';
 import { DEFAULT_MEMORY_FILE_FILTERING_OPTIONS } from '../config/constants.js';
 import { GEMINI_DIR } from './paths.js';
+import type { GeminiCLIExtension } from '../config/config.js';
 
 // Simple console logger, similar to the one previously in CLI's config.ts
 // TODO: Integrate with a more robust server-side logger if available/appropriate.
@@ -32,6 +33,12 @@ const logger = {
 interface GeminiFileContent {
   filePath: string;
   content: string | null;
+  isEnabled?: boolean;
+}
+
+interface GeminiFilePath {
+  filePath: string;
+  isEnabled?: boolean;
 }
 
 async function findProjectRoot(startDir: string): Promise<string | null> {
@@ -84,7 +91,6 @@ async function getGeminiMdFilePathsInternal(
   userHomePath: string,
   debugMode: boolean,
   fileService: FileDiscoveryService,
-  extensionContextFilePaths: string[] = [],
   folderTrust: boolean,
   fileFilteringOptions: FileFilteringOptions,
   maxDirs: number,
@@ -107,7 +113,6 @@ async function getGeminiMdFilePathsInternal(
         userHomePath,
         debugMode,
         fileService,
-        extensionContextFilePaths,
         folderTrust,
         fileFilteringOptions,
         maxDirs,
@@ -137,7 +142,6 @@ async function getGeminiMdFilePathsInternalForEachDir(
   userHomePath: string,
   debugMode: boolean,
   fileService: FileDiscoveryService,
-  extensionContextFilePaths: string[] = [],
   folderTrust: boolean,
   fileFilteringOptions: FileFilteringOptions,
   maxDirs: number,
@@ -226,11 +230,6 @@ async function getGeminiMdFilePathsInternalForEachDir(
     }
   }
 
-  // Add extension context file paths.
-  for (const extensionPath of extensionContextFilePaths) {
-    allPaths.add(extensionPath);
-  }
-
   const finalPaths = Array.from(allPaths);
 
   if (debugMode)
@@ -243,7 +242,7 @@ async function getGeminiMdFilePathsInternalForEachDir(
 }
 
 async function readGeminiMdFiles(
-  filePaths: string[],
+  fileRecords: GeminiFilePath[],
   debugMode: boolean,
   importFormat: 'flat' | 'tree' = 'tree',
 ): Promise<GeminiFileContent[]> {
@@ -251,10 +250,12 @@ async function readGeminiMdFiles(
   const CONCURRENT_LIMIT = 20; // Higher limit for file reads as they're typically faster
   const results: GeminiFileContent[] = [];
 
-  for (let i = 0; i < filePaths.length; i += CONCURRENT_LIMIT) {
-    const batch = filePaths.slice(i, i + CONCURRENT_LIMIT);
+  for (let i = 0; i < fileRecords.length; i += CONCURRENT_LIMIT) {
+    const batch = fileRecords.slice(i, i + CONCURRENT_LIMIT);
     const batchPromises = batch.map(
-      async (filePath): Promise<GeminiFileContent> => {
+      async (fileRecord): Promise<GeminiFileContent> => {
+        const filePath = fileRecord.filePath;
+        const isEnabled = fileRecord.isEnabled;
         try {
           const content = await fs.readFile(filePath, 'utf-8');
 
@@ -272,7 +273,7 @@ async function readGeminiMdFiles(
               `Successfully read and processed imports: ${filePath} (Length: ${processedResult.content.length})`,
             );
 
-          return { filePath, content: processedResult.content };
+          return { filePath, content: processedResult.content, isEnabled };
         } catch (error: unknown) {
           const isTestEnv =
             process.env['NODE_ENV'] === 'test' || process.env['VITEST'];
@@ -284,7 +285,7 @@ async function readGeminiMdFiles(
             );
           }
           if (debugMode) logger.debug(`Failed to read: ${filePath}`);
-          return { filePath, content: null }; // Still include it with null content
+          return { filePath, content: null, isEnabled }; // Still include it with null content
         }
       },
     );
@@ -314,6 +315,7 @@ function concatenateInstructions(
 ): string {
   return instructionContents
     .filter((item) => typeof item.content === 'string')
+    .filter((item) => item.isEnabled !== false)
     .map((item) => {
       const trimmedContent = (item.content as string).trim();
       if (trimmedContent.length === 0) {
@@ -342,7 +344,7 @@ export async function loadServerHierarchicalMemory(
   includeDirectoriesToReadGemini: readonly string[],
   debugMode: boolean,
   fileService: FileDiscoveryService,
-  extensionContextFilePaths: string[] = [],
+  extensions: GeminiCLIExtension[],
   folderTrust: boolean,
   importFormat: 'flat' | 'tree' = 'tree',
   fileFilteringOptions?: FileFilteringOptions,
@@ -362,18 +364,31 @@ export async function loadServerHierarchicalMemory(
     userHomePath,
     debugMode,
     fileService,
-    extensionContextFilePaths,
     folderTrust,
     fileFilteringOptions || DEFAULT_MEMORY_FILE_FILTERING_OPTIONS,
     maxDirs,
   );
-  if (filePaths.length === 0) {
+  const fileRecords: GeminiFilePath[] = filePaths.map((filePath) => ({
+    filePath,
+    isEnabled: true,
+  }));
+
+  // Add extension file paths separately since they may be conditionally enabled.
+  for (const extension of extensions) {
+    fileRecords.push(
+      ...extension.contextFiles.map((filePath) => ({
+        filePath,
+        isEnabled: extension.isActive,
+      })),
+    );
+  }
+  if (fileRecords.length === 0) {
     if (debugMode)
       logger.debug('No GEMINI.md files found in hierarchy of the workspace.');
     return { memoryContent: '', fileCount: 0 };
   }
   const contentsWithPaths = await readGeminiMdFiles(
-    filePaths,
+    fileRecords,
     debugMode,
     importFormat,
   );

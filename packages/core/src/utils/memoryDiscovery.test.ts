@@ -15,6 +15,7 @@ import {
 } from '../tools/memoryTool.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import { GEMINI_DIR } from './paths.js';
+import type { GeminiCLIExtension } from '../config/config.js';
 
 vi.mock('os', async (importOriginal) => {
   const actualOs = await importOriginal<typeof os>();
@@ -87,7 +88,7 @@ describe('loadServerHierarchicalMemory', () => {
         [],
         false,
         new FileDiscoveryService(projectRoot),
-        [],
+        [], // extensions
         false, // untrusted
       );
 
@@ -111,7 +112,7 @@ describe('loadServerHierarchicalMemory', () => {
         [],
         false,
         new FileDiscoveryService(projectRoot),
-        [],
+        [], // extensions
         false, // untrusted
       );
 
@@ -126,7 +127,7 @@ describe('loadServerHierarchicalMemory', () => {
       [],
       false,
       new FileDiscoveryService(projectRoot),
-      [],
+      [], // extensions
       DEFAULT_FOLDER_TRUST,
     );
 
@@ -147,7 +148,7 @@ describe('loadServerHierarchicalMemory', () => {
       [],
       false,
       new FileDiscoveryService(projectRoot),
-      [],
+      [], // extensions
       DEFAULT_FOLDER_TRUST,
     );
 
@@ -171,7 +172,7 @@ describe('loadServerHierarchicalMemory', () => {
       [],
       false,
       new FileDiscoveryService(projectRoot),
-      [],
+      [], // extensions
       DEFAULT_FOLDER_TRUST,
     );
 
@@ -199,7 +200,7 @@ describe('loadServerHierarchicalMemory', () => {
       [],
       false,
       new FileDiscoveryService(projectRoot),
-      [],
+      [], // extensions
       DEFAULT_FOLDER_TRUST,
     );
 
@@ -224,7 +225,7 @@ describe('loadServerHierarchicalMemory', () => {
       [],
       false,
       new FileDiscoveryService(projectRoot),
-      [],
+      [], // extensions
       DEFAULT_FOLDER_TRUST,
     );
 
@@ -249,7 +250,7 @@ describe('loadServerHierarchicalMemory', () => {
       [],
       false,
       new FileDiscoveryService(projectRoot),
-      [],
+      [], // extensions
       DEFAULT_FOLDER_TRUST,
     );
 
@@ -274,7 +275,7 @@ describe('loadServerHierarchicalMemory', () => {
       [],
       false,
       new FileDiscoveryService(projectRoot),
-      [],
+      [], // extensions
       DEFAULT_FOLDER_TRUST,
     );
 
@@ -311,7 +312,7 @@ describe('loadServerHierarchicalMemory', () => {
       [],
       false,
       new FileDiscoveryService(projectRoot),
-      [],
+      [], // extensions
       DEFAULT_FOLDER_TRUST,
     );
 
@@ -339,7 +340,7 @@ describe('loadServerHierarchicalMemory', () => {
       [],
       false,
       new FileDiscoveryService(projectRoot),
-      [],
+      [], // extensions
       DEFAULT_FOLDER_TRUST,
       'tree',
       {
@@ -372,7 +373,7 @@ describe('loadServerHierarchicalMemory', () => {
       [],
       true,
       new FileDiscoveryService(projectRoot),
-      [],
+      [], // extensions
       DEFAULT_FOLDER_TRUST,
       'tree', // importFormat
       {
@@ -394,7 +395,7 @@ describe('loadServerHierarchicalMemory', () => {
       [],
       false,
       new FileDiscoveryService(projectRoot),
-      [],
+      [], // extensions
       DEFAULT_FOLDER_TRUST,
     );
 
@@ -415,7 +416,12 @@ describe('loadServerHierarchicalMemory', () => {
       [],
       false,
       new FileDiscoveryService(projectRoot),
-      [extensionFilePath],
+      [
+        {
+          contextFiles: [extensionFilePath],
+          isActive: true,
+        } as GeminiCLIExtension,
+      ], // extensions
       DEFAULT_FOLDER_TRUST,
     );
 
@@ -439,7 +445,7 @@ describe('loadServerHierarchicalMemory', () => {
       [includedDir],
       false,
       new FileDiscoveryService(projectRoot),
-      [],
+      [], // extensions
       DEFAULT_FOLDER_TRUST,
     );
 
@@ -471,7 +477,7 @@ describe('loadServerHierarchicalMemory', () => {
       createdFiles.map((f) => path.dirname(f)),
       false,
       new FileDiscoveryService(projectRoot),
-      [],
+      [], // extensions
       DEFAULT_FOLDER_TRUST,
     );
 
@@ -504,7 +510,7 @@ describe('loadServerHierarchicalMemory', () => {
       [childDir, parentDir], // Deliberately include duplicates
       false,
       new FileDiscoveryService(projectRoot),
-      [],
+      [], // extensions
       DEFAULT_FOLDER_TRUST,
     );
 
