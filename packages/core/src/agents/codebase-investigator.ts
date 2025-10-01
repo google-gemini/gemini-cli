@@ -92,8 +92,8 @@ ${CODEBASE_REPORT_MARKDOWN}
 
   modelConfig: {
     model: DEFAULT_GEMINI_MODEL,
-    temp: 0.2,
-    top_p: 1.0,
+    temp: 0.1,
+    top_p: 0.95,
     thinkingBudget: -1,
   },
 
