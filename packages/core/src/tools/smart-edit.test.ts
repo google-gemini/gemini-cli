@@ -83,7 +83,6 @@ describe('SmartEditTool', () => {
     mockConfig = {
       getUsageStatisticsEnabled: vi.fn(() => true),
       getSessionId: vi.fn(() => 'mock-session-id'),
-      getDebugMode: vi.fn(() => false),
       getContentGeneratorConfig: vi.fn(() => ({ authType: 'mock' })),
       getUseSmartEdit: vi.fn(() => false),
       getUseModelRouter: vi.fn(() => false),
