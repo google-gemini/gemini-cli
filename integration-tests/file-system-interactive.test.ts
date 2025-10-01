@@ -51,13 +51,13 @@ describe('Interactive file system', () => {
 
       const readCall = await rig.waitForToolCall('read_file', 30000);
       if (!readCall) {
-        printDebugInfo(rig, rig.fullOutput, { readCall });
+        printDebugInfo(rig, rig._interactiveOutput, { readCall });
       }
       expect(readCall, 'Expected to find a read_file tool call').toBe(true);
 
       const versionOutput = await rig.waitForText('1.0.0', 15000);
       if (!versionOutput) {
-        printDebugInfo(rig, rig.fullOutput, { versionOutput });
+        printDebugInfo(rig, rig._interactiveOutput, { versionOutput });
       }
       expect(versionOutput, 'Expected to see version "1.0.0" in output').toBe(
         true,
@@ -74,7 +74,7 @@ describe('Interactive file system', () => {
       );
 
       if (!toolCall) {
-        printDebugInfo(rig, rig.fullOutput, {
+        printDebugInfo(rig, rig._interactiveOutput, {
           toolCall,
         });
       }
@@ -86,7 +86,7 @@ describe('Interactive file system', () => {
 
       const newFileContent = rig.readFile(fileName);
       if (newFileContent !== '1.0.1') {
-        printDebugInfo(rig, rig.fullOutput, {
+        printDebugInfo(rig, rig._interactiveOutput, {
           'File content mismatch': true,
           'Expected content': '1.0.1',
           'Actual content': newFileContent,
