@@ -11,6 +11,14 @@ on:
         description: 'The branch, tag, or SHA to release from.'
         required: true
         type: 'string'
+      registry:
+        description: 'The registry to publish to.'
+        required: true
+        type: 'choice'
+        options:
+          - 'npm'
+          - 'github'
+        default: 'npm'
       npm_channel:
         description: 'The npm channel to publish to (only used when registry is npm)'
         required: true
@@ -36,14 +44,6 @@ on:
         required: false
         type: 'boolean'
         default: false
-      registry:
-        description: 'The registry to publish to.'
-        required: true
-        type: 'choice'
-        options:
-          - 'npm'
-          - 'github'
-        default: 'npm'
 
 jobs:
   release:
