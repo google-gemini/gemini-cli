@@ -62,7 +62,7 @@ runs:
       shell: 'bash'
       working-directory: './verify'
       run: |-
-        gemini_version=$(npx --prefer-online "${{ inputs.npm-package}}")
+        gemini_version=$(npx --prefer-online "${{ inputs.npm-package}}" --version)
         if [ "$gemini_version" != "${{ inputs.expected-version }}" ]; then
           echo "❌ NPX Run Version mismatch: Got $gemini_version from ${{ inputs.npm-package }}, expected ${{ inputs.expected-version }}"
           exit 1
