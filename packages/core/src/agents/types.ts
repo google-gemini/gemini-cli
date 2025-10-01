@@ -75,8 +75,11 @@ export interface PromptConfig {
    */
   initialMessages?: Content[];
 
-  /*
-   * The query to start the loop. If not provided, a generic default will be used.
+  /**
+   * The specific task or question to trigger the agent's execution loop.
+   * This is sent as the first user message, distinct from the systemPrompt (identity/rules)
+   * and initialMessages (history/few-shots). Supports templating.
+   * If not provided, a generic "Get Started!" message is used.
    */
   query?: string;
 }
