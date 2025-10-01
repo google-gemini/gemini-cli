@@ -34,6 +34,7 @@ import {
   EVENT_EXTENSION_INSTALL,
   EVENT_MODEL_SLASH_COMMAND,
   EVENT_EXTENSION_DISABLE,
+  EVENT_SMART_EDIT_STRATEGY,
 } from './constants.js';
 import type {
   ApiErrorEvent,
@@ -64,6 +65,7 @@ import type {
   ExtensionUninstallEvent,
   ExtensionInstallEvent,
   ModelSlashCommandEvent,
+  SmartEditStrategyEvent,
 } from './types.js';
 import {
   recordApiErrorMetrics,
@@ -812,6 +814,27 @@ export function logExtensionDisable(
   const logger = logs.getLogger(SERVICE_NAME);
   const logRecord: LogRecord = {
     body: `Disabled extension ${event.extension_name}`,
+    attributes,
+  };
+  logger.emit(logRecord);
+}
+
+export function logSmartEditStrategy(
+  config: Config,
+  event: SmartEditStrategyEvent,
+): void {
+  ClearcutLogger.getInstance(config)?.logSmartEditStrategyEvent(event);
+  if (!isTelemetrySdkInitialized()) return;
+
+  const attributes: LogAttributes = {
+    ...getCommonAttributes(config),
+    ...event,
+    'event.name': EVENT_SMART_EDIT_STRATEGY,
+  };
+
+  const logger = logs.getLogger(SERVICE_NAME);
+  const logRecord: LogRecord = {
+    body: `Smart Edit Tool Strategy: ${event.strategy}`,
     attributes,
   };
   logger.emit(logRecord);
