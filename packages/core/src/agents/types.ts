@@ -74,6 +74,11 @@ export interface PromptConfig {
    * An array of user/model content pairs for few-shot prompting.
    */
   initialMessages?: Content[];
+
+  /*
+   * The query to start the loop. If not provided, a generic default will be used.
+   */
+  query?: string;
 }
 
 /**
