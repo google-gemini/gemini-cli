@@ -94,7 +94,7 @@ class DiffManager(private val project: Project) : Disposable {
 
     if (!suppressNotification) {
       val notification = JSONRPCNotification(
-        method = "ide/diffClosed",
+        method = "ide/diffRejected",
         params = buildJsonObject {
           put("filePath", filePath)
           put("content", modifiedContent ?: diffInfo.newContent)
