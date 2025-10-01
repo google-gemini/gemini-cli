@@ -7,9 +7,9 @@
 import type { GeminiCLIExtension } from '@google/gemini-cli-core';
 import { getErrorMessage } from '../../utils/errors.js';
 import {
-  type ExtensionUpdateStatus,
   ExtensionUpdateState,
   extensionUpdatesReducer,
+  initialExtensionUpdatesState,
 } from '../state/extensions.js';
 import { useCallback, useEffect, useMemo, useReducer } from 'react';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
@@ -52,7 +52,7 @@ export const useExtensionUpdates = (
 ) => {
   const [extensionsUpdateState, dispatchExtensionStateUpdate] = useReducer(
     extensionUpdatesReducer,
-    new Map<string, ExtensionUpdateStatus>(),
+    initialExtensionUpdatesState,
   );
   const [
     confirmUpdateExtensionRequests,
@@ -89,9 +89,15 @@ export const useExtensionUpdates = (
   }, [extensions, extensions.length, dispatchExtensionStateUpdate]);
 
   useEffect(() => {
+    if (extensionsUpdateState.batchChecksInProgress > 0) {
+      return;
+    }
+
     let extensionsWithUpdatesCount = 0;
     for (const extension of extensions) {
-      const currentState = extensionsUpdateState.get(extension.name);
+      const currentState = extensionsUpdateState.extensionStatuses.get(
+        extension.name,
+      );
       if (
         !currentState ||
         currentState.processed ||
@@ -161,7 +167,10 @@ export const useExtensionUpdates = (
 
   const extensionsUpdateStateComputed = useMemo(() => {
     const result = new Map<string, ExtensionUpdateState>();
-    for (const [key, value] of extensionsUpdateState.entries()) {
+    for (const [
+      key,
+      value,
+    ] of extensionsUpdateState.extensionStatuses.entries()) {
       result.set(key, value.status);
     }
     return result;
@@ -169,7 +178,7 @@ export const useExtensionUpdates = (
 
   return {
     extensionsUpdateState: extensionsUpdateStateComputed,
-    extensionsUpdateStateInternal: extensionsUpdateState,
+    extensionsUpdateStateInternal: extensionsUpdateState.extensionStatuses,
     dispatchExtensionStateUpdate,
     confirmUpdateExtensionRequests,
     addConfirmUpdateExtensionRequest,
