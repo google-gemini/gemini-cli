@@ -6,7 +6,7 @@ This document outlines configuration patterns and best practices for deploying a
 
 ## Centralized Configuration: The System Settings File
 
-The most powerful tools for enterprise administration are the system-wide settings files. These files allow you to define a baseline configuration (`system-defaults.json`) and a set of overrides (`settings.json`) that apply to all users on a machine. For a complete overview of configuration options, see the [Configuration documentation](./configuration.md).
+The most powerful tools for enterprise administration are the system-wide settings files. These files allow you to define a baseline configuration (`system-defaults.json`) and a set of overrides (`settings.json`) that apply to all users on a machine. For a complete overview of configuration options, see the [Configuration documentation](../get-started/configuration.md).
 
 Settings are merged from four files. The precedence order for single-value settings (like `theme`) is:
 
@@ -276,7 +276,7 @@ To mitigate the risk of potentially harmful operations, you can enforce the use 
 }
 ```
 
-You can also specify a custom, hardened Docker image for the sandbox using the `--sandbox-image` command-line argument or by building a custom `sandbox.Dockerfile` as described in the [Sandboxing documentation](./configuration.md#sandboxing).
+You can also specify a custom, hardened Docker image for the sandbox using the `--sandbox-image` command-line argument or by building a custom `sandbox.Dockerfile` as described in the [Sandboxing documentation](./sandbox.md).
 
 ## Controlling Network Access via Proxy
 
@@ -301,7 +301,7 @@ In corporate environments with strict network policies, you can configure Gemini
 
 ## Telemetry and Auditing
 
-For auditing and monitoring purposes, you can configure Gemini CLI to send telemetry data to a central location. This allows you to track tool usage and other events. For more information, see the [telemetry documentation](../telemetry.md).
+For auditing and monitoring purposes, you can configure Gemini CLI to send telemetry data to a central location. This allows you to track tool usage and other events. For more information, see the [telemetry documentation](./telemetry.md).
 
 **Example:** Enable telemetry and send it to a local OTLP collector. If `otlpEndpoint` is not specified, it defaults to `http://localhost:4317`.
 

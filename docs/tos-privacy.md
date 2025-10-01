@@ -55,7 +55,7 @@ If you are using a Gemini API key for authentication with a [Vertex AI GenAI API
 
 ### Usage Statistics Opt-Out
 
-You may opt-out from sending Usage Statistics to Google by following the instructions available here: [Usage Statistics Configuration](./cli/configuration.md#usage-statistics).
+You may opt-out from sending Usage Statistics to Google by following the instructions available here: [Usage Statistics Configuration](./get-started/configuration.md#usage-statistics).
 
 ## Frequently Asked Questions (FAQ) for the Gemini CLI
 
@@ -90,4 +90,4 @@ The data it collects depends on your account and authentication type:
 
 Please refer to the Privacy Notice that applies to your authentication method for more information about what data is collected and how this data is used.
 
-You can disable Usage Statistics for any account type by following the instructions in the [Usage Statistics Configuration](./cli/configuration.md#usage-statistics) documentation.
+You can disable Usage Statistics for any account type by following the instructions in the [Usage Statistics Configuration](./get-started/configuration-v1.md#usage-statistics) documentation.

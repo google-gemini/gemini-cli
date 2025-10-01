@@ -1,14 +1,16 @@
 # Gemini CLI Execution and Deployment
 
-This document describes how to run Gemini CLI and explains the deployment architecture that Gemini CLI uses.
+This document describes how to run Gemini CLI and its deployment architecture.
 
 ## Running Gemini CLI
 
 There are several ways to run Gemini CLI. The option you choose depends on how you intend to use Gemini CLI.
 
----
+- As a standard installation. This is the most straightforward method of using Gemini CLI.
+- In a sandbox. This method offers increased security and isolation.
+- From the source. This is recommended for contributors to the project.
 
-### 1. Standard installation (Recommended for typical users)
+### 1. Standard installation (recommended for standard users)
 
 This is the recommended way for end-users to install Gemini CLI. It involves downloading the Gemini CLI package from the NPM registry.
 
@@ -31,9 +33,7 @@ This is the recommended way for end-users to install Gemini CLI. It involves dow
   npx @google/gemini-cli
   ```
 
----
-
-### 2. Running in a sandbox (Docker/Podman)
+### 2. Run in a sandbox (Docker/Podman)
 
 For security and isolation, Gemini CLI can be run inside a container. This is the default way that the CLI executes tools that might have side effects.
 
@@ -49,9 +49,7 @@ For security and isolation, Gemini CLI can be run inside a container. This is th
   gemini --sandbox -y -p "your prompt here"
   ```
 
----
-
-### 3. Running from source (Recommended for Gemini CLI contributors)
+### 3. Run from source (recommended for Gemini CLI contributors)
 
 Contributors to the project will want to run the CLI directly from the source code.
 
