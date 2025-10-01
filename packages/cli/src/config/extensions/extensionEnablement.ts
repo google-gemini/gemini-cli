@@ -6,6 +6,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
+import { type Extension } from '../extension.js';
 
 export interface ExtensionEnablementConfig {
   overrides: string[];
@@ -104,24 +105,61 @@ function globToRegex(glob: string): RegExp {
   return new RegExp(`^${regexString}$`);
 }
 
-/**
- * Determines if an extension is enabled based on the configuration and current path.
- * The last matching rule in the overrides list wins.
- *
- * @param config The enablement configuration for a single extension.
- * @param currentPath The absolute path of the current working directory.
- * @returns True if the extension is enabled, false otherwise.
- */
 export class ExtensionEnablementManager {
   private configFilePath: string;
   private configDir: string;
+  // If non-empty, this overrides all other extension configuration and enables
+  // only the ones in this list.
+  private enabledExtensionNamesOverride: string[];
 
-  constructor(configDir: string) {
+  constructor(configDir: string, enabledExtensionNames?: string[]) {
     this.configDir = configDir;
     this.configFilePath = path.join(configDir, 'extension-enablement.json');
+    this.enabledExtensionNamesOverride =
+      enabledExtensionNames?.map((name) => name.toLowerCase()) ?? [];
   }
 
+  validateExtensionOverrides(extensions: Extension[]) {
+    for (const name of this.enabledExtensionNamesOverride) {
+      if (name === 'none') continue;
+      if (
+        !extensions.some(
+          (ext) => ext.config.name.toLowerCase() === name.toLowerCase(),
+        )
+      ) {
+        console.error(`Extension not found: ${name}`);
+      }
+    }
+  }
+
+  /**
+   * Determines if an extension is enabled based on its name and the current
+   * path. The last matching rule in the overrides list wins.
+   *
+   * @param extensionName The name of the extension.
+   * @param currentPath The absolute path of the current working directory.
+   * @returns True if the extension is enabled, false otherwise.
+   */
   isEnabled(extensionName: string, currentPath: string): boolean {
+    // If we have a single override called 'none', this disables all extensions.
+    // Typically, this comes from the user passing `-e none`.
+    if (
+      this.enabledExtensionNamesOverride.length === 1 &&
+      this.enabledExtensionNamesOverride[0] === 'none'
+    ) {
+      return false;
+    }
+
+    // If we have explicit overrides, only enable those extensions.
+    if (this.enabledExtensionNamesOverride.length > 0) {
+      // When checking against overrides ONLY, we use a case insensitive match.
+      // The override names are already lowercased in the constructor.
+      return this.enabledExtensionNamesOverride.includes(
+        extensionName.toLocaleLowerCase(),
+      );
+    }
+
+    // Otherwise, we use the configuration settings
     const config = this.readConfig();
     const extensionConfig = config[extensionName];
     // Extensions are enabled by default.

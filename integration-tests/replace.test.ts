@@ -134,11 +134,6 @@ describe('replace', () => {
 
     // CRITICAL: The final content of the file must be unchanged.
     const newFileContent = rig.readFile(fileName);
-    if (newFileContent !== fileContent) {
-      console.error('File content was changed when it should not have been.');
-      console.error('Expected:', fileContent);
-      console.error('Actual:', newFileContent);
-    }
     expect(newFileContent).toBe(fileContent);
   });
 
@@ -161,15 +156,6 @@ describe('replace', () => {
     expect(foundToolCall, 'Expected to find a replace tool call').toBeTruthy();
 
     const newFileContent = rig.readFile(fileName);
-
-    if (
-      newFileContent.replace(/\r\n/g, '\n') !==
-      expectedContent.replace(/\r\n/g, '\n')
-    ) {
-      console.error('File content mismatch - Debug info:');
-      console.error('Expected:', expectedContent);
-      console.error('Actual:', newFileContent);
-    }
 
     expect(newFileContent.replace(/\r\n/g, '\n')).toBe(
       expectedContent.replace(/\r\n/g, '\n'),
@@ -196,12 +182,6 @@ describe('replace', () => {
     expect(foundToolCall, 'Expected to find a replace tool call').toBeTruthy();
 
     const newFileContent = rig.readFile(fileName);
-
-    if (newFileContent !== expectedContent) {
-      console.error('File content mismatch - Debug info:');
-      console.error('Expected:', expectedContent);
-      console.error('Actual:', newFileContent);
-    }
 
     expect(newFileContent).toBe(expectedContent);
   });

@@ -24,10 +24,12 @@ export function ProQuotaDialog({
     {
       label: 'Change auth (executes the /auth command)',
       value: 'auth' as const,
+      key: 'auth',
     },
     {
       label: `Continue with ${fallbackModel}`,
       value: 'continue' as const,
+      key: 'continue',
     },
   ];
 

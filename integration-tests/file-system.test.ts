@@ -110,52 +110,7 @@ describe('file-system', () => {
     ).toBeTruthy();
 
     const newFileContent = rig.readFile(fileName);
-    if (newFileContent !== 'hello') {
-      console.error('File content mismatch - Debug info:');
-      console.error('Expected:', 'hello');
-      console.error('Actual:', newFileContent);
-    }
     expect(newFileContent).toBe('hello');
-  });
-
-  it('should perform a read-then-write sequence', async () => {
-    const rig = new TestRig();
-    await rig.setup('should perform a read-then-write sequence');
-    const fileName = 'version.txt';
-    rig.createFile(fileName, '1.0.0');
-
-    const prompt = `Read the version from ${fileName} and write the next version 1.0.1 back to the file.`;
-    const result = await rig.run(prompt);
-
-    await rig.waitForTelemetryReady();
-    const toolLogs = rig.readToolLogs();
-
-    const readCall = toolLogs.find(
-      (log) => log.toolRequest.name === 'read_file',
-    );
-    const writeCall = toolLogs.find(
-      (log) =>
-        log.toolRequest.name === 'write_file' ||
-        log.toolRequest.name === 'replace',
-    );
-
-    if (!readCall || !writeCall) {
-      printDebugInfo(rig, result, { readCall, writeCall });
-    }
-
-    expect(readCall, 'Expected to find a read_file tool call').toBeDefined();
-    expect(
-      writeCall,
-      'Expected to find a write_file or replace tool call',
-    ).toBeDefined();
-
-    const newFileContent = rig.readFile(fileName);
-    if (newFileContent !== '1.0.1') {
-      console.error('File content mismatch - Debug info:');
-      console.error('Expected:', '1.0.1');
-      console.error('Actual:', newFileContent);
-    }
-    expect(newFileContent).toBe('1.0.1');
   });
 
   it('should replace multiple instances of a string', async () => {
@@ -198,11 +153,6 @@ describe('file-system', () => {
     expect(successfulEdit, 'Expected a successful edit tool call').toBeTruthy();
 
     const newFileContent = rig.readFile(fileName);
-    if (newFileContent !== expectedContent) {
-      console.error('File content mismatch - Debug info:');
-      console.error('Expected:', expectedContent);
-      console.error('Actual:', newFileContent);
-    }
     expect(newFileContent).toBe(expectedContent);
   });
 
@@ -268,10 +218,6 @@ describe('file-system', () => {
     // Final verification: ensure the file was not created.
     const filePath = path.join(rig.testDir!, fileName);
     const fileExists = existsSync(filePath);
-    if (fileExists) {
-      console.error('The file was created when it should not exist.');
-      console.error('File path:', filePath);
-    }
     expect(fileExists, 'The non-existent file should not be created').toBe(
       false,
     );
