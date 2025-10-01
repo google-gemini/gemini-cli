@@ -6,6 +6,24 @@
 
 import { describe, it, expect } from 'vitest';
 import { TestRig, printDebugInfo, validateModelOutput } from './test-helper.js';
+import { getShellConfiguration } from '../packages/core/src/utils/shell-utils.js';
+
+const { shell } = getShellConfiguration();
+
+function getLineCountCommand(): { command: string; tool: string } {
+  switch (shell) {
+    case 'powershell':
+      return {
+        command: `(Get-Content test.txt).Length`,
+        tool: 'Get-Content',
+      };
+    case 'cmd':
+      return { command: `find /c /v "" test.txt`, tool: 'find' };
+    case 'bash':
+    default:
+      return { command: `wc -l test.txt`, tool: 'wc' };
+  }
+}
 
 describe('run_shell_command', () => {
   it('should be able to run a shell command', async () => {
@@ -73,12 +91,13 @@ describe('run_shell_command', () => {
     await rig.setup('should run allowed sub-command in non-interactive mode');
 
     const testFile = rig.createFile('test.txt', 'Lorem\nIpsum\nDolor\n');
-    const prompt = `use wc to tell me how many lines there are in ${testFile}`;
+    const { tool } = getLineCountCommand();
+    const prompt = `use ${tool} to tell me how many lines there are in ${testFile}`;
 
     // Provide the prompt via stdin to simulate non-interactive mode
     const result = await rig.run({
       stdin: prompt,
-      args: ['--allowed-tools=run_shell_command(wc)'],
+      args: [`--allowed-tools=run_shell_command(${tool})`],
     });
 
     const foundToolCall = await rig.waitForToolCall('run_shell_command', 15000);
@@ -100,7 +119,8 @@ describe('run_shell_command', () => {
     await rig.setup('should succeed with no parens in non-interactive mode');
 
     const testFile = rig.createFile('test.txt', 'Lorem\nIpsum\nDolor\n');
-    const prompt = `use wc to tell me how many lines there are in ${testFile}`;
+    const { tool } = getLineCountCommand();
+    const prompt = `use ${tool} to tell me how many lines there are in ${testFile}`;
 
     const result = await rig.run({
       stdin: prompt,
@@ -126,7 +146,8 @@ describe('run_shell_command', () => {
     await rig.setup('should succeed with --yolo mode');
 
     const testFile = rig.createFile('test.txt', 'Lorem\nIpsum\nDolor\n');
-    const prompt = `use wc to tell me how many lines there are in ${testFile}`;
+    const { tool } = getLineCountCommand();
+    const prompt = `use ${tool} to tell me how many lines there are in ${testFile}`;
 
     const result = await rig.run(
       {
@@ -154,11 +175,12 @@ describe('run_shell_command', () => {
     await rig.setup('should work with ShellTool alias');
 
     const testFile = rig.createFile('test.txt', 'Lorem\nIpsum\nDolor\n');
-    const prompt = `use wc to tell me how many lines there are in ${testFile}`;
+    const { tool } = getLineCountCommand();
+    const prompt = `use ${tool} to tell me how many lines there are in ${testFile}`;
 
     const result = await rig.run({
       stdin: prompt,
-      args: ['--allowed-tools=ShellTool(wc)'],
+      args: [`--allowed-tools=ShellTool(${tool})`],
     });
 
     const foundToolCall = await rig.waitForToolCall('run_shell_command', 15000);
@@ -179,12 +201,13 @@ describe('run_shell_command', () => {
     const rig = new TestRig();
     await rig.setup('should combine multiple --allowed-tools flags');
 
-    const prompt = `use wc and ls`;
+    const { tool } = getLineCountCommand();
+    const prompt = `use ${tool} and ls`;
 
     const result = await rig.run({
       stdin: prompt,
       args: [
-        '--allowed-tools=run_shell_command(wc)',
+        `--allowed-tools=run_shell_command(${tool})`,
         '--allowed-tools=run_shell_command(ls)',
       ],
     });
@@ -207,12 +230,13 @@ describe('run_shell_command', () => {
     const rig = new TestRig();
     await rig.setup('should allow all with "ShellTool" and other specifics');
 
+    const { tool } = getLineCountCommand();
     const prompt = `use date`;
 
     const result = await rig.run({
       stdin: prompt,
       args: [
-        '--allowed-tools=run_shell_command(wc)',
+        `--allowed-tools=run_shell_command(${tool})`,
         '--allowed-tools=run_shell_command',
       ],
     });
