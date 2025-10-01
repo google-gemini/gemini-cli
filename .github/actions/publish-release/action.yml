@@ -45,10 +45,17 @@ inputs:
     type: 'boolean'
     required: false
     default: false
+  gemini_api_key:
+    description: 'The API key for running integration tests.'
+    required: true
 
 runs:
   using: 'composite'
   steps:
+    - name: '📝 Print Inputs'
+      shell: 'bash'
+      run: 'echo "${{ toJSON(inputs) }}"'
+
     - name: '👤 Configure Git User'
       working-directory: '${{ inputs.working-directory }}'
       shell: 'bash'
@@ -109,10 +116,11 @@ runs:
         NODE_AUTH_TOKEN: '${{ inputs.wombat-token-core }}'
       shell: 'bash'
       run: |
-        npm publish \
-          --dry-run="${{ inputs.dry-run }}" \
-          --workspace="@google/gemini-cli-core" \
-          --no-tag
+        if [ "${{ inputs.dry-run }}" == "true" ]; then
+          npm publish --dry-run --workspace="@google/gemini-cli-core" --no-tag
+        else
+          npm publish --workspace="@google/gemini-cli-core" --no-tag
+        fi
 
     - name: '🔗 Install latest core package'
       working-directory: '${{ inputs.working-directory }}'
@@ -129,10 +137,11 @@ runs:
         NODE_AUTH_TOKEN: '${{ inputs.wombat-token-cli }}'
       shell: 'bash'
       run: |
-        npm publish \
-          --dry-run="${{ inputs.dry-run }}" \
-          --workspace="@google/gemini-cli" \
-          --no-tag
+        if [ "${{ inputs.dry-run }}" == "true" ]; then
+          npm publish --dry-run --workspace="@google/gemini-cli" --no-tag
+        else
+          npm publish --workspace="@google/gemini-cli" --no-tag
+        fi
 
     - name: '🔬 Verify NPM release by version'
       uses: './.github/actions/verify-release'
@@ -141,6 +150,7 @@ runs:
         npm-package: '@google/gemini-cli@${{ inputs.release-version }}'
         expected-version: '${{ inputs.release-version }}'
         ref: '${{ steps.release_branch.outputs.BRANCH_NAME }}'
+        gemini_api_key: '${{ inputs.gemini_api_key }}'
 
     - name: '🏷️ Tag release'
       uses: './.github/actions/tag-npm-release'

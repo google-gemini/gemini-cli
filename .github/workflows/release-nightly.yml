@@ -103,6 +103,7 @@ jobs:
           previous-tag: '${{ steps.nightly_version.outputs.PREVIOUS_TAG }}'
           working-directory: './release'
           skip-branch-cleanup: true
+          gemini_api_key: '${{ secrets.GEMINI_API_KEY }}'
 
       - name: 'Create and Merge Pull Request'
         uses: './.github/actions/create-pull-request'
