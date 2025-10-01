@@ -23,7 +23,11 @@ concurrency:
   cancel-in-progress: |-
     ${{ github.ref != 'refs/heads/main' && !startsWith(github.ref, 'refs/heads/release/') }}
 
-permissions: write-all
+permissions:
+  checks: 'write'
+  contents: 'read'
+  metadata: 'read'
+  statuses: 'write'
 
 defaults:
   run:

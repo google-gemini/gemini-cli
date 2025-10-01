@@ -27,7 +27,7 @@ concurrency:
     ${{ github.ref != 'refs/heads/main' && !startsWith(github.ref, 'refs/heads/release/') }}
 
 permissions:
-  administration: 'read'
+  metadata: 'read'
 
 jobs:
   merge_queue_skipper:
