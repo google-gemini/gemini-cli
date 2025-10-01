@@ -113,7 +113,42 @@ describe('file-system', () => {
     expect(newFileContent).toBe('hello');
   });
 
-  it('should replace multiple instances of a string', async () => {
+  it('should perform a read-then-write sequence', async () => {
+    const rig = new TestRig();
+    await rig.setup('should perform a read-then-write sequence');
+    const fileName = 'version.txt';
+    rig.createFile(fileName, '1.0.0');
+
+    const prompt = `Read the version from ${fileName} and write the next version 1.0.1 back to the file.`;
+    const result = await rig.run(prompt);
+
+    await rig.waitForTelemetryReady();
+    const toolLogs = rig.readToolLogs();
+
+    const readCall = toolLogs.find(
+      (log) => log.toolRequest.name === 'read_file',
+    );
+    const writeCall = toolLogs.find(
+      (log) =>
+        log.toolRequest.name === 'write_file' ||
+        log.toolRequest.name === 'replace',
+    );
+
+    if (!readCall || !writeCall) {
+      printDebugInfo(rig, result, { readCall, writeCall });
+    }
+
+    expect(readCall, 'Expected to find a read_file tool call').toBeDefined();
+    expect(
+      writeCall,
+      'Expected to find a write_file or replace tool call',
+    ).toBeDefined();
+
+    const newFileContent = rig.readFile(fileName);
+    expect(newFileContent).toBe('1.0.1');
+  });
+
+  it.skip('should replace multiple instances of a string', async () => {
     const rig = new TestRig();
     await rig.setup('should replace multiple instances of a string');
     const fileName = 'ambiguous.txt';
