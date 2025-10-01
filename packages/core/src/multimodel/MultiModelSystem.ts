@@ -32,11 +32,22 @@ import type { ToolCallResponseInfo } from '../core/turn.js';
 import { SessionManager } from '../sessions/SessionManager.js';
 import { getCompressionPrompt } from '../core/prompts.js';
 import { checkNextSpeaker } from './nextSpeakerChecker.js';
+import { getErrorMessage } from '../utils/errors.js';
 // import { findIndexAfterFraction } from '../core/client.js';
 
 // Compression constants (same as Gemini client)
 const COMPRESSION_TOKEN_THRESHOLD = 0.7; // Compress when token usage reaches 70% of limit
 const COMPRESSION_PRESERVE_THRESHOLD = 0.3; // Keep last 30% of conversation
+
+// Global reference to current active provider config (for subagents to inherit)
+let globalActiveProviderConfig: ModelProviderConfig | null = null;
+
+/**
+ * Get the current active provider config (for subagents to inherit from main session)
+ */
+export function getGlobalActiveProviderConfig(): ModelProviderConfig | null {
+  return globalActiveProviderConfig;
+}
 
 export class MultiModelSystem {
   private configManager: ProviderConfigManager;
@@ -202,6 +213,106 @@ export class MultiModelSystem {
     }
   }
   
+  /**
+   * Send messages and handle tool calls automatically (non-streaming)
+   * This method will execute tools and continue the conversation until no more tool calls
+   */
+  async sendMessage(
+    messages: UniversalMessage[],
+    signal: AbortSignal,
+    roleId?: string,
+    maxTurns: number = 20
+  ): Promise<{ content: string; toolCalls: ToolCall[] }> {
+    if (!this.currentProvider) {
+      throw new Error('No provider configured');
+    }
+
+    const sessionManager = SessionManager.getInstance();
+    const provider = await this.getOrCreateProvider(this.currentProvider);
+
+    // Add messages to history
+    messages.forEach(msg => {
+      sessionManager.addHistory({
+        ...msg,
+        timestamp: msg.timestamp || new Date()
+      });
+    });
+
+    let turnCount = 0;
+    let finalContent = '';
+    const allToolCalls: ToolCall[] = [];
+
+    while (turnCount < maxTurns) {
+      turnCount++;
+
+      if (signal.aborted) {
+        throw new Error('Operation aborted');
+      }
+
+      // Get current history and enhance with role/context
+      const currentHistory = sessionManager.getHistory();
+      const limitedMessages = this.limitContextSize(currentHistory);
+      const enhancedMessages = await this.enhanceMessagesWithRole(limitedMessages, roleId);
+
+      // Send to provider
+      const response = await provider.sendMessage(enhancedMessages, signal);
+
+      const assistantContent = response.content || '';
+      const toolCalls = response.toolCalls || [];
+
+      // Add assistant response to history
+      const assistantMessage: UniversalMessage = {
+        role: 'assistant',
+        content: assistantContent,
+        timestamp: new Date()
+      };
+
+      if (toolCalls.length > 0) {
+        assistantMessage.toolCalls = toolCalls;
+      }
+
+      sessionManager.addHistory(assistantMessage);
+      finalContent += assistantContent;
+      allToolCalls.push(...toolCalls);
+
+      // If no tool calls, we're done
+      if (toolCalls.length === 0) {
+        break;
+      }
+
+      // Execute tool calls
+      const toolResults: string[] = [];
+      for (const toolCall of toolCalls) {
+        const requestInfo: ToolCallRequestInfo = {
+          callId: toolCall.id || `call_${Date.now()}`,
+          name: toolCall.name,
+          args: toolCall.arguments || {},
+          isClientInitiated: false,
+          prompt_id: `multimodel_${Date.now()}`
+        };
+
+        try {
+          const toolResponse = await executeToolCall(this.config, requestInfo, signal);
+          const result = toolResponse.resultDisplay || 'Tool executed successfully';
+          const resultStr = typeof result === 'string' ? result : JSON.stringify(result);
+          toolResults.push(`Tool ${toolCall.name}: ${resultStr}`);
+        } catch (error) {
+          toolResults.push(`Tool ${toolCall.name} error: ${getErrorMessage(error)}`);
+        }
+      }
+
+      // Add tool results as user message
+      const toolResultMessage: UniversalMessage = {
+        role: 'user',
+        content: `Tool results:\n${toolResults.join('\n')}`,
+        timestamp: new Date()
+      };
+      sessionManager.addHistory(toolResultMessage);
+    }
+
+    return { content: finalContent, toolCalls: allToolCalls };
+  }
+
   async *sendMessageStream(
     messages: UniversalMessage[],
     signal: AbortSignal,
@@ -411,27 +522,36 @@ export class MultiModelSystem {
           }
           yield event;
         } else if (event.type === 'error') {
-          // Log error and clean up collected data
+          // Log error
           const errorMessage = event.error?.message || 'Unknown error';
           console.error(`[MultiModelSystem] Provider error: ${errorMessage}`);
           if (event.error?.stack) {
             console.error(`[MultiModelSystem] Error stack: ${event.error.stack}`);
           }
-          
-          // Clear collected data since stream failed
+
+          // Save any accumulated assistant content to history before handling error
+          if (assistantContent.trim() || assistantToolCalls.length > 0) {
+            const assistantMessage: UniversalMessage = {
+              role: 'assistant',
+              content: assistantContent,
+              timestamp: new Date()
+            };
+
+            // Include tool calls if any were made
+            if (assistantToolCalls.length > 0) {
+              assistantMessage.toolCalls = assistantToolCalls;
+            }
+
+            SessionManager.getInstance().addHistory(assistantMessage);
+            console.log(`[MultiModelSystem] Saved assistant response before error (${assistantContent.length} chars, ${assistantToolCalls.length} tool calls)`);
+          }
+
+          // Clear tool call requests since we can't execute them after error
           if (toolCallRequests.length > 0) {
-            console.warn(`[MultiModelSystem] Discarding ${toolCallRequests.length} tool call(s) due to error`);
+            console.warn(`[MultiModelSystem] Discarding ${toolCallRequests.length} tool call request(s) due to error`);
             toolCallRequests.length = 0;
           }
-          if (assistantToolCalls.length > 0) {
-            console.warn(`[MultiModelSystem] Discarding ${assistantToolCalls.length} assistant tool call(s) due to error`);
-            assistantToolCalls.length = 0;
-          }
-          if (assistantContent.trim()) {
-            console.warn(`[MultiModelSystem] Discarding ${assistantContent.length} chars of assistant content due to error`);
-            assistantContent = '';
-          }
-          
+
           yield event;
           return; // Don't continue with tool execution after error
         } else {
@@ -960,13 +1080,16 @@ Title:`;
       throw new Error('Model is required');
     }
 
-    
+
     // Ensure the provider is initialized before switching
     await this.getOrCreateProvider(config);
-    
+
     this.configManager.setProviderConfig(config);
     this.currentProvider = config;
-    
+
+    // Update global active provider config for subagents to inherit
+    globalActiveProviderConfig = config;
+
     // Set tools for the new provider
     await this.setProviderTools();
   }
