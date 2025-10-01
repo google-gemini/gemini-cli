@@ -802,7 +802,7 @@ describe('WriteFileTool', () => {
 
       const params = { file_path: filePath, content };
       const invocation = tool.build(params);
-      const result = await invocation.execute(abortSignal);
+      const result = await invocation.execute(new AbortController().signal);
 
       expect(result.error?.type).toBe(ToolErrorType.PERMISSION_DENIED);
       expect(result.llmContent).toContain(
@@ -828,7 +828,7 @@ describe('WriteFileTool', () => {
 
       const params = { file_path: filePath, content };
       const invocation = tool.build(params);
-      const result = await invocation.execute(abortSignal);
+      const result = await invocation.execute(new AbortController().signal);
 
       expect(result.error?.type).toBe(ToolErrorType.NO_SPACE_LEFT);
       expect(result.llmContent).toContain(
@@ -888,7 +888,7 @@ describe('WriteFileTool', () => {
 
       const params = { file_path: filePath, content };
       const invocation = tool.build(params);
-      const result = await invocation.execute(abortSignal);
+      const result = await invocation.execute(new AbortController().signal);
 
       expect(result.error?.type).toBe(ToolErrorType.FILE_WRITE_FAILURE);
       expect(result.llmContent).toContain(
@@ -897,6 +897,132 @@ describe('WriteFileTool', () => {
       expect(result.returnDisplay).toContain(
         'Error writing to file: Generic write error',
       );
+    });
+  });
+
+  describe('File Freshness Checking', () => {
+    beforeEach(() => {
+      vi.clearAllMocks();
+    });
+
+    it('should proceed normally when file is unchanged', async () => {
+      const filePath = path.join(rootDir, 'existing-file.txt');
+      const originalContent = 'Hello, World!';
+      fs.writeFileSync(filePath, originalContent);
+
+      const content = 'New content for file';
+
+      const params = { file_path: filePath, content };
+      const invocation = tool.build(params);
+      const result = await invocation.execute(new AbortController().signal);
+
+      expect(result.error).toBeUndefined();
+      expect(result.llmContent).toContain('Successfully overwrote file');
+    });
+
+    it('should automatically re-read file when modified externally', async () => {
+      const filePath = path.join(rootDir, 'existing-file.txt');
+      const originalContent = 'Hello, World!';
+      fs.writeFileSync(filePath, originalContent);
+
+      const content = 'New content for file';
+
+      const originalState = {
+        content: originalContent,
+        mtime: fs.statSync(filePath).mtime,
+        size: originalContent.length,
+      };
+
+      const modifiedContent = 'Hello, Universe!';
+      const currentState = {
+        content: modifiedContent,
+        mtime: new Date(fs.statSync(filePath).mtime.getTime() + 1000), // 1 second later
+        size: modifiedContent.length,
+      };
+
+      // Mock FileStateTracker to simulate file modification during execution
+      mockFileStateTracker.getFileState.mockResolvedValueOnce(originalState);
+      mockFileStateTracker.checkFreshness.mockResolvedValueOnce({
+        isFresh: false,
+        originalState,
+        currentState,
+        changeDescription: 'file content changed',
+      });
+
+      const params = { file_path: filePath, content };
+      const invocation = tool.build(params);
+      const result = await invocation.execute(new AbortController().signal);
+
+      expect(result.error).toBeUndefined();
+      expect(result.llmContent).toContain('Successfully overwrote file');
+      expect(result.llmContent).toContain(
+        'File was automatically re-read due to external changes',
+      );
+    });
+
+    it('should automatically create new file when original was deleted', async () => {
+      const filePath = path.join(rootDir, 'existing-file.txt');
+      const originalContent = 'Hello, World!';
+      fs.writeFileSync(filePath, originalContent);
+
+      const content = 'New content for file';
+
+      const originalState = {
+        content: originalContent,
+        mtime: fs.statSync(filePath).mtime,
+        size: originalContent.length,
+      };
+
+      // Mock FileStateTracker to simulate file deletion during execution
+      mockFileStateTracker.getFileState.mockResolvedValueOnce(originalState);
+      mockFileStateTracker.checkFreshness.mockResolvedValueOnce({
+        isFresh: false,
+        originalState,
+        currentState: undefined,
+        changeDescription: 'file was deleted',
+      });
+
+      const params = { file_path: filePath, content };
+      const invocation = tool.build(params);
+      const result = await invocation.execute(new AbortController().signal);
+
+      expect(result.error).toBeUndefined();
+      expect(result.llmContent).toContain('Successfully overwrote file');
+      expect(result.llmContent).toContain(
+        'File was automatically re-read due to external changes',
+      );
+    });
+
+    it('should proceed normally for new files', async () => {
+      const filePath = path.join(rootDir, 'new-file.txt');
+      const content = 'Content for new file';
+
+      const params = { file_path: filePath, content };
+      const invocation = tool.build(params);
+      const result = await invocation.execute(new AbortController().signal);
+
+      expect(result.error).toBeUndefined();
+      expect(result.llmContent).toContain(
+        'Successfully created and wrote to new file',
+      );
+    });
+
+    it('should not check freshness for files that failed to be read initially', async () => {
+      const filePath = path.join(rootDir, 'unreadable-file.txt');
+      const content = 'Content for unreadable file';
+
+      // Mock file read failure
+      vi.spyOn(fsService, 'readTextFile').mockRejectedValueOnce(
+        new Error('Permission denied'),
+      );
+
+      const params = { file_path: filePath, content };
+      const invocation = tool.build(params);
+      const result = await invocation.execute(new AbortController().signal);
+
+      expect(result.error).toBeDefined();
+      expect(result.error?.type).toBe(ToolErrorType.FILE_WRITE_FAILURE);
+      expect(result.llmContent).toContain('Error checking existing file');
     });
   });
 });
