@@ -996,7 +996,7 @@ const SETTINGS_SCHEMA = {
         label: 'Use Model Router',
         category: 'Experimental',
         requiresRestart: true,
-        default: true,
+        default: false,
         description:
           'Enable model routing to route requests to the best model based on complexity.',
         showInDialog: true,
@@ -1047,9 +1047,13 @@ export function getSettingsSchema(): SettingsSchemaType {
 type InferSettings<T extends SettingsSchema> = {
   -readonly [K in keyof T]?: T[K] extends { properties: SettingsSchema }
     ? InferSettings<T[K]['properties']>
-    : T[K]['default'] extends boolean
-      ? boolean
-      : T[K]['default'];
+    : T[K]['type'] extends 'enum'
+      ? T[K]['options'] extends readonly SettingEnumOption[]
+        ? T[K]['options'][number]['value']
+        : T[K]['default']
+      : T[K]['default'] extends boolean
+        ? boolean
+        : T[K]['default'];
 };
 
 export type Settings = InferSettings<SettingsSchemaType>;

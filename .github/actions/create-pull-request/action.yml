@@ -30,8 +30,11 @@ inputs:
 runs:
   using: 'composite'
   steps:
+    - name: '📝 Print Inputs'
+      shell: 'bash'
+      run: 'echo "${{ toJSON(inputs) }}"'
     - name: 'Create and Approve Pull Request'
-      if: "inputs.dry-run == 'false'"
+      if: "inputs.dry-run != 'true'"
       env:
         GH_TOKEN: '${{ inputs.github-token }}'
       shell: 'bash'
