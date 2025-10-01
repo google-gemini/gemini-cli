@@ -16,6 +16,7 @@ import { AgentTerminateMode } from './types.js';
 import { makeFakeConfig } from '../test-utils/config.js';
 import { ToolErrorType } from '../tools/tool-error.js';
 import type { Config } from '../config/config.js';
+import type { MessageBus } from '../confirmation-bus/message-bus.js';
 
 vi.mock('./executor.js');
 
@@ -50,6 +51,21 @@ describe('SubagentInvocation', () => {
     } as unknown as Mocked<AgentExecutor>;
 
     MockAgentExecutor.create.mockResolvedValue(mockExecutorInstance);
+  });
+
+  it('should pass the messageBus to the parent constructor', () => {
+    const mockMessageBus = {} as MessageBus;
+    const params = { task: 'Analyze data' };
+    const invocation = new SubagentInvocation(
+      params,
+      testDefinition,
+      mockConfig,
+      mockMessageBus,
+    );
+
+    // Access the protected messageBus property by casting to any
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((invocation as any).messageBus).toBe(mockMessageBus);
   });
 
   describe('getDescription', () => {

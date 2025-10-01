@@ -125,6 +125,17 @@ vi.mock('../ide/ide-client.js', () => ({
   },
 }));
 
+vi.mock('../agents/registry.js', () => {
+  const AgentRegistryMock = vi.fn();
+  AgentRegistryMock.prototype.initialize = vi.fn();
+  AgentRegistryMock.prototype.getAllDefinitions = vi.fn(() => []);
+  return { AgentRegistry: AgentRegistryMock };
+});
+
+vi.mock('../agents/subagent-tool-wrapper.js', () => ({
+  SubagentToolWrapper: vi.fn(),
+}));
+
 import { BaseLlmClient } from '../core/baseLlmClient.js';
 import { tokenLimit } from '../core/tokenLimits.js';
 import { uiTelemetryService } from '../telemetry/index.js';
@@ -583,6 +594,31 @@ describe('Server Config (config.ts)', () => {
     });
   });
 
+  describe('EnableSubagents Configuration', () => {
+    it('should default enableSubagents to false when not provided', () => {
+      const config = new Config(baseParams);
+      expect(config.getEnableSubagents()).toBe(false);
+    });
+
+    it('should set enableSubagents to true when provided as true', () => {
+      const paramsWithSubagents: ConfigParameters = {
+        ...baseParams,
+        enableSubagents: true,
+      };
+      const config = new Config(paramsWithSubagents);
+      expect(config.getEnableSubagents()).toBe(true);
+    });
+
+    it('should set enableSubagents to false when explicitly provided as false', () => {
+      const paramsWithSubagents: ConfigParameters = {
+        ...baseParams,
+        enableSubagents: false,
+      };
+      const config = new Config(paramsWithSubagents);
+      expect(config.getEnableSubagents()).toBe(false);
+    });
+  });
+
   describe('createToolRegistry', () => {
     it('should register a tool if coreTools contains an argument-specific pattern', async () => {
       const params: ConfigParameters = {
@@ -610,6 +646,78 @@ describe('Server Config (config.ts)', () => {
         registerToolMock as Mock
       ).mock.calls.some((call) => call[0] instanceof vi.mocked(ReadFileTool));
       expect(wasReadFileToolRegistered).toBe(false);
+    });
+
+    it('should register subagents as tools when enableSubagents is true', async () => {
+      const params: ConfigParameters = {
+        ...baseParams,
+        enableSubagents: true,
+      };
+      const config = new Config(params);
+
+      const mockAgentDefinitions = [
+        { name: 'agent1', description: 'Agent 1', instructions: 'Inst 1' },
+        { name: 'agent2', description: 'Agent 2', instructions: 'Inst 2' },
+      ];
+
+      const AgentRegistryMock = (
+        (await vi.importMock('../agents/registry.js')) as {
+          AgentRegistry: Mock;
+        }
+      ).AgentRegistry;
+      AgentRegistryMock.prototype.getAllDefinitions.mockReturnValue(
+        mockAgentDefinitions,
+      );
+
+      const SubagentToolWrapperMock = (
+        (await vi.importMock('../agents/subagent-tool-wrapper.js')) as {
+          SubagentToolWrapper: Mock;
+        }
+      ).SubagentToolWrapper;
+
+      await config.initialize();
+
+      const registerToolMock = (
+        (await vi.importMock('../tools/tool-registry')) as {
+          ToolRegistry: { prototype: { registerTool: Mock } };
+        }
+      ).ToolRegistry.prototype.registerTool;
+
+      expect(SubagentToolWrapperMock).toHaveBeenCalledTimes(2);
+      expect(SubagentToolWrapperMock).toHaveBeenCalledWith(
+        mockAgentDefinitions[0],
+        config,
+        undefined,
+      );
+      expect(SubagentToolWrapperMock).toHaveBeenCalledWith(
+        mockAgentDefinitions[1],
+        config,
+        undefined,
+      );
+
+      const calls = registerToolMock.mock.calls;
+      const registeredWrappers = calls.filter(
+        (call) => call[0] instanceof SubagentToolWrapperMock,
+      );
+      expect(registeredWrappers).toHaveLength(2);
+    });
+
+    it('should not register subagents as tools when enableSubagents is false', async () => {
+      const params: ConfigParameters = {
+        ...baseParams,
+        enableSubagents: false,
+      };
+      const config = new Config(params);
+
+      const SubagentToolWrapperMock = (
+        (await vi.importMock('../agents/subagent-tool-wrapper.js')) as {
+          SubagentToolWrapper: Mock;
+        }
+      ).SubagentToolWrapper;
+
+      await config.initialize();
+
+      expect(SubagentToolWrapperMock).not.toHaveBeenCalled();
     });
 
     describe('with minified tool class names', () => {
