@@ -34,19 +34,19 @@ export async function updateExtension(
   cwd: string = process.cwd(),
   requestConsent: (consent: string) => Promise<boolean>,
   currentState: ExtensionUpdateState,
-  dispatch: (action: ExtensionUpdateAction) => void,
+  dispatchExtensionStateUpdate: (action: ExtensionUpdateAction) => void,
 ): Promise<ExtensionUpdateInfo | undefined> {
   if (currentState === ExtensionUpdateState.UPDATING) {
     return undefined;
   }
-  dispatch({
+  dispatchExtensionStateUpdate({
     type: 'SET_STATE',
     payload: { name: extension.name, state: ExtensionUpdateState.UPDATING },
   });
   const installMetadata = loadInstallMetadata(extension.path);
 
   if (!installMetadata?.type) {
-    dispatch({
+    dispatchExtensionStateUpdate({
       type: 'SET_STATE',
       payload: { name: extension.name, state: ExtensionUpdateState.ERROR },
     });
@@ -55,7 +55,7 @@ export async function updateExtension(
     );
   }
   if (installMetadata?.type === 'link') {
-    dispatch({
+    dispatchExtensionStateUpdate({
       type: 'SET_STATE',
       payload: { name: extension.name, state: ExtensionUpdateState.UP_TO_DATE },
     });
@@ -84,14 +84,14 @@ export async function updateExtension(
       workspaceDir: cwd,
     });
     if (!updatedExtension) {
-      dispatch({
+      dispatchExtensionStateUpdate({
         type: 'SET_STATE',
         payload: { name: extension.name, state: ExtensionUpdateState.ERROR },
       });
       throw new Error('Updated extension not found after installation.');
     }
     const updatedVersion = updatedExtension.config.version;
-    dispatch({
+    dispatchExtensionStateUpdate({
       type: 'SET_STATE',
       payload: {
         name: extension.name,
@@ -107,7 +107,7 @@ export async function updateExtension(
     console.error(
       `Error updating extension, rolling back. ${getErrorMessage(e)}`,
     );
-    dispatch({
+    dispatchExtensionStateUpdate({
       type: 'SET_STATE',
       payload: { name: extension.name, state: ExtensionUpdateState.ERROR },
     });

@@ -51,7 +51,7 @@ interface SlashCommandProcessorActions {
   quit: (messages: HistoryItem[]) => void;
   setDebugMessage: (message: string) => void;
   toggleCorgiMode: () => void;
-  dispatch: (action: ExtensionUpdateAction) => void;
+  dispatchExtensionStateUpdate: (action: ExtensionUpdateAction) => void;
   addConfirmUpdateExtensionRequest: (request: ConfirmationRequest) => void;
 }
 
@@ -201,7 +201,7 @@ export const useSlashCommandProcessor = (
         setGeminiMdFileCount,
         reloadCommands,
         extensionsUpdateState,
-        dispatchExtensionStateUpdate: actions.dispatch,
+        dispatchExtensionStateUpdate: actions.dispatchExtensionStateUpdate,
         addConfirmUpdateExtensionRequest:
           actions.addConfirmUpdateExtensionRequest,
       },

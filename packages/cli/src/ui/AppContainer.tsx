@@ -460,7 +460,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       },
       setDebugMessage,
       toggleCorgiMode: () => setCorgiMode((prev) => !prev),
-      dispatch: dispatchExtensionStateUpdate,
+      dispatchExtensionStateUpdate,
       addConfirmUpdateExtensionRequest,
     }),
     [
