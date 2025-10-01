@@ -232,10 +232,10 @@ export class GeminiClient {
         role: 'user',
         parts: envParts,
       },
-      {
-        role: 'model',
-        parts: [{ text: 'Got it. Thanks for the context!' }],
-      },
+      // {
+      //   role: 'model',
+      //   parts: [{ text: 'Got it. Thanks for the context!' }],
+      // },
       ...(extraHistory ?? []),
     ];
     try {
