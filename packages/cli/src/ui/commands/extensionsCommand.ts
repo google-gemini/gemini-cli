@@ -9,6 +9,7 @@ import {
   updateAllUpdatableExtensions,
   type ExtensionUpdateInfo,
   updateExtension,
+  checkForAllExtensionUpdates,
 } from '../../config/extensions/update.js';
 import { getErrorMessage } from '../../utils/errors.js';
 import { ExtensionUpdateState } from '../state/extensions.js';
@@ -46,6 +47,10 @@ async function updateAction(context: CommandContext, args: string) {
   }
 
   try {
+    await checkForAllExtensionUpdates(
+      context.services.config!.getExtensions(),
+      context.ui.dispatchExtensionStateUpdate,
+    );
     context.ui.setPendingItem({
       type: MessageType.EXTENSIONS_LIST,
     });

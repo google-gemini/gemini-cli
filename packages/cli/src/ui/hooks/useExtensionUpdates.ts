@@ -87,7 +87,6 @@ export const useExtensionUpdates = (
       try {
         await checkForAllExtensionUpdates(
           extensions,
-          extensionsUpdateState,
           dispatchExtensionStateUpdate,
         );
       } finally {

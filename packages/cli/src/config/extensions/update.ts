@@ -153,33 +153,24 @@ export interface ExtensionUpdateCheckResult {
 
 export async function checkForAllExtensionUpdates(
   extensions: GeminiCLIExtension[],
-  extensionsUpdateState: Map<string, ExtensionUpdateStatus>,
   dispatch: (action: ExtensionUpdateAction) => void,
-  cwd: string = process.cwd(),
 ): Promise<void> {
   for (const extension of extensions) {
-    const initialState = extensionsUpdateState.get(extension.name);
-    if (initialState === undefined) {
-      if (!extension.installMetadata) {
-        dispatch({
-          type: 'SET_STATE',
-          payload: {
-            name: extension.name,
-            state: ExtensionUpdateState.NOT_UPDATABLE,
-          },
-        });
-        continue;
-      }
-      await checkForExtensionUpdate(
-        extension,
-        (updatedState) => {
-          dispatch({
-            type: 'SET_STATE',
-            payload: { name: extension.name, state: updatedState },
-          });
+    if (!extension.installMetadata) {
+      dispatch({
+        type: 'SET_STATE',
+        payload: {
+          name: extension.name,
+          state: ExtensionUpdateState.NOT_UPDATABLE,
         },
-        cwd,
-      );
+      });
+      continue;
     }
+    await checkForExtensionUpdate(extension, (updatedState) => {
+      dispatch({
+        type: 'SET_STATE',
+        payload: { name: extension.name, state: updatedState },
+      });
+    });
   }
 }

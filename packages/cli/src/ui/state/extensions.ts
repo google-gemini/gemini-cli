@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { checkExhaustive } from '../../utils/checks.js';
+
 export enum ExtensionUpdateState {
   CHECKING_FOR_UPDATES = 'checking for updates',
   UPDATED_NEEDS_RESTART = 'updated, needs restart',
@@ -60,6 +62,6 @@ export function extensionUpdatesReducer(
       return newState;
     }
     default:
-      return state;
+      checkExhaustive(action);
   }
 }

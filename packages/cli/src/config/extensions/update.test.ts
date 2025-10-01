@@ -301,9 +301,8 @@ describe('update tests', () => {
       mockGit.listRemote.mockResolvedValue('remoteHash	HEAD');
       mockGit.revparse.mockResolvedValue('localHash');
 
-      const extensionState = new Map();
       const dispatch = vi.fn();
-      await checkForAllExtensionUpdates([extension], extensionState, dispatch);
+      await checkForAllExtensionUpdates([extension], dispatch);
       expect(dispatch).toHaveBeenCalledWith({
         type: 'SET_STATE',
         payload: {
@@ -340,9 +339,8 @@ describe('update tests', () => {
       mockGit.listRemote.mockResolvedValue('sameHash	HEAD');
       mockGit.revparse.mockResolvedValue('sameHash');
 
-      const extensionState = new Map();
       const dispatch = vi.fn();
-      await checkForAllExtensionUpdates([extension], extensionState, dispatch);
+      await checkForAllExtensionUpdates([extension], dispatch);
       expect(dispatch).toHaveBeenCalledWith({
         type: 'SET_STATE',
         payload: {
@@ -376,14 +374,8 @@ describe('update tests', () => {
         process.cwd(),
         new ExtensionEnablementManager(ExtensionStorage.getUserExtensionsDir()),
       )[0];
-      const extensionState = new Map();
       const dispatch = vi.fn();
-      await checkForAllExtensionUpdates(
-        [extension],
-        extensionState,
-        dispatch,
-        tempWorkspaceDir,
-      );
+      await checkForAllExtensionUpdates([extension], dispatch);
       expect(dispatch).toHaveBeenCalledWith({
         type: 'SET_STATE',
         payload: {
@@ -417,14 +409,8 @@ describe('update tests', () => {
         process.cwd(),
         new ExtensionEnablementManager(ExtensionStorage.getUserExtensionsDir()),
       )[0];
-      const extensionState = new Map();
       const dispatch = vi.fn();
-      await checkForAllExtensionUpdates(
-        [extension],
-        extensionState,
-        dispatch,
-        tempWorkspaceDir,
-      );
+      await checkForAllExtensionUpdates([extension], dispatch);
       expect(dispatch).toHaveBeenCalledWith({
         type: 'SET_STATE',
         payload: {
@@ -457,9 +443,8 @@ describe('update tests', () => {
 
       mockGit.getRemotes.mockRejectedValue(new Error('Git error'));
 
-      const extensionState = new Map();
       const dispatch = vi.fn();
-      await checkForAllExtensionUpdates([extension], extensionState, dispatch);
+      await checkForAllExtensionUpdates([extension], dispatch);
       expect(dispatch).toHaveBeenCalledWith({
         type: 'SET_STATE',
         payload: {
