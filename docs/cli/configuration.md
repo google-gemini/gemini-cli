@@ -125,6 +125,10 @@ Settings are organized into categories. All settings should be placed within the
   - **Description:** Disable loading phrases for accessibility.
   - **Default:** `false`
 
+- **`ui.customWittyPhrases`** (array of strings):
+  - **Description:** A list of custom phrases to display during loading states. When provided, the CLI will cycle through these phrases instead of the default ones.
+  - **Default:** `[]`
+
 #### `ide`
 
 - **`ide.enabled`** (boolean):
@@ -324,7 +328,11 @@ Here is an example of a `settings.json` file with the nested structure, new as o
   "ui": {
     "theme": "GitHub",
     "hideBanner": true,
-    "hideTips": false
+    "hideTips": false,
+    "customWittyPhrases": [
+      "You forget a thousand things every day. Make sure this is one of ’em",
+      "Connecting to AGI"
+    ]
   },
   "tools": {
     "sandbox": "docker",
