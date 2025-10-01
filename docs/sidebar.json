@@ -1,0 +1,69 @@
+[
+  {
+    "label": "Overview",
+    "items": [
+      { "label": "Welcome", "slug": "docs" },
+      { "label": "Execution and Deployment", "slug": "docs/deployment" },
+      { "label": "Architecture Overview", "slug": "docs/architecture" }
+    ]
+  },
+  {
+    "label": "CLI",
+    "items": [
+      { "label": "Introduction", "slug": "docs/cli" },
+      { "label": "Authentication", "slug": "docs/cli/authentication" },
+      { "label": "Commands", "slug": "docs/cli/commands" },
+      { "label": "Configuration", "slug": "docs/cli/configuration" },
+      { "label": "Checkpointing", "slug": "docs/checkpointing" },
+      { "label": "Enterprise", "slug": "docs/cli/enterprise" },
+      { "label": "Extensions", "slug": "docs/extension" },
+      { "label": "Headless Mode", "slug": "docs/headless" },
+      { "label": "IDE Integration", "slug": "docs/ide-integration" },
+      {
+        "label": "IDE Companion Spec",
+        "slug": "docs/ide-companion-spec"
+      },
+      { "label": "Telemetry", "slug": "docs/telemetry" },
+      { "label": "Themes", "slug": "docs/cli/themes" },
+      { "label": "Token Caching", "slug": "docs/cli/token-caching" },
+      { "label": "Trusted Folders", "slug": "docs/trusted-folders" },
+      { "label": "Tutorials", "slug": "docs/cli/tutorials" }
+    ]
+  },
+  {
+    "label": "Core",
+    "items": [
+      { "label": "Introduction", "slug": "docs/core" },
+      { "label": "Tools API", "slug": "docs/core/tools-api" },
+      { "label": "Memory Import Processor", "slug": "docs/core/memport" }
+    ]
+  },
+  {
+    "label": "Tools",
+    "items": [
+      { "label": "Overview", "slug": "docs/tools" },
+      { "label": "File System", "slug": "docs/tools/file-system" },
+      { "label": "Multi-File Read", "slug": "docs/tools/multi-file" },
+      { "label": "Shell", "slug": "docs/tools/shell" },
+      { "label": "Web Fetch", "slug": "docs/tools/web-fetch" },
+      { "label": "Web Search", "slug": "docs/tools/web-search" },
+      { "label": "Memory", "slug": "docs/tools/memory" },
+      { "label": "MCP Servers", "slug": "docs/tools/mcp-server" },
+      { "label": "Sandboxing", "slug": "docs/sandbox" }
+    ]
+  },
+  {
+    "label": "Development",
+    "items": [
+      { "label": "NPM", "slug": "docs/npm" },
+      { "label": "Releases", "slug": "docs/releases" }
+    ]
+  },
+  {
+    "label": "Support",
+    "items": [
+      { "label": "Troubleshooting", "slug": "docs/troubleshooting" },
+      { "label": "Terms of Service", "slug": "docs/tos-privacy" }
+    ]
+  }
+]

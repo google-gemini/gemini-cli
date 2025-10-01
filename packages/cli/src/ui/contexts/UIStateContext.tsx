@@ -35,8 +35,12 @@ export interface ProQuotaDialogRequest {
   resolve: (intent: FallbackIntent) => void;
 }
 
+import { type UseHistoryManagerReturn } from '../hooks/useHistoryManager.js';
+import { type RestartReason } from '../hooks/useIdeTrustListener.js';
+
 export interface UIState {
   history: HistoryItem[];
+  historyManager: UseHistoryManagerReturn;
   isThemeDialogOpen: boolean;
   themeError: string | null;
   isAuthenticating: boolean;
@@ -50,11 +54,14 @@ export interface UIState {
   debugMessage: string;
   quittingMessages: HistoryItem[] | null;
   isSettingsDialogOpen: boolean;
+  isModelDialogOpen: boolean;
+  isPermissionsDialogOpen: boolean;
   slashCommands: readonly SlashCommand[];
   pendingSlashCommandHistoryItems: HistoryItemWithoutId[];
   commandContext: CommandContext;
   shellConfirmationRequest: ShellConfirmationRequest | null;
   confirmationRequest: ConfirmationRequest | null;
+  confirmUpdateExtensionRequests: ConfirmationRequest[];
   loopDetectionConfirmationRequest: LoopDetectionConfirmationRequest | null;
   geminiMdFileCount: number;
   streamingState: StreamingState;
@@ -107,6 +114,7 @@ export interface UIState {
   currentIDE: IdeInfo | null;
   updateInfo: UpdateObject | null;
   showIdeRestartPrompt: boolean;
+  ideTrustRestartReason: RestartReason;
   isRestarting: boolean;
   extensionsUpdateState: Map<string, ExtensionUpdateState>;
   activePtyId: number | undefined;

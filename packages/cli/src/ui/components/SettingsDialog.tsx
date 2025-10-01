@@ -358,7 +358,10 @@ export function SettingsDialog({
   };
 
   // Scope selector items
-  const scopeItems = getScopeItems();
+  const scopeItems = getScopeItems().map((item) => ({
+    ...item,
+    key: item.value,
+  }));
 
   const handleScopeHighlight = (scope: SettingScope) => {
     setSelectedScope(scope);
@@ -880,7 +883,9 @@ export function SettingsDialog({
             </Text>
             <RadioButtonSelect
               items={scopeItems}
-              initialIndex={0}
+              initialIndex={scopeItems.findIndex(
+                (item) => item.value === selectedScope,
+              )}
               onSelect={handleScopeSelect}
               onHighlight={handleScopeHighlight}
               isFocused={focusSection === 'scope'}

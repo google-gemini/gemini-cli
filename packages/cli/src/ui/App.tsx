@@ -4,18 +4,35 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Box, Text } from 'ink';
-import { StreamingContext } from './contexts/StreamingContext.js';
-import { Notifications } from './components/Notifications.js';
-import { MainContent } from './components/MainContent.js';
-import { DialogManager } from './components/DialogManager.js';
-import { Composer } from './components/Composer.js';
+import { useIsScreenReaderEnabled } from 'ink';
+import { useTerminalSize } from './hooks/useTerminalSize.js';
+import { lerp } from '../utils/math.js';
 import { useUIState } from './contexts/UIStateContext.js';
+import { StreamingContext } from './contexts/StreamingContext.js';
 import { QuittingDisplay } from './components/QuittingDisplay.js';
-import { theme } from './semantic-colors.js';
+import { ScreenReaderAppLayout } from './layouts/ScreenReaderAppLayout.js';
+import { DefaultAppLayout } from './layouts/DefaultAppLayout.js';
+
+const getContainerWidth = (terminalWidth: number): string => {
+  if (terminalWidth <= 80) {
+    return '98%';
+  }
+  if (terminalWidth >= 132) {
+    return '90%';
+  }
+
+  // Linearly interpolate between 80 columns (98%) and 132 columns (90%).
+  const t = (terminalWidth - 80) / (132 - 80);
+  const percentage = lerp(98, 90, t);
+
+  return `${Math.round(percentage)}%`;
+};
 
 export const App = () => {
   const uiState = useUIState();
+  const isScreenReaderEnabled = useIsScreenReaderEnabled();
+  const { columns } = useTerminalSize();
+  const containerWidth = getContainerWidth(columns);
 
   if (uiState.quittingMessages) {
     return <QuittingDisplay />;
@@ -23,31 +40,11 @@ export const App = () => {
 
   return (
     <StreamingContext.Provider value={uiState.streamingState}>
-      <Box flexDirection="column" width="90%">
-        <MainContent />
-
-        <Box flexDirection="column" ref={uiState.mainControlsRef}>
-          <Notifications />
-
-          {uiState.dialogsVisible ? <DialogManager /> : <Composer />}
-
-          {uiState.dialogsVisible && uiState.ctrlCPressedOnce && (
-            <Box marginTop={1}>
-              <Text color={theme.status.warning}>
-                Press Ctrl+C again to exit.
-              </Text>
-            </Box>
-          )}
-
-          {uiState.dialogsVisible && uiState.ctrlDPressedOnce && (
-            <Box marginTop={1}>
-              <Text color={theme.status.warning}>
-                Press Ctrl+D again to exit.
-              </Text>
-            </Box>
-          )}
-        </Box>
-      </Box>
+      {isScreenReaderEnabled ? (
+        <ScreenReaderAppLayout />
+      ) : (
+        <DefaultAppLayout width={containerWidth} />
+      )}
     </StreamingContext.Provider>
   );
 };
