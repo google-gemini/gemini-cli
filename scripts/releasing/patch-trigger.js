@@ -110,7 +110,7 @@ async function main() {
 
       // Split search string into searchArgs to prevent triple escaping on the quoted filters
       const searchArgs =
-        `repo:${context.repo.owner}/${context.repo.repo} is:pr in:comments "Patch PR Created" "${headRef}"`.split(
+        `repo:${context.repo.owner}/${context.repo.repo} is:pr in:comments "${headRef}"`.split(
           ' ',
         );
       console.log('Search args:', searchArgs);
@@ -125,6 +125,7 @@ async function main() {
           '--limit',
           '1',
           ...searchArgs,
+          'Patch PR Created',
         ],
         {
           encoding: 'utf8',
@@ -145,6 +146,12 @@ async function main() {
   } else {
     console.log('Skipping original PR lookup (test mode)');
     originalPr = 8655; // Mock for testing
+  }
+
+  if (!originalPr) {
+    throw new Error(
+      'Could not find the original PR for this patch. Cannot proceed with release.',
+    );
   }
 
   const releaseRef = `release/${version}-pr-${originalPr}`;
