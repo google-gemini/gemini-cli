@@ -28,6 +28,7 @@ import {
   parseInputForHighlighting,
   buildSegmentsForVisualSlice,
 } from '../utils/highlight.js';
+import { useKittyKeyboardProtocol } from '../hooks/useKittyKeyboardProtocol.js';
 import {
   clipboardHasImage,
   saveClipboardImage,
@@ -36,6 +37,21 @@ import {
 import * as path from 'node:path';
 import { SCREEN_READER_USER_PREFIX } from '../textConstants.js';
 import { useShellFocusState } from '../contexts/ShellFocusContext.js';
+
+/**
+ * Returns if the terminal can be trusted to handle paste events atomically
+ * rather than potentially sending multiple paste events separated by line
+ * breaks which could trigger unintended command execution.
+ */
+export function isTerminalPasteTrusted(
+  kittyProtocolSupported: boolean,
+): boolean {
+  // Ideally we could trust all VSCode family terminals as well but it appears
+  // we cannot as Cursor users on windows reported being impacted by this
+  // issue (https://github.com/google-gemini/gemini-cli/issues/3763).
+  return kittyProtocolSupported;
+}
+
 export interface InputPromptProps {
   buffer: TextBuffer;
   onSubmit: (value: string) => void;
@@ -100,12 +116,15 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   vimHandleInput,
   isEmbeddedShellFocused,
 }) => {
+  const kittyProtocol = useKittyKeyboardProtocol();
   const isShellFocused = useShellFocusState();
   const [justNavigatedHistory, setJustNavigatedHistory] = useState(false);
   const [escPressCount, setEscPressCount] = useState(0);
   const [showEscapePrompt, setShowEscapePrompt] = useState(false);
   const escapeTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const [recentPasteTime, setRecentPasteTime] = useState<number | null>(null);
+  const [recentUnsafePasteTime, setRecentUnsafePasteTime] = useState<
+    number | null
+  >(null);
   const pasteTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const [dirs, setDirs] = useState<readonly string[]>(
@@ -305,19 +324,28 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
       if (key.paste) {
         // Record paste time to prevent accidental auto-submission
-        setRecentPasteTime(Date.now());
+        if (!isTerminalPasteTrusted(kittyProtocol.supported)) {
+          setRecentUnsafePasteTime(Date.now());
 
-        // Clear any existing paste timeout
-        if (pasteTimeoutRef.current) {
-          clearTimeout(pasteTimeoutRef.current);
+          // Clear any existing paste timeout
+          if (pasteTimeoutRef.current) {
+            clearTimeout(pasteTimeoutRef.current);
+          }
+
+          // Clear the paste protection after a very short delay to prevent
+          // false positives.
+          // Due to how we use a reducer for text buffer state updates, it is
+          // reasonable to expect that key events that are really part of the
+          // same paste will be processed in the same event loop tick. 40ms
+          // is chosen arbitrarily as it is faster than a typical human
+          // could go from pressing paste to pressing enter. The fastest typists
+          // can type at 200 words per minute which roughly translates to 50ms
+          // per letter.
+          pasteTimeoutRef.current = setTimeout(() => {
+            setRecentUnsafePasteTime(null);
+            pasteTimeoutRef.current = null;
+          }, 40);
         }
-
-        // Clear the paste protection after a safe delay
-        pasteTimeoutRef.current = setTimeout(() => {
-          setRecentPasteTime(null);
-          pasteTimeoutRef.current = null;
-        }, 500);
-
         // Ensure we never accidentally interpret paste as regular input.
         buffer.handleInput(key);
         return;
@@ -586,8 +614,14 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       if (keyMatchers[Command.SUBMIT](key)) {
         if (buffer.text.trim()) {
           // Check if a paste operation occurred recently to prevent accidental auto-submission
-          if (recentPasteTime !== null) {
-            // Paste occurred recently, ignore this submit to prevent auto-execution
+          if (recentUnsafePasteTime !== null) {
+            // Paste occurred recently in a terminal where we don't trust pastes
+            // to be reported correctly so assume this paste was really a
+            // newline that was part of the paste.
+            // This has the added benefit that in the worst case at least users
+            // get some feedback that their keypress was handled rather than
+            // wondering why it was completey ignored.
+            buffer.newline();
             return;
           }
 
@@ -690,9 +724,10 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       reverseSearchActive,
       textBeforeReverseSearch,
       cursorPosition,
-      recentPasteTime,
+      recentUnsafePasteTime,
       commandSearchActive,
       commandSearchCompletion,
+      kittyProtocol.supported,
     ],
   );
 
