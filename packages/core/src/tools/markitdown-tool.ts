@@ -93,11 +93,11 @@ export interface MarkItDownResult extends ToolResult {
  * Tool for converting documents to Markdown using MarkItDown
  */
 export class MarkItDownTool extends BasePythonTool<MarkItDownParams, MarkItDownResult> {
-  static readonly Name: string = 'markitdown-tools';
+  static readonly Name: string = 'markitdown_tools';
 
   constructor(config: Config) {
     super(
-      'markitdown-tools',
+      'markitdown_tools',
       'Document Converter',
       'Converts various document formats (PDF, DOCX, PPTX, XLSX) to Markdown for LLM processing. Extracts text, structure, and metadata from documents.',
       ['markitdown[pdf,docx,pptx,xlsx]'],
