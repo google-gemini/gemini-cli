@@ -63,9 +63,15 @@ class McpSseIdeServer(private val project: Project, private val diffManager: Dif
   }
 
   init {
-    project.messageBus.connect().subscribe(OpenFilesManager.IDE_CONTEXT_TOPIC, object : IdeContextListener {
+    val busConnection = project.messageBus.connect()
+    busConnection.subscribe(OpenFilesManager.IDE_CONTEXT_TOPIC, object : IdeContextListener {
       override fun onIdeContextUpdate() {
         broadcastIdeContextUpdate()
+      }
+    })
+    busConnection.subscribe(DiffManager.DIFF_MANAGER_TOPIC, object : DiffManager.DiffManagerListener {
+      override fun onDiffNotification(notification: JSONRPCNotification) {
+        broadcastNotification(notification)
       }
     })
   }
@@ -176,11 +182,7 @@ class McpSseIdeServer(private val project: Project, private val diffManager: Dif
         diffManager.showDiff(filePath, newContent)
       }
 
-      CallToolResult(
-        content = listOf(
-          TextContent("Diff opened for file: $filePath")
-        )
-      )
+      CallToolResult(content = emptyList())
     }
 
     server.addTool(
@@ -197,14 +199,10 @@ class McpSseIdeServer(private val project: Project, private val diffManager: Dif
       val filePath = request.arguments["filePath"]?.toString()?.removeSurrounding("\"") ?: throw IllegalArgumentException("filePath is required")
       val suppressNotification = request.arguments["suppressNotification"]?.toString()?.toBoolean() ?: false
 
-      ApplicationManager.getApplication().invokeLater {
-        diffManager.closeDiff(filePath, suppressNotification)
-      }
+      val finalContent = diffManager.closeDiff(filePath, suppressNotification)
 
       CallToolResult(
-        content = listOf(
-          TextContent("Diff close request received for file: $filePath")
-        )
+        content = if (finalContent != null) listOf(TextContent(finalContent)) else emptyList()
       )
     }
 
@@ -220,29 +218,30 @@ class McpSseIdeServer(private val project: Project, private val diffManager: Dif
 
     val workspacePath = ProjectRootManager.getInstance(project).contentRoots.map { it.path }.joinToString(File.pathSeparator)
 
-    val tempDir = System.getProperty("java.io.tmpdir")
+    val ppid = ProcessHandle.current().parent().get().pid()
+
     val portInfo = PortInfo(
       port = port,
       authToken = authToken,
-      ppid = ProcessHandle.current().pid(),
+      ppid = ppid,
       ideInfo = ideInfo,
       workspacePath = workspacePath
     )
     val portInfoJson = McpJson.encodeToString(portInfo)
 
-    portFile = File(tempDir, "gemini-ide-server-${port}.json").apply {
-      writeText(portInfoJson)
-      setReadable(true, true)
-      setWritable(true, true)
-      deleteOnExit()
-    }
-    File(tempDir, "gemini-ide-server-${ProcessHandle.current().pid()}.json").apply {
-      writeText(portInfoJson)
-      setReadable(true, true)
-      setWritable(true, true)
-      deleteOnExit()
+    val ideDir = File(System.getProperty("java.io.tmpdir"), "gemini/ide").apply { mkdirs() }
+    portFile = File(ideDir, "gemini-ide-server-$ppid-$port.json").apply {
+        writeText(portInfoJson)
+        setReadable(true, true)
+        setWritable(true, true)
+        deleteOnExit()
     }
     LOG.info("Wrote port info to ${portFile?.absolutePath}")
+
+    project.service<GeminiCliServerState>().apply {
+        this.port = port
+        this.workspacePath = workspacePath
+    }
   }
 
   fun getServerPort(): Int? {
@@ -261,6 +260,11 @@ class McpSseIdeServer(private val project: Project, private val diffManager: Dif
     }
     portFile?.delete()
     activeTransports.clear()
+
+    project.service<GeminiCliServerState>().apply {
+        this.port = null
+        this.workspacePath = null
+    }
   }
 
   private fun generateAuthToken(): String {
@@ -268,16 +272,6 @@ class McpSseIdeServer(private val project: Project, private val diffManager: Dif
     val bytes = ByteArray(32)
     random.nextBytes(bytes)
     return Base64.getEncoder().encodeToString(bytes)
-  }
-
-  fun notifyDiffAccepted(filePath: String) {
-    LOG.info("Diff accepted for file: ${filePath}")
-    broadcastNotification("diff_accepted", buildJsonObject { put("filePath", filePath) })
-  }
-
-  fun notifyDiffClosed(filePath: String) {
-    LOG.info("Diff closed for file: ${filePath}")
-    broadcastNotification("diff_closed", buildJsonObject { put("filePath", filePath) })
   }
 
   private fun broadcastIdeContextUpdate() {
@@ -308,11 +302,15 @@ class McpSseIdeServer(private val project: Project, private val diffManager: Dif
       method = method,
       params = params
     )
+    broadcastNotification(notification)
+  }
+
+  private fun broadcastNotification(notification: JSONRPCNotification) {
     runBlocking {
       activeTransports.values.forEach { transport ->
         try {
           transport.send(notification)
-          LOG.debug("Notification sent to session ${transport.sessionId}: ${method}")
+          LOG.debug("Notification sent to session ${transport.sessionId}: ${notification.method}")
         } catch (e: Exception) {
           LOG.warn("Failed to send notification to session ${transport.sessionId}: ${e.message}")
         }
