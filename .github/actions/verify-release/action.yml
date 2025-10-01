@@ -9,6 +9,9 @@ inputs:
   expected-version:
     description: 'Expected version'
     required: true
+  gemini_api_key:
+    description: 'The API key for running integration tests.'
+    required: true
   ref:
     description: 'The branch, tag, or SHA to release from.'
     required: false
@@ -18,10 +21,6 @@ inputs:
 runs:
   using: 'composite'
   steps:
-    - name: '📝 Print Inputs'
-      shell: 'bash'
-      run: |
-        echo "${{ toJSON(inputs) }}"
     - name: 'Checkout'
       uses: 'actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955' # ratchet:actions/checkout@v4
       with:
@@ -37,21 +36,25 @@ runs:
         max_attempts: 10
         command: 'cd ./verify && pkg="${{ inputs.npm-package }}" && npm install --prefer-online --no-cache -g "$pkg"'
 
-    # This provides a very basic smoke test for Gemini CLI
-    - name: 'Run Gemini CLI'
-      id: 'gemini_cli'
+    - name: 'Basic smoke test'
       shell: 'bash'
       working-directory: './verify'
       run: |-
-        echo "gemini_version=$(gemini --version)" >> $GITHUB_OUTPUT
+        gemini_version=$(gemini --version)
+        if [ "$gemini_version" != "${{ inputs.expected-version }}" ]; then
+          echo "❌ Version mismatch: Got $gemini_version from ${{ inputs.npm-package }}, expected ${{ inputs.expected-version }}"
+          exit 1
+        fi
 
-    # Force a failure if it doesn't match
-    - name: 'Fail workflow if version does not match'
-      if: '${{ steps.gemini_cli.outputs.gemini_version != inputs.expected-version }}'
+    - name: 'Install dependencies for integration tests'
       shell: 'bash'
       working-directory: './verify'
-      run: |-
-        echo '❌ Got ${{ steps.gemini_cli.outputs.gemini_version }} from ${{ inputs.npm-package }}'
-        echo '❌ Expected Version ${{ inputs.expected-version }}'
+      run: 'npm install'
 
-        exit 1
+    - name: '🔬 Run integration tests against NPM release'
+      working-directory: './verify'
+      env:
+        GEMINI_API_KEY: '${{ inputs.gemini_api_key }}'
+        INTEGRATION_TEST_USE_INSTALLED_GEMINI: 'true'
+      shell: 'bash'
+      run: 'npm run test:integration:sandbox:none'

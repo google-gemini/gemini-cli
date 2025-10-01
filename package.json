@@ -99,6 +99,7 @@
     "prettier": "^3.5.3",
     "react-devtools-core": "^4.28.5",
     "semver": "^7.7.2",
+    "strip-ansi": "^7.1.2",
     "tsx": "^4.20.3",
     "typescript-eslint": "^8.30.1",
     "vitest": "^3.2.4",

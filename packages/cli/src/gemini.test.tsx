@@ -307,6 +307,7 @@ describe('gemini.tsx main function kitty protocol', () => {
       debug: undefined,
       prompt: undefined,
       promptInteractive: undefined,
+      query: undefined,
       allFiles: undefined,
       showMemoryUsage: undefined,
       yolo: undefined,
@@ -328,7 +329,6 @@ describe('gemini.tsx main function kitty protocol', () => {
       screenReader: undefined,
       useSmartEdit: undefined,
       useWriteTodos: undefined,
-      promptWords: undefined,
       outputFormat: undefined,
     });
 
