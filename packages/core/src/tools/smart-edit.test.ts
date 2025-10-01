@@ -195,7 +195,7 @@ describe('SmartEditTool', () => {
 
     it('should perform an exact replacement', async () => {
       const content = 'hello world';
-      const result = await calculateReplacement({
+      const result = await calculateReplacement(mockConfig, {
         params: {
           file_path: 'test.txt',
           instruction: 'test',
@@ -211,7 +211,7 @@ describe('SmartEditTool', () => {
 
     it('should perform a flexible, whitespace-insensitive replacement', async () => {
       const content = '  hello\n    world\n';
-      const result = await calculateReplacement({
+      const result = await calculateReplacement(mockConfig, {
         params: {
           file_path: 'test.txt',
           instruction: 'test',
@@ -227,7 +227,7 @@ describe('SmartEditTool', () => {
 
     it('should return 0 occurrences if no match is found', async () => {
       const content = 'hello world';
-      const result = await calculateReplacement({
+      const result = await calculateReplacement(mockConfig, {
         params: {
           file_path: 'test.txt',
           instruction: 'test',
@@ -245,7 +245,7 @@ describe('SmartEditTool', () => {
       // This case would fail with the previous exact and line-trimming flexible logic
       // because the whitespace *within* the line is different.
       const content = '  function  myFunc( a, b ) {\n    return a + b;\n  }';
-      const result = await calculateReplacement({
+      const result = await calculateReplacement(mockConfig, {
         params: {
           file_path: 'test.js',
           instruction: 'test',
