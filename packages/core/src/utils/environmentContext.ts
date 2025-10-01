@@ -6,7 +6,7 @@
 
 import type { Part } from '@google/genai';
 import type { Config } from '../config/config.js';
-import { getFolderStructure } from './getFolderStructure.js';
+// import { getFolderStructure } from './getFolderStructure.js';
 
 /**
  * Generates a string describing the current workspace directories and their structures.
@@ -19,28 +19,29 @@ export async function getDirectoryContextString(
   const workspaceContext = config.getWorkspaceContext();
   const workspaceDirectories = workspaceContext.getDirectories();
 
-  const folderStructures = await Promise.all(
-    workspaceDirectories.map((dir) =>
-      getFolderStructure(dir, {
-        fileService: config.getFileService(),
-      }),
-    ),
-  );
+  // const folderStructures = await Promise.all(
+  //   workspaceDirectories.map((dir) =>
+  //     getFolderStructure(dir, {
+  //       fileService: config.getFileService(),
+  //     }),
+  //   ),
+  // );
 
-  const folderStructure = folderStructures.join('\n');
+  // const folderStructure = folderStructures.join('\n');
 
   let workingDirPreamble: string;
   if (workspaceDirectories.length === 1) {
-    workingDirPreamble = `I'm currently working in the directory: ${workspaceDirectories[0]}`;
+    workingDirPreamble = `Current working directory: ${workspaceDirectories[0]}`;
   } else {
     const dirList = workspaceDirectories.map((dir) => `  - ${dir}`).join('\n');
     workingDirPreamble = `I'm currently working in the following directories:\n${dirList}`;
   }
 
-  return `${workingDirPreamble}
-Here is the folder structure of the current working directories:
+  return workingDirPreamble;
+//   return `${workingDirPreamble}
+// Here is the folder structure of the current working directories:
 
-${folderStructure}`;
+// ${folderStructure}`;
 }
 
 /**
@@ -61,9 +62,8 @@ export async function getEnvironmentContext(config: Config): Promise<Part[]> {
   const directoryContext = await getDirectoryContextString(config);
 
   const context = `
-This is the Gemini CLI. We are setting up the context for our chat.
-Today's date is ${today} (formatted according to the user's locale).
-My operating system is: ${platform}
+Date: ${today}
+Operating system: ${platform}
 ${directoryContext}
         `.trim();
 
