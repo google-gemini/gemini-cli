@@ -154,7 +154,7 @@ runs:
 
     - name: '🏷️ Tag release'
       uses: './.github/actions/tag-npm-release'
-      if: "${{ inputs.dry-run != 'true' }}"
+      if: "${{ inputs.dry-run != 'true' && inputs.npm-tag != 'none' }}"
       with:
         channel: '${{ inputs.npm-tag }}'
         version: '${{ inputs.release-version }}'
