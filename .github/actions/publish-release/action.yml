@@ -118,7 +118,7 @@ runs:
       working-directory: '${{ inputs.working-directory }}'
       shell: 'bash'
       run: |
-        node scripts/prepare-github-release.js
+        node ${{ github.workspace }}/scripts/prepare-github-release.js
 
     - name: 'Configure npm for publishing to npm'
       if: "inputs.registry == 'npm'"
