@@ -1485,7 +1485,7 @@ describe('loadCliConfig model selection', () => {
       argv,
     );
 
-    expect(config.getModel()).toBe(DEFAULT_GEMINI_MODEL_AUTO);
+    expect(config.getModel()).toBe(DEFAULT_GEMINI_MODEL);
   });
 
   it('always prefers model from argvs', async () => {
@@ -1802,8 +1802,22 @@ describe('loadCliConfig useRipgrep', () => {
       process.argv = ['node', 'script.js'];
       const argv = await parseArguments({} as Settings);
       const settings: Settings = {};
+<<<<<<< HEAD
       const config = await loadCliConfig(settings, [], 'test-session', argv);
       expect(config.getUseModelRouter()).toBe(true);
+=======
+      const config = await loadCliConfig(
+        settings,
+        [],
+        new ExtensionEnablementManager(
+          ExtensionStorage.getUserExtensionsDir(),
+          argv.extensions,
+        ),
+        'test-session',
+        argv,
+      );
+      expect(config.getUseModelRouter()).toBe(false);
+>>>>>>> 4c5ab80b (fix(routing): Disable model router by default (#10283))
     });
 
     it('should be true when useModelRouter is set to true in settings', async () => {

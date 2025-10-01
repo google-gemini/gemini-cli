@@ -986,7 +986,7 @@ const SETTINGS_SCHEMA = {
         label: 'Use Model Router',
         category: 'Experimental',
         requiresRestart: true,
-        default: true,
+        default: false,
         description:
           'Enable model routing to route requests to the best model based on complexity.',
         showInDialog: true,
