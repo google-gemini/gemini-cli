@@ -116,10 +116,11 @@ runs:
         NODE_AUTH_TOKEN: '${{ inputs.wombat-token-core }}'
       shell: 'bash'
       run: |
-        npm publish \
-          --dry-run="${{ inputs.dry-run }}" \
-          --workspace="@google/gemini-cli-core" \
-          --no-tag
+        if [ "${{ inputs.dry-run }}" == "true" ]; then
+          npm publish --dry-run --workspace="@google/gemini-cli-core" --no-tag
+        else
+          npm publish --workspace="@google/gemini-cli-core" --no-tag
+        fi
 
     - name: '🔗 Install latest core package'
       working-directory: '${{ inputs.working-directory }}'
@@ -136,10 +137,11 @@ runs:
         NODE_AUTH_TOKEN: '${{ inputs.wombat-token-cli }}'
       shell: 'bash'
       run: |
-        npm publish \
-          --dry-run="${{ inputs.dry-run }}" \
-          --workspace="@google/gemini-cli" \
-          --no-tag
+        if [ "${{ inputs.dry-run }}" == "true" ]; then
+          npm publish --dry-run --workspace="@google/gemini-cli" --no-tag
+        else
+          npm publish --workspace="@google/gemini-cli" --no-tag
+        fi
 
     - name: '🔬 Verify NPM release by version'
       uses: './.github/actions/verify-release'
