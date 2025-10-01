@@ -628,6 +628,16 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         return;
       }
 
+      // Ctrl+D (Clear input if buffer has text)
+      if (keyMatchers[Command.EXIT](key)) {
+        if (buffer.text.length > 0) {
+          buffer.setText('');
+          resetCompletionState();
+          return;
+        }
+        // If buffer is empty, let AppContainer handle exit
+      }
+
       // Kill line commands
       if (keyMatchers[Command.KILL_LINE_RIGHT](key)) {
         buffer.killLineRight();

@@ -757,6 +757,34 @@ describe('InputPrompt', () => {
     unmount();
   });
 
+  it('should clear the buffer on Ctrl+D if it has text', async () => {
+    props.buffer.setText('some text to clear');
+    const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />);
+    await wait();
+
+    stdin.write('\x04'); // Ctrl+D character
+    await wait();
+
+    expect(props.buffer.setText).toHaveBeenCalledWith('');
+    expect(mockCommandCompletion.resetCompletionState).toHaveBeenCalled();
+    expect(props.onSubmit).not.toHaveBeenCalled();
+    unmount();
+  });
+
+  it('should NOT clear the buffer on Ctrl+D if it is empty', async () => {
+    props.buffer.text = '';
+    const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />);
+    await wait();
+
+    stdin.write('\x04'); // Ctrl+D character
+    await wait();
+
+    expect(props.buffer.setText).not.toHaveBeenCalled();
+    expect(mockCommandCompletion.resetCompletionState).not.toHaveBeenCalled();
+    expect(props.onSubmit).not.toHaveBeenCalled();
+    unmount();
+  });
+
   describe('cursor-based completion trigger', () => {
     it('should trigger completion when cursor is after @ without spaces', async () => {
       // Set up buffer state
