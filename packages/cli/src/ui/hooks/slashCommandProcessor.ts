@@ -4,14 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {
-  useCallback,
-  useMemo,
-  useEffect,
-  useState,
-  type Dispatch,
-  type SetStateAction,
-} from 'react';
+import { useCallback, useMemo, useEffect, useState } from 'react';
 import { type PartListUnion } from '@google/genai';
 import process from 'node:process';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
@@ -42,7 +35,10 @@ import { BuiltinCommandLoader } from '../../services/BuiltinCommandLoader.js';
 import { FileCommandLoader } from '../../services/FileCommandLoader.js';
 import { McpPromptLoader } from '../../services/McpPromptLoader.js';
 import { parseSlashCommand } from '../../utils/commands.js';
-import type { ExtensionUpdateState } from '../state/extensions.js';
+import {
+  type ExtensionUpdateAction,
+  type ExtensionUpdateState,
+} from '../state/extensions.js';
 
 interface SlashCommandProcessorActions {
   openAuthDialog: () => void;
@@ -55,9 +51,7 @@ interface SlashCommandProcessorActions {
   quit: (messages: HistoryItem[]) => void;
   setDebugMessage: (message: string) => void;
   toggleCorgiMode: () => void;
-  setExtensionsUpdateState: Dispatch<
-    SetStateAction<Map<string, ExtensionUpdateState>>
-  >;
+  dispatch: (action: ExtensionUpdateAction) => void;
   addConfirmUpdateExtensionRequest: (request: ConfirmationRequest) => void;
 }
 
@@ -207,7 +201,7 @@ export const useSlashCommandProcessor = (
         setGeminiMdFileCount,
         reloadCommands,
         extensionsUpdateState,
-        setExtensionsUpdateState: actions.setExtensionsUpdateState,
+        dispatchExtensionStateUpdate: actions.dispatch,
         addConfirmUpdateExtensionRequest:
           actions.addConfirmUpdateExtensionRequest,
       },

@@ -60,7 +60,7 @@ async function updateAction(context: CommandContext, args: string) {
           ),
         context.services.config!.getExtensions(),
         context.ui.extensionsUpdateState,
-        context.ui.setExtensionsUpdateState,
+        context.ui.dispatchExtensionStateUpdate,
       );
     } else if (names?.length) {
       const workingDir = context.services.config!.getWorkingDir();
@@ -89,13 +89,7 @@ async function updateAction(context: CommandContext, args: string) {
             ),
           context.ui.extensionsUpdateState.get(extension.name) ??
             ExtensionUpdateState.UNKNOWN,
-          (updateState) => {
-            context.ui.setExtensionsUpdateState((prev) => {
-              const newState = new Map(prev);
-              newState.set(name, updateState);
-              return newState;
-            });
-          },
+          context.ui.dispatchExtensionStateUpdate,
         );
         if (updateInfo) updateInfos.push(updateInfo);
       }

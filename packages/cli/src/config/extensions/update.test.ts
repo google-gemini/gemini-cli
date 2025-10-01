@@ -186,6 +186,12 @@ describe('update tests', () => {
       mockGit.getRemotes.mockResolvedValue([{ name: 'origin' }]);
 
       const setExtensionUpdateState = vi.fn();
+      const dispatch = (action: {
+        type: string;
+        payload: { name: string; state: ExtensionUpdateState };
+      }) => {
+        setExtensionUpdateState(action.payload.state);
+      };
 
       const extension = annotateActiveExtensions(
         [
@@ -202,7 +208,7 @@ describe('update tests', () => {
         tempHomeDir,
         async (_) => true,
         ExtensionUpdateState.UPDATE_AVAILABLE,
-        setExtensionUpdateState,
+        dispatch,
       );
 
       expect(setExtensionUpdateState).toHaveBeenCalledWith(
@@ -229,6 +235,12 @@ describe('update tests', () => {
       mockGit.getRemotes.mockResolvedValue([{ name: 'origin' }]);
 
       const setExtensionUpdateState = vi.fn();
+      const dispatch = (action: {
+        type: string;
+        payload: { name: string; state: ExtensionUpdateState };
+      }) => {
+        setExtensionUpdateState(action.payload.state);
+      };
       const extension = annotateActiveExtensions(
         [
           loadExtension({
@@ -245,7 +257,7 @@ describe('update tests', () => {
           tempHomeDir,
           async (_) => true,
           ExtensionUpdateState.UPDATE_AVAILABLE,
-          setExtensionUpdateState,
+          dispatch,
         ),
       ).rejects.toThrow();
 
@@ -286,17 +298,17 @@ describe('update tests', () => {
       mockGit.listRemote.mockResolvedValue('remoteHash	HEAD');
       mockGit.revparse.mockResolvedValue('localHash');
 
-      let extensionState = new Map();
+      const extensionState = new Map();
+      const dispatch = (action: {
+        type: string;
+        payload: { name: string; state: ExtensionUpdateState };
+      }) => {
+        extensionState.set(action.payload.name, action.payload.state);
+      };
       const results = await checkForAllExtensionUpdates(
         [extension],
         extensionState,
-        (newState) => {
-          if (typeof newState === 'function') {
-            newState(extensionState);
-          } else {
-            extensionState = newState;
-          }
-        },
+        dispatch,
       );
       const result = results.get('test-extension');
       expect(result).toBe(ExtensionUpdateState.UPDATE_AVAILABLE);
@@ -329,17 +341,17 @@ describe('update tests', () => {
       mockGit.listRemote.mockResolvedValue('sameHash	HEAD');
       mockGit.revparse.mockResolvedValue('sameHash');
 
-      let extensionState = new Map();
+      const extensionState = new Map();
+      const dispatch = (action: {
+        type: string;
+        payload: { name: string; state: ExtensionUpdateState };
+      }) => {
+        extensionState.set(action.payload.name, action.payload.state);
+      };
       const results = await checkForAllExtensionUpdates(
         [extension],
         extensionState,
-        (newState) => {
-          if (typeof newState === 'function') {
-            newState(extensionState);
-          } else {
-            extensionState = newState;
-          }
-        },
+        dispatch,
       );
       const result = results.get('test-extension');
       expect(result).toBe(ExtensionUpdateState.UP_TO_DATE);
@@ -369,17 +381,17 @@ describe('update tests', () => {
         process.cwd(),
         new ExtensionEnablementManager(ExtensionStorage.getUserExtensionsDir()),
       )[0];
-      let extensionState = new Map();
+      const extensionState = new Map();
+      const dispatch = (action: {
+        type: string;
+        payload: { name: string; state: ExtensionUpdateState };
+      }) => {
+        extensionState.set(action.payload.name, action.payload.state);
+      };
       const results = await checkForAllExtensionUpdates(
         [extension],
         extensionState,
-        (newState) => {
-          if (typeof newState === 'function') {
-            newState(extensionState);
-          } else {
-            extensionState = newState;
-          }
-        },
+        dispatch,
         tempWorkspaceDir,
       );
       const result = results.get('local-extension');
@@ -410,17 +422,17 @@ describe('update tests', () => {
         process.cwd(),
         new ExtensionEnablementManager(ExtensionStorage.getUserExtensionsDir()),
       )[0];
-      let extensionState = new Map();
+      const extensionState = new Map();
+      const dispatch = (action: {
+        type: string;
+        payload: { name: string; state: ExtensionUpdateState };
+      }) => {
+        extensionState.set(action.payload.name, action.payload.state);
+      };
       const results = await checkForAllExtensionUpdates(
         [extension],
         extensionState,
-        (newState) => {
-          if (typeof newState === 'function') {
-            newState(extensionState);
-          } else {
-            extensionState = newState;
-          }
-        },
+        dispatch,
         tempWorkspaceDir,
       );
       const result = results.get('local-extension');
@@ -450,17 +462,17 @@ describe('update tests', () => {
 
       mockGit.getRemotes.mockRejectedValue(new Error('Git error'));
 
-      let extensionState = new Map();
+      const extensionState = new Map();
+      const dispatch = (action: {
+        type: string;
+        payload: { name: string; state: ExtensionUpdateState };
+      }) => {
+        extensionState.set(action.payload.name, action.payload.state);
+      };
       const results = await checkForAllExtensionUpdates(
         [extension],
         extensionState,
-        (newState) => {
-          if (typeof newState === 'function') {
-            newState(extensionState);
-          } else {
-            extensionState = newState;
-          }
-        },
+        dispatch,
       );
       const result = results.get('error-extension');
       expect(result).toBe(ExtensionUpdateState.ERROR);

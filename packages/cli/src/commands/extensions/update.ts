@@ -95,7 +95,7 @@ export async function handleUpdate(args: UpdateArgs) {
         workingDir,
         requestConsentNonInteractive,
         extensions,
-        await checkForAllExtensionUpdates(extensions, new Map(), (_) => {}),
+        await checkForAllExtensionUpdates(extensions, new Map(), () => {}),
         () => {},
       );
       updateInfos = updateInfos.filter(
