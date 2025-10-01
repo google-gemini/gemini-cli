@@ -40,13 +40,24 @@ describe('DescriptiveRadioButtonSelect', () => {
   const mockOnHighlight = vi.fn();
 
   const ITEMS: Array<DescriptiveRadioSelectItem<string>> = [
-    { title: 'Foo Title', description: 'This is Foo.', value: 'foo' },
-    { title: 'Bar Title', description: 'This is Bar.', value: 'bar' },
+    {
+      title: 'Foo Title',
+      description: 'This is Foo.',
+      value: 'foo',
+      key: 'foo',
+    },
+    {
+      title: 'Bar Title',
+      description: 'This is Bar.',
+      value: 'bar',
+      key: 'bar',
+    },
     {
       title: 'Baz Title',
       description: 'This is Baz.',
       value: 'baz',
       disabled: true,
+      key: 'baz',
     },
   ];
 

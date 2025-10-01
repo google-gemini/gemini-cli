@@ -26,6 +26,7 @@ import { ExtensionUpdateState } from '../state/extensions.js';
 vi.mock('../../config/extensions/update.js', () => ({
   updateExtension: vi.fn(),
   updateAllUpdatableExtensions: vi.fn(),
+  checkForAllExtensionUpdates: vi.fn(),
 }));
 
 const mockUpdateExtension = updateExtension as MockedFunction<
@@ -50,6 +51,9 @@ describe('extensionsCommand', () => {
           getExtensions: mockGetExtensions,
           getWorkingDir: () => '/test/dir',
         },
+      },
+      ui: {
+        dispatchExtensionStateUpdate: vi.fn(),
       },
     });
   });
@@ -168,10 +172,10 @@ describe('extensionsCommand', () => {
         updatedVersion: '1.0.1',
       });
       mockGetExtensions.mockReturnValue([extension]);
-      mockContext.ui.extensionsUpdateState.set(
-        extension.name,
-        ExtensionUpdateState.UPDATE_AVAILABLE,
-      );
+      mockContext.ui.extensionsUpdateState.set(extension.name, {
+        status: ExtensionUpdateState.UPDATE_AVAILABLE,
+        processed: false,
+      });
       await updateAction(mockContext, 'ext-one');
       expect(mockUpdateExtension).toHaveBeenCalledWith(
         extension,
@@ -250,6 +254,82 @@ describe('extensionsCommand', () => {
         },
         expect.any(Number),
       );
+    });
+
+    describe('completion', () => {
+      const updateCompletion = extensionsCommand.subCommands?.find(
+        (cmd) => cmd.name === 'update',
+      )?.completion;
+
+      if (!updateCompletion) {
+        throw new Error('Update completion not found');
+      }
+
+      const extensionOne: GeminiCLIExtension = {
+        name: 'ext-one',
+        version: '1.0.0',
+        isActive: true,
+        path: '/test/dir/ext-one',
+        installMetadata: {
+          type: 'git',
+          autoUpdate: false,
+          source: 'https://github.com/some/extension.git',
+        },
+      };
+      const extensionTwo: GeminiCLIExtension = {
+        name: 'another-ext',
+        version: '1.0.0',
+        isActive: true,
+        path: '/test/dir/another-ext',
+        installMetadata: {
+          type: 'git',
+          autoUpdate: false,
+          source: 'https://github.com/some/extension.git',
+        },
+      };
+      const allExt: GeminiCLIExtension = {
+        name: 'all-ext',
+        version: '1.0.0',
+        isActive: true,
+        path: '/test/dir/all-ext',
+        installMetadata: {
+          type: 'git',
+          autoUpdate: false,
+          source: 'https://github.com/some/extension.git',
+        },
+      };
+
+      it.each([
+        {
+          description: 'should return matching extension names',
+          extensions: [extensionOne, extensionTwo],
+          partialArg: 'ext',
+          expected: ['ext-one'],
+        },
+        {
+          description: 'should return --all when partialArg matches',
+          extensions: [],
+          partialArg: '--al',
+          expected: ['--all'],
+        },
+        {
+          description:
+            'should return both extension names and --all when both match',
+          extensions: [allExt],
+          partialArg: 'all',
+          expected: ['--all', 'all-ext'],
+        },
+        {
+          description: 'should return an empty array if no matches',
+          extensions: [extensionOne],
+          partialArg: 'nomatch',
+          expected: [],
+        },
+      ])('$description', async ({ extensions, partialArg, expected }) => {
+        mockGetExtensions.mockReturnValue(extensions);
+        const suggestions = await updateCompletion(mockContext, partialArg);
+        expect(suggestions).toEqual(expected);
+      });
     });
   });
 });

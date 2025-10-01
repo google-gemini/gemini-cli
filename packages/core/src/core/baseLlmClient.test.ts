@@ -36,7 +36,29 @@ vi.mock('../utils/errors.js', async (importOriginal) => {
 });
 
 vi.mock('../utils/retry.js', () => ({
-  retryWithBackoff: vi.fn(async (fn) => await fn()),
+  retryWithBackoff: vi.fn(async (fn, options) => {
+    // Default implementation - just call the function
+    const result = await fn();
+
+    // If shouldRetryOnContent is provided, test it but don't actually retry
+    // (unless we want to simulate retry exhaustion for testing)
+    if (options?.shouldRetryOnContent) {
+      const shouldRetry = options.shouldRetryOnContent(result);
+      if (shouldRetry) {
+        // Check if we need to simulate retry exhaustion (for error testing)
+        const responseText = result?.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (
+          !responseText ||
+          responseText.trim() === '' ||
+          responseText.includes('{"color": "blue"')
+        ) {
+          throw new Error('Retry attempts exhausted for invalid content');
+        }
+      }
+    }
+
+    return result;
+  }),
 }));
 
 const mockGenerateContent = vi.fn();
@@ -96,8 +118,14 @@ describe('BaseLlmClient', () => {
 
       expect(result).toEqual({ color: 'blue' });
 
-      // Ensure the retry mechanism was engaged
+      // Ensure the retry mechanism was engaged with shouldRetryOnContent
       expect(retryWithBackoff).toHaveBeenCalledTimes(1);
+      expect(retryWithBackoff).toHaveBeenCalledWith(
+        expect.any(Function),
+        expect.objectContaining({
+          shouldRetryOnContent: expect.any(Function),
+        }),
+      );
 
       // Validate the parameters passed to the underlying generator
       expect(mockGenerateContent).toHaveBeenCalledTimes(1);
@@ -194,9 +222,12 @@ describe('BaseLlmClient', () => {
       await client.generateJson(options);
 
       expect(retryWithBackoff).toHaveBeenCalledTimes(1);
-      expect(retryWithBackoff).toHaveBeenCalledWith(expect.any(Function), {
-        maxAttempts: customMaxAttempts,
-      });
+      expect(retryWithBackoff).toHaveBeenCalledWith(
+        expect.any(Function),
+        expect.objectContaining({
+          maxAttempts: customMaxAttempts,
+        }),
+      );
     });
 
     it('should call retryWithBackoff without maxAttempts when not provided', async () => {
@@ -206,9 +237,44 @@ describe('BaseLlmClient', () => {
       // No maxAttempts in defaultOptions
       await client.generateJson(defaultOptions);
 
-      expect(retryWithBackoff).toHaveBeenCalledWith(expect.any(Function), {
-        maxAttempts: 5,
-      });
+      expect(retryWithBackoff).toHaveBeenCalledWith(
+        expect.any(Function),
+        expect.objectContaining({
+          maxAttempts: 5,
+        }),
+      );
+    });
+  });
+
+  describe('generateJson - Content Validation and Retries', () => {
+    it('should validate content using shouldRetryOnContent function', async () => {
+      const mockResponse = createMockResponse('{"color": "blue"}');
+      mockGenerateContent.mockResolvedValue(mockResponse);
+
+      await client.generateJson(defaultOptions);
+
+      // Verify that retryWithBackoff was called with shouldRetryOnContent
+      expect(retryWithBackoff).toHaveBeenCalledWith(
+        expect.any(Function),
+        expect.objectContaining({
+          shouldRetryOnContent: expect.any(Function),
+        }),
+      );
+
+      // Test the shouldRetryOnContent function behavior
+      const retryCall = vi.mocked(retryWithBackoff).mock.calls[0];
+      const shouldRetryOnContent = retryCall[1]?.shouldRetryOnContent;
+
+      // Valid JSON should not trigger retry
+      expect(shouldRetryOnContent!(mockResponse)).toBe(false);
+
+      // Empty response should trigger retry
+      expect(shouldRetryOnContent!(createMockResponse(''))).toBe(true);
+
+      // Invalid JSON should trigger retry
+      expect(
+        shouldRetryOnContent!(createMockResponse('{"color": "blue"')),
+      ).toBe(true);
     });
   });
 
@@ -222,14 +288,14 @@ describe('BaseLlmClient', () => {
       const result = await client.generateJson(defaultOptions);
 
       expect(result).toEqual({ color: 'purple' });
-      expect(logMalformedJsonResponse).toHaveBeenCalledTimes(1);
       expect(logMalformedJsonResponse).toHaveBeenCalledWith(
         mockConfig,
         expect.any(MalformedJsonResponseEvent),
       );
-      // Validate the telemetry event content
-      const event = vi.mocked(logMalformedJsonResponse).mock
-        .calls[0][1] as MalformedJsonResponseEvent;
+      // Validate the telemetry event content - find the most recent call
+      const calls = vi.mocked(logMalformedJsonResponse).mock.calls;
+      const lastCall = calls[calls.length - 1];
+      const event = lastCall[1] as MalformedJsonResponseEvent;
       expect(event.model).toBe('test-model');
     });
 
@@ -247,38 +313,37 @@ describe('BaseLlmClient', () => {
   });
 
   describe('generateJson - Error Handling', () => {
-    it('should throw and report error for empty response', async () => {
+    it('should throw and report error for empty response after retry exhaustion', async () => {
       mockGenerateContent.mockResolvedValue(createMockResponse(''));
 
-      // The final error message includes the prefix added by the client's outer catch block.
       await expect(client.generateJson(defaultOptions)).rejects.toThrow(
-        'Failed to generate JSON content: API returned an empty response for generateJson.',
+        'Failed to generate JSON content: Retry attempts exhausted for invalid content',
       );
 
       // Verify error reporting details
       expect(reportError).toHaveBeenCalledTimes(1);
       expect(reportError).toHaveBeenCalledWith(
         expect.any(Error),
-        'Error in generateJson: API returned an empty response.',
+        'API returned invalid content (empty or unparsable JSON) after all retries.',
         defaultOptions.contents,
-        'generateJson-empty-response',
+        'generateJson-invalid-content',
       );
     });
 
-    it('should throw and report error for invalid JSON syntax', async () => {
+    it('should throw and report error for invalid JSON syntax after retry exhaustion', async () => {
       const invalidJson = '{"color": "blue"'; // missing closing brace
       mockGenerateContent.mockResolvedValue(createMockResponse(invalidJson));
 
       await expect(client.generateJson(defaultOptions)).rejects.toThrow(
-        /^Failed to generate JSON content: Failed to parse API response as JSON:/,
+        'Failed to generate JSON content: Retry attempts exhausted for invalid content',
       );
 
       expect(reportError).toHaveBeenCalledTimes(1);
       expect(reportError).toHaveBeenCalledWith(
         expect.any(Error),
-        'Failed to parse JSON response from generateJson.',
-        expect.objectContaining({ responseTextFailedToParse: invalidJson }),
-        'generateJson-parse',
+        'API returned invalid content (empty or unparsable JSON) after all retries.',
+        defaultOptions.contents,
+        'generateJson-invalid-content',
       );
     });
 

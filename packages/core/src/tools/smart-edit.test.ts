@@ -81,6 +81,12 @@ describe('SmartEditTool', () => {
     } as unknown as BaseLlmClient;
 
     mockConfig = {
+      getUsageStatisticsEnabled: vi.fn(() => true),
+      getSessionId: vi.fn(() => 'mock-session-id'),
+      getContentGeneratorConfig: vi.fn(() => ({ authType: 'mock' })),
+      getUseSmartEdit: vi.fn(() => false),
+      getUseModelRouter: vi.fn(() => false),
+      getProxy: vi.fn(() => undefined),
       getGeminiClient: vi.fn().mockReturnValue(geminiClient),
       getBaseLlmClient: vi.fn().mockReturnValue(baseLlmClient),
       getTargetDir: () => rootDir,
@@ -195,7 +201,7 @@ describe('SmartEditTool', () => {
 
     it('should perform an exact replacement', async () => {
       const content = 'hello world';
-      const result = await calculateReplacement({
+      const result = await calculateReplacement(mockConfig, {
         params: {
           file_path: 'test.txt',
           instruction: 'test',
@@ -211,7 +217,7 @@ describe('SmartEditTool', () => {
 
     it('should perform a flexible, whitespace-insensitive replacement', async () => {
       const content = '  hello\n    world\n';
-      const result = await calculateReplacement({
+      const result = await calculateReplacement(mockConfig, {
         params: {
           file_path: 'test.txt',
           instruction: 'test',
@@ -227,7 +233,7 @@ describe('SmartEditTool', () => {
 
     it('should return 0 occurrences if no match is found', async () => {
       const content = 'hello world';
-      const result = await calculateReplacement({
+      const result = await calculateReplacement(mockConfig, {
         params: {
           file_path: 'test.txt',
           instruction: 'test',
@@ -239,6 +245,99 @@ describe('SmartEditTool', () => {
       });
       expect(result.newContent).toBe(content);
       expect(result.occurrences).toBe(0);
+    });
+
+    it('should perform a regex-based replacement for flexible intra-line whitespace', async () => {
+      // This case would fail with the previous exact and line-trimming flexible logic
+      // because the whitespace *within* the line is different.
+      const content = '  function  myFunc( a, b ) {\n    return a + b;\n  }';
+      const result = await calculateReplacement(mockConfig, {
+        params: {
+          file_path: 'test.js',
+          instruction: 'test',
+          old_string: 'function myFunc(a, b) {', // Note the normalized whitespace
+          new_string: 'const yourFunc = (a, b) => {',
+        },
+        currentContent: content,
+        abortSignal,
+      });
+
+      // The indentation from the original line should be preserved and applied to the new string.
+      const expectedContent =
+        '  const yourFunc = (a, b) => {\n    return a + b;\n  }';
+      expect(result.newContent).toBe(expectedContent);
+      expect(result.occurrences).toBe(1);
+    });
+  });
+  describe('correctPath', () => {
+    it('should correct a relative path if it is unambiguous', () => {
+      const testFile = 'unique.txt';
+      fs.writeFileSync(path.join(rootDir, testFile), 'content');
+
+      const params: EditToolParams = {
+        file_path: testFile,
+        instruction: 'An instruction',
+        old_string: 'old',
+        new_string: 'new',
+      };
+
+      const validationResult = (tool as any).correctPath(params);
+
+      expect(validationResult).toBeNull();
+      expect(params.file_path).toBe(path.join(rootDir, testFile));
+    });
+
+    it('should correct a partial relative path if it is unambiguous', () => {
+      const subDir = path.join(rootDir, 'sub');
+      fs.mkdirSync(subDir);
+      const testFile = 'file.txt';
+      const partialPath = path.join('sub', testFile);
+      const fullPath = path.join(subDir, testFile);
+      fs.writeFileSync(fullPath, 'content');
+
+      const params: EditToolParams = {
+        file_path: partialPath,
+        instruction: 'An instruction',
+        old_string: 'old',
+        new_string: 'new',
+      };
+
+      const validationResult = (tool as any).correctPath(params);
+
+      expect(validationResult).toBeNull();
+      expect(params.file_path).toBe(fullPath);
+    });
+
+    it('should return an error for a relative path that does not exist', () => {
+      const params: EditToolParams = {
+        file_path: 'test.txt',
+        instruction: 'An instruction',
+        old_string: 'old',
+        new_string: 'new',
+      };
+      const result = (tool as any).correctPath(params);
+      expect(result).toMatch(/File not found for 'test.txt'/);
+    });
+
+    it('should return an error for an ambiguous path', () => {
+      const subDir1 = path.join(rootDir, 'module1');
+      const subDir2 = path.join(rootDir, 'module2');
+      fs.mkdirSync(subDir1, { recursive: true });
+      fs.mkdirSync(subDir2, { recursive: true });
+
+      const ambiguousFile = 'component.ts';
+      fs.writeFileSync(path.join(subDir1, ambiguousFile), 'content 1');
+      fs.writeFileSync(path.join(subDir2, ambiguousFile), 'content 2');
+
+      const params: EditToolParams = {
+        file_path: ambiguousFile,
+        instruction: 'An instruction',
+        old_string: 'old',
+        new_string: 'new',
+      };
+
+      const validationResult = (tool as any).correctPath(params);
+      expect(validationResult).toMatch(/ambiguous and matches multiple files/);
     });
   });
 
@@ -253,15 +352,15 @@ describe('SmartEditTool', () => {
       expect(tool.validateToolParams(params)).toBeNull();
     });
 
-    it('should return error for relative path', () => {
+    it('should return an error if path is outside the workspace', () => {
       const params: EditToolParams = {
-        file_path: 'test.txt',
+        file_path: path.join(os.tmpdir(), 'outside.txt'),
         instruction: 'An instruction',
         old_string: 'old',
         new_string: 'new',
       };
       expect(tool.validateToolParams(params)).toMatch(
-        /File path must be absolute/,
+        /must be within one of the workspace directories/,
       );
     });
   });
