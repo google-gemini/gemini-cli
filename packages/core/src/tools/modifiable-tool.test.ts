@@ -23,9 +23,13 @@ import * as path from 'node:path';
 const mockOpenDiff = vi.hoisted(() => vi.fn());
 const mockCreatePatch = vi.hoisted(() => vi.fn());
 
-vi.mock('../utils/editor.js', () => ({
-  openDiff: mockOpenDiff,
-}));
+vi.mock('../utils/editor.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../utils/editor.js')>();
+  return {
+    ...actual,
+    openDiff: mockOpenDiff,
+  };
+});
 
 vi.mock('diff', () => ({
   createPatch: mockCreatePatch,
