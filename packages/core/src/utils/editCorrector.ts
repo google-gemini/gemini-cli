@@ -179,13 +179,9 @@ export async function ensureCorrectEdit(
   abortSignal: AbortSignal,
 ): Promise<CorrectedEditResult> {
   const cacheKey = createHash('sha256')
-    .update(
-      JSON.stringify([
-        currentContent,
-        originalParams.old_string,
-        originalParams.new_string,
-      ]),
-    )
+    .update(createHash('sha256').update(currentContent).digest())
+    .update(createHash('sha256').update(originalParams.old_string).digest())
+    .update(createHash('sha256').update(originalParams.new_string).digest())
     .digest('hex');
   const cachedResult = editCorrectionCache.get(cacheKey);
   if (cachedResult) {
