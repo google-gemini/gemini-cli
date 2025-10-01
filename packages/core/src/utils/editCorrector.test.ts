@@ -611,6 +611,80 @@ describe('editCorrector', () => {
         expect(result.params).toEqual(originalParams);
       });
     });
+
+    describe('cache collision prevention', () => {
+      beforeEach(() => {
+        resetEditCorrectorCaches_TEST_ONLY();
+      });
+
+      it('should prevent cache collisions when parameters contain separator sequences', async () => {
+        const params1 = {
+          file_path: '/test/file.txt',
+          old_string: 'b---c',
+          new_string: 'd',
+        };
+        const params2 = {
+          file_path: '/test/file.txt',
+          old_string: 'c',
+          new_string: 'd',
+        };
+        mockResponses.push({ corrected_new_string_escaping: 'd' });
+        mockResponses.push({ corrected_new_string_escaping: 'd' });
+
+        // First call
+        await ensureCorrectEdit(
+          '/test/file.txt',
+          'a',
+          params1,
+          mockGeminiClientInstance,
+          mockBaseLlmClientInstance,
+          abortSignal,
+        );
+
+        // Second call
+        await ensureCorrectEdit(
+          '/test/file.txt',
+          'a---b',
+          params2,
+          mockGeminiClientInstance,
+          mockBaseLlmClientInstance,
+          abortSignal,
+        );
+
+        expect(mockGenerateJson).toHaveBeenCalledTimes(2);
+      });
+
+      it('should still cache when parameters are identical', async () => {
+        const params = {
+          file_path: '/test/file.txt',
+          old_string: 'b',
+          new_string: 'c',
+        };
+        mockResponses.push({ corrected_new_string_escaping: 'c' });
+
+        // First call
+        await ensureCorrectEdit(
+          '/test/file.txt',
+          'a',
+          params,
+          mockGeminiClientInstance,
+          mockBaseLlmClientInstance,
+          abortSignal,
+        );
+
+        // Second call
+        await ensureCorrectEdit(
+          '/test/file.txt',
+          'a',
+          params,
+          mockGeminiClientInstance,
+          mockBaseLlmClientInstance,
+          abortSignal,
+        );
+
+        expect(mockGenerateJson).toHaveBeenCalledTimes(1);
+      });
+    });
   });
 
   describe('ensureCorrectFileContent', () => {
