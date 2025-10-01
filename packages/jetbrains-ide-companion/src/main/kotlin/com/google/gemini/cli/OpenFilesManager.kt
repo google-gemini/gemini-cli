@@ -26,9 +26,12 @@ import com.intellij.util.messages.MessageBusConnection
 import com.intellij.util.messages.Topic
 import java.util.*
 
+import kotlinx.serialization.Serializable
+
 const val MAX_FILES = 10
 const val MAX_SELECTED_TEXT_LENGTH = 16384 // 16 KiB limit
 
+@Serializable
 data class File(
   var path: String,
   var timestamp: Long,
@@ -37,15 +40,18 @@ data class File(
   var selectedText: String? = null
 )
 
+@Serializable
 data class Cursor(
   val line: Int,
   val character: Int
 )
 
+@Serializable
 data class IdeContext(
   val workspaceState: WorkspaceState?
 )
 
+@Serializable
 data class WorkspaceState(
   val openFiles: List<File>,
   val isTrusted: Boolean
