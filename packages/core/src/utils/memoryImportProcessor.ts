@@ -164,10 +164,14 @@ function findCodeRegions(content: string): Array<[number, number]> {
       let childOffset = 0;
       for (const child of token.tokens) {
         const childIndexInParent = token.raw.indexOf(child.raw, childOffset);
-        if (childIndexInParent !== -1) {
-          walk(child, baseOffset + childIndexInParent);
-          childOffset = childIndexInParent + child.raw.length;
+        if (childIndexInParent === -1) {
+          logger.error(
+            `Could not find child token in parent raw content. Aborting parsing for this branch. Child raw: "${child.raw}"`,
+          );
+          break;
         }
+        walk(child, baseOffset + childIndexInParent);
+        childOffset = childIndexInParent + child.raw.length;
       }
     }
   }
