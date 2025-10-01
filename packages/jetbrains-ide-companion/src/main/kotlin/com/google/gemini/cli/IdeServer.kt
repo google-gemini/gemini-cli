@@ -48,7 +48,7 @@ private data class PortInfo(
   val workspacePath: String
 )
 
-class McpSseIdeServer(private val project: Project, private val diffManager: DiffManager) {
+class IdeServer(private val project: Project, private val diffManager: DiffManager) {
   private var server: Any? = null
   private var portFile: File? = null
   private val authToken = generateAuthToken()
@@ -59,7 +59,7 @@ class McpSseIdeServer(private val project: Project, private val diffManager: Dif
   private val mcpServer = createMcpServer()
 
   companion object {
-    private val LOG = Logger.getInstance(McpSseIdeServer::class.java)
+    private val LOG = Logger.getInstance(IdeServer::class.java)
   }
 
   init {
@@ -85,6 +85,7 @@ class McpSseIdeServer(private val project: Project, private val diffManager: Dif
     ApplicationManager.getApplication().executeOnPooledThread {
       try {
         server = embeddedServer(Netty, port = 0, host = "127.0.0.1") {
+          install(SSE)
           routing {
             intercept(ApplicationCallPipeline.Call) {
               if (!call.request.path().startsWith("/mcp")) return@intercept
