@@ -11,7 +11,7 @@ import {
   ExtensionUpdateState,
   extensionUpdatesReducer,
 } from '../state/extensions.js';
-import { useCallback, useEffect, useMemo, useReducer, useState } from 'react';
+import { useCallback, useEffect, useMemo, useReducer } from 'react';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
 import { MessageType, type ConfirmationRequest } from '../types.js';
 import {
@@ -54,7 +54,6 @@ export const useExtensionUpdates = (
     extensionUpdatesReducer,
     new Map<string, ExtensionUpdateStatus>(),
   );
-  const [isChecking, setIsChecking] = useState(false);
   const [
     confirmUpdateExtensionRequests,
     dispatchConfirmUpdateExtensionRequests,
@@ -81,25 +80,13 @@ export const useExtensionUpdates = (
   );
 
   useEffect(() => {
-    if (isChecking || extensions.length === 0) return;
-    setIsChecking(true);
     (async () => {
-      try {
-        await checkForAllExtensionUpdates(
-          extensions,
-          dispatchExtensionStateUpdate,
-        );
-      } finally {
-        setIsChecking(false);
-      }
+      await checkForAllExtensionUpdates(
+        extensions,
+        dispatchExtensionStateUpdate,
+      );
     })();
-  }, [
-    extensions,
-    extensions.length,
-    dispatchExtensionStateUpdate,
-    isChecking,
-    extensionsUpdateState,
-  ]);
+  }, [extensions, extensions.length, dispatchExtensionStateUpdate]);
 
   useEffect(() => {
     let extensionsWithUpdatesCount = 0;
