@@ -189,7 +189,7 @@ To avoid setting environment variables in every terminal session, you can:
 
 ## Non-interactive mode / headless environments
 
-Non-interative mode / headless environments will use your existing authentication method, if an existing authentication credential is cached. 
+Non-interative mode / headless environments will use your existing authentication method, if an existing authentication credential is cached.
 
 If you have not already logged in with an authentication credential (such as a Google account), you **must** configure authentication using environment variables:
 
