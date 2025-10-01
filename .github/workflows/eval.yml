@@ -49,13 +49,13 @@ jobs:
         DEFAULT_VERTEXAI_PROJECT: '${{ vars.GOOGLE_CLOUD_PROJECT }}'
         GOOGLE_CLOUD_PROJECT: '${{ vars.GOOGLE_CLOUD_PROJECT }}'
         GEMINI_API_KEY: '${{ secrets.EVAL_GEMINI_API_KEY }}'
-        GCLI_LOCAL_FILE_TELEMETRY: 'True'
+        GCLI_LOCAL_FILE_TELEMETRY: 'true'
         EVAL_GCS_BUCKET: '${{ vars.EVAL_GCS_ARTIFACTS_BUCKET }}'
     steps:
       - name: 'Checkout repository'
         uses: 'actions/checkout@v4' # ratchet:exclude
         with:
-          ref: ${{ inputs.branch-or-commit }}
+          ref: '${{ inputs.branch-or-commit }}'
 
       - name: 'Authenticate to Google Cloud'
         id: 'auth'
@@ -70,14 +70,14 @@ jobs:
       - name: 'Run evaluation'
         working-directory: '/app'
         run: |
-          poetry run exp_run --experiment-mode=on-demand --branch-or-commit=${{ inputs.branch-or-commit }} --model-name=gemini-2.5-pro --dataset=swebench_verified --concurrency=15
+          poetry run exp_run --experiment-mode=on-demand --branch-or-commit="${{ inputs.branch-or-commit }}" --model-name=gemini-2.5-pro --dataset=swebench_verified --concurrency=15
           poetry run python agent_prototypes/scripts/parse_gcli_logs_experiment.py --experiment_dir=experiments/adhoc/gcli_temp_exp --gcs-bucket="${EVAL_GCS_BUCKET}" --gcs-path=gh_action_artifacts
 
       - name: 'Get evaluation summary'
         id: 'calculate-rates'
         working-directory: '/app'
         run: |
-          poetry run bash $GITHUB_WORKSPACE/scripts/calculate_eval_success_rates.sh /app/experiments/adhoc/gcli_temp_exp/artifacts/summary_stats.md
+          poetry run bash "$GITHUB_WORKSPACE/scripts/calculate_eval_success_rates.sh" /app/experiments/adhoc/gcli_temp_exp/artifacts/summary_stats.md
 
       - name: 'Check evaluation threshold'
         if: >-

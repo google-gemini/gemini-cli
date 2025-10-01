@@ -4,8 +4,8 @@ set -euo pipefail
 
 SUMMARY_FILE="$1"
 
-if [ ! -f "$SUMMARY_FILE" ]; then
-    echo "Error: Summary file not found at $SUMMARY_FILE"
+if [[ ! -f "${SUMMARY_FILE}" ]]; then
+    echo "Error: Summary file not found at ${SUMMARY_FILE}"
     exit 1
 fi
 
@@ -110,4 +110,4 @@ END {
     }
 }
 
-' "$SUMMARY_FILE"
+' "${SUMMARY_FILE}"
