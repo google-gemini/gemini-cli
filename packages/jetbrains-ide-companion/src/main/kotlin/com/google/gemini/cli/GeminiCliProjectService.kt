@@ -12,13 +12,13 @@ class GeminiCliProjectService(private val project: Project) : Disposable {
   private val coroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
   private var openFilesManager: OpenFilesManager? = null
   private var diffManager: DiffManager? = null
-  private var ideServer: McpSseIdeServer? = null
+  private var ideServer: IdeServer? = null
 
   init {
     openFilesManager = project.service<OpenFilesManager>()
     diffManager = project.service<DiffManager>()
     diffManager?.let {
-      ideServer = McpSseIdeServer(project, it)
+      ideServer = IdeServer(project, it)
       coroutineScope.launch {
         ideServer?.start()
       }
