@@ -185,14 +185,7 @@ describe('update tests', () => {
       });
       mockGit.getRemotes.mockResolvedValue([{ name: 'origin' }]);
 
-      const setExtensionUpdateState = vi.fn();
-      const dispatch = (action: {
-        type: string;
-        payload: { name: string; state: ExtensionUpdateState };
-      }) => {
-        setExtensionUpdateState(action.payload.state);
-      };
-
+      const dispatch = vi.fn();
       const extension = annotateActiveExtensions(
         [
           loadExtension({
@@ -211,12 +204,20 @@ describe('update tests', () => {
         dispatch,
       );
 
-      expect(setExtensionUpdateState).toHaveBeenCalledWith(
-        ExtensionUpdateState.UPDATING,
-      );
-      expect(setExtensionUpdateState).toHaveBeenCalledWith(
-        ExtensionUpdateState.UPDATED_NEEDS_RESTART,
-      );
+      expect(dispatch).toHaveBeenCalledWith({
+        type: 'SET_STATE',
+        payload: {
+          name: extensionName,
+          state: ExtensionUpdateState.UPDATING,
+        },
+      });
+      expect(dispatch).toHaveBeenCalledWith({
+        type: 'SET_STATE',
+        payload: {
+          name: extensionName,
+          state: ExtensionUpdateState.UPDATED_NEEDS_RESTART,
+        },
+      });
     });
 
     it('should call setExtensionUpdateState with ERROR on failure', async () => {
@@ -234,13 +235,7 @@ describe('update tests', () => {
       mockGit.clone.mockRejectedValue(new Error('Git clone failed'));
       mockGit.getRemotes.mockResolvedValue([{ name: 'origin' }]);
 
-      const setExtensionUpdateState = vi.fn();
-      const dispatch = (action: {
-        type: string;
-        payload: { name: string; state: ExtensionUpdateState };
-      }) => {
-        setExtensionUpdateState(action.payload.state);
-      };
+      const dispatch = vi.fn();
       const extension = annotateActiveExtensions(
         [
           loadExtension({
@@ -261,12 +256,20 @@ describe('update tests', () => {
         ),
       ).rejects.toThrow();
 
-      expect(setExtensionUpdateState).toHaveBeenCalledWith(
-        ExtensionUpdateState.UPDATING,
-      );
-      expect(setExtensionUpdateState).toHaveBeenCalledWith(
-        ExtensionUpdateState.ERROR,
-      );
+      expect(dispatch).toHaveBeenCalledWith({
+        type: 'SET_STATE',
+        payload: {
+          name: extensionName,
+          state: ExtensionUpdateState.UPDATING,
+        },
+      });
+      expect(dispatch).toHaveBeenCalledWith({
+        type: 'SET_STATE',
+        payload: {
+          name: extensionName,
+          state: ExtensionUpdateState.ERROR,
+        },
+      });
     });
   });
 
@@ -299,19 +302,15 @@ describe('update tests', () => {
       mockGit.revparse.mockResolvedValue('localHash');
 
       const extensionState = new Map();
-      const dispatch = (action: {
-        type: string;
-        payload: { name: string; state: ExtensionUpdateState };
-      }) => {
-        extensionState.set(action.payload.name, action.payload.state);
-      };
-      const results = await checkForAllExtensionUpdates(
-        [extension],
-        extensionState,
-        dispatch,
-      );
-      const result = results.get('test-extension');
-      expect(result).toBe(ExtensionUpdateState.UPDATE_AVAILABLE);
+      const dispatch = vi.fn();
+      await checkForAllExtensionUpdates([extension], extensionState, dispatch);
+      expect(dispatch).toHaveBeenCalledWith({
+        type: 'SET_STATE',
+        payload: {
+          name: 'test-extension',
+          state: ExtensionUpdateState.UPDATE_AVAILABLE,
+        },
+      });
     });
 
     it('should return UpToDate for a git extension with no updates', async () => {
@@ -342,19 +341,15 @@ describe('update tests', () => {
       mockGit.revparse.mockResolvedValue('sameHash');
 
       const extensionState = new Map();
-      const dispatch = (action: {
-        type: string;
-        payload: { name: string; state: ExtensionUpdateState };
-      }) => {
-        extensionState.set(action.payload.name, action.payload.state);
-      };
-      const results = await checkForAllExtensionUpdates(
-        [extension],
-        extensionState,
-        dispatch,
-      );
-      const result = results.get('test-extension');
-      expect(result).toBe(ExtensionUpdateState.UP_TO_DATE);
+      const dispatch = vi.fn();
+      await checkForAllExtensionUpdates([extension], extensionState, dispatch);
+      expect(dispatch).toHaveBeenCalledWith({
+        type: 'SET_STATE',
+        payload: {
+          name: 'test-extension',
+          state: ExtensionUpdateState.UP_TO_DATE,
+        },
+      });
     });
 
     it('should return UpToDate for a local extension with no updates', async () => {
@@ -382,20 +377,20 @@ describe('update tests', () => {
         new ExtensionEnablementManager(ExtensionStorage.getUserExtensionsDir()),
       )[0];
       const extensionState = new Map();
-      const dispatch = (action: {
-        type: string;
-        payload: { name: string; state: ExtensionUpdateState };
-      }) => {
-        extensionState.set(action.payload.name, action.payload.state);
-      };
-      const results = await checkForAllExtensionUpdates(
+      const dispatch = vi.fn();
+      await checkForAllExtensionUpdates(
         [extension],
         extensionState,
         dispatch,
         tempWorkspaceDir,
       );
-      const result = results.get('local-extension');
-      expect(result).toBe(ExtensionUpdateState.UP_TO_DATE);
+      expect(dispatch).toHaveBeenCalledWith({
+        type: 'SET_STATE',
+        payload: {
+          name: 'local-extension',
+          state: ExtensionUpdateState.UP_TO_DATE,
+        },
+      });
     });
 
     it('should return UpdateAvailable for a local extension with updates', async () => {
@@ -423,20 +418,20 @@ describe('update tests', () => {
         new ExtensionEnablementManager(ExtensionStorage.getUserExtensionsDir()),
       )[0];
       const extensionState = new Map();
-      const dispatch = (action: {
-        type: string;
-        payload: { name: string; state: ExtensionUpdateState };
-      }) => {
-        extensionState.set(action.payload.name, action.payload.state);
-      };
-      const results = await checkForAllExtensionUpdates(
+      const dispatch = vi.fn();
+      await checkForAllExtensionUpdates(
         [extension],
         extensionState,
         dispatch,
         tempWorkspaceDir,
       );
-      const result = results.get('local-extension');
-      expect(result).toBe(ExtensionUpdateState.UPDATE_AVAILABLE);
+      expect(dispatch).toHaveBeenCalledWith({
+        type: 'SET_STATE',
+        payload: {
+          name: 'local-extension',
+          state: ExtensionUpdateState.UPDATE_AVAILABLE,
+        },
+      });
     });
 
     it('should return Error when git check fails', async () => {
@@ -463,19 +458,15 @@ describe('update tests', () => {
       mockGit.getRemotes.mockRejectedValue(new Error('Git error'));
 
       const extensionState = new Map();
-      const dispatch = (action: {
-        type: string;
-        payload: { name: string; state: ExtensionUpdateState };
-      }) => {
-        extensionState.set(action.payload.name, action.payload.state);
-      };
-      const results = await checkForAllExtensionUpdates(
-        [extension],
-        extensionState,
-        dispatch,
-      );
-      const result = results.get('error-extension');
-      expect(result).toBe(ExtensionUpdateState.ERROR);
+      const dispatch = vi.fn();
+      await checkForAllExtensionUpdates([extension], extensionState, dispatch);
+      expect(dispatch).toHaveBeenCalledWith({
+        type: 'SET_STATE',
+        payload: {
+          name: 'error-extension',
+          state: ExtensionUpdateState.ERROR,
+        },
+      });
     });
   });
 });

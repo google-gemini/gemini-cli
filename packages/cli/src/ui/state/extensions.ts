@@ -15,22 +15,48 @@ export enum ExtensionUpdateState {
   UNKNOWN = 'unknown',
 }
 
-export type ExtensionUpdateAction = {
-  type: 'SET_STATE';
-  payload: { name: string; state: ExtensionUpdateState };
-};
+export interface ExtensionUpdateStatus {
+  status: ExtensionUpdateState;
+  processed: boolean;
+}
+
+export type ExtensionUpdateAction =
+  | {
+      type: 'SET_STATE';
+      payload: { name: string; state: ExtensionUpdateState };
+    }
+  | {
+      type: 'SET_PROCESSED';
+      payload: { name: string; processed: boolean };
+    };
 
 export function extensionUpdatesReducer(
-  state: Map<string, ExtensionUpdateState>,
+  state: Map<string, ExtensionUpdateStatus>,
   action: ExtensionUpdateAction,
-): Map<string, ExtensionUpdateState> {
+): Map<string, ExtensionUpdateStatus> {
   switch (action.type) {
     case 'SET_STATE': {
-      if (state.get(action.payload.name) === action.payload.state) {
+      const existing = state.get(action.payload.name);
+      if (existing?.status === action.payload.state) {
         return state;
       }
       const newState = new Map(state);
-      newState.set(action.payload.name, action.payload.state);
+      newState.set(action.payload.name, {
+        status: action.payload.state,
+        processed: false,
+      });
+      return newState;
+    }
+    case 'SET_PROCESSED': {
+      const existing = state.get(action.payload.name);
+      if (!existing || existing.processed === action.payload.processed) {
+        return state;
+      }
+      const newState = new Map(state);
+      newState.set(action.payload.name, {
+        ...existing,
+        processed: action.payload.processed,
+      });
       return newState;
     }
     default:

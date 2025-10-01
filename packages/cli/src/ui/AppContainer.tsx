@@ -155,6 +155,7 @@ export const AppContainer = (props: AppContainerProps) => {
   const extensions = config.getExtensions();
   const {
     extensionsUpdateState,
+    extensionsUpdateStateInternal,
     dispatchExtensionStateUpdate,
     confirmUpdateExtensionRequests,
     addConfirmUpdateExtensionRequest,
@@ -496,7 +497,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
     setIsProcessing,
     setGeminiMdFileCount,
     slashCommandActions,
-    extensionsUpdateState,
+    extensionsUpdateStateInternal,
     isConfigInitialized,
   );
 

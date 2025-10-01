@@ -87,7 +87,7 @@ async function updateAction(context: CommandContext, args: string) {
               description,
               context.ui.addConfirmUpdateExtensionRequest,
             ),
-          context.ui.extensionsUpdateState.get(extension.name) ??
+          context.ui.extensionsUpdateState.get(extension.name)?.status ??
             ExtensionUpdateState.UNKNOWN,
           context.ui.dispatchExtensionStateUpdate,
         );

@@ -37,7 +37,7 @@ import { McpPromptLoader } from '../../services/McpPromptLoader.js';
 import { parseSlashCommand } from '../../utils/commands.js';
 import {
   type ExtensionUpdateAction,
-  type ExtensionUpdateState,
+  type ExtensionUpdateStatus,
 } from '../state/extensions.js';
 
 interface SlashCommandProcessorActions {
@@ -69,7 +69,7 @@ export const useSlashCommandProcessor = (
   setIsProcessing: (isProcessing: boolean) => void,
   setGeminiMdFileCount: (count: number) => void,
   actions: SlashCommandProcessorActions,
-  extensionsUpdateState: Map<string, ExtensionUpdateState>,
+  extensionsUpdateState: Map<string, ExtensionUpdateStatus>,
   isConfigInitialized: boolean,
 ) => {
   const session = useSessionStats();

@@ -7,6 +7,7 @@
 import {
   type ExtensionUpdateAction,
   ExtensionUpdateState,
+  type ExtensionUpdateStatus,
 } from '../../ui/state/extensions.js';
 import {
   copyExtension,
@@ -121,7 +122,7 @@ export async function updateAllUpdatableExtensions(
   cwd: string = process.cwd(),
   requestConsent: (consent: string) => Promise<boolean>,
   extensions: GeminiCLIExtension[],
-  extensionsState: Map<string, ExtensionUpdateState>,
+  extensionsState: Map<string, ExtensionUpdateStatus>,
   dispatch: (action: ExtensionUpdateAction) => void,
 ): Promise<ExtensionUpdateInfo[]> {
   return (
@@ -129,7 +130,7 @@ export async function updateAllUpdatableExtensions(
       extensions
         .filter(
           (extension) =>
-            extensionsState.get(extension.name) ===
+            extensionsState.get(extension.name)?.status ===
             ExtensionUpdateState.UPDATE_AVAILABLE,
         )
         .map((extension) =>
@@ -137,7 +138,7 @@ export async function updateAllUpdatableExtensions(
             extension,
             cwd,
             requestConsent,
-            extensionsState.get(extension.name)!,
+            extensionsState.get(extension.name)!.status,
             dispatch,
           ),
         ),
@@ -152,13 +153,10 @@ export interface ExtensionUpdateCheckResult {
 
 export async function checkForAllExtensionUpdates(
   extensions: GeminiCLIExtension[],
-  extensionsUpdateState: Map<string, ExtensionUpdateState>,
+  extensionsUpdateState: Map<string, ExtensionUpdateStatus>,
   dispatch: (action: ExtensionUpdateAction) => void,
   cwd: string = process.cwd(),
-): Promise<Map<string, ExtensionUpdateState>> {
-  const newStates: Map<string, ExtensionUpdateState> = new Map(
-    extensionsUpdateState,
-  );
+): Promise<void> {
   for (const extension of extensions) {
     const initialState = extensionsUpdateState.get(extension.name);
     if (initialState === undefined) {
@@ -170,7 +168,6 @@ export async function checkForAllExtensionUpdates(
             state: ExtensionUpdateState.NOT_UPDATABLE,
           },
         });
-        newStates.set(extension.name, ExtensionUpdateState.NOT_UPDATABLE);
         continue;
       }
       await checkForExtensionUpdate(
@@ -180,11 +177,9 @@ export async function checkForAllExtensionUpdates(
             type: 'SET_STATE',
             payload: { name: extension.name, state: updatedState },
           });
-          newStates.set(extension.name, updatedState);
         },
         cwd,
       );
     }
   }
-  return newStates;
 }

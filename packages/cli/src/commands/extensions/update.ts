@@ -91,11 +91,24 @@ export async function handleUpdate(args: UpdateArgs) {
   }
   if (args.all) {
     try {
+      const extensionState = new Map();
+      await checkForAllExtensionUpdates(
+        extensions,
+        extensionState,
+        (action) => {
+          if (action.type === 'SET_STATE') {
+            extensionState.set(action.payload.name, {
+              status: action.payload.state,
+              processed: true, // No need to process as we will force the update.
+            });
+          }
+        },
+      );
       let updateInfos = await updateAllUpdatableExtensions(
         workingDir,
         requestConsentNonInteractive,
         extensions,
-        await checkForAllExtensionUpdates(extensions, new Map(), () => {}),
+        extensionState,
         () => {},
       );
       updateInfos = updateInfos.filter(

@@ -17,7 +17,7 @@ import type { UseHistoryManagerReturn } from '../hooks/useHistoryManager.js';
 import type { SessionStatsState } from '../contexts/SessionContext.js';
 import type {
   ExtensionUpdateAction,
-  ExtensionUpdateState,
+  ExtensionUpdateStatus,
 } from '../state/extensions.js';
 
 // Grouped dependencies for clarity and easier mocking
@@ -69,7 +69,7 @@ export interface CommandContext {
     toggleVimEnabled: () => Promise<boolean>;
     setGeminiMdFileCount: (count: number) => void;
     reloadCommands: () => void;
-    extensionsUpdateState: Map<string, ExtensionUpdateState>;
+    extensionsUpdateState: Map<string, ExtensionUpdateStatus>;
     dispatchExtensionStateUpdate: (action: ExtensionUpdateAction) => void;
     addConfirmUpdateExtensionRequest: (value: ConfirmationRequest) => void;
   };
