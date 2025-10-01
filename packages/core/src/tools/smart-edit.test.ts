@@ -524,8 +524,11 @@ describe('SmartEditTool', () => {
         new_string: 'string',
       };
 
+      // Control timestamps precisely to avoid race conditions.
+      const now = Date.now();
+      const lastEditTime = now - 10000; // 10 seconds ago
+
       // Mock `getHistory` to simulate a previous edit by us.
-      const lastEditTime = Date.now() - 10000; // 10 seconds ago
       (geminiClient.getHistory as Mock).mockResolvedValue([
         {
           role: 'model',
@@ -543,7 +546,7 @@ describe('SmartEditTool', () => {
 
       // Mock `fs.statSync` to make it look like the file was modified recently by someone else.
       const statSpy = vi.spyOn(fs, 'statSync').mockReturnValue({
-        mtimeMs: Date.now(),
+        mtimeMs: now,
       } as fs.Stats);
 
       // Spy on `readTextFile` to confirm it gets called again.
