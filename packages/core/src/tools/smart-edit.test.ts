@@ -525,7 +525,7 @@ describe('SmartEditTool', () => {
       };
 
       // Mock `getHistory` to simulate a previous edit by us.
-      const lastEditTime = Date.now() - 5000; // 5 seconds ago
+      const lastEditTime = Date.now() - 10000; // 10 seconds ago
       (geminiClient.getHistory as Mock).mockResolvedValue([
         {
           role: 'model',
