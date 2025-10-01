@@ -5,36 +5,32 @@ import com.intellij.openapi.Disposable
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
 import com.intellij.openapi.project.Project
+import kotlinx.coroutines.*
 
 @Service(Service.Level.PROJECT)
 class GeminiCliProjectService(private val project: Project) : Disposable {
+  private val coroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
   private var openFilesManager: OpenFilesManager? = null
   private var diffManager: DiffManager? = null
-  private var ideServer: IDEServer? = null
+  private var ideServer: McpSseIdeServer? = null
 
   init {
     openFilesManager = project.service<OpenFilesManager>()
     diffManager = project.service<DiffManager>()
     diffManager?.let {
-      ideServer = IDEServer(project, it)
-      ideServer?.start()
+      ideServer = McpSseIdeServer(project, it)
+      coroutineScope.launch {
+        ideServer?.start()
+      }
     }
   }
 
   override fun dispose() {
     openFilesManager?.dispose()
-    ideServer?.stop()
+    runBlocking {
+      ideServer?.stop()
+    }
+    coroutineScope.cancel()
   }
 
-  fun getServerPort(): Int? {
-    return ideServer?.getServerPort()
-  }
-
-  fun notifyDiffAccepted(filePath: String, content: String) {
-    ideServer?.notifyDiffAccepted(filePath, content)
-  }
-
-  fun notifyDiffClosed(filePath: String, content: String) {
-    ideServer?.notifyDiffClosed(filePath, content)
-  }
 }
