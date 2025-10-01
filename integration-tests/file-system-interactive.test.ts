@@ -52,10 +52,11 @@ describe('Interactive file system', () => {
       const readCall = await rig.waitForToolCall('read_file', 30000);
       expect(readCall, 'Expected to find a read_file tool call').toBe(true);
 
-      const versionOutput = await rig.waitForText('1.0.0', 15000);
-      expect(versionOutput, 'Expected to see version "1.0.0" in output').toBe(
-        true,
-      );
+      const containsExpectedVersion = await rig.waitForText('1.0.0', 15000);
+      expect(
+        containsExpectedVersion,
+        'Expected to see version "1.0.0" in output',
+      ).toBe(true);
 
       // Step 2: Write the file
       const writePrompt = `now change the version to 1.0.1 in the file`;
