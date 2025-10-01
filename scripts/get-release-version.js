@@ -84,7 +84,7 @@ function isVersionDeprecated(version) {
     return output.length > 0;
   } catch (error) {
     // This command shouldn't fail for existing versions, but as a safeguard:
-    console.warn(
+    console.error(
       `Failed to check deprecation status for ${version}: ${error.message}`,
     );
     return false; // Assume not deprecated on error to avoid breaking the release.
@@ -136,7 +136,7 @@ function detectRollbackAndGetBaseline(npmDistTag) {
       highestExistingVersion = version;
       break; // Found the one we want
     } else {
-      console.log(`Ignoring deprecated version: ${version}`);
+      console.error(`Ignoring deprecated version: ${version}`);
     }
   }
 
@@ -162,7 +162,7 @@ function doesVersionExist(version) {
     const command = `npm view @google/gemini-cli@${version} version 2>/dev/null`;
     const output = execSync(command).toString().trim();
     if (output === version) {
-      console.warn(`Version ${version} already exists on NPM.`);
+      console.error(`Version ${version} already exists on NPM.`);
       return true;
     }
   } catch (_error) {
@@ -174,11 +174,11 @@ function doesVersionExist(version) {
     const command = `git tag -l 'v${version}'`;
     const tagOutput = execSync(command).toString().trim();
     if (tagOutput === `v${version}`) {
-      console.warn(`Git tag v${version} already exists.`);
+      console.error(`Git tag v${version} already exists.`);
       return true;
     }
   } catch (error) {
-    console.warn(`Failed to check git tags for conflicts: ${error.message}`);
+    console.error(`Failed to check git tags for conflicts: ${error.message}`);
   }
 
   // Check GitHub releases
@@ -186,7 +186,7 @@ function doesVersionExist(version) {
     const command = `gh release view "v${version}" --json tagName --jq .tagName 2>/dev/null`;
     const output = execSync(command).toString().trim();
     if (output === `v${version}`) {
-      console.warn(`GitHub release v${version} already exists.`);
+      console.error(`GitHub release v${version} already exists.`);
       return true;
     }
   } catch (error) {
@@ -196,7 +196,7 @@ function doesVersionExist(version) {
       error.message.includes('not found') ||
       error.status === 1;
     if (!isExpectedNotFound) {
-      console.warn(
+      console.error(
         `Failed to check GitHub releases for conflicts: ${error.message}`,
       );
     }
@@ -216,7 +216,7 @@ function getAndVerifyTags(npmDistTag, _gitTagPattern) {
 
   if (rollbackInfo.isRollback) {
     // Rollback scenario: warn about the rollback but don't fail
-    console.warn(
+    console.error(
       `Rollback detected! NPM ${npmDistTag} tag is ${rollbackInfo.distTagVersion}, but using ${baselineVersion} as baseline for next version calculation (highest existing version).`,
     );
   }
@@ -414,7 +414,7 @@ export function getVersion(options = {}) {
   if (type === 'stable' || type === 'preview' || type === 'patch') {
     let releaseVersion = versionData.releaseVersion;
     while (doesVersionExist(releaseVersion)) {
-      console.log(`Version ${releaseVersion} exists, incrementing.`);
+      console.error(`Version ${releaseVersion} exists, incrementing.`);
       if (releaseVersion.includes('-preview.')) {
         // Increment preview number: 0.6.0-preview.2 -> 0.6.0-preview.3
         const [version, prereleasePart] = releaseVersion.split('-');
