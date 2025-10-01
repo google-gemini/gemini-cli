@@ -148,8 +148,11 @@ export class AgentExecutor {
 
       // Phase 1: Work Phase
       // The agent works in a loop until it stops calling tools.
+      const query = this.definition.promptConfig.query
+        ? templateString(this.definition.promptConfig.query, inputs)
+        : 'Get Started!';
       let currentMessages: Content[] = [
-        { role: 'user', parts: [{ text: 'Get Started!' }] },
+        { role: 'user', parts: [{ text: query }] },
       ];
 
       while (true) {
@@ -302,7 +305,10 @@ export class AgentExecutor {
       );
     }
 
-    const startHistory = [...(promptConfig.initialMessages ?? [])];
+    const startHistory = this.applyTemplateToInitialMessages(
+      promptConfig.initialMessages ?? [],
+      inputs,
+    );
 
     // Build system instruction from the templated prompt string.
     const systemInstruction = promptConfig.systemPrompt
@@ -499,6 +505,28 @@ Important Rules:
 
     // Fallback to a generic extraction message if no description is provided.
     return 'Based on your work so far, provide a comprehensive summary of your analysis and findings. Do not perform any more function calls.';
+  }
+
+  /**
+   * Applies template strings to initial messages.
+   *
+   * @param initialMessages The initial messages from the prompt config.
+   * @param inputs The validated input parameters for this invocation.
+   * @returns A new array of `Content` with templated strings.
+   */
+  private applyTemplateToInitialMessages(
+    initialMessages: Content[],
+    inputs: AgentInputs,
+  ): Content[] {
+    return initialMessages.map((content) => {
+      const newParts = (content.parts ?? []).map((part) => {
+        if ('text' in part && part.text !== undefined) {
+          return { text: templateString(part.text, inputs) };
+        }
+        return part;
+      });
+      return { ...content, parts: newParts };
+    });
   }
 
   /**

@@ -110,6 +110,7 @@ const createTestDefinition = (
   tools: Array<string | MockTool> = [LSTool.Name],
   runConfigOverrides: Partial<AgentDefinition['runConfig']> = {},
   outputConfigOverrides: Partial<AgentDefinition['outputConfig']> = {},
+  promptConfigOverrides: Partial<AgentDefinition['promptConfig']> = {},
 ): AgentDefinition => ({
   name: 'TestAgent',
   description: 'An agent for testing.',
@@ -118,7 +119,10 @@ const createTestDefinition = (
   },
   modelConfig: { model: 'gemini-test-model', temp: 0, top_p: 1 },
   runConfig: { max_time_minutes: 5, max_turns: 5, ...runConfigOverrides },
-  promptConfig: { systemPrompt: 'Achieve the goal: ${goal}.' },
+  promptConfig: {
+    systemPrompt: 'Achieve the goal: ${goal}.',
+    ...promptConfigOverrides,
+  },
   toolConfig: { tools },
   outputConfig: { description: 'The final result.', ...outputConfigOverrides },
 });
@@ -386,6 +390,65 @@ describe('AgentExecutor', () => {
       );
     });
 
+    it('should use the templated query from promptConfig.query when provided', async () => {
+      const customQuery = 'Please achieve the goal: ${goal}';
+      const definition = createTestDefinition(
+        [], // No tools needed for this test
+        {},
+        {},
+        { query: customQuery, systemPrompt: 'You are a helpful agent.' }, // Use query, provide a system prompt
+      );
+      const executor = await AgentExecutor.create(
+        definition,
+        mockConfig,
+        onActivity,
+      );
+      const inputs: AgentInputs = { goal: 'test custom query' };
+
+      // Model stops immediately
+      mockModelResponse([]);
+      // Extraction
+      mockModelResponse([], undefined, 'Done.');
+
+      await executor.run(inputs, signal);
+
+      // Verify the first call to sendMessageStream (the work phase)
+      const workPhaseCallArgs = mockSendMessageStream.mock.calls[0][1];
+      const workPhaseMessageParts = workPhaseCallArgs.message as Part[];
+
+      expect(workPhaseMessageParts).toEqual([
+        { text: 'Please achieve the goal: test custom query' },
+      ]);
+    });
+
+    it('should default to "Get Started!" when promptConfig.query is not provided', async () => {
+      const definition = createTestDefinition(
+        [], // No tools needed for this test
+        {},
+        {},
+        { query: undefined, systemPrompt: 'You are a helpful agent.' }, // No query, provide a system prompt
+      );
+      const executor = await AgentExecutor.create(
+        definition,
+        mockConfig,
+        onActivity,
+      );
+      const inputs: AgentInputs = { goal: 'test default query' };
+
+      // Model stops immediately
+      mockModelResponse([]);
+      // Extraction
+      mockModelResponse([], undefined, 'Done.');
+
+      await executor.run(inputs, signal);
+
+      // Verify the first call to sendMessageStream (the work phase)
+      const workPhaseCallArgs = mockSendMessageStream.mock.calls[0][1];
+      const workPhaseMessageParts = workPhaseCallArgs.message as Part[];
+
+      expect(workPhaseMessageParts).toEqual([{ text: 'Get Started!' }]);
+    });
+
     it('should handle tool execution failure gracefully and report error', async () => {
       const definition = createTestDefinition([LSTool.Name]);
       const executor = await AgentExecutor.create(
@@ -516,6 +579,57 @@ describe('AgentExecutor', () => {
       expect(extractionText).toContain('Be sure you have addressed:');
       expect(extractionText).toContain('- Must include file names');
       expect(extractionText).toContain('- Must be concise');
+    });
+
+    it('should apply templating to initialMessages', async () => {
+      const definition = createTestDefinition(
+        [], // No tools needed
+        {},
+        {},
+        {
+          // Override systemPrompt to be undefined and provide initialMessages
+          systemPrompt: undefined,
+          initialMessages: [
+            {
+              role: 'user',
+              parts: [{ text: 'The user wants to ${goal}.' }],
+            },
+            {
+              role: 'model',
+              parts: [{ text: 'Okay, I will start working on ${goal}.' }],
+            },
+          ],
+        },
+      );
+
+      const executor = await AgentExecutor.create(
+        definition,
+        mockConfig,
+        onActivity,
+      );
+      const inputs: AgentInputs = { goal: 'find the file' };
+
+      // Model stops immediately
+      mockModelResponse([]);
+      // Extraction
+      mockModelResponse([], undefined, 'Done.');
+
+      await executor.run(inputs, signal);
+
+      // Verify that the initialMessages were templated correctly
+      const chatConstructorArgs = MockedGeminiChat.mock.calls[0];
+      const startHistory = chatConstructorArgs[2]; // 3rd argument is startHistory
+
+      expect(startHistory).toEqual([
+        {
+          role: 'user',
+          parts: [{ text: 'The user wants to find the file.' }],
+        },
+        {
+          role: 'model',
+          parts: [{ text: 'Okay, I will start working on find the file.' }],
+        },
+      ]);
     });
   });
 
