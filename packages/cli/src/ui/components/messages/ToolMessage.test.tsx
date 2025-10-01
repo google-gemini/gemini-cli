@@ -5,13 +5,13 @@
  */
 
 import React from 'react';
-import { render } from 'ink-testing-library';
 import type { ToolMessageProps } from './ToolMessage.js';
 import { ToolMessage } from './ToolMessage.js';
 import { StreamingState, ToolCallStatus } from '../../types.js';
 import { Text } from 'ink';
 import { StreamingContext } from '../../contexts/StreamingContext.js';
 import type { AnsiOutput } from '@google/gemini-cli-core';
+import { renderWithProviders } from '../../../test-utils/render.js';
 
 vi.mock('../TerminalOutput.js', () => ({
   TerminalOutput: function MockTerminalOutput({
@@ -72,7 +72,7 @@ const renderWithContext = (
   streamingState: StreamingState,
 ) => {
   const contextValue: StreamingState = streamingState;
-  return render(
+  return renderWithProviders(
     <StreamingContext.Provider value={contextValue}>
       {ui}
     </StreamingContext.Provider>,

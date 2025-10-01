@@ -55,6 +55,7 @@ export const Footer: React.FC = () => {
     promptTokenCount: uiState.sessionStats.lastPromptTokenCount,
     nightly: uiState.nightly,
     isTrustedFolder: uiState.isTrustedFolder,
+    //renderMarkdown: uiState.renderMarkdown,
   };
 
   const showMemoryUsage =
@@ -168,6 +169,28 @@ export const Footer: React.FC = () => {
             </Box>
           )}
           <Box alignItems="center" paddingLeft={2}>
+            {/* Markdown mode indicator - uncomment to enable
+            <Box>
+              <Text color={theme.ui.symbol}>| </Text>
+              <Text
+                color={
+                  renderMarkdown ? theme.status.success : theme.text.secondary
+                }
+                bold={renderMarkdown}
+              >
+                Rendered
+              </Text>
+              <Text color={theme.text.secondary}> / </Text>
+              <Text
+                color={
+                  !renderMarkdown ? theme.status.warning : theme.text.secondary
+                }
+                bold={!renderMarkdown}
+              >
+                Raw
+              </Text>
+            </Box>
+            */}
             {corgiMode && (
               <Text>
                 {!hideModelInfo && <Text color={theme.ui.comment}>| </Text>}
