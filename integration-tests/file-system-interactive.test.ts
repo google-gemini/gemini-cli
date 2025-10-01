@@ -50,15 +50,9 @@ describe('Interactive file system', () => {
       await type(ptyProcess, '\r');
 
       const readCall = await rig.waitForToolCall('read_file', 30000);
-      if (!readCall) {
-        printDebugInfo(rig, rig._interactiveOutput, { readCall });
-      }
       expect(readCall, 'Expected to find a read_file tool call').toBe(true);
 
       const versionOutput = await rig.waitForText('1.0.0', 15000);
-      if (!versionOutput) {
-        printDebugInfo(rig, rig._interactiveOutput, { versionOutput });
-      }
       expect(versionOutput, 'Expected to see version "1.0.0" in output').toBe(
         true,
       );
@@ -85,13 +79,6 @@ describe('Interactive file system', () => {
       ).toBe(true);
 
       const newFileContent = rig.readFile(fileName);
-      if (newFileContent !== '1.0.1') {
-        printDebugInfo(rig, rig._interactiveOutput, {
-          'File content mismatch': true,
-          'Expected content': '1.0.1',
-          'Actual content': newFileContent,
-        });
-      }
       expect(newFileContent).toBe('1.0.1');
     },
   );
