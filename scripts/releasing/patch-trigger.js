@@ -101,32 +101,6 @@ async function main() {
     );
   }
 
-  const releaseRef = `release/${version}`;
-  const workflowId =
-    context.eventName === 'pull_request'
-      ? 'release-patch-3-release.yml'
-      : process.env.WORKFLOW_ID || 'release-patch-3-release.yml';
-
-  console.log(`Detected channel: ${channel}, version: ${version}`);
-  console.log(`Release ref: ${releaseRef}`);
-  console.log(`Workflow ID: ${workflowId}`);
-  console.log(`Dry run: ${isDryRun}`);
-
-  if (testMode) {
-    console.log('\n🧪 TEST MODE - No API calls will be made');
-    console.log('\n📋 Parsed Results:');
-    console.log(`  - Branch: ${headRef}`);
-    console.log(
-      `  - Channel: ${channel} → npm tag: ${channel === 'stable' ? 'latest' : 'preview'}`,
-    );
-    console.log(`  - Version: ${version}`);
-    console.log(`  - Release ref: ${releaseRef}`);
-    console.log(`  - Workflow: ${workflowId}`);
-    console.log(`  - Dry run: ${isDryRun}`);
-    console.log('\n✅ Channel detection logic working correctly!');
-    return;
-  }
-
   // Try to find the original PR that requested this patch
   let originalPr = null;
   if (!testMode) {
@@ -159,6 +133,32 @@ async function main() {
   } else {
     console.log('Skipping original PR lookup (test mode)');
     originalPr = 8655; // Mock for testing
+  }
+
+  const releaseRef = `release/${version}-pr-${originalPr}`;
+  const workflowId =
+    context.eventName === 'pull_request'
+      ? 'release-patch-3-release.yml'
+      : process.env.WORKFLOW_ID || 'release-patch-3-release.yml';
+
+  console.log(`Detected channel: ${channel}, version: ${version}`);
+  console.log(`Release ref: ${releaseRef}`);
+  console.log(`Workflow ID: ${workflowId}`);
+  console.log(`Dry run: ${isDryRun}`);
+
+  if (testMode) {
+    console.log('\n🧪 TEST MODE - No API calls will be made');
+    console.log('\n📋 Parsed Results:');
+    console.log(`  - Branch: ${headRef}`);
+    console.log(
+      `  - Channel: ${channel} → npm tag: ${channel === 'stable' ? 'latest' : 'preview'}`,
+    );
+    console.log(`  - Version: ${version}`);
+    console.log(`  - Release ref: ${releaseRef}`);
+    console.log(`  - Workflow: ${workflowId}`);
+    console.log(`  - Dry run: ${isDryRun}`);
+    console.log('\n✅ Channel detection logic working correctly!');
+    return;
   }
 
   // Trigger the release workflow
