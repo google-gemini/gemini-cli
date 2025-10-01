@@ -68,6 +68,166 @@ describe('run_shell_command', () => {
     validateModelOutput(result, 'test-stdin', 'Shell command stdin test');
   });
 
+  it('should run allowed sub-command in non-interactive mode', async () => {
+    const rig = new TestRig();
+    await rig.setup('should run allowed sub-command in non-interactive mode');
+
+    const prompt = `use wc to tell me how many lines there are in /proc/meminfo`;
+
+    // Provide the prompt via stdin to simulate non-interactive mode
+    const result = await rig.run({
+      stdin: prompt,
+      args: ['--allowed-tools=run_shell_command(wc)'],
+    });
+
+    const foundToolCall = await rig.waitForToolCall('run_shell_command', 15000);
+
+    if (!foundToolCall) {
+      printDebugInfo(rig, result, {
+        'Found tool call': foundToolCall,
+      });
+    }
+
+    expect(
+      foundToolCall,
+      'Expected to find a run_shell_command tool call',
+    ).toBeTruthy();
+  });
+
+  it('should succeed with no parens in non-interactive mode', async () => {
+    const rig = new TestRig();
+    await rig.setup('should succeed with no parens in non-interactive mode');
+
+    const prompt = `use wc to tell me how many lines there are in /proc/meminfo`;
+
+    const result = await rig.run({
+      stdin: prompt,
+      args: ['--allowed-tools=run_shell_command'],
+    });
+
+    const foundToolCall = await rig.waitForToolCall('run_shell_command', 15000);
+
+    if (!foundToolCall) {
+      printDebugInfo(rig, result, {
+        'Found tool call': foundToolCall,
+      });
+    }
+
+    expect(
+      foundToolCall,
+      'Expected to find a run_shell_command tool call',
+    ).toBeTruthy();
+  });
+
+  it('should succeed with --yolo mode', async () => {
+    const rig = new TestRig();
+    await rig.setup('should succeed with --yolo mode');
+
+    const prompt = `use wc to tell me how many lines there are in /proc/meminfo`;
+
+    const result = await rig.run(
+      {
+        prompt: prompt,
+      },
+      '--yolo',
+    );
+
+    const foundToolCall = await rig.waitForToolCall('run_shell_command', 15000);
+
+    if (!foundToolCall) {
+      printDebugInfo(rig, result, {
+        'Found tool call': foundToolCall,
+      });
+    }
+
+    expect(
+      foundToolCall,
+      'Expected to find a run_shell_command tool call',
+    ).toBeTruthy();
+    expect(result).toContain('lines in /proc/meminfo');
+  });
+
+  it('should work with ShellTool alias', async () => {
+    const rig = new TestRig();
+    await rig.setup('should work with ShellTool alias');
+
+    const prompt = `use wc to tell me how many lines there are in /proc/meminfo`;
+
+    const result = await rig.run({
+      stdin: prompt,
+      args: ['--allowed-tools=ShellTool(wc)'],
+    });
+
+    const foundToolCall = await rig.waitForToolCall('run_shell_command', 15000);
+
+    if (!foundToolCall) {
+      printDebugInfo(rig, result, {
+        'Found tool call': foundToolCall,
+      });
+    }
+
+    expect(
+      foundToolCall,
+      'Expected to find a run_shell_command tool call',
+    ).toBeTruthy();
+  });
+
+  it('should combine multiple --allowed-tools flags', async () => {
+    const rig = new TestRig();
+    await rig.setup('should combine multiple --allowed-tools flags');
+
+    const prompt = `use wc and ls`;
+
+    const result = await rig.run({
+      stdin: prompt,
+      args: [
+        '--allowed-tools=run_shell_command(wc)',
+        '--allowed-tools=run_shell_command(ls)',
+      ],
+    });
+
+    const foundToolCall = await rig.waitForToolCall('run_shell_command', 15000);
+
+    if (!foundToolCall) {
+      printDebugInfo(rig, result, {
+        'Found tool call': foundToolCall,
+      });
+    }
+
+    expect(
+      foundToolCall,
+      'Expected to find a run_shell_command tool call',
+    ).toBeTruthy();
+  });
+
+  it('should allow all with "ShellTool" and other specifics', async () => {
+    const rig = new TestRig();
+    await rig.setup('should allow all with "ShellTool" and other specifics');
+
+    const prompt = `use date`;
+
+    const result = await rig.run({
+      stdin: prompt,
+      args: [
+        '--allowed-tools=run_shell_command(wc)',
+        '--allowed-tools=run_shell_command',
+      ],
+    });
+
+    const foundToolCall = await rig.waitForToolCall('run_shell_command', 15000);
+
+    if (!foundToolCall) {
+      printDebugInfo(rig, result, {
+        'Found tool call': foundToolCall,
+      });
+    }
+
+    expect(
+      foundToolCall,
+      'Expected to find a run_shell_command tool call',
+    ).toBeTruthy();
+  });
+
   it('should propagate environment variables to the child process', async () => {
     const rig = new TestRig();
     await rig.setup('should propagate environment variables');
