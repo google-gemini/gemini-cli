@@ -81,6 +81,13 @@ describe('SmartEditTool', () => {
     } as unknown as BaseLlmClient;
 
     mockConfig = {
+      getUsageStatisticsEnabled: vi.fn(() => true),
+      getSessionId: vi.fn(() => 'mock-session-id'),
+      getDebugMode: vi.fn(() => false),
+      getContentGeneratorConfig: vi.fn(() => ({ authType: 'mock' })),
+      getUseSmartEdit: vi.fn(() => false),
+      getUseModelRouter: vi.fn(() => false),
+      getProxy: vi.fn(() => undefined),
       getGeminiClient: vi.fn().mockReturnValue(geminiClient),
       getBaseLlmClient: vi.fn().mockReturnValue(baseLlmClient),
       getTargetDir: () => rootDir,
