@@ -264,6 +264,8 @@ export async function calculateReplacement(
 
   const regexResult = await calculateRegexReplacement(context);
   if (regexResult) {
+    const event = new SmartEditStrategyEvent('regex');
+    logSmartEditStrategy(config, event);
     return regexResult;
   }
 
