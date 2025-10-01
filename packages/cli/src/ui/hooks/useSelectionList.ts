@@ -4,12 +4,17 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useReducer, useRef, useEffect } from 'react';
-import { useKeypress } from './useKeypress.js';
+import { useReducer, useRef, useEffect, useCallback } from 'react';
+import { useKeypress, type Key } from './useKeypress.js';
 
 export interface SelectionListItem<T> {
   key: string;
   value: T;
+  disabled?: boolean;
+}
+
+interface BaseSelectionItem {
+  key: string;
   disabled?: boolean;
 }
 
@@ -27,43 +32,33 @@ export interface UseSelectionListResult {
   setActiveIndex: (index: number) => void;
 }
 
-interface SelectionListState<T> {
+interface SelectionListState {
   activeIndex: number;
   initialIndex: number;
   pendingHighlight: boolean;
   pendingSelect: boolean;
-  items: Array<SelectionListItem<T>>;
+  items: BaseSelectionItem[];
 }
 
-type SelectionListAction<T> =
+type SelectionListAction =
   | {
       type: 'SET_ACTIVE_INDEX';
       payload: {
         index: number;
-        items: Array<SelectionListItem<T>>;
       };
     }
   | {
       type: 'MOVE_UP';
-      payload: {
-        items: Array<SelectionListItem<T>>;
-      };
     }
   | {
       type: 'MOVE_DOWN';
-      payload: {
-        items: Array<SelectionListItem<T>>;
-      };
     }
   | {
       type: 'SELECT_CURRENT';
-      payload: {
-        items: Array<SelectionListItem<T>>;
-      };
     }
   | {
       type: 'INITIALIZE';
-      payload: { initialIndex: number; items: Array<SelectionListItem<T>> };
+      payload: { initialIndex: number; items: BaseSelectionItem[] };
     }
   | {
       type: 'CLEAR_PENDING_FLAGS';
@@ -74,10 +69,10 @@ const NUMBER_INPUT_TIMEOUT_MS = 1000;
 /**
  * Helper function to find the next enabled index in a given direction, supporting wrapping.
  */
-const findNextValidIndex = <T>(
+const findNextValidIndex = (
   currentIndex: number,
   direction: 'up' | 'down',
-  items: Array<SelectionListItem<T>>,
+  items: BaseSelectionItem[],
 ): number => {
   const len = items.length;
   if (len === 0) return currentIndex;
@@ -99,9 +94,9 @@ const findNextValidIndex = <T>(
   return currentIndex;
 };
 
-const computeInitialIndex = <T>(
+const computeInitialIndex = (
   initialIndex: number,
-  items: Array<SelectionListItem<T>>,
+  items: BaseSelectionItem[],
   initialKey?: string,
 ): number => {
   if (items.length === 0) {
@@ -130,13 +125,14 @@ const computeInitialIndex = <T>(
   return targetIndex;
 };
 
-function selectionListReducer<T>(
-  state: SelectionListState<T>,
-  action: SelectionListAction<T>,
-): SelectionListState<T> {
+function selectionListReducer(
+  state: SelectionListState,
+  action: SelectionListAction,
+): SelectionListState {
   switch (action.type) {
     case 'SET_ACTIVE_INDEX': {
-      const { index, items } = action.payload;
+      const { index } = action.payload;
+      const { items } = state;
 
       // Only update if index actually changed and is valid
       if (index === state.activeIndex) {
@@ -150,7 +146,7 @@ function selectionListReducer<T>(
     }
 
     case 'MOVE_UP': {
-      const { items } = action.payload;
+      const { items } = state;
       const newIndex = findNextValidIndex(state.activeIndex, 'up', items);
       if (newIndex !== state.activeIndex) {
         return { ...state, activeIndex: newIndex, pendingHighlight: true };
@@ -159,7 +155,7 @@ function selectionListReducer<T>(
     }
 
     case 'MOVE_DOWN': {
-      const { items } = action.payload;
+      const { items } = state;
       const newIndex = findNextValidIndex(state.activeIndex, 'down', items);
       if (newIndex !== state.activeIndex) {
         return { ...state, activeIndex: newIndex, pendingHighlight: true };
@@ -179,15 +175,13 @@ function selectionListReducer<T>(
           ? state.items[state.activeIndex]?.key
           : undefined;
 
-      if (items === state.items && initialIndex === state.initialIndex) {
-        return state;
-      }
-
+      // We don't need to check for equality here anymore as it is handled in the effect
       const targetIndex = computeInitialIndex(initialIndex, items, activeKey);
 
       return {
         ...state,
         items,
+        initialIndex,
         activeIndex: targetIndex,
         pendingHighlight: false,
       };
@@ -209,6 +203,28 @@ function selectionListReducer<T>(
   }
 }
 
+function areBaseItemsEqual(
+  a: BaseSelectionItem[],
+  b: BaseSelectionItem[],
+): boolean {
+  if (a === b) return true;
+  if (a.length !== b.length) return false;
+
+  for (let i = 0; i < a.length; i++) {
+    if (a[i]!.key !== b[i]!.key || a[i]!.disabled !== b[i]!.disabled) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function toBaseItems<T>(
+  items: Array<SelectionListItem<T>>,
+): BaseSelectionItem[] {
+  return items.map(({ key, disabled }) => ({ key, disabled }));
+}
+
 /**
  * A headless hook that provides keyboard navigation and selection logic
  * for list-based selection components like radio buttons and menus.
@@ -228,20 +244,38 @@ export function useSelectionList<T>({
   isFocused = true,
   showNumbers = false,
 }: UseSelectionListOptions<T>): UseSelectionListResult {
-  const [state, dispatch] = useReducer(selectionListReducer<T>, {
-    activeIndex: computeInitialIndex(initialIndex, items),
+  const baseItems = toBaseItems(items);
+
+  const [state, dispatch] = useReducer(selectionListReducer, {
+    activeIndex: computeInitialIndex(initialIndex, baseItems),
     initialIndex,
     pendingHighlight: false,
     pendingSelect: false,
-    items,
+    items: baseItems,
   });
   const numberInputRef = useRef('');
   const numberInputTimer = useRef<NodeJS.Timeout | null>(null);
 
+  const prevBaseItemsRef = useRef(baseItems);
+  const prevInitialIndexRef = useRef(initialIndex);
+
   // Initialize/synchronize state when initialIndex or items change
   useEffect(() => {
-    dispatch({ type: 'INITIALIZE', payload: { initialIndex, items } });
-  }, [initialIndex, items]);
+    const baseItemsChanged = !areBaseItemsEqual(
+      prevBaseItemsRef.current,
+      baseItems,
+    );
+    const initialIndexChanged = prevInitialIndexRef.current !== initialIndex;
+
+    if (baseItemsChanged || initialIndexChanged) {
+      dispatch({
+        type: 'INITIALIZE',
+        payload: { initialIndex, items: baseItems },
+      });
+      prevBaseItemsRef.current = baseItems;
+      prevInitialIndexRef.current = initialIndex;
+    }
+  });
 
   // Handle side effects based on state changes
   useEffect(() => {
@@ -281,8 +315,9 @@ export function useSelectionList<T>({
     [],
   );
 
-  useKeypress(
-    (key) => {
+  const itemsLength = items.length;
+  const handleKeypress = useCallback(
+    (key: Key) => {
       const { sequence, name } = key;
       const isNumeric = showNumbers && /^[0-9]$/.test(sequence);
 
@@ -293,17 +328,17 @@ export function useSelectionList<T>({
       }
 
       if (name === 'k' || name === 'up') {
-        dispatch({ type: 'MOVE_UP', payload: { items } });
+        dispatch({ type: 'MOVE_UP' });
         return;
       }
 
       if (name === 'j' || name === 'down') {
-        dispatch({ type: 'MOVE_DOWN', payload: { items } });
+        dispatch({ type: 'MOVE_DOWN' });
         return;
       }
 
       if (name === 'return') {
-        dispatch({ type: 'SELECT_CURRENT', payload: { items } });
+        dispatch({ type: 'SELECT_CURRENT' });
         return;
       }
 
@@ -326,18 +361,17 @@ export function useSelectionList<T>({
           return;
         }
 
-        if (targetIndex >= 0 && targetIndex < items.length) {
+        if (targetIndex >= 0 && targetIndex < itemsLength) {
           dispatch({
             type: 'SET_ACTIVE_INDEX',
-            payload: { index: targetIndex, items },
+            payload: { index: targetIndex },
           });
 
           // If the number can't be a prefix for another valid number, select immediately
           const potentialNextNumber = Number.parseInt(newNumberInput + '0', 10);
-          if (potentialNextNumber > items.length) {
+          if (potentialNextNumber > itemsLength) {
             dispatch({
               type: 'SELECT_CURRENT',
-              payload: { items },
             });
             numberInputRef.current = '';
           } else {
@@ -345,7 +379,6 @@ export function useSelectionList<T>({
             numberInputTimer.current = setTimeout(() => {
               dispatch({
                 type: 'SELECT_CURRENT',
-                payload: { items },
               });
               numberInputRef.current = '';
             }, NUMBER_INPUT_TIMEOUT_MS);
@@ -356,13 +389,15 @@ export function useSelectionList<T>({
         }
       }
     },
-    { isActive: !!(isFocused && items.length > 0) },
+    [dispatch, itemsLength, showNumbers],
   );
+
+  useKeypress(handleKeypress, { isActive: !!(isFocused && itemsLength > 0) });
 
   const setActiveIndex = (index: number) => {
     dispatch({
       type: 'SET_ACTIVE_INDEX',
-      payload: { index, items },
+      payload: { index },
     });
   };
 
