@@ -7,7 +7,7 @@
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { isSubpath } from './paths.js';
-import { marked } from 'marked';
+import { marked, type Token } from 'marked';
 
 // Simple console logger for import processing
 const logger = {
@@ -153,39 +153,32 @@ function isLetter(char: string): boolean {
 function findCodeRegions(content: string): Array<[number, number]> {
   const regions: Array<[number, number]> = [];
   const tokens = marked.lexer(content);
+  let offset = 0;
 
-  // Map from raw content to a queue of its start indices in the original content.
-  const rawContentIndices = new Map<string, number[]>();
-
-  function walk(token: { type: string; raw: string; tokens?: unknown[] }) {
+  function walk(token: Token, baseOffset: number) {
     if (token.type === 'code' || token.type === 'codespan') {
-      if (!rawContentIndices.has(token.raw)) {
-        const indices: number[] = [];
-        let lastIndex = -1;
-        while ((lastIndex = content.indexOf(token.raw, lastIndex + 1)) !== -1) {
-          indices.push(lastIndex);
-        }
-        rawContentIndices.set(token.raw, indices);
-      }
-
-      const indices = rawContentIndices.get(token.raw);
-      if (indices && indices.length > 0) {
-        // Assume tokens are processed in order of appearance.
-        // Dequeue the next available index for this raw content.
-        const idx = indices.shift()!;
-        regions.push([idx, idx + token.raw.length]);
-      }
+      regions.push([baseOffset, baseOffset + token.raw.length]);
     }
 
     if ('tokens' in token && token.tokens) {
+      let childOffset = 0;
       for (const child of token.tokens) {
-        walk(child as { type: string; raw: string; tokens?: unknown[] });
+        const childIndexInParent = token.raw.indexOf(child.raw, childOffset);
+        if (childIndexInParent === -1) {
+          logger.error(
+            `Could not find child token in parent raw content. Aborting parsing for this branch. Child raw: "${child.raw}"`,
+          );
+          break;
+        }
+        walk(child, baseOffset + childIndexInParent);
+        childOffset = childIndexInParent + child.raw.length;
       }
     }
   }
 
   for (const token of tokens) {
-    walk(token);
+    walk(token, offset);
+    offset += token.raw.length;
   }
 
   return regions;
