@@ -31,6 +31,7 @@ import type {
   ExtensionEnableEvent,
   ModelSlashCommandEvent,
   ExtensionDisableEvent,
+  LogEntryTruncatedEvent,
 } from '../types.js';
 import { EventMetadataKey } from './event-metadata-key.js';
 import type { Config } from '../../config/config.js';
@@ -73,6 +74,7 @@ export enum EventNames {
   EXTENSION_INSTALL = 'extension_install',
   EXTENSION_UNINSTALL = 'extension_uninstall',
   TOOL_OUTPUT_TRUNCATED = 'tool_output_truncated',
+  LOG_ENTRY_TRUNCATED = 'log_entry_truncated',
   MODEL_ROUTING = 'model_routing',
   MODEL_SLASH_COMMAND = 'model_slash_command',
 }
@@ -952,6 +954,35 @@ export class ClearcutLogger {
 
     this.enqueueLogEvent(
       this.createLogEvent(EventNames.TOOL_OUTPUT_TRUNCATED, data),
+    );
+    this.flushIfNeeded();
+  }
+
+  logLogEntryTruncatedEvent(event: LogEntryTruncatedEvent): void {
+    const data: EventValue[] = [
+      {
+        gemini_cli_key:
+          EventMetadataKey.GEMINI_CLI_LOG_ENTRY_TRUNCATED_ORIGINAL_SIZE_BYTES,
+        value: JSON.stringify(event.original_size_bytes),
+      },
+      {
+        gemini_cli_key:
+          EventMetadataKey.GEMINI_CLI_LOG_ENTRY_TRUNCATED_TRUNCATED_SIZE_BYTES,
+        value: JSON.stringify(event.truncated_size_bytes),
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_LOG_ENTRY_TRUNCATED_FIELDS,
+        value: JSON.stringify(event.truncated_fields.join(', ')),
+      },
+      {
+        gemini_cli_key:
+          EventMetadataKey.GEMINI_CLI_LOG_ENTRY_TRUNCATED_EVENT_TYPE,
+        value: JSON.stringify(event.event_type),
+      },
+    ];
+
+    this.enqueueLogEvent(
+      this.createLogEvent(EventNames.LOG_ENTRY_TRUNCATED, data),
     );
     this.flushIfNeeded();
   }

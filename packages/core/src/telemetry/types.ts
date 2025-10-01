@@ -621,6 +621,29 @@ export class ToolOutputTruncatedEvent implements BaseTelemetryEvent {
   }
 }
 
+export class LogEntryTruncatedEvent implements BaseTelemetryEvent {
+  readonly eventName = 'log_entry_truncated';
+  readonly 'event.timestamp' = new Date().toISOString();
+  'event.name': string;
+  original_size_bytes: number;
+  truncated_size_bytes: number;
+  truncated_fields: string[];
+  event_type: string; // The type of event that was truncated (e.g., 'api_response', 'tool_call')
+
+  constructor(details: {
+    originalSizeBytes: number;
+    truncatedSizeBytes: number;
+    truncatedFields: string[];
+    eventType: string;
+  }) {
+    this['event.name'] = this.eventName;
+    this.original_size_bytes = details.originalSizeBytes;
+    this.truncated_size_bytes = details.truncatedSizeBytes;
+    this.truncated_fields = details.truncatedFields;
+    this.event_type = details.eventType;
+  }
+}
+
 export class ExtensionUninstallEvent implements BaseTelemetryEvent {
   'event.name': 'extension_uninstall';
   'event.timestamp': string;
@@ -687,6 +710,7 @@ export type TelemetryEvent =
   | ExtensionUninstallEvent
   | ModelRoutingEvent
   | ToolOutputTruncatedEvent
+  | LogEntryTruncatedEvent
   | ModelSlashCommandEvent;
 
 export class ExtensionDisableEvent implements BaseTelemetryEvent {

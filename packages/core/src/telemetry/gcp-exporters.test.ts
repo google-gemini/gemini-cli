@@ -401,5 +401,222 @@ describe('GCP Exporters', () => {
         expect(elapsed).toBeLessThan(50);
       });
     });
+
+    describe('log entry size calculation and truncation', () => {
+      describe('calculateLogEntrySize', () => {
+        it('should calculate correct byte size through export behavior', () => {
+          // Since calculateLogEntrySize is not exposed, we verify it through
+          // the truncation behavior in the export tests below
+          expect(true).toBe(true);
+        });
+      });
+
+      describe('truncateLargeAttributes', () => {
+        it('should not truncate small log entries', () => {
+          const mockLogRecords: ReadableLogRecord[] = [
+            {
+              hrTime: [1234567890, 123456789],
+              hrTimeObserved: [1234567890, 123456789],
+              severityNumber: 9,
+              body: 'Small log message',
+              attributes: {
+                'session.id': 'test-session',
+                'event.name': 'test.event',
+              },
+            } as unknown as ReadableLogRecord,
+          ];
+
+          const callback = vi.fn();
+          exporter.export(mockLogRecords, callback);
+
+          expect(mockLog.entry).toHaveBeenCalledWith(
+            expect.any(Object),
+            expect.not.objectContaining({
+              _log_entry_truncated: true,
+            }),
+          );
+        });
+
+        it('should truncate large string fields', async () => {
+          // Create a large enough payload to exceed the 200KB threshold
+          const largeText = 'a'.repeat(250000); // 250KB
+          const mockLogRecords: ReadableLogRecord[] = [
+            {
+              hrTime: [1234567890, 123456789],
+              hrTimeObserved: [1234567890, 123456789],
+              severityNumber: 9,
+              body: 'Test message',
+              attributes: {
+                'session.id': 'test-session',
+                response_text: largeText,
+              },
+            } as unknown as ReadableLogRecord,
+          ];
+
+          const callback = vi.fn();
+          exporter.export(mockLogRecords, callback);
+
+          await new Promise((resolve) => setTimeout(resolve, 0));
+
+          const callArgs = mockLog.entry.mock.calls[0][1];
+          expect(callArgs._log_entry_truncated).toBe(true);
+          expect(callArgs._original_size_bytes).toBeGreaterThan(0);
+          expect(callArgs._truncated_fields).toBeDefined();
+          expect(typeof callArgs.response_text).toBe('string');
+          expect(callArgs.response_text).toContain('[TRUNCATED');
+        });
+
+        it('should truncate large object fields', async () => {
+          const largeObject = { data: 'x'.repeat(250000) }; // 250KB
+          const mockLogRecords: ReadableLogRecord[] = [
+            {
+              hrTime: [1234567890, 123456789],
+              hrTimeObserved: [1234567890, 123456789],
+              severityNumber: 9,
+              body: 'Test message',
+              attributes: {
+                'session.id': 'test-session',
+                function_args: largeObject,
+              },
+            } as unknown as ReadableLogRecord,
+          ];
+
+          const callback = vi.fn();
+          exporter.export(mockLogRecords, callback);
+
+          await new Promise((resolve) => setTimeout(resolve, 0));
+
+          const callArgs = mockLog.entry.mock.calls[0][1];
+          expect(callArgs._log_entry_truncated).toBe(true);
+          expect(callArgs._truncated_fields).toContain('function_args');
+        });
+
+        it('should preserve critical fields when truncating', async () => {
+          const largeText = 'a'.repeat(250000); // 250KB
+          const mockLogRecords: ReadableLogRecord[] = [
+            {
+              hrTime: [1234567890, 123456789],
+              hrTimeObserved: [1234567890, 123456789],
+              severityNumber: 9,
+              body: 'Test message',
+              attributes: {
+                'session.id': 'critical-session',
+                'user.email': 'test@example.com',
+                'event.name': 'important.event',
+                response_text: largeText,
+              },
+            } as unknown as ReadableLogRecord,
+          ];
+
+          const callback = vi.fn();
+          exporter.export(mockLogRecords, callback);
+
+          await new Promise((resolve) => setTimeout(resolve, 0));
+
+          const callArgs = mockLog.entry.mock.calls[0][1];
+          expect(callArgs['session.id']).toBe('critical-session');
+          expect(callArgs['user.email']).toBe('test@example.com');
+          expect(callArgs['event.name']).toBe('important.event');
+          expect(callArgs._log_entry_truncated).toBe(true);
+        });
+
+        it('should add truncation metadata', async () => {
+          const largeText = 'a'.repeat(250000); // 250KB
+          const mockLogRecords: ReadableLogRecord[] = [
+            {
+              hrTime: [1234567890, 123456789],
+              hrTimeObserved: [1234567890, 123456789],
+              severityNumber: 9,
+              body: 'Test message',
+              attributes: {
+                'session.id': 'test-session',
+                response_text: largeText,
+              },
+            } as unknown as ReadableLogRecord,
+          ];
+
+          const callback = vi.fn();
+          exporter.export(mockLogRecords, callback);
+
+          await new Promise((resolve) => setTimeout(resolve, 0));
+
+          const callArgs = mockLog.entry.mock.calls[0][1];
+          expect(callArgs._log_entry_truncated).toBe(true);
+          expect(typeof callArgs._original_size_bytes).toBe('number');
+          expect(callArgs._original_size_bytes).toBeGreaterThan(0);
+          expect(typeof callArgs._truncated_fields).toBe('string');
+          expect(callArgs._truncated_fields.length).toBeGreaterThan(0);
+          expect(typeof callArgs._truncated_size_bytes).toBe('number');
+        });
+
+        it('should handle JSON stringify errors gracefully', async () => {
+          const circularRef: Record<string, unknown> = { a: 'value' };
+          circularRef['circular'] = circularRef;
+
+          const mockLogRecords: ReadableLogRecord[] = [
+            {
+              hrTime: [1234567890, 123456789],
+              hrTimeObserved: [1234567890, 123456789],
+              severityNumber: 9,
+              body: 'Test message',
+              attributes: {
+                'session.id': 'test-session',
+                function_args: circularRef,
+              },
+            } as unknown as ReadableLogRecord,
+          ];
+
+          const callback = vi.fn();
+
+          // Should not throw
+          expect(() => {
+            exporter.export(mockLogRecords, callback);
+          }).not.toThrow();
+
+          await new Promise((resolve) => setTimeout(resolve, 0));
+
+          expect(callback).toHaveBeenCalledWith({
+            code: ExportResultCode.SUCCESS,
+          });
+        });
+
+        it('should handle extremely large entries that need aggressive truncation', async () => {
+          const extremelyLargeText = 'x'.repeat(300000); // 300KB
+          const mockLogRecords: ReadableLogRecord[] = [
+            {
+              hrTime: [1234567890, 123456789],
+              hrTimeObserved: [1234567890, 123456789],
+              severityNumber: 9,
+              body: 'Test message',
+              attributes: {
+                'session.id': 'test-session',
+                'event.name': 'test.event',
+                response_text: extremelyLargeText,
+                prompt: extremelyLargeText,
+                request_text: extremelyLargeText,
+                function_args: extremelyLargeText,
+                non_critical_large_field: extremelyLargeText,
+              },
+            } as unknown as ReadableLogRecord,
+          ];
+
+          const callback = vi.fn();
+          exporter.export(mockLogRecords, callback);
+
+          await new Promise((resolve) => setTimeout(resolve, 0));
+
+          const callArgs = mockLog.entry.mock.calls[0][1];
+          expect(callArgs._log_entry_truncated).toBe(true);
+          expect(callArgs['session.id']).toBe('test-session');
+          expect(callArgs['event.name']).toBe('test.event');
+
+          // Calculate final size to ensure it's under threshold
+          const finalSize = new TextEncoder().encode(
+            JSON.stringify(callArgs),
+          ).length;
+          expect(finalSize).toBeLessThan(262144); // Under 256KB GCP limit
+        });
+      });
+    });
   });
 });

@@ -34,6 +34,7 @@ import {
   EVENT_EXTENSION_INSTALL,
   EVENT_MODEL_SLASH_COMMAND,
   EVENT_EXTENSION_DISABLE,
+  EVENT_LOG_ENTRY_TRUNCATED,
 } from './constants.js';
 import type {
   ApiErrorEvent,
@@ -64,6 +65,7 @@ import type {
   ExtensionUninstallEvent,
   ExtensionInstallEvent,
   ModelSlashCommandEvent,
+  LogEntryTruncatedEvent,
 } from './types.js';
 import {
   recordApiErrorMetrics,
@@ -800,6 +802,28 @@ export function logExtensionDisable(
   const logger = logs.getLogger(SERVICE_NAME);
   const logRecord: LogRecord = {
     body: `Disabled extension ${event.extension_name}`,
+    attributes,
+  };
+  logger.emit(logRecord);
+}
+
+export function logLogEntryTruncated(
+  config: Config,
+  event: LogEntryTruncatedEvent,
+): void {
+  ClearcutLogger.getInstance(config)?.logLogEntryTruncatedEvent(event);
+  if (!isTelemetrySdkInitialized()) return;
+
+  const attributes: LogAttributes = {
+    ...getCommonAttributes(config),
+    ...event,
+    'event.name': EVENT_LOG_ENTRY_TRUNCATED,
+    'event.timestamp': new Date().toISOString(),
+  };
+
+  const logger = logs.getLogger(SERVICE_NAME);
+  const logRecord: LogRecord = {
+    body: `Log entry truncated for event type ${event.event_type}. Original size: ${event.original_size_bytes} bytes, truncated size: ${event.truncated_size_bytes} bytes. Fields truncated: ${event.truncated_fields.join(', ')}`,
     attributes,
   };
   logger.emit(logRecord);

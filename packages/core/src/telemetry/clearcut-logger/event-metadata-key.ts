@@ -394,6 +394,22 @@ export enum EventMetadataKey {
   GEMINI_CLI_TOOL_OUTPUT_TRUNCATED_LINES = 92,
 
   // ==========================================================================
+  // Log Entry Truncated Event Keys
+  // ===========================================================================
+
+  // Logs the original size of the log entry in bytes.
+  GEMINI_CLI_LOG_ENTRY_TRUNCATED_ORIGINAL_SIZE_BYTES = 109,
+
+  // Logs the truncated size of the log entry in bytes.
+  GEMINI_CLI_LOG_ENTRY_TRUNCATED_TRUNCATED_SIZE_BYTES = 110,
+
+  // Logs the fields that were truncated from the log entry.
+  GEMINI_CLI_LOG_ENTRY_TRUNCATED_FIELDS = 111,
+
+  // Logs the event type that was truncated (e.g., 'api_response', 'tool_call').
+  GEMINI_CLI_LOG_ENTRY_TRUNCATED_EVENT_TYPE = 112,
+
+  // ==========================================================================
   // Model Router Event Keys
   // ==========================================================================
 

@@ -17,6 +17,144 @@ import type {
 } from '@opentelemetry/sdk-logs';
 
 /**
+ * Google Cloud Logging has a hard 256KB (262,144 bytes) limit per log entry.
+ * We use a 200KB threshold to leave room for metadata overhead.
+ * @see https://cloud.google.com/logging/quotas#log-limits
+ */
+const GCP_LOG_ENTRY_SIZE_LIMIT = 262144; // 256KB in bytes
+const GCP_LOG_ENTRY_SIZE_THRESHOLD = 204800; // 200KB in bytes (safe threshold)
+
+/**
+ * Fields that should be preserved even when truncating (critical metadata)
+ */
+const CRITICAL_FIELDS = new Set([
+  'session.id',
+  'user.email',
+  'event.name',
+  'event.timestamp',
+  'model',
+  'error.message',
+  'error.type',
+  'prompt_id',
+  'function_name',
+  'tool_name',
+  'status_code',
+  'duration_ms',
+]);
+
+/**
+ * Fields that are typically large and can be truncated aggressively
+ */
+const TRUNCATABLE_FIELDS = [
+  'response_text',
+  'function_args',
+  'prompt',
+  'request_text',
+  'message',
+];
+
+/**
+ * Calculate the approximate size of a log entry in bytes
+ */
+function calculateLogEntrySize(attributes: Record<string, unknown>): number {
+  try {
+    return new TextEncoder().encode(JSON.stringify(attributes)).length;
+  } catch (_error) {
+    return GCP_LOG_ENTRY_SIZE_LIMIT;
+  }
+}
+
+/**
+ * Truncate large fields in log attributes to fit within size limits
+ */
+function truncateLargeAttributes(
+  attributes: Record<string, unknown>,
+  targetSize: number,
+): {
+  truncatedAttributes: Record<string, unknown>;
+  wasTruncated: boolean;
+  truncatedFields: string[];
+  originalSize: number;
+} {
+  const originalSize = calculateLogEntrySize(attributes);
+
+  if (originalSize <= targetSize) {
+    return {
+      truncatedAttributes: attributes,
+      wasTruncated: false,
+      truncatedFields: [],
+      originalSize,
+    };
+  }
+
+  const truncatedAttributes = { ...attributes };
+  const truncatedFields: string[] = [];
+
+  for (const field of TRUNCATABLE_FIELDS) {
+    if (field in truncatedAttributes) {
+      const value = truncatedAttributes[field];
+      if (typeof value === 'string' && value.length > 1000) {
+        truncatedAttributes[field] =
+          value.substring(0, 500) + '... [TRUNCATED - see original logs]';
+        truncatedFields.push(field);
+
+        // Check limit
+        const newSize = calculateLogEntrySize(truncatedAttributes);
+        if (newSize <= targetSize) {
+          return {
+            truncatedAttributes,
+            wasTruncated: true,
+            truncatedFields,
+            originalSize,
+          };
+        }
+      } else if (typeof value === 'object' && value !== null) {
+        // Truncate JSON objects
+        try {
+          const jsonString = JSON.stringify(value);
+          if (jsonString.length > 1000) {
+            truncatedAttributes[field] =
+              jsonString.substring(0, 500) + '... [TRUNCATED]';
+            truncatedFields.push(field);
+
+            const newSize = calculateLogEntrySize(truncatedAttributes);
+            if (newSize <= targetSize) {
+              return {
+                truncatedAttributes,
+                wasTruncated: true,
+                truncatedFields,
+                originalSize,
+              };
+            }
+          }
+        } catch {
+          // If JSON stringify fails, remove the field
+          delete truncatedAttributes[field];
+          truncatedFields.push(field);
+        }
+      }
+    }
+  }
+
+  // If still too large, remove all non-critical fields
+  const criticalOnly: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(truncatedAttributes)) {
+    if (CRITICAL_FIELDS.has(key)) {
+      criticalOnly[key] = value;
+    } else if (!truncatedFields.includes(key)) {
+      truncatedFields.push(key);
+    }
+  }
+
+  return {
+    truncatedAttributes: criticalOnly,
+    wasTruncated: true,
+    truncatedFields,
+    originalSize,
+  };
+}
+
+/**
  * Google Cloud Trace exporter that extends the official trace exporter
  */
 export class GcpTraceExporter extends TraceExporter {
@@ -59,6 +197,34 @@ export class GcpLogExporter implements LogRecordExporter {
   ): void {
     try {
       const entries = logs.map((log) => {
+        const logData: Record<string, unknown> = {
+          session_id: log.attributes?.['session.id'],
+          ...log.attributes,
+          ...log.resource?.attributes,
+          message: log.body,
+        };
+
+        const {
+          truncatedAttributes,
+          wasTruncated,
+          truncatedFields,
+          originalSize,
+        } = truncateLargeAttributes(logData, GCP_LOG_ENTRY_SIZE_THRESHOLD);
+
+        if (wasTruncated) {
+          truncatedAttributes['_log_entry_truncated'] = true;
+          truncatedAttributes['_original_size_bytes'] = originalSize;
+          truncatedAttributes['_truncated_fields'] = truncatedFields.join(', ');
+          truncatedAttributes['_truncated_size_bytes'] =
+            calculateLogEntrySize(truncatedAttributes);
+
+          if (process.env['DEBUG_MODE'] === 'true') {
+            console.warn(
+              `GCP log entry truncated: ${originalSize} bytes -> ${truncatedAttributes['_truncated_size_bytes']} bytes. Fields: ${truncatedFields.join(', ')}`,
+            );
+          }
+        }
+
         const entry = this.log.entry(
           {
             severity: this.mapSeverityToCloudLogging(log.severityNumber),
@@ -70,12 +236,7 @@ export class GcpLogExporter implements LogRecordExporter {
               },
             },
           },
-          {
-            session_id: log.attributes?.['session.id'],
-            ...log.attributes,
-            ...log.resource?.attributes,
-            message: log.body,
-          },
+          truncatedAttributes,
         );
         return entry;
       });
