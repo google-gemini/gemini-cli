@@ -3,6 +3,7 @@ package com.google.gemini.cli
 
 import com.intellij.ide.impl.isTrusted
 import com.intellij.openapi.Disposable
+import com.intellij.openapi.components.Service
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.editor.EditorFactory
 import com.intellij.openapi.editor.event.CaretEvent
@@ -12,6 +13,7 @@ import com.intellij.openapi.editor.event.SelectionListener
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.fileEditor.FileEditorManagerEvent
 import com.intellij.openapi.fileEditor.FileEditorManagerListener
+import com.intellij.openapi.fileEditor.TextEditor
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.vfs.VirtualFileManager
@@ -53,6 +55,7 @@ interface IdeContextListener : EventListener {
   fun onIdeContextUpdate()
 }
 
+@Service(Service.Level.PROJECT)
 class OpenFilesManager(private val project: Project) : Disposable {
   private val openFiles = mutableListOf<File>()
   private val connection: MessageBusConnection = project.messageBus.connect(this)
@@ -154,6 +157,15 @@ class OpenFilesManager(private val project: Project) : Disposable {
         }
       }
     })
+
+    // Populate initial state
+    val fileEditorManager = FileEditorManager.getInstance(project)
+    fileEditorManager.selectedFiles.forEach { file ->
+      addOrMoveToFront(file)
+    }
+    if (openFiles.isNotEmpty()) {
+      fireWithDebounce()
+    }
   }
 
   private fun isFileUri(file: VirtualFile): Boolean {
@@ -183,17 +195,39 @@ class OpenFilesManager(private val project: Project) : Disposable {
     if (openFiles.size > MAX_FILES) {
       openFiles.removeLast()
     }
+
+    updateActiveContext(file)
   }
 
   private fun remove(file: VirtualFile) {
     openFiles.removeIf { it.path == file.path }
   }
 
+  private fun updateActiveContext(file: VirtualFile) {
+    val activeFile = openFiles.firstOrNull { it.path == file.path && it.isActive } ?: return
+    val fileEditor = FileEditorManager.getInstance(project).getEditors(file).firstOrNull()
+
+    if (fileEditor is TextEditor) {
+      val editor = fileEditor.editor
+
+      // Update cursor
+      val caret = editor.caretModel.currentCaret
+      activeFile.cursor = Cursor(caret.logicalPosition.line + 1, caret.logicalPosition.column)
+
+      // Update selection
+      var selectedText: String? = editor.selectionModel.selectedText
+      if (selectedText != null && selectedText.length > MAX_SELECTED_TEXT_LENGTH) {
+        selectedText = selectedText.substring(0, MAX_SELECTED_TEXT_LENGTH) + "... [TRUNCATED]"
+      }
+      activeFile.selectedText = selectedText
+    }
+  }
+
   private fun fireWithDebounce() {
     alarm.cancelAllRequests()
-    alarm.addRequest({
+    alarm.addRequest(({
       publisher.onIdeContextUpdate()
-    }, 50)
+    }), 50)
   }
 
   fun getState(): IdeContext {
