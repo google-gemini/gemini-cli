@@ -33,7 +33,7 @@ runs:
 
     - name: 'Change tag for @google/gemini-cli-core'
       if: |-
-        ${{ inputs.dry-run == 'false' }}
+        ${{ inputs.dry-run != 'true' }}
       env:
         NODE_AUTH_TOKEN: '${{ inputs.wombat-token-core }}'
       shell: 'bash'
@@ -42,7 +42,7 @@ runs:
 
     - name: 'Change tag for @google/gemini-cli'
       if: |-
-        ${{ inputs.dry-run == 'false' }}
+        ${{ inputs.dry-run != 'true' }}
       env:
         NODE_AUTH_TOKEN: '${{ inputs.wombat-token-cli }}'
       shell: 'bash'

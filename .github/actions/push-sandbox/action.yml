@@ -77,7 +77,7 @@ runs:
         echo "uri=$(cat final_image_uri.txt)" >> $GITHUB_OUTPUT
     - name: 'publish'
       shell: 'bash'
-      if: "${{ inputs.dry-run == 'false' }}"
+      if: "${{ inputs.dry-run != 'true' }}"
       run: |-
         docker push "${{ steps.docker_build.outputs.uri }}"
     - name: 'Create issue on failure'
