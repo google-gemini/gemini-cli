@@ -26,9 +26,6 @@ concurrency:
   cancel-in-progress: |-
     ${{ github.ref != 'refs/heads/main' && !startsWith(github.ref, 'refs/heads/release/') }}
 
-permissions:
-  metadata: 'read'
-
 jobs:
   merge_queue_skipper:
     name: 'Merge Queue Skipper'
