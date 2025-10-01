@@ -6,7 +6,7 @@ The Gemini CLI includes the ability to automatically ignore files, similar to `.
 
 ## How it works
 
-When you add a path to your `.geminiignore` file, tools that respect this file will exclude matching files and directories from their operations. For example, when you use the [`read_many_files`](./tools/multi-file.md) command, any paths in your `.geminiignore` file will be automatically excluded.
+When you add a path to your `.geminiignore` file, tools that respect this file will exclude matching files and directories from their operations. For example, when you use the [`read_many_files`](../tools/multi-file.md) command, any paths in your `.geminiignore` file will be automatically excluded.
 
 For the most part, `.geminiignore` follows the conventions of `.gitignore` files:
 
