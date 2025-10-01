@@ -207,6 +207,136 @@ describe('parseArguments', () => {
     expect(argv.prompt).toBeUndefined();
   });
 
+  it('should convert positional query argument to prompt by default', async () => {
+    process.argv = ['node', 'script.js', 'Hi Gemini'];
+    const argv = await parseArguments({} as Settings);
+    expect(argv.query).toBe('Hi Gemini');
+    expect(argv.prompt).toBe('Hi Gemini');
+    expect(argv.promptInteractive).toBeUndefined();
+  });
+
+  it('should map @path to prompt (one-shot) when it starts with @', async () => {
+    process.argv = ['node', 'script.js', '@path ./file.md'];
+    const argv = await parseArguments({} as Settings);
+    expect(argv.query).toBe('@path ./file.md');
+    expect(argv.prompt).toBe('@path ./file.md');
+    expect(argv.promptInteractive).toBeUndefined();
+  });
+
+  it('should map @path to prompt even when config flags are present', async () => {
+    // @path queries should now go to one-shot mode regardless of other flags
+    process.argv = [
+      'node',
+      'script.js',
+      '@path',
+      './file.md',
+      '--model',
+      'gemini-1.5-pro',
+    ];
+    const argv = await parseArguments({} as Settings);
+    expect(argv.query).toBe('@path ./file.md');
+    expect(argv.prompt).toBe('@path ./file.md'); // Should map to one-shot
+    expect(argv.promptInteractive).toBeUndefined();
+    expect(argv.model).toBe('gemini-1.5-pro');
+  });
+
+  it('maps unquoted positional @path + arg to prompt (one-shot)', async () => {
+    // Simulate: gemini @path ./file.md
+    process.argv = ['node', 'script.js', '@path', './file.md'];
+    const argv = await parseArguments({} as Settings);
+    // After normalization, query is a single string
+    expect(argv.query).toBe('@path ./file.md');
+    // And it's mapped to one-shot prompt when no -p/-i flags are set
+    expect(argv.prompt).toBe('@path ./file.md');
+    expect(argv.promptInteractive).toBeUndefined();
+  });
+
+  it('should handle multiple @path arguments in a single command (one-shot)', async () => {
+    // Simulate: gemini @path ./file1.md @path ./file2.md
+    process.argv = [
+      'node',
+      'script.js',
+      '@path',
+      './file1.md',
+      '@path',
+      './file2.md',
+    ];
+    const argv = await parseArguments({} as Settings);
+    // After normalization, all arguments are joined with spaces
+    expect(argv.query).toBe('@path ./file1.md @path ./file2.md');
+    // And it's mapped to one-shot prompt
+    expect(argv.prompt).toBe('@path ./file1.md @path ./file2.md');
+    expect(argv.promptInteractive).toBeUndefined();
+  });
+
+  it('should handle mixed quoted and unquoted @path arguments (one-shot)', async () => {
+    // Simulate: gemini "@path ./file1.md" @path ./file2.md "additional text"
+    process.argv = [
+      'node',
+      'script.js',
+      '@path ./file1.md',
+      '@path',
+      './file2.md',
+      'additional text',
+    ];
+    const argv = await parseArguments({} as Settings);
+    // After normalization, all arguments are joined with spaces
+    expect(argv.query).toBe(
+      '@path ./file1.md @path ./file2.md additional text',
+    );
+    // And it's mapped to one-shot prompt
+    expect(argv.prompt).toBe(
+      '@path ./file1.md @path ./file2.md additional text',
+    );
+    expect(argv.promptInteractive).toBeUndefined();
+  });
+
+  it('should map @path to prompt with ambient flags (debug, telemetry)', async () => {
+    // Ambient flags like debug, telemetry should NOT affect routing
+    process.argv = [
+      'node',
+      'script.js',
+      '@path',
+      './file.md',
+      '--debug',
+      '--telemetry',
+    ];
+    const argv = await parseArguments({} as Settings);
+    expect(argv.query).toBe('@path ./file.md');
+    expect(argv.prompt).toBe('@path ./file.md'); // Should map to one-shot
+    expect(argv.promptInteractive).toBeUndefined();
+    expect(argv.debug).toBe(true);
+    expect(argv.telemetry).toBe(true);
+  });
+
+  it('should map any @command to prompt (one-shot)', async () => {
+    // Test that all @commands now go to one-shot mode
+    const testCases = [
+      '@path ./file.md',
+      '@include src/',
+      '@search pattern',
+      '@web query',
+      '@git status',
+    ];
+
+    for (const testQuery of testCases) {
+      process.argv = ['node', 'script.js', testQuery];
+      const argv = await parseArguments({} as Settings);
+      expect(argv.query).toBe(testQuery);
+      expect(argv.prompt).toBe(testQuery);
+      expect(argv.promptInteractive).toBeUndefined();
+    }
+  });
+
+  it('should handle @command with leading whitespace', async () => {
+    // Test that trim() + routing handles leading whitespace correctly
+    process.argv = ['node', 'script.js', '  @path ./file.md'];
+    const argv = await parseArguments({} as Settings);
+    expect(argv.query).toBe('  @path ./file.md');
+    expect(argv.prompt).toBe('  @path ./file.md');
+    expect(argv.promptInteractive).toBeUndefined();
+  });
+
   it('should throw an error when both --yolo and --approval-mode are used together', async () => {
     process.argv = [
       'node',
@@ -1931,7 +2061,7 @@ describe('loadCliConfig model selection', () => {
       argv,
     );
 
-    expect(config.getModel()).toBe(DEFAULT_GEMINI_MODEL_AUTO);
+    expect(config.getModel()).toBe(DEFAULT_GEMINI_MODEL);
   });
 
   it('always prefers model from argvs', async () => {
@@ -2367,7 +2497,7 @@ describe('loadCliConfig useRipgrep', () => {
         'test-session',
         argv,
       );
-      expect(config.getUseModelRouter()).toBe(true);
+      expect(config.getUseModelRouter()).toBe(false);
     });
 
     it('should be true when useModelRouter is set to true in settings', async () => {
@@ -2702,7 +2832,7 @@ describe('loadCliConfig interactive', () => {
       'script.js',
       '--model',
       'gemini-1.5-pro',
-      '--sandbox',
+      '--yolo',
       'Hello world',
     ];
     const argv = await parseArguments({} as Settings);
@@ -2717,6 +2847,9 @@ describe('loadCliConfig interactive', () => {
       argv,
     );
     expect(config.isInteractive()).toBe(false);
+    // Verify the question is preserved for one-shot execution
+    expect(argv.prompt).toBe('Hello world');
+    expect(argv.promptInteractive).toBeUndefined();
   });
 
   it('should not be interactive if positional prompt words are provided with extensions flag', async () => {
@@ -2734,7 +2867,103 @@ describe('loadCliConfig interactive', () => {
       argv,
     );
     expect(config.isInteractive()).toBe(false);
-    expect(argv.promptWords).toEqual(['hello']);
+    expect(argv.query).toBe('hello');
+    expect(argv.extensions).toEqual(['none']);
+  });
+
+  it('should handle multiple positional words correctly', async () => {
+    process.stdin.isTTY = true;
+    process.argv = ['node', 'script.js', 'hello world how are you'];
+    const argv = await parseArguments({} as Settings);
+    const config = await loadCliConfig(
+      {},
+      [],
+      new ExtensionEnablementManager(
+        ExtensionStorage.getUserExtensionsDir(),
+        argv.extensions,
+      ),
+      'test-session',
+      argv,
+    );
+    expect(config.isInteractive()).toBe(false);
+    expect(argv.query).toBe('hello world how are you');
+    expect(argv.prompt).toBe('hello world how are you');
+  });
+
+  it('should handle multiple positional words with flags', async () => {
+    process.stdin.isTTY = true;
+    process.argv = [
+      'node',
+      'script.js',
+      '--model',
+      'gemini-1.5-pro',
+      'write',
+      'a',
+      'function',
+      'to',
+      'sort',
+      'array',
+    ];
+    const argv = await parseArguments({} as Settings);
+    const config = await loadCliConfig(
+      {},
+      [],
+      new ExtensionEnablementManager(
+        ExtensionStorage.getUserExtensionsDir(),
+        argv.extensions,
+      ),
+      'test-session',
+      argv,
+    );
+    expect(config.isInteractive()).toBe(false);
+    expect(argv.query).toBe('write a function to sort array');
+    expect(argv.model).toBe('gemini-1.5-pro');
+  });
+
+  it('should handle empty positional arguments', async () => {
+    process.stdin.isTTY = true;
+    process.argv = ['node', 'script.js', ''];
+    const argv = await parseArguments({} as Settings);
+    const config = await loadCliConfig(
+      {},
+      [],
+      new ExtensionEnablementManager(
+        ExtensionStorage.getUserExtensionsDir(),
+        argv.extensions,
+      ),
+      'test-session',
+      argv,
+    );
+    expect(config.isInteractive()).toBe(true);
+    expect(argv.query).toBeUndefined();
+  });
+
+  it('should handle extensions flag with positional arguments correctly', async () => {
+    process.stdin.isTTY = true;
+    process.argv = [
+      'node',
+      'script.js',
+      '-e',
+      'none',
+      'hello',
+      'world',
+      'how',
+      'are',
+      'you',
+    ];
+    const argv = await parseArguments({} as Settings);
+    const config = await loadCliConfig(
+      {},
+      [],
+      new ExtensionEnablementManager(
+        ExtensionStorage.getUserExtensionsDir(),
+        argv.extensions,
+      ),
+      'test-session',
+      argv,
+    );
+    expect(config.isInteractive()).toBe(false);
+    expect(argv.query).toBe('hello world how are you');
     expect(argv.extensions).toEqual(['none']);
   });
 
@@ -3174,10 +3403,23 @@ describe('parseArguments with positional prompt', () => {
     mockConsoleError.mockRestore();
   });
 
-  it('should correctly parse a positional prompt', async () => {
+  it('should correctly parse a positional prompt to query field', async () => {
     process.argv = ['node', 'script.js', 'positional', 'prompt'];
     const argv = await parseArguments({} as Settings);
-    expect(argv.promptWords).toEqual(['positional', 'prompt']);
+    expect(argv.query).toBe('positional prompt');
+    // Since no explicit prompt flags are set and query doesn't start with @, should map to prompt (one-shot)
+    expect(argv.prompt).toBe('positional prompt');
+    expect(argv.promptInteractive).toBeUndefined();
+  });
+
+  it('should have correct positional argument description', async () => {
+    // Test that the positional argument has the expected description
+    const yargsInstance = await import('./config.js');
+    // This test verifies that the positional 'query' argument is properly configured
+    // with the description: "Positional prompt. Defaults to one-shot; use -i/--prompt-interactive for interactive."
+    process.argv = ['node', 'script.js', 'test', 'query'];
+    const argv = await yargsInstance.parseArguments({} as Settings);
+    expect(argv.query).toBe('test query');
   });
 
   it('should correctly parse a prompt from the --prompt flag', async () => {
