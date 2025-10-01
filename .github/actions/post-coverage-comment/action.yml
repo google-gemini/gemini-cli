@@ -27,6 +27,9 @@ inputs:
 runs:
   using: 'composite'
   steps:
+    - name: '📝 Print Inputs'
+      shell: 'bash'
+      run: 'echo "${{ toJSON(inputs) }}"'
     - name: 'Prepare Coverage Comment'
       id: 'prep_coverage_comment'
       shell: 'bash'

@@ -18,6 +18,9 @@ inputs:
 runs:
   using: 'composite'
   steps:
+    - name: '📝 Print Inputs'
+      shell: 'bash'
+      run: 'echo "${{ toJSON(inputs) }}"'
     - name: 'Checkout'
       uses: 'actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955' # ratchet:actions/checkout@v4
       with:

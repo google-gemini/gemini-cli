@@ -30,6 +30,9 @@ inputs:
 runs:
   using: 'composite'
   steps:
+    - name: '📝 Print Inputs'
+      shell: 'bash'
+      run: 'echo "${{ toJSON(inputs) }}"'
     - name: 'Create and Approve Pull Request'
       if: "inputs.dry-run != 'true'"
       env:
