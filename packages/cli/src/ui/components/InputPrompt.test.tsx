@@ -1538,20 +1538,13 @@ describe('InputPrompt', () => {
   });
 
   describe('paste auto-submission protection', () => {
-    let originalTermProgram: string | undefined;
-
     beforeEach(() => {
       vi.useFakeTimers();
-      originalTermProgram = process.env['TERM_PROGRAM'];
-      // Default to a non-vscode terminal for tests
-      delete process.env['TERM_PROGRAM'];
-      // Default to kitty protocol not supported
       mockedUseKittyKeyboardProtocol.mockReturnValue({ supported: false });
     });
 
     afterEach(() => {
       vi.useRealTimers();
-      process.env['TERM_PROGRAM'] = originalTermProgram;
     });
 
     it('should prevent auto-submission immediately after an unsafe paste', async () => {
@@ -1595,7 +1588,7 @@ describe('InputPrompt', () => {
 
       // Advance timers past the protection timeout
       await act(async () => {
-        await vi.advanceTimersByTimeAsync(40);
+        await vi.advanceTimersByTimeAsync(50);
       });
 
       // Now Enter should work normally
@@ -1613,12 +1606,6 @@ describe('InputPrompt', () => {
         name: 'kitty',
         setup: () =>
           mockedUseKittyKeyboardProtocol.mockReturnValue({ supported: true }),
-      },
-      {
-        name: 'vscode',
-        setup: () => {
-          process.env['TERM_PROGRAM'] = 'vscode';
-        },
       },
     ])(
       'should allow immediate submission for a trusted paste ($name)',

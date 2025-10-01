@@ -46,7 +46,10 @@ import { useShellFocusState } from '../contexts/ShellFocusContext.js';
 export function isTerminalPasteTrusted(
   kittyProtocolSupported: boolean,
 ): boolean {
-  return kittyProtocolSupported || process.env['TERM_PROGRAM'] === 'vscode';
+  // Ideally we could trust all VSCode family terminals as well but it appears
+  // we cannot as Cursor users on windows reported being impacted by this
+  // issue (https://github.com/google-gemini/gemini-cli/issues/3763).
+  return kittyProtocolSupported;
 }
 
 export interface InputPromptProps {
@@ -333,7 +336,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           // false positives.
           // Due to how we use a reducer for text buffer state updates, it is
           // reasonable to expect that key events that are really part of the
-          // same paste will be processed in the same event loop tick. 30ms
+          // same paste will be processed in the same event loop tick. 40ms
           // is chosen arbitrarily as it is faster than a typical human
           // could go from pressing paste to pressing enter. The fastest typists
           // can type at 200 words per minute which roughly translates to 50ms
@@ -341,7 +344,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           pasteTimeoutRef.current = setTimeout(() => {
             setRecentUnsafePasteTime(null);
             pasteTimeoutRef.current = null;
-          }, 30);
+          }, 40);
         }
         // Ensure we never accidentally interpret paste as regular input.
         buffer.handleInput(key);
