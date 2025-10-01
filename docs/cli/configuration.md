@@ -461,6 +461,15 @@ The CLI automatically loads environment variables from an `.env` file. The loadi
 - **`CODE_ASSIST_ENDPOINT`**:
   - Specifies the endpoint for the code assist server.
   - This is useful for development and testing.
+- **`GEMINI_SYSTEM_MD`**:
+  - Overrides the base system prompt with the contents of a Markdown file.
+  - If set to `1` or `true`, it uses the file at `.gemini/system.md`.
+  - If set to a file path, it uses that file. The path can be absolute or relative. `~` is supported for the home directory.
+  - The specified file must exist.
+- **`GEMINI_WRITE_SYSTEM_MD`**:
+  - Writes the default system prompt to a file. This is useful for getting a template to customize.
+  - If set to `1` or `true`, it writes to `.gemini/system.md`.
+  - If set to a file path, it writes to that path. The path can be absolute or relative. `~` is supported for the home directory. **Note: This will overwrite the file if it already exists.**
 
 ## Command-Line Arguments
 
