@@ -89,12 +89,17 @@ async function findLastEditTimestamp(
       let id: string | undefined;
       let content: unknown;
 
-      if (isFunctionCall(entry) && part.functionCall?.name) {
+      if (isFunctionCall(entry) && part.functionCall?.name === 'replace') {
         id = part.functionCall.id;
         content = part.functionCall.args;
-      } else if (isFunctionResponse(entry) && part.functionResponse?.name) {
+      } else if (
+        isFunctionResponse(entry) &&
+        part.functionResponse?.name === 'replace'
+      ) {
         id = part.functionResponse.id;
         content = part.functionResponse.response;
+      } else {
+        continue;
       }
 
       // Normalize paths to handle Windows vs. POSIX differences before comparison.
