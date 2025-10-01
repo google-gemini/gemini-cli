@@ -76,7 +76,11 @@ import {
   ExtensionUninstallEvent,
 } from './types.js';
 import * as metrics from './metrics.js';
-import { FileOperation } from './metrics.js';
+import {
+  FileOperation,
+  GenAiOperationName,
+  GenAiProviderName,
+} from './metrics.js';
 import * as sdk from './sdk.js';
 import { vi, describe, beforeEach, it, expect, afterEach } from 'vitest';
 import type {
@@ -289,6 +293,12 @@ describe('loggers', () => {
     const mockMetrics = {
       recordApiResponseMetrics: vi.fn(),
       recordTokenUsageMetrics: vi.fn(),
+      getConventionAttributes: vi.fn(() => ({
+        'gen_ai.operation.name': GenAiOperationName.GENERATE_CONTENT,
+        'gen_ai.provider.name': GenAiProviderName.GCP_VERTEX_AI,
+        'gen_ai.request.model': 'test-model',
+        'gen_ai.response.model': 'test-model',
+      })),
     };
 
     beforeEach(() => {
@@ -297,6 +307,9 @@ describe('loggers', () => {
       );
       vi.spyOn(metrics, 'recordTokenUsageMetrics').mockImplementation(
         mockMetrics.recordTokenUsageMetrics,
+      );
+      vi.spyOn(metrics, 'getConventionAttributes').mockImplementation(
+        mockMetrics.getConventionAttributes,
       );
     });
 
@@ -345,13 +358,47 @@ describe('loggers', () => {
       expect(mockMetrics.recordApiResponseMetrics).toHaveBeenCalledWith(
         mockConfig,
         100,
-        { model: 'test-model', status_code: 200 },
+        {
+          model: 'test-model',
+          status_code: 200,
+          genAiAttributes: {
+            'gen_ai.operation.name': 'generate_content',
+            'gen_ai.provider.name': 'gcp.vertex_ai',
+            'gen_ai.request.model': 'test-model',
+            'gen_ai.response.model': 'test-model',
+          },
+        },
+      );
+
+      // Verify token usage calls for all token types
+      expect(mockMetrics.recordTokenUsageMetrics).toHaveBeenCalledWith(
+        mockConfig,
+        17,
+        {
+          model: 'test-model',
+          type: 'input',
+          genAiAttributes: {
+            'gen_ai.operation.name': 'generate_content',
+            'gen_ai.provider.name': 'gcp.vertex_ai',
+            'gen_ai.request.model': 'test-model',
+            'gen_ai.response.model': 'test-model',
+          },
+        },
       );
 
       expect(mockMetrics.recordTokenUsageMetrics).toHaveBeenCalledWith(
         mockConfig,
         50,
-        { model: 'test-model', type: 'output' },
+        {
+          model: 'test-model',
+          type: 'output',
+          genAiAttributes: {
+            'gen_ai.operation.name': 'generate_content',
+            'gen_ai.provider.name': 'gcp.vertex_ai',
+            'gen_ai.request.model': 'test-model',
+            'gen_ai.response.model': 'test-model',
+          },
+        },
       );
 
       expect(mockUiEvent.addEvent).toHaveBeenCalledWith({

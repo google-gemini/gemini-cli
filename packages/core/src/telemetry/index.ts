@@ -85,6 +85,13 @@ export {
   recordContentRetry,
   recordContentRetryFailure,
   recordModelRoutingMetrics,
+  // Custom metrics for token usage and API responses
+  recordCustomTokenUsageMetrics,
+  recordCustomApiResponseMetrics,
+  // OpenTelemetry GenAI semantic convention for token usage and operation duration
+  recordGenAiClientTokenUsage,
+  recordGenAiClientOperationDuration,
+  getConventionAttributes,
   // Performance monitoring functions
   recordStartupPerformance,
   recordMemoryUsage,
@@ -103,4 +110,8 @@ export {
   ToolExecutionPhase,
   ApiRequestPhase,
   FileOperation,
+  // OpenTelemetry Semantic Convention types
+  GenAiOperationName,
+  GenAiProviderName,
+  GenAiTokenType,
 } from './metrics.js';
