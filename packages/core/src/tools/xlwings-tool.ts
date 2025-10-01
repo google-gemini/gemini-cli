@@ -971,7 +971,7 @@ interface SheetData {
  * Excel interaction tool using xlwings for real-time Excel manipulation
  */
 export class XlwingsTool extends BasePythonTool<XlwingsParams, XlwingsResult> {
-  static readonly Name: string = 'xlwings-tools';
+  static readonly Name: string = 'xlwings_tools';
 
   /**
    * Escapes a file path for safe use in Python string literals
@@ -1027,7 +1027,7 @@ export class XlwingsTool extends BasePythonTool<XlwingsParams, XlwingsResult> {
 
   constructor(config: Config) {
     super(
-      'xlwings-tools',
+      'xlwings_tools',
       'Excel Automation',
       'Automates Excel operations: read/write data, create charts, format cells, manage sheets. Requires Microsoft Excel and xlwings Python library.',
       ['xlwings'], // Python requirements
@@ -8547,7 +8547,24 @@ if not app:
 
 wb, app_used, opened_by_us, created_by_us = get_workbook_smart("${this.escapePythonPath(params.workbook || '')}")
 if not wb:
-    wb = xw.books.active
+    result = {
+        "success": False,
+        "operation": "get_used_range",
+        "error_type": "workbook_not_found",
+        "error_message": "Could not find the specified workbook",
+        "context": {
+            "workbook": ${this.formatPythonString(params.workbook || '')},
+            "required_action": "specify_workbook"
+        },
+        "suggested_actions": [
+            "Open the workbook in Excel first",
+            "Verify the workbook path is correct",
+            "Check if the file exists at the specified location",
+            "Use list_workbooks() to see available workbooks"
+        ]
+    }
+    print(json.dumps(result))
+    exit()
 
 ws = get_worksheet(wb, ${this.formatPythonString(params.worksheet || '')})
 if not ws:

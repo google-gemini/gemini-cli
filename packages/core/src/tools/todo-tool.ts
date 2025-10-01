@@ -792,11 +792,11 @@ class TodoInvocation extends BaseToolInvocation<TodoParams, TodoResult> {
 }
 
 export class TodoTool extends BaseDeclarativeTool<TodoParams, TodoResult> {
-  static readonly Name: string = 'todo-tools';
+  static readonly Name: string = 'todo_tools';
 
   constructor() {
     super(
-      'todo-tools',
+      'todo_tools',
       'TODO Task Manager',
       'Manage and track tasks with priorities and dependencies',
       Kind.Other,

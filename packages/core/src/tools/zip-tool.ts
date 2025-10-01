@@ -705,11 +705,11 @@ Note: This is a simulation. For actual file removal, a proper ZIP library would 
 }
 
 export class ZipTool extends BaseDeclarativeTool<ZipParams, ZipResult> {
-  static readonly Name: string = 'zip-tools';
+  static readonly Name: string = 'zip_tools';
 
   constructor(private readonly config: Config) {
     super(
-      'zip-tools',
+      'zip_tools',
       'Archive Operations',
       'Archive file operations: create/extract archives, compress/decompress files, list contents, add/remove files. Supports basic compression operations.',
       Kind.Other,

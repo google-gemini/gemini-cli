@@ -1155,8 +1155,8 @@ ${pageStructureDisplay}`,
           const baseF = fLower.replace('.pdf', '');
 
           // Check for substring matches, ignoring spaces and special characters
-          const normalizedInput = baseFileName.replace(/[\s\-\(\)\[\]]/g, '');
-          const normalizedFile = baseF.replace(/[\s\-\(\)\[\]]/g, '');
+          const normalizedInput = baseFileName.replace(/[\s\-()[]]/g, '');
+          const normalizedFile = baseF.replace(/[\s\-()[]]/g, '');
 
           return normalizedFile.includes(normalizedInput.substring(0, 10)) ||
                  normalizedInput.includes(normalizedFile.substring(0, 10)) ||
@@ -1183,6 +1183,7 @@ ${pageStructureDisplay}`,
       return this.createErrorResult(errorMessage);
 
     } catch (error) {
+      console.warn('Error while generating file not found suggestions:', error);
       // Fallback to simple error if file system operations fail
       return this.createErrorResult(`PDF file not found: ${file}`);
     }
@@ -1265,7 +1266,7 @@ ${pageStructureDisplay}`,
 }
 
 export class PDFTool extends BackupableTool<PDFParams, PDFResult> {
-  static readonly Name: string = 'pdf-tools';
+  static readonly Name: string = 'pdf_tools';
 
   constructor() {
     super(
