@@ -12,7 +12,7 @@ on:
         required: true
         type: 'string'
       npm_channel:
-        description: 'The npm channel to publish to (only used when registry is npm)
+        description: 'The npm channel to publish to (only used when registry is npm)'
         required: true
         type: 'choice'
         options:
@@ -32,7 +32,7 @@ on:
         type: 'boolean'
         default: false
       skip_github_release:
-        description: 'Select to skip creating a GitHub release (only used when registry is npm)
+        description: 'Select to skip creating a GitHub release (only used when registry is npm)'
         required: false
         type: 'boolean'
         default: false
