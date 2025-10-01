@@ -1152,6 +1152,7 @@ describe('Hierarchical Memory Loading (config.ts) - Placeholder Suite', () => {
         respectGeminiIgnore: true,
       },
       undefined, // maxDirs
+      false,
     );
   });
 
