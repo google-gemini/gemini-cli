@@ -344,16 +344,14 @@ describe('loggers', () => {
 
       expect(mockMetrics.recordApiResponseMetrics).toHaveBeenCalledWith(
         mockConfig,
-        'test-model',
         100,
-        200,
+        { model: 'test-model', status_code: 200 },
       );
 
       expect(mockMetrics.recordTokenUsageMetrics).toHaveBeenCalledWith(
         mockConfig,
-        'test-model',
         50,
-        'output',
+        { model: 'test-model', type: 'output' },
       );
 
       expect(mockUiEvent.addEvent).toHaveBeenCalledWith({
@@ -632,11 +630,13 @@ describe('loggers', () => {
 
       expect(mockMetrics.recordToolCallMetrics).toHaveBeenCalledWith(
         mockConfig,
-        'test-function',
         100,
-        true,
-        ToolCallDecision.ACCEPT,
-        'native',
+        {
+          function_name: 'test-function',
+          success: true,
+          decision: ToolCallDecision.ACCEPT,
+          tool_type: 'native',
+        },
       );
 
       expect(mockUiEvent.addEvent).toHaveBeenCalledWith({
@@ -703,11 +703,13 @@ describe('loggers', () => {
 
       expect(mockMetrics.recordToolCallMetrics).toHaveBeenCalledWith(
         mockConfig,
-        'test-function',
         100,
-        false,
-        ToolCallDecision.REJECT,
-        'native',
+        {
+          function_name: 'test-function',
+          success: false,
+          decision: ToolCallDecision.REJECT,
+          tool_type: 'native',
+        },
       );
 
       expect(mockUiEvent.addEvent).toHaveBeenCalledWith({
@@ -777,11 +779,13 @@ describe('loggers', () => {
 
       expect(mockMetrics.recordToolCallMetrics).toHaveBeenCalledWith(
         mockConfig,
-        'test-function',
         100,
-        true,
-        ToolCallDecision.MODIFY,
-        'native',
+        {
+          function_name: 'test-function',
+          success: true,
+          decision: ToolCallDecision.MODIFY,
+          tool_type: 'native',
+        },
       );
 
       expect(mockUiEvent.addEvent).toHaveBeenCalledWith({
@@ -850,11 +854,13 @@ describe('loggers', () => {
 
       expect(mockMetrics.recordToolCallMetrics).toHaveBeenCalledWith(
         mockConfig,
-        'test-function',
         100,
-        true,
-        undefined,
-        'native',
+        {
+          function_name: 'test-function',
+          success: true,
+          decision: undefined,
+          tool_type: 'native',
+        },
       );
 
       expect(mockUiEvent.addEvent).toHaveBeenCalledWith({
@@ -924,11 +930,13 @@ describe('loggers', () => {
 
       expect(mockMetrics.recordToolCallMetrics).toHaveBeenCalledWith(
         mockConfig,
-        'test-function',
         100,
-        false,
-        undefined,
-        'native',
+        {
+          function_name: 'test-function',
+          success: false,
+          decision: undefined,
+          tool_type: 'native',
+        },
       );
 
       expect(mockUiEvent.addEvent).toHaveBeenCalledWith({
@@ -1085,11 +1093,13 @@ describe('loggers', () => {
 
       expect(mockMetrics.recordFileOperationMetric).toHaveBeenCalledWith(
         mockConfig,
-        'read',
-        10,
-        'text/plain',
-        '.txt',
-        'typescript',
+        {
+          operation: 'read',
+          lines: 10,
+          mimetype: 'text/plain',
+          extension: '.txt',
+          programming_language: 'typescript',
+        },
       );
     });
   });

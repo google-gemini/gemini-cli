@@ -191,14 +191,12 @@ export function logToolCall(config: Config, event: ToolCallEvent): void {
     attributes,
   };
   logger.emit(logRecord);
-  recordToolCallMetrics(
-    config,
-    event.function_name,
-    event.duration_ms,
-    event.success,
-    event.decision,
-    event.tool_type,
-  );
+  recordToolCallMetrics(config, event.duration_ms, {
+    function_name: event.function_name,
+    success: event.success,
+    decision: event.decision,
+    tool_type: event.tool_type,
+  });
 }
 
 export function logToolOutputTruncated(
@@ -258,14 +256,13 @@ export function logFileOperation(
   };
   logger.emit(logRecord);
 
-  recordFileOperationMetric(
-    config,
-    event.operation,
-    event.lines,
-    event.mimetype,
-    event.extension,
-    event.programming_language,
-  );
+  recordFileOperationMetric(config, {
+    operation: event.operation,
+    lines: event.lines,
+    mimetype: event.mimetype,
+    extension: event.extension,
+    programming_language: event.programming_language,
+  });
 }
 
 export function logApiRequest(config: Config, event: ApiRequestEvent): void {
@@ -364,13 +361,11 @@ export function logApiError(config: Config, event: ApiErrorEvent): void {
     attributes,
   };
   logger.emit(logRecord);
-  recordApiErrorMetrics(
-    config,
-    event.model,
-    event.duration_ms,
-    event.status_code,
-    event.error_type,
-  );
+  recordApiErrorMetrics(config, event.duration_ms, {
+    model: event.model,
+    status_code: event.status_code,
+    error_type: event.error_type,
+  });
 }
 
 export function logApiResponse(config: Config, event: ApiResponseEvent): void {
@@ -403,37 +398,30 @@ export function logApiResponse(config: Config, event: ApiResponseEvent): void {
     attributes,
   };
   logger.emit(logRecord);
-  recordApiResponseMetrics(
-    config,
-    event.model,
-    event.duration_ms,
-    event.status_code,
-  );
-  recordTokenUsageMetrics(
-    config,
-    event.model,
-    event.input_token_count,
-    'input',
-  );
-  recordTokenUsageMetrics(
-    config,
-    event.model,
-    event.output_token_count,
-    'output',
-  );
-  recordTokenUsageMetrics(
-    config,
-    event.model,
-    event.cached_content_token_count,
-    'cache',
-  );
-  recordTokenUsageMetrics(
-    config,
-    event.model,
-    event.thoughts_token_count,
-    'thought',
-  );
-  recordTokenUsageMetrics(config, event.model, event.tool_token_count, 'tool');
+  recordApiResponseMetrics(config, event.duration_ms, {
+    model: event.model,
+    status_code: event.status_code,
+  });
+  recordTokenUsageMetrics(config, event.input_token_count, {
+    model: event.model,
+    type: 'input',
+  });
+  recordTokenUsageMetrics(config, event.output_token_count, {
+    model: event.model,
+    type: 'output',
+  });
+  recordTokenUsageMetrics(config, event.cached_content_token_count, {
+    model: event.model,
+    type: 'cache',
+  });
+  recordTokenUsageMetrics(config, event.thoughts_token_count, {
+    model: event.model,
+    type: 'thought',
+  });
+  recordTokenUsageMetrics(config, event.tool_token_count, {
+    model: event.model,
+    type: 'tool',
+  });
 }
 
 export function logLoopDetected(
