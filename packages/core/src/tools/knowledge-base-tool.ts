@@ -45,8 +45,8 @@ export interface KnowledgeBaseParams {
   collection?: string;
 
   /** Advanced search and retrieval options */
-  where?: Record<string, any>;  // Metadata filtering: {"author": "John", "page": {"$gt": 10}}
-  where_document?: Record<string, any>;  // Full-text search: {"$contains": "search term"}
+  where?: Record<string, unknown>;  // Metadata filtering: {"author": "John", "page": {"$gt": 10}}
+  where_document?: Record<string, unknown>;  // Full-text search: {"$contains": "search term"}
   content_mode?: 'chunks' | 'full' | 'metadata_only';  // Content inclusion level
   similarity_threshold?: number;  // Minimum similarity score (0-1)
 
@@ -259,7 +259,12 @@ export class KnowledgeBaseTool extends BasePythonTool<KnowledgeBaseParams, ToolR
           };
         }
 
-        const displayResults = results.slice(0, 3).map((r: any, i: number) =>
+        interface SearchResult {
+          similarity?: number;
+          content?: string;
+          metadata?: Record<string, unknown>;
+        }
+        const displayResults = results.slice(0, 3).map((r: SearchResult, i: number) =>
           `**Result ${i + 1}** (similarity: ${r.similarity || 0})\n${params.content_mode === 'full' ? r.content : r.content?.substring(0, 200) + '...' || ''}${r.metadata ? `\n*Metadata: ${JSON.stringify(r.metadata)}*` : ''}`
         ).join('\n\n');
 
@@ -269,16 +274,24 @@ export class KnowledgeBaseTool extends BasePythonTool<KnowledgeBaseParams, ToolR
         };
       } else if (params.op === 'get') {
         const documents = result.documents || [];
+        interface Document {
+          id?: string;
+          content?: string;
+        }
         return {
-          returnDisplay: `📄 **Retrieved ${documents.length} documents**\n\n${documents.map((doc: any, i: number) =>
+          returnDisplay: `📄 **Retrieved ${documents.length} documents**\n\n${documents.map((doc: Document, i: number) =>
             `**Document ${i + 1}**: ${doc.id}\n${params.content_mode !== 'metadata_only' ? (doc.content?.substring(0, 200) + '...' || 'No content') : 'Metadata only'}`
           ).join('\n\n')}`,
           llmContent: JSON.stringify(documents, null, 2)
         };
       } else if (params.op === 'list_collections') {
         const collections = result.collections || [];
+        interface Collection {
+          name?: string;
+          metadata?: Record<string, unknown>;
+        }
         return {
-          returnDisplay: `📚 **Available Collections** (${collections.length})\n\n${collections.map((col: any) =>
+          returnDisplay: `📚 **Available Collections** (${collections.length})\n\n${collections.map((col: Collection) =>
             `• **${col.name}**${col.metadata ? ` - ${JSON.stringify(col.metadata)}` : ''}`
           ).join('\n')}`,
           llmContent: JSON.stringify(collections, null, 2)
