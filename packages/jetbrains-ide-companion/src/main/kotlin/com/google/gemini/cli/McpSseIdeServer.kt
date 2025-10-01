@@ -1,20 +1,22 @@
 package com.google.gemini.cli
 
 import DiffManager
+import com.google.gemini.cli.transport.StreamableHttpServerTransport
 import com.intellij.openapi.components.service
 import com.intellij.openapi.application.ApplicationInfo
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.roots.ProjectRootManager
-import io.ktor.http.*
+import io.ktor.http.HttpHeaders
+import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.*
 import io.ktor.server.engine.*
 import io.ktor.server.netty.*
-import io.ktor.server.plugins.cors.routing.CORS
+import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
-import io.ktor.server.sse.sse
+import io.ktor.server.sse.*
 import io.modelcontextprotocol.kotlin.sdk.CallToolResult
 import io.modelcontextprotocol.kotlin.sdk.Implementation
 import io.modelcontextprotocol.kotlin.sdk.JSONRPCNotification
@@ -23,19 +25,16 @@ import io.modelcontextprotocol.kotlin.sdk.TextContent
 import io.modelcontextprotocol.kotlin.sdk.Tool
 import io.modelcontextprotocol.kotlin.sdk.server.Server
 import io.modelcontextprotocol.kotlin.sdk.server.ServerOptions
-import io.modelcontextprotocol.kotlin.sdk.server.SseServerTransport
 import io.modelcontextprotocol.kotlin.sdk.shared.McpJson
 import kotlinx.coroutines.*
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.put
 import java.io.File
 import java.security.SecureRandom
 import java.util.*
-import java.util.concurrent.ConcurrentHashMap
 
 @Serializable
 private data class IdeInfo(val name: String, val displayName: String)
@@ -53,13 +52,14 @@ class McpSseIdeServer(private val project: Project, private val diffManager: Dif
   private var server: Any? = null
   private var portFile: File? = null
   private val authToken = generateAuthToken()
-  private val activeTransports = ConcurrentHashMap<String, SseServerTransport>()
-  private val mcpServer = createMcpServer()
   private val openFilesManager: OpenFilesManager = project.service()
+  private val transport = StreamableHttpServerTransport(
+    allowedHosts = listOf("localhost", "127.0.0.1", "host.docker.internal")
+  )
+  private val mcpServer = createMcpServer()
 
   companion object {
     private val LOG = Logger.getInstance(McpSseIdeServer::class.java)
-    private const val MCP_SESSION_ID_HEADER = "mcp-session-id"
   }
 
   init {
@@ -74,68 +74,36 @@ class McpSseIdeServer(private val project: Project, private val diffManager: Dif
         broadcastNotification(notification)
       }
     })
+
+    transport.setOnSessionInitialized { sessionId ->
+      LOG.info("New MCP session initialized: $sessionId")
+    }
   }
 
-  fun start() {
+  suspend fun start() {
+    mcpServer.connect(transport)
     ApplicationManager.getApplication().executeOnPooledThread {
       try {
         server = embeddedServer(Netty, port = 0, host = "127.0.0.1") {
-          install(CORS) {
-            allowMethod(HttpMethod.Options)
-            allowMethod(HttpMethod.Post)
-            allowMethod(HttpMethod.Get)
-            allowHeader(HttpHeaders.ContentType)
-            allowHeader(HttpHeaders.Authorization)
-            allowHeader(MCP_SESSION_ID_HEADER)
-            allowHost("localhost", listOf("http", "https"))
-            allowHost("127.0.0.1", listOf("http", "https"))
-            allowNonSimpleContentTypes = true
-          }
-
           routing {
-            sse("/mcp") {
+            intercept(ApplicationCallPipeline.Call) {
+              if (!call.request.path().startsWith("/mcp")) return@intercept
+
               val authHeader = call.request.headers[HttpHeaders.Authorization]
               if (authHeader != "Bearer $authToken") {
-                LOG.warn("Unauthorized SSE connection attempt.")
                 call.respond(HttpStatusCode.Unauthorized, "Unauthorized")
-                return@sse
-              }
-
-              val transport = SseServerTransport("/mcp", this)
-              LOG.info("New SSE session created: ${transport.sessionId}")
-              activeTransports[transport.sessionId] = transport
-              sendInitialIdeContext(transport)
-
-              mcpServer.onClose {
-                LOG.info("MCP server session closed for sessionId: ${transport.sessionId}")
-                activeTransports.remove(transport.sessionId)
-              }
-
-              try {
-                mcpServer.connect(transport)
-              } catch (e: Exception) {
-                LOG.error("Error during MCP session: ${e.message}", e)
-              }
-              finally {
-                LOG.info("SSE session ended: ${transport.sessionId}")
-                activeTransports.remove(transport.sessionId)
+                finish()
               }
             }
 
             post("/mcp") {
-              val sessionId = call.parameters["sessionId"]
-              if (sessionId == null) {
-                call.respond(HttpStatusCode.BadRequest, "Missing sessionId parameter")
-                return@post
-              }
-
-              val transport = activeTransports[sessionId]
-              if (transport == null) {
-                call.respond(HttpStatusCode.BadRequest, "Invalid session ID")
-                return@post
-              }
-
-              transport.handlePostMessage(call)
+              transport.handlePostRequest(null, call)
+            }
+            sse("/mcp") {
+              transport.handleGetRequest(this, call)
+            }
+            delete("/mcp") {
+              transport.handleDeleteRequest(null, call)
             }
           }
         }.start(wait = false)
@@ -231,39 +199,30 @@ class McpSseIdeServer(private val project: Project, private val diffManager: Dif
 
     val ideDir = File(System.getProperty("java.io.tmpdir"), "gemini/ide").apply { mkdirs() }
     portFile = File(ideDir, "gemini-ide-server-$ppid-$port.json").apply {
-        writeText(portInfoJson)
-        setReadable(true, true)
-        setWritable(true, true)
-        deleteOnExit()
+      writeText(portInfoJson)
+      setReadable(true, true)
+      setWritable(true, true)
+      deleteOnExit()
     }
     LOG.info("Wrote port info to ${portFile?.absolutePath}")
 
     project.service<GeminiCliServerState>().apply {
-        this.port = port
-        this.workspacePath = workspacePath
+      this.port = port
+      this.workspacePath = workspacePath
     }
   }
 
-  fun getServerPort(): Int? {
-    return if (server != null) {
-      val startedServer = server as io.ktor.server.engine.EmbeddedServer<*, *>
-      runBlocking { startedServer.engine.resolvedConnectors().first().port }
-    } else {
-      null
-    }
-  }
-
-  fun stop() {
+  suspend fun stop() {
     if (server != null) {
       val startedServer = server as io.ktor.server.engine.EmbeddedServer<*, *>
       startedServer.stop(0, 0, java.util.concurrent.TimeUnit.MILLISECONDS)
     }
     portFile?.delete()
-    activeTransports.clear()
+    transport.close()
 
     project.service<GeminiCliServerState>().apply {
-        this.port = null
-        this.workspacePath = null
+      this.port = null
+      this.workspacePath = null
     }
   }
 
@@ -277,44 +236,22 @@ class McpSseIdeServer(private val project: Project, private val diffManager: Dif
   private fun broadcastIdeContextUpdate() {
     val context = openFilesManager.getState()
     val contextJson = McpJson.encodeToJsonElement(context)
-    broadcastNotification("ide/contextUpdate", contextJson)
-  }
-
-  private fun sendInitialIdeContext(transport: SseServerTransport) {
-    val context = openFilesManager.getState()
-    val contextJson = McpJson.encodeToJsonElement(context)
     val notification = JSONRPCNotification(
       method = "ide/contextUpdate",
       params = contextJson
-    )
-    runBlocking {
-      try {
-        transport.send(notification)
-        LOG.info("Sent initial IDE context to session ${transport.sessionId}")
-      } catch (e: Exception) {
-        LOG.warn("Failed to send initial IDE context to session ${transport.sessionId}: ${e.message}")
-      }
-    }
-  }
-
-  private fun broadcastNotification(method: String, params: JsonElement) {
-    val notification = JSONRPCNotification(
-      method = method,
-      params = params
     )
     broadcastNotification(notification)
   }
 
   private fun broadcastNotification(notification: JSONRPCNotification) {
     runBlocking {
-      activeTransports.values.forEach { transport ->
-        try {
-          transport.send(notification)
-          LOG.debug("Notification sent to session ${transport.sessionId}: ${notification.method}")
-        } catch (e: Exception) {
-          LOG.warn("Failed to send notification to session ${transport.sessionId}: ${e.message}")
-        }
+      try {
+        transport.send(notification)
+        LOG.debug("Notification sent: ${notification.method}")
+      } catch (e: Exception) {
+        LOG.warn("Failed to send notification: ${e.message}")
       }
     }
   }
 }
+
