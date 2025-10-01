@@ -97,7 +97,9 @@ async function findLastEditTimestamp(
         content = part.functionResponse.response;
       }
 
-      if (id && JSON.stringify(content).includes(filePath)) {
+      // Normalize paths to handle Windows vs. POSIX differences before comparison.
+      const normalizedContent = JSON.stringify(content).replace(/\\\\/g, '/');
+      if (id && normalizedContent.includes(filePath.replace(/\\/g, '/'))) {
         return getTimestampFromFunctionId(id);
       }
     }
