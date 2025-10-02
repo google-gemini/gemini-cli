@@ -103,13 +103,14 @@ jobs:
           previous-tag: '${{ steps.nightly_version.outputs.PREVIOUS_TAG }}'
           working-directory: './release'
           skip-branch-cleanup: true
+          force-skip-tests: '${{ github.event.inputs.force_skip_tests }}'
           gemini_api_key: '${{ secrets.GEMINI_API_KEY }}'
 
       - name: 'Create and Merge Pull Request'
         uses: './.github/actions/create-pull-request'
         with:
           branch-name: 'release/${{ steps.nightly_version.outputs.RELEASE_TAG }}'
-          pr-title: 'chore(release): bump version to ${{ steps.nightly_version.outputs.RELEASE_VERSION }}'
+          pr-title: 'chore/release: bump version to ${{ steps.nightly_version.outputs.RELEASE_VERSION }}'
           pr-body: 'Automated version bump for nightly release.'
           github-token: '${{ secrets.GEMINI_CLI_ROBOT_GITHUB_PAT }}'
           dry-run: '${{ github.event.inputs.dry_run }}'
