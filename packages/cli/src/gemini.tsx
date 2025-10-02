@@ -370,8 +370,16 @@ export async function main() {
         appEvents,
       );
       agentExecutor = exec;
-      expressApp.listen(argv.a2aPort, () => {
+      const server = expressApp.listen(argv.a2aPort, () => {
         console.log(`A2A server listening on port ${argv.a2aPort}`);
+      });
+      server.on('error', (err) => {
+        console.error(
+          `Failed to start A2A server on port ${argv.a2aPort}:`,
+          err,
+        );
+        // Optionally exit or prevent agentExecutor from being used
+        agentExecutor = undefined;
       });
     }
 

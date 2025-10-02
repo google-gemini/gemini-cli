@@ -23,7 +23,7 @@ const coderAgentCard: AgentCard = {
   name: 'Gemini SDLC Agent',
   description:
     'An agent that generates code based on natural language instructions and streams file outputs.',
-  url: 'http://localhost:41242/',
+  url: 'http://localhost:41243/',
   provider: {
     organization: 'Google',
     url: 'https://google.com',
@@ -70,15 +70,19 @@ export async function createApp(
     const bucketName = process.env['GCS_BUCKET_NAME'];
     let taskStoreForExecutor: TaskStore;
     let taskStoreForHandler: TaskStore;
+    const inMemoryTaskStore = new InMemoryTaskStore();
 
-    if (bucketName) {
+    if (cliConfig) {
+      logger.info('Running in CLI mode, using shared InMemoryTaskStore');
+      taskStoreForExecutor = inMemoryTaskStore;
+      taskStoreForHandler = inMemoryTaskStore;
+    } else if (bucketName) {
       logger.info(`Using GCSTaskStore with bucket: ${bucketName}`);
       const gcsTaskStore = new GCSTaskStore(bucketName);
       taskStoreForExecutor = gcsTaskStore;
       taskStoreForHandler = new NoOpTaskStore(gcsTaskStore);
     } else {
-      logger.info('Using InMemoryTaskStore');
-      const inMemoryTaskStore = new InMemoryTaskStore();
+      logger.info('Using InMemoryTaskStore for standalone server');
       taskStoreForExecutor = inMemoryTaskStore;
       taskStoreForHandler = inMemoryTaskStore;
     }
@@ -96,6 +100,13 @@ export async function createApp(
     );
 
     let expressApp = express();
+
+    // Log all incoming requests
+    expressApp.use((req, res, next) => {
+      logger.info(`[App] Incoming request: ${req.method} ${req.url}`);
+      next();
+    });
+
     expressApp.use((req, res, next) => {
       requestStorage.run({ req }, next);
     });

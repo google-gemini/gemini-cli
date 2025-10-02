@@ -62,6 +62,11 @@ import path from 'node:path';
 import { useSessionStats } from '../contexts/SessionContext.js';
 import { useKeypress } from './useKeypress.js';
 import type { LoadedSettings } from '../../config/settings.js';
+import type {
+  CoderAgentExecutor,
+  AgentSettings,
+} from '@google/gemini-cli-a2a-server';
+import { DefaultExecutionEventBus } from '@a2a-js/sdk/server';
 
 enum StreamProcessingStatus {
   Completed,
@@ -105,6 +110,7 @@ export const useGeminiStream = (
   terminalWidth: number,
   terminalHeight: number,
   isShellFocused?: boolean,
+  agentExecutor?: CoderAgentExecutor,
 ) => {
   const [initError, setInitError] = useState<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -791,22 +797,64 @@ export const useGeminiStream = (
         }
 
         setIsResponding(true);
+
         setInitError(null);
 
         try {
-          const stream = geminiClient.sendMessageStream(
-            queryToSend,
-            abortSignal,
-            prompt_id,
-          );
-          const processingStatus = await processGeminiStreamEvents(
-            stream,
-            userMessageTimestamp,
-            abortSignal,
-          );
+          if (agentExecutor) {
+            // A2A Mode
+            const taskId = 'cli-session-task';
+            const contextId = 'cli-session-context';
 
-          if (processingStatus === StreamProcessingStatus.UserCancelled) {
-            return;
+            const agentSettings: AgentSettings = {
+              kind: 'agent-settings',
+              workspacePath: config.getProjectRoot() || process.cwd(),
+            };
+            const eventBus = new DefaultExecutionEventBus();
+            const taskWrapper = await agentExecutor.createTask(
+              taskId,
+              contextId,
+              agentSettings,
+              eventBus,
+            );
+
+            eventBus.on('event', (event) => {
+              onDebugMessage(`[A2A Event]: ${JSON.stringify(event)}`);
+            });
+
+            if (typeof queryToSend === 'string') {
+              const stream = taskWrapper.task.processUserInput(
+                queryToSend,
+                abortSignal,
+                prompt_id,
+              );
+              await processGeminiStreamEvents(
+                stream,
+                userMessageTimestamp,
+                abortSignal,
+              );
+            } else {
+              onDebugMessage(
+                '[A2A Event]: Query to send is not a string. This use case is not yet supported in A2A mode.',
+              );
+              // TODO(b/369671111): Handle non-string queryToSend for A2A mode
+            }
+          } else {
+            // Normal CLI Mode
+            const stream = geminiClient.sendMessageStream(
+              queryToSend,
+              abortSignal,
+              prompt_id,
+            );
+            const processingStatus = await processGeminiStreamEvents(
+              stream,
+              userMessageTimestamp,
+              abortSignal,
+            );
+
+            if (processingStatus === StreamProcessingStatus.UserCancelled) {
+              return;
+            }
           }
 
           if (pendingHistoryItemRef.current) {
@@ -855,6 +903,8 @@ export const useGeminiStream = (
       startNewPrompt,
       getPromptCount,
       handleLoopDetectedEvent,
+      agentExecutor,
+      onDebugMessage,
     ],
   );
 

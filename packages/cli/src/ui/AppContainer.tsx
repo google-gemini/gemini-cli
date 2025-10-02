@@ -597,6 +597,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
     terminalWidth,
     terminalHeight,
     embeddedShellFocused,
+    props.agentExecutor,
   );
 
   // Auto-accept indicator

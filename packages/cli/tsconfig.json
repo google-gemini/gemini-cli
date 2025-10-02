@@ -84,5 +84,5 @@
     "src/services/prompt-processors/shellProcessor.test.ts",
     "src/commands/extensions/examples/**"
   ],
-  "references": [{ "path": "../core" }]
+  "references": [{ "path": "../core" }, { "path": "../a2a-server" }]
 }

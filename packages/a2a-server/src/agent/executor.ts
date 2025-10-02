@@ -89,7 +89,7 @@ export class CoderAgentExecutor implements AgentExecutor {
 
   constructor(
     private taskStore?: TaskStore,
-    private cliConfig?: Config,
+    private cliConfig?: Config, // TODO(b/369671111): Use cliConfig if available
     private cliAppEvents?: EventEmitter,
   ) {}
 
@@ -97,7 +97,11 @@ export class CoderAgentExecutor implements AgentExecutor {
     agentSettings: AgentSettings,
     taskId: string,
   ): Promise<Config> {
-    // TODO(b/369671111): Use cliConfig if available
+    if (this.cliConfig) {
+      logger.info('[CoderAgentExecutor] Using cliConfig as base');
+      return this.cliConfig;
+    }
+    logger.info('[CoderAgentExecutor] Loading config from files');
     const workspaceRoot = setTargetDir(agentSettings);
     loadEnvironment(); // Will override any global env with workspace envs
     const settings = loadSettings(workspaceRoot);
@@ -161,6 +165,16 @@ export class CoderAgentExecutor implements AgentExecutor {
     const wrapper = new TaskWrapper(runtimeTask, agentSettings);
     this.tasks.set(taskId, wrapper);
     logger.info(`New task ${taskId} created.`);
+    try {
+      await this.taskStore?.save(wrapper.toSDKTask());
+      logger.info(`New task ${taskId} saved to store.`);
+    } catch (saveError) {
+      logger.error(
+        `[CoderAgentExecutor] Failed to save new task ${taskId} to store:`,
+        saveError,
+      );
+      // Depending on the desired behavior, you might want to throw here
+    }
     return wrapper;
   }
 
@@ -290,6 +304,9 @@ export class CoderAgentExecutor implements AgentExecutor {
     requestContext: RequestContext,
     eventBus: ExecutionEventBus,
   ): Promise<void> {
+    logger.info(
+      `[CoderAgentExecutor] execute() called with context: ${JSON.stringify(requestContext)}`,
+    );
     const userMessage = requestContext.userMessage as Message;
     const sdkTask = requestContext.task as SDKTask | undefined;
 
@@ -434,6 +451,10 @@ export class CoderAgentExecutor implements AgentExecutor {
       );
       return;
     }
+
+    logger.info(
+      `[CoderAgentExecutor] Wrapper found for task ${taskId}: ${!!wrapper}`,
+    );
 
     const currentTask = wrapper.task;
 

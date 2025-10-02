@@ -920,7 +920,21 @@ export class Task {
       yield* (async function* () {})(); // Yield nothing
     }
   }
-
+  async *processUserInput(
+    inputText: string,
+    abortSignal: AbortSignal,
+    promptId: string,
+  ): AsyncGenerator<ServerGeminiStreamEvent> {
+    const stream = this.geminiClient.sendMessageStream(
+      inputText,
+      abortSignal,
+      promptId,
+    );
+    for await (const event of stream) {
+      await this.acceptAgentMessage(event);
+      yield event;
+    }
+  }
   _sendTextContent(content: string): void {
     if (content === '') {
       return;

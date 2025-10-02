@@ -40,7 +40,7 @@ export enum CoderAgentEvent {
 }
 
 export interface AgentSettings {
-  kind: CoderAgentEvent.StateAgentSettingsEvent;
+  kind: 'agent-settings';
   workspacePath: string;
 }
 
