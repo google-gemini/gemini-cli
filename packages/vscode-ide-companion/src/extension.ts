@@ -37,6 +37,7 @@ let log: (message: string) => void = () => {};
 async function checkForUpdates(
   context: vscode.ExtensionContext,
   log: (message: string) => void,
+  infoMessageEnabled: boolean,
 ) {
   try {
     const currentVersion = context.extension.packageJSON.version;
@@ -81,7 +82,11 @@ async function checkForUpdates(
     // The versions are sorted by date, so the first one is the latest.
     const latestVersion = extension?.versions?.[0]?.version;
 
-    if (latestVersion && semver.gt(latestVersion, currentVersion)) {
+    if (
+      infoMessageEnabled &&
+      latestVersion &&
+      semver.gt(latestVersion, currentVersion)
+    ) {
       const selection = await vscode.window.showInformationMessage(
         `A new version (${latestVersion}) of the Gemini CLI Companion extension is available.`,
         'Update to latest version',
@@ -105,7 +110,11 @@ export async function activate(context: vscode.ExtensionContext) {
   log = createLogger(context, logger);
   log('Extension activated');
 
-  checkForUpdates(context, log);
+  const infoMessageEnabled = !HIDE_INSTALLATION_GREETING_IDES.has(
+    detectIdeFromEnv().name,
+  );
+
+  checkForUpdates(context, log, infoMessageEnabled);
 
   const diffContentProvider = new DiffContentProvider();
   const diffManager = new DiffManager(log, diffContentProvider);
@@ -148,11 +157,14 @@ export async function activate(context: vscode.ExtensionContext) {
     log(`Failed to start IDE server: ${message}`);
   }
 
-  const infoMessageEnabled = !HIDE_INSTALLATION_GREETING_IDES.has(
+  const greetingMessageEnabled = !HIDE_INSTALLATION_GREETING_IDES.has(
     detectIdeFromEnv().name,
   );
 
-  if (!context.globalState.get(INFO_MESSAGE_SHOWN_KEY) && infoMessageEnabled) {
+  if (
+    !context.globalState.get(INFO_MESSAGE_SHOWN_KEY) &&
+    greetingMessageEnabled
+  ) {
     void vscode.window.showInformationMessage(
       'Gemini CLI Companion extension successfully installed.',
     );
