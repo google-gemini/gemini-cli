@@ -127,7 +127,7 @@ export function initializeTelemetry(config: Config): void {
       exportIntervalMillis: 30000,
     });
   } else if (useOtlp) {
-    const otlpHeaders = config.getTelemetryOtlpHeaders();
+    const otlpHeaders = config.getTelemetryOtlpHeaders() ?? {};
     const hasHeaders = Object.keys(otlpHeaders).length > 0;
 
     if (hasHeaders) {
