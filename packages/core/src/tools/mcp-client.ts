@@ -102,7 +102,9 @@ export class McpClient {
       // Already connected
       return;
     }
-    this.isDisconnecting = false;
+    if (this.isDisconnecting) {
+      throw new Error('Cannot reconnect while still disconnecting');
+    }
     this.updateStatus(MCPServerStatus.CONNECTING);
     try {
       this.client = await connectToMcpServer(
@@ -111,6 +113,15 @@ export class McpClient {
         this.debugMode,
         this.workspaceContext,
       );
+      const originalOnError = this.client.onerror;
+      this.client.onerror = (error) => {
+        if (originalOnError) originalOnError(error);
+        if (this.isDisconnecting) {
+          return;
+        }
+        console.error(`MCP ERROR (${this.serverName}):`, error.toString());
+        this.updateStatus(MCPServerStatus.DISCONNECTED);
+      };
       this.updateStatus(MCPServerStatus.CONNECTED);
     } catch (error) {
       this.updateStatus(MCPServerStatus.DISCONNECTED);
