@@ -65,7 +65,7 @@ export const CodebaseInvestigatorAgent: AgentDefinition = {
   name: 'codebase_investigator',
   displayName: 'Codebase Investigator Agent',
   description: `Your primary tool for multifile search tasks and codebase exploration. 
-    Invoke this tool to delegates search tasks to an autonomous subagent. 
+    Invoke this tool to delegate search tasks to an autonomous subagent. 
     Use this to find features, understand context, or locate specific files, functions, or symbols. 
     Returns a structured xml report with key file paths, symbols, architectural map and insights to solve a task or answer questions.`,
   inputConfig: {
