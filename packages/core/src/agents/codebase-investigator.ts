@@ -64,9 +64,10 @@ const CODEBASE_REPORT_MARKDOWN = `<CodebaseReport>
 export const CodebaseInvestigatorAgent: AgentDefinition = {
   name: 'codebase_investigator',
   displayName: 'Codebase Investigator Agent',
-  description: `Invoke this agent to delegates complex codebase exploration to an autonomous subagent. 
-    Use for vague user requests that require searching multiple files to understand a feature or find context. 
-    Returns a structured xml report with key file paths, symbols, architectural map and insights to solve a task.`,
+  description: `Your primary tool for multifile search tasks and codebase exploration. 
+    Invoke this tool to delegate search tasks to an autonomous subagent. 
+    Use this to find features, understand context, or locate specific files, functions, or symbols. 
+    Returns a structured xml report with key file paths, symbols, architectural map and insights to solve a task or answer questions.`,
   inputConfig: {
     inputs: {
       objective: {
