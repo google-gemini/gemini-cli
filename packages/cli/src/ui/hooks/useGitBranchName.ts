@@ -35,9 +35,14 @@ function useGitWatcher(cwd: string, onBranchChange: () => void) {
     let headWatcher: fs.FSWatcher | undefined;
     let cwdWatcher: fs.FSWatcher | undefined;
 
+    let isMounted = true;
+
     const setupHeadWatcher = () => {
+      if (!isMounted) return;
+
       // Stop watching the cwd for .git creation if we are now watching HEAD.
       cwdWatcher?.close();
+      cwdWatcher = undefined;
       try {
         console.debug('[GitBranchName] Setting up HEAD watcher.');
         headWatcher = fs.watch(gitHeadPath, (eventType: string) => {
@@ -55,19 +60,26 @@ function useGitWatcher(cwd: string, onBranchChange: () => void) {
     };
 
     const setupCwdWatcher = () => {
+      if (!isMounted) return;
+
       try {
         console.debug(
           '[GitBranchName] .git/HEAD not found. Setting up CWD watcher.',
         );
         cwdWatcher = fs.watch(cwd, (eventType, filename) => {
+          // On macOS, filename can be null for rename events.
+          // To be robust, we check for the existence of the .git directory
+          // if the filename is '.git' or if it's null.
           if (
             (eventType === 'rename' || eventType === 'change') &&
-            filename === '.git'
+            (filename === '.git' || filename === null)
           ) {
             // Check if the created .git is actually a directory.
             fs.promises
               .stat(path.join(cwd, '.git'))
               .then((stats) => {
+                if (!isMounted) return;
+
                 if (stats.isDirectory()) {
                   console.debug(
                     '[GitBranchName] .git directory detected. Switching to HEAD watcher.',
@@ -82,11 +94,13 @@ function useGitWatcher(cwd: string, onBranchChange: () => void) {
                 }
               })
               .catch((err) => {
-                // Ignore stat errors.
-                console.debug(
-                  '[GitBranchName] Error checking .git status. Ignoring.',
-                  err,
-                );
+                // Ignore stat errors (e.g. file not found if the change was not .git creation)
+                if (isMounted) {
+                  console.debug(
+                    '[GitBranchName] Error checking .git status. Ignoring.',
+                    err,
+                  );
+                }
               });
           }
         });
@@ -99,18 +113,23 @@ function useGitWatcher(cwd: string, onBranchChange: () => void) {
       }
     };
 
-    fsPromises
-      .access(gitHeadPath, fs.constants.F_OK)
-      .then(() => {
-        // .git/HEAD exists, watch it directly.
-        setupHeadWatcher();
-      })
-      .catch(() => {
-        // .git/HEAD does not exist, watch the cwd for .git creation.
-        setupCwdWatcher();
-      });
+    void (async () => {
+      try {
+        await fsPromises.access(gitHeadPath, fs.constants.F_OK);
+        if (isMounted) {
+          // .git/HEAD exists, watch it directly.
+          setupHeadWatcher();
+        }
+      } catch {
+        if (isMounted) {
+          // .git/HEAD does not exist, watch the cwd for .git creation.
+          setupCwdWatcher();
+        }
+      }
+    })();
 
     return () => {
+      isMounted = false;
       console.debug('[GitBranchName] Closing watchers.');
       headWatcher?.close();
       cwdWatcher?.close();
