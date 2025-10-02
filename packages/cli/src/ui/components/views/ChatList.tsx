@@ -18,14 +18,11 @@ export const ChatList: React.FC<ChatListProps> = ({ chats }) => {
     return <Text>No saved conversation checkpoints found.</Text>;
   }
 
-  const maxNameLength = Math.max(...chats.map((chat) => chat.name.length));
-
   return (
     <Box flexDirection="column">
       <Text>List of saved conversations:</Text>
       <Box height={1} />
       {chats.map((chat) => {
-        const paddedName = chat.name.padEnd(maxNameLength, ' ');
         const isoString = chat.mtime;
         const match = isoString.match(
           /(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2}:\d{2})/,
@@ -36,11 +33,9 @@ export const ChatList: React.FC<ChatListProps> = ({ chats }) => {
         return (
           <Box key={chat.name} flexDirection="row">
             <Text>
-              {'  '}- <Text color={theme.text.accent}>{paddedName}</Text>
+              {'  '}- <Text color={theme.text.accent}>{chat.name}</Text>
               {'  '}
-              <Text color={theme.text.secondary}>
-                (saved on {formattedDate})
-              </Text>
+              <Text color={theme.text.secondary}>({formattedDate})</Text>
             </Text>
           </Box>
         );

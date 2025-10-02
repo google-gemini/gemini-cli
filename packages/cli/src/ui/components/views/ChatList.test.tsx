@@ -40,7 +40,7 @@ describe('<ChatList />', () => {
       },
     ];
     const { lastFrame } = render(<ChatList chats={mockChatsWithInvalidDate} />);
-    expect(lastFrame()).toContain('(saved on Invalid Date)');
+    expect(lastFrame()).toContain('(Invalid Date)');
     expect(lastFrame()).toMatchSnapshot();
   });
 });
