@@ -595,9 +595,6 @@ export async function loadCliConfig(
   const allowedTools = argv.allowedTools || settings.tools?.allowed || [];
   const allowedToolsSet = new Set(allowedTools);
 
-  // If promptWords are provided, always use non-interactive mode
-  const hasPromptWords = argv.promptWords && argv.promptWords.length > 0;
-
   // Interactive mode: explicit -i flag or (TTY + no args + no -p flag)
   const hasQuery = !!argv.query;
   const interactive =
