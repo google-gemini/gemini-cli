@@ -41,6 +41,9 @@ describe('Core System Prompt (prompts.ts)', () => {
     vi.stubEnv('GEMINI_WRITE_SYSTEM_MD', undefined);
     mockConfig = {
       getEnableSubagents: vi.fn().mockReturnValue(false),
+      getToolRegistry: vi.fn().mockReturnValue({
+        getAllToolNames: vi.fn().mockReturnValue([]),
+      }),
     } as unknown as Config;
   });
 

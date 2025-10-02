@@ -84,10 +84,6 @@ export function getCoreSystemPrompt(
     process.env['GEMINI_SYSTEM_MD'],
   );
 
-  console.warn(
-    `Enabled subagents: ${config.getEnableSubagents()} &&
-    Allowed tools ${config.getAllowedTools()?.includes(CodebaseInvestigatorAgent.name)} and ${config.getAllowedTools()}`,
-  );
   // Proceed only if the environment variable is set and is not disabled.
   if (systemMdResolution.value && !systemMdResolution.isDisabled) {
     systemMdEnabled = true;
@@ -103,10 +99,14 @@ export function getCoreSystemPrompt(
     }
   }
 
+  const enableCodebaseInvestigator = config
+    .getToolRegistry()
+    .getAllToolNames()
+    .includes(CodebaseInvestigatorAgent.name);
+
   const basePrompt = systemMdEnabled
     ? fs.readFileSync(systemMdPath, 'utf8')
-    : `
-You are an interactive CLI agent specializing in software engineering tasks. Your primary goal is to help users safely and efficiently, adhering strictly to the following instructions and utilizing your available tools.
+    : `You are an interactive CLI agent specializing in software engineering tasks. Your primary goal is to help users safely and efficiently, adhering strictly to the following instructions and utilizing your available tools.
 
 # Core Mandates
 
@@ -127,7 +127,7 @@ You are an interactive CLI agent specializing in software engineering tasks. You
 ## Software Engineering Tasks
 When requested to perform tasks like fixing bugs, adding features, refactoring, or explaining code, follow this sequence:
 ${(function () {
-  if (config.getEnableSubagents()) {
+  if (enableCodebaseInvestigator) {
     return `
 1. **Understand & Strategize:** for any request that requires searching terms or explore the codebase, your **first and primary tool** must be '${CodebaseInvestigatorAgent.name}'. You must use it to build a comprehensive understanding of the relevant code, its structure, and dependencies. The output from '${CodebaseInvestigatorAgent.name}' will be the foundation of your plan. YOU MUST not use '${GrepTool.Name}' or '${GlobTool.Name}' as your initial exploration tool; they should only be used for secondary, targeted searches after the investigator has provided you with context.
 2. **Plan:** Build a coherent and grounded (based on the understanding in step 1) plan for how you intend to resolve the user's task. Do not ignore the output of '${CodebaseInvestigatorAgent.name}', you must use it as the foundation of your plan. Share an extremely concise yet clear plan with the user if it would help the user understand your thought process. As part of the plan, you should use an iterative development process that includes writing unit tests to verify your changes. Use output logs or debug statements as part of this process to arrive at a solution.`;
@@ -255,7 +255,7 @@ model: [tool_call: ${ShellTool.Name} for 'node server.js &' because it must run 
 </example>
 
 ${(function () {
-  if (config.getEnableSubagents()) {
+  if (enableCodebaseInvestigator) {
     return `
 <example>
 user: Refactor the auth logic in src/auth.py to use the requests library instead of urllib.
@@ -346,7 +346,7 @@ I've written the tests. Now I'll run the project's test command to verify them.
 </example>
 
 ${(function () {
-  if (config.getEnableSubagents()) {
+  if (enableCodebaseInvestigator) {
     return `
 <example>
 user: How do I update the user's profile information in this system?
