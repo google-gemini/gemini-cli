@@ -10,7 +10,7 @@ import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import type {
   MessageActionReturn,
   SlashCommand,
-  type CommandContext,
+  CommandContext,
 } from './types.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
 import type { Content } from '@google/genai';
@@ -151,7 +151,10 @@ describe('chatCommand', () => {
         toISOString: () => 'an-invalid-date-string',
       } as Date;
 
-      mockFs.readdir.mockResolvedValue(fakeFiles);
+      mockFs.readdir.mockImplementation(
+        (async (_: string): Promise<string[]> =>
+          fakeFiles as string[]) as unknown as typeof fsPromises.readdir,
+      );
       mockFs.stat.mockResolvedValue({ mtime: badDate } as Stats);
 
       const result = (await listCommand?.action?.(
@@ -367,8 +370,24 @@ describe('chatCommand', () => {
       });
     });
 
+    it('should return confirm_action before deleting', async () => {
+      mockContext.invocation = {
+        raw: `/chat delete ${tag}`,
+        name: 'delete',
+        args: tag,
+      };
+      const result = await deleteCommand?.action?.(mockContext, tag);
+      expect(result).toMatchObject({
+        type: 'confirm_action',
+        originalInvocation: { raw: `/chat delete ${tag}` },
+      });
+      expect(result).toHaveProperty('prompt');
+      expect(mockDeleteCheckpoint).not.toHaveBeenCalled();
+    });
+
     it('should return an error if checkpoint is not found', async () => {
       mockDeleteCheckpoint.mockResolvedValue(false);
+      mockContext.overwriteConfirmed = true; // simulate user confirmed deletion
       const result = await deleteCommand?.action?.(mockContext, tag);
       expect(result).toEqual({
         type: 'message',
@@ -378,6 +397,7 @@ describe('chatCommand', () => {
     });
 
     it('should delete the conversation', async () => {
+      mockContext.overwriteConfirmed = true; // simulate user confirmed deletion
       const result = await deleteCommand?.action?.(mockContext, tag);
 
       expect(mockDeleteCheckpoint).toHaveBeenCalledWith(tag);
@@ -536,7 +556,7 @@ Hi there!`;
       const expectedPath = path.join(process.cwd(), 'my-chat.json');
       const [actualPath, actualContent] = mockFs.writeFile.mock.calls[0];
       expect(actualPath).toEqual(expectedPath);
-      const parsedContent = JSON.parse(actualContent);
+      const parsedContent = JSON.parse(actualContent as string);
       expect(Array.isArray(parsedContent)).toBe(true);
       parsedContent.forEach((item: Content) => {
         expect(item).toHaveProperty('role');
@@ -551,9 +571,9 @@ Hi there!`;
       const expectedPath = path.join(process.cwd(), 'my-chat.md');
       const [actualPath, actualContent] = mockFs.writeFile.mock.calls[0];
       expect(actualPath).toEqual(expectedPath);
-      const entries = actualContent.split('\n\n---\n\n');
+      const entries = (actualContent as string).split('\n\n---\n\n');
       expect(entries.length).toBe(mockHistory.length);
-      entries.forEach((entry, index) => {
+      entries.forEach((entry: string, index: number) => {
         const { role, parts } = mockHistory[index];
         const text = parts.map((p) => p.text).join('');
         const roleIcon = role === 'user' ? '🧑‍💻' : '✨';
