@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { spawnAsync } from '@google/gemini-cli-core';
 import fs from 'node:fs';
 import fsPromises from 'node:fs/promises';
@@ -35,11 +35,7 @@ function useGitWatcher(cwd: string, onBranchChange: () => void) {
     let headWatcher: fs.FSWatcher | undefined;
     let cwdWatcher: fs.FSWatcher | undefined;
 
-    let isMounted = true;
-
     const setupHeadWatcher = () => {
-      if (!isMounted) return;
-
       // Clean up existing watchers to prevent resource leaks.
       headWatcher?.close();
       // Stop watching the cwd for .git creation if we are now watching HEAD.
@@ -56,19 +52,15 @@ function useGitWatcher(cwd: string, onBranchChange: () => void) {
                 await fsPromises.access(gitHeadPath, fs.constants.F_OK);
                 // File still exists, so it was likely an atomic write.
                 // Trigger a branch change check.
-                if (isMounted) {
-                  onBranchChange();
-                }
+                onBranchChange();
               } catch {
                 // File is gone. Fall back to watching the CWD.
-                if (isMounted) {
-                  console.debug(
-                    '[GitBranchName] .git/HEAD deleted. Falling back to CWD watcher.',
-                  );
-                  // The headWatcher is now invalid, so close it before setting up the new one.
-                  headWatcher?.close();
-                  setupCwdWatcher();
-                }
+                console.debug(
+                  '[GitBranchName] .git/HEAD deleted. Falling back to CWD watcher.',
+                );
+                // The headWatcher is now invalid, so close it before setting up the new one.
+                headWatcher?.close();
+                setupCwdWatcher();
               }
             })();
           } else if (eventType === 'change') {
@@ -86,8 +78,6 @@ function useGitWatcher(cwd: string, onBranchChange: () => void) {
     };
 
     const setupCwdWatcher = () => {
-      if (!isMounted) return;
-
       try {
         console.debug(
           '[GitBranchName] .git/HEAD not found. Setting up CWD watcher.',
@@ -104,8 +94,6 @@ function useGitWatcher(cwd: string, onBranchChange: () => void) {
             fs.promises
               .stat(path.join(cwd, '.git'))
               .then((stats) => {
-                if (!isMounted) return;
-
                 if (stats.isDirectory()) {
                   console.debug(
                     '[GitBranchName] .git directory detected. Switching to HEAD watcher.',
@@ -121,12 +109,10 @@ function useGitWatcher(cwd: string, onBranchChange: () => void) {
               })
               .catch((err) => {
                 // Ignore stat errors (e.g. file not found if the change was not .git creation)
-                if (isMounted) {
-                  console.debug(
-                    '[GitBranchName] Error checking .git status. Ignoring.',
-                    err,
-                  );
-                }
+                console.debug(
+                  '[GitBranchName] Error checking .git status. Ignoring.',
+                  err,
+                );
               });
           }
         });
@@ -142,20 +128,15 @@ function useGitWatcher(cwd: string, onBranchChange: () => void) {
     void (async () => {
       try {
         await fsPromises.access(gitHeadPath, fs.constants.F_OK);
-        if (isMounted) {
-          // .git/HEAD exists, watch it directly.
-          setupHeadWatcher();
-        }
+        // .git/HEAD exists, watch it directly.
+        setupHeadWatcher();
       } catch {
-        if (isMounted) {
-          // .git/HEAD does not exist, watch the cwd for .git creation.
-          setupCwdWatcher();
-        }
+        // .git/HEAD does not exist, watch the cwd for .git creation.
+        setupCwdWatcher();
       }
     })();
 
     return () => {
-      isMounted = false;
       console.debug('[GitBranchName] Closing watchers.');
       headWatcher?.close();
       cwdWatcher?.close();
@@ -165,6 +146,14 @@ function useGitWatcher(cwd: string, onBranchChange: () => void) {
 
 export function useGitBranchName(cwd: string): string | undefined {
   const [branchName, setBranchName] = useState<string | undefined>(undefined);
+  const isMounted = useRef(true);
+
+  useEffect(() => {
+    isMounted.current = true;
+    return () => {
+      isMounted.current = false;
+    };
+  }, []);
 
   const fetchBranchName = useCallback(async () => {
     try {
@@ -173,6 +162,8 @@ export function useGitBranchName(cwd: string): string | undefined {
         ['rev-parse', '--abbrev-ref', 'HEAD'],
         { cwd },
       );
+      if (!isMounted.current) return;
+
       const branch = stdout.toString().trim();
       if (branch && branch !== 'HEAD') {
         setBranchName(branch);
@@ -182,9 +173,11 @@ export function useGitBranchName(cwd: string): string | undefined {
           ['rev-parse', '--short', 'HEAD'],
           { cwd },
         );
+        if (!isMounted.current) return;
         setBranchName(hashStdout.toString().trim());
       }
     } catch (_error) {
+      if (!isMounted.current) return;
       setBranchName(undefined);
     }
   }, [cwd, setBranchName]);
