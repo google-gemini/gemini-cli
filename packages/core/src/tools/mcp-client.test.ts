@@ -13,7 +13,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AuthProviderType, type Config } from '../config/config.js';
 import { GoogleCredentialProvider } from '../mcp/google-auth-provider.js';
 import type { PromptRegistry } from '../prompts/prompt-registry.js';
-import type { WorkspaceContext } from '../utils/workspaceContext.js';
+import { WorkspaceContext } from '../utils/workspaceContext.js';
 import {
   createTransport,
   hasNetworkTransport,
@@ -22,6 +22,9 @@ import {
   populateMcpServerCommand,
 } from './mcp-client.js';
 import type { ToolRegistry } from './tool-registry.js';
+import * as fs from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
 
 vi.mock('@modelcontextprotocol/sdk/client/stdio.js');
 vi.mock('@modelcontextprotocol/sdk/client/index.js');
@@ -30,6 +33,18 @@ vi.mock('../mcp/oauth-provider.js');
 vi.mock('../mcp/oauth-token-storage.js');
 
 describe('mcp-client', () => {
+  let workspaceContext: WorkspaceContext;
+  let testWorkspace: string;
+
+  beforeEach(() => {
+    // create a tmp dir for this test
+    // Create a unique temporary directory for the workspace to avoid conflicts
+    testWorkspace = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'gemini-agent-test-'),
+    );
+    workspaceContext = new WorkspaceContext(testWorkspace);
+  });
+
   afterEach(() => {
     vi.restoreAllMocks();
   });
@@ -69,7 +84,7 @@ describe('mcp-client', () => {
         },
         mockedToolRegistry,
         {} as PromptRegistry,
-        {} as WorkspaceContext,
+        workspaceContext,
         false,
       );
       await client.connect();
@@ -131,7 +146,7 @@ describe('mcp-client', () => {
         },
         mockedToolRegistry,
         {} as PromptRegistry,
-        {} as WorkspaceContext,
+        workspaceContext,
         false,
       );
       await client.connect();
@@ -171,7 +186,7 @@ describe('mcp-client', () => {
         },
         {} as ToolRegistry,
         {} as PromptRegistry,
-        {} as WorkspaceContext,
+        workspaceContext,
         false,
       );
       await client.connect();

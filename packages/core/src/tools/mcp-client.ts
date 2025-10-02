@@ -80,7 +80,7 @@ export enum MCPDiscoveryState {
  * managing the state of a single MCP server.
  */
 export class McpClient {
-  private client: Client;
+  private client: Client | undefined;
   private transport: Transport | undefined;
   private status: MCPServerStatus = MCPServerStatus.DISCONNECTED;
   private isDisconnecting = false;
@@ -92,51 +92,25 @@ export class McpClient {
     private readonly promptRegistry: PromptRegistry,
     private readonly workspaceContext: WorkspaceContext,
     private readonly debugMode: boolean,
-  ) {
-    this.client = new Client({
-      name: `gemini-cli-mcp-client-${this.serverName}`,
-      version: '0.0.1',
-    });
-  }
+  ) {}
 
   /**
    * Connects to the MCP server.
    */
   async connect(): Promise<void> {
+    if (this.client) {
+      // Already connected
+      return;
+    }
     this.isDisconnecting = false;
     this.updateStatus(MCPServerStatus.CONNECTING);
     try {
-      this.transport = await this.createTransport();
-
-      this.client.onerror = (error) => {
-        if (this.isDisconnecting) {
-          return;
-        }
-        console.error(`MCP ERROR (${this.serverName}):`, error.toString());
-        this.updateStatus(MCPServerStatus.DISCONNECTED);
-      };
-
-      this.client.registerCapabilities({
-        roots: {},
-      });
-
-      this.client.setRequestHandler(ListRootsRequestSchema, async () => {
-        const roots = [];
-        for (const dir of this.workspaceContext.getDirectories()) {
-          roots.push({
-            uri: pathToFileURL(dir).toString(),
-            name: basename(dir),
-          });
-        }
-        return {
-          roots,
-        };
-      });
-
-      await this.client.connect(this.transport, {
-        timeout: this.serverConfig.timeout,
-      });
-
+      this.client = await connectToMcpServer(
+        this.serverName,
+        this.serverConfig,
+        this.debugMode,
+        this.workspaceContext,
+      );
       this.updateStatus(MCPServerStatus.CONNECTED);
     } catch (error) {
       this.updateStatus(MCPServerStatus.DISCONNECTED);
@@ -168,12 +142,18 @@ export class McpClient {
    * Disconnects from the MCP server.
    */
   async disconnect(): Promise<void> {
+    if (this.isDisconnecting) return;
     this.isDisconnecting = true;
+    const client = this.client;
+    this.client = undefined;
     if (this.transport) {
       await this.transport.close();
     }
-    this.client.close();
+    if (client) {
+      await client?.close();
+    }
     this.updateStatus(MCPServerStatus.DISCONNECTED);
+    this.isDisconnecting = false;
   }
 
   /**
@@ -188,11 +168,12 @@ export class McpClient {
     updateMCPServerStatus(this.serverName, status);
   }
 
-  private async createTransport(): Promise<Transport> {
-    return createTransport(this.serverName, this.serverConfig, this.debugMode);
-  }
-
   private async discoverTools(cliConfig: Config): Promise<DiscoveredMCPTool[]> {
+    if (!this.client) {
+      throw new Error(
+        'Client is not connected, must connect before discovering tools.',
+      );
+    }
     return discoverTools(
       this.serverName,
       this.serverConfig,
@@ -202,6 +183,11 @@ export class McpClient {
   }
 
   private async discoverPrompts(): Promise<Prompt[]> {
+    if (!this.client) {
+      throw new Error(
+        'Client is not connected, must connect before discovering prompts.',
+      );
+    }
     return discoverPrompts(this.serverName, this.client, this.promptRegistry);
   }
 }
