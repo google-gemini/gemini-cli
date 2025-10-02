@@ -9,7 +9,7 @@ Git repository releases tend to be the simplest and most flexible approach, whil
 
 ## Releasing through a git repository
 
-This is the most flexible and simple option. All you need to do us create a publicly accessible git repo (such as a public github repository) and then users can install your extension using `gemini extensions install <your-repo-uri>`, or for a GitHub repository they can use the simplified `gemini extensions install <org>/<repo>` format. They can optionally depend on a specific ref (branch/tag/commit) using the `--ref=<some-ref>` argument, this defaults to the default branch.
+This is the most flexible and simple option. All you need to do is create a publicly accessible git repo (such as a public github repository) and then users can install your extension using `gemini extensions install <your-repo-uri>`, or for a GitHub repository they can use the simplified `gemini extensions install <org>/<repo>` format. They can optionally depend on a specific ref (branch/tag/commit) using the `--ref=<some-ref>` argument, this defaults to the default branch.
 
 Whenever commits are pushed to the ref that a user depends on, they will be prompted to update the extension. Note that this also allows for easy rollbacks, the HEAD commit is always treated as the latest version regardless of the actual version in the `gemini-extension.json` file.
 
@@ -74,7 +74,7 @@ To ensure Gemini CLI can automatically find the correct release asset for each p
 
 Archives must be fully contained extensions and have all the standard requirements - specifically the `gemini-extension.json` file must be at the root of the archive.
 
-The rest of the layout should look exactly the same as a typical extension, see [extensions.md](extension.md).
+The rest of the layout should look exactly the same as a typical extension, see [extensions.md](./index.md).
 
 #### Example GitHub Actions workflow
 
