@@ -133,31 +133,32 @@ describe('isCommandAllowed', () => {
   });
 
   describe('command substitution', () => {
-    it('should block command substitution using `$(...)`', () => {
-      const result = isCommandAllowed('echo $(rm -rf /)', config);
-      expect(result.allowed).toBe(false);
-      expect(result.reason).toContain('Command substitution');
+    it('should allow $() command substitution by default', () => {
+      const result = isCommandAllowed('echo $(ls)', config);
+      expect(result.allowed).toBe(true);
     });
 
-    it('should block command substitution using `<(...)`', () => {
+    it('should enforce blocklist entries found inside command substitution', () => {
+      config.getExcludeTools = () => ['run_shell_command(ls)'];
+      const result = isCommandAllowed('echo $(ls)', config);
+      expect(result.allowed).toBe(false);
+      expect(result.reason).toBe(`Command 'ls' is blocked by configuration`);
+    });
+
+    it('should inspect process substitution commands', () => {
+      config.getExcludeTools = () => ['run_shell_command(ls)'];
       const result = isCommandAllowed('diff <(ls) <(ls -a)', config);
       expect(result.allowed).toBe(false);
-      expect(result.reason).toContain('Command substitution');
+      expect(result.reason).toBe(`Command 'ls' is blocked by configuration`);
     });
 
-    it('should block command substitution using `>(...)`', () => {
-      const result = isCommandAllowed(
-        'echo "Log message" > >(tee log.txt)',
-        config,
-      );
-      expect(result.allowed).toBe(false);
-      expect(result.reason).toContain('Command substitution');
-    });
-
-    it('should block command substitution using backticks', () => {
+    it('should inspect backtick substitution commands', () => {
+      config.getExcludeTools = () => ['run_shell_command(rm)'];
       const result = isCommandAllowed('echo `rm -rf /`', config);
       expect(result.allowed).toBe(false);
-      expect(result.reason).toContain('Command substitution');
+      expect(result.reason).toBe(
+        `Command 'rm -rf /' is blocked by configuration`,
+      );
     });
 
     it('should allow substitution-like patterns inside single quotes', () => {
@@ -289,6 +290,11 @@ describe('getCommandRoots', () => {
   it('should correctly parse a chained command with quotes', () => {
     const result = getCommandRoots('echo "hello" && git commit -m "feat"');
     expect(result).toEqual(['echo', 'git']);
+  });
+
+  it('should include commands discovered inside command substitution', () => {
+    const result = getCommandRoots('echo $(ls -a)');
+    expect(result).toEqual(['echo', 'ls']);
   });
 });
 
