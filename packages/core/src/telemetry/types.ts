@@ -718,9 +718,9 @@ export class SmartEditStrategyEvent implements BaseTelemetryEvent {
 export class SmartEditCorrectionEvent implements BaseTelemetryEvent {
   'event.name': 'smart_edit_correction';
   'event.timestamp': string;
-  correction: string;
+  correction: 'success' | 'failure';
 
-  constructor(correction: string) {
+  constructor(correction: 'success' | 'failure') {
     this['event.name'] = 'smart_edit_correction';
     this['event.timestamp'] = new Date().toISOString();
     this.correction = correction;
