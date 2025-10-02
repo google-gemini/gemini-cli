@@ -16,6 +16,8 @@ import type { AgentSettings } from '../types.js';
 import { GCSTaskStore, NoOpTaskStore } from '../persistence/gcs.js';
 import { CoderAgentExecutor } from '../agent/executor.js';
 import { requestStorage } from './requestStorage.js';
+import type { Config } from '@google/gemini-cli-core';
+import type { EventEmitter } from 'node:events';
 
 const coderAgentCard: AgentCard = {
   name: 'Gemini SDLC Agent',
@@ -59,7 +61,10 @@ export function updateCoderAgentCardUrl(port: number) {
   coderAgentCard.url = `http://localhost:${port}/`;
 }
 
-export async function createApp() {
+export async function createApp(
+  cliConfig?: Config,
+  cliAppEvents?: EventEmitter,
+) {
   try {
     // loadEnvironment() is called within getConfig now
     const bucketName = process.env['GCS_BUCKET_NAME'];
@@ -78,7 +83,11 @@ export async function createApp() {
       taskStoreForHandler = inMemoryTaskStore;
     }
 
-    const agentExecutor = new CoderAgentExecutor(taskStoreForExecutor);
+    const agentExecutor = new CoderAgentExecutor(
+      taskStoreForExecutor,
+      cliConfig,
+      cliAppEvents,
+    );
 
     const requestHandler = new DefaultRequestHandler(
       coderAgentCard,
@@ -162,7 +171,7 @@ export async function createApp() {
       }
       res.json({ metadata: await wrapper.task.getMetadata() });
     });
-    return expressApp;
+    return { expressApp, agentExecutor };
   } catch (error) {
     logger.error('[CoreAgent] Error during startup:', error);
     process.exit(1);
@@ -171,7 +180,7 @@ export async function createApp() {
 
 export async function main() {
   try {
-    const expressApp = await createApp();
+    const { expressApp } = await createApp();
     const port = process.env['CODER_AGENT_PORT'] || 0;
 
     const server = expressApp.listen(port, () => {

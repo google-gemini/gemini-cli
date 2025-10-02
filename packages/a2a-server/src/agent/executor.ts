@@ -19,6 +19,7 @@ import type {
 } from '@google/gemini-cli-core';
 import { GeminiEventType } from '@google/gemini-cli-core';
 import { v4 as uuidv4 } from 'uuid';
+import type { EventEmitter } from 'node:events';
 
 import { logger } from '../utils/logger.js';
 import type {
@@ -86,7 +87,11 @@ export class CoderAgentExecutor implements AgentExecutor {
   // Track tasks with an active execution loop.
   private executingTasks = new Set<string>();
 
-  constructor(private taskStore?: TaskStore) {}
+  constructor(
+    private taskStore?: TaskStore,
+    private cliConfig?: Config,
+    private cliAppEvents?: EventEmitter,
+  ) {}
 
   private async getConfig(
     agentSettings: AgentSettings,

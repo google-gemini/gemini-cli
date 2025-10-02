@@ -62,6 +62,8 @@ import {
   relaunchAppInChildProcess,
   relaunchOnExitCode,
 } from './utils/relaunch.js';
+import { createApp } from '@google/gemini-cli-a2a-server/src/http/app.js';
+import type { CoderAgentExecutor } from '@google/gemini-cli-a2a-server/src/agent/executor.js';
 
 export function validateDnsResolutionOrder(
   order: string | undefined,
@@ -143,6 +145,7 @@ export async function startInteractiveUI(
   startupWarnings: string[],
   workspaceRoot: string = process.cwd(),
   initializationResult: InitializationResult,
+  agentExecutor?: CoderAgentExecutor,
 ) {
   const version = await getCliVersion();
   setWindowTitle(basename(workspaceRoot), settings);
@@ -165,6 +168,7 @@ export async function startInteractiveUI(
                 startupWarnings={startupWarnings}
                 version={version}
                 initializationResult={initializationResult}
+                agentExecutor={agentExecutor}
               />
             </VimModeProvider>
           </SessionStatsProvider>
@@ -359,6 +363,18 @@ export async function main() {
       process.exit(0);
     }
 
+    let agentExecutor: CoderAgentExecutor | undefined;
+    if (argv.a2aPort) {
+      const { expressApp, agentExecutor: exec } = await createApp(
+        config,
+        appEvents,
+      );
+      agentExecutor = exec;
+      expressApp.listen(argv.a2aPort, () => {
+        console.log(`A2A server listening on port ${argv.a2aPort}`);
+      });
+    }
+
     const wasRaw = process.stdin.isRaw;
     let kittyProtocolDetectionComplete: Promise<boolean> | undefined;
     if (config.isInteractive() && !wasRaw && process.stdin.isTTY) {
@@ -411,6 +427,7 @@ export async function main() {
         startupWarnings,
         process.cwd(),
         initializationResult,
+        agentExecutor,
       );
       return;
     }

@@ -90,6 +90,7 @@ import { useSessionStats } from './contexts/SessionContext.js';
 import { useGitBranchName } from './hooks/useGitBranchName.js';
 import { useExtensionUpdates } from './hooks/useExtensionUpdates.js';
 import { ShellFocusContext } from './contexts/ShellFocusContext.js';
+import type { CoderAgentExecutor } from '@google/gemini-cli-a2a-server/src/agent/executor.js';
 
 const CTRL_EXIT_PROMPT_DURATION_MS = 1000;
 
@@ -110,6 +111,7 @@ interface AppContainerProps {
   startupWarnings?: string[];
   version: string;
   initializationResult: InitializationResult;
+  agentExecutor?: CoderAgentExecutor;
 }
 
 /**
