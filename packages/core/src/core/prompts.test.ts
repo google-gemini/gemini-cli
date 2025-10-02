@@ -12,6 +12,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { GEMINI_CONFIG_DIR } from '../tools/memoryTool.js';
 import type { Config } from '../config/config.js';
+import { CodebaseInvestigatorAgent } from '../agents/codebase-investigator.js';
 
 // Mock tool names if they are dynamically generated or complex
 vi.mock('../tools/ls', () => ({ LSTool: { Name: 'list_directory' } }));
@@ -28,6 +29,9 @@ vi.mock('../tools/shell', () => ({
 vi.mock('../tools/write-file', () => ({
   WriteFileTool: { Name: 'write_file' },
 }));
+vi.mock('../agents/codebase-investigator.js', () => ({
+  CodebaseInvestigatorAgent: { name: 'codebase_investigator' },
+}));
 vi.mock('../utils/gitUtils', () => ({
   isGitRepository: vi.fn(),
 }));
@@ -40,7 +44,6 @@ describe('Core System Prompt (prompts.ts)', () => {
     vi.stubEnv('GEMINI_SYSTEM_MD', undefined);
     vi.stubEnv('GEMINI_WRITE_SYSTEM_MD', undefined);
     mockConfig = {
-      getEnableSubagents: vi.fn().mockReturnValue(false),
       getToolRegistry: vi.fn().mockReturnValue({
         getAllToolNames: vi.fn().mockReturnValue([]),
       }),
@@ -101,7 +104,7 @@ describe('Core System Prompt (prompts.ts)', () => {
   });
 
   it('should include non-sandbox instructions when SANDBOX env var is not set', () => {
-    vi.stubEnv('SANDBOX', undefined); // Ensure it's not set
+    vi.stubEnv('SANDBOX', undefined); // Ensure it\'s not set
     const prompt = getCoreSystemPrompt(mockConfig);
     expect(prompt).toContain('# Outside of Sandbox');
     expect(prompt).not.toContain('# Sandbox');
@@ -123,6 +126,76 @@ describe('Core System Prompt (prompts.ts)', () => {
     const prompt = getCoreSystemPrompt(mockConfig);
     expect(prompt).not.toContain('# Git Repository');
     expect(prompt).toMatchSnapshot();
+  });
+
+  describe('with CodebaseInvestigator enabled', () => {
+    beforeEach(() => {
+      mockConfig = {
+        getToolRegistry: vi.fn().mockReturnValue({
+          getAllToolNames: vi
+            .fn()
+            .mockReturnValue([CodebaseInvestigatorAgent.name]),
+        }),
+      } as unknown as Config;
+    });
+
+    it('should include CodebaseInvestigator instructions in the prompt', () => {
+      const prompt = getCoreSystemPrompt(mockConfig);
+      expect(prompt).toContain(
+        `your **first and primary tool** must be '${CodebaseInvestigatorAgent.name}'`,
+      );
+      expect(prompt).toContain(
+        `Do not ignore the output of '${CodebaseInvestigatorAgent.name}'`,
+      );
+      expect(prompt).not.toContain(
+        "Use 'search_file_content' and 'glob' search tools extensively",
+      );
+    });
+
+    it('should include CodebaseInvestigator examples in the prompt', () => {
+      const prompt = getCoreSystemPrompt(mockConfig);
+      expect(prompt).toContain(
+        "First, I'll use the Codebase Investigator to understand the current implementation",
+      );
+      expect(prompt).toContain(
+        `[tool_call: ${CodebaseInvestigatorAgent.name} for query 'Analyze the authentication logic`,
+      );
+      expect(prompt).toContain(
+        "I'll use the Codebase Investigator to find the relevant code and APIs.",
+      );
+      expect(prompt).toContain(
+        `[tool_call: ${CodebaseInvestigatorAgent.name} for query 'Find the code responsible for updating user profile information`,
+      );
+    });
+  });
+
+  describe('with CodebaseInvestigator disabled', () => {
+    // No beforeEach needed, will use the default from the parent describe
+    it('should include standard tool instructions in the prompt', () => {
+      const prompt = getCoreSystemPrompt(mockConfig);
+      expect(prompt).not.toContain(
+        `your **first and primary tool** must be '${CodebaseInvestigatorAgent.name}'`,
+      );
+      expect(prompt).toContain(
+        "Use 'search_file_content' and 'glob' search tools extensively",
+      );
+    });
+
+    it('should include standard tool examples in the prompt', () => {
+      const prompt = getCoreSystemPrompt(mockConfig);
+      expect(prompt).not.toContain(
+        "First, I'll use the Codebase Investigator to understand the current implementation",
+      );
+      expect(prompt).not.toContain(
+        `[tool_call: ${CodebaseInvestigatorAgent.name} for query 'Analyze the authentication logic`,
+      );
+      expect(prompt).toContain(
+        "First, I'll analyze the code and check for a test safety net before planning any changes.",
+      );
+      expect(prompt).toContain(
+        "I'm not immediately sure how user profile information is updated. I'll search the codebase for terms like 'UserProfile'",
+      );
+    });
   });
 
   describe('GEMINI_SYSTEM_MD environment variable', () => {
