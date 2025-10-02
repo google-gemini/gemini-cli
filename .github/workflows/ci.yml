@@ -34,6 +34,7 @@ defaults:
 
 jobs:
   merge_queue_skipper:
+    permissions: 'read-all'
     name: 'Merge Queue Skipper'
     runs-on: 'gemini-cli-ubuntu-16-core'
     outputs:
