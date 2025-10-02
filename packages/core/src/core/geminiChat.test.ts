@@ -17,6 +17,7 @@ import {
   InvalidStreamError,
   StreamEventType,
   type StreamEvent,
+  isSchemaDepthError,
 } from './geminiChat.js';
 import type { Config } from '../config/config.js';
 import { setSimulate429 } from '../utils/testUtils.js';
@@ -907,14 +908,26 @@ describe('GeminiChat', () => {
     describe('API error retry behavior', () => {
       beforeEach(() => {
         // Use a more direct mock for retry testing
-        mockRetryWithBackoff.mockImplementation(async (apiCall, options) => {
+        mockRetryWithBackoff.mockImplementation(async (apiCall) => {
           try {
             return await apiCall();
           } catch (error) {
-            if (
-              options?.shouldRetryOnError &&
-              options.shouldRetryOnError(error)
-            ) {
+            // Simulate the logic of defaultShouldRetry for ApiError
+            let shouldRetry = false;
+            if (error instanceof ApiError && error.message) {
+              if (
+                error.status === 429 ||
+                (error.status >= 500 && error.status < 600)
+              ) {
+                shouldRetry = true;
+              }
+              // Explicitly don't retry on these
+              if (error.status === 400 || isSchemaDepthError(error.message)) {
+                shouldRetry = false;
+              }
+            }
+
+            if (shouldRetry) {
               // Try again
               return await apiCall();
             }

@@ -5,6 +5,7 @@
  */
 
 import type { GenerateContentResponse } from '@google/genai';
+import { ApiError } from '@google/genai';
 import { AuthType } from '../core/contentGenerator.js';
 import {
   isProQuotaExceededError,
@@ -42,6 +43,14 @@ const DEFAULT_RETRY_OPTIONS: RetryOptions = {
  * @returns True if the error is a transient error, false otherwise.
  */
 function defaultShouldRetry(error: Error | unknown): boolean {
+  if (error instanceof ApiError && error.message) {
+    if (error.status === 400) return false;
+    if (error.message.includes('maximum schema depth exceeded')) return false;
+    if (error.status === 429) return true;
+    if (error.status >= 500 && error.status < 600) return true;
+    return false;
+  }
+
   // Check for common transient error status codes either in message or a status property
   if (error && typeof (error as { status?: number }).status === 'number') {
     const status = (error as { status: number }).status;
