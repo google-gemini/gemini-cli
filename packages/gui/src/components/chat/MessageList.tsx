@@ -1167,8 +1167,12 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isStreaming, onS
     return <ToolResponseDisplay toolResponse={toolResponse} timestamp={message.timestamp} />;
   }
 
-  // If message has tool calls, display them directly without bubble wrapper
+  // If message has tool calls, display both content (if any) and tool calls
   if (message.toolCalls && message.toolCalls.length > 0) {
+    const { thinkingSections, mainContent } = parseThinkingContent(message.content);
+    const stateSnapshot = parseStateSnapshot(message.content);
+    const contentWithoutSnapshot = mainContent.replace(/<state_snapshot>[\s\S]*?<\/state_snapshot>/g, '').trim();
+
     return (
       <div className="flex gap-3 max-w-4xl">
         {/* Avatar */}
@@ -1176,8 +1180,20 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isStreaming, onS
           <Brain size={20} />
         </div>
 
-        {/* Tool calls content */}
-        <div className="space-y-3">
+        {/* Content and Tool calls */}
+        <div className="flex-1 space-y-3">
+          {/* Display text content if present */}
+          {contentWithoutSnapshot && (
+            <Card className="bg-muted/50 border border-green-200/50 dark:border-green-700/30">
+              <CardContent className="px-4 py-0">
+                <ThinkingSection thinkingSections={thinkingSections} />
+                {stateSnapshot && <StateSnapshotDisplay stateSnapshot={stateSnapshot} />}
+                <MarkdownRenderer content={contentWithoutSnapshot} className="px-3 py-2" />
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Display tool calls */}
           {message.toolCalls.map((toolCall, index) => (
             <ToolCallDisplay key={index} toolCall={toolCall} timestamp={message.timestamp} />
           ))}

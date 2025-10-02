@@ -729,10 +729,11 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(({ di
               const messageIndex = currentSession.messages.findIndex(m => m.id === currentAssistantMessageId);
               if (messageIndex >= 0) {
                 const updatedMessages = [...currentSession.messages];
+                const existingToolCalls = updatedMessages[messageIndex].toolCalls || [];
                 updatedMessages[messageIndex] = {
                   ...updatedMessages[messageIndex],
                   content: assistantContent,
-                  toolCalls: event.toolCall ? [event.toolCall] : undefined
+                  toolCalls: event.toolCall ? [...existingToolCalls, event.toolCall] : existingToolCalls
                 };
 
                 updateSession(activeSessionId, {
@@ -742,12 +743,15 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(({ di
               }
             }
 
-            // Clear streaming display and prepare for new content after tool execution
+            // CRITICAL: Don't reset assistantContent or currentAssistantMessageId here
+            // The assistant message with tool calls has been saved to the session
+            // Keep the references so any future content updates to the same message
+            // Don't clear assistantContent - preserve it in case there's more content
+            // Don't reset currentAssistantMessageId - keep updating the same message
+            // Don't reset hasCreatedInitialMessage - the message still exists
+
+            // Only clear the streaming display since the content is now persisted
             setStreamingMessage('');
-            // Reset for new message after tool call
-            assistantContent = '';
-            currentAssistantMessageId = null;
-            hasCreatedInitialMessage = false;
           } else if (event.toolCall) {
             // Create a new message for tool calls if there's no current assistant message
             const toolCallMessage: ChatMessage = {
