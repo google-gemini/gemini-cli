@@ -37,6 +37,7 @@ import kotlinx.serialization.json.put
 import java.io.File
 import java.security.SecureRandom
 import java.util.*
+import java.util.concurrent.TimeUnit
 
 @Serializable
 private data class IdeInfo(val name: String, val displayName: String)
@@ -55,13 +56,15 @@ class IdeServer(private val project: Project, private val diffManager: DiffManag
   private var portFile: File? = null
   private val authToken = generateAuthToken()
   private val openFilesManager: OpenFilesManager = project.service()
-  private val transport = StreamableHttpServerTransport(
-    allowedHosts = listOf("localhost", "127.0.0.1", "host.docker.internal")
-  )
+  private val transports = mutableMapOf<String, StreamableHttpServerTransport>()
+  private val sessionsWithInitialNotification = mutableSetOf<String>()
+  private val keepAliveJobs = mutableMapOf<String, Job>()
   private val mcpServer = createMcpServer()
+  private val coroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
   companion object {
     private val LOG = Logger.getInstance(IdeServer::class.java)
+    private const val KEEP_ALIVE_INTERVAL_MS = 30000L // 30 seconds
   }
 
   init {
@@ -76,14 +79,9 @@ class IdeServer(private val project: Project, private val diffManager: DiffManag
         broadcastNotification(notification)
       }
     })
-
-    transport.setOnSessionInitialized { sessionId ->
-      LOG.info("New MCP session initialized: $sessionId")
-    }
   }
 
   suspend fun start() {
-    mcpServer.connect(transport)
     ApplicationManager.getApplication().executeOnPooledThread {
       try {
         server = embeddedServer(Netty, port = 0, host = "127.0.0.1") {
@@ -103,18 +101,18 @@ class IdeServer(private val project: Project, private val diffManager: DiffManag
             }
 
             post("/mcp") {
-              transport.handlePostRequest(null, call)
+              handleMcpPostRequest(call)
             }
             sse("/mcp") {
-              transport.handleGetRequest(this, call)
+              handleMcpGetRequest(this, call)
             }
             delete("/mcp") {
-              transport.handleDeleteRequest(null, call)
+              handleMcpDeleteRequest(call)
             }
           }
         }.start(wait = false)
 
-        val startedServer = server as io.ktor.server.engine.EmbeddedServer<*, *>
+        val startedServer = server as EmbeddedServer<*, *>
         val port = runBlocking { startedServer.engine.resolvedConnectors().first().port }
         LOG.info("MCP IDE Server V2 started on port ${port}")
         writePortInfo(port)
@@ -183,6 +181,60 @@ class IdeServer(private val project: Project, private val diffManager: DiffManag
     return server
   }
 
+  private suspend fun handleMcpPostRequest(call: ApplicationCall) {
+    val sessionId = call.request.headers["mcp-session-id"]
+    val transport = if (sessionId != null && transports.containsKey(sessionId)) {
+      transports[sessionId]!!
+    } else {
+      // Create new transport for initialization request
+      val newTransport = StreamableHttpServerTransport(
+        true,
+        allowedHosts = listOf("localhost", "127.0.0.1", "host.docker.internal")
+      )
+
+      newTransport.setSessionIdGenerator { UUID.randomUUID().toString() }
+      newTransport.setOnSessionInitialized { newSessionId ->
+        LOG.info("New MCP session initialized: $newSessionId")
+        transports[newSessionId] = newTransport
+        startKeepAliveForSession(newSessionId, newTransport)
+
+        // Send initial IDE context to new session
+        sendInitialIdeContextToSession(newSessionId, newTransport)
+      }
+      newTransport.setOnSessionClosed { closedSessionId ->
+        LOG.info("MCP session closed: $closedSessionId")
+        cleanupSession(closedSessionId)
+      }
+
+      mcpServer.connect(newTransport)
+      newTransport
+    }
+
+    transport.handlePostRequest(null, call)
+  }
+
+  private suspend fun handleMcpGetRequest(session: ServerSSESession, call: ApplicationCall) {
+    val sessionId = call.request.headers["mcp-session-id"]
+    if (sessionId == null || !transports.containsKey(sessionId)) {
+      call.respond(HttpStatusCode.BadRequest, "Invalid or missing session ID")
+      return
+    }
+
+    val transport = transports[sessionId]!!
+    transport.handleGetRequest(session, call)
+  }
+
+  private suspend fun handleMcpDeleteRequest(call: ApplicationCall) {
+    val sessionId = call.request.headers["mcp-session-id"]
+    if (sessionId == null || !transports.containsKey(sessionId)) {
+      call.respond(HttpStatusCode.BadRequest, "Invalid or missing session ID")
+      return
+    }
+
+    val transport = transports[sessionId]!!
+    transport.handleDeleteRequest(null, call)
+  }
+
   private fun writePortInfo(port: Int) {
     val appInfo = ApplicationInfo.getInstance()
     val ideInfo = IdeInfo(
@@ -190,7 +242,7 @@ class IdeServer(private val project: Project, private val diffManager: DiffManag
       displayName = appInfo.fullApplicationName
     )
 
-    val workspacePath = ProjectRootManager.getInstance(project).contentRoots.map { it.path }.joinToString(File.pathSeparator)
+    val workspacePath = ProjectRootManager.getInstance(project).contentRoots.joinToString(File.pathSeparator) { it.path }
 
     val ppid = ProcessHandle.current().pid()
 
@@ -218,13 +270,78 @@ class IdeServer(private val project: Project, private val diffManager: DiffManag
     }
   }
 
+  private fun startKeepAliveForSession(sessionId: String, transport: StreamableHttpServerTransport) {
+    val keepAliveJob = coroutineScope.launch {
+      while (isActive && transports.containsKey(sessionId)) {
+        try {
+          delay(KEEP_ALIVE_INTERVAL_MS)
+          // Send ping message to keep connection alive
+          transport.send(JSONRPCNotification(
+            jsonrpc = "2.0",
+            method = "ping"
+          ))
+        } catch (e: Exception) {
+          LOG.warn("Failed to send keep-alive ping for session $sessionId: ${e.message}")
+          // If we can't send ping, assume the session is dead and clean up
+          cleanupSession(sessionId)
+          break
+        }
+      }
+    }
+    keepAliveJobs[sessionId] = keepAliveJob
+  }
+
+  private fun sendInitialIdeContextToSession(sessionId: String, transport: StreamableHttpServerTransport) {
+    if (sessionsWithInitialNotification.contains(sessionId)) {
+      return
+    }
+
+    val context = openFilesManager.getState()
+    val contextJson = McpJson.encodeToJsonElement(context)
+    val notification = JSONRPCNotification(
+      method = "ide/contextUpdate",
+      params = contextJson
+    )
+
+    coroutineScope.launch {
+      try {
+        transport.send(notification)
+        sessionsWithInitialNotification.add(sessionId)
+        LOG.debug("Initial IDE context sent to session: $sessionId")
+      } catch (e: Exception) {
+        LOG.warn("Failed to send initial IDE context to session $sessionId: ${e.message}")
+      }
+    }
+  }
+
+  private fun cleanupSession(sessionId: String) {
+    LOG.info("Cleaning up session: $sessionId")
+
+    // Cancel keep-alive job
+    keepAliveJobs[sessionId]?.cancel()
+    keepAliveJobs.remove(sessionId)
+
+    // Remove from sessions with initial notification
+    sessionsWithInitialNotification.remove(sessionId)
+
+    // Remove transport
+    transports.remove(sessionId)
+  }
+
   suspend fun stop() {
+    // Clean up all sessions
+    transports.keys.toList().forEach { sessionId ->
+      cleanupSession(sessionId)
+    }
+
+    // Cancel coroutine scope
+    coroutineScope.cancel()
+
     if (server != null) {
-      val startedServer = server as io.ktor.server.engine.EmbeddedServer<*, *>
-      startedServer.stop(0, 0, java.util.concurrent.TimeUnit.MILLISECONDS)
+      val startedServer = server as EmbeddedServer<*, *>
+      startedServer.stop(0, 0, TimeUnit.MILLISECONDS)
     }
     portFile?.delete()
-    transport.close()
 
     project.service<GeminiCliServerState>().apply {
       this.port = null
@@ -250,12 +367,16 @@ class IdeServer(private val project: Project, private val diffManager: DiffManag
   }
 
   private fun broadcastNotification(notification: JSONRPCNotification) {
-    runBlocking {
-      try {
-        transport.send(notification)
-        LOG.debug("Notification sent: ${notification.method}")
-      } catch (e: Exception) {
-        LOG.warn("Failed to send notification: ${e.message}")
+    transports.forEach { (sessionId, transport) ->
+      coroutineScope.launch {
+        try {
+          transport.send(notification)
+          LOG.debug("Notification sent to session $sessionId: ${notification.method}")
+        } catch (e: Exception) {
+          LOG.warn("Failed to send notification to session $sessionId: ${e.message}")
+          // If we can't send to a session, clean it up
+          cleanupSession(sessionId)
+        }
       }
     }
   }
