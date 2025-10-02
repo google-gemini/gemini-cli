@@ -61,6 +61,11 @@ function originalOtelMockFactory() {
       setLogger: vi.fn(),
       warn: vi.fn(),
     },
+    DiagConsoleLogger: vi.fn(),
+    DiagLogLevel: {
+      NONE: 0,
+      INFO: 1,
+    },
   } as const;
 }
 
@@ -82,6 +87,8 @@ describe('Telemetry Metrics', () => {
   let recordPerformanceScoreModule: typeof import('./metrics.js').recordPerformanceScore;
   let recordPerformanceRegressionModule: typeof import('./metrics.js').recordPerformanceRegression;
   let recordBaselineComparisonModule: typeof import('./metrics.js').recordBaselineComparison;
+  let recordGenAiClientTokenUsageModule: typeof import('./metrics.js').recordGenAiClientTokenUsage;
+  let recordGenAiClientOperationDurationModule: typeof import('./metrics.js').recordGenAiClientOperationDuration;
 
   beforeEach(async () => {
     vi.resetModules();
@@ -110,6 +117,10 @@ describe('Telemetry Metrics', () => {
     recordPerformanceRegressionModule =
       metricsJsModule.recordPerformanceRegression;
     recordBaselineComparisonModule = metricsJsModule.recordBaselineComparison;
+    recordGenAiClientTokenUsageModule =
+      metricsJsModule.recordGenAiClientTokenUsage;
+    recordGenAiClientOperationDurationModule =
+      metricsJsModule.recordGenAiClientOperationDuration;
 
     const otelApiModule = await import('@opentelemetry/api');
 
@@ -424,6 +435,182 @@ describe('Telemetry Metrics', () => {
         'session.id': 'test-session-id',
         'routing.decision_source': 'classifier',
         'routing.error_message': 'test-error',
+      });
+    });
+  });
+
+  describe('OpenTelemetry GenAI Semantic Convention Metrics', () => {
+    const mockConfig = {
+      getSessionId: () => 'test-session-id',
+      getTelemetryEnabled: () => true,
+    } as unknown as Config;
+
+    describe('recordGenAiClientTokenUsage', () => {
+      it('should not record metrics when not initialized', () => {
+        recordGenAiClientTokenUsageModule(mockConfig, 100, {
+          'gen_ai.operation.name': 'generate_content',
+          'gen_ai.provider.name': 'gcp.gen_ai',
+          'gen_ai.token.type': 'input',
+        });
+
+        expect(mockHistogramRecordFn).not.toHaveBeenCalled();
+      });
+
+      it('should record input token usage with correct attributes', () => {
+        initializeMetricsModule(mockConfig);
+        mockHistogramRecordFn.mockClear();
+
+        recordGenAiClientTokenUsageModule(mockConfig, 150, {
+          'gen_ai.operation.name': 'generate_content',
+          'gen_ai.provider.name': 'gcp.gen_ai',
+          'gen_ai.token.type': 'input',
+          'gen_ai.request.model': 'gemini-2.0-flash',
+          'gen_ai.response.model': 'gemini-2.0-flash',
+        });
+
+        expect(mockHistogramRecordFn).toHaveBeenCalledWith(150, {
+          'session.id': 'test-session-id',
+          'gen_ai.operation.name': 'generate_content',
+          'gen_ai.provider.name': 'gcp.gen_ai',
+          'gen_ai.token.type': 'input',
+          'gen_ai.request.model': 'gemini-2.0-flash',
+          'gen_ai.response.model': 'gemini-2.0-flash',
+        });
+      });
+
+      it('should record output token usage with correct attributes', () => {
+        initializeMetricsModule(mockConfig);
+        mockHistogramRecordFn.mockClear();
+
+        recordGenAiClientTokenUsageModule(mockConfig, 75, {
+          'gen_ai.operation.name': 'generate_content',
+          'gen_ai.provider.name': 'gcp.vertex_ai',
+          'gen_ai.token.type': 'output',
+          'gen_ai.request.model': 'gemini-pro',
+        });
+
+        expect(mockHistogramRecordFn).toHaveBeenCalledWith(75, {
+          'session.id': 'test-session-id',
+          'gen_ai.operation.name': 'generate_content',
+          'gen_ai.provider.name': 'gcp.vertex_ai',
+          'gen_ai.token.type': 'output',
+          'gen_ai.request.model': 'gemini-pro',
+        });
+      });
+
+      it('should record token usage with optional attributes', () => {
+        initializeMetricsModule(mockConfig);
+        mockHistogramRecordFn.mockClear();
+
+        recordGenAiClientTokenUsageModule(mockConfig, 200, {
+          'gen_ai.operation.name': 'generate_content',
+          'gen_ai.provider.name': 'gcp.vertex_ai',
+          'gen_ai.token.type': 'input',
+          'gen_ai.request.model': 'text-embedding-004',
+          'server.address': 'aiplatform.googleapis.com',
+          'server.port': 443,
+        });
+
+        expect(mockHistogramRecordFn).toHaveBeenCalledWith(200, {
+          'session.id': 'test-session-id',
+          'gen_ai.operation.name': 'generate_content',
+          'gen_ai.provider.name': 'gcp.vertex_ai',
+          'gen_ai.token.type': 'input',
+          'gen_ai.request.model': 'text-embedding-004',
+          'server.address': 'aiplatform.googleapis.com',
+          'server.port': 443,
+        });
+      });
+    });
+
+    describe('recordGenAiClientOperationDuration', () => {
+      it('should not record metrics when not initialized', () => {
+        recordGenAiClientOperationDurationModule(mockConfig, 2.5, {
+          'gen_ai.operation.name': 'generate_content',
+          'gen_ai.provider.name': 'gcp.gen_ai',
+        });
+
+        expect(mockHistogramRecordFn).not.toHaveBeenCalled();
+      });
+
+      it('should record successful operation duration with correct attributes', () => {
+        initializeMetricsModule(mockConfig);
+        mockHistogramRecordFn.mockClear();
+
+        recordGenAiClientOperationDurationModule(mockConfig, 1.25, {
+          'gen_ai.operation.name': 'generate_content',
+          'gen_ai.provider.name': 'gcp.gen_ai',
+          'gen_ai.request.model': 'gemini-2.0-flash',
+          'gen_ai.response.model': 'gemini-2.0-flash',
+        });
+
+        expect(mockHistogramRecordFn).toHaveBeenCalledWith(1.25, {
+          'session.id': 'test-session-id',
+          'gen_ai.operation.name': 'generate_content',
+          'gen_ai.provider.name': 'gcp.gen_ai',
+          'gen_ai.request.model': 'gemini-2.0-flash',
+          'gen_ai.response.model': 'gemini-2.0-flash',
+        });
+      });
+
+      it('should record failed operation duration with error type', () => {
+        initializeMetricsModule(mockConfig);
+        mockHistogramRecordFn.mockClear();
+
+        recordGenAiClientOperationDurationModule(mockConfig, 3.75, {
+          'gen_ai.operation.name': 'generate_content',
+          'gen_ai.provider.name': 'gcp.vertex_ai',
+          'gen_ai.request.model': 'gemini-pro',
+          'error.type': 'quota_exceeded',
+        });
+
+        expect(mockHistogramRecordFn).toHaveBeenCalledWith(3.75, {
+          'session.id': 'test-session-id',
+          'gen_ai.operation.name': 'generate_content',
+          'gen_ai.provider.name': 'gcp.vertex_ai',
+          'gen_ai.request.model': 'gemini-pro',
+          'error.type': 'quota_exceeded',
+        });
+      });
+
+      it('should record operation duration with server details', () => {
+        initializeMetricsModule(mockConfig);
+        mockHistogramRecordFn.mockClear();
+
+        recordGenAiClientOperationDurationModule(mockConfig, 0.95, {
+          'gen_ai.operation.name': 'generate_content',
+          'gen_ai.provider.name': 'gcp.vertex_ai',
+          'gen_ai.request.model': 'gemini-1.5-pro',
+          'gen_ai.response.model': 'gemini-1.5-pro-001',
+          'server.address': 'us-central1-aiplatform.googleapis.com',
+          'server.port': 443,
+        });
+
+        expect(mockHistogramRecordFn).toHaveBeenCalledWith(0.95, {
+          'session.id': 'test-session-id',
+          'gen_ai.operation.name': 'generate_content',
+          'gen_ai.provider.name': 'gcp.vertex_ai',
+          'gen_ai.request.model': 'gemini-1.5-pro',
+          'gen_ai.response.model': 'gemini-1.5-pro-001',
+          'server.address': 'us-central1-aiplatform.googleapis.com',
+          'server.port': 443,
+        });
+      });
+
+      it('should handle minimal required attributes', () => {
+        initializeMetricsModule(mockConfig);
+        mockHistogramRecordFn.mockClear();
+
+        recordGenAiClientOperationDurationModule(mockConfig, 2.1, {
+          'gen_ai.operation.name': 'generate_content',
+          'gen_ai.provider.name': 'gcp.gen_ai',
+        });
+
+        expect(mockHistogramRecordFn).toHaveBeenCalledWith(2.1, {
+          'session.id': 'test-session-id',
+          'gen_ai.operation.name': 'generate_content',
+          'gen_ai.provider.name': 'gcp.gen_ai',
+        });
       });
     });
   });
