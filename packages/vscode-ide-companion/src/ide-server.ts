@@ -183,7 +183,7 @@ export class IDEServer {
         next();
       });
 
-      const mcpServer = createMcpServer(this.diffManager, this.log);
+      const mcpServer = createMcpServer(this.diffManager);
 
       this.openFilesManager = new OpenFilesManager(context);
       const onDidChangeSubscription = this.openFilesManager.onDidChange(() => {
