@@ -8,6 +8,7 @@ import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.roots.ProjectRootManager
+import com.intellij.openapi.vfs.VirtualFileManager
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.serialization.kotlinx.json.json
@@ -77,6 +78,42 @@ class IdeServer(private val project: Project, private val diffManager: DiffManag
     busConnection.subscribe(DiffManager.DIFF_MANAGER_TOPIC, object : DiffManager.DiffManagerListener {
       override fun onDiffNotification(notification: JSONRPCNotification) {
         broadcastNotification(notification)
+      }
+    })
+
+    // Listen for workspace folder changes (equivalent to VS Code's onDidChangeWorkspaceFolders)
+    busConnection.subscribe(VirtualFileManager.VFS_CHANGES, object : com.intellij.openapi.vfs.newvfs.BulkFileListener {
+      override fun after(events: List<com.intellij.openapi.vfs.newvfs.events.VFileEvent>) {
+        // Check if any of the events represent workspace root changes
+        val hasWorkspaceChange = events.any { event ->
+          event is com.intellij.openapi.vfs.newvfs.events.VFileCreateEvent ||
+          event is com.intellij.openapi.vfs.newvfs.events.VFileDeleteEvent ||
+          event is com.intellij.openapi.vfs.newvfs.events.VFileMoveEvent
+        }
+
+        if (hasWorkspaceChange) {
+          LOG.info("Workspace change detected, syncing environment variables")
+          syncEnvVars()
+        }
+      }
+    })
+
+    // Listen for project trust changes (equivalent to VS Code's onDidGrantWorkspaceTrust)
+    // In JetBrains, we can listen for project state changes
+    busConnection.subscribe(com.intellij.openapi.project.ProjectManager.TOPIC, object : com.intellij.openapi.project.ProjectManagerListener {
+      override fun projectOpened(project: Project) {
+        LOG.info("Project opened, syncing environment variables")
+        syncEnvVars()
+      }
+
+      override fun projectClosingBeforeSave(project: Project) {
+        // Clean up when project closes
+        if (project == this@IdeServer.project) {
+          LOG.info("Project closing, cleaning up environment variables")
+          coroutineScope.launch {
+            stop()
+          }
+        }
       }
     })
   }
@@ -199,6 +236,7 @@ class IdeServer(private val project: Project, private val diffManager: DiffManag
         startKeepAliveForSession(newSessionId, newTransport)
 
         // Send initial IDE context to new session
+        LOG.info("IdeServer: Sending initial IDE context to new session: $newSessionId")
         sendInitialIdeContextToSession(newSessionId, newTransport)
       }
       newTransport.setOnSessionClosed { closedSessionId ->
@@ -236,6 +274,10 @@ class IdeServer(private val project: Project, private val diffManager: DiffManag
   }
 
   private fun writePortInfo(port: Int) {
+    syncEnvVars(port)
+  }
+
+  private fun syncEnvVars(port: Int? = null) {
     val appInfo = ApplicationInfo.getInstance()
     val ideInfo = IdeInfo(
       name = appInfo.versionName.lowercase().replace(" ", ""),
@@ -245,9 +287,15 @@ class IdeServer(private val project: Project, private val diffManager: DiffManag
     val workspacePath = ProjectRootManager.getInstance(project).contentRoots.joinToString(File.pathSeparator) { it.path }
 
     val ppid = ProcessHandle.current().pid()
+    val actualPort = port ?: project.service<GeminiCliServerState>().port
+
+    if (actualPort == null) {
+      LOG.warn("Cannot sync env vars: port is null")
+      return
+    }
 
     val portInfo = PortInfo(
-      port = port,
+      port = actualPort,
       authToken = authToken,
       ppid = ppid,
       ideInfo = ideInfo,
@@ -256,7 +304,7 @@ class IdeServer(private val project: Project, private val diffManager: DiffManag
     val portInfoJson = McpJson.encodeToString(portInfo)
 
     val ideDir = File(System.getProperty("java.io.tmpdir"), "gemini/ide").apply { mkdirs() }
-    portFile = File(ideDir, "gemini-ide-server-$ppid-$port.json").apply {
+    portFile = File(ideDir, "gemini-ide-server-$ppid-$actualPort.json").apply {
       writeText(portInfoJson)
       setReadable(true, true)
       setWritable(true, true)
@@ -265,9 +313,12 @@ class IdeServer(private val project: Project, private val diffManager: DiffManag
     LOG.info("Wrote port info to ${portFile?.absolutePath}")
 
     project.service<GeminiCliServerState>().apply {
-      this.port = port
+      this.port = actualPort
       this.workspacePath = workspacePath
     }
+
+    // Broadcast IDE context update after syncing env vars
+    broadcastIdeContextUpdate()
   }
 
   private fun startKeepAliveForSession(sessionId: String, transport: StreamableHttpServerTransport) {
@@ -363,15 +414,17 @@ class IdeServer(private val project: Project, private val diffManager: DiffManag
       method = "ide/contextUpdate",
       params = contextJson
     )
+    LOG.info("IdeServer: Broadcasting IDE context update, open files: ${context.workspaceState?.openFiles?.size ?: 0}, active sessions: ${transports.size}")
     broadcastNotification(notification)
   }
 
   private fun broadcastNotification(notification: JSONRPCNotification) {
+    LOG.info("IdeServer: Broadcasting notification to ${transports.size} sessions: ${notification.method}")
     transports.forEach { (sessionId, transport) ->
       coroutineScope.launch {
         try {
           transport.send(notification)
-          LOG.debug("Notification sent to session $sessionId: ${notification.method}")
+          LOG.info("IdeServer: Notification successfully sent to session $sessionId: ${notification.method}")
         } catch (e: Exception) {
           LOG.warn("Failed to send notification to session $sessionId: ${e.message}")
           // If we can't send to a session, clean it up
