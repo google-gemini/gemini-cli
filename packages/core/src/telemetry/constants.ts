@@ -30,6 +30,7 @@ export const EVENT_CONTENT_RETRY = 'gemini_cli.chat.content_retry';
 export const EVENT_CONTENT_RETRY_FAILURE =
   'gemini_cli.chat.content_retry_failure';
 export const EVENT_FILE_OPERATION = 'gemini_cli.file_operation';
+export const EVENT_TOOL_OUTPUT_TRUNCATED = 'gemini_cli.tool_output_truncated';
 export const EVENT_MODEL_SLASH_COMMAND = 'gemini_cli.slash_command.model';
 export const EVENT_SMART_EDIT_STRATEGY = 'gemini_cli.smart_edit.strategy';
 export const EVENT_MODEL_ROUTING = 'gemini_cli.model_routing';

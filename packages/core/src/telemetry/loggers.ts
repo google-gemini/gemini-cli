@@ -29,6 +29,7 @@ import {
   EVENT_CONTENT_RETRY,
   EVENT_CONTENT_RETRY_FAILURE,
   EVENT_FILE_OPERATION,
+  EVENT_TOOL_OUTPUT_TRUNCATED,
   EVENT_RIPGREP_FALLBACK,
   EVENT_MODEL_ROUTING,
   EVENT_EXTENSION_INSTALL,
@@ -214,7 +215,7 @@ export function logToolOutputTruncated(
   const attributes: LogAttributes = {
     ...getCommonAttributes(config),
     ...event,
-    'event.name': 'tool_output_truncated',
+    'event.name': EVENT_TOOL_OUTPUT_TRUNCATED,
     'event.timestamp': new Date().toISOString(),
   };
 
