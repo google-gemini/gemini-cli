@@ -294,6 +294,7 @@ Check our [Official Roadmap](https://github.com/orgs/google-gemini/projects/11) 
 ## 📖 Resources
 
 - **[Official Roadmap](./ROADMAP.md)** - See what's coming next.
+- **[Changelog](./docs/changelogs/index.md)** - See recent notable updates.
 - **[NPM Package](https://www.npmjs.com/package/@google/gemini-cli)** - Package registry.
 - **[GitHub Issues](https://github.com/google-gemini/gemini-cli/issues)** - Report bugs or request features.
 - **[Security Advisories](https://github.com/google-gemini/gemini-cli/security/advisories)** - Security updates.
