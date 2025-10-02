@@ -370,44 +370,46 @@ export class AgentExecutor {
       return true;
     });
 
-    const toolPromises = validatedFunctionCalls.map(async (functionCall) => {
-      const callId = functionCall.id ?? `${functionCall.name}-${Date.now()}`;
-      const args = functionCall.args ?? {};
+    const toolPromises = validatedFunctionCalls.map(
+      async (functionCall, index) => {
+        const callId = functionCall.id ?? `${promptId}-${index}`;
+        const args = functionCall.args ?? {};
 
-      this.emitActivity('TOOL_CALL_START', {
-        name: functionCall.name,
-        args,
-      });
-
-      const requestInfo: ToolCallRequestInfo = {
-        callId,
-        name: functionCall.name as string,
-        args: args as Record<string, unknown>,
-        isClientInitiated: true,
-        prompt_id: promptId,
-      };
-
-      const toolResponse = await executeToolCall(
-        this.runtimeContext,
-        requestInfo,
-        signal,
-      );
-
-      if (toolResponse.error) {
-        this.emitActivity('ERROR', {
-          context: 'tool_call',
+        this.emitActivity('TOOL_CALL_START', {
           name: functionCall.name,
-          error: toolResponse.error.message,
+          args,
         });
-      } else {
-        this.emitActivity('TOOL_CALL_END', {
-          name: functionCall.name,
-          output: toolResponse.resultDisplay,
-        });
-      }
 
-      return toolResponse;
-    });
+        const requestInfo: ToolCallRequestInfo = {
+          callId,
+          name: functionCall.name as string,
+          args: args as Record<string, unknown>,
+          isClientInitiated: true,
+          prompt_id: promptId,
+        };
+
+        const toolResponse = await executeToolCall(
+          this.runtimeContext,
+          requestInfo,
+          signal,
+        );
+
+        if (toolResponse.error) {
+          this.emitActivity('ERROR', {
+            context: 'tool_call',
+            name: functionCall.name,
+            error: toolResponse.error.message,
+          });
+        } else {
+          this.emitActivity('TOOL_CALL_END', {
+            name: functionCall.name,
+            output: toolResponse.resultDisplay,
+          });
+        }
+
+        return toolResponse;
+      },
+    );
 
     const toolResponses = await Promise.all(toolPromises);
     const toolResponseParts: Part[] = toolResponses
