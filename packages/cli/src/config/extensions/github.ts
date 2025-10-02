@@ -85,7 +85,11 @@ export function parseGitHubRepoForReleases(source: string): {
   // Default to a github repo path, so `source` can be just an org/repo
   const parsedUrl = URL.parse(source, 'https://github.com');
   // The pathname should be "/owner/repo".
-  const parts = parsedUrl?.pathname.substring(1).split('/');
+  const parts = parsedUrl?.pathname
+    .substring(1)
+    .split('/')
+    // Remove the empty segments, fixes trailing slashes
+    .filter((part) => part !== '');
   if (parts?.length !== 2 || parsedUrl?.host !== 'github.com') {
     throw new Error(
       `Invalid GitHub repository source: ${source}. Expected "owner/repo" or a github repo uri.`,
@@ -418,22 +422,25 @@ async function downloadFile(url: string, dest: string): Promise<void> {
 
 function extractFile(file: string, dest: string) {
   let args: string[];
+  let command: 'tar' | 'unzip';
   if (file.endsWith('.tar.gz')) {
     args = ['-xzf', file, '-C', dest];
+    command = 'tar';
   } else if (file.endsWith('.zip')) {
-    args = ['-xf', file, '-C', dest];
+    args = [file, '-d', dest];
+    command = 'unzip';
   } else {
     throw new Error(`Unsupported file extension for extraction: ${file}`);
   }
 
-  const result = spawnSync('tar', args, { stdio: 'pipe' });
+  const result = spawnSync(command, args, { stdio: 'pipe' });
 
   if (result.status !== 0) {
     if (result.error) {
-      throw new Error(`Failed to spawn 'tar': ${result.error.message}`);
+      throw new Error(`Failed to spawn '${command}': ${result.error.message}`);
     }
     throw new Error(
-      `'tar' command failed with exit code ${result.status}: ${result.stderr.toString()}`,
+      `'${command}' command failed with exit code ${result.status}: ${result.stderr.toString()}`,
     );
   }
 }

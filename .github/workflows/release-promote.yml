@@ -68,12 +68,15 @@ jobs:
           GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
         run: |
           set -e
-          STABLE_JSON=$(node scripts/get-release-version.js --type=stable ${{ github.event.inputs.stable_version_override && format('--stable_version_override={0}', github.event.inputs.stable_version_override) || '' }})
-          PREVIEW_JSON=$(node scripts/get-release-version.js --type=preview ${{ github.event.inputs.preview_version_override && format('--preview_version_override={0}', github.event.inputs.preview_version_override) || '' }})
-          NIGHTLY_JSON=$(node scripts/get-release-version.js --type=promote-nightly)
-          echo "STABLE_JSON_COMMAND=node scripts/get-release-version.js --type=stable ${{ github.event.inputs.stable_version_override && format('--stable_version_override={0}', github.event.inputs.stable_version_override) || '' }}"
-          echo "PREVIEW_JSON_COMMAND=node scripts/get-release-version.js --type=preview ${{ github.event.inputs.preview_version_override && format('--preview_version_override={0}', github.event.inputs.preview_version_override) || '' }}"
-          echo "NIGHTLY_JSON_COMMAND=node scripts/get-release-version.js --type=promote-nightly"
+          STABLE_COMMAND="node scripts/get-release-version.js --type=stable ${{ github.event.inputs.stable_version_override && format('--stable_version_override={0}', github.event.inputs.stable_version_override) || '' }}"
+          PREVIEW_COMMAND="node scripts/get-release-version.js --type=preview ${{ github.event.inputs.preview_version_override && format('--preview_version_override={0}', github.event.inputs.preview_version_override) || '' }}"
+          NIGHTLY_COMMAND="node scripts/get-release-version.js --type=promote-nightly"
+          STABLE_JSON=$(${STABLE_COMMAND})
+          PREVIEW_JSON=$(${PREVIEW_COMMAND})
+          NIGHTLY_JSON=$(${NIGHTLY_COMMAND})
+          echo "STABLE_JSON_COMMAND=${STABLE_COMMAND}"
+          echo "PREVIEW_JSON_COMMAND=${PREVIEW_COMMAND}"
+          echo "NIGHTLY_JSON_COMMAND=${NIGHTLY_COMMAND}"
           echo "STABLE_JSON: ${STABLE_JSON}"
           echo "PREVIEW_JSON: ${PREVIEW_JSON}"
           echo "NIGHTLY_JSON: ${NIGHTLY_JSON}"
@@ -83,25 +86,39 @@ jobs:
           echo "PREVIOUS_STABLE_TAG=$(echo "${STABLE_JSON}" | jq -r .previousReleaseTag)" >> "${GITHUB_OUTPUT}"
           echo "PREVIEW_VERSION=$(echo "${PREVIEW_JSON}" | jq -r .releaseVersion)" >> "${GITHUB_OUTPUT}"
           # shellcheck disable=SC1083
-          echo "PREVIEW_SHA=$(git rev-parse '${{ github.event.inputs.ref }}'^{commit})" >> "${GITHUB_OUTPUT}"
+          REF="${{ github.event.inputs.ref }}"
+          SHA=$(git ls-remote origin "$REF" | awk '{print $1}')
+          if [ -z "$SHA" ]; then
+            if [[ "$REF" =~ ^[0-9a-f]{7,40}$ ]]; then
+              SHA="$REF"
+            else
+              echo "::error::Could not resolve ref '$REF' to a commit SHA."
+              exit 1
+            fi
+          fi
+          echo "PREVIEW_SHA=$SHA" >> "${GITHUB_OUTPUT}"
           echo "PREVIOUS_PREVIEW_TAG=$(echo "${PREVIEW_JSON}" | jq -r .previousReleaseTag)" >> "${GITHUB_OUTPUT}"
           echo "NEXT_NIGHTLY_VERSION=$(echo "${NIGHTLY_JSON}" | jq -r .releaseVersion)" >> "${GITHUB_OUTPUT}"
           echo "PREVIOUS_NIGHTLY_TAG=$(echo "${NIGHTLY_JSON}" | jq -r .previousReleaseTag)" >> "${GITHUB_OUTPUT}"
           CURRENT_NIGHTLY_TAG=$(git describe --tags --abbrev=0 --match="*nightly*")
           echo "CURRENT_NIGHTLY_TAG=${CURRENT_NIGHTLY_TAG}" >> "${GITHUB_OUTPUT}"
-          echo "NEXT_SHA=$(git rev-parse HEAD)" >> "${GITHUB_OUTPUT}"
+          echo "NEXT_SHA=$SHA" >> "${GITHUB_OUTPUT}"
 
       - name: 'Display Pending Updates'
         run: |
-          echo "Pending Changes, Next Versions:"
-          echo "  Nightly: ${{ steps.versions.outputs.NEXT_NIGHTLY_VERSION }}"
-          echo "  Preview: ${{ steps.versions.outputs.PREVIEW_VERSION }}"
-          echo "  Stable: ${{ steps.versions.outputs.STABLE_VERSION }}"
+          echo "Release Plan:"
+          echo "-----------"
+          echo "Stable Release: ${{ steps.versions.outputs.STABLE_VERSION }}"
+          echo "  - Commit: ${{ steps.versions.outputs.STABLE_SHA }}"
+          echo "  - Previous Tag: ${{ steps.versions.outputs.PREVIOUS_STABLE_TAG }}"
           echo ""
-          echo "Relevant SHAs:"
-          echo "  Stable: Will be cut from:  : ${{ steps.versions.outputs.STABLE_SHA }} / ${{ steps.versions.outputs.PREVIOUS_STABLE_TAG }}"
-          echo "  Preview will be cut from:  : ${{ steps.versions.outputs.PREVIEW_SHA }} (${{ github.event.inputs.ref }})". Users last saw preview as: ${{ steps.versions.outputs.PREVIOUS_PREVIEW_TAG }}
-          echo "  Nightly will be udpated in : ${{ steps.versions.outputs.NEXT_SHA }} (${{ github.event.inputs.ref }}). Previous nightly tag: ${{ steps.versions.outputs.PREVIOUS_NIGHTLY_TAG }}"
+          echo "Preview Release: ${{ steps.versions.outputs.PREVIEW_VERSION }}"
+          echo "  - Commit: ${{ steps.versions.outputs.PREVIEW_SHA }} (${{ github.event.inputs.ref }})"
+          echo "  - Previous Tag: ${{ steps.versions.outputs.PREVIOUS_PREVIEW_TAG }}"
+          echo ""
+          echo "Preparing Next Nightly Release: ${{ steps.versions.outputs.NEXT_NIGHTLY_VERSION }}"
+          echo "  - Merging Version Update PR to Branch: ${{ github.event.inputs.ref }}"
+          echo "  - Previous Tag: ${{ steps.versions.outputs.PREVIOUS_NIGHTLY_TAG }}"
 
   test:
     name: 'Test ${{ matrix.channel }}'
@@ -190,6 +207,8 @@ jobs:
           dry-run: '${{ github.event.inputs.dry_run }}'
           previous-tag: '${{ needs.calculate-versions.outputs.PREVIOUS_PREVIEW_TAG }}'
           working-directory: './release'
+          gemini_api_key: '${{ secrets.GEMINI_API_KEY }}'
+          force-skip-tests: '${{ github.event.inputs.force_skip_tests }}'
 
       - name: 'Create Issue on Failure'
         if: '${{ failure() && github.event.inputs.dry_run == false }}'
@@ -246,6 +265,8 @@ jobs:
           dry-run: '${{ github.event.inputs.dry_run }}'
           previous-tag: '${{ needs.calculate-versions.outputs.PREVIOUS_STABLE_TAG }}'
           working-directory: './release'
+          gemini_api_key: '${{ secrets.GEMINI_API_KEY }}'
+          force-skip-tests: '${{ github.event.inputs.force_skip_tests }}'
 
       - name: 'Create Issue on Failure'
         if: '${{ failure() && github.event.inputs.dry_run == false }}'

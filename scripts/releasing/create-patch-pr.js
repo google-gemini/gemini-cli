@@ -18,6 +18,12 @@ async function main() {
       type: 'string',
       demandOption: true,
     })
+    .option('pullRequestNumber', {
+      alias: 'pr',
+      description: "The pr number that we're cherry picking",
+      type: 'number',
+      demandOption: true,
+    })
     .option('channel', {
       alias: 'ch',
       description: 'The release channel to patch.',
@@ -32,7 +38,7 @@ async function main() {
     .help()
     .alias('help', 'h').argv;
 
-  const { commit, channel, dryRun } = argv;
+  const { commit, channel, dryRun, pullRequestNumber } = argv;
 
   console.log(`Starting patch process for commit: ${commit}`);
   console.log(`Targeting channel: ${channel}`);
@@ -45,7 +51,7 @@ async function main() {
   const releaseInfo = getLatestReleaseInfo(channel);
   const latestTag = releaseInfo.currentTag;
 
-  const releaseBranch = `release/${latestTag}`;
+  const releaseBranch = `release/${latestTag}-pr-${pullRequestNumber}`;
   const hotfixBranch = `hotfix/${latestTag}/${channel}/cherry-pick-${commit.substring(0, 7)}`;
 
   // Create the release branch from the tag if it doesn't exist.

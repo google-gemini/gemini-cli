@@ -81,6 +81,12 @@ describe('SmartEditTool', () => {
     } as unknown as BaseLlmClient;
 
     mockConfig = {
+      getUsageStatisticsEnabled: vi.fn(() => true),
+      getSessionId: vi.fn(() => 'mock-session-id'),
+      getContentGeneratorConfig: vi.fn(() => ({ authType: 'mock' })),
+      getUseSmartEdit: vi.fn(() => false),
+      getUseModelRouter: vi.fn(() => false),
+      getProxy: vi.fn(() => undefined),
       getGeminiClient: vi.fn().mockReturnValue(geminiClient),
       getBaseLlmClient: vi.fn().mockReturnValue(baseLlmClient),
       getTargetDir: () => rootDir,
@@ -195,7 +201,7 @@ describe('SmartEditTool', () => {
 
     it('should perform an exact replacement', async () => {
       const content = 'hello world';
-      const result = await calculateReplacement({
+      const result = await calculateReplacement(mockConfig, {
         params: {
           file_path: 'test.txt',
           instruction: 'test',
@@ -211,7 +217,7 @@ describe('SmartEditTool', () => {
 
     it('should perform a flexible, whitespace-insensitive replacement', async () => {
       const content = '  hello\n    world\n';
-      const result = await calculateReplacement({
+      const result = await calculateReplacement(mockConfig, {
         params: {
           file_path: 'test.txt',
           instruction: 'test',
@@ -227,7 +233,7 @@ describe('SmartEditTool', () => {
 
     it('should return 0 occurrences if no match is found', async () => {
       const content = 'hello world';
-      const result = await calculateReplacement({
+      const result = await calculateReplacement(mockConfig, {
         params: {
           file_path: 'test.txt',
           instruction: 'test',
@@ -239,6 +245,28 @@ describe('SmartEditTool', () => {
       });
       expect(result.newContent).toBe(content);
       expect(result.occurrences).toBe(0);
+    });
+
+    it('should perform a regex-based replacement for flexible intra-line whitespace', async () => {
+      // This case would fail with the previous exact and line-trimming flexible logic
+      // because the whitespace *within* the line is different.
+      const content = '  function  myFunc( a, b ) {\n    return a + b;\n  }';
+      const result = await calculateReplacement(mockConfig, {
+        params: {
+          file_path: 'test.js',
+          instruction: 'test',
+          old_string: 'function myFunc(a, b) {', // Note the normalized whitespace
+          new_string: 'const yourFunc = (a, b) => {',
+        },
+        currentContent: content,
+        abortSignal,
+      });
+
+      // The indentation from the original line should be preserved and applied to the new string.
+      const expectedContent =
+        '  const yourFunc = (a, b) => {\n    return a + b;\n  }';
+      expect(result.newContent).toBe(expectedContent);
+      expect(result.occurrences).toBe(1);
     });
   });
   describe('correctPath', () => {
