@@ -376,16 +376,18 @@ export class SessionManager {
     if (!targetSessionId) {
       return [];
     }
-    
+
     const session = this.sessions.get(targetSessionId);
     if (!session) {
       return [];
     }
-    
-    // Return all conversation history without filtering
-    const displayMessages = session.conversationHistory;
-    
-    console.log(`[SessionManager] Retrieved ${displayMessages.length} display messages for session ${targetSessionId}`);
+
+    // Filter out "Please continue." continuation prompts from display
+    const displayMessages = session.conversationHistory.filter(msg =>
+      !(msg.role === 'user' && msg.content === 'Please continue.')
+    );
+
+    console.log(`[SessionManager] Retrieved ${displayMessages.length} display messages (filtered ${session.conversationHistory.length - displayMessages.length} continuation prompts) for session ${targetSessionId}`);
     return displayMessages;
   }
 
