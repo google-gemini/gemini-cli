@@ -49,7 +49,30 @@ function useGitWatcher(cwd: string, onBranchChange: () => void) {
       try {
         console.debug('[GitBranchName] Setting up HEAD watcher.');
         headWatcher = fs.watch(gitHeadPath, (eventType: string) => {
-          if (eventType === 'change' || eventType === 'rename') {
+          if (eventType === 'rename') {
+            // The file might have been deleted.
+            void (async () => {
+              try {
+                await fsPromises.access(gitHeadPath, fs.constants.F_OK);
+                // File still exists, so it was likely an atomic write.
+                // Trigger a branch change check.
+                if (isMounted) {
+                  onBranchChange();
+                }
+              } catch {
+                // File is gone. Fall back to watching the CWD.
+                if (isMounted) {
+                  console.debug(
+                    '[GitBranchName] .git/HEAD deleted. Falling back to CWD watcher.',
+                  );
+                  // The headWatcher is now invalid, so close it before setting up the new one.
+                  headWatcher?.close();
+                  setupCwdWatcher();
+                }
+              }
+            })();
+          } else if (eventType === 'change') {
+            // The file content changed.
             onBranchChange();
           }
         });
