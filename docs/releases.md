@@ -6,9 +6,9 @@ We will follow https://semver.org/ as closely as possible but will call out when
 
 Each Tuesday ~2000 UTC new Stable and Preview releases will be cut. The promotion flow is:
 
-- Code is commited to main and pushed each night to nightly
+- Code is committed to main and pushed each night to nightly
 - After no more than 1 week on main, code is promoted to the `preview` channel
-- After 1 week the most recent `preview` channel is promoted to `stable` cannel
+- After 1 week the most recent `preview` channel is promoted to `stable` channel
 - Patch fixes will be produced against both `preview` and `stable` as needed, with the final 'patch' version number incrementing each time.
 
 ### Preview

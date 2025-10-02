@@ -68,7 +68,7 @@ These settings can be overridden by environment variables or CLI flags.
 `true` or `1` will enable the feature. Any other value will disable it.
 
 For detailed information about all configuration options, see the
-[Configuration Guide](./cli/configuration.md).
+[Configuration Guide](../get-started/configuration.md).
 
 ## Google Cloud Telemetry
 
