@@ -14,6 +14,42 @@
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
 
+/**
+ * Extract base version and channel info from hotfix branch name. Branches can
+ * be in multiple formats:
+ *  - New NEW: hotfix/v0.5.3/v0.5.4/preview/cherry-pick-abc -> v0.5.4 and preview
+ *  - New format: hotfix/v0.5.3/preview/cherry-pick-abc -> v0.5.3 and preview
+ *  - Old format: hotfix/v0.5.3/cherry-pick-abc -> v0.5.3 and stable (default)
+ * We check the formats from newest to oldest. If the channel found is invalid,
+ * an error is thrown.
+ */
+function getBranchInfo({ branchName, context }) {
+  const parts = branchName.split('/');
+  const version = parts[1];
+  let channel = 'stable'; // default for old format
+  if (parts.length >= 5 && (parts[3] === 'stable' || parts[3] === 'preview')) {
+    channel = parts[3];
+  } else if (
+    parts.length >= 4 &&
+    (parts[2] === 'stable' || parts[2] === 'preview')
+  ) {
+    // New format with explicit channel
+    channel = parts[2];
+  } else if (context.eventName === 'workflow_dispatch') {
+    // Manual dispatch, infer from version name
+    channel = version.includes('preview') ? 'preview' : 'stable';
+  }
+
+  // Validate channel
+  if (channel !== 'stable' && channel !== 'preview') {
+    throw new Error(
+      `Invalid channel: ${channel}. Must be 'stable' or 'preview'.`,
+    );
+  }
+
+  return { channel, version };
+}
+
 async function main() {
   const argv = await yargs(hideBin(process.argv))
     .option('head-ref', {
@@ -79,27 +115,7 @@ async function main() {
 
   console.log(`Processing patch trigger for branch: ${headRef}`);
 
-  // Extract base version and channel from hotfix branch name
-  // New format: hotfix/v0.5.3/preview/cherry-pick-abc -> v0.5.3 and preview
-  // Old format: hotfix/v0.5.3/cherry-pick-abc -> v0.5.3 and stable (default)
-  const parts = headRef.split('/');
-  const version = parts[1];
-  let channel = 'stable'; // default for old format
-
-  if (parts.length >= 4 && (parts[2] === 'stable' || parts[2] === 'preview')) {
-    // New format with explicit channel
-    channel = parts[2];
-  } else if (context.eventName === 'workflow_dispatch') {
-    // Manual dispatch, infer from version name
-    channel = version.includes('preview') ? 'preview' : 'stable';
-  }
-
-  // Validate channel
-  if (channel !== 'stable' && channel !== 'preview') {
-    throw new Error(
-      `Invalid channel: ${channel}. Must be 'stable' or 'preview'.`,
-    );
-  }
+  const { version, channel } = getBranchInfo({ branchName: headRef, context });
 
   // Try to find the original PR that requested this patch
   let originalPr = null;
