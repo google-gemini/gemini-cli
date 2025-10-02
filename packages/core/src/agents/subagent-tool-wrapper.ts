@@ -14,6 +14,7 @@ import type { Config } from '../config/config.js';
 import type { AgentDefinition, AgentInputs } from './types.js';
 import { convertInputConfigToJsonSchema } from './schema-utils.js';
 import { SubagentInvocation } from './invocation.js';
+import type { MessageBus } from '../confirmation-bus/message-bus.js';
 
 /**
  * A tool wrapper that dynamically exposes a subagent as a standard,
@@ -31,10 +32,12 @@ export class SubagentToolWrapper extends BaseDeclarativeTool<
    *
    * @param definition The `AgentDefinition` of the subagent to wrap.
    * @param config The runtime configuration, passed down to the subagent.
+   * @param messageBus Optional message bus for policy enforcement.
    */
   constructor(
     private readonly definition: AgentDefinition,
     private readonly config: Config,
+    messageBus?: MessageBus,
   ) {
     // Dynamically generate the JSON schema required for the tool definition.
     const parameterSchema = convertInputConfigToJsonSchema(
@@ -49,6 +52,7 @@ export class SubagentToolWrapper extends BaseDeclarativeTool<
       parameterSchema,
       /* isOutputMarkdown */ true,
       /* canUpdateOutput */ true,
+      messageBus,
     );
   }
 
@@ -64,6 +68,11 @@ export class SubagentToolWrapper extends BaseDeclarativeTool<
   protected createInvocation(
     params: AgentInputs,
   ): ToolInvocation<AgentInputs, ToolResult> {
-    return new SubagentInvocation(params, this.definition, this.config);
+    return new SubagentInvocation(
+      params,
+      this.definition,
+      this.config,
+      this.messageBus,
+    );
   }
 }

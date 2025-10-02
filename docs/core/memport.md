@@ -43,7 +43,7 @@ More content here.
 
 Welcome to my project!
 
-@./getting-started.md
+@./get-started.md
 
 ## Features
 

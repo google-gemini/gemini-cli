@@ -16,6 +16,8 @@ Learn how to enable and setup OpenTelemetry for Gemini CLI.
   - [Logs and Metrics](#logs-and-metrics)
     - [Logs](#logs)
     - [Metrics](#metrics)
+      - [Custom](#custom)
+      - [GenAI Semantic Convention](#genai-semantic-convention)
 
 ## Key Benefits
 
@@ -66,7 +68,7 @@ These settings can be overridden by environment variables or CLI flags.
 `true` or `1` will enable the feature. Any other value will disable it.
 
 For detailed information about all configuration options, see the
-[Configuration Guide](./cli/configuration.md).
+[Configuration Guide](../get-started/configuration.md).
 
 ## Google Cloud Telemetry
 
@@ -322,7 +324,9 @@ for Gemini CLI:
 
 ### Metrics
 
-Metrics are numerical measurements of behavior over time. The following metrics are collected for Gemini CLI:
+Metrics are numerical measurements of behavior over time.
+
+#### Custom
 
 - `gemini_cli.session.count` (Counter, Int): Incremented once per CLI startup.
 
@@ -347,11 +351,16 @@ Metrics are numerical measurements of behavior over time. The following metrics 
 - `gemini_cli.api.request.latency` (Histogram, ms): Measures API request latency.
   - **Attributes**:
     - `model`
+  - **Note**: This metric overlaps with `gen_ai.client.operation.duration` below
+    that's compliant with GenAI Semantic Conventions.
 
 - `gemini_cli.token.usage` (Counter, Int): Counts the number of tokens used.
   - **Attributes**:
     - `model`
     - `type` (string: "input", "output", "thought", "cache", or "tool")
+  - **Note**: This metric overlaps with `gen_ai.client.token.usage` below for
+    `input`/`output` token types that's compliant with GenAI Semantic
+    Conventions.
 
 - `gemini_cli.file.operation.count` (Counter, Int): Counts file operations.
   - **Attributes**:
@@ -369,3 +378,30 @@ Metrics are numerical measurements of behavior over time. The following metrics 
   - **Attributes**:
     - `tokens_before`: (Int): Number of tokens in context prior to compression
     - `tokens_after`: (Int): Number of tokens in context after compression
+
+#### GenAI Semantic Convention
+
+The following metrics comply with [OpenTelemetry GenAI semantic conventions]
+for standardized observability across GenAI applications:
+
+- `gen_ai.client.token.usage` (Histogram, token): Number of input and output tokens used per operation.
+  - **Attributes**:
+    - `gen_ai.operation.name` (string): The operation type (e.g., "generate_content", "chat")
+    - `gen_ai.provider.name` (string): The GenAI provider ("gcp.gen_ai" or "gcp.vertex_ai")
+    - `gen_ai.token.type` (string): The token type ("input" or "output")
+    - `gen_ai.request.model` (string, optional): The model name used for the request
+    - `gen_ai.response.model` (string, optional): The model name that generated the response
+    - `server.address` (string, optional): GenAI server address
+    - `server.port` (int, optional): GenAI server port
+
+- `gen_ai.client.operation.duration` (Histogram, s): GenAI operation duration in seconds.
+  - **Attributes**:
+    - `gen_ai.operation.name` (string): The operation type (e.g., "generate_content", "chat")
+    - `gen_ai.provider.name` (string): The GenAI provider ("gcp.gen_ai" or "gcp.vertex_ai")
+    - `gen_ai.request.model` (string, optional): The model name used for the request
+    - `gen_ai.response.model` (string, optional): The model name that generated the response
+    - `server.address` (string, optional): GenAI server address
+    - `server.port` (int, optional): GenAI server port
+    - `error.type` (string, optional): Error type if the operation failed
+
+[OpenTelemetry GenAI semantic conventions]: https://github.com/open-telemetry/semantic-conventions/blob/main/docs/gen-ai/gen-ai-metrics.md
