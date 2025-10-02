@@ -78,6 +78,8 @@ function useGitWatcher(cwd: string, onBranchChange: () => void) {
     };
 
     const setupCwdWatcher = () => {
+      // Clean up existing watcher to prevent resource leaks.
+      cwdWatcher?.close();
       try {
         console.debug(
           '[GitBranchName] .git/HEAD not found. Setting up CWD watcher.',
