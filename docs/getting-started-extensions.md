@@ -198,7 +198,7 @@ Restart the CLI again. The model will now have the context from your `GEMINI.md`
 
 Once you are happy with your extension, you can share it with others. The two primary ways of releasing extensions are via a Git repository or through GitHub Releases. Using a public Git repository is the simplest method.
 
-For detailed instructions on both methods, please refer to the [Extension Releasing Guide](extension-releasing.md).
+For detailed instructions on both methods, please refer to the [Extension Releasing Guide](./extensions/extension-releasing.md).
 
 ## Conclusion
 
