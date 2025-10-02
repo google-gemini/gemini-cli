@@ -15,10 +15,13 @@ import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
 
 /**
- * Extract base version and channel info from hotfix branch name
- * New NEW format: hotfix/v0.5.3/v0.5.4/preview/cherry-pick-abc -> v0.5.4 and preview
- * New format: hotfix/v0.5.3/preview/cherry-pick-abc -> v0.5.3 and preview
- * Old format: hotfix/v0.5.3/cherry-pick-abc -> v0.5.3 and stable (default)
+ * Extract base version and channel info from hotfix branch name. Branches can
+ * be in multiple formats:
+ *  - New NEW: hotfix/v0.5.3/v0.5.4/preview/cherry-pick-abc -> v0.5.4 and preview
+ *  - New format: hotfix/v0.5.3/preview/cherry-pick-abc -> v0.5.3 and preview
+ *  - Old format: hotfix/v0.5.3/cherry-pick-abc -> v0.5.3 and stable (default)
+ * We check the formats from newest to oldest. If the channel found is invalid,
+ * an error is thrown.
  */
 function getBranchInfo({ branchName, context }) {
   const parts = branchName.split('/');
