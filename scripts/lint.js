@@ -109,7 +109,7 @@ function runCommand(command, stdio = 'inherit') {
     }
     execSync(command, { stdio, env });
     return true;
-  } catch (_e) {
+  } catch {
     return false;
   }
 }

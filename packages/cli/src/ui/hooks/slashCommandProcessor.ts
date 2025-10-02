@@ -4,28 +4,28 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useCallback, useMemo, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { type PartListUnion } from '@google/genai';
 import process from 'node:process';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
 import type { Config } from '@google/gemini-cli-core';
 import {
   GitService,
+  IdeClient,
   Logger,
   logSlashCommand,
   makeSlashCommandEvent,
   SlashCommandStatus,
-  ToolConfirmationOutcome,
   Storage,
-  IdeClient,
+  ToolConfirmationOutcome,
 } from '@google/gemini-cli-core';
 import { useSessionStats } from '../contexts/SessionContext.js';
 import type {
-  Message,
-  HistoryItemWithoutId,
-  SlashCommandProcessorResult,
-  HistoryItem,
   ConfirmationRequest,
+  HistoryItem,
+  HistoryItemWithoutId,
+  Message,
+  SlashCommandProcessorResult,
 } from '../types.js';
 import { MessageType } from '../types.js';
 import type { LoadedSettings } from '../../config/settings.js';
@@ -35,9 +35,9 @@ import { BuiltinCommandLoader } from '../../services/BuiltinCommandLoader.js';
 import { FileCommandLoader } from '../../services/FileCommandLoader.js';
 import { McpPromptLoader } from '../../services/McpPromptLoader.js';
 import { parseSlashCommand } from '../../utils/commands.js';
-import {
-  type ExtensionUpdateAction,
-  type ExtensionUpdateStatus,
+import type {
+  ExtensionUpdateAction,
+  ExtensionUpdateStatus,
 } from '../state/extensions.js';
 
 interface SlashCommandProcessorActions {
@@ -51,6 +51,7 @@ interface SlashCommandProcessorActions {
   quit: (messages: HistoryItem[]) => void;
   setDebugMessage: (message: string) => void;
   toggleCorgiMode: () => void;
+  setExtensionsUpdateState: (action: ExtensionUpdateAction) => void;
   dispatchExtensionStateUpdate: (action: ExtensionUpdateAction) => void;
   addConfirmUpdateExtensionRequest: (request: ConfirmationRequest) => void;
 }
@@ -102,15 +103,16 @@ export const useSlashCommandProcessor = (
     return new GitService(config.getProjectRoot(), config.storage);
   }, [config]);
 
-  const logger = useMemo(() => {
-    const l = new Logger(
-      config?.getSessionId() || '',
-      config?.storage ?? new Storage(process.cwd()),
-    );
-    // The logger's initialize is async, but we can create the instance
-    // synchronously. Commands that use it will await its initialization.
-    return l;
-  }, [config]);
+  const logger = useMemo(
+    () =>
+      // The logger's initialize is async, but we can create the instance
+      // synchronously. Commands that use it will await its initialization.
+      new Logger(
+        config?.getSessionId() || '',
+        config?.storage ?? new Storage(process.cwd()),
+      ),
+    [config],
+  );
 
   const [pendingItem, setPendingItem] = useState<HistoryItemWithoutId | null>(
     null,
@@ -287,9 +289,7 @@ export const useSlashCommandProcessor = (
 
       const trimmed = rawQuery.trim();
 
-      const isFeedback = [':)', '👍'].includes(
-        trimmed,
-      );
+      const isFeedback = [':)', '👍'].includes(trimmed);
 
       if (isFeedback) {
         addItem(
