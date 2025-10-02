@@ -10,6 +10,8 @@ import type { ToolResult, ToolInvocation, ToolCallConfirmationDetails } from './
 import type { ToolConfirmationOutcome } from './tools.js';
 import type { Config } from '../config/config.js';
 import type { ToolResponseData } from '../providers/types.js';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 /**
  * JSON-serializable value type for Python conversion
@@ -111,7 +113,7 @@ interface ShapeTextFormat {
  */
 interface XlwingsParams {
   /** Operation type */
-  op: 
+  op:
   // Range operations
   'read_range' | 'write_range' | 'clear_range' | 'formula_range' | 'format_range' |
   'get_cell_info' | 'insert_range' | 'delete_range' |
@@ -124,25 +126,27 @@ interface XlwingsParams {
   // Comment operations
   'add_comment' | 'edit_comment' | 'delete_comment' | 'list_comments' |
   // Chart operations
-  'create_chart' | 'update_chart' | 'delete_chart' | 'list_charts' | 
+  'create_chart' | 'update_chart' | 'delete_chart' | 'list_charts' |
   // Shape operations
   'create_shape' | 'create_textbox' | 'list_shapes' | 'modify_shape' | 'delete_shape' | 'move_shape' | 'resize_shape' |
   // Sheet operations
-  'add_sheet' | 'alter_sheet' | 'delete_sheet' | 'move_sheet' | 'copy_sheet' | 'list_sheets' | 
+  'add_sheet' | 'alter_sheet' | 'delete_sheet' | 'move_sheet' | 'copy_sheet' | 'list_sheets' |
   // Workbook operations
   'list_apps' | 'show_excel' | 'hide_excel' |
   // Selection operations
-  'get_selection' | 'set_selection' | 
+  'get_selection' | 'set_selection' |
   // Workbook operations
-  'create_workbook' |  'open_workbook' | 'save_workbook' | 'close_workbook' | 'list_workbooks' |  
+  'create_workbook' |  'open_workbook' | 'save_workbook' | 'close_workbook' | 'list_workbooks' |
   //VBA operations
-  'convert_data_types' | 'add_vba_module' | 'run_vba_macro' | 'update_vba_code' | 'list_vba_modules' | 'delete_vba_module' | 
+  'convert_data_types' | 'add_vba_module' | 'run_vba_macro' | 'update_vba_code' | 'list_vba_modules' | 'delete_vba_module' |
   // Image operations
-  'insert_image' | 'list_images' | 'delete_image' |   'resize_image' | 'move_image' | /* 'save_range_as_image' | */ 'save_chart_as_image' |   
+  'insert_image' | 'list_images' | 'delete_image' |   'resize_image' | 'move_image' | /* 'save_range_as_image' | */ 'save_chart_as_image' |
   // Row/Column operations
   'insert_row' | 'insert_column' | 'delete_row' | 'delete_column'| 'get_last_row' | 'get_last_column' |
   // PDF export operations
-  'export_workbook_to_pdf' | 'export_worksheet_to_pdf';
+  'export_workbook_to_pdf' | 'export_worksheet_to_pdf' |
+  // Documentation query
+  'doc_query';
   
   /** Target workbook name (optional - uses active if not specified) */
   workbook?: string;
@@ -572,6 +576,22 @@ interface XlwingsParams {
     /** Specific range to apply filter to (if not specified, uses current selection or used range) */
     filter_range?: string;
   };
+
+  /**
+   * Code generation mode - when true, returns generated Python code without executing it
+   * This allows LLM to learn from code examples and generate similar code
+   */
+  code_generation_mode?: boolean;
+
+  /**
+   * Query for documentation search (doc_query operation)
+   */
+  query?: string;
+
+  /**
+   * Number of results to return from documentation search (default: 5)
+   */
+  limit?: number;
 }
 
 /**
@@ -591,6 +611,12 @@ interface XlwingsResult extends ToolResult {
   cells_affected?: number;
   xlwings_error?: string; // Renamed to avoid conflict with ToolResult.error
   structuredData?: ToolResponseData;  // Add structured response data
+
+  /** Generated Python code (only present when code_generation_mode is enabled) */
+  generated_code?: string;
+
+  /** Display text for LLM (optional custom display message) */
+  displayText?: string;
 
   // File operation results
   file?: {
@@ -1022,14 +1048,14 @@ export class XlwingsTool extends BasePythonTool<XlwingsParams, XlwingsResult> {
     'insert_image', 'list_images', 'delete_image', 'resize_image', 'move_image',
     'save_chart_as_image', 'export_workbook_to_pdf', 'export_worksheet_to_pdf',
     'list_apps', 'insert_row', 'insert_column', 'delete_row', 'delete_column',
-    'show_excel', 'hide_excel'
+    'show_excel', 'hide_excel', 'doc_query'
   ];
 
   constructor(config: Config) {
     super(
       'xlwings_tools',
       'Excel Automation',
-      'Automates Excel operations: read/write data, create charts, format cells, manage sheets. Requires Microsoft Excel and xlwings Python library.',
+      'Automates Excel operations: read/write data, create charts, format cells, manage sheets. Includes doc_query operation to search built-in xlwings documentation - use this to learn correct syntax before performing operations. Requires Microsoft Excel and xlwings Python library.',
       ['xlwings'], // Python requirements
       {
         type: 'object',
@@ -1041,8 +1067,43 @@ export class XlwingsTool extends BasePythonTool<XlwingsParams, XlwingsResult> {
               'get_sheet_info', 'set_row_height', 'set_column_width', 'get_row_height', 'get_column_width', 'add_comment', 'edit_comment', 'delete_comment', 'list_comments', 'create_chart', 'update_chart', 'delete_chart', 'list_charts', 'create_shape',
               'create_textbox', 'list_shapes', 'modify_shape', 'delete_shape', 'move_shape', 'resize_shape', 'add_sheet', 'alter_sheet', 'delete_sheet', 'move_sheet', 'copy_sheet', 'list_workbooks', 'list_sheets', 'get_selection', 'set_selection', 'create_workbook', 'add_filter', 'remove_filter', 'get_filter_info',
               'open_workbook', 'save_workbook', 'close_workbook', 'get_last_row', 'get_last_column', 'convert_data_types', 'add_vba_module', 'run_vba_macro', 'update_vba_code', 'list_vba_modules', 'delete_vba_module', 'insert_image', 'list_images', 'delete_image',
-              'resize_image', 'move_image', /* 'save_range_as_image', */ 'save_chart_as_image', 'export_workbook_to_pdf', 'export_worksheet_to_pdf', 'list_apps', 'insert_row', 'insert_column', 'delete_row', 'delete_column', 'show_excel', 'hide_excel'],
-            description: 'Operation to perform. Key operations: get_sheet_info (recommended for table analysis), get_used_range (basic range info), get_cell_info (detailed single cell analysis), sort_range (use get_sheet_info first to identify data boundaries)'
+              'resize_image', 'move_image', /* 'save_range_as_image', */ 'save_chart_as_image', 'export_workbook_to_pdf', 'export_worksheet_to_pdf', 'list_apps', 'insert_row', 'insert_column', 'delete_row', 'delete_column', 'show_excel', 'hide_excel', 'doc_query'],
+            description: `Operation to perform.
+
+IMPORTANT WORKFLOW:
+1. If you're unsure about xlwings syntax or need to learn how to do something, use 'doc_query' FIRST
+2. Review the documentation results to understand correct API usage
+3. Then perform the actual operation with correct parameters
+
+Key operations:
+- doc_query: Search xlwings documentation (USE THIS FIRST when learning new operations)
+- get_sheet_info: Recommended for table analysis
+- get_used_range: Basic range info
+- get_cell_info: Detailed single cell analysis
+- sort_range: Use get_sheet_info first to identify data boundaries
+
+Common doc_query topics: reading data, writing data, formatting, charts, images, VBA, data types, matplotlib integration`
+          },
+          query: {
+            type: 'string',
+            description: `Search query for doc_query operation. Examples of good queries:
+- "how to read data from Excel range"
+- "write dataframe to Excel sheet"
+- "create chart with xlwings"
+- "format cells background color"
+- "insert image into worksheet"
+- "add VBA macro to workbook"
+- "convert Excel data types"
+- "use pictures.add with matplotlib"
+- "workbook save and close"
+- "sheet operations add delete"
+Use doc_query when you need to learn correct xlwings syntax, API usage, or best practices before performing Excel operations.`
+          },
+          limit: {
+            type: 'number',
+            description: 'Number of documentation results to return (default: 5, max: 20). Only for doc_query operation.',
+            minimum: 1,
+            maximum: 20
           },
           workbook: {
             type: 'string',
@@ -1709,6 +1770,10 @@ export class XlwingsTool extends BasePythonTool<XlwingsParams, XlwingsResult> {
                 }
               }
             }
+          },
+          code_generation_mode: {
+            type: 'boolean',
+            description: 'When true, generates Python code without executing it. Returns the generated code for LLM to learn from and reference for similar operations. Default: false (executes the code normally).'
           }
         }
       },
@@ -1744,15 +1809,76 @@ export class XlwingsTool extends BasePythonTool<XlwingsParams, XlwingsResult> {
 
   protected parseResult(pythonOutput: string, params: XlwingsParams): XlwingsResult {
     try {
+      // Check if in code generation mode (result already has generated_code)
+      if (params.code_generation_mode) {
+        // In code generation mode, the result is already properly formatted in execute()
+        // This path shouldn't normally be reached, but handle it safely
+        const displayMessage = `Generated Python code for ${params.op} operation:\n\n\`\`\`python\n${pythonOutput}\n\`\`\``;
+        return {
+          success: true,
+          operation: params.op,
+          generated_code: pythonOutput,
+          displayText: displayMessage,
+          llmContent: displayMessage,
+          returnDisplay: displayMessage
+        };
+      }
 
       // Try to parse JSON output from Python script
       const lines = pythonOutput.trim().split('\n');
       const lastLine = lines[lines.length - 1];
 
-      
+      // Special handling for doc_query operation
+      if (params.op === 'doc_query' && lastLine.startsWith('{') && lastLine.endsWith('}')) {
+        const result = JSON.parse(lastLine);
+
+        if (!result.success) {
+          return {
+            success: false,
+            operation: 'doc_query',
+            xlwings_error: result.error || 'Documentation query failed',
+            llmContent: `Failed to query xlwings documentation: ${result.error}`,
+            returnDisplay: `❌ **Documentation Query Failed**\n\n${result.error}`
+          };
+        }
+
+        const results = result.results || [];
+        if (results.length === 0) {
+          return {
+            success: true,
+            operation: 'doc_query',
+            llmContent: `No documentation found for query: "${params.query}"`,
+            returnDisplay: `🔍 **No Results Found**\n\nQuery: "${params.query}"\n\nTry different keywords or check the documentation.`
+          };
+        }
+
+        // Format results for LLM
+        let llmContent = `Found ${results.length} documentation results for "${params.query}":\n\n`;
+        let returnDisplay = `🔍 **xlwings Documentation Results** (${results.length} found)\n\nQuery: "${params.query}"\n\n`;
+
+        results.forEach((doc: { content: string; source: string; doc_type: string; section_title?: string; similarity: number }, i: number) => {
+          const sectionInfo = doc.section_title ? ` - ${doc.section_title}` : '';
+          llmContent += `**Result ${i + 1}** (from ${doc.doc_type}${sectionInfo}, similarity: ${(doc.similarity * 100).toFixed(1)}%)\n`;
+          llmContent += `${doc.content}\n\n`;
+          llmContent += `---\n\n`;
+
+          // Shorter version for display
+          const preview = doc.content.length > 300 ? doc.content.substring(0, 300) + '...' : doc.content;
+          returnDisplay += `**${i + 1}.** ${doc.doc_type}${sectionInfo} (${(doc.similarity * 100).toFixed(1)}%)\n${preview}\n\n`;
+        });
+
+        return {
+          success: true,
+          operation: 'doc_query',
+          llmContent,
+          returnDisplay
+        };
+      }
+
+
       if (lastLine.startsWith('{') && lastLine.endsWith('}')) {
         const result = JSON.parse(lastLine);
-        
+
         // Format the result for LLM consumption using helpful response patterns
         let llmContent = '';
         if (result.success) {
@@ -2606,7 +2732,104 @@ export class XlwingsTool extends BasePythonTool<XlwingsParams, XlwingsResult> {
     }
   }
 
+  private buildDocQueryScript(params: XlwingsParams): string {
+    const query = params.query || '';
+    const limit = params.limit || 5;
+    // Get the directory path in ES module context
+    // In production, __dirname will be in dist/src/tools/
+    // So we need to go up to packages/core/data/xlwings_docs_db
+    const __filename = fileURLToPath(import.meta.url);
+    const __dirname = path.dirname(__filename);
+    // From dist/src/tools to packages/core root is ../../../ but data is at packages/core/data
+    // So from dist/src/tools: ../../../data/xlwings_docs_db
+    const dbPath = path.join(__dirname, '../../../data/xlwings_docs_db').replace(/\\/g, '/');
+
+    return `
+import json
+import sys
+from pathlib import Path
+
+try:
+    import chromadb
+    from chromadb.config import Settings
+except ImportError:
+    print(json.dumps({
+        "success": False,
+        "operation": "doc_query",
+        "error": "chromadb library is not installed. Please install it using: pip install chromadb"
+    }))
+    sys.exit(1)
+
+try:
+    # Database path
+    db_path = Path(r"${dbPath}")
+
+    if not db_path.exists():
+        print(json.dumps({
+            "success": False,
+            "operation": "doc_query",
+            "error": f"Documentation database not found. Searched at: {db_path}. Absolute path: {db_path.absolute()}"
+        }))
+        sys.exit(1)
+
+    # Initialize ChromaDB client
+    client = chromadb.PersistentClient(
+        path=str(db_path),
+        settings=Settings(anonymized_telemetry=False)
+    )
+
+    # Get collection
+    collection = client.get_collection(name="xlwings_docs")
+
+    # Query documentation
+    results = collection.query(
+        query_texts=[${JSON.stringify(query)}],
+        n_results=${limit}
+    )
+
+    # Format results
+    formatted_results = []
+    if results and results['documents'] and len(results['documents']) > 0:
+        for i, (doc, metadata, distance) in enumerate(zip(
+            results['documents'][0],
+            results['metadatas'][0],
+            results['distances'][0] if results['distances'] else [0] * len(results['documents'][0])
+        )):
+            formatted_results.append({
+                "content": doc,
+                "source": metadata.get('source_file', 'unknown'),
+                "doc_type": metadata.get('doc_type', 'unknown'),
+                "section_title": metadata.get('section_title', ''),
+                "chunk_index": metadata.get('chunk_index', 0),
+                "similarity": 1.0 - distance  # Convert distance to similarity
+            })
+
+    result = {
+        "success": True,
+        "operation": "doc_query",
+        "query": ${JSON.stringify(query)},
+        "results_count": len(formatted_results),
+        "results": formatted_results
+    }
+
+    print(json.dumps(result))
+
+except Exception as e:
+    print(json.dumps({
+        "success": False,
+        "operation": "doc_query",
+        "error": str(e)
+    }))
+    sys.exit(1)
+`;
+  }
+
   private buildPythonScript(params: XlwingsParams): string {
+    // Special handling for doc_query operation
+    if (params.op === 'doc_query') {
+      return this.buildDocQueryScript(params);
+    }
+
     const imports = [
       'import json',
       'import sys',
@@ -13106,7 +13329,10 @@ class XlwingsInvocation extends BaseToolInvocation<XlwingsParams, XlwingsResult>
       'get_filter_info',
 
       // Non-destructive display operations
-      'show_excel', 'hide_excel'
+      'show_excel', 'hide_excel',
+
+      // Documentation query
+      'doc_query'
     ]);
 
     // Check if this operation is considered safe
@@ -13127,8 +13353,23 @@ class XlwingsInvocation extends BaseToolInvocation<XlwingsParams, XlwingsResult>
   }
 
   async execute(signal: AbortSignal, updateOutput?: (output: string) => void): Promise<XlwingsResult> {
-    // Call the parent class's createInvocation method to get a BasePythonToolInvocation
-    // We can't use this.tool.createInvocation() because that would create another XlwingsInvocation (recursion)
+    // Check if code generation mode is enabled
+    if (this.params.code_generation_mode) {
+      // Generate Python code without executing it
+      const generatedCode = this.tool['generatePythonCode'](this.params);
+      const fullMessage = `Generated Python code for ${this.params.op} operation (not executed):\n\n\`\`\`python\n${generatedCode}\n\`\`\``;
+
+      return {
+        success: true,
+        operation: this.params.op,
+        generated_code: generatedCode,
+        displayText: fullMessage,
+        llmContent: fullMessage,
+        returnDisplay: fullMessage
+      };
+    }
+
+    // Normal execution mode - call the parent class's createInvocation method
     const basePythonInvocation = Object.getPrototypeOf(Object.getPrototypeOf(this.tool)).createInvocation.call(this.tool, this.params);
     return basePythonInvocation.execute(signal, updateOutput);
   }
