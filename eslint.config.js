@@ -14,16 +14,6 @@ import vitest from '@vitest/eslint-plugin';
 import globals from 'globals';
 import licenseHeader from 'eslint-plugin-license-header';
 
-/*
-  ESM way to get __dirname
-
-  const __filename = url.fileURLToPath(import.meta.url);
-  const __dirname = path.dirname(__filename);
-
-  Determine the monorepo root (assuming eslint.config.js is at the root)
-  const projectRoot = __dirname;
-*/
-
 export default tseslint.config(
   {
     // Global ignores
