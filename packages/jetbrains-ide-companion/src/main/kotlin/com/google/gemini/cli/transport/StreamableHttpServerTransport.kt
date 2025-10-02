@@ -5,6 +5,7 @@ import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpMethod
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.ApplicationCall
+import io.ktor.http.parseHeaderValue
 import io.ktor.server.request.contentType
 import io.ktor.server.request.header
 import io.ktor.server.request.host
@@ -271,9 +272,10 @@ public class StreamableHttpServerTransport(
      */
     public suspend fun handlePostRequest(session: ServerSSESession?, call: ApplicationCall) {
         try {
-            val acceptHeader = call.request.header(HttpHeaders.Accept)
-            val isAcceptEventStream = acceptHeader.accepts(ContentType.Text.EventStream)
-            val isAcceptJson = acceptHeader.accepts(ContentType.Application.Json)
+            val acceptHeader = call.request.header(HttpHeaders.Accept) ?: ""
+            val parsedHeaders = parseHeaderValue(acceptHeader)
+            val isAcceptEventStream = parsedHeaders.any { it.value.equals("text/event-stream", ignoreCase = true) }
+            val isAcceptJson = parsedHeaders.any { it.value.equals("application/json", ignoreCase = true) || it.value.equals("*/*", ignoreCase = true) }
 
             if (!isAcceptEventStream || !isAcceptJson) {
                 call.reject(
@@ -366,8 +368,9 @@ public class StreamableHttpServerTransport(
         }
         session!!
 
-        val acceptHeader = call.request.header(HttpHeaders.Accept)
-        if (!acceptHeader.accepts(ContentType.Text.EventStream)) {
+        val acceptHeader = call.request.header(HttpHeaders.Accept) ?: ""
+        val parsedHeaders = parseHeaderValue(acceptHeader)
+        if (!parsedHeaders.any { it.value.equals("text/event-stream", ignoreCase = true) }) {
             call.reject(
                 HttpStatusCode.NotAcceptable,
                 ErrorCode.Unknown(-32000),
@@ -533,13 +536,6 @@ public class StreamableHttpServerTransport(
         }
     }
 
-    private fun String?.accepts(mime: ContentType): Boolean {
-        if (this == null) return false
-
-        val escaped = Regex.escape(mime.toString())
-        val pattern = Regex("""(^|,\s*)$escaped(\s*(;|,|$))""", RegexOption.IGNORE_CASE)
-        return pattern.containsMatchIn(this)
-    }
 
     private suspend fun emitOnStream(streamId: String, session: ServerSSESession, message: JSONRPCMessage) {
         val eventId = eventStore?.storeEvent(streamId, message)
