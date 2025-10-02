@@ -10,6 +10,7 @@ import { ReadFileTool } from '../tools/read-file.js';
 import { GLOB_TOOL_NAME } from '../tools/tool-names.js';
 import { GrepTool } from '../tools/grep.js';
 import { DEFAULT_GEMINI_MODEL } from '../config/models.js';
+import { Type } from '@google/genai';
 
 const CODEBASE_REPORT_MARKDOWN = `<CodebaseReport>
   <SummaryOfFindings>
@@ -77,17 +78,22 @@ export const CodebaseInvestigatorAgent: AgentDefinition = {
     },
   },
   outputConfig: {
-    description: `A detailed markdown report summarizing the findings of the codebase investigation and insights that are the foundation for planning and executing any code modification related to the objective.
+    outputName: 'report',
+    description: 'The final investigation report.',
+    schema: {
+      type: Type.STRING,
+      description: `A detailed markdown report summarizing the findings of the codebase investigation and insights that are the foundation for planning and executing any code modification related to the objective.
       # Report Format
 The final report should be structured markdown, clearly answering the investigation focus, citing the files, symbols, architectural patterns and how they relate to the given investigation focus.
 The report should strictly follow a format like this example: 
 ${CODEBASE_REPORT_MARKDOWN}
+
+Completion Criteria:
+- The report must directly address the initial \`objective\`.
+- Cite specific files, functions, or configuration snippets and symbols as evidence for your findings.
+- Conclude with a xml markdown summary of the key files, symbols, technologies, architectural patterns, and conventions discovered.
 `,
-    completion_criteria: [
-      'The report must directly address the initial `objective`.',
-      'Cite specific files, functions, or configuration snippets and symbols as evidence for your findings.',
-      'Conclude with a xml markdown summary of the key files, symbols, technologies, architectural patterns, and conventions discovered.',
-    ],
+    },
   },
 
   modelConfig: {
