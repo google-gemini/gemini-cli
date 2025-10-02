@@ -9,7 +9,6 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import {
-  EXTENSIONS_CONFIG_FILENAME,
   ExtensionStorage,
   annotateActiveExtensions,
   loadExtension,
@@ -17,29 +16,14 @@ import {
 import { createExtension } from '../../test-utils/createExtension.js';
 import { useExtensionUpdates } from './useExtensionUpdates.js';
 import { GEMINI_DIR, type GeminiCLIExtension } from '@google/gemini-cli-core';
-import { isWorkspaceTrusted } from '../../config/trustedFolders.js';
 import { renderHook, waitFor } from '@testing-library/react';
 import { MessageType } from '../types.js';
 import { ExtensionEnablementManager } from '../../config/extensions/extensionEnablement.js';
-
-const mockGit = {
-  clone: vi.fn(),
-  getRemotes: vi.fn(),
-  fetch: vi.fn(),
-  checkout: vi.fn(),
-  listRemote: vi.fn(),
-  revparse: vi.fn(),
-  // Not a part of the actual API, but we need to use this to do the correct
-  // file system interactions.
-  path: vi.fn(),
-};
-
-vi.mock('simple-git', () => ({
-  simpleGit: vi.fn((path: string) => {
-    mockGit.path.mockReturnValue(path);
-    return mockGit;
-  }),
-}));
+import {
+  checkForAllExtensionUpdates,
+  updateExtension,
+} from '../../config/extensions/update.js';
+import { ExtensionUpdateState } from '../state/extensions.js';
 
 vi.mock('os', async (importOriginal) => {
   const mockedOs = await importOriginal<typeof os>();
@@ -49,45 +33,9 @@ vi.mock('os', async (importOriginal) => {
   };
 });
 
-vi.mock('../../config/trustedFolders.js', async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import('../../config/trustedFolders.js')>();
-  return {
-    ...actual,
-    isWorkspaceTrusted: vi.fn(),
-  };
-});
-
-const mockLogExtensionInstallEvent = vi.hoisted(() => vi.fn());
-const mockLogExtensionUninstall = vi.hoisted(() => vi.fn());
-
-vi.mock('@google/gemini-cli-core', async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import('@google/gemini-cli-core')>();
-  return {
-    ...actual,
-    logExtensionInstallEvent: mockLogExtensionInstallEvent,
-    logExtensionUninstall: mockLogExtensionUninstall,
-    ExtensionInstallEvent: vi.fn(),
-    ExtensionUninstallEvent: vi.fn(),
-  };
-});
-
-vi.mock('child_process', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('child_process')>();
-  return {
-    ...actual,
-    execSync: vi.fn(),
-  };
-});
-
-const mockQuestion = vi.hoisted(() => vi.fn());
-const mockClose = vi.hoisted(() => vi.fn());
-vi.mock('node:readline', () => ({
-  createInterface: vi.fn(() => ({
-    question: mockQuestion,
-    close: mockClose,
-  })),
+vi.mock('../../config/extensions/update.js', () => ({
+  checkForAllExtensionUpdates: vi.fn(),
+  updateExtension: vi.fn(),
 }));
 
 describe('useExtensionUpdates', () => {
@@ -101,7 +49,8 @@ describe('useExtensionUpdates', () => {
     vi.mocked(os.homedir).mockReturnValue(tempHomeDir);
     userExtensionsDir = path.join(tempHomeDir, GEMINI_DIR, 'extensions');
     fs.mkdirSync(userExtensionsDir, { recursive: true });
-    Object.values(mockGit).forEach((fn) => fn.mockReset());
+    vi.mocked(checkForAllExtensionUpdates).mockReset();
+    vi.mocked(updateExtension).mockReset();
   });
 
   afterEach(() => {
@@ -126,16 +75,17 @@ describe('useExtensionUpdates', () => {
     const addItem = vi.fn();
     const cwd = '/test/cwd';
 
-    mockGit.getRemotes.mockResolvedValue([
-      {
-        name: 'origin',
-        refs: {
-          fetch: 'https://github.com/google/gemini-cli.git',
-        },
+    vi.mocked(checkForAllExtensionUpdates).mockImplementation(
+      async (extensions, dispatch) => {
+        dispatch({
+          type: 'SET_STATE',
+          payload: {
+            name: 'test-extension',
+            state: ExtensionUpdateState.UPDATE_AVAILABLE,
+          },
+        });
       },
-    ]);
-    mockGit.revparse.mockResolvedValue('local-hash');
-    mockGit.listRemote.mockResolvedValue('remote-hash\tHEAD');
+    );
 
     renderHook(() =>
       useExtensionUpdates(extensions as GeminiCLIExtension[], addItem, cwd),
@@ -170,28 +120,23 @@ describe('useExtensionUpdates', () => {
     )[0];
 
     const addItem = vi.fn();
-    mockGit.getRemotes.mockResolvedValue([
-      {
-        name: 'origin',
-        refs: {
-          fetch: 'https://github.com/google/gemini-cli.git',
-        },
+
+    vi.mocked(checkForAllExtensionUpdates).mockImplementation(
+      async (extensions, dispatch) => {
+        dispatch({
+          type: 'SET_STATE',
+          payload: {
+            name: 'test-extension',
+            state: ExtensionUpdateState.UPDATE_AVAILABLE,
+          },
+        });
       },
-    ]);
-    mockGit.revparse.mockResolvedValue('local-hash');
-    mockGit.listRemote.mockResolvedValue('remote-hash\tHEAD');
-    mockGit.clone.mockImplementation(async (_, destination) => {
-      fs.mkdirSync(path.join(mockGit.path(), destination), {
-        recursive: true,
-      });
-      fs.writeFileSync(
-        path.join(mockGit.path(), destination, EXTENSIONS_CONFIG_FILENAME),
-        JSON.stringify({ name: 'test-extension', version: '1.1.0' }),
-      );
-    });
-    vi.mocked(isWorkspaceTrusted).mockReturnValue({
-      isTrusted: true,
-      source: 'file',
+    );
+
+    vi.mocked(updateExtension).mockResolvedValue({
+      originalVersion: '1.0.0',
+      updatedVersion: '1.1.0',
+      name: '',
     });
 
     renderHook(() => useExtensionUpdates([extension], addItem, tempHomeDir));
@@ -206,7 +151,169 @@ describe('useExtensionUpdates', () => {
           expect.any(Number),
         );
       },
-      { timeout: 2000 },
+      { timeout: 4000 },
     );
+  });
+
+  it('should batch update notifications for multiple extensions', async () => {
+    const extensionDir1 = createExtension({
+      extensionsDir: userExtensionsDir,
+      name: 'test-extension-1',
+      version: '1.0.0',
+      installMetadata: {
+        source: 'https://some.git/repo1',
+        type: 'git',
+        autoUpdate: true,
+      },
+    });
+    const extensionDir2 = createExtension({
+      extensionsDir: userExtensionsDir,
+      name: 'test-extension-2',
+      version: '2.0.0',
+      installMetadata: {
+        source: 'https://some.git/repo2',
+        type: 'git',
+        autoUpdate: true,
+      },
+    });
+
+    const extensions = annotateActiveExtensions(
+      [
+        loadExtension({
+          extensionDir: extensionDir1,
+          workspaceDir: tempHomeDir,
+        })!,
+        loadExtension({
+          extensionDir: extensionDir2,
+          workspaceDir: tempHomeDir,
+        })!,
+      ],
+      tempHomeDir,
+      new ExtensionEnablementManager(ExtensionStorage.getUserExtensionsDir()),
+    );
+
+    const addItem = vi.fn();
+
+    vi.mocked(checkForAllExtensionUpdates).mockImplementation(
+      async (extensions, dispatch) => {
+        dispatch({
+          type: 'SET_STATE',
+          payload: {
+            name: 'test-extension-1',
+            state: ExtensionUpdateState.UPDATE_AVAILABLE,
+          },
+        });
+        dispatch({
+          type: 'SET_STATE',
+          payload: {
+            name: 'test-extension-2',
+            state: ExtensionUpdateState.UPDATE_AVAILABLE,
+          },
+        });
+      },
+    );
+
+    vi.mocked(updateExtension)
+      .mockResolvedValueOnce({
+        originalVersion: '1.0.0',
+        updatedVersion: '1.1.0',
+        name: '',
+      })
+      .mockResolvedValueOnce({
+        originalVersion: '2.0.0',
+        updatedVersion: '2.1.0',
+        name: '',
+      });
+
+    renderHook(() => useExtensionUpdates(extensions, addItem, tempHomeDir));
+
+    await waitFor(
+      () => {
+        expect(addItem).toHaveBeenCalledTimes(2);
+        expect(addItem).toHaveBeenCalledWith(
+          {
+            type: MessageType.INFO,
+            text: 'Extension "test-extension-1" successfully updated: 1.0.0 → 1.1.0.',
+          },
+          expect.any(Number),
+        );
+        expect(addItem).toHaveBeenCalledWith(
+          {
+            type: MessageType.INFO,
+            text: 'Extension "test-extension-2" successfully updated: 2.0.0 → 2.1.0.',
+          },
+          expect.any(Number),
+        );
+      },
+      { timeout: 4000 },
+    );
+  });
+
+  it('should batch update notifications for multiple extensions with autoUpdate: false', async () => {
+    const extensions = [
+      {
+        name: 'test-extension-1',
+        type: 'git',
+        version: '1.0.0',
+        path: '/some/path1',
+        isActive: true,
+        installMetadata: {
+          type: 'git',
+          source: 'https://some/repo1',
+          autoUpdate: false,
+        },
+      },
+      {
+        name: 'test-extension-2',
+        type: 'git',
+        version: '2.0.0',
+        path: '/some/path2',
+        isActive: true,
+        installMetadata: {
+          type: 'git',
+          source: 'https://some/repo2',
+          autoUpdate: false,
+        },
+      },
+    ];
+    const addItem = vi.fn();
+    const cwd = '/test/cwd';
+
+    vi.mocked(checkForAllExtensionUpdates).mockImplementation(
+      async (extensions, dispatch) => {
+        dispatch({ type: 'BATCH_CHECK_START' });
+        dispatch({
+          type: 'SET_STATE',
+          payload: {
+            name: 'test-extension-1',
+            state: ExtensionUpdateState.UPDATE_AVAILABLE,
+          },
+        });
+        await new Promise((r) => setTimeout(r, 50));
+        dispatch({
+          type: 'SET_STATE',
+          payload: {
+            name: 'test-extension-2',
+            state: ExtensionUpdateState.UPDATE_AVAILABLE,
+          },
+        });
+        dispatch({ type: 'BATCH_CHECK_END' });
+      },
+    );
+
+    renderHook(() =>
+      useExtensionUpdates(extensions as GeminiCLIExtension[], addItem, cwd),
+    );
+
+    await waitFor(() => {
+      expect(addItem).toHaveBeenCalledTimes(1);
+      expect(addItem).toHaveBeenCalledWith(
+        {
+          type: MessageType.INFO,
+          text: 'You have 2 extensions with an update available, run "/extensions list" for more information.',
+        },
+        expect.any(Number),
+      );
+    });
   });
 });
