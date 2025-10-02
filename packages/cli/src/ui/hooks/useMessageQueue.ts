@@ -18,6 +18,8 @@ export interface UseMessageQueueReturn {
   addMessage: (message: string) => void;
   clearQueue: () => void;
   getQueuedMessagesText: () => string;
+  popLastMessage: () => string | undefined;
+  hasMessages: () => boolean;
 }
 
 /**
@@ -51,6 +53,20 @@ export function useMessageQueue({
     return messageQueue.join('\n\n');
   }, [messageQueue]);
 
+  // Pop the last message from the queue (most recently added)
+  const popLastMessage = useCallback(() => {
+    if (messageQueue.length === 0) return undefined;
+    const lastMessage = messageQueue[messageQueue.length - 1];
+    setMessageQueue((prev) => prev.slice(0, -1));
+    return lastMessage;
+  }, [messageQueue]);
+
+  // Check if there are any messages in the queue
+  const hasMessages = useCallback(
+    () => messageQueue.length > 0,
+    [messageQueue],
+  );
+
   // Process queued messages when streaming becomes idle
   useEffect(() => {
     if (
@@ -71,5 +87,7 @@ export function useMessageQueue({
     addMessage,
     clearQueue,
     getQueuedMessagesText,
+    popLastMessage,
+    hasMessages,
   };
 }

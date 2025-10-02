@@ -75,6 +75,8 @@ export interface InputPromptProps {
   isEmbeddedShellFocused?: boolean;
   setQueueErrorMessage: (message: string | null) => void;
   streamingState: StreamingState;
+  popLastMessage?: () => string | undefined;
+  hasMessages?: () => boolean;
 }
 
 // The input content, input container, and input suggestions list may have different widths
@@ -113,6 +115,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   isEmbeddedShellFocused,
   setQueueErrorMessage,
   streamingState,
+  popLastMessage,
+  hasMessages,
 }) => {
   const kittyProtocol = useKittyKeyboardProtocol();
   const isShellFocused = useShellFocusState();
@@ -597,6 +601,16 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         }
 
         if (keyMatchers[Command.HISTORY_UP](key)) {
+          // Check for queued messages first when input is empty
+          if (buffer.text.trim() === '' && hasMessages && popLastMessage) {
+            if (hasMessages()) {
+              const lastMessage = popLastMessage();
+              if (lastMessage) {
+                buffer.setText(lastMessage);
+                return;
+              }
+            }
+          }
           inputHistory.navigateUp();
           return;
         }
@@ -610,6 +624,16 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           (buffer.allVisualLines.length === 1 ||
             (buffer.visualCursor[0] === 0 && buffer.visualScrollRow === 0))
         ) {
+          // Check for queued messages first when input is empty
+          if (buffer.text.trim() === '' && hasMessages && popLastMessage) {
+            if (hasMessages()) {
+              const lastMessage = popLastMessage();
+              if (lastMessage) {
+                buffer.setText(lastMessage);
+                return;
+              }
+            }
+          }
           inputHistory.navigateUp();
           return;
         }
@@ -753,6 +777,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       commandSearchActive,
       commandSearchCompletion,
       kittyProtocol.supported,
+      hasMessages,
+      popLastMessage,
     ],
   );
 
