@@ -242,7 +242,6 @@ export class IDEServer {
                     `Session ${sessionId} missed ${missedPings} pings. Closing connection and cleaning up interval.`,
                   );
                   clearInterval(keepAlive);
-                  transport.close();
                 }
               });
           }, 60000); // 60 sec
