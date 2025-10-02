@@ -233,8 +233,6 @@ If you are experiencing performance issues with file searching (e.g., with `@` c
     - **`enabled`** (boolean): Whether or not telemetry is enabled.
     - **`target`** (string): The destination for collected telemetry. Supported values are `local` and `gcp`.
     - **`otlpEndpoint`** (string): The endpoint for the OTLP Exporter.
-    - **`otlpProtocol`** (string): The OTLP protocol to use. Supported values are `grpc` and `http`. Defaults to `grpc`.
-    - **`otlpHeaders`** (object): Custom headers to send with OTLP telemetry requests. Useful for authentication (e.g., API keys, bearer tokens). Values can reference environment variables using `$VAR_NAME` or `${VAR_NAME}` syntax.
     - **`logPrompts`** (boolean): Whether or not to include the content of user prompts in the logs.
   - **Example:**
     ```json
@@ -242,11 +240,6 @@ If you are experiencing performance issues with file searching (e.g., with `@` c
       "enabled": true,
       "target": "local",
       "otlpEndpoint": "http://localhost:16686",
-      "otlpProtocol": "http",
-      "otlpHeaders": {
-        "Authorization": "Bearer ${MY_TOKEN}",
-        "x-api-key": "abc123"
-      },
       "logPrompts": false
     }
     ```
@@ -442,11 +435,6 @@ The CLI automatically loads environment variables from an `.env` file. The loadi
 - **`OTLP_GOOGLE_CLOUD_PROJECT`**:
   - Your Google Cloud Project ID for Telemetry in Google Cloud
   - Example: `export OTLP_GOOGLE_CLOUD_PROJECT="YOUR_PROJECT_ID"`.
-- **`GEMINI_TELEMETRY_OTLP_HEADERS`**:
-  - Custom headers to send with OTLP telemetry requests. Can be specified in JSON format or as comma/semicolon-delimited `key=value` pairs.
-  - Useful for authentication with secured OTLP collectors (e.g., API keys, bearer tokens).
-  - JSON format example: `export GEMINI_TELEMETRY_OTLP_HEADERS='{"Authorization":"Bearer token","x-api-key":"abc123"}'`
-  - Delimiter format example: `export GEMINI_TELEMETRY_OTLP_HEADERS='Authorization=Bearer token,x-api-key=abc123'`
 - **`GOOGLE_CLOUD_LOCATION`**:
   - Your Google Cloud Project Location (e.g., us-central1).
   - Required for using Vertex AI in non express mode.
@@ -516,9 +504,6 @@ Arguments passed directly when running the CLI can override other configurations
   - Sets the OTLP endpoint for telemetry. See [telemetry](../telemetry.md) for more information.
 - **`--telemetry-otlp-protocol`**:
   - Sets the OTLP protocol for telemetry (`grpc` or `http`). Defaults to `grpc`. See [telemetry](../telemetry.md) for more information.
-- **`--telemetry-otlp-header <key=value>`**:
-  - Adds a custom OTLP header in `key=value` format. Can be specified multiple times to add multiple headers. Useful for authentication (e.g., `--telemetry-otlp-header "Authorization=Bearer token"`).
-  - Example: `gemini --telemetry --telemetry-otlp-header "Authorization=Bearer xyz" --telemetry-otlp-header "x-api-key=abc123"`
 - **`--telemetry-log-prompts`**:
   - Enables logging of prompts for telemetry. See [telemetry](../telemetry.md) for more information.
 - **`--checkpointing`**:
