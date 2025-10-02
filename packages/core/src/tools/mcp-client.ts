@@ -55,6 +55,8 @@ export type DiscoveredMCPPrompt = Prompt & {
 export enum MCPServerStatus {
   /** Server is disconnected or experiencing errors */
   DISCONNECTED = 'disconnected',
+  /** Server is actively disconnecting */
+  DISCONNECTING = 'disconnecting',
   /** Server is in the process of connecting */
   CONNECTING = 'connecting',
   /** Server is connected and ready to use */
@@ -83,7 +85,6 @@ export class McpClient {
   private client: Client | undefined;
   private transport: Transport | undefined;
   private status: MCPServerStatus = MCPServerStatus.DISCONNECTED;
-  private isDisconnecting = false;
 
   constructor(
     private readonly serverName: string,
@@ -98,12 +99,10 @@ export class McpClient {
    * Connects to the MCP server.
    */
   async connect(): Promise<void> {
-    if (this.client) {
-      // Already connected
-      return;
-    }
-    if (this.isDisconnecting) {
-      throw new Error('Cannot reconnect while still disconnecting');
+    if (this.status !== MCPServerStatus.DISCONNECTED) {
+      throw new Error(
+        `Can only connect when the client is disconnected, current state is ${this.status}`,
+      );
     }
     this.updateStatus(MCPServerStatus.CONNECTING);
     try {
@@ -115,10 +114,10 @@ export class McpClient {
       );
       const originalOnError = this.client.onerror;
       this.client.onerror = (error) => {
-        if (originalOnError) originalOnError(error);
-        if (this.isDisconnecting) {
+        if (this.status !== MCPServerStatus.CONNECTED) {
           return;
         }
+        if (originalOnError) originalOnError(error);
         console.error(`MCP ERROR (${this.serverName}):`, error.toString());
         this.updateStatus(MCPServerStatus.DISCONNECTED);
       };
@@ -153,18 +152,19 @@ export class McpClient {
    * Disconnects from the MCP server.
    */
   async disconnect(): Promise<void> {
-    if (this.isDisconnecting) return;
-    this.isDisconnecting = true;
+    if (this.status !== MCPServerStatus.CONNECTED) {
+      return;
+    }
+    this.updateStatus(MCPServerStatus.DISCONNECTING);
     const client = this.client;
     this.client = undefined;
     if (this.transport) {
       await this.transport.close();
     }
     if (client) {
-      await client?.close();
+      await client.close();
     }
     this.updateStatus(MCPServerStatus.DISCONNECTED);
-    this.isDisconnecting = false;
   }
 
   /**
@@ -179,27 +179,27 @@ export class McpClient {
     updateMCPServerStatus(this.serverName, status);
   }
 
-  private async discoverTools(cliConfig: Config): Promise<DiscoveredMCPTool[]> {
-    if (!this.client) {
+  private assertConnected(): void {
+    if (this.status !== MCPServerStatus.CONNECTED) {
       throw new Error(
-        'Client is not connected, must connect before discovering tools.',
+        `Client is not connected, must connect before interacting with the server. Current state is ${this.status}`,
       );
     }
+  }
+
+  private async discoverTools(cliConfig: Config): Promise<DiscoveredMCPTool[]> {
+    this.assertConnected();
     return discoverTools(
       this.serverName,
       this.serverConfig,
-      this.client,
+      this.client!,
       cliConfig,
     );
   }
 
   private async discoverPrompts(): Promise<Prompt[]> {
-    if (!this.client) {
-      throw new Error(
-        'Client is not connected, must connect before discovering prompts.',
-      );
-    }
-    return discoverPrompts(this.serverName, this.client, this.promptRegistry);
+    this.assertConnected();
+    return discoverPrompts(this.serverName, this.client!, this.promptRegistry);
   }
 }
 
