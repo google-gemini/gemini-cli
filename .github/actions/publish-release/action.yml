@@ -96,11 +96,10 @@ runs:
           echo "Dry run enabled. Skipping push."
         fi
 
-    - name: '🛠️ Build and Prepare Packages'
+    - name: '🛠️ Prepare Packages'
       working-directory: '${{ inputs.working-directory }}'
       shell: 'bash'
       run: |
-        npm run build:packages
         npm run prepare:package
 
     - name: 'Configure npm for publishing'
@@ -162,11 +161,7 @@ runs:
         wombat-token-core: '${{ inputs.wombat-token-core }}'
         wombat-token-cli: '${{ inputs.wombat-token-cli }}'
 
-    - name: '🎁 Bundle'
-      working-directory: '${{ inputs.working-directory }}'
-      shell: 'bash'
-      run: |
-        npm run bundle
+
 
     - name: '🎉 Create GitHub Release'
       working-directory: '${{ inputs.working-directory }}'
