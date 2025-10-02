@@ -11,7 +11,13 @@ export function createLogger(
   logger: vscode.OutputChannel,
 ) {
   return (message: string) => {
-    if (context.extensionMode === vscode.ExtensionMode.Development) {
+    const isDevMode =
+      context.extensionMode === vscode.ExtensionMode.Development;
+    const isLoggingEnabled = vscode.workspace
+      .getConfiguration('gemini-cli.debug')
+      .get('logging.enabled');
+
+    if (isDevMode || isLoggingEnabled) {
       logger.appendLine(message);
     }
   };
