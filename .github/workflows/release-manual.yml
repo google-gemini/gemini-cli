@@ -16,11 +16,11 @@ on:
         required: true
         type: 'choice'
         options:
-          - 'npm'
+          - 'npm-wombat'
           - 'github'
-        default: 'npm'
+        default: 'npm-wombat'
       npm_channel:
-        description: 'The npm channel to publish to (only used when registry is npm)'
+        description: 'The npm channel to publish to (only used when registry is npm-wombat)'
         required: true
         type: 'choice'
         options:
@@ -40,7 +40,7 @@ on:
         type: 'boolean'
         default: false
       skip_github_release:
-        description: 'Select to skip creating a GitHub release (only used when registry is npm)'
+        description: 'Select to skip creating a GitHub release (only used when registry is npm-wombat)'
         required: false
         type: 'boolean'
         default: false

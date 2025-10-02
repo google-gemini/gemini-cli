@@ -51,8 +51,7 @@ inputs:
   registry:
     description: 'The registry to publish to.'
     required: false
-    default: 'npm'
-
+    default: 'npm-wombat'
 runs:
   using: 'composite'
   steps:
@@ -121,7 +120,7 @@ runs:
         node ${{ github.workspace }}/scripts/prepare-github-release.js
 
     - name: 'Configure npm for publishing to npm'
-      if: "inputs.registry == 'npm'"
+      if: "inputs.registry != 'github'"
       uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020'
       with:
         node-version-file: '${{ inputs.working-directory }}/.nvmrc'
@@ -137,7 +136,7 @@ runs:
         scope: '@google-gemini'
 
     - name: '📦 Publish @google/gemini-cli-core to npm'
-      if: "inputs.registry == 'npm'"
+      if: "inputs.registry != 'github'"
       working-directory: '${{ inputs.working-directory }}'
       env:
         NODE_AUTH_TOKEN: '${{ inputs.wombat-token-core }}'
@@ -163,7 +162,7 @@ runs:
 
     - name: '🔗 Install latest core package'
       working-directory: '${{ inputs.working-directory }}'
-      if: "${{ inputs.dry-run != 'true' && inputs.registry == 'npm' }}"
+      if: "${{ inputs.dry-run != 'true' && inputs.registry != 'github' }}"
       shell: 'bash'
       run: |
         npm install "@google/gemini-cli-core@${{ inputs.release-version }}" \
@@ -171,7 +170,7 @@ runs:
         --save-exact
 
     - name: '📦 Publish @google/gemini-cli to npm'
-      if: "inputs.registry == 'npm'"
+      if: "inputs.registry != 'github'"
       working-directory: '${{ inputs.working-directory }}'
       env:
         NODE_AUTH_TOKEN: '${{ inputs.wombat-token-cli }}'
@@ -197,7 +196,7 @@ runs:
 
     - name: '🔬 Verify NPM release by version'
       uses: './.github/actions/verify-release'
-      if: "${{ inputs.dry-run != 'true' && inputs.force-skip-tests != 'true' && inputs.registry == 'npm' }}"
+      if: "${{ inputs.dry-run != 'true' && inputs.force-skip-tests != 'true' && inputs.registry != 'github' }}"
       with:
         npm-package: '@google/gemini-cli@${{ inputs.release-version }}'
         expected-version: '${{ inputs.release-version }}'
@@ -206,7 +205,7 @@ runs:
 
     - name: '🏷️ Tag release'
       uses: './.github/actions/tag-npm-release'
-      if: "${{ inputs.dry-run != 'true' && inputs.registry == 'npm' }}"
+      if: "${{ inputs.dry-run != 'true' && inputs.registry != 'github' }}"
       with:
         channel: '${{ inputs.npm-tag }}'
         version: '${{ inputs.release-version }}'
@@ -216,7 +215,7 @@ runs:
 
     - name: '🎉 Create GitHub Release'
       working-directory: '${{ inputs.working-directory }}'
-      if: "${{ inputs.dry-run != 'true' && inputs.skip-github-release != 'true' && inputs.npm-tag != 'dev' && inputs.registry == 'npm' }}"
+      if: "${{ inputs.dry-run != 'true' && inputs.skip-github-release != 'true' && inputs.npm-tag != 'dev' && inputs.registry != 'github' }}"
       env:
         GITHUB_TOKEN: '${{ inputs.github-token }}'
       shell: 'bash'
