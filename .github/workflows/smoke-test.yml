@@ -8,16 +8,19 @@ on:
   workflow_dispatch:
     inputs:
       ref:
-        description: 'The branch, tag, or SHA to release from.'
+        description: 'The branch, tag, or SHA to test on.'
         required: false
         type: 'string'
         default: 'main'
       dry-run:
         description: 'Run a dry-run of the smoke test; No bug will be created'
+        required: true
+        type: 'boolean'
+        default: true
 
 jobs:
   smoke-test:
-    runs-on: 'ubuntu-latest'
+    runs-on: 'self-hosted'
     permissions:
       contents: 'read'
       issues: 'write'
