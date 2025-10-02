@@ -10,9 +10,11 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.roots.ProjectRootManager
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
+import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.*
 import io.ktor.server.engine.*
 import io.ktor.server.netty.*
+import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
@@ -86,6 +88,9 @@ class IdeServer(private val project: Project, private val diffManager: DiffManag
       try {
         server = embeddedServer(Netty, port = 0, host = "127.0.0.1") {
           install(SSE)
+          install(ContentNegotiation) {
+            json(McpJson)
+          }
           routing {
             intercept(ApplicationCallPipeline.Call) {
               if (!call.request.path().startsWith("/mcp")) return@intercept
@@ -187,7 +192,7 @@ class IdeServer(private val project: Project, private val diffManager: DiffManag
 
     val workspacePath = ProjectRootManager.getInstance(project).contentRoots.map { it.path }.joinToString(File.pathSeparator)
 
-    val ppid = ProcessHandle.current().parent().get().pid()
+    val ppid = ProcessHandle.current().pid()
 
     val portInfo = PortInfo(
       port = port,

@@ -13,6 +13,7 @@ plugins {
   kotlin("jvm") version "2.2.0"
   id("org.jetbrains.intellij.platform") version "2.7.2"
   id("org.jetbrains.changelog") version "2.1.2"
+  kotlin("plugin.serialization") version "1.9.0"
 }
 
 
@@ -49,6 +50,7 @@ dependencies {
   implementation("io.ktor:ktor-server-content-negotiation:3.3.0")
   implementation("io.ktor:ktor-serialization-kotlinx-json:3.3.0")
   implementation("io.ktor:ktor-server-cors:3.3.0")
+  implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
 
   testImplementation("junit:junit:4.13.2")
   testImplementation("org.jetbrains.kotlin:kotlin-test-junit:1.9.22")
