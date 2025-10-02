@@ -97,6 +97,7 @@ export class CoderAgentExecutor implements AgentExecutor {
     agentSettings: AgentSettings,
     taskId: string,
   ): Promise<Config> {
+    // TODO(b/369671111): Use cliConfig if available
     const workspaceRoot = setTargetDir(agentSettings);
     loadEnvironment(); // Will override any global env with workspace envs
     const settings = loadSettings(workspaceRoot);
@@ -129,6 +130,7 @@ export class CoderAgentExecutor implements AgentExecutor {
       contextId,
       config,
       eventBus,
+      this.cliAppEvents,
     );
     runtimeTask.taskState = persistedState._taskState;
     await runtimeTask.geminiClient.initialize();
@@ -147,7 +149,13 @@ export class CoderAgentExecutor implements AgentExecutor {
   ): Promise<TaskWrapper> {
     const agentSettings = agentSettingsInput || ({} as AgentSettings);
     const config = await this.getConfig(agentSettings, taskId);
-    const runtimeTask = await Task.create(taskId, contextId, config, eventBus);
+    const runtimeTask = await Task.create(
+      taskId,
+      contextId,
+      config,
+      eventBus,
+      this.cliAppEvents,
+    );
     await runtimeTask.geminiClient.initialize();
 
     const wrapper = new TaskWrapper(runtimeTask, agentSettings);

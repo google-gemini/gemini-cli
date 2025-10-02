@@ -40,6 +40,7 @@ import type {
 import { v4 as uuidv4 } from 'uuid';
 import { logger } from '../utils/logger.js';
 import * as fs from 'node:fs';
+import type { EventEmitter } from 'node:events';
 
 import { CoderAgentEvent } from '../types.js';
 import type {
@@ -64,6 +65,7 @@ export class Task {
   pendingToolConfirmationDetails: Map<string, ToolCallConfirmationDetails>;
   taskState: TaskState;
   eventBus?: ExecutionEventBus;
+  cliAppEvents?: EventEmitter;
   completedToolCalls: CompletedToolCall[];
   skipFinalTrueAfterInlineEdit = false;
 
@@ -80,6 +82,7 @@ export class Task {
     contextId: string,
     config: Config,
     eventBus?: ExecutionEventBus,
+    cliAppEvents?: EventEmitter,
   ) {
     this.id = id;
     this.contextId = contextId;
@@ -89,6 +92,7 @@ export class Task {
     this.pendingToolConfirmationDetails = new Map();
     this.taskState = 'submitted';
     this.eventBus = eventBus;
+    this.cliAppEvents = cliAppEvents;
     this.completedToolCalls = [];
     this._resetToolCompletionPromise();
     this.config.setFallbackModelHandler(
@@ -104,8 +108,9 @@ export class Task {
     contextId: string,
     config: Config,
     eventBus?: ExecutionEventBus,
+    cliAppEvents?: EventEmitter,
   ): Promise<Task> {
-    return new Task(id, contextId, config, eventBus);
+    return new Task(id, contextId, config, eventBus, cliAppEvents);
   }
 
   // Note: `getAllMCPServerStatuses` retrieves the status of all MCP servers for the entire
@@ -283,6 +288,7 @@ export class Task {
       metadataError,
     );
     this.eventBus?.publish(event);
+    // TODO(b/369671111): Emit to cliAppEvents as well
   }
 
   private _schedulerOutputUpdate(
