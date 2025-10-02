@@ -33,8 +33,7 @@ export const ChatList: React.FC<ChatListProps> = ({ chats }) => {
         return (
           <Box key={chat.name} flexDirection="row">
             <Text>
-              {'  '}- <Text color={theme.text.accent}>{chat.name}</Text>
-              {'  '}
+              {'  '}- <Text color={theme.text.accent}>{chat.name}</Text>{' '}
               <Text color={theme.text.secondary}>({formattedDate})</Text>
             </Text>
           </Box>
