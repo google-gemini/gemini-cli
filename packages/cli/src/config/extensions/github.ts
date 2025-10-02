@@ -17,7 +17,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { EXTENSIONS_CONFIG_FILENAME, loadExtension } from '../extension.js';
 import * as tar from 'tar';
-import * as unzipper from 'unzipper';
+import extract from 'extract-zip';
 
 function getGitHubToken(): string | undefined {
   return process.env['GITHUB_TOKEN'];
@@ -424,10 +424,7 @@ export async function extractFile(file: string, dest: string): Promise<void> {
       cwd: dest,
     });
   } else if (file.endsWith('.zip')) {
-    await fs
-      .createReadStream(file)
-      .pipe(unzipper.Extract({ path: dest }))
-      .promise();
+    await extract(file, { dir: dest });
   } else {
     throw new Error(`Unsupported file extension for extraction: ${file}`);
   }
