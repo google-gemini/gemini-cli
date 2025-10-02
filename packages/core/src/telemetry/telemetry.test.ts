@@ -34,6 +34,7 @@ describe('telemetry', () => {
     vi.spyOn(mockConfig, 'getTelemetryOtlpEndpoint').mockReturnValue(
       'http://localhost:4317',
     );
+    vi.spyOn(mockConfig, 'getTelemetryOtlpHeaders').mockReturnValue({});
     vi.spyOn(mockConfig, 'getSessionId').mockReturnValue('test-session-id');
     mockNodeSdk = {
       start: vi.fn(),

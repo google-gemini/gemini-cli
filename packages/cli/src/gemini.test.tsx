@@ -317,6 +317,7 @@ describe('gemini.tsx main function kitty protocol', () => {
       telemetryTarget: undefined,
       telemetryOtlpEndpoint: undefined,
       telemetryOtlpProtocol: undefined,
+      telemetryOtlpHeader: undefined,
       telemetryLogPrompts: undefined,
       telemetryOutfile: undefined,
       allowedMcpServerNames: undefined,
