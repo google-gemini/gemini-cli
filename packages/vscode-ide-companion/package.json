@@ -31,6 +31,16 @@
     "onStartupFinished"
   ],
   "contributes": {
+    "configuration": {
+      "title": "Gemini CLI",
+      "properties": {
+        "gemini-cli.debug.logging.enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable detailed logging for debugging the Gemini CLI Companion."
+        }
+      }
+    },
     "languages": [
       {
         "id": "gemini-diff-editable"

@@ -47,6 +47,9 @@ vi.mock('vscode', () => ({
     registerTextDocumentContentProvider: vi.fn(),
     onDidChangeWorkspaceFolders: vi.fn(),
     onDidGrantWorkspaceTrust: vi.fn(),
+    getConfiguration: vi.fn(() => ({
+      get: vi.fn(),
+    })),
   },
   commands: {
     registerCommand: vi.fn(),
