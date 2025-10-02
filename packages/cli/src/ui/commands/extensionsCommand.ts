@@ -9,6 +9,7 @@ import {
   updateAllUpdatableExtensions,
   type ExtensionUpdateInfo,
   updateExtension,
+  checkForAllExtensionUpdates,
 } from '../../config/extensions/update.js';
 import { getErrorMessage } from '../../utils/errors.js';
 import { ExtensionUpdateState } from '../state/extensions.js';
@@ -46,6 +47,10 @@ async function updateAction(context: CommandContext, args: string) {
   }
 
   try {
+    await checkForAllExtensionUpdates(
+      context.services.config!.getExtensions(),
+      context.ui.dispatchExtensionStateUpdate,
+    );
     context.ui.setPendingItem({
       type: MessageType.EXTENSIONS_LIST,
     });
@@ -54,10 +59,13 @@ async function updateAction(context: CommandContext, args: string) {
         context.services.config!.getWorkingDir(),
         // We don't have the ability to prompt for consent yet in this flow.
         (description) =>
-          requestConsentInteractive(description, context.ui.addItem),
+          requestConsentInteractive(
+            description,
+            context.ui.addConfirmUpdateExtensionRequest,
+          ),
         context.services.config!.getExtensions(),
         context.ui.extensionsUpdateState,
-        context.ui.setExtensionsUpdateState,
+        context.ui.dispatchExtensionStateUpdate,
       );
     } else if (names?.length) {
       const workingDir = context.services.config!.getWorkingDir();
@@ -80,16 +88,13 @@ async function updateAction(context: CommandContext, args: string) {
           extension,
           workingDir,
           (description) =>
-            requestConsentInteractive(description, context.ui.addItem),
-          context.ui.extensionsUpdateState.get(extension.name) ??
+            requestConsentInteractive(
+              description,
+              context.ui.addConfirmUpdateExtensionRequest,
+            ),
+          context.ui.extensionsUpdateState.get(extension.name)?.status ??
             ExtensionUpdateState.UNKNOWN,
-          (updateState) => {
-            context.ui.setExtensionsUpdateState((prev) => {
-              const newState = new Map(prev);
-              newState.set(name, updateState);
-              return newState;
-            });
-          },
+          context.ui.dispatchExtensionStateUpdate,
         );
         if (updateInfo) updateInfos.push(updateInfo);
       }
@@ -136,6 +141,19 @@ const updateExtensionsCommand: SlashCommand = {
   description: 'Update extensions. Usage: update <extension-names>|--all',
   kind: CommandKind.BUILT_IN,
   action: updateAction,
+  completion: async (context, partialArg) => {
+    const extensions = context.services.config?.getExtensions() ?? [];
+    const extensionNames = extensions.map((ext) => ext.name);
+    const suggestions = extensionNames.filter((name) =>
+      name.startsWith(partialArg),
+    );
+
+    if ('--all'.startsWith(partialArg) || 'all'.startsWith(partialArg)) {
+      suggestions.unshift('--all');
+    }
+
+    return suggestions;
+  },
 };
 
 export const extensionsCommand: SlashCommand = {

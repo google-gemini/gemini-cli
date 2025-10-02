@@ -31,6 +31,8 @@ import type {
   ExtensionEnableEvent,
   ModelSlashCommandEvent,
   ExtensionDisableEvent,
+  SmartEditStrategyEvent,
+  SmartEditCorrectionEvent,
 } from '../types.js';
 import { EventMetadataKey } from './event-metadata-key.js';
 import type { Config } from '../../config/config.js';
@@ -39,7 +41,11 @@ import { UserAccountManager } from '../../utils/userAccountManager.js';
 import { safeJsonStringify } from '../../utils/safeJsonStringify.js';
 import { FixedDeque } from 'mnemonist';
 import { GIT_COMMIT_INFO, CLI_VERSION } from '../../generated/git-commit.js';
-import { IDE_DEFINITIONS, detectIdeFromEnv } from '../../ide/detect-ide.js';
+import {
+  IDE_DEFINITIONS,
+  detectIdeFromEnv,
+  isCloudShell,
+} from '../../ide/detect-ide.js';
 
 export enum EventNames {
   START_SESSION = 'start_session',
@@ -71,6 +77,8 @@ export enum EventNames {
   TOOL_OUTPUT_TRUNCATED = 'tool_output_truncated',
   MODEL_ROUTING = 'model_routing',
   MODEL_SLASH_COMMAND = 'model_slash_command',
+  SMART_EDIT_STRATEGY = 'smart_edit_strategy',
+  SMART_EDIT_CORRECTION = 'smart_edit_correction',
 }
 
 export interface LogResponse {
@@ -114,6 +122,8 @@ export interface LogRequest {
 function determineSurface(): string {
   if (process.env['SURFACE']) {
     return process.env['SURFACE'];
+  } else if (isCloudShell()) {
+    return IDE_DEFINITIONS.cloudshell.name;
   } else if (process.env['GITHUB_SHA']) {
     return 'GitHub';
   } else if (process.env['TERM_PROGRAM'] === 'vscode') {
@@ -1029,6 +1039,34 @@ export class ClearcutLogger {
 
     this.enqueueLogEvent(
       this.createLogEvent(EventNames.EXTENSION_DISABLE, data),
+    );
+    this.flushIfNeeded();
+  }
+
+  logSmartEditStrategyEvent(event: SmartEditStrategyEvent): void {
+    const data: EventValue[] = [
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_SMART_EDIT_STRATEGY,
+        value: event.strategy,
+      },
+    ];
+
+    this.enqueueLogEvent(
+      this.createLogEvent(EventNames.SMART_EDIT_STRATEGY, data),
+    );
+    this.flushIfNeeded();
+  }
+
+  logSmartEditCorrectionEvent(event: SmartEditCorrectionEvent): void {
+    const data: EventValue[] = [
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_SMART_EDIT_CORRECTION,
+        value: event.correction,
+      },
+    ];
+
+    this.enqueueLogEvent(
+      this.createLogEvent(EventNames.SMART_EDIT_CORRECTION, data),
     );
     this.flushIfNeeded();
   }

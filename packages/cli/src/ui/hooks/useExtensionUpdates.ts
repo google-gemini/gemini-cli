@@ -6,95 +6,181 @@
 
 import type { GeminiCLIExtension } from '@google/gemini-cli-core';
 import { getErrorMessage } from '../../utils/errors.js';
-import { ExtensionUpdateState } from '../state/extensions.js';
-import { useState } from 'react';
+import {
+  ExtensionUpdateState,
+  extensionUpdatesReducer,
+  initialExtensionUpdatesState,
+} from '../state/extensions.js';
+import { useCallback, useEffect, useMemo, useReducer } from 'react';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
-import { MessageType } from '../types.js';
+import { MessageType, type ConfirmationRequest } from '../types.js';
 import {
   checkForAllExtensionUpdates,
   updateExtension,
 } from '../../config/extensions/update.js';
 import { requestConsentInteractive } from '../../config/extension.js';
+import { checkExhaustive } from '../../utils/checks.js';
+
+type ConfirmationRequestWrapper = {
+  prompt: React.ReactNode;
+  onConfirm: (confirmed: boolean) => void;
+};
+
+type ConfirmationRequestAction =
+  | { type: 'add'; request: ConfirmationRequestWrapper }
+  | { type: 'remove'; request: ConfirmationRequestWrapper };
+
+function confirmationRequestsReducer(
+  state: ConfirmationRequestWrapper[],
+  action: ConfirmationRequestAction,
+): ConfirmationRequestWrapper[] {
+  switch (action.type) {
+    case 'add':
+      return [...state, action.request];
+    case 'remove':
+      return state.filter((r) => r !== action.request);
+    default:
+      checkExhaustive(action);
+      return state;
+  }
+}
 
 export const useExtensionUpdates = (
   extensions: GeminiCLIExtension[],
   addItem: UseHistoryManagerReturn['addItem'],
   cwd: string,
 ) => {
-  const [extensionsUpdateState, setExtensionsUpdateState] = useState(
-    new Map<string, ExtensionUpdateState>(),
+  const [extensionsUpdateState, dispatchExtensionStateUpdate] = useReducer(
+    extensionUpdatesReducer,
+    initialExtensionUpdatesState,
   );
-  const [isChecking, setIsChecking] = useState(false);
+  const [
+    confirmUpdateExtensionRequests,
+    dispatchConfirmUpdateExtensionRequests,
+  ] = useReducer(confirmationRequestsReducer, []);
+  const addConfirmUpdateExtensionRequest = useCallback(
+    (original: ConfirmationRequest) => {
+      const wrappedRequest = {
+        prompt: original.prompt,
+        onConfirm: (confirmed: boolean) => {
+          // Remove it from the outstanding list of requests by identity.
+          dispatchConfirmUpdateExtensionRequests({
+            type: 'remove',
+            request: wrappedRequest,
+          });
+          original.onConfirm(confirmed);
+        },
+      };
+      dispatchConfirmUpdateExtensionRequests({
+        type: 'add',
+        request: wrappedRequest,
+      });
+    },
+    [dispatchConfirmUpdateExtensionRequests],
+  );
 
-  (async () => {
-    if (isChecking) return;
-    setIsChecking(true);
-    try {
-      const updateState = await checkForAllExtensionUpdates(
+  useEffect(() => {
+    (async () => {
+      await checkForAllExtensionUpdates(
         extensions,
-        extensionsUpdateState,
-        setExtensionsUpdateState,
+        dispatchExtensionStateUpdate,
       );
-      let extensionsWithUpdatesCount = 0;
-      for (const extension of extensions) {
-        const prevState = extensionsUpdateState.get(extension.name);
-        const currentState = updateState.get(extension.name);
-        if (
-          prevState === currentState ||
-          currentState !== ExtensionUpdateState.UPDATE_AVAILABLE
-        ) {
-          continue;
-        }
-        if (extension.installMetadata?.autoUpdate) {
-          updateExtension(
-            extension,
-            cwd,
-            (description) => requestConsentInteractive(description, addItem),
-            currentState,
-            (newState) => {
-              setExtensionsUpdateState((prev) => {
-                const finalState = new Map(prev);
-                finalState.set(extension.name, newState);
-                return finalState;
-              });
-            },
-          )
-            .then((result) => {
-              if (!result) return;
-              addItem(
-                {
-                  type: MessageType.INFO,
-                  text: `Extension "${extension.name}" successfully updated: ${result.originalVersion} → ${result.updatedVersion}.`,
-                },
-                Date.now(),
-              );
-            })
-            .catch((error) => {
-              console.error(
-                `Error updating extension "${extension.name}": ${getErrorMessage(error)}.`,
-              );
-            });
-        } else {
-          extensionsWithUpdatesCount++;
-        }
-      }
-      if (extensionsWithUpdatesCount > 0) {
-        const s = extensionsWithUpdatesCount > 1 ? 's' : '';
-        addItem(
-          {
-            type: MessageType.INFO,
-            text: `You have ${extensionsWithUpdatesCount} extension${s} with an update available, run "/extensions list" for more information.`,
-          },
-          Date.now(),
-        );
-      }
-    } finally {
-      setIsChecking(false);
+    })();
+  }, [extensions, extensions.length, dispatchExtensionStateUpdate]);
+
+  useEffect(() => {
+    if (extensionsUpdateState.batchChecksInProgress > 0) {
+      return;
     }
-  })();
+
+    let extensionsWithUpdatesCount = 0;
+    for (const extension of extensions) {
+      const currentState = extensionsUpdateState.extensionStatuses.get(
+        extension.name,
+      );
+      if (
+        !currentState ||
+        currentState.processed ||
+        currentState.status !== ExtensionUpdateState.UPDATE_AVAILABLE
+      ) {
+        continue;
+      }
+
+      // Mark as processed immediately to avoid re-triggering.
+      dispatchExtensionStateUpdate({
+        type: 'SET_PROCESSED',
+        payload: { name: extension.name, processed: true },
+      });
+
+      if (extension.installMetadata?.autoUpdate) {
+        updateExtension(
+          extension,
+          cwd,
+          (description) =>
+            requestConsentInteractive(
+              description,
+              addConfirmUpdateExtensionRequest,
+            ),
+          currentState.status,
+          dispatchExtensionStateUpdate,
+        )
+          .then((result) => {
+            if (!result) return;
+            addItem(
+              {
+                type: MessageType.INFO,
+                text: `Extension "${extension.name}" successfully updated: ${result.originalVersion} → ${result.updatedVersion}.`,
+              },
+              Date.now(),
+            );
+          })
+          .catch((error) => {
+            addItem(
+              {
+                type: MessageType.ERROR,
+                text: getErrorMessage(error),
+              },
+              Date.now(),
+            );
+          });
+      } else {
+        extensionsWithUpdatesCount++;
+      }
+    }
+    if (extensionsWithUpdatesCount > 0) {
+      const s = extensionsWithUpdatesCount > 1 ? 's' : '';
+      addItem(
+        {
+          type: MessageType.INFO,
+          text: `You have ${extensionsWithUpdatesCount} extension${s} with an update available, run "/extensions list" for more information.`,
+        },
+        Date.now(),
+      );
+    }
+  }, [
+    extensions,
+    extensionsUpdateState,
+    addConfirmUpdateExtensionRequest,
+    addItem,
+    cwd,
+  ]);
+
+  const extensionsUpdateStateComputed = useMemo(() => {
+    const result = new Map<string, ExtensionUpdateState>();
+    for (const [
+      key,
+      value,
+    ] of extensionsUpdateState.extensionStatuses.entries()) {
+      result.set(key, value.status);
+    }
+    return result;
+  }, [extensionsUpdateState]);
 
   return {
-    extensionsUpdateState,
-    setExtensionsUpdateState,
+    extensionsUpdateState: extensionsUpdateStateComputed,
+    extensionsUpdateStateInternal: extensionsUpdateState.extensionStatuses,
+    dispatchExtensionStateUpdate,
+    confirmUpdateExtensionRequests,
+    addConfirmUpdateExtensionRequest,
   };
 };

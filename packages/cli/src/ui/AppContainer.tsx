@@ -153,12 +153,17 @@ export const AppContainer = (props: AppContainerProps) => {
   );
 
   const extensions = config.getExtensions();
-  const { extensionsUpdateState, setExtensionsUpdateState } =
-    useExtensionUpdates(
-      extensions,
-      historyManager.addItem,
-      config.getWorkingDir(),
-    );
+  const {
+    extensionsUpdateState,
+    extensionsUpdateStateInternal,
+    dispatchExtensionStateUpdate,
+    confirmUpdateExtensionRequests,
+    addConfirmUpdateExtensionRequest,
+  } = useExtensionUpdates(
+    extensions,
+    historyManager.addItem,
+    config.getWorkingDir(),
+  );
 
   const [isPermissionsDialogOpen, setPermissionsDialogOpen] = useState(false);
   const openPermissionsDialog = useCallback(
@@ -455,7 +460,8 @@ Logging in with Google... Please restart Gemini CLI to continue.
       },
       setDebugMessage,
       toggleCorgiMode: () => setCorgiMode((prev) => !prev),
-      setExtensionsUpdateState,
+      dispatchExtensionStateUpdate,
+      addConfirmUpdateExtensionRequest,
     }),
     [
       setAuthState,
@@ -467,8 +473,9 @@ Logging in with Google... Please restart Gemini CLI to continue.
       setDebugMessage,
       setShowPrivacyNotice,
       setCorgiMode,
-      setExtensionsUpdateState,
+      dispatchExtensionStateUpdate,
       openPermissionsDialog,
+      addConfirmUpdateExtensionRequest,
     ],
   );
 
@@ -490,7 +497,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
     setIsProcessing,
     setGeminiMdFileCount,
     slashCommandActions,
-    extensionsUpdateState,
+    extensionsUpdateStateInternal,
     isConfigInitialized,
   );
 
@@ -779,7 +786,10 @@ Logging in with Google... Please restart Gemini CLI to continue.
 
   const { isFolderTrustDialogOpen, handleFolderTrustSelect, isRestarting } =
     useFolderTrust(settings, setIsTrustedFolder);
-  const { needsRestart: ideNeedsRestart } = useIdeTrustListener();
+  const {
+    needsRestart: ideNeedsRestart,
+    restartReason: ideTrustRestartReason,
+  } = useIdeTrustListener();
   const isInitialMount = useRef(true);
 
   useEffect(() => {
@@ -973,14 +983,6 @@ Logging in with Google... Please restart Gemini CLI to continue.
   );
 
   useKeypress(handleGlobalKeypress, { isActive: true });
-  useKeypress(
-    (key) => {
-      if (key.name === 'r' || key.name === 'R') {
-        process.exit(0);
-      }
-    },
-    { isActive: showIdeRestartPrompt },
-  );
 
   // Update terminal title with Gemini CLI status and thoughts
   useEffect(() => {
@@ -1042,6 +1044,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
     isFolderTrustDialogOpen ||
     !!shellConfirmationRequest ||
     !!confirmationRequest ||
+    confirmUpdateExtensionRequests.length > 0 ||
     !!loopDetectionConfirmationRequest ||
     isThemeDialogOpen ||
     isSettingsDialogOpen ||
@@ -1051,6 +1054,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
     isAuthDialogOpen ||
     isEditorDialogOpen ||
     showPrivacyNotice ||
+    showIdeRestartPrompt ||
     !!proQuotaRequest;
 
   const pendingHistoryItems = useMemo(
@@ -1082,6 +1086,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       commandContext,
       shellConfirmationRequest,
       confirmationRequest,
+      confirmUpdateExtensionRequests,
       loopDetectionConfirmationRequest,
       geminiMdFileCount,
       streamingState,
@@ -1133,6 +1138,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       currentIDE,
       updateInfo,
       showIdeRestartPrompt,
+      ideTrustRestartReason,
       isRestarting,
       extensionsUpdateState,
       activePtyId,
@@ -1159,6 +1165,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       commandContext,
       shellConfirmationRequest,
       confirmationRequest,
+      confirmUpdateExtensionRequests,
       loopDetectionConfirmationRequest,
       geminiMdFileCount,
       streamingState,
@@ -1209,6 +1216,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       currentIDE,
       updateInfo,
       showIdeRestartPrompt,
+      ideTrustRestartReason,
       isRestarting,
       currentModel,
       extensionsUpdateState,
