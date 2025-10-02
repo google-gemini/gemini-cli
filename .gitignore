@@ -53,6 +53,3 @@ gha-creds-*.json
 
 # Log files
 patch_output.log
-
-# Ripgrep download temp directories
-packages/cli/download-ripgrep*/
