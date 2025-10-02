@@ -245,7 +245,7 @@ export class IDEServer {
                   transport.close();
                 }
               });
-          }, 30000); // 30 sec
+          }, 60000); // 60 sec
 
           transport.onclose = () => {
             clearInterval(keepAlive);
