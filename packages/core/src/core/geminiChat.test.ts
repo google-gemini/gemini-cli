@@ -17,7 +17,6 @@ import {
   InvalidStreamError,
   StreamEventType,
   type StreamEvent,
-  isSchemaDepthError,
 } from './geminiChat.js';
 import type { Config } from '../config/config.js';
 import { setSimulate429 } from '../utils/testUtils.js';
@@ -922,7 +921,7 @@ describe('GeminiChat', () => {
                 shouldRetry = true;
               }
               // Explicitly don't retry on these
-              if (error.status === 400 || isSchemaDepthError(error.message)) {
+              if (error.status === 400) {
                 shouldRetry = false;
               }
             }
@@ -1006,36 +1005,6 @@ describe('GeminiChat', () => {
                 'Success after retry',
           ),
         ).toBe(true);
-      });
-
-      it('should not retry on schema depth errors', async () => {
-        const schemaError = new ApiError({
-          message: 'Request failed: maximum schema depth exceeded',
-          status: 500,
-        });
-
-        vi.mocked(mockContentGenerator.generateContentStream).mockRejectedValue(
-          schemaError,
-        );
-
-        const stream = await chat.sendMessageStream(
-          'test-model',
-          { message: 'test' },
-          'prompt-id-schema',
-        );
-
-        await expect(
-          (async () => {
-            for await (const _ of stream) {
-              /* consume stream */
-            }
-          })(),
-        ).rejects.toThrow(schemaError);
-
-        // Should only be called once (no retry)
-        expect(
-          mockContentGenerator.generateContentStream,
-        ).toHaveBeenCalledTimes(1);
       });
 
       it('should retry on 5xx server errors', async () => {

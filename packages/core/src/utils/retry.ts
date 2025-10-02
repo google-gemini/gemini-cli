@@ -45,7 +45,6 @@ const DEFAULT_RETRY_OPTIONS: RetryOptions = {
 function defaultShouldRetry(error: Error | unknown): boolean {
   if (error instanceof ApiError && error.message) {
     if (error.status === 400) return false;
-    if (error.message.includes('maximum schema depth exceeded')) return false;
     if (error.status === 429) return true;
     if (error.status >= 500 && error.status < 600) return true;
     return false;
