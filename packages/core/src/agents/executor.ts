@@ -148,8 +148,11 @@ export class AgentExecutor {
 
       // Phase 1: Work Phase
       // The agent works in a loop until it stops calling tools.
+      const query = this.definition.promptConfig.query
+        ? templateString(this.definition.promptConfig.query, inputs)
+        : 'Get Started!';
       let currentMessages: Content[] = [
-        { role: 'user', parts: [{ text: 'Get Started!' }] },
+        { role: 'user', parts: [{ text: query }] },
       ];
 
       while (true) {
@@ -302,7 +305,10 @@ export class AgentExecutor {
       );
     }
 
-    const startHistory = [...(promptConfig.initialMessages ?? [])];
+    const startHistory = this.applyTemplateToInitialMessages(
+      promptConfig.initialMessages ?? [],
+      inputs,
+    );
 
     // Build system instruction from the templated prompt string.
     const systemInstruction = promptConfig.systemPrompt
@@ -364,44 +370,46 @@ export class AgentExecutor {
       return true;
     });
 
-    const toolPromises = validatedFunctionCalls.map(async (functionCall) => {
-      const callId = functionCall.id ?? `${functionCall.name}-${Date.now()}`;
-      const args = functionCall.args ?? {};
+    const toolPromises = validatedFunctionCalls.map(
+      async (functionCall, index) => {
+        const callId = functionCall.id ?? `${promptId}-${index}`;
+        const args = functionCall.args ?? {};
 
-      this.emitActivity('TOOL_CALL_START', {
-        name: functionCall.name,
-        args,
-      });
-
-      const requestInfo: ToolCallRequestInfo = {
-        callId,
-        name: functionCall.name as string,
-        args: args as Record<string, unknown>,
-        isClientInitiated: true,
-        prompt_id: promptId,
-      };
-
-      const toolResponse = await executeToolCall(
-        this.runtimeContext,
-        requestInfo,
-        signal,
-      );
-
-      if (toolResponse.error) {
-        this.emitActivity('ERROR', {
-          context: 'tool_call',
+        this.emitActivity('TOOL_CALL_START', {
           name: functionCall.name,
-          error: toolResponse.error.message,
+          args,
         });
-      } else {
-        this.emitActivity('TOOL_CALL_END', {
-          name: functionCall.name,
-          output: toolResponse.resultDisplay,
-        });
-      }
 
-      return toolResponse;
-    });
+        const requestInfo: ToolCallRequestInfo = {
+          callId,
+          name: functionCall.name as string,
+          args: args as Record<string, unknown>,
+          isClientInitiated: true,
+          prompt_id: promptId,
+        };
+
+        const toolResponse = await executeToolCall(
+          this.runtimeContext,
+          requestInfo,
+          signal,
+        );
+
+        if (toolResponse.error) {
+          this.emitActivity('ERROR', {
+            context: 'tool_call',
+            name: functionCall.name,
+            error: toolResponse.error.message,
+          });
+        } else {
+          this.emitActivity('TOOL_CALL_END', {
+            name: functionCall.name,
+            output: toolResponse.resultDisplay,
+          });
+        }
+
+        return toolResponse;
+      },
+    );
 
     const toolResponses = await Promise.all(toolPromises);
     const toolResponseParts: Part[] = toolResponses
@@ -499,6 +507,28 @@ Important Rules:
 
     // Fallback to a generic extraction message if no description is provided.
     return 'Based on your work so far, provide a comprehensive summary of your analysis and findings. Do not perform any more function calls.';
+  }
+
+  /**
+   * Applies template strings to initial messages.
+   *
+   * @param initialMessages The initial messages from the prompt config.
+   * @param inputs The validated input parameters for this invocation.
+   * @returns A new array of `Content` with templated strings.
+   */
+  private applyTemplateToInitialMessages(
+    initialMessages: Content[],
+    inputs: AgentInputs,
+  ): Content[] {
+    return initialMessages.map((content) => {
+      const newParts = (content.parts ?? []).map((part) => {
+        if ('text' in part && part.text !== undefined) {
+          return { text: templateString(part.text, inputs) };
+        }
+        return part;
+      });
+      return { ...content, parts: newParts };
+    });
   }
 
   /**
