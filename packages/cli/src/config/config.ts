@@ -74,6 +74,7 @@ export interface CliArgs {
   telemetryTarget: string | undefined;
   telemetryOtlpEndpoint: string | undefined;
   telemetryOtlpProtocol: string | undefined;
+  telemetryOtlpHeader: string[] | undefined;
   telemetryLogPrompts: boolean | undefined;
   telemetryOutfile: string | undefined;
   allowedMcpServerNames: string[] | undefined;
@@ -118,6 +119,11 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
       choices: ['grpc', 'http'],
       description:
         'Set the OTLP protocol for telemetry (grpc or http). Overrides settings files.',
+    })
+    .option('telemetry-otlp-header', {
+      type: 'array',
+      description:
+        'Add custom OTLP header(s) in key=value format. Can be specified multiple times. Overrides environment variables and settings files.',
     })
     .option('telemetry-log-prompts', {
       type: 'boolean',

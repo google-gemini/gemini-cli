@@ -308,7 +308,8 @@ Configures logging and metrics collection for Gemini CLI. For more information, 
   - **`enabled`** (boolean): Whether or not telemetry is enabled.
   - **`target`** (string): The destination for collected telemetry. Supported values are `local` and `gcp`.
   - **`otlpEndpoint`** (string): The endpoint for the OTLP Exporter.
-  - **`otlpProtocol`** (string): The protocol for the OTLP Exporter (`grpc` or `http`).
+  - **`otlpProtocol`** (string): The protocol for the OTLP Exporter (`grpc` or `http`). Defaults to `grpc`.
+  - **`otlpHeaders`** (object): Custom headers to send with OTLP telemetry requests. Useful for authentication (e.g., API keys, bearer tokens). Values can reference environment variables using `$VAR_NAME` or `${VAR_NAME}` syntax.
   - **`logPrompts`** (boolean): Whether or not to include the content of user prompts in the logs.
   - **`outfile`** (string): The file to write telemetry to when `target` is `local`.
   - **`useCollector`** (boolean): Whether to use an external OTLP collector.
@@ -351,6 +352,11 @@ Here is an example of a `settings.json` file with the nested structure, new as o
     "enabled": true,
     "target": "local",
     "otlpEndpoint": "http://localhost:4317",
+    "otlpProtocol": "http",
+    "otlpHeaders": {
+      "Authorization": "Bearer ${MY_TOKEN}",
+      "x-api-key": "abc123"
+    },
     "logPrompts": true
   },
   "privacy": {
@@ -436,6 +442,11 @@ The CLI automatically loads environment variables from an `.env` file. The loadi
 - **`GEMINI_TELEMETRY_OTLP_PROTOCOL`**:
   - Sets the OTLP protocol (`grpc` or `http`).
   - Overrides the `telemetry.otlpProtocol` setting.
+- **`GEMINI_TELEMETRY_OTLP_HEADERS`**:
+  - Custom headers to send with OTLP telemetry requests. Can be specified in JSON format or as comma/semicolon-delimited `key=value` pairs.
+  - Useful for authentication with secured OTLP collectors (e.g., API keys, bearer tokens).
+  - JSON format example: `export GEMINI_TELEMETRY_OTLP_HEADERS='{"Authorization":"Bearer token","x-api-key":"abc123"}'`
+  - Delimiter format example: `export GEMINI_TELEMETRY_OTLP_HEADERS='Authorization=Bearer token,x-api-key=abc123'`
 - **`GEMINI_TELEMETRY_LOG_PROMPTS`**:
   - Set to `true` or `1` to enable or disable logging of user prompts. Any other value is treated as disabling it.
   - Overrides the `telemetry.logPrompts` setting.
@@ -521,6 +532,9 @@ Arguments passed directly when running the CLI can override other configurations
   - Sets the OTLP endpoint for telemetry. See [telemetry](../telemetry.md) for more information.
 - **`--telemetry-otlp-protocol`**:
   - Sets the OTLP protocol for telemetry (`grpc` or `http`). Defaults to `grpc`. See [telemetry](../telemetry.md) for more information.
+- **`--telemetry-otlp-header <key=value>`**:
+  - Adds a custom OTLP header in `key=value` format. Can be specified multiple times to add multiple headers. Useful for authentication (e.g., `--telemetry-otlp-header "Authorization=Bearer token"`).
+  - Example: `gemini --telemetry --telemetry-otlp-header "Authorization=Bearer xyz" --telemetry-otlp-header "x-api-key=abc123"`
 - **`--telemetry-log-prompts`**:
   - Enables logging of prompts for telemetry. See [telemetry](../telemetry.md) for more information.
 - **`--checkpointing`**:
