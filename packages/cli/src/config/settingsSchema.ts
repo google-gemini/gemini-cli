@@ -1001,6 +1001,15 @@ const SETTINGS_SCHEMA = {
           'Enable model routing to route requests to the best model based on complexity.',
         showInDialog: true,
       },
+      enableSubagents: {
+        type: 'boolean',
+        label: 'Enable Subagents',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: false,
+        description: 'Enable experimental subagents.',
+        showInDialog: false,
+      },
     },
   },
 
@@ -1047,9 +1056,13 @@ export function getSettingsSchema(): SettingsSchemaType {
 type InferSettings<T extends SettingsSchema> = {
   -readonly [K in keyof T]?: T[K] extends { properties: SettingsSchema }
     ? InferSettings<T[K]['properties']>
-    : T[K]['default'] extends boolean
-      ? boolean
-      : T[K]['default'];
+    : T[K]['type'] extends 'enum'
+      ? T[K]['options'] extends readonly SettingEnumOption[]
+        ? T[K]['options'][number]['value']
+        : T[K]['default']
+      : T[K]['default'] extends boolean
+        ? boolean
+        : T[K]['default'];
 };
 
 export type Settings = InferSettings<SettingsSchemaType>;
