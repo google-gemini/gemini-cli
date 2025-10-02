@@ -21,7 +21,7 @@ Slash commands provide meta-level control over the CLI itself.
         - Linux/macOS: `~/.gemini/tmp/<project_hash>/`
         - Windows: `C:\Users\<YourUsername>\.gemini\tmp\<project_hash>\`
         - When you run `/chat list`, the CLI only scans these specific directories to find available checkpoints.
-        - **Note:** These checkpoints are for manually saving and resuming conversation states. For automatic checkpoints created before file modifications, see the [Checkpointing documentation](./checkpointing.md).
+        - **Note:** These checkpoints are for manually saving and resuming conversation states. For automatic checkpoints created before file modifications, see the [Checkpointing documentation](../cli/checkpointing.md).
     - **`resume`**
       - **Description:** Resumes a conversation from a previous save.
       - **Usage:** `/chat resume <tag>`
@@ -87,12 +87,14 @@ Slash commands provide meta-level control over the CLI itself.
       - **Description:** Display the full, concatenated content of the current hierarchical memory that has been loaded from all `GEMINI.md` files. This lets you inspect the instructional context being provided to the Gemini model.
     - **`refresh`**:
       - **Description:** Reload the hierarchical instructional memory from all `GEMINI.md` files found in the configured locations (global, project/ancestors, and sub-directories). This command updates the model with the latest `GEMINI.md` content.
+    - **`list`**:
+      - **Description:** Lists the paths of the GEMINI.md files in use for hierarchical memory.
     - **Note:** For more details on how `GEMINI.md` files contribute to hierarchical memory, see the [CLI Configuration documentation](../get-started/configuration.md).
 
 - **`/restore`**
   - **Description:** Restores the project files to the state they were in just before a tool was executed. This is particularly useful for undoing file edits made by a tool. If run without a tool call ID, it will list available checkpoints to restore from.
   - **Usage:** `/restore [tool_call_id]`
-  - **Note:** Only available if the CLI is invoked with the `--checkpointing` option or configured via [settings](../get-started/configuration.md). See [Checkpointing documentation](../checkpointing.md) for more details.
+  - **Note:** Only available if the CLI is invoked with the `--checkpointing` option or configured via [settings](../get-started/configuration.md). See [Checkpointing documentation](../cli/checkpointing.md) for more details.
 
 - **`/settings`**
   - **Description:** Open the settings editor to view and modify Gemini CLI settings.
