@@ -116,8 +116,8 @@ jobs:
           echo "  - Commit: ${{ steps.versions.outputs.PREVIEW_SHA }} (${{ github.event.inputs.ref }})"
           echo "  - Previous Tag: ${{ steps.versions.outputs.PREVIOUS_PREVIEW_TAG }}"
           echo ""
-          echo "Next Nightly Release: ${{ steps.versions.outputs.NEXT_NIGHTLY_VERSION }}"
-          echo "  - Commit: ${{ steps.versions.outputs.NEXT_SHA }} (${{ github.event.inputs.ref }})"
+          echo "Preparing Next Nightly Release: ${{ steps.versions.outputs.NEXT_NIGHTLY_VERSION }}"
+          echo "  - Merging Version Update PR to Branch: ${{ github.event.inputs.ref }}"
           echo "  - Previous Tag: ${{ steps.versions.outputs.PREVIOUS_NIGHTLY_TAG }}"
 
   test:
