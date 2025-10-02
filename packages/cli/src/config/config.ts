@@ -87,6 +87,7 @@ export interface CliArgs {
   useSmartEdit: boolean | undefined;
   useWriteTodos: boolean | undefined;
   outputFormat: string | undefined;
+  a2aPort: number | undefined;
 }
 
 export async function parseArguments(settings: Settings): Promise<CliArgs> {
@@ -167,6 +168,10 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
       'proxy',
       'Use the "proxy" setting in settings.json instead. This flag will be removed in a future version.',
     )
+    .option('a2a-port', {
+      type: 'number',
+      description: 'Port number for the A2A server.',
+    })
     .command('$0 [query..]', 'Launch Gemini CLI', (yargsInstance) =>
       yargsInstance
         .positional('query', {
