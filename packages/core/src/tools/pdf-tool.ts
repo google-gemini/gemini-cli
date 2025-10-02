@@ -924,8 +924,135 @@ ${pageStructureDisplay}`,
     }
   }
 
+  /**
+   * Resolve a named destination to a page reference
+   */
+  private resolveNamedDestination(pdfDoc: PDFLibDocument, destName: string): PDFObject | null {
+    try {
+      const catalog = pdfDoc.catalog;
 
+      // Try /Dests dictionary first (old-style named destinations)
+      const dests = catalog.lookup(catalog.context.obj('Dests'));
+      if (dests instanceof PDFDict) {
+        const dest = dests.lookup(dests.context.obj(destName));
+        if (dest) {
+          // Dereference if needed
+          const resolvedDest = dest && typeof dest === 'object' && 'objectNumber' in dest
+            ? catalog.context.lookup(dest)
+            : dest;
 
+          if (resolvedDest instanceof PDFArray && resolvedDest.size() > 0) {
+            return resolvedDest.get(0);
+          } else if (Array.isArray(resolvedDest) && resolvedDest.length > 0) {
+            return resolvedDest[0];
+          }
+        }
+      }
+
+      // Try /Names dictionary (new-style named destinations)
+      const names = catalog.lookup(catalog.context.obj('Names'));
+      if (names instanceof PDFDict) {
+        const destsTree = names.lookup(names.context.obj('Dests'));
+        if (destsTree instanceof PDFDict) {
+          // Search in the name tree
+          let foundDest: PDFObject | null | undefined = this.searchNameTree(destsTree, destName);
+          if (foundDest) {
+            // Dereference if it's a reference
+            if (typeof foundDest === 'object' && foundDest !== null && 'objectNumber' in foundDest) {
+              foundDest = catalog.context.lookup(foundDest) || null;
+            }
+
+            // Handle different destination formats
+            if (foundDest) {
+              // If it's a Dict, try to get the /D key
+              if (foundDest instanceof PDFDict) {
+                const destArray = foundDest.lookup(foundDest.context.obj('D'));
+                if (destArray instanceof PDFArray && destArray.size() > 0) {
+                  return destArray.get(0);
+                } else if (Array.isArray(destArray) && destArray.length > 0) {
+                  return destArray[0];
+                }
+              }
+              // If it's directly an array
+              else if (foundDest instanceof PDFArray && foundDest.size() > 0) {
+                return foundDest.get(0);
+              } else if (Array.isArray(foundDest) && foundDest.length > 0) {
+                return foundDest[0];
+              }
+            }
+          }
+        }
+      }
+
+      return null;
+    } catch (error) {
+      console.warn(`[PDF] Failed to resolve named destination "${destName}":`, error);
+      return null;
+    }
+  }
+
+  /**
+   * Search a PDF name tree for a specific key
+   */
+  private searchNameTree(node: PDFDict, targetName: string): PDFObject | null {
+    try {
+      // First dereference the node if it's a reference
+      let actualNode = node;
+      if (typeof node === 'object' && node !== null && 'objectNumber' in node) {
+        const deref = node.context.lookup(node);
+        if (deref instanceof PDFDict) {
+          actualNode = deref;
+        }
+      }
+
+      // Check for /Names array (leaf node)
+      const namesArray = actualNode.lookup(actualNode.context.obj('Names'));
+      if (namesArray instanceof PDFArray) {
+        // Names array format: [name1, value1, name2, value2, ...]
+        for (let i = 0; i < namesArray.size(); i += 2) {
+          const name = namesArray.get(i);
+          let nameStr = '';
+
+          if (name instanceof PDFString) {
+            nameStr = name.decodeText();
+          } else if (typeof name === 'string') {
+            nameStr = name;
+          } else if (name && typeof name === 'object' && 'value' in name) {
+            nameStr = String((name as { value: unknown }).value);
+          } else {
+            nameStr = String(name);
+          }
+
+          if (nameStr === targetName) {
+            return namesArray.get(i + 1);
+          }
+        }
+      }
+
+      // Check for /Kids array (intermediate node)
+      const kidsArray = actualNode.lookup(actualNode.context.obj('Kids'));
+      if (kidsArray instanceof PDFArray) {
+        for (let i = 0; i < kidsArray.size(); i++) {
+          let kid: PDFObject | undefined = kidsArray.get(i);
+
+          // Dereference kid if it's a reference
+          if (kid && typeof kid === 'object' && 'objectNumber' in kid) {
+            kid = actualNode.context.lookup(kid);
+          }
+
+          if (kid && kid instanceof PDFDict) {
+            const result = this.searchNameTree(kid, targetName);
+            if (result) return result;
+          }
+        }
+      }
+
+      return null;
+    } catch (error) {
+      console.warn('[PDF] Error searching name tree:', error);
+      return null;
+    }
+  }
 
   private async extractOutline(pdfDoc: PDFLibDocument, _originalBuffer: Buffer): Promise<{ hasOutline: boolean; items: PDFOutlineItem[]; totalItems: number }> {
     try {
@@ -1033,11 +1160,39 @@ ${pageStructureDisplay}`,
                 } else if (Array.isArray(dest) && dest.length > 0) {
                   pageNum = findPageNumber(dest[0]);
                 }
-              } else if (action instanceof PDFDict) {
-                // Action-based destination
-                const actionDest = action.lookup(action.context.obj('D'));
-                if (actionDest && Array.isArray(actionDest)) {
-                  pageNum = findPageNumber(actionDest[0]);
+              } else if (action) {
+                // Action-based destination - need to resolve the reference first
+                let actionDict: PDFObject | undefined = action;
+
+                // If action is a reference, dereference it
+                if (typeof action === 'object' && action !== null && 'objectNumber' in action) {
+                  try {
+                    const context = currentDict.context;
+                    actionDict = context.lookup(action);
+                  } catch {
+                    // If lookup fails, actionDict remains the original action
+                  }
+                }
+
+                if (actionDict && actionDict instanceof PDFDict) {
+                  // Look for /D (Destination) in the action dictionary
+                  const actionDest = actionDict.lookup(actionDict.context.obj('D'));
+                  if (actionDest) {
+                    // Check if it's a named destination (PDFString)
+                    if (actionDest instanceof PDFString) {
+                      // Named destination - need to resolve it
+                      const destName = actionDest.decodeText();
+                      const resolvedDest = this.resolveNamedDestination(pdfDoc, destName);
+                      if (resolvedDest) {
+                        pageNum = findPageNumber(resolvedDest);
+                      }
+                    } else if (actionDest instanceof PDFArray && actionDest.size() > 0) {
+                      // Direct destination array
+                      pageNum = findPageNumber(actionDest.get(0));
+                    } else if (Array.isArray(actionDest) && actionDest.length > 0) {
+                      pageNum = findPageNumber(actionDest[0]);
+                    }
+                  }
                 }
               }
 
