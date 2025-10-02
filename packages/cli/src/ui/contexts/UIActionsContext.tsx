@@ -45,6 +45,8 @@ export interface UIActions {
   onWorkspaceMigrationDialogOpen: () => void;
   onWorkspaceMigrationDialogClose: () => void;
   handleProQuotaChoice: (choice: 'auth' | 'continue') => void;
+  popLastMessage: () => string | undefined;
+  hasMessages: () => boolean;
 }
 
 export const UIActionsContext = createContext<UIActions | null>(null);
