@@ -325,7 +325,7 @@ export class MultiModelSystem {
 
     // GUI should send ONLY new user messages (like GeminiClient pattern)
     console.log('[MultiModelSystem] Received new user messages:', messages);
-    
+
     // Add all received messages to history (they should all be new user messages)
     const sessionManager = SessionManager.getInstance();
     messages.forEach(msg => {
@@ -336,9 +336,12 @@ export class MultiModelSystem {
         timestamp: msg.timestamp || new Date()
       };
       sessionManager.addHistory(msgToAdd);
-      
+
       // Auto-update title if this is the first user message in the session
-      sessionManager.handleAutoTitleGeneration(msg);
+      // Skip auto-title for continuation prompts
+      if (!(msg.role === 'user' && msg.content === 'Please continue.' && continuationDepth > 0)) {
+        sessionManager.handleAutoTitleGeneration(msg);
+      }
     });
 
     const provider = await this.getOrCreateProvider(this.currentProvider!);
@@ -462,14 +465,14 @@ export class MultiModelSystem {
       const toolCallRequests: ToolCallRequestInfo[] = [];
       const assistantToolCalls: ToolCall[] = [];  // Collect tool calls for history
       let assistantContent = '';
-      
+
       // Collect tool call requests and pass through other events
       for await (const event of responseStream) {
         if (signal.aborted) {
           console.error('[MultiModelSystem] Operation cancelled.');
           return;
         }
-        
+
         if (event.type === 'content_delta' && event.content) {
           // Collect assistant content for history
           assistantContent += event.content;
@@ -504,22 +507,8 @@ export class MultiModelSystem {
           console.log(`[MultiModelSystem] Provider compression event:`, event.compressionInfo);
           yield event;
         } else if (event.type === 'done') {
-          // Save assistant response to history when stream completes
-          if (assistantContent.trim() || assistantToolCalls.length > 0) {
-            const assistantMessage: UniversalMessage = {
-              role: 'assistant',
-              content: assistantContent,
-              timestamp: new Date()
-            };
-            
-            // Include tool calls if any were made
-            if (assistantToolCalls.length > 0) {
-              assistantMessage.toolCalls = assistantToolCalls;
-            }
-            
-            SessionManager.getInstance().addHistory(assistantMessage);
-            console.log(`[MultiModelSystem] Saved assistant response to history (${assistantContent.length} chars, ${assistantToolCalls.length} tool calls)`);
-          }
+          // Note: Assistant message is now saved AFTER the stream completes, not here
+          // This prevents duplicate saves and ensures tool calls are included
           yield event;
         } else if (event.type === 'error') {
           // Log error
@@ -560,7 +549,25 @@ export class MultiModelSystem {
           yield event;
         }
       }
-      
+
+      // CRITICAL: Save assistant message to history BEFORE processing tool calls
+      // This ensures assistant content is preserved even if tool execution fails or continues
+      if (assistantContent.trim() || assistantToolCalls.length > 0) {
+        const assistantMessage: UniversalMessage = {
+          role: 'assistant',
+          content: assistantContent,
+          timestamp: new Date()
+        };
+
+        // Include tool calls if any were made
+        if (assistantToolCalls.length > 0) {
+          assistantMessage.toolCalls = assistantToolCalls;
+        }
+
+        SessionManager.getInstance().addHistory(assistantMessage);
+        console.log(`[MultiModelSystem] Saved assistant response BEFORE tool execution (${assistantContent.length} chars, ${assistantToolCalls.length} tool calls)`);
+      }
+
       // Check if we have tool calls to execute (like nonInteractiveCli.ts)
       if (toolCallRequests.length > 0) {
         // Check for duplicate tool calls before execution
@@ -786,7 +793,7 @@ export class MultiModelSystem {
 
             if (nextSpeakerResult && nextSpeakerResult.next_speaker === 'model') {
               // Model should continue, send "Please continue." message
-              console.log('[MultiModelSystem] Model should continue, sending continuation prompt');
+              console.log('[MultiModelSystem] Model should continue, sending continuation prompt (depth:', continuationDepth, ')');
 
               const continueMessage: UniversalMessage = {
                 role: 'user',
@@ -805,6 +812,8 @@ export class MultiModelSystem {
             console.warn('[MultiModelSystem] Next speaker check failed:', error);
             // If check fails, default to waiting for user input
           }
+        } else if (continuationDepth >= MAX_CONTINUATION_DEPTH) {
+          console.warn(`[MultiModelSystem] Reached max continuation depth (${MAX_CONTINUATION_DEPTH}), stopping continuation`);
         }
 
         // Generate title if appropriate
