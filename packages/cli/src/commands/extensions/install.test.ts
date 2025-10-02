@@ -9,9 +9,11 @@ import { handleInstall, installCommand } from './install.js';
 import yargs from 'yargs';
 
 const mockInstallExtension = vi.hoisted(() => vi.fn());
+const mockRequestConsentNonInteractive = vi.hoisted(() => vi.fn());
 
 vi.mock('../../config/extension.js', () => ({
   installExtension: mockInstallExtension,
+  requestConsentNonInteractive: mockRequestConsentNonInteractive,
 }));
 
 vi.mock('../../utils/errors.js', () => ({
@@ -27,14 +29,20 @@ describe('extensions install command', () => {
   });
 
   it('should fail if both git source and local path are provided', () => {
-    const validationParser = yargs([]).command(installCommand).fail(false);
+    const validationParser = yargs([])
+      .command(installCommand)
+      .fail(false)
+      .locale('en');
     expect(() =>
       validationParser.parse('install some-url --path /some/path'),
     ).toThrow('Arguments source and path are mutually exclusive');
   });
 
   it('should fail if both auto update and local path are provided', () => {
-    const validationParser = yargs([]).command(installCommand).fail(false);
+    const validationParser = yargs([])
+      .command(installCommand)
+      .fail(false)
+      .locale('en');
     expect(() =>
       validationParser.parse(
         'install some-url --path /some/path --auto-update',
@@ -58,6 +66,7 @@ describe('handleInstall', () => {
 
   afterEach(() => {
     mockInstallExtension.mockClear();
+    mockRequestConsentNonInteractive.mockClear();
     vi.resetAllMocks();
   });
 

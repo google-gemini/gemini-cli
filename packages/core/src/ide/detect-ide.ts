@@ -16,11 +16,13 @@ export const IDE_DEFINITIONS = {
   vscodefork: { name: 'vscodefork', displayName: 'IDE' },
 } as const;
 
-export type IdeName = keyof typeof IDE_DEFINITIONS;
-
 export interface IdeInfo {
-  name: IdeName;
+  name: string;
   displayName: string;
+}
+
+export function isCloudShell(): boolean {
+  return !!(process.env['EDITOR_IN_CLOUD_SHELL'] || process.env['CLOUD_SHELL']);
 }
 
 export function detectIdeFromEnv(): IdeInfo {
@@ -36,7 +38,7 @@ export function detectIdeFromEnv(): IdeInfo {
   if (process.env['CODESPACES']) {
     return IDE_DEFINITIONS.codespaces;
   }
-  if (process.env['EDITOR_IN_CLOUD_SHELL'] || process.env['CLOUD_SHELL']) {
+  if (isCloudShell()) {
     return IDE_DEFINITIONS.cloudshell;
   }
   if (process.env['TERM_PRODUCT'] === 'Trae') {
@@ -64,10 +66,20 @@ function verifyVSCode(
   return IDE_DEFINITIONS.vscodefork;
 }
 
-export function detectIde(ideProcessInfo: {
-  pid: number;
-  command: string;
-}): IdeInfo | undefined {
+export function detectIde(
+  ideProcessInfo: {
+    pid: number;
+    command: string;
+  },
+  ideInfoFromFile?: { name?: string; displayName?: string },
+): IdeInfo | undefined {
+  if (ideInfoFromFile?.name && ideInfoFromFile.displayName) {
+    return {
+      name: ideInfoFromFile.name,
+      displayName: ideInfoFromFile.displayName,
+    };
+  }
+
   // Only VSCode-based integrations are currently supported.
   if (process.env['TERM_PROGRAM'] !== 'vscode') {
     return undefined;

@@ -2,11 +2,6 @@ name: 'Run Tests'
 description: 'Runs the preflight checks and integration tests.'
 
 inputs:
-  force_skip_tests:
-    description: 'Whether to force skip the tests.'
-    required: false
-    type: 'boolean'
-    default: false
   gemini_api_key:
     description: 'The API key for running integration tests.'
     required: true
@@ -18,14 +13,24 @@ inputs:
 runs:
   using: 'composite'
   steps:
+    - name: '📝 Print Inputs'
+      shell: 'bash'
+      run: 'echo "${{ toJSON(inputs) }}"'
     - name: 'Run Tests'
-      if: '${{ !inputs.force_skip_tests }}'
       env:
         GEMINI_API_KEY: '${{ inputs.gemini_api_key }}'
       working-directory: '${{ inputs.working-directory }}'
       run: |-
+        echo "::group::Build"
         npm run build
+        echo "::endgroup::"
+        echo "::group::Unit Tests"
         npm run test:ci
+        echo "::endgroup::"
+        echo "::group::Integration Tests (no sandbox)"
         npm run test:integration:sandbox:none
+        echo "::endgroup::"
+        echo "::group::Integration Tests (docker sandbox)"
         npm run test:integration:sandbox:docker
+        echo "::endgroup::"
       shell: 'bash'

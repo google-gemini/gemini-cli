@@ -13,6 +13,13 @@ on:
   pull_request_target:
     types: ['labeled']
   merge_group:
+  workflow_dispatch:
+    inputs:
+      branch_ref:
+        description: 'Branch to run on'
+        required: true
+        default: 'main'
+        type: 'string'
 
 concurrency:
   group: '${{ github.workflow }}-${{ github.head_ref || github.ref }}'
@@ -20,48 +27,27 @@ concurrency:
     ${{ github.ref != 'refs/heads/main' && !startsWith(github.ref, 'refs/heads/release/') }}
 
 jobs:
-  build:
-    name: 'Build Project'
+  merge_queue_skipper:
+    name: 'Merge Queue Skipper'
     runs-on: 'gemini-cli-ubuntu-16-core'
-    if: |
-      github.event_name == 'push' ||
-      github.event_name == 'merge_group' ||
-      (github.event.pull_request.head.repo.full_name == github.repository) ||
-      (github.event.label.name == 'maintainer:e2e:ok')
+    outputs:
+      skip: '${{ steps.merge-queue-e2e-skipper.outputs.skip-check }}'
     steps:
-      - name: 'Checkout'
-        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
-
-      - name: 'Set up Node.js'
-        uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions-node@v4
+      - id: 'merge-queue-e2e-skipper'
+        uses: 'cariad-tech/merge-queue-ci-skipper@1032489e59437862c90a08a2c92809c903883772' # ratchet:cariad-tech/merge-queue-ci-skipper@main
         with:
-          node-version-file: '.nvmrc'
-          cache: 'npm'
-
-      - name: 'Install dependencies'
-        run: 'npm ci'
-
-      - name: 'Build project'
-        run: 'npm run build'
-
-      - name: 'Archive build artifacts'
-        run: 'tar -cvf build-artifacts.tar bundle/ node_modules/ packages/ package.json'
-
-      - name: 'Upload build artifacts'
-        uses: 'actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02'
-        with:
-          name: 'build-artifacts-${{ github.run_id }}'
-          path: 'build-artifacts.tar'
+          secret: '${{ secrets.GITHUB_TOKEN }}'
 
   e2e_linux:
     name: 'E2E Test (Linux) - ${{ matrix.sandbox }}'
-    needs:
-      - 'build'
+    needs: 'merge_queue_skipper'
     if: |
-      github.event_name == 'push' ||
+      needs.merge_queue_skipper.outputs.skip == 'false' &&
+      (github.event_name == 'push' ||
       github.event_name == 'merge_group' ||
+      github.event_name == 'workflow_dispatch' ||
       (github.event.pull_request.head.repo.full_name == github.repository) ||
-      (github.event.label.name == 'maintainer:e2e:ok')
+      (github.event.label.name == 'maintainer:e2e:ok'))
     runs-on: 'gemini-cli-ubuntu-16-core'
     strategy:
       fail-fast: false
@@ -74,29 +60,28 @@ jobs:
 
     steps:
       - name: 'Checkout (fork)'
-        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
+        uses: 'actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955' # ratchet:actions/checkout@v5
         if: "github.event_name == 'pull_request_target'"
         with:
           ref: '${{ github.event.pull_request.head.sha }}'
           repository: '${{ github.event.pull_request.head.repo.full_name }}'
 
       - name: 'Checkout (internal)'
-        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
+        uses: 'actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955' # ratchet:actions/checkout@v5
         if: "github.event_name != 'pull_request_target'"
-
-      - name: 'Download build artifacts'
-        uses: 'actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093'
         with:
-          name: 'build-artifacts-${{ github.run_id }}'
-          path: '.'
-
-      - name: 'Extract build artifacts'
-        run: 'tar -xvf build-artifacts.tar'
+          ref: '${{ github.event.inputs.branch_ref || github.ref }}'
 
       - name: 'Set up Node.js ${{ matrix.node-version }}'
         uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions-node@v4
         with:
           node-version: '${{ matrix.node-version }}'
+
+      - name: 'Install dependencies'
+        run: 'npm ci'
+
+      - name: 'Build project'
+        run: 'npm run build'
 
       - name: 'Set up Docker'
         if: "matrix.sandbox == 'sandbox:docker'"
@@ -106,67 +91,55 @@ jobs:
         env:
           GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
           KEEP_OUTPUT: 'true'
-          SANDBOX: '${{ matrix.sandbox }}'
           VERBOSE: 'true'
-          GEMINI_SANDBOX: 'docker'
         shell: 'bash'
         run: |
           if [[ "${{ matrix.sandbox }}" == "sandbox:docker" ]]; then
-            npm run build:sandbox
+            npm run test:integration:sandbox:docker
+          else
+            npm run test:integration:sandbox:none
           fi
-          npx vitest run --root ./integration-tests
 
-  e2e_slow_platforms:
-    name: 'Slow E2E - Mac'
-    needs:
-      - 'build'
+  e2e_mac:
+    name: 'E2E Test (macOS)'
+    needs: 'merge_queue_skipper'
     if: |
-      github.event_name == 'push' ||
+      needs.merge_queue_skipper.outputs.skip == 'false' &&
+      (github.event_name == 'push' ||
       github.event_name == 'merge_group' ||
+      github.event_name == 'workflow_dispatch' ||
       (github.event.pull_request.head.repo.full_name == github.repository) ||
-      (github.event.label.name == 'maintainer:e2e:ok')
-    runs-on: '${{ matrix.os }}'
-    continue-on-error: true
-    strategy:
-      fail-fast: false
-      matrix:
-        os:
-          - 'macos-latest'
-        node-version:
-          - '20.x'
-
+      (github.event.label.name == 'maintainer:e2e:ok'))
+    runs-on: 'macos-latest'
     steps:
       - name: 'Checkout (fork)'
-        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
+        uses: 'actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955' # ratchet:actions/checkout@v5
         if: "github.event_name == 'pull_request_target'"
         with:
           ref: '${{ github.event.pull_request.head.sha }}'
           repository: '${{ github.event.pull_request.head.repo.full_name }}'
 
       - name: 'Checkout (internal)'
-        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
+        uses: 'actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955' # ratchet:actions/checkout@v5
         if: "github.event_name != 'pull_request_target'"
-
-      - name: 'Download build artifacts'
-        uses: 'actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093'
         with:
-          name: 'build-artifacts-${{ github.run_id }}'
-          path: '.'
+          ref: '${{ github.event.inputs.branch_ref || github.ref }}'
 
-      - name: 'Extract build artifacts'
-        run: 'tar -xvf build-artifacts.tar'
-
-      - name: 'Set up Node.js ${{ matrix.node-version }}'
+      - name: 'Set up Node.js 20.x'
         uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions-node@v4
         with:
-          node-version: '${{ matrix.node-version }}'
+          node-version: '20.x'
+
+      - name: 'Install dependencies'
+        run: 'npm ci'
+
+      - name: 'Build project'
+        run: 'npm run build'
 
       - name: 'Fix rollup optional dependencies on macOS'
         if: "runner.os == 'macOS'"
         run: |
           npm cache clean --force
-          npm install --no-save @rollup/rollup-darwin-arm64 || true
-
       - name: 'Run E2E tests (non-Windows)'
         if: "runner.os != 'Windows'"
         env:
@@ -174,29 +147,34 @@ jobs:
           KEEP_OUTPUT: 'true'
           SANDBOX: 'sandbox:none'
           VERBOSE: 'true'
-        run: 'npx vitest run --root ./integration-tests'
+        run: 'npm run test:integration:sandbox:none'
 
   e2e_windows:
     name: 'Slow E2E - Win'
+    needs: 'merge_queue_skipper'
     if: |
-      github.event_name == 'push' ||
+      needs.merge_queue_skipper.outputs.skip == 'false' &&
+      (github.event_name == 'push' ||
       github.event_name == 'merge_group' ||
+      github.event_name == 'workflow_dispatch' ||
       (github.event.pull_request.head.repo.full_name == github.repository) ||
-      (github.event.label.name == 'maintainer:e2e:ok')
+      (github.event.label.name == 'maintainer:e2e:ok'))
     runs-on: 'gemini-cli-windows-16-core'
     continue-on-error: true
 
     steps:
       - name: 'Checkout (fork)'
-        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
+        uses: 'actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955' # ratchet:actions/checkout@v5
         if: "github.event_name == 'pull_request_target'"
         with:
           ref: '${{ github.event.pull_request.head.sha }}'
           repository: '${{ github.event.pull_request.head.repo.full_name }}'
 
       - name: 'Checkout (internal)'
-        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
+        uses: 'actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955' # ratchet:actions/checkout@v5
         if: "github.event_name != 'pull_request_target'"
+        with:
+          ref: '${{ github.event.inputs.branch_ref || github.ref }}'
 
       - name: 'Set up Node.js 20.x'
         uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions-node@v4
@@ -226,6 +204,10 @@ jobs:
         run: 'npm ci'
         shell: 'pwsh'
 
+      - name: 'Build project'
+        run: 'npm run build'
+        shell: 'pwsh'
+
       - name: 'Run E2E tests'
         env:
           GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
@@ -236,7 +218,7 @@ jobs:
           UV_THREADPOOL_SIZE: '32'
           NODE_ENV: 'test'
         shell: 'pwsh'
-        run: 'npx vitest run --root ./integration-tests'
+        run: 'npm run test:integration:sandbox:none'
 
   e2e:
     name: 'E2E'
@@ -244,17 +226,20 @@ jobs:
       always() && (
         github.event_name == 'push' ||
         github.event_name == 'merge_group' ||
+        github.event_name == 'workflow_dispatch' ||
         (github.event.pull_request.head.repo.full_name == github.repository) ||
         (github.event.label.name == 'maintainer:e2e:ok')
       )
     needs:
       - 'e2e_linux'
+      - 'e2e_mac'
     runs-on: 'gemini-cli-ubuntu-16-core'
     steps:
       - name: 'Check E2E test results'
         run: |
-          if [[ ${{ needs.e2e_linux.result }} != 'success' ]]; then
-            echo "The required E2E test job failed."
+          if [[ (${{ needs.e2e_linux.result }} != 'success' && ${{ needs.e2e_linux.result }} != 'skipped') || \
+               (${{ needs.e2e_mac.result }} != 'success' && ${{ needs.e2e_mac.result }} != 'skipped') ]]; then
+            echo "One or more E2E jobs failed."
             exit 1
           fi
-          echo "All required E2E test jobs passed!"
+          echo "All required E2E jobs passed!"

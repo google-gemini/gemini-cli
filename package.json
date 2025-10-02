@@ -1,6 +1,6 @@
 {
   "name": "@google/gemini-cli",
-  "version": "0.7.0-nightly.20250918.2722473a",
+  "version": "0.9.0-nightly.20251001.163dba7e",
   "engines": {
     "node": ">=20.0.0"
   },
@@ -14,7 +14,7 @@
     "url": "git+https://github.com/google-gemini/gemini-cli.git"
   },
   "config": {
-    "sandboxImageUri": "us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:0.7.0-nightly.20250918.2722473a"
+    "sandboxImageUri": "us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:0.9.0-nightly.20251001.163dba7e"
   },
   "scripts": {
     "start": "cross-env node scripts/start.js",
@@ -29,7 +29,7 @@
     "build:vscode": "node scripts/build_vscode_companion.js",
     "build:all": "npm run build && npm run build:sandbox && npm run build:vscode",
     "build:packages": "npm run build --workspaces",
-    "build:sandbox": "node scripts/build_sandbox.js --skip-npm-install-build",
+    "build:sandbox": "node scripts/build_sandbox.js",
     "bundle": "npm run generate && node esbuild.config.js && node scripts/copy_bundle_assets.js",
     "test": "npm run test --workspaces --if-present --parallel",
     "test:ci": "npm run test:ci --workspaces --if-present --parallel && npm run test:scripts",
@@ -52,7 +52,14 @@
     "telemetry": "node scripts/telemetry.js",
     "check:lockfile": "node scripts/check-lockfile.js",
     "clean": "node scripts/clean.js",
-    "pre-commit": "lint-staged"
+    "pre-commit": "node scripts/pre-commit.js"
+  },
+  "overrides": {
+    "wrap-ansi": "9.0.2",
+    "ansi-regex": "5.0.1",
+    "cliui": {
+      "wrap-ansi": "7.0.0"
+    }
   },
   "bin": {
     "gemini": "bundle/gemini.js"
@@ -91,12 +98,15 @@
     "npm-run-all": "^4.1.5",
     "prettier": "^3.5.3",
     "react-devtools-core": "^4.28.5",
+    "semver": "^7.7.2",
+    "strip-ansi": "^7.1.2",
     "tsx": "^4.20.3",
     "typescript-eslint": "^8.30.1",
     "vitest": "^3.2.4",
     "yargs": "^17.7.2"
   },
   "dependencies": {
+    "@testing-library/dom": "^10.4.1",
     "simple-git": "^3.28.0"
   },
   "optionalDependencies": {
@@ -107,9 +117,6 @@
     "@lydell/node-pty-win32-arm64": "1.1.0",
     "@lydell/node-pty-win32-x64": "1.1.0",
     "node-pty": "^1.0.0"
-  },
-  "overrides": {
-    "wrap-ansi": "9.0.2"
   },
   "lint-staged": {
     "*.{js,jsx,ts,tsx}": [

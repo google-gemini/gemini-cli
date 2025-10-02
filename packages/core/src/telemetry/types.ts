@@ -498,17 +498,20 @@ export class ContentRetryEvent implements BaseTelemetryEvent {
   attempt_number: number;
   error_type: string; // e.g., 'EmptyStreamError'
   retry_delay_ms: number;
+  model: string;
 
   constructor(
     attempt_number: number,
     error_type: string,
     retry_delay_ms: number,
+    model: string,
   ) {
     this['event.name'] = 'content_retry';
     this['event.timestamp'] = new Date().toISOString();
     this.attempt_number = attempt_number;
     this.error_type = error_type;
     this.retry_delay_ms = retry_delay_ms;
+    this.model = model;
   }
 }
 
@@ -518,10 +521,12 @@ export class ContentRetryFailureEvent implements BaseTelemetryEvent {
   total_attempts: number;
   final_error_type: string;
   total_duration_ms?: number; // Optional: total time spent retrying
+  model: string;
 
   constructor(
     total_attempts: number,
     final_error_type: string,
+    model: string,
     total_duration_ms?: number,
   ) {
     this['event.name'] = 'content_retry_failure';
@@ -529,6 +534,7 @@ export class ContentRetryFailureEvent implements BaseTelemetryEvent {
     this.total_attempts = total_attempts;
     this.final_error_type = final_error_type;
     this.total_duration_ms = total_duration_ms;
+    this.model = model;
   }
 }
 
@@ -560,33 +566,6 @@ export class ModelRoutingEvent implements BaseTelemetryEvent {
     this.error_message = error_message;
   }
 }
-
-export type TelemetryEvent =
-  | StartSessionEvent
-  | EndSessionEvent
-  | UserPromptEvent
-  | ToolCallEvent
-  | ApiRequestEvent
-  | ApiErrorEvent
-  | ApiResponseEvent
-  | FlashFallbackEvent
-  | LoopDetectedEvent
-  | LoopDetectionDisabledEvent
-  | NextSpeakerCheckEvent
-  | KittySequenceOverflowEvent
-  | MalformedJsonResponseEvent
-  | IdeConnectionEvent
-  | ConversationFinishedEvent
-  | SlashCommandEvent
-  | FileOperationEvent
-  | InvalidChunkEvent
-  | ContentRetryEvent
-  | ContentRetryFailureEvent
-  | ExtensionEnableEvent
-  | ExtensionInstallEvent
-  | ExtensionUninstallEvent
-  | ModelRoutingEvent
-  | ToolOutputTruncatedEvent;
 
 export class ExtensionInstallEvent implements BaseTelemetryEvent {
   'event.name': 'extension_install';
@@ -667,5 +646,83 @@ export class ExtensionEnableEvent implements BaseTelemetryEvent {
     this['event.timestamp'] = new Date().toISOString();
     this.extension_name = extension_name;
     this.setting_scope = settingScope;
+  }
+}
+
+export class ModelSlashCommandEvent implements BaseTelemetryEvent {
+  'event.name': 'model_slash_command';
+  'event.timestamp': string;
+  model_name: string;
+
+  constructor(model_name: string) {
+    this['event.name'] = 'model_slash_command';
+    this['event.timestamp'] = new Date().toISOString();
+    this.model_name = model_name;
+  }
+}
+
+export type TelemetryEvent =
+  | StartSessionEvent
+  | EndSessionEvent
+  | UserPromptEvent
+  | ToolCallEvent
+  | ApiRequestEvent
+  | ApiErrorEvent
+  | ApiResponseEvent
+  | FlashFallbackEvent
+  | LoopDetectedEvent
+  | LoopDetectionDisabledEvent
+  | NextSpeakerCheckEvent
+  | KittySequenceOverflowEvent
+  | MalformedJsonResponseEvent
+  | IdeConnectionEvent
+  | ConversationFinishedEvent
+  | SlashCommandEvent
+  | FileOperationEvent
+  | InvalidChunkEvent
+  | ContentRetryEvent
+  | ContentRetryFailureEvent
+  | ExtensionEnableEvent
+  | ExtensionInstallEvent
+  | ExtensionUninstallEvent
+  | ModelRoutingEvent
+  | ToolOutputTruncatedEvent
+  | ModelSlashCommandEvent;
+
+export class ExtensionDisableEvent implements BaseTelemetryEvent {
+  'event.name': 'extension_disable';
+  'event.timestamp': string;
+  extension_name: string;
+  setting_scope: string;
+
+  constructor(extension_name: string, settingScope: string) {
+    this['event.name'] = 'extension_disable';
+    this['event.timestamp'] = new Date().toISOString();
+    this.extension_name = extension_name;
+    this.setting_scope = settingScope;
+  }
+}
+
+export class SmartEditStrategyEvent implements BaseTelemetryEvent {
+  'event.name': 'smart_edit_strategy';
+  'event.timestamp': string;
+  strategy: string;
+
+  constructor(strategy: string) {
+    this['event.name'] = 'smart_edit_strategy';
+    this['event.timestamp'] = new Date().toISOString();
+    this.strategy = strategy;
+  }
+}
+
+export class SmartEditCorrectionEvent implements BaseTelemetryEvent {
+  'event.name': 'smart_edit_correction';
+  'event.timestamp': string;
+  correction: 'success' | 'failure';
+
+  constructor(correction: 'success' | 'failure') {
+    this['event.name'] = 'smart_edit_correction';
+    this['event.timestamp'] = new Date().toISOString();
+    this.correction = correction;
   }
 }

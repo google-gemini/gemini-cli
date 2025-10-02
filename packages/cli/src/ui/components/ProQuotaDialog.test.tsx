@@ -38,10 +38,12 @@ describe('ProQuotaDialog', () => {
           {
             label: 'Change auth (executes the /auth command)',
             value: 'auth',
+            key: 'auth',
           },
           {
             label: `Continue with gemini-2.5-flash`,
             value: 'continue',
+            key: 'continue',
           },
         ],
       }),

@@ -248,6 +248,16 @@ const SETTINGS_SCHEMA = {
         description: 'Hide the window title bar',
         showInDialog: true,
       },
+      showStatusInTitle: {
+        type: 'boolean',
+        label: 'Show Status in Title',
+        category: 'UI',
+        requiresRestart: false,
+        default: false,
+        description:
+          'Show Gemini CLI status and thoughts in the terminal window title',
+        showInDialog: true,
+      },
       hideTips: {
         type: 'boolean',
         label: 'Hide Tips',
@@ -751,7 +761,7 @@ const SETTINGS_SCHEMA = {
         label: 'Enable Tool Output Truncation',
         category: 'General',
         requiresRestart: true,
-        default: false,
+        default: true,
         description: 'Enable truncation of large tool outputs.',
         showInDialog: true,
       },
@@ -772,6 +782,16 @@ const SETTINGS_SCHEMA = {
         requiresRestart: true,
         default: DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
         description: 'The number of lines to keep when truncating tool output.',
+        showInDialog: true,
+      },
+      enableMessageBusIntegration: {
+        type: 'boolean',
+        label: 'Enable Message Bus Integration',
+        category: 'Tools',
+        requiresRestart: true,
+        default: false,
+        description:
+          'Enable policy-based tool confirmation via message bus integration. When enabled, tools will automatically respect policy engine decisions (ALLOW/DENY/ASK_USER) without requiring individual tool implementations.',
         showInDialog: true,
       },
     },
@@ -979,6 +999,15 @@ const SETTINGS_SCHEMA = {
         default: false,
         description:
           'Enable model routing to route requests to the best model based on complexity.',
+        showInDialog: true,
+      },
+      enableSubagents: {
+        type: 'boolean',
+        label: 'Enable Subagents',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: false,
+        description: 'Enable experimental subagents.',
         showInDialog: false,
       },
     },
@@ -1027,9 +1056,13 @@ export function getSettingsSchema(): SettingsSchemaType {
 type InferSettings<T extends SettingsSchema> = {
   -readonly [K in keyof T]?: T[K] extends { properties: SettingsSchema }
     ? InferSettings<T[K]['properties']>
-    : T[K]['default'] extends boolean
-      ? boolean
-      : T[K]['default'];
+    : T[K]['type'] extends 'enum'
+      ? T[K]['options'] extends readonly SettingEnumOption[]
+        ? T[K]['options'][number]['value']
+        : T[K]['default']
+      : T[K]['default'] extends boolean
+        ? boolean
+        : T[K]['default'];
 };
 
 export type Settings = InferSettings<SettingsSchemaType>;

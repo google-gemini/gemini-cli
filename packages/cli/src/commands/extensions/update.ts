@@ -8,6 +8,8 @@ import type { CommandModule } from 'yargs';
 import {
   loadExtensions,
   annotateActiveExtensions,
+  ExtensionStorage,
+  requestConsentNonInteractive,
 } from '../../config/extension.js';
 import {
   updateAllUpdatableExtensions,
@@ -18,6 +20,7 @@ import {
 import { checkForExtensionUpdate } from '../../config/extensions/github.js';
 import { getErrorMessage } from '../../utils/errors.js';
 import { ExtensionUpdateState } from '../../ui/state/extensions.js';
+import { ExtensionEnablementManager } from '../../config/extensions/extensionEnablement.js';
 
 interface UpdateArgs {
   name?: string;
@@ -29,34 +32,19 @@ const updateOutput = (info: ExtensionUpdateInfo) =>
 
 export async function handleUpdate(args: UpdateArgs) {
   const workingDir = process.cwd();
-  const allExtensions = loadExtensions();
+  const extensionEnablementManager = new ExtensionEnablementManager(
+    ExtensionStorage.getUserExtensionsDir(),
+    // Force enable named extensions, otherwise we will only update the enabled
+    // ones.
+    args.name ? [args.name] : [],
+  );
+  const allExtensions = loadExtensions(extensionEnablementManager);
   const extensions = annotateActiveExtensions(
     allExtensions,
-    allExtensions.map((e) => e.config.name),
     workingDir,
+    extensionEnablementManager,
   );
-
-  if (args.all) {
-    try {
-      let updateInfos = await updateAllUpdatableExtensions(
-        workingDir,
-        extensions,
-        await checkForAllExtensionUpdates(extensions, new Map(), (_) => {}),
-        () => {},
-      );
-      updateInfos = updateInfos.filter(
-        (info) => info.originalVersion !== info.updatedVersion,
-      );
-      if (updateInfos.length === 0) {
-        console.log('No extensions to update.');
-        return;
-      }
-      console.log(updateInfos.map((info) => updateOutput(info)).join('\n'));
-    } catch (error) {
-      console.error(getErrorMessage(error));
-    }
-  }
-  if (args.name)
+  if (args.name) {
     try {
       const extension = extensions.find(
         (extension) => extension.name === args.name,
@@ -83,6 +71,7 @@ export async function handleUpdate(args: UpdateArgs) {
       const updatedExtensionInfo = (await updateExtension(
         extension,
         workingDir,
+        requestConsentNonInteractive,
         updateState,
         () => {},
       ))!;
@@ -99,10 +88,41 @@ export async function handleUpdate(args: UpdateArgs) {
     } catch (error) {
       console.error(getErrorMessage(error));
     }
+  }
+  if (args.all) {
+    try {
+      const extensionState = new Map();
+      await checkForAllExtensionUpdates(extensions, (action) => {
+        if (action.type === 'SET_STATE') {
+          extensionState.set(action.payload.name, {
+            status: action.payload.state,
+            processed: true, // No need to process as we will force the update.
+          });
+        }
+      });
+      let updateInfos = await updateAllUpdatableExtensions(
+        workingDir,
+        requestConsentNonInteractive,
+        extensions,
+        extensionState,
+        () => {},
+      );
+      updateInfos = updateInfos.filter(
+        (info) => info.originalVersion !== info.updatedVersion,
+      );
+      if (updateInfos.length === 0) {
+        console.log('No extensions to update.');
+        return;
+      }
+      console.log(updateInfos.map((info) => updateOutput(info)).join('\n'));
+    } catch (error) {
+      console.error(getErrorMessage(error));
+    }
+  }
 }
 
 export const updateCommand: CommandModule = {
-  command: 'update [--all] [name]',
+  command: 'update [<name>] [--all]',
   describe:
     'Updates all extensions or a named extension to the latest version.',
   builder: (yargs) =>

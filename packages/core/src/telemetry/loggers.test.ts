@@ -34,6 +34,7 @@ import {
   EVENT_RIPGREP_FALLBACK,
   EVENT_MODEL_ROUTING,
   EVENT_EXTENSION_ENABLE,
+  EVENT_EXTENSION_DISABLE,
   EVENT_EXTENSION_INSTALL,
   EVENT_EXTENSION_UNINSTALL,
 } from './constants.js';
@@ -51,6 +52,7 @@ import {
   logToolOutputTruncated,
   logModelRouting,
   logExtensionEnable,
+  logExtensionDisable,
   logExtensionInstallEvent,
   logExtensionUninstall,
 } from './loggers.js';
@@ -69,11 +71,16 @@ import {
   ToolOutputTruncatedEvent,
   ModelRoutingEvent,
   ExtensionEnableEvent,
+  ExtensionDisableEvent,
   ExtensionInstallEvent,
   ExtensionUninstallEvent,
 } from './types.js';
 import * as metrics from './metrics.js';
-import { FileOperation } from './metrics.js';
+import {
+  FileOperation,
+  GenAiOperationName,
+  GenAiProviderName,
+} from './metrics.js';
 import * as sdk from './sdk.js';
 import { vi, describe, beforeEach, it, expect, afterEach } from 'vitest';
 import type {
@@ -286,6 +293,12 @@ describe('loggers', () => {
     const mockMetrics = {
       recordApiResponseMetrics: vi.fn(),
       recordTokenUsageMetrics: vi.fn(),
+      getConventionAttributes: vi.fn(() => ({
+        'gen_ai.operation.name': GenAiOperationName.GENERATE_CONTENT,
+        'gen_ai.provider.name': GenAiProviderName.GCP_VERTEX_AI,
+        'gen_ai.request.model': 'test-model',
+        'gen_ai.response.model': 'test-model',
+      })),
     };
 
     beforeEach(() => {
@@ -294,6 +307,9 @@ describe('loggers', () => {
       );
       vi.spyOn(metrics, 'recordTokenUsageMetrics').mockImplementation(
         mockMetrics.recordTokenUsageMetrics,
+      );
+      vi.spyOn(metrics, 'getConventionAttributes').mockImplementation(
+        mockMetrics.getConventionAttributes,
       );
     });
 
@@ -341,16 +357,48 @@ describe('loggers', () => {
 
       expect(mockMetrics.recordApiResponseMetrics).toHaveBeenCalledWith(
         mockConfig,
-        'test-model',
         100,
-        200,
+        {
+          model: 'test-model',
+          status_code: 200,
+          genAiAttributes: {
+            'gen_ai.operation.name': 'generate_content',
+            'gen_ai.provider.name': 'gcp.vertex_ai',
+            'gen_ai.request.model': 'test-model',
+            'gen_ai.response.model': 'test-model',
+          },
+        },
+      );
+
+      // Verify token usage calls for all token types
+      expect(mockMetrics.recordTokenUsageMetrics).toHaveBeenCalledWith(
+        mockConfig,
+        17,
+        {
+          model: 'test-model',
+          type: 'input',
+          genAiAttributes: {
+            'gen_ai.operation.name': 'generate_content',
+            'gen_ai.provider.name': 'gcp.vertex_ai',
+            'gen_ai.request.model': 'test-model',
+            'gen_ai.response.model': 'test-model',
+          },
+        },
       );
 
       expect(mockMetrics.recordTokenUsageMetrics).toHaveBeenCalledWith(
         mockConfig,
-        'test-model',
         50,
-        'output',
+        {
+          model: 'test-model',
+          type: 'output',
+          genAiAttributes: {
+            'gen_ai.operation.name': 'generate_content',
+            'gen_ai.provider.name': 'gcp.vertex_ai',
+            'gen_ai.request.model': 'test-model',
+            'gen_ai.response.model': 'test-model',
+          },
+        },
       );
 
       expect(mockUiEvent.addEvent).toHaveBeenCalledWith({
@@ -629,11 +677,13 @@ describe('loggers', () => {
 
       expect(mockMetrics.recordToolCallMetrics).toHaveBeenCalledWith(
         mockConfig,
-        'test-function',
         100,
-        true,
-        ToolCallDecision.ACCEPT,
-        'native',
+        {
+          function_name: 'test-function',
+          success: true,
+          decision: ToolCallDecision.ACCEPT,
+          tool_type: 'native',
+        },
       );
 
       expect(mockUiEvent.addEvent).toHaveBeenCalledWith({
@@ -700,11 +750,13 @@ describe('loggers', () => {
 
       expect(mockMetrics.recordToolCallMetrics).toHaveBeenCalledWith(
         mockConfig,
-        'test-function',
         100,
-        false,
-        ToolCallDecision.REJECT,
-        'native',
+        {
+          function_name: 'test-function',
+          success: false,
+          decision: ToolCallDecision.REJECT,
+          tool_type: 'native',
+        },
       );
 
       expect(mockUiEvent.addEvent).toHaveBeenCalledWith({
@@ -774,11 +826,13 @@ describe('loggers', () => {
 
       expect(mockMetrics.recordToolCallMetrics).toHaveBeenCalledWith(
         mockConfig,
-        'test-function',
         100,
-        true,
-        ToolCallDecision.MODIFY,
-        'native',
+        {
+          function_name: 'test-function',
+          success: true,
+          decision: ToolCallDecision.MODIFY,
+          tool_type: 'native',
+        },
       );
 
       expect(mockUiEvent.addEvent).toHaveBeenCalledWith({
@@ -847,11 +901,13 @@ describe('loggers', () => {
 
       expect(mockMetrics.recordToolCallMetrics).toHaveBeenCalledWith(
         mockConfig,
-        'test-function',
         100,
-        true,
-        undefined,
-        'native',
+        {
+          function_name: 'test-function',
+          success: true,
+          decision: undefined,
+          tool_type: 'native',
+        },
       );
 
       expect(mockUiEvent.addEvent).toHaveBeenCalledWith({
@@ -921,11 +977,13 @@ describe('loggers', () => {
 
       expect(mockMetrics.recordToolCallMetrics).toHaveBeenCalledWith(
         mockConfig,
-        'test-function',
         100,
-        false,
-        undefined,
-        'native',
+        {
+          function_name: 'test-function',
+          success: false,
+          decision: undefined,
+          tool_type: 'native',
+        },
       );
 
       expect(mockUiEvent.addEvent).toHaveBeenCalledWith({
@@ -1082,11 +1140,13 @@ describe('loggers', () => {
 
       expect(mockMetrics.recordFileOperationMetric).toHaveBeenCalledWith(
         mockConfig,
-        'read',
-        10,
-        'text/plain',
-        '.txt',
-        'typescript',
+        {
+          operation: 'read',
+          lines: 10,
+          mimetype: 'text/plain',
+          extension: '.txt',
+          programming_language: 'typescript',
+        },
       );
     });
   });
@@ -1301,6 +1361,43 @@ describe('loggers', () => {
           'session.id': 'test-session-id',
           'user.email': 'test-user@example.com',
           'event.name': EVENT_EXTENSION_ENABLE,
+          'event.timestamp': '2025-01-01T00:00:00.000Z',
+          extension_name: 'vscode',
+          setting_scope: 'user',
+        },
+      });
+    });
+  });
+
+  describe('logExtensionDisable', () => {
+    const mockConfig = {
+      getSessionId: () => 'test-session-id',
+      getUsageStatisticsEnabled: () => true,
+    } as unknown as Config;
+
+    beforeEach(() => {
+      vi.spyOn(ClearcutLogger.prototype, 'logExtensionDisableEvent');
+    });
+
+    afterEach(() => {
+      vi.resetAllMocks();
+    });
+
+    it('should log extension disable event', () => {
+      const event = new ExtensionDisableEvent('vscode', 'user');
+
+      logExtensionDisable(mockConfig, event);
+
+      expect(
+        ClearcutLogger.prototype.logExtensionDisableEvent,
+      ).toHaveBeenCalledWith(event);
+
+      expect(mockLogger.emit).toHaveBeenCalledWith({
+        body: 'Disabled extension vscode',
+        attributes: {
+          'session.id': 'test-session-id',
+          'user.email': 'test-user@example.com',
+          'event.name': EVENT_EXTENSION_DISABLE,
           'event.timestamp': '2025-01-01T00:00:00.000Z',
           extension_name: 'vscode',
           setting_scope: 'user',

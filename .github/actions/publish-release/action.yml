@@ -36,14 +36,25 @@ inputs:
     description: 'The working directory to run the steps in.'
     required: false
     default: '.'
+  force-skip-tests:
+    description: 'Skip tests and validation'
+    required: false
+    default: false
+  skip-branch-cleanup:
+    description: 'Whether to skip cleaning up the release branch.'
+    type: 'boolean'
+    required: false
+    default: false
+  gemini_api_key:
+    description: 'The API key for running integration tests.'
+    required: true
 
 runs:
   using: 'composite'
   steps:
     - name: '📝 Print Inputs'
       shell: 'bash'
-      run: |
-        echo "${{ toJSON(inputs) }}"
+      run: 'echo "${{ toJSON(inputs) }}"'
 
     - name: '👤 Configure Git User'
       working-directory: '${{ inputs.working-directory }}'
@@ -75,6 +86,7 @@ runs:
         DRY_RUN: '${{ inputs.dry-run }}'
         RELEASE_TAG: '${{ inputs.release-tag }}'
       run: |-
+        set -e
         git add package.json package-lock.json packages/*/package.json
         git commit -m "chore(release): ${RELEASE_TAG}"
         if [[ "${DRY_RUN}" == "false" ]]; then
@@ -104,14 +116,15 @@ runs:
         NODE_AUTH_TOKEN: '${{ inputs.wombat-token-core }}'
       shell: 'bash'
       run: |
-        npm publish \
-          --dry-run="${{ inputs.dry-run }}" \
-          --workspace="@google/gemini-cli-core" \
-          --tag="${{ inputs.npm-tag }}"
+        if [ "${{ inputs.dry-run }}" == "true" ]; then
+          npm publish --dry-run --workspace="@google/gemini-cli-core" --no-tag
+        else
+          npm publish --workspace="@google/gemini-cli-core" --no-tag
+        fi
 
     - name: '🔗 Install latest core package'
       working-directory: '${{ inputs.working-directory }}'
-      if: "${{ inputs.dry-run == 'false' }}"
+      if: "${{ inputs.dry-run != 'true' }}"
       shell: 'bash'
       run: |
         npm install "@google/gemini-cli-core@${{ inputs.release-version }}" \
@@ -124,10 +137,30 @@ runs:
         NODE_AUTH_TOKEN: '${{ inputs.wombat-token-cli }}'
       shell: 'bash'
       run: |
-        npm publish \
-          --dry-run="${{ inputs.dry-run }}" \
-          --workspace="@google/gemini-cli" \
-          --tag="${{ inputs.npm-tag }}"
+        if [ "${{ inputs.dry-run }}" == "true" ]; then
+          npm publish --dry-run --workspace="@google/gemini-cli" --no-tag
+        else
+          npm publish --workspace="@google/gemini-cli" --no-tag
+        fi
+
+    - name: '🔬 Verify NPM release by version'
+      uses: './.github/actions/verify-release'
+      if: "${{ inputs.dry-run != 'true' && inputs.force-skip-tests != 'true' }}"
+      with:
+        npm-package: '@google/gemini-cli@${{ inputs.release-version }}'
+        expected-version: '${{ inputs.release-version }}'
+        ref: '${{ steps.release_branch.outputs.BRANCH_NAME }}'
+        gemini_api_key: '${{ inputs.gemini_api_key }}'
+
+    - name: '🏷️ Tag release'
+      uses: './.github/actions/tag-npm-release'
+      if: "${{ inputs.dry-run != 'true' }}"
+      with:
+        channel: '${{ inputs.npm-tag }}'
+        version: '${{ inputs.release-version }}'
+        dry-run: '${{ inputs.dry-run }}'
+        wombat-token-core: '${{ inputs.wombat-token-core }}'
+        wombat-token-cli: '${{ inputs.wombat-token-cli }}'
 
     - name: '🎁 Bundle'
       working-directory: '${{ inputs.working-directory }}'
@@ -137,7 +170,7 @@ runs:
 
     - name: '🎉 Create GitHub Release'
       working-directory: '${{ inputs.working-directory }}'
-      if: "${{ inputs.dry-run == 'false' && inputs.skip-github-release == 'false' }}"
+      if: "${{ inputs.dry-run != 'true' && inputs.skip-github-release != 'true' && inputs.npm-tag != 'dev' }}"
       env:
         GITHUB_TOKEN: '${{ inputs.github-token }}'
       shell: 'bash'
@@ -151,7 +184,7 @@ runs:
 
     - name: '🧹 Clean up release branch'
       working-directory: '${{ inputs.working-directory }}'
-      if: "${{ inputs.dry-run == 'false' }}"
+      if: "${{ inputs.dry-run != 'true' && inputs.skip-branch-cleanup != 'true' }}"
       continue-on-error: true
       shell: 'bash'
       run: |

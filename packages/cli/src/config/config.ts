@@ -12,7 +12,6 @@ import { hideBin } from 'yargs/helpers';
 import process from 'node:process';
 import { mcpCommand } from '../commands/mcp.js';
 import type {
-  TelemetryTarget,
   FileFilteringOptions,
   MCPServerConfig,
   OutputFormat,
@@ -32,6 +31,8 @@ import {
   ShellTool,
   EditTool,
   WriteFileTool,
+  resolveTelemetrySettings,
+  FatalConfigError,
 } from '@google/gemini-cli-core';
 import type { Settings } from './settings.js';
 
@@ -44,6 +45,7 @@ import { appEvents } from '../utils/events.js';
 
 import { isWorkspaceTrusted } from './trustedFolders.js';
 import { createPolicyEngineConfig } from './policy.js';
+import type { ExtensionEnablementManager } from './extensions/extensionEnablement.js';
 
 // Simple console logger for now - replace with actual logger if available
 const logger = {
@@ -56,6 +58,7 @@ const logger = {
 };
 
 export interface CliArgs {
+  query: string | undefined;
   model: string | undefined;
   sandbox: boolean | string | undefined;
   sandboxImage: string | undefined;
@@ -83,12 +86,12 @@ export interface CliArgs {
   screenReader: boolean | undefined;
   useSmartEdit: boolean | undefined;
   useWriteTodos: boolean | undefined;
-  promptWords: string[] | undefined;
   outputFormat: string | undefined;
 }
 
 export async function parseArguments(settings: Settings): Promise<CliArgs> {
-  const yargsInstance = yargs(hideBin(process.argv))
+  const rawArgv = hideBin(process.argv);
+  const yargsInstance = yargs(rawArgv)
     .locale('en')
     .scriptName('gemini')
     .usage(
@@ -164,8 +167,12 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
       'proxy',
       'Use the "proxy" setting in settings.json instead. This flag will be removed in a future version.',
     )
-    .command('$0 [promptWords...]', 'Launch Gemini CLI', (yargsInstance) =>
+    .command('$0 [query..]', 'Launch Gemini CLI', (yargsInstance) =>
       yargsInstance
+        .positional('query', {
+          description:
+            'Positional prompt. Defaults to one-shot; use -i/--prompt-interactive for interactive.',
+        })
         .option('model', {
           alias: 'm',
           type: 'string',
@@ -299,22 +306,28 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
           'prompt',
           'Use the positional prompt instead. This flag will be removed in a future version.',
         )
+        // Ensure validation flows through .fail() for clean UX
+        .fail((msg, err, yargs) => {
+          console.error(msg || err?.message || 'Unknown error');
+          yargs.showHelp();
+          process.exit(1);
+        })
         .check((argv) => {
-          const promptWords = argv['promptWords'] as string[] | undefined;
-          if (argv['prompt'] && promptWords && promptWords.length > 0) {
-            throw new Error(
-              'Cannot use both a positional prompt and the --prompt (-p) flag together',
-            );
+          // The 'query' positional can be a string (for one arg) or string[] (for multiple).
+          // This guard safely checks if any positional argument was provided.
+          const query = argv['query'] as string | string[] | undefined;
+          const hasPositionalQuery = Array.isArray(query)
+            ? query.length > 0
+            : !!query;
+
+          if (argv['prompt'] && hasPositionalQuery) {
+            return 'Cannot use both a positional prompt and the --prompt (-p) flag together';
           }
           if (argv['prompt'] && argv['promptInteractive']) {
-            throw new Error(
-              'Cannot use both --prompt (-p) and --prompt-interactive (-i) together',
-            );
+            return 'Cannot use both --prompt (-p) and --prompt-interactive (-i) together';
           }
           if (argv.yolo && argv['approvalMode']) {
-            throw new Error(
-              'Cannot use both --yolo (-y) and --approval-mode together. Use --approval-mode=yolo instead.',
-            );
+            return 'Cannot use both --yolo (-y) and --approval-mode together. Use --approval-mode=yolo instead.';
           }
           return true;
         }),
@@ -337,6 +350,8 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
   yargsInstance.wrap(yargsInstance.terminalWidth());
   const result = await yargsInstance.parse();
 
+  // If yargs handled --help/--version it will have exited; nothing to do here.
+
   // Handle case where MCP subcommands are executed - they should exit the process
   // and not return to main CLI logic
   if (
@@ -346,6 +361,26 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
     // MCP commands handle their own execution and process exit
     process.exit(0);
   }
+
+  // Normalize query args: handle both quoted "@path file" and unquoted @path file
+  const queryArg = (result as { query?: string | string[] | undefined }).query;
+  const q: string | undefined = Array.isArray(queryArg)
+    ? queryArg.join(' ')
+    : queryArg;
+
+  // Route positional args: explicit -i flag -> interactive; else -> one-shot (even for @commands)
+  if (q && !result['prompt']) {
+    const hasExplicitInteractive =
+      result['promptInteractive'] === '' || !!result['promptInteractive'];
+    if (hasExplicitInteractive) {
+      result['promptInteractive'] = q;
+    } else {
+      result['prompt'] = q;
+    }
+  }
+
+  // Keep CliArgs.query as a string for downstream typing
+  (result as Record<string, unknown>)['query'] = q || undefined;
 
   // The import format is now only controlled by settings.memoryImportFormat
   // We no longer accept it as a CLI argument
@@ -395,30 +430,36 @@ export async function loadHierarchicalGeminiMemory(
   );
 }
 
+export function isDebugMode(argv: CliArgs): boolean {
+  return (
+    argv.debug ||
+    [process.env['DEBUG'], process.env['DEBUG_MODE']].some(
+      (v) => v === 'true' || v === '1',
+    )
+  );
+}
+
 export async function loadCliConfig(
   settings: Settings,
   extensions: Extension[],
+  extensionEnablementManager: ExtensionEnablementManager,
   sessionId: string,
   argv: CliArgs,
   cwd: string = process.cwd(),
 ): Promise<Config> {
-  const debugMode =
-    argv.debug ||
-    [process.env['DEBUG'], process.env['DEBUG_MODE']].some(
-      (v) => v === 'true' || v === '1',
-    ) ||
-    false;
+  const debugMode = isDebugMode(argv);
+
   const memoryImportFormat = settings.context?.importFormat || 'tree';
 
   const ideMode = settings.ide?.enabled ?? false;
 
   const folderTrust = settings.security?.folderTrust?.enabled ?? false;
-  const trustedFolder = isWorkspaceTrusted(settings) ?? true;
+  const trustedFolder = isWorkspaceTrusted(settings)?.isTrusted ?? true;
 
   const allExtensions = annotateActiveExtensions(
     extensions,
-    argv.extensions || [],
     cwd,
+    extensionEnablementManager,
   );
 
   const activeExtensions = extensions.filter(
@@ -467,8 +508,7 @@ export async function loadCliConfig(
   );
 
   let mcpServers = mergeMcpServers(settings, activeExtensions);
-  const question =
-    argv.promptInteractive || argv.prompt || (argv.promptWords || []).join(' ');
+  const question = argv.promptInteractive || argv.prompt || '';
 
   // Determine approval mode with backward compatibility
   let approvalMode: ApprovalMode;
@@ -503,10 +543,29 @@ export async function loadCliConfig(
     approvalMode = ApprovalMode.DEFAULT;
   }
 
+  let telemetrySettings;
+  try {
+    telemetrySettings = await resolveTelemetrySettings({
+      argv,
+      env: process.env as unknown as Record<string, string | undefined>,
+      settings: settings.telemetry,
+    });
+  } catch (err) {
+    if (err instanceof FatalConfigError) {
+      throw new FatalConfigError(
+        `Invalid telemetry configuration: ${err.message}.`,
+      );
+    }
+    throw err;
+  }
+
   const policyEngineConfig = createPolicyEngineConfig(settings, approvalMode);
 
+  // Interactive mode: explicit -i flag or (TTY + no args + no -p flag)
+  const hasQuery = !!argv.query;
   const interactive =
-    !!argv.promptInteractive || (process.stdin.isTTY && question.length === 0);
+    !!argv.promptInteractive ||
+    (process.stdin.isTTY && !hasQuery && !argv.prompt);
   // In non-interactive mode, exclude tools that require a prompt.
   const extraExcludes: string[] = [];
   if (!interactive && !argv.experimentalAcp) {
@@ -605,23 +664,7 @@ export async function loadCliConfig(
       ...settings.ui?.accessibility,
       screenReader,
     },
-    telemetry: {
-      enabled: argv.telemetry ?? settings.telemetry?.enabled,
-      target: (argv.telemetryTarget ??
-        settings.telemetry?.target) as TelemetryTarget,
-      otlpEndpoint:
-        argv.telemetryOtlpEndpoint ??
-        process.env['OTEL_EXPORTER_OTLP_ENDPOINT'] ??
-        settings.telemetry?.otlpEndpoint,
-      otlpProtocol: (['grpc', 'http'] as const).find(
-        (p) =>
-          p ===
-          (argv.telemetryOtlpProtocol ?? settings.telemetry?.otlpProtocol),
-      ),
-      logPrompts: argv.telemetryLogPrompts ?? settings.telemetry?.logPrompts,
-      outfile: argv.telemetryOutfile ?? settings.telemetry?.outfile,
-      useCollector: settings.telemetry?.useCollector,
-    },
+    telemetry: telemetrySettings,
     usageStatisticsEnabled: settings.privacy?.usageStatisticsEnabled ?? true,
     fileFiltering: settings.context?.fileFiltering,
     checkpointing:
@@ -663,6 +706,9 @@ export async function loadCliConfig(
       format: (argv.outputFormat ?? settings.output?.format) as OutputFormat,
     },
     useModelRouter,
+    enableMessageBusIntegration:
+      settings.tools?.enableMessageBusIntegration ?? false,
+    enableSubagents: settings.experimental?.enableSubagents ?? false,
   });
 }
 
