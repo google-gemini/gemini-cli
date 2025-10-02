@@ -126,15 +126,6 @@ export class IDEServer {
   constructor(log: (message: string) => void, diffManager: DiffManager) {
     this.log = log;
     this.diffManager = diffManager;
-
-    process.on('uncaughtException', (error) => {
-      this.log(`Uncaught exception: ${error.message}`);
-      this.log(error.stack || 'No stack trace available');
-    });
-
-    process.on('unhandledRejection', (reason, promise) => {
-      this.log(`Unhandled rejection at: ${promise}, reason: ${reason}`);
-    });
   }
 
   start(context: vscode.ExtensionContext): Promise<void> {
