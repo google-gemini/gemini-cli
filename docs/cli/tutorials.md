@@ -24,7 +24,7 @@ Before you begin, ensure you have the following installed and configured:
 
 #### Configure the MCP server in `settings.json`
 
-In your project's root directory, create or open the [`.gemini/settings.json` file](./configuration.md). Within the file, add the `mcpServers` configuration block, which provides instructions for how to launch the GitHub MCP server.
+In your project's root directory, create or open the [`.gemini/settings.json` file](../get-started/configuration.md). Within the file, add the `mcpServers` configuration block, which provides instructions for how to launch the GitHub MCP server.
 
 ```json
 {
