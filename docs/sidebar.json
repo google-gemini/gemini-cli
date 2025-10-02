@@ -4,7 +4,7 @@
     "items": [
       {
         "label": "Introduction",
-        "slug": "docs/"
+        "slug": "docs"
       },
       {
         "label": "Architecture Overview",
