@@ -9,7 +9,7 @@ import * as ClientLib from '@modelcontextprotocol/sdk/client/index.js';
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
 import * as SdkClientStdioLib from '@modelcontextprotocol/sdk/client/stdio.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AuthProviderType, type Config } from '../config/config.js';
 import { GoogleCredentialProvider } from '../mcp/google-auth-provider.js';
 import type { PromptRegistry } from '../prompts/prompt-registry.js';
