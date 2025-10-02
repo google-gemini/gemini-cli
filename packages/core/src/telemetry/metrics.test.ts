@@ -61,6 +61,11 @@ function originalOtelMockFactory() {
       setLogger: vi.fn(),
       warn: vi.fn(),
     },
+    DiagConsoleLogger: vi.fn(),
+    DiagLogLevel: {
+      NONE: 0,
+      INFO: 1,
+    },
   } as const;
 }
 
@@ -82,6 +87,8 @@ describe('Telemetry Metrics', () => {
   let recordPerformanceScoreModule: typeof import('./metrics.js').recordPerformanceScore;
   let recordPerformanceRegressionModule: typeof import('./metrics.js').recordPerformanceRegression;
   let recordBaselineComparisonModule: typeof import('./metrics.js').recordBaselineComparison;
+  let recordGenAiClientTokenUsageModule: typeof import('./metrics.js').recordGenAiClientTokenUsage;
+  let recordGenAiClientOperationDurationModule: typeof import('./metrics.js').recordGenAiClientOperationDuration;
 
   beforeEach(async () => {
     vi.resetModules();
@@ -110,6 +117,10 @@ describe('Telemetry Metrics', () => {
     recordPerformanceRegressionModule =
       metricsJsModule.recordPerformanceRegression;
     recordBaselineComparisonModule = metricsJsModule.recordBaselineComparison;
+    recordGenAiClientTokenUsageModule =
+      metricsJsModule.recordGenAiClientTokenUsage;
+    recordGenAiClientOperationDurationModule =
+      metricsJsModule.recordGenAiClientOperationDuration;
 
     const otelApiModule = await import('@opentelemetry/api');
 
@@ -160,13 +171,19 @@ describe('Telemetry Metrics', () => {
     } as unknown as Config;
 
     it('should not record metrics if not initialized', () => {
-      recordTokenUsageMetricsModule(mockConfig, 'gemini-pro', 100, 'input');
+      recordTokenUsageMetricsModule(mockConfig, 100, {
+        model: 'gemini-pro',
+        type: 'input',
+      });
       expect(mockCounterAddFn).not.toHaveBeenCalled();
     });
 
     it('should record token usage with the correct attributes', () => {
       initializeMetricsModule(mockConfig);
-      recordTokenUsageMetricsModule(mockConfig, 'gemini-pro', 100, 'input');
+      recordTokenUsageMetricsModule(mockConfig, 100, {
+        model: 'gemini-pro',
+        type: 'input',
+      });
       expect(mockCounterAddFn).toHaveBeenCalledTimes(2);
       expect(mockCounterAddFn).toHaveBeenNthCalledWith(1, 1, {
         'session.id': 'test-session-id',
@@ -182,28 +199,40 @@ describe('Telemetry Metrics', () => {
       initializeMetricsModule(mockConfig);
       mockCounterAddFn.mockClear();
 
-      recordTokenUsageMetricsModule(mockConfig, 'gemini-pro', 50, 'output');
+      recordTokenUsageMetricsModule(mockConfig, 50, {
+        model: 'gemini-pro',
+        type: 'output',
+      });
       expect(mockCounterAddFn).toHaveBeenCalledWith(50, {
         'session.id': 'test-session-id',
         model: 'gemini-pro',
         type: 'output',
       });
 
-      recordTokenUsageMetricsModule(mockConfig, 'gemini-pro', 25, 'thought');
+      recordTokenUsageMetricsModule(mockConfig, 25, {
+        model: 'gemini-pro',
+        type: 'thought',
+      });
       expect(mockCounterAddFn).toHaveBeenCalledWith(25, {
         'session.id': 'test-session-id',
         model: 'gemini-pro',
         type: 'thought',
       });
 
-      recordTokenUsageMetricsModule(mockConfig, 'gemini-pro', 75, 'cache');
+      recordTokenUsageMetricsModule(mockConfig, 75, {
+        model: 'gemini-pro',
+        type: 'cache',
+      });
       expect(mockCounterAddFn).toHaveBeenCalledWith(75, {
         'session.id': 'test-session-id',
         model: 'gemini-pro',
         type: 'cache',
       });
 
-      recordTokenUsageMetricsModule(mockConfig, 'gemini-pro', 125, 'tool');
+      recordTokenUsageMetricsModule(mockConfig, 125, {
+        model: 'gemini-pro',
+        type: 'tool',
+      });
       expect(mockCounterAddFn).toHaveBeenCalledWith(125, {
         'session.id': 'test-session-id',
         model: 'gemini-pro',
@@ -215,7 +244,10 @@ describe('Telemetry Metrics', () => {
       initializeMetricsModule(mockConfig);
       mockCounterAddFn.mockClear();
 
-      recordTokenUsageMetricsModule(mockConfig, 'gemini-ultra', 200, 'input');
+      recordTokenUsageMetricsModule(mockConfig, 200, {
+        model: 'gemini-ultra',
+        type: 'input',
+      });
       expect(mockCounterAddFn).toHaveBeenCalledWith(200, {
         'session.id': 'test-session-id',
         model: 'gemini-ultra',
@@ -231,25 +263,23 @@ describe('Telemetry Metrics', () => {
     } as unknown as Config;
 
     it('should not record metrics if not initialized', () => {
-      recordFileOperationMetricModule(
-        mockConfig,
-        FileOperation.CREATE,
-        10,
-        'text/plain',
-        'txt',
-      );
+      recordFileOperationMetricModule(mockConfig, {
+        operation: FileOperation.CREATE,
+        lines: 10,
+        mimetype: 'text/plain',
+        extension: 'txt',
+      });
       expect(mockCounterAddFn).not.toHaveBeenCalled();
     });
 
     it('should record file creation with all attributes', () => {
       initializeMetricsModule(mockConfig);
-      recordFileOperationMetricModule(
-        mockConfig,
-        FileOperation.CREATE,
-        10,
-        'text/plain',
-        'txt',
-      );
+      recordFileOperationMetricModule(mockConfig, {
+        operation: FileOperation.CREATE,
+        lines: 10,
+        mimetype: 'text/plain',
+        extension: 'txt',
+      });
 
       expect(mockCounterAddFn).toHaveBeenCalledTimes(2);
       expect(mockCounterAddFn).toHaveBeenNthCalledWith(1, 1, {
@@ -268,7 +298,9 @@ describe('Telemetry Metrics', () => {
       initializeMetricsModule(mockConfig);
       mockCounterAddFn.mockClear();
 
-      recordFileOperationMetricModule(mockConfig, FileOperation.READ);
+      recordFileOperationMetricModule(mockConfig, {
+        operation: FileOperation.READ,
+      });
       expect(mockCounterAddFn).toHaveBeenCalledWith(1, {
         'session.id': 'test-session-id',
         operation: FileOperation.READ,
@@ -279,12 +311,10 @@ describe('Telemetry Metrics', () => {
       initializeMetricsModule(mockConfig);
       mockCounterAddFn.mockClear();
 
-      recordFileOperationMetricModule(
-        mockConfig,
-        FileOperation.UPDATE,
-        undefined,
-        'application/javascript',
-      );
+      recordFileOperationMetricModule(mockConfig, {
+        operation: FileOperation.UPDATE,
+        mimetype: 'application/javascript',
+      });
       expect(mockCounterAddFn).toHaveBeenCalledWith(1, {
         'session.id': 'test-session-id',
         operation: FileOperation.UPDATE,
@@ -296,13 +326,9 @@ describe('Telemetry Metrics', () => {
       initializeMetricsModule(mockConfig);
       mockCounterAddFn.mockClear();
 
-      recordFileOperationMetricModule(
-        mockConfig,
-        FileOperation.UPDATE,
-        undefined,
-        undefined,
-        undefined,
-      );
+      recordFileOperationMetricModule(mockConfig, {
+        operation: FileOperation.UPDATE,
+      });
 
       expect(mockCounterAddFn).toHaveBeenCalledWith(1, {
         'session.id': 'test-session-id',
@@ -314,14 +340,12 @@ describe('Telemetry Metrics', () => {
       initializeMetricsModule(mockConfig);
       mockCounterAddFn.mockClear();
 
-      recordFileOperationMetricModule(
-        mockConfig,
-        FileOperation.UPDATE,
-        10,
-        'text/plain',
-        'txt',
-        undefined,
-      );
+      recordFileOperationMetricModule(mockConfig, {
+        operation: FileOperation.UPDATE,
+        lines: 10,
+        mimetype: 'text/plain',
+        extension: 'txt',
+      });
 
       expect(mockCounterAddFn).toHaveBeenCalledWith(1, {
         'session.id': 'test-session-id',
@@ -336,13 +360,9 @@ describe('Telemetry Metrics', () => {
       initializeMetricsModule(mockConfig);
       mockCounterAddFn.mockClear();
 
-      recordFileOperationMetricModule(
-        mockConfig,
-        FileOperation.UPDATE,
-        undefined,
-        undefined,
-        undefined,
-      );
+      recordFileOperationMetricModule(mockConfig, {
+        operation: FileOperation.UPDATE,
+      });
 
       expect(mockCounterAddFn).toHaveBeenCalledWith(1, {
         'session.id': 'test-session-id',
@@ -419,6 +439,182 @@ describe('Telemetry Metrics', () => {
     });
   });
 
+  describe('OpenTelemetry GenAI Semantic Convention Metrics', () => {
+    const mockConfig = {
+      getSessionId: () => 'test-session-id',
+      getTelemetryEnabled: () => true,
+    } as unknown as Config;
+
+    describe('recordGenAiClientTokenUsage', () => {
+      it('should not record metrics when not initialized', () => {
+        recordGenAiClientTokenUsageModule(mockConfig, 100, {
+          'gen_ai.operation.name': 'generate_content',
+          'gen_ai.provider.name': 'gcp.gen_ai',
+          'gen_ai.token.type': 'input',
+        });
+
+        expect(mockHistogramRecordFn).not.toHaveBeenCalled();
+      });
+
+      it('should record input token usage with correct attributes', () => {
+        initializeMetricsModule(mockConfig);
+        mockHistogramRecordFn.mockClear();
+
+        recordGenAiClientTokenUsageModule(mockConfig, 150, {
+          'gen_ai.operation.name': 'generate_content',
+          'gen_ai.provider.name': 'gcp.gen_ai',
+          'gen_ai.token.type': 'input',
+          'gen_ai.request.model': 'gemini-2.0-flash',
+          'gen_ai.response.model': 'gemini-2.0-flash',
+        });
+
+        expect(mockHistogramRecordFn).toHaveBeenCalledWith(150, {
+          'session.id': 'test-session-id',
+          'gen_ai.operation.name': 'generate_content',
+          'gen_ai.provider.name': 'gcp.gen_ai',
+          'gen_ai.token.type': 'input',
+          'gen_ai.request.model': 'gemini-2.0-flash',
+          'gen_ai.response.model': 'gemini-2.0-flash',
+        });
+      });
+
+      it('should record output token usage with correct attributes', () => {
+        initializeMetricsModule(mockConfig);
+        mockHistogramRecordFn.mockClear();
+
+        recordGenAiClientTokenUsageModule(mockConfig, 75, {
+          'gen_ai.operation.name': 'generate_content',
+          'gen_ai.provider.name': 'gcp.vertex_ai',
+          'gen_ai.token.type': 'output',
+          'gen_ai.request.model': 'gemini-pro',
+        });
+
+        expect(mockHistogramRecordFn).toHaveBeenCalledWith(75, {
+          'session.id': 'test-session-id',
+          'gen_ai.operation.name': 'generate_content',
+          'gen_ai.provider.name': 'gcp.vertex_ai',
+          'gen_ai.token.type': 'output',
+          'gen_ai.request.model': 'gemini-pro',
+        });
+      });
+
+      it('should record token usage with optional attributes', () => {
+        initializeMetricsModule(mockConfig);
+        mockHistogramRecordFn.mockClear();
+
+        recordGenAiClientTokenUsageModule(mockConfig, 200, {
+          'gen_ai.operation.name': 'generate_content',
+          'gen_ai.provider.name': 'gcp.vertex_ai',
+          'gen_ai.token.type': 'input',
+          'gen_ai.request.model': 'text-embedding-004',
+          'server.address': 'aiplatform.googleapis.com',
+          'server.port': 443,
+        });
+
+        expect(mockHistogramRecordFn).toHaveBeenCalledWith(200, {
+          'session.id': 'test-session-id',
+          'gen_ai.operation.name': 'generate_content',
+          'gen_ai.provider.name': 'gcp.vertex_ai',
+          'gen_ai.token.type': 'input',
+          'gen_ai.request.model': 'text-embedding-004',
+          'server.address': 'aiplatform.googleapis.com',
+          'server.port': 443,
+        });
+      });
+    });
+
+    describe('recordGenAiClientOperationDuration', () => {
+      it('should not record metrics when not initialized', () => {
+        recordGenAiClientOperationDurationModule(mockConfig, 2.5, {
+          'gen_ai.operation.name': 'generate_content',
+          'gen_ai.provider.name': 'gcp.gen_ai',
+        });
+
+        expect(mockHistogramRecordFn).not.toHaveBeenCalled();
+      });
+
+      it('should record successful operation duration with correct attributes', () => {
+        initializeMetricsModule(mockConfig);
+        mockHistogramRecordFn.mockClear();
+
+        recordGenAiClientOperationDurationModule(mockConfig, 1.25, {
+          'gen_ai.operation.name': 'generate_content',
+          'gen_ai.provider.name': 'gcp.gen_ai',
+          'gen_ai.request.model': 'gemini-2.0-flash',
+          'gen_ai.response.model': 'gemini-2.0-flash',
+        });
+
+        expect(mockHistogramRecordFn).toHaveBeenCalledWith(1.25, {
+          'session.id': 'test-session-id',
+          'gen_ai.operation.name': 'generate_content',
+          'gen_ai.provider.name': 'gcp.gen_ai',
+          'gen_ai.request.model': 'gemini-2.0-flash',
+          'gen_ai.response.model': 'gemini-2.0-flash',
+        });
+      });
+
+      it('should record failed operation duration with error type', () => {
+        initializeMetricsModule(mockConfig);
+        mockHistogramRecordFn.mockClear();
+
+        recordGenAiClientOperationDurationModule(mockConfig, 3.75, {
+          'gen_ai.operation.name': 'generate_content',
+          'gen_ai.provider.name': 'gcp.vertex_ai',
+          'gen_ai.request.model': 'gemini-pro',
+          'error.type': 'quota_exceeded',
+        });
+
+        expect(mockHistogramRecordFn).toHaveBeenCalledWith(3.75, {
+          'session.id': 'test-session-id',
+          'gen_ai.operation.name': 'generate_content',
+          'gen_ai.provider.name': 'gcp.vertex_ai',
+          'gen_ai.request.model': 'gemini-pro',
+          'error.type': 'quota_exceeded',
+        });
+      });
+
+      it('should record operation duration with server details', () => {
+        initializeMetricsModule(mockConfig);
+        mockHistogramRecordFn.mockClear();
+
+        recordGenAiClientOperationDurationModule(mockConfig, 0.95, {
+          'gen_ai.operation.name': 'generate_content',
+          'gen_ai.provider.name': 'gcp.vertex_ai',
+          'gen_ai.request.model': 'gemini-1.5-pro',
+          'gen_ai.response.model': 'gemini-1.5-pro-001',
+          'server.address': 'us-central1-aiplatform.googleapis.com',
+          'server.port': 443,
+        });
+
+        expect(mockHistogramRecordFn).toHaveBeenCalledWith(0.95, {
+          'session.id': 'test-session-id',
+          'gen_ai.operation.name': 'generate_content',
+          'gen_ai.provider.name': 'gcp.vertex_ai',
+          'gen_ai.request.model': 'gemini-1.5-pro',
+          'gen_ai.response.model': 'gemini-1.5-pro-001',
+          'server.address': 'us-central1-aiplatform.googleapis.com',
+          'server.port': 443,
+        });
+      });
+
+      it('should handle minimal required attributes', () => {
+        initializeMetricsModule(mockConfig);
+        mockHistogramRecordFn.mockClear();
+
+        recordGenAiClientOperationDurationModule(mockConfig, 2.1, {
+          'gen_ai.operation.name': 'generate_content',
+          'gen_ai.provider.name': 'gcp.gen_ai',
+        });
+
+        expect(mockHistogramRecordFn).toHaveBeenCalledWith(2.1, {
+          'session.id': 'test-session-id',
+          'gen_ai.operation.name': 'generate_content',
+          'gen_ai.provider.name': 'gcp.gen_ai',
+        });
+      });
+    });
+  });
+
   describe('Performance Monitoring Metrics', () => {
     const mockConfig = {
       getSessionId: () => 'test-session-id',
@@ -436,14 +632,12 @@ describe('Telemetry Metrics', () => {
         initializeMetricsModule(mockConfigDisabled);
         mockHistogramRecordFn.mockClear();
 
-        recordStartupPerformanceModule(
-          mockConfigDisabled,
-          'settings_loading',
-          100,
-          {
+        recordStartupPerformanceModule(mockConfigDisabled, 100, {
+          phase: 'settings_loading',
+          details: {
             auth_type: 'gemini',
           },
-        );
+        });
 
         expect(mockHistogramRecordFn).not.toHaveBeenCalled();
       });
@@ -452,10 +646,13 @@ describe('Telemetry Metrics', () => {
         initializeMetricsModule(mockConfig);
         mockHistogramRecordFn.mockClear();
 
-        recordStartupPerformanceModule(mockConfig, 'settings_loading', 150, {
-          auth_type: 'gemini',
-          telemetry_enabled: true,
-          settings_sources: 2,
+        recordStartupPerformanceModule(mockConfig, 150, {
+          phase: 'settings_loading',
+          details: {
+            auth_type: 'gemini',
+            telemetry_enabled: true,
+            settings_sources: 2,
+          },
         });
 
         expect(mockHistogramRecordFn).toHaveBeenCalledWith(150, {
@@ -471,7 +668,7 @@ describe('Telemetry Metrics', () => {
         initializeMetricsModule(mockConfig);
         mockHistogramRecordFn.mockClear();
 
-        recordStartupPerformanceModule(mockConfig, 'cleanup', 50);
+        recordStartupPerformanceModule(mockConfig, 50, { phase: 'cleanup' });
 
         expect(mockHistogramRecordFn).toHaveBeenCalledWith(50, {
           'session.id': 'test-session-id',
@@ -485,15 +682,13 @@ describe('Telemetry Metrics', () => {
 
         // Test with realistic floating-point values that performance.now() would return
         const floatingPointDuration = 123.45678;
-        recordStartupPerformanceModule(
-          mockConfig,
-          'total_startup',
-          floatingPointDuration,
-          {
+        recordStartupPerformanceModule(mockConfig, floatingPointDuration, {
+          phase: 'total_startup',
+          details: {
             is_tty: true,
             has_question: false,
           },
-        );
+        });
 
         expect(mockHistogramRecordFn).toHaveBeenCalledWith(
           floatingPointDuration,
@@ -512,12 +707,10 @@ describe('Telemetry Metrics', () => {
         initializeMetricsModule(mockConfig);
         mockHistogramRecordFn.mockClear();
 
-        recordMemoryUsageModule(
-          mockConfig,
-          MemoryMetricType.HEAP_USED,
-          15728640,
-          'startup',
-        );
+        recordMemoryUsageModule(mockConfig, 15728640, {
+          memory_type: MemoryMetricType.HEAP_USED,
+          component: 'startup',
+        });
 
         expect(mockHistogramRecordFn).toHaveBeenCalledWith(15728640, {
           'session.id': 'test-session-id',
@@ -530,24 +723,18 @@ describe('Telemetry Metrics', () => {
         initializeMetricsModule(mockConfig);
         mockHistogramRecordFn.mockClear();
 
-        recordMemoryUsageModule(
-          mockConfig,
-          MemoryMetricType.HEAP_TOTAL,
-          31457280,
-          'api_call',
-        );
-        recordMemoryUsageModule(
-          mockConfig,
-          MemoryMetricType.EXTERNAL,
-          2097152,
-          'tool_execution',
-        );
-        recordMemoryUsageModule(
-          mockConfig,
-          MemoryMetricType.RSS,
-          41943040,
-          'memory_monitor',
-        );
+        recordMemoryUsageModule(mockConfig, 31457280, {
+          memory_type: MemoryMetricType.HEAP_TOTAL,
+          component: 'api_call',
+        });
+        recordMemoryUsageModule(mockConfig, 2097152, {
+          memory_type: MemoryMetricType.EXTERNAL,
+          component: 'tool_execution',
+        });
+        recordMemoryUsageModule(mockConfig, 41943040, {
+          memory_type: MemoryMetricType.RSS,
+          component: 'memory_monitor',
+        });
 
         expect(mockHistogramRecordFn).toHaveBeenCalledTimes(3); // One for each call
         expect(mockHistogramRecordFn).toHaveBeenNthCalledWith(1, 31457280, {
@@ -571,16 +758,13 @@ describe('Telemetry Metrics', () => {
         initializeMetricsModule(mockConfig);
         mockHistogramRecordFn.mockClear();
 
-        recordMemoryUsageModule(
-          mockConfig,
-          MemoryMetricType.HEAP_USED,
-          15728640,
-        );
+        recordMemoryUsageModule(mockConfig, 15728640, {
+          memory_type: MemoryMetricType.HEAP_USED,
+        });
 
         expect(mockHistogramRecordFn).toHaveBeenCalledWith(15728640, {
           'session.id': 'test-session-id',
           memory_type: 'heap_used',
-          component: undefined,
         });
       });
     });
@@ -590,7 +774,9 @@ describe('Telemetry Metrics', () => {
         initializeMetricsModule(mockConfig);
         mockHistogramRecordFn.mockClear();
 
-        recordCpuUsageModule(mockConfig, 85.5, 'tool_execution');
+        recordCpuUsageModule(mockConfig, 85.5, {
+          component: 'tool_execution',
+        });
 
         expect(mockHistogramRecordFn).toHaveBeenCalledWith(85.5, {
           'session.id': 'test-session-id',
@@ -602,11 +788,10 @@ describe('Telemetry Metrics', () => {
         initializeMetricsModule(mockConfig);
         mockHistogramRecordFn.mockClear();
 
-        recordCpuUsageModule(mockConfig, 42.3);
+        recordCpuUsageModule(mockConfig, 42.3, {});
 
         expect(mockHistogramRecordFn).toHaveBeenCalledWith(42.3, {
           'session.id': 'test-session-id',
-          component: undefined,
         });
       });
     });
@@ -640,12 +825,10 @@ describe('Telemetry Metrics', () => {
         initializeMetricsModule(mockConfig);
         mockHistogramRecordFn.mockClear();
 
-        recordToolExecutionBreakdownModule(
-          mockConfig,
-          'Read',
-          ToolExecutionPhase.VALIDATION,
-          25,
-        );
+        recordToolExecutionBreakdownModule(mockConfig, 25, {
+          function_name: 'Read',
+          phase: ToolExecutionPhase.VALIDATION,
+        });
 
         expect(mockHistogramRecordFn).toHaveBeenCalledWith(25, {
           'session.id': 'test-session-id',
@@ -658,24 +841,18 @@ describe('Telemetry Metrics', () => {
         initializeMetricsModule(mockConfig);
         mockHistogramRecordFn.mockClear();
 
-        recordToolExecutionBreakdownModule(
-          mockConfig,
-          'Bash',
-          ToolExecutionPhase.PREPARATION,
-          50,
-        );
-        recordToolExecutionBreakdownModule(
-          mockConfig,
-          'Bash',
-          ToolExecutionPhase.EXECUTION,
-          1500,
-        );
-        recordToolExecutionBreakdownModule(
-          mockConfig,
-          'Bash',
-          ToolExecutionPhase.RESULT_PROCESSING,
-          75,
-        );
+        recordToolExecutionBreakdownModule(mockConfig, 50, {
+          function_name: 'Bash',
+          phase: ToolExecutionPhase.PREPARATION,
+        });
+        recordToolExecutionBreakdownModule(mockConfig, 1500, {
+          function_name: 'Bash',
+          phase: ToolExecutionPhase.EXECUTION,
+        });
+        recordToolExecutionBreakdownModule(mockConfig, 75, {
+          function_name: 'Bash',
+          phase: ToolExecutionPhase.RESULT_PROCESSING,
+        });
 
         expect(mockHistogramRecordFn).toHaveBeenCalledTimes(3); // One for each call
         expect(mockHistogramRecordFn).toHaveBeenNthCalledWith(1, 50, {
@@ -701,13 +878,11 @@ describe('Telemetry Metrics', () => {
         initializeMetricsModule(mockConfig);
         mockHistogramRecordFn.mockClear();
 
-        recordTokenEfficiencyModule(
-          mockConfig,
-          'gemini-pro',
-          'cache_hit_rate',
-          0.85,
-          'api_request',
-        );
+        recordTokenEfficiencyModule(mockConfig, 0.85, {
+          model: 'gemini-pro',
+          metric: 'cache_hit_rate',
+          context: 'api_request',
+        });
 
         expect(mockHistogramRecordFn).toHaveBeenCalledWith(0.85, {
           'session.id': 'test-session-id',
@@ -721,18 +896,15 @@ describe('Telemetry Metrics', () => {
         initializeMetricsModule(mockConfig);
         mockHistogramRecordFn.mockClear();
 
-        recordTokenEfficiencyModule(
-          mockConfig,
-          'gemini-pro',
-          'tokens_per_operation',
-          125.5,
-        );
+        recordTokenEfficiencyModule(mockConfig, 125.5, {
+          model: 'gemini-pro',
+          metric: 'tokens_per_operation',
+        });
 
         expect(mockHistogramRecordFn).toHaveBeenCalledWith(125.5, {
           'session.id': 'test-session-id',
           model: 'gemini-pro',
           metric: 'tokens_per_operation',
-          context: undefined,
         });
       });
     });
@@ -742,12 +914,10 @@ describe('Telemetry Metrics', () => {
         initializeMetricsModule(mockConfig);
         mockHistogramRecordFn.mockClear();
 
-        recordApiRequestBreakdownModule(
-          mockConfig,
-          'gemini-pro',
-          ApiRequestPhase.REQUEST_PREPARATION,
-          15,
-        );
+        recordApiRequestBreakdownModule(mockConfig, 15, {
+          model: 'gemini-pro',
+          phase: ApiRequestPhase.REQUEST_PREPARATION,
+        });
 
         expect(mockHistogramRecordFn).toHaveBeenCalledWith(15, {
           'session.id': 'test-session-id',
@@ -760,24 +930,18 @@ describe('Telemetry Metrics', () => {
         initializeMetricsModule(mockConfig);
         mockHistogramRecordFn.mockClear();
 
-        recordApiRequestBreakdownModule(
-          mockConfig,
-          'gemini-pro',
-          ApiRequestPhase.NETWORK_LATENCY,
-          250,
-        );
-        recordApiRequestBreakdownModule(
-          mockConfig,
-          'gemini-pro',
-          ApiRequestPhase.RESPONSE_PROCESSING,
-          100,
-        );
-        recordApiRequestBreakdownModule(
-          mockConfig,
-          'gemini-pro',
-          ApiRequestPhase.TOKEN_PROCESSING,
-          50,
-        );
+        recordApiRequestBreakdownModule(mockConfig, 250, {
+          model: 'gemini-pro',
+          phase: ApiRequestPhase.NETWORK_LATENCY,
+        });
+        recordApiRequestBreakdownModule(mockConfig, 100, {
+          model: 'gemini-pro',
+          phase: ApiRequestPhase.RESPONSE_PROCESSING,
+        });
+        recordApiRequestBreakdownModule(mockConfig, 50, {
+          model: 'gemini-pro',
+          phase: ApiRequestPhase.TOKEN_PROCESSING,
+        });
 
         expect(mockHistogramRecordFn).toHaveBeenCalledTimes(3); // One for each call
         expect(mockHistogramRecordFn).toHaveBeenNthCalledWith(1, 250, {
@@ -803,12 +967,10 @@ describe('Telemetry Metrics', () => {
         initializeMetricsModule(mockConfig);
         mockHistogramRecordFn.mockClear();
 
-        recordPerformanceScoreModule(
-          mockConfig,
-          85.5,
-          'memory_efficiency',
-          80.0,
-        );
+        recordPerformanceScoreModule(mockConfig, 85.5, {
+          category: 'memory_efficiency',
+          baseline: 80.0,
+        });
 
         expect(mockHistogramRecordFn).toHaveBeenCalledWith(85.5, {
           'session.id': 'test-session-id',
@@ -821,12 +983,13 @@ describe('Telemetry Metrics', () => {
         initializeMetricsModule(mockConfig);
         mockHistogramRecordFn.mockClear();
 
-        recordPerformanceScoreModule(mockConfig, 92.3, 'overall_performance');
+        recordPerformanceScoreModule(mockConfig, 92.3, {
+          category: 'overall_performance',
+        });
 
         expect(mockHistogramRecordFn).toHaveBeenCalledWith(92.3, {
           'session.id': 'test-session-id',
           category: 'overall_performance',
-          baseline: undefined,
         });
       });
     });
@@ -837,13 +1000,12 @@ describe('Telemetry Metrics', () => {
         mockCounterAddFn.mockClear();
         mockHistogramRecordFn.mockClear();
 
-        recordPerformanceRegressionModule(
-          mockConfig,
-          'startup_time',
-          1200,
-          1000,
-          'medium',
-        );
+        recordPerformanceRegressionModule(mockConfig, {
+          metric: 'startup_time',
+          current_value: 1200,
+          baseline_value: 1000,
+          severity: 'medium',
+        });
 
         // Verify regression counter
         expect(mockCounterAddFn).toHaveBeenCalledWith(1, {
@@ -869,13 +1031,12 @@ describe('Telemetry Metrics', () => {
         mockCounterAddFn.mockClear();
         mockHistogramRecordFn.mockClear();
 
-        recordPerformanceRegressionModule(
-          mockConfig,
-          'memory_usage',
-          100,
-          0,
-          'high',
-        );
+        recordPerformanceRegressionModule(mockConfig, {
+          metric: 'memory_usage',
+          current_value: 100,
+          baseline_value: 0,
+          severity: 'high',
+        });
 
         // Verify regression counter still recorded
         expect(mockCounterAddFn).toHaveBeenCalledWith(1, {
@@ -894,20 +1055,18 @@ describe('Telemetry Metrics', () => {
         initializeMetricsModule(mockConfig);
         mockCounterAddFn.mockClear();
 
-        recordPerformanceRegressionModule(
-          mockConfig,
-          'api_latency',
-          500,
-          400,
-          'low',
-        );
-        recordPerformanceRegressionModule(
-          mockConfig,
-          'cpu_usage',
-          90,
-          70,
-          'high',
-        );
+        recordPerformanceRegressionModule(mockConfig, {
+          metric: 'api_latency',
+          current_value: 500,
+          baseline_value: 400,
+          severity: 'low',
+        });
+        recordPerformanceRegressionModule(mockConfig, {
+          metric: 'cpu_usage',
+          current_value: 90,
+          baseline_value: 70,
+          severity: 'high',
+        });
 
         expect(mockCounterAddFn).toHaveBeenNthCalledWith(1, 1, {
           'session.id': 'test-session-id',
@@ -931,13 +1090,12 @@ describe('Telemetry Metrics', () => {
         initializeMetricsModule(mockConfig);
         mockHistogramRecordFn.mockClear();
 
-        recordBaselineComparisonModule(
-          mockConfig,
-          'memory_usage',
-          120,
-          100,
-          'performance_tracking',
-        );
+        recordBaselineComparisonModule(mockConfig, {
+          metric: 'memory_usage',
+          current_value: 120,
+          baseline_value: 100,
+          category: 'performance_tracking',
+        });
 
         // 20% increase: (120 - 100) / 100 * 100 = 20%
         expect(mockHistogramRecordFn).toHaveBeenCalledWith(20, {
@@ -953,13 +1111,12 @@ describe('Telemetry Metrics', () => {
         initializeMetricsModule(mockConfig);
         mockHistogramRecordFn.mockClear();
 
-        recordBaselineComparisonModule(
-          mockConfig,
-          'startup_time',
-          800,
-          1000,
-          'optimization',
-        );
+        recordBaselineComparisonModule(mockConfig, {
+          metric: 'startup_time',
+          current_value: 800,
+          baseline_value: 1000,
+          category: 'optimization',
+        });
 
         // 20% decrease: (800 - 1000) / 1000 * 100 = -20%
         expect(mockHistogramRecordFn).toHaveBeenCalledWith(-20, {
@@ -981,13 +1138,12 @@ describe('Telemetry Metrics', () => {
         initializeMetricsModule(mockConfig);
         mockHistogramRecordFn.mockClear();
 
-        recordBaselineComparisonModule(
-          mockConfig,
-          'new_metric',
-          50,
-          0,
-          'testing',
-        );
+        recordBaselineComparisonModule(mockConfig, {
+          metric: 'new_metric',
+          current_value: 50,
+          baseline_value: 0,
+          category: 'testing',
+        });
 
         expect(diagSpy).toHaveBeenCalledWith(
           'Baseline value is zero, skipping comparison.',

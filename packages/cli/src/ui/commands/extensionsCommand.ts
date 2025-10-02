@@ -9,6 +9,7 @@ import {
   updateAllUpdatableExtensions,
   type ExtensionUpdateInfo,
   updateExtension,
+  checkForAllExtensionUpdates,
 } from '../../config/extensions/update.js';
 import { getErrorMessage } from '../../utils/errors.js';
 import { ExtensionUpdateState } from '../state/extensions.js';
@@ -46,6 +47,10 @@ async function updateAction(context: CommandContext, args: string) {
   }
 
   try {
+    await checkForAllExtensionUpdates(
+      context.services.config!.getExtensions(),
+      context.ui.dispatchExtensionStateUpdate,
+    );
     context.ui.setPendingItem({
       type: MessageType.EXTENSIONS_LIST,
     });
@@ -60,7 +65,7 @@ async function updateAction(context: CommandContext, args: string) {
           ),
         context.services.config!.getExtensions(),
         context.ui.extensionsUpdateState,
-        context.ui.setExtensionsUpdateState,
+        context.ui.dispatchExtensionStateUpdate,
       );
     } else if (names?.length) {
       const workingDir = context.services.config!.getWorkingDir();
@@ -87,15 +92,9 @@ async function updateAction(context: CommandContext, args: string) {
               description,
               context.ui.addConfirmUpdateExtensionRequest,
             ),
-          context.ui.extensionsUpdateState.get(extension.name) ??
+          context.ui.extensionsUpdateState.get(extension.name)?.status ??
             ExtensionUpdateState.UNKNOWN,
-          (updateState) => {
-            context.ui.setExtensionsUpdateState((prev) => {
-              const newState = new Map(prev);
-              newState.set(name, updateState);
-              return newState;
-            });
-          },
+          context.ui.dispatchExtensionStateUpdate,
         );
         if (updateInfo) updateInfos.push(updateInfo);
       }

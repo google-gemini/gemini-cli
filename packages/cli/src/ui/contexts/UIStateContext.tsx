@@ -26,8 +26,8 @@ import type {
 } from '@google/gemini-cli-core';
 import type { DOMElement } from 'ink';
 import type { SessionStatsState } from '../contexts/SessionContext.js';
-import type { UpdateObject } from '../utils/updateCheck.js';
 import type { ExtensionUpdateState } from '../state/extensions.js';
+import type { UpdateObject } from '../utils/updateCheck.js';
 
 export interface ProQuotaDialogRequest {
   failedModel: string;

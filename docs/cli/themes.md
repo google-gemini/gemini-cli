@@ -32,7 +32,7 @@ Gemini CLI comes with a selection of pre-defined themes, which you can list usin
 
 ### Theme Persistence
 
-Selected themes are saved in Gemini CLI's [configuration](./configuration.md) so your preference is remembered across sessions.
+Selected themes are saved in Gemini CLI's [configuration](../get-started/configuration.md) so your preference is remembered across sessions.
 
 ---
 
@@ -146,7 +146,7 @@ The theme file must be a valid JSON file that follows the same structure as a cu
 
 - Select your custom theme using the `/theme` command in Gemini CLI. Your custom theme will appear in the theme selection dialog.
 - Or, set it as the default by adding `"theme": "MyCustomTheme"` to the `ui` object in your `settings.json`.
-- Custom themes can be set at the user, project, or system level, and follow the same [configuration precedence](./configuration.md) as other settings.
+- Custom themes can be set at the user, project, or system level, and follow the same [configuration precedence](../get-started/configuration.md) as other settings.
 
 ---
 
