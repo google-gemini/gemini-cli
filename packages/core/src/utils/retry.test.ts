@@ -6,6 +6,7 @@
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { ApiError } from '@google/genai';
 import type { HttpError } from './retry.js';
 import { retryWithBackoff } from './retry.js';
 import { setSimulate429 } from './testUtils.js';
@@ -161,7 +162,43 @@ describe('retryWithBackoff', () => {
     expect(mockFn).not.toHaveBeenCalled();
   });
 
-  it('should use default shouldRetry if not provided, retrying on 429', async () => {
+  it('should use default shouldRetry if not provided, retrying on ApiError 429', async () => {
+    const mockFn = vi.fn(async () => {
+      throw new ApiError({ message: 'Too Many Requests', status: 429 });
+    });
+
+    const promise = retryWithBackoff(mockFn, {
+      maxAttempts: 2,
+      initialDelayMs: 10,
+    });
+
+    // Attach the rejection expectation *before* running timers
+    const assertionPromise =
+      expect(promise).rejects.toThrow('Too Many Requests'); // eslint-disable-line vitest/valid-expect
+
+    // Run timers to trigger retries and eventual rejection
+    await vi.runAllTimersAsync();
+
+    // Await the assertion
+    await assertionPromise;
+
+    expect(mockFn).toHaveBeenCalledTimes(2);
+  });
+
+  it('should use default shouldRetry if not provided, not retrying on ApiError 400', async () => {
+    const mockFn = vi.fn(async () => {
+      throw new ApiError({ message: 'Bad Request', status: 400 });
+    });
+
+    const promise = retryWithBackoff(mockFn, {
+      maxAttempts: 2,
+      initialDelayMs: 10,
+    });
+    await expect(promise).rejects.toThrow('Bad Request');
+    expect(mockFn).toHaveBeenCalledTimes(1);
+  });
+
+  it('should use default shouldRetry if not provided, retrying on generic error with status 429', async () => {
     const mockFn = vi.fn(async () => {
       const error = new Error('Too Many Requests') as any;
       error.status = 429;
@@ -186,7 +223,7 @@ describe('retryWithBackoff', () => {
     expect(mockFn).toHaveBeenCalledTimes(2);
   });
 
-  it('should use default shouldRetry if not provided, not retrying on 400', async () => {
+  it('should use default shouldRetry if not provided, not retrying on generic error with status 400', async () => {
     const mockFn = vi.fn(async () => {
       const error = new Error('Bad Request') as any;
       error.status = 400;
