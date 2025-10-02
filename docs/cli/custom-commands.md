@@ -1,8 +1,8 @@
-### Custom Commands
+# Custom Commands
 
 Custom commands let you save and reuse your favorite or most frequently used prompts as personal shortcuts within Gemini CLI. You can create commands that are specific to a single project or commands that are available globally across all your projects, streamlining your workflow and ensuring consistency.
 
-#### File locations and precedence
+## File locations and precedence
 
 Gemini CLI discovers commands from two locations, loaded in a specific order:
 
@@ -11,30 +11,30 @@ Gemini CLI discovers commands from two locations, loaded in a specific order:
 
 If a command in the project directory has the same name as a command in the user directory, the **project command will always be used.** This allows projects to override global commands with project-specific versions.
 
-#### Naming and namespacing
+## Naming and namespacing
 
 The name of a command is determined by its file path relative to its `commands` directory. Subdirectories are used to create namespaced commands, with the path separator (`/` or `\`) being converted to a colon (`:`).
 
 - A file at `~/.gemini/commands/test.toml` becomes the command `/test`.
 - A file at `<project>/.gemini/commands/git/commit.toml` becomes the namespaced command `/git:commit`.
 
-#### TOML File Format (v1)
+## TOML File Format (v1)
 
 Your command definition files must be written in the TOML format and use the `.toml` file extension.
 
-##### Required fields
+### Required fields
 
 - `prompt` (String): The prompt that will be sent to the Gemini model when the command is executed. This can be a single-line or multi-line string.
 
-##### Optional fields
+### Optional fields
 
 - `description` (String): A brief, one-line description of what the command does. This text will be displayed next to your command in the `/help` menu. **If you omit this field, a generic description will be generated from the filename.**
 
-#### Handling arguments
+## Handling arguments
 
 Custom commands support two powerful methods for handling arguments. The CLI automatically chooses the correct method based on the content of your command\'s `prompt`.
 
-##### 1. Context-aware injection with `{{args}}`
+### 1. Context-aware injection with `{{args}}`
 
 If your `prompt` contains the special placeholder `{{args}}`, the CLI will replace that placeholder with the text the user typed after the command name.
 
@@ -79,7 +79,7 @@ When you run `/grep-code It\'s complicated`:
 5. The CLI prompts you to confirm this exact, secure command before execution.
 6. The final prompt is sent.
 
-##### 2. Default argument handling
+### 2. Default argument handling
 
 If your `prompt` does **not** contain the special placeholder `{{args}}`, the CLI uses a default behavior for handling arguments.
 
@@ -120,7 +120,7 @@ The command follows this format: `/changelog <version> <type> <message>`
 
 When you run `/changelog 1.2.0 added "New feature"`, the final text sent to the model will be the original prompt followed by two newlines and the command you typed.
 
-##### 3. Executing Shell commands with `!{...}`
+### 3. Executing Shell commands with `!{...}`
 
 You can make your commands dynamic by executing shell commands directly within your `prompt` and injecting their output. This is ideal for gathering context from your local environment, like reading file content or checking the status of Git.
 
@@ -158,7 +158,7 @@ Please generate a Conventional Commit message based on the following git diff:
 
 When you run `/git:commit`, the CLI first executes `git diff --staged`, then replaces `!{git diff --staged}` with the output of that command before sending the final, complete prompt to the model.
 
-##### 4. Injecting file content with `@{...}`
+### 4. Injecting file content with `@{...}`
 
 You can directly embed the content of a file or a directory listing into your prompt using the `@{...}` syntax. This is useful for creating commands that operate on specific files.
 
@@ -195,7 +195,7 @@ When you run `/review FileCommandLoader.ts`, the `@{docs/best-practices.md}` pla
 
 ---
 
-#### Example: A "Pure Function" refactoring command
+## Example: A "Pure Function" refactoring command
 
 Let's create a global command that asks the model to refactor a piece of code.
 
