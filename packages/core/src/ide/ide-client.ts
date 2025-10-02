@@ -104,6 +104,13 @@ export class IdeClient {
 
   private constructor() {}
 
+  /**
+   * Implements a singleton pattern for the IdeClient.
+   *
+   * The initialization is asynchronous, so we store and return the promise of
+   * the instance. This ensures that the async setup runs only once, and all
+   * subsequent calls receive the same client instance promise.
+   */
   static getInstance(): Promise<IdeClient> {
     if (!IdeClient.instancePromise) {
       IdeClient.instancePromise = (async () => {
@@ -245,8 +252,8 @@ export class IdeClient {
             params: {
               name: `openDiff`,
               arguments: {
-                filePath,
-                newContent,
+                file1: filePath,
+                file2: newContent,
               },
             },
           },

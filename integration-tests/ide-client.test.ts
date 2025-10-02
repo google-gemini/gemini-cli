@@ -23,28 +23,30 @@ describe('IDE client', () => {
     delete process.env['GEMINI_CLI_IDE_WORKSPACE_PATH'];
   });
 
-  it('should send tool calls to the IDE server', async () => {
-    rig = new TestRig();
-    rig.setup('ide-client-test');
-
+  it('should trigger openDiff when editing a file in IDE mode', async () => {
+    // 1. Setup the server
     server = new TestMcpServer();
     const port = await server.start();
 
-    // Set env vars to make the CLI think it's connected to an IDE
+    // 2. Configure the Environment by setting all necessary env vars.
     process.env['GEMINI_CLI_IDE_SERVER_PORT'] = String(port);
     process.env['TERM_PROGRAM'] = 'vscode';
+
+    // 3. Set up the Workspace.
+    rig = new TestRig();
+    rig.setup('ide-open-diff-test');
     process.env['GEMINI_CLI_IDE_WORKSPACE_PATH'] = rig.testDir!;
 
-    const prompt =
-      "Please create a file named 'test.txt' with the content 'hello world'";
-    await rig.run(prompt);
+    // 4. Run the Action.
+    await rig.run(
+      "create a file named 'test.txt' and add 'new content' as content",
+    );
 
-    const foundToolCall = await rig.waitForToolCall('write_file');
-
-    expect(
-      foundToolCall,
-      'Expected to find a write_file tool call',
-    ).toBeTruthy();
+    // The TestRig spawns the Gemini CLI in a separate child process.
+    // Therefore, we cannot spy on the IdeClient directly in this test process.
+    // Instead, we spy on the mock server to verify that it receives the
+    // openDiff request from the CLI process.
+    expect(server.getOpenDiffSpy()).toHaveBeenCalled();
   });
 
   it('should allow the CLI to work correctly even if it fails to connect to the IDE', async () => {

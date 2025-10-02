@@ -8,29 +8,32 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import express from 'express';
 import { type Server as HTTPServer } from 'node:http';
-
 import { randomUUID } from 'node:crypto';
-import type { Tool } from '@modelcontextprotocol/sdk/types.js';
+import { z } from 'zod';
+
+import { vi } from 'vitest';
 
 export class TestMcpServer {
   private server: HTTPServer | undefined;
   public requests: unknown[] = [];
+  // This spy is used to verify that the mock server received a specific request
+  // from the CLI, which runs in a separate process during integration tests.
+  // Spying on the client-side code directly is not possible in this scenario.
+  private openDiffSpy = vi.fn();
 
-  /**
-   * Starts the mock MCP server.
-   * @param tools A map of tool names to their implementations.
-   *   This allows tests to inject custom or failing tool implementations.
-   */
-  async start(tools?: Record<string, Tool>): Promise<number> {
+  getOpenDiffSpy() {
+    return this.openDiffSpy;
+  }
+
+  async start(): Promise<number> {
     const app = express();
     app.use(express.json());
-    const mcpServer = new McpServer(
-      {
-        name: 'test-mcp-server',
-        version: '1.0.0',
-      },
-      { capabilities: { tools } },
-    );
+    const mcpServer = new McpServer({
+      name: 'test-mcp-server',
+      version: '1.0.0',
+    });
+
+    this._registerTools(mcpServer);
 
     const transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: () => randomUUID(),
@@ -55,10 +58,6 @@ export class TestMcpServer {
     });
   }
 
-  getRequests() {
-    return this.requests;
-  }
-
   async stop(): Promise<void> {
     if (this.server) {
       await new Promise<void>((resolve, reject) => {
@@ -72,5 +71,70 @@ export class TestMcpServer {
       });
       this.server = undefined;
     }
+  }
+
+  private _registerTools(mcpServer: McpServer) {
+    mcpServer.registerTool(
+      'openDiff',
+      {
+        inputSchema: {
+          file1: z.string(),
+          file2: z.string(),
+        },
+      },
+      async (params) => {
+        this.openDiffSpy(params);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: 'Diff view opened.',
+            },
+          ],
+        };
+      },
+    );
+
+    mcpServer.registerTool(
+      'closeDiff',
+      {
+        inputSchema: {
+          filePath: z.string(),
+        },
+      },
+      async () => ({
+        content: [
+          {
+            type: 'text',
+            text: 'Diff view closed.',
+          },
+        ],
+      }),
+    );
+
+    mcpServer.registerTool(
+      'write_file',
+      {
+        inputSchema: {
+          file_path: z.string(),
+          content: z.string(),
+        },
+      },
+      async () => ({
+        content: [{ type: 'text', text: 'File written.' }],
+      }),
+    );
+
+    mcpServer.registerTool(
+      'run_shell_command',
+      {
+        inputSchema: {
+          command: z.string(),
+        },
+      },
+      async () => ({
+        content: [{ type: 'text', text: 'Shell command executed.' }],
+      }),
+    );
   }
 }
