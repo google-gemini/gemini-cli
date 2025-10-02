@@ -133,11 +133,29 @@ export async function runNonInteractive(
         if (toolCallRequests.length > 0) {
           const toolResponseParts: Part[] = [];
           for (const requestInfo of toolCallRequests) {
+            if (config.getShowNonInteractiveToolInfo()) {
+              console.error(`[INFO] Using tool: ${requestInfo.name}`);
+            }
+
             const toolResponse = await executeToolCall(
               config,
               requestInfo,
               abortController.signal,
             );
+
+            if (config.getShowNonInteractiveToolInfo()) {
+              if (toolResponse.error) {
+                console.error(
+                  `[INFO] Tool ${requestInfo.name} failed with error: ${
+                    toolResponse.resultDisplay || toolResponse.error.message
+                  }`,
+                );
+              } else {
+                console.error(
+                  `[INFO] Tool ${requestInfo.name} output: ${toolResponse.resultDisplay}`,
+                );
+              }
+            }
 
             if (toolResponse.error) {
               handleToolError(
