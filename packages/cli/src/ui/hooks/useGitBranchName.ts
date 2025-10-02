@@ -40,9 +40,12 @@ function useGitWatcher(cwd: string, onBranchChange: () => void) {
     const setupHeadWatcher = () => {
       if (!isMounted) return;
 
+      // Clean up existing watchers to prevent resource leaks.
+      headWatcher?.close();
       // Stop watching the cwd for .git creation if we are now watching HEAD.
       cwdWatcher?.close();
       cwdWatcher = undefined;
+
       try {
         console.debug('[GitBranchName] Setting up HEAD watcher.');
         headWatcher = fs.watch(gitHeadPath, (eventType: string) => {
