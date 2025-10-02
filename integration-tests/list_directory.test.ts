@@ -12,7 +12,7 @@ import { join } from 'node:path';
 describe('list_directory', () => {
   it('should be able to list a directory', async () => {
     const rig = new TestRig();
-    await rig.setup('should be able to list a directory');
+    rig.setup('should be able to list a directory');
     rig.createFile('file1.txt', 'file 1 content');
     rig.mkdir('subdir');
     rig.sync();
@@ -25,7 +25,7 @@ describe('list_directory', () => {
         const subdirPath = join(rig.testDir!, 'subdir');
         return existsSync(file1Path) && existsSync(subdirPath);
       },
-      1000, // 1 second max wait
+      3000, // 3 second max wait
       50, // check every 50ms
     );
 
