@@ -52,5 +52,9 @@
       description="Open the Gemini CLI settings page">
       <add-to-group group-id="ToolsMenu" anchor="last"/>
     </action>
+    <action id="ShowGeminiCliNotices" class="com.google.gemini.cli.ShowNoticesAction" text="Show Notices"
+      description="Show Gemini CLI notices and licenses">
+      <add-to-group group-id="ToolsMenu" anchor="last"/>
+    </action>
   </actions>
 </idea-plugin>
