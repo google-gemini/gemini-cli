@@ -14,7 +14,7 @@ import { ApprovalMode } from '@google/gemini-cli-core';
 import * as path from 'node:path';
 import type { CommandContext, SlashCommand } from '../commands/types.js';
 import { CommandKind } from '../commands/types.js';
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import type { UseShellHistoryReturn } from '../hooks/useShellHistory.js';
 import { useShellHistory } from '../hooks/useShellHistory.js';
 import type { UseCommandCompletionReturn } from '../hooks/useCommandCompletion.js';
@@ -24,7 +24,9 @@ import { useInputHistory } from '../hooks/useInputHistory.js';
 import type { UseReverseSearchCompletionReturn } from '../hooks/useReverseSearchCompletion.js';
 import { useReverseSearchCompletion } from '../hooks/useReverseSearchCompletion.js';
 import * as clipboardUtils from '../utils/clipboardUtils.js';
+import { useKittyKeyboardProtocol } from '../hooks/useKittyKeyboardProtocol.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
+import stripAnsi from 'strip-ansi';
 import chalk from 'chalk';
 
 vi.mock('../hooks/useShellHistory.js');
@@ -32,6 +34,7 @@ vi.mock('../hooks/useCommandCompletion.js');
 vi.mock('../hooks/useInputHistory.js');
 vi.mock('../hooks/useReverseSearchCompletion.js');
 vi.mock('../utils/clipboardUtils.js');
+vi.mock('../hooks/useKittyKeyboardProtocol.js');
 
 const mockSlashCommands: SlashCommand[] = [
   {
@@ -96,6 +99,7 @@ describe('InputPrompt', () => {
   const mockedUseReverseSearchCompletion = vi.mocked(
     useReverseSearchCompletion,
   );
+  const mockedUseKittyKeyboardProtocol = vi.mocked(useKittyKeyboardProtocol);
 
   beforeEach(() => {
     vi.resetAllMocks();
@@ -112,6 +116,7 @@ describe('InputPrompt', () => {
         mockBuffer.cursor = [0, newText.length];
         mockBuffer.viewportVisualLines = [newText];
         mockBuffer.allVisualLines = [newText];
+        mockBuffer.visualToLogicalMap = [[0, 0]];
       }),
       replaceRangeByOffset: vi.fn(),
       viewportVisualLines: [''],
@@ -137,6 +142,7 @@ describe('InputPrompt', () => {
       replaceRange: vi.fn(),
       deleteWordLeft: vi.fn(),
       deleteWordRight: vi.fn(),
+      visualToLogicalMap: [[0, 0]],
     } as unknown as TextBuffer;
 
     mockShellHistory = {
@@ -190,6 +196,10 @@ describe('InputPrompt', () => {
     mockedUseReverseSearchCompletion.mockReturnValue(
       mockReverseSearchCompletion,
     );
+
+    mockedUseKittyKeyboardProtocol.mockReturnValue({
+      supported: false,
+    });
 
     props = {
       buffer: mockBuffer,
@@ -1333,6 +1343,128 @@ describe('InputPrompt', () => {
       expect(frame).toContain(`hello 👍${chalk.inverse(' ')}`);
       unmount();
     });
+
+    it('should display cursor on an empty line', async () => {
+      mockBuffer.text = '';
+      mockBuffer.lines = [''];
+      mockBuffer.viewportVisualLines = [''];
+      mockBuffer.visualCursor = [0, 0];
+
+      const { stdout, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+      );
+      await wait();
+
+      const frame = stdout.lastFrame();
+      expect(frame).toContain(chalk.inverse(' '));
+      unmount();
+    });
+
+    it('should display cursor on a space between words', async () => {
+      mockBuffer.text = 'hello world';
+      mockBuffer.lines = ['hello world'];
+      mockBuffer.viewportVisualLines = ['hello world'];
+      mockBuffer.visualCursor = [0, 5]; // cursor on the space
+
+      const { stdout, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+      );
+      await wait();
+
+      const frame = stdout.lastFrame();
+      expect(frame).toContain(`hello${chalk.inverse(' ')}world`);
+      unmount();
+    });
+
+    it('should display cursor in the middle of a line in a multiline block', async () => {
+      const text = 'first line\nsecond line\nthird line';
+      mockBuffer.text = text;
+      mockBuffer.lines = text.split('\n');
+      mockBuffer.viewportVisualLines = text.split('\n');
+      mockBuffer.visualCursor = [1, 3]; // cursor on 'o' in 'second'
+      mockBuffer.visualToLogicalMap = [
+        [0, 0],
+        [1, 0],
+        [2, 0],
+      ];
+
+      const { stdout, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+      );
+      await wait();
+
+      const frame = stdout.lastFrame();
+      expect(frame).toContain(`sec${chalk.inverse('o')}nd line`);
+      unmount();
+    });
+
+    it('should display cursor at the beginning of a line in a multiline block', async () => {
+      const text = 'first line\nsecond line';
+      mockBuffer.text = text;
+      mockBuffer.lines = text.split('\n');
+      mockBuffer.viewportVisualLines = text.split('\n');
+      mockBuffer.visualCursor = [1, 0]; // cursor on 's' in 'second'
+      mockBuffer.visualToLogicalMap = [
+        [0, 0],
+        [1, 0],
+      ];
+
+      const { stdout, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+      );
+      await wait();
+
+      const frame = stdout.lastFrame();
+      expect(frame).toContain(`${chalk.inverse('s')}econd line`);
+      unmount();
+    });
+
+    it('should display cursor at the end of a line in a multiline block', async () => {
+      const text = 'first line\nsecond line';
+      mockBuffer.text = text;
+      mockBuffer.lines = text.split('\n');
+      mockBuffer.viewportVisualLines = text.split('\n');
+      mockBuffer.visualCursor = [0, 10]; // cursor after 'first line'
+      mockBuffer.visualToLogicalMap = [
+        [0, 0],
+        [1, 0],
+      ];
+
+      const { stdout, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+      );
+      await wait();
+
+      const frame = stdout.lastFrame();
+      expect(frame).toContain(`first line${chalk.inverse(' ')}`);
+      unmount();
+    });
+
+    it('should display cursor on a blank line in a multiline block', async () => {
+      const text = 'first line\n\nthird line';
+      mockBuffer.text = text;
+      mockBuffer.lines = text.split('\n');
+      mockBuffer.viewportVisualLines = text.split('\n');
+      mockBuffer.visualCursor = [1, 0]; // cursor on the blank line
+      mockBuffer.visualToLogicalMap = [
+        [0, 0],
+        [1, 0],
+        [2, 0],
+      ];
+
+      const { stdout, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+      );
+      await wait();
+
+      const frame = stdout.lastFrame();
+      const lines = frame!.split('\n');
+      // The line with the cursor should just be an inverted space inside the box border
+      expect(
+        lines.find((l) => l.includes(chalk.inverse(' '))),
+      ).not.toBeUndefined();
+      unmount();
+    });
   });
 
   describe('multiline rendering', () => {
@@ -1343,6 +1475,12 @@ describe('InputPrompt', () => {
       mockBuffer.viewportVisualLines = text.split('\n');
       mockBuffer.allVisualLines = text.split('\n');
       mockBuffer.visualCursor = [2, 5]; // cursor at the end of "world"
+      // Provide a visual-to-logical mapping for each visual line
+      mockBuffer.visualToLogicalMap = [
+        [0, 0], // 'hello' starts at col 0 of logical line 0
+        [1, 0], // '' (blank) is logical line 1, col 0
+        [2, 0], // 'world' is logical line 2, col 0
+      ];
 
       const { stdout, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
@@ -1400,55 +1538,99 @@ describe('InputPrompt', () => {
   });
 
   describe('paste auto-submission protection', () => {
-    it('should prevent auto-submission immediately after paste with newlines', async () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+      mockedUseKittyKeyboardProtocol.mockReturnValue({ supported: false });
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('should prevent auto-submission immediately after an unsafe paste', async () => {
+      // isTerminalPasteTrusted will be false due to beforeEach setup.
+      props.buffer.text = 'some command';
+
       const { stdin, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
       );
-      await wait();
-
-      // First type some text manually
-      stdin.write('test command');
-      await wait();
+      await vi.runAllTimersAsync();
 
       // Simulate a paste operation (this should set the paste protection)
-      stdin.write(`\x1b[200~\npasted content\x1b[201~`);
-      await wait();
+      stdin.write(`\x1b[200~pasted content\x1b[201~`);
+      await vi.runAllTimersAsync();
 
       // Simulate an Enter key press immediately after paste
       stdin.write('\r');
-      await wait();
+      await vi.runAllTimersAsync();
 
       // Verify that onSubmit was NOT called due to recent paste protection
       expect(props.onSubmit).not.toHaveBeenCalled();
-
+      // It should call newline() instead
+      expect(props.buffer.newline).toHaveBeenCalled();
       unmount();
     });
 
-    it('should allow submission after paste protection timeout', async () => {
-      // Set up buffer with text for submission
-      props.buffer.text = 'test command';
+    it('should allow submission after unsafe paste protection timeout', async () => {
+      // isTerminalPasteTrusted will be false due to beforeEach setup.
+      props.buffer.text = 'pasted text';
 
       const { stdin, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
       );
-      await wait();
+      await vi.runAllTimersAsync();
 
       // Simulate a paste operation (this sets the protection)
-      stdin.write(`\x1b[200~\npasted\x1b[201~`);
-      await wait();
+      act(() => {
+        stdin.write('\x1b[200~pasted text\x1b[201~');
+      });
+      await vi.runAllTimersAsync();
 
-      // Wait for the protection timeout to naturally expire
-      await new Promise((resolve) => setTimeout(resolve, 600));
+      // Advance timers past the protection timeout
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(50);
+      });
 
       // Now Enter should work normally
       stdin.write('\r');
-      await wait();
+      await vi.runAllTimersAsync();
 
-      // Verify that onSubmit was called after the timeout
-      expect(props.onSubmit).toHaveBeenCalledWith('test command');
+      expect(props.onSubmit).toHaveBeenCalledWith('pasted text');
+      expect(props.buffer.newline).not.toHaveBeenCalled();
 
       unmount();
     });
+
+    it.each([
+      {
+        name: 'kitty',
+        setup: () =>
+          mockedUseKittyKeyboardProtocol.mockReturnValue({ supported: true }),
+      },
+    ])(
+      'should allow immediate submission for a trusted paste ($name)',
+      async ({ setup }) => {
+        setup();
+        props.buffer.text = 'pasted command';
+
+        const { stdin, unmount } = renderWithProviders(
+          <InputPrompt {...props} />,
+        );
+        await vi.runAllTimersAsync();
+
+        // Simulate a paste operation
+        stdin.write('\x1b[200~some pasted stuff\x1b[201~');
+        await vi.runAllTimersAsync();
+
+        // Simulate an Enter key press immediately after paste
+        stdin.write('\r');
+        await vi.runAllTimersAsync();
+
+        // Verify that onSubmit was called
+        expect(props.onSubmit).toHaveBeenCalledWith('pasted command');
+        unmount();
+      },
+    );
 
     it('should not interfere with normal Enter key submission when no recent paste', async () => {
       // Set up buffer with text before rendering to ensure submission works
@@ -1457,11 +1639,11 @@ describe('InputPrompt', () => {
       const { stdin, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
       );
-      await wait();
+      await vi.runAllTimersAsync();
 
       // Press Enter without any recent paste
       stdin.write('\r');
-      await wait();
+      await vi.runAllTimersAsync();
 
       // Verify that onSubmit was called normally
       expect(props.onSubmit).toHaveBeenCalledWith('normal command');
@@ -1789,6 +1971,144 @@ describe('InputPrompt', () => {
     });
   });
 
+  describe('command search (Ctrl+R when not in shell)', () => {
+    it('enters command search on Ctrl+R and shows suggestions', async () => {
+      props.shellModeActive = false;
+
+      vi.mocked(useReverseSearchCompletion).mockImplementation(
+        (buffer, data, isActive) => ({
+          ...mockReverseSearchCompletion,
+          suggestions: isActive
+            ? [
+                { label: 'git commit -m "msg"', value: 'git commit -m "msg"' },
+                { label: 'git push', value: 'git push' },
+              ]
+            : [],
+          showSuggestions: !!isActive,
+          activeSuggestionIndex: isActive ? 0 : -1,
+        }),
+      );
+
+      const { stdin, stdout, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+      );
+      await wait();
+
+      act(() => {
+        stdin.write('\x12'); // Ctrl+R
+      });
+      await wait();
+
+      const frame = stdout.lastFrame() ?? '';
+      expect(frame).toContain('(r:)');
+      expect(frame).toContain('git commit');
+      expect(frame).toContain('git push');
+      unmount();
+    });
+
+    it('expands and collapses long suggestion via Right/Left arrows', async () => {
+      props.shellModeActive = false;
+      const longValue = 'l'.repeat(200);
+
+      vi.mocked(useReverseSearchCompletion).mockReturnValue({
+        ...mockReverseSearchCompletion,
+        suggestions: [{ label: longValue, value: longValue, matchedIndex: 0 }],
+        showSuggestions: true,
+        activeSuggestionIndex: 0,
+        visibleStartIndex: 0,
+        isLoadingSuggestions: false,
+      });
+
+      const { stdin, stdout, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+      );
+      await wait();
+
+      stdin.write('\x12');
+      await wait();
+
+      expect(clean(stdout.lastFrame())).toContain('→');
+
+      stdin.write('\u001B[C');
+      await wait(200);
+      expect(clean(stdout.lastFrame())).toContain('←');
+      expect(stdout.lastFrame()).toMatchSnapshot(
+        'command-search-expanded-match',
+      );
+
+      stdin.write('\u001B[D');
+      await wait();
+      expect(clean(stdout.lastFrame())).toContain('→');
+      expect(stdout.lastFrame()).toMatchSnapshot(
+        'command-search-collapsed-match',
+      );
+      unmount();
+    });
+
+    it('renders match window and expanded view (snapshots)', async () => {
+      props.shellModeActive = false;
+      props.buffer.setText('commit');
+
+      const label = 'git commit -m "feat: add search" in src/app';
+      const matchedIndex = label.indexOf('commit');
+
+      vi.mocked(useReverseSearchCompletion).mockReturnValue({
+        ...mockReverseSearchCompletion,
+        suggestions: [{ label, value: label, matchedIndex }],
+        showSuggestions: true,
+        activeSuggestionIndex: 0,
+        visibleStartIndex: 0,
+        isLoadingSuggestions: false,
+      });
+
+      const { stdin, stdout, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+      );
+      await wait();
+
+      stdin.write('\x12');
+      await wait();
+      expect(stdout.lastFrame()).toMatchSnapshot(
+        'command-search-collapsed-match',
+      );
+
+      stdin.write('\u001B[C');
+      await wait();
+      expect(stdout.lastFrame()).toMatchSnapshot(
+        'command-search-expanded-match',
+      );
+
+      unmount();
+    });
+
+    it('does not show expand/collapse indicator for short suggestions', async () => {
+      props.shellModeActive = false;
+      const shortValue = 'echo hello';
+
+      vi.mocked(useReverseSearchCompletion).mockReturnValue({
+        ...mockReverseSearchCompletion,
+        suggestions: [{ label: shortValue, value: shortValue }],
+        showSuggestions: true,
+        activeSuggestionIndex: 0,
+        visibleStartIndex: 0,
+        isLoadingSuggestions: false,
+      });
+
+      const { stdin, stdout, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+      );
+      await wait();
+
+      stdin.write('\x12');
+      await wait();
+
+      const frame = clean(stdout.lastFrame());
+      expect(frame).not.toContain('→');
+      expect(frame).not.toContain('←');
+      unmount();
+    });
+  });
+
   describe('snapshots', () => {
     it('should render correctly in shell mode', async () => {
       props.shellModeActive = true;
@@ -1819,5 +2139,37 @@ describe('InputPrompt', () => {
       expect(stdout.lastFrame()).toMatchSnapshot();
       unmount();
     });
+
+    it('should not show inverted cursor when shell is focused', async () => {
+      props.isEmbeddedShellFocused = true;
+      props.focus = false;
+      const { stdout, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+      );
+      await wait();
+      expect(stdout.lastFrame()).not.toContain(`{chalk.inverse(' ')}`);
+      // This snapshot is good to make sure there was an input prompt but does
+      // not show the inverted cursor because snapshots do not show colors.
+      expect(stdout.lastFrame()).toMatchSnapshot();
+      unmount();
+    });
+  });
+
+  it('should still allow input when shell is not focused', async () => {
+    const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />, {
+      shellFocus: false,
+    });
+    await wait();
+
+    stdin.write('a');
+    await wait();
+
+    expect(mockBuffer.handleInput).toHaveBeenCalled();
+    unmount();
   });
 });
+function clean(str: string | undefined): string {
+  if (!str) return '';
+  // Remove ANSI escape codes and trim whitespace
+  return stripAnsi(str).trim();
+}

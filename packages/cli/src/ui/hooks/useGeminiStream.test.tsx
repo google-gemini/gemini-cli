@@ -114,7 +114,7 @@ vi.mock('./useStateAndRef.js', () => ({
       }
       ref.current = val;
     });
-    return [ref, setVal];
+    return [val, ref, setVal];
   }),
 }));
 
@@ -210,6 +210,7 @@ describe('useGeminiStream', () => {
         .fn()
         .mockReturnValue(contentGeneratorConfig),
       getUseSmartEdit: () => false,
+      getUseModelRouter: () => false,
     } as unknown as Config;
     mockOnDebugMessage = vi.fn();
     mockHandleSlashCommand = vi.fn().mockResolvedValue(false);
@@ -2213,6 +2214,72 @@ describe('useGeminiStream', () => {
           expect.any(Number),
         );
       });
+    });
+
+    it('should memoize pendingHistoryItems', () => {
+      mockUseReactToolScheduler.mockReturnValue([
+        [],
+        mockScheduleToolCalls,
+        mockCancelAllToolCalls,
+        mockMarkToolsAsSubmitted,
+      ]);
+
+      const { result, rerender } = renderHook(() =>
+        useGeminiStream(
+          mockConfig.getGeminiClient(),
+          [],
+          mockAddItem,
+          mockConfig,
+          mockLoadedSettings,
+          mockOnDebugMessage,
+          mockHandleSlashCommand,
+          false,
+          () => 'vscode' as EditorType,
+          () => {},
+          () => Promise.resolve(),
+          false,
+          () => {},
+          () => {},
+          () => {},
+          () => {},
+          80,
+          24,
+        ),
+      );
+
+      const firstResult = result.current.pendingHistoryItems;
+      rerender();
+      const secondResult = result.current.pendingHistoryItems;
+
+      expect(firstResult).toStrictEqual(secondResult);
+
+      const newToolCalls: TrackedToolCall[] = [
+        {
+          request: { callId: 'call1', name: 'tool1', args: {} },
+          status: 'executing',
+          tool: {
+            name: 'tool1',
+            displayName: 'tool1',
+            description: 'desc1',
+            build: vi.fn(),
+          },
+          invocation: {
+            getDescription: () => 'Mock description',
+          },
+        } as unknown as TrackedExecutingToolCall,
+      ];
+
+      mockUseReactToolScheduler.mockReturnValue([
+        newToolCalls,
+        mockScheduleToolCalls,
+        mockCancelAllToolCalls,
+        mockMarkToolsAsSubmitted,
+      ]);
+
+      rerender();
+      const thirdResult = result.current.pendingHistoryItems;
+
+      expect(thirdResult).not.toStrictEqual(secondResult);
     });
 
     it('should reset thought to null when user cancels', async () => {

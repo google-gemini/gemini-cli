@@ -61,7 +61,11 @@ export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
               }
             />
           </Box>
-          {primaryText && <Text color={theme.text.accent}>{primaryText}</Text>}
+          {primaryText && (
+            <Text color={theme.text.accent} wrap="truncate-end">
+              {primaryText}
+            </Text>
+          )}
           {!isNarrow && cancelAndTimerContent && (
             <Text color={theme.text.secondary}> {cancelAndTimerContent}</Text>
           )}

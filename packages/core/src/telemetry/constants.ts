@@ -12,6 +12,10 @@ export const EVENT_API_REQUEST = 'gemini_cli.api_request';
 export const EVENT_API_ERROR = 'gemini_cli.api_error';
 export const EVENT_API_RESPONSE = 'gemini_cli.api_response';
 export const EVENT_CLI_CONFIG = 'gemini_cli.config';
+export const EVENT_EXTENSION_DISABLE = 'gemini_cli.extension_disable';
+export const EVENT_EXTENSION_ENABLE = 'gemini_cli.extension_enable';
+export const EVENT_EXTENSION_INSTALL = 'gemini_cli.extension_install';
+export const EVENT_EXTENSION_UNINSTALL = 'gemini_cli.extension_uninstall';
 export const EVENT_FLASH_FALLBACK = 'gemini_cli.flash_fallback';
 export const EVENT_RIPGREP_FALLBACK = 'gemini_cli.ripgrep_fallback';
 export const EVENT_NEXT_SPEAKER_CHECK = 'gemini_cli.next_speaker_check';
@@ -26,14 +30,13 @@ export const EVENT_CONTENT_RETRY = 'gemini_cli.chat.content_retry';
 export const EVENT_CONTENT_RETRY_FAILURE =
   'gemini_cli.chat.content_retry_failure';
 export const EVENT_FILE_OPERATION = 'gemini_cli.file_operation';
-export const METRIC_TOOL_CALL_COUNT = 'gemini_cli.tool.call.count';
-export const METRIC_TOOL_CALL_LATENCY = 'gemini_cli.tool.call.latency';
-export const METRIC_API_REQUEST_COUNT = 'gemini_cli.api.request.count';
-export const METRIC_API_REQUEST_LATENCY = 'gemini_cli.api.request.latency';
-export const METRIC_TOKEN_USAGE = 'gemini_cli.token.usage';
-export const METRIC_SESSION_COUNT = 'gemini_cli.session.count';
-export const METRIC_FILE_OPERATION_COUNT = 'gemini_cli.file.operation.count';
-export const METRIC_INVALID_CHUNK_COUNT = 'gemini_cli.chat.invalid_chunk.count';
-export const METRIC_CONTENT_RETRY_COUNT = 'gemini_cli.chat.content_retry.count';
-export const METRIC_CONTENT_RETRY_FAILURE_COUNT =
-  'gemini_cli.chat.content_retry_failure.count';
+export const EVENT_MODEL_SLASH_COMMAND = 'gemini_cli.slash_command.model';
+export const EVENT_SMART_EDIT_STRATEGY = 'gemini_cli.smart_edit.strategy';
+export const EVENT_MODEL_ROUTING = 'gemini_cli.model_routing';
+export const EVENT_SMART_EDIT_CORRECTION = 'gemini_cli.smart_edit.correction';
+
+// Performance Events
+export const EVENT_STARTUP_PERFORMANCE = 'gemini_cli.startup.performance';
+export const EVENT_MEMORY_USAGE = 'gemini_cli.memory.usage';
+export const EVENT_PERFORMANCE_BASELINE = 'gemini_cli.performance.baseline';
+export const EVENT_PERFORMANCE_REGRESSION = 'gemini_cli.performance.regression';

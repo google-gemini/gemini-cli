@@ -50,6 +50,7 @@ import {
 import { shouldAttemptBrowserLaunch } from '../utils/browser.js';
 import type { MCPOAuthConfig } from '../mcp/oauth-provider.js';
 import { ideContextStore } from '../ide/ideContext.js';
+import { WriteTodosTool } from '../tools/write-todos.js';
 import type { FileSystemService } from '../services/fileSystemService.js';
 import { StandardFileSystemService } from '../services/fileSystemService.js';
 import {
@@ -74,6 +75,9 @@ import { PolicyEngine } from '../policy/policy-engine.js';
 import type { PolicyEngineConfig } from '../policy/types.js';
 import type { UserTierId } from '../code_assist/types.js';
 import { ProxyAgent, setGlobalDispatcher } from 'undici';
+
+import { AgentRegistry } from '../agents/registry.js';
+import { SubagentToolWrapper } from '../agents/subagent-tool-wrapper.js';
 
 export enum ApprovalMode {
   DEFAULT = 'default',
@@ -105,6 +109,7 @@ export interface TelemetrySettings {
   otlpProtocol?: 'grpc' | 'http';
   logPrompts?: boolean;
   outfile?: string;
+  useCollector?: boolean;
 }
 
 export interface OutputSettings {
@@ -116,24 +121,27 @@ export interface GeminiCLIExtension {
   version: string;
   isActive: boolean;
   path: string;
-  source?: string;
-  type?: 'git' | 'local' | 'link';
-  ref?: string;
+  installMetadata?: ExtensionInstallMetadata;
 }
 
-export interface FileFilteringOptions {
-  respectGitIgnore: boolean;
-  respectGeminiIgnore: boolean;
+export interface ExtensionInstallMetadata {
+  source: string;
+  type: 'git' | 'local' | 'link' | 'github-release';
+  releaseTag?: string; // Only present for github-release installs.
+  ref?: string;
+  autoUpdate?: boolean;
 }
-// For memory files
-export const DEFAULT_MEMORY_FILE_FILTERING_OPTIONS: FileFilteringOptions = {
-  respectGitIgnore: false,
-  respectGeminiIgnore: true,
-};
-// For all other files
-export const DEFAULT_FILE_FILTERING_OPTIONS: FileFilteringOptions = {
-  respectGitIgnore: true,
-  respectGeminiIgnore: true,
+
+import type { FileFilteringOptions } from './constants.js';
+import {
+  DEFAULT_MEMORY_FILE_FILTERING_OPTIONS,
+  DEFAULT_FILE_FILTERING_OPTIONS,
+} from './constants.js';
+
+export type { FileFilteringOptions };
+export {
+  DEFAULT_MEMORY_FILE_FILTERING_OPTIONS,
+  DEFAULT_FILE_FILTERING_OPTIONS,
 };
 
 export const DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD = 4_000_000;
@@ -164,12 +172,18 @@ export class MCPServerConfig {
     // OAuth configuration
     readonly oauth?: MCPOAuthConfig,
     readonly authProviderType?: AuthProviderType,
+    // Service Account Configuration
+    /* targetAudience format: CLIENT_ID.apps.googleusercontent.com */
+    readonly targetAudience?: string,
+    /* targetServiceAccount format: <service-account-name>@<project-num>.iam.gserviceaccount.com */
+    readonly targetServiceAccount?: string,
   ) {}
 }
 
 export enum AuthProviderType {
   DYNAMIC_DISCOVERY = 'dynamic_discovery',
   GOOGLE_CREDENTIALS = 'google_credentials',
+  SERVICE_ACCOUNT_IMPERSONATION = 'service_account_impersonation',
 }
 
 export interface SandboxConfig {
@@ -240,14 +254,18 @@ export interface ConfigParameters {
   enableToolOutputTruncation?: boolean;
   eventEmitter?: EventEmitter;
   useSmartEdit?: boolean;
+  useWriteTodos?: boolean;
   policyEngineConfig?: PolicyEngineConfig;
   output?: OutputSettings;
   useModelRouter?: boolean;
+  enableMessageBusIntegration?: boolean;
+  enableSubagents?: boolean;
 }
 
 export class Config {
   private toolRegistry!: ToolRegistry;
   private promptRegistry!: PromptRegistry;
+  private agentRegistry!: AgentRegistry;
   private readonly sessionId: string;
   private fileSystemService: FileSystemService;
   private contentGeneratorConfig!: ContentGeneratorConfig;
@@ -328,10 +346,13 @@ export class Config {
   private readonly fileExclusions: FileExclusions;
   private readonly eventEmitter?: EventEmitter;
   private readonly useSmartEdit: boolean;
+  private readonly useWriteTodos: boolean;
   private readonly messageBus: MessageBus;
   private readonly policyEngine: PolicyEngine;
   private readonly outputSettings: OutputSettings;
   private readonly useModelRouter: boolean;
+  private readonly enableMessageBusIntegration: boolean;
+  private readonly enableSubagents: boolean;
 
   constructor(params: ConfigParameters) {
     this.sessionId = params.sessionId;
@@ -368,6 +389,7 @@ export class Config {
       otlpProtocol: params.telemetry?.otlpProtocol,
       logPrompts: params.telemetry?.logPrompts ?? true,
       outfile: params.telemetry?.outfile,
+      useCollector: params.telemetry?.useCollector,
     };
     this.usageStatisticsEnabled = params.usageStatisticsEnabled ?? true;
 
@@ -415,10 +437,13 @@ export class Config {
       DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD;
     this.truncateToolOutputLines =
       params.truncateToolOutputLines ?? DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES;
-    this.enableToolOutputTruncation =
-      params.enableToolOutputTruncation ?? false;
+    this.enableToolOutputTruncation = params.enableToolOutputTruncation ?? true;
     this.useSmartEdit = params.useSmartEdit ?? true;
+    this.useWriteTodos = params.useWriteTodos ?? false;
     this.useModelRouter = params.useModelRouter ?? false;
+    this.enableMessageBusIntegration =
+      params.enableMessageBusIntegration ?? false;
+    this.enableSubagents = params.enableSubagents ?? false;
     this.extensionManagement = params.extensionManagement ?? true;
     this.storage = new Storage(this.targetDir);
     this.enablePromptCompletion = params.enablePromptCompletion ?? false;
@@ -460,8 +485,11 @@ export class Config {
       await this.getGitService();
     }
     this.promptRegistry = new PromptRegistry();
+
+    this.agentRegistry = new AgentRegistry(this);
+    await this.agentRegistry.initialize();
+
     this.toolRegistry = await this.createToolRegistry();
-    logCliConfiguration(this, new StartSessionEvent(this, this.toolRegistry));
 
     await this.geminiClient.initialize();
   }
@@ -498,6 +526,9 @@ export class Config {
 
     // Reset the session flag since we're explicitly changing auth and using default model
     this.inFallbackMode = false;
+
+    // Logging the cli configuration here as the auth related configuration params would have been loaded by this point
+    logCliConfiguration(this, new StartSessionEvent(this, this.toolRegistry));
   }
 
   getUserTier(): UserTierId | undefined {
@@ -602,6 +633,10 @@ export class Config {
 
   getWorkspaceContext(): WorkspaceContext {
     return this.workspaceContext;
+  }
+
+  getAgentRegistry(): AgentRegistry {
+    return this.agentRegistry;
   }
 
   getToolRegistry(): ToolRegistry {
@@ -714,6 +749,10 @@ export class Config {
 
   getTelemetryOutfile(): string | undefined {
     return this.telemetrySettings.outfile;
+  }
+
+  getTelemetryUseCollector(): boolean {
+    return this.telemetrySettings.useCollector ?? false;
   }
 
   getGeminiClient(): GeminiClient {
@@ -942,6 +981,10 @@ export class Config {
     return this.useSmartEdit;
   }
 
+  getUseWriteTodos(): boolean {
+    return this.useWriteTodos;
+  }
+
   getOutputFormat(): OutputFormat {
     return this.outputSettings?.format
       ? this.outputSettings.format
@@ -970,6 +1013,14 @@ export class Config {
 
   getPolicyEngine(): PolicyEngine {
     return this.policyEngine;
+  }
+
+  getEnableMessageBusIntegration(): boolean {
+    return this.enableMessageBusIntegration;
+  }
+
+  getEnableSubagents(): boolean {
+    return this.enableSubagents;
   }
 
   async createToolRegistry(): Promise<ToolRegistry> {
@@ -1005,7 +1056,24 @@ export class Config {
       }
 
       if (isEnabled) {
-        registry.registerTool(new ToolClass(...args));
+        // Pass message bus to tools when feature flag is enabled
+        // This first implementation is only focused on the general case of
+        // the tool registry.
+        const messageBusEnabled = this.getEnableMessageBusIntegration();
+        if (this.debugMode && messageBusEnabled) {
+          console.log(
+            `[DEBUG] enableMessageBusIntegration setting: ${messageBusEnabled}`,
+          );
+        }
+        const toolArgs = messageBusEnabled
+          ? [...args, this.getMessageBus()]
+          : args;
+        if (this.debugMode && messageBusEnabled) {
+          console.log(
+            `[DEBUG] Registering ${className} with messageBus: ${messageBusEnabled ? 'YES' : 'NO'}`,
+          );
+        }
+        registry.registerTool(new ToolClass(...toolArgs));
       }
     };
 
@@ -1042,6 +1110,44 @@ export class Config {
     registerCoreTool(ShellTool, this);
     registerCoreTool(MemoryTool);
     registerCoreTool(WebSearchTool, this);
+    if (this.getUseWriteTodos()) {
+      registerCoreTool(WriteTodosTool, this);
+    }
+
+    // Register Subagents as Tools
+    if (this.getEnableSubagents()) {
+      const agentDefinitions = this.agentRegistry.getAllDefinitions();
+      for (const definition of agentDefinitions) {
+        // We must respect the main allowed/exclude lists for agents too.
+        const excludeTools = this.getExcludeTools() || [];
+        const allowedTools = this.getAllowedTools();
+
+        const isExcluded = excludeTools.includes(definition.name);
+        const isAllowed =
+          !allowedTools || allowedTools.includes(definition.name);
+
+        if (isAllowed && !isExcluded) {
+          try {
+            const messageBusEnabled = this.getEnableMessageBusIntegration();
+            const wrapper = new SubagentToolWrapper(
+              definition,
+              this,
+              messageBusEnabled ? this.getMessageBus() : undefined,
+            );
+            registry.registerTool(wrapper);
+          } catch (error) {
+            console.error(
+              `Failed to wrap agent '${definition.name}' as a tool:`,
+              error,
+            );
+          }
+        } else if (this.getDebugMode()) {
+          console.log(
+            `[Config] Skipping registration of agent '${definition.name}' due to allow/exclude configuration.`,
+          );
+        }
+      }
+    }
 
     await registry.discoverAllTools();
     return registry;

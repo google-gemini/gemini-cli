@@ -137,6 +137,7 @@ export class ToolCallEvent implements BaseTelemetryEvent {
   prompt_id: string;
   tool_type: 'native' | 'mcp';
   content_length?: number;
+  mcp_server_name?: string;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   metadata?: { [key: string]: any };
 
@@ -153,11 +154,16 @@ export class ToolCallEvent implements BaseTelemetryEvent {
     this.error = call.response.error?.message;
     this.error_type = call.response.errorType;
     this.prompt_id = call.request.prompt_id;
-    this.tool_type =
-      typeof call.tool !== 'undefined' && call.tool instanceof DiscoveredMCPTool
-        ? 'mcp'
-        : 'native';
     this.content_length = call.response.contentLength;
+    if (
+      typeof call.tool !== 'undefined' &&
+      call.tool instanceof DiscoveredMCPTool
+    ) {
+      this.tool_type = 'mcp';
+      this.mcp_server_name = call.tool.serverName;
+    } else {
+      this.tool_type = 'native';
+    }
 
     if (
       call.status === 'success' &&
@@ -309,6 +315,18 @@ export class LoopDetectedEvent implements BaseTelemetryEvent {
     this['event.name'] = 'loop_detected';
     this['event.timestamp'] = new Date().toISOString();
     this.loop_type = loop_type;
+    this.prompt_id = prompt_id;
+  }
+}
+
+export class LoopDetectionDisabledEvent implements BaseTelemetryEvent {
+  'event.name': 'loop_detection_disabled';
+  'event.timestamp': string;
+  prompt_id: string;
+
+  constructor(prompt_id: string) {
+    this['event.name'] = 'loop_detection_disabled';
+    this['event.timestamp'] = new Date().toISOString();
     this.prompt_id = prompt_id;
   }
 }
@@ -480,17 +498,20 @@ export class ContentRetryEvent implements BaseTelemetryEvent {
   attempt_number: number;
   error_type: string; // e.g., 'EmptyStreamError'
   retry_delay_ms: number;
+  model: string;
 
   constructor(
     attempt_number: number,
     error_type: string,
     retry_delay_ms: number,
+    model: string,
   ) {
     this['event.name'] = 'content_retry';
     this['event.timestamp'] = new Date().toISOString();
     this.attempt_number = attempt_number;
     this.error_type = error_type;
     this.retry_delay_ms = retry_delay_ms;
+    this.model = model;
   }
 }
 
@@ -500,10 +521,12 @@ export class ContentRetryFailureEvent implements BaseTelemetryEvent {
   total_attempts: number;
   final_error_type: string;
   total_duration_ms?: number; // Optional: total time spent retrying
+  model: string;
 
   constructor(
     total_attempts: number,
     final_error_type: string,
+    model: string,
     total_duration_ms?: number,
   ) {
     this['event.name'] = 'content_retry_failure';
@@ -511,32 +534,38 @@ export class ContentRetryFailureEvent implements BaseTelemetryEvent {
     this.total_attempts = total_attempts;
     this.final_error_type = final_error_type;
     this.total_duration_ms = total_duration_ms;
+    this.model = model;
   }
 }
 
-export type TelemetryEvent =
-  | StartSessionEvent
-  | EndSessionEvent
-  | UserPromptEvent
-  | ToolCallEvent
-  | ApiRequestEvent
-  | ApiErrorEvent
-  | ApiResponseEvent
-  | FlashFallbackEvent
-  | LoopDetectedEvent
-  | NextSpeakerCheckEvent
-  | KittySequenceOverflowEvent
-  | MalformedJsonResponseEvent
-  | IdeConnectionEvent
-  | ConversationFinishedEvent
-  | SlashCommandEvent
-  | FileOperationEvent
-  | InvalidChunkEvent
-  | ContentRetryEvent
-  | ContentRetryFailureEvent
-  | ExtensionInstallEvent
-  | ExtensionUninstallEvent
-  | ToolOutputTruncatedEvent;
+export class ModelRoutingEvent implements BaseTelemetryEvent {
+  'event.name': 'model_routing';
+  'event.timestamp': string;
+  decision_model: string;
+  decision_source: string;
+  routing_latency_ms: number;
+  reasoning?: string;
+  failed: boolean;
+  error_message?: string;
+
+  constructor(
+    decision_model: string,
+    decision_source: string,
+    routing_latency_ms: number,
+    reasoning: string | undefined,
+    failed: boolean,
+    error_message: string | undefined,
+  ) {
+    this['event.name'] = 'model_routing';
+    this['event.timestamp'] = new Date().toISOString();
+    this.decision_model = decision_model;
+    this.decision_source = decision_source;
+    this.routing_latency_ms = routing_latency_ms;
+    this.reasoning = reasoning;
+    this.failed = failed;
+    this.error_message = error_message;
+  }
+}
 
 export class ExtensionInstallEvent implements BaseTelemetryEvent {
   'event.name': 'extension_install';
@@ -603,5 +632,97 @@ export class ExtensionUninstallEvent implements BaseTelemetryEvent {
     this['event.timestamp'] = new Date().toISOString();
     this.extension_name = extension_name;
     this.status = status;
+  }
+}
+
+export class ExtensionEnableEvent implements BaseTelemetryEvent {
+  'event.name': 'extension_enable';
+  'event.timestamp': string;
+  extension_name: string;
+  setting_scope: string;
+
+  constructor(extension_name: string, settingScope: string) {
+    this['event.name'] = 'extension_enable';
+    this['event.timestamp'] = new Date().toISOString();
+    this.extension_name = extension_name;
+    this.setting_scope = settingScope;
+  }
+}
+
+export class ModelSlashCommandEvent implements BaseTelemetryEvent {
+  'event.name': 'model_slash_command';
+  'event.timestamp': string;
+  model_name: string;
+
+  constructor(model_name: string) {
+    this['event.name'] = 'model_slash_command';
+    this['event.timestamp'] = new Date().toISOString();
+    this.model_name = model_name;
+  }
+}
+
+export type TelemetryEvent =
+  | StartSessionEvent
+  | EndSessionEvent
+  | UserPromptEvent
+  | ToolCallEvent
+  | ApiRequestEvent
+  | ApiErrorEvent
+  | ApiResponseEvent
+  | FlashFallbackEvent
+  | LoopDetectedEvent
+  | LoopDetectionDisabledEvent
+  | NextSpeakerCheckEvent
+  | KittySequenceOverflowEvent
+  | MalformedJsonResponseEvent
+  | IdeConnectionEvent
+  | ConversationFinishedEvent
+  | SlashCommandEvent
+  | FileOperationEvent
+  | InvalidChunkEvent
+  | ContentRetryEvent
+  | ContentRetryFailureEvent
+  | ExtensionEnableEvent
+  | ExtensionInstallEvent
+  | ExtensionUninstallEvent
+  | ModelRoutingEvent
+  | ToolOutputTruncatedEvent
+  | ModelSlashCommandEvent;
+
+export class ExtensionDisableEvent implements BaseTelemetryEvent {
+  'event.name': 'extension_disable';
+  'event.timestamp': string;
+  extension_name: string;
+  setting_scope: string;
+
+  constructor(extension_name: string, settingScope: string) {
+    this['event.name'] = 'extension_disable';
+    this['event.timestamp'] = new Date().toISOString();
+    this.extension_name = extension_name;
+    this.setting_scope = settingScope;
+  }
+}
+
+export class SmartEditStrategyEvent implements BaseTelemetryEvent {
+  'event.name': 'smart_edit_strategy';
+  'event.timestamp': string;
+  strategy: string;
+
+  constructor(strategy: string) {
+    this['event.name'] = 'smart_edit_strategy';
+    this['event.timestamp'] = new Date().toISOString();
+    this.strategy = strategy;
+  }
+}
+
+export class SmartEditCorrectionEvent implements BaseTelemetryEvent {
+  'event.name': 'smart_edit_correction';
+  'event.timestamp': string;
+  correction: 'success' | 'failure';
+
+  constructor(correction: 'success' | 'failure') {
+    this['event.name'] = 'smart_edit_correction';
+    this['event.timestamp'] = new Date().toISOString();
+    this.correction = correction;
   }
 }

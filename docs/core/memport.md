@@ -43,7 +43,7 @@ More content here.
 
 Welcome to my project!
 
-@./getting-started.md
+@./get-started.md
 
 ## Features
 
@@ -147,7 +147,7 @@ Processes import statements in GEMINI.md content.
 - `debugMode` (boolean, optional): Whether to enable debug logging (default: false)
 - `importState` (ImportState, optional): State tracking for circular import prevention
 
-**Returns:** Promise<ProcessImportsResult> - Object containing processed content and import tree
+**Returns:** Promise&lt;ProcessImportsResult&gt; - Object containing processed content and import tree
 
 ### `ProcessImportsResult`
 
@@ -187,7 +187,7 @@ Finds the project root by searching for a `.git` directory upwards from the give
 
 - `startDir` (string): The directory to start searching from
 
-**Returns:** Promise<string> - The project root directory (or the start directory if no `.git` is found)
+**Returns:** Promise&lt;string&gt; - The project root directory (or the start directory if no `.git` is found)
 
 ## Best Practices
 
