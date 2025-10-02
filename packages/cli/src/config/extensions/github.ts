@@ -85,7 +85,11 @@ export function parseGitHubRepoForReleases(source: string): {
   // Default to a github repo path, so `source` can be just an org/repo
   const parsedUrl = URL.parse(source, 'https://github.com');
   // The pathname should be "/owner/repo".
-  const parts = parsedUrl?.pathname.substring(1).split('/');
+  const parts = parsedUrl?.pathname
+    .substring(1)
+    .split('/')
+    // Remove the empty segments, fixes trailing slashes
+    .filter((part) => part !== '');
   if (parts?.length !== 2 || parsedUrl?.host !== 'github.com') {
     throw new Error(
       `Invalid GitHub repository source: ${source}. Expected "owner/repo" or a github repo uri.`,

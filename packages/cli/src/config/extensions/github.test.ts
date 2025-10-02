@@ -292,8 +292,15 @@ describe('git extension helpers', () => {
       expect(repo).toBe('repo');
     });
 
-    it('should parse owner and repo from a full GitHub UR without .git', () => {
+    it('should parse owner and repo from a full GitHub URL without .git', () => {
       const source = 'https://github.com/owner/repo';
+      const { owner, repo } = parseGitHubRepoForReleases(source);
+      expect(owner).toBe('owner');
+      expect(repo).toBe('repo');
+    });
+
+    it('should parse owner and repo from a full GitHub URL with a trailing slash', () => {
+      const source = 'https://github.com/owner/repo/';
       const { owner, repo } = parseGitHubRepoForReleases(source);
       expect(owner).toBe('owner');
       expect(repo).toBe('repo');
