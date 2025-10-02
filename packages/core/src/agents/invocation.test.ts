@@ -39,7 +39,7 @@ const testDefinition: AgentDefinition = {
 };
 
 describe('SubagentInvocation', () => {
-  let mockExecutorInstance: Mocked<AgentExecutor>;
+  let mockExecutorInstance: Mocked<AgentExecutor<unknown>>;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -48,7 +48,7 @@ describe('SubagentInvocation', () => {
     mockExecutorInstance = {
       run: vi.fn(),
       definition: testDefinition,
-    } as unknown as Mocked<AgentExecutor>;
+    } as unknown as Mocked<AgentExecutor<unknown>>;
 
     MockAgentExecutor.create.mockResolvedValue(mockExecutorInstance);
   });

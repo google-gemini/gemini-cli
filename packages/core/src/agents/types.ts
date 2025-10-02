@@ -48,8 +48,9 @@ export interface SubagentActivityEvent {
 
 /**
  * The definition for an agent.
+ * @template TOutput The specific type of the agent's final output object.
  */
-export interface AgentDefinition {
+export interface AgentDefinition<TOutput = unknown> {
   /** Unique identifier for the agent. */
   name: string;
   displayName?: string;
@@ -60,6 +61,14 @@ export interface AgentDefinition {
   toolConfig?: ToolConfig;
   outputConfig?: OutputConfig;
   inputConfig: InputConfig;
+  /**
+   * An optional function to process the raw output from the agent's final tool
+   * call into a string format.
+   *
+   * @param output The raw output value from the `complete_task` tool, now strongly typed with TOutput.
+   * @returns A string representation of the final output.
+   */
+  processOutput?: (output: TOutput) => string;
 }
 
 /**

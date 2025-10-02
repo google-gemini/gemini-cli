@@ -48,8 +48,8 @@ const TASK_COMPLETE_TOOL_NAME = 'complete_task';
  * This executor runs the agent in a loop, calling tools until it calls the
  * mandatory `complete_task` tool to signal completion.
  */
-export class AgentExecutor {
-  readonly definition: AgentDefinition;
+export class AgentExecutor<TOutput> {
+  readonly definition: AgentDefinition<TOutput>;
 
   private readonly agentId: string;
   private readonly toolRegistry: ToolRegistry;
@@ -67,11 +67,11 @@ export class AgentExecutor {
    * @param onActivity An optional callback to receive activity events.
    * @returns A promise that resolves to a new `AgentExecutor` instance.
    */
-  static async create(
-    definition: AgentDefinition,
+  static async create<TOutput>(
+    definition: AgentDefinition<TOutput>,
     runtimeContext: Config,
     onActivity?: ActivityCallback,
-  ): Promise<AgentExecutor> {
+  ): Promise<AgentExecutor<TOutput>> {
     // Create an isolated tool registry for this agent instance.
     const agentToolRegistry = new ToolRegistry(runtimeContext);
     const parentToolRegistry = await runtimeContext.getToolRegistry();
@@ -116,7 +116,7 @@ export class AgentExecutor {
    * instantiate the class.
    */
   private constructor(
-    definition: AgentDefinition,
+    definition: AgentDefinition<TOutput>,
     runtimeContext: Config,
     toolRegistry: ToolRegistry,
     onActivity?: ActivityCallback,
@@ -397,7 +397,20 @@ export class AgentExecutor {
         if (outputConfig) {
           const outputName = outputConfig.outputName;
           if (args[outputName] !== undefined) {
-            submittedOutput = String(args[outputName]);
+            const outputValue = args[outputName];
+
+            if (this.definition.processOutput) {
+              // The `outputValue` is `unknown` at compile time, but at runtime it's what the LLM provides.
+              // The agent's `processOutput` implementation is now responsible for handling this type.
+              submittedOutput = this.definition.processOutput(
+                outputValue as TOutput,
+              );
+            } else {
+              submittedOutput =
+                typeof outputValue === 'string'
+                  ? outputValue
+                  : JSON.stringify(outputValue, null, 2);
+            }
             syncResponseParts.push({
               functionResponse: {
                 name: TASK_COMPLETE_TOOL_NAME,
