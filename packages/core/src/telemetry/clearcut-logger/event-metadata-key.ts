@@ -259,8 +259,8 @@ export enum EventMetadataKey {
   // Kitty Sequence Overflow Event Keys
   // ===========================================================================
 
-  // Logs the truncated kitty sequence.
-  GEMINI_CLI_KITTY_TRUNCATED_SEQUENCE = 52,
+  // Do not use.
+  DEPRECATED_GEMINI_CLI_KITTY_TRUNCATED_SEQUENCE = 52,
 
   // Logs the length of the kitty sequence that overflowed.
   GEMINI_CLI_KITTY_SEQUENCE_LENGTH = 53,

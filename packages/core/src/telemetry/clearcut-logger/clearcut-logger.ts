@@ -788,10 +788,6 @@ export class ClearcutLogger {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_KITTY_SEQUENCE_LENGTH,
         value: event.sequence_length.toString(),
       },
-      {
-        gemini_cli_key: EventMetadataKey.GEMINI_CLI_KITTY_TRUNCATED_SEQUENCE,
-        value: event.truncated_sequence,
-      },
     ];
 
     this.enqueueLogEvent(
