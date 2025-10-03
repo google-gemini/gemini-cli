@@ -496,6 +496,7 @@ export async function installExtension(
           `Extension "${newExtensionName}" is already installed. Please uninstall it first.`,
         );
       }
+      // TODO: only request consent if -y isn't passed in
       await maybeRequestConsentOrFail(
         newExtensionConfig,
         requestConsent,

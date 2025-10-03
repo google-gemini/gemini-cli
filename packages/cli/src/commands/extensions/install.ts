@@ -18,6 +18,7 @@ interface InstallArgs {
   path?: string;
   ref?: string;
   autoUpdate?: boolean;
+  yolo?: boolean;
 }
 
 export async function handleInstall(args: InstallArgs) {
@@ -51,10 +52,14 @@ export async function handleInstall(args: InstallArgs) {
       throw new Error('Either --source or --path must be provided.');
     }
 
-    const name = await installExtension(
-      installMetadata,
-      requestConsentNonInteractive,
-    );
+    async function requestConsent(consent: string) {
+      if (args.yolo) {
+        return Promise.resolve(true);
+      }
+      return requestConsentNonInteractive(consent);
+    }
+
+    const name = await installExtension(installMetadata, requestConsent);
     console.log(`Extension "${name}" installed successfully and enabled.`);
   } catch (error) {
     console.error(getErrorMessage(error));
@@ -63,7 +68,7 @@ export async function handleInstall(args: InstallArgs) {
 }
 
 export const installCommand: CommandModule = {
-  command: 'install [<source>] [--path] [--ref] [--auto-update]',
+  command: 'install [<source>] [--path] [--ref] [--auto-update] [--yolo | y]',
   describe: 'Installs an extension from a git repository URL or a local path.',
   builder: (yargs) =>
     yargs
@@ -83,6 +88,11 @@ export const installCommand: CommandModule = {
         describe: 'Enable auto-update for this extension.',
         type: 'boolean',
       })
+      .option('yolo', {
+        alias: 'y',
+        describe: 'Enable yolo mode',
+        type: 'boolean',
+      })
       .conflicts('source', 'path')
       .conflicts('path', 'ref')
       .conflicts('path', 'auto-update')
@@ -98,6 +108,7 @@ export const installCommand: CommandModule = {
       path: argv['path'] as string | undefined,
       ref: argv['ref'] as string | undefined,
       autoUpdate: argv['auto-update'] as boolean | undefined,
+      yolo: argv['yolo'] as boolean | undefined,
     });
   },
 };

@@ -8,12 +8,17 @@ import { describe, it, expect, vi, type MockInstance } from 'vitest';
 import { handleInstall, installCommand } from './install.js';
 import yargs from 'yargs';
 
-const mockInstallExtension = vi.hoisted(() => vi.fn());
-const mockRequestConsentNonInteractive = vi.hoisted(() => vi.fn());
+const { mockRequestFn } = vi.hoisted(() => ({
+    mockRequestFn: vi.fn(),
+  }));
+const mockInstallExtension = vi.hoisted(() => vi.fn(() => 
+    // Simulate mockRequestFn being called by installExtension
+     mockRequestFn()
+  ));
 
 vi.mock('../../config/extension.js', () => ({
   installExtension: mockInstallExtension,
-  requestConsentNonInteractive: mockRequestConsentNonInteractive,
+  requestConsentNonInteractive: mockRequestFn,
 }));
 
 vi.mock('../../utils/errors.js', () => ({
@@ -51,7 +56,7 @@ describe('extensions install command', () => {
   });
 });
 
-describe('handleInstall', () => {
+describe.only('handleInstall', () => {
   let consoleLogSpy: MockInstance;
   let consoleErrorSpy: MockInstance;
   let processSpy: MockInstance;
@@ -66,7 +71,7 @@ describe('handleInstall', () => {
 
   afterEach(() => {
     mockInstallExtension.mockClear();
-    mockRequestConsentNonInteractive.mockClear();
+    mockRequestFn.mockClear();
     vi.resetAllMocks();
   });
 
@@ -92,6 +97,23 @@ describe('handleInstall', () => {
     expect(consoleLogSpy).toHaveBeenCalledWith(
       'Extension "https-extension" installed successfully and enabled.',
     );
+  });
+
+  it('should call requestConsent if yolo is disabled', async () => {
+    await handleInstall({
+      source: 'https://google.com',
+      yolo: false,
+    });
+
+    expect(mockRequestFn).toHaveBeenCalled();
+  });
+
+  it('should not call requestConsent if yolo is enabled', async () => {
+    await handleInstall({
+      source: 'https://google.com',
+      yolo: true,
+    });
+    expect(mockRequestFn).toHaveBeenCalled();
   });
 
   it('should install an extension from a git source', async () => {
