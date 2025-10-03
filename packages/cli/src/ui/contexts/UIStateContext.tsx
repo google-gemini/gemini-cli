@@ -118,6 +118,7 @@ export interface UIState {
   isRestarting: boolean;
   extensionsUpdateState: Map<string, ExtensionUpdateState>;
   activePtyId: number | undefined;
+  isOpenDefaultIdeDialogOpen: boolean;
   embeddedShellFocused: boolean;
 }
 

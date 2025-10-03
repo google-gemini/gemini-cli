@@ -48,6 +48,7 @@ interface SlashCommandProcessorActions {
   openSettingsDialog: () => void;
   openModelDialog: () => void;
   openPermissionsDialog: () => void;
+  openDefaultIdeDialog: () => void;
   quit: (messages: HistoryItem[]) => void;
   setDebugMessage: (message: string) => void;
   toggleCorgiMode: () => void;
@@ -204,6 +205,7 @@ export const useSlashCommandProcessor = (
         dispatchExtensionStateUpdate: actions.dispatchExtensionStateUpdate,
         addConfirmUpdateExtensionRequest:
           actions.addConfirmUpdateExtensionRequest,
+        openDefaultIdeDialog: actions.openDefaultIdeDialog,
       },
       session: {
         stats: session.stats,
