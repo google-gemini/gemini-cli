@@ -41,25 +41,14 @@ const MarkdownDisplayInternal: React.FC<MarkdownDisplayProps> = ({
   // Raw markdown mode - display syntax-highlighted markdown without rendering
   if (!renderMarkdown) {
     // Hide line numbers in raw markdown mode as they are confusing due to chunked output
-    const settingsWithoutLineNumbers = settings
-      ? ({
-          ...settings,
-          merged: {
-            ...settings.merged,
-            ui: {
-              ...settings.merged.ui,
-              showLineNumbers: false,
-            },
-          },
-        } as typeof settings)
-      : undefined;
     const colorizedMarkdown = colorizeCode(
       text,
       'markdown',
       availableTerminalHeight,
       terminalWidth - CODE_BLOCK_PREFIX_PADDING,
       undefined,
-      settingsWithoutLineNumbers,
+      settings,
+      true, // hideLineNumbers
     );
     return (
       <Box paddingLeft={CODE_BLOCK_PREFIX_PADDING} flexDirection="column">

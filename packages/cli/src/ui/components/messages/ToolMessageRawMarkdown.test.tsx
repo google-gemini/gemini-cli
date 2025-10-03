@@ -22,27 +22,24 @@ describe('<ToolMessage /> - Raw Markdown Display Snapshots', () => {
     emphasis: 'medium',
   };
 
-  it('renders with renderMarkdown=true (default)', () => {
-    const { lastFrame } = renderWithProviders(
-      <StreamingContext.Provider value={StreamingState.Idle}>
-        <ToolMessage {...baseProps} />
-      </StreamingContext.Provider>,
-      {
-        uiState: { renderMarkdown: true, streamingState: StreamingState.Idle },
-      },
-    );
-    expect(lastFrame()).toMatchSnapshot();
-  });
-
-  it('renders with renderMarkdown=false (raw markdown with syntax highlighting, no line numbers)', () => {
-    const { lastFrame } = renderWithProviders(
-      <StreamingContext.Provider value={StreamingState.Idle}>
-        <ToolMessage {...baseProps} />
-      </StreamingContext.Provider>,
-      {
-        uiState: { renderMarkdown: false, streamingState: StreamingState.Idle },
-      },
-    );
-    expect(lastFrame()).toMatchSnapshot();
-  });
+  it.each([
+    { renderMarkdown: true, description: '(default)' },
+    {
+      renderMarkdown: false,
+      description: '(raw markdown with syntax highlighting, no line numbers)',
+    },
+  ])(
+    'renders with renderMarkdown=$renderMarkdown $description',
+    ({ renderMarkdown }) => {
+      const { lastFrame } = renderWithProviders(
+        <StreamingContext.Provider value={StreamingState.Idle}>
+          <ToolMessage {...baseProps} />
+        </StreamingContext.Provider>,
+        {
+          uiState: { renderMarkdown, streamingState: StreamingState.Idle },
+        },
+      );
+      expect(lastFrame()).toMatchSnapshot();
+    },
+  );
 });
