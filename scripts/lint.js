@@ -189,7 +189,10 @@ export function runSensitiveKeywordLinter() {
     const baseRef = process.env.GITHUB_BASE_REF || 'main';
     try {
       execSync(`git fetch origin ${baseRef}`);
-      return execSync(`git diff --name-only origin/${baseRef}...HEAD`)
+      const mergeBase = execSync(`git merge-base HEAD origin/${baseRef}`)
+        .toString()
+        .trim();
+      return execSync(`git diff --name-only ${mergeBase}..HEAD`)
         .toString()
         .trim()
         .split('\n')
@@ -198,7 +201,7 @@ export function runSensitiveKeywordLinter() {
       console.error(`Could not get changed files against origin/${baseRef}.`);
       try {
         console.log('Falling back to diff against HEAD~1');
-        return execSync(`git diff --name-only HEAD~1...HEAD`)
+        return execSync(`git diff --name-only HEAD~1..HEAD`)
           .toString()
           .trim()
           .split('\n')
