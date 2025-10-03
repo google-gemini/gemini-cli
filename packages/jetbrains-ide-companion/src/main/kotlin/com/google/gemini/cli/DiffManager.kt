@@ -11,8 +11,10 @@ import com.intellij.openapi.fileEditor.TextEditor
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Key
+import com.intellij.openapi.vfs.VfsUtil
 import com.intellij.util.messages.Topic
 import com.intellij.openapi.vfs.LocalFileSystem
+import com.intellij.openapi.vfs.VirtualFile
 import io.modelcontextprotocol.kotlin.sdk.JSONRPCNotification
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -26,6 +28,7 @@ class DiffManager(private val project: Project) : Disposable {
 
   private data class DiffInfo(
     val originalFilePath: String,
+    val originalContent: String?,
     val newContent: String
   )
 
@@ -63,19 +66,24 @@ class DiffManager(private val project: Project) : Disposable {
       DiffContentFactory.getInstance().create("")
     }
 
-    val content2 = DiffContentFactory.getInstance().create(newContent)
+    val content2 = DiffContentFactory.getInstance().create(project, newContent, file?.fileType)
 
     val request = SimpleDiffRequest("Gemini Code Change", content1, content2, "Original", "Gemini's Suggestion")
 
     // Add custom actions to the diff viewer
-    val actions = listOf(CloseDiffAction(filePath), AcceptDiffAction(filePath))
+    val actions = listOf(CloseDiffAction(this, filePath), AcceptDiffAction(this, filePath))
     request.putUserData(DiffUserDataKeys.CONTEXT_ACTIONS, actions)
     request.putUserData(GEMINI_FILE_PATH_KEY, filePath)
 
     DiffManager.getInstance().showDiff(project, request)
 
     // Add state tracking
-    diffDocuments[filePath] = DiffInfo(originalFilePath = filePath, newContent = newContent)
+    val originalContent = file?.let { VfsUtil.loadText(it) }
+    diffDocuments[filePath] = DiffInfo(
+      originalFilePath = filePath,
+      originalContent = originalContent,
+      newContent = newContent
+    )
   }
 
   /**
@@ -85,10 +93,13 @@ class DiffManager(private val project: Project) : Disposable {
    * @param suppressNotification If true, a notification about the closure will not be sent.
    * @return The final content of the editor pane before it was closed, or null if not found.
    */
-  fun closeDiff(filePath: String, suppressNotification: Boolean = false): String? {
+  fun rejectDiff(filePath: String, suppressNotification: Boolean = false) =
+    rejectDiff(filePath, null, suppressNotification)
+
+  fun rejectDiff(filePath: String, file: VirtualFile?, suppressNotification: Boolean = false): String? {
     val diffInfo = diffDocuments[filePath] ?: return null
 
-    val modifiedContent = closeDiffEditor(filePath)
+    closeDiffEditor(file, filePath)
 
     diffDocuments.remove(filePath)
 
@@ -97,13 +108,13 @@ class DiffManager(private val project: Project) : Disposable {
         method = "ide/diffRejected",
         params = buildJsonObject {
           put("filePath", filePath)
-          put("content", modifiedContent ?: diffInfo.newContent)
+          put("content", diffInfo.originalContent)
         }
       )
       publisher.onDiffNotification(notification)
     }
 
-    return modifiedContent ?: diffInfo.newContent
+    return diffInfo.originalContent
   }
 
   /**
@@ -112,10 +123,10 @@ class DiffManager(private val project: Project) : Disposable {
    *
    * @param filePath The path of the file whose diff was accepted.
    */
-  fun acceptDiff(filePath: String) {
+  fun acceptDiff(filePath: String, file: VirtualFile?) {
     val diffInfo = diffDocuments[filePath] ?: return
 
-    val modifiedContent = closeDiffEditor(filePath)
+    val modifiedContent = closeDiffEditor(file, filePath)
 
     diffDocuments.remove(filePath)
 
@@ -129,60 +140,18 @@ class DiffManager(private val project: Project) : Disposable {
     publisher.onDiffNotification(notification)
   }
 
-  /**
-   * Handles the user canceling or closing a diff view.
-   * Closes the editor and publishes an `ide/diffClosed` notification.
-   *
-   * @param filePath The path of the file whose diff was canceled.
-   */
-  fun cancelDiff(filePath: String) {
-    val diffInfo = diffDocuments[filePath] ?: return
-
-    val modifiedContent = closeDiffEditor(filePath)
-
-    diffDocuments.remove(filePath)
-
-    val notification = JSONRPCNotification(
-      method = "ide/diffClosed",
-      params = buildJsonObject {
-        put("filePath", filePath)
-        put("content", modifiedContent ?: diffInfo.newContent)
-      }
-    )
-    publisher.onDiffNotification(notification)
+  fun cancelDiff(filePath: String, file: VirtualFile?) {
+    rejectDiff(filePath, file, suppressNotification = true)
   }
 
-  /**
-   * Checks if there is currently an active diff session for a specific file.
-   *
-   * @param filePath The path of the file to check.
-   * @return `true` if a diff is open for the given file, `false` otherwise.
-   *
-   * ```
-   *  Why isn't it being called right now?
-   *
-   *   You might ask why we didn't add the update method when we refactored AcceptDiffAction.
-   *
-   *   This is because in the current implementation, these two Actions are added directly to a specific diff view's internal
-   *   toolbar via request.putUserData(DiffUserDataKeys.CONTEXT_ACTIONS, ...). With this approach, the platform already
-   *   ensures that they are only visible when that specific diff view is open, so we don't need to manually implement the
-   *   update method for now.
-   *
-   *   In summary, isDiffOpenFor is a forward-looking method that provides architectural support. It provides a solid
-   *   foundation for us to add context-aware (dynamically shown or hidden) buttons or menu items related to the diff
-   *   anywhere in the IDE in the future (e.g., the main toolbar, the main menu, or the project view's context menu).
-   * ```
-   */
-  fun isDiffOpenFor(filePath: String): Boolean = diffDocuments.containsKey(filePath)
-
-  private fun closeDiffEditor(filePath: String): String? {
+  private fun closeDiffEditor(fileToClose: VirtualFile?, filePath: String): String? {
     val fileEditorManager = FileEditorManager.getInstance(project)
-    val fileToClose = fileEditorManager.openFiles.find {
+    val actualFileToClose = fileToClose ?: fileEditorManager.openFiles.find {
       it.getUserData(GEMINI_FILE_PATH_KEY) == filePath
     }
 
     var content: String? = null
-    fileToClose?.let { file ->
+    actualFileToClose?.let { file ->
       // It's important to get the content before closing the editor.
       val editor = fileEditorManager.getSelectedEditor(file)
       if (editor is TextEditor) {
@@ -191,7 +160,9 @@ class DiffManager(private val project: Project) : Disposable {
           content = editor.editor.document.text
         }
       }
-      fileEditorManager.closeFile(file)
+      ApplicationManager.getApplication().invokeLater {
+        fileEditorManager.closeFile(file)
+      }
     }
     return content
   }
