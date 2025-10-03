@@ -1074,6 +1074,8 @@ export const useGeminiStream = (
     if (agentExecutor && a2aEventBus) {
       const eventBus = a2aEventBus;
       onDebugMessage(`[A2A EventBus]: Subscribing to A2A events`);
+      const externalMessageBufferRef = { current: '' };
+      const currentMessageTimestampRef = { current: Date.now() };
 
       const eventHandler = (event: AgentExecutionEvent) => {
         if (
@@ -1081,69 +1083,71 @@ export const useGeminiStream = (
           event.metadata &&
           event.metadata['source'] === 'external'
         ) {
-          const coderAgentMessage = event.metadata['coderAgent'] as {
-            kind: CoderAgentEvent;
-          };
+          const coderAgentMessage = event.metadata['coderAgent'] as
+            | { kind: CoderAgentEvent }
+            | undefined;
           const messageParts = event.status.message?.parts;
-          const userMessageTimestamp = Date.now(); // Approximate timestamp
+          const userMessageTimestamp = currentMessageTimestampRef.current;
+
+          if (!coderAgentMessage) return;
 
           switch (coderAgentMessage.kind) {
             case CoderAgentEvent.TextContentEvent:
               if (messageParts) {
-                let combinedText = '';
-                for (const part of messageParts) {
-                  if (part.kind === 'text') {
-                    combinedText += part.text;
+                const textPart = messageParts.find(
+                  (part) => part.kind === 'text',
+                );
+                if (textPart) {
+                  const newText = (textPart as { text: string }).text;
+                  if (newText) {
+                    externalMessageBufferRef.current = handleContentEvent(
+                      newText,
+                      externalMessageBufferRef.current,
+                      userMessageTimestamp,
+                    );
+                    geminiClient.addHistory({
+                      role: 'model',
+                      parts: [{ text: newText }],
+                    });
                   }
-                }
-                if (combinedText) {
-                  // TODO(b/369671111): Proper streaming content handling for external events.
-                  addItem(
-                    { type: MessageType.GEMINI, text: combinedText },
-                    userMessageTimestamp,
-                  );
-                  // Add to agent history for context
-                  geminiClient.addHistory({
-                    role: 'model',
-                    parts: [{ text: combinedText }],
-                  });
                 }
               }
               break;
             case CoderAgentEvent.ThoughtEvent:
               if (messageParts) {
-                for (const part of messageParts) {
-                  if (part.kind === 'data' && part.data) {
-                    setThought(part.data as ThoughtSummary);
-                  }
+                const dataPart = messageParts.find(
+                  (part) => part.kind === 'data',
+                );
+                if (dataPart && (dataPart as { data: unknown }).data) {
+                  setThought(
+                    (dataPart as { data: unknown }).data as ThoughtSummary,
+                  );
                 }
               }
-              break;
-            case CoderAgentEvent.ToolCallUpdateEvent:
-            case CoderAgentEvent.ToolCallConfirmationEvent:
-              if (messageParts) {
-                for (const part of messageParts) {
-                  if (part.kind === 'data' && part.data) {
-                    // TODO(b/369671111): Implement mapping to useReactToolScheduler updates for external events.
-                  }
-                }
-              }
-              break;
-            case CoderAgentEvent.StateChangeEvent:
-              // TODO(b/369671111): Map task state to UI state (e.g., isResponding)
               break;
             case CoderAgentEvent.ExternalUserMessageEvent:
               if (messageParts) {
                 let combinedText = '';
                 for (const part of messageParts) {
                   if (part.kind === 'text') {
-                    combinedText += part.text;
+                    combinedText += (part as { text: string }).text;
                   }
                 }
                 if (combinedText) {
+                  // Finalize any pending agent message from external source
+                  if (pendingHistoryItemRef.current) {
+                    addItem(
+                      pendingHistoryItemRef.current,
+                      userMessageTimestamp,
+                    );
+                    setPendingHistoryItem(null);
+                  }
+                  externalMessageBufferRef.current = '';
+                  currentMessageTimestampRef.current = Date.now(); // New timestamp for new message
+
                   addItem(
                     { type: MessageType.USER, text: `ext - ${combinedText}` },
-                    userMessageTimestamp,
+                    currentMessageTimestampRef.current,
                   );
                   // Also add to agent history for context
                   geminiClient.addHistory({
@@ -1153,15 +1157,40 @@ export const useGeminiStream = (
                 }
               }
               break;
+            case CoderAgentEvent.StateChangeEvent: {
+              // Map task state to UI state (e.g., isResponding)
+              const newState = event.status.state;
+              if (newState === 'submitted' || newState === 'working') {
+                setIsResponding(true);
+              } else {
+                setIsResponding(false);
+              }
+              break;
+            }
+            case CoderAgentEvent.ToolCallUpdateEvent:
+            case CoderAgentEvent.ToolCallConfirmationEvent:
+              // Tool call UI updates are handled by the shared CoreToolScheduler
+              // and its existing integrations with useReactToolScheduler.
+              break;
             default:
               break;
           }
+
           const errorObj = event.metadata['error'];
           if (errorObj) {
             handleErrorEvent(
               { error: new Error(String(errorObj)) },
               Date.now(),
             );
+          }
+
+          if (event.final) {
+            if (pendingHistoryItemRef.current) {
+              addItem(pendingHistoryItemRef.current, userMessageTimestamp);
+              setPendingHistoryItem(null);
+            }
+            externalMessageBufferRef.current = '';
+            setThought(null);
           }
         } else if (event.metadata && event.metadata['source'] === 'cli') {
           // Ignore events originating from the CLI itself
@@ -1185,6 +1214,9 @@ export const useGeminiStream = (
     setThought,
     handleErrorEvent,
     geminiClient,
+    handleContentEvent,
+    pendingHistoryItemRef,
+    setPendingHistoryItem,
   ]);
 
   const pendingHistoryItems = useMemo(

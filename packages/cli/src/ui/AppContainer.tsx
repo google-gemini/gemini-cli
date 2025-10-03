@@ -61,6 +61,7 @@ import { useTerminalSize } from './hooks/useTerminalSize.js';
 import { calculatePromptWidths } from './components/InputPrompt.js';
 import { useStdin, useStdout } from 'ink';
 import ansiEscapes from 'ansi-escapes';
+import * as fs from 'node:fs';
 import { basename } from 'node:path';
 import { computeWindowTitle } from '../utils/windowTitle.js';
 import { useTextBuffer } from './components/shared/text-buffer.js';
