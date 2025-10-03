@@ -99,7 +99,7 @@ export async function handleUpdate(args: UpdateArgs) {
             });
           }
         },
-        process.cwd(),
+        workingDir,
       );
       let updateInfos = await updateAllUpdatableExtensions(
         workingDir,
