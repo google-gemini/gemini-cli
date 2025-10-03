@@ -106,7 +106,7 @@ export function extensionUpdatesReducer(
             ...(action.payload.names ?? []),
           ],
           onComplete: (updateInfos) => {
-            state?.scheduledUpdate?.onComplete(updateInfos);
+            state.scheduledUpdate?.onComplete(updateInfos);
             action.payload.onComplete(updateInfos);
           },
         },
