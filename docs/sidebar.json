@@ -3,6 +3,10 @@
     "label": "Overview",
     "items": [
       {
+        "label": "Introduction",
+        "slug": "docs"
+      },
+      {
         "label": "Architecture Overview",
         "slug": "docs/architecture"
       }
@@ -115,7 +119,7 @@
     "label": "Tools",
     "items": [
       {
-        "label": "Overview",
+        "label": "Introduction",
         "slug": "docs/tools"
       },
       {
