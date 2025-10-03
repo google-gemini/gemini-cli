@@ -440,6 +440,19 @@ export class GeminiClient {
     }
   }
 
+  private _getEffectiveModelForCurrentTurn(): string {
+    if (this.currentSequenceModel) {
+      return this.currentSequenceModel;
+    }
+
+    const configModel = this.config.getModel();
+    const model: string =
+      configModel === DEFAULT_GEMINI_MODEL_AUTO
+        ? DEFAULT_GEMINI_MODEL
+        : configModel;
+    return getEffectiveModel(this.config.isInFallbackMode(), model);
+  }
+
   async *sendMessageStream(
     request: PartListUnion,
     signal: AbortSignal,
@@ -466,22 +479,7 @@ export class GeminiClient {
     }
 
     // Check for context window overflow
-    let modelForLimitCheck: string;
-    if (this.currentSequenceModel) {
-      // Use the sticky model if we are in a sequence
-      modelForLimitCheck = this.currentSequenceModel;
-    } else {
-      // Otherwise use the configured model (accounting for 'auto' and fallback)
-      const configModel = this.config.getModel();
-      const model: string =
-        configModel === DEFAULT_GEMINI_MODEL_AUTO
-          ? DEFAULT_GEMINI_MODEL
-          : configModel;
-      modelForLimitCheck = getEffectiveModel(
-        this.config.isInFallbackMode(),
-        model,
-      );
-    }
+    const modelForLimitCheck = this._getEffectiveModelForCurrentTurn();
 
     const lastPromptTokenCount = uiTelemetryService.getLastPromptTokenCount();
     const estimatedRequestTokenCount = Math.floor(
@@ -688,14 +686,7 @@ export class GeminiClient {
     // If the model is 'auto', we will use a placeholder model to check.
     // Compression occurs before we choose a model, so calling `count_tokens`
     // before the model is chosen would result in an error.
-    const configModel = this.config.getModel();
-    let model: string =
-      configModel === DEFAULT_GEMINI_MODEL_AUTO
-        ? DEFAULT_GEMINI_MODEL
-        : configModel;
-
-    // Check if the model needs to be a fallback
-    model = getEffectiveModel(this.config.isInFallbackMode(), model);
+    const model = this._getEffectiveModelForCurrentTurn();
 
     const curatedHistory = this.getChat().getHistory(true);
 
