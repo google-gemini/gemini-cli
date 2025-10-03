@@ -90,7 +90,7 @@ export const installCommand: CommandModule = {
       })
       .option('yolo', {
         alias: 'y',
-        describe: 'Enable yolo mode',
+        describe: 'Enable yolo mode, and bypass the consent prompt.',
         type: 'boolean',
       })
       .conflicts('source', 'path')
