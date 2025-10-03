@@ -271,7 +271,7 @@ export function getErrorStatus(error: unknown): number | undefined {
  * @param error The error object.
  * @returns The delay in milliseconds, or 0 if not found or invalid.
  */
-function getRetryAfterDelayMs(error: unknown): number {
+function getRetryDelayFromHeader(error: unknown): number {
   if (typeof error === 'object' && error !== null) {
     // Check for error.response.headers (common in axios errors)
     if (
@@ -305,7 +305,43 @@ function getRetryAfterDelayMs(error: unknown): number {
 }
 
 /**
- * Determines the delay duration based on the error, prioritizing Retry-After header.
+ * Extracts the delay from a structured error's RetryInfo.
+ * See https://cloud.google.com/apis/design/errors#error_info
+ * @param error The error object.
+ * @returns The delay in milliseconds, or 0 if not found or invalid.
+ */
+function getRetryDelayFromStructuredError(error: unknown): number {
+  if (error && typeof error === 'object' && 'response' in error) {
+    const gaxiosError = error as { response?: { data?: { error?: unknown } } };
+    const errorDetails = (
+      gaxiosError.response?.data?.error as { details?: unknown[] }
+    )?.details;
+
+    if (Array.isArray(errorDetails)) {
+      const retryInfo = errorDetails.find(
+        (detail): detail is { '@type': string; retryDelay: string } =>
+          typeof detail === 'object' &&
+          detail !== null &&
+          (detail as { '@type'?: unknown })['@type'] ===
+            'type.googleapis.com/google.rpc.RetryInfo' &&
+          'retryDelay' in detail,
+      );
+
+      if (retryInfo?.retryDelay) {
+        // The field is a string like "51820.638305887s"
+        const seconds = parseFloat(retryInfo.retryDelay);
+        if (!isNaN(seconds)) {
+          return Math.round(seconds * 1000);
+        }
+      }
+    }
+  }
+  return 0;
+}
+
+/**
+ * Determines the delay duration based on the error, prioritizing structured
+ * error details, then the Retry-After header.
  * @param error The error object.
  * @returns An object containing the delay duration in milliseconds and the error status.
  */
@@ -317,7 +353,12 @@ function getDelayDurationAndStatus(error: unknown): {
   let delayDurationMs = 0;
 
   if (errorStatus === 429) {
-    delayDurationMs = getRetryAfterDelayMs(error);
+    // First, try to get delay from structured error details.
+    delayDurationMs = getRetryDelayFromStructuredError(error);
+    // If not found, fall back to Retry-After header.
+    if (delayDurationMs === 0) {
+      delayDurationMs = getRetryDelayFromHeader(error);
+    }
   }
   return { delayDurationMs, errorStatus };
 }
