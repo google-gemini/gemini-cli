@@ -15,9 +15,9 @@ import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
 
 /**
- * Extract base version and channel info from hotfix branch name. Branches can
- * be in multiple formats:
- *  - New NEW: hotfix/v0.5.3/v0.5.4/preview/cherry-pick-abc -> v0.5.4 and preview
+ * Extract base version, original pr, and originalPr info from hotfix branch name.
+ * Formats:
+ *  - New NEW: hotfix/v0.5.3/v0.5.4/preview/cherry-pick-abc/pr-1234 -> v0.5.4, preview, 1234
  *  - New format: hotfix/v0.5.3/preview/cherry-pick-abc -> v0.5.3 and preview
  *  - Old format: hotfix/v0.5.3/cherry-pick-abc -> v0.5.3 and stable (default)
  * We check the formats from newest to oldest. If the channel found is invalid,
@@ -26,9 +26,12 @@ import { hideBin } from 'yargs/helpers';
 function getBranchInfo({ branchName, context }) {
   const parts = branchName.split('/');
   const version = parts[1];
+  let prNum;
   let channel = 'stable'; // default for old format
-  if (parts.length >= 5 && (parts[3] === 'stable' || parts[3] === 'preview')) {
+  if (parts.length >= 6 && (parts[3] === 'stable' || parts[3] === 'preview')) {
     channel = parts[3];
+    const prMatch = parts[5].match(/pr-(\d+)/);
+    prNum = prMatch[1];
   } else if (
     parts.length >= 4 &&
     (parts[2] === 'stable' || parts[2] === 'preview')
@@ -47,7 +50,7 @@ function getBranchInfo({ branchName, context }) {
     );
   }
 
-  return { channel, version };
+  return { channel, prNum, version };
 }
 
 async function main() {
@@ -115,11 +118,14 @@ async function main() {
 
   console.log(`Processing patch trigger for branch: ${headRef}`);
 
-  const { version, channel } = getBranchInfo({ branchName: headRef, context });
+  const { prNum, version, channel } = getBranchInfo({
+    branchName: headRef,
+    context,
+  });
 
-  // Try to find the original PR that requested this patch
-  let originalPr = null;
-  if (!testMode) {
+  let originalPr = prNum;
+
+  if (!testMode && !originalPr) {
     try {
       console.log('Looking for original PR using search...');
       const { execFileSync } = await import('node:child_process');
