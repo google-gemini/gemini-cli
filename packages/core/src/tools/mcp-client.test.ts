@@ -546,8 +546,8 @@ describe('connectToMcpServer with OAuth', () => {
   let mockedClient: ClientLib.Client;
   let workspaceContext: WorkspaceContext;
   let testWorkspace: string;
-  let mockAuthProvider: any;
-  let mockTokenStorage: any;
+  let mockAuthProvider: MCPOAuthProvider;
+  let mockTokenStorage: MCPOAuthTokenStorage;
 
   beforeEach(() => {
     mockedClient = {
@@ -569,16 +569,16 @@ describe('connectToMcpServer with OAuth', () => {
     vi.spyOn(console, 'warn').mockImplementation(() => {});
     vi.spyOn(console, 'error').mockImplementation(() => {});
 
+    mockTokenStorage = {
+      getCredentials: vi.fn().mockResolvedValue({ clientId: 'test-client' }),
+    } as unknown as MCPOAuthTokenStorage;
+    vi.mocked(MCPOAuthTokenStorage).mockReturnValue(mockTokenStorage);
     mockAuthProvider = {
       authenticate: vi.fn().mockResolvedValue(undefined),
       getValidToken: vi.fn().mockResolvedValue('test-access-token'),
-    };
+      tokenStorage: mockTokenStorage,
+    } as unknown as MCPOAuthProvider;
     vi.mocked(MCPOAuthProvider).mockReturnValue(mockAuthProvider);
-
-    mockTokenStorage = {
-      getCredentials: vi.fn().mockResolvedValue({ clientId: 'test-client' }),
-    };
-    vi.mocked(MCPOAuthTokenStorage).mockReturnValue(mockTokenStorage);
   });
 
   afterEach(() => {
