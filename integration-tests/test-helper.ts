@@ -845,43 +845,46 @@ export class TestRig {
   }
 
   /**
-   * Starts an interactive session and waits for it to be fully ready.
-   * This is a higher-level utility built on top of `runInteractive`.
+   * Waits for an interactive session to be fully ready for input.
+   * This is a higher-level utility to be used with `runInteractive`.
    *
    * It handles the initial setup boilerplate:
-   * 1. Starts the process using `runInteractive`.
-   * 2. Automatically handles the authentication prompt if it appears.
-   * 3. Waits for the "Type your message" prompt to ensure the CLI is ready for input.
+   * 1. Automatically handles the authentication prompt if it appears.
+   * 2. Waits for the "Type your message" prompt to ensure the CLI is ready for input.
    *
    * Throws an error if the session fails to become ready within the timeout.
    *
-   * @returns A promise that resolves with the `ptyProcess` and the exit `promise`.
+   * @param ptyProcess The process returned from `runInteractive`.
    */
-  async startInteractive(): Promise<{
-    ptyProcess: pty.IPty;
-    promise: Promise<{ exitCode: number; signal?: number; output: string }>;
-  }> {
-    const { ptyProcess, promise } = this.runInteractive();
+  async ensureReadyForInput(ptyProcess: pty.IPty): Promise<void> {
+    const timeout = 25000;
+    const pollingInterval = 200;
+    const startTime = Date.now();
+    let authPromptHandled = false;
 
-    const authDialogAppeared = await this.waitForText(
-      'How would you like to authenticate',
-      5000,
+    while (Date.now() - startTime < timeout) {
+      const output = stripAnsi(this._interactiveOutput).toLowerCase();
+
+      // If the ready prompt appears, we're done.
+      if (output.includes('type your message')) {
+        return;
+      }
+
+      // If the auth prompt appears and we haven't handled it yet.
+      if (
+        !authPromptHandled &&
+        output.includes('how would you like to authenticate')
+      ) {
+        ptyProcess.write('2');
+        authPromptHandled = true;
+      }
+
+      // Wait for the next poll.
+      await new Promise((resolve) => setTimeout(resolve, pollingInterval));
+    }
+
+    throw new Error(
+      `CLI did not start up in interactive mode correctly. Output: ${this._interactiveOutput}`,
     );
-
-    // select the second option if auth dialog come's up
-    if (authDialogAppeared) {
-      ptyProcess.write('2');
-    }
-
-    // Wait for the app to be ready
-    const isReady = await this.waitForText('Type your message', 20000);
-
-    if (!isReady) {
-      throw new Error(
-        `CLI did not start up in interactive mode correctly. Output: ${this._interactiveOutput}`,
-      );
-    }
-
-    return { ptyProcess, promise };
   }
 }

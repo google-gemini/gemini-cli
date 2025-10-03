@@ -23,7 +23,8 @@ describe('Interactive Mode', () => {
     async () => {
       await rig.setup('interactive-compress-test');
 
-      const { ptyProcess } = await rig.startInteractive();
+      const { ptyProcess } = rig.runInteractive();
+      await rig.ensureReadyForInput(ptyProcess);
 
       const longPrompt =
         'Dont do anything except returning a 1000 token long paragragh with the <name of the scientist who discovered theory of relativity> at the end to indicate end of response. This is a moderately long sentence.';
@@ -53,7 +54,8 @@ describe('Interactive Mode', () => {
     async () => {
       await rig.setup('interactive-compress-test');
 
-      const { ptyProcess } = await rig.startInteractive();
+      const { ptyProcess } = rig.runInteractive();
+      await rig.ensureReadyForInput(ptyProcess);
 
       await type(ptyProcess, '/compress');
       await new Promise((resolve) => setTimeout(resolve, 100));
