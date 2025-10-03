@@ -13,6 +13,20 @@ import {
   isCommandAllowed,
   stripShellWrapper,
 } from './shell-utils.js';
+import type { SpawnSyncReturns } from 'node:child_process';
+
+const mockSpawnSync = vi.hoisted(() => vi.fn());
+
+vi.mock('node:child_process', async () => {
+  const actual =
+    await vi.importActual<typeof import('node:child_process')>(
+      'node:child_process',
+    );
+  return {
+    ...actual,
+    spawnSync: mockSpawnSync,
+  };
+});
 import type { Config } from '../config/config.js';
 
 const mockPlatform = vi.hoisted(() => vi.fn());
@@ -165,6 +179,83 @@ describe('isCommandAllowed', () => {
       config.getCoreTools = () => ['ShellTool(echo)'];
       const result = isCommandAllowed("echo '$(pwd)'", config);
       expect(result.allowed).toBe(true);
+    });
+  });
+
+  describe('powershell command parsing', () => {
+    const originalComSpec = process.env['ComSpec'];
+
+    const createSpawnSyncResult = (
+      stdout: string,
+      status = 0,
+      error?: NodeJS.ErrnoException,
+    ): SpawnSyncReturns<string> & { error?: NodeJS.ErrnoException } => ({
+      pid: 0,
+      output: ['', stdout, ''],
+      stdout,
+      stderr: '',
+      status,
+      signal: null,
+      error,
+    });
+
+    beforeEach(() => {
+      mockPlatform.mockReturnValue('win32');
+      process.env['ComSpec'] =
+        'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe';
+      mockSpawnSync.mockImplementation((command, args) => {
+        const cmd = typeof command === 'string' ? command.toLowerCase() : '';
+        if (cmd.endsWith('powershell.exe') || cmd.endsWith('pwsh.exe')) {
+          if (Array.isArray(args) && args.includes('-EncodedCommand')) {
+            const json =
+              '["Get-ChildItem","ForEach-Object { git status }","git status"]';
+            return createSpawnSyncResult(json);
+          }
+          return createSpawnSyncResult('');
+        }
+
+        const enoent = new Error('not found') as NodeJS.ErrnoException;
+        enoent.code = 'ENOENT';
+        return createSpawnSyncResult('', undefined, enoent);
+      });
+    });
+
+    afterEach(() => {
+      mockSpawnSync.mockReset();
+      if (originalComSpec === undefined) {
+        delete process.env['ComSpec'];
+      } else {
+        process.env['ComSpec'] = originalComSpec;
+      }
+    });
+
+    it('should allow nested powershell commands when all are allowlisted', () => {
+      config.getCoreTools = () => [
+        'run_shell_command(Get-ChildItem)',
+        'run_shell_command(ForEach-Object)',
+        'run_shell_command(git)',
+      ];
+
+      const result = isCommandAllowed(
+        '& { Get-ChildItem | ForEach-Object { git status } }',
+        config,
+      );
+
+      expect(result.allowed).toBe(true);
+    });
+
+    it('should block nested powershell commands when a nested command is blocked', () => {
+      config.getExcludeTools = () => ['run_shell_command(git)'];
+
+      const result = isCommandAllowed(
+        '& { Get-ChildItem | ForEach-Object { git status } }',
+        config,
+      );
+
+      expect(result.allowed).toBe(false);
+      expect(result.reason).toBe(
+        "Command 'git status' is blocked by configuration",
+      );
     });
   });
 });

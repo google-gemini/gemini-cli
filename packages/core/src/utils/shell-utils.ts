@@ -8,10 +8,17 @@ import type { AnyToolInvocation } from '../index.js';
 import type { Config } from '../config/config.js';
 import os from 'node:os';
 import { quote } from 'shell-quote';
-import Parser, { type SyntaxNode } from 'tree-sitter';
+import Parser, {
+  type Language as TreeSitterLanguage,
+  type SyntaxNode,
+} from 'tree-sitter';
 import Bash from 'tree-sitter-bash';
 import { doesToolInvocationMatch } from './tool-utils.js';
-import { spawn, type SpawnOptionsWithoutStdio } from 'node:child_process';
+import {
+  spawn,
+  spawnSync,
+  type SpawnOptionsWithoutStdio,
+} from 'node:child_process';
 
 const SHELL_TOOL_NAMES = ['run_shell_command', 'ShellTool'];
 
@@ -82,6 +89,92 @@ export function getShellConfiguration(): ShellConfiguration {
  */
 export const isWindows = () => os.platform() === 'win32';
 
+const POWERSHELL_EXECUTABLE_CANDIDATES = ['powershell.exe', 'pwsh.exe'];
+
+const POWERSHELL_COMMAND_EXTRACTION_SCRIPT = `
+[Console]::InputEncoding = [System.Text.Encoding]::UTF8
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+$commandText = [Console]::In.ReadToEnd()
+$tokens = $null
+$errors = $null
+$ast = [System.Management.Automation.Language.Parser]::ParseInput($commandText, [ref]$tokens, [ref]$errors)
+if ($errors -and $errors.Count -gt 0) {
+  Write-Output '[]'
+  exit 0
+}
+$commands = $ast.FindAll({ param($node) $node -is [System.Management.Automation.Language.CommandAst] }, $true) | ForEach-Object {
+  $_.ToString().Trim()
+}
+$commands | ConvertTo-Json -Compress
+`;
+
+const POWERSHELL_COMMAND_EXTRACTION_SCRIPT_ENCODED = Buffer.from(
+  POWERSHELL_COMMAND_EXTRACTION_SCRIPT,
+  'utf16le',
+).toString('base64');
+
+function isPowerShellConfigured(): boolean {
+  const comSpec = process.env['ComSpec'];
+  if (!comSpec) {
+    return false;
+  }
+  const lower = comSpec.toLowerCase();
+  return lower.endsWith('powershell.exe') || lower.endsWith('pwsh.exe');
+}
+
+function parsePowerShellCommands(command: string): string[] | undefined {
+  if (!isWindows() || !command.trim() || !isPowerShellConfigured()) {
+    return undefined;
+  }
+
+  for (const executable of POWERSHELL_EXECUTABLE_CANDIDATES) {
+    const result = spawnSync(
+      executable,
+      [
+        '-NoProfile',
+        '-EncodedCommand',
+        POWERSHELL_COMMAND_EXTRACTION_SCRIPT_ENCODED,
+      ],
+      {
+        input: command,
+        encoding: 'utf8',
+        maxBuffer: 1024 * 1024,
+      },
+    );
+
+    if (result.error) {
+      const errno = (result.error as NodeJS.ErrnoException).code;
+      if (errno === 'ENOENT') {
+        continue;
+      }
+      return undefined;
+    }
+
+    if (result.status !== 0) {
+      continue;
+    }
+
+    const stdout = (result.stdout || '').trim();
+    if (!stdout) {
+      return [];
+    }
+
+    try {
+      const parsed = JSON.parse(stdout);
+      if (Array.isArray(parsed)) {
+        return parsed
+          .filter((value) => typeof value === 'string')
+          .map((value: string) => value.trim())
+          .filter(Boolean);
+      }
+    } catch {
+      continue;
+    }
+  }
+
+  return undefined;
+}
+
 /**
  * Escapes a string so that it can be safely used as a single argument
  * in a shell command, preventing command injection.
@@ -111,13 +204,18 @@ export function escapeShellArg(arg: string, shell: ShellType): string {
 
 const TREE_SITTER_SKIP_TYPES = new Set(['heredoc_body']);
 
+// `tree-sitter-bash` ships its own `Language` typings that are structurally
+// incompatible with the ones from `tree-sitter`. A direct cast keeps type-safety
+// at call sites without suppressing the error globally.
+const BASH_LANGUAGE = Bash as unknown as TreeSitterLanguage;
+
 let bashParserInstance: Parser | undefined;
 
 function getBashParser(): Parser | undefined {
   try {
     if (!bashParserInstance) {
       bashParserInstance = new Parser();
-      bashParserInstance.setLanguage(Bash);
+      bashParserInstance.setLanguage(BASH_LANGUAGE);
     }
     return bashParserInstance;
   } catch {
@@ -252,6 +350,11 @@ function legacyCommandRoot(command: string): string | undefined {
  * Falls back to the legacy parser if Tree-sitter cannot provide a clean parse.
  */
 export function splitCommands(command: string): string[] {
+  const powerShellParsed = parsePowerShellCommands(command);
+  if (powerShellParsed !== undefined) {
+    return powerShellParsed;
+  }
+
   const root = parseWithTreeSitter(command);
   if (root) {
     const nodes: SyntaxNode[] = [];
