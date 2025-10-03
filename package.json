@@ -17,7 +17,7 @@
     "sandboxImageUri": "us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:0.9.0-nightly.20251001.163dba7e"
   },
   "scripts": {
-    "start": "cross-env node scripts/start.js",
+    "start": "cross-env DEV=false node scripts/start.js",
     "start:a2a-server": "CODER_AGENT_PORT=41242 npm run start --workspace @google/gemini-cli-a2a-server",
     "debug": "cross-env DEBUG=1 node --inspect-brk scripts/start.js",
     "auth:npm": "npx google-artifactregistry-auth",
@@ -41,7 +41,7 @@
     "test:integration:sandbox:podman": "cross-env GEMINI_SANDBOX=podman vitest run --root ./integration-tests",
     "lint": "eslint . --ext .ts,.tsx && eslint integration-tests",
     "lint:fix": "eslint . --fix && eslint integration-tests --fix",
-    "lint:ci": "eslint . --ext .ts,.tsx --max-warnings 0 && eslint integration-tests --max-warnings 0",
+    "lint:ci": "npx eslint . --ext .ts,.tsx --no-warn-ignored && npx eslint integration-tests --no-warn-ignored",
     "lint:all": "node scripts/lint.js",
     "format": "prettier --experimental-cli --write .",
     "typecheck": "npm run typecheck --workspaces --if-present",
@@ -97,7 +97,7 @@
     "msw": "^2.10.4",
     "npm-run-all": "^4.1.5",
     "prettier": "^3.5.3",
-    "react-devtools-core": "^4.28.5",
+    "react-devtools-core": "^6.1.5",
     "semver": "^7.7.2",
     "strip-ansi": "^7.1.2",
     "tsx": "^4.20.3",
@@ -121,7 +121,7 @@
   "lint-staged": {
     "*.{js,jsx,ts,tsx}": [
       "prettier --write",
-      "eslint --fix --max-warnings 0"
+      "eslint --fix"
     ],
     "*.{json,md}": [
       "prettier --write"

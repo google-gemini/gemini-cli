@@ -165,7 +165,7 @@ function doesVersionExist(version) {
       console.error(`Version ${version} already exists on NPM.`);
       return true;
     }
-  } catch (_error) {
+  } catch {
     // This is expected if the version doesn't exist.
   }
 
@@ -205,7 +205,7 @@ function doesVersionExist(version) {
   return false;
 }
 
-function getAndVerifyTags(npmDistTag, _gitTagPattern) {
+function getAndVerifyTags(npmDistTag) {
   // Detect rollback scenarios and get the correct baseline
   const rollbackInfo = detectRollbackAndGetBaseline(npmDistTag);
   const baselineVersion = rollbackInfo.baseline;
@@ -433,12 +433,11 @@ export function getVersion(options = {}) {
   }
 
   // All checks are done, construct the final result.
-  const result = {
+
+  return {
     releaseTag: `v${versionData.releaseVersion}`,
     ...versionData,
   };
-
-  return result;
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {

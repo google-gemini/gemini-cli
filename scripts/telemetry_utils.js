@@ -154,7 +154,7 @@ export function waitForPort(port, timeout = 10000) {
         socket.end();
         resolve();
       });
-      socket.once('error', (_) => {
+      socket.once('error', () => {
         if (Date.now() - startTime > timeout) {
           reject(new Error(`Timeout waiting for port ${port} to open.`));
         } else {
@@ -423,7 +423,7 @@ export function registerCleanup(
       if (fd) {
         try {
           fs.closeSync(fd);
-        } catch (_) {
+        } catch {
           /* no-op */
         }
       }
