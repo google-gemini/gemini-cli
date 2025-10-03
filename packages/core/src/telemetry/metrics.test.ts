@@ -21,6 +21,7 @@ import {
 } from './metrics.js';
 import { makeFakeConfig } from '../test-utils/config.js';
 import { ModelRoutingEvent, AgentFinishEvent } from './types.js';
+import { AgentTerminateMode } from '../agents/types.js';
 
 const mockCounterAddFn: Mock<
   (value: number, attributes?: Attributes, context?: Context) => void
@@ -453,7 +454,7 @@ describe('Telemetry Metrics', () => {
         'TestAgent',
         1000,
         5,
-        'GOAL',
+        AgentTerminateMode.GOAL,
       );
       recordAgentRunMetricsModule(mockConfig, event);
       expect(mockCounterAddFn).not.toHaveBeenCalled();
@@ -470,7 +471,7 @@ describe('Telemetry Metrics', () => {
         'TestAgent',
         1000,
         5,
-        'GOAL',
+        AgentTerminateMode.GOAL,
       );
       recordAgentRunMetricsModule(mockConfig, event);
 

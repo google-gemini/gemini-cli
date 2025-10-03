@@ -99,6 +99,7 @@ import * as uiTelemetry from './uiTelemetry.js';
 import { makeFakeConfig } from '../test-utils/config.js';
 import { ClearcutLogger } from './clearcut-logger/clearcut-logger.js';
 import { UserAccountManager } from '../utils/userAccountManager.js';
+import { AgentTerminateMode } from '../agents/types.js';
 
 describe('loggers', () => {
   const mockLogger = {
@@ -1463,7 +1464,7 @@ describe('loggers', () => {
         'TestAgent',
         1000,
         5,
-        'GOAL',
+        AgentTerminateMode.GOAL,
       );
 
       logAgentFinish(mockConfig, event);

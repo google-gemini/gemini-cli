@@ -32,6 +32,7 @@ import {
   AgentStartEvent,
   AgentFinishEvent,
 } from '../types.js';
+import { AgentTerminateMode } from '../../agents/types.js';
 import { GIT_COMMIT_INFO, CLI_VERSION } from '../../generated/git-commit.js';
 import { UserAccountManager } from '../../utils/userAccountManager.js';
 import { InstallationManager } from '../../utils/installationManager.js';
@@ -752,7 +753,7 @@ describe('ClearcutLogger', () => {
         'TestAgent',
         1000,
         5,
-        'GOAL',
+        AgentTerminateMode.GOAL,
       );
 
       logger?.logAgentFinishEvent(event);
@@ -792,7 +793,7 @@ describe('ClearcutLogger', () => {
         'TestAgent',
         500,
         2,
-        'ERROR',
+        AgentTerminateMode.ERROR,
         'Something went wrong',
       );
 

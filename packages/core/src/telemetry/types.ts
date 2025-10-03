@@ -19,6 +19,7 @@ import type { FileOperation } from './metrics.js';
 export { ToolCallDecision };
 import type { ToolRegistry } from '../tools/tool-registry.js';
 import type { OutputFormat } from '../output/types.js';
+import type { AgentTerminateMode } from '../agents/types.js';
 
 export interface BaseTelemetryEvent {
   'event.name': string;
@@ -750,7 +751,7 @@ export class AgentFinishEvent implements BaseTelemetryEvent {
   agent_name: string;
   duration_ms: number;
   turn_count: number;
-  terminate_reason: string;
+  terminate_reason: AgentTerminateMode;
   error_message?: string;
 
   constructor(
@@ -758,7 +759,7 @@ export class AgentFinishEvent implements BaseTelemetryEvent {
     agent_name: string,
     duration_ms: number,
     turn_count: number,
-    terminate_reason: string,
+    terminate_reason: AgentTerminateMode,
     error_message?: string,
   ) {
     this['event.name'] = 'agent_finish';
