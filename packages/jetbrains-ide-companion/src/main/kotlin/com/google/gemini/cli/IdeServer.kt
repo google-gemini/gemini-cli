@@ -240,7 +240,7 @@ class IdeServer(private val project: Project, private val diffManager: DiffManag
       val suppressNotification =
         request.arguments["suppressNotification"]?.toString()?.toBoolean() ?: false
 
-      val finalContent = diffManager.closeDiff(filePath, suppressNotification)
+      val finalContent = diffManager.rejectDiff(filePath, suppressNotification)
 
       @Serializable data class CloseDiffResponse(val content: String?)
       val response = McpJson.encodeToString(CloseDiffResponse(finalContent))
@@ -339,7 +339,7 @@ class IdeServer(private val project: Project, private val diffManager: DiffManag
     val actualPort = port ?: project.service<GeminiCliServerState>().port
 
     if (actualPort == null) {
-      LOG.warn("Cannot sync env vars: port is null")
+      LOG.warn("Cannot sync envars: port is null")
       return
     }
 
