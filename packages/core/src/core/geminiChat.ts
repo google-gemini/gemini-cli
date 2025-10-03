@@ -500,7 +500,7 @@ export class GeminiChat {
     let hasToolCall = false;
     let hasFinishReason = false;
 
-    for await (const chunk of this.stopBeforeSecondMutator(streamResponse)) {
+    for await (const chunk of this.enforceAtomicTurns(streamResponse)) {
       hasFinishReason =
         chunk?.candidates?.some((candidate) => candidate.finishReason) ?? false;
       if (isValidResponse(chunk)) {
@@ -620,17 +620,34 @@ export class GeminiChat {
   }
 
   /**
-   * Truncates the chunkStream right before the second function call to a
-   * function that mutates state. This may involve trimming parts from a chunk
-   * as well as omtting some chunks altogether.
+   * Enforces atomic tool-calling turns to prevent race conditions in parallel
+   * tool execution. The model's stream of tool calls is processed to ensure
+   * that each "turn" consists of one of two types:
    *
-   * We do this because it improves tool call quality if the model gets
-   * feedback from one mutating function call before it makes the next one.
+   * 1.  **Read-Only Turn:** One or more non-mutator (read-only) tool calls,
+   *     which can be executed in parallel.
+   * 2.  **Mutation Turn:** A single mutator (state-changing) tool call.
+   *
+   * This mechanism ensures that any given turn is either a batch of parallel,
+   * read-only "planning" actions OR a single, state-changing "acting" action.
+   * This eliminates race conditions that could occur if mutator and non-mutator
+   * tools were executed in parallel (e.g., a `read_file` racing a `write_file`).
+   *
+   * If the model produces a stream containing a mix of tool types, the stream
+   * is terminated at the point a mutator is encountered after non-mutators,
+   * or immediately after the first mutator if it's the initial tool call.
+   * This defers subsequent tool calls to the next turn, enforcing a safe
+   * "Plan -> Act -> Observe" agentic loop.
+   *
+   * @param chunkStream The incoming stream of `GenerateContentResponse` chunks
+   *   from the model.
+   * @returns An `AsyncGenerator` that yields `GenerateContentResponse` chunks,
+   *   potentially truncated to enforce atomic turns.
    */
-  private async *stopBeforeSecondMutator(
+  private async *enforceAtomicTurns(
     chunkStream: AsyncGenerator<GenerateContentResponse>,
   ): AsyncGenerator<GenerateContentResponse> {
-    let foundMutatorFunctionCall = false;
+    let hasSeenToolCall = false;
 
     for await (const chunk of chunkStream) {
       const candidate = chunk.candidates?.[0];
@@ -642,25 +659,31 @@ export class GeminiChat {
 
       const truncatedParts: Part[] = [];
       for (const part of content.parts) {
-        if (this.isMutatorFunctionCall(part)) {
-          if (foundMutatorFunctionCall) {
-            // This is the second mutator call.
-            // Truncate and return immedaitely.
-            const newChunk = new GenerateContentResponse();
-            newChunk.candidates = [
-              {
-                ...candidate,
-                content: {
-                  ...content,
-                  parts: truncatedParts,
-                },
-                finishReason: FinishReason.STOP,
-              },
-            ];
-            yield newChunk;
-            return;
+        const isMutator = this.isMutatorFunctionCall(part);
+        const isToolCall = isMutator || !!part?.functionCall?.name;
+
+        if (isMutator) {
+          if (hasSeenToolCall) {
+            // Case 1: non-mutator(s) followed by a mutator. Stop before mutator.
+          } else {
+            // Case 2: mutator is the first tool. Allow it and stop.
+            truncatedParts.push(part);
           }
-          foundMutatorFunctionCall = true;
+
+          const newChunk = new GenerateContentResponse();
+          newChunk.candidates = [
+            {
+              ...candidate,
+              content: { ...content, parts: truncatedParts },
+              finishReason: FinishReason.STOP,
+            },
+          ];
+          yield newChunk;
+          return;
+        }
+
+        if (isToolCall) {
+          hasSeenToolCall = true;
         }
         truncatedParts.push(part);
       }

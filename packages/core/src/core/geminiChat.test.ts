@@ -1301,7 +1301,7 @@ describe('GeminiChat', () => {
     expect(turn4.parts[0].text).toBe('second response');
   });
 
-  describe('stopBeforeSecondMutator', () => {
+  describe('enforceAtomicTurns', () => {
     beforeEach(() => {
       // Common setup for these tests: mock the tool registry.
       const mockToolRegistry = {
@@ -1315,21 +1315,11 @@ describe('GeminiChat', () => {
       vi.mocked(mockConfig.getToolRegistry).mockReturnValue(mockToolRegistry);
     });
 
-    it('should stop streaming before a second mutator tool call', async () => {
+    it('should stop streaming before a mutator if non-mutators precede it', async () => {
       const responses = [
         {
           candidates: [
             { content: { role: 'model', parts: [{ text: 'First part. ' }] } },
-          ],
-        },
-        {
-          candidates: [
-            {
-              content: {
-                role: 'model',
-                parts: [{ functionCall: { name: 'edit', args: {} } }],
-              },
-            },
           ],
         },
         {
@@ -1342,7 +1332,7 @@ describe('GeminiChat', () => {
             },
           ],
         },
-        // This chunk contains the second mutator and should be clipped.
+        // This chunk contains the mutator and should be clipped.
         {
           candidates: [
             {
@@ -1391,17 +1381,21 @@ describe('GeminiChat', () => {
 
       const modelTurn = history[1]!;
       expect(modelTurn.role).toBe('model');
-      expect(modelTurn?.parts?.length).toBe(3);
+      expect(modelTurn?.parts?.length).toBe(2);
       expect(modelTurn?.parts![0]!.text).toBe('First part. ');
-      expect(modelTurn.parts![1]!.functionCall?.name).toBe('edit');
-      expect(modelTurn.parts![2]!.functionCall?.name).toBe('fetch');
+      expect(modelTurn.parts![1]!.functionCall?.name).toBe('fetch');
     });
 
-    it('should not stop streaming if only one mutator is present', async () => {
+    it('should stop streaming after the first mutator if it is the first tool call', async () => {
       const responses = [
         {
           candidates: [
-            { content: { role: 'model', parts: [{ text: 'Part 1. ' }] } },
+            {
+              content: {
+                role: 'model',
+                parts: [{ text: 'Part 1. ' }],
+              },
+            },
           ],
         },
         {
@@ -1446,9 +1440,9 @@ describe('GeminiChat', () => {
 
       const history = chat.getHistory();
       const modelTurn = history[1]!;
-      expect(modelTurn?.parts?.length).toBe(3);
+      expect(modelTurn?.parts?.length).toBe(2);
+      expect(modelTurn.parts![0]!.text).toBe('Part 1. ');
       expect(modelTurn.parts![1]!.functionCall?.name).toBe('edit');
-      expect(modelTurn.parts![2]!.text).toBe('Part 2.');
     });
 
     it('should clip the chunk containing the second mutator, preserving prior parts', async () => {
@@ -1503,9 +1497,8 @@ describe('GeminiChat', () => {
 
       const history = chat.getHistory();
       const modelTurn = history[1]!;
-      expect(modelTurn?.parts?.length).toBe(2);
+      expect(modelTurn?.parts?.length).toBe(1);
       expect(modelTurn.parts![0]!.functionCall?.name).toBe('edit');
-      expect(modelTurn.parts![1]!.text).toBe('Keep this text. ');
     });
 
     it('should handle two mutators in the same chunk (parallel call scenario)', async () => {
