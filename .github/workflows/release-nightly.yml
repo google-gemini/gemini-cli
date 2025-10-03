@@ -98,18 +98,13 @@ jobs:
           dry-run: '${{ github.event.inputs.dry_run }}'
           working-directory: './release'
 
-      - name: 'Run evaluation'
+      - name: 'Trigger Evaluation'
         if: "${{ github.event.inputs.dry_run == 'false' }}"
-        uses: './.github/actions/run-evaluation'
-        with:
-          branch-or-commit: '${{ steps.build.outputs.branch-name }}'
-          dry-run: 'true'
-          github-token: '${{ secrets.GITHUB_TOKEN }}'
-          google-cloud-project: '${{ vars.GOOGLE_CLOUD_PROJECT }}'
-          gcp-wif-provider: '${{ vars.GCP_WIF_PROVIDER }}'
-          service-account-email: '${{ vars.SERVICE_ACCOUNT_EMAIL }}'
-          eval-gemini-api-key: '${{ secrets.EVAL_GEMINI_API_KEY }}'
-          eval-gcs-bucket: '${{ vars.EVAL_GCS_BUCKET }}'
+        env:
+          GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+        shell: 'bash'
+        run: |
+          gh workflow run eval.yml --ref ${{ steps.build.outputs.branch-name }} -f branch-or-commit=${{ steps.build.outputs.branch-name }} -f dry-run=true
 
       - name: 'Publish Release'
         if: true
@@ -128,11 +123,6 @@ jobs:
           skip-branch-cleanup: true
           force-skip-tests: '${{ github.event.inputs.force_skip_tests }}'
           gemini_api_key: '${{ secrets.GEMINI_API_KEY }}'
-          google-cloud-project: '${{ vars.GOOGLE_CLOUD_PROJECT }}'
-          gcp-wif-provider: '${{ vars.GCP_WIF_PROVIDER }}'
-          service-account-email: '${{ vars.SERVICE_ACCOUNT_EMAIL }}'
-          eval-gemini-api-key: '${{ secrets.EVAL_GEMINI_API_KEY }}'
-          eval-gcs-bucket: '${{ vars.EVAL_GCS_BUCKET }}'
 
       - name: 'Create and Merge Pull Request'
         uses: './.github/actions/create-pull-request'

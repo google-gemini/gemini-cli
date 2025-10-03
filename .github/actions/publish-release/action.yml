@@ -54,29 +54,9 @@ inputs:
     description: 'The registry to publish to.'
     required: false
     default: 'npm-wombat'
-  google-cloud-project:
-    description: 'Google Cloud project ID.'
-    required: true
-  gcp-wif-provider:
-    description: 'Google Cloud Workload Identity Provider.'
-    required: true
-  service-account-email:
-    description: 'Google Cloud service account email.'
-    required: true
-  eval-gemini-api-key:
-    description: 'Gemini API key for evaluation.'
-    required: true
-  eval-gcs-bucket:
-    description: 'GCS bucket for evaluation artifacts.'
-    required: true
-
 runs:
   using: 'composite'
   steps:
-    - name: '📝 Print Inputs'
-      shell: 'bash'
-      run: 'echo "${{ toJSON(inputs) }}"'
-
     - name: 'Configure npm for publishing'
       uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020'
       with:
@@ -159,19 +139,6 @@ runs:
         expected-version: '${{ inputs.release-version }}'
         ref: '${{ inputs.branch-name }}'
         gemini_api_key: '${{ inputs.gemini_api_key }}'
-
-    - name: 'Run evaluation'
-      uses: './.github/actions/run-evaluation'
-      if: "${{ inputs.dry-run != 'true' }}"
-      with:
-        branch-or-commit: '${{ inputs.branch-name }}'
-        dry-run: 'false'
-        github-token: '${{ inputs.github-token }}'
-        google-cloud-project: '${{ inputs.google-cloud-project }}'
-        gcp-wif-provider: '${{ inputs.gcp-wif-provider }}'
-        service-account-email: '${{ inputs.service-account-email }}'
-        eval-gemini-api-key: '${{ inputs.eval-gemini-api-key }}'
-        eval-gcs-bucket: '${{ inputs.eval-gcs-bucket }}'
 
     - name: '🏷️ Tag release'
       uses: './.github/actions/tag-npm-release'
