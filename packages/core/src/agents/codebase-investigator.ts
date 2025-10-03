@@ -10,111 +10,86 @@ import { ReadFileTool } from '../tools/read-file.js';
 import { GLOB_TOOL_NAME } from '../tools/tool-names.js';
 import { GrepTool } from '../tools/grep.js';
 import { DEFAULT_GEMINI_MODEL } from '../config/models.js';
-import { Type } from '@google/genai';
+import { z } from 'zod';
 
 // Define a type that matches the outputConfig schema for type safety.
-type CodebaseInvestigationReport = {
-  SummaryOfFindings: string;
-  ExplorationTrace: string[];
-  RelevantLocations: Array<{
-    FilePath: string;
-    Reasoning: string;
-    KeySymbols: string[];
-  }>;
-};
+const CodebaseInvestigationReportSchema = z.object({
+  SummaryOfFindings: z
+    .string()
+    .describe(
+      "A summary of the investigation's conclusions and insights for the main agent.",
+    ),
+  ExplorationTrace: z
+    .array(z.string())
+    .describe(
+      'A step-by-step list of actions and tools used during the investigation.',
+    ),
+  RelevantLocations: z
+    .array(
+      z.object({
+        FilePath: z.string(),
+        Reasoning: z.string(),
+        KeySymbols: z.array(z.string()),
+      }),
+    )
+    .describe('A list of relevant files and the key symbols within them.'),
+});
 
 /**
  * A Proof-of-Concept subagent specialized in analyzing codebase structure,
  * dependencies, and technologies.
  */
-export const CodebaseInvestigatorAgent: AgentDefinition<CodebaseInvestigationReport> =
-  {
-    name: 'codebase_investigator',
-    displayName: 'Codebase Investigator Agent',
-    description: `Your primary tool for multifile search tasks and codebase exploration. 
+export const CodebaseInvestigatorAgent: AgentDefinition<
+  typeof CodebaseInvestigationReportSchema
+> = {
+  name: 'codebase_investigator',
+  displayName: 'Codebase Investigator Agent',
+  description: `Your primary tool for multifile search tasks and codebase exploration. 
     Invoke this tool to delegate search tasks to an autonomous subagent. 
     Use this to find features, understand context, or locate specific files, functions, or symbols. 
     Returns a structured Json report with key file paths, symbols, architectural map and insights to solve a task or answer questions`,
-    inputConfig: {
-      inputs: {
-        objective: {
-          description: `A comprehensive and detailed description of the user's ultimate goal. 
+  inputConfig: {
+    inputs: {
+      objective: {
+        description: `A comprehensive and detailed description of the user's ultimate goal. 
           You must include original user's objective as well as questions and any extra context and questions you may have.`,
-          type: 'string',
-          required: true,
-        },
+        type: 'string',
+        required: true,
       },
     },
-    outputConfig: {
-      outputName: 'report',
-      description: 'The final investigation report as a JSON object.',
-      schema: {
-        type: Type.OBJECT,
-        description: `A detailed JSON object summarizing the findings of the codebase investigation.`,
-        properties: {
-          SummaryOfFindings: {
-            type: Type.STRING,
-            description:
-              "A summary of the investigation's conclusions and insights for the main agent.",
-          },
-          ExplorationTrace: {
-            type: Type.ARRAY,
-            description:
-              'A step-by-step list of actions and tools used during the investigation.',
-            items: { type: Type.STRING },
-          },
-          RelevantLocations: {
-            type: Type.ARRAY,
-            description:
-              'A list of relevant files and the key symbols within them.',
-            items: {
-              type: Type.OBJECT,
-              properties: {
-                FilePath: { type: Type.STRING },
-                Reasoning: { type: Type.STRING },
-                KeySymbols: {
-                  type: Type.ARRAY,
-                  items: { type: Type.STRING },
-                },
-              },
-              required: ['FilePath', 'Reasoning', 'KeySymbols'],
-            },
-          },
-        },
-        required: [
-          'SummaryOfFindings',
-          'ExplorationTrace',
-          'RelevantLocations',
-        ],
-      },
-    },
+  },
+  outputConfig: {
+    outputName: 'report',
+    description: 'The final investigation report as a JSON object.',
+    schema: CodebaseInvestigationReportSchema,
+  },
 
-    // The 'output' parameter is now strongly typed as CodebaseInvestigationReport!
-    processOutput: (output) => JSON.stringify(output, null, 2),
+  // The 'output' parameter is now strongly typed as CodebaseInvestigationReport!
+  processOutput: (output) => JSON.stringify(output, null, 2),
 
-    modelConfig: {
-      model: DEFAULT_GEMINI_MODEL,
-      temp: 0.1,
-      top_p: 0.95,
-      thinkingBudget: -1,
-    },
+  modelConfig: {
+    model: DEFAULT_GEMINI_MODEL,
+    temp: 0.1,
+    top_p: 0.95,
+    thinkingBudget: -1,
+  },
 
-    runConfig: {
-      max_time_minutes: 5,
-      max_turns: 15,
-    },
+  runConfig: {
+    max_time_minutes: 5,
+    max_turns: 15,
+  },
 
-    toolConfig: {
-      // Grant access only to read-only tools.
-      tools: [LSTool.Name, ReadFileTool.Name, GLOB_TOOL_NAME, GrepTool.Name],
-    },
+  toolConfig: {
+    // Grant access only to read-only tools.
+    tools: [LSTool.Name, ReadFileTool.Name, GLOB_TOOL_NAME, GrepTool.Name],
+  },
 
-    promptConfig: {
-      query: `Your task is to do a deep investigation of the codebase to find all relevant files, code locations, architectural mental map and insights to solve  for the following user objective:
+  promptConfig: {
+    query: `Your task is to do a deep investigation of the codebase to find all relevant files, code locations, architectural mental map and insights to solve  for the following user objective:
 <objective>
 \${objective}
 </objective>`,
-      systemPrompt: `You are **Codebase Investigator**, a hyper-specialized AI agent and an expert in reverse-engineering complex software projects. You are a sub-agent within a larger development system.
+    systemPrompt: `You are **Codebase Investigator**, a hyper-specialized AI agent and an expert in reverse-engineering complex software projects. You are a sub-agent within a larger development system.
 Your **SOLE PURPOSE** is to build a complete mental model of the code relevant to a given investigation. You must identify all relevant files, understand their roles, and foresee the direct architectural consequences of potential changes.
 You are a sub-agent in a larger system. Your only responsibility is to provide deep, actionable context.
 - **DO:** Find the key modules, classes, and functions that are part of the problem and its solution.
@@ -148,12 +123,30 @@ You operate in a non-interactive loop and must reason based on the information p
 Your mission is complete **ONLY** when your \`Questions to Resolve\` list is empty and you have identified all files and necessary change *considerations*.
 When you are finished, you **MUST** call the \`complete_task\` tool. The \`report\` argument for this tool **MUST** be a valid JSON object containing your findings.
 
-**Example of the final tool call:**
+**Example of the final report**
 \`\`\`json
 {
-  "tool_code": "print(complete_task(report={\\"SummaryOfFindings\\": \\"The core issue is X...\\", \\"ExplorationTrace\\": [\\"Searched for Y...\\", \\"Read file Z...\\"], \\"RelevantLocations\\": [{\\"FilePath\\": \\"src/main.js\\", \\"Reasoning\\": \\"This is the entry point...\\", \\"KeySymbols\\": [\\"main\\", \\"init\\"]}]}))"
+  "SummaryOfFindings": "The core issue is a race condition in the \`updateUser\` function. The function reads the user's state, performs an asynchronous operation, and then writes the state back. If another request modifies the user state during the async operation, that change will be overwritten. The fix requires implementing a transactional read-modify-write pattern, potentially using a database lock or a versioning system.",
+  "ExplorationTrace": [
+    "Used \`grep\` to search for \`updateUser\` to locate the primary function.",
+    "Read the file \`src/controllers/userController.js\` to understand the function's logic.",
+    "Used \`ls -R\` to look for related files, such as services or database models.",
+    "Read \`src/services/userService.js\` and \`src/models/User.js\` to understand the data flow and how state is managed."
+  ],
+  "RelevantLocations": [
+    {
+      "FilePath": "src/controllers/userController.js",
+      "Reasoning": "This file contains the \`updateUser\` function which has the race condition. It's the entry point for the problematic logic.",
+      "KeySymbols": ["updateUser", "getUser", "saveUser"]
+    },
+    {
+      "FilePath": "src/services/userService.js",
+      "Reasoning": "This service is called by the controller and handles the direct interaction with the data layer. Any locking mechanism would likely be implemented here.",
+      "KeySymbols": ["updateUserData"]
+    }
+  ]
 }
 \`\`\`
 `,
-    },
-  };
+  },
+};

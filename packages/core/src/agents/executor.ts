@@ -14,6 +14,7 @@ import type {
   FunctionCall,
   GenerateContentConfig,
   FunctionDeclaration,
+  Schema,
 } from '@google/genai';
 import { executeToolCall } from '../core/nonInteractiveToolExecutor.js';
 import { ToolRegistry } from '../tools/tool-registry.js';
@@ -36,6 +37,8 @@ import type {
 import { AgentTerminateMode } from './types.js';
 import { templateString } from './utils.js';
 import { parseThought } from '../utils/thoughtUtils.js';
+import { type z } from 'zod';
+import { zodToJsonSchema } from 'zod-to-json-schema';
 
 /** A callback function to report on agent activity. */
 export type ActivityCallback = (activity: SubagentActivityEvent) => void;
@@ -48,7 +51,7 @@ const TASK_COMPLETE_TOOL_NAME = 'complete_task';
  * This executor runs the agent in a loop, calling tools until it calls the
  * mandatory `complete_task` tool to signal completion.
  */
-export class AgentExecutor<TOutput> {
+export class AgentExecutor<TOutput extends z.ZodTypeAny> {
   readonly definition: AgentDefinition<TOutput>;
 
   private readonly agentId: string;
@@ -67,7 +70,7 @@ export class AgentExecutor<TOutput> {
    * @param onActivity An optional callback to receive activity events.
    * @returns A promise that resolves to a new `AgentExecutor` instance.
    */
-  static async create<TOutput>(
+  static async create<TOutput extends z.ZodTypeAny>(
     definition: AgentDefinition<TOutput>,
     runtimeContext: Config,
     onActivity?: ActivityCallback,
@@ -398,13 +401,29 @@ export class AgentExecutor<TOutput> {
           const outputName = outputConfig.outputName;
           if (args[outputName] !== undefined) {
             const outputValue = args[outputName];
+            const validationResult = outputConfig.schema.safeParse(outputValue);
 
+            if (!validationResult.success) {
+              taskCompleted = false; // Validation failed, revoke completion
+              const error = `Output validation failed: ${JSON.stringify(validationResult.error.flatten())}`;
+              syncResponseParts.push({
+                functionResponse: {
+                  name: TASK_COMPLETE_TOOL_NAME,
+                  response: { error },
+                  id: callId,
+                },
+              });
+              this.emitActivity('ERROR', {
+                context: 'tool_call',
+                name: functionCall.name,
+                error,
+              });
+              continue;
+            }
+
+            const validatedOutput = validationResult.data;
             if (this.definition.processOutput) {
-              // The `outputValue` is `unknown` at compile time, but at runtime it's what the LLM provides.
-              // The agent's `processOutput` implementation is now responsible for handling this type.
-              submittedOutput = this.definition.processOutput(
-                outputValue as TOutput,
-              );
+              submittedOutput = this.definition.processOutput(validatedOutput);
             } else {
               submittedOutput =
                 typeof outputValue === 'string'
@@ -586,10 +605,14 @@ export class AgentExecutor<TOutput> {
     };
 
     if (outputConfig) {
-      completeTool.parameters!.properties![outputConfig.outputName] = {
-        description: outputConfig.description,
-        ...(outputConfig.schema ?? { type: Type.STRING }),
-      };
+      const jsonSchema = zodToJsonSchema(outputConfig.schema);
+      const {
+        $schema: _$schema,
+        definitions: _definitions,
+        ...schema
+      } = jsonSchema;
+      completeTool.parameters!.properties![outputConfig.outputName] =
+        schema as Schema;
       completeTool.parameters!.required!.push(outputConfig.outputName);
     }
 

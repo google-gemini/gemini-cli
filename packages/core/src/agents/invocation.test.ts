@@ -17,6 +17,7 @@ import { makeFakeConfig } from '../test-utils/config.js';
 import { ToolErrorType } from '../tools/tool-error.js';
 import type { Config } from '../config/config.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
+import { type z } from 'zod';
 
 vi.mock('./executor.js');
 
@@ -24,7 +25,7 @@ const MockAgentExecutor = vi.mocked(AgentExecutor);
 
 let mockConfig: Config;
 
-const testDefinition: AgentDefinition = {
+const testDefinition: AgentDefinition<z.ZodUnknown> = {
   name: 'MockAgent',
   description: 'A mock agent.',
   inputConfig: {
@@ -39,7 +40,7 @@ const testDefinition: AgentDefinition = {
 };
 
 describe('SubagentInvocation', () => {
-  let mockExecutorInstance: Mocked<AgentExecutor<unknown>>;
+  let mockExecutorInstance: Mocked<AgentExecutor<z.ZodUnknown>>;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -48,15 +49,17 @@ describe('SubagentInvocation', () => {
     mockExecutorInstance = {
       run: vi.fn(),
       definition: testDefinition,
-    } as unknown as Mocked<AgentExecutor<unknown>>;
+    } as unknown as Mocked<AgentExecutor<z.ZodUnknown>>;
 
-    MockAgentExecutor.create.mockResolvedValue(mockExecutorInstance);
+    MockAgentExecutor.create.mockResolvedValue(
+      mockExecutorInstance as unknown as AgentExecutor<z.ZodTypeAny>,
+    );
   });
 
   it('should pass the messageBus to the parent constructor', () => {
     const mockMessageBus = {} as MessageBus;
     const params = { task: 'Analyze data' };
-    const invocation = new SubagentInvocation(
+    const invocation = new SubagentInvocation<z.ZodUnknown>(
       params,
       testDefinition,
       mockConfig,
@@ -71,7 +74,7 @@ describe('SubagentInvocation', () => {
   describe('getDescription', () => {
     it('should format the description with inputs', () => {
       const params = { task: 'Analyze data', priority: 5 };
-      const invocation = new SubagentInvocation(
+      const invocation = new SubagentInvocation<z.ZodUnknown>(
         params,
         testDefinition,
         mockConfig,
@@ -85,7 +88,7 @@ describe('SubagentInvocation', () => {
     it('should truncate long input values', () => {
       const longTask = 'A'.repeat(100);
       const params = { task: longTask };
-      const invocation = new SubagentInvocation(
+      const invocation = new SubagentInvocation<z.ZodUnknown>(
         params,
         testDefinition,
         mockConfig,
@@ -107,7 +110,7 @@ describe('SubagentInvocation', () => {
       for (let i = 0; i < 20; i++) {
         params[`input${i}`] = `value${i}`;
       }
-      const invocation = new SubagentInvocation(
+      const invocation = new SubagentInvocation<z.ZodUnknown>(
         params,
         longNameDef,
         mockConfig,
@@ -127,12 +130,16 @@ describe('SubagentInvocation', () => {
     let signal: AbortSignal;
     let updateOutput: ReturnType<typeof vi.fn>;
     const params = { task: 'Execute task' };
-    let invocation: SubagentInvocation;
+    let invocation: SubagentInvocation<z.ZodUnknown>;
 
     beforeEach(() => {
       signal = new AbortController().signal;
       updateOutput = vi.fn();
-      invocation = new SubagentInvocation(params, testDefinition, mockConfig);
+      invocation = new SubagentInvocation<z.ZodUnknown>(
+        params,
+        testDefinition,
+        mockConfig,
+      );
     });
 
     it('should initialize and run the executor successfully', async () => {
