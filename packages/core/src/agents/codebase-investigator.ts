@@ -64,7 +64,7 @@ export const CodebaseInvestigatorAgent: AgentDefinition<
     schema: CodebaseInvestigationReportSchema,
   },
 
-  // The 'output' parameter is now strongly typed as CodebaseInvestigationReport!
+  // The 'output' parameter is now strongly typed as CodebaseInvestigationReportSchema
   processOutput: (output) => JSON.stringify(output, null, 2),
 
   modelConfig: {
