@@ -265,7 +265,7 @@ export class CodePatternAnalyzer {
 
     // Advanced metrics that Claude doesn't typically provide
     const maintainabilityIndex = Math.max(0, Math.min(100,
-      171 - 5.2 * Math.log(halsteadVolume) - 0.23 * cyclomaticComplexity - 16.2 * Math.log(linesOfCode)
+      171 - 5.2 * Math.log(Math.max(1, halsteadVolume)) - 0.23 * cyclomaticComplexity - 16.2 * Math.log(Math.max(1, linesOfCode))
     ));
 
     const testCoverage = this.estimateTestCoverage(code);
