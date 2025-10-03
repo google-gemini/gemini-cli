@@ -58,7 +58,7 @@ describe('extensions install command', () => {
   });
 });
 
-describe.only('handleInstall', () => {
+describe('handleInstall', () => {
   let consoleLogSpy: MockInstance;
   let consoleErrorSpy: MockInstance;
   let processSpy: MockInstance;
