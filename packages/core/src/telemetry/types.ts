@@ -702,3 +702,27 @@ export class ExtensionDisableEvent implements BaseTelemetryEvent {
     this.setting_scope = settingScope;
   }
 }
+
+export class SmartEditStrategyEvent implements BaseTelemetryEvent {
+  'event.name': 'smart_edit_strategy';
+  'event.timestamp': string;
+  strategy: string;
+
+  constructor(strategy: string) {
+    this['event.name'] = 'smart_edit_strategy';
+    this['event.timestamp'] = new Date().toISOString();
+    this.strategy = strategy;
+  }
+}
+
+export class SmartEditCorrectionEvent implements BaseTelemetryEvent {
+  'event.name': 'smart_edit_correction';
+  'event.timestamp': string;
+  correction: 'success' | 'failure';
+
+  constructor(correction: 'success' | 'failure') {
+    this['event.name'] = 'smart_edit_correction';
+    this['event.timestamp'] = new Date().toISOString();
+    this.correction = correction;
+  }
+}

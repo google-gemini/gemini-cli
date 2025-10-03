@@ -2,7 +2,7 @@
   "name": "gemini-cli-vscode-ide-companion",
   "displayName": "Gemini CLI Companion",
   "description": "Enable Gemini CLI with direct access to your IDE workspace.",
-  "version": "0.8.0-nightly.20250925.b1da8c21",
+  "version": "0.9.0-nightly.20251001.163dba7e",
   "publisher": "google",
   "icon": "assets/icon.png",
   "repository": {
@@ -31,6 +31,16 @@
     "onStartupFinished"
   ],
   "contributes": {
+    "configuration": {
+      "title": "Gemini CLI",
+      "properties": {
+        "gemini-cli.debug.logging.enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable detailed logging for debugging the Gemini CLI Companion."
+        }
+      }
+    },
     "languages": [
       {
         "id": "gemini-diff-editable"

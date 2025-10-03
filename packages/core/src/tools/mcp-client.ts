@@ -584,6 +584,9 @@ export async function discoverTools(
   cliConfig: Config,
 ): Promise<DiscoveredMCPTool[]> {
   try {
+    // Only request tools if the server supports them.
+    if (mcpClient.getServerCapabilities()?.tools == null) return [];
+
     const mcpCallableTool = mcpToTool(mcpClient, {
       timeout: mcpServerConfig.timeout ?? MCP_DEFAULT_TIMEOUT_MSEC,
     });
