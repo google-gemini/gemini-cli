@@ -42,44 +42,54 @@ function checkRelease() {
     }
     const lastReleaseVersion = match[1];
     const lastReleaseCommit = match[2];
-    console.log(`Last release version: ${lastReleaseVersion}`);
-    console.log(`Last release commit hash: ${lastReleaseCommit}`);
 
     // Step 2: Check for new commits
-    execSync('git fetch origin main');
+    execSync('git fetch origin main', { stdio: 'pipe' });
     const gitLog = execSync(
-      `git log ${lastReleaseCommit}..origin/main -- packages/vscode-ide-companion`,
+      `git log ${lastReleaseCommit}..origin/main --invert-grep --grep="chore(release): bump version to" -- packages/vscode-ide-companion`,
       { encoding: 'utf-8' },
     ).trim();
-
-    if (gitLog) {
-      console.log(
-        '\nNew commits found since last release. A new release is needed.',
-      );
-      console.log('---');
-      console.log(gitLog);
-      console.log('---');
-    } else {
-      console.log(
-        '\nNo new commits found since last release. No release is necessary.',
-      );
-    }
 
     // Step 3: Check for dependency changes
     const noticesDiff = execSync(
       `git diff ${lastReleaseCommit}..origin/main -- packages/vscode-ide-companion/NOTICES.txt`,
       { encoding: 'utf-8' },
     ).trim();
+
+    if (gitLog) {
+      console.log('\n--- New Commits ---');
+      console.log(gitLog);
+      console.log('-------------------');
+    }
+
+    if (noticesDiff) {
+      console.log('\n--- Dependency Changes ---');
+      console.log(noticesDiff);
+      console.log('------------------------');
+    }
+
+    console.log('\n--- Summary ---');
+    if (gitLog) {
+      console.log(
+        'New commits found for `packages/vscode-ide-companion` since last release. A new release is needed.',
+      );
+    } else {
+      console.log(
+        'No new commits found since last release. No release is necessary.',
+      );
+    }
+
     if (noticesDiff) {
       console.log(
-        '\nDependencies have changed. The license review form will require extra details.',
+        'Dependencies have changed. The license review form will require extra details.',
       );
-      console.log('---');
-      console.log(noticesDiff);
-      console.log('---');
     } else {
-      console.log('\nNo dependency changes found.');
+      console.log('No dependency changes found.');
     }
+
+    console.log(`Last release version: ${lastReleaseVersion}`);
+    console.log(`Last release commit hash: ${lastReleaseCommit}`);
+    console.log('---------------');
   } catch (error) {
     console.error('Error checking for release:', error.message);
     process.exit(1);

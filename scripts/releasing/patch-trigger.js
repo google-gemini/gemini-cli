@@ -14,6 +14,42 @@
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
 
+/**
+ * Extract base version and channel info from hotfix branch name. Branches can
+ * be in multiple formats:
+ *  - New NEW: hotfix/v0.5.3/v0.5.4/preview/cherry-pick-abc -> v0.5.4 and preview
+ *  - New format: hotfix/v0.5.3/preview/cherry-pick-abc -> v0.5.3 and preview
+ *  - Old format: hotfix/v0.5.3/cherry-pick-abc -> v0.5.3 and stable (default)
+ * We check the formats from newest to oldest. If the channel found is invalid,
+ * an error is thrown.
+ */
+function getBranchInfo({ branchName, context }) {
+  const parts = branchName.split('/');
+  const version = parts[1];
+  let channel = 'stable'; // default for old format
+  if (parts.length >= 5 && (parts[3] === 'stable' || parts[3] === 'preview')) {
+    channel = parts[3];
+  } else if (
+    parts.length >= 4 &&
+    (parts[2] === 'stable' || parts[2] === 'preview')
+  ) {
+    // New format with explicit channel
+    channel = parts[2];
+  } else if (context.eventName === 'workflow_dispatch') {
+    // Manual dispatch, infer from version name
+    channel = version.includes('preview') ? 'preview' : 'stable';
+  }
+
+  // Validate channel
+  if (channel !== 'stable' && channel !== 'preview') {
+    throw new Error(
+      `Invalid channel: ${channel}. Must be 'stable' or 'preview'.`,
+    );
+  }
+
+  return { channel, version };
+}
+
 async function main() {
   const argv = await yargs(hideBin(process.argv))
     .option('head-ref', {
@@ -79,29 +115,62 @@ async function main() {
 
   console.log(`Processing patch trigger for branch: ${headRef}`);
 
-  // Extract base version and channel from hotfix branch name
-  // New format: hotfix/v0.5.3/preview/cherry-pick-abc -> v0.5.3 and preview
-  // Old format: hotfix/v0.5.3/cherry-pick-abc -> v0.5.3 and stable (default)
-  const parts = headRef.split('/');
-  const version = parts[1];
-  let channel = 'stable'; // default for old format
+  const { version, channel } = getBranchInfo({ branchName: headRef, context });
 
-  if (parts.length >= 4 && (parts[2] === 'stable' || parts[2] === 'preview')) {
-    // New format with explicit channel
-    channel = parts[2];
-  } else if (context.eventName === 'workflow_dispatch') {
-    // Manual dispatch, infer from version name
-    channel = version.includes('preview') ? 'preview' : 'stable';
+  // Try to find the original PR that requested this patch
+  let originalPr = null;
+  if (!testMode) {
+    try {
+      console.log('Looking for original PR using search...');
+      const { execFileSync } = await import('node:child_process');
+
+      // Split search string into searchArgs to prevent triple escaping on the quoted filters
+      const searchArgs =
+        `repo:${context.repo.owner}/${context.repo.repo} is:pr in:comments "${headRef}"`.split(
+          ' ',
+        );
+      console.log('Search args:', searchArgs);
+      // Use gh CLI to search for PRs with comments referencing the hotfix branch
+      const result = execFileSync(
+        'gh',
+        [
+          'search',
+          'prs',
+          '--json',
+          'number,title',
+          '--limit',
+          '1',
+          ...searchArgs,
+          'Patch PR Created',
+        ],
+        {
+          encoding: 'utf8',
+          env: { ...process.env, GH_TOKEN: process.env.GITHUB_TOKEN },
+        },
+      );
+
+      const searchResults = JSON.parse(result);
+      if (searchResults && searchResults.length > 0) {
+        originalPr = searchResults[0].number;
+        console.log(`Found original PR: #${originalPr}`);
+      } else {
+        console.log('Could not find a matching original PR via search.');
+      }
+    } catch (e) {
+      console.log('Could not determine original PR:', e.message);
+    }
+  } else {
+    console.log('Skipping original PR lookup (test mode)');
+    originalPr = 8655; // Mock for testing
   }
 
-  // Validate channel
-  if (channel !== 'stable' && channel !== 'preview') {
+  if (!originalPr) {
     throw new Error(
-      `Invalid channel: ${channel}. Must be 'stable' or 'preview'.`,
+      'Could not find the original PR for this patch. Cannot proceed with release.',
     );
   }
 
-  const releaseRef = `release/${version}`;
+  const releaseRef = `release/${version}-pr-${originalPr}`;
   const workflowId =
     context.eventName === 'pull_request'
       ? 'release-patch-3-release.yml'
@@ -125,40 +194,6 @@ async function main() {
     console.log(`  - Dry run: ${isDryRun}`);
     console.log('\n✅ Channel detection logic working correctly!');
     return;
-  }
-
-  // Try to find the original PR that requested this patch
-  let originalPr = null;
-  if (!testMode) {
-    try {
-      console.log('Looking for original PR using search...');
-      const { execFileSync } = await import('node:child_process');
-
-      // Use gh CLI to search for PRs with comments referencing the hotfix branch
-      const query = `repo:${context.repo.owner}/${context.repo.repo} is:pr is:all in:comments "Patch PR Created" "${headRef}"`;
-
-      const result = execFileSync(
-        'gh',
-        ['search', 'prs', '--json', 'number,title', '--limit', '1', query],
-        {
-          encoding: 'utf8',
-          env: { ...process.env, GH_TOKEN: process.env.GITHUB_TOKEN },
-        },
-      );
-
-      const searchResults = JSON.parse(result);
-      if (searchResults && searchResults.length > 0) {
-        originalPr = searchResults[0].number;
-        console.log(`Found original PR: #${originalPr}`);
-      } else {
-        console.log('Could not find a matching original PR via search.');
-      }
-    } catch (e) {
-      console.log('Could not determine original PR:', e.message);
-    }
-  } else {
-    console.log('Skipping original PR lookup (test mode)');
-    originalPr = 8655; // Mock for testing
   }
 
   // Trigger the release workflow
