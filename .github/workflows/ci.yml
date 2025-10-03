@@ -87,6 +87,9 @@ jobs:
       - name: 'Run Prettier'
         run: 'node scripts/lint.js --prettier'
 
+      - name: 'Run sensitive keyword linter'
+        run: 'npm run lint:sensitive-keywords'
+
   test_linux:
     name: 'Test (Linux)'
     runs-on: 'gemini-cli-ubuntu-16-core'

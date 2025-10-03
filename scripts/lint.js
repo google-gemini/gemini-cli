@@ -7,7 +7,13 @@
  */
 
 import { execSync } from 'node:child_process';
-import { mkdirSync, rmSync } from 'node:fs';
+import {
+  mkdirSync,
+  rmSync,
+  readFileSync,
+  existsSync,
+  lstatSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -169,6 +175,80 @@ export function runPrettier() {
   }
 }
 
+export function runSensitiveKeywordLinter() {
+  console.log('\nRunning sensitive keyword linter...');
+  const SENSITIVE_PATTERN = /gemini-\d+(\.\d+)?/g;
+  const ALLOWED_KEYWORDS = new Set([
+    'gemini-2.5',
+    'gemini-2.0',
+    'gemini-1.5',
+    'gemini-1.0',
+  ]);
+
+  function getChangedFiles() {
+    const baseRef = process.env.GITHUB_BASE_REF || 'main';
+    try {
+      execSync(`git fetch origin ${baseRef}`);
+      return execSync(`git diff --name-only origin/${baseRef}...HEAD`)
+        .toString()
+        .trim()
+        .split('\n')
+        .filter(Boolean);
+    } catch (_error) {
+      console.error(`Could not get changed files against origin/${baseRef}.`);
+      try {
+        console.log('Falling back to diff against HEAD~1');
+        return execSync(`git diff --name-only HEAD~1...HEAD`)
+          .toString()
+          .trim()
+          .split('\n')
+          .filter(Boolean);
+      } catch (_fallbackError) {
+        console.error('Could not get changed files against HEAD~1 either.');
+        process.exit(1);
+      }
+    }
+  }
+
+  const changedFiles = getChangedFiles();
+  const violations = [];
+
+  for (const file of changedFiles) {
+    if (!existsSync(file) || lstatSync(file).isDirectory()) {
+      continue;
+    }
+    const content = readFileSync(file, 'utf-8');
+    const matches = content.match(SENSITIVE_PATTERN);
+
+    if (matches) {
+      for (const match of matches) {
+        if (!ALLOWED_KEYWORDS.has(match)) {
+          violations.push({ file, keyword: match });
+        }
+      }
+    }
+  }
+
+  if (violations.length > 0) {
+    console.error(
+      'Error: Found sensitive keywords that are not in the allowlist:',
+    );
+    violations.forEach((violation) => {
+      console.error(
+        `  - Found "${violation.keyword}" in file: ${violation.file}`,
+      );
+    });
+    console.error('\nPlease remove or replace these keywords.');
+    console.error(
+      'Allowed keywords are:',
+      Array.from(ALLOWED_KEYWORDS).join(', '),
+    );
+    process.exit(1);
+  } else {
+    console.log('No sensitive keyword violations found.');
+  }
+}
+
 function main() {
   const args = process.argv.slice(2);
 
@@ -190,6 +270,9 @@ function main() {
   if (args.includes('--prettier')) {
     runPrettier();
   }
+  if (args.includes('--sensitive-keywords')) {
+    runSensitiveKeywordLinter();
+  }
 
   if (args.length === 0) {
     setupLinters();
@@ -198,6 +281,7 @@ function main() {
     runShellcheck();
     runYamllint();
     runPrettier();
+    runSensitiveKeywordLinter();
     console.log('\nAll linting checks passed!');
   }
 }
