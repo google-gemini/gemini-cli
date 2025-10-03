@@ -23,7 +23,6 @@ import {
   type StreamEvent,
 } from '../core/geminiChat.js';
 import {
-  Type,
   type FunctionCall,
   type Part,
   type GenerateContentResponse,
@@ -32,6 +31,7 @@ import {
 import type { Config } from '../config/config.js';
 import { MockTool } from '../test-utils/mock-tool.js';
 import { getDirectoryContextString } from '../utils/environmentContext.js';
+import { z } from 'zod';
 
 const { mockSendMessageStream, mockExecuteToolCall } = vi.hoisted(() => ({
   mockSendMessageStream: vi.fn(),
@@ -120,27 +120,19 @@ let parentToolRegistry: ToolRegistry;
 /**
  * Type-safe helper to create agent definitions for tests.
  */
-type OutputConfigMode = 'default' | 'none' | Partial<OutputConfig>;
-
-const createTestDefinition = (
+const createTestDefinition = <TOutput extends z.ZodTypeAny>(
   tools: Array<string | MockTool> = [LSTool.Name],
-  runConfigOverrides: Partial<AgentDefinition['runConfig']> = {},
-  outputConfigMode: OutputConfigMode = 'default',
-): AgentDefinition => {
-  let outputConfig: OutputConfig | undefined;
+  runConfigOverrides: Partial<AgentDefinition<TOutput>['runConfig']> = {},
+  outputConfigMode: 'default' | 'none' = 'default',
+  schema: TOutput = z.string() as unknown as TOutput,
+): AgentDefinition<TOutput> => {
+  let outputConfig: OutputConfig<TOutput> | undefined;
 
   if (outputConfigMode === 'default') {
     outputConfig = {
       outputName: 'finalResult',
       description: 'The final result.',
-      schema: { type: Type.STRING },
-    };
-  } else if (outputConfigMode !== 'none') {
-    outputConfig = {
-      outputName: 'finalResult',
-      description: 'The final result.',
-      schema: { type: Type.STRING },
-      ...outputConfigMode,
+      schema,
     };
   }
 
