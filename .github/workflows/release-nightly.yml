@@ -123,7 +123,6 @@ jobs:
           RELEASE_TAG: '${{ steps.nightly_version.outputs.RELEASE_TAG }}'
           DETAILS_URL: '${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}'
         run: |
-          gh issue create \
-            --title "Nightly Release Failed for ${RELEASE_TAG} on $(date +'%Y-%m-%d')" \
-            --body "The nightly-release workflow failed. See the full run for details: ${DETAILS_URL}" \
-            --label 'kind/bug,release-failure,priority/p0'
+          TITLE="Nightly Release Failed for ${RELEASE_TAG} on $(date +'%Y-%m-%d')"
+          BODY="The nightly-release workflow failed. See the full run for details: ${DETAILS_URL}"
+          gh issue create --title "${TITLE}" --body "${BODY}" --label 'kind/bug,release-failure,priority/p0'
