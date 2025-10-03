@@ -554,9 +554,10 @@ describe('SmartEditTool', () => {
 
       const params: EditToolParams = {
         file_path: filePath,
-        instruction: 'Replace "content" with "string"',
-        old_string: 'non-existent-text', // This will fail initially
-        new_string: 'string',
+        instruction:
+          'Replace "externally modified content" with "externally modified string"',
+        old_string: 'externally modified content', // This will fail initially
+        new_string: 'externally modified string',
       };
 
       // Control timestamps precisely to avoid race conditions.
