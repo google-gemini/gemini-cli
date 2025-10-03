@@ -167,7 +167,8 @@ async function main() {
     } catch (e) {
       console.log('Could not determine original PR:', e.message);
     }
-  } else {
+  }
+  if (!originalPr && testMode) {
     console.log('Skipping original PR lookup (test mode)');
     originalPr = 8655; // Mock for testing
   }
