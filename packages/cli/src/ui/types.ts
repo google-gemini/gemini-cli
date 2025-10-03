@@ -165,6 +165,16 @@ export type HistoryItemExtensionsList = HistoryItemBase & {
   type: 'extensions_list';
 };
 
+export interface ChatDetail {
+  name: string;
+  mtime: string;
+}
+
+export type HistoryItemChatList = HistoryItemBase & {
+  type: 'chat_list';
+  chats: ChatDetail[];
+};
+
 export interface ToolDefinition {
   name: string;
   displayName: string;
@@ -234,7 +244,8 @@ export type HistoryItemWithoutId =
   | HistoryItemCompression
   | HistoryItemExtensionsList
   | HistoryItemToolsList
-  | HistoryItemMcpStatus;
+  | HistoryItemMcpStatus
+  | HistoryItemChatList;
 
 export type HistoryItem = HistoryItemWithoutId & { id: number };
 
@@ -255,6 +266,7 @@ export enum MessageType {
   EXTENSIONS_LIST = 'extensions_list',
   TOOLS_LIST = 'tools_list',
   MCP_STATUS = 'mcp_status',
+  CHAT_LIST = 'chat_list',
 }
 
 // Simplified message structure for internal feedback
