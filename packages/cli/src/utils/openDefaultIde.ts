@@ -52,13 +52,21 @@ export async function openDefaultIde(directory = process.cwd()): Promise<void> {
     for (const editor of CODE_EDITORS) {
       if (await isCommandAvailable(editor)) {
         try {
-          const childProcess = spawn(editor, [directory], {
-            detached: true,
-            stdio: 'ignore',
-          });
+          await new Promise<void>((resolve, reject) => {
+            const childProcess = spawn(editor, [directory], {
+              detached: true,
+              stdio: 'ignore',
+            });
 
-          // Unref so the parent process can exit
-          childProcess.unref();
+            // Reject the promise if the process fails to spawn
+            childProcess.on('error', reject);
+
+            // The 'spawn' event confirms the process started successfully
+            childProcess.on('spawn', () => {
+              childProcess.unref();
+              resolve();
+            });
+          });
 
           return; // Successfully opened with a code editor
         } catch (error) {
