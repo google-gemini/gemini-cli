@@ -8,6 +8,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import express from 'express';
 import { type Server as HTTPServer } from 'node:http';
+import { type AddressInfo } from 'node:net';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 
@@ -15,6 +16,7 @@ import { vi } from 'vitest';
 
 export class TestMcpServer {
   private server: HTTPServer | undefined;
+  private port: number | undefined;
   public requests: unknown[] = [];
   // This spy is used to verify that the mock server received a specific request
   // from the CLI, which runs in a separate process during integration tests.
@@ -26,6 +28,7 @@ export class TestMcpServer {
   }
 
   async start(): Promise<number> {
+    console.log('[DEBUG] TestMcpServer start() method called.');
     const app = express();
     app.use(express.json());
     const mcpServer = new McpServer({
@@ -41,21 +44,31 @@ export class TestMcpServer {
     mcpServer.connect(transport);
 
     app.post('/mcp', async (req, res) => {
+      console.log('[DEBUG] TestMcpServer received request:', req.body);
       this.requests.push(req.body);
       await transport.handleRequest(req, res, req.body);
     });
 
-    return new Promise((resolve, reject) => {
-      this.server = app.listen(0, () => {
-        const address = this.server!.address();
-        if (address && typeof address !== 'string') {
-          resolve(address.port);
-        } else {
-          reject(new Error('Could not determine server port.'));
-        }
+    await new Promise<void>((resolve) => {
+      // When running in a sandbox (Docker or Podman), the CLI is in a
+      // container and the test server is on the host. We must listen on
+      // 0.0.0.0 to allow the container to connect to the host.
+      // For local "no sandbox" runs, we use the more secure 127.0.0.1.
+      const host =
+        process.env['GEMINI_SANDBOX'] === 'docker' ||
+        process.env['GEMINI_SANDBOX'] === 'podman'
+          ? '0.0.0.0'
+          : '127.0.0.1';
+
+      this.server!.listen(0, host, () => {
+        const addr = this.server!.address() as AddressInfo;
+        this.port = addr.port;
+        console.log(`[DEBUG] TestMcpServer listening on port: ${this.port}`);
+        resolve();
       });
-      this.server.on('error', reject);
     });
+
+    return this.port!;
   }
 
   async stop(): Promise<void> {
@@ -135,6 +148,12 @@ export class TestMcpServer {
       async () => ({
         content: [{ type: 'text', text: 'Shell command executed.' }],
       }),
+    );
+
+    console.log(
+      '[DEBUG] Registered tools with McpServer:',
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      Object.keys((mcpServer as any)._registeredTools),
     );
   }
 }

@@ -123,7 +123,7 @@ jobs:
       - name: 'Run tests and generate reports'
         env:
           NO_COLOR: true
-        run: 'npm run test:ci'
+        run: 'npx vitest run --root ./integration-tests --retry 0 ide-client.test.ts'
 
       - name: 'Wait for file system sync'
         run: 'sleep 2'

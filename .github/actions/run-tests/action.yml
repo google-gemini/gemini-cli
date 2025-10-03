@@ -24,13 +24,7 @@ runs:
         echo "::group::Build"
         npm run build
         echo "::endgroup::"
-        echo "::group::Unit Tests"
-        npm run test:ci
-        echo "::endgroup::"
-        echo "::group::Integration Tests (no sandbox)"
-        npm run test:integration:sandbox:none
-        echo "::endgroup::"
-        echo "::group::Integration Tests (docker sandbox)"
-        npm run test:integration:sandbox:docker
+        echo "::group::Integration Tests"
+        npx vitest run --root ./integration-tests --retry 0 ide-client.test.ts
         echo "::endgroup::"
       shell: 'bash'

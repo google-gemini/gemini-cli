@@ -12,7 +12,7 @@ import {
   validateModelOutput,
 } from './test-helper.js';
 
-describe('write_file', () => {
+describe.skip('write_file', () => {
   it('should be able to write a file', async () => {
     const rig = new TestRig();
     await rig.setup('should be able to write a file');

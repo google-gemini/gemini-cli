@@ -104,6 +104,10 @@ export class IdeClient {
 
   private constructor() {}
 
+  static resetForTesting() {
+    IdeClient.instancePromise = null;
+  }
+
   /**
    * Implements a singleton pattern for the IdeClient.
    *
@@ -155,6 +159,22 @@ export class IdeClient {
 
     this.setState(IDEConnectionStatus.Connecting);
 
+    const portFromEnv = this.getPortFromEnv();
+    if (portFromEnv) {
+      const connected = await this.establishHttpConnection(portFromEnv);
+      if (connected) {
+        return;
+      }
+    }
+
+    const stdioConfigFromEnv = this.getStdioConfigFromEnv();
+    if (stdioConfigFromEnv) {
+      const connected = await this.establishStdioConnection(stdioConfigFromEnv);
+      if (connected) {
+        return;
+      }
+    }
+
     this.connectionConfig = await this.getConnectionConfigFromFile();
     if (this.connectionConfig?.authToken) {
       this.authToken = this.connectionConfig.authToken;
@@ -189,22 +209,6 @@ export class IdeClient {
         if (connected) {
           return;
         }
-      }
-    }
-
-    const portFromEnv = this.getPortFromEnv();
-    if (portFromEnv) {
-      const connected = await this.establishHttpConnection(portFromEnv);
-      if (connected) {
-        return;
-      }
-    }
-
-    const stdioConfigFromEnv = this.getStdioConfigFromEnv();
-    if (stdioConfigFromEnv) {
-      const connected = await this.establishStdioConnection(stdioConfigFromEnv);
-      if (connected) {
-        return;
       }
     }
 
@@ -427,12 +431,26 @@ export class IdeClient {
   }
 
   isDiffingEnabled(): boolean {
-    return (
+    console.log('[DEBUG] isDiffingEnabled check:');
+    console.log(`  - !!this.client: ${!!this.client}`);
+    console.log(`  - this.state.status: ${this.state.status}`);
+    console.log(
+      `  - isConnected: ${this.state.status === IDEConnectionStatus.Connected}`,
+    );
+    console.log(`  - availableTools: ${this.availableTools}`);
+    console.log(
+      `  - has openDiff: ${this.availableTools.includes('openDiff')}`,
+    );
+    console.log(
+      `  - has closeDiff: ${this.availableTools.includes('closeDiff')}`,
+    );
+    const result =
       !!this.client &&
       this.state.status === IDEConnectionStatus.Connected &&
       this.availableTools.includes('openDiff') &&
-      this.availableTools.includes('closeDiff')
-    );
+      this.availableTools.includes('closeDiff');
+    console.log(`  - result: ${result}`);
+    return result;
   }
 
   private async discoverTools(): Promise<void> {

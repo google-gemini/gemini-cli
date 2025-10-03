@@ -163,6 +163,7 @@ export class TestRig {
     testName: string,
     options: { settings?: Record<string, unknown> } = {},
   ) {
+    console.log(`[DEBUG] TestRig.setup() started for test: ${testName}`);
     this.testName = testName;
     const sanitizedName = sanitizeTestName(testName);
     this.testDir = join(env.INTEGRATION_TEST_FILE_DIR!, sanitizedName);
@@ -190,9 +191,11 @@ export class TestRig {
       join(geminiDir, 'settings.json'),
       JSON.stringify(settings, null, 2),
     );
+    console.log(`[DEBUG] TestRig.setup() completed for test: ${testName}`);
   }
 
   createFile(fileName: string, content: string) {
+    console.log(`[DEBUG] TestRig.createFile() called for: ${fileName}`);
     const filePath = join(this.testDir!, fileName);
     writeFileSync(filePath, content);
     return filePath;
@@ -228,15 +231,22 @@ export class TestRig {
   run(
     promptOrOptions:
       | string
-      | { prompt?: string; stdin?: string; stdinDoesNotEnd?: boolean },
+      | {
+          prompt?: string;
+          stdin?: string;
+          stdinDoesNotEnd?: boolean;
+          env?: NodeJS.ProcessEnv;
+        },
     ...args: string[]
   ): Promise<string> {
+    console.log('[DEBUG] TestRig.run() started.');
     const { command, initialArgs } = this._getCommandAndArgs(['--yolo']);
     const commandArgs = [...initialArgs];
     const execOptions: {
       cwd: string;
       encoding: 'utf-8';
       input?: string;
+      env?: NodeJS.ProcessEnv;
     } = {
       cwd: this.testDir!,
       encoding: 'utf-8',
@@ -254,14 +264,35 @@ export class TestRig {
       if (promptOrOptions.stdin) {
         execOptions.input = promptOrOptions.stdin;
       }
+      if (promptOrOptions.env) {
+        execOptions.env = promptOrOptions.env;
+      }
     }
 
     commandArgs.push(...args);
 
-    const child = spawn(command, commandArgs, {
-      cwd: this.testDir!,
-      stdio: 'pipe',
-      env: process.env,
+    console.log(
+      `[DEBUG] Spawning command: ${command} ${commandArgs.join(' ')}`,
+    );
+    let child;
+    try {
+      child = spawn(command, commandArgs, {
+        cwd: this.testDir!,
+        stdio: 'pipe',
+        env: execOptions.env || process.env,
+      });
+      console.log('[DEBUG] Spawn successful.');
+    } catch (e) {
+      console.error('[DEBUG] Spawn failed with synchronous error:', e);
+      throw e;
+    }
+
+    child.on('spawn', () => {
+      console.log('[DEBUG] Child process spawn event fired.');
+    });
+
+    child.on('error', (err) => {
+      console.error('[DEBUG] Child process error event fired:', err);
     });
 
     let stdout = '';
@@ -295,6 +326,7 @@ export class TestRig {
 
     const promise = new Promise<string>((resolve, reject) => {
       child.on('close', (code: number) => {
+        console.log('[DEBUG] TestRig.run() child process closed.');
         if (code === 0) {
           // Store the raw stdout for Podman telemetry parsing
           this._lastRunStdout = stdout;
@@ -302,7 +334,11 @@ export class TestRig {
           // Filter out telemetry output when running with Podman
           // Podman seems to output telemetry to stdout even when writing to file
           let result = stdout;
+          console.log('[DEBUG] Checking for Podman sandbox...');
           if (env.GEMINI_SANDBOX === 'podman') {
+            console.log(
+              '[DEBUG] Podman sandbox detected. Filtering telemetry...',
+            );
             // Remove telemetry JSON objects from output
             // They are multi-line JSON objects that start with { and contain telemetry fields
             const lines = result.split(EOL);
@@ -335,7 +371,9 @@ export class TestRig {
             }
 
             result = filteredLines.join('\n');
+            console.log('[DEBUG] Telemetry filtering complete.');
           }
+          console.log('[DEBUG] Podman check complete.');
 
           // Check if this is a JSON output test - if so, don't include stderr
           // as it would corrupt the JSON
@@ -422,6 +460,7 @@ export class TestRig {
   }
 
   async cleanup() {
+    console.log('[DEBUG] TestRig.cleanup() started.');
     // Clean up test directory
     if (this.testDir && !env.KEEP_OUTPUT) {
       try {
@@ -433,6 +472,7 @@ export class TestRig {
         }
       }
     }
+    console.log('[DEBUG] TestRig.cleanup() completed.');
   }
 
   async waitForTelemetryReady() {
@@ -808,12 +848,26 @@ export class TestRig {
     );
   }
 
+  runInteractive(
+    options: { env?: NodeJS.ProcessEnv },
+    ...args: string[]
+  ): {
+    ptyProcess: IPty;
+    promise: Promise<{ exitCode: number; signal?: number; output: string }>;
+  };
   runInteractive(...args: string[]): {
-    ptyProcess: pty.IPty;
+    ptyProcess: IPty;
+    promise: Promise<{ exitCode: number; signal?: number; output: string }>;
+  };
+  runInteractive(
+    optionsOrFirstArg: { env?: NodeJS.ProcessEnv } | string,
+    ...args: string[]
+  ): {
+    ptyProcess: IPty;
     promise: Promise<{ exitCode: number; signal?: number; output: string }>;
   } {
     const { command, initialArgs } = this._getCommandAndArgs(['--yolo']);
-    const commandArgs = [...initialArgs, ...args];
+    const commandArgs = [...initialArgs];
     const isWindows = os.platform() === 'win32';
 
     this._interactiveOutput = ''; // Reset output for the new run
@@ -823,10 +877,26 @@ export class TestRig {
       cols: 80,
       rows: 30,
       cwd: this.testDir!,
-      env: Object.fromEntries(
-        Object.entries(process.env).filter(([, v]) => v !== undefined),
-      ) as { [key: string]: string },
+      env: {
+        ...process.env,
+      } as { [key: string]: string },
     };
+
+    if (typeof optionsOrFirstArg === 'string') {
+      commandArgs.push(optionsOrFirstArg);
+    } else if (optionsOrFirstArg && optionsOrFirstArg.env) {
+      options.env = { ...options.env, ...optionsOrFirstArg.env };
+    }
+
+    commandArgs.push(...args);
+
+    if (typeof optionsOrFirstArg === 'string') {
+      commandArgs.push(optionsOrFirstArg);
+    } else if (optionsOrFirstArg && optionsOrFirstArg.env) {
+      options.env = { ...options.env, ...optionsOrFirstArg.env };
+    }
+
+    commandArgs.push(...args);
 
     if (isWindows) {
       // node-pty on Windows requires a shell to be specified when using winpty.

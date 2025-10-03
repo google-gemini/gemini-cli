@@ -41,6 +41,9 @@ interface AtCommandPart {
  * Handles \ escaped spaces within paths.
  */
 function parseAllAtCommands(query: string): AtCommandPart[] {
+  if (typeof query !== 'string') {
+    return [];
+  }
   const parts: AtCommandPart[] = [];
   let currentIndex = 0;
 

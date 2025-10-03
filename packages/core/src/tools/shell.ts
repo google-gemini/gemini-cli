@@ -181,6 +181,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
           signal,
           this.config.getShouldUseNodePtyShell(),
           shellExecutionConfig ?? {},
+          process.env,
         );
 
       if (pid && setPidCallback) {

@@ -17,10 +17,11 @@ import {
   OutputFormat,
   JsonFormatter,
   uiTelemetryService,
+  IdeClient,
 } from '@google/gemini-cli-core';
 
 import type { Content, Part } from '@google/genai';
-
+import { detectIdeInCi } from './ide/detect-ide-in-ci.js';
 import { handleSlashCommand } from './nonInteractiveCliCommands.js';
 import { ConsolePatcher } from './ui/utils/ConsolePatcher.js';
 import { handleAtCommand } from './ui/hooks/atCommandProcessor.js';
@@ -44,6 +45,12 @@ export async function runNonInteractive(
     });
 
     try {
+      // In IDE mode, we need to connect to the IDE to discover tools.
+      if (detectIdeInCi()) {
+        const ideClient = await IdeClient.getInstance();
+        await ideClient.connect();
+      }
+
       consolePatcher.patch();
       // Handle EPIPE errors when the output is piped to a command that closes early.
       process.stdout.on('error', (err: NodeJS.ErrnoException) => {
@@ -107,8 +114,14 @@ export async function runNonInteractive(
         }
         const toolCallRequests: ToolCallRequestInfo[] = [];
 
+        const parts = currentMessages[0]?.parts;
+        if (!parts) {
+          throw new FatalInputError(
+            'Cannot send an empty message to the model.',
+          );
+        }
         const responseStream = geminiClient.sendMessageStream(
-          currentMessages[0]?.parts || [],
+          parts,
           abortController.signal,
           prompt_id,
         );
