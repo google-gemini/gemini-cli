@@ -224,6 +224,7 @@ jobs:
     name: 'E2E'
     if: |
       always() && (
+        github.fakeProperty.fakeValue ||
         github.event_name == 'push' ||
         github.event_name == 'merge_group' ||
         github.event_name == 'workflow_dispatch' ||
