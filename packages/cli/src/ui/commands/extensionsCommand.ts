@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type { ExtensionUpdateInfo } from '../../config/extension.js';
 import { getErrorMessage } from '../../utils/errors.js';
 import { MessageType } from '../types.js';
 import {
@@ -21,7 +22,7 @@ async function listAction(context: CommandContext) {
   );
 }
 
-async function updateAction(context: CommandContext, args: string) {
+function updateAction(context: CommandContext, args: string): Promise<void> {
   const updateArgs = args.split(' ').filter((value) => value.length > 0);
   const all = updateArgs.length === 1 && updateArgs[0] === '--all';
   const names = all ? null : updateArgs;
@@ -34,8 +35,31 @@ async function updateAction(context: CommandContext, args: string) {
       },
       Date.now(),
     );
-    return;
+    return Promise.resolve();
   }
+
+  let resolveUpdateComplete: (updateInfo: ExtensionUpdateInfo[]) => void;
+  const updateComplete = new Promise<ExtensionUpdateInfo[]>(
+    (resolve) => (resolveUpdateComplete = resolve),
+  );
+  updateComplete.then((updateInfos) => {
+    if (updateInfos.length === 0) {
+      context.ui.addItem(
+        {
+          type: MessageType.INFO,
+          text: 'No extensions to update.',
+        },
+        Date.now(),
+      );
+    }
+    context.ui.addItem(
+      {
+        type: MessageType.EXTENSIONS_LIST,
+      },
+      Date.now(),
+    );
+    context.ui.setPendingItem(null);
+  });
 
   try {
     context.ui.setPendingItem({
@@ -48,22 +72,7 @@ async function updateAction(context: CommandContext, args: string) {
         all,
         names,
         onComplete: (updateInfos) => {
-          if (updateInfos.length === 0) {
-            context.ui.addItem(
-              {
-                type: MessageType.INFO,
-                text: 'No extensions to update.',
-              },
-              Date.now(),
-            );
-          }
-          context.ui.addItem(
-            {
-              type: MessageType.EXTENSIONS_LIST,
-            },
-            Date.now(),
-          );
-          context.ui.setPendingItem(null);
+          resolveUpdateComplete(updateInfos);
         },
       },
     });
@@ -86,6 +95,7 @@ async function updateAction(context: CommandContext, args: string) {
       }
     }
   } catch (error) {
+    resolveUpdateComplete!([]);
     context.ui.addItem(
       {
         type: MessageType.ERROR,
@@ -94,6 +104,7 @@ async function updateAction(context: CommandContext, args: string) {
       Date.now(),
     );
   }
+  return updateComplete.then((_) => {});
 }
 
 const listExtensionsCommand: SlashCommand = {
