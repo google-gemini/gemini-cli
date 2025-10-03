@@ -29,11 +29,14 @@ import {
   EVENT_CONTENT_RETRY,
   EVENT_CONTENT_RETRY_FAILURE,
   EVENT_FILE_OPERATION,
+  EVENT_TOOL_OUTPUT_TRUNCATED,
   EVENT_RIPGREP_FALLBACK,
   EVENT_MODEL_ROUTING,
   EVENT_EXTENSION_INSTALL,
   EVENT_MODEL_SLASH_COMMAND,
   EVENT_EXTENSION_DISABLE,
+  EVENT_SMART_EDIT_STRATEGY,
+  EVENT_SMART_EDIT_CORRECTION,
 } from './constants.js';
 import type {
   ApiErrorEvent,
@@ -64,6 +67,8 @@ import type {
   ExtensionUninstallEvent,
   ExtensionInstallEvent,
   ModelSlashCommandEvent,
+  SmartEditStrategyEvent,
+  SmartEditCorrectionEvent,
 } from './types.js';
 import {
   recordApiErrorMetrics,
@@ -210,7 +215,7 @@ export function logToolOutputTruncated(
   const attributes: LogAttributes = {
     ...getCommonAttributes(config),
     ...event,
-    'event.name': 'tool_output_truncated',
+    'event.name': EVENT_TOOL_OUTPUT_TRUNCATED,
     'event.timestamp': new Date().toISOString(),
   };
 
@@ -812,6 +817,48 @@ export function logExtensionDisable(
   const logger = logs.getLogger(SERVICE_NAME);
   const logRecord: LogRecord = {
     body: `Disabled extension ${event.extension_name}`,
+    attributes,
+  };
+  logger.emit(logRecord);
+}
+
+export function logSmartEditStrategy(
+  config: Config,
+  event: SmartEditStrategyEvent,
+): void {
+  ClearcutLogger.getInstance(config)?.logSmartEditStrategyEvent(event);
+  if (!isTelemetrySdkInitialized()) return;
+
+  const attributes: LogAttributes = {
+    ...getCommonAttributes(config),
+    ...event,
+    'event.name': EVENT_SMART_EDIT_STRATEGY,
+  };
+
+  const logger = logs.getLogger(SERVICE_NAME);
+  const logRecord: LogRecord = {
+    body: `Smart Edit Tool Strategy: ${event.strategy}`,
+    attributes,
+  };
+  logger.emit(logRecord);
+}
+
+export function logSmartEditCorrectionEvent(
+  config: Config,
+  event: SmartEditCorrectionEvent,
+): void {
+  ClearcutLogger.getInstance(config)?.logSmartEditCorrectionEvent(event);
+  if (!isTelemetrySdkInitialized()) return;
+
+  const attributes: LogAttributes = {
+    ...getCommonAttributes(config),
+    ...event,
+    'event.name': EVENT_SMART_EDIT_CORRECTION,
+  };
+
+  const logger = logs.getLogger(SERVICE_NAME);
+  const logRecord: LogRecord = {
+    body: `Smart Edit Tool Correction: ${event.correction}`,
     attributes,
   };
   logger.emit(logRecord);

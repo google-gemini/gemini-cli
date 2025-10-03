@@ -32,6 +32,10 @@ runs:
         ref: '${{ github.event.inputs.ref }}'
         fetch-depth: 0
 
+    - name: 'Clear npm cache'
+      shell: 'bash'
+      run: 'npm cache clean --force'
+
     - name: 'Install from NPM'
       uses: 'nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08' # ratchet:nick-fields/retry@v3
       with:
@@ -40,13 +44,27 @@ runs:
         max_attempts: 10
         command: 'cd ./verify && pkg="${{ inputs.npm-package }}" && npm install --prefer-online --no-cache -g "$pkg"'
 
-    - name: 'Basic smoke test'
+    - name: 'Smoke test - NPM Install'
       shell: 'bash'
       working-directory: './verify'
       run: |-
         gemini_version=$(gemini --version)
         if [ "$gemini_version" != "${{ inputs.expected-version }}" ]; then
-          echo "❌ Version mismatch: Got $gemini_version from ${{ inputs.npm-package }}, expected ${{ inputs.expected-version }}"
+          echo "❌ NPM Version mismatch: Got $gemini_version from ${{ inputs.npm-package }}, expected ${{ inputs.expected-version }}"
+          exit 1
+        fi
+
+    - name: 'Clear npm cache'
+      shell: 'bash'
+      run: 'npm cache clean --force'
+
+    - name: 'Smoke test - NPX Run'
+      shell: 'bash'
+      working-directory: './verify'
+      run: |-
+        gemini_version=$(npx --prefer-online "${{ inputs.npm-package}}" --version)
+        if [ "$gemini_version" != "${{ inputs.expected-version }}" ]; then
+          echo "❌ NPX Run Version mismatch: Got $gemini_version from ${{ inputs.npm-package }}, expected ${{ inputs.expected-version }}"
           exit 1
         fi
 
