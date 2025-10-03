@@ -174,7 +174,7 @@ describe('extensionsCommand', () => {
       mockGetExtensions.mockReturnValue([extension]);
       mockContext.ui.extensionsUpdateState.set(extension.name, {
         status: ExtensionUpdateState.UPDATE_AVAILABLE,
-        processed: false,
+        notified: false,
       });
       await updateAction(mockContext, 'ext-one');
       expect(mockUpdateExtension).toHaveBeenCalledWith(

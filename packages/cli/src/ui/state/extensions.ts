@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type { ExtensionUpdateInfo } from '../../config/extension.js';
 import { checkExhaustive } from '../../utils/checks.js';
 
 export enum ExtensionUpdateState {
@@ -19,17 +20,26 @@ export enum ExtensionUpdateState {
 
 export interface ExtensionUpdateStatus {
   status: ExtensionUpdateState;
-  processed: boolean;
+  notified: boolean;
 }
 
 export interface ExtensionUpdatesState {
   extensionStatuses: Map<string, ExtensionUpdateStatus>;
   batchChecksInProgress: number;
+  // Explicitly scheduled updates.
+  scheduledUpdate: UpdateArgs | null;
+}
+
+export interface UpdateArgs {
+  names: string[] | null;
+  all: boolean;
+  onComplete: (updateInfos: ExtensionUpdateInfo[]) => void;
 }
 
 export const initialExtensionUpdatesState: ExtensionUpdatesState = {
   extensionStatuses: new Map(),
   batchChecksInProgress: 0,
+  scheduledUpdate: null,
 };
 
 export type ExtensionUpdateAction =
@@ -38,11 +48,13 @@ export type ExtensionUpdateAction =
       payload: { name: string; state: ExtensionUpdateState };
     }
   | {
-      type: 'SET_PROCESSED';
-      payload: { name: string; processed: boolean };
+      type: 'SET_NOTIFIED';
+      payload: { name: string; notified: boolean };
     }
   | { type: 'BATCH_CHECK_START' }
-  | { type: 'BATCH_CHECK_END' };
+  | { type: 'BATCH_CHECK_END' }
+  | { type: 'SCHEDULE_UPDATE'; payload: UpdateArgs }
+  | { type: 'CLEAR_SCHEDULED_UPDATE' };
 
 export function extensionUpdatesReducer(
   state: ExtensionUpdatesState,
@@ -57,19 +69,19 @@ export function extensionUpdatesReducer(
       const newStatuses = new Map(state.extensionStatuses);
       newStatuses.set(action.payload.name, {
         status: action.payload.state,
-        processed: false,
+        notified: false,
       });
       return { ...state, extensionStatuses: newStatuses };
     }
-    case 'SET_PROCESSED': {
+    case 'SET_NOTIFIED': {
       const existing = state.extensionStatuses.get(action.payload.name);
-      if (!existing || existing.processed === action.payload.processed) {
+      if (!existing || existing.notified === action.payload.notified) {
         return state;
       }
       const newStatuses = new Map(state.extensionStatuses);
       newStatuses.set(action.payload.name, {
         ...existing,
-        processed: action.payload.processed,
+        notified: action.payload.notified,
       });
       return { ...state, extensionStatuses: newStatuses };
     }
@@ -82,6 +94,27 @@ export function extensionUpdatesReducer(
       return {
         ...state,
         batchChecksInProgress: state.batchChecksInProgress - 1,
+      };
+    case 'SCHEDULE_UPDATE':
+      return {
+        ...state,
+        // If there is a pre-existing scheduled update, we merge them.
+        scheduledUpdate: {
+          all: state.scheduledUpdate?.all || action.payload.all,
+          names: [
+            ...(state.scheduledUpdate?.names ?? []),
+            ...(action.payload.names ?? []),
+          ],
+          onComplete: (updateInfos) => {
+            state?.scheduledUpdate?.onComplete(updateInfos);
+            action.payload.onComplete(updateInfos);
+          },
+        },
+      };
+    case 'CLEAR_SCHEDULED_UPDATE':
+      return {
+        ...state,
+        scheduledUpdate: null,
       };
     default:
       checkExhaustive(action);
