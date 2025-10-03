@@ -855,6 +855,57 @@ describe('Server Config (config.ts)', () => {
       expect(config.getTruncateToolOutputThreshold()).toBe(50000);
     });
   });
+
+  describe('getMcpServers', () => {
+    it('should return undefined if no mcpServers are configured', () => {
+      const config = new Config(baseParams);
+      expect(config.getMcpServers()).toBeUndefined();
+    });
+
+    it('should filter out disabled servers', () => {
+      const paramsWithServers: ConfigParameters = {
+        ...baseParams,
+        mcpServers: {
+          server1: { command: 'cmd1', enabled: true },
+          server2: { command: 'cmd2', enabled: false },
+          server3: { command: 'cmd3' },
+        },
+      };
+      const config = new Config(paramsWithServers);
+      const servers = config.getMcpServers();
+      expect(servers).toBeDefined();
+      expect(Object.keys(servers!)).toEqual(['server1', 'server3']);
+      expect(servers!['server1'].command).toBe('cmd1');
+      expect(servers!['server3'].command).toBe('cmd3');
+    });
+
+    it('should return all servers if none are explicitly disabled', () => {
+      const paramsWithServers: ConfigParameters = {
+        ...baseParams,
+        mcpServers: {
+          server1: { command: 'cmd1', enabled: true },
+          server2: { command: 'cmd2' },
+        },
+      };
+      const config = new Config(paramsWithServers);
+      const servers = config.getMcpServers();
+      expect(servers).toBeDefined();
+      expect(Object.keys(servers!)).toEqual(['server1', 'server2']);
+    });
+
+    it('should return an empty object if all servers are disabled', () => {
+      const paramsWithServers: ConfigParameters = {
+        ...baseParams,
+        mcpServers: {
+          server1: { command: 'cmd1', enabled: false },
+          server2: { command: 'cmd2', enabled: false },
+        },
+      };
+      const config = new Config(paramsWithServers);
+      const servers = config.getMcpServers();
+      expect(servers).toEqual({});
+    });
+  });
 });
 
 describe('setApprovalMode with folder trust', () => {
