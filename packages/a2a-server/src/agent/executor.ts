@@ -26,6 +26,7 @@ import type {
   StateChange,
   AgentSettings,
   PersistedStateMetadata,
+  ExternalUserMessage,
 } from '../types.js';
 import {
   CoderAgentEvent,
@@ -260,6 +261,7 @@ export class CoderAgentExecutor implements AgentExecutor {
       task.setTaskStateAndPublishUpdate(
         'canceled',
         stateChange,
+        'external',
         'Task canceled by user request.',
         undefined,
         true,
@@ -309,6 +311,26 @@ export class CoderAgentExecutor implements AgentExecutor {
     );
     const userMessage = requestContext.userMessage as Message;
     const sdkTask = requestContext.task as SDKTask | undefined;
+
+    // Publish the incoming external message to the event bus for the CLI to display
+    const externalMessageEvent: AgentExecutionEvent = {
+      kind: 'status-update',
+      taskId: userMessage.taskId || sdkTask?.id || uuidv4(),
+      contextId: userMessage.contextId || sdkTask?.contextId || uuidv4(),
+      status: {
+        state: sdkTask?.status.state || 'submitted',
+        message: userMessage,
+        timestamp: new Date().toISOString(),
+      },
+      final: false,
+      metadata: {
+        ['coderAgent']: {
+          kind: CoderAgentEvent.ExternalUserMessageEvent,
+        } as ExternalUserMessage,
+        ['source']: 'external',
+      },
+    };
+    eventBus.publish(externalMessageEvent);
 
     const taskId = sdkTask?.id || userMessage.taskId || uuidv4();
     const contextId: string =
@@ -493,6 +515,7 @@ export class CoderAgentExecutor implements AgentExecutor {
       let agentEvents = currentTask.acceptUserMessage(
         requestContext,
         abortSignal,
+        'external',
       );
 
       while (agentTurnActive) {
@@ -513,7 +536,7 @@ export class CoderAgentExecutor implements AgentExecutor {
             );
             continue;
           }
-          await currentTask.acceptAgentMessage(event);
+          await currentTask.acceptAgentMessage(event, 'external');
         }
 
         if (abortSignal.aborted) throw new Error('Execution aborted');
@@ -522,7 +545,11 @@ export class CoderAgentExecutor implements AgentExecutor {
           logger.info(
             `[CoderAgentExecutor] Task ${taskId}: Found ${toolCallRequests.length} tool call requests. Scheduling as a batch.`,
           );
-          await currentTask.scheduleToolCalls(toolCallRequests, abortSignal);
+          await currentTask.scheduleToolCalls(
+            toolCallRequests,
+            abortSignal,
+            'external',
+          );
         }
 
         logger.info(
@@ -551,6 +578,7 @@ export class CoderAgentExecutor implements AgentExecutor {
             currentTask.setTaskStateAndPublishUpdate(
               'input-required',
               stateChange,
+              'external',
               undefined,
               undefined,
               true,
@@ -563,6 +591,7 @@ export class CoderAgentExecutor implements AgentExecutor {
             agentEvents = currentTask.sendCompletedToolsToLlm(
               completedTools,
               abortSignal,
+              'external',
             );
             // Continue the loop to process the LLM response to the tool results.
           }
@@ -583,6 +612,7 @@ export class CoderAgentExecutor implements AgentExecutor {
       currentTask.setTaskStateAndPublishUpdate(
         'input-required',
         stateChange,
+        'external',
         undefined,
         undefined,
         true,
@@ -598,6 +628,7 @@ export class CoderAgentExecutor implements AgentExecutor {
           currentTask.setTaskStateAndPublishUpdate(
             'input-required',
             { kind: CoderAgentEvent.StateChangeEvent },
+            'external',
             'Execution aborted by client.',
             undefined,
             true,
@@ -618,6 +649,7 @@ export class CoderAgentExecutor implements AgentExecutor {
           currentTask.setTaskStateAndPublishUpdate(
             'failed',
             stateChange,
+            'external',
             errorMessage,
             undefined,
             true,

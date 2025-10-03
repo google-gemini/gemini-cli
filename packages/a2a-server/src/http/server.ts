@@ -7,7 +7,7 @@
 import * as url from 'node:url';
 import * as path from 'node:path';
 
-import { logger } from '../utils/logger.js';
+import { logger, initializeLogger } from '../utils/logger.js';
 import { main } from './app.js';
 
 // Check if the module is the main script being run. path.resolve() creates a
@@ -26,6 +26,7 @@ if (
   isMainModule &&
   process.env['NODE_ENV'] !== 'test'
 ) {
+  initializeLogger(); // Enable console logging for standalone server
   main().catch((error) => {
     logger.error('[CoreAgent] Unhandled error in main:', error);
     process.exit(1);

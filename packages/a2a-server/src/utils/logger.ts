@@ -22,7 +22,13 @@ const logger = winston.createLogger({
       ); // Only print ...rest if present
     }),
   ),
-  transports: [new winston.transports.Console()],
+  transports: [], // Console transport added by initializeLogger
 });
+
+export function initializeLogger(): void {
+  if (!logger.transports.some((t) => t instanceof winston.transports.Console)) {
+    logger.add(new winston.transports.Console());
+  }
+}
 
 export { logger };

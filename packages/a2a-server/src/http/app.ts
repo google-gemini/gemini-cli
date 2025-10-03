@@ -8,7 +8,11 @@ import express from 'express';
 
 import type { AgentCard } from '@a2a-js/sdk';
 import type { TaskStore } from '@a2a-js/sdk/server';
-import { DefaultRequestHandler, InMemoryTaskStore } from '@a2a-js/sdk/server';
+import {
+  DefaultRequestHandler,
+  InMemoryTaskStore,
+  DefaultExecutionEventBusManager,
+} from '@a2a-js/sdk/server';
 import { A2AExpressApp } from '@a2a-js/sdk/server/express'; // Import server components
 import { v4 as uuidv4 } from 'uuid';
 import { logger } from '../utils/logger.js';
@@ -93,10 +97,13 @@ export async function createApp(
       cliAppEvents,
     );
 
+    const eventBusManager = new DefaultExecutionEventBusManager();
+
     const requestHandler = new DefaultRequestHandler(
       coderAgentCard,
       taskStoreForHandler,
       agentExecutor,
+      eventBusManager,
     );
 
     let expressApp = express();
@@ -182,7 +189,7 @@ export async function createApp(
       }
       res.json({ metadata: await wrapper.task.getMetadata() });
     });
-    return { expressApp, agentExecutor };
+    return { expressApp, agentExecutor, eventBusManager };
   } catch (error) {
     logger.error('[CoreAgent] Error during startup:', error);
     process.exit(1);

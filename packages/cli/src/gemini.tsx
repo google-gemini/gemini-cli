@@ -64,6 +64,10 @@ import {
 } from './utils/relaunch.js';
 import { createApp } from '@google/gemini-cli-a2a-server/src/http/app.js';
 import type { CoderAgentExecutor } from '@google/gemini-cli-a2a-server/src/agent/executor.js';
+import type {
+  ExecutionEventBus,
+  ExecutionEventBusManager,
+} from '@a2a-js/sdk/server';
 
 export function validateDnsResolutionOrder(
   order: string | undefined,
@@ -146,6 +150,7 @@ export async function startInteractiveUI(
   workspaceRoot: string = process.cwd(),
   initializationResult: InitializationResult,
   agentExecutor?: CoderAgentExecutor,
+  a2aEventBus?: ExecutionEventBus,
 ) {
   const version = await getCliVersion();
   setWindowTitle(basename(workspaceRoot), settings);
@@ -169,6 +174,7 @@ export async function startInteractiveUI(
                 version={version}
                 initializationResult={initializationResult}
                 agentExecutor={agentExecutor}
+                a2aEventBus={a2aEventBus}
               />
             </VimModeProvider>
           </SessionStatsProvider>
@@ -364,12 +370,19 @@ export async function main() {
     }
 
     let agentExecutor: CoderAgentExecutor | undefined;
+    let a2aEventBus: ExecutionEventBus | undefined;
     if (argv.a2aPort) {
-      const { expressApp, agentExecutor: exec } = await createApp(
-        config,
-        appEvents,
-      );
+      const {
+        expressApp,
+        agentExecutor: exec,
+        eventBusManager,
+      } = await createApp(config, appEvents);
       agentExecutor = exec;
+      if (eventBusManager) {
+        a2aEventBus = (
+          eventBusManager as ExecutionEventBusManager
+        ).createOrGetByTaskId('cli-session-task');
+      }
       const server = expressApp.listen(argv.a2aPort, () => {
         console.log(`A2A server listening on port ${argv.a2aPort}`);
       });
@@ -436,6 +449,7 @@ export async function main() {
         process.cwd(),
         initializationResult,
         agentExecutor,
+        a2aEventBus,
       );
       return;
     }

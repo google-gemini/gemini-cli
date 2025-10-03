@@ -221,6 +221,7 @@ export class Task {
   private _createStatusUpdateEvent(
     stateToReport: TaskState,
     coderAgentMessage: CoderAgentMessage,
+    source: 'cli' | 'external',
     message?: Message,
     final = false,
     timestamp?: string,
@@ -231,10 +232,12 @@ export class Task {
       model: string;
       userTier?: UserTierId;
       error?: string;
+      source: 'cli' | 'external';
     } = {
       coderAgent: coderAgentMessage,
       model: this.config.getModel(),
       userTier: this.config.getUserTier(),
+      source,
     };
 
     if (metadataError) {
@@ -258,6 +261,7 @@ export class Task {
   setTaskStateAndPublishUpdate(
     newState: TaskState,
     coderAgentMessage: CoderAgentMessage,
+    source: 'cli' | 'external',
     messageText?: string,
     messageParts?: Part[], // For more complex messages
     final = false,
@@ -282,6 +286,7 @@ export class Task {
     const event = this._createStatusUpdateEvent(
       this.taskState,
       coderAgentMessage,
+      source,
       message,
       final,
       undefined,
@@ -294,6 +299,7 @@ export class Task {
   private _schedulerOutputUpdate(
     toolCallId: string,
     outputChunk: string | AnsiOutput,
+    source: 'cli' | 'external',
   ): void {
     let outputAsText: string;
     if (typeof outputChunk === 'string') {
@@ -308,7 +314,9 @@ export class Task {
       '[Task] Scheduler output update for tool call ' +
         toolCallId +
         ': ' +
-        outputAsText,
+        outputAsText +
+        ' from source: ' +
+        source,
     );
     const artifact: Artifact = {
       artifactId: `tool-${toolCallId}-output`,
@@ -332,9 +340,10 @@ export class Task {
 
   private async _schedulerAllToolCallsComplete(
     completedToolCalls: CompletedToolCall[],
+    source: 'cli' | 'external',
   ): Promise<void> {
     logger.info(
-      '[Task] All tool calls completed by scheduler (batch):',
+      `[Task] All tool calls completed by scheduler (batch from ${source}):`,
       completedToolCalls.map((tc) => tc.request.callId),
     );
     this.completedToolCalls.push(...completedToolCalls);
@@ -343,7 +352,10 @@ export class Task {
     });
   }
 
-  private _schedulerToolCallsUpdate(toolCalls: ToolCall[]): void {
+  private _schedulerToolCallsUpdate(
+    toolCalls: ToolCall[],
+    source: 'cli' | 'external',
+  ): void {
     logger.info(
       '[Task] Scheduler tool calls updated:',
       toolCalls.map((tc) => `${tc.request.callId} (${tc.status})`),
@@ -380,6 +392,7 @@ export class Task {
         const event = this._createStatusUpdateEvent(
           this.taskState,
           coderAgentMessage,
+          source,
           message,
           false, // Always false for these continuous updates
         );
@@ -424,6 +437,7 @@ export class Task {
       this.setTaskStateAndPublishUpdate(
         'input-required',
         { kind: CoderAgentEvent.StateChangeEvent },
+        source,
         undefined,
         undefined,
         /*final*/ true,
@@ -547,6 +561,7 @@ export class Task {
   async scheduleToolCalls(
     requests: ToolCallRequestInfo[],
     abortSignal: AbortSignal,
+    source: 'cli' | 'external' = 'external',
   ): Promise<void> {
     if (requests.length === 0) {
       return;
@@ -579,19 +594,22 @@ export class Task {
     const stateChange: StateChange = {
       kind: CoderAgentEvent.StateChangeEvent,
     };
-    this.setTaskStateAndPublishUpdate('working', stateChange);
+    this.setTaskStateAndPublishUpdate('working', stateChange, source);
 
-    await this.scheduler.schedule(updatedRequests, abortSignal);
+    await this.scheduler.schedule(updatedRequests, abortSignal, source);
   }
 
-  async acceptAgentMessage(event: ServerGeminiStreamEvent): Promise<void> {
+  async acceptAgentMessage(
+    event: ServerGeminiStreamEvent,
+    source: 'cli' | 'external',
+  ): Promise<void> {
     const stateChange: StateChange = {
       kind: CoderAgentEvent.StateChangeEvent,
     };
     switch (event.type) {
       case GeminiEventType.Content:
         logger.info('[Task] Sending agent message content...');
-        this._sendTextContent(event.value);
+        this._sendTextContent(event.value, source);
         break;
       case GeminiEventType.ToolCallRequest:
         // This is now handled by the agent loop, which collects all requests
@@ -627,6 +645,7 @@ export class Task {
         this.setTaskStateAndPublishUpdate(
           'input-required',
           stateChange,
+          source,
           'Task cancelled by user',
           undefined,
           true,
@@ -634,7 +653,7 @@ export class Task {
         break;
       case GeminiEventType.Thought:
         logger.info('[Task] Sending agent thought...');
-        this._sendThought(event.value);
+        this._sendThought(event.value, source);
         break;
       case GeminiEventType.ChatCompressed:
         break;
@@ -660,6 +679,7 @@ export class Task {
         this.setTaskStateAndPublishUpdate(
           this.taskState,
           stateChange,
+          source,
           `Agent Error, unknown agent message: ${errorMessage}`,
           undefined,
           false,
@@ -670,7 +690,10 @@ export class Task {
     }
   }
 
-  private async _handleToolConfirmationPart(part: Part): Promise<boolean> {
+  private async _handleToolConfirmationPart(
+    part: Part,
+    source: 'cli' | 'external',
+  ): Promise<boolean> {
     if (
       part.kind !== 'data' ||
       !part.data ||
@@ -776,6 +799,7 @@ export class Task {
       const event = this._createStatusUpdateEvent(
         this.taskState,
         toolCallUpdate,
+        source,
         message,
         false,
       );
@@ -817,6 +841,7 @@ export class Task {
   async *sendCompletedToolsToLlm(
     completedToolCalls: CompletedToolCall[],
     aborted: AbortSignal,
+    source: 'cli' | 'external' = 'external',
   ): AsyncGenerator<ServerGeminiStreamEvent> {
     if (completedToolCalls.length === 0) {
       yield* (async function* () {})(); // Yield nothing
@@ -844,7 +869,7 @@ export class Task {
       kind: CoderAgentEvent.StateChangeEvent,
     };
     // Set task state to working as we are about to call LLM
-    this.setTaskStateAndPublishUpdate('working', stateChange);
+    this.setTaskStateAndPublishUpdate('working', stateChange, source);
     // TODO: Determine what it mean to have, then add a prompt ID.
     yield* this.geminiClient.sendMessageStream(
       llmParts,
@@ -856,6 +881,7 @@ export class Task {
   async *acceptUserMessage(
     requestContext: RequestContext,
     aborted: AbortSignal,
+    source: 'cli' | 'external' = 'external',
   ): AsyncGenerator<ServerGeminiStreamEvent> {
     const userMessage = requestContext.userMessage;
     const llmParts: PartUnion[] = [];
@@ -863,7 +889,10 @@ export class Task {
     let hasContentForLlm = false;
 
     for (const part of userMessage.parts) {
-      const confirmationHandled = await this._handleToolConfirmationPart(part);
+      const confirmationHandled = await this._handleToolConfirmationPart(
+        part,
+        source,
+      );
       if (confirmationHandled) {
         anyConfirmationHandled = true;
         // If a confirmation was handled, the scheduler will now run the tool (or cancel it).
@@ -884,7 +913,7 @@ export class Task {
         kind: CoderAgentEvent.StateChangeEvent,
       };
       // Set task state to working as we are about to call LLM
-      this.setTaskStateAndPublishUpdate('working', stateChange);
+      this.setTaskStateAndPublishUpdate('working', stateChange, source);
       // TODO: Determine what it mean to have, then add a prompt ID.
       yield* this.geminiClient.sendMessageStream(
         llmParts,
@@ -907,7 +936,7 @@ export class Task {
         const stateChange: StateChange = {
           kind: CoderAgentEvent.StateChangeEvent,
         };
-        this.setTaskStateAndPublishUpdate('working', stateChange); // Reflect potential background activity
+        this.setTaskStateAndPublishUpdate('working', stateChange, source); // Reflect potential background activity
       }
       yield* (async function* () {})(); // Yield nothing
     } else {
@@ -931,11 +960,11 @@ export class Task {
       promptId,
     );
     for await (const event of stream) {
-      await this.acceptAgentMessage(event);
+      await this.acceptAgentMessage(event, 'cli');
       yield event;
     }
   }
-  _sendTextContent(content: string): void {
+  _sendTextContent(content: string, source: 'cli' | 'external'): void {
     if (content === '') {
       return;
     }
@@ -948,13 +977,14 @@ export class Task {
       this._createStatusUpdateEvent(
         this.taskState,
         textContent,
+        source,
         message,
         false,
       ),
     );
   }
 
-  _sendThought(content: ThoughtSummary): void {
+  _sendThought(content: ThoughtSummary, source: 'cli' | 'external'): void {
     if (!content.subject && !content.description) {
       return;
     }
@@ -976,7 +1006,13 @@ export class Task {
       kind: CoderAgentEvent.ThoughtEvent,
     };
     this.eventBus?.publish(
-      this._createStatusUpdateEvent(this.taskState, thought, message, false),
+      this._createStatusUpdateEvent(
+        this.taskState,
+        thought,
+        source,
+        message,
+        false,
+      ),
     );
   }
 }

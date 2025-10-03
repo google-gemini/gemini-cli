@@ -61,7 +61,6 @@ import { useTerminalSize } from './hooks/useTerminalSize.js';
 import { calculatePromptWidths } from './components/InputPrompt.js';
 import { useStdin, useStdout } from 'ink';
 import ansiEscapes from 'ansi-escapes';
-import * as fs from 'node:fs';
 import { basename } from 'node:path';
 import { computeWindowTitle } from '../utils/windowTitle.js';
 import { useTextBuffer } from './components/shared/text-buffer.js';
@@ -91,6 +90,7 @@ import { useGitBranchName } from './hooks/useGitBranchName.js';
 import { useExtensionUpdates } from './hooks/useExtensionUpdates.js';
 import { ShellFocusContext } from './contexts/ShellFocusContext.js';
 import type { CoderAgentExecutor } from '@google/gemini-cli-a2a-server/src/agent/executor.js';
+import type { ExecutionEventBus } from '@a2a-js/sdk/server';
 
 const CTRL_EXIT_PROMPT_DURATION_MS = 1000;
 
@@ -112,6 +112,7 @@ interface AppContainerProps {
   version: string;
   initializationResult: InitializationResult;
   agentExecutor?: CoderAgentExecutor;
+  a2aEventBus?: ExecutionEventBus;
 }
 
 /**
@@ -567,6 +568,13 @@ Logging in with Google... Please restart Gemini CLI to continue.
 
   const cancelHandlerRef = useRef<() => void>(() => {});
 
+  const logDebugMessage = useCallback(
+    (message: string) => {
+      setDebugMessage(message);
+    },
+    [setDebugMessage],
+  );
+
   const {
     streamingState,
     submitQuery,
@@ -583,7 +591,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
     historyManager.addItem,
     config,
     settings,
-    setDebugMessage,
+    logDebugMessage,
     handleSlashCommand,
     shellModeActive,
     () => settings.merged.general?.preferredEditor as EditorType,
@@ -598,6 +606,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
     terminalHeight,
     embeddedShellFocused,
     props.agentExecutor,
+    props.a2aEventBus,
   );
 
   // Auto-accept indicator

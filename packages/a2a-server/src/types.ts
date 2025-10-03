@@ -37,6 +37,10 @@ export enum CoderAgentEvent {
    * An event that contains a thought from the agent.
    */
   ThoughtEvent = 'thought',
+  /**
+   * An event representing the initial user message from an external source.
+   */
+  ExternalUserMessageEvent = 'external-user-message',
 }
 
 export interface AgentSettings {
@@ -64,6 +68,10 @@ export interface Thought {
   kind: CoderAgentEvent.ThoughtEvent;
 }
 
+export interface ExternalUserMessage {
+  kind: CoderAgentEvent.ExternalUserMessageEvent;
+}
+
 export type ThoughtSummary = {
   subject: string;
   description: string;
@@ -80,7 +88,8 @@ export type CoderAgentMessage =
   | ToolCallUpdate
   | TextContent
   | StateChange
-  | Thought;
+  | Thought
+  | ExternalUserMessage;
 
 export interface TaskMetadata {
   id: string;
