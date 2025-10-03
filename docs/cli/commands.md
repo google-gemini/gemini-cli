@@ -20,7 +20,7 @@ Slash commands provide meta-level control over the CLI itself.
       - **Details on Checkpoint Location:** The default locations for saved chat checkpoints are:
         - Linux/macOS: `~/.gemini/tmp/<project_hash>/`
         - Windows: `C:\Users\<YourUsername>\.gemini\tmp\<project_hash>\`
-        - **Behavior:** This project-specific storage means that commands like `/chat list` and `/chat resume` only have access to chats saved from within the current project. 
+        - **Behavior:** Chats are saved into a project-specific directory, determined by where you run the CLI. Consequently, saved chats are only accessible when working within that same project. 
         - When you run `/chat list`, the CLI only scans these specific directories to find available checkpoints.
         - **Note:** These checkpoints are for manually saving and resuming conversation states. For automatic checkpoints created before file modifications, see the [Checkpointing documentation](../cli/checkpointing.md).
     - **`resume`**
