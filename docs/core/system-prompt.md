@@ -4,15 +4,15 @@ The core system instructions that guide Gemini CLI can be completely replaced wi
 
 ## Overview
 
-- `GEMINI_SYSTEM_MD` tells the CLI to use an external Markdown file as the system prompt instead of the built‑in default.
-- This is a full replacement, not a merge. If you override it, none of the default core instructions apply unless you include them yourself.
-- Intended for advanced users who need strict, project‑specific behavior or a customized persona.
+The `GEMINI_SYSTEM_MD` variable instructs the CLI to use an external Markdown file for its system prompt, completely overriding the built-in default. This is a full replacement, not a merge. If you use a custom file, none of the original core instructions will apply unless you include them yourself.
+
+This feature is intended for advanced users who need to enforce strict, project-specific behavior or create a customized persona.
 
 > Tip: You can export the current default system prompt to a file first, review it, and then selectively modify or replace it (see [“Export the default prompt”](#export-the-default-prompt-recommended)).
 
 ## How to enable
 
-You can set the environment variable temporarily in your shell, or persist it via a `.gemini/.env` file. See [`docs/cli/authentication.md` → “Persisting Environment Variables with `.env` Files”](../cli/authentication.md#persisting-environment-variables-with-env-files).
+You can set the environment variable temporarily in your shell, or persist it via a `.gemini/.env` file. See [Persisting Environment Variables](../get-started/authentication.md#persisting-environment-variables).
 
 - Use the project default path (`.gemini/system.md`):
   - `GEMINI_SYSTEM_MD=true` or `GEMINI_SYSTEM_MD=1`
@@ -74,4 +74,3 @@ Keep SYSTEM.md minimal but complete for safety and tool operation. Keep GEMINI.m
   - Paths are resolved from the current working directory; try an absolute path.
 - Restore defaults
   - Unset `GEMINI_SYSTEM_MD` or set it to `0`/`false`.
-

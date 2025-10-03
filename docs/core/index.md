@@ -6,7 +6,7 @@ Gemini CLI's core package (`packages/core`) is the backend portion of Gemini CLI
 
 - **[Core tools API](./tools-api.md):** Information on how tools are defined, registered, and used by the core.
 - **[Memory Import Processor](./memport.md):** Documentation for the modular GEMINI.md import feature using @file.md syntax.
- - **[System Prompt Override](./system-prompt.md):** Replace the built‑in system instructions using `GEMINI_SYSTEM_MD`.
+- **[System Prompt Override](./system-prompt.md):** Replace the built‑in system instructions using `GEMINI_SYSTEM_MD`.
 
 ## Role of the core
 
