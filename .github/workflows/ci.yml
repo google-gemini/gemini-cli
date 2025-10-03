@@ -88,7 +88,7 @@ jobs:
         run: 'node scripts/lint.js --prettier'
 
       - name: 'Run sensitive keyword linter'
-        run: 'npm run lint:sensitive-keywords'
+        run: 'node scripts/lint.js --sensitive-keywords'
 
   test_linux:
     name: 'Test (Linux)'
