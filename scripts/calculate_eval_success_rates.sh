@@ -22,7 +22,7 @@ BEGIN {
 }
 
 # --- Evaluation Resolution Rate ---
-/## 📝 Evaluation Results/ {
+/## 📊 Combined Statistics/ {
     in_results_section = 1
     next
 }

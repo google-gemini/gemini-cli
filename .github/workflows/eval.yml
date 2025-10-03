@@ -51,6 +51,9 @@ jobs:
         GEMINI_API_KEY: '${{ secrets.EVAL_GEMINI_API_KEY }}'
         GCLI_LOCAL_FILE_TELEMETRY: 'true'
     steps:
+      - name: 'Checkout repository'
+        uses: 'actions/checkout@v4'
+
       - name: 'Run evaluation'
         uses: './.github/actions/run-evaluation'
         with:
