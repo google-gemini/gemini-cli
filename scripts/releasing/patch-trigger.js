@@ -126,6 +126,7 @@ async function main() {
   let originalPr = prNum;
   console.log(`Found originalPr: ${prNum} from hotfix branch`);
 
+  // Fallback to using PR search (inconsistent) if no pr found in branch name.
   if (!testMode && !originalPr) {
     try {
       console.log('Looking for original PR using search...');
