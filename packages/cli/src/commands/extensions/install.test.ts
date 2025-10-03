@@ -12,9 +12,9 @@ const { mockRequestFn } = vi.hoisted(() => ({
   mockRequestFn: vi.fn(),
 }));
 const mockInstallExtension = vi.hoisted(() =>
-  vi.fn(() =>
+  vi.fn((_: unknown, requestConsent: (consent: string) => void) =>
     // Simulate mockRequestFn being called by installExtension
-    mockRequestFn(),
+    requestConsent('Consent'),
   ),
 );
 
@@ -115,7 +115,7 @@ describe.only('handleInstall', () => {
       source: 'https://google.com',
       yolo: true,
     });
-    expect(mockRequestFn).toHaveBeenCalled();
+    expect(mockRequestFn).not.toHaveBeenCalled();
   });
 
   it('should install an extension from a git source', async () => {
