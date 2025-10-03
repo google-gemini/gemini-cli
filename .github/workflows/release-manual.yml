@@ -93,6 +93,23 @@ jobs:
           gemini_api_key: '${{ secrets.GEMINI_API_KEY }}'
           working-directory: './release'
 
+      - name: 'Build Release'
+        id: 'build'
+        uses: './.github/actions/build-release'
+        with:
+          release-version: '${{ steps.release_info.outputs.RELEASE_VERSION }}'
+          release-tag: '${{ github.event.inputs.version }}'
+          dry-run: '${{ github.event.inputs.dry_run }}'
+          working-directory: './release'
+
+      - name: 'Trigger Evaluation'
+        if: "${{ github.event.inputs.dry_run == 'false' }}"
+        env:
+          GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+        shell: 'bash'
+        run: |
+          gh workflow run eval.yml --ref ${{ steps.build.outputs.branch-name }} -f branch-or-commit=${{ steps.build.outputs.branch-name }} -f dry-run=true
+
       - name: 'Publish Release'
         uses: './.github/actions/publish-release'
         with:
@@ -107,6 +124,7 @@ jobs:
           previous-tag: '${{ steps.release_info.outputs.PREVIOUS_TAG }}'
           skip-github-release: '${{ github.event.inputs.skip_github_release }}'
           working-directory: './release'
+          branch-name: '${{ steps.build.outputs.branch-name }}'
           gemini_api_key: '${{ secrets.GEMINI_API_KEY }}'
           registry: '${{ github.event.inputs.registry }}'
 

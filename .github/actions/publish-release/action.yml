@@ -1,5 +1,5 @@
 name: 'Publish Release'
-description: 'Builds, prepares, and publishes the gemini-cli packages to npm and creates a GitHub release.'
+description: 'Publishes the gemini-cli packages to npm and creates a GitHub release.'
 
 inputs:
   release-version:
@@ -40,6 +40,8 @@ inputs:
     description: 'Skip tests and validation'
     required: false
     default: false
+  branch-name:
+    description: 'The name of the release branch.'
   skip-branch-cleanup:
     description: 'Whether to skip cleaning up the release branch.'
     type: 'boolean'
@@ -55,72 +57,7 @@ inputs:
 runs:
   using: 'composite'
   steps:
-    - name: '📝 Print Inputs'
-      shell: 'bash'
-      run: 'echo "${{ toJSON(inputs) }}"'
-
-    - name: '👤 Configure Git User'
-      working-directory: '${{ inputs.working-directory }}'
-      shell: 'bash'
-      run: |
-        git config user.name "gemini-cli-robot"
-        git config user.email "gemini-cli-robot@google.com"
-
-    - name: '🌿 Create and switch to a release branch'
-      working-directory: '${{ inputs.working-directory }}'
-      id: 'release_branch'
-      shell: 'bash'
-      run: |
-        BRANCH_NAME="release/${{ inputs.release-tag }}"
-        git switch -c "${BRANCH_NAME}"
-        echo "BRANCH_NAME=${BRANCH_NAME}" >> "${GITHUB_OUTPUT}"
-
-    - name: '⬆️ Update package versions'
-      working-directory: '${{ inputs.working-directory }}'
-      shell: 'bash'
-      run: |
-        npm run release:version "${{ inputs.release-version }}"
-
-    - name: '💾 Commit and Conditionally Push package versions'
-      working-directory: '${{ inputs.working-directory }}'
-      shell: 'bash'
-      env:
-        BRANCH_NAME: '${{ steps.release_branch.outputs.BRANCH_NAME }}'
-        DRY_RUN: '${{ inputs.dry-run }}'
-        RELEASE_TAG: '${{ inputs.release-tag }}'
-      run: |-
-        set -e
-        git add package.json package-lock.json packages/*/package.json
-        git commit -m "chore(release): ${RELEASE_TAG}"
-        if [[ "${DRY_RUN}" == "false" ]]; then
-          echo "Pushing release branch to remote..."
-          git push --set-upstream origin "${BRANCH_NAME}" --follow-tags
-        else
-          echo "Dry run enabled. Skipping push."
-        fi
-
-    - name: '🛠️ Build and Prepare Packages'
-      working-directory: '${{ inputs.working-directory }}'
-      shell: 'bash'
-      run: |
-        npm run build:packages
-        npm run prepare:package
-
-    - name: '🎁 Bundle'
-      working-directory: '${{ inputs.working-directory }}'
-      shell: 'bash'
-      run: |
-        npm run bundle
-
-    - name: '📦 Prepare for GitHub release'
-      if: "inputs.registry == 'github'"
-      working-directory: '${{ inputs.working-directory }}'
-      shell: 'bash'
-      run: |
-        node ${{ github.workspace }}/scripts/prepare-github-release.js
-
-    - name: 'Configure npm for publishing to npm'
-      if: "inputs.registry != 'github'"
+    - name: 'Configure npm for publishing'
       uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020'
       with:
         node-version-file: '${{ inputs.working-directory }}/.nvmrc'
@@ -200,7 +137,7 @@ runs:
       with:
         npm-package: '@google/gemini-cli@${{ inputs.release-version }}'
         expected-version: '${{ inputs.release-version }}'
-        ref: '${{ steps.release_branch.outputs.BRANCH_NAME }}'
+        ref: '${{ inputs.branch-name }}'
         gemini_api_key: '${{ inputs.gemini_api_key }}'
 
     - name: '🏷️ Tag release'
@@ -222,7 +159,7 @@ runs:
       run: |
         gh release create "${{ inputs.release-tag }}" \
           bundle/gemini.js \
-          --target "${{ steps.release_branch.outputs.BRANCH_NAME }}" \
+          --target "${{ inputs.branch-name }}" \
           --title "Release ${{ inputs.release-tag }}" \
           --notes-start-tag "${{ inputs.previous-tag }}" \
           --generate-notes
@@ -233,5 +170,5 @@ runs:
       continue-on-error: true
       shell: 'bash'
       run: |
-        echo "Cleaning up release branch ${{ steps.release_branch.outputs.BRANCH_NAME }}..."
-        git push origin --delete "${{ steps.release_branch.outputs.BRANCH_NAME }}"
+        echo "Cleaning up release branch ${{ inputs.branch-name }}..."
+        git push origin --delete "${{ inputs.branch-name }}"

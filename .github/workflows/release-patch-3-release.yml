@@ -150,19 +150,47 @@ jobs:
           gemini_api_key: '${{ secrets.GEMINI_API_KEY }}'
           working-directory: './release'
 
+      - name: 'Build Release'
+        id: 'build'
+        uses: './.github/actions/build-release'
+        with:
+          release-version: '${{ steps.patch_version.outputs.RELEASE_VERSION }}'
+          release-tag: '${{ steps.patch_version.outputs.RELEASE_TAG }}'
+          dry-run: '${{ github.event.inputs.dry_run }}'
+          working-directory: './release'
+
+      - name: 'Run evaluation'
+        if: "${{ github.event.inputs.dry_run == 'false' }}"
+        uses: './.github/actions/run-evaluation'
+        with:
+          branch-or-commit: '${{ steps.build.outputs.branch-name }}'
+          dry-run: 'true'
+          github-token: '${{ secrets.GITHUB_TOKEN }}'
+          google-cloud-project: '${{ vars.GOOGLE_CLOUD_PROJECT }}'
+          gcp-wif-provider: '${{ vars.GCP_WIF_PROVIDER }}'
+          service-account-email: '${{ vars.SERVICE_ACCOUNT_EMAIL }}'
+          eval-gemini-api-key: '${{ secrets.EVAL_GEMINI_API_KEY }}'
+          eval-gcs-bucket: '${{ vars.EVAL_GCS_BUCKET }}'
+
       - name: 'Publish Release'
         uses: './.github/actions/publish-release'
         with:
           release-version: '${{ steps.patch_version.outputs.RELEASE_VERSION }}'
           release-tag: '${{ steps.patch_version.outputs.RELEASE_TAG }}'
           npm-tag: '${{ steps.patch_version.outputs.NPM_TAG }}'
-          wombat-token-core: '${{ secrets.WOMBAT_TOKEN_CORE }}'
+          wombat-token-core: '${{ secrets.Wombat_TOKEN_CORE }}'
           wombat-token-cli: '${{ secrets.WOMBAT_TOKEN_CLI }}'
           github-token: '${{ secrets.GITHUB_TOKEN }}'
           dry-run: '${{ github.event.inputs.dry_run }}'
           previous-tag: '${{ steps.patch_version.outputs.PREVIOUS_TAG }}'
           working-directory: './release'
+          branch-name: '${{ steps.build.outputs.branch-name }}'
           gemini_api_key: '${{ secrets.GEMINI_API_KEY }}'
+          google-cloud-project: '${{ vars.GOOGLE_CLOUD_PROJECT }}'
+          gcp-wif-provider: '${{ vars.GCP_WIF_PROVIDER }}'
+          service-account-email: '${{ vars.SERVICE_ACCOUNT_EMAIL }}'
+          eval-gemini-api-key: '${{ secrets.EVAL_GEMINI_API_KEY }}'
+          eval-gcs-bucket: '${{ vars.EVAL_GCS_BUCKET }}'
 
       - name: 'Create Issue on Failure'
         if: '${{ failure() && github.event.inputs.dry_run == false }}'

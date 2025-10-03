@@ -2,6 +2,26 @@ name: 'Eval'
 
 on:
   workflow_dispatch:
+    inputs:
+      branch-or-commit:
+        description: 'The branch or commit to run the evaluation on.'
+        required: true
+        type: 'string'
+      dry-run:
+        description: 'dry run: runs evaluation without creating an issue.'
+        required: false
+        type: 'boolean'
+        default: true
+      resolution-rate-threshold:
+        description: 'The threshold for the resolution rate.'
+        required: false
+        type: 'number'
+        default: 90
+      tool-success-rate-threshold:
+        description: 'The threshold for the tool success rate.'
+        required: false
+        type: 'number'
+        default: 80
 
 defaults:
   run:
@@ -11,6 +31,7 @@ permissions:
   contents: 'read'
   id-token: 'write'
   packages: 'read'
+  issues: 'write'
 
 jobs:
   eval:
@@ -28,21 +49,21 @@ jobs:
         DEFAULT_VERTEXAI_PROJECT: '${{ vars.GOOGLE_CLOUD_PROJECT }}'
         GOOGLE_CLOUD_PROJECT: '${{ vars.GOOGLE_CLOUD_PROJECT }}'
         GEMINI_API_KEY: '${{ secrets.EVAL_GEMINI_API_KEY }}'
-        GCLI_LOCAL_FILE_TELEMETRY: 'True'
-        EVAL_GCS_BUCKET: '${{ vars.EVAL_GCS_ARTIFACTS_BUCKET }}'
+        GCLI_LOCAL_FILE_TELEMETRY: 'true'
     steps:
-      - name: 'Authenticate to Google Cloud'
-        id: 'auth'
-        uses: 'google-github-actions/auth@v2' # ratchet:exclude
-        with:
-          project_id: '${{ vars.GOOGLE_CLOUD_PROJECT }}'
-          workload_identity_provider: '${{ vars.GCP_WIF_PROVIDER }}'
-          service_account: '${{ vars.SERVICE_ACCOUNT_EMAIL }}'
-          token_format: 'access_token'
-          access_token_scopes: 'https://www.googleapis.com/auth/cloud-platform'
+      - name: 'Checkout repository'
+        uses: 'actions/checkout@v4'
 
       - name: 'Run evaluation'
-        working-directory: '/app'
-        run: |
-          poetry run exp_run --experiment-mode=on-demand --branch-or-commit=${{ github.ref_name }} --model-name=gemini-2.5-pro --dataset=swebench_verified --concurrency=15
-          poetry run python agent_prototypes/scripts/parse_gcli_logs_experiment.py --experiment_dir=experiments/adhoc/gcli_temp_exp --gcs-bucket="${EVAL_GCS_BUCKET}" --gcs-path=gh_action_artifacts
+        uses: './.github/actions/run-evaluation'
+        with:
+          branch-or-commit: '${{ inputs.branch-or-commit }}'
+          dry-run: '${{ inputs.dry-run }}'
+          resolution-rate-threshold: '${{ inputs.resolution-rate-threshold }}'
+          tool-success-rate-threshold: '${{ inputs.tool-success-rate-threshold }}'
+          github-token: '${{ secrets.GITHUB_TOKEN }}'
+          google-cloud-project: '${{ vars.GOOGLE_CLOUD_PROJECT }}'
+          gcp-wif-provider: '${{ vars.GCP_WIF_PROVIDER }}'
+          service-account-email: '${{ vars.SERVICE_ACCOUNT_EMAIL }}'
+          eval-gemini-api-key: '${{ secrets.EVAL_GEMINI_API_KEY }}'
+          eval-gcs-bucket: '${{ vars.EVAL_GCS_ARTIFACTS_BUCKET }}'
