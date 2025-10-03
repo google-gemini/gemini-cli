@@ -40,6 +40,7 @@ describe('FixLLMEditWithInstruction', () => {
   const mockApiResponse: SearchReplaceEdit = {
     search: '<h1>Old Title</h1>',
     replace: '<h1>New Title</h1>',
+    noChangesRequired: false,
     explanation: 'The original search was correct.',
   };
 
@@ -208,12 +209,14 @@ describe('FixLLMEditWithInstruction', () => {
       const firstResponse: SearchReplaceEdit = {
         search: 'original text',
         replace: 'first replacement',
+        noChangesRequired: false,
         explanation: 'First edit correction',
       };
 
       const secondResponse: SearchReplaceEdit = {
         search: 'different text',
         replace: 'second replacement',
+        noChangesRequired: false,
         explanation: 'Second edit correction',
       };
 
@@ -266,12 +269,14 @@ describe('FixLLMEditWithInstruction', () => {
       const yamlResponse: SearchReplaceEdit = {
         search: '---\ntitle: Old\n---',
         replace: '---\ntitle: New\n---',
+        noChangesRequired: false,
         explanation: 'Updated YAML frontmatter',
       };
 
       const contentResponse: SearchReplaceEdit = {
         search: 'old content',
         replace: 'new content',
+        noChangesRequired: false,
         explanation: 'Updated content',
       };
 
