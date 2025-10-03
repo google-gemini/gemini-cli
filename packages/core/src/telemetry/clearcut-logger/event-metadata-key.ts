@@ -79,8 +79,8 @@ export enum EventMetadataKey {
   // Logs the tool call duration in milliseconds.
   GEMINI_CLI_TOOL_CALL_DURATION_MS = 17,
 
-  // Logs the tool call error message, if any.
-  GEMINI_CLI_TOOL_ERROR_MESSAGE = 18,
+  // Do not use.
+  DEPRECATED_GEMINI_CLI_TOOL_ERROR_MESSAGE = 18,
 
   // Logs the tool call error type, if any.
   GEMINI_CLI_TOOL_CALL_ERROR_TYPE = 19,
@@ -259,8 +259,8 @@ export enum EventMetadataKey {
   // Kitty Sequence Overflow Event Keys
   // ===========================================================================
 
-  // Logs the truncated kitty sequence.
-  GEMINI_CLI_KITTY_TRUNCATED_SEQUENCE = 52,
+  // Do not use.
+  DEPRECATED_GEMINI_CLI_KITTY_TRUNCATED_SEQUENCE = 52,
 
   // Logs the length of the kitty sequence that overflowed.
   GEMINI_CLI_KITTY_SEQUENCE_LENGTH = 53,
