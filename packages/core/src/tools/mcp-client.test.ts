@@ -234,7 +234,7 @@ describe('mcp-client', () => {
         },
         mockedToolRegistry,
         {} as PromptRegistry,
-        {} as WorkspaceContext,
+        workspaceContext,
         false,
       );
       await client.connect();
@@ -282,7 +282,7 @@ describe('mcp-client', () => {
         },
         mockedToolRegistry,
         {} as PromptRegistry,
-        {} as WorkspaceContext,
+        workspaceContext,
         false,
       );
       await client.connect();
