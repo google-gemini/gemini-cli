@@ -50,9 +50,10 @@ async function main() {
 
   const releaseInfo = getLatestReleaseInfo(channel);
   const latestTag = releaseInfo.currentTag;
+  const nextVersion = releaseInfo.nextVersion;
 
   const releaseBranch = `release/${latestTag}-pr-${pullRequestNumber}`;
-  const hotfixBranch = `hotfix/${latestTag}/${channel}/cherry-pick-${commit.substring(0, 7)}`;
+  const hotfixBranch = `hotfix/${latestTag}/${nextVersion}/${channel}/cherry-pick-${commit.substring(0, 7)}/pr-${pullRequestNumber}`;
 
   // Create the release branch from the tag if it doesn't exist.
   if (!branchExists(releaseBranch)) {
@@ -190,8 +191,8 @@ async function main() {
   console.log(
     `Creating pull request from ${hotfixBranch} to ${releaseBranch}...`,
   );
-  let prTitle = `fix(patch): cherry-pick ${commit.substring(0, 7)} to ${releaseBranch}`;
-  let prBody = `This PR automatically cherry-picks commit ${commit} to patch the ${channel} release.`;
+  let prTitle = `fix(patch): cherry-pick ${commit.substring(0, 7)} to ${releaseBranch} to patch version ${releaseInfo.currentTag} and create version ${releaseInfo.nextVersion}`;
+  let prBody = `This PR automatically cherry-picks commit ${commit} to patch version ${releaseInfo.currentTag} in the ${channel} release to create version ${releaseInfo.nextVersion}.`;
 
   if (hasConflicts) {
     prTitle = `fix(patch): cherry-pick ${commit.substring(0, 7)} to ${releaseBranch} [CONFLICTS]`;
