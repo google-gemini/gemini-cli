@@ -123,6 +123,23 @@ describe('handleAutoUpdate', () => {
     expect(mockSpawn).not.toHaveBeenCalled();
   });
 
+  it.each([PackageManager.NPX, PackageManager.PNPX, PackageManager.BUNX])(
+    'should suppress update notifications when running via %s',
+    (packageManager) => {
+      mockGetInstallationInfo.mockReturnValue({
+        updateCommand: undefined,
+        updateMessage: `Running via ${packageManager}, update not applicable.`,
+        isGlobal: false,
+        packageManager,
+      });
+
+      handleAutoUpdate(mockUpdateInfo, mockSettings, '/root', mockSpawn);
+
+      expect(mockUpdateEventEmitter.emit).not.toHaveBeenCalled();
+      expect(mockSpawn).not.toHaveBeenCalled();
+    },
+  );
+
   it('should emit "update-received" but not update if no update command is found', () => {
     mockGetInstallationInfo.mockReturnValue({
       updateCommand: undefined,
