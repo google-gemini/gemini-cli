@@ -10,64 +10,44 @@ import { ReadFileTool } from '../tools/read-file.js';
 import { GLOB_TOOL_NAME } from '../tools/tool-names.js';
 import { GrepTool } from '../tools/grep.js';
 import { DEFAULT_GEMINI_MODEL } from '../config/models.js';
-import { Type } from '@google/genai';
+import { z } from 'zod';
 
-const CODEBASE_REPORT_MARKDOWN = `<CodebaseReport>
-  <SummaryOfFindings>
-    The user's objective is to remove an optional \`config\` property from the command context. The investigation identified that the \`CommandContext\` interface, defined in \`packages/cli/src/ui/commands/types.ts\`, contains a nullable \`config: Config | null\` property. A \`TODO\` comment confirms the intent to make this property non-nullable.
-    The primary challenge is that numerous tests throughout the codebase rely on this property being optional, often setting it to \`null\` during the creation of mock \`CommandContext\` objects. The key to resolving this is to update the mock creation utility, \`createMockCommandContext\`, to provide a default mock \`Config\` object instead of \`null\`.
-    The \`Config\` class, defined in \`packages/core/src/config/config.ts\`, is the type of the \`config\` property. To facilitate the required changes, a mock \`Config\` object can be created based on the \`ConfigParameters\` interface from the same file.
-    The plan involves three main steps:
-    1.  Update the \`CommandContext\` interface to make the \`config\` property non-nullable.
-    2.  Modify \`createMockCommandContext\` to use a default mock \`Config\` object.
-    3.  Update all test files that currently rely on a null \`config\` to use the updated mock creation utility.
-  </SummaryOfFindings>
-  <ExplorationTrace>
-    1.  Searched for "CommandContext" to locate its definition.
-    2.  Read \`packages/cli/src/ui/commands/types.ts\` and identified the \`config: Config | null\` property.
-    3.  Searched for \`config: null\` to find all instances where the config is explicitly set to null.
-    4.  Read \`packages/cli/src/test-utils/mockCommandContext.ts\` to understand how mock contexts are created.
-    5.  Searched for \`createMockCommandContext\` to find all its usages.
-    6.  Searched for the definition of the \`Config\` interface to understand how to create a mock object.
-    7.  Read \`packages/core/src/config/config.ts\` to understand the \`Config\` class and \`ConfigParameters\` interface.
-  </ExplorationTrace>
-  <RelevantLocations>
-    <Location>
-      <FilePath>packages/cli/src/ui/commands/types.ts</FilePath>
-      <Reasoning>This file contains the definition of the \`CommandContext\` interface, which is the central piece of this investigation. The property \`config: Config | null\` needs to be changed to \`config: Config\` here.</Reasoning>
-      <KeySymbols>
-        <Symbol>CommandContext</Symbol>
-      </KeySymbols>
-    </Location>
-    <Location>
-      <FilePath>packages/cli/src/test-utils/mockCommandContext.ts</FilePath>
-      <Reasoning>This file contains the \`createMockCommandContext\` function, which is used in many tests to create mock \`CommandContext\` objects. This function needs to be updated to provide a default mock \`Config\` object instead of \`null\`.</Reasoning>
-      <KeySymbols>
-        <Symbol>createMockCommandContext</Symbol>
-      </KeySymbols>
-    </Location>
-    <Location>
-      <FilePath>packages/core/src/config/config.ts</FilePath>
-      <Reasoning>This file defines the \`Config\` class and the \`ConfigParameters\` interface. This information is needed to create a proper mock \`Config\` object to be used in the updated \`createMockCommandContext\` function.</Reasoning>
-      <KeySymbols>
-        <Symbol>Config</Symbol>
-        <Symbol>ConfigParameters</Symbol>
-      </KeySymbols>
-    </Location>
-  </RelevantLocations>
-</CodebaseReport>`;
+// Define a type that matches the outputConfig schema for type safety.
+const CodebaseInvestigationReportSchema = z.object({
+  SummaryOfFindings: z
+    .string()
+    .describe(
+      "A summary of the investigation's conclusions and insights for the main agent.",
+    ),
+  ExplorationTrace: z
+    .array(z.string())
+    .describe(
+      'A step-by-step list of actions and tools used during the investigation.',
+    ),
+  RelevantLocations: z
+    .array(
+      z.object({
+        FilePath: z.string(),
+        Reasoning: z.string(),
+        KeySymbols: z.array(z.string()),
+      }),
+    )
+    .describe('A list of relevant files and the key symbols within them.'),
+});
 
 /**
  * A Proof-of-Concept subagent specialized in analyzing codebase structure,
  * dependencies, and technologies.
  */
-export const CodebaseInvestigatorAgent: AgentDefinition = {
+export const CodebaseInvestigatorAgent: AgentDefinition<
+  typeof CodebaseInvestigationReportSchema
+> = {
   name: 'codebase_investigator',
   displayName: 'Codebase Investigator Agent',
   description: `Your primary tool for multifile search tasks and codebase exploration. 
     Invoke this tool to delegate search tasks to an autonomous subagent. 
     Use this to find features, understand context, or locate specific files, functions, or symbols. 
-    Returns a structured xml report with key file paths, symbols, architectural map and insights to solve a task or answer questions.`,
+    Returns a structured Json report with key file paths, symbols, architectural map and insights to solve a task or answer questions`,
   inputConfig: {
     inputs: {
       objective: {
@@ -80,22 +60,12 @@ export const CodebaseInvestigatorAgent: AgentDefinition = {
   },
   outputConfig: {
     outputName: 'report',
-    description: 'The final investigation report.',
-    schema: {
-      type: Type.STRING,
-      description: `A detailed markdown report summarizing the findings of the codebase investigation and insights that are the foundation for planning and executing any code modification related to the objective.
-      # Report Format
-The final report should be structured markdown, clearly answering the investigation focus, citing the files, symbols, architectural patterns and how they relate to the given investigation focus.
-The report should strictly follow a format like this example: 
-${CODEBASE_REPORT_MARKDOWN}
-
-Completion Criteria:
-- The report must directly address the initial \`objective\`.
-- Cite specific files, functions, or configuration snippets and symbols as evidence for your findings.
-- Conclude with a xml markdown summary of the key files, symbols, technologies, architectural patterns, and conventions discovered.
-`,
-    },
+    description: 'The final investigation report as a JSON object.',
+    schema: CodebaseInvestigationReportSchema,
   },
+
+  // The 'output' parameter is now strongly typed as CodebaseInvestigationReportSchema
+  processOutput: (output) => JSON.stringify(output, null, 2),
 
   modelConfig: {
     model: DEFAULT_GEMINI_MODEL,
@@ -142,37 +112,41 @@ You operate in a non-interactive loop and must reason based on the information p
 **This is your most critical function. Your scratchpad is your memory and your plan.**
 1.  **Initialization:** On your very first turn, you **MUST** create the \`<scratchpad>\` section. Analyze the \`task\` and create an initial \`Checklist\` of investigation goals and a \`Questions to Resolve\` section for any initial uncertainties.
 2.  **Constant Updates:** After **every** \`<OBSERVATION>\`, you **MUST** update the scratchpad.
-    *   Mark checklist items as complete: \`[x]\`.
-    *   Add new checklist items as you trace the architecture.
-    *   **Explicitly log questions in \`Questions to Resolve\`** (e.g., \`[ ] What is the purpose of the 'None' element in this list?\`). Do not consider your investigation complete until this list is empty.
-    *   Record \`Key Findings\` with file paths and notes about their purpose and relevance.
-    *   Update \`Irrelevant Paths to Ignore\` to avoid re-investigating dead ends.
+    * Mark checklist items as complete: \`[x]\`.
+    * Add new checklist items as you trace the architecture.
+    * **Explicitly log questions in \`Questions to Resolve\`** (e.g., \`[ ] What is the purpose of the 'None' element in this list?\`). Do not consider your investigation complete until this list is empty.
+    * Record \`Key Findings\` with file paths and notes about their purpose and relevance.
+    * Update \`Irrelevant Paths to Ignore\` to avoid re-investigating dead ends.
 3.  **Thinking on Paper:** The scratchpad must show your reasoning process, including how you resolve your questions.
 ---
-## Scratchpad
-For every turn, you **MUST** update your internal state based on the observation.
-Scratchpad example:
-<SCRATCHPAD>
-**Checklist:**
-- [x] Find the main translation loading logic.
-- [ ] **(New)** Investigate the \`gettext.translation\` function to understand its arguments.
-- [ ] **(New)** Check the signature of \`locale.init\` and its callers for type consistency.
-**Questions to Resolve:**
-- [x] ~~What is the purpose of the 'None' element in the \`locale_dirs\` list?~~ **Finding:** It's for system-wide gettext catalogs.
-**Key Findings:**
-- \`sphinx/application.py\`: Assembles the \`locale_dirs\` list. The order is critical.
-- \`sphinx/locale/__init__.py\`: Consumes \`locale_dirs\`. Its \`init\` function signature might need a type hint update if \`None\` is passed.
-**Irrelevant Paths to Ignore:**
-- \`README.md\`
-**Next Step:**
-- I will use \`web_fetch\` to search for "python gettext translation localedir None" to resolve my open question.
-</SCRATCHPAD>
 ## Termination
-Your mission is complete **ONLY** when your \`Questions to Resolve\` list is empty and you are confident you have identified all files and necessary change *considerations*.
-# Report Format
-The final report should be structured markdown, clearly answering the investigation focus, citing the files, symbols, architectural patterns and how they relate to the given investigation focus.
-The report should strictly follow a format like this example: 
-${CODEBASE_REPORT_MARKDOWN}
+Your mission is complete **ONLY** when your \`Questions to Resolve\` list is empty and you have identified all files and necessary change *considerations*.
+When you are finished, you **MUST** call the \`complete_task\` tool. The \`report\` argument for this tool **MUST** be a valid JSON object containing your findings.
+
+**Example of the final report**
+\`\`\`json
+{
+  "SummaryOfFindings": "The core issue is a race condition in the \`updateUser\` function. The function reads the user's state, performs an asynchronous operation, and then writes the state back. If another request modifies the user state during the async operation, that change will be overwritten. The fix requires implementing a transactional read-modify-write pattern, potentially using a database lock or a versioning system.",
+  "ExplorationTrace": [
+    "Used \`grep\` to search for \`updateUser\` to locate the primary function.",
+    "Read the file \`src/controllers/userController.js\` to understand the function's logic.",
+    "Used \`ls -R\` to look for related files, such as services or database models.",
+    "Read \`src/services/userService.js\` and \`src/models/User.js\` to understand the data flow and how state is managed."
+  ],
+  "RelevantLocations": [
+    {
+      "FilePath": "src/controllers/userController.js",
+      "Reasoning": "This file contains the \`updateUser\` function which has the race condition. It's the entry point for the problematic logic.",
+      "KeySymbols": ["updateUser", "getUser", "saveUser"]
+    },
+    {
+      "FilePath": "src/services/userService.js",
+      "Reasoning": "This service is called by the controller and handles the direct interaction with the data layer. Any locking mechanism would likely be implemented here.",
+      "KeySymbols": ["updateUserData"]
+    }
+  ]
+}
+\`\`\`
 `,
   },
 };
