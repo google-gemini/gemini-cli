@@ -12,16 +12,14 @@ on:
         required: true
         type: 'string'
       npm_channel:
-        description: 'The npm channel to publish to. Select "none" to not tag the release.'
+        description: 'The npm channel to publish to.'
         required: true
         type: 'choice'
         options:
           - 'preview'
           - 'nightly'
           - 'latest'
-          - 'dev'
-          - 'none'
-        default: 'dev'
+        default: 'latest'
       dry_run:
         description: 'Run a dry-run of the release process; no branches, npm packages or GitHub releases will be created.'
         required: true
