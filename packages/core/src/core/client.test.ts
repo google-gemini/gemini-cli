@@ -1505,6 +1505,87 @@ ${JSON.stringify(
       );
     });
 
+    it('should yield ContextWindowWillOverflow when the context window is about to overflow', async () => {
+      // Arrange
+      const MOCKED_TOKEN_LIMIT = 1000;
+      vi.mocked(tokenLimit).mockReturnValue(MOCKED_TOKEN_LIMIT);
+
+      // Set last prompt token count to be near the limit (e.g., 96%)
+      const lastPromptTokenCount = MOCKED_TOKEN_LIMIT * 0.96;
+      vi.mocked(uiTelemetryService.getLastPromptTokenCount).mockReturnValue(
+        lastPromptTokenCount,
+      );
+
+      // Mock tryCompressChat to not compress (so we can test the overflow logic)
+      vi.spyOn(client, 'tryCompressChat').mockResolvedValue({
+        originalTokenCount: lastPromptTokenCount,
+        newTokenCount: lastPromptTokenCount,
+        compressionStatus: CompressionStatus.NOOP,
+      });
+
+      // Act
+      const stream = client.sendMessageStream(
+        [{ text: 'Hi' }],
+        new AbortController().signal,
+        'prompt-id-overflow',
+      );
+
+      const events = await fromAsync(stream);
+
+      // Assert
+      expect(events).toContainEqual({
+        type: GeminiEventType.ContextWindowWillOverflow,
+      });
+      // Ensure turn.run is not called
+      expect(mockTurnRunFn).not.toHaveBeenCalled();
+    });
+
+    it("should use the sticky model's token limit for the overflow check", async () => {
+      // Arrange
+      const STICKY_MODEL = 'gemini-1.5-flash';
+      const STICKY_MODEL_LIMIT = 1000;
+      const CONFIG_MODEL_LIMIT = 2000;
+
+      // Set up token limits
+      vi.mocked(tokenLimit).mockImplementation((model) => {
+        if (model === STICKY_MODEL) return STICKY_MODEL_LIMIT;
+        return CONFIG_MODEL_LIMIT;
+      });
+
+      // Set the sticky model
+      client['currentSequenceModel'] = STICKY_MODEL;
+
+      // Set token count to be near the sticky model's limit (e.g., 960)
+      // This would not overflow the config model's limit (2000)
+      const lastPromptTokenCount = STICKY_MODEL_LIMIT * 0.96;
+      vi.mocked(uiTelemetryService.getLastPromptTokenCount).mockReturnValue(
+        lastPromptTokenCount,
+      );
+
+      vi.spyOn(client, 'tryCompressChat').mockResolvedValue({
+        originalTokenCount: lastPromptTokenCount,
+        newTokenCount: lastPromptTokenCount,
+        compressionStatus: CompressionStatus.NOOP,
+      });
+
+      // Act
+      const stream = client.sendMessageStream(
+        [{ text: 'Hi' }],
+        new AbortController().signal,
+        'test-session-id', // Use the same ID as the session to keep stickiness
+      );
+
+      const events = await fromAsync(stream);
+
+      // Assert
+      // Should overflow based on the sticky model's limit
+      expect(events).toContainEqual({
+        type: GeminiEventType.ContextWindowWillOverflow,
+      });
+      expect(tokenLimit).toHaveBeenCalledWith(STICKY_MODEL);
+      expect(mockTurnRunFn).not.toHaveBeenCalled();
+    });
+
     describe('Model Routing', () => {
       let mockRouterService: { route: Mock };
 

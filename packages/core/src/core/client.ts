@@ -440,6 +440,19 @@ export class GeminiClient {
     }
   }
 
+  private _getEffectiveModelForCurrentTurn(): string {
+    if (this.currentSequenceModel) {
+      return this.currentSequenceModel;
+    }
+
+    const configModel = this.config.getModel();
+    const model: string =
+      configModel === DEFAULT_GEMINI_MODEL_AUTO
+        ? DEFAULT_GEMINI_MODEL
+        : configModel;
+    return getEffectiveModel(this.config.isInFallbackMode(), model);
+  }
+
   async *sendMessageStream(
     request: PartListUnion,
     signal: AbortSignal,
@@ -462,6 +475,23 @@ export class GeminiClient {
     // Ensure turns never exceeds MAX_TURNS to prevent infinite loops
     const boundedTurns = Math.min(turns, MAX_TURNS);
     if (!boundedTurns) {
+      return new Turn(this.getChat(), prompt_id);
+    }
+
+    // Check for context window overflow
+    const modelForLimitCheck = this._getEffectiveModelForCurrentTurn();
+
+    const lastPromptTokenCount = uiTelemetryService.getLastPromptTokenCount();
+    const estimatedRequestTokenCount = Math.floor(
+      JSON.stringify(request).length / 4,
+    );
+    const totalEstimatedTokenCount =
+      lastPromptTokenCount + estimatedRequestTokenCount;
+    const limit = tokenLimit(modelForLimitCheck);
+
+    // If we are over 95% of the limit, stop and ask the user to compress.
+    if (totalEstimatedTokenCount > limit * 0.95) {
+      yield { type: GeminiEventType.ContextWindowWillOverflow };
       return new Turn(this.getChat(), prompt_id);
     }
 
@@ -656,14 +686,7 @@ export class GeminiClient {
     // If the model is 'auto', we will use a placeholder model to check.
     // Compression occurs before we choose a model, so calling `count_tokens`
     // before the model is chosen would result in an error.
-    const configModel = this.config.getModel();
-    let model: string =
-      configModel === DEFAULT_GEMINI_MODEL_AUTO
-        ? DEFAULT_GEMINI_MODEL
-        : configModel;
-
-    // Check if the model needs to be a fallback
-    model = getEffectiveModel(this.config.isInFallbackMode(), model);
+    const model = this._getEffectiveModelForCurrentTurn();
 
     const curatedHistory = this.getChat().getHistory(true);
 
