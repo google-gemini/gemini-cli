@@ -8,8 +8,9 @@
  * @fileoverview Defines the core configuration interfaces and types for the agent architecture.
  */
 
-import type { Content, FunctionDeclaration, Schema } from '@google/genai';
+import type { Content, FunctionDeclaration } from '@google/genai';
 import type { AnyDeclarativeTool } from '../tools/tools.js';
+import { type z } from 'zod';
 
 /**
  * Describes the possible termination modes for an agent.
@@ -48,8 +49,9 @@ export interface SubagentActivityEvent {
 
 /**
  * The definition for an agent.
+ * @template TOutput The specific Zod schema for the agent's final output object.
  */
-export interface AgentDefinition {
+export interface AgentDefinition<TOutput extends z.ZodTypeAny = z.ZodUnknown> {
   /** Unique identifier for the agent. */
   name: string;
   displayName?: string;
@@ -58,8 +60,16 @@ export interface AgentDefinition {
   modelConfig: ModelConfig;
   runConfig: RunConfig;
   toolConfig?: ToolConfig;
-  outputConfig?: OutputConfig;
+  outputConfig?: OutputConfig<TOutput>;
   inputConfig: InputConfig;
+  /**
+   * An optional function to process the raw output from the agent's final tool
+   * call into a string format.
+   *
+   * @param output The raw output value from the `complete_task` tool, now strongly typed with TOutput.
+   * @returns A string representation of the final output.
+   */
+  processOutput?: (output: z.infer<TOutput>) => string;
 }
 
 /**
@@ -118,7 +128,7 @@ export interface InputConfig {
 /**
  * Configures the expected outputs for the agent.
  */
-export interface OutputConfig {
+export interface OutputConfig<T extends z.ZodTypeAny> {
   /**
    * The name of the final result parameter. This will be the name of the
    * argument in the `submit_final_output` tool (e.g., "report", "answer").
@@ -134,7 +144,7 @@ export interface OutputConfig {
    * schema for the tool's argument, allowing for structured output enforcement.
    * Defaults to { type: 'string' }.
    */
-  schema?: Schema;
+  schema: T;
 }
 
 /**
