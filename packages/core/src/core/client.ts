@@ -465,6 +465,28 @@ export class GeminiClient {
       return new Turn(this.getChat(), prompt_id);
     }
 
+    // Check for context window overflow
+    const configModel = this.config.getModel();
+    let model: string =
+      configModel === DEFAULT_GEMINI_MODEL_AUTO
+        ? DEFAULT_GEMINI_MODEL
+        : configModel;
+    model = getEffectiveModel(this.config.isInFallbackMode(), model);
+
+    const lastPromptTokenCount = uiTelemetryService.getLastPromptTokenCount();
+    const estimatedRequestTokenCount = Math.floor(
+      JSON.stringify(request).length / 4,
+    );
+    const totalEstimatedTokenCount =
+      lastPromptTokenCount + estimatedRequestTokenCount;
+    const limit = tokenLimit(model);
+
+    // If we are over 95% of the limit, stop and ask the user to compress.
+    if (totalEstimatedTokenCount > limit * 0.95) {
+      yield { type: GeminiEventType.ContextWindowWillOverflow };
+      return new Turn(this.getChat(), prompt_id);
+    }
+
     const compressed = await this.tryCompressChat(prompt_id, false);
 
     if (compressed.compressionStatus === CompressionStatus.COMPRESSED) {

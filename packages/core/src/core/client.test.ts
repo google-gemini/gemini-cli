@@ -1505,6 +1505,41 @@ ${JSON.stringify(
       );
     });
 
+    it('should yield ContextWindowWillOverflow when the context window is about to overflow', async () => {
+      // Arrange
+      const MOCKED_TOKEN_LIMIT = 1000;
+      vi.mocked(tokenLimit).mockReturnValue(MOCKED_TOKEN_LIMIT);
+
+      // Set last prompt token count to be near the limit (e.g., 96%)
+      const lastPromptTokenCount = MOCKED_TOKEN_LIMIT * 0.96;
+      vi.mocked(uiTelemetryService.getLastPromptTokenCount).mockReturnValue(
+        lastPromptTokenCount,
+      );
+
+      // Mock tryCompressChat to not compress (so we can test the overflow logic)
+      vi.spyOn(client, 'tryCompressChat').mockResolvedValue({
+        originalTokenCount: lastPromptTokenCount,
+        newTokenCount: lastPromptTokenCount,
+        compressionStatus: CompressionStatus.NOOP,
+      });
+
+      // Act
+      const stream = client.sendMessageStream(
+        [{ text: 'Hi' }],
+        new AbortController().signal,
+        'prompt-id-overflow',
+      );
+
+      const events = await fromAsync(stream);
+
+      // Assert
+      expect(events).toContainEqual({
+        type: GeminiEventType.ContextWindowWillOverflow,
+      });
+      // Ensure turn.run is not called
+      expect(mockTurnRunFn).not.toHaveBeenCalled();
+    });
+
     describe('Model Routing', () => {
       let mockRouterService: { route: Mock };
 
