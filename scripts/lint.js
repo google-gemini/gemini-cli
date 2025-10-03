@@ -231,17 +231,7 @@ export function runSensitiveKeywordLinter() {
 
   if (violations.length > 0) {
     console.error(
-      'Error: Found sensitive keywords that are not in the allowlist:',
-    );
-    violations.forEach((violation) => {
-      console.error(
-        `  - Found "${violation.keyword}" in file: ${violation.file}`,
-      );
-    });
-    console.error('\nPlease remove or replace these keywords.');
-    console.error(
-      'Allowed keywords are:',
-      Array.from(ALLOWED_KEYWORDS).join(', '),
+      'Found sensitive keywords, please make sure these changes are appropriate to submit',
     );
     process.exit(1);
   } else {
