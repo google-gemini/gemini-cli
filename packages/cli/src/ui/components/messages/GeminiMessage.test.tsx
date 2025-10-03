@@ -15,43 +15,35 @@ describe('<GeminiMessage /> - Raw Markdown Display Snapshots', () => {
     terminalWidth: 80,
   };
 
-  it('renders with renderMarkdown=true (default)', () => {
-    const { lastFrame } = renderWithProviders(
-      <GeminiMessage {...baseProps} />,
-      {
-        uiState: { renderMarkdown: true, streamingState: StreamingState.Idle },
-      },
-    );
-    expect(lastFrame()).toMatchSnapshot();
-  });
+  it.each([
+    { renderMarkdown: true, description: '(default)' },
+    {
+      renderMarkdown: false,
+      description: '(raw markdown with syntax highlighting, no line numbers)',
+    },
+  ])(
+    'renders with renderMarkdown=$renderMarkdown $description',
+    ({ renderMarkdown }) => {
+      const { lastFrame } = renderWithProviders(
+        <GeminiMessage {...baseProps} />,
+        {
+          uiState: { renderMarkdown, streamingState: StreamingState.Idle },
+        },
+      );
+      expect(lastFrame()).toMatchSnapshot();
+    },
+  );
 
-  it('renders with renderMarkdown=false (raw markdown with syntax highlighting, no line numbers)', () => {
-    const { lastFrame } = renderWithProviders(
-      <GeminiMessage {...baseProps} />,
-      {
-        uiState: { renderMarkdown: false, streamingState: StreamingState.Idle },
-      },
-    );
-    expect(lastFrame()).toMatchSnapshot();
-  });
-
-  it('renders pending state with renderMarkdown=true', () => {
-    const { lastFrame } = renderWithProviders(
-      <GeminiMessage {...baseProps} isPending={true} />,
-      {
-        uiState: { renderMarkdown: true, streamingState: StreamingState.Idle },
-      },
-    );
-    expect(lastFrame()).toMatchSnapshot();
-  });
-
-  it('renders pending state with renderMarkdown=false', () => {
-    const { lastFrame } = renderWithProviders(
-      <GeminiMessage {...baseProps} isPending={true} />,
-      {
-        uiState: { renderMarkdown: false, streamingState: StreamingState.Idle },
-      },
-    );
-    expect(lastFrame()).toMatchSnapshot();
-  });
+  it.each([{ renderMarkdown: true }, { renderMarkdown: false }])(
+    'renders pending state with renderMarkdown=$renderMarkdown',
+    ({ renderMarkdown }) => {
+      const { lastFrame } = renderWithProviders(
+        <GeminiMessage {...baseProps} isPending={true} />,
+        {
+          uiState: { renderMarkdown, streamingState: StreamingState.Idle },
+        },
+      );
+      expect(lastFrame()).toMatchSnapshot();
+    },
+  );
 });
