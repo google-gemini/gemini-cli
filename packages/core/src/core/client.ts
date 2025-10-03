@@ -466,12 +466,22 @@ export class GeminiClient {
     }
 
     // Check for context window overflow
-    const configModel = this.config.getModel();
-    let model: string =
-      configModel === DEFAULT_GEMINI_MODEL_AUTO
-        ? DEFAULT_GEMINI_MODEL
-        : configModel;
-    model = getEffectiveModel(this.config.isInFallbackMode(), model);
+    let modelForLimitCheck: string;
+    if (this.currentSequenceModel) {
+      // Use the sticky model if we are in a sequence
+      modelForLimitCheck = this.currentSequenceModel;
+    } else {
+      // Otherwise use the configured model (accounting for 'auto' and fallback)
+      const configModel = this.config.getModel();
+      const model: string =
+        configModel === DEFAULT_GEMINI_MODEL_AUTO
+          ? DEFAULT_GEMINI_MODEL
+          : configModel;
+      modelForLimitCheck = getEffectiveModel(
+        this.config.isInFallbackMode(),
+        model,
+      );
+    }
 
     const lastPromptTokenCount = uiTelemetryService.getLastPromptTokenCount();
     const estimatedRequestTokenCount = Math.floor(
@@ -479,7 +489,7 @@ export class GeminiClient {
     );
     const totalEstimatedTokenCount =
       lastPromptTokenCount + estimatedRequestTokenCount;
-    const limit = tokenLimit(model);
+    const limit = tokenLimit(modelForLimitCheck);
 
     // If we are over 95% of the limit, stop and ask the user to compress.
     if (totalEstimatedTokenCount > limit * 0.95) {
