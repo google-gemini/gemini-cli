@@ -5,6 +5,7 @@
  */
 
 import type { GenerateContentResponse } from '@google/genai';
+import { ApiError } from '@google/genai';
 import { AuthType } from '../core/contentGenerator.js';
 import {
   isProQuotaExceededError,
@@ -42,17 +43,19 @@ const DEFAULT_RETRY_OPTIONS: RetryOptions = {
  * @returns True if the error is a transient error, false otherwise.
  */
 function defaultShouldRetry(error: Error | unknown): boolean {
-  // Check for common transient error status codes either in message or a status property
-  if (error && typeof (error as { status?: number }).status === 'number') {
-    const status = (error as { status: number }).status;
-    if (status === 429 || (status >= 500 && status < 600)) {
-      return true;
-    }
+  // Priority check for ApiError
+  if (error instanceof ApiError) {
+    // Explicitly do not retry 400 (Bad Request)
+    if (error.status === 400) return false;
+    return error.status === 429 || (error.status >= 500 && error.status < 600);
   }
-  if (error instanceof Error && error.message) {
-    if (error.message.includes('429')) return true;
-    if (error.message.match(/5\d{2}/)) return true;
+
+  // Check for status using helper (handles other error shapes)
+  const status = getErrorStatus(error);
+  if (status !== undefined) {
+    return status === 429 || (status >= 500 && status < 600);
   }
+
   return false;
 }
 
