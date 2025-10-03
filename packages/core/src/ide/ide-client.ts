@@ -708,11 +708,32 @@ export class IdeClient {
     );
     this.client.onerror = (_error) => {
       const errorMessage = _error instanceof Error ? _error.message : `_error`;
-      this.setState(
-        IDEConnectionStatus.Disconnected,
-        `IDE connection error. The connection was lost unexpectedly. Please try reconnecting by running /ide enable\n${errorMessage}`,
-        true,
-      );
+
+      // Check if this is an authentication-related error
+      const isAuthError =
+        errorMessage.includes('fetch failed') ||
+        errorMessage.includes('authentication') ||
+        errorMessage.includes('ECONNREFUSED') ||
+        errorMessage.includes('ENOTFOUND');
+
+      if (isAuthError) {
+        // Don't treat authentication-related disconnects as critical errors
+        logger.debug(
+          'IDE connection interrupted, possibly due to authentication:',
+          errorMessage,
+        );
+        this.setState(
+          IDEConnectionStatus.Disconnected,
+          `IDE connection temporarily interrupted. This may be due to authentication refresh. Try reconnecting with /ide enable if needed.`,
+          false, // Don't log to console as error
+        );
+      } else {
+        this.setState(
+          IDEConnectionStatus.Disconnected,
+          `IDE connection error. The connection was lost unexpectedly. Please try reconnecting by running /ide enable\n${errorMessage}`,
+          true,
+        );
+      }
     };
     this.client.onclose = () => {
       this.setState(
