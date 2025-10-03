@@ -58,7 +58,7 @@ jobs:
           fetch-depth: 1
 
       - name: 'Unshallow fetch for keyword linter'
-        run: git fetch --prune --unshallow
+        run: 'git fetch --prune --unshallow'
 
       - name: 'Set up Node.js'
         uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions/setup-node@v4.4.0
