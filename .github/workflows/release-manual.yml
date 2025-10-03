@@ -102,14 +102,6 @@ jobs:
           dry-run: '${{ github.event.inputs.dry_run }}'
           working-directory: './release'
 
-      - name: 'Trigger Evaluation'
-        if: "${{ github.event.inputs.dry_run == 'false' }}"
-        env:
-          GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
-        shell: 'bash'
-        run: |
-          gh workflow run eval.yml --ref ${{ steps.build.outputs.branch-name }} -f branch-or-commit=${{ steps.build.outputs.branch-name }} -f dry-run=true
-
       - name: 'Publish Release'
         uses: './.github/actions/publish-release'
         with:
@@ -127,6 +119,11 @@ jobs:
           branch-name: '${{ steps.build.outputs.branch-name }}'
           gemini_api_key: '${{ secrets.GEMINI_API_KEY }}'
           registry: '${{ github.event.inputs.registry }}'
+          google-cloud-project: '${{ vars.GOOGLE_CLOUD_PROJECT }}'
+          gcp-wif-provider: '${{ vars.GCP_WIF_PROVIDER }}'
+          service-account-email: '${{ vars.SERVICE_ACCOUNT_EMAIL }}'
+          eval-gemini-api-key: '${{ secrets.EVAL_GEMINI_API_KEY }}'
+          eval-gcs-bucket: '${{ vars.EVAL_GCS_BUCKET }}'
 
       - name: 'Create Issue on Failure'
         if: '${{ failure() && github.event.inputs.dry_run == false }}'

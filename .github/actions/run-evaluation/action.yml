@@ -1,0 +1,111 @@
+name: 'Run evaluation'
+description: 'Runs evaluation on a given branch or commit and checks against thresholds.'
+
+inputs:
+  branch-or-commit:
+    description: 'The branch or commit to run the evaluation on.'
+    required: true
+  dry-run:
+    description: 'dry run: runs evaluation without creating an issue.'
+    required: false
+    default: 'true'
+  resolution-rate-threshold:
+    description: 'The threshold for the resolution rate.'
+    required: false
+    default: '90'
+  tool-success-rate-threshold:
+    description: 'The threshold for the tool success rate.'
+    required: false
+    default: '80'
+  github-token:
+    description: 'GitHub token for authentication.'
+    required: true
+  google-cloud-project:
+    description: 'Google Cloud project ID.'
+    required: true
+  gcp-wif-provider:
+    description: 'Google Cloud Workload Identity Provider.'
+    required: true
+  service-account-email:
+    description: 'Google Cloud service account email.'
+    required: true
+  eval-gemini-api-key:
+    description: 'Gemini API key for evaluation.'
+    required: true
+  eval-gcs-bucket:
+    description: 'GCS bucket for evaluation artifacts.'
+    required: true
+
+runs:
+  using: 'composite'
+  steps:
+    - name: 'Checkout repository'
+      uses: 'actions/checkout@v4' # ratchet:exclude
+      with:
+        ref: '${{ inputs.branch-or-commit }}'
+
+    - name: 'Authenticate to Google Cloud'
+      id: 'auth'
+      uses: 'google-github-actions/auth@v2' # ratchet:exclude
+      with:
+        project_id: '${{ inputs.google-cloud-project }}'
+        workload_identity_provider: '${{ inputs.gcp-wif-provider }}'
+        service_account: '${{ inputs.service-account-email }}'
+        token_format: 'access_token'
+        access_token_scopes: 'https://www.googleapis.com/auth/cloud-platform'
+
+    - name: 'Run evaluation'
+      shell: 'bash'
+      working-directory: '/app'
+      run: |
+        poetry run exp_run --experiment-mode='on-demand' --branch-or-commit='${{ inputs.branch-or-commit }}' --model-name=gemini-1.5-pro --dataset=swebench_verified --concurrency=15
+        poetry run python agent_prototypes/scripts/parse_gcli_logs_experiment.py --experiment_dir=experiments/adhoc/gcli_temp_exp --gcs-bucket="${EVAL_GCS_BUCKET}" --gcs-path=gh_action_artifacts
+      env:
+        EVAL_GCS_BUCKET: '${{ inputs.eval-gcs-bucket }}'
+
+    - name: 'Get evaluation summary'
+      id: 'calculate-rates'
+      shell: 'bash'
+      working-directory: '/app'
+      run: |
+        poetry run bash "$GITHUB_WORKSPACE/scripts/calculate_eval_success_rates.sh" /app/experiments/adhoc/gcli_temp_exp/artifacts/summary_stats.md
+
+    - name: 'Check evaluation threshold'
+      if: >-
+        ${{(steps.calculate-rates.outputs.resolution-rate < inputs.resolution-rate-threshold ||
+        steps.calculate-rates.outputs.tool-success-rate < inputs.tool-success-rate-threshold) }}
+      uses: 'actions/github-script@v7' # ratchet:exclude
+      with:
+        github-token: '${{ inputs.github-token }}'
+        script: |
+          const resolutionRate = ${{ steps.calculate-rates.outputs.resolution-rate }};
+          const toolSuccessRate = ${{ steps.calculate-rates.outputs.tool-success-rate }};
+          const resolutionRateThreshold = ${{ inputs.resolution-rate-threshold }};
+          const toolSuccessRateThreshold = ${{ inputs.tool-success-rate-threshold }};
+          const branchOrCommit = '${{ inputs.branch-or-commit }}';
+          const runUrl = `https://github.com/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`;
+          const dryRun = ${{ inputs.dry-run }};
+
+          const title = `⚠️ Evaluation below threshold for ${branchOrCommit}`;
+          const body = "
+          Evaluation for `" + branchOrCommit + "` failed to meet the required thresholds.
+
+          - **Resolution Rate**: ${resolutionRate}% (Threshold: ${resolutionRateThreshold}%)
+          - **Tool Success Rate**: ${toolSuccessRate}% (Threshold: ${toolSuccessRateThreshold}%)
+
+          [View Workflow Run](${runUrl})
+          ";
+
+          if (dryRun) {
+            console.log('Dry run enabled. Would create issue with:');
+            console.log(`Title: ${title}`);
+            console.log(`Body: ${body}`);
+          } else {
+            await github.rest.issues.create({
+              owner: process.env.GITHUB_REPOSITORY.split('/')[0],
+              repo: process.env.GITHUB_REPOSITORY.split('/')[1],
+              title: title,
+              body: body,
+              labels: ['eval-failure']
+            });
+          }
