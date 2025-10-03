@@ -9,12 +9,14 @@ import { handleInstall, installCommand } from './install.js';
 import yargs from 'yargs';
 
 const { mockRequestFn } = vi.hoisted(() => ({
-    mockRequestFn: vi.fn(),
-  }));
-const mockInstallExtension = vi.hoisted(() => vi.fn(() => 
+  mockRequestFn: vi.fn(),
+}));
+const mockInstallExtension = vi.hoisted(() =>
+  vi.fn(() =>
     // Simulate mockRequestFn being called by installExtension
-     mockRequestFn()
-  ));
+    mockRequestFn(),
+  ),
+);
 
 vi.mock('../../config/extension.js', () => ({
   installExtension: mockInstallExtension,
