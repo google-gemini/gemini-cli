@@ -211,28 +211,39 @@ export function runSensitiveKeywordLinter() {
   }
 
   const changedFiles = getChangedFiles();
-  const violations = [];
+  let violationsFound = false;
 
   for (const file of changedFiles) {
     if (!existsSync(file) || lstatSync(file).isDirectory()) {
       continue;
     }
     const content = readFileSync(file, 'utf-8');
-    const matches = content.match(SENSITIVE_PATTERN);
-
-    if (matches) {
-      for (const match of matches) {
-        if (!ALLOWED_KEYWORDS.has(match)) {
-          violations.push({ file, keyword: match });
+    const lines = content.split('\n');
+    let match;
+    while ((match = SENSITIVE_PATTERN.exec(content)) !== null) {
+      const keyword = match[0];
+      if (!ALLOWED_KEYWORDS.has(keyword)) {
+        violationsFound = true;
+        const matchIndex = match.index;
+        let lineNum = 0;
+        let charCount = 0;
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          if (charCount + line.length + 1 > matchIndex) {
+            lineNum = i + 1;
+            const colNum = matchIndex - charCount + 1;
+            console.error(
+              `${file}:${lineNum}:${colNum}: warning: Found sensitive keyword "${keyword}". Please make sure this change is appropriate to submit.`,
+            );
+            break;
+          }
+          charCount += line.length + 1; // +1 for the newline
         }
       }
     }
   }
 
-  if (violations.length > 0) {
-    console.error(
-      'Found sensitive keywords, please make sure these changes are appropriate to submit',
-    );
+  if (violationsFound) {
     process.exit(1);
   } else {
     console.log('No sensitive keyword violations found.');
