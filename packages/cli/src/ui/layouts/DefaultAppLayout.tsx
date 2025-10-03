@@ -13,13 +13,11 @@ import { Composer } from '../components/Composer.js';
 import { ExitWarning } from '../components/ExitWarning.js';
 import { useUIState } from '../contexts/UIStateContext.js';
 
-export const DefaultAppLayout: React.FC<{ width?: string }> = ({
-  width = '90%',
-}) => {
+export const DefaultAppLayout: React.FC = () => {
   const uiState = useUIState();
 
   return (
-    <Box flexDirection="column" width={width}>
+    <Box flexDirection="column" width={uiState.mainAreaWidth}>
       <MainContent />
 
       <Box flexDirection="column" ref={uiState.mainControlsRef}>
@@ -27,7 +25,7 @@ export const DefaultAppLayout: React.FC<{ width?: string }> = ({
 
         {uiState.dialogsVisible ? (
           <DialogManager
-            terminalWidth={uiState.terminalWidth}
+            terminalWidth={uiState.mainAreaWidth}
             addItem={uiState.historyManager.addItem}
           />
         ) : (
