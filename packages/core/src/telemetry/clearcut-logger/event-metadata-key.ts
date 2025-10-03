@@ -89,6 +89,16 @@ export enum EventMetadataKey {
   GEMINI_CLI_TOOL_CALL_CONTENT_LENGTH = 93,
 
   // ==========================================================================
+  // Replace Tool Call Event Keys
+  // ===========================================================================
+
+  // Logs a smart edit tool strategy choice.
+  GEMINI_CLI_SMART_EDIT_STRATEGY = 109,
+
+  // Logs a smart edit correction event.
+  GEMINI_CLI_SMART_EDIT_CORRECTION = 110,
+
+  // ==========================================================================
   // GenAI API Request Event Keys
   // ===========================================================================
 

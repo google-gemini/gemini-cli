@@ -107,13 +107,6 @@ function sendIdeContextUpdateNotification(
     params: ideContext,
   });
 
-  log(
-    `Sending IDE context update notification: ${JSON.stringify(
-      notification,
-      null,
-      2,
-    )}`,
-  );
   transport.send(notification);
 }
 
@@ -173,24 +166,27 @@ export class IDEServer {
 
       app.use((req, res, next) => {
         const authHeader = req.headers.authorization;
-        if (authHeader) {
-          const parts = authHeader.split(' ');
-          if (parts.length !== 2 || parts[0] !== 'Bearer') {
-            this.log('Malformed Authorization header. Rejecting request.');
-            res.status(401).send('Unauthorized');
-            return;
-          }
-          const token = parts[1];
-          if (token !== this.authToken) {
-            this.log('Invalid auth token provided. Rejecting request.');
-            res.status(401).send('Unauthorized');
-            return;
-          }
+        if (!authHeader) {
+          this.log('Missing Authorization header. Rejecting request.');
+          res.status(401).send('Unauthorized');
+          return;
+        }
+        const parts = authHeader.split(' ');
+        if (parts.length !== 2 || parts[0] !== 'Bearer') {
+          this.log('Malformed Authorization header. Rejecting request.');
+          res.status(401).send('Unauthorized');
+          return;
+        }
+        const token = parts[1];
+        if (token !== this.authToken) {
+          this.log('Invalid auth token provided. Rejecting request.');
+          res.status(401).send('Unauthorized');
+          return;
         }
         next();
       });
 
-      const mcpServer = createMcpServer(this.diffManager);
+      const mcpServer = createMcpServer(this.diffManager, this.log);
 
       this.openFilesManager = new OpenFilesManager(context);
       const onDidChangeSubscription = this.openFilesManager.onDidChange(() => {
@@ -222,16 +218,27 @@ export class IDEServer {
               this.transports[newSessionId] = transport;
             },
           });
+          let missedPings = 0;
           const keepAlive = setInterval(() => {
-            try {
-              transport.send({ jsonrpc: '2.0', method: 'ping' });
-            } catch (e) {
-              this.log(
-                'Failed to send keep-alive ping, cleaning up interval.' + e,
-              );
-              clearInterval(keepAlive);
-            }
-          }, 30000); // 30 sec
+            const sessionId = transport.sessionId ?? 'unknown';
+            transport
+              .send({ jsonrpc: '2.0', method: 'ping' })
+              .then(() => {
+                missedPings = 0;
+              })
+              .catch((error) => {
+                missedPings++;
+                this.log(
+                  `Failed to send keep-alive ping for session ${sessionId}. Missed pings: ${missedPings}. Error: ${error.message}`,
+                );
+                if (missedPings >= 3) {
+                  this.log(
+                    `Session ${sessionId} missed ${missedPings} pings. Closing connection and cleaning up interval.`,
+                  );
+                  clearInterval(keepAlive);
+                }
+              });
+          }, 60000); // 60 sec
 
           transport.onclose = () => {
             clearInterval(keepAlive);
@@ -315,6 +322,8 @@ export class IDEServer {
       app.get('/mcp', handleSessionRequest);
 
       app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
+        this.log(`Error processing request: ${err.message}`);
+        this.log(`Stack trace: ${err.stack}`);
         if (err instanceof CORSError) {
           res.status(403).json({ error: 'Request denied by CORS policy.' });
         } else {
@@ -348,6 +357,14 @@ export class IDEServer {
           }
         }
         resolve();
+      });
+
+      this.server.on('close', () => {
+        this.log('IDE server connection closed.');
+      });
+
+      this.server.on('error', (error) => {
+        this.log(`IDE server error: ${error.message}`);
       });
     });
   }
@@ -421,7 +438,10 @@ export class IDEServer {
   }
 }
 
-const createMcpServer = (diffManager: DiffManager) => {
+const createMcpServer = (
+  diffManager: DiffManager,
+  log: (message: string) => void,
+) => {
   const server = new McpServer(
     {
       name: 'gemini-cli-companion-mcp-server',
@@ -437,6 +457,7 @@ const createMcpServer = (diffManager: DiffManager) => {
       inputSchema: OpenDiffRequestSchema.shape,
     },
     async ({ filePath, newContent }: z.infer<typeof OpenDiffRequestSchema>) => {
+      log(`Received openDiff request for filePath: ${filePath}`);
       await diffManager.showDiff(filePath, newContent);
       return { content: [] };
     },
@@ -451,6 +472,7 @@ const createMcpServer = (diffManager: DiffManager) => {
       filePath,
       suppressNotification,
     }: z.infer<typeof CloseDiffRequestSchema>) => {
+      log(`Received closeDiff request for filePath: ${filePath}`);
       const content = await diffManager.closeDiff(
         filePath,
         suppressNotification,

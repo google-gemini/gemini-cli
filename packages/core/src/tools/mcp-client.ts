@@ -55,6 +55,8 @@ export type DiscoveredMCPPrompt = Prompt & {
 export enum MCPServerStatus {
   /** Server is disconnected or experiencing errors */
   DISCONNECTED = 'disconnected',
+  /** Server is actively disconnecting */
+  DISCONNECTING = 'disconnecting',
   /** Server is in the process of connecting */
   CONNECTING = 'connecting',
   /** Server is connected and ready to use */
@@ -80,10 +82,9 @@ export enum MCPDiscoveryState {
  * managing the state of a single MCP server.
  */
 export class McpClient {
-  private client: Client;
+  private client: Client | undefined;
   private transport: Transport | undefined;
   private status: MCPServerStatus = MCPServerStatus.DISCONNECTED;
-  private isDisconnecting = false;
 
   constructor(
     private readonly serverName: string,
@@ -92,51 +93,34 @@ export class McpClient {
     private readonly promptRegistry: PromptRegistry,
     private readonly workspaceContext: WorkspaceContext,
     private readonly debugMode: boolean,
-  ) {
-    this.client = new Client({
-      name: `gemini-cli-mcp-client-${this.serverName}`,
-      version: '0.0.1',
-    });
-  }
+  ) {}
 
   /**
    * Connects to the MCP server.
    */
   async connect(): Promise<void> {
-    this.isDisconnecting = false;
+    if (this.status !== MCPServerStatus.DISCONNECTED) {
+      throw new Error(
+        `Can only connect when the client is disconnected, current state is ${this.status}`,
+      );
+    }
     this.updateStatus(MCPServerStatus.CONNECTING);
     try {
-      this.transport = await this.createTransport();
-
+      this.client = await connectToMcpServer(
+        this.serverName,
+        this.serverConfig,
+        this.debugMode,
+        this.workspaceContext,
+      );
+      const originalOnError = this.client.onerror;
       this.client.onerror = (error) => {
-        if (this.isDisconnecting) {
+        if (this.status !== MCPServerStatus.CONNECTED) {
           return;
         }
+        if (originalOnError) originalOnError(error);
         console.error(`MCP ERROR (${this.serverName}):`, error.toString());
         this.updateStatus(MCPServerStatus.DISCONNECTED);
       };
-
-      this.client.registerCapabilities({
-        roots: {},
-      });
-
-      this.client.setRequestHandler(ListRootsRequestSchema, async () => {
-        const roots = [];
-        for (const dir of this.workspaceContext.getDirectories()) {
-          roots.push({
-            uri: pathToFileURL(dir).toString(),
-            name: basename(dir),
-          });
-        }
-        return {
-          roots,
-        };
-      });
-
-      await this.client.connect(this.transport, {
-        timeout: this.serverConfig.timeout,
-      });
-
       this.updateStatus(MCPServerStatus.CONNECTED);
     } catch (error) {
       this.updateStatus(MCPServerStatus.DISCONNECTED);
@@ -168,11 +152,18 @@ export class McpClient {
    * Disconnects from the MCP server.
    */
   async disconnect(): Promise<void> {
-    this.isDisconnecting = true;
+    if (this.status !== MCPServerStatus.CONNECTED) {
+      return;
+    }
+    this.updateStatus(MCPServerStatus.DISCONNECTING);
+    const client = this.client;
+    this.client = undefined;
     if (this.transport) {
       await this.transport.close();
     }
-    this.client.close();
+    if (client) {
+      await client.close();
+    }
     this.updateStatus(MCPServerStatus.DISCONNECTED);
   }
 
@@ -188,21 +179,27 @@ export class McpClient {
     updateMCPServerStatus(this.serverName, status);
   }
 
-  private async createTransport(): Promise<Transport> {
-    return createTransport(this.serverName, this.serverConfig, this.debugMode);
+  private assertConnected(): void {
+    if (this.status !== MCPServerStatus.CONNECTED) {
+      throw new Error(
+        `Client is not connected, must connect before interacting with the server. Current state is ${this.status}`,
+      );
+    }
   }
 
   private async discoverTools(cliConfig: Config): Promise<DiscoveredMCPTool[]> {
+    this.assertConnected();
     return discoverTools(
       this.serverName,
       this.serverConfig,
-      this.client,
+      this.client!,
       cliConfig,
     );
   }
 
   private async discoverPrompts(): Promise<Prompt[]> {
-    return discoverPrompts(this.serverName, this.client, this.promptRegistry);
+    this.assertConnected();
+    return discoverPrompts(this.serverName, this.client!, this.promptRegistry);
   }
 }
 
@@ -584,6 +581,9 @@ export async function discoverTools(
   cliConfig: Config,
 ): Promise<DiscoveredMCPTool[]> {
   try {
+    // Only request tools if the server supports them.
+    if (mcpClient.getServerCapabilities()?.tools == null) return [];
+
     const mcpCallableTool = mcpToTool(mcpClient, {
       timeout: mcpServerConfig.timeout ?? MCP_DEFAULT_TIMEOUT_MSEC,
     });

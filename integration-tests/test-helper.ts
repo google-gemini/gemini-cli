@@ -13,6 +13,7 @@ import { DEFAULT_GEMINI_MODEL } from '../packages/core/src/config/models.js';
 import fs from 'node:fs';
 import * as pty from '@lydell/node-pty';
 import stripAnsi from 'strip-ansi';
+import * as os from 'node:os';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -813,16 +814,27 @@ export class TestRig {
   } {
     const { command, initialArgs } = this._getCommandAndArgs(['--yolo']);
     const commandArgs = [...initialArgs, ...args];
+    const isWindows = os.platform() === 'win32';
 
     this._interactiveOutput = ''; // Reset output for the new run
 
-    const ptyProcess = pty.spawn(command, commandArgs, {
+    const options: pty.IPtyForkOptions = {
       name: 'xterm-color',
       cols: 80,
       rows: 30,
       cwd: this.testDir!,
-      env: process.env as { [key: string]: string },
-    });
+      env: Object.fromEntries(
+        Object.entries(process.env).filter(([, v]) => v !== undefined),
+      ) as { [key: string]: string },
+    };
+
+    if (isWindows) {
+      // node-pty on Windows requires a shell to be specified when using winpty.
+      options.shell = process.env.COMSPEC || 'cmd.exe';
+    }
+
+    const executable = command === 'node' ? process.execPath : command;
+    const ptyProcess = pty.spawn(executable, commandArgs, options);
 
     ptyProcess.onData((data) => {
       this._interactiveOutput += data;

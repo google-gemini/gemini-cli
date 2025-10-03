@@ -2,68 +2,222 @@
   {
     "label": "Overview",
     "items": [
-      { "label": "Welcome", "slug": "docs" },
-      { "label": "Execution and Deployment", "slug": "docs/deployment" },
-      { "label": "Architecture Overview", "slug": "docs/architecture" }
+      {
+        "label": "Introduction",
+        "slug": "docs"
+      },
+      {
+        "label": "Architecture Overview",
+        "slug": "docs/architecture"
+      }
+    ]
+  },
+  {
+    "label": "Get Started",
+    "items": [
+      {
+        "label": "Gemini CLI Quickstart",
+        "slug": "docs/get-started"
+      },
+      {
+        "label": "Authentication",
+        "slug": "docs/get-started/authentication"
+      },
+      {
+        "label": "Configuration",
+        "slug": "docs/get-started/configuration"
+      },
+      {
+        "label": "Deployment",
+        "slug": "docs/get-started/deployment"
+      },
+      {
+        "label": "Examples",
+        "slug": "docs/get-started/examples"
+      }
     ]
   },
   {
     "label": "CLI",
     "items": [
-      { "label": "Introduction", "slug": "docs/cli" },
-      { "label": "Authentication", "slug": "docs/cli/authentication" },
-      { "label": "Commands", "slug": "docs/cli/commands" },
-      { "label": "Configuration", "slug": "docs/cli/configuration" },
-      { "label": "Checkpointing", "slug": "docs/checkpointing" },
-      { "label": "Enterprise", "slug": "docs/cli/enterprise" },
-      { "label": "Extensions", "slug": "docs/extension" },
-      { "label": "Headless Mode", "slug": "docs/headless" },
-      { "label": "IDE Integration", "slug": "docs/ide-integration" },
       {
-        "label": "IDE Companion Spec",
-        "slug": "docs/ide-companion-spec"
+        "label": "Introduction",
+        "slug": "docs/cli"
       },
-      { "label": "Telemetry", "slug": "docs/telemetry" },
-      { "label": "Themes", "slug": "docs/cli/themes" },
-      { "label": "Token Caching", "slug": "docs/cli/token-caching" },
-      { "label": "Trusted Folders", "slug": "docs/trusted-folders" },
-      { "label": "Tutorials", "slug": "docs/cli/tutorials" }
+      {
+        "label": "Commands",
+        "slug": "docs/cli/commands"
+      },
+      {
+        "label": "Checkpointing",
+        "slug": "docs/cli/checkpointing"
+      },
+      {
+        "label": "Custom Commands",
+        "slug": "docs/cli/custom-commands"
+      },
+      {
+        "label": "Enterprise",
+        "slug": "docs/cli/enterprise"
+      },
+      {
+        "label": "Headless Mode",
+        "slug": "docs/cli/headless"
+      },
+      {
+        "label": "Keyboard Shortcuts",
+        "slug": "docs/cli/keyboard-shortcuts"
+      },
+      {
+        "label": "Sandbox",
+        "slug": "docs/cli/sandbox"
+      },
+      {
+        "label": "Telemetry",
+        "slug": "docs/cli/telemetry"
+      },
+      {
+        "label": "Themes",
+        "slug": "docs/cli/themes"
+      },
+      {
+        "label": "Token Caching",
+        "slug": "docs/cli/token-caching"
+      },
+      {
+        "label": "Trusted Folders",
+        "slug": "docs/cli/trusted-folders"
+      },
+      {
+        "label": "Tutorials",
+        "slug": "docs/cli/tutorials"
+      },
+      {
+        "label": "Uninstall",
+        "slug": "docs/cli/uninstall"
+      }
     ]
   },
   {
     "label": "Core",
     "items": [
-      { "label": "Introduction", "slug": "docs/core" },
-      { "label": "Tools API", "slug": "docs/core/tools-api" },
-      { "label": "Memory Import Processor", "slug": "docs/core/memport" }
+      {
+        "label": "Introduction",
+        "slug": "docs/core"
+      },
+      {
+        "label": "Tools API",
+        "slug": "docs/core/tools-api"
+      },
+      {
+        "label": "Memory Import Processor",
+        "slug": "docs/core/memport"
+      }
     ]
   },
   {
     "label": "Tools",
     "items": [
-      { "label": "Overview", "slug": "docs/tools" },
-      { "label": "File System", "slug": "docs/tools/file-system" },
-      { "label": "Multi-File Read", "slug": "docs/tools/multi-file" },
-      { "label": "Shell", "slug": "docs/tools/shell" },
-      { "label": "Web Fetch", "slug": "docs/tools/web-fetch" },
-      { "label": "Web Search", "slug": "docs/tools/web-search" },
-      { "label": "Memory", "slug": "docs/tools/memory" },
-      { "label": "MCP Servers", "slug": "docs/tools/mcp-server" },
-      { "label": "Sandboxing", "slug": "docs/sandbox" }
+      {
+        "label": "Introduction",
+        "slug": "docs/tools"
+      },
+      {
+        "label": "File System",
+        "slug": "docs/tools/file-system"
+      },
+      {
+        "label": "Multi-File Read",
+        "slug": "docs/tools/multi-file"
+      },
+      {
+        "label": "Shell",
+        "slug": "docs/tools/shell"
+      },
+      {
+        "label": "Web Fetch",
+        "slug": "docs/tools/web-fetch"
+      },
+      {
+        "label": "Web Search",
+        "slug": "docs/tools/web-search"
+      },
+      {
+        "label": "Memory",
+        "slug": "docs/tools/memory"
+      },
+      {
+        "label": "MCP Servers",
+        "slug": "docs/tools/mcp-server"
+      }
+    ]
+  },
+  {
+    "label": "Extensions",
+    "items": [
+      {
+        "label": "Introduction",
+        "slug": "docs/extensions"
+      },
+      {
+        "label": "Extension Releasing",
+        "slug": "docs/extensions/extension-releasing"
+      }
+    ]
+  },
+  {
+    "label": "IDE Integration",
+    "items": [
+      {
+        "label": "Introduction",
+        "slug": "docs/ide-integration"
+      },
+      {
+        "label": "IDE Companion Spec",
+        "slug": "docs/ide-integration/ide-companion-spec"
+      }
     ]
   },
   {
     "label": "Development",
     "items": [
-      { "label": "NPM", "slug": "docs/npm" },
-      { "label": "Releases", "slug": "docs/releases" }
+      {
+        "label": "NPM",
+        "slug": "docs/npm"
+      },
+      {
+        "label": "Releases",
+        "slug": "docs/releases"
+      },
+      {
+        "label": "Integration Tests",
+        "slug": "docs/integration-tests"
+      },
+      {
+        "label": "Issue and PR Automation",
+        "slug": "docs/issue-and-pr-automation"
+      }
     ]
   },
   {
     "label": "Support",
     "items": [
-      { "label": "Troubleshooting", "slug": "docs/troubleshooting" },
-      { "label": "Terms of Service", "slug": "docs/tos-privacy" }
+      {
+        "label": "FAQ",
+        "slug": "docs/faq"
+      },
+      {
+        "label": "Troubleshooting",
+        "slug": "docs/troubleshooting"
+      },
+      {
+        "label": "Quota and Pricing",
+        "slug": "docs/quota-and-pricing"
+      },
+      {
+        "label": "Terms of Service",
+        "slug": "docs/tos-privacy"
+      }
     ]
   }
 ]

@@ -34,6 +34,7 @@ defaults:
 
 jobs:
   merge_queue_skipper:
+    permissions: 'read-all'
     name: 'Merge Queue Skipper'
     runs-on: 'gemini-cli-ubuntu-16-core'
     outputs:
@@ -54,7 +55,7 @@ jobs:
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
         with:
           ref: '${{ github.event.inputs.branch_ref || github.ref }}'
-          fetch-depth: 1
+          fetch-depth: 0
 
       - name: 'Set up Node.js'
         uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions/setup-node@v4.4.0
@@ -85,6 +86,9 @@ jobs:
 
       - name: 'Run Prettier'
         run: 'node scripts/lint.js --prettier'
+
+      - name: 'Run sensitive keyword linter'
+        run: 'node scripts/lint.js --sensitive-keywords'
 
   test_linux:
     name: 'Test (Linux)'
@@ -123,6 +127,12 @@ jobs:
         env:
           NO_COLOR: true
         run: 'npm run test:ci'
+
+      - name: 'Bundle'
+        run: 'npm run bundle'
+
+      - name: 'Smoke test bundle'
+        run: 'node ./bundle/gemini.js --version'
 
       - name: 'Wait for file system sync'
         run: 'sleep 2'
@@ -185,6 +195,12 @@ jobs:
         env:
           NO_COLOR: true
         run: 'npm run test:ci -- --coverage.enabled=false'
+
+      - name: 'Bundle'
+        run: 'npm run bundle'
+
+      - name: 'Smoke test bundle'
+        run: 'node ./bundle/gemini.js --version'
 
       - name: 'Wait for file system sync'
         run: 'sleep 2'
@@ -320,6 +336,14 @@ jobs:
           UV_THREADPOOL_SIZE: '32'
           NODE_ENV: 'test'
         run: 'npm run test:ci -- --coverage.enabled=false'
+        shell: 'pwsh'
+
+      - name: 'Bundle'
+        run: 'npm run bundle'
+        shell: 'pwsh'
+
+      - name: 'Smoke test bundle'
+        run: 'node ./bundle/gemini.js --version'
         shell: 'pwsh'
 
   ci:
