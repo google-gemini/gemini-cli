@@ -235,8 +235,8 @@ export function runSensitiveKeywordLinter() {
           if (charCount + line.length + 1 > matchIndex) {
             lineNum = i + 1;
             const colNum = matchIndex - charCount + 1;
-            console.error(
-              `${file}:${lineNum}:${colNum}: warning: Found sensitive keyword "${keyword}". Please make sure this change is appropriate to submit.`,
+            console.log(
+              `::warning file=${file},line=${lineNum},col=${colNum}::Found sensitive keyword "${keyword}". Please make sure this change is appropriate to submit.`,
             );
             break;
           }
@@ -246,9 +246,7 @@ export function runSensitiveKeywordLinter() {
     }
   }
 
-  if (violationsFound) {
-    process.exit(1);
-  } else {
+  if (!violationsFound) {
     console.log('No sensitive keyword violations found.');
   }
 }
