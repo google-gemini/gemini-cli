@@ -78,6 +78,7 @@ const SearchReplaceEditSchema = {
     explanation: { type: Type.STRING },
     search: { type: Type.STRING },
     replace: { type: Type.STRING },
+    noChangesRequired: { type: Type.BOOLEAN },
   },
   required: ['search', 'replace', 'explanation'],
 };
