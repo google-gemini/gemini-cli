@@ -8,7 +8,7 @@
  * @fileoverview Defines the core configuration interfaces and types for the agent architecture.
  */
 
-import type { Content, FunctionDeclaration } from '@google/genai';
+import type { Content, FunctionDeclaration, Schema } from '@google/genai';
 import type { AnyDeclarativeTool } from '../tools/tools.js';
 
 /**
@@ -74,6 +74,14 @@ export interface PromptConfig {
    * An array of user/model content pairs for few-shot prompting.
    */
   initialMessages?: Content[];
+
+  /**
+   * The specific task or question to trigger the agent's execution loop.
+   * This is sent as the first user message, distinct from the systemPrompt (identity/rules)
+   * and initialMessages (history/few-shots). Supports templating.
+   * If not provided, a generic "Get Started!" message is used.
+   */
+  query?: string;
 }
 
 /**
@@ -111,11 +119,22 @@ export interface InputConfig {
  * Configures the expected outputs for the agent.
  */
 export interface OutputConfig {
-  /** Description of what the agent should return when finished. */
+  /**
+   * The name of the final result parameter. This will be the name of the
+   * argument in the `submit_final_output` tool (e.g., "report", "answer").
+   */
+  outputName: string;
+  /**
+   * A description of the expected output. This will be used as the description
+   * for the tool argument.
+   */
   description: string;
-  /** Optional criteria that must be completed before the agent finishes. */
-  completion_criteria?: string[];
-  // TODO(abhipatel12): Add required_outputs if natural completion insufficient
+  /**
+   * Optional JSON schema for the output. If provided, it will be used as the
+   * schema for the tool's argument, allowing for structured output enforcement.
+   * Defaults to { type: 'string' }.
+   */
+  schema?: Schema;
 }
 
 /**
