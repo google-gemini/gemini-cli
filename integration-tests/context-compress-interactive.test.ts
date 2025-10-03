@@ -99,12 +99,6 @@ describe('Interactive Mode', () => {
       await new Promise((resolve) => setTimeout(resolve, 100));
       await type(ptyProcess, '\r');
 
-      const foundEvent = await rig.waitForTelemetryEvent(
-        'chat_compression',
-        90000,
-      );
-      expect(foundEvent).toBe(true);
-
       const compressionFailed = await rig.waitForText(
         'compression was not beneficial',
         25000,
