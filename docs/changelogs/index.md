@@ -9,7 +9,7 @@ Wondering what's new in Gemini CLI? This document provides key highlights and no
   - Manage your extensions at the command line with:
     - `gemini extensions install|uninstall|link`
     - `gemini extensions enable|disable`
-    - `gemini extensions list|upgrade`
+    - `gemini extensions list|update`
 - 🎉 **Interactive shell:** Run interactive commands like `vim`, `rebase -i`, or even `gemini` 😎 directly in Gemini CLI. ([pr](https://github.com/google-gemini/gemini-cli/pull/6694) by [@galz10](https://github.com/galz10))
 - **Model selection:** Choose the Gemini model for your session with /model. ([pr](https://github.com/google-gemini/gemini-cli/pull/8940) by [@abhipatel12](https://github.com/abhipatel12))
 - **Model routing:** Gemini CLI will now intelligently pick the best model for the task. Simple queries will be sent to Flash while complex analytical or creative tasks will still use the power of Pro. This ensures your quota will last for a longer period of time. You can always opt-out of this via `/model`. ([pr](https://github.com/google-gemini/gemini-cli/pull/9262) by [@abhipatel12](https://github.com/abhipatel12))
