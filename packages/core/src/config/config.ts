@@ -689,7 +689,7 @@ export class Config {
 
     const filteredServers: Record<string, MCPServerConfig> = {};
     for (const [name, config] of Object.entries(this.mcpServers)) {
-      if (config.enabled === false) {
+      if (config?.enabled === false) {
         continue;
       }
       filteredServers[name] = config;
