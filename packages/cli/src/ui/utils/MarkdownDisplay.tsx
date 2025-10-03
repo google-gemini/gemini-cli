@@ -17,6 +17,7 @@ interface MarkdownDisplayProps {
   isPending: boolean;
   availableTerminalHeight?: number;
   terminalWidth: number;
+  renderMarkdown?: boolean;
 }
 
 // Constants for Markdown parsing and rendering
@@ -31,8 +32,30 @@ const MarkdownDisplayInternal: React.FC<MarkdownDisplayProps> = ({
   isPending,
   availableTerminalHeight,
   terminalWidth,
+  renderMarkdown = true,
 }) => {
+  const settings = useSettings();
+
   if (!text) return <></>;
+
+  // Raw markdown mode - display syntax-highlighted markdown without rendering
+  if (!renderMarkdown) {
+    // Hide line numbers in raw markdown mode as they are confusing due to chunked output
+    const colorizedMarkdown = colorizeCode(
+      text,
+      'markdown',
+      availableTerminalHeight,
+      terminalWidth - CODE_BLOCK_PREFIX_PADDING,
+      undefined,
+      settings,
+      true, // hideLineNumbers
+    );
+    return (
+      <Box paddingLeft={CODE_BLOCK_PREFIX_PADDING} flexDirection="column">
+        {colorizedMarkdown}
+      </Box>
+    );
+  }
 
   const lines = text.split(/\r?\n/);
   const headerRegex = /^ *(#{1,4}) +(.*)/;
