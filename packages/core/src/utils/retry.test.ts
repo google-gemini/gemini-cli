@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { ApiError } from '@google/genai';
 import type { HttpError } from './retry.js';
@@ -81,22 +80,13 @@ describe('retryWithBackoff', () => {
       initialDelayMs: 10,
     });
 
-    // 2. IMPORTANT: Attach the rejection expectation to the promise *immediately*.
-    //    This ensures a 'catch' handler is present before the promise can reject.
-    //    The result is a new promise that resolves when the assertion is met.
-    // eslint-disable-next-line vitest/valid-expect
-    const assertionPromise = expect(promise).rejects.toThrow(
-      'Simulated error attempt 3',
-    );
+    // 2. Run timers and await expectation in parallel.
+    await Promise.all([
+      expect(promise).rejects.toThrow('Simulated error attempt 3'),
+      vi.runAllTimersAsync(),
+    ]);
 
-    // 3. Now, advance the timers. This will trigger the retries and the
-    //    eventual rejection. The handler attached in step 2 will catch it.
-    await vi.runAllTimersAsync();
-
-    // 4. Await the assertion promise itself to ensure the test was successful.
-    await assertionPromise;
-
-    // 5. Finally, assert the number of calls.
+    // 3. Finally, assert the number of calls.
     expect(mockFn).toHaveBeenCalledTimes(3);
   });
 
@@ -107,12 +97,10 @@ describe('retryWithBackoff', () => {
     const promise = retryWithBackoff(mockFn);
 
     // Expect it to fail with the error from the 5th attempt.
-    // eslint-disable-next-line vitest/valid-expect
-    const assertionPromise = expect(promise).rejects.toThrow(
-      'Simulated error attempt 5',
-    );
-    await vi.runAllTimersAsync();
-    await assertionPromise;
+    await Promise.all([
+      expect(promise).rejects.toThrow('Simulated error attempt 5'),
+      vi.runAllTimersAsync(),
+    ]);
 
     expect(mockFn).toHaveBeenCalledTimes(5);
   });
@@ -124,12 +112,10 @@ describe('retryWithBackoff', () => {
     const promise = retryWithBackoff(mockFn, { maxAttempts: undefined });
 
     // Expect it to fail with the error from the 5th attempt.
-    // eslint-disable-next-line vitest/valid-expect
-    const assertionPromise = expect(promise).rejects.toThrow(
-      'Simulated error attempt 5',
-    );
-    await vi.runAllTimersAsync();
-    await assertionPromise;
+    await Promise.all([
+      expect(promise).rejects.toThrow('Simulated error attempt 5'),
+      vi.runAllTimersAsync(),
+    ]);
 
     expect(mockFn).toHaveBeenCalledTimes(5);
   });
@@ -172,15 +158,10 @@ describe('retryWithBackoff', () => {
       initialDelayMs: 10,
     });
 
-    // Attach the rejection expectation *before* running timers
-    const assertionPromise =
-      expect(promise).rejects.toThrow('Too Many Requests'); // eslint-disable-line vitest/valid-expect
-
-    // Run timers to trigger retries and eventual rejection
-    await vi.runAllTimersAsync();
-
-    // Await the assertion
-    await assertionPromise;
+    await Promise.all([
+      expect(promise).rejects.toThrow('Too Many Requests'),
+      vi.runAllTimersAsync(),
+    ]);
 
     expect(mockFn).toHaveBeenCalledTimes(2);
   });
@@ -210,15 +191,11 @@ describe('retryWithBackoff', () => {
       initialDelayMs: 10,
     });
 
-    // Attach the rejection expectation *before* running timers
-    const assertionPromise =
-      expect(promise).rejects.toThrow('Too Many Requests'); // eslint-disable-line vitest/valid-expect
-
-    // Run timers to trigger retries and eventual rejection
-    await vi.runAllTimersAsync();
-
-    // Await the assertion
-    await assertionPromise;
+    // Run timers and await expectation in parallel.
+    await Promise.all([
+      expect(promise).rejects.toThrow('Too Many Requests'),
+      vi.runAllTimersAsync(),
+    ]);
 
     expect(mockFn).toHaveBeenCalledTimes(2);
   });
@@ -279,11 +256,11 @@ describe('retryWithBackoff', () => {
 
     // We expect rejections as mockFn fails 5 times
     const promise1 = runRetry();
-    // Attach the rejection expectation *before* running timers
-    // eslint-disable-next-line vitest/valid-expect
-    const assertionPromise1 = expect(promise1).rejects.toThrow();
-    await vi.runAllTimersAsync(); // Advance for the delay in the first runRetry
-    await assertionPromise1;
+    // Run timers and await expectation in parallel.
+    await Promise.all([
+      expect(promise1).rejects.toThrow(),
+      vi.runAllTimersAsync(),
+    ]);
 
     const firstDelaySet = setTimeoutSpy.mock.calls.map(
       (call) => call[1] as number,
@@ -294,11 +271,11 @@ describe('retryWithBackoff', () => {
     mockFn = createFailingFunction(5); // Re-initialize with 5 failures
 
     const promise2 = runRetry();
-    // Attach the rejection expectation *before* running timers
-    // eslint-disable-next-line vitest/valid-expect
-    const assertionPromise2 = expect(promise2).rejects.toThrow();
-    await vi.runAllTimersAsync(); // Advance for the delay in the second runRetry
-    await assertionPromise2;
+    // Run timers and await expectation in parallel.
+    await Promise.all([
+      expect(promise2).rejects.toThrow(),
+      vi.runAllTimersAsync(),
+    ]);
 
     const secondDelaySet = setTimeoutSpy.mock.calls.map(
       (call) => call[1] as number,
