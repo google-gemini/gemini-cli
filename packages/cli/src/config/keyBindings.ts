@@ -152,7 +152,10 @@ export const defaultKeyBindings: KeyBindingConfig = {
     { key: 'x', ctrl: true },
     { sequence: '\x18', ctrl: true },
   ],
-  [Command.PASTE_CLIPBOARD_IMAGE]: [{ key: 'v', ctrl: true }],
+  [Command.PASTE_CLIPBOARD_IMAGE]: [
+    { key: 'v', ctrl: true },
+    { key: 'v', command: true }, // For Windows Alt+V (Alt maps to meta/command)
+  ],
 
   // App level bindings
   [Command.SHOW_ERROR_DETAILS]: [{ key: 'o', ctrl: true }],
