@@ -124,6 +124,7 @@ async function main() {
   });
 
   let originalPr = prNum;
+  console.log(`Found originalPr: ${prNum} from hotfix branch`);
 
   if (!testMode && !originalPr) {
     try {
