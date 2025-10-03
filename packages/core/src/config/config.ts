@@ -164,6 +164,7 @@ export class MCPServerConfig {
     // Common
     readonly timeout?: number,
     readonly trust?: boolean,
+    readonly enabled?: boolean,
     // Metadata
     readonly description?: string,
     readonly includeTools?: string[],
@@ -682,7 +683,18 @@ export class Config {
   }
 
   getMcpServers(): Record<string, MCPServerConfig> | undefined {
-    return this.mcpServers;
+    if (!this.mcpServers) {
+      return undefined;
+    }
+
+    const filteredServers: Record<string, MCPServerConfig> = {};
+    for (const [name, config] of Object.entries(this.mcpServers)) {
+      if (config?.enabled === false) {
+        continue;
+      }
+      filteredServers[name] = config;
+    }
+    return filteredServers;
   }
 
   getUserMemory(): string {
