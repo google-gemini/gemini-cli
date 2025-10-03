@@ -1,0 +1,49 @@
+name: 'On Merge Smoke Test'
+
+on:
+  push:
+    branches:
+      - 'main'
+      - 'release/**'
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'The branch, tag, or SHA to test on.'
+        required: false
+        type: 'string'
+        default: 'main'
+      dry-run:
+        description: 'Run a dry-run of the smoke test; No bug will be created'
+        required: true
+        type: 'boolean'
+        default: true
+
+jobs:
+  smoke-test:
+    runs-on: 'self-hosted'
+    permissions:
+      contents: 'read'
+      issues: 'write'
+    steps:
+      - name: 'Checkout'
+        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
+        with:
+          ref: '${{ github.event.inputs.ref || github.sha }}'
+          fetch-depth: 0
+      - name: 'Install Dependencies'
+        run: 'npm ci'
+      - name: 'Build bundle'
+        run: 'npm run bundle'
+      - name: 'Smoke test bundle'
+        run: 'node ./bundle/gemini.js --version'
+      - name: 'Create Issue on Failure'
+        if: '${{ failure() && github.event.inputs.dry-run == false }}'
+        env:
+          GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+          DETAILS_URL: '${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}'
+          REF: '${{ github.event.inputs.ref }}'
+        run: |
+          gh issue create \
+            --title 'Smoke test failed on ${REF} @ $(date +'%Y-%m-%d')' \
+            --body 'Smoke test build failed. See the full run for details: ${DETAILS_URL}' \
+            --label 'kind/bug,priority/p0'
