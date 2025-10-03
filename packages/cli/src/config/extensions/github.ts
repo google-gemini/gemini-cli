@@ -420,7 +420,7 @@ async function downloadFile(url: string, dest: string): Promise<void> {
   });
 }
 
-function extractFile(file: string, dest: string) {
+export function extractFile(file: string, dest: string) {
   let args: string[];
   let command: 'tar' | 'unzip';
   if (file.endsWith('.tar.gz')) {

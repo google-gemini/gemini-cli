@@ -5,15 +5,19 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import * as os from 'node:os';
+import { spawnSync } from 'node:child_process';
 import {
   checkForExtensionUpdate,
   cloneFromGit,
+  extractFile,
   findReleaseAsset,
   parseGitHubRepoForReleases,
 } from './github.js';
 import { simpleGit, type SimpleGit } from 'simple-git';
 import { ExtensionUpdateState } from '../../ui/state/extensions.js';
-import type * as os from 'node:os';
 import type { GeminiCLIExtension } from '@google/gemini-cli-core';
 
 const mockPlatform = vi.hoisted(() => vi.fn());
@@ -345,6 +349,92 @@ describe('git extension helpers', () => {
       const source = 'https://github.com/owner/repo/extra';
       expect(() => parseGitHubRepoForReleases(source)).toThrow(
         'Invalid GitHub repository source: https://github.com/owner/repo/extra. Expected "owner/repo" or a github repo uri.',
+      );
+    });
+  });
+
+  describe('extractFile', () => {
+    let tempDir: string;
+    let sourceDir: string;
+    let destDir: string;
+
+    beforeEach(() => {
+      tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gemini-cli-test-'));
+      sourceDir = path.join(tempDir, 'source');
+      destDir = path.join(tempDir, 'dest');
+      fs.mkdirSync(sourceDir, { recursive: true });
+      fs.mkdirSync(destDir, { recursive: true });
+
+      // Create some files in sourceDir
+      fs.writeFileSync(path.join(sourceDir, 'file1.txt'), 'hello');
+      fs.mkdirSync(path.join(sourceDir, 'subdir'));
+      fs.writeFileSync(path.join(sourceDir, 'subdir', 'file2.txt'), 'world');
+    });
+
+    afterEach(() => {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    });
+
+    it('should extract a .tar.gz file', () => {
+      const archivePath = path.join(tempDir, 'test.tar.gz');
+      // Create tar.gz archive
+      const result = spawnSync('tar', [
+        '-czf',
+        archivePath,
+        '-C',
+        sourceDir,
+        '.',
+      ]);
+      expect(result.status).toBe(0);
+      expect(result.error).toBeUndefined();
+
+      extractFile(archivePath, destDir);
+
+      // Verify extracted files
+      expect(fs.existsSync(path.join(destDir, 'file1.txt'))).toBe(true);
+      expect(fs.readFileSync(path.join(destDir, 'file1.txt'), 'utf8')).toBe(
+        'hello',
+      );
+      expect(fs.existsSync(path.join(destDir, 'subdir', 'file2.txt'))).toBe(
+        true,
+      );
+      expect(
+        fs.readFileSync(path.join(destDir, 'subdir', 'file2.txt'), 'utf8'),
+      ).toBe('world');
+    });
+
+    it('should extract a .zip file', () => {
+      const archivePath = path.join(tempDir, 'test.zip');
+      // On windows, use tar to create zip files.
+      const result =
+        os.platform() === 'win32'
+          ? spawnSync('tar', ['-czf', archivePath, '-C', sourceDir, '.'])
+          : spawnSync('zip', ['-r', archivePath, '.'], {
+              cwd: sourceDir,
+            });
+      expect(result.error).toBeUndefined();
+      expect(result.status).toBe(0);
+
+      extractFile(archivePath, destDir);
+
+      // Verify extracted files
+      expect(fs.existsSync(path.join(destDir, 'file1.txt'))).toBe(true);
+      expect(fs.readFileSync(path.join(destDir, 'file1.txt'), 'utf8')).toBe(
+        'hello',
+      );
+      expect(fs.existsSync(path.join(destDir, 'subdir', 'file2.txt'))).toBe(
+        true,
+      );
+      expect(
+        fs.readFileSync(path.join(destDir, 'subdir', 'file2.txt'), 'utf8'),
+      ).toBe('world');
+    });
+
+    it('should throw an error for unsupported file types', () => {
+      const unsupportedFile = path.join(tempDir, 'test.rar');
+      fs.writeFileSync(unsupportedFile, 'dummy content');
+      expect(() => extractFile(unsupportedFile, destDir)).toThrow(
+        `Unsupported file extension for extraction: ${unsupportedFile}`,
       );
     });
   });
