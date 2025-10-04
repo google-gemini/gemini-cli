@@ -13,7 +13,10 @@ import { IDE_DEFINITIONS, type IdeInfo } from './detect-ide.js';
 import { GEMINI_CLI_COMPANION_EXTENSION_NAME } from './constants.js';
 
 function getVsCodeCommand(platform: NodeJS.Platform = process.platform) {
-  return platform === 'win32' ? 'code.cmd' : 'code';
+  if (platform === 'win32') {  
+    return ['code.cmd', 'code-insiders.cmd'];  
+  }  
+  return ['code', 'code-insiders'];  
 }
 
 export interface IdeInstaller {
@@ -29,73 +32,94 @@ async function findVsCodeCommand(
   platform: NodeJS.Platform = process.platform,
 ): Promise<string | null> {
   // 1. Check PATH first.
-  const vscodeCommand = getVsCodeCommand(platform);
-  try {
-    if (platform === 'win32') {
-      const result = child_process
-        .execSync(`where.exe ${vscodeCommand}`)
-        .toString()
-        .trim();
-      // `where.exe` can return multiple paths. Return the first one.
-      const firstPath = result.split(/\r?\n/)[0];
-      if (firstPath) {
-        return firstPath;
-      }
-    } else {
-      child_process.execSync(`command -v ${vscodeCommand}`, {
-        stdio: 'ignore',
-      });
-      return vscodeCommand;
-    }
-  } catch {
-    // Not in PATH, continue to check common locations.
-  }
-
-  // 2. Check common installation locations.
-  const locations: string[] = [];
-  const homeDir = os.homedir();
-
-  if (platform === 'darwin') {
-    // macOS
-    locations.push(
-      '/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code',
-      path.join(homeDir, 'Library/Application Support/Code/bin/code'),
-    );
-  } else if (platform === 'linux') {
-    // Linux
-    locations.push(
-      '/usr/share/code/bin/code',
-      '/snap/bin/code',
-      path.join(homeDir, '.local/share/code/bin/code'),
-    );
-  } else if (platform === 'win32') {
-    // Windows
-    locations.push(
-      path.join(
-        process.env['ProgramFiles'] || 'C:\\Program Files',
-        'Microsoft VS Code',
-        'bin',
-        'code.cmd',
-      ),
-      path.join(
-        homeDir,
-        'AppData',
-        'Local',
-        'Programs',
-        'Microsoft VS Code',
-        'bin',
-        'code.cmd',
-      ),
-    );
-  }
-
-  for (const location of locations) {
-    if (fs.existsSync(location)) {
-      return location;
-    }
-  }
-
-  return null;
+  const vscodeCommands = getVsCodeCommand(platform);  
+    
+  // 1. Check PATH first for each command  
+  for (const vscodeCommand of vscodeCommands) {  
+    try {  
+      if (platform === 'win32') {  
+        const result = child_process  
+          .execSync(`where.exe ${vscodeCommand}`)  
+          .toString()  
+          .trim();  
+        const firstPath = result.split(/\r?\n/)[0];  
+        if (firstPath) {  
+          return firstPath;  
+        }  
+      } else {  
+        child_process.execSync(`command -v ${vscodeCommand}`, {  
+          stdio: 'ignore',  
+        });  
+        return vscodeCommand;  
+      }  
+    } catch {  
+      // Command not found, try next one  
+      continue;  
+    }  
+  }  
+  
+  // 2. Check common installation locations  
+  const locations: string[] = [];  
+  const homeDir = os.homedir();  
+  
+  if (platform === 'darwin') {  
+    locations.push(  
+      '/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code',  
+      '/Applications/Visual Studio Code - Insiders.app/Contents/Resources/app/bin/code-insiders',  
+      path.join(homeDir, 'Library/Application Support/Code/bin/code'),  
+      path.join(homeDir, 'Library/Application Support/Code - Insiders/bin/code-insiders'),  
+    );  
+  } else if (platform === 'linux') {  
+    locations.push(  
+      '/usr/share/code/bin/code',  
+      '/usr/share/code-insiders/bin/code-insiders',  
+      '/snap/bin/code',  
+      '/snap/bin/code-insiders',  
+      path.join(homeDir, '.local/share/code/bin/code'),  
+      path.join(homeDir, '.local/share/code-insiders/bin/code-insiders'),  
+    );  
+  } else if (platform === 'win32') {  
+    locations.push(  
+      path.join(  
+        process.env['ProgramFiles'] || 'C:\\Program Files',  
+        'Microsoft VS Code',  
+        'bin',  
+        'code.cmd',  
+      ),  
+      path.join(  
+        process.env['ProgramFiles'] || 'C:\\Program Files',  
+        'Microsoft VS Code Insiders',  
+        'bin',  
+        'code-insiders.cmd',  
+      ),  
+      path.join(  
+        homeDir,  
+        'AppData',  
+        'Local',  
+        'Programs',  
+        'Microsoft VS Code',  
+        'bin',  
+        'code.cmd',  
+      ),  
+      path.join(  
+        homeDir,  
+        'AppData',  
+        'Local',  
+        'Programs',  
+        'Microsoft VS Code Insiders',  
+        'bin',  
+        'code-insiders.cmd',  
+      ),  
+    );  
+  }  
+  
+  for (const location of locations) {  
+    if (fs.existsSync(location)) {  
+      return location;  
+    }  
+  }  
+  
+  return null;  
 }
 
 class VsCodeInstaller implements IdeInstaller {

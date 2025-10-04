@@ -74,22 +74,37 @@ describe('ide-installer', () => {
           platform: 'win32' as NodeJS.Platform,
           expectedLookupPaths: [
             path.join('C:\\Program Files', 'Microsoft VS Code/bin/code.cmd'),
+            path.join('C:\\Program Files', 'Microsoft VS Code Insiders/bin/code-insiders.cmd'),  
             path.join(
               HOME_DIR,
               '/AppData/Local/Programs/Microsoft VS Code/bin/code.cmd',
             ),
+            path.join(  
+              HOME_DIR,  
+              '/AppData/Local/Programs/Microsoft VS Code Insiders/bin/code-insiders.cmd',  
+            ),  
           ],
         },
         {
           platform: 'darwin' as NodeJS.Platform,
           expectedLookupPaths: [
             '/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code',
+            '/Applications/Visual Studio Code - Insiders.app/Contents/Resources/app/bin/code-insiders',  
+
             path.join(HOME_DIR, 'Library/Application Support/Code/bin/code'),
+            path.join(HOME_DIR, 'Library/Application Support/Code - Insiders/bin/code-insiders'),
           ],
         },
         {
           platform: 'linux' as NodeJS.Platform,
-          expectedLookupPaths: ['/usr/share/code/bin/code'],
+          expectedLookupPaths: [  
+        '/usr/share/code/bin/code',  
+        '/usr/share/code-insiders/bin/code-insiders',  
+        '/snap/bin/code',  
+        '/snap/bin/code-insiders',  
+        path.join(HOME_DIR, '.local/share/code/bin/code'),  
+        path.join(HOME_DIR, '.local/share/code-insiders/bin/code-insiders'),  
+        ],  
         },
       ])(
         'identifies the path to code cli on platform: $platform',
@@ -123,6 +138,85 @@ describe('ide-installer', () => {
         );
       });
 
+      it('tries code command before code-insiders in PATH', async () => {  
+        const { installer } = setup({  
+          platform: 'linux',  
+          execSync: vi.fn()  
+            .mockImplementationOnce(() => {  
+              throw new Error('code not found'); // First call for 'code' fails  
+            })  
+            .mockReturnValueOnce(''), // Second call for 'code-insiders' succeeds  
+        });  
+          
+        await installer.install();  
+          
+        expect(child_process.execSync).toHaveBeenCalledWith('command -v code', {  
+          stdio: 'ignore',  
+        });  
+        expect(child_process.execSync).toHaveBeenCalledWith('command -v code-insiders', {  
+          stdio: 'ignore',  
+        });  
+      });  
+        
+      it('uses code command when both are available', async () => {  
+        const { installer } = setup({  
+          platform: 'linux',  
+          execSync: () => '', // Both commands succeed  
+        });  
+          
+        await installer.install();  
+          
+        expect(child_process.spawnSync).toHaveBeenCalledWith(  
+          'code', // Should use 'code', not 'code-insiders'  
+          [  
+            '--install-extension',  
+            'google.gemini-cli-vscode-ide-companion',  
+            '--force',  
+          ],  
+          { stdio: 'pipe' },  
+        );  
+      });  
+        
+      it('uses code-insiders when code is not available', async () => {  
+        const { installer } = setup({  
+          platform: 'linux',  
+          execSync: vi.fn()  
+            .mockImplementationOnce(() => {  
+              throw new Error('code not found');  
+            })  
+            .mockReturnValueOnce(''), // code-insiders found  
+        });  
+          
+        await installer.install();  
+          
+        expect(child_process.spawnSync).toHaveBeenCalledWith(  
+          'code-insiders',  
+          [  
+            '--install-extension',  
+            'google.gemini-cli-vscode-ide-companion',  
+            '--force',  
+          ],  
+          { stdio: 'pipe' },  
+        );  
+      });
+
+      it('tries code.cmd before code-insiders.cmd on Windows', async () => {  
+        const { installer } = setup({  
+          platform: 'win32',  
+          execSync: vi.fn()  
+            .mockImplementationOnce(() => {  
+              throw new Error('code.cmd not found');  
+            })  
+            .mockReturnValueOnce('C:\\Program Files\\Microsoft VS Code Insiders\\bin\\code-insiders.cmd'),  
+        });  
+          
+        await installer.install();  
+          
+        expect(child_process.execSync).toHaveBeenCalledWith('where.exe code.cmd');  
+        expect(child_process.execSync).toHaveBeenCalledWith('where.exe code-insiders.cmd');  
+      });
+
+
       it.each([
         {
           ide: IDE_DEFINITIONS.vscode,
@@ -144,30 +238,30 @@ describe('ide-installer', () => {
         },
       );
 
-      it.each([
-        {
-          ide: IDE_DEFINITIONS.vscode,
-          expectedErr: 'VS Code CLI not found',
-        },
-        {
-          ide: IDE_DEFINITIONS.firebasestudio,
-          expectedErr: 'Firebase Studio CLI not found',
-        },
-      ])(
-        'should return a failure message if $ide is not installed',
-        async ({ ide, expectedErr }) => {
-          const { installer } = setup({
-            ide,
-            execSync: () => {
-              throw new Error('Command not found');
-            },
-            existsResult: false,
-          });
-          const result = await installer.install();
-          expect(result.success).toBe(false);
-          expect(result.message).toContain(expectedErr);
-        },
-      );
+      it.each([  
+      {  
+        ide: IDE_DEFINITIONS.vscode,  
+        expectedErr: 'VS Code CLI not found',  
+      },  
+      {  
+        ide: IDE_DEFINITIONS.firebasestudio,  
+        expectedErr: 'Firebase Studio CLI not found',  
+      },  
+    ])(  
+      'should return a failure message if neither code nor code-insiders is available',  
+      async ({ ide, expectedErr }) => {  
+        const { installer } = setup({  
+          ide,  
+          execSync: () => {  
+            throw new Error('Command not found'); // Both commands fail  
+          },  
+          existsResult: false, // No installation paths found either  
+        });  
+        const result = await installer.install();  
+        expect(result.success).toBe(false);  
+        expect(result.message).toContain(expectedErr);  
+      },  
+    );
     });
   });
 });
