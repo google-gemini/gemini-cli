@@ -302,7 +302,11 @@ describe('update tests', () => {
       mockGit.revparse.mockResolvedValue('localHash');
 
       const dispatch = vi.fn();
-      await checkForAllExtensionUpdates([extension], dispatch);
+      await checkForAllExtensionUpdates(
+        [extension],
+        dispatch,
+        tempWorkspaceDir,
+      );
       expect(dispatch).toHaveBeenCalledWith({
         type: 'SET_STATE',
         payload: {
@@ -340,7 +344,11 @@ describe('update tests', () => {
       mockGit.revparse.mockResolvedValue('sameHash');
 
       const dispatch = vi.fn();
-      await checkForAllExtensionUpdates([extension], dispatch);
+      await checkForAllExtensionUpdates(
+        [extension],
+        dispatch,
+        tempWorkspaceDir,
+      );
       expect(dispatch).toHaveBeenCalledWith({
         type: 'SET_STATE',
         payload: {
@@ -375,7 +383,11 @@ describe('update tests', () => {
         new ExtensionEnablementManager(ExtensionStorage.getUserExtensionsDir()),
       )[0];
       const dispatch = vi.fn();
-      await checkForAllExtensionUpdates([extension], dispatch);
+      await checkForAllExtensionUpdates(
+        [extension],
+        dispatch,
+        tempWorkspaceDir,
+      );
       expect(dispatch).toHaveBeenCalledWith({
         type: 'SET_STATE',
         payload: {
@@ -410,7 +422,11 @@ describe('update tests', () => {
         new ExtensionEnablementManager(ExtensionStorage.getUserExtensionsDir()),
       )[0];
       const dispatch = vi.fn();
-      await checkForAllExtensionUpdates([extension], dispatch);
+      await checkForAllExtensionUpdates(
+        [extension],
+        dispatch,
+        tempWorkspaceDir,
+      );
       expect(dispatch).toHaveBeenCalledWith({
         type: 'SET_STATE',
         payload: {
@@ -444,7 +460,11 @@ describe('update tests', () => {
       mockGit.getRemotes.mockRejectedValue(new Error('Git error'));
 
       const dispatch = vi.fn();
-      await checkForAllExtensionUpdates([extension], dispatch);
+      await checkForAllExtensionUpdates(
+        [extension],
+        dispatch,
+        tempWorkspaceDir,
+      );
       expect(dispatch).toHaveBeenCalledWith({
         type: 'SET_STATE',
         payload: {
