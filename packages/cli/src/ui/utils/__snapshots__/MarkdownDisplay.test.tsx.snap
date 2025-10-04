@@ -1,6 +1,129 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`<MarkdownDisplay /> > renders a simple paragraph 1`] = `"Hello, world."`;
+exports[`<MarkdownDisplay /> > handles malformed markdown gracefully 1`] = `
+" 1 Unclosed code block
+"
+`;
+
+exports[`<MarkdownDisplay /> > renders a simple paragraph 1`] = `
+"Hello, world.
+"
+`;
+
+exports[`<MarkdownDisplay /> > renders large 2KB markdown document 1`] = `
+"Section 1
+
+This is paragraph 1 with some bold and italic text.
+
+Section 2
+
+This is paragraph 2 with some bold and italic text.
+
+Section 3
+
+This is paragraph 3 with some bold and italic text.
+
+Section 4
+
+This is paragraph 4 with some bold and italic text.
+
+Section 5
+
+This is paragraph 5 with some bold and italic text.
+
+Section 6
+
+This is paragraph 6 with some bold and italic text.
+
+Section 7
+
+This is paragraph 7 with some bold and italic text.
+
+Section 8
+
+This is paragraph 8 with some bold and italic text.
+
+Section 9
+
+This is paragraph 9 with some bold and italic text.
+
+Section 10
+
+This is paragraph 10 with some bold and italic text.
+
+Section 11
+
+This is paragraph 11 with some bold and italic text.
+
+Section 12
+
+This is paragraph 12 with some bold and italic text.
+
+Section 13
+
+This is paragraph 13 with some bold and italic text.
+
+Section 14
+
+This is paragraph 14 with some bold and italic text.
+
+Section 15
+
+This is paragraph 15 with some bold and italic text.
+
+Section 16
+
+This is paragraph 16 with some bold and italic text.
+
+Section 17
+
+This is paragraph 17 with some bold and italic text.
+
+Section 18
+
+This is paragraph 18 with some bold and italic text.
+
+Section 19
+
+This is paragraph 19 with some bold and italic text.
+
+Section 20
+
+This is paragraph 20 with some bold and italic text.
+
+Section 21
+
+This is paragraph 21 with some bold and italic text.
+
+Section 22
+
+This is paragraph 22 with some bold and italic text.
+
+Section 23
+
+This is paragraph 23 with some bold and italic text.
+
+Section 24
+
+This is paragraph 24 with some bold and italic text.
+
+Section 25
+
+This is paragraph 25 with some bold and italic text.
+
+Section 26
+
+This is paragraph 26 with some bold and italic text.
+
+Section 27
+
+This is paragraph 27 with some bold and italic text.
+
+Section 28
+
+This is paragraph 28 with some bold and italic text.
+"
+`;
 
 exports[`<MarkdownDisplay /> > renders nothing for empty text 1`] = `""`;
 
@@ -9,8 +132,10 @@ exports[`<MarkdownDisplay /> > with 'Unix' line endings > correctly parses a mix
 
 Here is a paragraph.
 
- - List item 1
- - List item 2
+* List item 1
+
+* List item 2
+
 
  1 some code
 
@@ -22,53 +147,148 @@ exports[`<MarkdownDisplay /> > with 'Unix' line endings > handles a table at the
 "Some text before.
 | A | B |
 |---|
-| 1 | 2 |"
+| 1 | 2 |
+"
 `;
 
-exports[`<MarkdownDisplay /> > with 'Unix' line endings > handles unclosed (pending) code blocks 1`] = `" 1 let y = 2;"`;
+exports[`<MarkdownDisplay /> > with 'Unix' line endings > handles deeply nested lists (10 levels) 1`] = `
+"*    *
+L1L2  * L3  * L4     * L5      * L6         * L7          * L8           * L9             * L10
 
-exports[`<MarkdownDisplay /> > with 'Unix' line endings > hides line numbers in code blocks when showLineNumbers is false 1`] = `" const x = 1;"`;
+
+"
+`;
+
+exports[`<MarkdownDisplay /> > with 'Unix' line endings > handles unclosed (pending) code blocks 1`] = `
+" 1 let y = 2;
+"
+`;
+
+exports[`<MarkdownDisplay /> > with 'Unix' line endings > hides line numbers in code blocks when showLineNumbers is false 1`] = `
+" const x = 1;
+"
+`;
 
 exports[`<MarkdownDisplay /> > with 'Unix' line endings > inserts a single space between paragraphs 1`] = `
 "Paragraph 1.
 
-Paragraph 2."
+Paragraph 2.
+"
+`;
+
+exports[`<MarkdownDisplay /> > with 'Unix' line endings > renders 4-level nested lists 1`] = `
+"* Level 1   * Level 2      * Level 3         * Level 4
+
+"
 `;
 
 exports[`<MarkdownDisplay /> > with 'Unix' line endings > renders a fenced code block with a language 1`] = `
 " 1 const x = 1;
- 2 console.log(x);"
+ 2 console.log(x);
+"
 `;
 
-exports[`<MarkdownDisplay /> > with 'Unix' line endings > renders a fenced code block without a language 1`] = `" 1 plain text"`;
+exports[`<MarkdownDisplay /> > with 'Unix' line endings > renders a fenced code block without a language 1`] = `
+" 1 plain text
+"
+`;
+
+exports[`<MarkdownDisplay /> > with 'Unix' line endings > renders blockquotes 1`] = `
+"┌──────────────────────────────────────────────────────────────────────────────────────────────────┐
+│ This is a quote                                                                                  │
+│ It spans multiple lines                                                                          │
+└──────────────────────────────────────────────────────────────────────────────────────────────────┘
+"
+`;
+
+exports[`<MarkdownDisplay /> > with 'Unix' line endings > renders code blocks within list items 1`] = `
+"* List item with         1 const x = 1;
+code:
+
+* Another list item
+
+"
+`;
 
 exports[`<MarkdownDisplay /> > with 'Unix' line endings > renders headers with correct levels 1`] = `
 "Header 1
+
 Header 2
+
 Header 3
+
 Header 4
 "
 `;
 
 exports[`<MarkdownDisplay /> > with 'Unix' line endings > renders horizontal rules 1`] = `
 "Hello
----
+
 World
+
 ---
+
 Test
 "
 `;
 
+exports[`<MarkdownDisplay /> > with 'Unix' line endings > renders inline code within text 1`] = `
+"Use the \`console.log()\` function for debugging.
+"
+`;
+
+exports[`<MarkdownDisplay /> > with 'Unix' line endings > renders mixed ordered and unordered list nesting 1`] = `
+"1. Ordered item 1   * Unordered sub-item
+                    * Another sub-item
+
+2. Ordered item 2   1. Nested ordered
+                    2. Another nested
+
+"
+`;
+
+exports[`<MarkdownDisplay /> > with 'Unix' line endings > renders nested blockquotes 1`] = `
+"┌──────────────────────────────────────────────────────────────────────────────────────────────────┐
+│ Level 1 quote┌──────────────────────────────┐                                                    │
+│              │ Level 2 quote┌──────────────┐│                                                    │
+│              │              │ Level 3 quote││                                                    │
+│              │              └──────────────┘│                                                    │
+│              └──────────────────────────────┘                                                    │
+└──────────────────────────────────────────────────────────────────────────────────────────────────┘
+"
+`;
+
+exports[`<MarkdownDisplay /> > with 'Unix' line endings > renders nested inline elements (bold within link) 1`] = `
+"bold link
+"
+`;
+
 exports[`<MarkdownDisplay /> > with 'Unix' line endings > renders nested unordered lists 1`] = `
-" * Level 1
-   * Level 2
-     * Level 3
+"* Level 1   * Level 2      * Level 3
+
+"
+`;
+
+exports[`<MarkdownDisplay /> > with 'Unix' line endings > renders ordered list with custom start property 1`] = `
+"5. Item five
+
+6. Item six
+
+7. Item seven
+
 "
 `;
 
 exports[`<MarkdownDisplay /> > with 'Unix' line endings > renders ordered lists 1`] = `
-" 1. First item
- 2. Second item
+"1. First item
+
+2. Second item
+
+"
+`;
+
+exports[`<MarkdownDisplay /> > with 'Unix' line endings > renders strikethrough text 1`] = `
+"This is deleted text.
 "
 `;
 
@@ -80,25 +300,36 @@ exports[`<MarkdownDisplay /> > with 'Unix' line endings > renders tables correct
 │ Cell 1   │ Cell 2   │
 │ Cell 3   │ Cell 4   │
 └──────────┴──────────┘
+
 "
 `;
 
 exports[`<MarkdownDisplay /> > with 'Unix' line endings > renders unordered lists with different markers 1`] = `
-" - item A
- * item B
- + item C
+"* item A
+
+
+* item B
+
+
+* item C
+
 "
 `;
 
-exports[`<MarkdownDisplay /> > with 'Unix' line endings > shows line numbers in code blocks by default 1`] = `" 1 const x = 1;"`;
+exports[`<MarkdownDisplay /> > with 'Unix' line endings > shows line numbers in code blocks by default 1`] = `
+" 1 const x = 1;
+"
+`;
 
 exports[`<MarkdownDisplay /> > with 'Windows' line endings > correctly parses a mix of markdown elements 1`] = `
 "Main Title
 
 Here is a paragraph.
 
- - List item 1
- - List item 2
+* List item 1
+
+* List item 2
+
 
  1 some code
 
@@ -110,53 +341,149 @@ exports[`<MarkdownDisplay /> > with 'Windows' line endings > handles a table at 
 "Some text before.
 | A | B |
 |---|
-| 1 | 2 |"
+| 1 | 2 |
+"
 `;
 
-exports[`<MarkdownDisplay /> > with 'Windows' line endings > handles unclosed (pending) code blocks 1`] = `" 1 let y = 2;"`;
+exports[`<MarkdownDisplay /> > with 'Windows' line endings > handles deeply nested lists (10 levels) 1`] = `
+"*    *
+L1L2  * L3  * L4     * L5      * L6         * L7          * L8           * L9             * L10
 
-exports[`<MarkdownDisplay /> > with 'Windows' line endings > hides line numbers in code blocks when showLineNumbers is false 1`] = `" const x = 1;"`;
+
+"
+`;
+
+exports[`<MarkdownDisplay /> > with 'Windows' line endings > handles unclosed (pending) code blocks 1`] = `
+" 1 let y = 2;
+"
+`;
+
+exports[`<MarkdownDisplay /> > with 'Windows' line endings > hides line numbers in code blocks when showLineNumbers is false 1`] = `
+" const x = 1;
+"
+`;
 
 exports[`<MarkdownDisplay /> > with 'Windows' line endings > inserts a single space between paragraphs 1`] = `
 "Paragraph 1.
 
-Paragraph 2."
+Paragraph 2.
+"
+`;
+
+exports[`<MarkdownDisplay /> > with 'Windows' line endings > renders 4-level nested lists 1`] = `
+"* Level 1   * Level 2      * Level 3         * Level 4
+
+"
 `;
 
 exports[`<MarkdownDisplay /> > with 'Windows' line endings > renders a fenced code block with a language 1`] = `
 " 1 const x = 1;
- 2 console.log(x);"
+ 2 console.log(x);
+"
 `;
 
-exports[`<MarkdownDisplay /> > with 'Windows' line endings > renders a fenced code block without a language 1`] = `" 1 plain text"`;
+exports[`<MarkdownDisplay /> > with 'Windows' line endings > renders a fenced code block without a language 1`] = `
+" 1 plain text
+"
+`;
+
+exports[`<MarkdownDisplay /> > with 'Windows' line endings > renders blockquotes 1`] = `
+"┌──────────────────────────────────────────────────────────────────────────────────────────────────┐
+│ This is a quote
+                                                                                 │
+│ It spans multiple lines                                                                          │
+└──────────────────────────────────────────────────────────────────────────────────────────────────┘
+"
+`;
+
+exports[`<MarkdownDisplay /> > with 'Windows' line endings > renders code blocks within list items 1`] = `
+"* List item with         1 const x = 1;
+code:
+
+* Another list item
+
+"
+`;
 
 exports[`<MarkdownDisplay /> > with 'Windows' line endings > renders headers with correct levels 1`] = `
 "Header 1
+
 Header 2
+
 Header 3
+
 Header 4
 "
 `;
 
 exports[`<MarkdownDisplay /> > with 'Windows' line endings > renders horizontal rules 1`] = `
 "Hello
----
+
 World
+
 ---
+
 Test
 "
 `;
 
+exports[`<MarkdownDisplay /> > with 'Windows' line endings > renders inline code within text 1`] = `
+"Use the \`console.log()\` function for debugging.
+"
+`;
+
+exports[`<MarkdownDisplay /> > with 'Windows' line endings > renders mixed ordered and unordered list nesting 1`] = `
+"1. Ordered item 1   * Unordered sub-item
+                    * Another sub-item
+
+2. Ordered item 2   1. Nested ordered
+                    2. Another nested
+
+"
+`;
+
+exports[`<MarkdownDisplay /> > with 'Windows' line endings > renders nested blockquotes 1`] = `
+"┌──────────────────────────────────────────────────────────────────────────────────────────────────┐
+│ Level 1 quote┌──────────────────────────────┐                                                    │
+│              │ Level 2 quote┌──────────────┐│                                                    │
+│              │              │ Level 3 quote││                                                    │
+│              │              └──────────────┘│                                                    │
+│              └──────────────────────────────┘                                                    │
+└──────────────────────────────────────────────────────────────────────────────────────────────────┘
+"
+`;
+
+exports[`<MarkdownDisplay /> > with 'Windows' line endings > renders nested inline elements (bold within link) 1`] = `
+"bold link
+"
+`;
+
 exports[`<MarkdownDisplay /> > with 'Windows' line endings > renders nested unordered lists 1`] = `
-" * Level 1
-   * Level 2
-     * Level 3
+"* Level 1   * Level 2      * Level 3
+
+"
+`;
+
+exports[`<MarkdownDisplay /> > with 'Windows' line endings > renders ordered list with custom start property 1`] = `
+"5. Item five
+
+6. Item six
+
+7. Item seven
+
 "
 `;
 
 exports[`<MarkdownDisplay /> > with 'Windows' line endings > renders ordered lists 1`] = `
-" 1. First item
- 2. Second item
+"1. First item
+
+2. Second item
+
+"
+`;
+
+exports[`<MarkdownDisplay /> > with 'Windows' line endings > renders strikethrough text 1`] = `
+"This is deleted text.
 "
 `;
 
@@ -168,14 +495,23 @@ exports[`<MarkdownDisplay /> > with 'Windows' line endings > renders tables corr
 │ Cell 1   │ Cell 2   │
 │ Cell 3   │ Cell 4   │
 └──────────┴──────────┘
+
 "
 `;
 
 exports[`<MarkdownDisplay /> > with 'Windows' line endings > renders unordered lists with different markers 1`] = `
-" - item A
- * item B
- + item C
+"* item A
+
+
+* item B
+
+
+* item C
+
 "
 `;
 
-exports[`<MarkdownDisplay /> > with 'Windows' line endings > shows line numbers in code blocks by default 1`] = `" 1 const x = 1;"`;
+exports[`<MarkdownDisplay /> > with 'Windows' line endings > shows line numbers in code blocks by default 1`] = `
+" 1 const x = 1;
+"
+`;
