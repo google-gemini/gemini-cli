@@ -65,6 +65,15 @@ export type { TelemetryEvent } from './types.js';
 export { SpanStatusCode, ValueType } from '@opentelemetry/api';
 export { SemanticAttributes } from '@opentelemetry/semantic-conventions';
 export * from './uiTelemetry.js';
+export {
+  MemoryMonitor,
+  initializeMemoryMonitor,
+  getMemoryMonitor,
+  recordCurrentMemoryUsage,
+  startGlobalMemoryMonitoring,
+  stopGlobalMemoryMonitoring,
+} from './memory-monitor.js';
+export type { MemorySnapshot, ProcessMetrics } from './memory-monitor.js';
 export { HighWaterMarkTracker } from './high-water-mark-tracker.js';
 export { RateLimiter } from './rate-limiter.js';
 export { ActivityType } from './activity-types.js';
