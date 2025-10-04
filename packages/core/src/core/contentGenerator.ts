@@ -16,7 +16,7 @@ import { GoogleGenAI } from '@google/genai';
 import { createCodeAssistContentGenerator } from '../code_assist/codeAssist.js';
 import type { Config } from '../config/config.js';
 
-import type { UserTierId } from '../code_assist/types.js';
+import { AuthType, type UserTierId } from '../config/authTypes.js';
 import { LoggingContentGenerator } from './loggingContentGenerator.js';
 import { InstallationManager } from '../utils/installationManager.js';
 
@@ -41,12 +41,8 @@ export interface ContentGenerator {
   userTier?: UserTierId;
 }
 
-export enum AuthType {
-  LOGIN_WITH_GOOGLE = 'oauth-personal',
-  USE_GEMINI = 'gemini-api-key',
-  USE_VERTEX_AI = 'vertex-ai',
-  CLOUD_SHELL = 'cloud-shell',
-}
+// Re-export for backward compatibility
+export { AuthType } from '../config/authTypes.js';
 
 export type ContentGeneratorConfig = {
   apiKey?: string;

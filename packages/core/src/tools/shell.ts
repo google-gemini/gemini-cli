@@ -22,7 +22,7 @@ import {
   ToolConfirmationOutcome,
   Kind,
 } from './tools.js';
-import { getErrorMessage } from '../utils/errors.js';
+import { getErrorMessage } from '../utils/errors/index.js';
 import { summarizeToolOutput } from '../utils/summarizer.js';
 import type {
   ShellExecutionConfig,

@@ -7,7 +7,7 @@
 import * as fs from 'node:fs/promises';
 import type { Dirent } from 'node:fs';
 import * as path from 'node:path';
-import { getErrorMessage, isNodeError } from './errors.js';
+import { getErrorMessage, isNodeError } from './errors/index.js';
 import type { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import type { FileFilteringOptions } from '../config/constants.js';
 import { DEFAULT_FILE_FILTERING_OPTIONS } from '../config/constants.js';

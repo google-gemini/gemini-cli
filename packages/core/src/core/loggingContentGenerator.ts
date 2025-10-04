@@ -27,11 +27,7 @@ import {
 } from '../telemetry/loggers.js';
 import type { ContentGenerator } from './contentGenerator.js';
 import { toContents } from '../code_assist/converter.js';
-import { isStructuredError } from '../utils/quotaErrorDetection.js';
-
-interface StructuredError {
-  status: number;
-}
+import { parseError } from '../utils/errors/errorParsing.js';
 
 /**
  * A decorator that wraps a ContentGenerator to add logging to API calls.
@@ -96,9 +92,7 @@ export class LoggingContentGenerator implements ContentGenerator {
         prompt_id,
         this.config.getContentGeneratorConfig()?.authType,
         errorType,
-        isStructuredError(error)
-          ? (error as StructuredError).status
-          : undefined,
+        parseError(error).statusCode,
       ),
     );
   }

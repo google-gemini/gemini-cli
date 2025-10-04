@@ -18,7 +18,10 @@ import open from 'open';
 import path from 'node:path';
 import { promises as fs } from 'node:fs';
 import type { Config } from '../config/config.js';
-import { getErrorMessage, FatalAuthenticationError } from '../utils/errors.js';
+import {
+  getErrorMessage,
+  FatalAuthenticationError,
+} from '../utils/errors/index.js';
 import { UserAccountManager } from '../utils/userAccountManager.js';
 import { AuthType } from '../core/contentGenerator.js';
 import readline from 'node:readline';

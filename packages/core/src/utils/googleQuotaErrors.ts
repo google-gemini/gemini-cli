@@ -4,159 +4,210 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {
-  ErrorInfo,
-  GoogleApiError,
-  QuotaFailure,
-  RetryInfo,
-} from './googleErrors.js';
+import type { GoogleApiError } from './googleErrors.js';
 import { parseGoogleApiError } from './googleErrors.js';
 
-const FIVE_MINUTES_IN_SECONDS = 5 * 60;
+/**
+ * Classification result for Google API quota errors
+ */
+export type QuotaClassification = {
+  type: 'TERMINAL_QUOTA' | 'RETRYABLE_QUOTA';
+  message: string;
+  retryDelayMs?: number;
+  cause: GoogleApiError;
+};
 
 /**
- * A non-retryable error indicating a hard quota limit has been reached (e.g., daily limit).
+ * Classifies a Google API error as a quota error if applicable.
+ * Returns null if the error is not a quota error or not a 429 error.
+ *
+ * @param error - The error to classify
+ * @returns QuotaClassification if it's a quota error, null otherwise
  */
-export class TerminalQuotaError extends Error {
-  constructor(
-    message: string,
-    override readonly cause: GoogleApiError,
-  ) {
-    super(message);
-    this.name = 'TerminalQuotaError';
-  }
-}
-
-/**
- * A retryable error indicating a temporary quota issue (e.g., per-minute limit).
- */
-export class RetryableQuotaError extends Error {
-  retryDelayMs: number;
-
-  constructor(
-    message: string,
-    override readonly cause: GoogleApiError,
-    retryDelaySeconds: number,
-  ) {
-    super(message);
-    this.name = 'RetryableQuotaError';
-    this.retryDelayMs = retryDelaySeconds * 1000;
-  }
-}
-
-/**
- * Parses a duration string (e.g., "34.074824224s", "60s") and returns the time in seconds.
- * @param duration The duration string to parse.
- * @returns The duration in seconds, or null if parsing fails.
- */
-function parseDurationInSeconds(duration: string): number | null {
-  if (!duration.endsWith('s')) {
+export function classifyGoogleError(
+  error: unknown,
+): QuotaClassification | null {
+  const googleError = parseGoogleApiError(error);
+  if (!googleError || googleError.code !== 429) {
     return null;
   }
-  const seconds = parseFloat(duration.slice(0, -1));
-  return isNaN(seconds) ? null : seconds;
+
+  // Check if this is actually a Google quota error by looking for specific indicators
+  const message = googleError.message.toLowerCase();
+  const hasQuotaIndicator =
+    message.includes('quota') ||
+    (message.includes('daily') && message.includes('limit')) ||
+    message.includes('googleapis.com') ||
+    message.includes('gemini');
+
+  // Also check if we have Google-specific error details
+  const hasGoogleDetails =
+    googleError.details && googleError.details.length > 0;
+
+  // Check for RetryInfo in details
+  const retryInfo = googleError.details?.find(
+    (d) => d['@type'] === 'type.googleapis.com/google.rpc.RetryInfo',
+  );
+
+  // Check for QuotaFailure in details
+  const quotaFailure = googleError.details?.find(
+    (d) => d['@type'] === 'type.googleapis.com/google.rpc.QuotaFailure',
+  );
+
+  // Check for ErrorInfo in details
+  const errorInfo = googleError.details?.find(
+    (d) => d['@type'] === 'type.googleapis.com/google.rpc.ErrorInfo',
+  );
+
+  // Only classify as a quota error if we have clear indicators
+  if (!hasQuotaIndicator && !hasGoogleDetails && !quotaFailure && !errorInfo) {
+    return null;
+  }
+
+  // Determine if this is a terminal or retryable quota error
+  const isTerminal = isTerminalQuotaError(googleError, quotaFailure, errorInfo);
+
+  if (isTerminal) {
+    return {
+      type: 'TERMINAL_QUOTA',
+      message: buildQuotaMessage(googleError, quotaFailure, errorInfo),
+      cause: googleError,
+    };
+  }
+
+  // It's retryable - extract retry delay if available
+  let retryDelayMs: number | undefined;
+  if (retryInfo?.['retryDelay']) {
+    retryDelayMs = parseRetryDelay(retryInfo['retryDelay']);
+  }
+
+  return {
+    type: 'RETRYABLE_QUOTA',
+    message: buildQuotaMessage(googleError, quotaFailure, errorInfo),
+    retryDelayMs,
+    cause: googleError,
+  };
 }
 
 /**
- * Analyzes a caught error and classifies it as a specific quota-related error if applicable.
- *
- * It decides whether an error is a `TerminalQuotaError` or a `RetryableQuotaError` based on
- * the following logic:
- * - If the error indicates a daily limit, it's a `TerminalQuotaError`.
- * - If the error suggests a retry delay of more than 5 minutes, it's a `TerminalQuotaError`.
- * - If the error suggests a retry delay of 5 minutes or less, it's a `RetryableQuotaError`.
- * - If the error indicates a per-minute limit, it's a `RetryableQuotaError`.
- *
- * @param error The error to classify.
- * @returns A `TerminalQuotaError`, `RetryableQuotaError`, or the original `unknown` error.
+ * Determines if a quota error is terminal (daily limit) or retryable
  */
-export function classifyGoogleError(error: unknown): unknown {
-  const googleApiError = parseGoogleApiError(error);
+function isTerminalQuotaError(
+  error: GoogleApiError,
+  quotaFailure?: Record<string, unknown>,
+  errorInfo?: Record<string, unknown>,
+): boolean {
+  // Check for daily limit indicators
+  const message = error.message.toLowerCase();
+  const isDailyLimit =
+    message.includes('daily') ||
+    message.includes('per day') ||
+    message.includes('24 hour') ||
+    message.includes('24-hour');
 
-  if (!googleApiError || googleApiError.code !== 429) {
-    return error; // Not a 429 error we can handle.
-  }
+  // Check for Pro model quota indicators
+  const isProQuota =
+    message.includes('pro') ||
+    message.includes('gemini-1.5-pro') ||
+    message.includes('gemini-2.0-flash-exp');
 
-  const quotaFailure = googleApiError.details.find(
-    (d): d is QuotaFailure =>
-      d['@type'] === 'type.googleapis.com/google.rpc.QuotaFailure',
-  );
-
-  const errorInfo = googleApiError.details.find(
-    (d): d is ErrorInfo =>
-      d['@type'] === 'type.googleapis.com/google.rpc.ErrorInfo',
-  );
-
-  const retryInfo = googleApiError.details.find(
-    (d): d is RetryInfo =>
-      d['@type'] === 'type.googleapis.com/google.rpc.RetryInfo',
-  );
-
-  // 1. Check for long-term limits in QuotaFailure or ErrorInfo
-  if (quotaFailure) {
-    for (const violation of quotaFailure.violations) {
-      const quotaId = violation.quotaId ?? '';
-      if (quotaId.includes('PerDay') || quotaId.includes('Daily')) {
-        return new TerminalQuotaError(
-          `Reached a daily quota limit: ${violation.description}`,
-          googleApiError,
-        );
+  // Check QuotaFailure violations for daily limits
+  if (quotaFailure?.violations && Array.isArray(quotaFailure.violations)) {
+    for (const violation of quotaFailure.violations as Array<
+      Record<string, unknown>
+    >) {
+      const subject = (violation.subject as string)?.toLowerCase() || '';
+      const description =
+        (violation.description as string)?.toLowerCase() || '';
+      if (
+        subject.includes('daily') ||
+        description.includes('daily') ||
+        subject.includes('per_day') ||
+        description.includes('per day')
+      ) {
+        return true;
       }
     }
   }
 
-  if (errorInfo) {
-    const quotaLimit = errorInfo.metadata?.['quota_limit'] ?? '';
-    if (quotaLimit.includes('PerDay') || quotaLimit.includes('Daily')) {
-      return new TerminalQuotaError(
-        `Reached a daily quota limit: ${errorInfo.reason}`,
-        googleApiError,
-      );
+  // Check ErrorInfo for quota group indicators
+  if (errorInfo?.metadata && typeof errorInfo.metadata === 'object') {
+    const metadata = errorInfo.metadata as Record<string, unknown>;
+    const quotaGroup = (metadata.quotaGroup as string)?.toLowerCase();
+    if (
+      quotaGroup &&
+      (quotaGroup.includes('daily') || quotaGroup.includes('per_day'))
+    ) {
+      return true;
     }
   }
 
-  // 2. Check for long delays in RetryInfo
-  if (retryInfo?.retryDelay) {
-    const delaySeconds = parseDurationInSeconds(retryInfo.retryDelay);
-    if (delaySeconds !== null) {
-      if (delaySeconds > FIVE_MINUTES_IN_SECONDS) {
-        return new TerminalQuotaError(
-          `Quota limit requires a long delay of ${retryInfo.retryDelay}.`,
-          googleApiError,
-        );
-      }
-      // This is a retryable error with a specific delay.
-      return new RetryableQuotaError(
-        `Quota limit hit. Retrying after ${retryInfo.retryDelay}.`,
-        googleApiError,
-        delaySeconds,
-      );
+  // Daily limits are terminal, Pro quotas are often terminal
+  return isDailyLimit || isProQuota;
+}
+
+/**
+ * Parses retry delay from RetryInfo
+ */
+function parseRetryDelay(retryDelay: unknown): number | undefined {
+  if (!retryDelay) return undefined;
+
+  // Handle string format like "60s"
+  if (typeof retryDelay === 'string') {
+    const match = retryDelay.match(/^(\d+)s$/);
+    if (match) {
+      return parseInt(match[1], 10) * 1000;
     }
   }
 
-  // 3. Check for short-term limits in QuotaFailure or ErrorInfo
-  if (quotaFailure) {
-    for (const violation of quotaFailure.violations) {
-      const quotaId = violation.quotaId ?? '';
-      if (quotaId.includes('PerMinute')) {
-        return new RetryableQuotaError(
-          `Quota limit hit: ${violation.description}. Retrying after 60s.`,
-          googleApiError,
-          60,
-        );
-      }
+  // Handle object format { seconds: 60, nanos: 0 }
+  if (
+    typeof retryDelay === 'object' &&
+    retryDelay !== null &&
+    'seconds' in retryDelay
+  ) {
+    const delay = retryDelay as Record<string, unknown>;
+    const seconds = parseInt(String(delay.seconds), 10);
+    const nanos = Number(delay.nanos) || 0;
+    return seconds * 1000 + Math.floor(nanos / 1000000);
+  }
+
+  return undefined;
+}
+
+/**
+ * Builds a descriptive message for the quota error
+ */
+function buildQuotaMessage(
+  error: GoogleApiError,
+  quotaFailure?: Record<string, unknown>,
+  errorInfo?: Record<string, unknown>,
+): string {
+  // Start with the base error message
+  let message = error.message;
+
+  // Add quota failure details if available
+  if (
+    quotaFailure?.violations &&
+    Array.isArray(quotaFailure.violations) &&
+    quotaFailure.violations.length > 0
+  ) {
+    const violations = (
+      quotaFailure.violations as Array<Record<string, unknown>>
+    )
+      .map((v) => (v.description as string) || (v.subject as string))
+      .filter(Boolean)
+      .join(', ');
+    if (violations) {
+      message += ` (Quota violations: ${violations})`;
     }
   }
 
-  if (errorInfo) {
-    const quotaLimit = errorInfo.metadata?.['quota_limit'] ?? '';
-    if (quotaLimit.includes('PerMinute')) {
-      return new RetryableQuotaError(
-        `Quota limit hit: ${errorInfo.reason}. Retrying after 60s.`,
-        googleApiError,
-        60,
-      );
-    }
+  // Add error info reason if available
+  const reason = errorInfo?.reason as string;
+  if (reason && reason !== 'RATE_LIMIT_EXCEEDED') {
+    message += ` (Reason: ${reason})`;
   }
-  return error; // Fallback to original error if no specific classification fits.
+
+  return message;
 }

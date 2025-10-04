@@ -6,6 +6,7 @@
 
 // Export config
 export * from './config/config.js';
+export * from './config/authTypes.js';
 export * from './output/types.js';
 export * from './output/json-formatter.js';
 export * from './policy/types.js';
@@ -34,7 +35,7 @@ export * from './code_assist/types.js';
 // Export utilities
 export * from './utils/paths.js';
 export * from './utils/schemaValidator.js';
-export * from './utils/errors.js';
+export * from './utils/errors/index.js';
 export * from './utils/getFolderStructure.js';
 export * from './utils/memoryDiscovery.js';
 export * from './utils/gitIgnoreParser.js';
@@ -50,7 +51,9 @@ export * from './utils/textUtils.js';
 export * from './utils/formatters.js';
 export * from './utils/generateContentResponseUtilities.js';
 export * from './utils/filesearch/fileSearch.js';
-export * from './utils/errorParsing.js';
+// errorParsing exports are now included in errors/index.js
+export * from './utils/googleErrors.js'; // Google API error parsing
+export * from './utils/googleQuotaErrors.js'; // Google quota classification
 export * from './utils/workspaceContext.js';
 export * from './utils/ignorePatterns.js';
 export * from './utils/partUtils.js';

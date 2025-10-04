@@ -5,7 +5,7 @@
  */
 
 import type { TelemetrySettings } from '../config/config.js';
-import { FatalConfigError } from '../utils/errors.js';
+import { FatalConfigError } from '../utils/errors/index.js';
 import { TelemetryTarget } from './index.js';
 
 /**
