@@ -6,19 +6,20 @@ import com.intellij.diff.requests.SimpleDiffRequest
 import com.intellij.diff.util.DiffUserDataKeys
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.components.Service
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.fileEditor.TextEditor
-import com.intellij.openapi.components.Service
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Key
-import com.intellij.openapi.vfs.VfsUtil
-import com.intellij.util.messages.Topic
 import com.intellij.openapi.vfs.LocalFileSystem
+import com.intellij.openapi.vfs.VfsUtil
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.util.messages.Topic
 import io.modelcontextprotocol.kotlin.sdk.JSONRPCNotification
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
-import java.util.EventListener
+import java.nio.file.Paths
+import java.util.*
 
 /**
  * Manages the state and lifecycle of Gemini diff views within the IDE.
@@ -68,7 +69,8 @@ class DiffManager(private val project: Project) : Disposable {
 
     val content2 = DiffContentFactory.getInstance().create(project, newContent, file?.fileType)
 
-    val request = SimpleDiffRequest("Gemini Code Change", content1, content2, "Original", "Gemini's Suggestion")
+    val diffTitle = "${Paths.get(filePath).fileName} ↔ Modified"
+    val request = SimpleDiffRequest(diffTitle, content1, content2, "Original", "Gemini's suggestion")
 
     // Add custom actions to the diff viewer
     val actions = listOf(CloseDiffAction(this, filePath), AcceptDiffAction(this, filePath))
