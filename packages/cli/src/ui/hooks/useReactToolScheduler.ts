@@ -90,6 +90,7 @@ export function useReactToolScheduler(
   const allToolCallsCompleteHandler: AllToolCallsCompleteHandler = useCallback(
     async (completedToolCalls) => {
       await onComplete(completedToolCalls);
+      setToolCallsForDisplay([]);
     },
     [onComplete],
   );
@@ -139,8 +140,7 @@ export function useReactToolScheduler(
         getPreferredEditor,
         config,
         onEditorClose,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      } as any),
+      }),
     [
       config,
       outputUpdateHandler,
