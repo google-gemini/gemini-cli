@@ -13,7 +13,7 @@ plugins {
   kotlin("jvm") version "2.2.0"
   id("org.jetbrains.intellij.platform") version "2.7.2"
   id("org.jetbrains.changelog") version "2.1.2"
-  kotlin("plugin.serialization") version "1.9.0"
+  kotlin("plugin.serialization") version "2.2.0"
 }
 
 
@@ -43,17 +43,15 @@ dependencies {
 
   // MCP Kotlin SDK dependencies
   implementation("io.modelcontextprotocol:kotlin-sdk:0.7.2")
-  implementation("io.ktor:ktor-server-netty:3.3.0")
-  implementation("io.ktor:ktor-server-sse:3.3.0")
-  implementation("io.ktor:ktor-server-core:3.3.0")
-  implementation("io.ktor:ktor-server-cio:3.3.0")
-  implementation("io.ktor:ktor-server-content-negotiation:3.3.0")
-  implementation("io.ktor:ktor-serialization-kotlinx-json:3.3.0")
-  implementation("io.ktor:ktor-server-cors:3.3.0")
-  implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
+  implementation("io.ktor:ktor-server-netty:2.3.11")
+  implementation("io.ktor:ktor-server-core:2.3.11")
+  implementation("io.ktor:ktor-server-cio:2.3.11")
+  implementation("io.ktor:ktor-server-content-negotiation:2.3.11")
+  implementation("io.ktor:ktor-serialization-kotlinx-json:2.3.11")
+  implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.0-RC")
 
   testImplementation("junit:junit:4.13.2")
-  testImplementation("org.jetbrains.kotlin:kotlin-test-junit:1.9.22")
+  testImplementation("org.jetbrains.kotlin:kotlin-test-junit:2.2.0")
 }
 
 intellijPlatform {
