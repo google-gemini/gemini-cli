@@ -154,6 +154,7 @@ export interface ExtensionUpdateCheckResult {
 export async function checkForAllExtensionUpdates(
   extensions: GeminiCLIExtension[],
   dispatch: (action: ExtensionUpdateAction) => void,
+  cwd: string = process.cwd(),
 ): Promise<void> {
   dispatch({ type: 'BATCH_CHECK_START' });
   const promises: Array<Promise<void>> = [];
@@ -168,13 +169,20 @@ export async function checkForAllExtensionUpdates(
       });
       continue;
     }
+    dispatch({
+      type: 'SET_STATE',
+      payload: {
+        name: extension.name,
+        state: ExtensionUpdateState.CHECKING_FOR_UPDATES,
+      },
+    });
     promises.push(
-      checkForExtensionUpdate(extension, (updatedState) => {
+      checkForExtensionUpdate(extension, cwd).then((state) =>
         dispatch({
           type: 'SET_STATE',
-          payload: { name: extension.name, state: updatedState },
-        });
-      }),
+          payload: { name: extension.name, state },
+        }),
+      ),
     );
   }
   await Promise.all(promises);
