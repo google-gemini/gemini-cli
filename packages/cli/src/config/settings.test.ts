@@ -59,7 +59,6 @@ import {
   USER_SETTINGS_PATH, // This IS the mocked path.
   getSystemSettingsPath,
   getSystemDefaultsPath,
-  SETTINGS_DIRECTORY_NAME, // This is from the original module, but used by the mock.
   migrateSettingsToV1,
   needsMigration,
   type Settings,
@@ -70,10 +69,10 @@ import {
 import { FatalConfigError, GEMINI_DIR } from '@google/gemini-cli-core';
 
 const MOCK_WORKSPACE_DIR = '/mock/workspace';
-// Use the (mocked) SETTINGS_DIRECTORY_NAME for consistency
+// Use the (mocked) GEMINI_DIR for consistency
 const MOCK_WORKSPACE_SETTINGS_PATH = pathActual.join(
   MOCK_WORKSPACE_DIR,
-  SETTINGS_DIRECTORY_NAME,
+  GEMINI_DIR,
   'settings.json',
 );
 

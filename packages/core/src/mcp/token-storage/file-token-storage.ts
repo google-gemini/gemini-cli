@@ -10,6 +10,7 @@ import * as os from 'node:os';
 import * as crypto from 'node:crypto';
 import { BaseTokenStorage } from './base-token-storage.js';
 import type { OAuthCredentials } from './types.js';
+import { GEMINI_DIR } from '../../utils/paths.js';
 
 export class FileTokenStorage extends BaseTokenStorage {
   private readonly tokenFilePath: string;
@@ -17,7 +18,7 @@ export class FileTokenStorage extends BaseTokenStorage {
 
   constructor(serviceName: string) {
     super(serviceName);
-    const configDir = path.join(os.homedir(), '.gemini');
+    const configDir = path.join(os.homedir(), GEMINI_DIR);
     this.tokenFilePath = path.join(configDir, 'mcp-oauth-tokens-v2.json');
     this.encryptionKey = this.deriveEncryptionKey();
   }
