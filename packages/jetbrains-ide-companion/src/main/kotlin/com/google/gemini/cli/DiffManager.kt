@@ -87,34 +87,31 @@ class DiffManager(private val project: Project) : Disposable {
   }
 
   /**
-   * Programmatically closes an open diff view for a specific file.
+   * Closes a diff view and returns its final content, sending an `ide/diffClosed` notification.
+   * This is used by the `closeDiff` tool.
    *
    * @param filePath The path of the file whose diff view should be closed.
    * @param suppressNotification If true, a notification about the closure will not be sent.
    * @return The final content of the editor pane before it was closed, or null if not found.
    */
-  fun rejectDiff(filePath: String, suppressNotification: Boolean = false) =
-    rejectDiff(filePath, null, suppressNotification)
-
-  fun rejectDiff(filePath: String, file: VirtualFile?, suppressNotification: Boolean = false): String? {
+  fun closeDiff(filePath: String, suppressNotification: Boolean = false): String? {
     val diffInfo = diffDocuments[filePath] ?: return null
-
-    closeDiffEditor(file, filePath)
-
+    val modifiedContent = closeDiffEditor(null, filePath)
     diffDocuments.remove(filePath)
+    val finalContent = modifiedContent ?: diffInfo.newContent
 
     if (!suppressNotification) {
       val notification = JSONRPCNotification(
-        method = "ide/diffRejected",
-        params = buildJsonObject {
-          put("filePath", filePath)
-          put("content", diffInfo.originalContent)
-        }
+          method = "ide/diffClosed",
+          params = buildJsonObject {
+              put("filePath", filePath)
+              put("content", finalContent)
+          }
       )
       publisher.onDiffNotification(notification)
     }
 
-    return diffInfo.originalContent
+    return finalContent
   }
 
   /**
@@ -140,8 +137,24 @@ class DiffManager(private val project: Project) : Disposable {
     publisher.onDiffNotification(notification)
   }
 
+  /**
+   * Handles the user closing/canceling the diff view from the UI.
+   * Closes the editor and publishes an `ide/diffClosed` notification.
+   */
   fun cancelDiff(filePath: String, file: VirtualFile?) {
-    rejectDiff(filePath, file, suppressNotification = true)
+    val diffInfo = diffDocuments[filePath] ?: return
+
+    val modifiedContent = closeDiffEditor(file, filePath)
+    diffDocuments.remove(filePath)
+
+    val notification = JSONRPCNotification(
+        method = "ide/diffClosed",
+        params = buildJsonObject {
+            put("filePath", filePath)
+            put("content", modifiedContent ?: diffInfo.newContent)
+        }
+    )
+    publisher.onDiffNotification(notification)
   }
 
   private fun closeDiffEditor(fileToClose: VirtualFile?, filePath: String): String? {
