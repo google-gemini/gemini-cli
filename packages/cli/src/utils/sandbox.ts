@@ -344,7 +344,7 @@ export async function start_sandbox(
       sandboxProcess = spawn(config.command, args, {
         stdio: 'inherit',
       });
-      return new Promise((resolve, reject) => {
+      return await new Promise((resolve, reject) => {
         sandboxProcess?.on('error', reject);
         sandboxProcess?.on('close', (code) => {
           process.stdin.resume();
@@ -824,7 +824,7 @@ export async function start_sandbox(
       stdio: 'inherit',
     });
 
-    return new Promise<number>((resolve, reject) => {
+    return await new Promise<number>((resolve, reject) => {
       sandboxProcess.on('error', (err) => {
         console.error('Sandbox process error:', err);
         reject(err);

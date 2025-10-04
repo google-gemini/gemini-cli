@@ -578,7 +578,6 @@ export class GeminiClient {
     }
     return turn;
   }
-
   async generateContent(
     contents: Content[],
     generationConfig: GenerateContentConfig,
@@ -622,7 +621,7 @@ export class GeminiClient {
         error?: unknown,
       ) =>
         // Pass the captured model to the centralized handler.
-        await handleFallback(this.config, currentAttemptModel, authType, error);
+        handleFallback(this.config, currentAttemptModel, authType, error);
 
       const result = await retryWithBackoff(apiCall, {
         onPersistent429: onPersistent429Callback,
