@@ -166,19 +166,22 @@ export class IDEServer {
 
       app.use((req, res, next) => {
         const authHeader = req.headers.authorization;
-        if (authHeader) {
-          const parts = authHeader.split(' ');
-          if (parts.length !== 2 || parts[0] !== 'Bearer') {
-            this.log('Malformed Authorization header. Rejecting request.');
-            res.status(401).send('Unauthorized');
-            return;
-          }
-          const token = parts[1];
-          if (token !== this.authToken) {
-            this.log('Invalid auth token provided. Rejecting request.');
-            res.status(401).send('Unauthorized');
-            return;
-          }
+        if (!authHeader) {
+          this.log('Missing Authorization header. Rejecting request.');
+          res.status(401).send('Unauthorized');
+          return;
+        }
+        const parts = authHeader.split(' ');
+        if (parts.length !== 2 || parts[0] !== 'Bearer') {
+          this.log('Malformed Authorization header. Rejecting request.');
+          res.status(401).send('Unauthorized');
+          return;
+        }
+        const token = parts[1];
+        if (token !== this.authToken) {
+          this.log('Invalid auth token provided. Rejecting request.');
+          res.status(401).send('Unauthorized');
+          return;
         }
         next();
       });

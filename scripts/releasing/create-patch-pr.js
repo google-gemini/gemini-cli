@@ -53,7 +53,7 @@ async function main() {
   const nextVersion = releaseInfo.nextVersion;
 
   const releaseBranch = `release/${latestTag}-pr-${pullRequestNumber}`;
-  const hotfixBranch = `hotfix/${latestTag}/${nextVersion}/${channel}/cherry-pick-${commit.substring(0, 7)}`;
+  const hotfixBranch = `hotfix/${latestTag}/${nextVersion}/${channel}/cherry-pick-${commit.substring(0, 7)}/pr-${pullRequestNumber}`;
 
   // Create the release branch from the tag if it doesn't exist.
   if (!branchExists(releaseBranch)) {
