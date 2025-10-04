@@ -28,6 +28,7 @@ import kotlinx.coroutines.*
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.put
@@ -237,17 +238,16 @@ class IdeServer(private val project: Project, private val diffManager: DiffManag
     ) { request ->
       val filePath = (request.arguments["filePath"] as? JsonPrimitive)?.content
         ?: throw IllegalArgumentException("filePath is required and must be a string")
-      val suppressNotification =
-        request.arguments["suppressNotification"]?.toString()?.toBoolean() ?: false
-
-      val finalContent = diffManager.rejectDiff(filePath, suppressNotification)
+      val suppressNotification = (request.arguments["suppressNotification"] as? JsonPrimitive)?.booleanOrNull ?: false
+      val content = diffManager.closeDiff(filePath, suppressNotification)
 
       @Serializable data class CloseDiffResponse(val content: String?)
-      val response = McpJson.encodeToString(CloseDiffResponse(finalContent))
+      val response = McpJson.encodeToString(CloseDiffResponse(content))
 
       CallToolResult(
         content = listOf(TextContent(response))
-      )    }
+      )
+    }
 
     return server
   }
