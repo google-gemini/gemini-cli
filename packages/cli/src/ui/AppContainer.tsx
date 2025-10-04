@@ -90,6 +90,7 @@ import { useSessionStats } from './contexts/SessionContext.js';
 import { useGitBranchName } from './hooks/useGitBranchName.js';
 import { useExtensionUpdates } from './hooks/useExtensionUpdates.js';
 import { ShellFocusContext } from './contexts/ShellFocusContext.js';
+import { useShellHistory } from './hooks/useShellHistory.js';
 
 const CTRL_EXIT_PROMPT_DURATION_MS = 1000;
 
@@ -139,6 +140,7 @@ export const AppContainer = (props: AppContainerProps) => {
   );
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [embeddedShellFocused, setEmbeddedShellFocused] = useState(false);
+  const quickCommandAbortControllerRef = useRef<AbortController | null>(null);
 
   const [geminiMdFileCount, setGeminiMdFileCount] = useState<number>(
     initializationResult.geminiMdFileCount,
@@ -282,6 +284,8 @@ export const AppContainer = (props: AppContainerProps) => {
     isValidPath,
     shellModeActive,
   });
+
+  const shellHistory = useShellHistory(config.getProjectRoot());
 
   useEffect(() => {
     const fetchUserMessages = async () => {
@@ -575,6 +579,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
     handleApprovalModeChange,
     activePtyId,
     loopDetectionConfirmationRequest,
+    handleShellCommand,
   } = useGeminiStream(
     config.getGeminiClient(),
     historyManager.history,
@@ -907,6 +912,9 @@ Logging in with Google... Please restart Gemini CLI to continue.
       if (keyMatchers[Command.QUIT](key)) {
         if (!ctrlCPressedOnce) {
           cancelOngoingRequest?.();
+          // Also cancel quick command if one is running
+          quickCommandAbortControllerRef.current?.abort();
+          quickCommandAbortControllerRef.current = null;
         }
 
         if (!ctrlCPressedOnce) {
@@ -955,6 +963,31 @@ Logging in with Google... Please restart Gemini CLI to continue.
         !enteringConstrainHeightMode
       ) {
         setConstrainHeight(false);
+      } else if (keyMatchers[Command.EXECUTE_PROMPT_COMMAND](key)) {
+        const commandToExecute = buffer.text.trim();
+        if (commandToExecute) {
+          buffer.setText('');
+          // Add command to shell history
+          shellHistory.addCommandToHistory(commandToExecute);
+          const abortController = new AbortController();
+          // Store the controller so Ctrl+C can cancel it
+          quickCommandAbortControllerRef.current = abortController;
+
+          // Clear the ref when the command completes or is aborted
+          const cleanup = () => {
+            if (quickCommandAbortControllerRef.current === abortController) {
+              quickCommandAbortControllerRef.current = null;
+            }
+          };
+          abortController.signal.addEventListener('abort', cleanup, {
+            once: true,
+          });
+
+          // Using the same shell command processor as Shell Mode
+          handleShellCommand(commandToExecute, abortController.signal);
+        }
+        // Consume the key event even if buffer is empty to prevent newline
+        return;
       } else if (keyMatchers[Command.TOGGLE_SHELL_INPUT_FOCUS](key)) {
         if (activePtyId || embeddedShellFocused) {
           setEmbeddedShellFocused((prev) => !prev);
@@ -973,7 +1006,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       ctrlCPressedOnce,
       setCtrlCPressedOnce,
       ctrlCTimerRef,
-      buffer.text.length,
+      buffer,
       ctrlDPressedOnce,
       setCtrlDPressedOnce,
       ctrlDTimerRef,
@@ -982,6 +1015,8 @@ Logging in with Google... Please restart Gemini CLI to continue.
       activePtyId,
       embeddedShellFocused,
       settings.merged.general?.debugKeystrokeLogging,
+      handleShellCommand,
+      shellHistory,
     ],
   );
 
