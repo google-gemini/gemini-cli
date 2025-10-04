@@ -77,7 +77,7 @@ describe('useExtensionUpdates', () => {
     const cwd = '/test/cwd';
 
     vi.mocked(checkForAllExtensionUpdates).mockImplementation(
-      async (extensions, dispatch) => {
+      async (_extensions, dispatch, _cwd) => {
         dispatch({
           type: 'SET_STATE',
           payload: {
@@ -123,7 +123,7 @@ describe('useExtensionUpdates', () => {
     const addItem = vi.fn();
 
     vi.mocked(checkForAllExtensionUpdates).mockImplementation(
-      async (extensions, dispatch) => {
+      async (_extensions, dispatch, _cwd) => {
         dispatch({
           type: 'SET_STATE',
           payload: {
@@ -196,7 +196,7 @@ describe('useExtensionUpdates', () => {
     const addItem = vi.fn();
 
     vi.mocked(checkForAllExtensionUpdates).mockImplementation(
-      async (extensions, dispatch) => {
+      async (_extensions, dispatch, _cwd) => {
         dispatch({
           type: 'SET_STATE',
           payload: {
@@ -283,7 +283,7 @@ describe('useExtensionUpdates', () => {
     const cwd = '/test/cwd';
 
     vi.mocked(checkForAllExtensionUpdates).mockImplementation(
-      async (extensions, dispatch) => {
+      async (_extensions, dispatch, _cwd) => {
         dispatch({ type: 'BATCH_CHECK_START' });
         dispatch({
           type: 'SET_STATE',

@@ -133,11 +133,7 @@ describe('git extension helpers', () => {
         },
         contextFiles: [],
       };
-      let result: ExtensionUpdateState | undefined = undefined;
-      await checkForExtensionUpdate(
-        extension,
-        (newState) => (result = newState),
-      );
+      const result = await checkForExtensionUpdate(extension);
       expect(result).toBe(ExtensionUpdateState.NOT_UPDATABLE);
     });
 
@@ -154,11 +150,7 @@ describe('git extension helpers', () => {
         contextFiles: [],
       };
       mockGit.getRemotes.mockResolvedValue([]);
-      let result: ExtensionUpdateState | undefined = undefined;
-      await checkForExtensionUpdate(
-        extension,
-        (newState) => (result = newState),
-      );
+      const result = await checkForExtensionUpdate(extension);
       expect(result).toBe(ExtensionUpdateState.ERROR);
     });
 
@@ -180,11 +172,7 @@ describe('git extension helpers', () => {
       mockGit.listRemote.mockResolvedValue('remote-hash\tHEAD');
       mockGit.revparse.mockResolvedValue('local-hash');
 
-      let result: ExtensionUpdateState | undefined = undefined;
-      await checkForExtensionUpdate(
-        extension,
-        (newState) => (result = newState),
-      );
+      const result = await checkForExtensionUpdate(extension);
       expect(result).toBe(ExtensionUpdateState.UPDATE_AVAILABLE);
     });
 
@@ -206,11 +194,7 @@ describe('git extension helpers', () => {
       mockGit.listRemote.mockResolvedValue('same-hash\tHEAD');
       mockGit.revparse.mockResolvedValue('same-hash');
 
-      let result: ExtensionUpdateState | undefined = undefined;
-      await checkForExtensionUpdate(
-        extension,
-        (newState) => (result = newState),
-      );
+      const result = await checkForExtensionUpdate(extension);
       expect(result).toBe(ExtensionUpdateState.UP_TO_DATE);
     });
 
@@ -228,11 +212,7 @@ describe('git extension helpers', () => {
       };
       mockGit.getRemotes.mockRejectedValue(new Error('git error'));
 
-      let result: ExtensionUpdateState | undefined = undefined;
-      await checkForExtensionUpdate(
-        extension,
-        (newState) => (result = newState),
-      );
+      const result = await checkForExtensionUpdate(extension);
       expect(result).toBe(ExtensionUpdateState.ERROR);
     });
   });
