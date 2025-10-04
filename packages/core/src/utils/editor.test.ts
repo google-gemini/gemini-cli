@@ -72,6 +72,7 @@ describe('editor utils', () => {
       { editor: 'neovim', commands: ['nvim'], win32Commands: ['nvim'] },
       { editor: 'zed', commands: ['zed', 'zeditor'], win32Commands: ['zed'] },
       { editor: 'emacs', commands: ['emacs'], win32Commands: ['emacs.exe'] },
+      { editor: 'micro', commands: ['micro'], win32Commands: ['micro.exe'] },
     ];
 
     for (const { editor, commands, win32Commands } of testCases) {
@@ -307,6 +308,14 @@ describe('editor utils', () => {
       });
     });
 
+    it('should return the correct command for micro', () => {
+      const command = getDiffCommand('old.txt', 'new.txt', 'micro');
+      expect(command).toEqual({
+        command: 'micro',
+        args: ['old.txt', 'new.txt'],
+      });
+    });
+
     it('should return null for an unsupported editor', () => {
       // @ts-expect-error Testing unsupported editor
       const command = getDiffCommand('old.txt', 'new.txt', 'foobar');
@@ -373,7 +382,7 @@ describe('editor utils', () => {
       });
     }
 
-    const terminalEditors: EditorType[] = ['vim', 'neovim', 'emacs'];
+    const terminalEditors: EditorType[] = ['vim', 'neovim', 'emacs', 'micro'];
 
     for (const editor of terminalEditors) {
       it(`should call spawnSync for ${editor}`, async () => {
@@ -401,7 +410,7 @@ describe('editor utils', () => {
     });
 
     describe('onEditorClose callback', () => {
-      const terminalEditors: EditorType[] = ['vim', 'neovim', 'emacs'];
+      const terminalEditors: EditorType[] = ['vim', 'neovim', 'emacs', 'micro'];
       for (const editor of terminalEditors) {
         it(`should call onEditorClose for ${editor} on close`, async () => {
           const onEditorClose = vi.fn();
@@ -474,6 +483,15 @@ describe('editor utils', () => {
       expect(allowEditorTypeInSandbox('neovim')).toBe(true);
     });
 
+    it('should allow micro in sandbox mode', () => {
+      vi.stubEnv('SANDBOX', 'sandbox');
+      expect(allowEditorTypeInSandbox('micro')).toBe(true);
+    });
+
+    it('should allow micro when not in sandbox mode', () => {
+      expect(allowEditorTypeInSandbox('micro')).toBe(true);
+    });
+
     const guiEditors: EditorType[] = [
       'vscode',
       'vscodium',
@@ -540,6 +558,12 @@ describe('editor utils', () => {
       (execSync as Mock).mockReturnValue(Buffer.from('/usr/bin/nvim'));
       vi.stubEnv('SANDBOX', 'sandbox');
       expect(isEditorAvailable('neovim')).toBe(true);
+    });
+
+    it('should return true for micro when installed and in sandbox mode', () => {
+      (execSync as Mock).mockReturnValue(Buffer.from('/usr/bin/micro'));
+      vi.stubEnv('SANDBOX', 'sandbox');
+      expect(isEditorAvailable('micro')).toBe(true);
     });
   });
 });
