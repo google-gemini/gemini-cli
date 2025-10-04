@@ -138,7 +138,7 @@ Navigate to the **Actions** tab and run the **Release: Patch (1) Create PR** wor
 This workflow will automatically:
 
 1.  Find the latest release tag for the channel.
-2.  Create a release branch from that tag if one doesn't exist (e.g., `release/v0.5.1`).
+2.  Create a release branch from that tag if one doesn't exist (e.g., `release/v0.5.1-pr-12345`).
 3.  Create a new hotfix branch from the release branch.
 4.  Cherry-pick your specified commit into the hotfix branch.
 5.  Create a pull request from the hotfix branch back to the release branch.
