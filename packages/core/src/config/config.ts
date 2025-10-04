@@ -116,12 +116,21 @@ export interface OutputSettings {
   format?: OutputFormat;
 }
 
+/**
+ * All information required in CLI to handle an extension. Defined in Core so
+ * that the collection of loaded, active, and inactive extensions can be passed
+ * around on the config object though Core does not use this information
+ * directly.
+ */
 export interface GeminiCLIExtension {
   name: string;
   version: string;
   isActive: boolean;
   path: string;
   installMetadata?: ExtensionInstallMetadata;
+  mcpServers?: Record<string, MCPServerConfig>;
+  contextFiles: string[];
+  excludeTools?: string[];
 }
 
 export interface ExtensionInstallMetadata {

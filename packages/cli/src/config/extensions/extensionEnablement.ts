@@ -6,7 +6,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { type Extension } from '../extension.js';
+import type { GeminiCLIExtension } from '@google/gemini-cli-core';
 
 export interface ExtensionEnablementConfig {
   overrides: string[];
@@ -119,13 +119,11 @@ export class ExtensionEnablementManager {
       enabledExtensionNames?.map((name) => name.toLowerCase()) ?? [];
   }
 
-  validateExtensionOverrides(extensions: Extension[]) {
+  validateExtensionOverrides(extensions: GeminiCLIExtension[]) {
     for (const name of this.enabledExtensionNamesOverride) {
       if (name === 'none') continue;
       if (
-        !extensions.some(
-          (ext) => ext.config.name.toLowerCase() === name.toLowerCase(),
-        )
+        !extensions.some((ext) => ext.name.toLowerCase() === name.toLowerCase())
       ) {
         console.error(`Extension not found: ${name}`);
       }
