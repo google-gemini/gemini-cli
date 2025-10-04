@@ -23,12 +23,13 @@ import { reportError } from '../utils/errorReporting.js';
 import { logMalformedJsonResponse } from '../telemetry/loggers.js';
 import { retryWithBackoff } from '../utils/retry.js';
 import { MalformedJsonResponseEvent } from '../telemetry/types.js';
-import { getErrorMessage } from '../utils/errors.js';
+import { getErrorMessage } from '../utils/errors/index.js';
 
 vi.mock('../utils/errorReporting.js');
 vi.mock('../telemetry/loggers.js');
-vi.mock('../utils/errors.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../utils/errors.js')>();
+vi.mock('../utils/errors/index.js', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('../utils/errors/index.js')>();
   return {
     ...actual,
     getErrorMessage: vi.fn((e) => (e instanceof Error ? e.message : String(e))),

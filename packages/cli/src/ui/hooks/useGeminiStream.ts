@@ -24,7 +24,7 @@ import {
   MessageSenderType,
   logUserPrompt,
   GitService,
-  UnauthorizedError,
+  parseError,
   UserPromptEvent,
   DEFAULT_GEMINI_FLASH_MODEL,
   logConversationFinishedEvent,
@@ -818,7 +818,8 @@ export const useGeminiStream = (
             handleLoopDetectedEvent();
           }
         } catch (error: unknown) {
-          if (error instanceof UnauthorizedError) {
+          const parsed = parseError(error);
+          if (parsed.statusCode === 401) {
             onAuthError('Session expired or is unauthorized.');
           } else if (!isNodeError(error) || error.name !== 'AbortError') {
             addItem(

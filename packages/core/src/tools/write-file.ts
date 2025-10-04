@@ -25,7 +25,7 @@ import {
 } from './tools.js';
 import { ToolErrorType } from './tool-error.js';
 import { makeRelative, shortenPath } from '../utils/paths.js';
-import { getErrorMessage, isNodeError } from '../utils/errors.js';
+import { getErrorMessage, isNodeError } from '../utils/errors/index.js';
 import {
   ensureCorrectEdit,
   ensureCorrectFileContent,

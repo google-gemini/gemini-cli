@@ -9,7 +9,7 @@ import type { ToolInvocation, ToolResult } from './tools.js';
 import { BaseDeclarativeTool, BaseToolInvocation, Kind } from './tools.js';
 import { ToolErrorType } from './tool-error.js';
 
-import { getErrorMessage } from '../utils/errors.js';
+import { getErrorMessage } from '../utils/errors/index.js';
 import { type Config } from '../config/config.js';
 import { getResponseText } from '../utils/partUtils.js';
 import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';

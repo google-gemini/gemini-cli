@@ -12,7 +12,7 @@ import {
   MCPDiscoveryState,
   populateMcpServerCommand,
 } from './mcp-client.js';
-import { getErrorMessage } from '../utils/errors.js';
+import { getErrorMessage } from '../utils/errors/index.js';
 import type { EventEmitter } from 'node:events';
 import type { WorkspaceContext } from '../utils/workspaceContext.js';
 

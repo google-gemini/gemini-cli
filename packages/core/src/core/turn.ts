@@ -21,11 +21,11 @@ import type {
 import type { ToolErrorType } from '../tools/tool-error.js';
 import { getResponseText } from '../utils/partUtils.js';
 import { reportError } from '../utils/errorReporting.js';
-import {
-  getErrorMessage,
-  UnauthorizedError,
-  toFriendlyError,
-} from '../utils/errors.js';
+import { parseError, isAuthError } from '../utils/errors/index.js';
+import type { StructuredError } from '../utils/errors/index.js';
+
+// Re-export for backward compatibility
+export type { StructuredError } from '../utils/errors/index.js';
 import type { GeminiChat } from './geminiChat.js';
 import { parseThought, type ThoughtSummary } from '../utils/thoughtUtils.js';
 
@@ -63,11 +63,6 @@ export enum GeminiEventType {
 export type ServerGeminiRetryEvent = {
   type: GeminiEventType.Retry;
 };
-
-export interface StructuredError {
-  message: string;
-  status?: number;
-}
 
 export interface GeminiErrorEventValue {
   error: StructuredError;
@@ -301,28 +296,21 @@ export class Turn {
         return;
       }
 
-      const error = toFriendlyError(e);
-      if (error instanceof UnauthorizedError) {
-        throw error;
+      const parsed = parseError(e);
+      if (isAuthError(parsed)) {
+        throw new Error(parsed.errorMessage);
       }
 
       const contextForReport = [...this.chat.getHistory(/*curated*/ true), req];
       await reportError(
-        error,
+        e,
         'Error when talking to Gemini API',
         contextForReport,
         'Turn.run-sendMessageStream',
       );
-      const status =
-        typeof error === 'object' &&
-        error !== null &&
-        'status' in error &&
-        typeof (error as { status: unknown }).status === 'number'
-          ? (error as { status: number }).status
-          : undefined;
       const structuredError: StructuredError = {
-        message: getErrorMessage(error),
-        status,
+        message: parsed.errorMessage,
+        status: parsed.statusCode,
       };
       await this.chat.maybeIncludeSchemaDepthContext(structuredError);
       yield { type: GeminiEventType.Error, value: { error: structuredError } };

@@ -16,7 +16,7 @@ import {
   ToolConfirmationOutcome,
 } from './tools.js';
 import { ToolErrorType } from './tool-error.js';
-import { getErrorMessage } from '../utils/errors.js';
+import { getErrorMessage } from '../utils/errors/index.js';
 import type { Config } from '../config/config.js';
 import { ApprovalMode, DEFAULT_GEMINI_FLASH_MODEL } from '../config/config.js';
 import { getResponseText } from '../utils/partUtils.js';

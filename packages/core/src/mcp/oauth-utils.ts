@@ -5,7 +5,7 @@
  */
 
 import type { MCPOAuthConfig } from './oauth-provider.js';
-import { getErrorMessage } from '../utils/errors.js';
+import { getErrorMessage } from '../utils/errors/index.js';
 
 /**
  * OAuth authorization server metadata as per RFC 8414.

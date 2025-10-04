@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type { UserTierId } from '../config/authTypes.js';
+
 export interface ClientMetadata {
   ideType?: ClientMetadataIdeType;
   ideVersion?: string;
@@ -102,11 +104,7 @@ export enum IneligibleTierReasonCode {
  *
  * //depot/google3/cloud/developer_experience/cloudcode/pa/service/usertier.go;l=16
  */
-export enum UserTierId {
-  FREE = 'free-tier',
-  LEGACY = 'legacy-tier',
-  STANDARD = 'standard-tier',
-}
+export { UserTierId } from '../config/authTypes.js';
 
 /**
  * PrivacyNotice reflects the structure received from the CodeAssist in regards to a tier

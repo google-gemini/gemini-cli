@@ -11,7 +11,7 @@ import path from 'node:path';
 import fs from 'node:fs';
 import * as Diff from 'diff';
 import { DEFAULT_DIFF_OPTIONS } from './diffOptions.js';
-import { isNodeError } from '../utils/errors.js';
+import { isNodeError } from '../utils/errors/index.js';
 import type {
   AnyDeclarativeTool,
   DeclarativeTool,

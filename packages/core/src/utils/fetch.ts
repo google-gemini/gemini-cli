@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { getErrorMessage, isNodeError } from './errors.js';
+import { getErrorMessage, isNodeError } from './errors/index.js';
 import { URL } from 'node:url';
 
 const PRIVATE_IP_RANGES = [
