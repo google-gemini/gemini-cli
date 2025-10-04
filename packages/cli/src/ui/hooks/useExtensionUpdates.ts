@@ -197,9 +197,16 @@ export const useExtensionUpdates = (
       );
     }
     if (scheduledUpdate) {
-      Promise.all(updatePromises).then((results) =>
-        scheduledUpdate.onComplete(results.filter((result) => result != null)),
-      );
+      Promise.all(updatePromises).then((results) => {
+        const nonNullResults = results.filter((result) => result != null);
+        scheduledUpdate.onCompleteCallbacks.forEach((callback) => {
+          try {
+            callback(nonNullResults);
+          } catch (e) {
+            console.error(getErrorMessage(e));
+          }
+        });
+      });
     }
   }, [
     extensions,

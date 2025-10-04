@@ -27,14 +27,22 @@ export interface ExtensionUpdatesState {
   extensionStatuses: Map<string, ExtensionUpdateStatus>;
   batchChecksInProgress: number;
   // Explicitly scheduled updates.
-  scheduledUpdate: UpdateArgs | null;
+  scheduledUpdate: ScheduledUpdate | null;
 }
 
-export interface UpdateArgs {
+export interface ScheduledUpdate {
   names: string[] | null;
   all: boolean;
-  onComplete: (updateInfos: ExtensionUpdateInfo[]) => void;
+  onCompleteCallbacks: OnCompleteUpdate[];
 }
+
+export interface ScheduleUpdateArgs {
+  names: string[] | null;
+  all: boolean;
+  onComplete: OnCompleteUpdate;
+}
+
+type OnCompleteUpdate = (updateInfos: ExtensionUpdateInfo[]) => void;
 
 export const initialExtensionUpdatesState: ExtensionUpdatesState = {
   extensionStatuses: new Map(),
@@ -53,7 +61,7 @@ export type ExtensionUpdateAction =
     }
   | { type: 'BATCH_CHECK_START' }
   | { type: 'BATCH_CHECK_END' }
-  | { type: 'SCHEDULE_UPDATE'; payload: UpdateArgs }
+  | { type: 'SCHEDULE_UPDATE'; payload: ScheduleUpdateArgs }
   | { type: 'CLEAR_SCHEDULED_UPDATE' };
 
 export function extensionUpdatesReducer(
@@ -105,10 +113,10 @@ export function extensionUpdatesReducer(
             ...(state.scheduledUpdate?.names ?? []),
             ...(action.payload.names ?? []),
           ],
-          onComplete: (updateInfos) => {
-            state.scheduledUpdate?.onComplete(updateInfos);
-            action.payload.onComplete(updateInfos);
-          },
+          onCompleteCallbacks: [
+            ...(state.scheduledUpdate?.onCompleteCallbacks ?? []),
+            action.payload.onComplete,
+          ],
         },
       };
     case 'CLEAR_SCHEDULED_UPDATE':

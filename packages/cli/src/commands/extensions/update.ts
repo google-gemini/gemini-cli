@@ -95,7 +95,6 @@ export async function handleUpdate(args: UpdateArgs) {
           if (action.type === 'SET_STATE') {
             extensionState.set(action.payload.name, {
               status: action.payload.state,
-              notified: true, // No need to process as we will force the update.
             });
           }
         },
