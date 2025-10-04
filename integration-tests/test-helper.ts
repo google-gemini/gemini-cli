@@ -12,6 +12,8 @@ import { env } from 'node:process';
 import { DEFAULT_GEMINI_MODEL } from '../packages/core/src/config/models.js';
 import fs from 'node:fs';
 import * as pty from '@lydell/node-pty';
+import stripAnsi from 'strip-ansi';
+import * as os from 'node:os';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -112,11 +114,38 @@ export function validateModelOutput(
   return true;
 }
 
+// Simulates typing a string one character at a time to avoid paste detection.
+export async function type(ptyProcess: pty.IPty, text: string) {
+  const delay = 5;
+  for (const char of text) {
+    ptyProcess.write(char);
+    await new Promise((resolve) => setTimeout(resolve, delay));
+  }
+}
+
+interface ParsedLog {
+  attributes?: {
+    'event.name'?: string;
+    function_name?: string;
+    function_args?: string;
+    success?: boolean;
+    duration_ms?: number;
+  };
+  scopeMetrics?: {
+    metrics: {
+      descriptor: {
+        name: string;
+      };
+    }[];
+  }[];
+}
+
 export class TestRig {
   bundlePath: string;
   testDir: string | null;
   testName?: string;
   _lastRunStdout?: string;
+  _interactiveOutput = '';
 
   constructor() {
     this.bundlePath = join(__dirname, '..', 'bundle/gemini.js');
@@ -178,13 +207,32 @@ export class TestRig {
     execSync('sync', { cwd: this.testDir! });
   }
 
+  /**
+   * The command and args to use to invoke Gemini CLI. Allows us to switch
+   * between using the bundled gemini.js (the default) and using the installed
+   * 'gemini' (used to verify npm bundles).
+   */
+  private _getCommandAndArgs(extraInitialArgs: string[] = []): {
+    command: string;
+    initialArgs: string[];
+  } {
+    const isNpmReleaseTest =
+      process.env.INTEGRATION_TEST_USE_INSTALLED_GEMINI === 'true';
+    const command = isNpmReleaseTest ? 'gemini' : 'node';
+    const initialArgs = isNpmReleaseTest
+      ? extraInitialArgs
+      : [this.bundlePath, ...extraInitialArgs];
+    return { command, initialArgs };
+  }
+
   run(
     promptOrOptions:
       | string
       | { prompt?: string; stdin?: string; stdinDoesNotEnd?: boolean },
     ...args: string[]
   ): Promise<string> {
-    const commandArgs = [this.bundlePath, '--yolo'];
+    const { command, initialArgs } = this._getCommandAndArgs(['--yolo']);
+    const commandArgs = [...initialArgs];
     const execOptions: {
       cwd: string;
       encoding: 'utf-8';
@@ -210,9 +258,10 @@ export class TestRig {
 
     commandArgs.push(...args);
 
-    const child = spawn('node', commandArgs, {
+    const child = spawn(command, commandArgs, {
       cwd: this.testDir!,
       stdio: 'pipe',
+      env: process.env,
     });
 
     let stdout = '';
@@ -309,6 +358,58 @@ export class TestRig {
     return promise;
   }
 
+  runCommand(
+    args: string[],
+    options: { stdin?: string } = {},
+  ): Promise<string> {
+    const { command, initialArgs } = this._getCommandAndArgs();
+    const commandArgs = [...initialArgs, ...args];
+
+    const child = spawn(command, commandArgs, {
+      cwd: this.testDir!,
+      stdio: 'pipe',
+    });
+
+    let stdout = '';
+    let stderr = '';
+
+    if (options.stdin) {
+      child.stdin!.write(options.stdin);
+      child.stdin!.end();
+    }
+
+    child.stdout!.on('data', (data: Buffer) => {
+      stdout += data;
+      if (env.KEEP_OUTPUT === 'true' || env.VERBOSE === 'true') {
+        process.stdout.write(data);
+      }
+    });
+
+    child.stderr!.on('data', (data: Buffer) => {
+      stderr += data;
+      if (env.KEEP_OUTPUT === 'true' || env.VERBOSE === 'true') {
+        process.stderr.write(data);
+      }
+    });
+
+    const promise = new Promise<string>((resolve, reject) => {
+      child.on('close', (code: number) => {
+        if (code === 0) {
+          this._lastRunStdout = stdout;
+          let result = stdout;
+          if (stderr) {
+            result += `\n\nStdErr:\n${stderr}`;
+          }
+          resolve(result);
+        } else {
+          reject(new Error(`Process exited with code ${code}:\n${stderr}`));
+        }
+      });
+    });
+
+    return promise;
+  }
+
   readFile(fileName: string) {
     const filePath = join(this.testDir!, fileName);
     const content = readFileSync(filePath, 'utf-8');
@@ -366,37 +467,12 @@ export class TestRig {
 
     return this.poll(
       () => {
-        const logFilePath = join(this.testDir!, 'telemetry.log');
-
-        if (!logFilePath || !fs.existsSync(logFilePath)) {
-          return false;
-        }
-
-        const content = readFileSync(logFilePath, 'utf-8');
-        const jsonObjects = content
-          .split(/}\n{/)
-          .map((obj, index, array) => {
-            // Add back the braces we removed during split
-            if (index > 0) obj = '{' + obj;
-            if (index < array.length - 1) obj = obj + '}';
-            return obj.trim();
-          })
-          .filter((obj) => obj);
-
-        for (const jsonStr of jsonObjects) {
-          try {
-            const logData = JSON.parse(jsonStr);
-            if (
-              logData.attributes &&
-              logData.attributes['event.name'] === `gemini_cli.${eventName}`
-            ) {
-              return true;
-            }
-          } catch {
-            // ignore
-          }
-        }
-        return false;
+        const logs = this._readAndParseTelemetryLog();
+        return logs.some(
+          (logData) =>
+            logData.attributes &&
+            logData.attributes['event.name'] === `gemini_cli.${eventName}`,
+        );
       },
       timeout,
       100,
@@ -593,6 +669,45 @@ export class TestRig {
     return logs;
   }
 
+  private _readAndParseTelemetryLog(): ParsedLog[] {
+    // Telemetry is always written to the test directory
+    const logFilePath = join(this.testDir!, 'telemetry.log');
+
+    if (!logFilePath || !fs.existsSync(logFilePath)) {
+      return [];
+    }
+
+    const content = readFileSync(logFilePath, 'utf-8');
+
+    // Split the content into individual JSON objects
+    // They are separated by "}\n{"
+    const jsonObjects = content
+      .split(/}\n{/)
+      .map((obj, index, array) => {
+        // Add back the braces we removed during split
+        if (index > 0) obj = '{' + obj;
+        if (index < array.length - 1) obj = obj + '}';
+        return obj.trim();
+      })
+      .filter((obj) => obj);
+
+    const logs: ParsedLog[] = [];
+
+    for (const jsonStr of jsonObjects) {
+      try {
+        const logData = JSON.parse(jsonStr);
+        logs.push(logData);
+      } catch (e) {
+        // Skip objects that aren't valid JSON
+        if (env.VERBOSE === 'true') {
+          console.error('Failed to parse telemetry object:', e);
+        }
+      }
+    }
+
+    return logs;
+  }
+
   readToolLogs() {
     // For Podman, first check if telemetry file exists and has content
     // If not, fall back to parsing from stdout
@@ -622,33 +737,7 @@ export class TestRig {
       }
     }
 
-    // Telemetry is always written to the test directory
-    const logFilePath = join(this.testDir!, 'telemetry.log');
-
-    if (!logFilePath) {
-      console.warn(`TELEMETRY_LOG_FILE environment variable not set`);
-      return [];
-    }
-
-    // Check if file exists, if not return empty array (file might not be created yet)
-    if (!fs.existsSync(logFilePath)) {
-      return [];
-    }
-
-    const content = readFileSync(logFilePath, 'utf-8');
-
-    // Split the content into individual JSON objects
-    // They are separated by "}\n{"
-    const jsonObjects = content
-      .split(/}\n{/)
-      .map((obj, index, array) => {
-        // Add back the braces we removed during split
-        if (index > 0) obj = '{' + obj;
-        if (index < array.length - 1) obj = obj + '}';
-        return obj.trim();
-      })
-      .filter((obj) => obj);
-
+    const parsedLogs = this._readAndParseTelemetryLog();
     const logs: {
       toolRequest: {
         name: string;
@@ -658,29 +747,21 @@ export class TestRig {
       };
     }[] = [];
 
-    for (const jsonStr of jsonObjects) {
-      try {
-        const logData = JSON.parse(jsonStr);
-        // Look for tool call logs
-        if (
-          logData.attributes &&
-          logData.attributes['event.name'] === 'gemini_cli.tool_call'
-        ) {
-          const toolName = logData.attributes.function_name;
-          logs.push({
-            toolRequest: {
-              name: toolName,
-              args: logData.attributes.function_args,
-              success: logData.attributes.success,
-              duration_ms: logData.attributes.duration_ms,
-            },
-          });
-        }
-      } catch (e) {
-        // Skip objects that aren't valid JSON
-        if (env.VERBOSE === 'true') {
-          console.error('Failed to parse telemetry object:', e);
-        }
+    for (const logData of parsedLogs) {
+      // Look for tool call logs
+      if (
+        logData.attributes &&
+        logData.attributes['event.name'] === 'gemini_cli.tool_call'
+      ) {
+        const toolName = logData.attributes.function_name;
+        logs.push({
+          toolRequest: {
+            name: toolName,
+            args: logData.attributes.function_args,
+            success: logData.attributes.success,
+            duration_ms: logData.attributes.duration_ms,
+          },
+        });
       }
     }
 
@@ -688,58 +769,75 @@ export class TestRig {
   }
 
   readLastApiRequest(): Record<string, unknown> | null {
-    // Telemetry is always written to the test directory
-    const logFilePath = join(this.testDir!, 'telemetry.log');
+    const logs = this._readAndParseTelemetryLog();
+    const apiRequests = logs.filter(
+      (logData) =>
+        logData.attributes &&
+        logData.attributes['event.name'] === 'gemini_cli.api_request',
+    );
+    return apiRequests.pop() || null;
+  }
 
-    if (!logFilePath || !fs.existsSync(logFilePath)) {
-      return null;
-    }
-
-    const content = readFileSync(logFilePath, 'utf-8');
-    const jsonObjects = content
-      .split(/}\n{/)
-      .map((obj, index, array) => {
-        if (index > 0) obj = '{' + obj;
-        if (index < array.length - 1) obj = obj + '}';
-        return obj.trim();
-      })
-      .filter((obj) => obj);
-
-    let lastApiRequest = null;
-
-    for (const jsonStr of jsonObjects) {
-      try {
-        const logData = JSON.parse(jsonStr);
-        if (
-          logData.attributes &&
-          logData.attributes['event.name'] === 'gemini_cli.api_request'
-        ) {
-          lastApiRequest = logData;
+  readMetric(metricName: string): Record<string, unknown> | null {
+    const logs = this._readAndParseTelemetryLog();
+    for (const logData of logs) {
+      if (logData.scopeMetrics) {
+        for (const scopeMetric of logData.scopeMetrics) {
+          for (const metric of scopeMetric.metrics) {
+            if (metric.descriptor.name === `gemini_cli.${metricName}`) {
+              return metric;
+            }
+          }
         }
-      } catch {
-        // ignore
       }
     }
-    return lastApiRequest;
+    return null;
+  }
+
+  async waitForText(text: string, timeout?: number): Promise<boolean> {
+    if (!timeout) {
+      timeout = this.getDefaultTimeout();
+    }
+    return this.poll(
+      () =>
+        stripAnsi(this._interactiveOutput)
+          .toLowerCase()
+          .includes(text.toLowerCase()),
+      timeout,
+      200,
+    );
   }
 
   runInteractive(...args: string[]): {
     ptyProcess: pty.IPty;
     promise: Promise<{ exitCode: number; signal?: number; output: string }>;
   } {
-    const commandArgs = [this.bundlePath, '--yolo', ...args];
+    const { command, initialArgs } = this._getCommandAndArgs(['--yolo']);
+    const commandArgs = [...initialArgs, ...args];
+    const isWindows = os.platform() === 'win32';
 
-    const ptyProcess = pty.spawn('node', commandArgs, {
+    this._interactiveOutput = ''; // Reset output for the new run
+
+    const options: pty.IPtyForkOptions = {
       name: 'xterm-color',
       cols: 80,
       rows: 30,
       cwd: this.testDir!,
-      env: process.env as { [key: string]: string },
-    });
+      env: Object.fromEntries(
+        Object.entries(process.env).filter(([, v]) => v !== undefined),
+      ) as { [key: string]: string },
+    };
 
-    let output = '';
+    if (isWindows) {
+      // node-pty on Windows requires a shell to be specified when using winpty.
+      options.shell = process.env.COMSPEC || 'cmd.exe';
+    }
+
+    const executable = command === 'node' ? process.execPath : command;
+    const ptyProcess = pty.spawn(executable, commandArgs, options);
+
     ptyProcess.onData((data) => {
-      output += data;
+      this._interactiveOutput += data;
       if (env.KEEP_OUTPUT === 'true' || env.VERBOSE === 'true') {
         process.stdout.write(data);
       }
@@ -751,7 +849,7 @@ export class TestRig {
       output: string;
     }>((resolve) => {
       ptyProcess.onExit(({ exitCode, signal }) => {
-        resolve({ exitCode, signal, output });
+        resolve({ exitCode, signal, output: this._interactiveOutput });
       });
     });
 

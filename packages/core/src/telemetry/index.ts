@@ -74,3 +74,44 @@ export {
   recordUserActivity,
   isUserActive,
 } from './activity-detector.js';
+export {
+  // Core metrics functions
+  recordToolCallMetrics,
+  recordTokenUsageMetrics,
+  recordApiResponseMetrics,
+  recordApiErrorMetrics,
+  recordFileOperationMetric,
+  recordInvalidChunk,
+  recordContentRetry,
+  recordContentRetryFailure,
+  recordModelRoutingMetrics,
+  // Custom metrics for token usage and API responses
+  recordCustomTokenUsageMetrics,
+  recordCustomApiResponseMetrics,
+  // OpenTelemetry GenAI semantic convention for token usage and operation duration
+  recordGenAiClientTokenUsage,
+  recordGenAiClientOperationDuration,
+  getConventionAttributes,
+  // Performance monitoring functions
+  recordStartupPerformance,
+  recordMemoryUsage,
+  recordCpuUsage,
+  recordToolQueueDepth,
+  recordToolExecutionBreakdown,
+  recordTokenEfficiency,
+  recordApiRequestBreakdown,
+  recordPerformanceScore,
+  recordPerformanceRegression,
+  recordBaselineComparison,
+  isPerformanceMonitoringActive,
+  // Performance monitoring types
+  PerformanceMetricType,
+  MemoryMetricType,
+  ToolExecutionPhase,
+  ApiRequestPhase,
+  FileOperation,
+  // OpenTelemetry Semantic Convention types
+  GenAiOperationName,
+  GenAiProviderName,
+  GenAiTokenType,
+} from './metrics.js';

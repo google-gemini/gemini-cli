@@ -26,8 +26,8 @@ import type {
 } from '@google/gemini-cli-core';
 import type { DOMElement } from 'ink';
 import type { SessionStatsState } from '../contexts/SessionContext.js';
-import type { UpdateObject } from '../utils/updateCheck.js';
 import type { ExtensionUpdateState } from '../state/extensions.js';
+import type { UpdateObject } from '../utils/updateCheck.js';
 
 export interface ProQuotaDialogRequest {
   failedModel: string;
@@ -36,6 +36,7 @@ export interface ProQuotaDialogRequest {
 }
 
 import { type UseHistoryManagerReturn } from '../hooks/useHistoryManager.js';
+import { type RestartReason } from '../hooks/useIdeTrustListener.js';
 
 export interface UIState {
   history: HistoryItem[];
@@ -60,6 +61,7 @@ export interface UIState {
   commandContext: CommandContext;
   shellConfirmationRequest: ShellConfirmationRequest | null;
   confirmationRequest: ConfirmationRequest | null;
+  confirmUpdateExtensionRequests: ConfirmationRequest[];
   loopDetectionConfirmationRequest: LoopDetectionConfirmationRequest | null;
   geminiMdFileCount: number;
   streamingState: StreamingState;
@@ -112,6 +114,7 @@ export interface UIState {
   currentIDE: IdeInfo | null;
   updateInfo: UpdateObject | null;
   showIdeRestartPrompt: boolean;
+  ideTrustRestartReason: RestartReason;
   isRestarting: boolean;
   extensionsUpdateState: Map<string, ExtensionUpdateState>;
   activePtyId: number | undefined;

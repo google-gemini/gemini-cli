@@ -18,6 +18,12 @@ async function main() {
       type: 'string',
       demandOption: true,
     })
+    .option('pullRequestNumber', {
+      alias: 'pr',
+      description: "The pr number that we're cherry picking",
+      type: 'number',
+      demandOption: true,
+    })
     .option('channel', {
       alias: 'ch',
       description: 'The release channel to patch.',
@@ -32,7 +38,7 @@ async function main() {
     .help()
     .alias('help', 'h').argv;
 
-  const { commit, channel, dryRun } = argv;
+  const { commit, channel, dryRun, pullRequestNumber } = argv;
 
   console.log(`Starting patch process for commit: ${commit}`);
   console.log(`Targeting channel: ${channel}`);
@@ -42,11 +48,12 @@ async function main() {
 
   run('git fetch --all --tags --prune', dryRun);
 
-  const latestTag = getLatestTag(channel);
-  console.log(`Found latest tag for ${channel}: ${latestTag}`);
+  const releaseInfo = getLatestReleaseInfo(channel);
+  const latestTag = releaseInfo.currentTag;
+  const nextVersion = releaseInfo.nextVersion;
 
-  const releaseBranch = `release/${latestTag}`;
-  const hotfixBranch = `hotfix/${latestTag}/${channel}/cherry-pick-${commit.substring(0, 7)}`;
+  const releaseBranch = `release/${latestTag}-pr-${pullRequestNumber}`;
+  const hotfixBranch = `hotfix/${latestTag}/${nextVersion}/${channel}/cherry-pick-${commit.substring(0, 7)}/pr-${pullRequestNumber}`;
 
   // Create the release branch from the tag if it doesn't exist.
   if (!branchExists(releaseBranch)) {
@@ -184,8 +191,8 @@ async function main() {
   console.log(
     `Creating pull request from ${hotfixBranch} to ${releaseBranch}...`,
   );
-  let prTitle = `fix(patch): cherry-pick ${commit.substring(0, 7)} to ${releaseBranch}`;
-  let prBody = `This PR automatically cherry-picks commit ${commit} to patch the ${channel} release.`;
+  let prTitle = `fix(patch): cherry-pick ${commit.substring(0, 7)} to ${releaseBranch} to patch version ${releaseInfo.currentTag} and create version ${releaseInfo.nextVersion}`;
+  let prBody = `This PR automatically cherry-picks commit ${commit} to patch version ${releaseInfo.currentTag} in the ${channel} release to create version ${releaseInfo.nextVersion}.`;
 
   if (hasConflicts) {
     prTitle = `fix(patch): cherry-pick ${commit.substring(0, 7)} to ${releaseBranch} [CONFLICTS]`;
@@ -260,17 +267,20 @@ function branchExists(branchName) {
   }
 }
 
-function getLatestTag(channel) {
-  console.log(`Fetching latest tag for channel: ${channel}...`);
-  const pattern =
-    channel === 'stable'
-      ? '(contains("nightly") or contains("preview")) | not'
-      : '(contains("preview"))';
-  const command = `gh release list --limit 30 --json tagName | jq -r '[.[] | select(.tagName | ${pattern})] | .[0].tagName'`;
+function getLatestReleaseInfo(channel) {
+  console.log(`Fetching latest release info for channel: ${channel}...`);
+  const patchFrom = channel; // 'stable' or 'preview'
+  const command = `node scripts/get-release-version.js --type=patch --patch-from=${patchFrom}`;
   try {
-    return execSync(command).toString().trim();
+    const result = JSON.parse(execSync(command).toString().trim());
+    console.log(`Current ${channel} tag: ${result.previousReleaseTag}`);
+    console.log(`Next ${channel} version would be: ${result.releaseVersion}`);
+    return {
+      currentTag: result.previousReleaseTag,
+      nextVersion: result.releaseVersion,
+    };
   } catch (err) {
-    console.error(`Failed to get latest tag for channel: ${channel}`);
+    console.error(`Failed to get release info for channel: ${channel}`);
     throw err;
   }
 }

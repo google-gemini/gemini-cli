@@ -375,14 +375,6 @@ export class GeminiChat {
     ) => await handleFallback(this.config, model, authType, error);
 
     const streamResponse = await retryWithBackoff(apiCall, {
-      shouldRetry: (error: unknown) => {
-        if (error instanceof Error && error.message) {
-          if (isSchemaDepthError(error.message)) return false;
-          if (error.message.includes('429')) return true;
-          if (error.message.match(/5\d{2}/)) return true;
-        }
-        return false;
-      },
       onPersistent429: onPersistent429Callback,
       authType: this.config.getContentGeneratorConfig()?.authType,
     });

@@ -79,14 +79,24 @@ export enum EventMetadataKey {
   // Logs the tool call duration in milliseconds.
   GEMINI_CLI_TOOL_CALL_DURATION_MS = 17,
 
-  // Logs the tool call error message, if any.
-  GEMINI_CLI_TOOL_ERROR_MESSAGE = 18,
+  // Do not use.
+  DEPRECATED_GEMINI_CLI_TOOL_ERROR_MESSAGE = 18,
 
   // Logs the tool call error type, if any.
   GEMINI_CLI_TOOL_CALL_ERROR_TYPE = 19,
 
   // Logs the length of tool output
   GEMINI_CLI_TOOL_CALL_CONTENT_LENGTH = 93,
+
+  // ==========================================================================
+  // Replace Tool Call Event Keys
+  // ===========================================================================
+
+  // Logs a smart edit tool strategy choice.
+  GEMINI_CLI_SMART_EDIT_STRATEGY = 109,
+
+  // Logs a smart edit correction event.
+  GEMINI_CLI_SMART_EDIT_CORRECTION = 110,
 
   // ==========================================================================
   // GenAI API Request Event Keys
@@ -233,12 +243,24 @@ export enum EventMetadataKey {
   // Logs user removed lines in edit/write tool response.
   GEMINI_CLI_USER_REMOVED_LINES = 50,
 
+  // Logs AI added characters in edit/write tool response.
+  GEMINI_CLI_AI_ADDED_CHARS = 103,
+
+  // Logs AI removed characters in edit/write tool response.
+  GEMINI_CLI_AI_REMOVED_CHARS = 104,
+
+  // Logs user added characters in edit/write tool response.
+  GEMINI_CLI_USER_ADDED_CHARS = 105,
+
+  // Logs user removed characters in edit/write tool response.
+  GEMINI_CLI_USER_REMOVED_CHARS = 106,
+
   // ==========================================================================
   // Kitty Sequence Overflow Event Keys
   // ===========================================================================
 
-  // Logs the truncated kitty sequence.
-  GEMINI_CLI_KITTY_TRUNCATED_SEQUENCE = 52,
+  // Do not use.
+  DEPRECATED_GEMINI_CLI_KITTY_TRUNCATED_SEQUENCE = 52,
 
   // Logs the length of the kitty sequence that overflowed.
   GEMINI_CLI_KITTY_SEQUENCE_LENGTH = 53,
@@ -403,5 +425,5 @@ export enum EventMetadataKey {
   GEMINI_CLI_ROUTING_DECISION_SOURCE = 101,
 
   // Logs an event when the user uses the /model command.
-  GEMINI_CLI_MODEL_SLASH_COMMAND = 103,
+  GEMINI_CLI_MODEL_SLASH_COMMAND = 108,
 }
