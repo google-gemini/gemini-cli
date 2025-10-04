@@ -13,6 +13,20 @@ import {
   isCommandAllowed,
   stripShellWrapper,
 } from './shell-utils.js';
+import type { SpawnSyncReturns } from 'node:child_process';
+
+const mockSpawnSync = vi.hoisted(() => vi.fn());
+
+vi.mock('node:child_process', async () => {
+  const actual =
+    await vi.importActual<typeof import('node:child_process')>(
+      'node:child_process',
+    );
+  return {
+    ...actual,
+    spawnSync: mockSpawnSync,
+  };
+});
 import type { Config } from '../config/config.js';
 
 const mockPlatform = vi.hoisted(() => vi.fn());
@@ -133,37 +147,115 @@ describe('isCommandAllowed', () => {
   });
 
   describe('command substitution', () => {
-    it('should block command substitution using `$(...)`', () => {
-      const result = isCommandAllowed('echo $(rm -rf /)', config);
-      expect(result.allowed).toBe(false);
-      expect(result.reason).toContain('Command substitution');
+    it('should allow $() command substitution by default', () => {
+      const result = isCommandAllowed('echo $(ls)', config);
+      expect(result.allowed).toBe(true);
     });
 
-    it('should block command substitution using `<(...)`', () => {
+    it('should enforce blocklist entries found inside command substitution', () => {
+      config.getExcludeTools = () => ['run_shell_command(ls)'];
+      const result = isCommandAllowed('echo $(ls)', config);
+      expect(result.allowed).toBe(false);
+      expect(result.reason).toBe(`Command 'ls' is blocked by configuration`);
+    });
+
+    it('should inspect process substitution commands', () => {
+      config.getExcludeTools = () => ['run_shell_command(ls)'];
       const result = isCommandAllowed('diff <(ls) <(ls -a)', config);
       expect(result.allowed).toBe(false);
-      expect(result.reason).toContain('Command substitution');
+      expect(result.reason).toBe(`Command 'ls' is blocked by configuration`);
     });
 
-    it('should block command substitution using `>(...)`', () => {
-      const result = isCommandAllowed(
-        'echo "Log message" > >(tee log.txt)',
-        config,
-      );
-      expect(result.allowed).toBe(false);
-      expect(result.reason).toContain('Command substitution');
-    });
-
-    it('should block command substitution using backticks', () => {
+    it('should inspect backtick substitution commands', () => {
+      config.getExcludeTools = () => ['run_shell_command(rm)'];
       const result = isCommandAllowed('echo `rm -rf /`', config);
       expect(result.allowed).toBe(false);
-      expect(result.reason).toContain('Command substitution');
+      expect(result.reason).toBe(
+        `Command 'rm -rf /' is blocked by configuration`,
+      );
     });
 
     it('should allow substitution-like patterns inside single quotes', () => {
       config.getCoreTools = () => ['ShellTool(echo)'];
       const result = isCommandAllowed("echo '$(pwd)'", config);
       expect(result.allowed).toBe(true);
+    });
+  });
+
+  describe('powershell command parsing', () => {
+    const originalComSpec = process.env['ComSpec'];
+
+    const createSpawnSyncResult = (
+      stdout: string,
+      status = 0,
+      error?: NodeJS.ErrnoException,
+    ): SpawnSyncReturns<string> & { error?: NodeJS.ErrnoException } => ({
+      pid: 0,
+      output: ['', stdout, ''],
+      stdout,
+      stderr: '',
+      status,
+      signal: null,
+      error,
+    });
+
+    beforeEach(() => {
+      mockPlatform.mockReturnValue('win32');
+      process.env['ComSpec'] =
+        'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe';
+      mockSpawnSync.mockImplementation((command, args) => {
+        const cmd = typeof command === 'string' ? command.toLowerCase() : '';
+        if (cmd.endsWith('powershell.exe') || cmd.endsWith('pwsh.exe')) {
+          if (Array.isArray(args) && args.includes('-EncodedCommand')) {
+            const json =
+              '["Get-ChildItem","ForEach-Object { git status }","git status"]';
+            return createSpawnSyncResult(json);
+          }
+          return createSpawnSyncResult('');
+        }
+
+        const enoent = new Error('not found') as NodeJS.ErrnoException;
+        enoent.code = 'ENOENT';
+        return createSpawnSyncResult('', undefined, enoent);
+      });
+    });
+
+    afterEach(() => {
+      mockSpawnSync.mockReset();
+      if (originalComSpec === undefined) {
+        delete process.env['ComSpec'];
+      } else {
+        process.env['ComSpec'] = originalComSpec;
+      }
+    });
+
+    it('should allow nested powershell commands when all are allowlisted', () => {
+      config.getCoreTools = () => [
+        'run_shell_command(Get-ChildItem)',
+        'run_shell_command(ForEach-Object)',
+        'run_shell_command(git)',
+      ];
+
+      const result = isCommandAllowed(
+        '& { Get-ChildItem | ForEach-Object { git status } }',
+        config,
+      );
+
+      expect(result.allowed).toBe(true);
+    });
+
+    it('should block nested powershell commands when a nested command is blocked', () => {
+      config.getExcludeTools = () => ['run_shell_command(git)'];
+
+      const result = isCommandAllowed(
+        '& { Get-ChildItem | ForEach-Object { git status } }',
+        config,
+      );
+
+      expect(result.allowed).toBe(false);
+      expect(result.reason).toBe(
+        "Command 'git status' is blocked by configuration",
+      );
     });
   });
 });
@@ -289,6 +381,11 @@ describe('getCommandRoots', () => {
   it('should correctly parse a chained command with quotes', () => {
     const result = getCommandRoots('echo "hello" && git commit -m "feat"');
     expect(result).toEqual(['echo', 'git']);
+  });
+
+  it('should include commands discovered inside command substitution', () => {
+    const result = getCommandRoots('echo $(ls -a)');
+    expect(result).toEqual(['echo', 'ls']);
   });
 });
 

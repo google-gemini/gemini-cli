@@ -90,10 +90,40 @@ describe('ShellTool', () => {
       expect(isCommandAllowed('ls -l', mockConfig).allowed).toBe(true);
     });
 
-    it('should block a command with command substitution using $()', () => {
-      expect(isCommandAllowed('echo $(rm -rf /)', mockConfig).allowed).toBe(
-        false,
+    it('allows nested command substitution when nested commands are on the allowlist', () => {
+      (mockConfig.getCoreTools as Mock).mockReturnValue([
+        'run_shell_command(echo)',
+        'run_shell_command(ls)',
+      ]);
+
+      const result = isCommandAllowed('echo $(ls)', mockConfig);
+      expect(result.allowed).toBe(true);
+    });
+
+    it('blocks nested command substitution when a nested command is missing from the allowlist', () => {
+      (mockConfig.getCoreTools as Mock).mockReturnValue([
+        'run_shell_command(echo)',
+      ]);
+
+      const result = isCommandAllowed('echo $(ls)', mockConfig);
+      expect(result.allowed).toBe(false);
+      expect(result.reason).toBe(
+        'Command(s) not in the allowed commands list. Disallowed commands: "ls"',
       );
+    });
+
+    it('blocks nested command substitution when a nested command is explicitly blocked', () => {
+      (mockConfig.getCoreTools as Mock).mockReturnValue([
+        'run_shell_command(echo)',
+        'run_shell_command(ls)',
+      ]);
+      (mockConfig.getExcludeTools as Mock).mockReturnValue([
+        'run_shell_command(ls)',
+      ]);
+
+      const result = isCommandAllowed('echo $(ls)', mockConfig);
+      expect(result.allowed).toBe(false);
+      expect(result.reason).toBe("Command 'ls' is blocked by configuration");
     });
   });
 

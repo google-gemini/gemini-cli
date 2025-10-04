@@ -8,8 +8,17 @@ import type { AnyToolInvocation } from '../index.js';
 import type { Config } from '../config/config.js';
 import os from 'node:os';
 import { quote } from 'shell-quote';
+import Parser, {
+  type Language as TreeSitterLanguage,
+  type SyntaxNode,
+} from 'tree-sitter';
+import Bash from 'tree-sitter-bash';
 import { doesToolInvocationMatch } from './tool-utils.js';
-import { spawn, type SpawnOptionsWithoutStdio } from 'node:child_process';
+import {
+  spawn,
+  spawnSync,
+  type SpawnOptionsWithoutStdio,
+} from 'node:child_process';
 
 const SHELL_TOOL_NAMES = ['run_shell_command', 'ShellTool'];
 
@@ -80,6 +89,92 @@ export function getShellConfiguration(): ShellConfiguration {
  */
 export const isWindows = () => os.platform() === 'win32';
 
+const POWERSHELL_EXECUTABLE_CANDIDATES = ['powershell.exe', 'pwsh.exe'];
+
+const POWERSHELL_COMMAND_EXTRACTION_SCRIPT = `
+[Console]::InputEncoding = [System.Text.Encoding]::UTF8
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+$commandText = [Console]::In.ReadToEnd()
+$tokens = $null
+$errors = $null
+$ast = [System.Management.Automation.Language.Parser]::ParseInput($commandText, [ref]$tokens, [ref]$errors)
+if ($errors -and $errors.Count -gt 0) {
+  Write-Output '[]'
+  exit 0
+}
+$commands = $ast.FindAll({ param($node) $node -is [System.Management.Automation.Language.CommandAst] }, $true) | ForEach-Object {
+  $_.ToString().Trim()
+}
+$commands | ConvertTo-Json -Compress
+`;
+
+const POWERSHELL_COMMAND_EXTRACTION_SCRIPT_ENCODED = Buffer.from(
+  POWERSHELL_COMMAND_EXTRACTION_SCRIPT,
+  'utf16le',
+).toString('base64');
+
+function isPowerShellConfigured(): boolean {
+  const comSpec = process.env['ComSpec'];
+  if (!comSpec) {
+    return false;
+  }
+  const lower = comSpec.toLowerCase();
+  return lower.endsWith('powershell.exe') || lower.endsWith('pwsh.exe');
+}
+
+function parsePowerShellCommands(command: string): string[] | undefined {
+  if (!isWindows() || !command.trim() || !isPowerShellConfigured()) {
+    return undefined;
+  }
+
+  for (const executable of POWERSHELL_EXECUTABLE_CANDIDATES) {
+    const result = spawnSync(
+      executable,
+      [
+        '-NoProfile',
+        '-EncodedCommand',
+        POWERSHELL_COMMAND_EXTRACTION_SCRIPT_ENCODED,
+      ],
+      {
+        input: command,
+        encoding: 'utf8',
+        maxBuffer: 1024 * 1024,
+      },
+    );
+
+    if (result.error) {
+      const errno = (result.error as NodeJS.ErrnoException).code;
+      if (errno === 'ENOENT') {
+        continue;
+      }
+      return undefined;
+    }
+
+    if (result.status !== 0) {
+      continue;
+    }
+
+    const stdout = (result.stdout || '').trim();
+    if (!stdout) {
+      return [];
+    }
+
+    try {
+      const parsed = JSON.parse(stdout);
+      if (Array.isArray(parsed)) {
+        return parsed
+          .filter((value) => typeof value === 'string')
+          .map((value: string) => value.trim())
+          .filter(Boolean);
+      }
+    } catch {
+      continue;
+    }
+  }
+
+  return undefined;
+}
+
 /**
  * Escapes a string so that it can be safely used as a single argument
  * in a shell command, preventing command injection.
@@ -107,13 +202,83 @@ export function escapeShellArg(arg: string, shell: ShellType): string {
   }
 }
 
-/**
- * Splits a shell command into a list of individual commands, respecting quotes.
- * This is used to separate chained commands (e.g., using &&, ||, ;).
- * @param command The shell command string to parse
- * @returns An array of individual command strings
- */
-export function splitCommands(command: string): string[] {
+const TREE_SITTER_SKIP_TYPES = new Set(['heredoc_body']);
+
+// `tree-sitter-bash` ships its own `Language` typings that are structurally
+// incompatible with the ones from `tree-sitter`. A direct cast keeps type-safety
+// at call sites without suppressing the error globally.
+const BASH_LANGUAGE = Bash as unknown as TreeSitterLanguage;
+
+let bashParserInstance: Parser | undefined;
+
+function getBashParser(): Parser | undefined {
+  try {
+    if (!bashParserInstance) {
+      bashParserInstance = new Parser();
+      bashParserInstance.setLanguage(BASH_LANGUAGE);
+    }
+    return bashParserInstance;
+  } catch {
+    bashParserInstance = undefined;
+    return undefined;
+  }
+}
+
+function parseWithTreeSitter(command: string): SyntaxNode | undefined {
+  if (!command.trim()) {
+    return undefined;
+  }
+
+  const parser = getBashParser();
+  if (!parser) {
+    return undefined;
+  }
+
+  try {
+    const tree = parser.parse(command);
+    if (tree.rootNode.hasError) {
+      return undefined;
+    }
+    return tree.rootNode;
+  } catch {
+    return undefined;
+  }
+}
+
+function collectCommandNodes(node: SyntaxNode, acc: SyntaxNode[]): void {
+  if (node.type === 'command') {
+    acc.push(node);
+  }
+
+  if (TREE_SITTER_SKIP_TYPES.has(node.type)) {
+    return;
+  }
+
+  for (const child of node.namedChildren) {
+    collectCommandNodes(child, acc);
+  }
+}
+
+function normalizeCommandText(source: string, node: SyntaxNode): string {
+  return source.slice(node.startIndex, node.endIndex).trim();
+}
+
+function getCommandNameFromNode(node: SyntaxNode): string | undefined {
+  const nameNode = node.childForFieldName('name');
+  if (nameNode) {
+    return nameNode.text.split(/[\\/]/).pop();
+  }
+
+  for (const child of node.namedChildren) {
+    if (child.type === 'command_name') {
+      return child.text.split(/[\\/]/).pop();
+    }
+  }
+
+  return undefined;
+}
+
+function legacySplitCommands(command: string): string[] {
   const commands: string[] = [];
   let currentCommand = '';
   let inSingleQuotes = false;
@@ -143,7 +308,7 @@ export function splitCommands(command: string): string[] {
       ) {
         commands.push(currentCommand.trim());
         currentCommand = '';
-        i++; // Skip the next character
+        i++;
       } else if (char === ';' || char === '&' || char === '|') {
         commands.push(currentCommand.trim());
         currentCommand = '';
@@ -160,39 +325,70 @@ export function splitCommands(command: string): string[] {
     commands.push(currentCommand.trim());
   }
 
-  return commands.filter(Boolean); // Filter out any empty strings
+  return commands.filter(Boolean);
 }
 
-/**
- * Extracts the root command from a given shell command string.
- * This is used to identify the base command for permission checks.
- * @param command The shell command string to parse
- * @returns The root command name, or undefined if it cannot be determined
- * @example getCommandRoot("ls -la /tmp") returns "ls"
- * @example getCommandRoot("git status && npm test") returns "git"
- */
-export function getCommandRoot(command: string): string | undefined {
+function legacyCommandRoot(command: string): string | undefined {
   const trimmedCommand = command.trim();
   if (!trimmedCommand) {
     return undefined;
   }
 
-  // This regex is designed to find the first "word" of a command,
-  // while respecting quotes. It looks for a sequence of non-whitespace
-  // characters that are not inside quotes.
   const match = trimmedCommand.match(/^"([^"]+)"|^'([^']+)'|^(\S+)/);
   if (match) {
-    // The first element in the match array is the full match.
-    // The subsequent elements are the capture groups.
-    // We prefer a captured group because it will be unquoted.
     const commandRoot = match[1] || match[2] || match[3];
     if (commandRoot) {
-      // If the command is a path, return the last component.
       return commandRoot.split(/[\\/]/).pop();
     }
   }
 
   return undefined;
+}
+
+/**
+ * Splits a shell command into a list of individual commands using Tree-sitter.
+ * Falls back to the legacy parser if Tree-sitter cannot provide a clean parse.
+ */
+export function splitCommands(command: string): string[] {
+  const powerShellParsed = parsePowerShellCommands(command);
+  if (powerShellParsed !== undefined) {
+    return powerShellParsed;
+  }
+
+  const root = parseWithTreeSitter(command);
+  if (root) {
+    const nodes: SyntaxNode[] = [];
+    collectCommandNodes(root, nodes);
+    const parsed = nodes
+      .map((node) => normalizeCommandText(command, node))
+      .filter(Boolean);
+    if (parsed.length > 0) {
+      return parsed;
+    }
+  }
+
+  return legacySplitCommands(command);
+}
+
+/**
+ * Extracts the root command from a given shell command string using Tree-sitter.
+ * Falls back to the legacy parser if parsing fails.
+ */
+export function getCommandRoot(command: string): string | undefined {
+  const root = parseWithTreeSitter(command);
+  if (root) {
+    const nodes: SyntaxNode[] = [];
+    collectCommandNodes(root, nodes);
+    const first = nodes[0];
+    if (first) {
+      const name = getCommandNameFromNode(first);
+      if (name) {
+        return name;
+      }
+    }
+  }
+
+  return legacyCommandRoot(command);
 }
 
 export function getCommandRoots(command: string): string[] {
@@ -218,70 +414,6 @@ export function stripShellWrapper(command: string): string {
     return newCommand;
   }
   return command.trim();
-}
-
-/**
- * Detects command substitution patterns in a shell command, following bash quoting rules:
- * - Single quotes ('): Everything literal, no substitution possible
- * - Double quotes ("): Command substitution with $() and backticks unless escaped with \
- * - No quotes: Command substitution with $(), <(), and backticks
- * @param command The shell command string to check
- * @returns true if command substitution would be executed by bash
- */
-export function detectCommandSubstitution(command: string): boolean {
-  let inSingleQuotes = false;
-  let inDoubleQuotes = false;
-  let inBackticks = false;
-  let i = 0;
-
-  while (i < command.length) {
-    const char = command[i];
-    const nextChar = command[i + 1];
-
-    // Handle escaping - only works outside single quotes
-    if (char === '\\' && !inSingleQuotes) {
-      i += 2; // Skip the escaped character
-      continue;
-    }
-
-    // Handle quote state changes
-    if (char === "'" && !inDoubleQuotes && !inBackticks) {
-      inSingleQuotes = !inSingleQuotes;
-    } else if (char === '"' && !inSingleQuotes && !inBackticks) {
-      inDoubleQuotes = !inDoubleQuotes;
-    } else if (char === '`' && !inSingleQuotes) {
-      // Backticks work outside single quotes (including in double quotes)
-      inBackticks = !inBackticks;
-    }
-
-    // Check for command substitution patterns that would be executed
-    if (!inSingleQuotes) {
-      // $(...) command substitution - works in double quotes and unquoted
-      if (char === '$' && nextChar === '(') {
-        return true;
-      }
-
-      // <(...) process substitution - works unquoted only (not in double quotes)
-      if (char === '<' && nextChar === '(' && !inDoubleQuotes && !inBackticks) {
-        return true;
-      }
-
-      // >(...) process substitution - works unquoted only (not in double quotes)
-      if (char === '>' && nextChar === '(' && !inDoubleQuotes && !inBackticks) {
-        return true;
-      }
-
-      // Backtick command substitution - check for opening backtick
-      // (We track the state above, so this catches the start of backtick substitution)
-      if (char === '`' && !inBackticks) {
-        return true;
-      }
-    }
-
-    i++;
-  }
-
-  return false;
 }
 
 /**
@@ -318,17 +450,6 @@ export function checkCommandPermissions(
   blockReason?: string;
   isHardDenial?: boolean;
 } {
-  // Disallow command substitution for security.
-  if (detectCommandSubstitution(command)) {
-    return {
-      allAllowed: false,
-      disallowedCommands: [command],
-      blockReason:
-        'Command substitution using $(), `` ` ``, <(), or >() is not allowed for security reasons',
-      isHardDenial: true,
-    };
-  }
-
   const normalize = (cmd: string): string => cmd.trim().replace(/\s+/g, ' ');
   const commandsToValidate = splitCommands(command).map(normalize);
   const invocation: AnyToolInvocation & { params: { command: string } } = {
