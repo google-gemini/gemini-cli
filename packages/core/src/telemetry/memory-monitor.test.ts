@@ -18,6 +18,8 @@ import {
 } from './memory-monitor.js';
 import type { Config } from '../config/config.js';
 import { recordMemoryUsage, isPerformanceMonitoringActive } from './metrics.js';
+import { HighWaterMarkTracker } from './high-water-mark-tracker.js';
+import { RateLimiter } from './rate-limiter.js';
 
 // Mock dependencies
 vi.mock('./metrics.js', () => ({
@@ -318,6 +320,34 @@ describe('MemoryMonitor', () => {
 
         // Verify no final snapshot was taken
         expect(mockRecordMemoryUsage).toHaveBeenCalledTimes(callsBeforeStop);
+      });
+
+      it('should periodically cleanup tracker state to prevent growth', () => {
+        const trackerCleanupSpy = vi.spyOn(
+          HighWaterMarkTracker.prototype,
+          'cleanup',
+        );
+        const rateLimiterCleanupSpy = vi.spyOn(
+          RateLimiter.prototype,
+          'cleanup',
+        );
+
+        const monitor = new MemoryMonitor();
+        monitor.start(mockConfig, 1000);
+
+        trackerCleanupSpy.mockClear();
+        rateLimiterCleanupSpy.mockClear();
+
+        // Advance timers beyond the cleanup interval (15 minutes) to trigger cleanup
+        vi.advanceTimersByTime(16 * 60 * 1000);
+
+        expect(trackerCleanupSpy).toHaveBeenCalled();
+        expect(rateLimiterCleanupSpy).toHaveBeenCalled();
+
+        monitor.stop(mockConfig);
+
+        trackerCleanupSpy.mockRestore();
+        rateLimiterCleanupSpy.mockRestore();
       });
     });
 

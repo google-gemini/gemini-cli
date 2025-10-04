@@ -41,6 +41,10 @@ export class MemoryMonitor {
   private highWaterMarkTracker: HighWaterMarkTracker;
   private rateLimiter: RateLimiter;
   private useEnhancedMonitoring: boolean = true;
+  private lastCleanupTimestamp: number = Date.now();
+
+  private static readonly STATE_CLEANUP_INTERVAL_MS = 15 * 60 * 1000; // 15 minutes
+  private static readonly STATE_CLEANUP_MAX_AGE_MS = 60 * 60 * 1000; // 1 hour
 
   constructor() {
     // No config stored to avoid multi-session attribution issues
@@ -72,6 +76,8 @@ export class MemoryMonitor {
    * Check if we should record memory metrics and do so if conditions are met
    */
   private checkAndRecordIfNeeded(config: Config): void {
+    this.performPeriodicCleanup();
+
     if (!this.useEnhancedMonitoring) {
       // Fall back to original behavior
       this.takeSnapshot('periodic', config);
@@ -111,6 +117,23 @@ export class MemoryMonitor {
       // Occasionally record even without growth for baseline tracking
       this.takeSnapshotWithoutRecording('periodic_check', config);
     }
+  }
+
+  /**
+   * Periodically prune tracker state to avoid unbounded growth when keys change.
+   */
+  private performPeriodicCleanup(): void {
+    const now = Date.now();
+    if (
+      now - this.lastCleanupTimestamp <
+      MemoryMonitor.STATE_CLEANUP_INTERVAL_MS
+    ) {
+      return;
+    }
+
+    this.lastCleanupTimestamp = now;
+    this.highWaterMarkTracker.cleanup(MemoryMonitor.STATE_CLEANUP_MAX_AGE_MS);
+    this.rateLimiter.cleanup(MemoryMonitor.STATE_CLEANUP_MAX_AGE_MS);
   }
 
   /**
