@@ -150,9 +150,16 @@ exports[`<MarkdownDisplay /> > with 'Unix' line endings > handles a table at the
 `;
 
 exports[`<MarkdownDisplay /> > with 'Unix' line endings > handles deeply nested lists (10 levels) 1`] = `
-"*    *
-L1L2  * L3  * L4     * L5      * L6         * L7          * L8           * L9             * L10
-
+"* L1
+   * L2
+      * L3
+         * L4
+            * L5
+               * L6
+                  * L7
+                     * L8
+                        * L9
+                           * L10
 "
 `;
 
@@ -174,7 +181,10 @@ Paragraph 2.
 `;
 
 exports[`<MarkdownDisplay /> > with 'Unix' line endings > renders 4-level nested lists 1`] = `
-"* Level 1   * Level 2      * Level 3         * Level 4
+"* Level 1
+   * Level 2
+      * Level 3
+         * Level 4
 "
 `;
 
@@ -198,8 +208,9 @@ exports[`<MarkdownDisplay /> > with 'Unix' line endings > renders blockquotes 1`
 `;
 
 exports[`<MarkdownDisplay /> > with 'Unix' line endings > renders code blocks within list items 1`] = `
-"* List item with         1 const x = 1;
-code:
+"* List item with code:
+    1 const x = 1;
+
 * Another list item
 "
 `;
@@ -232,10 +243,12 @@ exports[`<MarkdownDisplay /> > with 'Unix' line endings > renders inline code wi
 `;
 
 exports[`<MarkdownDisplay /> > with 'Unix' line endings > renders mixed ordered and unordered list nesting 1`] = `
-"1. Ordered item 1   * Unordered sub-item
-                    * Another sub-item
-2. Ordered item 2   1. Nested ordered
-                    2. Another nested
+"1. Ordered item 1
+   * Unordered sub-item
+   * Another sub-item
+2. Ordered item 2
+   1. Nested ordered
+   2. Another nested
 "
 `;
 
@@ -256,7 +269,9 @@ exports[`<MarkdownDisplay /> > with 'Unix' line endings > renders nested inline 
 `;
 
 exports[`<MarkdownDisplay /> > with 'Unix' line endings > renders nested unordered lists 1`] = `
-"* Level 1   * Level 2      * Level 3
+"* Level 1
+   * Level 2
+      * Level 3
 "
 `;
 
@@ -327,9 +342,16 @@ exports[`<MarkdownDisplay /> > with 'Windows' line endings > handles a table at 
 `;
 
 exports[`<MarkdownDisplay /> > with 'Windows' line endings > handles deeply nested lists (10 levels) 1`] = `
-"*    *
-L1L2  * L3  * L4     * L5      * L6         * L7          * L8           * L9             * L10
-
+"* L1
+   * L2
+      * L3
+         * L4
+            * L5
+               * L6
+                  * L7
+                     * L8
+                        * L9
+                           * L10
 "
 `;
 
@@ -351,7 +373,10 @@ Paragraph 2.
 `;
 
 exports[`<MarkdownDisplay /> > with 'Windows' line endings > renders 4-level nested lists 1`] = `
-"* Level 1   * Level 2      * Level 3         * Level 4
+"* Level 1
+   * Level 2
+      * Level 3
+         * Level 4
 "
 `;
 
@@ -376,8 +401,9 @@ exports[`<MarkdownDisplay /> > with 'Windows' line endings > renders blockquotes
 `;
 
 exports[`<MarkdownDisplay /> > with 'Windows' line endings > renders code blocks within list items 1`] = `
-"* List item with         1 const x = 1;
-code:
+"* List item with code:
+    1 const x = 1;
+
 * Another list item
 "
 `;
@@ -410,10 +436,12 @@ exports[`<MarkdownDisplay /> > with 'Windows' line endings > renders inline code
 `;
 
 exports[`<MarkdownDisplay /> > with 'Windows' line endings > renders mixed ordered and unordered list nesting 1`] = `
-"1. Ordered item 1   * Unordered sub-item
-                    * Another sub-item
-2. Ordered item 2   1. Nested ordered
-                    2. Another nested
+"1. Ordered item 1
+   * Unordered sub-item
+   * Another sub-item
+2. Ordered item 2
+   1. Nested ordered
+   2. Another nested
 "
 `;
 
@@ -434,7 +462,9 @@ exports[`<MarkdownDisplay /> > with 'Windows' line endings > renders nested inli
 `;
 
 exports[`<MarkdownDisplay /> > with 'Windows' line endings > renders nested unordered lists 1`] = `
-"* Level 1   * Level 2      * Level 3
+"* Level 1
+   * Level 2
+      * Level 3
 "
 `;
 

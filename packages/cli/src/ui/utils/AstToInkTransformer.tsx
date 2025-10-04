@@ -257,7 +257,7 @@ const RenderListItemInternal: React.FC<RenderListItemInternalProps> = ({
   const nestedLists = node.children.filter((c): c is List => c.type === 'list');
 
   return (
-    <Box key={`item-${depth}-${index}`}>
+    <Box key={`item-${depth}-${index}`} flexDirection="column">
       <Text>
         {indent}
         {marker} {itemText}
