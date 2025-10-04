@@ -140,12 +140,15 @@ export const ideCommand = async (): Promise<SlashCommand> => {
       name: 'ide',
       description: 'manage IDE integration',
       kind: CommandKind.BUILT_IN,
-      action: (): SlashCommandActionReturn =>
-        ({
+      action: (context: CommandContext): SlashCommandActionReturn => {
+        // Show dialog to ask if user wants to open default IDE
+        context.ui.openDefaultIdeDialog();
+        return {
           type: 'message',
-          messageType: 'error',
+          messageType: 'info',
           content: `IDE integration is not supported in your current environment. To use this feature, run Gemini CLI in one of these supported IDEs: VS Code or VS Code forks.`,
-        }) as const,
+        } as const;
+      },
     };
   }
 

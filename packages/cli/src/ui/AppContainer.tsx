@@ -43,6 +43,7 @@ import {
   clearCachedCredentialFile,
   ShellExecutionService,
 } from '@google/gemini-cli-core';
+import { openDefaultIde } from '../utils/openDefaultIde.js';
 import { validateAuthMethod } from '../config/auth.js';
 import { loadHierarchicalGeminiMemory } from '../config/config.js';
 import process from 'node:process';
@@ -166,6 +167,8 @@ export const AppContainer = (props: AppContainerProps) => {
   );
 
   const [isPermissionsDialogOpen, setPermissionsDialogOpen] = useState(false);
+  const [isOpenDefaultIdeDialogOpen, setOpenDefaultIdeDialogOpen] =
+    useState(false);
   const openPermissionsDialog = useCallback(
     () => setPermissionsDialogOpen(true),
     [],
@@ -173,6 +176,43 @@ export const AppContainer = (props: AppContainerProps) => {
   const closePermissionsDialog = useCallback(
     () => setPermissionsDialogOpen(false),
     [],
+  );
+
+  const openDefaultIdeDialog = useCallback(
+    () => setOpenDefaultIdeDialogOpen(true),
+    [],
+  );
+
+  const closeDefaultIdeDialog = useCallback(
+    () => setOpenDefaultIdeDialogOpen(false),
+    [],
+  );
+
+  const handleOpenDefaultIde = useCallback(
+    async (choice: 'yes' | 'no') => {
+      closeDefaultIdeDialog();
+      if (choice === 'yes') {
+        try {
+          await openDefaultIde();
+          historyManager.addItem(
+            {
+              type: 'info',
+              text: 'Gemini CLI has attempted to open your default IDE. In your IDE, open the terminal, and run `gemini` to continue.',
+            },
+            Date.now(),
+          );
+        } catch (error) {
+          historyManager.addItem(
+            {
+              type: 'error',
+              text: `Failed to open default IDE: ${getErrorMessage(error)}`,
+            },
+            Date.now(),
+          );
+        }
+      }
+    },
+    [closeDefaultIdeDialog, historyManager],
   );
 
   // Helper to determine the effective model, considering the fallback state.
@@ -451,6 +491,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       openSettingsDialog,
       openModelDialog,
       openPermissionsDialog,
+      openDefaultIdeDialog,
       quit: (messages: HistoryItem[]) => {
         setQuittingMessages(messages);
         setTimeout(async () => {
@@ -475,6 +516,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       setCorgiMode,
       dispatchExtensionStateUpdate,
       openPermissionsDialog,
+      openDefaultIdeDialog,
       addConfirmUpdateExtensionRequest,
     ],
   );
@@ -736,6 +778,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       !isAuthDialogOpen &&
       !isThemeDialogOpen &&
       !isEditorDialogOpen &&
+      !isOpenDefaultIdeDialogOpen &&
       !showPrivacyNotice &&
       geminiClient?.isInitialized?.()
     ) {
@@ -750,6 +793,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
     isAuthDialogOpen,
     isThemeDialogOpen,
     isEditorDialogOpen,
+    isOpenDefaultIdeDialogOpen,
     showPrivacyNotice,
     geminiClient,
   ]);
@@ -1053,6 +1097,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
     isSettingsDialogOpen ||
     isModelDialogOpen ||
     isPermissionsDialogOpen ||
+    isOpenDefaultIdeDialogOpen ||
     isAuthenticating ||
     isAuthDialogOpen ||
     isEditorDialogOpen ||
@@ -1084,6 +1129,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       isSettingsDialogOpen,
       isModelDialogOpen,
       isPermissionsDialogOpen,
+      isOpenDefaultIdeDialogOpen,
       slashCommands,
       pendingSlashCommandHistoryItems,
       commandContext,
@@ -1163,6 +1209,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       isSettingsDialogOpen,
       isModelDialogOpen,
       isPermissionsDialogOpen,
+      isOpenDefaultIdeDialogOpen,
       slashCommands,
       pendingSlashCommandHistoryItems,
       commandContext,
@@ -1242,6 +1289,9 @@ Logging in with Google... Please restart Gemini CLI to continue.
       closeSettingsDialog,
       closeModelDialog,
       closePermissionsDialog,
+      openDefaultIdeDialog,
+      closeDefaultIdeDialog,
+      handleOpenDefaultIde,
       setShellModeActive,
       vimHandleInput,
       handleIdePromptComplete,
@@ -1266,6 +1316,9 @@ Logging in with Google... Please restart Gemini CLI to continue.
       closeSettingsDialog,
       closeModelDialog,
       closePermissionsDialog,
+      openDefaultIdeDialog,
+      closeDefaultIdeDialog,
+      handleOpenDefaultIde,
       setShellModeActive,
       vimHandleInput,
       handleIdePromptComplete,

@@ -72,6 +72,7 @@ export interface CommandContext {
     extensionsUpdateState: Map<string, ExtensionUpdateStatus>;
     dispatchExtensionStateUpdate: (action: ExtensionUpdateAction) => void;
     addConfirmUpdateExtensionRequest: (value: ConfirmationRequest) => void;
+    openDefaultIdeDialog: () => void;
   };
   // Session-specific data
   session: {

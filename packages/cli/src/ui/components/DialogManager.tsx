@@ -28,6 +28,7 @@ import { useSettings } from '../contexts/SettingsContext.js';
 import process from 'node:process';
 import { type UseHistoryManagerReturn } from '../hooks/useHistoryManager.js';
 import { IdeTrustChangeDialog } from './IdeTrustChangeDialog.js';
+import { OpenDefaultIdeDialog } from './OpenDefaultIdeDialog.js';
 
 interface DialogManagerProps {
   addItem: UseHistoryManagerReturn['addItem'];
@@ -49,6 +50,9 @@ export const DialogManager = ({
 
   if (uiState.showIdeRestartPrompt) {
     return <IdeTrustChangeDialog reason={uiState.ideTrustRestartReason} />;
+  }
+  if (uiState.isOpenDefaultIdeDialogOpen) {
+    return <OpenDefaultIdeDialog onChoice={uiActions.handleOpenDefaultIde} />;
   }
   if (uiState.showWorkspaceMigrationDialog) {
     return (
