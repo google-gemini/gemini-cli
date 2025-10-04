@@ -1113,10 +1113,8 @@ export class Config {
     registerCoreTool(ShellTool, this);
     registerCoreTool(MemoryTool);
     registerCoreTool(WebSearchTool, this);
-    if (this.getUseWriteTodos()) {
-      registerCoreTool(WriteTodosTool, this);
-    }
-
+    registerCoreTool(WriteTodosTool, this);
+    
     // Register Subagents as Tools
     if (this.getEnableSubagents()) {
       const agentDefinitions = this.agentRegistry.getAllDefinitions();

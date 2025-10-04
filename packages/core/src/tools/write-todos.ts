@@ -131,7 +131,7 @@ export class WriteTodosTool extends BaseDeclarativeTool<
   WriteTodosToolParams,
   ToolResult
 > {
-  static readonly Name: string = 'write_todos_list';
+  static readonly Name: string = 'write_todos';
 
   constructor() {
     super(
