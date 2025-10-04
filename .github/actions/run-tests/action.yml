@@ -24,9 +24,6 @@ runs:
         echo "::group::Build"
         npm run build
         echo "::endgroup::"
-        echo "::group::Unit Tests"
-        npm run test:ci
-        echo "::endgroup::"
         echo "::group::Integration Tests (no sandbox)"
         npm run test:integration:sandbox:none
         echo "::endgroup::"

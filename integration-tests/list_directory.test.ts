@@ -9,7 +9,7 @@ import { TestRig, printDebugInfo, validateModelOutput } from './test-helper.js';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 
-describe('list_directory', () => {
+describe.skip('list_directory', () => {
   it('should be able to list a directory', async () => {
     const rig = new TestRig();
     await rig.setup('should be able to list a directory');

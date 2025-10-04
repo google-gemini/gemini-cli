@@ -104,6 +104,13 @@ export class IdeClient {
 
   private constructor() {}
 
+  /**
+   * Implements a singleton pattern for the IdeClient.
+   *
+   * The initialization is asynchronous, so we store and return the promise of
+   * the instance. This ensures that the async setup runs only once, and all
+   * subsequent calls receive the same client instance promise.
+   */
   static getInstance(): Promise<IdeClient> {
     if (!IdeClient.instancePromise) {
       IdeClient.instancePromise = (async () => {
@@ -245,8 +252,8 @@ export class IdeClient {
             params: {
               name: `openDiff`,
               arguments: {
-                filePath,
-                newContent,
+                file1: filePath,
+                file2: newContent,
               },
             },
           },
@@ -420,12 +427,26 @@ export class IdeClient {
   }
 
   isDiffingEnabled(): boolean {
-    return (
+    console.log('[DEBUG] isDiffingEnabled check:');
+    console.log(`  - !!this.client: ${!!this.client}`);
+    console.log(`  - this.state.status: ${this.state.status}`);
+    console.log(
+      `  - isConnected: ${this.state.status === IDEConnectionStatus.Connected}`,
+    );
+    console.log(`  - availableTools: ${this.availableTools}`);
+    console.log(
+      `  - has openDiff: ${this.availableTools.includes('openDiff')}`,
+    );
+    console.log(
+      `  - has closeDiff: ${this.availableTools.includes('closeDiff')}`,
+    );
+    const result =
       !!this.client &&
       this.state.status === IDEConnectionStatus.Connected &&
       this.availableTools.includes('openDiff') &&
-      this.availableTools.includes('closeDiff')
-    );
+      this.availableTools.includes('closeDiff');
+    console.log(`  - result: ${result}`);
+    return result;
   }
 
   private async discoverTools(): Promise<void> {
