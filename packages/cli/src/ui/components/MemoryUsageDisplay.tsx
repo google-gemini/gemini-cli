@@ -10,12 +10,15 @@ import { Box, Text } from 'ink';
 import { theme } from '../semantic-colors.js';
 import process from 'node:process';
 import { formatMemoryUsage } from '../utils/formatters.js';
+import { useUIState } from '../contexts/UIStateContext.js';
 
 export const MemoryUsageDisplay: React.FC = () => {
   const [memoryUsage, setMemoryUsage] = useState<string>('');
   const [memoryUsageColor, setMemoryUsageColor] = useState<string>(
     theme.text.secondary,
   );
+
+  const uiState = useUIState();
 
   useEffect(() => {
     const updateMemory = () => {
@@ -27,10 +30,16 @@ export const MemoryUsageDisplay: React.FC = () => {
           : theme.text.secondary,
       );
     };
-    const intervalId = setInterval(updateMemory, 2000);
-    updateMemory(); // Initial update
-    return () => clearInterval(intervalId);
-  }, []);
+
+    // Update memory when UI is active (input, output, errors changing)
+    // This piggybacks on existing UI updates instead of using independent setInterval
+    updateMemory();
+  }, [
+    uiState.streamingState,
+    uiState.buffer.text,
+    uiState.errorCount,
+    uiState.history.length,
+  ]);
 
   return (
     <Box>
