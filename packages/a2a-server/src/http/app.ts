@@ -8,7 +8,11 @@ import express from 'express';
 
 import type { AgentCard } from '@a2a-js/sdk';
 import type { TaskStore } from '@a2a-js/sdk/server';
-import { DefaultRequestHandler, InMemoryTaskStore } from '@a2a-js/sdk/server';
+import {
+  DefaultRequestHandler,
+  InMemoryTaskStore,
+  DefaultExecutionEventBusManager,
+} from '@a2a-js/sdk/server';
 import { A2AExpressApp } from '@a2a-js/sdk/server/express'; // Import server components
 import { v4 as uuidv4 } from 'uuid';
 import { logger } from '../utils/logger.js';
@@ -16,12 +20,14 @@ import type { AgentSettings } from '../types.js';
 import { GCSTaskStore, NoOpTaskStore } from '../persistence/gcs.js';
 import { CoderAgentExecutor } from '../agent/executor.js';
 import { requestStorage } from './requestStorage.js';
+import type { Config } from '@google/gemini-cli-core';
+import type { EventEmitter } from 'node:events';
 
 const coderAgentCard: AgentCard = {
   name: 'Gemini SDLC Agent',
   description:
     'An agent that generates code based on natural language instructions and streams file outputs.',
-  url: 'http://localhost:41242/',
+  url: 'http://localhost:41243/',
   provider: {
     organization: 'Google',
     url: 'https://google.com',
@@ -59,34 +65,55 @@ export function updateCoderAgentCardUrl(port: number) {
   coderAgentCard.url = `http://localhost:${port}/`;
 }
 
-export async function createApp() {
+export async function createApp(
+  cliConfig?: Config,
+  cliAppEvents?: EventEmitter,
+) {
   try {
     // loadEnvironment() is called within getConfig now
     const bucketName = process.env['GCS_BUCKET_NAME'];
     let taskStoreForExecutor: TaskStore;
     let taskStoreForHandler: TaskStore;
+    const inMemoryTaskStore = new InMemoryTaskStore();
 
-    if (bucketName) {
+    if (cliConfig) {
+      logger.info('Running in CLI mode, using shared InMemoryTaskStore');
+      taskStoreForExecutor = inMemoryTaskStore;
+      taskStoreForHandler = inMemoryTaskStore;
+    } else if (bucketName) {
       logger.info(`Using GCSTaskStore with bucket: ${bucketName}`);
       const gcsTaskStore = new GCSTaskStore(bucketName);
       taskStoreForExecutor = gcsTaskStore;
       taskStoreForHandler = new NoOpTaskStore(gcsTaskStore);
     } else {
-      logger.info('Using InMemoryTaskStore');
-      const inMemoryTaskStore = new InMemoryTaskStore();
+      logger.info('Using InMemoryTaskStore for standalone server');
       taskStoreForExecutor = inMemoryTaskStore;
       taskStoreForHandler = inMemoryTaskStore;
     }
 
-    const agentExecutor = new CoderAgentExecutor(taskStoreForExecutor);
+    const agentExecutor = new CoderAgentExecutor(
+      taskStoreForExecutor,
+      cliConfig,
+      cliAppEvents,
+    );
+
+    const eventBusManager = new DefaultExecutionEventBusManager();
 
     const requestHandler = new DefaultRequestHandler(
       coderAgentCard,
       taskStoreForHandler,
       agentExecutor,
+      eventBusManager,
     );
 
     let expressApp = express();
+
+    // Log all incoming requests
+    expressApp.use((req, res, next) => {
+      logger.info(`[App] Incoming request: ${req.method} ${req.url}`);
+      next();
+    });
+
     expressApp.use((req, res, next) => {
       requestStorage.run({ req }, next);
     });
@@ -162,7 +189,7 @@ export async function createApp() {
       }
       res.json({ metadata: await wrapper.task.getMetadata() });
     });
-    return expressApp;
+    return { expressApp, agentExecutor, eventBusManager };
   } catch (error) {
     logger.error('[CoreAgent] Error during startup:', error);
     process.exit(1);
@@ -171,7 +198,7 @@ export async function createApp() {
 
 export async function main() {
   try {
-    const expressApp = await createApp();
+    const { expressApp } = await createApp();
     const port = process.env['CODER_AGENT_PORT'] || 0;
 
     const server = expressApp.listen(port, () => {

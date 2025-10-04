@@ -138,13 +138,21 @@ export function mergeMcpServers(settings: Settings, extensions: Extension[]) {
 
 export function setTargetDir(agentSettings: AgentSettings | undefined): string {
   const originalCWD = process.cwd();
+  logger.info(`[setTargetDir] Original CWD: ${originalCWD}`);
+  logger.info(`[setTargetDir] AgentSettings: ${JSON.stringify(agentSettings)}`);
+
   const targetDir =
     process.env['CODER_AGENT_WORKSPACE_PATH'] ??
     (agentSettings?.kind === CoderAgentEvent.StateAgentSettingsEvent
       ? agentSettings.workspacePath
       : undefined);
 
+  logger.info(`[setTargetDir] Target directory: ${targetDir}`);
+
   if (!targetDir) {
+    logger.info(
+      '[setTargetDir] No targetDir specified, returning original CWD.',
+    );
     return originalCWD;
   }
 
@@ -154,11 +162,13 @@ export function setTargetDir(agentSettings: AgentSettings | undefined): string {
 
   try {
     const resolvedPath = path.resolve(targetDir);
+    logger.info(`[setTargetDir] Resolved path: ${resolvedPath}`);
     process.chdir(resolvedPath);
+    logger.info(`[setTargetDir] New CWD: ${process.cwd()}`);
     return resolvedPath;
   } catch (e) {
     logger.error(
-      `[CoderAgentExecutor] Error resolving workspace path: ${e}, returning original os.cwd()`,
+      `[CoderAgentExecutor] Error resolving or changing workspace path: ${e}, returning original os.cwd()`,
     );
     return originalCWD;
   }
