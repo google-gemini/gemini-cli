@@ -55,7 +55,13 @@ export const Help: React.FC<Help> = ({ commands }) => (
       <Text bold color={theme.text.accent}>
         start server
       </Text>
-      ).
+      ). Or use{' '}
+      <Text bold color={theme.text.accent}>
+        {process.platform === 'darwin'
+          ? 'Meta+Enter / Ctrl+Enter'
+          : 'Ctrl+Enter'}
+      </Text>{' '}
+      to run commands directly without entering shell mode.
     </Text>
 
     <Box height={1} />
@@ -138,7 +144,15 @@ export const Help: React.FC<Help> = ({ commands }) => (
     </Text>
     <Text color={theme.text.primary}>
       <Text bold color={theme.text.accent}>
-        {process.platform === 'darwin' ? 'Ctrl+X / Meta+Enter' : 'Ctrl+X'}
+        {process.platform === 'darwin'
+          ? 'Meta+Enter / Ctrl+Enter'
+          : 'Ctrl+Enter'}
+      </Text>{' '}
+      - Execute shell command directly without switching modes
+    </Text>
+    <Text color={theme.text.primary}>
+      <Text bold color={theme.text.accent}>
+        Ctrl+X
       </Text>{' '}
       - Open input in external editor
     </Text>

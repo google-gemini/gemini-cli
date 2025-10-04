@@ -201,6 +201,21 @@ The `!` prefix lets you interact with your system's shell directly from within G
     - **Exiting shell mode:**
       - When exited, the UI reverts to its standard appearance and normal Gemini CLI behavior resumes.
 
-- **Caution for all `!` usage:** Commands you execute in shell mode have the same permissions and impact as if you ran them directly in your terminal.
+### Quick Command Execution (`Ctrl+Enter` / `Meta+Enter`)
 
-- **Environment Variable:** When a command is executed via `!` or in shell mode, the `GEMINI_CLI=1` environment variable is set in the subprocess's environment. This allows scripts or tools to detect if they are being run from within the Gemini CLI.
+While in **prompt mode**, you can quickly execute shell commands without switching to shell mode:
+
+- **`Ctrl+Enter` / `Meta+Enter`**
+  - **Description:** Execute the current input as a shell command directly. After execution, you remain in prompt mode.
+  - **Behavior:**
+    - Works only when you're in prompt mode (not shell mode)
+    - The command is executed using the same shell processor as shell mode
+    - After execution, the input is cleared and you stay in prompt mode
+    - Useful for quick commands without mode switching
+  - **Examples:**
+    - Type `ls -la` and press `Ctrl+Enter`/`Meta+Enter` to execute without entering shell mode
+    - Type `git status` and press `Ctrl+Enter`/`Meta+Enter` to check git status quickly
+
+- **Caution for all `!` usage and quick command execution:** Commands you execute have the same permissions and impact as if you ran them directly in your terminal.
+
+- **Environment Variable:** When a command is executed via `!`, in shell mode, or with `Ctrl+Enter`/`Meta+Enter`, the `GEMINI_CLI=1` environment variable is set in the subprocess's environment. This allows scripts or tools to detect if they are being run from within the Gemini CLI.

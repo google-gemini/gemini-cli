@@ -46,7 +46,8 @@ describe('keyMatchers', () => {
     [Command.SUBMIT]: (key: Key) =>
       key.name === 'return' && !key.ctrl && !key.meta && !key.paste,
     [Command.NEWLINE]: (key: Key) =>
-      key.name === 'return' && (key.ctrl || key.meta || key.paste),
+      (key.name === 'return' && (key.paste || key.shift)) ||
+      (key.name === 'j' && key.ctrl),
     [Command.OPEN_EXTERNAL_EDITOR]: (key: Key) =>
       key.ctrl && (key.name === 'x' || key.sequence === '\x18'),
     [Command.PASTE_CLIPBOARD_IMAGE]: (key: Key) => key.ctrl && key.name === 'v',
@@ -67,6 +68,8 @@ describe('keyMatchers', () => {
       key.ctrl && key.name === 'f',
     [Command.EXPAND_SUGGESTION]: (key: Key) => key.name === 'right',
     [Command.COLLAPSE_SUGGESTION]: (key: Key) => key.name === 'left',
+    [Command.EXECUTE_PROMPT_COMMAND]: (key: Key) =>
+      key.name === 'return' && (key.ctrl || key.meta),
   };
 
   // Test data for each command with positive and negative test cases
@@ -187,11 +190,16 @@ describe('keyMatchers', () => {
     {
       command: Command.NEWLINE,
       positive: [
+        createKey('return', { paste: true }),
+        createKey('return', { shift: true }),
+        createKey('j', { ctrl: true }),
+      ],
+      negative: [
+        createKey('return'),
+        createKey('n'),
         createKey('return', { ctrl: true }),
         createKey('return', { meta: true }),
-        createKey('return', { paste: true }),
       ],
-      negative: [createKey('return'), createKey('n')],
     },
 
     // External tools
@@ -261,6 +269,14 @@ describe('keyMatchers', () => {
       command: Command.TOGGLE_SHELL_INPUT_FOCUS,
       positive: [createKey('f', { ctrl: true })],
       negative: [createKey('f')],
+    },
+    {
+      command: Command.EXECUTE_PROMPT_COMMAND,
+      positive: [
+        createKey('return', { ctrl: true }),
+        createKey('return', { meta: true }),
+      ],
+      negative: [createKey('return'), createKey('return', { shift: true })],
     },
   ];
 

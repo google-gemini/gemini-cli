@@ -21,6 +21,7 @@ This document lists the available keyboard shortcuts in the Gemini CLI.
 | -------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
 | `!`                                                | Toggle shell mode when the input is empty.                                                                                          |
 | `\` (at end of line) + `Enter`                     | Insert a newline.                                                                                                                   |
+| `Ctrl+Enter` / `Meta+Enter`                        | Execute the current input as a shell command directly without switching to shell mode (works in prompt mode).                       |
 | `Down Arrow`                                       | Navigate down through the input history.                                                                                            |
 | `Enter`                                            | Submit the current prompt.                                                                                                          |
 | `Meta+Delete` / `Ctrl+Delete`                      | Delete the word to the right of the cursor.                                                                                         |
@@ -42,7 +43,7 @@ This document lists the available keyboard shortcuts in the Gemini CLI.
 | `Ctrl+U`                                           | Delete from the cursor to the beginning of the line.                                                                                |
 | `Ctrl+V`                                           | Paste clipboard content. If the clipboard contains an image, it will be saved and a reference to it will be inserted in the prompt. |
 | `Ctrl+W` / `Meta+Backspace` / `Ctrl+Backspace`     | Delete the word to the left of the cursor.                                                                                          |
-| `Ctrl+X` / `Meta+Enter`                            | Open the current input in an external editor.                                                                                       |
+| `Ctrl+X`                                           | Open the current input in an external editor.                                                                                       |
 
 ## Suggestions
 
