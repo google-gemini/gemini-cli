@@ -17,7 +17,7 @@
     "sandboxImageUri": "us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:0.9.0-nightly.20251001.163dba7e"
   },
   "scripts": {
-    "start": "cross-env node scripts/start.js",
+    "start": "cross-env NODE_ENV=development node scripts/start.js",
     "start:a2a-server": "CODER_AGENT_PORT=41242 npm run start --workspace @google/gemini-cli-a2a-server",
     "debug": "cross-env DEBUG=1 node --inspect-brk scripts/start.js",
     "auth:npm": "npx google-artifactregistry-auth",
@@ -92,7 +92,6 @@
     "json": "^11.0.0",
     "lint-staged": "^16.1.6",
     "memfs": "^4.42.0",
-    "mnemonist": "^0.40.3",
     "mock-fs": "^5.5.0",
     "msw": "^2.10.4",
     "npm-run-all": "^4.1.5",
@@ -107,6 +106,7 @@
   },
   "dependencies": {
     "@testing-library/dom": "^10.4.1",
+    "mnemonist": "^0.40.3",
     "simple-git": "^3.28.0"
   },
   "optionalDependencies": {
