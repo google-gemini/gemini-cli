@@ -5,7 +5,11 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { profiler } from './DebugProfiler.js';
+import {
+  profiler,
+  ACTION_TIMESTAMP_CAPACITY,
+  FRAME_TIMESTAMP_CAPACITY,
+} from './DebugProfiler.js';
 import { FixedDeque } from 'mnemonist';
 
 describe('DebugProfiler', () => {
@@ -16,12 +20,64 @@ describe('DebugProfiler', () => {
     profiler.lastFrameStartTime = 0;
     profiler.openedDebugConsole = false;
     profiler.lastActionTimestamp = 0;
-    profiler.possiblyIdleFrameTimestamps = new FixedDeque<number>(Array, 1024);
-    profiler.actionTimestamps = new FixedDeque<number>(Array, 1024);
+    profiler.possiblyIdleFrameTimestamps = new FixedDeque<number>(
+      Array,
+      FRAME_TIMESTAMP_CAPACITY,
+    );
+    profiler.actionTimestamps = new FixedDeque<number>(
+      Array,
+      ACTION_TIMESTAMP_CAPACITY,
+    );
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
+    profiler.actionTimestamps.clear();
+    profiler.possiblyIdleFrameTimestamps.clear();
+  });
+
+  it('should not exceed action timestamp capacity', () => {
+    for (let i = 0; i < ACTION_TIMESTAMP_CAPACITY + 10; i++) {
+      profiler.reportAction();
+      // To ensure we don't trigger the debounce
+      profiler.lastActionTimestamp = 0;
+    }
+    expect(profiler.actionTimestamps.size).toBe(ACTION_TIMESTAMP_CAPACITY);
+  });
+
+  it('should not exceed frame timestamp capacity', () => {
+    for (let i = 0; i < FRAME_TIMESTAMP_CAPACITY + 10; i++) {
+      profiler.reportFrameRendered();
+      // To ensure we don't trigger the debounce
+      profiler.lastFrameStartTime = 0;
+    }
+    expect(profiler.possiblyIdleFrameTimestamps.size).toBe(
+      FRAME_TIMESTAMP_CAPACITY,
+    );
+  });
+
+  it('should drop oldest action timestamps when capacity is reached', () => {
+    for (let i = 0; i < ACTION_TIMESTAMP_CAPACITY; i++) {
+      profiler.actionTimestamps.push(i);
+    }
+    profiler.lastActionTimestamp = 0;
+    profiler.reportAction();
+
+    expect(profiler.actionTimestamps.size).toBe(ACTION_TIMESTAMP_CAPACITY);
+    expect(profiler.actionTimestamps.peekFirst()).toBe(1);
+  });
+
+  it('should drop oldest frame timestamps when capacity is reached', () => {
+    for (let i = 0; i < FRAME_TIMESTAMP_CAPACITY; i++) {
+      profiler.possiblyIdleFrameTimestamps.push(i);
+    }
+    profiler.lastFrameStartTime = 0;
+    profiler.reportFrameRendered();
+
+    expect(profiler.possiblyIdleFrameTimestamps.size).toBe(
+      FRAME_TIMESTAMP_CAPACITY,
+    );
+    expect(profiler.possiblyIdleFrameTimestamps.peekFirst()).toBe(1);
   });
 
   it('should not report frames as idle if an action happens shortly after', async () => {

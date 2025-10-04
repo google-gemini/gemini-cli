@@ -203,6 +203,7 @@ describe('BuiltinCommandLoader profile', () => {
 
   it('should not include profile command when isDevelopment is false', async () => {
     process.env['NODE_ENV'] = 'production';
+    const { BuiltinCommandLoader } = await import('./BuiltinCommandLoader.js');
     const loader = new BuiltinCommandLoader(mockConfig);
     const commands = await loader.loadCommands(new AbortController().signal);
     const profileCmd = commands.find((c) => c.name === 'profile');
@@ -211,6 +212,7 @@ describe('BuiltinCommandLoader profile', () => {
 
   it('should include profile command when isDevelopment is true', async () => {
     process.env['NODE_ENV'] = 'development';
+    const { BuiltinCommandLoader } = await import('./BuiltinCommandLoader.js');
     const loader = new BuiltinCommandLoader(mockConfig);
     const commands = await loader.loadCommands(new AbortController().signal);
     const profileCmd = commands.find((c) => c.name === 'profile');

@@ -16,8 +16,8 @@ import { appEvents, AppEvent } from '../../utils/events.js';
 // idle frames.
 const MIN_TIME_FROM_ACTION_TO_BE_IDLE = 500;
 
-const ACTION_TIMESTAMP_CAPACITY = 1024;
-const FRAME_TIMESTAMP_CAPACITY = 1024;
+export const ACTION_TIMESTAMP_CAPACITY = 2048;
+export const FRAME_TIMESTAMP_CAPACITY = 2048;
 
 // Exported for testing purposes.
 export const profiler = {
@@ -36,6 +36,9 @@ export const profiler = {
   reportAction() {
     const now = Date.now();
     if (now - this.lastActionTimestamp > 16) {
+      if (this.actionTimestamps.size >= ACTION_TIMESTAMP_CAPACITY) {
+        this.actionTimestamps.shift();
+      }
       this.actionTimestamps.push(now);
       this.lastActionTimestamp = now;
     }
@@ -48,11 +51,17 @@ export const profiler = {
       this.lastFrameStartTime = now;
       this.numFrames++;
       if (debugNumSpinners === 0) {
+        if (this.possiblyIdleFrameTimestamps.size >= FRAME_TIMESTAMP_CAPACITY) {
+          this.possiblyIdleFrameTimestamps.shift();
+        }
         this.possiblyIdleFrameTimestamps.push(now);
       } else {
         // If a spinner is present, consider this an action that both prevents
         // this frame from being idle and also should prevent a follow on frame
         // from being considered idle.
+        if (this.actionTimestamps.size >= ACTION_TIMESTAMP_CAPACITY) {
+          this.actionTimestamps.shift();
+        }
         this.actionTimestamps.push(now);
       }
     }
