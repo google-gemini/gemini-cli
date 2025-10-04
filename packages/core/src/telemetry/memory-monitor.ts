@@ -7,13 +7,14 @@
 import v8 from 'node:v8';
 import process from 'node:process';
 import type { Config } from '../config/config.js';
+import { bytesToMB } from '../utils/formatters.js';
+import { isUserActive } from './activity-detector.js';
+import { HighWaterMarkTracker } from './high-water-mark-tracker.js';
 import {
   recordMemoryUsage,
   MemoryMetricType,
   isPerformanceMonitoringActive,
 } from './metrics.js';
-import { isUserActive } from './activity-detector.js';
-import { HighWaterMarkTracker } from './high-water-mark-tracker.js';
 import { RateLimiter } from './rate-limiter.js';
 
 export interface MemorySnapshot {
@@ -151,25 +152,22 @@ export class MemoryMonitor {
 
     // Record memory metrics if monitoring is active
     if (isPerformanceMonitoringActive()) {
-      recordMemoryUsage(
-        config,
-        MemoryMetricType.HEAP_USED,
-        snapshot.heapUsed,
-        context,
-      );
-      recordMemoryUsage(
-        config,
-        MemoryMetricType.HEAP_TOTAL,
-        snapshot.heapTotal,
-        context,
-      );
-      recordMemoryUsage(
-        config,
-        MemoryMetricType.EXTERNAL,
-        snapshot.external,
-        context,
-      );
-      recordMemoryUsage(config, MemoryMetricType.RSS, snapshot.rss, context);
+      recordMemoryUsage(config, snapshot.heapUsed, {
+        memory_type: MemoryMetricType.HEAP_USED,
+        component: context,
+      });
+      recordMemoryUsage(config, snapshot.heapTotal, {
+        memory_type: MemoryMetricType.HEAP_TOTAL,
+        component: context,
+      });
+      recordMemoryUsage(config, snapshot.external, {
+        memory_type: MemoryMetricType.EXTERNAL,
+        component: context,
+      });
+      recordMemoryUsage(config, snapshot.rss, {
+        memory_type: MemoryMetricType.RSS,
+        component: context,
+      });
     }
 
     this.lastSnapshot = snapshot;
@@ -288,7 +286,7 @@ export class MemoryMonitor {
    */
   checkMemoryThreshold(thresholdMB: number): boolean {
     const current = this.getCurrentMemoryUsage();
-    const currentMB = current.heapUsed / (1024 * 1024);
+    const currentMB = bytesToMB(current.heapUsed);
     return currentMB > thresholdMB;
   }
 
@@ -304,12 +302,11 @@ export class MemoryMonitor {
   } {
     const current = this.getCurrentMemoryUsage();
     return {
-      heapUsedMB: Math.round((current.heapUsed / (1024 * 1024)) * 100) / 100,
-      heapTotalMB: Math.round((current.heapTotal / (1024 * 1024)) * 100) / 100,
-      externalMB: Math.round((current.external / (1024 * 1024)) * 100) / 100,
-      rssMB: Math.round((current.rss / (1024 * 1024)) * 100) / 100,
-      heapSizeLimitMB:
-        Math.round((current.heapSizeLimit / (1024 * 1024)) * 100) / 100,
+      heapUsedMB: Math.round(bytesToMB(current.heapUsed) * 100) / 100,
+      heapTotalMB: Math.round(bytesToMB(current.heapTotal) * 100) / 100,
+      externalMB: Math.round(bytesToMB(current.external) * 100) / 100,
+      rssMB: Math.round(bytesToMB(current.rss) * 100) / 100,
+      heapSizeLimitMB: Math.round(bytesToMB(current.heapSizeLimit) * 100) / 100,
     };
   }
 

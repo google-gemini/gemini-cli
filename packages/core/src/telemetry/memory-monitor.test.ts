@@ -159,27 +159,35 @@ describe('MemoryMonitor', () => {
         // Verify metrics were recorded
         expect(mockRecordMemoryUsage).toHaveBeenCalledWith(
           mockConfig,
-          'heap_used',
           mockMemoryUsage.heapUsed,
-          'test_context',
+          {
+            memory_type: 'heap_used',
+            component: 'test_context',
+          },
         );
         expect(mockRecordMemoryUsage).toHaveBeenCalledWith(
           mockConfig,
-          'heap_total',
           mockMemoryUsage.heapTotal,
-          'test_context',
+          {
+            memory_type: 'heap_total',
+            component: 'test_context',
+          },
         );
         expect(mockRecordMemoryUsage).toHaveBeenCalledWith(
           mockConfig,
-          'external',
           mockMemoryUsage.external,
-          'test_context',
+          {
+            memory_type: 'external',
+            component: 'test_context',
+          },
         );
         expect(mockRecordMemoryUsage).toHaveBeenCalledWith(
           mockConfig,
-          'rss',
           mockMemoryUsage.rss,
-          'test_context',
+          {
+            memory_type: 'rss',
+            component: 'test_context',
+          },
         );
       });
 
@@ -236,9 +244,11 @@ describe('MemoryMonitor', () => {
         // Verify initial snapshot was taken
         expect(mockRecordMemoryUsage).toHaveBeenCalledWith(
           mockConfig,
-          'heap_used',
           mockMemoryUsage.heapUsed,
-          'monitoring_start',
+          {
+            memory_type: 'heap_used',
+            component: 'monitoring_start',
+          },
         );
 
         // Fast-forward time to trigger periodic snapshot
@@ -247,9 +257,11 @@ describe('MemoryMonitor', () => {
         // Verify monitoring_start snapshot was taken (multiple metrics)
         expect(mockRecordMemoryUsage).toHaveBeenCalledWith(
           mockConfig,
-          'heap_used',
           expect.any(Number),
-          'monitoring_start',
+          {
+            memory_type: 'heap_used',
+            component: 'monitoring_start',
+          },
         );
 
         // Stop monitoring
@@ -258,9 +270,11 @@ describe('MemoryMonitor', () => {
         // Verify final snapshot was taken
         expect(mockRecordMemoryUsage).toHaveBeenCalledWith(
           mockConfig,
-          'heap_used',
           mockMemoryUsage.heapUsed,
-          'monitoring_stop',
+          {
+            memory_type: 'heap_used',
+            component: 'monitoring_stop',
+          },
         );
       });
 
@@ -435,9 +449,11 @@ describe('MemoryMonitor', () => {
 
         expect(mockRecordMemoryUsage).toHaveBeenCalledWith(
           mockConfig,
-          'heap_used',
           mockMemoryUsage.heapUsed,
-          'test_component',
+          {
+            memory_type: 'heap_used',
+            component: 'test_component',
+          },
         );
       });
 
@@ -452,9 +468,11 @@ describe('MemoryMonitor', () => {
 
         expect(mockRecordMemoryUsage).toHaveBeenCalledWith(
           mockConfig,
-          'heap_used',
           mockMemoryUsage.heapUsed,
-          'test_component_test_operation',
+          {
+            memory_type: 'heap_used',
+            component: 'test_component_test_operation',
+          },
         );
       });
     });
@@ -516,9 +534,11 @@ describe('MemoryMonitor', () => {
 
         expect(mockRecordMemoryUsage).toHaveBeenCalledWith(
           mockConfig,
-          'heap_used',
           mockMemoryUsage.heapUsed,
-          'test_context',
+          {
+            memory_type: 'heap_used',
+            component: 'test_context',
+          },
         );
       });
     });
@@ -530,18 +550,22 @@ describe('MemoryMonitor', () => {
         // Verify initial snapshot
         expect(mockRecordMemoryUsage).toHaveBeenCalledWith(
           mockConfig,
-          'heap_used',
           mockMemoryUsage.heapUsed,
-          'monitoring_start',
+          {
+            memory_type: 'heap_used',
+            component: 'monitoring_start',
+          },
         );
 
         // Fast-forward and verify monitoring snapshot
         vi.advanceTimersByTime(1000);
         expect(mockRecordMemoryUsage).toHaveBeenCalledWith(
           mockConfig,
-          'heap_used',
           expect.any(Number),
-          'monitoring_start',
+          {
+            memory_type: 'heap_used',
+            component: 'monitoring_start',
+          },
         );
       });
     });
@@ -554,9 +578,11 @@ describe('MemoryMonitor', () => {
         // Verify final snapshot
         expect(mockRecordMemoryUsage).toHaveBeenCalledWith(
           mockConfig,
-          'heap_used',
           mockMemoryUsage.heapUsed,
-          'monitoring_stop',
+          {
+            memory_type: 'heap_used',
+            component: 'monitoring_stop',
+          },
         );
 
         // Verify no more periodic snapshots
