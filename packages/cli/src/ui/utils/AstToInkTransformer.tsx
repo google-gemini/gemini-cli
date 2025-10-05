@@ -182,7 +182,7 @@ function renderPhrasing(children: PhrasingContent[]): React.ReactNode {
       case 'inlineCode':
         return (
           <Text key={key} color="cyan">
-            `{child.value}`
+            {child.value}
           </Text>
         );
       case 'link':
