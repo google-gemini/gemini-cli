@@ -157,6 +157,41 @@ const RenderCodeBlockInternal: React.FC<RenderCodeBlockProps> = ({
 const RenderCodeBlock = React.memo(RenderCodeBlockInternal);
 
 /**
+ * Extract headers and rows from table AST node
+ * Reusable utility to avoid duplication
+ */
+function extractTableData(node: Table): {
+  headers: string[];
+  rows: string[][];
+} {
+  const headers: string[] = [];
+  if (node.children.length > 0 && node.children[0].children) {
+    node.children[0].children.forEach((cell) => {
+      if (cell.children.length > 0 && cell.children[0].type === 'text') {
+        headers.push(cell.children[0].value);
+      } else {
+        headers.push('');
+      }
+    });
+  }
+
+  const rows: string[][] = [];
+  for (let i = 1; i < node.children.length; i++) {
+    const row = node.children[i];
+    const cells: string[] = [];
+    row.children.forEach((cell) => {
+      if (cell.children.length > 0 && cell.children[0].type === 'text') {
+        cells.push(cell.children[0].value);
+      } else {
+        cells.push('');
+      }
+    });
+    rows.push(cells);
+  }
+  return { headers, rows };
+}
+
+/**
  * Render phrasing (inline) content
  * Maps mdast inline nodes directly to React components
  */
@@ -268,33 +303,7 @@ const RenderListItemInternal: React.FC<RenderListItemInternalProps> = ({
       ))}
 
       {tables.map((table, idx) => {
-        // Extract headers from first row
-        const headers: string[] = [];
-        if (table.children.length > 0 && table.children[0].children) {
-          table.children[0].children.forEach((cell) => {
-            if (cell.children.length > 0 && cell.children[0].type === 'text') {
-              headers.push(cell.children[0].value);
-            } else {
-              headers.push('');
-            }
-          });
-        }
-
-        // Extract data rows (skip header row)
-        const rows: string[][] = [];
-        for (let i = 1; i < table.children.length; i++) {
-          const row = table.children[i];
-          const cells: string[] = [];
-          row.children.forEach((cell) => {
-            if (cell.children.length > 0 && cell.children[0].type === 'text') {
-              cells.push(cell.children[0].value);
-            } else {
-              cells.push('');
-            }
-          });
-          rows.push(cells);
-        }
-
+        const { headers, rows } = extractTableData(table);
         return (
           <Box
             key={`table-${depth}-${index}-${idx}`}
@@ -472,33 +481,7 @@ function transformTable(
   terminalWidth: number,
 ): React.ReactElement {
   const isTopLevel = depth === 0;
-
-  // Extract headers from first row
-  const headers: string[] = [];
-  if (node.children.length > 0 && node.children[0].children) {
-    node.children[0].children.forEach((cell) => {
-      if (cell.children.length > 0 && cell.children[0].type === 'text') {
-        headers.push(cell.children[0].value);
-      } else {
-        headers.push('');
-      }
-    });
-  }
-
-  // Extract data rows (skip header row)
-  const rows: string[][] = [];
-  for (let i = 1; i < node.children.length; i++) {
-    const row = node.children[i];
-    const cells: string[] = [];
-    row.children.forEach((cell) => {
-      if (cell.children.length > 0 && cell.children[0].type === 'text') {
-        cells.push(cell.children[0].value);
-      } else {
-        cells.push('');
-      }
-    });
-    rows.push(cells);
-  }
+  const { headers, rows } = extractTableData(node);
 
   return (
     <Box key={key} marginBottom={isTopLevel ? 1 : 0}>

@@ -8,7 +8,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { MarkdownDisplay } from './MarkdownDisplay.js';
 import { LoadedSettings } from '../../config/settings.js';
 import { renderWithProviders } from '../../test-utils/render.js';
-import { transformMarkdownToInk } from './AstToInkTransformer.js';
+import {
+  transformMarkdownToInk,
+  parseMarkdown,
+} from './AstToInkTransformer.js';
 
 describe('<MarkdownDisplay />', () => {
   const baseProps = {
@@ -405,6 +408,12 @@ Another paragraph.
 });
 
 describe('<MarkdownDisplay /> - Performance Tests', () => {
+  const baseProps = {
+    isPending: false,
+    terminalWidth: 80,
+    availableTerminalHeight: 40,
+  };
+
   it('renders 2KB markdown in under 10ms (AC7 requirement)', () => {
     // Generate exactly 2KB of markdown content
     const sections = [];
@@ -517,5 +526,90 @@ Another paragraph.
 
     // Performance should be reasonable (<100ms average)
     expect(avg).toBeLessThan(100);
+  });
+
+  it('parses 2KB markdown in <10ms (AC7 core parsing requirement)', () => {
+    // Generate exactly 2KB of markdown content
+    const sections = [];
+    let totalSize = 0;
+    let i = 1;
+    while (totalSize < 2048) {
+      const section = `## Section ${i}\n\nThis is paragraph ${i} with **bold**, *italic*, and \`code\` elements.\n\n`;
+      sections.push(section);
+      totalSize += section.length;
+      i++;
+    }
+    const text = sections.join('');
+    expect(text.length).toBeGreaterThanOrEqual(2000);
+
+    // Measure pure parsing time (not transformation)
+    const startTime = performance.now();
+    const ast = parseMarkdown(text);
+    const endTime = performance.now();
+    const duration = endTime - startTime;
+
+    // Verify result exists
+    expect(ast).toBeDefined();
+    expect(ast?.type).toBe('root');
+
+    // AC7 requirement: <10ms for pure parsing
+    expect(duration).toBeLessThan(10);
+  });
+
+  it('handles empty inline code', () => {
+    const text = 'Text with `` empty code.';
+    const { lastFrame } = renderWithProviders(
+      <MarkdownDisplay {...baseProps} text={text} />,
+    );
+    expect(lastFrame()).toMatchSnapshot();
+  });
+
+  it('handles multiple consecutive bold/italic', () => {
+    const text = '**bold1** **bold2** *italic1* *italic2*';
+    const { lastFrame } = renderWithProviders(
+      <MarkdownDisplay {...baseProps} text={text} />,
+    );
+    expect(lastFrame()).toMatchSnapshot();
+  });
+
+  it('handles link with special characters in URL', () => {
+    const text = '[link](https://example.com/path?param=value&foo=bar)';
+    const { lastFrame } = renderWithProviders(
+      <MarkdownDisplay {...baseProps} text={text} />,
+    );
+    expect(lastFrame()).toMatchSnapshot();
+  });
+
+  it('handles empty list items', () => {
+    const text = `* Item 1
+*
+* Item 3`;
+    const { lastFrame } = renderWithProviders(
+      <MarkdownDisplay {...baseProps} text={text} />,
+    );
+    expect(lastFrame()).toMatchSnapshot();
+  });
+
+  it('handles horizontal rule variations', () => {
+    const text = `Before rule
+---
+After first
+***
+After second`;
+    const { lastFrame } = renderWithProviders(
+      <MarkdownDisplay {...baseProps} text={text} />,
+    );
+    expect(lastFrame()).toMatchSnapshot();
+  });
+
+  it('handles mixed heading levels', () => {
+    const text = `# H1
+### H3
+## H2
+#### H4`;
+    const { lastFrame } = renderWithProviders(
+      <MarkdownDisplay {...baseProps} text={text} />,
+    );
+    expect(lastFrame()).toMatchSnapshot();
   });
 });

@@ -38,6 +38,7 @@ This function aims to find an *intelligent* or "safe" index within the provided 
 import { unified } from 'unified';
 import remarkParse from 'remark-parse';
 import remarkGfm from 'remark-gfm';
+import type { Node } from 'unist';
 
 /**
  * Checks if a given character index within a string is inside a fenced code block.
@@ -57,17 +58,21 @@ const isIndexInsideCodeBlock = (
     // Walk the AST to find all code blocks and their positions
     const codeBlocks: Array<{ start: number; end: number }> = [];
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const walk = (node: any) => {
-      if (node.type === 'code' && node.position) {
+    const walk = (node: Node) => {
+      if (
+        node.type === 'code' &&
+        node.position &&
+        node.position.start.offset !== undefined &&
+        node.position.end.offset !== undefined
+      ) {
         // Code node positions are in the AST
         codeBlocks.push({
           start: node.position.start.offset,
           end: node.position.end.offset,
         });
       }
-      if (node.children) {
-        node.children.forEach(walk);
+      if ('children' in node && Array.isArray(node.children)) {
+        (node.children as Node[]).forEach(walk);
       }
     };
 
@@ -104,9 +109,13 @@ const findEnclosingCodeBlockStart = (
     // Walk the AST to find the code block containing the index
     let enclosingStart = -1;
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const walk = (node: any) => {
-      if (node.type === 'code' && node.position) {
+    const walk = (node: Node) => {
+      if (
+        node.type === 'code' &&
+        node.position &&
+        node.position.start.offset !== undefined &&
+        node.position.end.offset !== undefined
+      ) {
         const start = node.position.start.offset;
         const end = node.position.end.offset;
         if (index >= start && index < end) {
@@ -114,8 +123,8 @@ const findEnclosingCodeBlockStart = (
           return; // Found it, stop searching
         }
       }
-      if (node.children) {
-        node.children.forEach(walk);
+      if ('children' in node && Array.isArray(node.children)) {
+        (node.children as Node[]).forEach(walk);
       }
     };
 
