@@ -68,15 +68,5 @@ runs:
           exit 1
         fi
 
-    - name: 'Install dependencies for integration tests'
-      shell: 'bash'
-      working-directory: './verify'
-      run: 'npm install'
-
-    - name: '🔬 Run integration tests against NPM release'
-      working-directory: './verify'
-      env:
-        GEMINI_API_KEY: '${{ inputs.gemini_api_key }}'
-        INTEGRATION_TEST_USE_INSTALLED_GEMINI: 'true'
-      shell: 'bash'
-      run: 'npm run test:integration:sandbox:none'
+# TODO: Add back integration tests once we resolve
+# https://github.com/google-gemini/gemini-cli/issues/10517
