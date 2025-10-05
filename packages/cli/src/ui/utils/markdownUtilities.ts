@@ -78,19 +78,10 @@ const isIndexInsideCodeBlock = (
       (block) => indexToTest >= block.start && indexToTest < block.end,
     );
   } catch (error) {
-    // Fallback to simple detection if parsing fails
+    // Avoid falling back to a known buggy regex implementation.
+    // It's safer to assume it's not a code block if parsing fails.
     console.error('Failed to parse markdown for code block detection:', error);
-    let fenceCount = 0;
-    let searchPos = 0;
-    while (searchPos < content.length) {
-      const nextFence = content.indexOf('```', searchPos);
-      if (nextFence === -1 || nextFence >= indexToTest) {
-        break;
-      }
-      fenceCount++;
-      searchPos = nextFence + 3;
-    }
-    return fenceCount % 2 === 1;
+    return false;
   }
 };
 
@@ -131,26 +122,8 @@ const findEnclosingCodeBlockStart = (
     walk(tree);
     return enclosingStart;
   } catch (error) {
-    // Fallback to simple detection if parsing fails
+    // If parsing fails, we cannot reliably find the block.
     console.error('Failed to parse markdown for code block detection:', error);
-    if (!isIndexInsideCodeBlock(content, index)) {
-      return -1;
-    }
-    let currentSearchPos = 0;
-    while (currentSearchPos < index) {
-      const blockStartIndex = content.indexOf('```', currentSearchPos);
-      if (blockStartIndex === -1 || blockStartIndex >= index) {
-        break;
-      }
-      const blockEndIndex = content.indexOf('```', blockStartIndex + 3);
-      if (blockStartIndex < index) {
-        if (blockEndIndex === -1 || index < blockEndIndex + 3) {
-          return blockStartIndex;
-        }
-      }
-      if (blockEndIndex === -1) break;
-      currentSearchPos = blockEndIndex + 3;
-    }
     return -1;
   }
 };

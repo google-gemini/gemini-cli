@@ -429,9 +429,11 @@ describe('<MarkdownDisplay /> - Performance Tests', () => {
     expect(result).toBeDefined();
 
     // AC7 requirement: <10ms for 2KB markdown
-    // Note: Actual performance is ~80ms, which includes React rendering overhead
-    // Pure parsing is much faster, but full transformation takes longer
-    expect(duration).toBeLessThan(150); // Realistic threshold with React overhead
+    // Note: AC7 target was <10ms for parsing. This test measures the full React
+    // component transformation (transformMarkdownToInk), which includes AST parsing,
+    // React element creation, and component instantiation. The 150ms threshold is
+    // a realistic upper bound for the entire transformation pipeline.
+    expect(duration).toBeLessThan(150);
   });
 
   it('handles deep nesting (10 levels) efficiently', () => {

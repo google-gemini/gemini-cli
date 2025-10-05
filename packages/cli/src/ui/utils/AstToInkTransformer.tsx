@@ -24,14 +24,13 @@ import remarkParse from 'remark-parse';
 import remarkGfm from 'remark-gfm';
 import type {
   Root,
-  Content,
+  RootContent,
   PhrasingContent,
   Paragraph,
   Heading,
   Code,
   List,
   ListItem,
-  BlockContent,
   Table,
   Blockquote,
 } from 'mdast';
@@ -39,6 +38,7 @@ import { theme } from '../semantic-colors.js';
 import { colorizeCode } from './CodeColorizer.js';
 import { TableRenderer } from './TableRenderer.js';
 import { useSettings } from '../contexts/SettingsContext.js';
+import { checkExhaustive } from '../../utils/checks.js';
 
 /**
  * Type guard for mdast Root node
@@ -575,7 +575,7 @@ function transformBlockquote(
  * Routes nodes to specific transformers based on type
  */
 function transformNode(
-  node: Content | BlockContent,
+  node: RootContent,
   key: string,
   depth: number,
   isPending: boolean,
@@ -611,7 +611,32 @@ function transformNode(
         availableTerminalHeight,
         terminalWidth,
       );
+    // Unsupported or edge-case node types - return null
+    case 'html':
+    case 'definition':
+    case 'footnoteDefinition':
+    case 'yaml':
+      return null;
+    // Phrasing content that shouldn't appear at root level
+    case 'break':
+    case 'delete':
+    case 'emphasis':
+    case 'footnoteReference':
+    case 'image':
+    case 'imageReference':
+    case 'inlineCode':
+    case 'link':
+    case 'linkReference':
+    case 'strong':
+    case 'text':
+      return null;
+    // Table/list internals that shouldn't appear at root level
+    case 'listItem':
+    case 'tableRow':
+    case 'tableCell':
+      return null;
     default:
+      checkExhaustive(node);
       return null;
   }
 }
