@@ -52,6 +52,8 @@
     "telemetry": "node scripts/telemetry.js",
     "check:lockfile": "node scripts/check-lockfile.js",
     "clean": "node scripts/clean.js",
+    "docs:gen:extensions": "tsx scripts/docgen/generate-extension-vars.ts",
+    "docs:check:extensions": "npm run docs:gen:extensions && git diff --exit-code -- docs/extensions/index.md",
     "pre-commit": "node scripts/pre-commit.js"
   },
   "overrides": {

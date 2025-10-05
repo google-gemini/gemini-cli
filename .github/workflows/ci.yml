@@ -78,6 +78,9 @@ jobs:
       - name: 'Run actionlint'
         run: 'node scripts/lint.js --actionlint'
 
+      - name: 'Check extension variable docs'
+        run: 'npm run docs:check:extensions'
+
       - name: 'Run shellcheck'
         run: 'node scripts/lint.js --shellcheck'
 
