@@ -34,7 +34,12 @@ export const useAutocomplete = ({
     setItems([]);
     setCurrentMatch(null);
     setSelectedIndex(0);
-  }, []);
+
+    // Return focus to textarea after closing
+    if (textareaRef.current) {
+      textareaRef.current.focus();
+    }
+  }, [textareaRef]);
 
   const showAutocomplete = useCallback(async (match: AutocompleteMatch, textareaElement: HTMLTextAreaElement) => {
     // Don't block if already loading - just update the current match
@@ -191,10 +196,12 @@ function getCursorPosition(textarea: HTMLTextAreaElement, _index: number) {
   const textareaRect = textarea.getBoundingClientRect();
   const style = getComputedStyle(textarea);
 
-  // Position the dropdown higher to align with Excel menu (bottom-12 = 48px from bottom)
-  // Adjust top position to be 48px higher than the textarea bottom
+  // Position the dropdown above the textarea to avoid blocking the input
+  // Dropdown height is approximately 400-500px, position it above
+  const dropdownHeight = 450; // Approximate height with filters + items
+
   return {
-    top: textareaRect.bottom + window.scrollY - 30,
+    top: textareaRect.top + window.scrollY - dropdownHeight - 8, // 8px gap above textarea
     left: textareaRect.left + window.scrollX + parseInt(style.paddingLeft, 10),
     height: 20
   };

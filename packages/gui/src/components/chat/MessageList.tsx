@@ -19,6 +19,7 @@ import { SmartVisualization } from '@/components/charts/SmartVisualization';
 import { multiModelService } from '@/services/multiModelService';
 import { useChatStore } from '@/stores/chatStore';
 import type { ChatMessage, ToolCallConfirmationDetails, ToolConfirmationOutcome, ToolCall } from '@/types';
+import { CodeHighlight } from '@/components/ui/CodeHighlight';
 
 
 
@@ -715,10 +716,12 @@ const ToolCallDisplay: React.FC<{ toolCall: ToolCall; timestamp?: Date }> = ({ t
                           <pre className="text-xs bg-background/50 rounded px-3 py-2 whitespace-pre-wrap font-mono text-foreground/80 overflow-x-auto border">
                             {JSON.stringify(value, null, 2)}
                           </pre>
+                        ) : key === 'code' || key === 'script' || key === 'query' ? (
+                          <CodeHighlight code={String(value)} language="python" />
                         ) : (
-                          <div className="text-xs text-foreground/90 break-words font-mono bg-background/30 rounded px-2 py-1">
+                          <pre className="text-xs text-foreground/90 font-mono bg-background/30 rounded px-2 py-1 whitespace-pre-wrap overflow-x-auto">
                             {String(value)}
-                          </div>
+                          </pre>
                         )}
                       </div>
                     </div>

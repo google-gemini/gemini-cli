@@ -65,8 +65,20 @@ export class AutocompleteSystem {
   ): { newText: string; newCursorPos: number } {
     const before = text.slice(0, match.startPos);
     const after = text.slice(match.endPos);
-    const newText = before + selectedValue + after;
-    const newCursorPos = match.startPos + selectedValue.length;
+
+    // Format the selected value: remove trailing slash and add quotes
+    let formattedValue = selectedValue;
+
+    // Remove trailing slash if present
+    if (formattedValue.endsWith('/') || formattedValue.endsWith('\\')) {
+      formattedValue = formattedValue.slice(0, -1);
+    }
+
+    // Add quotes around the path
+    formattedValue = `"${formattedValue}"`;
+
+    const newText = before + formattedValue + after;
+    const newCursorPos = match.startPos + formattedValue.length;
 
     return { newText, newCursorPos };
   }

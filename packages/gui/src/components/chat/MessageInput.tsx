@@ -800,8 +800,14 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(({ di
               });
             }
 
-            // Don't reset state here - LLM might continue streaming after tool response
-            // State will be reset only when a new message starts or conversation ends
+            // IMPORTANT: Reset message tracking after tool response
+            // This ensures that any new content after tool response creates a NEW message
+            // The previous message with tool calls has already been saved (line 735)
+            // So resetting here won't cause content loss, but will prevent new content
+            // from being incorrectly appended to the tool call message
+            assistantContent = '';
+            currentAssistantMessageId = null;
+            hasCreatedInitialMessage = false;
           }
         }
         else if (event.type === 'compression') {

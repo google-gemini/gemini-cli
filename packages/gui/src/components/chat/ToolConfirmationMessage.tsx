@@ -2,6 +2,7 @@ import React from 'react';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { AlertTriangle, Code, Info, Server, FileText } from 'lucide-react';
+import { CodeHighlight } from '@/components/ui/CodeHighlight';
 
 // Import types from local types to avoid WASM dependencies
 import type {
@@ -100,6 +101,26 @@ const ToolConfirmationMessage: React.FC<ToolConfirmationMessageProps> = ({
   );
 
   const renderExecConfirmation = (details: ToolExecuteConfirmationDetails) => {
+    // Extract Python code from command (remove "python toolname..." prefix)
+    const extractPythonCode = (command: string): string => {
+      console.log('Original command:', command);
+      console.log('Command length:', command.length);
+
+      // Command format: "python toolname (requires: ...)\n\n<actual python code>"
+      // We need to extract just the Python code part
+      const parts = command.split('\n\n');
+      console.log('Split parts:', parts.length);
+
+      if (parts.length > 1) {
+        // Return everything after the first "\n\n"
+        const extracted = parts.slice(1).join('\n\n');
+        console.log('Extracted code:', extracted);
+        console.log('Extracted length:', extracted.length);
+        return extracted;
+      }
+      return command;
+    };
+
     // Parse tool information from command and rootCommand
     const parseToolInfo = () => {
       const { command, rootCommand } = details;
@@ -198,14 +219,12 @@ const ToolConfirmationMessage: React.FC<ToolConfirmationMessageProps> = ({
               </div>
 
               {/* Collapsible Code Section */}
-              <details className="bg-white dark:bg-gray-900 rounded-md border border-red-200/50 dark:border-red-800/50">
-                <summary className="px-3 py-2 text-xs font-medium text-gray-600 dark:text-gray-400 border-b border-red-200/50 dark:border-red-800/50 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50">
-                  View Python code
+              <details open className="rounded-md border border-red-200/50 dark:border-red-800/50 overflow-hidden">
+                <summary className="px-3 py-2 text-xs font-medium text-gray-600 dark:text-gray-400 bg-white dark:bg-gray-900 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                  🐍 Python Code (Click to collapse)
                 </summary>
-                <div className="p-3 max-h-32 overflow-auto">
-                  <code className="text-xs font-mono text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
-                    {details.command}
-                  </code>
+                <div>
+                  <CodeHighlight code={extractPythonCode(details.command)} language="python" maxHeight="400px" />
                 </div>
               </details>
 

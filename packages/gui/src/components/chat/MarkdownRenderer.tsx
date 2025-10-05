@@ -194,7 +194,10 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
       }
 
       // Handle formulas (centered text with math symbols)
-      if (trimmed.includes('=') && (trimmed.includes('×') || trimmed.includes('÷') || /\d+/.test(trimmed))) {
+      // Only treat as formula if it has explicit math symbols (×, ÷) or starts with a digit followed by math
+      // Exclude code-like patterns (>>>, function calls, assignments with dots/brackets)
+      const hasCodePatterns = trimmed.includes('>>>') || trimmed.includes('(') || trimmed.includes('[') || trimmed.includes('.') || trimmed.includes('=>');
+      if (!hasCodePatterns && trimmed.includes('=') && (trimmed.includes('×') || trimmed.includes('÷'))) {
         parsed.push({
           type: 'formula',
           content: trimmed
@@ -446,15 +449,21 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
   };
 
   const processLineWithUrls = (line: string) => {
-    // URL regex pattern to detect various URL formats
-    const urlRegex = /(https?:\/\/[^\s]+|www\.[^\s]+|[a-zA-Z0-9][a-zA-Z0-9-]{1,61}[a-zA-Z0-9]\.[a-zA-Z]{2,}[^\s]*)/g;
+    // URL regex pattern - only match explicit HTTP/HTTPS URLs and www. domains
+    // Do NOT match file paths, file names, or anything with backslashes
+    const urlRegex = /(https?:\/\/[^\s]+|www\.[a-zA-Z0-9-]+\.[a-zA-Z]{2,}[^\s]*)/g;
 
     // Split the line by URLs while keeping the URLs
     const parts = line.split(urlRegex);
 
     return parts.map((part, partIndex) => {
-      // Check if this part is a URL
-      if (urlRegex.test(part)) {
+      // Additional checks to ensure it's really a URL and not a file path
+      const isUrl = urlRegex.test(part) &&
+                    !part.includes('\\') && // Not a Windows path
+                    !part.match(/^[A-Za-z]:/) && // Not a drive letter
+                    !part.match(/\.(xlsx?|docx?|pdf|txt|csv|json|xml|zip|rar|7z|tar|gz|exe|dll|bat|sh|py|js|ts|java|cpp|c|h)$/i); // Not a file with common extension
+
+      if (isUrl) {
         // Ensure URL has protocol
         const href = part.startsWith('http') ? part : `https://${part}`;
 
