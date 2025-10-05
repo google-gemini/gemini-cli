@@ -35,6 +35,7 @@ export const EVENT_MODEL_SLASH_COMMAND = 'gemini_cli.slash_command.model';
 export const EVENT_SMART_EDIT_STRATEGY = 'gemini_cli.smart_edit.strategy';
 export const EVENT_MODEL_ROUTING = 'gemini_cli.model_routing';
 export const EVENT_SMART_EDIT_CORRECTION = 'gemini_cli.smart_edit.correction';
+export const EVENT_FEEDBACK = 'gemini_cli.feedback';
 
 // Performance Events
 export const EVENT_STARTUP_PERFORMANCE = 'gemini_cli.startup.performance';

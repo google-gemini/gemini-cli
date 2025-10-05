@@ -13,7 +13,9 @@ import {
   GitService,
   IdeClient,
   Logger,
+  logFeedback,
   logSlashCommand,
+  makeFeedbackEvent,
   makeSlashCommandEvent,
   SlashCommandStatus,
   Storage,
@@ -287,19 +289,15 @@ export const useSlashCommandProcessor = (
         return false;
       }
 
-      const trimmed = rawQuery.trim();
+      let trimmed = rawQuery.trim();
 
       const isFeedback = [':)', '👍'].includes(trimmed);
 
       if (isFeedback) {
-        addItem(
-          {
-            type: MessageType.INFO,
-            text: 'Feedback received. Thank you!',
-          },
-          Date.now(),
-        );
-        return { type: 'handled' };
+        if (config) {
+          logFeedback(config, makeFeedbackEvent(trimmed));
+        }
+        trimmed = '/thanks';
       }
 
       if (!trimmed.startsWith('/') && !trimmed.startsWith('?')) {

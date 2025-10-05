@@ -10,6 +10,7 @@ import {
   CommandKind,
 } from './types.js';
 import { MessageType } from '../types.js';
+import { logFeedback, makeFeedbackEvent } from '@google/gemini-cli-core';
 
 export const thanksCommand: SlashCommand = {
   name: 'thanks',
@@ -18,6 +19,12 @@ export const thanksCommand: SlashCommand = {
   isFeedback: true,
   altNames: ['good', 'ack'],
   action: async (context: CommandContext): Promise<void> => {
+    if (context.services.config && context.invocation) {
+      logFeedback(
+        context.services.config,
+        makeFeedbackEvent(context.invocation.raw),
+      );
+    }
     context.ui.addItem(
       {
         type: MessageType.INFO,
