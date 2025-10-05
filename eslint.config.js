@@ -49,6 +49,10 @@ export default tseslint.config(
         version: 'detect',
       },
     },
+    rules: {
+      // Disable prop-types validation for TypeScript projects
+      'react/prop-types': 'off',
+    },
   },
   {
     // Import specific config
