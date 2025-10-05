@@ -31,6 +31,8 @@ import type {
   ExtensionEnableEvent,
   ModelSlashCommandEvent,
   ExtensionDisableEvent,
+  SmartEditStrategyEvent,
+  SmartEditCorrectionEvent,
 } from '../types.js';
 import { EventMetadataKey } from './event-metadata-key.js';
 import type { Config } from '../../config/config.js';
@@ -75,6 +77,8 @@ export enum EventNames {
   TOOL_OUTPUT_TRUNCATED = 'tool_output_truncated',
   MODEL_ROUTING = 'model_routing',
   MODEL_SLASH_COMMAND = 'model_slash_command',
+  SMART_EDIT_STRATEGY = 'smart_edit_strategy',
+  SMART_EDIT_CORRECTION = 'smart_edit_correction',
 }
 
 export interface LogResponse {
@@ -472,10 +476,6 @@ export class ClearcutLogger {
         value: JSON.stringify(event.duration_ms),
       },
       {
-        gemini_cli_key: EventMetadataKey.GEMINI_CLI_TOOL_ERROR_MESSAGE,
-        value: JSON.stringify(event.error),
-      },
-      {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_TOOL_CALL_ERROR_TYPE,
         value: JSON.stringify(event.error_type),
       },
@@ -788,10 +788,6 @@ export class ClearcutLogger {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_KITTY_SEQUENCE_LENGTH,
         value: event.sequence_length.toString(),
       },
-      {
-        gemini_cli_key: EventMetadataKey.GEMINI_CLI_KITTY_TRUNCATED_SEQUENCE,
-        value: event.truncated_sequence,
-      },
     ];
 
     this.enqueueLogEvent(
@@ -1035,6 +1031,34 @@ export class ClearcutLogger {
 
     this.enqueueLogEvent(
       this.createLogEvent(EventNames.EXTENSION_DISABLE, data),
+    );
+    this.flushIfNeeded();
+  }
+
+  logSmartEditStrategyEvent(event: SmartEditStrategyEvent): void {
+    const data: EventValue[] = [
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_SMART_EDIT_STRATEGY,
+        value: event.strategy,
+      },
+    ];
+
+    this.enqueueLogEvent(
+      this.createLogEvent(EventNames.SMART_EDIT_STRATEGY, data),
+    );
+    this.flushIfNeeded();
+  }
+
+  logSmartEditCorrectionEvent(event: SmartEditCorrectionEvent): void {
+    const data: EventValue[] = [
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_SMART_EDIT_CORRECTION,
+        value: event.correction,
+      },
+    ];
+
+    this.enqueueLogEvent(
+      this.createLogEvent(EventNames.SMART_EDIT_CORRECTION, data),
     );
     this.flushIfNeeded();
   }
