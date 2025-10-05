@@ -32,7 +32,7 @@ function formatVariableName(name: string): string {
 function renderTable(entries: SchemaEntry[]): string {
   const header = ['| variable | description |', '| --- | --- |'];
   const rows = entries.map(([key, value]) => {
-    const description = value.description.replace(/\s+/g, ' ').trim();
+    const description = value.description.trim().replace(/\|/g, '\\|').replace(/\r?\n/g, '<br />');
     return `| \`${formatVariableName(key)}\` | ${description} |`;
   });
 
