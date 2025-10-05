@@ -300,6 +300,22 @@ Another paragraph.
       expect(lastFrame()).toMatchSnapshot();
     });
 
+    it('renders tables within list items', () => {
+      const text = `
+* List item with table:
+
+  | Header 1 | Header 2 |
+  |----------|----------|
+  | Cell 1   | Cell 2   |
+
+* Another list item
+`.replace(/\n/g, eol);
+      const { lastFrame } = renderWithProviders(
+        <MarkdownDisplay {...baseProps} text={text} />,
+      );
+      expect(lastFrame()).toMatchSnapshot();
+    });
+
     it('handles deeply nested lists (10 levels)', () => {
       const text = `
 * L1

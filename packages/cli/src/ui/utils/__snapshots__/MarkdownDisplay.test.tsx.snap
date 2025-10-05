@@ -209,6 +209,7 @@ exports[`<MarkdownDisplay /> > with 'Unix' line endings > renders blockquotes 1`
 
 exports[`<MarkdownDisplay /> > with 'Unix' line endings > renders code blocks within list items 1`] = `
 "* List item with code:
+
     1 const x = 1;
 
 * Another list item
@@ -294,14 +295,25 @@ exports[`<MarkdownDisplay /> > with 'Unix' line endings > renders strikethrough 
 `;
 
 exports[`<MarkdownDisplay /> > with 'Unix' line endings > renders tables correctly 1`] = `
-"
-┌──────────┬──────────┐
+"┌──────────┬──────────┐
 │ Header 1 │ Header 2 │
 ├──────────┼──────────┤
 │ Cell 1   │ Cell 2   │
 │ Cell 3   │ Cell 4   │
 └──────────┴──────────┘
+"
+`;
 
+exports[`<MarkdownDisplay /> > with 'Unix' line endings > renders tables within list items 1`] = `
+"* List item with table:
+
+   ┌──────────┬──────────┐
+   │ Header 1 │ Header 2 │
+   ├──────────┼──────────┤
+   │ Cell 1   │ Cell 2   │
+   └──────────┴──────────┘
+
+* Another list item
 "
 `;
 
@@ -402,6 +414,7 @@ exports[`<MarkdownDisplay /> > with 'Windows' line endings > renders blockquotes
 
 exports[`<MarkdownDisplay /> > with 'Windows' line endings > renders code blocks within list items 1`] = `
 "* List item with code:
+
     1 const x = 1;
 
 * Another list item
@@ -487,14 +500,25 @@ exports[`<MarkdownDisplay /> > with 'Windows' line endings > renders strikethrou
 `;
 
 exports[`<MarkdownDisplay /> > with 'Windows' line endings > renders tables correctly 1`] = `
-"
-┌──────────┬──────────┐
+"┌──────────┬──────────┐
 │ Header 1 │ Header 2 │
 ├──────────┼──────────┤
 │ Cell 1   │ Cell 2   │
 │ Cell 3   │ Cell 4   │
 └──────────┴──────────┘
+"
+`;
 
+exports[`<MarkdownDisplay /> > with 'Windows' line endings > renders tables within list items 1`] = `
+"* List item with table:
+
+   ┌──────────┬──────────┐
+   │ Header 1 │ Header 2 │
+   ├──────────┼──────────┤
+   │ Cell 1   │ Cell 2   │
+   └──────────┴──────────┘
+
+* Another list item
 "
 `;
 

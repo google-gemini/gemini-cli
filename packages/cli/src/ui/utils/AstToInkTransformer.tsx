@@ -11,15 +11,10 @@
  * It replaces regex-based line-by-line parsing with AST transformation.
  *
  * Key Features:
- * - Semantic spacing (depth-aware marginBottom pattern)
- * - Proper nested structure handling (lists, code blocks)
+ * - Semantic spacing (depth-aware marginBottom)
+ * - Proper nested structure handling (lists, code blocks, tables)
  * - Type-safe parsing with runtime validation
  * - Graceful fallback for malformed markdown
- *
- * Research References:
- * - CommonMark spec: Whitespace normalization (AST doesn't preserve source blanks)
- * - mdast spec: Hierarchical semantic nodes with depth properties
- * - Industry pattern: Box marginBottom for consistent vertical spacing
  */
 
 import React from 'react';
@@ -48,7 +43,6 @@ import { useSettings } from '../contexts/SettingsContext.js';
 /**
  * Type guard for mdast Root node
  * Runtime validation prevents type assertion errors
- * Lesson 1 (Commit a4f2db3): Always use type guards, never type assertions
  */
 function isMdastRoot(node: unknown): node is Root {
   return (
@@ -64,7 +58,6 @@ function isMdastRoot(node: unknown): node is Root {
 /**
  * Parse markdown into mdast AST
  * Returns null on failure to enable graceful fallback
- * Lesson 2 (Commit e3246358): Trust the parser for fence detection and malformed markdown
  */
 export function parseMarkdown(markdown: string): Root | null {
   try {
@@ -79,8 +72,6 @@ export function parseMarkdown(markdown: string): Root | null {
 
 /**
  * Props for RenderCodeBlock component
- * Matches existing interface from MarkdownDisplay.tsx
- * Pattern 6: Component Interfaces (Existing)
  */
 interface RenderCodeBlockProps {
   code: string;
@@ -168,9 +159,6 @@ const RenderCodeBlock = React.memo(RenderCodeBlockInternal);
 /**
  * Render phrasing (inline) content
  * Maps mdast inline nodes directly to React components
- * Lesson 3 (Commit c774826): Direct React rendering, no re-parsing
- * Lesson 6 (Commit c774826): Keep inline rendering simple
- * Pattern 5: Direct Phrasing Content Rendering
  */
 function renderPhrasing(children: PhrasingContent[]): React.ReactNode {
   return children.map((child, index) => {
@@ -224,13 +212,11 @@ interface RenderListItemInternalProps {
   depth: number;
   ordered: boolean;
   start?: number;
+  terminalWidth?: number;
 }
 
 /**
- * List item renderer with code block support
- * Lesson 5 (Commit 879328b): Code blocks in lists need special handling
- * Lesson 7 (Commit 879328b): Use node.start property for ordered lists
- * Pattern 4: List Item with Code Block Support
+ * List item renderer with code block and table support
  */
 const RenderListItemInternal: React.FC<RenderListItemInternalProps> = ({
   node,
@@ -238,6 +224,7 @@ const RenderListItemInternal: React.FC<RenderListItemInternalProps> = ({
   depth,
   ordered,
   start,
+  terminalWidth = 80,
 }) => {
   const indent = '   '.repeat(depth);
   const marker = ordered ? `${(start || 1) + index}.` : '*';
@@ -252,6 +239,9 @@ const RenderListItemInternal: React.FC<RenderListItemInternalProps> = ({
 
   // Extract code blocks (CRITICAL for proper termination)
   const codeBlocks = node.children.filter((c): c is Code => c.type === 'code');
+
+  // Extract tables
+  const tables = node.children.filter((c): c is Table => c.type === 'table');
 
   // Extract nested lists
   const nestedLists = node.children.filter((c): c is List => c.type === 'list');
@@ -277,8 +267,57 @@ const RenderListItemInternal: React.FC<RenderListItemInternalProps> = ({
         </Box>
       ))}
 
+      {tables.map((table, idx) => {
+        // Extract headers from first row
+        const headers: string[] = [];
+        if (table.children.length > 0 && table.children[0].children) {
+          table.children[0].children.forEach((cell) => {
+            if (cell.children.length > 0 && cell.children[0].type === 'text') {
+              headers.push(cell.children[0].value);
+            } else {
+              headers.push('');
+            }
+          });
+        }
+
+        // Extract data rows (skip header row)
+        const rows: string[][] = [];
+        for (let i = 1; i < table.children.length; i++) {
+          const row = table.children[i];
+          const cells: string[] = [];
+          row.children.forEach((cell) => {
+            if (cell.children.length > 0 && cell.children[0].type === 'text') {
+              cells.push(cell.children[0].value);
+            } else {
+              cells.push('');
+            }
+          });
+          rows.push(cells);
+        }
+
+        return (
+          <Box
+            key={`table-${depth}-${index}-${idx}`}
+            paddingLeft={3}
+            marginTop={1}
+            marginBottom={1}
+          >
+            <TableRenderer
+              headers={headers}
+              rows={rows}
+              terminalWidth={terminalWidth - 3}
+            />
+          </Box>
+        );
+      })}
+
       {nestedLists.map((list, idx) =>
-        renderList(list, `nested-${depth}-${index}-${idx}`, depth + 1),
+        renderList(
+          list,
+          `nested-${depth}-${index}-${idx}`,
+          depth + 1,
+          terminalWidth,
+        ),
       )}
     </Box>
   );
@@ -286,13 +325,13 @@ const RenderListItemInternal: React.FC<RenderListItemInternalProps> = ({
 
 /**
  * List renderer with depth tracking
- * Lesson 4 (Commit 140daf2): Only top-level items get marginBottom={1}
- * Pattern 3: List Rendering with Depth Tracking
+ * Only top-level items get marginBottom={1}
  */
 function renderList(
   node: List,
   key: string,
   depth: number,
+  terminalWidth?: number,
 ): React.ReactElement {
   const isTopLevel = depth === 0;
 
@@ -306,6 +345,7 @@ function renderList(
           depth={depth}
           ordered={node.ordered || false}
           start={node.start || undefined}
+          terminalWidth={terminalWidth}
         />
       ))}
     </Box>
@@ -314,7 +354,6 @@ function renderList(
 
 /**
  * Transform paragraph node
- * Pattern 2: Semantic-Normalizing Spacing (Box marginBottom)
  */
 function transformParagraph(
   node: Paragraph,
@@ -331,7 +370,6 @@ function transformParagraph(
 
 /**
  * Transform heading node
- * Pattern 2: Semantic-Normalizing Spacing (Box marginBottom)
  */
 function transformHeading(
   node: Heading,
@@ -386,7 +424,6 @@ function transformHeading(
 
 /**
  * Transform code block node
- * Pattern 2: Semantic-Normalizing Spacing (Box marginBottom)
  */
 function transformCodeBlock(
   node: Code,
@@ -412,7 +449,6 @@ function transformCodeBlock(
 
 /**
  * Transform thematic break node
- * Pattern 2: Semantic-Normalizing Spacing (Box marginBottom)
  */
 function transformThematicBreak(
   key: string,
@@ -428,7 +464,6 @@ function transformThematicBreak(
 
 /**
  * Transform table node
- * Pattern 7: Table Transformer
  */
 function transformTable(
   node: Table,
@@ -478,7 +513,6 @@ function transformTable(
 
 /**
  * Transform blockquote node
- * Pattern 8: Blockquote Transformer
  */
 function transformBlockquote(
   node: Blockquote,
@@ -514,7 +548,6 @@ function transformBlockquote(
 /**
  * Main node transformer
  * Routes nodes to specific transformers based on type
- * Pattern 2: Semantic-Normalizing Spacing (Box marginBottom)
  */
 function transformNode(
   node: Content | BlockContent,
@@ -541,7 +574,7 @@ function transformNode(
     case 'thematicBreak':
       return transformThematicBreak(key, depth);
     case 'list':
-      return renderList(node as List, key, depth);
+      return renderList(node as List, key, depth, terminalWidth);
     case 'table':
       return transformTable(node as Table, key, depth, terminalWidth || 80);
     case 'blockquote':
@@ -570,7 +603,6 @@ export interface TransformOptions {
 /**
  * Main transform function
  * Converts markdown AST to Ink React elements
- * Pattern 1: Type-Safe Parsing with Validation
  */
 export function transformMarkdownToInk(
   markdown: string,
