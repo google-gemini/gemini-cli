@@ -259,6 +259,20 @@ Another paragraph.
       expect(lastFrame()).toMatchSnapshot();
     });
 
+    it('renders blockquotes with multiple paragraphs', () => {
+      const text = `
+> This is the first paragraph in the blockquote.
+>
+> This is the second paragraph. You can add more paragraphs by adding a \`>\` before each new line.
+>
+> This is the third.
+`.replace(/\n/g, eol);
+      const { lastFrame } = renderWithProviders(
+        <MarkdownDisplay {...baseProps} text={text} />,
+      );
+      expect(lastFrame()).toMatchSnapshot();
+    });
+
     it('renders mixed ordered and unordered list nesting', () => {
       const text = `
 1. Ordered item 1

@@ -513,6 +513,7 @@ function transformTable(
 
 /**
  * Transform blockquote node
+ * Renders with continuous left vertical bar (GitHub style)
  */
 function transformBlockquote(
   node: Blockquote,
@@ -523,24 +524,48 @@ function transformBlockquote(
   terminalWidth?: number,
 ): React.ReactElement {
   const isTopLevel = depth === 0;
+  const barChar = '│';
+  const barColor = theme.text.secondary;
+
+  // Flatten all children into lines with bar prefix
+  const lines: React.ReactNode[] = [];
+
+  node.children.forEach((child, idx) => {
+    const isLastChild = idx === node.children.length - 1;
+    const element = transformNode(
+      child,
+      `quote-${idx}`,
+      depth + 1,
+      isPending,
+      availableTerminalHeight,
+      terminalWidth,
+    );
+
+    // Add element with bar prefix
+    lines.push(
+      <Box key={`quote-line-${idx}`} flexDirection="row">
+        <Text color={barColor} bold>
+          {barChar}{' '}
+        </Text>
+        <Box flexGrow={1}>{element}</Box>
+      </Box>,
+    );
+
+    // Add spacing line with bar between children (except last)
+    if (!isLastChild) {
+      lines.push(
+        <Box key={`quote-space-${idx}`} flexDirection="row">
+          <Text color={barColor} bold>
+            {barChar}
+          </Text>
+        </Box>,
+      );
+    }
+  });
+
   return (
-    <Box
-      key={key}
-      borderLeft
-      borderStyle="single"
-      paddingLeft={1}
-      marginBottom={isTopLevel ? 1 : 0}
-    >
-      {node.children.map((child, idx) =>
-        transformNode(
-          child,
-          `quote-${idx}`,
-          depth + 1,
-          isPending,
-          availableTerminalHeight,
-          terminalWidth,
-        ),
-      )}
+    <Box key={key} marginBottom={isTopLevel ? 1 : 0} flexDirection="column">
+      {lines}
     </Box>
   );
 }

@@ -200,10 +200,17 @@ exports[`<MarkdownDisplay /> > with 'Unix' line endings > renders a fenced code 
 `;
 
 exports[`<MarkdownDisplay /> > with 'Unix' line endings > renders blockquotes 1`] = `
-"┌──────────────────────────────────────────────────────────────────────────────────────────────────┐
-│ This is a quote                                                                                  │
-│ It spans multiple lines                                                                          │
-└──────────────────────────────────────────────────────────────────────────────────────────────────┘
+"│ This is a quote
+  It spans multiple lines
+"
+`;
+
+exports[`<MarkdownDisplay /> > with 'Unix' line endings > renders blockquotes with multiple paragraphs 1`] = `
+"│ This is the first paragraph in the blockquote.
+│
+│ This is the second paragraph. You can add more paragraphs by adding a \`>\` before each new line.
+│
+│ This is the third.
 "
 `;
 
@@ -254,13 +261,11 @@ exports[`<MarkdownDisplay /> > with 'Unix' line endings > renders mixed ordered 
 `;
 
 exports[`<MarkdownDisplay /> > with 'Unix' line endings > renders nested blockquotes 1`] = `
-"┌──────────────────────────────────────────────────────────────────────────────────────────────────┐
-│ Level 1 quote┌──────────────────────────────┐                                                    │
-│              │ Level 2 quote┌──────────────┐│                                                    │
-│              │              │ Level 3 quote││                                                    │
-│              │              └──────────────┘│                                                    │
-│              └──────────────────────────────┘                                                    │
-└──────────────────────────────────────────────────────────────────────────────────────────────────┘
+"│ Level 1 quote
+│
+│ │ Level 2 quote
+  │
+  │ │ Level 3 quote
 "
 `;
 
@@ -404,11 +409,17 @@ exports[`<MarkdownDisplay /> > with 'Windows' line endings > renders a fenced co
 `;
 
 exports[`<MarkdownDisplay /> > with 'Windows' line endings > renders blockquotes 1`] = `
-"┌──────────────────────────────────────────────────────────────────────────────────────────────────┐
-│ This is a quote
-                                                                                 │
-│ It spans multiple lines                                                                          │
-└──────────────────────────────────────────────────────────────────────────────────────────────────┘
+"│ This is a quote
+  It spans multiple lines
+"
+`;
+
+exports[`<MarkdownDisplay /> > with 'Windows' line endings > renders blockquotes with multiple paragraphs 1`] = `
+"│ This is the first paragraph in the blockquote.
+│
+│ This is the second paragraph. You can add more paragraphs by adding a \`>\` before each new line.
+│
+│ This is the third.
 "
 `;
 
@@ -459,13 +470,11 @@ exports[`<MarkdownDisplay /> > with 'Windows' line endings > renders mixed order
 `;
 
 exports[`<MarkdownDisplay /> > with 'Windows' line endings > renders nested blockquotes 1`] = `
-"┌──────────────────────────────────────────────────────────────────────────────────────────────────┐
-│ Level 1 quote┌──────────────────────────────┐                                                    │
-│              │ Level 2 quote┌──────────────┐│                                                    │
-│              │              │ Level 3 quote││                                                    │
-│              │              └──────────────┘│                                                    │
-│              └──────────────────────────────┘                                                    │
-└──────────────────────────────────────────────────────────────────────────────────────────────────┘
+"│ Level 1 quote
+│
+│ │ Level 2 quote
+  │
+  │ │ Level 3 quote
 "
 `;
 
