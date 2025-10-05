@@ -89,19 +89,22 @@ export class ClipboardTestHelpers {
     try {
       if (platform === 'win32') {
         // Windows - requires .NET framework
-        // Escape backslashes for PowerShell
+        // Escape single quotes for PowerShell to prevent injection
+        const escapedPath = absolutePath.replace(/'/g, "''");
         const script = `
           Add-Type -AssemblyName System.Windows.Forms;
-          $image = [System.Drawing.Image]::FromFile('${absolutePath.replace(/\\/g, '\\')}');
+          $image = [System.Drawing.Image]::FromFile('${escapedPath}');
           [System.Windows.Forms.Clipboard]::SetImage($image);
         `;
         await execAsync(`powershell -Command "${script}"`);
       } else if (platform === 'darwin') {
-        // macOS - escape single quotes and backslashes for AppleScript
-        const escapedPath = absolutePath.replace(/([\\'])/g, '\\$1');
+        // macOS - use osascript with path as argument to prevent injection
         await execFileAsync('osascript', [
           '-e',
-          `set the clipboard to (read (POSIX file "${escapedPath}") as «class PNGf»)`,
+          'set thePath to POSIX file (item 1 of argv)',
+          '-e',
+          'set the clipboard to (read thePath as «class PNGf»)',
+          absolutePath,
         ]);
       } else if (platform === 'linux') {
         // Linux - use execFile to avoid shell injection

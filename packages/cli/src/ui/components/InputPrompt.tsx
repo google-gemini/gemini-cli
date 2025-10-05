@@ -146,6 +146,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   ]);
   const [expandedSuggestionIndex, setExpandedSuggestionIndex] =
     useState<number>(-1);
+  const [isPasting, setIsPasting] = useState(false);
   const shellHistory = useShellHistory(config.getProjectRoot());
   const shellHistoryData = shellHistory.history;
 
@@ -335,18 +336,14 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       const screenshotMarkdown = await takeAndAddScreenshot(screenshotsDir);
       if (screenshotMarkdown) {
         // Insert the screenshot markdown at the current cursor position
-        const currentText = buffer.text;
         const cursorPos = buffer.cursor;
-        const lines = currentText.split('\n');
-        const currentLine = lines[cursorPos[0]] || '';
+        let offset = 0;
+        for (let i = 0; i < cursorPos[0]; i++) {
+          offset += buffer.lines[i].length + 1; // +1 for newline
+        }
+        offset += cursorPos[1];
 
-        const newLine =
-          currentLine.slice(0, cursorPos[1]) +
-          screenshotMarkdown +
-          currentLine.slice(cursorPos[1]);
-
-        lines[cursorPos[0]] = newLine;
-        buffer.setText(lines.join('\n'));
+        buffer.replaceRangeByOffset(offset, offset, screenshotMarkdown);
 
         // Update cursor position
         buffer.cursor = [
@@ -365,6 +362,11 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
   const handleInput = useCallback(
     (key: Key) => {
+      // Ignore input during paste operations to prevent race conditions, except for enter
+      if (isPasting && key.name !== 'return') {
+        return;
+      }
+
       // TODO(jacobr): this special case is likely not needed anymore.
       // We should probably stop supporting paste if the InputPrompt is not
       // focused.
@@ -411,7 +413,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
             buffer.handleInput(key);
           }
         };
-        void handlePaste();
+        setIsPasting(true);
+        void handlePaste().finally(() => setIsPasting(false));
         return;
       }
 
@@ -800,6 +803,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       commandSearchCompletion,
       kittyProtocol.supported,
       handleScreenshot,
+      isPasting,
     ],
   );
 

@@ -510,35 +510,38 @@ export async function saveClipboardImage(
             `clipboard-fallback-${timestamp}-${randomString}.ps1`,
           );
           await fs.writeFile(fallbackScriptPath, fallbackCmdTemplate, 'utf8');
-          result = await new Promise<{ stdout: string; stderr: string }>(
-            (resolve, reject) => {
-              execFile(
-                'powershell.exe',
-                [
-                  '-ExecutionPolicy',
-                  'Bypass',
-                  '-NoProfile',
-                  '-File',
-                  fallbackScriptPath,
-                  '-outputPath',
-                  tempFilePath,
-                ],
-                { maxBuffer: 10 * 1024 * 1024 },
-                (error, stdout, stderr) => {
-                  if (error) {
-                    reject(error);
-                  } else {
-                    resolve({ stdout, stderr });
-                  }
-                },
-              );
-            },
-          );
-          // Optionally, clean up script file
           try {
-            await fs.unlink(fallbackScriptPath);
-          } catch {
-            // Ignore errors when cleaning up temporary file
+            result = await new Promise<{ stdout: string; stderr: string }>(
+              (resolve, reject) => {
+                execFile(
+                  'powershell.exe',
+                  [
+                    '-ExecutionPolicy',
+                    'Bypass',
+                    '-NoProfile',
+                    '-File',
+                    fallbackScriptPath,
+                    '-outputPath',
+                    tempFilePath,
+                  ],
+                  { maxBuffer: 10 * 1024 * 1024 },
+                  (error, stdout, stderr) => {
+                    if (error) {
+                      reject(error);
+                    } else {
+                      resolve({ stdout, stderr });
+                    }
+                  },
+                );
+              },
+            );
+          } finally {
+            // Clean up script file
+            try {
+              await fs.unlink(fallbackScriptPath);
+            } catch {
+              // Ignore errors when cleaning up temporary file
+            }
           }
         } catch (fallbackError) {
           console.error('Fallback method failed:', fallbackError);
