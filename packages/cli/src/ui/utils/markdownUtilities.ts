@@ -35,8 +35,13 @@ This function aims to find an *intelligent* or "safe" index within the provided 
 **In essence, `findSafeSplitPoint` tries to be a good Markdown citizen when forced to divide content, preferring structural boundaries over arbitrary character limits, with a strong emphasis on not corrupting code blocks.**
 */
 
+import { unified } from 'unified';
+import remarkParse from 'remark-parse';
+import remarkGfm from 'remark-gfm';
+
 /**
- * Checks if a given character index within a string is inside a fenced (```) code block.
+ * Checks if a given character index within a string is inside a fenced code block.
+ * Uses AST parsing to properly detect code blocks including those in lists with indentation.
  * @param content The full string content.
  * @param indexToTest The character index to test.
  * @returns True if the index is inside a code block's content, false otherwise.
@@ -45,22 +50,54 @@ const isIndexInsideCodeBlock = (
   content: string,
   indexToTest: number,
 ): boolean => {
-  let fenceCount = 0;
-  let searchPos = 0;
-  while (searchPos < content.length) {
-    const nextFence = content.indexOf('```', searchPos);
-    if (nextFence === -1 || nextFence >= indexToTest) {
-      break;
+  try {
+    const processor = unified().use(remarkParse).use(remarkGfm);
+    const tree = processor.parse(content);
+
+    // Walk the AST to find all code blocks and their positions
+    const codeBlocks: Array<{ start: number; end: number }> = [];
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const walk = (node: any) => {
+      if (node.type === 'code' && node.position) {
+        // Code node positions are in the AST
+        codeBlocks.push({
+          start: node.position.start.offset,
+          end: node.position.end.offset,
+        });
+      }
+      if (node.children) {
+        node.children.forEach(walk);
+      }
+    };
+
+    walk(tree);
+
+    // Check if indexToTest falls within any code block
+    return codeBlocks.some(
+      (block) => indexToTest >= block.start && indexToTest < block.end,
+    );
+  } catch (error) {
+    // Fallback to simple detection if parsing fails
+    console.error('Failed to parse markdown for code block detection:', error);
+    let fenceCount = 0;
+    let searchPos = 0;
+    while (searchPos < content.length) {
+      const nextFence = content.indexOf('```', searchPos);
+      if (nextFence === -1 || nextFence >= indexToTest) {
+        break;
+      }
+      fenceCount++;
+      searchPos = nextFence + 3;
     }
-    fenceCount++;
-    searchPos = nextFence + 3;
+    return fenceCount % 2 === 1;
   }
-  return fenceCount % 2 === 1;
 };
 
 /**
  * Finds the starting index of the code block that encloses the given index.
  * Returns -1 if the index is not inside a code block.
+ * Uses AST parsing to properly detect code blocks.
  * @param content The markdown content.
  * @param index The index to check.
  * @returns Start index of the enclosing code block or -1.
@@ -69,25 +106,53 @@ const findEnclosingCodeBlockStart = (
   content: string,
   index: number,
 ): number => {
-  if (!isIndexInsideCodeBlock(content, index)) {
+  try {
+    const processor = unified().use(remarkParse).use(remarkGfm);
+    const tree = processor.parse(content);
+
+    // Walk the AST to find the code block containing the index
+    let enclosingStart = -1;
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const walk = (node: any) => {
+      if (node.type === 'code' && node.position) {
+        const start = node.position.start.offset;
+        const end = node.position.end.offset;
+        if (index >= start && index < end) {
+          enclosingStart = start;
+          return; // Found it, stop searching
+        }
+      }
+      if (node.children) {
+        node.children.forEach(walk);
+      }
+    };
+
+    walk(tree);
+    return enclosingStart;
+  } catch (error) {
+    // Fallback to simple detection if parsing fails
+    console.error('Failed to parse markdown for code block detection:', error);
+    if (!isIndexInsideCodeBlock(content, index)) {
+      return -1;
+    }
+    let currentSearchPos = 0;
+    while (currentSearchPos < index) {
+      const blockStartIndex = content.indexOf('```', currentSearchPos);
+      if (blockStartIndex === -1 || blockStartIndex >= index) {
+        break;
+      }
+      const blockEndIndex = content.indexOf('```', blockStartIndex + 3);
+      if (blockStartIndex < index) {
+        if (blockEndIndex === -1 || index < blockEndIndex + 3) {
+          return blockStartIndex;
+        }
+      }
+      if (blockEndIndex === -1) break;
+      currentSearchPos = blockEndIndex + 3;
+    }
     return -1;
   }
-  let currentSearchPos = 0;
-  while (currentSearchPos < index) {
-    const blockStartIndex = content.indexOf('```', currentSearchPos);
-    if (blockStartIndex === -1 || blockStartIndex >= index) {
-      break;
-    }
-    const blockEndIndex = content.indexOf('```', blockStartIndex + 3);
-    if (blockStartIndex < index) {
-      if (blockEndIndex === -1 || index < blockEndIndex + 3) {
-        return blockStartIndex;
-      }
-    }
-    if (blockEndIndex === -1) break;
-    currentSearchPos = blockEndIndex + 3;
-  }
-  return -1;
 };
 
 export const findLastSafeSplitPoint = (content: string) => {

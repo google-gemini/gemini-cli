@@ -267,6 +267,7 @@ const RenderListItemInternal: React.FC<RenderListItemInternalProps> = ({
         <Box
           key={`code-${depth}-${index}-${idx}`}
           paddingLeft={3}
+          marginTop={1}
           marginBottom={1}
         >
           <RenderCodeBlock
