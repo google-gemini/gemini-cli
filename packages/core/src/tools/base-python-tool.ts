@@ -174,19 +174,16 @@ class BasePythonToolInvocation<
     }
 
     const pythonCode = this.tool['generatePythonCode'](this.params);
-    const codePreview = pythonCode.length > 200 
-      ? pythonCode.slice(0, 200) + '...'
-      : pythonCode;
 
     const requirements = this.requirements;
-    const requirementsStr = requirements.length > 0 
+    const requirementsStr = requirements.length > 0
       ? ` (requires: ${requirements.join(', ')})`
       : '';
 
     const confirmationDetails: ToolExecuteConfirmationDetails = {
       type: 'exec',
       title: `Confirm ${this.tool.displayName} Execution`,
-      command: `python ${this.tool.name}${requirementsStr}\n\n${codePreview}`,
+      command: `python ${this.tool.name}${requirementsStr}\n\n${pythonCode}`,
       rootCommand,
       onConfirm: async (outcome: ToolConfirmationOutcome) => {
         if (outcome === ToolConfirmationOutcome.ProceedAlways) {
