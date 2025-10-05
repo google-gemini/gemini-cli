@@ -1427,7 +1427,14 @@ export class PDFTool extends BackupableTool<PDFParams, PDFResult> {
     super(
       'pdf-tools',
       'PDF Operations',
-      'PDF operations: create/merge PDFs, SPLIT pages into separate PDF files, extracttext to get text from pages, SEARCH text across entire PDF (pages optional), info for PDF metadata.',
+      `PDF operations: create/merge PDFs, SPLIT pages into separate PDF files, extracttext to get text from pages, SEARCH text across entire PDF (pages optional), info for PDF metadata.
+# USAGE GUIDELINES
+- Always use op="info" first to get the document information and table of content before other operations.
+- Unless required, avoid using op="extracttext" on entire documents; specify pages (e.g. "1-5", "1,3,5")  instead.
+
+# WHEN NOT TO USE
+- Manipulating PDF content (edit, annotate, sign) is not supported.
+      `,
       Kind.Other,
       {
         type: 'object',

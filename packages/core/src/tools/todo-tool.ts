@@ -798,7 +798,58 @@ export class TodoTool extends BaseDeclarativeTool<TodoParams, TodoResult> {
     super(
       'todo_tools',
       'TODO Task Manager',
-      'Manage and track tasks with priorities and dependencies',
+      `Analyze and break down user requests into manageable tasks, track their progress, and provide status updates.
+
+# Usage guidelines
+  - Identify all required sub-tasks, add them to the task list.
+  - Work on one task at a time, mark it as in-progress before starting.
+  - Upon completion of a task, immediately mark it as completed.
+  - If a task cannot proceed due to unmet dependencies, mark it as blocked.
+  - If a task needs to be temporarily halted, mark it as paused with a reason and resume condition.
+  - If a task is no longer needed, mark it as cancelled with a reason.
+
+NOTICE: User can change objectives anytime, adapt tasks accordingly, do not stick rigidly to old tasks, keep flexibility, do not hesitate to cancel or pause tasks that no longer align with user goals.
+
+# When to use this tool
+  - Complex requests needing multiple steps, need more than 3 steps
+  - User explicitly asks for task breakdown or tracking
+
+# When not to use this tool
+  - Simple requests easily handled in one step
+  - User asks for unrelated information
+# Example of use
+<example>
+  user: "Find in Excel address data for all customers in New York, then extract emails, and send them a promotional email."
+  assistant:
+    "This request involves multiple steps. Let me break it down into tasks:"
+    1. Open the Excel file and get worksheet list.
+    2. Identify the worksheet with customer address data, read for several rows to understand structure.
+    3. Identify the column with city data, filter for 'New York'.
+    4. Extract email addresses from filtered rows.
+    5. Draft promotional email content.
+    6. Send emails to extracted addresses.
+
+  <reasoning>
+  The assistant should use this tool because:
+    1. The request involves multiple distinct steps (data extraction, filtering, email drafting, sending).
+    2. Each step can be treated as a separate task with dependencies (e.g., cannot send emails before extracting addresses).
+    3. The overall request is complex and benefits from structured task management to ensure all parts are completed.
+  </reasoning>
+</example>
+
+# Example of not use
+<example>
+  user: "What's the weather like in New York?"
+  assistant: "The weather in New York is currently sunny with a high of 75°F and a low of 60°F."
+  
+  <reasoning>
+  The assistant should NOT use this tool because:
+    1. The request is simple and can be answered in one step.
+    2. There are no multiple tasks or steps involved that require tracking or management.
+    3. Using the tool would add unnecessary complexity to a straightforward query.
+  </reasoning>
+</example>
+      `,
       Kind.Other,
       {
         type: 'object',

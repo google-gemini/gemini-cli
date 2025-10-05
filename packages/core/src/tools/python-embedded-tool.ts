@@ -23,6 +23,9 @@ import {
 } from './tools.js';
 import { getErrorMessage } from '../utils/errors.js';
 import { ShellExecutionService } from '../services/shellExecutionService.js';
+import { XlwingsDocTool } from '../tools/xlwings-doc-tool.js';
+import { GeminiSearchTool } from '../tools/gemini-search-tool.js';
+
 
 export const OUTPUT_UPDATE_INTERVAL_MS = 1000;
 
@@ -65,14 +68,10 @@ class PythonEmbeddedToolInvocation extends BaseToolInvocation<
       return false;
     }
 
-    const codePreview = this.params.code.length > 200 
-      ? this.params.code.slice(0, 200) + '...'
-      : this.params.code;
-
     const confirmationDetails: ToolExecuteConfirmationDetails = {
       type: 'exec',
       title: 'Confirm Python Code Execution',
-      command: `python (embedded) -c "${codePreview}"`,
+      command: `python (embedded) -c "${this.params.code}"`,
       rootCommand: 'python_embedded',
       onConfirm: async (outcome: ToolConfirmationOutcome) => {
         if (outcome === ToolConfirmationOutcome.ProceedAlways) {
@@ -330,7 +329,114 @@ export class PythonEmbeddedTool extends BaseDeclarativeTool<PythonEmbeddedToolPa
     super(
       'python-embedded-tools',
       'Python Code Execution (Embedded)',
-      'Execute Python code using embedded Python 3.13.7 environment for stable and consistent execution. IMPORTANT: Always use UTF-8 encoding for text operations to avoid Unicode errors.',
+      `Use this tool to execute python code it.
+This tool uses an embedded Python 3.13.7 environment to ensure stable and consistent execution across different systems.
+# USAGE GUIDELINES
+- IMPORTANT: AVOID using python code to obtain large amount of data and return to llm memory, this is inefficient and error-prone, consumes too many tokens, prefer file-based operations and handle data locally with python libraries
+- If your code produces errors, try to fix them based on error messages, if you can not resolve, use ${GeminiSearchTool.Name} to search for solutions or examples, if you are still stuck, inform the user about the technical limitations
+
+# PYTHON CODING GUIDELINES
+- When performing file-based operations, always use absolute file paths (as instructed in GENERAL GUIDELINES). Always close workbooks after operations to avoid file locks, even if errors occur. Use double backslashes (e.g., C:\\\\path\\\\to\\\\file.xlsx) or raw strings (e.g., r\\"C:\\path\\to\\file.xlsx\\") for Windows paths.
+- Use standard libraries where possible to avoid dependency issues
+- If external libraries are needed, specify them in the "requirements" parameter when calling the tool (e.g., ["requests", "pandas", "matplotlib"])
+- When working with files, always specify UTF-8 encoding (e.g., open(file, "r", encoding="utf-8")) to prevent UnicodeEncodeError on Windows systems
+- When handling text output, ensure it is UTF-8 encoded to avoid issues with non-ASCII characters
+- For any data processing, consider using pandas for tabular data and matplotlib for visualizations
+- When generating plots or images, save them to files and provide the file paths in the output
+- When working with dates and times, use the datetime module and be explicit about time zones if relevant
+- When making HTTP requests, use the requests library and handle potential exceptions (e.g., timeouts, connection errors)
+- When parsing JSON or XML data, use the json or xml.etree.ElementTree modules respectively
+- When performing numerical computations, consider using numpy for efficiency
+- When working with data files (CSV, Excel), use pandas for easy reading/writing and manipulation
+- When automating Excel tasks, prefer xlwings for interaction with open workbooks and advanced features; use openpyxl for file-based operations without needing an open instance
+- Always include error handling to manage exceptions gracefully and provide informative messages
+- Write clean, readable code with appropriate comments to explain complex logic
+- Test code snippets independently to ensure they work as expected before integrating them into larger scripts
+- For complex PDF generation or manipulation, consider using PyPDF2 or ReportLab libraries
+
+# EXCEL SPECIFIC GUIDELINES
+## Decide which python library to use between xlwings and openpyxl based on the following guidelines:
+### When to choose xlwings:
+    - User explicitly requests to use xlwings
+    - Task involves interacting with an already opened Excel application
+    - Task requires advanced Excel features not supported by openpyxl (e.g., charts, shapes, macros)
+    - Task requires real-time interaction with Excel (e.g., updating live data, responding to user actions in Excel)
+*NOTICE*: If you're unsure how to use xlwings, or your xlwings code produces errors, refer to ${XlwingsDocTool.Name} for documentation and examples, follow the query examples provided in the tool description to find relevant information quickly
+### When to choose openpyxl:
+    - As default option when unsure
+    - User explicitly requests to use openpyxl
+    - Task involves complex data processing, analysis, or visualization that is better handled with pandas/matplotlib
+    - Task requires reading/writing large datasets where performance and memory efficiency are critical
+    - Task involves creating or modifying Excel files without needing to interact with an open Excel application
+    - When xlwings encounters persistent or cryptic errors (e.g., COM errors, attribute errors on chart objects) despite following documentation, consider switching to openpyxl for file-based operations (if interaction with an open instance is not strictly required) or inform the user about the technical limitations and suggest manual intervention in Excel
+*NOTICE*: You may use neither openpyxl nor xlwings, as long as the task can be accomplished with pandas/matplotlib or other Python libraries directly
+
+## Common xlwings operations
+- Open or connect to an existing workbook:
+  \`\`\`python
+  import xlwings as xw
+  import os
+
+  # Set workbook variable
+  file_path = 'file_path.xlsx'
+  book = None
+
+  # Iterate through Excel instances and get book
+  for app in xw.apps:
+      for wb in app.books:
+          if wb.name == file_path:
+              # Found the workbook by name
+              book = wb
+              break
+          if wb.name == os.path.basename(file_path):
+              # Found the open workbook by base name
+              book = wb
+              break
+          if wb.name == os.path.splitext(os.path.basename(file_path))[0]:
+              # Found the open workbook by name without extension
+              book = wb
+              break
+          if wb.fullname == file_path:
+              # Found the open workbook by full path
+              book = wb
+              break
+  # If not found, open it
+  if book is None:
+      book = xw.Book(file_path)
+  \`\`\`
+
+- Get used range and read data:
+  \`\`\`python
+  # Get used range (actual data area)
+  used_range = sheet.used_range
+  if used_range:
+      last_row = used_range.last_cell.row
+      last_col = used_range.last_cell.column
+
+      # CRITICAL: Don't use .options(pd.DataFrame, header=None) - causes TypeError
+      # Instead, read as 2D array first, then convert to DataFrame
+      data = sheet.range((1, 1), (last_row, last_col)).value
+      df = pd.DataFrame(data)
+  \`\`\`
+
+- When on a file-based operation, avoid alerts/popups:
+  \`\`\`python
+  app = App()
+  with app.properties(display_alerts=False):
+      # do stuff
+  \`\`\`
+
+- Chart title:
+  \`\`\`python
+  chart.api.HasTitle = True
+  chart.api.ChartTitle.Text = "Title"  # Chart title
+  chart.api.Axes(1).HasTitle = True  # X axis
+  chart.api.Axes(1).AxisTitle.Text = "X Axis Title"
+  chart.api.Axes(2).HasTitle = True  # Y axis
+  chart.api.Axes(2).AxisTitle.Text = "Y Axis Title"
+  \`\`\`
+`
+      ,
       Kind.Execute,
       {
         type: 'object',
