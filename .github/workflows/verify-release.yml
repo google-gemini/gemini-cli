@@ -29,3 +29,4 @@ jobs:
           npm-package: '${{github.event.inputs.npm-package}}'
           expected-version: '${{github.event.inputs.version}}'
           ref: '${{github.event.inputs.ref}}'
+          gemini_api_key: '${{ secrets.GEMINI_API_KEY }}'

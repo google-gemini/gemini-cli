@@ -30,40 +30,11 @@ export const EVENT_CONTENT_RETRY = 'gemini_cli.chat.content_retry';
 export const EVENT_CONTENT_RETRY_FAILURE =
   'gemini_cli.chat.content_retry_failure';
 export const EVENT_FILE_OPERATION = 'gemini_cli.file_operation';
+export const EVENT_TOOL_OUTPUT_TRUNCATED = 'gemini_cli.tool_output_truncated';
 export const EVENT_MODEL_SLASH_COMMAND = 'gemini_cli.slash_command.model';
-export const METRIC_TOOL_CALL_COUNT = 'gemini_cli.tool.call.count';
-export const METRIC_TOOL_CALL_LATENCY = 'gemini_cli.tool.call.latency';
-export const METRIC_API_REQUEST_COUNT = 'gemini_cli.api.request.count';
-export const METRIC_API_REQUEST_LATENCY = 'gemini_cli.api.request.latency';
-export const METRIC_TOKEN_USAGE = 'gemini_cli.token.usage';
-export const METRIC_SESSION_COUNT = 'gemini_cli.session.count';
-export const METRIC_FILE_OPERATION_COUNT = 'gemini_cli.file.operation.count';
-export const METRIC_INVALID_CHUNK_COUNT = 'gemini_cli.chat.invalid_chunk.count';
-export const METRIC_CONTENT_RETRY_COUNT = 'gemini_cli.chat.content_retry.count';
-export const METRIC_CONTENT_RETRY_FAILURE_COUNT =
-  'gemini_cli.chat.content_retry_failure.count';
+export const EVENT_SMART_EDIT_STRATEGY = 'gemini_cli.smart_edit.strategy';
 export const EVENT_MODEL_ROUTING = 'gemini_cli.model_routing';
-export const METRIC_MODEL_ROUTING_LATENCY = 'gemini_cli.model_routing.latency';
-export const METRIC_MODEL_ROUTING_FAILURE_COUNT =
-  'gemini_cli.model_routing.failure.count';
-export const METRIC_MODEL_SLASH_COMMAND_CALL_COUNT =
-  'gemini_cli.slash_command.model.call_count';
-
-// Performance Monitoring Metrics
-export const METRIC_STARTUP_TIME = 'gemini_cli.startup.duration';
-export const METRIC_MEMORY_USAGE = 'gemini_cli.memory.usage';
-export const METRIC_CPU_USAGE = 'gemini_cli.cpu.usage';
-export const METRIC_TOOL_QUEUE_DEPTH = 'gemini_cli.tool.queue.depth';
-export const METRIC_TOOL_EXECUTION_BREAKDOWN =
-  'gemini_cli.tool.execution.breakdown';
-export const METRIC_TOKEN_EFFICIENCY = 'gemini_cli.token.efficiency';
-export const METRIC_API_REQUEST_BREAKDOWN = 'gemini_cli.api.request.breakdown';
-export const METRIC_PERFORMANCE_SCORE = 'gemini_cli.performance.score';
-export const METRIC_REGRESSION_DETECTION = 'gemini_cli.performance.regression';
-export const METRIC_REGRESSION_PERCENTAGE_CHANGE =
-  'gemini_cli.performance.regression.percentage_change';
-export const METRIC_BASELINE_COMPARISON =
-  'gemini_cli.performance.baseline.comparison';
+export const EVENT_SMART_EDIT_CORRECTION = 'gemini_cli.smart_edit.correction';
 
 // Performance Events
 export const EVENT_STARTUP_PERFORMANCE = 'gemini_cli.startup.performance';

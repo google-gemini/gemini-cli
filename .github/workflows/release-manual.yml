@@ -11,8 +11,16 @@ on:
         description: 'The branch, tag, or SHA to release from.'
         required: true
         type: 'string'
+      registry:
+        description: 'The registry to publish to.'
+        required: true
+        type: 'choice'
+        options:
+          - 'npm-wombat'
+          - 'github'
+        default: 'npm-wombat'
       npm_channel:
-        description: 'The npm channel to publish to.'
+        description: 'The npm channel to publish to (only used when registry is npm-wombat)'
         required: true
         type: 'choice'
         options:
@@ -32,7 +40,7 @@ on:
         type: 'boolean'
         default: false
       skip_github_release:
-        description: 'Select to skip creating a GitHub release and create a npm release only.'
+        description: 'Select to skip creating a GitHub release (only used when registry is npm-wombat)'
         required: false
         type: 'boolean'
         default: false
@@ -99,6 +107,8 @@ jobs:
           previous-tag: '${{ steps.release_info.outputs.PREVIOUS_TAG }}'
           skip-github-release: '${{ github.event.inputs.skip_github_release }}'
           working-directory: './release'
+          gemini_api_key: '${{ secrets.GEMINI_API_KEY }}'
+          registry: '${{ github.event.inputs.registry }}'
 
       - name: 'Create Issue on Failure'
         if: '${{ failure() && github.event.inputs.dry_run == false }}'

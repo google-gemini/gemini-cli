@@ -1,5 +1,5 @@
-name: 'Create and Merge Pull Request'
-description: 'Creates a pull request and merges it automatically.'
+name: 'Create Pull Request'
+description: 'Creates a pull request.'
 
 inputs:
   branch-name:
@@ -30,8 +30,11 @@ inputs:
 runs:
   using: 'composite'
   steps:
-    - name: 'Create and Approve Pull Request'
-      if: "inputs.dry-run == 'false'"
+    - name: '📝 Print Inputs'
+      shell: 'bash'
+      run: 'echo "${{ toJSON(inputs) }}"'
+    - name: 'Creates a Pull Request'
+      if: "inputs.dry-run != 'true'"
       env:
         GH_TOKEN: '${{ inputs.github-token }}'
       shell: 'bash'
@@ -48,4 +51,4 @@ runs:
           --base "${{ inputs.base-branch }}" \
           --head "${{ inputs.branch-name }}" \
           --fill)
-        gh pr merge "$PR_URL" --auto --squash
+        gh pr merge "$PR_URL" --auto

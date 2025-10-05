@@ -32,6 +32,10 @@ import { IdeClient } from '../ide/ide-client.js';
 import { FixLLMEditWithInstruction } from '../utils/llm-edit-fixer.js';
 import { applyReplacement } from './edit.js';
 import { safeLiteralReplace } from '../utils/textUtils.js';
+import { SmartEditStrategyEvent } from '../telemetry/types.js';
+import { logSmartEditStrategy } from '../telemetry/loggers.js';
+import { SmartEditCorrectionEvent } from '../telemetry/types.js';
+import { logSmartEditCorrectionEvent } from '../telemetry/loggers.js';
 
 interface ReplacementContext {
   params: EditToolParams;
@@ -57,6 +61,15 @@ function restoreTrailingNewline(
     return modifiedContent.replace(/\n$/, '');
   }
   return modifiedContent;
+}
+
+/**
+ * Escapes characters with special meaning in regular expressions.
+ * @param str The string to escape.
+ * @returns The escaped string.
+ */
+function escapeRegex(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); // $& means the whole matched string
 }
 
 async function calculateExactReplacement(
@@ -146,6 +159,68 @@ async function calculateFlexibleReplacement(
   return null;
 }
 
+async function calculateRegexReplacement(
+  context: ReplacementContext,
+): Promise<ReplacementResult | null> {
+  const { currentContent, params } = context;
+  const { old_string, new_string } = params;
+
+  // Normalize line endings for consistent processing.
+  const normalizedSearch = old_string.replace(/\r\n/g, '\n');
+  const normalizedReplace = new_string.replace(/\r\n/g, '\n');
+
+  // This logic is ported from your Python implementation.
+  // It builds a flexible, multi-line regex from a search string.
+  const delimiters = ['(', ')', ':', '[', ']', '{', '}', '>', '<', '='];
+
+  let processedString = normalizedSearch;
+  for (const delim of delimiters) {
+    processedString = processedString.split(delim).join(` ${delim} `);
+  }
+
+  // Split by any whitespace and remove empty strings.
+  const tokens = processedString.split(/\s+/).filter(Boolean);
+
+  if (tokens.length === 0) {
+    return null;
+  }
+
+  const escapedTokens = tokens.map(escapeRegex);
+  // Join tokens with `\s*` to allow for flexible whitespace between them.
+  const pattern = escapedTokens.join('\\s*');
+
+  // The final pattern captures leading whitespace (indentation) and then matches the token pattern.
+  // 'm' flag enables multi-line mode, so '^' matches the start of any line.
+  const finalPattern = `^(\\s*)${pattern}`;
+  const flexibleRegex = new RegExp(finalPattern, 'm');
+
+  const match = flexibleRegex.exec(currentContent);
+
+  if (!match) {
+    return null;
+  }
+
+  const indentation = match[1] || '';
+  const newLines = normalizedReplace.split('\n');
+  const newBlockWithIndent = newLines
+    .map((line) => `${indentation}${line}`)
+    .join('\n');
+
+  // Use replace with the regex to substitute the matched content.
+  // Since the regex doesn't have the 'g' flag, it will only replace the first occurrence.
+  const modifiedCode = currentContent.replace(
+    flexibleRegex,
+    newBlockWithIndent,
+  );
+
+  return {
+    newContent: restoreTrailingNewline(currentContent, modifiedCode),
+    occurrences: 1, // This method is designed to find and replace only the first occurrence.
+    finalOldString: normalizedSearch,
+    finalNewString: normalizedReplace,
+  };
+}
+
 /**
  * Detects the line ending style of a string.
  * @param content The string content to analyze.
@@ -158,6 +233,7 @@ function detectLineEnding(content: string): '\r\n' | '\n' {
 }
 
 export async function calculateReplacement(
+  config: Config,
   context: ReplacementContext,
 ): Promise<ReplacementResult> {
   const { currentContent, params } = context;
@@ -176,12 +252,23 @@ export async function calculateReplacement(
 
   const exactResult = await calculateExactReplacement(context);
   if (exactResult) {
+    const event = new SmartEditStrategyEvent('exact');
+    logSmartEditStrategy(config, event);
     return exactResult;
   }
 
   const flexibleResult = await calculateFlexibleReplacement(context);
   if (flexibleResult) {
+    const event = new SmartEditStrategyEvent('flexible');
+    logSmartEditStrategy(config, event);
     return flexibleResult;
+  }
+
+  const regexResult = await calculateRegexReplacement(context);
+  if (regexResult) {
+    const event = new SmartEditStrategyEvent('regex');
+    logSmartEditStrategy(config, event);
+    return regexResult;
   }
 
   return {
@@ -312,7 +399,7 @@ class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
       };
     }
 
-    const secondAttemptResult = await calculateReplacement({
+    const secondAttemptResult = await calculateReplacement(this.config, {
       params: {
         ...params,
         old_string: fixedEdit.search,
@@ -331,7 +418,10 @@ class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
     );
 
     if (secondError) {
-      // The fix failed, return the original error
+      // The fix failed, log failure and return the original error
+      const event = new SmartEditCorrectionEvent('failure');
+      logSmartEditCorrectionEvent(this.config, event);
+
       return {
         currentContent,
         newContent: currentContent,
@@ -341,6 +431,9 @@ class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
         originalLineEnding,
       };
     }
+
+    const event = new SmartEditCorrectionEvent('success');
+    logSmartEditCorrectionEvent(this.config, event);
 
     return {
       currentContent,
@@ -440,7 +533,7 @@ class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
       };
     }
 
-    const replacementResult = await calculateReplacement({
+    const replacementResult = await calculateReplacement(this.config, {
       params,
       currentContent,
       abortSignal,
