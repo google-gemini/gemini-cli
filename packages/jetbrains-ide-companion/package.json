@@ -4,7 +4,7 @@
   "description": "JetBrains IDE companion for Gemini CLI",
   "private": true,
   "scripts": {
-    "build": "./gradlew build",
+    "build": "./gradlew build buildPlugin",
     "clean": "./gradlew clean",
     "test": "./gradlew test"
   },
