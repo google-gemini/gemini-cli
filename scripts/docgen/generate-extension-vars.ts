@@ -65,7 +65,7 @@ function main() {
   const updated = upsertBlock(doc, block);
 
   if (updated !== doc) {
-    writeFileSync(DOC_PATH, `${updated.trim()}\n`, 'utf8');
+    writeFileSync(DOC_PATH, updated, 'utf8');
   }
 
   console.log(
