@@ -55,7 +55,7 @@ function upsertBlock(original: string, block: string): string {
     return original.replace(pattern, block);
   }
 
-  return `${original.trim()}\n\n${block}\n`;
+  return `${original.replace(/\s*$/, '')}\n\n${block}\n`;
 }
 
 function main() {
