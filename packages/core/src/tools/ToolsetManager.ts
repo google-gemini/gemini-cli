@@ -32,6 +32,7 @@ import { EconomicCalendarTool } from './economic-calendar-tool.js';
 import { MarketDataTool } from './market-data-tool.js';
 import { EconomicNewsTool } from './economic-news-tool.js';
 import { KnowledgeBaseTool } from './knowledge-base-tool.js';
+import { XlwingsDocTool } from './xlwings-doc-tool.js';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type ToolClass = any;
@@ -60,7 +61,8 @@ const ROLE_TOOLSET_MAP: Record<string, ToolClass[]> = {
     FileTool,
     ShellTool,
     WebTool,
-    XlwingsTool,
+    // XlwingsTool,
+    XlwingsDocTool,
     MarkItDownTool,
     KnowledgeBaseTool,
     PDFTool,
