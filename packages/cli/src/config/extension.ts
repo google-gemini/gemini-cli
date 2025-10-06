@@ -55,6 +55,7 @@ export interface Extension {
 export interface ExtensionConfig {
   name: string;
   version: string;
+  author?: string;
   mcpServers?: Record<string, MCPServerConfig>;
   contextFileName?: string | string[];
   excludeTools?: string[];
@@ -328,6 +329,7 @@ export function annotateActiveExtensions(
   return extensions.map((extension) => ({
     name: extension.config.name,
     version: extension.config.version,
+    author: extension.config.author,
     isActive: manager.isEnabled(extension.config.name, workspaceDir),
     path: extension.path,
     installMetadata: extension.installMetadata,

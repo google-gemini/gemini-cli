@@ -94,6 +94,7 @@ The `gemini-extension.json` file contains the configuration for the extension. T
 {
   "name": "my-extension",
   "version": "1.0.0",
+  "author": "Google",
   "mcpServers": {
     "my-server": {
       "command": "node my-server.js"
@@ -106,6 +107,7 @@ The `gemini-extension.json` file contains the configuration for the extension. T
 
 - `name`: The name of the extension. This is used to uniquely identify the extension and for conflict resolution when extension commands have the same name as user or project commands. The name should be lowercase or numbers and use dashes instead of underscores or spaces. This is how users will refer to your extension in the CLI. Note that we expect this name to match the extension directory name.
 - `version`: The version of the extension.
+- `author`: (Optional) A string representation of the author's name. This can be an individual name (e.g., "Christine Betts"), an organization (e.g., "Google"), or a domain (e.g., "example.com"). This information is displayed when listing extensions to help users identify the source.
 - `mcpServers`: A map of MCP servers to configure. The key is the name of the server, and the value is the server configuration. These servers will be loaded on startup just like MCP servers configured in a [`settings.json` file](../get-started/configuration.md). If both an extension and a `settings.json` file configure an MCP server with the same name, the server defined in the `settings.json` file takes precedence.
   - Note that all MCP server configuration options are supported except for `trust`.
 - `contextFileName`: The name of the file that contains the context for the extension. This will be used to load the context from the extension directory. If this property is not used but a `GEMINI.md` file is present in your extension directory, then that file will be loaded.

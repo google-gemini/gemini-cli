@@ -1,6 +1,7 @@
 {
   "name": "mcp-server-example",
   "version": "1.0.0",
+  "author": "Google",
   "mcpServers": {
     "nodeServer": {
       "command": "node",

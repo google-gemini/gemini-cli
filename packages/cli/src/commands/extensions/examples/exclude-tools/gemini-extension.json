@@ -1,5 +1,6 @@
 {
   "name": "excludeTools",
   "version": "1.0.0",
+  "author": "Google",
   "excludeTools": ["run_shell_command(rm -rf)"]
 }

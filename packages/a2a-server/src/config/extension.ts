@@ -23,6 +23,7 @@ export interface Extension {
 export interface ExtensionConfig {
   name: string;
   version: string;
+  author?: string;
   mcpServers?: Record<string, MCPServerConfig>;
   contextFileName?: string | string[];
 }
