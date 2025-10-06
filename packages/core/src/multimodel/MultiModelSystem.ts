@@ -251,8 +251,8 @@ export class MultiModelSystem {
 
       // Get current history and enhance with role/context
       const currentHistory = sessionManager.getHistory();
-      const limitedMessages = this.limitContextSize(currentHistory);
-      const enhancedMessages = await this.enhanceMessagesWithRole(limitedMessages, roleId);
+      // const limitedMessages = this.limitContextSize(currentHistory);
+      const enhancedMessages = await this.enhanceMessagesWithRole([...currentHistory], roleId);
 
       // Send to provider
       const response = await provider.sendMessage(enhancedMessages, signal);
@@ -431,7 +431,6 @@ export class MultiModelSystem {
       // Check if we need to compress before processing (like Gemini client does)
       const compressionResult = await this.tryCompressChat(provider, sessionManager, fullHistory);
       if (compressionResult.compressionStatus === CompressionStatus.COMPRESSED) {
-        console.log(`[MultiModelSystem] Chat compressed: ${compressionResult.originalTokenCount} -> ${compressionResult.newTokenCount} tokens`);
         
         // Yield compression event to notify frontend
         const compressionInfo: CompressionInfo = {
@@ -448,18 +447,10 @@ export class MultiModelSystem {
       
       // Get the updated history after potential compression
       const currentHistory = sessionManager.getHistory();
-      const limitedMessages = this.limitContextSize(currentHistory);
-      console.log(`[MultiModelSystem] Turn ${turnCount}: Using ${limitedMessages.length}/${currentHistory.length} messages after context limiting`);
+      // const limitedMessages = this.limitContextSize(currentHistory);
       
-      // Debug: Print last few messages to see tool responses
-      const lastFewMessages = limitedMessages.slice(-3);
-      console.log('[MultiModelSystem] Last 3 messages in history:');
-      lastFewMessages.forEach((msg, idx) => {
-        console.log(`  [${idx}] ${msg.role}: ${msg.content?.substring(0, 100)}...${msg.toolCalls ? ` [${msg.toolCalls.length} tool calls]` : ''}`);
-      });
-
       // Enhance messages with system prompt, role and workspace context
-      const enhancedMessages = await this.enhanceMessagesWithRole(limitedMessages, roleId);
+      const enhancedMessages = await this.enhanceMessagesWithRole([...currentHistory], roleId);
       
       const responseStream = provider.sendMessageStream(enhancedMessages, signal);
       const toolCallRequests: ToolCallRequestInfo[] = [];
@@ -518,21 +509,16 @@ export class MultiModelSystem {
             console.error(`[MultiModelSystem] Error stack: ${event.error.stack}`);
           }
 
-          // Save any accumulated assistant content to history before handling error
-          if (assistantContent.trim() || assistantToolCalls.length > 0) {
+          // Save accumulated assistant content WITHOUT tool calls (since they can't be executed)
+          if (assistantContent.trim()) {
             const assistantMessage: UniversalMessage = {
               role: 'assistant',
               content: assistantContent,
               timestamp: new Date()
             };
-
-            // Include tool calls if any were made
-            if (assistantToolCalls.length > 0) {
-              assistantMessage.toolCalls = assistantToolCalls;
-            }
-
+            // Don't include tool calls since we can't execute them due to error
             SessionManager.getInstance().addHistory(assistantMessage);
-            console.log(`[MultiModelSystem] Saved assistant response before error (${assistantContent.length} chars, ${assistantToolCalls.length} tool calls)`);
+            console.log(`[MultiModelSystem] Saved assistant response before error (${assistantContent.length} chars, discarded ${assistantToolCalls.length} tool calls)`);
           }
 
           // Clear tool call requests since we can't execute them after error
@@ -550,26 +536,10 @@ export class MultiModelSystem {
         }
       }
 
-      // CRITICAL: Save assistant message to history BEFORE processing tool calls
-      // This ensures assistant content is preserved even if tool execution fails or continues
-      if (assistantContent.trim() || assistantToolCalls.length > 0) {
-        const assistantMessage: UniversalMessage = {
-          role: 'assistant',
-          content: assistantContent,
-          timestamp: new Date()
-        };
-
-        // Include tool calls if any were made
-        if (assistantToolCalls.length > 0) {
-          assistantMessage.toolCalls = assistantToolCalls;
-        }
-
-        SessionManager.getInstance().addHistory(assistantMessage);
-        console.log(`[MultiModelSystem] Saved assistant response BEFORE tool execution (${assistantContent.length} chars, ${assistantToolCalls.length} tool calls)`);
-      }
-
       // Check if we have tool calls to execute (like nonInteractiveCli.ts)
       if (toolCallRequests.length > 0) {
+        // Collect tool responses to save together with assistant message
+        const executedToolResponses: UniversalMessage[] = [];
         // Check for duplicate tool calls before execution
         for (const requestInfo of toolCallRequests) {
           const callSignature = {
@@ -603,93 +573,175 @@ export class MultiModelSystem {
           }
         }
         
-        // Execute each tool call and create individual tool response messages
-        for (const requestInfo of toolCallRequests) {
-          try {
-            let toolResponse;
-            
-            // Use CoreToolScheduler with confirmation support if handler is available
-            if (this.toolConfirmationHandler) {
-              toolResponse = await new Promise<ToolCallResponseInfo>((resolve, reject) => {
-                const scheduler = new CoreToolScheduler({
-                  config: this.config,
-                  getPreferredEditor: () => undefined,
-                  onEditorClose: () => {},
-                  onAllToolCallsComplete: async (completedToolCalls) => {
-                    // Clear reference when tool calls are complete
-                    this.activeToolScheduler = undefined;
-                    resolve(completedToolCalls[0].response);
-                  },
-                  // Pass the confirmation handler from GUI
-                  onToolCallsUpdate: async (toolCallsUpdate) => {
-                    if (toolCallsUpdate.some(tc => tc.status === 'awaiting_approval')) {
-                      const waitingCall = toolCallsUpdate.find(tc => tc.status === 'awaiting_approval');
-                      if (waitingCall && 'confirmationDetails' in waitingCall && this.toolConfirmationHandler) {
-                        // Call our confirmation handler to get user's decision
-                        const outcome = await this.toolConfirmationHandler(waitingCall.confirmationDetails);
-                        // Call the scheduler's onConfirm method with the outcome
-                        await waitingCall.confirmationDetails.onConfirm(outcome);
-                        return;
-                      }
+        // Execute all tool calls in parallel using a single CoreToolScheduler
+        const yieldedToolCallIds = new Set<string>();
+
+        // Use CoreToolScheduler with confirmation support if handler is available
+        if (this.toolConfirmationHandler) {
+          await new Promise<void>((resolve, reject) => {
+            const scheduler = new CoreToolScheduler({
+              config: this.config,
+              getPreferredEditor: () => undefined,
+              onEditorClose: () => {},
+
+              // This is called every time any tool's status changes
+              onToolCallsUpdate: async (toolCallsUpdate) => {
+                for (const toolCall of toolCallsUpdate) {
+                  // Handle confirmation requests
+                  if (toolCall.status === 'awaiting_approval') {
+                    if ('confirmationDetails' in toolCall && this.toolConfirmationHandler) {
+                      const outcome = await this.toolConfirmationHandler(toolCall.confirmationDetails);
+                      await toolCall.confirmationDetails.onConfirm(outcome);
                     }
                   }
-                });
 
-                // Save reference to active scheduler for approval mode changes
-                this.activeToolScheduler = scheduler;
+                  // Collect completed tool responses
+                  if ((toolCall.status === 'success' || toolCall.status === 'error' || toolCall.status === 'cancelled')
+                      && !yieldedToolCallIds.has(toolCall.request.callId)) {
 
-                scheduler.schedule(requestInfo, signal)
-                .catch(reject);
+                    yieldedToolCallIds.add(toolCall.request.callId);
+
+                    // Extract tool response content
+                    let toolResponseContent: string;
+
+                    if (toolCall.status === 'success' && 'response' in toolCall) {
+                      const response = toolCall.response;
+
+                      if (response.responseParts && response.responseParts.length > 0) {
+                        const responsePart = response.responseParts[0];
+
+                        if ('text' in responsePart) {
+                          toolResponseContent = responsePart.text || '';
+                        } else if ('functionResponse' in responsePart && responsePart.functionResponse) {
+                          const funcResponse = responsePart.functionResponse.response;
+                          if (funcResponse && typeof funcResponse === 'object') {
+                            if ('output' in funcResponse && funcResponse['output']) {
+                              toolResponseContent = funcResponse['output'] as string;
+                            } else {
+                              toolResponseContent = JSON.stringify(funcResponse, null, 2);
+                            }
+                          } else {
+                            toolResponseContent = JSON.stringify(funcResponse, null, 2);
+                          }
+                        } else if ('inlineData' in responsePart && responsePart.inlineData?.data) {
+                          toolResponseContent = `[Tool returned file data: ${responsePart.inlineData.mimeType}]`;
+                        } else {
+                          toolResponseContent = '[Tool response data]';
+                        }
+                      } else {
+                        toolResponseContent = 'Tool executed successfully';
+                      }
+                    } else if (toolCall.status === 'error' && 'response' in toolCall) {
+                      const errorMsg = toolCall.response.error?.message || 'Tool execution failed';
+                      toolResponseContent = `Tool execution failed: ${errorMsg}`;
+                    } else if (toolCall.status === 'cancelled' && 'response' in toolCall) {
+                      const cancelMsg = toolCall.response.error?.message || 'Tool execution cancelled';
+                      toolResponseContent = `Tool cancelled: ${cancelMsg}`;
+                    } else {
+                      toolResponseContent = 'Unknown tool status';
+                    }
+
+                    // Create tool response message
+                    const toolResponseMessage = this.createToolResponseMessage(
+                      toolResponseContent,
+                      toolCall.request.callId,
+                      toolCall.request.name
+                    );
+
+                    executedToolResponses.push(toolResponseMessage);
+
+                    console.log(`[MultiModelSystem] Collected tool response for ${toolCall.request.name} (status: ${toolCall.status})`);
+                  }
+                }
+              },
+
+              // All tools completed
+              onAllToolCallsComplete: async (completedToolCalls) => {
+                this.activeToolScheduler = undefined;
+                console.log(`[MultiModelSystem] All ${completedToolCalls.length} tool calls completed`);
+                resolve();
+              }
+            });
+
+            // Save reference to active scheduler for approval mode changes
+            this.activeToolScheduler = scheduler;
+
+            // Check for abort
+            if (signal.aborted) {
+              console.warn(`[MultiModelSystem] Aborted before tool execution.`);
+              resolve();
+              return;
+            }
+
+            // Schedule all tools at once - they will execute in parallel
+            scheduler.schedule(toolCallRequests, signal)
+              .catch((error) => {
+                console.error(`[MultiModelSystem] Scheduler error:`, error);
+                reject(error);
               });
-            } else {
-              // Fallback to non-interactive execution
-              toolResponse = await executeToolCall(this.config, requestInfo, signal);
-            }
-            
-            if (toolResponse.error) {
-              console.error(`[MultiModelSystem] Tool call failed:`, toolResponse.error);
-              
-              // Create error response message to inform LLM about the failure
-              const errorMessage = `Tool execution failed: ${toolResponse.error.message || toolResponse.error}`;
-              const toolErrorMessage = this.createToolResponseMessage(
-                errorMessage,
-                requestInfo.callId,
-                requestInfo.name
-              );
-              
-              SessionManager.getInstance().addHistory(toolErrorMessage);
-              console.log(`[MultiModelSystem] Added tool error response for ${requestInfo.name} (ID: ${requestInfo.callId}) to session history`);
-              
-              // Yield error response to frontend for immediate display
-              yield {
-                type: 'tool_response',
-                content: errorMessage,
-                toolCallId: requestInfo.callId,
-                toolName: requestInfo.name,
-                toolSuccess: false  // Indicate failure
+          });
+
+          // Now yield all collected results
+          for (const toolResponseMessage of executedToolResponses) {
+            const toolCallId = toolResponseMessage.tool_call_id || '';
+            const toolName = toolResponseMessage.name || '';
+            const content = typeof toolResponseMessage.content === 'string'
+              ? toolResponseMessage.content
+              : JSON.stringify(toolResponseMessage.content);
+
+            yield {
+              type: 'tool_response',
+              content,
+              toolCallId,
+              toolName,
+              toolSuccess: !content.includes('failed') && !content.includes('cancelled'),
+              toolResponseData: undefined
+            };
+          }
+        } else {
+          // Fallback: parallel execution without confirmation using Promise.allSettled
+          const executionPromises = toolCallRequests.map(async (requestInfo) => {
+            try {
+              const toolResponse = await executeToolCall(this.config, requestInfo, signal);
+              return { requestInfo, toolResponse, success: !toolResponse.error };
+            } catch (error) {
+              return {
+                requestInfo,
+                toolResponse: {
+                  callId: requestInfo.callId,
+                  responseParts: [],
+                  error: error instanceof Error ? error : new Error(String(error)),
+                  errorType: undefined,
+                  resultDisplay: undefined,
+                  structuredData: undefined
+                } as ToolCallResponseInfo,
+                success: false
               };
-              
-              // Continue with other tool calls instead of terminating
-              continue;
             }
-            
-            // Process each response part for this specific tool call
-            if (toolResponse.responseParts && toolResponse.responseParts.length > 0) {
-              for (const responsePart of toolResponse.responseParts) {
-                let toolResponseContent: string;
-                
-                // Convert Part to content string
+          });
+
+          const results = await Promise.allSettled(executionPromises);
+
+          // Process results as they become available
+          for (const result of results) {
+            if (result.status === 'fulfilled' && result.value) {
+              const { requestInfo, toolResponse, success } = result.value;
+
+              let toolResponseContent: string;
+
+              if (toolResponse.error) {
+                toolResponseContent = `Tool execution failed: ${toolResponse.error.message || toolResponse.error}`;
+              } else if (toolResponse.responseParts && toolResponse.responseParts.length > 0) {
+                const responsePart = toolResponse.responseParts[0];
+
                 if ('text' in responsePart) {
                   toolResponseContent = responsePart.text || '';
                 } else if ('functionResponse' in responsePart && responsePart.functionResponse) {
-                  // Extract the actual tool result from functionResponse
                   const response = responsePart.functionResponse.response;
                   if (response && typeof response === 'object') {
-                    // Check for 'output' field first (standard format)
                     if ('output' in response && response['output']) {
                       toolResponseContent = response['output'] as string;
                     } else {
-                      // For tools like xlwings that don't use 'output' field, use full JSON
                       toolResponseContent = JSON.stringify(response, null, 2);
                     }
                   } else {
@@ -700,64 +752,50 @@ export class MultiModelSystem {
                 } else {
                   toolResponseContent = '[Tool response data]';
                 }
-                
-                // Create tool response message with appropriate format based on detected model type
-                const toolResponseMessage = this.createToolResponseMessage(
-                  toolResponseContent,
-                  requestInfo.callId,
-                  requestInfo.name
-                );
-                
-                SessionManager.getInstance().addHistory(toolResponseMessage);
-                console.log(`[MultiModelSystem] Added tool response for ${requestInfo.name} (ID: ${requestInfo.callId}) to session history`);
-                
-                // Yield tool response to frontend for immediate display
-                yield {
-                  type: 'tool_response',
-                  content: toolResponseContent,
-                  toolCallId: requestInfo.callId,
-                  toolName: requestInfo.name,
-                  toolSuccess: true,  // Indicate success
-                  toolResponseData: toolResponse.structuredData  // Include structured data
-                };
+              } else {
+                toolResponseContent = 'Tool executed successfully';
               }
+
+              const toolResponseMessage = this.createToolResponseMessage(
+                toolResponseContent,
+                requestInfo.callId,
+                requestInfo.name
+              );
+
+              executedToolResponses.push(toolResponseMessage);
+
+              yield {
+                type: 'tool_response',
+                content: toolResponseContent,
+                toolCallId: requestInfo.callId,
+                toolName: requestInfo.name,
+                toolSuccess: success,
+                toolResponseData: toolResponse.structuredData
+              };
             }
-            
-          } catch (error) {
-            console.error(`[MultiModelSystem] Tool execution error:`, error);
-            
-            // Create error response message to inform LLM about the execution failure
-            const errorMessage = `Tool execution error: ${error instanceof Error ? error.message : 'Unknown tool execution error'}`;
-            const toolErrorMessage = this.createToolResponseMessage(
-              errorMessage,
-              requestInfo.callId,
-              requestInfo.name
-            );
-            
-            SessionManager.getInstance().addHistory(toolErrorMessage);
-            console.log(`[MultiModelSystem] Added tool execution error for ${requestInfo.name} (ID: ${requestInfo.callId}) to session history`);
-            
-            // Yield error response to frontend for immediate display
-            yield {
-              type: 'tool_response',
-              content: errorMessage,
-              toolCallId: requestInfo.callId,
-              toolName: requestInfo.name
-            };
-            
-            // Continue with other tool calls instead of terminating
-            continue;
           }
         }
-        
-        // After all tools are executed, let the natural conversation flow continue
+
+        // All tool calls completed - save assistant message with executed tool calls and responses together
+        this.saveAssistantWithToolCalls(assistantContent, assistantToolCalls, executedToolResponses);
         console.log(`[MultiModelSystem] Tool execution completed for ${toolCallRequests.length} tools. Continuing conversation...`);
         
         // Continue the conversation loop to let LLM process tool responses naturally
         continue;
-      } 
+      }
       else {
-        // No tool calls, check if model should continue
+        // No tool calls - save assistant message immediately if there's content
+        if (assistantContent.trim()) {
+          const assistantMessage: UniversalMessage = {
+            role: 'assistant',
+            content: assistantContent,
+            timestamp: new Date()
+          };
+          SessionManager.getInstance().addHistory(assistantMessage);
+          console.log(`[MultiModelSystem] Saved assistant response without tool calls (${assistantContent.length} chars)`);
+        }
+
+        // Check if model should continue
 
         // Check if we should skip next speaker check
         const skipNextSpeakerCheck = this.config.getSkipNextSpeakerCheck ? this.config.getSkipNextSpeakerCheck() : false;
@@ -1129,51 +1167,6 @@ Title:`;
   }
 
 
-  private limitContextSize(messages: readonly UniversalMessage[]): UniversalMessage[] {
-    return [...messages]; // Return mutable copy of all messages
-    
-    // Get max turns from config or use default
-    const DEFAULT_MAX_TURNS = 20;
-    const maxTurns = this.config.getMaxSessionTurns() >= 0 ? this.config.getMaxSessionTurns() : DEFAULT_MAX_TURNS;
-    if (maxTurns <= 0) {
-      return [...messages]; // No limit if set to 0 or negative, return mutable copy
-    }
-
-    // Always preserve system messages
-    const systemMessages = messages.filter(m => m.role === 'system');
-    const conversationMessages = messages.filter(m => m.role !== 'system');
-    
-    // Count turns from the end (each user message starts a new turn)
-    const turns: UniversalMessage[][] = [];
-    let currentTurn: UniversalMessage[] = [];
-    
-    // Process messages in reverse to count from the most recent
-    for (let i = conversationMessages.length - 1; i >= 0; i--) {
-      const message = conversationMessages[i];
-      currentTurn.unshift(message);
-      
-      // A user message starts a new turn (when going backwards)
-      if (message.role === 'user') {
-        turns.unshift([...currentTurn]);
-        currentTurn = [];
-        
-        // Stop if we have enough turns
-        if (turns.length >= maxTurns) {
-          break;
-        }
-      }
-    }
-    
-    // Flatten the kept turns
-    const keptMessages = turns.flat();
-    
-    if (keptMessages.length < conversationMessages.length) {
-      console.log(`[MultiModelSystem] Context limited: kept ${keptMessages.length}/${conversationMessages.length} messages (${turns.length} turns)`);
-    }
-    
-    return [...systemMessages, ...keptMessages];
-  }
-
   /**
    * Compress conversation history when token usage approaches provider limits or turn count exceeds threshold
    */
@@ -1452,6 +1445,52 @@ Title:`;
         compressionStatus: CompressionStatus.COMPRESSION_FAILED_TOKEN_COUNT_ERROR,
       };
     }
+  }
+
+  /**
+   * Save assistant message together with executed tool calls and their responses
+   * This ensures tool calls and responses are always paired correctly
+   */
+  private saveAssistantWithToolCalls(
+    assistantContent: string,
+    allToolCalls: ToolCall[],
+    executedToolResponses: UniversalMessage[]
+  ): void {
+    const sessionManager = SessionManager.getInstance();
+
+    // Build set of executed tool call IDs from responses
+    const executedToolCallIds = new Set(
+      executedToolResponses
+        .map(r => r.tool_call_id)
+        .filter((id): id is string => id !== undefined)
+    );
+
+    // Only keep tool calls that have corresponding responses
+    const executedToolCalls = allToolCalls.filter(tc =>
+      executedToolCallIds.has(tc.id)
+    );
+
+    console.log(`[MultiModelSystem] Saving assistant message: ${allToolCalls.length} total tool calls, ${executedToolCalls.length} executed, ${executedToolResponses.length} responses`);
+
+    // Save assistant message with only executed tool calls
+    const assistantMessage: UniversalMessage = {
+      role: 'assistant',
+      content: assistantContent,
+      timestamp: new Date()
+    };
+
+    if (executedToolCalls.length > 0) {
+      assistantMessage.toolCalls = executedToolCalls;
+    }
+
+    sessionManager.addHistory(assistantMessage);
+
+    // Save all tool responses
+    executedToolResponses.forEach(response => {
+      sessionManager.addHistory(response);
+    });
+
+    console.log(`[MultiModelSystem] Saved assistant message with ${executedToolCalls.length} tool calls and ${executedToolResponses.length} responses`);
   }
 
   /**
