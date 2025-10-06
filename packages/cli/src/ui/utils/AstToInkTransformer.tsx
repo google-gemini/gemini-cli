@@ -159,34 +159,26 @@ const RenderCodeBlock = React.memo(RenderCodeBlockInternal);
 
 /**
  * Extract headers and rows from table AST node
- * Reusable utility to avoid duplication
+ * Returns PhrasingContent arrays for direct rendering without markdown serialization
  */
 function extractTableData(node: Table): {
-  headers: string[];
-  rows: string[][];
+  headers: PhrasingContent[][];
+  rows: PhrasingContent[][][];
   alignment?: AlignType[];
 } {
-  const headers: string[] = [];
+  const headers: PhrasingContent[][] = [];
   if (node.children.length > 0 && node.children[0].children) {
     node.children[0].children.forEach((cell) => {
-      if (cell.children.length > 0 && cell.children[0].type === 'text') {
-        headers.push(cell.children[0].value);
-      } else {
-        headers.push('');
-      }
+      headers.push(cell.children);
     });
   }
 
-  const rows: string[][] = [];
+  const rows: PhrasingContent[][][] = [];
   for (let i = 1; i < node.children.length; i++) {
     const row = node.children[i];
-    const cells: string[] = [];
+    const cells: PhrasingContent[][] = [];
     row.children.forEach((cell) => {
-      if (cell.children.length > 0 && cell.children[0].type === 'text') {
-        cells.push(cell.children[0].value);
-      } else {
-        cells.push('');
-      }
+      cells.push(cell.children);
     });
     rows.push(cells);
   }

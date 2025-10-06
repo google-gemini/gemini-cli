@@ -544,3 +544,47 @@ exports[`<MarkdownDisplay /> > with 'Windows' line endings > shows line numbers 
 " 1 const x = 1;
 "
 `;
+
+exports[`<MarkdownDisplay /> - Performance Tests > handles empty inline code 1`] = `
+"Text with \`\` empty code.
+"
+`;
+
+exports[`<MarkdownDisplay /> - Performance Tests > handles empty list items 1`] = `
+"* Item 1
+*
+* Item 3
+"
+`;
+
+exports[`<MarkdownDisplay /> - Performance Tests > handles horizontal rule variations 1`] = `
+"Before rule
+
+After first
+
+---
+
+After second
+"
+`;
+
+exports[`<MarkdownDisplay /> - Performance Tests > handles link with special characters in URL 1`] = `
+"link
+"
+`;
+
+exports[`<MarkdownDisplay /> - Performance Tests > handles mixed heading levels 1`] = `
+"H1
+
+H3
+
+H2
+
+H4
+"
+`;
+
+exports[`<MarkdownDisplay /> - Performance Tests > handles multiple consecutive bold/italic 1`] = `
+"bold1 bold2 italic1 italic2
+"
+`;

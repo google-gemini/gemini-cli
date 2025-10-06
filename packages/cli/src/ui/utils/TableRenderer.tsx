@@ -6,15 +6,63 @@
 
 import React from 'react';
 import { Text, Box } from 'ink';
-import type { AlignType } from 'mdast';
+import type { AlignType, PhrasingContent } from 'mdast';
+import { toString } from 'mdast-util-to-string';
+import stringWidth from 'string-width';
 import { theme } from '../semantic-colors.js';
-import { RenderInline, getPlainTextLength } from './InlineMarkdownRenderer.js';
 
 interface TableRendererProps {
-  headers: string[];
-  rows: string[][];
+  headers: PhrasingContent[][];
+  rows: PhrasingContent[][][];
   alignment?: AlignType[];
   terminalWidth: number;
+}
+
+/**
+ * Render phrasing (inline) content from AST nodes
+ * Maps mdast inline nodes directly to React components
+ */
+function renderPhrasing(children: PhrasingContent[]): React.ReactNode {
+  return children.map((child, index) => {
+    const key = `inline-${index}`;
+
+    switch (child.type) {
+      case 'text':
+        return <React.Fragment key={key}>{child.value}</React.Fragment>;
+      case 'strong':
+        return (
+          <Text key={key} bold>
+            {renderPhrasing(child.children)}
+          </Text>
+        );
+      case 'emphasis':
+        return (
+          <Text key={key} italic>
+            {renderPhrasing(child.children)}
+          </Text>
+        );
+      case 'inlineCode':
+        return (
+          <Text key={key} color="cyan">
+            {child.value}
+          </Text>
+        );
+      case 'link':
+        return (
+          <Text key={key} underline color="blue">
+            {renderPhrasing(child.children)}
+          </Text>
+        );
+      case 'delete':
+        return (
+          <Text key={key} strikethrough>
+            {renderPhrasing(child.children)}
+          </Text>
+        );
+      default:
+        return null;
+    }
+  });
 }
 
 /**
@@ -27,11 +75,16 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
   alignment,
   terminalWidth,
 }) => {
-  // Calculate column widths using actual display width after markdown processing
+  // Calculate column widths using mdast-util-to-string for plain text length
   const columnWidths = headers.map((header, index) => {
-    const headerWidth = getPlainTextLength(header);
+    const headerText = toString({ type: 'paragraph', children: header });
+    const headerWidth = stringWidth(headerText);
     const maxRowWidth = Math.max(
-      ...rows.map((row) => getPlainTextLength(row[index] || '')),
+      ...rows.map((row) => {
+        const cellContent = row[index] || [];
+        const cellText = toString({ type: 'paragraph', children: cellContent });
+        return stringWidth(cellText);
+      }),
     );
     return Math.max(headerWidth, maxRowWidth) + 2; // Add padding
   });
@@ -46,48 +99,31 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
 
   // Helper function to render a cell with proper width and alignment
   const renderCell = (
-    content: string,
+    content: PhrasingContent[],
     width: number,
     columnIndex: number,
     isHeader = false,
   ): React.ReactNode => {
     const contentWidth = Math.max(0, width - 2);
-    const displayWidth = getPlainTextLength(content);
+    const cellText = toString({ type: 'paragraph', children: content });
+    const displayWidth = stringWidth(cellText);
 
-    let cellContent = content;
-    if (displayWidth > contentWidth) {
-      if (contentWidth <= 3) {
-        // Just truncate by character count
-        cellContent = content.substring(
-          0,
-          Math.min(content.length, contentWidth),
-        );
-      } else {
-        // Truncate preserving markdown formatting using binary search
-        let left = 0;
-        let right = content.length;
-        let bestTruncated = content;
-
-        // Binary search to find the optimal truncation point
-        while (left <= right) {
-          const mid = Math.floor((left + right) / 2);
-          const candidate = content.substring(0, mid);
-          const candidateWidth = getPlainTextLength(candidate);
-
-          if (candidateWidth <= contentWidth - 3) {
-            bestTruncated = candidate;
-            left = mid + 1;
-          } else {
-            right = mid - 1;
-          }
-        }
-
-        cellContent = bestTruncated + '...';
-      }
-    }
+    // For now, if content is too wide, we truncate with ellipsis
+    // TODO: Implement smart truncation that preserves AST structure
+    const renderedContent =
+      displayWidth > contentWidth ? (
+        <Text>{cellText.substring(0, contentWidth - 3)}...</Text>
+      ) : isHeader ? (
+        <Text bold color={theme.text.link}>
+          {renderPhrasing(content)}
+        </Text>
+      ) : (
+        renderPhrasing(content)
+      );
 
     // Calculate exact padding needed
-    const actualDisplayWidth = getPlainTextLength(cellContent);
+    const actualDisplayWidth =
+      displayWidth > contentWidth ? contentWidth : displayWidth;
     const paddingNeeded = Math.max(0, contentWidth - actualDisplayWidth);
 
     // Get alignment for this column (default to left)
@@ -112,13 +148,7 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
     return (
       <Text>
         {' '.repeat(leftPadding)}
-        {isHeader ? (
-          <Text bold color={theme.text.link}>
-            <RenderInline text={cellContent} />
-          </Text>
-        ) : (
-          <RenderInline text={cellContent} />
-        )}
+        {renderedContent}
         {' '.repeat(rightPadding)}
       </Text>
     );
@@ -140,10 +170,13 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
   };
 
   // Helper function to render a table row
-  const renderRow = (cells: string[], isHeader = false): React.ReactNode => {
+  const renderRow = (
+    cells: PhrasingContent[][],
+    isHeader = false,
+  ): React.ReactNode => {
     const renderedCells = cells.map((cell, index) => {
       const width = adjustedWidths[index] || 0;
-      return renderCell(cell || '', width, index, isHeader);
+      return renderCell(cell || [], width, index, isHeader);
     });
 
     return (
