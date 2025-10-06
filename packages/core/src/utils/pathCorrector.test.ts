@@ -26,27 +26,11 @@ describe('pathCorrector', () => {
     fs.mkdirSync(rootDir, { recursive: true });
     fs.mkdirSync(otherWorkspaceDir, { recursive: true });
 
-    const fileSystemService = new StandardFileSystemService();
-    // Mock findFiles to search in both directories
-    vi.spyOn(fileSystemService, 'findFiles').mockImplementation(
-      (filePath: string, searchPaths: readonly string[]) => {
-        const found: string[] = [];
-        for (const searchPath of searchPaths) {
-          // A simplified find logic for tests
-          const potentialPath = path.join(searchPath, filePath);
-          if (fs.existsSync(potentialPath)) {
-            found.push(potentialPath);
-          }
-        }
-        return found;
-      },
-    );
-
     mockConfig = {
       getTargetDir: () => rootDir,
       getWorkspaceContext: () =>
         createMockWorkspaceContext(rootDir, [otherWorkspaceDir]),
-      getFileSystemService: () => fileSystemService,
+      getFileSystemService: () => new StandardFileSystemService(),
     } as unknown as Config;
   });
 
@@ -95,14 +79,6 @@ describe('pathCorrector', () => {
     fs.mkdirSync(subDir2, { recursive: true });
     fs.writeFileSync(path.join(subDir1, ambiguousFile), 'content 1');
     fs.writeFileSync(path.join(subDir2, ambiguousFile), 'content 2');
-
-    // Simulate finding multiple files with same file name
-    const fileSystemService = new StandardFileSystemService();
-    vi.spyOn(fileSystemService, 'findFiles').mockReturnValue([
-      path.join(subDir1, ambiguousFile),
-      path.join(subDir2, ambiguousFile),
-    ]);
-    mockConfig.getFileSystemService = () => fileSystemService;
 
     const result = correctPath(ambiguousFile, mockConfig);
 
