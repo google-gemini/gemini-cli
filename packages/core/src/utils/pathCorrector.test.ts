@@ -89,14 +89,18 @@ describe('pathCorrector', () => {
 
   it('should return an error for an ambiguous path', () => {
     const ambiguousFile = 'component.ts';
-    fs.writeFileSync(path.join(rootDir, ambiguousFile), 'content 1');
-    fs.writeFileSync(path.join(otherWorkspaceDir, ambiguousFile), 'content 2');
+    const subDir1 = path.join(rootDir, 'module1');
+    const subDir2 = path.join(otherWorkspaceDir, 'module2');
+    fs.mkdirSync(subDir1, { recursive: true });
+    fs.mkdirSync(subDir2, { recursive: true });
+    fs.writeFileSync(path.join(subDir1, ambiguousFile), 'content 1');
+    fs.writeFileSync(path.join(subDir2, ambiguousFile), 'content 2');
 
     // Re-implement findFiles for this specific test to simulate finding multiple files
     const fileSystemService = new StandardFileSystemService();
     vi.spyOn(fileSystemService, 'findFiles').mockReturnValue([
-      path.join(rootDir, ambiguousFile),
-      path.join(otherWorkspaceDir, ambiguousFile),
+      path.join(subDir1, ambiguousFile),
+      path.join(subDir2, ambiguousFile),
     ]);
     mockConfig.getFileSystemService = () => fileSystemService;
 
