@@ -70,6 +70,7 @@
     "LICENSE"
   ],
   "devDependencies": {
+    "@octokit/rest": "^22.0.0",
     "@types/marked": "^5.0.2",
     "@types/mime-types": "^3.0.1",
     "@types/minimatch": "^5.1.2",
