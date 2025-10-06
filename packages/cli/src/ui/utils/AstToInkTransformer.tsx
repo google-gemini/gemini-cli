@@ -188,8 +188,10 @@ function extractTableData(node: Table): {
 /**
  * Render phrasing (inline) content
  * Maps mdast inline nodes directly to React components
+ *
+ * Exported for use in TableRenderer to maintain consistency
  */
-function renderPhrasing(children: PhrasingContent[]): React.ReactNode {
+export function renderPhrasing(children: PhrasingContent[]): React.ReactNode {
   return children.map((child, index) => {
     const key = `inline-${index}`;
 

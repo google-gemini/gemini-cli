@@ -10,59 +10,13 @@ import type { AlignType, PhrasingContent } from 'mdast';
 import { toString } from 'mdast-util-to-string';
 import stringWidth from 'string-width';
 import { theme } from '../semantic-colors.js';
+import { renderPhrasing } from './AstToInkTransformer.js';
 
 interface TableRendererProps {
   headers: PhrasingContent[][];
   rows: PhrasingContent[][][];
   alignment?: AlignType[];
   terminalWidth: number;
-}
-
-/**
- * Render phrasing (inline) content from AST nodes
- * Maps mdast inline nodes directly to React components
- */
-function renderPhrasing(children: PhrasingContent[]): React.ReactNode {
-  return children.map((child, index) => {
-    const key = `inline-${index}`;
-
-    switch (child.type) {
-      case 'text':
-        return <React.Fragment key={key}>{child.value}</React.Fragment>;
-      case 'strong':
-        return (
-          <Text key={key} bold>
-            {renderPhrasing(child.children)}
-          </Text>
-        );
-      case 'emphasis':
-        return (
-          <Text key={key} italic>
-            {renderPhrasing(child.children)}
-          </Text>
-        );
-      case 'inlineCode':
-        return (
-          <Text key={key} color="cyan">
-            {child.value}
-          </Text>
-        );
-      case 'link':
-        return (
-          <Text key={key} underline color="blue">
-            {renderPhrasing(child.children)}
-          </Text>
-        );
-      case 'delete':
-        return (
-          <Text key={key} strikethrough>
-            {renderPhrasing(child.children)}
-          </Text>
-        );
-      default:
-        return null;
-    }
-  });
 }
 
 /**
