@@ -54,7 +54,7 @@ jobs:
 
       - name: 'Print Inputs'
         run: |
-          echo "${{ toJSON(github.event.inputs) }}"
+          echo '${{ toJSON(github.event.inputs) }}'
 
       - name: 'Run Tests'
         if: "${{github.event.inputs.force_skip_tests == 'false'}}"

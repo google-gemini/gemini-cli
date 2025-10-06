@@ -32,7 +32,8 @@ runs:
   steps:
     - name: '📝 Print Inputs'
       shell: 'bash'
-      run: 'echo "${{ toJSON(inputs) }}"'
+      run: |
+        echo '${{ toJSON(inputs) }}'
     - name: 'Creates a Pull Request'
       if: "inputs.dry-run != 'true'"
       env:

@@ -60,7 +60,7 @@ jobs:
       - name: 'Print Inputs'
         shell: 'bash'
         run: |-
-          echo "${{ toJSON(inputs) }}"
+          echo '${{ toJSON(inputs) }}'
 
       - name: 'Calculate Versions and SHAs'
         id: 'versions'

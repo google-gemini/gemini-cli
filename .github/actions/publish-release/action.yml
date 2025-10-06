@@ -57,7 +57,8 @@ runs:
   steps:
     - name: '📝 Print Inputs'
       shell: 'bash'
-      run: 'echo "${{ toJSON(inputs) }}"'
+      run: |
+        echo '${{ toJSON(inputs) }}'
 
     - name: '👤 Configure Git User'
       working-directory: '${{ inputs.working-directory }}'

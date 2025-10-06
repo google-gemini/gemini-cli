@@ -15,7 +15,8 @@ runs:
   steps:
     - name: '📝 Print Inputs'
       shell: 'bash'
-      run: 'echo "${{ toJSON(inputs) }}"'
+      run: |
+        echo '${{ toJSON(inputs) }}'
     - name: 'Run Tests'
       env:
         GEMINI_API_KEY: '${{ inputs.gemini_api_key }}'
