@@ -14,7 +14,7 @@ import type {
 } from '@google/gemini-cli-core';
 import {
   Config,
-  DEFAULT_MEMORY_FILE_FILTERING_OPTIONS,
+  DEFAULT_FILE_FILTERING_OPTIONS,
 } from '@google/gemini-cli-core';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
@@ -81,13 +81,13 @@ describe('Configuration Integration Tests', () => {
         sandbox: false,
         targetDir: tempDir,
         debugMode: false,
-        fileFilteringRespectGitIgnore: undefined, // Should default to DEFAULT_MEMORY_FILE_FILTERING_OPTIONS
+        fileFilteringRespectGitIgnore: undefined, // Should default to  DEFAULT_FILE_FILTERING_OPTIONS
       };
 
       const config = new Config(configParams);
 
       expect(config.getFileFilteringRespectGitIgnore()).toBe(
-        DEFAULT_MEMORY_FILE_FILTERING_OPTIONS.respectGitIgnore,
+        DEFAULT_FILE_FILTERING_OPTIONS.respectGitIgnore,
       );
     });
 
@@ -163,7 +163,7 @@ describe('Configuration Integration Tests', () => {
 
       // All settings should use defaults
       expect(config.getFileFilteringRespectGitIgnore()).toBe(
-        DEFAULT_MEMORY_FILE_FILTERING_OPTIONS.respectGitIgnore,
+        DEFAULT_FILE_FILTERING_OPTIONS.respectGitIgnore,
       );
     });
 
@@ -182,7 +182,7 @@ describe('Configuration Integration Tests', () => {
 
       // All git-aware settings should use defaults
       expect(config.getFileFilteringRespectGitIgnore()).toBe(
-        DEFAULT_MEMORY_FILE_FILTERING_OPTIONS.respectGitIgnore,
+        DEFAULT_FILE_FILTERING_OPTIONS.respectGitIgnore,
       );
     });
   });
