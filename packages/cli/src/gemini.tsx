@@ -294,7 +294,15 @@ export async function main() {
         }
       }
       let stdinData = '';
-      if (!process.stdin.isTTY) {
+      // Only read stdin if:
+      // 1. stdin is not a TTY (it's piped)
+      // 2. AND the user hasn't provided a complete prompt via -p, -i, or positional args
+      const hasExplicitPrompt = !!(
+        argv.prompt ||
+        argv.promptInteractive ||
+        argv.query
+      );
+      if (!process.stdin.isTTY && !hasExplicitPrompt) {
         stdinData = await readStdin();
       }
 
@@ -419,10 +427,11 @@ export async function main() {
 
     // If not a TTY, read from stdin
     // This is for cases where the user pipes input directly into the command
-    if (!process.stdin.isTTY) {
+    // BUT only if we don't already have a complete input from command line args
+    if (!process.stdin.isTTY && !input) {
       const stdinData = await readStdin();
       if (stdinData) {
-        input = `${stdinData}\n\n${input}`;
+        input = stdinData;
       }
     }
     if (!input) {

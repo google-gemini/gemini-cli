@@ -339,6 +339,217 @@ describe('gemini.tsx main function kitty protocol', () => {
   });
 });
 
+describe('stdin handling for banishing trailing input', () => {
+  let mockReadStdin: ReturnType<typeof vi.fn>;
+  let mockParseArguments: ReturnType<typeof vi.fn>;
+  let mockLoadCliConfig: ReturnType<typeof vi.fn>;
+  let mockLoadSettings: ReturnType<typeof vi.fn>;
+  let originalIsTTY: boolean | undefined;
+
+  // Import modules once for all tests
+  let main: typeof import('./gemini.js').main;
+  let readStdin: typeof import('./utils/readStdin.js').readStdin;
+  let parseArguments: typeof import('./config/config.js').parseArguments;
+  let loadCliConfig: typeof import('./config/config.js').loadCliConfig;
+  let loadSettings: typeof import('./config/settings.js').loadSettings;
+
+  // Helper function to create a complete config mock
+  const createConfigMock = (overrides: Partial<Config> = {}): Config =>
+    ({
+      isInteractive: () => false,
+      getQuestion: () => '',
+      getSandbox: () => false,
+      getDebugMode: () => false,
+      getListExtensions: () => false,
+      getMcpServers: () => ({}),
+      initialize: vi.fn(),
+      getExperimentalZedIntegration: () => false,
+      getIdeMode: () => false,
+      getScreenReader: () => false,
+      getGeminiMdFileCount: () => 0,
+      getProjectRoot: () => '/',
+      getContentGeneratorConfig: () => ({ authType: 'test' }),
+      getFullContext: () => false,
+      getOutputFormat: () => 'text',
+      getFolderTrustFeature: () => false,
+      getFolderTrust: () => false,
+      getUsageStatisticsEnabled: () => false,
+      storage: { getProjectTempDir: () => '/tmp' },
+      ...overrides,
+    }) as unknown as Config;
+
+  beforeEach(async () => {
+    // Mock readStdin
+    vi.doMock('./utils/readStdin.js', () => ({
+      readStdin: vi.fn(),
+    }));
+
+    // Store original isTTY value
+    originalIsTTY = process.stdin.isTTY;
+
+    // Set up basic mocks
+    mockReadStdin = vi.fn();
+    mockParseArguments = vi.fn();
+    mockLoadCliConfig = vi.fn();
+    mockLoadSettings = vi.fn();
+
+    // Default mock implementations
+    mockLoadSettings.mockReturnValue({
+      errors: [],
+      merged: {
+        advanced: { autoConfigureMemory: false },
+        security: { auth: {} },
+        ui: {},
+      },
+      setValue: vi.fn(),
+      forScope: () => ({ settings: {}, originalSettings: {}, path: '' }),
+    });
+
+    // Import modules after mocking
+    ({ main } = await import('./gemini.js'));
+    ({ readStdin } = await import('./utils/readStdin.js'));
+    ({ parseArguments } = await import('./config/config.js'));
+    ({ loadCliConfig } = await import('./config/config.js'));
+    ({ loadSettings } = await import('./config/settings.js'));
+
+    // Set up mocks
+    vi.mocked(readStdin).mockImplementation(mockReadStdin);
+    vi.mocked(parseArguments).mockImplementation(mockParseArguments);
+    vi.mocked(loadCliConfig).mockImplementation(mockLoadCliConfig);
+    vi.mocked(loadSettings).mockImplementation(mockLoadSettings);
+
+    // Mock process.exit to prevent actual exit
+    vi.spyOn(process, 'exit').mockImplementation(() => {
+      throw new MockProcessExitError();
+    });
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    // Restore original isTTY
+    if (originalIsTTY !== undefined) {
+      Object.defineProperty(process.stdin, 'isTTY', {
+        value: originalIsTTY,
+        configurable: true,
+      });
+    }
+    vi.restoreAllMocks();
+    vi.resetModules();
+  });
+
+  it('should NOT read from stdin when prompt is provided via -p option', async () => {
+    // Set stdin as non-TTY (piped)
+    Object.defineProperty(process.stdin, 'isTTY', {
+      value: false,
+      configurable: true,
+    });
+
+    // Mock parseArguments to return a prompt
+    mockParseArguments.mockResolvedValue({
+      prompt: 'Hello from -p option',
+      query: undefined,
+    });
+
+    // Mock loadCliConfig to return non-interactive config with the prompt
+    mockLoadCliConfig.mockResolvedValue(
+      createConfigMock({ getQuestion: () => 'Hello from -p option' }),
+    );
+
+    try {
+      await main();
+    } catch (e) {
+      if (!(e instanceof MockProcessExitError)) throw e;
+    }
+
+    // Verify readStdin was NOT called
+    expect(mockReadStdin).not.toHaveBeenCalled();
+  });
+
+  it('should NOT read from stdin when query/positional argument is provided', async () => {
+    // Set stdin as non-TTY (piped)
+    Object.defineProperty(process.stdin, 'isTTY', {
+      value: false,
+      configurable: true,
+    });
+
+    // Mock parseArguments to return a query (positional argument)
+    mockParseArguments.mockResolvedValue({
+      prompt: undefined,
+      query: 'Hello from positional arg',
+    });
+
+    // Mock loadCliConfig to return non-interactive config with the query
+    mockLoadCliConfig.mockResolvedValue(
+      createConfigMock({ getQuestion: () => 'Hello from positional arg' }),
+    );
+
+    try {
+      await main();
+    } catch (e) {
+      if (!(e instanceof MockProcessExitError)) throw e;
+    }
+
+    // Verify readStdin was NOT called
+    expect(mockReadStdin).not.toHaveBeenCalled();
+  });
+
+  it('should read from stdin when no prompt is provided and stdin is piped', async () => {
+    // Set stdin as non-TTY (piped)
+    Object.defineProperty(process.stdin, 'isTTY', {
+      value: false,
+      configurable: true,
+    });
+
+    // Mock parseArguments to return no prompt or query
+    mockParseArguments.mockResolvedValue({
+      prompt: undefined,
+      query: undefined,
+    });
+
+    // Mock loadCliConfig to return non-interactive config with no question initially
+    mockLoadCliConfig.mockResolvedValue(createConfigMock());
+
+    // Mock readStdin to return some input
+    mockReadStdin.mockResolvedValue('Hello from stdin');
+
+    try {
+      await main();
+    } catch (e) {
+      if (!(e instanceof MockProcessExitError)) throw e;
+    }
+
+    // Verify readStdin WAS called
+    expect(mockReadStdin).toHaveBeenCalledTimes(1);
+  });
+
+  it('should NOT read from stdin when stdin is a TTY (interactive terminal)', async () => {
+    // Set stdin as TTY (interactive terminal)
+    Object.defineProperty(process.stdin, 'isTTY', {
+      value: true,
+      configurable: true,
+    });
+
+    // Mock parseArguments to return no prompt or query
+    mockParseArguments.mockResolvedValue({
+      prompt: undefined,
+      query: undefined,
+    });
+
+    // Mock loadCliConfig to return non-interactive config
+    mockLoadCliConfig.mockResolvedValue(createConfigMock());
+
+    try {
+      await main();
+    } catch (e) {
+      if (!(e instanceof MockProcessExitError)) throw e;
+      // Expected to exit with error due to no input
+    }
+
+    // Verify readStdin was NOT called (because stdin is TTY)
+    expect(mockReadStdin).not.toHaveBeenCalled();
+  });
+});
+
 describe('validateDnsResolutionOrder', () => {
   let consoleWarnSpy: ReturnType<typeof vi.spyOn>;
 
