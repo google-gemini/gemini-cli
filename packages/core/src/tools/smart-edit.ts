@@ -42,6 +42,9 @@ import { logSmartEditStrategy } from '../telemetry/loggers.js';
 import { SmartEditCorrectionEvent } from '../telemetry/types.js';
 import { logSmartEditCorrectionEvent } from '../telemetry/loggers.js';
 
+// The time in milliseconds to wait before considering a file modification as external.
+const EXTERNAL_EDIT_BUFFER_MS = 2000;
+
 interface ReplacementContext {
   params: EditToolParams;
   currentContent: string;
@@ -449,13 +452,13 @@ class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
       this.config.getGeminiClient(),
     );
 
-    // Add a 2-second buffer to account for timing inaccuracies. If the file
-    // was modified more than a second after the last edit tool was run, we
+    // Add a 2 second buffer to account for timing inaccuracies. If the file
+    // was modified more than 2 seconds after the last edit tool was run, we
     // can send the LLM edit fixer a custom message and the newest file content.
     if (lastEditedByUsTime > 0) {
       const stats = fs.statSync(params.file_path);
       const diff = stats.mtimeMs - lastEditedByUsTime;
-      if (diff > 2000) {
+      if (diff > EXTERNAL_EDIT_BUFFER_MS) {
         currentContent = await this.config
           .getFileSystemService()
           .readTextFile(params.file_path);
