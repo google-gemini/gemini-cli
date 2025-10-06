@@ -42,7 +42,7 @@ Gemini CLI uses JSON settings files for persistent configuration. There are four
 
 **Note on environment variables in settings:** String values within your `settings.json` files can reference environment variables using either `$VAR_NAME` or `${VAR_NAME}` syntax. These variables will be automatically resolved when the settings are loaded. For example, if you have an environment variable `MY_API_TOKEN`, you could use it in `settings.json` like this: `"apiKey": "$MY_API_TOKEN"`.
 
-> **Note for Enterprise Users:** For guidance on deploying and managing Gemini CLI in a corporate environment, please see the [Enterprise Configuration](./enterprise.md) documentation.
+> **Note for Enterprise Users:** For guidance on deploying and managing Gemini CLI in a corporate environment, please see the [Enterprise Configuration](../cli/enterprise.md) documentation.
 
 ### The `.gemini` directory in your project
 
@@ -131,7 +131,7 @@ If you are experiencing performance issues with file searching (e.g., with `@` c
   - **Example:** `"autoAccept": true`
 
 - **`theme`** (string):
-  - **Description:** Sets the visual [theme](./themes.md) for Gemini CLI.
+  - **Description:** Sets the visual [theme](../cli/themes.md) for Gemini CLI.
   - **Default:** `"Default"`
   - **Example:** `"theme": "GitHub"`
 
@@ -216,7 +216,7 @@ If you are experiencing performance issues with file searching (e.g., with `@` c
     ```
 
 - **`checkpointing`** (object):
-  - **Description:** Configures the checkpointing feature, which allows you to save and restore conversation and file states. See the [Checkpointing documentation](../checkpointing.md) for more details.
+  - **Description:** Configures the checkpointing feature, which allows you to save and restore conversation and file states. See the [Checkpointing documentation](../cli/checkpointing.md) for more details.
   - **Default:** `{"enabled": false}`
   - **Properties:**
     - **`enabled`** (boolean): When `true`, the `/restore` command is available.
@@ -227,7 +227,7 @@ If you are experiencing performance issues with file searching (e.g., with `@` c
   - **Example:** `"preferredEditor": "vscode"`
 
 - **`telemetry`** (object)
-  - **Description:** Configures logging and metrics collection for Gemini CLI. For more information, see [Telemetry](../telemetry.md).
+  - **Description:** Configures logging and metrics collection for Gemini CLI. For more information, see [Telemetry](../cli/telemetry.md).
   - **Default:** `{"enabled": false, "target": "local", "otlpEndpoint": "http://localhost:4317", "logPrompts": true}`
   - **Properties:**
     - **`enabled`** (boolean): Whether or not telemetry is enabled.
@@ -497,17 +497,17 @@ Arguments passed directly when running the CLI can override other configurations
   - A comma-separated list of tool names that will bypass the confirmation dialog.
   - Example: `gemini --allowed-tools "ShellTool(git status)"`
 - **`--telemetry`**:
-  - Enables [telemetry](../telemetry.md).
+  - Enables [telemetry](../cli/telemetry.md).
 - **`--telemetry-target`**:
-  - Sets the telemetry target. See [telemetry](../telemetry.md) for more information.
+  - Sets the telemetry target. See [telemetry](../cli/telemetry.md) for more information.
 - **`--telemetry-otlp-endpoint`**:
-  - Sets the OTLP endpoint for telemetry. See [telemetry](../telemetry.md) for more information.
+  - Sets the OTLP endpoint for telemetry. See [telemetry](../cli/telemetry.md) for more information.
 - **`--telemetry-otlp-protocol`**:
-  - Sets the OTLP protocol for telemetry (`grpc` or `http`). Defaults to `grpc`. See [telemetry](../telemetry.md) for more information.
+  - Sets the OTLP protocol for telemetry (`grpc` or `http`). Defaults to `grpc`. See [telemetry](../cli/telemetry.md) for more information.
 - **`--telemetry-log-prompts`**:
-  - Enables logging of prompts for telemetry. See [telemetry](../telemetry.md) for more information.
+  - Enables logging of prompts for telemetry. See [telemetry](../cli/telemetry.md) for more information.
 - **`--checkpointing`**:
-  - Enables [checkpointing](../checkpointing.md).
+  - Enables [checkpointing](../cli/checkpointing.md).
 - **`--extensions <extension_name ...>`** (**`-e <extension_name ...>`**):
   - Specifies a list of extensions to use for the session. If not provided, all available extensions are used.
   - Use the special term `gemini -e none` to disable all extensions.
@@ -583,7 +583,7 @@ This example demonstrates how you can provide general project context, specific 
 - **Commands for Memory Management:**
   - Use `/memory refresh` to force a re-scan and reload of all context files from all configured locations. This updates the AI's instructional context.
   - Use `/memory show` to display the combined instructional context currently loaded, allowing you to verify the hierarchy and content being used by the AI.
-  - See the [Commands documentation](./commands.md#memory) for full details on the `/memory` command and its sub-commands (`show` and `refresh`).
+  - See the [Commands documentation](../cli/commands.md#memory) for full details on the `/memory` command and its sub-commands (`show` and `refresh`).
 
 By understanding and utilizing these configuration layers and the hierarchical nature of context files, you can effectively manage the AI's memory and tailor the Gemini CLI's responses to your specific needs and projects.
 

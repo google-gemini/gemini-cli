@@ -9,6 +9,7 @@ import { diag, metrics, ValueType } from '@opentelemetry/api';
 import { SERVICE_NAME, EVENT_CHAT_COMPRESSION } from './constants.js';
 import type { Config } from '../config/config.js';
 import type { ModelRoutingEvent, ModelSlashCommandEvent } from './types.js';
+import { AuthType } from '../core/contentGenerator.js';
 
 const TOOL_CALL_COUNT = 'gemini_cli.tool.call.count';
 const TOOL_CALL_LATENCY = 'gemini_cli.tool.call.latency';
@@ -25,6 +26,10 @@ const MODEL_ROUTING_LATENCY = 'gemini_cli.model_routing.latency';
 const MODEL_ROUTING_FAILURE_COUNT = 'gemini_cli.model_routing.failure.count';
 const MODEL_SLASH_COMMAND_CALL_COUNT =
   'gemini_cli.slash_command.model.call_count';
+
+// OpenTelemetry GenAI Semantic Convention Metrics
+const GEN_AI_CLIENT_TOKEN_USAGE = 'gen_ai.client.token.usage';
+const GEN_AI_CLIENT_OPERATION_DURATION = 'gen_ai.client.operation.duration';
 
 // Performance Monitoring Metrics
 const STARTUP_TIME = 'gemini_cli.startup.duration';
@@ -168,6 +173,36 @@ const HISTOGRAM_DEFINITIONS = {
     attributes: {} as {
       'routing.decision_model': string;
       'routing.decision_source': string;
+    },
+  },
+  [GEN_AI_CLIENT_TOKEN_USAGE]: {
+    description: 'Number of input and output tokens used.',
+    unit: 'token',
+    valueType: ValueType.INT,
+    assign: (h: Histogram) => (genAiClientTokenUsageHistogram = h),
+    attributes: {} as {
+      'gen_ai.operation.name': string;
+      'gen_ai.provider.name': string;
+      'gen_ai.token.type': 'input' | 'output';
+      'gen_ai.request.model'?: string;
+      'gen_ai.response.model'?: string;
+      'server.address'?: string;
+      'server.port'?: number;
+    },
+  },
+  [GEN_AI_CLIENT_OPERATION_DURATION]: {
+    description: 'GenAI operation duration.',
+    unit: 's',
+    valueType: ValueType.DOUBLE,
+    assign: (h: Histogram) => (genAiClientOperationDurationHistogram = h),
+    attributes: {} as {
+      'gen_ai.operation.name': string;
+      'gen_ai.provider.name': string;
+      'gen_ai.request.model'?: string;
+      'gen_ai.response.model'?: string;
+      'server.address'?: string;
+      'server.port'?: number;
+      'error.type'?: string;
     },
   },
 } as const;
@@ -341,6 +376,20 @@ export enum ApiRequestPhase {
   TOKEN_PROCESSING = 'token_processing',
 }
 
+export enum GenAiOperationName {
+  GENERATE_CONTENT = 'generate_content',
+}
+
+export enum GenAiProviderName {
+  GCP_GEN_AI = 'gcp.gen_ai',
+  GCP_VERTEX_AI = 'gcp.vertex_ai',
+}
+
+export enum GenAiTokenType {
+  INPUT = 'input',
+  OUTPUT = 'output',
+}
+
 let cliMeter: Meter | undefined;
 let toolCallCounter: Counter | undefined;
 let toolCallLatencyHistogram: Histogram | undefined;
@@ -356,6 +405,10 @@ let contentRetryFailureCounter: Counter | undefined;
 let modelRoutingLatencyHistogram: Histogram | undefined;
 let modelRoutingFailureCounter: Counter | undefined;
 let modelSlashCommandCallCounter: Counter | undefined;
+
+// OpenTelemetry GenAI Semantic Convention Metrics
+let genAiClientTokenUsageHistogram: Histogram | undefined;
+let genAiClientOperationDurationHistogram: Histogram | undefined;
 
 // Performance Monitoring Metrics
 let startupTimeHistogram: Histogram | undefined;
@@ -437,7 +490,7 @@ export function recordToolCallMetrics(
   });
 }
 
-export function recordTokenUsageMetrics(
+export function recordCustomTokenUsageMetrics(
   config: Config,
   tokenCount: number,
   attributes: MetricDefinitions[typeof TOKEN_USAGE]['attributes'],
@@ -449,7 +502,7 @@ export function recordTokenUsageMetrics(
   });
 }
 
-export function recordApiResponseMetrics(
+export function recordCustomApiResponseMetrics(
   config: Config,
   durationMs: number,
   attributes: MetricDefinitions[typeof API_REQUEST_COUNT]['attributes'],
@@ -572,6 +625,81 @@ export function recordModelRoutingMetrics(
     });
   }
 }
+
+// OpenTelemetry GenAI Semantic Convention Recording Functions
+
+export function recordGenAiClientTokenUsage(
+  config: Config,
+  tokenCount: number,
+  attributes: MetricDefinitions[typeof GEN_AI_CLIENT_TOKEN_USAGE]['attributes'],
+): void {
+  if (!genAiClientTokenUsageHistogram || !isMetricsInitialized) return;
+
+  const metricAttributes: Attributes = {
+    ...baseMetricDefinition.getCommonAttributes(config),
+    ...attributes,
+  };
+
+  genAiClientTokenUsageHistogram.record(tokenCount, metricAttributes);
+}
+
+export function recordGenAiClientOperationDuration(
+  config: Config,
+  durationSeconds: number,
+  attributes: MetricDefinitions[typeof GEN_AI_CLIENT_OPERATION_DURATION]['attributes'],
+): void {
+  if (!genAiClientOperationDurationHistogram || !isMetricsInitialized) return;
+
+  const metricAttributes: Attributes = {
+    ...baseMetricDefinition.getCommonAttributes(config),
+    ...attributes,
+  };
+
+  genAiClientOperationDurationHistogram.record(
+    durationSeconds,
+    metricAttributes,
+  );
+}
+
+export function getConventionAttributes(event: {
+  model: string;
+  auth_type?: string;
+}): {
+  'gen_ai.operation.name': GenAiOperationName;
+  'gen_ai.provider.name': GenAiProviderName;
+  'gen_ai.request.model': string;
+  'gen_ai.response.model': string;
+} {
+  const operationName = getGenAiOperationName();
+  const provider = getGenAiProvider(event.auth_type);
+
+  return {
+    'gen_ai.operation.name': operationName,
+    'gen_ai.provider.name': provider,
+    'gen_ai.request.model': event.model,
+    'gen_ai.response.model': event.model,
+  };
+}
+
+/**
+ * Maps authentication type to GenAI provider name following OpenTelemetry conventions
+ */
+function getGenAiProvider(authType?: string): GenAiProviderName {
+  switch (authType) {
+    case AuthType.USE_VERTEX_AI:
+    case AuthType.CLOUD_SHELL:
+    case AuthType.LOGIN_WITH_GOOGLE:
+      return GenAiProviderName.GCP_VERTEX_AI;
+    case AuthType.USE_GEMINI:
+    default:
+      return GenAiProviderName.GCP_GEN_AI;
+  }
+}
+
+function getGenAiOperationName(): GenAiOperationName {
+  return GenAiOperationName.GENERATE_CONTENT;
+}
+
 // Performance Monitoring Functions
 
 export function initializePerformanceMonitoring(config: Config): void {
@@ -766,4 +894,72 @@ export function recordBaselineComparison(
 // Utility function to check if performance monitoring is enabled
 export function isPerformanceMonitoringActive(): boolean {
   return isPerformanceMonitoringEnabled && isMetricsInitialized;
+}
+
+/**
+ * Token usage recording that emits both custom and convention metrics.
+ */
+export function recordTokenUsageMetrics(
+  config: Config,
+  tokenCount: number,
+  attributes: {
+    model: string;
+    type: 'input' | 'output' | 'thought' | 'cache' | 'tool';
+    genAiAttributes?: {
+      'gen_ai.operation.name': string;
+      'gen_ai.provider.name': string;
+      'gen_ai.request.model'?: string;
+      'gen_ai.response.model'?: string;
+      'server.address'?: string;
+      'server.port'?: number;
+    };
+  },
+): void {
+  recordCustomTokenUsageMetrics(config, tokenCount, {
+    model: attributes.model,
+    type: attributes.type,
+  });
+
+  if (
+    (attributes.type === 'input' || attributes.type === 'output') &&
+    attributes.genAiAttributes
+  ) {
+    recordGenAiClientTokenUsage(config, tokenCount, {
+      ...attributes.genAiAttributes,
+      'gen_ai.token.type': attributes.type,
+    });
+  }
+}
+
+/**
+ * Operation latency recording that emits both custom and convention metrics.
+ */
+export function recordApiResponseMetrics(
+  config: Config,
+  durationMs: number,
+  attributes: {
+    model: string;
+    status_code?: number | string;
+    genAiAttributes?: {
+      'gen_ai.operation.name': string;
+      'gen_ai.provider.name': string;
+      'gen_ai.request.model'?: string;
+      'gen_ai.response.model'?: string;
+      'server.address'?: string;
+      'server.port'?: number;
+      'error.type'?: string;
+    };
+  },
+): void {
+  recordCustomApiResponseMetrics(config, durationMs, {
+    model: attributes.model,
+    status_code: attributes.status_code,
+  });
+
+  if (attributes.genAiAttributes) {
+    const durationSeconds = durationMs / 1000;
+    recordGenAiClientOperationDuration(config, durationSeconds, {
+      ...attributes.genAiAttributes,
+    });
+  }
 }

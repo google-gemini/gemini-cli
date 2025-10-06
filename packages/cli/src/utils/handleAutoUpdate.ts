@@ -6,7 +6,7 @@
 
 import type { UpdateObject } from '../ui/utils/updateCheck.js';
 import type { LoadedSettings } from '../config/settings.js';
-import { getInstallationInfo } from './installationInfo.js';
+import { getInstallationInfo, PackageManager } from './installationInfo.js';
 import { updateEventEmitter } from './updateEventEmitter.js';
 import type { HistoryItem } from '../ui/types.js';
 import { MessageType } from '../ui/types.js';
@@ -31,6 +31,14 @@ export function handleAutoUpdate(
     projectRoot,
     settings.merged.general?.disableAutoUpdate ?? false,
   );
+
+  if (
+    [PackageManager.NPX, PackageManager.PNPX, PackageManager.BUNX].includes(
+      installationInfo.packageManager,
+    )
+  ) {
+    return;
+  }
 
   let combinedMessage = info.message;
   if (installationInfo.updateMessage) {

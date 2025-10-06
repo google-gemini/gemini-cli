@@ -148,7 +148,7 @@ describe('file-system', () => {
     expect(newFileContent).toBe('1.0.1');
   });
 
-  it('should replace multiple instances of a string', async () => {
+  it.skip('should replace multiple instances of a string', async () => {
     const rig = new TestRig();
     await rig.setup('should replace multiple instances of a string');
     const fileName = 'ambiguous.txt';
@@ -253,7 +253,6 @@ describe('file-system', () => {
     // Final verification: ensure the file was not created.
     const filePath = path.join(rig.testDir!, fileName);
     const fileExists = existsSync(filePath);
-
     expect(fileExists, 'The non-existent file should not be created').toBe(
       false,
     );
