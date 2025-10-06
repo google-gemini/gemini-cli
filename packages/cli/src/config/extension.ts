@@ -8,6 +8,7 @@ import type {
   MCPServerConfig,
   GeminiCLIExtension,
   ExtensionInstallMetadata,
+  ExtensionConfig,
 } from '@google/gemini-cli-core';
 import {
   GEMINI_DIR,
@@ -50,15 +51,6 @@ export interface Extension {
   config: ExtensionConfig;
   contextFiles: string[];
   installMetadata?: ExtensionInstallMetadata | undefined;
-}
-
-export interface ExtensionConfig {
-  name: string;
-  version: string;
-  author?: string;
-  mcpServers?: Record<string, MCPServerConfig>;
-  contextFileName?: string | string[];
-  excludeTools?: string[];
 }
 
 export interface ExtensionUpdateInfo {

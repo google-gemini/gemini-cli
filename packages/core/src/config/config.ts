@@ -125,6 +125,15 @@ export interface GeminiCLIExtension {
   installMetadata?: ExtensionInstallMetadata;
 }
 
+export interface ExtensionConfig {
+  name: string;
+  version: string;
+  author?: string;
+  mcpServers?: Record<string, MCPServerConfig>;
+  contextFileName?: string | string[];
+  excludeTools?: string[];
+}
+
 export interface ExtensionInstallMetadata {
   source: string;
   type: 'git' | 'local' | 'link' | 'github-release';
