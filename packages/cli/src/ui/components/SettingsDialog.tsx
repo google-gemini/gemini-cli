@@ -358,7 +358,10 @@ export function SettingsDialog({
   };
 
   // Scope selector items
-  const scopeItems = getScopeItems();
+  const scopeItems = getScopeItems().map((item) => ({
+    ...item,
+    key: item.value,
+  }));
 
   const handleScopeHighlight = (scope: SettingScope) => {
     setSelectedScope(scope);
@@ -370,7 +373,7 @@ export function SettingsDialog({
   };
 
   // Height constraint calculations similar to ThemeDialog
-  const DIALOG_PADDING = 2;
+  const DIALOG_PADDING = 4;
   const SETTINGS_TITLE_HEIGHT = 2; // "Settings" title + spacing
   const SCROLL_ARROWS_HEIGHT = 2; // Up and down arrows
   const SPACING_HEIGHT = 1; // Space between settings list and scope

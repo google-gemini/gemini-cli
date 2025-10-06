@@ -79,7 +79,7 @@ function parseAllowedSubcommands(
         subcommands
           .split(',')
           .map((s) => s.trim())
-          .forEach((s) => allSubcommands.add(s));
+          .forEach((s) => s && allSubcommands.add(s));
       }
     }
   }

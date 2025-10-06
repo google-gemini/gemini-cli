@@ -26,7 +26,7 @@ import { getStartupWarnings } from './utils/startupWarnings.js';
 import { getUserStartupWarnings } from './utils/userStartupWarnings.js';
 import { ConsolePatcher } from './ui/utils/ConsolePatcher.js';
 import { runNonInteractive } from './nonInteractiveCli.js';
-import { loadExtensions } from './config/extension.js';
+import { ExtensionStorage, loadExtensions } from './config/extension.js';
 import {
   cleanupCheckpoints,
   registerCleanup,
@@ -46,11 +46,14 @@ import {
 } from './core/initializer.js';
 import { validateAuthMethod } from './config/auth.js';
 import { setMaxSizedBoxDebugging } from './ui/components/shared/MaxSizedBox.js';
+import { runZedIntegration } from './zed-integration/zedIntegration.js';
+import { cleanupExpiredSessions } from './utils/sessionCleanup.js';
 import { validateNonInteractiveAuth } from './validateNonInterActiveAuth.js';
 import { detectAndEnableKittyProtocol } from './ui/utils/kittyProtocolDetector.js';
 import { checkForUpdates } from './ui/utils/updateCheck.js';
 import { handleAutoUpdate } from './utils/handleAutoUpdate.js';
 import { appEvents, AppEvent } from './utils/events.js';
+import { computeWindowTitle } from './utils/windowTitle.js';
 import { SettingsContext } from './ui/contexts/SettingsContext.js';
 
 import { SessionStatsProvider } from './ui/contexts/SessionContext.js';
@@ -61,6 +64,8 @@ import {
   relaunchAppInChildProcess,
   relaunchOnExitCode,
 } from './utils/relaunch.js';
+import { loadSandboxConfig } from './config/sandboxConfig.js';
+import { ExtensionEnablementManager } from './config/extensions/extensionEnablement.js';
 
 export function validateDnsResolutionOrder(
   order: string | undefined,
@@ -109,9 +114,6 @@ function getNodeMemoryArgs(isDebugMode: boolean): string[] {
 
   return [];
 }
-
-import { runZedIntegration } from './zed-integration/zedIntegration.js';
-import { loadSandboxConfig } from './config/sandboxConfig.js';
 
 export function setupUnhandledRejectionHandler() {
   let unhandledRejectionOccurred = false;
@@ -265,6 +267,7 @@ export async function main() {
       const partialConfig = await loadCliConfig(
         settings.merged,
         [],
+        new ExtensionEnablementManager(ExtensionStorage.getUserExtensionsDir()),
         sessionId,
         argv,
       );
@@ -335,13 +338,21 @@ export async function main() {
   // to run Gemini CLI. It is now safe to perform expensive initialization that
   // may have side effects.
   {
-    const extensions = loadExtensions();
+    const extensionEnablementManager = new ExtensionEnablementManager(
+      ExtensionStorage.getUserExtensionsDir(),
+      argv.extensions,
+    );
+    const extensions = loadExtensions(extensionEnablementManager);
     const config = await loadCliConfig(
       settings.merged,
       extensions,
+      extensionEnablementManager,
       sessionId,
       argv,
     );
+
+    // Cleanup sessions after config initialization
+    await cleanupExpiredSessions(config, settings.merged);
 
     if (config.getListExtensions()) {
       console.log('Installed extensions:');
@@ -454,13 +465,7 @@ export async function main() {
 
 function setWindowTitle(title: string, settings: LoadedSettings) {
   if (!settings.merged.ui?.hideWindowTitle) {
-    const windowTitle = (
-      process.env['CLI_TITLE'] || `Gemini - ${title}`
-    ).replace(
-      // eslint-disable-next-line no-control-regex
-      /[\x00-\x1F\x7F]/g,
-      '',
-    );
+    const windowTitle = computeWindowTitle(title);
     process.stdout.write(`\x1b]2;${windowTitle}\x07`);
 
     process.on('exit', () => {

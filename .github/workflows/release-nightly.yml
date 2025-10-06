@@ -14,7 +14,7 @@ on:
         description: 'Select to skip the "Run Tests" step in testing. Prod releases should run tests'
         required: false
         type: 'boolean'
-        default: false
+        default: true
       ref:
         description: 'The branch, tag, or SHA to release from.'
         required: false
@@ -33,36 +33,64 @@ jobs:
       - name: 'Checkout'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
         with:
+          fetch-depth: 0
+
+      - name: 'Checkout Release Code'
+        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
+        with:
           ref: '${{ github.event.inputs.ref }}'
+          path: 'release'
           fetch-depth: 0
 
       - name: 'Setup Node.js'
         uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions/setup-node@v4
         with:
-          node-version-file: '.nvmrc'
+          node-version-file: './release/.nvmrc'
           cache: 'npm'
 
       - name: 'Install Dependencies'
+        working-directory: './release'
         run: 'npm ci'
 
+      - name: 'Print Inputs'
+        run: |
+          echo "${{ toJSON(github.event.inputs) }}"
+
       - name: 'Run Tests'
-        if: "${{github.event.inputs.force_skip_tests != 'true'}}"
+        if: "${{github.event.inputs.force_skip_tests == 'false'}}"
         uses: './.github/actions/run-tests'
         with:
           gemini_api_key: '${{ secrets.GEMINI_API_KEY }}'
+          working-directory: './release'
 
       - name: 'Get Nightly Version'
         id: 'nightly_version'
+        working-directory: './release'
         env:
           GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
         run: |
+          # Calculate the version using the centralized script
           VERSION_JSON=$(node scripts/get-release-version.js --type=nightly)
-          echo "RELEASE_TAG=$(echo "${VERSION_JSON}" | jq -r .releaseTag)" >> "${GITHUB_OUTPUT}"
-          echo "RELEASE_VERSION=$(echo "${VERSION_JSON}" | jq -r .releaseVersion)" >> "${GITHUB_OUTPUT}"
-          echo "NPM_TAG=$(echo "${VERSION_JSON}" | jq -r .npmTag)" >> "${GITHUB_OUTPUT}"
-          echo "PREVIOUS_TAG=$(echo "${VERSION_JSON}" | jq -r .previousReleaseTag)" >> "${GITHUB_OUTPUT}"
+
+          # Extract values for logging and outputs
+          RELEASE_TAG=$(echo "${VERSION_JSON}" | jq -r .releaseTag)
+          RELEASE_VERSION=$(echo "${VERSION_JSON}" | jq -r .releaseVersion)
+          NPM_TAG=$(echo "${VERSION_JSON}" | jq -r .npmTag)
+          PREVIOUS_TAG=$(echo "${VERSION_JSON}" | jq -r .previousReleaseTag)
+
+          # Print calculated values for logging
+          echo "Calculated Release Tag: ${RELEASE_TAG}"
+          echo "Calculated Release Version: ${RELEASE_VERSION}"
+          echo "Calculated Previous Tag: ${PREVIOUS_TAG}"
+
+          # Set outputs for subsequent steps
+          echo "RELEASE_TAG=${RELEASE_TAG}" >> "${GITHUB_OUTPUT}"
+          echo "RELEASE_VERSION=${RELEASE_VERSION}" >> "${GITHUB_OUTPUT}"
+          echo "NPM_TAG=${NPM_TAG}" >> "${GITHUB_OUTPUT}"
+          echo "PREVIOUS_TAG=${PREVIOUS_TAG}" >> "${GITHUB_OUTPUT}"
 
       - name: 'Publish Release'
+        if: true
         uses: './.github/actions/publish-release'
         with:
           release-version: '${{ steps.nightly_version.outputs.RELEASE_VERSION }}'
@@ -73,25 +101,29 @@ jobs:
           github-token: '${{ secrets.GITHUB_TOKEN }}'
           dry-run: '${{ github.event.inputs.dry_run }}'
           previous-tag: '${{ steps.nightly_version.outputs.PREVIOUS_TAG }}'
+          working-directory: './release'
+          skip-branch-cleanup: true
+          force-skip-tests: '${{ github.event.inputs.force_skip_tests }}'
+          gemini_api_key: '${{ secrets.GEMINI_API_KEY }}'
 
       - name: 'Create and Merge Pull Request'
         uses: './.github/actions/create-pull-request'
         with:
           branch-name: 'release/${{ steps.nightly_version.outputs.RELEASE_TAG }}'
-          pr-title: 'chore(release): bump version to ${{ steps.nightly_version.outputs.RELEASE_VERSION }}'
+          pr-title: 'chore/release: bump version to ${{ steps.nightly_version.outputs.RELEASE_VERSION }}'
           pr-body: 'Automated version bump for nightly release.'
-          app-id: '${{ secrets.APP_ID }}'
-          private-key: '${{ secrets.PRIVATE_KEY }}'
+          github-token: '${{ secrets.GEMINI_CLI_ROBOT_GITHUB_PAT }}'
           dry-run: '${{ github.event.inputs.dry_run }}'
+          working-directory: './release'
 
       - name: 'Create Issue on Failure'
-        if: '${{ failure() && github.event.inputs.dry_run == false }}'
+        if: "${{ failure() && github.event.inputs.dry_run != 'true' }}"
         env:
           GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
           RELEASE_TAG: '${{ steps.nightly_version.outputs.RELEASE_TAG }}'
           DETAILS_URL: '${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}'
         run: |
           gh issue create \
-            --title 'Nightly Release Failed for ${RELEASE_TAG} on $(date +'%Y-%m-%d')' \
-            --body 'The nightly-release workflow failed. See the full run for details: ${DETAILS_URL}' \
+            --title "Nightly Release Failed for ${RELEASE_TAG} on $(date +'%Y-%m-%d')" \
+            --body "The nightly-release workflow failed. See the full run for details: ${DETAILS_URL}" \
             --label 'kind/bug,release-failure,priority/p0'
