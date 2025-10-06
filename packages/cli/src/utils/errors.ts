@@ -101,30 +101,26 @@ export function handleToolError(
   toolName: string,
   toolError: Error,
   config: Config,
-  errorCode?: string | number,
+  errorType?: string,
   resultDisplay?: string,
 ): void {
   const errorMessage = `Error executing tool ${toolName}: ${resultDisplay || toolError.message}`;
 
-  const errorTypeStr = typeof errorCode === 'string' ? errorCode : undefined;
-  const isFatal = isFatalToolError(errorTypeStr);
+  const isFatal = isFatalToolError(errorType);
 
   if (isFatal) {
     const toolExecutionError = new FatalToolExecutionError(errorMessage);
-    const exitCode =
-      typeof errorCode === 'number' ? errorCode : toolExecutionError.exitCode;
-
     if (config.getOutputFormat() === OutputFormat.JSON) {
       const formatter = new JsonFormatter();
       const formattedError = formatter.formatError(
         toolExecutionError,
-        errorCode ?? toolExecutionError.exitCode,
+        errorType ?? toolExecutionError.exitCode,
       );
       console.error(formattedError);
     } else {
       console.error(errorMessage);
     }
-    process.exit(exitCode);
+    process.exit(toolExecutionError.exitCode);
   }
 
   // Non-fatal: log and continue
