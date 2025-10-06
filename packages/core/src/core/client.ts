@@ -4,6 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+/**
+ * @license
+ * Copyright 2025 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 import type {
   GenerateContentConfig,
   PartListUnion,
@@ -150,7 +156,9 @@ export class GeminiClient {
   }
 
   async initialize() {
-    this.chat = await this.startChat();
+    if (!this.chat) {
+      this.chat = await this.startChat();
+    }
   }
 
   private getContentGeneratorOrFail(): ContentGenerator {

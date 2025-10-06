@@ -275,7 +275,7 @@ describe('CoreToolScheduler', () => {
     };
 
     abortController.abort();
-    await scheduler.schedule([request], abortController.signal);
+    await scheduler.schedule([request], abortController.signal, 'cli');
 
     expect(onAllToolCallsComplete).toHaveBeenCalled();
     const completedCalls = onAllToolCallsComplete.mock
@@ -350,7 +350,7 @@ describe('CoreToolScheduler', () => {
       prompt_id: 'prompt-id-abort',
     };
 
-    await scheduler.schedule([request], abortController.signal);
+    await scheduler.schedule([request], abortController.signal, 'cli');
 
     expect(onAllToolCallsComplete).toHaveBeenCalled();
     const completedCalls = onAllToolCallsComplete.mock
@@ -467,7 +467,7 @@ describe('CoreToolScheduler with payload', () => {
       prompt_id: 'prompt-id-2',
     };
 
-    await scheduler.schedule([request], abortController.signal);
+    await scheduler.schedule([request], abortController.signal, 'cli');
 
     const awaitingCall = (await waitForStatus(
       onToolCallsUpdate,
@@ -787,7 +787,7 @@ describe('CoreToolScheduler edit cancellation', () => {
       prompt_id: 'prompt-id-1',
     };
 
-    await scheduler.schedule([request], abortController.signal);
+    await scheduler.schedule([request], abortController.signal, 'cli');
 
     const awaitingCall = (await waitForStatus(
       onToolCallsUpdate,
@@ -894,7 +894,7 @@ describe('CoreToolScheduler YOLO mode', () => {
     };
 
     // Act
-    await scheduler.schedule([request], abortController.signal);
+    await scheduler.schedule([request], abortController.signal, 'cli');
 
     // Wait for the tool execution to complete
     await vi.waitFor(() => {
@@ -1008,7 +1008,7 @@ describe('CoreToolScheduler request queueing', () => {
     };
 
     // Schedule the first call, which will pause execution.
-    scheduler.schedule([request1], abortController.signal);
+    scheduler.schedule([request1], abortController.signal, 'cli');
 
     // Wait for the first call to be in the 'executing' state.
     await waitForStatus(onToolCallsUpdate, 'executing');
@@ -1017,6 +1017,7 @@ describe('CoreToolScheduler request queueing', () => {
     const schedulePromise2 = scheduler.schedule(
       [request2],
       abortController.signal,
+      'cli',
     );
 
     // Ensure the second tool call hasn't been executed yet.
@@ -1133,7 +1134,7 @@ describe('CoreToolScheduler request queueing', () => {
     };
 
     // Act
-    await scheduler.schedule([request], abortController.signal);
+    await scheduler.schedule([request], abortController.signal, 'cli');
 
     // Wait for the tool execution to complete
     await vi.waitFor(() => {
@@ -1245,10 +1246,12 @@ describe('CoreToolScheduler request queueing', () => {
     const schedulePromise1 = scheduler.schedule(
       [request1],
       abortController.signal,
+      'cli',
     );
     const schedulePromise2 = scheduler.schedule(
       [request2],
       abortController.signal,
+      'cli',
     );
 
     // Wait for both promises to resolve.
@@ -1372,7 +1375,7 @@ describe('CoreToolScheduler request queueing', () => {
       },
     ];
 
-    await scheduler.schedule(requests, abortController.signal);
+    await scheduler.schedule(requests, abortController.signal, 'cli');
 
     // Wait for all tools to be awaiting approval
     await vi.waitFor(() => {

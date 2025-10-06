@@ -28,7 +28,7 @@ export async function executeToolCall(
         resolve(completedToolCalls[0].response);
       },
     })
-      .schedule(toolCallRequest, abortSignal)
+      .schedule(toolCallRequest, abortSignal, 'cli')
       .catch(reject);
   });
 }

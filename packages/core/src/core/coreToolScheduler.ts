@@ -50,6 +50,7 @@ export type ValidatingToolCall = {
   invocation: AnyToolInvocation;
   startTime?: number;
   outcome?: ToolConfirmationOutcome;
+  source?: 'cli' | 'external';
 };
 
 export type ScheduledToolCall = {
@@ -59,6 +60,7 @@ export type ScheduledToolCall = {
   invocation: AnyToolInvocation;
   startTime?: number;
   outcome?: ToolConfirmationOutcome;
+  source?: 'cli' | 'external';
 };
 
 export type ErroredToolCall = {
@@ -68,6 +70,7 @@ export type ErroredToolCall = {
   tool?: AnyDeclarativeTool;
   durationMs?: number;
   outcome?: ToolConfirmationOutcome;
+  source?: 'cli' | 'external';
 };
 
 export type SuccessfulToolCall = {
@@ -78,6 +81,7 @@ export type SuccessfulToolCall = {
   invocation: AnyToolInvocation;
   durationMs?: number;
   outcome?: ToolConfirmationOutcome;
+  source?: 'cli' | 'external';
 };
 
 export type ExecutingToolCall = {
@@ -89,6 +93,7 @@ export type ExecutingToolCall = {
   startTime?: number;
   outcome?: ToolConfirmationOutcome;
   pid?: number;
+  source?: 'cli' | 'external';
 };
 
 export type CancelledToolCall = {
@@ -99,6 +104,7 @@ export type CancelledToolCall = {
   invocation: AnyToolInvocation;
   durationMs?: number;
   outcome?: ToolConfirmationOutcome;
+  source?: 'cli' | 'external';
 };
 
 export type WaitingToolCall = {
@@ -109,6 +115,7 @@ export type WaitingToolCall = {
   confirmationDetails: ToolCallConfirmationDetails;
   startTime?: number;
   outcome?: ToolConfirmationOutcome;
+  source?: 'cli' | 'external';
 };
 
 export type Status = ToolCall['status'];
@@ -134,13 +141,18 @@ export type ConfirmHandler = (
 export type OutputUpdateHandler = (
   toolCallId: string,
   outputChunk: string | AnsiOutput,
+  source: 'cli' | 'external',
 ) => void;
 
 export type AllToolCallsCompleteHandler = (
   completedToolCalls: CompletedToolCall[],
+  source: 'cli' | 'external',
 ) => Promise<void>;
 
-export type ToolCallsUpdateHandler = (toolCalls: ToolCall[]) => void;
+export type ToolCallsUpdateHandler = (
+  toolCalls: ToolCall[],
+  source: 'cli' | 'external',
+) => void;
 
 /**
  * Formats tool output for a Gemini FunctionResponse.
@@ -413,6 +425,7 @@ export class CoreToolScheduler {
             response: auxiliaryData as ToolCallResponseInfo,
             durationMs,
             outcome,
+            source: currentCall.source,
           } as SuccessfulToolCall;
         }
         case 'error': {
@@ -426,6 +439,7 @@ export class CoreToolScheduler {
             response: auxiliaryData as ToolCallResponseInfo,
             durationMs,
             outcome,
+            source: currentCall.source,
           } as ErroredToolCall;
         }
         case 'awaiting_approval':
@@ -437,6 +451,7 @@ export class CoreToolScheduler {
             startTime: existingStartTime,
             outcome,
             invocation,
+            source: currentCall.source,
           } as WaitingToolCall;
         case 'scheduled':
           return {
@@ -446,6 +461,7 @@ export class CoreToolScheduler {
             startTime: existingStartTime,
             outcome,
             invocation,
+            source: currentCall.source,
           } as ScheduledToolCall;
         case 'cancelled': {
           const durationMs = existingStartTime
@@ -493,6 +509,7 @@ export class CoreToolScheduler {
             },
             durationMs,
             outcome,
+            source: currentCall.source,
           } as CancelledToolCall;
         }
         case 'validating':
@@ -503,6 +520,7 @@ export class CoreToolScheduler {
             startTime: existingStartTime,
             outcome,
             invocation,
+            source: currentCall.source,
           } as ValidatingToolCall;
         case 'executing':
           return {
@@ -512,6 +530,7 @@ export class CoreToolScheduler {
             startTime: existingStartTime,
             outcome,
             invocation,
+            source: currentCall.source,
           } as ExecutingToolCall;
         default: {
           const exhaustiveCheck: never = newStatus;
@@ -618,6 +637,7 @@ export class CoreToolScheduler {
   schedule(
     request: ToolCallRequestInfo | ToolCallRequestInfo[],
     signal: AbortSignal,
+    source: 'cli' | 'external',
   ): Promise<void> {
     if (this.isRunning() || this.isScheduling) {
       return new Promise((resolve, reject) => {
@@ -648,12 +668,13 @@ export class CoreToolScheduler {
         });
       });
     }
-    return this._schedule(request, signal);
+    return this._schedule(request, signal, source);
   }
 
   private async _schedule(
     request: ToolCallRequestInfo | ToolCallRequestInfo[],
     signal: AbortSignal,
+    source: 'cli' | 'external',
   ): Promise<void> {
     this.isScheduling = true;
     try {
@@ -679,6 +700,7 @@ export class CoreToolScheduler {
                 ToolErrorType.TOOL_NOT_REGISTERED,
               ),
               durationMs: 0,
+              source,
             };
           }
 
@@ -697,6 +719,7 @@ export class CoreToolScheduler {
                 ToolErrorType.INVALID_TOOL_PARAMS,
               ),
               durationMs: 0,
+              source,
             };
           }
 
@@ -706,6 +729,7 @@ export class CoreToolScheduler {
             tool: toolInstance,
             invocation: invocationOrError,
             startTime: Date.now(),
+            source,
           };
         },
       );
@@ -966,7 +990,11 @@ export class CoreToolScheduler {
           scheduledCall.tool.canUpdateOutput && this.outputUpdateHandler
             ? (outputChunk: string | AnsiOutput) => {
                 if (this.outputUpdateHandler) {
-                  this.outputUpdateHandler(callId, outputChunk);
+                  this.outputUpdateHandler(
+                    callId,
+                    outputChunk,
+                    scheduledCall.source || 'external',
+                  );
                 }
                 this.toolCalls = this.toolCalls.map((tc) =>
                   tc.request.callId === callId && tc.status === 'executing'
@@ -1129,14 +1157,16 @@ export class CoreToolScheduler {
 
       if (this.onAllToolCallsComplete) {
         this.isFinalizingToolCalls = true;
-        await this.onAllToolCallsComplete(completedCalls);
+        const source = completedCalls[0]?.source || 'external';
+        await this.onAllToolCallsComplete(completedCalls, source);
         this.isFinalizingToolCalls = false;
       }
       this.notifyToolCallsUpdate();
       // After completion, process the next item in the queue.
       if (this.requestQueue.length > 0) {
         const next = this.requestQueue.shift()!;
-        this._schedule(next.request, next.signal)
+        const source = this.toolCalls[0]?.source || 'external';
+        this._schedule(next.request, next.signal, source)
           .then(next.resolve)
           .catch(next.reject);
       }
@@ -1145,7 +1175,8 @@ export class CoreToolScheduler {
 
   private notifyToolCallsUpdate(): void {
     if (this.onToolCallsUpdate) {
-      this.onToolCallsUpdate([...this.toolCalls]);
+      const source = this.toolCalls[0]?.source || 'external';
+      this.onToolCallsUpdate([...this.toolCalls], source);
     }
   }
 

@@ -19,12 +19,14 @@ import type {
 } from '@google/gemini-cli-core';
 import { GeminiEventType } from '@google/gemini-cli-core';
 import { v4 as uuidv4 } from 'uuid';
+import type { EventEmitter } from 'node:events';
 
 import { logger } from '../utils/logger.js';
 import type {
   StateChange,
   AgentSettings,
   PersistedStateMetadata,
+  ExternalUserMessage,
 } from '../types.js';
 import {
   CoderAgentEvent,
@@ -86,12 +88,21 @@ export class CoderAgentExecutor implements AgentExecutor {
   // Track tasks with an active execution loop.
   private executingTasks = new Set<string>();
 
-  constructor(private taskStore?: TaskStore) {}
+  constructor(
+    private taskStore?: TaskStore,
+    private cliConfig?: Config, // TODO(b/369671111): Use cliConfig if available
+    private cliAppEvents?: EventEmitter,
+  ) {}
 
   private async getConfig(
     agentSettings: AgentSettings,
     taskId: string,
   ): Promise<Config> {
+    if (this.cliConfig) {
+      logger.info('[CoderAgentExecutor] Using cliConfig as base');
+      return this.cliConfig;
+    }
+    logger.info('[CoderAgentExecutor] Loading config from files');
     const workspaceRoot = setTargetDir(agentSettings);
     loadEnvironment(); // Will override any global env with workspace envs
     const settings = loadSettings(workspaceRoot);
@@ -124,6 +135,7 @@ export class CoderAgentExecutor implements AgentExecutor {
       contextId,
       config,
       eventBus,
+      this.cliAppEvents,
     );
     runtimeTask.taskState = persistedState._taskState;
     await runtimeTask.geminiClient.initialize();
@@ -142,12 +154,28 @@ export class CoderAgentExecutor implements AgentExecutor {
   ): Promise<TaskWrapper> {
     const agentSettings = agentSettingsInput || ({} as AgentSettings);
     const config = await this.getConfig(agentSettings, taskId);
-    const runtimeTask = await Task.create(taskId, contextId, config, eventBus);
+    const runtimeTask = await Task.create(
+      taskId,
+      contextId,
+      config,
+      eventBus,
+      this.cliAppEvents,
+    );
     await runtimeTask.geminiClient.initialize();
 
     const wrapper = new TaskWrapper(runtimeTask, agentSettings);
     this.tasks.set(taskId, wrapper);
     logger.info(`New task ${taskId} created.`);
+    try {
+      await this.taskStore?.save(wrapper.toSDKTask());
+      logger.info(`New task ${taskId} saved to store.`);
+    } catch (saveError) {
+      logger.error(
+        `[CoderAgentExecutor] Failed to save new task ${taskId} to store:`,
+        saveError,
+      );
+      // Depending on the desired behavior, you might want to throw here
+    }
     return wrapper;
   }
 
@@ -233,6 +261,7 @@ export class CoderAgentExecutor implements AgentExecutor {
       task.setTaskStateAndPublishUpdate(
         'canceled',
         stateChange,
+        'external',
         'Task canceled by user request.',
         undefined,
         true,
@@ -277,8 +306,31 @@ export class CoderAgentExecutor implements AgentExecutor {
     requestContext: RequestContext,
     eventBus: ExecutionEventBus,
   ): Promise<void> {
+    logger.info(
+      `[CoderAgentExecutor] execute() called with context: ${JSON.stringify(requestContext)}`,
+    );
     const userMessage = requestContext.userMessage as Message;
     const sdkTask = requestContext.task as SDKTask | undefined;
+
+    // Publish the incoming external message to the event bus for the CLI to display
+    const externalMessageEvent: AgentExecutionEvent = {
+      kind: 'status-update',
+      taskId: userMessage.taskId || sdkTask?.id || uuidv4(),
+      contextId: userMessage.contextId || sdkTask?.contextId || uuidv4(),
+      status: {
+        state: sdkTask?.status.state || 'submitted',
+        message: userMessage,
+        timestamp: new Date().toISOString(),
+      },
+      final: false,
+      metadata: {
+        ['coderAgent']: {
+          kind: CoderAgentEvent.ExternalUserMessageEvent,
+        } as ExternalUserMessage,
+        ['source']: 'external',
+      },
+    };
+    eventBus.publish(externalMessageEvent);
 
     const taskId = sdkTask?.id || userMessage.taskId || uuidv4();
     const contextId: string =
@@ -422,6 +474,10 @@ export class CoderAgentExecutor implements AgentExecutor {
       return;
     }
 
+    logger.info(
+      `[CoderAgentExecutor] Wrapper found for task ${taskId}: ${!!wrapper}`,
+    );
+
     const currentTask = wrapper.task;
 
     if (['canceled', 'failed', 'completed'].includes(currentTask.taskState)) {
@@ -459,6 +515,7 @@ export class CoderAgentExecutor implements AgentExecutor {
       let agentEvents = currentTask.acceptUserMessage(
         requestContext,
         abortSignal,
+        'external',
       );
 
       while (agentTurnActive) {
@@ -479,7 +536,7 @@ export class CoderAgentExecutor implements AgentExecutor {
             );
             continue;
           }
-          await currentTask.acceptAgentMessage(event);
+          await currentTask.acceptAgentMessage(event, 'external');
         }
 
         if (abortSignal.aborted) throw new Error('Execution aborted');
@@ -488,7 +545,11 @@ export class CoderAgentExecutor implements AgentExecutor {
           logger.info(
             `[CoderAgentExecutor] Task ${taskId}: Found ${toolCallRequests.length} tool call requests. Scheduling as a batch.`,
           );
-          await currentTask.scheduleToolCalls(toolCallRequests, abortSignal);
+          await currentTask.scheduleToolCalls(
+            toolCallRequests,
+            abortSignal,
+            'external',
+          );
         }
 
         logger.info(
@@ -517,6 +578,7 @@ export class CoderAgentExecutor implements AgentExecutor {
             currentTask.setTaskStateAndPublishUpdate(
               'input-required',
               stateChange,
+              'external',
               undefined,
               undefined,
               true,
@@ -529,6 +591,7 @@ export class CoderAgentExecutor implements AgentExecutor {
             agentEvents = currentTask.sendCompletedToolsToLlm(
               completedTools,
               abortSignal,
+              'external',
             );
             // Continue the loop to process the LLM response to the tool results.
           }
@@ -549,6 +612,7 @@ export class CoderAgentExecutor implements AgentExecutor {
       currentTask.setTaskStateAndPublishUpdate(
         'input-required',
         stateChange,
+        'external',
         undefined,
         undefined,
         true,
@@ -564,6 +628,7 @@ export class CoderAgentExecutor implements AgentExecutor {
           currentTask.setTaskStateAndPublishUpdate(
             'input-required',
             { kind: CoderAgentEvent.StateChangeEvent },
+            'external',
             'Execution aborted by client.',
             undefined,
             true,
@@ -584,6 +649,7 @@ export class CoderAgentExecutor implements AgentExecutor {
           currentTask.setTaskStateAndPublishUpdate(
             'failed',
             stateChange,
+            'external',
             errorMessage,
             undefined,
             true,
