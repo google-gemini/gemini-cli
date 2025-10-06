@@ -244,6 +244,8 @@ interface RenderListItemInternalProps {
   ordered: boolean;
   start?: number;
   terminalWidth?: number;
+  isPending?: boolean;
+  availableTerminalHeight?: number;
 }
 
 /**
@@ -257,6 +259,8 @@ const RenderListItemInternal: React.FC<RenderListItemInternalProps> = ({
   ordered,
   start,
   terminalWidth = 80,
+  isPending = false,
+  availableTerminalHeight,
 }) => {
   const indent = '   '.repeat(depth);
   const marker = ordered ? `${(start || 1) + index}.` : '*';
@@ -363,7 +367,14 @@ const RenderListItemInternal: React.FC<RenderListItemInternalProps> = ({
           childElement = (
             <Box key={key}>
               {prefix && <Text>{prefix.trim()}</Text>}
-              {renderList(child, key, depth + 1, terminalWidth)}
+              {renderList(
+                child,
+                key,
+                depth + 1,
+                terminalWidth,
+                isPending,
+                availableTerminalHeight,
+              )}
             </Box>
           );
           break;
@@ -379,8 +390,8 @@ const RenderListItemInternal: React.FC<RenderListItemInternalProps> = ({
                   child as RootContent,
                   key,
                   depth + 1,
-                  false,
-                  undefined,
+                  isPending,
+                  availableTerminalHeight,
                   terminalWidth,
                 )}
               </Box>
@@ -414,6 +425,8 @@ function renderList(
   key: string,
   depth: number,
   terminalWidth?: number,
+  isPending?: boolean,
+  availableTerminalHeight?: number,
 ): React.ReactElement {
   const isTopLevel = depth === 0;
   // Spread lists have blank lines between items in source markdown
@@ -439,6 +452,8 @@ function renderList(
               ordered={node.ordered || false}
               start={node.start || undefined}
               terminalWidth={terminalWidth}
+              isPending={isPending}
+              availableTerminalHeight={availableTerminalHeight}
             />
           </Box>
         );
@@ -669,7 +684,14 @@ function transformNode(
     case 'thematicBreak':
       return transformThematicBreak(key, depth);
     case 'list':
-      return renderList(node as List, key, depth, terminalWidth);
+      return renderList(
+        node as List,
+        key,
+        depth,
+        terminalWidth,
+        isPending,
+        availableTerminalHeight,
+      );
     case 'table':
       return transformTable(node as Table, key, depth, terminalWidth || 80);
     case 'blockquote':
