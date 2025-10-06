@@ -74,7 +74,7 @@ jobs:
         run: |
           # Use the existing get-release-version.js script to calculate patch version
           # Run from main checkout which has full git history and access to npm
-          PATCH_JSON=$(node ../scripts/get-release-version.js --type=patch --patch-from=${{ github.event.inputs.type }})
+          PATCH_JSON=$(node scripts/get-release-version.js --type=patch --patch-from=${{ github.event.inputs.type }})
           echo "Patch version calculation result: ${PATCH_JSON}"
 
           RELEASE_VERSION=$(echo "${PATCH_JSON}" | jq -r .releaseVersion)
@@ -193,7 +193,7 @@ jobs:
           GITHUB_REPOSITORY_OWNER: '${{ github.repository_owner }}'
           GITHUB_REPOSITORY_NAME: '${{ github.event.repository.name }}'
         run: |
-          node ../scripts/releasing/patch-comment.js
+          node scripts/releasing/patch-comment.js
 
       - name: 'Comment Failure on Original PR'
         working-directory: './release'
@@ -220,4 +220,4 @@ jobs:
             echo "Detected version race condition failure - posting specific comment with current version info"
             export RACE_CONDITION_FAILURE=true
           fi
-          node ../scripts/releasing/patch-comment.js
+          node scripts/releasing/patch-comment.js
