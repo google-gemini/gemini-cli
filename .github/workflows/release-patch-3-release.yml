@@ -57,7 +57,6 @@ jobs:
           cache: 'npm'
 
       - name: 'Install Dependencies'
-        working-directory: './release'
         run: |-
           npm ci
 
