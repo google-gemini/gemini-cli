@@ -10,8 +10,9 @@ import {
   JsonFormatter,
   parseAndFormatApiError,
   FatalTurnLimitedError,
-  FatalToolExecutionError,
   FatalCancellationError,
+  FatalToolExecutionError,
+  isFatalToolError,
 } from '@google/gemini-cli-core';
 
 export function getErrorMessage(error: unknown): string {
@@ -88,8 +89,13 @@ export function handleError(
 
 /**
  * Handles tool execution errors specifically.
- * In JSON mode, outputs formatted JSON error and exits.
- * In text mode, outputs error message to stderr only.
+ *
+ * Fatal errors (e.g., NO_SPACE_LEFT) cause the CLI to exit immediately,
+ * as they indicate unrecoverable system state.
+ *
+ * Non-fatal errors (e.g., INVALID_TOOL_PARAMS, FILE_NOT_FOUND, PATH_NOT_IN_WORKSPACE)
+ * are logged to stderr and the error response is sent back to the model,
+ * allowing it to self-correct.
  */
 export function handleToolError(
   toolName: string,
@@ -99,22 +105,30 @@ export function handleToolError(
   resultDisplay?: string,
 ): void {
   const errorMessage = `Error executing tool ${toolName}: ${resultDisplay || toolError.message}`;
-  const toolExecutionError = new FatalToolExecutionError(errorMessage);
 
-  if (config.getOutputFormat() === OutputFormat.JSON) {
-    const formatter = new JsonFormatter();
-    const formattedError = formatter.formatError(
-      toolExecutionError,
-      errorCode ?? toolExecutionError.exitCode,
-    );
+  const errorTypeStr = typeof errorCode === 'string' ? errorCode : undefined;
+  const isFatal = isFatalToolError(errorTypeStr);
 
-    console.error(formattedError);
-    process.exit(
-      typeof errorCode === 'number' ? errorCode : toolExecutionError.exitCode,
-    );
-  } else {
-    console.error(errorMessage);
+  if (isFatal) {
+    const toolExecutionError = new FatalToolExecutionError(errorMessage);
+    const exitCode =
+      typeof errorCode === 'number' ? errorCode : toolExecutionError.exitCode;
+
+    if (config.getOutputFormat() === OutputFormat.JSON) {
+      const formatter = new JsonFormatter();
+      const formattedError = formatter.formatError(
+        toolExecutionError,
+        errorCode ?? toolExecutionError.exitCode,
+      );
+      console.error(formattedError);
+    } else {
+      console.error(errorMessage);
+    }
+    process.exit(exitCode);
   }
+
+  // Non-fatal: log and continue
+  console.error(errorMessage);
 }
 
 /**
