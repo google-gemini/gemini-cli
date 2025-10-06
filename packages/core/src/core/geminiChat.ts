@@ -327,10 +327,6 @@ export class GeminiChat {
               ),
             );
           }
-          // If the stream fails, remove the user message that was added.
-          if (self.history[self.history.length - 1] === userContent) {
-            self.history.pop();
-          }
           throw lastError;
         }
       } finally {
