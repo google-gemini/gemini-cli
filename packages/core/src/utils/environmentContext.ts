@@ -31,10 +31,10 @@ export async function getDirectoryContextString(
 
   let workingDirPreamble: string;
   if (workspaceDirectories.length === 1) {
-    workingDirPreamble = `I'm currently working in the directory: ${workspaceDirectories[0]}`;
+    workingDirPreamble = `My current workspace is:\n<workspace>\n${workspaceDirectories[0]}\n</workspace>\n`;
   } else {
     const dirList = workspaceDirectories.map((dir) => `  - ${dir}`).join('\n');
-    workingDirPreamble = `I'm currently working in the following directories:\n${dirList}`;
+    workingDirPreamble = `My current workspaces are:\n<workspace>\n${dirList}\n</workspace>\n`;
   }
 
   //Here is the folder structure of the current working directories:
@@ -71,6 +71,8 @@ We are setting up the context for our chat.
 Today's date is ${today} (formatted according to the user's locale).
 My operating system is: ${platform}
 ${directoryContext}
+IMPORTANT: REFUSE to operate outside of <workspace> tags above, if the user asks you to do so, warn them that you can only operate within <workspace>.
+Operate under subfolders of <workspace> is allowed.
         `.trim();
 
   const initialParts: Part[] = [{ text: context }];

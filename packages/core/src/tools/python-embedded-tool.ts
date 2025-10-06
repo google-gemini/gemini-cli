@@ -371,6 +371,19 @@ This tool uses an embedded Python 3.13.7 environment to ensure stable and consis
     - When xlwings encounters persistent or cryptic errors (e.g., COM errors, attribute errors on chart objects) despite following documentation, consider switching to openpyxl for file-based operations (if interaction with an open instance is not strictly required) or inform the user about the technical limitations and suggest manual intervention in Excel
 *NOTICE*: You may use neither openpyxl nor xlwings, as long as the task can be accomplished with pandas/matplotlib or other Python libraries directly
 
+## GENERAL GUIDELINES
+- NEVER assume a worksheet has table headers; NEVER assume there is only one header row, there may be multiple header rows or no headers at all; Ferthermore, there maybe multiple tables and headers in a single worksheet, if necessary, try to identify the correct table by sampling data
+
+## User may refer column letters like "A", "B", "C", or even "XA", "XB" in complex sheets, convert them to numerical indexes use a function like this:
+\`\`\`python
+def col_letter_to_index(col_letter):
+    col_letter = col_letter.upper()
+    index = 0
+    for i, char in enumerate(reversed(col_letter)):
+        index += (ord(char) - ord('A') + 1) * (26 ** i)
+    return index
+\`\`\`
+
 ## Common xlwings operations
 - Open or connect to an existing workbook:
   \`\`\`python
