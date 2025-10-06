@@ -6,12 +6,14 @@
 
 import React from 'react';
 import { Text, Box } from 'ink';
+import type { AlignType } from 'mdast';
 import { theme } from '../semantic-colors.js';
 import { RenderInline, getPlainTextLength } from './InlineMarkdownRenderer.js';
 
 interface TableRendererProps {
   headers: string[];
   rows: string[][];
+  alignment?: AlignType[];
   terminalWidth: number;
 }
 
@@ -22,6 +24,7 @@ interface TableRendererProps {
 export const TableRenderer: React.FC<TableRendererProps> = ({
   headers,
   rows,
+  alignment,
   terminalWidth,
 }) => {
   // Calculate column widths using actual display width after markdown processing
@@ -41,10 +44,11 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
     Math.floor(width * scaleFactor),
   );
 
-  // Helper function to render a cell with proper width
+  // Helper function to render a cell with proper width and alignment
   const renderCell = (
     content: string,
     width: number,
+    columnIndex: number,
     isHeader = false,
   ): React.ReactNode => {
     const contentWidth = Math.max(0, width - 2);
@@ -86,8 +90,28 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
     const actualDisplayWidth = getPlainTextLength(cellContent);
     const paddingNeeded = Math.max(0, contentWidth - actualDisplayWidth);
 
+    // Get alignment for this column (default to left)
+    const align = alignment?.[columnIndex] || 'left';
+
+    // Distribute padding based on alignment
+    let leftPadding = 0;
+    let rightPadding = 0;
+
+    if (align === 'center') {
+      leftPadding = Math.floor(paddingNeeded / 2);
+      rightPadding = paddingNeeded - leftPadding;
+    } else if (align === 'right') {
+      leftPadding = paddingNeeded;
+      rightPadding = 0;
+    } else {
+      // 'left' or null
+      leftPadding = 0;
+      rightPadding = paddingNeeded;
+    }
+
     return (
       <Text>
+        {' '.repeat(leftPadding)}
         {isHeader ? (
           <Text bold color={theme.text.link}>
             <RenderInline text={cellContent} />
@@ -95,7 +119,7 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
         ) : (
           <RenderInline text={cellContent} />
         )}
-        {' '.repeat(paddingNeeded)}
+        {' '.repeat(rightPadding)}
       </Text>
     );
   };
@@ -119,7 +143,7 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
   const renderRow = (cells: string[], isHeader = false): React.ReactNode => {
     const renderedCells = cells.map((cell, index) => {
       const width = adjustedWidths[index] || 0;
-      return renderCell(cell || '', width, isHeader);
+      return renderCell(cell || '', width, index, isHeader);
     });
 
     return (

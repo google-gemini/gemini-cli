@@ -33,6 +33,7 @@ import type {
   ListItem,
   Table,
   Blockquote,
+  AlignType,
 } from 'mdast';
 import { theme } from '../semantic-colors.js';
 import { colorizeCode } from './CodeColorizer.js';
@@ -163,6 +164,7 @@ const RenderCodeBlock = React.memo(RenderCodeBlockInternal);
 function extractTableData(node: Table): {
   headers: string[];
   rows: string[][];
+  alignment?: AlignType[];
 } {
   const headers: string[] = [];
   if (node.children.length > 0 && node.children[0].children) {
@@ -188,7 +190,7 @@ function extractTableData(node: Table): {
     });
     rows.push(cells);
   }
-  return { headers, rows };
+  return { headers, rows, alignment: node.align || undefined };
 }
 
 /**
@@ -303,7 +305,7 @@ const RenderListItemInternal: React.FC<RenderListItemInternalProps> = ({
       ))}
 
       {tables.map((table, idx) => {
-        const { headers, rows } = extractTableData(table);
+        const { headers, rows, alignment } = extractTableData(table);
         return (
           <Box
             key={`table-${depth}-${index}-${idx}`}
@@ -314,6 +316,7 @@ const RenderListItemInternal: React.FC<RenderListItemInternalProps> = ({
             <TableRenderer
               headers={headers}
               rows={rows}
+              alignment={alignment}
               terminalWidth={terminalWidth - 3}
             />
           </Box>
@@ -481,13 +484,14 @@ function transformTable(
   terminalWidth: number,
 ): React.ReactElement {
   const isTopLevel = depth === 0;
-  const { headers, rows } = extractTableData(node);
+  const { headers, rows, alignment } = extractTableData(node);
 
   return (
     <Box key={key} marginBottom={isTopLevel ? 1 : 0}>
       <TableRenderer
         headers={headers}
         rows={rows}
+        alignment={alignment}
         terminalWidth={terminalWidth}
       />
     </Box>
