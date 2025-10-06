@@ -2,22 +2,6 @@
 
 Wondering what's new in Gemini CLI? This document provides key highlights and notable changes to Gemini CLI.
 
-## v0.8.0 - Gemini CLI weekly update - 2025-09-29
-
-- 🎉**Introducing Gemini CLI Extensions**🎉:
-  - Build, manage, and customize your Gemini CLI experience with extensions.
-  - Manage your extensions at the command line with:
-    - `gemini extensions install|uninstall|link`
-    - `gemini extensions enable|disable`
-    - `gemini extensions list|upgrade`
-- 🎉 **Interactive shell:** Run interactive commands like `vim`, `rebase -i`, or even `gemini` 😎 directly in Gemini CLI. ([pr](https://github.com/google-gemini/gemini-cli/pull/6694) by [@galz10](https://github.com/galz10))
-- **Model selection:** Choose the Gemini model for your session with /model. ([pr](https://github.com/google-gemini/gemini-cli/pull/8940) by [@abhipatel12](https://github.com/abhipatel12))
-- **Model routing:** Gemini CLI will now intelligently pick the best model for the task. Simple queries will be sent to Flash while complex analytical or creative tasks will still use the power of Pro. This ensures your quota will last for a longer period of time. You can always opt-out of this via `/model`. ([pr](https://github.com/google-gemini/gemini-cli/pull/9262) by [@abhipatel12](https://github.com/abhipatel12))
-- **Folder trust:**
-  - Opening Gemini CLI in a folder for the first time will now surface a trust dialog. ([pr](https://github.com/google-gemini/gemini-cli/pull/5815) by [@shrutip90](https://github.com/shrutip90))
-  - Enable or disable checking folder trust holistically with `folderTrust` in your settings.json. ([pr](https://github.com/google-gemini/gemini-cli/pull/5798) by [@shrutip90](https://github.com/shrutip90))
-- **Small features, polish, reliability & bug fixes:** A large amount of changes, smaller features, UI updates, reliability and bug fixes + general polish made it in this week!
-
 ## v0.7.0 - Gemini CLI weekly update - 2025-09-22
 
 - 🎉**Build your own Gemini CLI IDE plugin:** We've published a spec for creating IDE plugins to enable rich context-aware experiences and native in-editor diffing in your IDE of choice. ([pr](https://github.com/google-gemini/gemini-cli/pull/8479) by [@skeshive](https://github.com/skeshive))
