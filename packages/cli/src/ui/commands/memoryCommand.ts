@@ -4,11 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {
-  getErrorMessage,
-  loadServerHierarchicalMemory,
-} from '@google/gemini-cli-core';
+import { getErrorMessage } from '@google/gemini-cli-core';
 import { MessageType } from '../types.js';
+import { loadHierarchicalGeminiMemory } from '../../config/config.js';
 import type { SlashCommand, SlashCommandActionReturn } from './types.js';
 import { CommandKind } from './types.js';
 
@@ -82,25 +80,26 @@ export const memoryCommand: SlashCommand = {
 
         try {
           const config = await context.services.config;
+          const settings = context.services.settings;
           if (config) {
             const { memoryContent, fileCount, filePaths } =
-              await loadServerHierarchicalMemory(
+              await loadHierarchicalGeminiMemory(
                 config.getWorkingDir(),
                 config.shouldLoadMemoryFromIncludeDirectories()
                   ? config.getWorkspaceContext().getDirectories()
                   : [],
                 config.getDebugMode(),
                 config.getFileService(),
+                settings.merged,
                 config.getExtensionContextFilePaths(),
-                config.getFolderTrust(),
-                context.services.settings.merged.context?.importFormat ||
-                  'tree', // Use setting or default to 'tree'
+                config.isTrustedFolder(),
+                settings.merged.context?.importFormat || 'tree',
                 config.getFileFilteringOptions(),
-                context.services.settings.merged.context?.discoveryMaxDirs,
               );
             config.setUserMemory(memoryContent);
             config.setGeminiMdFileCount(fileCount);
             config.setGeminiMdFilePaths(filePaths);
+            context.ui.setGeminiMdFileCount(fileCount);
 
             const successMessage =
               memoryContent.length > 0
