@@ -38,7 +38,10 @@ const REQUIRED_PACKAGES = [
   'lxml',
   'feedparser',
   'textblob',
-  'trafilatura'
+  'trafilatura',
+  'scipy',
+  'statsmodels',
+  'arch'
 ];
 
 function log(message) {
