@@ -14,6 +14,9 @@ inputs:
   wombat-token-cli:
     description: 'The npm token for the @google/gemini-cli package.'
     required: true
+  wombat-token-a2a-server:
+    description: 'The npm token for the @google/gemini-cli-a2a-server package.'
+    required: true
   github-token:
     description: 'The GitHub token for creating the release.'
     required: true
@@ -143,6 +146,17 @@ runs:
           npm publish --workspace="@google/gemini-cli" --no-tag
         fi
 
+    - name: '📦 Publish @google/gemini-cli-a2a-server'
+      working-directory: '${{ inputs.working-directory }}'
+      env:
+        NODE_AUTH_TOKEN: '${{ inputs.wombat-token-a2a-server }}'
+      shell: 'bash'
+      run: |
+        npm publish \
+          --dry-run="${{ inputs.dry-run }}" \
+          --workspace="@google/gemini-cli-a2a-server" \
+          --no-tag
+
     - name: '🔬 Verify NPM release by version'
       uses: './.github/actions/verify-release'
       if: "${{ inputs.dry-run != 'true' && inputs.force-skip-tests != 'true' }}"
@@ -161,6 +175,7 @@ runs:
         dry-run: '${{ inputs.dry-run }}'
         wombat-token-core: '${{ inputs.wombat-token-core }}'
         wombat-token-cli: '${{ inputs.wombat-token-cli }}'
+        wombat-token-a2a-server: '${{ inputs.wombat-token-a2a-server }}'
 
     - name: '🎁 Bundle'
       working-directory: '${{ inputs.working-directory }}'

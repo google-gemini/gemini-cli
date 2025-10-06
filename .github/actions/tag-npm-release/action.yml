@@ -16,6 +16,9 @@ inputs:
     required: true
   wombat-token-cli:
     description: 'The npm token for wombat @google/gemini-cli'
+  wombat-token-a2a-server:
+    description: 'The npm token for the @google/gemini-cli-a2a-server package.'
+    required: true
 
 runs:
   using: 'composite'
@@ -49,9 +52,18 @@ runs:
       run: |
         npm dist-tag add @google/gemini-cli@${{ inputs.version }} ${{ inputs.channel }}
 
+    - name: 'Change tag for @google/gemini-cli-a2a-server'
+      if: |-
+        ${{ inputs.dry-run == 'false' }}
+      env:
+        NODE_AUTH_TOKEN: '${{ inputs.wombat-token-a2a-server }}'
+      shell: 'bash'
+      run: |
+        npm dist-tag add @google/gemini-cli-a2a-server@${{ inputs.version }} ${{ inputs.channel }}
+
     - name: 'Log dry run'
       if: |-
         ${{ inputs.dry-run == 'true' }}
       shell: 'bash'
       run: |
-        echo "Dry run: Would have added tag '${{ inputs.channel }}' to version '${{ inputs.version }}' for @google/gemini-cli and @google/gemini-cli-core."
+        echo "Dry run: Would have added tag '${{ inputs.channel }}' to version '${{ inputs.version }}' for @google/gemini-cli, @google/gemini-cli-core, and @google/gemini-cli-a2a-server."

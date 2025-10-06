@@ -13,8 +13,8 @@
     "gemini-cli-a2a-server": "dist/src/http/server.js"
   },
   "scripts": {
-    "build": "node ../../scripts/build_package.js",
     "start": "node dist/src/http/server.js",
+    "build": "node ../../scripts/build_package.js",
     "lint": "eslint . --ext .ts,.tsx",
     "format": "prettier --write .",
     "test": "vitest run",
