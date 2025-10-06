@@ -156,7 +156,7 @@ export const findLastSafeSplitPoint = (content: string) => {
       break;
     }
 
-    const potentialSplitPoint = dnlIndex + 2;
+    const potentialSplitPoint = dnlIndex;
     if (!isIndexInsideCodeBlock(content, potentialSplitPoint)) {
       return potentialSplitPoint;
     }
