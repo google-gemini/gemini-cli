@@ -211,6 +211,7 @@ export interface ConfigParameters {
   geminiMdFilePaths?: string[];
   approvalMode?: ApprovalMode;
   showMemoryUsage?: boolean;
+  showNonInteractiveToolInfo?: boolean;
   contextFileName?: string | string[];
   accessibility?: AccessibilitySettings;
   telemetry?: TelemetrySettings;
@@ -289,6 +290,7 @@ export class Config {
   private geminiMdFilePaths: string[];
   private approvalMode: ApprovalMode;
   private readonly showMemoryUsage: boolean;
+  private readonly showNonInteractiveToolInfo: boolean;
   private readonly accessibility: AccessibilitySettings;
   private readonly telemetrySettings: TelemetrySettings;
   private readonly usageStatisticsEnabled: boolean;
@@ -380,6 +382,8 @@ export class Config {
     this.geminiMdFilePaths = params.geminiMdFilePaths ?? [];
     this.approvalMode = params.approvalMode ?? ApprovalMode.DEFAULT;
     this.showMemoryUsage = params.showMemoryUsage ?? false;
+    this.showNonInteractiveToolInfo =
+      params.showNonInteractiveToolInfo ?? false;
     this.accessibility = params.accessibility ?? {};
     this.telemetrySettings = {
       enabled: params.telemetry?.enabled ?? false,
@@ -724,6 +728,10 @@ export class Config {
 
   getShowMemoryUsage(): boolean {
     return this.showMemoryUsage;
+  }
+
+  getShowNonInteractiveToolInfo(): boolean {
+    return this.showNonInteractiveToolInfo;
   }
 
   getAccessibility(): AccessibilitySettings {

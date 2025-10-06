@@ -330,6 +330,7 @@ describe('gemini.tsx main function kitty protocol', () => {
       useSmartEdit: undefined,
       useWriteTodos: undefined,
       outputFormat: undefined,
+      showNonInteractiveToolInfo: undefined,
     });
 
     await main();

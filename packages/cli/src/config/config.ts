@@ -67,6 +67,7 @@ export interface CliArgs {
   promptInteractive: string | undefined;
   allFiles: boolean | undefined;
   showMemoryUsage: boolean | undefined;
+  showNonInteractiveToolInfo: boolean | undefined;
   yolo: boolean | undefined;
   approvalMode: string | undefined;
   telemetry: boolean | undefined;
@@ -207,6 +208,11 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
         .option('show-memory-usage', {
           type: 'boolean',
           description: 'Show memory usage in status bar',
+          default: false,
+        })
+        .option('show-non-interactive-tool-info', {
+          type: 'boolean',
+          description: 'Show tool usage in non-interactive mode',
           default: false,
         })
         .option('yolo', {
@@ -662,6 +668,10 @@ export async function loadCliConfig(
     approvalMode,
     showMemoryUsage:
       argv.showMemoryUsage || settings.ui?.showMemoryUsage || false,
+    showNonInteractiveToolInfo:
+      argv.showNonInteractiveToolInfo ||
+      settings.general?.showNonInteractiveToolInfo ||
+      false,
     accessibility: {
       ...settings.ui?.accessibility,
       screenReader,
