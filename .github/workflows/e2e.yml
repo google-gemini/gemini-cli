@@ -38,6 +38,7 @@ jobs:
         uses: 'cariad-tech/merge-queue-ci-skipper@1032489e59437862c90a08a2c92809c903883772' # ratchet:cariad-tech/merge-queue-ci-skipper@main
         with:
           secret: '${{ secrets.GITHUB_TOKEN }}'
+    continue-on-error: true
 
   e2e_linux:
     name: 'E2E Test (Linux) - ${{ matrix.sandbox }}'
