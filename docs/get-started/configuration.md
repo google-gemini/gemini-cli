@@ -1,13 +1,11 @@
 # Gemini CLI Configuration
 
-**Note on New Configuration Format**
-
-The format of the `settings.json` file has been updated to a new, more organized structure.
-
-- The new format will be supported in the stable release starting **[09/10/25]**.
-- Automatic migration from the old format to the new format will begin on **[09/17/25]**.
-
-For details on the previous format, please see the [v1 Configuration documentation](./configuration-v1.md).
+> **Note on Configuration Format, 9/17/25:** The format of the `settings.json` file has been updated to a new, more organized structure.
+>
+> - The new format will be supported in the stable release starting **[09/10/25]**.
+> - Automatic migration from the old format to the new format will begin on **[09/17/25]**.
+>
+> For details on the previous format, please see the [v1 Configuration documentation](./configuration-v1.md).
 
 Gemini CLI offers several ways to configure its behavior, including environment variables, command-line arguments, and settings files. This document outlines the different configuration methods and available settings.
 
@@ -42,7 +40,7 @@ Gemini CLI uses JSON settings files for persistent configuration. There are four
 
 **Note on environment variables in settings:** String values within your `settings.json` files can reference environment variables using either `$VAR_NAME` or `${VAR_NAME}` syntax. These variables will be automatically resolved when the settings are loaded. For example, if you have an environment variable `MY_API_TOKEN`, you could use it in `settings.json` like this: `"apiKey": "$MY_API_TOKEN"`.
 
-> **Note for Enterprise Users:** For guidance on deploying and managing Gemini CLI in a corporate environment, please see the [Enterprise Configuration](./enterprise.md) documentation.
+> **Note for Enterprise Users:** For guidance on deploying and managing Gemini CLI in a corporate environment, please see the [Enterprise Configuration](../cli/enterprise.md) documentation.
 
 ### The `.gemini` directory in your project
 
@@ -86,7 +84,7 @@ Settings are organized into categories. All settings should be placed within the
 #### `ui`
 
 - **`ui.theme`** (string):
-  - **Description:** The color theme for the UI. See [Themes](./themes.md) for available options.
+  - **Description:** The color theme for the UI. See [Themes](../cli/themes.md) for available options.
   - **Default:** `undefined`
 
 - **`ui.customThemes`** (object):
@@ -124,6 +122,10 @@ Settings are organized into categories. All settings should be placed within the
 - **`ui.accessibility.disableLoadingPhrases`** (boolean):
   - **Description:** Disable loading phrases for accessibility.
   - **Default:** `false`
+
+- **`ui.customWittyPhrases`** (array of strings):
+  - **Description:** A list of custom phrases to display during loading states. When provided, the CLI will cycle through these phrases instead of the default ones.
+  - **Default:** `[]`
 
 #### `ide`
 
@@ -208,7 +210,7 @@ Settings are organized into categories. All settings should be placed within the
   Use `node-pty` for an interactive shell experience. Fallback to `child_process` still applies. Defaults to `false`.
 
 - **`tools.core`** (array of strings):
-  - **Description:** This can be used to restrict the set of built-in tools [with an allowlist](./enterprise.md#restricting-tool-access). See [Built-in Tools](../core/tools-api.md#built-in-tools) for a list of core tools. The match semantics are the same as `tools.allowed`.
+  - **Description:** This can be used to restrict the set of built-in tools [with an allowlist](../cli/enterprise.md#restricting-tool-access). See [Built-in Tools](../core/tools-api.md#built-in-tools) for a list of core tools. The match semantics are the same as `tools.allowed`.
   - **Default:** `undefined`
 
 - **`tools.exclude`** (array of strings):
@@ -225,7 +227,7 @@ Settings are organized into categories. All settings should be placed within the
 
 - **`tools.callCommand`** (string):
   - **Description:** Defines a custom shell command for calling a specific tool that was discovered using `tools.discoveryCommand`. The shell command must meet the following criteria:
-    - It must take function `name` (exactly as in [function declaration](https://ai.google.dev/gemini-api/docs/function-calling#function-declarations)) as first command line argument.
+    - It must take function `name` (exactly as in [function declaration](https://ai.google.dev/gemini-api/docs/function-calling#function-declarations)) as the first command line argument.
     - It must read function arguments as JSON on `stdin`, analogous to [`functionCall.args`](https://cloud.google.com/vertex-ai/generative-ai/docs/model-reference/inference#functioncall).
     - It must return function output as JSON on `stdout`, analogous to [`functionResponse.response.content`](https://cloud.google.com/vertex-ai/generative-ai/docs/model-reference/inference#functionresponse).
   - **Default:** `undefined`
@@ -300,7 +302,7 @@ Configures connections to one or more Model-Context Protocol (MCP) servers for d
 
 #### `telemetry`
 
-Configures logging and metrics collection for Gemini CLI. For more information, see [Telemetry](../telemetry.md).
+Configures logging and metrics collection for Gemini CLI. For more information, see [Telemetry](../cli/telemetry.md).
 
 - **Properties:**
   - **`enabled`** (boolean): Whether or not telemetry is enabled.
@@ -324,7 +326,11 @@ Here is an example of a `settings.json` file with the nested structure, new as o
   "ui": {
     "theme": "GitHub",
     "hideBanner": true,
-    "hideTips": false
+    "hideTips": false,
+    "customWittyPhrases": [
+      "You forget a thousand things every day. Make sure this is one of ’em",
+      "Connecting to AGI"
+    ]
   },
   "tools": {
     "sandbox": "docker",
@@ -441,7 +447,7 @@ The CLI automatically loads environment variables from an `.env` file. The loadi
   - Overrides the `telemetry.useCollector` setting.
 - **`GOOGLE_CLOUD_LOCATION`**:
   - Your Google Cloud Project Location (e.g., us-central1).
-  - Required for using Vertex AI in non express mode.
+  - Required for using Vertex AI in non-express mode.
   - Example: `export GOOGLE_CLOUD_LOCATION="YOUR_PROJECT_LOCATION"`.
 - **`GEMINI_SANDBOX`**:
   - Alternative to the `sandbox` setting in `settings.json`.
@@ -508,17 +514,17 @@ Arguments passed directly when running the CLI can override other configurations
   - A comma-separated list of tool names that will bypass the confirmation dialog.
   - Example: `gemini --allowed-tools "ShellTool(git status)"`
 - **`--telemetry`**:
-  - Enables [telemetry](../telemetry.md).
+  - Enables [telemetry](../cli/telemetry.md).
 - **`--telemetry-target`**:
-  - Sets the telemetry target. See [telemetry](../telemetry.md) for more information.
+  - Sets the telemetry target. See [telemetry](../cli/telemetry.md) for more information.
 - **`--telemetry-otlp-endpoint`**:
-  - Sets the OTLP endpoint for telemetry. See [telemetry](../telemetry.md) for more information.
+  - Sets the OTLP endpoint for telemetry. See [telemetry](../cli/telemetry.md) for more information.
 - **`--telemetry-otlp-protocol`**:
-  - Sets the OTLP protocol for telemetry (`grpc` or `http`). Defaults to `grpc`. See [telemetry](../telemetry.md) for more information.
+  - Sets the OTLP protocol for telemetry (`grpc` or `http`). Defaults to `grpc`. See [telemetry](../cli/telemetry.md) for more information.
 - **`--telemetry-log-prompts`**:
-  - Enables logging of prompts for telemetry. See [telemetry](../telemetry.md) for more information.
+  - Enables logging of prompts for telemetry. See [telemetry](../cli/telemetry.md) for more information.
 - **`--checkpointing`**:
-  - Enables [checkpointing](../checkpointing.md).
+  - Enables [checkpointing](../cli/checkpointing.md).
 - **`--extensions <extension_name ...>`** (**`-e <extension_name ...>`**):
   - Specifies a list of extensions to use for the session. If not provided, all available extensions are used.
   - Use the special term `gemini -e none` to disable all extensions.
@@ -594,7 +600,7 @@ This example demonstrates how you can provide general project context, specific 
 - **Commands for Memory Management:**
   - Use `/memory refresh` to force a re-scan and reload of all context files from all configured locations. This updates the AI's instructional context.
   - Use `/memory show` to display the combined instructional context currently loaded, allowing you to verify the hierarchy and content being used by the AI.
-  - See the [Commands documentation](./commands.md#memory) for full details on the `/memory` command and its sub-commands (`show` and `refresh`).
+  - See the [Commands documentation](../cli/commands.md#memory) for full details on the `/memory` command and its sub-commands (`show` and `refresh`).
 
 By understanding and utilizing these configuration layers and the hierarchical nature of context files, you can effectively manage the AI's memory and tailor the Gemini CLI's responses to your specific needs and projects.
 

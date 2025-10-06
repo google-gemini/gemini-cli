@@ -29,11 +29,14 @@ import {
   EVENT_CONTENT_RETRY,
   EVENT_CONTENT_RETRY_FAILURE,
   EVENT_FILE_OPERATION,
+  EVENT_TOOL_OUTPUT_TRUNCATED,
   EVENT_RIPGREP_FALLBACK,
   EVENT_MODEL_ROUTING,
   EVENT_EXTENSION_INSTALL,
   EVENT_MODEL_SLASH_COMMAND,
   EVENT_EXTENSION_DISABLE,
+  EVENT_SMART_EDIT_STRATEGY,
+  EVENT_SMART_EDIT_CORRECTION,
 } from './constants.js';
 import type {
   ApiErrorEvent,
@@ -64,11 +67,11 @@ import type {
   ExtensionUninstallEvent,
   ExtensionInstallEvent,
   ModelSlashCommandEvent,
+  SmartEditStrategyEvent,
+  SmartEditCorrectionEvent,
 } from './types.js';
 import {
   recordApiErrorMetrics,
-  recordTokenUsageMetrics,
-  recordApiResponseMetrics,
   recordToolCallMetrics,
   recordChatCompressionMetrics,
   recordFileOperationMetric,
@@ -77,6 +80,9 @@ import {
   recordContentRetryFailure,
   recordModelRoutingMetrics,
   recordModelSlashCommand,
+  getConventionAttributes,
+  recordTokenUsageMetrics,
+  recordApiResponseMetrics,
 } from './metrics.js';
 import { isTelemetrySdkInitialized } from './sdk.js';
 import type { UiEvent } from './uiTelemetry.js';
@@ -209,7 +215,7 @@ export function logToolOutputTruncated(
   const attributes: LogAttributes = {
     ...getCommonAttributes(config),
     ...event,
-    'event.name': 'tool_output_truncated',
+    'event.name': EVENT_TOOL_OUTPUT_TRUNCATED,
     'event.timestamp': new Date().toISOString(),
   };
 
@@ -366,6 +372,17 @@ export function logApiError(config: Config, event: ApiErrorEvent): void {
     status_code: event.status_code,
     error_type: event.error_type,
   });
+
+  // Record GenAI operation duration for errors
+  const conventionAttributes = getConventionAttributes(event);
+  recordApiResponseMetrics(config, event.duration_ms, {
+    model: event.model,
+    status_code: event.status_code,
+    genAiAttributes: {
+      ...conventionAttributes,
+      'error.type': event.error_type || 'unknown',
+    },
+  });
 }
 
 export function logApiResponse(config: Config, event: ApiResponseEvent): void {
@@ -398,30 +415,30 @@ export function logApiResponse(config: Config, event: ApiResponseEvent): void {
     attributes,
   };
   logger.emit(logRecord);
+
+  const conventionAttributes = getConventionAttributes(event);
+
   recordApiResponseMetrics(config, event.duration_ms, {
     model: event.model,
     status_code: event.status_code,
+    genAiAttributes: conventionAttributes,
   });
-  recordTokenUsageMetrics(config, event.input_token_count, {
-    model: event.model,
-    type: 'input',
-  });
-  recordTokenUsageMetrics(config, event.output_token_count, {
-    model: event.model,
-    type: 'output',
-  });
-  recordTokenUsageMetrics(config, event.cached_content_token_count, {
-    model: event.model,
-    type: 'cache',
-  });
-  recordTokenUsageMetrics(config, event.thoughts_token_count, {
-    model: event.model,
-    type: 'thought',
-  });
-  recordTokenUsageMetrics(config, event.tool_token_count, {
-    model: event.model,
-    type: 'tool',
-  });
+
+  const tokenUsageData = [
+    { count: event.input_token_count, type: 'input' as const },
+    { count: event.output_token_count, type: 'output' as const },
+    { count: event.cached_content_token_count, type: 'cache' as const },
+    { count: event.thoughts_token_count, type: 'thought' as const },
+    { count: event.tool_token_count, type: 'tool' as const },
+  ];
+
+  for (const { count, type } of tokenUsageData) {
+    recordTokenUsageMetrics(config, count, {
+      model: event.model,
+      type,
+      genAiAttributes: conventionAttributes,
+    });
+  }
 }
 
 export function logLoopDetected(
@@ -800,6 +817,48 @@ export function logExtensionDisable(
   const logger = logs.getLogger(SERVICE_NAME);
   const logRecord: LogRecord = {
     body: `Disabled extension ${event.extension_name}`,
+    attributes,
+  };
+  logger.emit(logRecord);
+}
+
+export function logSmartEditStrategy(
+  config: Config,
+  event: SmartEditStrategyEvent,
+): void {
+  ClearcutLogger.getInstance(config)?.logSmartEditStrategyEvent(event);
+  if (!isTelemetrySdkInitialized()) return;
+
+  const attributes: LogAttributes = {
+    ...getCommonAttributes(config),
+    ...event,
+    'event.name': EVENT_SMART_EDIT_STRATEGY,
+  };
+
+  const logger = logs.getLogger(SERVICE_NAME);
+  const logRecord: LogRecord = {
+    body: `Smart Edit Tool Strategy: ${event.strategy}`,
+    attributes,
+  };
+  logger.emit(logRecord);
+}
+
+export function logSmartEditCorrectionEvent(
+  config: Config,
+  event: SmartEditCorrectionEvent,
+): void {
+  ClearcutLogger.getInstance(config)?.logSmartEditCorrectionEvent(event);
+  if (!isTelemetrySdkInitialized()) return;
+
+  const attributes: LogAttributes = {
+    ...getCommonAttributes(config),
+    ...event,
+    'event.name': EVENT_SMART_EDIT_CORRECTION,
+  };
+
+  const logger = logs.getLogger(SERVICE_NAME);
+  const logRecord: LogRecord = {
+    body: `Smart Edit Tool Correction: ${event.correction}`,
     attributes,
   };
   logger.emit(logRecord);

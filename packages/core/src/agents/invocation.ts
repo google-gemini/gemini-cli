@@ -14,6 +14,8 @@ import type {
   AgentInputs,
   SubagentActivityEvent,
 } from './types.js';
+import type { MessageBus } from '../confirmation-bus/message-bus.js';
+import { type z } from 'zod';
 
 const INPUT_PREVIEW_MAX_LENGTH = 50;
 const DESCRIPTION_MAX_LENGTH = 200;
@@ -28,21 +30,22 @@ const DESCRIPTION_MAX_LENGTH = 200;
  * live output stream.
  * 4. Formatting the final result into a {@link ToolResult}.
  */
-export class SubagentInvocation extends BaseToolInvocation<
-  AgentInputs,
-  ToolResult
-> {
+export class SubagentInvocation<
+  TOutput extends z.ZodTypeAny,
+> extends BaseToolInvocation<AgentInputs, ToolResult> {
   /**
    * @param params The validated input parameters for the agent.
    * @param definition The definition object that configures the agent.
    * @param config The global runtime configuration.
+   * @param messageBus Optional message bus for policy enforcement.
    */
   constructor(
     params: AgentInputs,
-    private readonly definition: AgentDefinition,
+    private readonly definition: AgentDefinition<TOutput>,
     private readonly config: Config,
+    messageBus?: MessageBus,
   ) {
-    super(params);
+    super(params, messageBus);
   }
 
   /**
