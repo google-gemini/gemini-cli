@@ -67,7 +67,6 @@ jobs:
 
       - name: 'Get Patch Version'
         id: 'patch_version'
-        working-directory: './release'
         env:
           GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
         run: |
@@ -177,7 +176,6 @@ jobs:
             --label 'kind/bug,release-failure,priority/p0'
 
       - name: 'Comment Success on Original PR'
-        working-directory: './release'
         if: '${{ success() && github.event.inputs.original_pr }}'
         env:
           GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
@@ -195,7 +193,6 @@ jobs:
           node scripts/releasing/patch-comment.js
 
       - name: 'Comment Failure on Original PR'
-        working-directory: './release'
         if: '${{ failure() && github.event.inputs.original_pr }}'
         env:
           GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
