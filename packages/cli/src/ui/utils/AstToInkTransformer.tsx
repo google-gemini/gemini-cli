@@ -18,10 +18,11 @@
  */
 
 import React from 'react';
-import { Text, Box } from 'ink';
+import { Text, Box, Transform } from 'ink';
 import { unified } from 'unified';
 import remarkParse from 'remark-parse';
 import remarkGfm from 'remark-gfm';
+import terminalLink from 'terminal-link';
 import type {
   Root,
   RootContent,
@@ -216,12 +217,23 @@ export function renderPhrasing(children: PhrasingContent[]): React.ReactNode {
             {child.value}
           </Text>
         );
-      case 'link':
+      case 'link': {
+        // Use Transform + terminal-link for clickable hyperlinks
+        // This approach works because Transform operates on the rendered output string
+        const url = child.url || '';
         return (
-          <Text key={key} underline color="blue">
-            {renderPhrasing(child.children)}
-          </Text>
+          <Transform
+            key={key}
+            transform={(output) =>
+              terminalLink(output, url, { fallback: false })
+            }
+          >
+            <Text underline color="blue">
+              {renderPhrasing(child.children)}
+            </Text>
+          </Transform>
         );
+      }
       case 'delete':
         return (
           <Text key={key} strikethrough>
