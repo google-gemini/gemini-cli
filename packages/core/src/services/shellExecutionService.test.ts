@@ -356,6 +356,51 @@ describe('ShellExecutionService', () => {
       expect(result.aborted).toBe(true);
       // The process kill is mocked, so we just check that the flag is set.
     });
+
+    it('should send SIGTERM and then SIGKILL on abort', async () => {
+      vi.useFakeTimers();
+      const { result } = await simulateExecution(
+        'sleep 10',
+        async (pty, abortController) => {
+          abortController.abort();
+          await vi.advanceTimersByTimeAsync(250);
+          pty.onExit.mock.calls[0][0]({ exitCode: 0, signal: 9 });
+        },
+      );
+
+      expect(result.aborted).toBe(true);
+      expect(mockProcessKill).toHaveBeenCalledWith(
+        -mockPtyProcess.pid,
+        'SIGTERM',
+      );
+      expect(mockProcessKill).toHaveBeenCalledWith(
+        -mockPtyProcess.pid,
+        'SIGKILL',
+      );
+      expect(result.signal).toBe(9);
+      vi.useRealTimers();
+    });
+
+    it('should resolve immediately on abort, even with a long processing chain', async () => {
+      const start = performance.now();
+      const { result } = await simulateExecution(
+        'long-output',
+        (pty, abortController) => {
+          // Simulate a lot of data being in the queue to be processed
+          for (let i = 0; i < 1000; i++) {
+            pty.onData.mock.calls[0][0]('some data');
+          }
+          abortController.abort();
+          pty.onExit.mock.calls[0][0]({ exitCode: 1, signal: null });
+        },
+      );
+      const end = performance.now();
+
+      expect(result.aborted).toBe(true);
+      // The test should complete very quickly, without waiting for the simulated
+      // processing of 1000 data chunks.
+      expect(end - start).toBeLessThan(100);
+    });
   });
 
   describe('Binary Output', () => {
@@ -632,6 +677,28 @@ describe('ShellExecutionService child_process fallback', () => {
 
       expect(result.output.trim()).toBe('');
       expect(onOutputEventMock).not.toHaveBeenCalled();
+    });
+
+    it('should truncate stdout using a sliding window', async () => {
+      const MAX_SIZE = 16 * 1024 * 1024;
+      // Make the chunks slightly smaller than half to ensure the buffer overflows on the third write.
+      const chunk1 = 'a'.repeat(MAX_SIZE / 2 - 5);
+      const chunk2 = 'b'.repeat(MAX_SIZE / 2 - 5);
+      const chunk3 = 'c'.repeat(20);
+
+      const { result } = await simulateExecution('large-output', (cp) => {
+        cp.stdout?.emit('data', Buffer.from(chunk1));
+        cp.stdout?.emit('data', Buffer.from(chunk2));
+        cp.stdout?.emit('data', Buffer.from(chunk3));
+        cp.emit('exit', 0, null);
+      });
+
+      const expectedStart = (chunk1 + chunk2 + chunk3).slice(-MAX_SIZE);
+      expect(result.output.length).toBe(MAX_SIZE);
+      expect(result.output.startsWith(expectedStart.substring(0, 10))).toBe(
+        true,
+      );
+      expect(result.output.endsWith('c'.repeat(20))).toBe(true);
     });
   });
 

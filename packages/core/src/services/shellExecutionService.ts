@@ -21,6 +21,7 @@ import {
 const { Terminal } = pkg;
 
 const SIGKILL_TIMEOUT_MS = 200;
+const MAX_CHILD_PROCESS_BUFFER_SIZE = 16 * 1024 * 1024; // 16MB
 
 /** A structured result from a shell command execution. */
 export interface ShellExecutionResult {
@@ -216,8 +217,18 @@ export class ShellExecutionService {
 
             if (stream === 'stdout') {
               stdout += decodedChunk;
+              if (stdout.length > MAX_CHILD_PROCESS_BUFFER_SIZE) {
+                stdout = stdout.substring(
+                  stdout.length - MAX_CHILD_PROCESS_BUFFER_SIZE,
+                );
+              }
             } else {
               stderr += decodedChunk;
+              if (stderr.length > MAX_CHILD_PROCESS_BUFFER_SIZE) {
+                stderr = stderr.substring(
+                  stderr.length - MAX_CHILD_PROCESS_BUFFER_SIZE,
+                );
+              }
             }
           }
         };
@@ -394,6 +405,8 @@ export class ShellExecutionService {
           }
 
           const renderFn = () => {
+            renderTimeout = null;
+
             if (!isStreamingRawContent) {
               return;
             }
@@ -408,11 +421,11 @@ export class ShellExecutionService {
               }
             }
 
+            const buffer = headlessTerminal.buffer.active;
             let newOutput: AnsiOutput;
             if (shellExecutionConfig.showColor) {
               newOutput = serializeTerminalToObject(headlessTerminal);
             } else {
-              const buffer = headlessTerminal.buffer.active;
               const lines: AnsiOutput = [];
               for (let y = 0; y < headlessTerminal.rows; y++) {
                 const line = buffer.getLine(buffer.viewportY + y);
@@ -447,6 +460,10 @@ export class ShellExecutionService {
               }
             }
 
+            if (buffer.cursorY > lastNonEmptyLine) {
+              lastNonEmptyLine = buffer.cursorY;
+            }
+
             const trimmedOutput = newOutput.slice(0, lastNonEmptyLine + 1);
 
             const finalOutput = shellExecutionConfig.disableDynamicLineTrimming
@@ -465,9 +482,10 @@ export class ShellExecutionService {
 
           if (finalRender) {
             renderFn();
-          } else {
-            renderTimeout = setTimeout(renderFn, 17);
+            return;
           }
+
+          renderTimeout = setTimeout(renderFn, 17);
         };
 
         headlessTerminal.onScroll(() => {
@@ -535,7 +553,7 @@ export class ShellExecutionService {
             abortSignal.removeEventListener('abort', abortHandler);
             this.activePtys.delete(ptyProcess.pid);
 
-            processingChain.then(() => {
+            const finalize = () => {
               render(true);
               const finalBuffer = Buffer.concat(outputChunks);
 
@@ -551,7 +569,13 @@ export class ShellExecutionService {
                   (ptyInfo?.name as 'node-pty' | 'lydell-node-pty') ??
                   'node-pty',
               });
-            });
+            };
+
+            if (abortSignal.aborted) {
+              finalize();
+            } else {
+              processingChain.then(finalize);
+            }
           },
         );
 
@@ -562,10 +586,16 @@ export class ShellExecutionService {
             } else {
               try {
                 // Kill the entire process group
-                process.kill(-ptyProcess.pid, 'SIGINT');
+                process.kill(-ptyProcess.pid, 'SIGTERM');
+                await new Promise((res) => setTimeout(res, SIGKILL_TIMEOUT_MS));
+                if (!exited) {
+                  process.kill(-ptyProcess.pid, 'SIGKILL');
+                }
               } catch (_e) {
                 // Fallback to killing just the process if the group kill fails
-                ptyProcess.kill('SIGINT');
+                if (!exited) {
+                  ptyProcess.kill('SIGKILL');
+                }
               }
             }
           }
