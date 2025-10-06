@@ -113,6 +113,36 @@ The `gemini-extension.json` file contains the configuration for the extension. T
 
 When Gemini CLI starts, it loads all the extensions and merges their configurations. If there are any conflicts, the workspace configuration takes precedence.
 
+### Settings
+
+Extensions can define settings that the user will be prompted to provide upon installation. This is useful for things like API keys, URLs, or other configuration that the extension needs to function.
+
+To define settings, add a `settings` array to your `gemini-extension.json` file. Each object in the array should have the following properties:
+
+- `name`: A user-friendly name for the setting.
+- `description`: A description of the setting and what it's used for.
+- `envVar`: The name of the environment variable that the setting will be stored as.
+
+**Example**
+
+```json
+{
+  "name": "my-api-extension",
+  "version": "1.0.0",
+  "settings": [
+    {
+      "name": "API Key",
+      "description": "Your API key for the service.",
+      "envVar": "MY_API_KEY"
+    }
+  ]
+}
+```
+
+When a user installs this extension, they will be prompted to enter their API key. The value will be saved to a `.env` file in the extension's directory (e.g., `<home>/.gemini/extensions/my-api-extension/.env`).
+
+These will be available to scripts within your extension and also in the gemini-extension.json file. They are not available to e.g., custom commands or GEMINI.md files.
+
 ### Custom commands
 
 Extensions can provide [custom commands](../cli/custom-commands.md) by placing TOML files in a `commands/` subdirectory within the extension directory. These commands follow the same format as user and project custom commands and use standard naming conventions.

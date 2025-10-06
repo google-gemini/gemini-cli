@@ -9,6 +9,7 @@ import * as path from 'node:path';
 import {
   EXTENSIONS_CONFIG_FILENAME,
   INSTALL_METADATA_FILENAME,
+  type ExtensionSetting,
 } from '../config/extension.js';
 import {
   type MCPServerConfig,
@@ -23,12 +24,13 @@ export function createExtension({
   contextFileName = undefined as string | undefined,
   mcpServers = {} as Record<string, MCPServerConfig>,
   installMetadata = undefined as ExtensionInstallMetadata | undefined,
+  settings = undefined as ExtensionSetting[] | undefined,
 } = {}): string {
   const extDir = path.join(extensionsDir, name);
   fs.mkdirSync(extDir, { recursive: true });
   fs.writeFileSync(
     path.join(extDir, EXTENSIONS_CONFIG_FILENAME),
-    JSON.stringify({ name, version, contextFileName, mcpServers }),
+    JSON.stringify({ name, version, contextFileName, mcpServers, settings }),
   );
 
   if (addContextFile) {
