@@ -18,16 +18,16 @@ const isMainModule =
   path.resolve(process.argv[1]) ===
   path.resolve(url.fileURLToPath(import.meta.url));
 
-process.on('uncaughtException', (error) => {
-  logger.error('Unhandled exception:', error);
-  process.exit(1);
-});
-
 if (
   import.meta.url.startsWith('file:') &&
   isMainModule &&
   process.env['NODE_ENV'] !== 'test'
 ) {
+  process.on('uncaughtException', (error) => {
+    logger.error('Unhandled exception:', error);
+    process.exit(1);
+  });
+
   main().catch((error) => {
     logger.error('[CoreAgent] Unhandled error in main:', error);
     process.exit(1);
