@@ -248,6 +248,7 @@ interface RenderListItemInternalProps {
 
 /**
  * List item renderer with code block and table support
+ * Processes children in order to preserve content sequence
  */
 const RenderListItemInternal: React.FC<RenderListItemInternalProps> = ({
   node,
@@ -260,78 +261,153 @@ const RenderListItemInternal: React.FC<RenderListItemInternalProps> = ({
   const indent = '   '.repeat(depth);
   const marker = ordered ? `${(start || 1) + index}.` : '*';
 
-  // Extract first paragraph as item text
-  const firstParagraph = node.children.find(
-    (c): c is Paragraph => c.type === 'paragraph',
-  );
-  const itemText = firstParagraph
-    ? renderPhrasing(firstParagraph.children)
-    : '';
+  // Calculate spacing for continuation lines (indent + marker + space)
+  const markerLine = `${indent}${marker} `;
+  const continuationIndent = ' '.repeat(markerLine.length);
 
-  // Extract code blocks (CRITICAL for proper termination)
-  const codeBlocks = node.children.filter((c): c is Code => c.type === 'code');
+  if (node.children.length === 0) {
+    return (
+      <Box key={`item-${depth}-${index}`}>
+        <Text>
+          {indent}
+          {marker}
+        </Text>
+      </Box>
+    );
+  }
 
-  // Extract tables
-  const tables = node.children.filter((c): c is Table => c.type === 'table');
+  const elements: React.ReactNode[] = [];
+  let markerUsed = false;
 
-  // Extract nested lists
-  const nestedLists = node.children.filter((c): c is List => c.type === 'list');
+  // Use spread property to determine if we need spacing between children
+  const needsSpacing = node.spread || false;
+
+  // Process each child in order
+  node.children.forEach((child, childIdx) => {
+    const key = `child-${depth}-${index}-${childIdx}`;
+    const isFirstChild = childIdx === 0;
+
+    if (!markerUsed && child.type === 'paragraph') {
+      // First paragraph: render inline with marker
+      elements.push(
+        <Text key={key}>
+          {indent}
+          {marker} {renderPhrasing(child.children)}
+        </Text>,
+      );
+      markerUsed = true;
+    } else {
+      // All other children: render with continuation indent
+      let childElement: React.ReactNode = null;
+
+      // If marker not yet used, add it before first non-paragraph element
+      const prefix = !markerUsed ? `${indent}${marker}\n` : '';
+      if (!markerUsed) markerUsed = true;
+
+      // Add top margin for spread lists (preserves \n\n spacing)
+      const topMargin = needsSpacing && !isFirstChild ? 1 : 0;
+
+      switch (child.type) {
+        case 'paragraph':
+          childElement = (
+            <Box key={key} marginTop={topMargin}>
+              <Text wrap="wrap">
+                {continuationIndent}
+                {renderPhrasing(child.children)}
+              </Text>
+            </Box>
+          );
+          break;
+        case 'code':
+          childElement = (
+            <Box
+              key={key}
+              flexDirection="column"
+              marginTop={1}
+              marginBottom={1}
+            >
+              {prefix && <Text>{prefix.trim()}</Text>}
+              <Box paddingLeft={continuationIndent.length}>
+                <RenderCodeBlock
+                  code={child.value}
+                  language={child.lang || null}
+                  terminalWidth={terminalWidth - continuationIndent.length}
+                />
+              </Box>
+            </Box>
+          );
+          break;
+        case 'table': {
+          const { headers, rows, alignment } = extractTableData(child);
+          childElement = (
+            <Box
+              key={key}
+              flexDirection="column"
+              marginTop={1}
+              marginBottom={1}
+            >
+              {prefix && <Text>{prefix.trim()}</Text>}
+              <Box paddingLeft={continuationIndent.length}>
+                <TableRenderer
+                  headers={headers}
+                  rows={rows}
+                  alignment={alignment}
+                  terminalWidth={terminalWidth - continuationIndent.length}
+                />
+              </Box>
+            </Box>
+          );
+          break;
+        }
+        case 'list':
+          childElement = (
+            <Box key={key}>
+              {prefix && <Text>{prefix.trim()}</Text>}
+              {renderList(child, key, depth + 1, terminalWidth)}
+            </Box>
+          );
+          break;
+        case 'heading':
+        case 'blockquote':
+        case 'thematicBreak':
+          // These are less common in list items but should still be handled
+          childElement = (
+            <Box key={key}>
+              {prefix && <Text>{prefix.trim()}</Text>}
+              <Box paddingLeft={continuationIndent.length}>
+                {transformNode(
+                  child as RootContent,
+                  key,
+                  depth + 1,
+                  false,
+                  undefined,
+                  terminalWidth,
+                )}
+              </Box>
+            </Box>
+          );
+          break;
+        default:
+          // Unknown or unsupported type - skip
+          break;
+      }
+
+      if (childElement) {
+        elements.push(childElement);
+      }
+    }
+  });
 
   return (
     <Box key={`item-${depth}-${index}`} flexDirection="column">
-      <Text>
-        {indent}
-        {marker} {itemText}
-      </Text>
-
-      {codeBlocks.map((codeBlock, idx) => (
-        <Box
-          key={`code-${depth}-${index}-${idx}`}
-          paddingLeft={3}
-          marginTop={1}
-          marginBottom={1}
-        >
-          <RenderCodeBlock
-            code={codeBlock.value}
-            language={codeBlock.lang || null}
-          />
-        </Box>
-      ))}
-
-      {tables.map((table, idx) => {
-        const { headers, rows, alignment } = extractTableData(table);
-        return (
-          <Box
-            key={`table-${depth}-${index}-${idx}`}
-            paddingLeft={3}
-            marginTop={1}
-            marginBottom={1}
-          >
-            <TableRenderer
-              headers={headers}
-              rows={rows}
-              alignment={alignment}
-              terminalWidth={terminalWidth - 3}
-            />
-          </Box>
-        );
-      })}
-
-      {nestedLists.map((list, idx) =>
-        renderList(
-          list,
-          `nested-${depth}-${index}-${idx}`,
-          depth + 1,
-          terminalWidth,
-        ),
-      )}
+      {elements}
     </Box>
   );
 };
 
 /**
  * List renderer with depth tracking
- * Only top-level items get marginBottom={1}
+ * Spacing controlled by list spread property and depth
  */
 function renderList(
   node: List,
@@ -340,20 +416,33 @@ function renderList(
   terminalWidth?: number,
 ): React.ReactElement {
   const isTopLevel = depth === 0;
+  // Spread lists have blank lines between items in source markdown
+  const hasSpacing = node.spread || false;
 
   return (
     <Box key={key} flexDirection="column" marginBottom={isTopLevel ? 1 : 0}>
-      {node.children.map((item, index) => (
-        <RenderListItemInternal
-          key={`item-${depth}-${index}`}
-          node={item}
-          index={index}
-          depth={depth}
-          ordered={node.ordered || false}
-          start={node.start || undefined}
-          terminalWidth={terminalWidth}
-        />
-      ))}
+      {node.children.map((item, index) => {
+        // Add margin between list items for spread lists
+        const isLastItem = index === node.children.length - 1;
+        const itemMarginBottom = hasSpacing && !isLastItem ? 1 : 0;
+
+        return (
+          <Box
+            key={`item-wrapper-${depth}-${index}`}
+            marginBottom={itemMarginBottom}
+          >
+            <RenderListItemInternal
+              key={`item-${depth}-${index}`}
+              node={item}
+              index={index}
+              depth={depth}
+              ordered={node.ordered || false}
+              start={node.start || undefined}
+              terminalWidth={terminalWidth}
+            />
+          </Box>
+        );
+      })}
     </Box>
   );
 }
