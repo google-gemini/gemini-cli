@@ -42,12 +42,11 @@ jobs:
     name: 'E2E Test (Linux) - ${{ matrix.sandbox }}'
     needs: 'merge_queue_skipper'
     if: |
-      needs.merge_queue_skipper.outputs.skip == 'false' &&
-      (github.event_name == 'push' ||
+      github.event_name == 'push' ||
       github.event_name == 'merge_group' ||
       github.event_name == 'workflow_dispatch' ||
       (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) ||
-      (github.event_name == 'pull_request_target' && github.event.label.name == 'maintainer:e2e:ok'))
+      (github.event_name == 'pull_request_target' && github.event.label.name == 'maintainer:e2e:ok')
     runs-on: 'gemini-cli-ubuntu-16-core'
     strategy:
       fail-fast: false
@@ -224,10 +223,11 @@ jobs:
     name: 'E2E'
     if: |
       always() && (
-        github.event_name == 'push' ||
+        (needs.merge-queue-e2e-skipper.result !='success' || needs.merge_queue_skipper.outputs.skip == 'false') &&
+        (github.event_name == 'push' ||
         github.event_name == 'merge_group' ||
         (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) ||
-        (github.event_name == 'pull_request_target' && github.event.label.name == 'maintainer:e2e:ok')
+        (github.event_name == 'pull_request_target' && github.event.label.name == 'maintainer:e2e:ok'))
       )
     needs:
       - 'e2e_linux'
