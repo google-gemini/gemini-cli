@@ -16,6 +16,7 @@ inputs:
     required: true
   wombat-token-cli:
     description: 'The npm token for wombat @google/gemini-cli'
+    required: true
 
 runs:
   using: 'composite'
