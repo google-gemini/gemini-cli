@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useRef, useState, forwardRef, useImperativeHandle, useCallback, useEffect } from 'react';
+import { useRef, useState, forwardRef, useImperativeHandle, useCallback, useEffect, useMemo } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import type React from 'react';
 import { format } from 'date-fns';
@@ -20,6 +20,7 @@ import { multiModelService } from '@/services/multiModelService';
 import { useChatStore } from '@/stores/chatStore';
 import type { ChatMessage, ToolCallConfirmationDetails, ToolConfirmationOutcome, ToolCall } from '@/types';
 import { CodeHighlight } from '@/components/ui/CodeHighlight';
+import { ToolExecutionGroup } from './ToolExecutionGroup';
 
 
 
@@ -273,6 +274,82 @@ function parseToolResponse(message: ChatMessage): ParsedToolResponse | null {
   return null;
 }
 
+// Enhanced message type that groups tool executions
+interface ProcessedMessage {
+  type: 'regular' | 'tool_execution_group';
+  originalMessage: ChatMessage;
+  data?: {
+    executions?: Array<{
+      toolCall: ToolCall;
+      toolResponse?: {
+        content: string;
+        success?: boolean;
+        toolResponseData?: import('@/types').ToolResponseData;
+        timestamp?: Date;
+      };
+    }>;
+  };
+}
+
+/**
+ * Process messages to group tool calls with their responses
+ */
+function processMessagesForToolGrouping(messages: ChatMessage[]): ProcessedMessage[] {
+  const processed: ProcessedMessage[] = [];
+  let i = 0;
+
+  while (i < messages.length) {
+    const message = messages[i];
+
+    // Check if this message has tool calls
+    if (message.toolCalls && message.toolCalls.length > 0) {
+      const executions = message.toolCalls.map(toolCall => {
+        // Look ahead for matching tool response
+        let toolResponse;
+        for (let j = i + 1; j < messages.length; j++) {
+          const nextMsg = messages[j];
+          const parsedResponse = parseToolResponse(nextMsg);
+
+          // Match by tool call ID or tool name
+          if (parsedResponse &&
+              (parsedResponse.toolCallId === toolCall.id ||
+               parsedResponse.toolName === toolCall.name)) {
+            toolResponse = {
+              content: parsedResponse.content,
+              success: parsedResponse.success,
+              toolResponseData: parsedResponse.structuredData,
+              timestamp: nextMsg.timestamp
+            };
+            break;
+          }
+        }
+
+        return {
+          toolCall,
+          toolResponse
+        };
+      });
+
+      processed.push({
+        type: 'tool_execution_group',
+        originalMessage: message,
+        data: { executions }
+      });
+    }
+    // Skip tool response messages as they're now included in execution groups
+    else if (!parseToolResponse(message)) {
+      processed.push({
+        type: 'regular',
+        originalMessage: message
+      });
+    }
+
+    i++;
+  }
+
+  return processed;
+}
+
 interface MessageListProps {
   messages: ChatMessage[];
   isStreaming?: boolean;
@@ -301,20 +378,16 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(({
   const containerRef = useRef<HTMLDivElement>(null);
   const [showScrollButton, setShowScrollButton] = useState(false);
 
-  // Expose methods to parent component
-  useImperativeHandle(ref, () => ({
-    scrollToBottom: () => {
-      scrollToBottom();
-    }
-  }), []);
+  // Process messages to group tool executions
+  const processedMessages = useMemo(() => processMessagesForToolGrouping(messages), [messages]);
 
   // Configure virtualizer with dynamic height measurement
   const virtualizer = useVirtualizer({
-    count: messages.length,
+    count: processedMessages.length,
     getScrollElement: () => containerRef.current,
     estimateSize: () => 150, // Simplified initial height estimate
     // Provide unique key for each message to prevent cross-session state confusion
-    getItemKey: (index) => messages[index]?.id || `fallback-${index}`,
+    getItemKey: (index) => processedMessages[index]?.originalMessage.id || `fallback-${index}`,
     // Key: Enable dynamic height measurement
     measureElement: (element) => {
       // Measure actual element height including margins
@@ -365,6 +438,13 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(({
       });
     }
   }, []);
+
+  // Expose methods to parent component
+  useImperativeHandle(ref, () => ({
+    scrollToBottom: () => {
+      scrollToBottom();
+    }
+  }), [scrollToBottom]);
 
   // Continuous scrolling when button is clicked during streaming
   const scrollToBottomContinuous = useCallback(() => {
@@ -491,7 +571,7 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(({
           }}
         >
         {virtualizer.getVirtualItems().map((virtualItem) => {
-          const message = messages[virtualItem.index];
+          const processedMsg = processedMessages[virtualItem.index];
 
           return (
             <div
@@ -507,10 +587,27 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(({
               }}
               className="mb-4"
             >
-              <MessageBubble
-                message={message}
-                onSaveAsTemplate={saveAsTemplate}
-              />
+              {processedMsg.type === 'tool_execution_group' && processedMsg.data?.executions ? (
+                <div className="flex gap-3 max-w-4xl">
+                  {/* LLM Avatar */}
+                  <div className="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center bg-secondary">
+                    <Brain size={20} />
+                  </div>
+
+                  {/* Tool Execution Group */}
+                  <div className="flex-1">
+                    <ToolExecutionGroup
+                      executions={processedMsg.data.executions}
+                      timestamp={processedMsg.originalMessage.timestamp}
+                    />
+                  </div>
+                </div>
+              ) : (
+                <MessageBubble
+                  message={processedMsg.originalMessage}
+                  onSaveAsTemplate={saveAsTemplate}
+                />
+              )}
             </div>
           );
         })}
