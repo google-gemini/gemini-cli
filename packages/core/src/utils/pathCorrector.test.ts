@@ -96,7 +96,7 @@ describe('pathCorrector', () => {
     fs.writeFileSync(path.join(subDir1, ambiguousFile), 'content 1');
     fs.writeFileSync(path.join(subDir2, ambiguousFile), 'content 2');
 
-    // Re-implement findFiles for this specific test to simulate finding multiple files
+    // Simulate finding multiple files with same file name
     const fileSystemService = new StandardFileSystemService();
     vi.spyOn(fileSystemService, 'findFiles').mockReturnValue([
       path.join(subDir1, ambiguousFile),
