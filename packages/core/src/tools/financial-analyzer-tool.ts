@@ -9,8 +9,9 @@ import type { ToolResult } from './tools.js';
 import type { VisualizationData, ToolResponseData } from '../providers/types.js';
 import { BasePythonTool } from './base-python-tool.js';
 
-export interface MarketDataTool3Params {
-  op: 'get_quote' | 'get_historical' | 'search_symbols' | 'get_indices' | 'screen_stocks' | 'get_technical_indicators' | 'get_n225' | 'get_sp500' | 'get_nasdaq' | 'get_usdjpy';
+export interface FinancialAnalyzerParams {
+  op: 'get_quote' | 'get_historical' | 'search_symbols' | 'screen_stocks' | 'get_technical_indicators' | 'get_n225' | 'get_sp500' | 'get_nasdaq' | 'get_usdjpy'
+    | 'rolling_stats' | 'correlation_matrix' | 'regression_analysis' | 'var_analysis' | 'portfolio_optimization' | 'garch_model' | 'sharpe_ratio';
   symbols?: string[];
   data_source?: 'auto' | 'tvscreener' | 'yfinance';
   markets?: string[];
@@ -25,8 +26,30 @@ export interface MarketDataTool3Params {
   sort_by?: string;
   sort_order?: 'asc' | 'desc';
   limit?: number;
-  // Index-specific parameters
-  index_types?: Array<'SP500' | 'NASDAQ' | 'NIKKEI225' | 'DJI' | 'FTSE' | 'DAX'>;
+  index_types?: string[];  // For get_indices operation
+
+  // === Financial Analysis Parameters ===
+  // Rolling statistics
+  window?: number;  // Rolling window size (e.g., 30, 60)
+  stat_type?: 'mean' | 'std' | 'var' | 'corr' | 'beta';
+
+  // Regression analysis
+  benchmark?: string;  // Benchmark symbol for regression (e.g., 'SPY', '^GSPC')
+  factors?: string[];  // Multi-factor regression
+
+  // VaR analysis
+  confidence_level?: number;  // 0.95, 0.99
+  var_method?: 'historical' | 'parametric' | 'monte_carlo';
+
+  // Portfolio optimization
+  target_return?: number;
+  risk_free_rate?: number;
+  constraints?: Record<string, unknown>;
+
+  // GARCH model
+  forecast_periods?: number;
+  garch_p?: number;  // GARCH(p,q) p parameter
+  garch_q?: number;  // GARCH(p,q) q parameter
 }
 
 interface QuoteData {
@@ -102,34 +125,108 @@ interface TechnicalIndicator {
   calculation_time: string;
 }
 
-interface MarketDataTool3Result extends ToolResult {
+interface FinancialAnalyzerResult extends ToolResult {
   data?: {
     quotes?: QuoteData[];
     bars?: HistoricalBar[];
     screener_results?: ScreenerResult[];
     indices?: IndexData[];
     technical_indicators?: TechnicalIndicator[];
+
+    // Financial analysis results
+    rolling_stats?: Record<string, number[]>;
+    correlation_matrix?: number[][];
+    regression?: {
+      alpha: number;
+      beta: number | number[];
+      r_squared: number;
+      p_values: number[];
+      residuals?: number[];
+    };
+    var_analysis?: {
+      var: number;
+      cvar: number;
+      method: string;
+      confidence: number;
+    };
+    portfolio?: {
+      weights: number[];
+      expected_return: number;
+      volatility: number;
+      sharpe_ratio?: number;
+    };
+    garch?: {
+      omega: number;
+      alpha: number[];
+      beta: number[];
+      current_volatility: number;
+      forecast: number[];
+      aic?: number;
+      bic?: number;
+    };
+    sharpe?: number;
+
     summary: string;
     metadata?: Record<string, unknown>;
   };
   structuredData?: ToolResponseData;
 }
 
-export class MarketDataTool extends BasePythonTool<MarketDataTool3Params, MarketDataTool3Result> {
-  static readonly Name: string = 'market_data_tool';
+export class FinancialAnalyzer extends BasePythonTool<FinancialAnalyzerParams, FinancialAnalyzerResult> {
+  static readonly Name: string = 'financial_analyzer';
   constructor(config: Config) {
     super(
-      'market_data_tool',
-      'Advanced Market Data API (tvscreener)',
-      'Professional-grade market data using tvscreener for comprehensive market screening and analysis with support for SP500, NASDAQ, NIKKEI225, individual stocks, and advanced technical indicators. Provides real-time quotes, market screening, and technical analysis.',
-      ['tvscreener', 'pandas', 'numpy', 'yfinance', 'ta', 'selenium'],
+      'financial_analyzer',
+      'Financial Analyzer - Market Data & Statistical Analysis',
+      `Comprehensive financial analysis tool combining market data retrieval and advanced statistical analysis.
+
+# DATA OPERATIONS
+- op='get_quote': Get real-time quotes for stocks/crypto/forex
+- op='get_historical': Get historical OHLC price data
+- op='search_symbols': Search for stock symbols by name/keyword
+- op='screen_stocks': Screen stocks by criteria (market cap, PE ratio, etc.)
+- op='get_technical_indicators': Calculate technical indicators (RSI, MACD, etc.)
+- op='get_n225': Get Nikkei 225 index data
+- op='get_sp500': Get S&P 500 index data
+- op='get_nasdaq': Get NASDAQ Composite index data
+- op='get_usdjpy': Get USD/JPY forex rate
+
+# STATISTICAL ANALYSIS OPERATIONS (Data retrieved internally)
+- op='rolling_stats': Calculate rolling statistics (mean, std, correlation)
+  Required: symbols, period, window, stat_type
+- op='correlation_matrix': Compute correlation matrix for multiple assets
+  Required: symbols, period
+- op='regression_analysis': Perform regression analysis (CAPM, multi-factor)
+  Required: symbols, period, benchmark (e.g., 'SPY')
+- op='var_analysis': Calculate Value at Risk (VaR) and CVaR
+  Required: symbols, period, confidence_level (0.95/0.99), var_method
+- op='portfolio_optimization': Optimize portfolio weights (Markowitz)
+  Required: symbols, period, target_return (optional), risk_free_rate
+- op='garch_model': Fit GARCH model for volatility forecasting
+  Required: symbols, period, forecast_periods
+- op='sharpe_ratio': Calculate Sharpe ratio
+  Required: symbols, period, risk_free_rate
+
+# IMPORTANT NOTES
+- Statistical operations fetch data internally - DO NOT fetch data separately
+- Always verify symbols with search_symbols if unsure
+- Default period is 1y for analysis operations
+      `,
+      ['tvscreener', 'pandas', 'numpy', 'yfinance', 'ta', 'selenium', 'scipy', 'statsmodels', 'arch'],
       {
         type: 'object',
         properties: {
           op: {
             type: 'string',
-            enum: ['get_quote', 'get_historical', 'search_symbols', 'get_indices', 'screen_stocks', 'get_technical_indicators', 'get_n225', 'get_sp500', 'get_nasdaq', 'get_usdjpy'],
-            description: 'Operation: get_quote (real-time quotes), get_historical (OHLC data), search_symbols (find symbols), get_indices (major indices), screen_stocks (stock screening), get_technical_indicators (technical analysis), get_n225 (Nikkei 225), get_sp500 (S&P 500), get_nasdaq (NASDAQ), get_usdjpy (USD/JPY)',
+            enum: [
+              'get_quote', 'get_historical', 'search_symbols', 'screen_stocks', 'get_technical_indicators',
+              'get_n225', 'get_sp500', 'get_nasdaq', 'get_usdjpy',
+              'rolling_stats', 'correlation_matrix', 'regression_analysis', 'var_analysis',
+              'portfolio_optimization', 'garch_model', 'sharpe_ratio'
+            ],
+            description: `Operation type:
+DATA: get_quote, get_historical, search_symbols, screen_stocks, get_technical_indicators, get_n225, get_sp500, get_nasdaq, get_usdjpy
+ANALYSIS: rolling_stats, correlation_matrix, regression_analysis, var_analysis, portfolio_optimization, garch_model, sharpe_ratio`,
           },
           symbols: {
             type: 'array',
@@ -194,6 +291,59 @@ export class MarketDataTool extends BasePythonTool<MarketDataTool3Params, Market
             items: { type: 'string', enum: ['SP500', 'NASDAQ', 'NIKKEI225', 'DJI', 'FTSE', 'DAX'] },
             description: 'Specific indices to retrieve',
           },
+
+          // === Financial Analysis Parameters ===
+          window: {
+            type: 'number',
+            description: 'Rolling window size for rolling_stats (e.g., 30, 60 days)',
+          },
+          stat_type: {
+            type: 'string',
+            enum: ['mean', 'std', 'var', 'corr', 'beta'],
+            description: 'Type of rolling statistic to calculate',
+          },
+          benchmark: {
+            type: 'string',
+            description: 'Benchmark symbol for regression analysis (e.g., SPY, ^GSPC)',
+          },
+          factors: {
+            type: 'array',
+            items: { type: 'string' },
+            description: 'Factor symbols for multi-factor regression',
+          },
+          confidence_level: {
+            type: 'number',
+            description: 'Confidence level for VaR analysis (0.95 or 0.99)',
+          },
+          var_method: {
+            type: 'string',
+            enum: ['historical', 'parametric', 'monte_carlo'],
+            description: 'Method for VaR calculation',
+          },
+          target_return: {
+            type: 'number',
+            description: 'Target return for portfolio optimization (annual return)',
+          },
+          risk_free_rate: {
+            type: 'number',
+            description: 'Risk-free rate for Sharpe ratio and portfolio optimization (default: 0.02)',
+          },
+          constraints: {
+            type: 'object',
+            description: 'Portfolio constraints (max_weight, min_weight, sector_limits, etc.)',
+          },
+          forecast_periods: {
+            type: 'number',
+            description: 'Number of periods to forecast for GARCH model (default: 5)',
+          },
+          garch_p: {
+            type: 'number',
+            description: 'GARCH(p,q) p parameter (default: 1)',
+          },
+          garch_q: {
+            type: 'number',
+            description: 'GARCH(p,q) q parameter (default: 1)',
+          },
         },
         required: ['op'],
       },
@@ -203,12 +353,12 @@ export class MarketDataTool extends BasePythonTool<MarketDataTool3Params, Market
     );
   }
 
-  protected override requiresConfirmation(_params: MarketDataTool3Params): boolean {
-    // Market data tool only reads market data, no confirmation needed
+  protected override requiresConfirmation(_params: FinancialAnalyzerParams): boolean {
+    // Financial analyzer only reads market data, no confirmation needed
     return false;
   }
 
-  protected generatePythonCode(params: MarketDataTool3Params): string {
+  protected generatePythonCode(params: FinancialAnalyzerParams): string {
     const {
       op,
       symbols,
@@ -225,6 +375,18 @@ export class MarketDataTool extends BasePythonTool<MarketDataTool3Params, Market
       sort_order,
       limit,
       index_types,
+      // Financial analysis parameters
+      window,
+      stat_type,
+      benchmark,
+      factors,
+      confidence_level,
+      var_method,
+      target_return,
+      risk_free_rate,
+      forecast_periods,
+      garch_p,
+      garch_q,
     } = params;
 
     const symbolsStr = symbols ? JSON.stringify(symbols) : '[]';
@@ -232,7 +394,7 @@ export class MarketDataTool extends BasePythonTool<MarketDataTool3Params, Market
     const marketsStr = markets ? JSON.stringify(markets) : '[]';
     const intervalValue = interval || '1d';
     const periodValue = period || '1mo';
-    const timeframeValue = timeframe || 30;
+    const timeframeValue = timeframe || 60;  // Increased to 60 days for MACD calculation
     const searchQueryValue = search_query || '';
     const includeIndicators = include_indicators ? 'True' : 'False';
     const indicatorTypesStr = indicator_types ? JSON.stringify(indicator_types) : '[]';
@@ -241,6 +403,19 @@ export class MarketDataTool extends BasePythonTool<MarketDataTool3Params, Market
     const sortOrderValue = sort_order === 'asc' ? 'True' : 'False';
     const limitValue = limit || 50;
     const indexTypesStr = index_types ? JSON.stringify(index_types) : '[]';
+
+    // Financial analysis parameter conversions
+    const windowValue = window || 30;
+    const statTypeValue = stat_type || 'mean';
+    const benchmarkValue = benchmark || '';
+    const factorsStr = factors ? JSON.stringify(factors) : '[]';
+    const confidenceLevelValue = confidence_level || 0.95;
+    const varMethodValue = var_method || 'historical';
+    const targetReturnValue = target_return || 0.0;
+    const riskFreeRateValue = risk_free_rate || 0.0;
+    const forecastPeriodsValue = forecast_periods || 5;
+    const garchPValue = garch_p || 1;
+    const garchQValue = garch_q || 1;
 
     return `
 import json
@@ -271,6 +446,26 @@ try:
     TA_AVAILABLE = True
 except ImportError:
     TA_AVAILABLE = False
+
+# Statistical analysis libraries
+try:
+    from scipy import stats
+    SCIPY_AVAILABLE = True
+except ImportError:
+    SCIPY_AVAILABLE = False
+
+try:
+    import statsmodels.api as sm
+    from statsmodels.regression.linear_model import OLS
+    STATSMODELS_AVAILABLE = True
+except ImportError:
+    STATSMODELS_AVAILABLE = False
+
+try:
+    from arch import arch_model
+    ARCH_AVAILABLE = True
+except ImportError:
+    ARCH_AVAILABLE = False
 
 # TradingView scraper functionality
 try:
@@ -326,7 +521,8 @@ class TechnicalIndicators:
                         rsi_indicator = ta.momentum.RSIIndicator(close, window=14)
                         indicators['RSI'] = float(rsi_indicator.rsi().iloc[-1])
 
-                    elif indicator == 'MACD' and len(close) >= 26:
+                    elif indicator == 'MACD' and len(close) >= 35:
+                        # MACD requires more data for stable calculation (26-period EMA + 9-period signal line)
                         macd_indicator = ta.trend.MACD(close)
                         indicators['MACD'] = float(macd_indicator.macd().iloc[-1])
                         indicators['MACD_Signal'] = float(macd_indicator.macd_signal().iloc[-1])
@@ -1417,8 +1613,267 @@ class MarketDataAPI:
 
         return indicators
 
+class FinancialAnalyzer:
+    """Advanced financial analysis functions"""
+
+    def __init__(self, market_api: MarketDataAPI):
+        self.api = market_api
+
+    def fetch_price_data(self, symbols: list[str], period: str = '1y') -> pd.DataFrame:
+        """Fetch historical price data for analysis"""
+        bars = self.api.get_historical_data(symbols, '1d', period)
+
+        df_list = []
+        for bar in bars:
+            if not bar.get('error'):
+                df_list.append({
+                    'symbol': bar['symbol'],
+                    'date': pd.to_datetime(bar['datetime']),
+                    'close': bar['close']
+                })
+
+        if not df_list:
+            return pd.DataFrame()
+
+        df = pd.DataFrame(df_list)
+        df_pivot = df.pivot(index='date', columns='symbol', values='close')
+        return df_pivot
+
+    def calculate_rolling_stats(self, symbols: list[str], window: int, stat_type: str) -> dict:
+        """Calculate rolling statistics"""
+        if not YFINANCE_AVAILABLE:
+            return {'error': 'yfinance required for rolling stats'}
+
+        df = self.fetch_price_data(symbols, period='2y')
+
+        if df.empty:
+            return {'error': 'No data available for symbols'}
+
+        results = {}
+
+        for symbol in df.columns:
+            prices = df[symbol].dropna()
+
+            if stat_type == 'mean':
+                rolling = prices.rolling(window=window).mean()
+            elif stat_type == 'std':
+                rolling = prices.rolling(window=window).std()
+            elif stat_type == 'var':
+                rolling = prices.rolling(window=window).var()
+            elif stat_type == 'corr':
+                if len(df.columns) > 1:
+                    other_cols = [c for c in df.columns if c != symbol]
+                    rolling = prices.rolling(window=window).corr(df[other_cols[0]])
+                else:
+                    rolling = pd.Series([np.nan] * len(prices))
+            else:
+                rolling = prices.rolling(window=window).mean()
+
+            results[symbol] = rolling.dropna().tolist()
+
+        return {
+            'rolling_stats': results,
+            'window': window,
+            'stat_type': stat_type,
+            'symbols': list(df.columns)
+        }
+
+    def calculate_correlation_matrix(self, symbols: list[str]) -> dict:
+        """Calculate correlation matrix for multiple assets"""
+        df = self.fetch_price_data(symbols, period='1y')
+
+        if df.empty or len(df.columns) < 2:
+            return {'error': 'Need at least 2 symbols with data'}
+
+        returns = df.pct_change().dropna()
+        corr_matrix = returns.corr()
+
+        return {
+            'correlation_matrix': corr_matrix.values.tolist(),
+            'symbols': corr_matrix.columns.tolist()
+        }
+
+    def regression_analysis(self, symbol: str, benchmark: str, factors: list[str]) -> dict:
+        """Perform regression analysis (CAPM or multi-factor)"""
+        if not STATSMODELS_AVAILABLE:
+            return {'error': 'statsmodels required for regression'}
+
+        all_symbols = [symbol, benchmark] + (factors if factors else [])
+        df = self.fetch_price_data(all_symbols, period='2y')
+
+        if df.empty or symbol not in df.columns or benchmark not in df.columns:
+            return {'error': 'Insufficient data for regression'}
+
+        returns = df.pct_change().dropna()
+
+        y = returns[symbol]
+        X = returns[[benchmark] + factors] if factors else returns[[benchmark]]
+        X = sm.add_constant(X)
+
+        model = OLS(y, X).fit()
+
+        return {
+            'alpha': float(model.params[0]),
+            'beta': model.params[1:].tolist() if len(model.params) > 2 else float(model.params[1]),
+            'r_squared': float(model.rsquared),
+            'p_values': model.pvalues.tolist(),
+            'residuals': model.resid.tolist()
+        }
+
+    def var_analysis(self, symbols: list[str], confidence: float, method: str) -> dict:
+        """Calculate Value at Risk (VaR) and CVaR"""
+        if not SCIPY_AVAILABLE:
+            return {'error': 'scipy required for VaR calculation'}
+
+        df = self.fetch_price_data(symbols, period='1y')
+
+        if df.empty:
+            return {'error': 'No data available'}
+
+        returns = df.pct_change().dropna()
+        portfolio_returns = returns.mean(axis=1)
+
+        if method == 'historical':
+            var = np.percentile(portfolio_returns, (1 - confidence) * 100)
+            cvar = portfolio_returns[portfolio_returns <= var].mean()
+        elif method == 'parametric':
+            mean = portfolio_returns.mean()
+            std = portfolio_returns.std()
+            var = stats.norm.ppf(1 - confidence, mean, std)
+            cvar = mean - std * stats.norm.pdf(stats.norm.ppf(1 - confidence)) / (1 - confidence)
+        else:
+            var = np.percentile(portfolio_returns, (1 - confidence) * 100)
+            cvar = portfolio_returns[portfolio_returns <= var].mean()
+
+        return {
+            'var': float(var),
+            'cvar': float(cvar),
+            'method': method,
+            'confidence': confidence
+        }
+
+    def portfolio_optimization(self, symbols: list[str], target_return: float, risk_free_rate: float) -> dict:
+        """Optimize portfolio weights using scipy (simplified Markowitz)"""
+        if not SCIPY_AVAILABLE:
+            return {'error': 'scipy required for portfolio optimization'}
+
+        df = self.fetch_price_data(symbols, period='2y')
+
+        if df.empty or len(df.columns) < 2:
+            return {'error': 'Need at least 2 symbols with data'}
+
+        returns = df.pct_change().dropna()
+        mean_returns = returns.mean().values
+        cov_matrix = returns.cov().values
+
+        n_assets = len(symbols)
+
+        # Simple equal-weighted portfolio as baseline
+        equal_weights = np.ones(n_assets) / n_assets
+        equal_return = float(mean_returns @ equal_weights)
+        equal_volatility = float(np.sqrt(equal_weights @ cov_matrix @ equal_weights))
+        equal_sharpe = (equal_return - risk_free_rate) / equal_volatility if equal_volatility > 0 else 0
+
+        # Use scipy minimize for minimum variance portfolio
+        from scipy.optimize import minimize
+
+        def portfolio_volatility(weights):
+            return np.sqrt(weights @ cov_matrix @ weights)
+
+        constraints = [
+            {'type': 'eq', 'fun': lambda w: np.sum(w) - 1},  # weights sum to 1
+        ]
+        bounds = tuple((0, 1) for _ in range(n_assets))
+        initial_weights = equal_weights
+
+        result = minimize(
+            portfolio_volatility,
+            initial_weights,
+            method='SLSQP',
+            bounds=bounds,
+            constraints=constraints
+        )
+
+        if not result.success:
+            return {
+                'error': 'Optimization failed, returning equal-weighted portfolio',
+                'weights': equal_weights.tolist(),
+                'expected_return': equal_return,
+                'volatility': equal_volatility,
+                'sharpe_ratio': equal_sharpe,
+                'symbols': symbols
+            }
+
+        opt_weights = result.x
+        opt_return = float(mean_returns @ opt_weights)
+        opt_volatility = float(np.sqrt(opt_weights @ cov_matrix @ opt_weights))
+        opt_sharpe = (opt_return - risk_free_rate) / opt_volatility if opt_volatility > 0 else 0
+
+        return {
+            'weights': opt_weights.tolist(),
+            'expected_return': opt_return,
+            'volatility': opt_volatility,
+            'sharpe_ratio': opt_sharpe,
+            'symbols': symbols,
+            'note': 'Minimum variance portfolio (scipy optimization)'
+        }
+
+    def garch_model(self, symbol: str, p: int, q: int, forecast_periods: int) -> dict:
+        """Fit GARCH model for volatility forecasting"""
+        if not ARCH_AVAILABLE:
+            return {'error': 'arch library required for GARCH modeling'}
+
+        df = self.fetch_price_data([symbol], period='2y')
+
+        if df.empty or symbol not in df.columns:
+            return {'error': 'Insufficient data for GARCH model'}
+
+        returns = df[symbol].pct_change().dropna() * 100
+
+        try:
+            model = arch_model(returns, vol='Garch', p=p, q=q)
+            fitted = model.fit(disp='off')
+
+            forecast = fitted.forecast(horizon=forecast_periods)
+            forecast_variance = forecast.variance.values[-1, :]
+
+            return {
+                'omega': float(fitted.params['omega']),
+                'alpha': [float(fitted.params[f'alpha[{i+1}]']) for i in range(p)],
+                'beta': [float(fitted.params[f'beta[{i+1}]']) for i in range(q)],
+                'current_volatility': float(fitted.conditional_volatility[-1]),
+                'forecast': forecast_variance.tolist(),
+                'aic': float(fitted.aic),
+                'bic': float(fitted.bic)
+            }
+        except Exception as e:
+            return {'error': f'GARCH model failed: {str(e)}'}
+
+    def calculate_sharpe_ratio(self, symbols: list[str], risk_free_rate: float) -> dict:
+        """Calculate Sharpe ratio for portfolio"""
+        df = self.fetch_price_data(symbols, period='1y')
+
+        if df.empty:
+            return {'error': 'No data available'}
+
+        returns = df.pct_change().dropna()
+        portfolio_returns = returns.mean(axis=1)
+
+        mean_return = portfolio_returns.mean() * 252
+        volatility = portfolio_returns.std() * np.sqrt(252)
+
+        sharpe = (mean_return - risk_free_rate) / volatility if volatility > 0 else 0
+
+        return {
+            'sharpe_ratio': float(sharpe),
+            'annual_return': float(mean_return),
+            'annual_volatility': float(volatility),
+            'risk_free_rate': risk_free_rate
+        }
+
 # Execute operation
 api = MarketDataAPI()
+analyzer = FinancialAnalyzer(api)
 operation = "${op}"
 data_source = "${dataSourceValue}"
 
@@ -1544,6 +1999,67 @@ try:
             "summary": f"Retrieved USD/JPY forex data"
         }
 
+    # === Financial Analysis Operations ===
+    elif operation == "rolling_stats":
+        if not ${symbolsStr} or len(${symbolsStr}) == 0:
+            result = {"error": "No symbols provided for rolling stats"}
+        else:
+            symbols = ${symbolsStr}
+            analysis_result = analyzer.calculate_rolling_stats(symbols, ${windowValue}, "${statTypeValue}")
+            result = {**analysis_result, "summary": f"Calculated rolling {analysis_result.get('stat_type', 'stats')} for {len(symbols)} symbols"}
+
+    elif operation == "correlation_matrix":
+        if not ${symbolsStr} or len(${symbolsStr}) < 2:
+            result = {"error": "Need at least 2 symbols for correlation matrix"}
+        else:
+            symbols = ${symbolsStr}
+            analysis_result = analyzer.calculate_correlation_matrix(symbols)
+            result = {**analysis_result, "summary": f"Calculated correlation matrix for {len(symbols)} symbols"}
+
+    elif operation == "regression_analysis":
+        if not ${symbolsStr} or len(${symbolsStr}) == 0:
+            result = {"error": "No symbol provided for regression"}
+        elif not "${benchmarkValue}":
+            result = {"error": "No benchmark provided for regression"}
+        else:
+            symbol = ${symbolsStr}[0]
+            benchmark = "${benchmarkValue}"
+            factors = ${factorsStr}
+            analysis_result = analyzer.regression_analysis(symbol, benchmark, factors)
+            result = {**analysis_result, "summary": f"Regression analysis: {symbol} vs {benchmark}"}
+
+    elif operation == "var_analysis":
+        if not ${symbolsStr} or len(${symbolsStr}) == 0:
+            result = {"error": "No symbols provided for VaR analysis"}
+        else:
+            symbols = ${symbolsStr}
+            analysis_result = analyzer.var_analysis(symbols, ${confidenceLevelValue}, "${varMethodValue}")
+            result = {**analysis_result, "summary": f"VaR analysis at {analysis_result.get('confidence', 0.95)*100}% confidence"}
+
+    elif operation == "portfolio_optimization":
+        if not ${symbolsStr} or len(${symbolsStr}) < 2:
+            result = {"error": "Need at least 2 symbols for portfolio optimization"}
+        else:
+            symbols = ${symbolsStr}
+            analysis_result = analyzer.portfolio_optimization(symbols, ${targetReturnValue}, ${riskFreeRateValue})
+            result = {**analysis_result, "summary": f"Optimized portfolio for {len(symbols)} assets"}
+
+    elif operation == "garch_model":
+        if not ${symbolsStr} or len(${symbolsStr}) == 0:
+            result = {"error": "No symbol provided for GARCH model"}
+        else:
+            symbol = ${symbolsStr}[0]
+            analysis_result = analyzer.garch_model(symbol, ${garchPValue}, ${garchQValue}, ${forecastPeriodsValue})
+            result = {**analysis_result, "summary": f"GARCH({${garchPValue}},{${garchQValue}}) model for {symbol}"}
+
+    elif operation == "sharpe_ratio":
+        if not ${symbolsStr} or len(${symbolsStr}) == 0:
+            result = {"error": "No symbols provided for Sharpe ratio"}
+        else:
+            symbols = ${symbolsStr}
+            analysis_result = analyzer.calculate_sharpe_ratio(symbols, ${riskFreeRateValue})
+            result = {**analysis_result, "summary": f"Sharpe ratio for portfolio of {len(symbols)} assets"}
+
     else:
         result = {"summary": f"Unknown operation: {operation}", "error": "Invalid operation"}
 
@@ -1557,6 +2073,9 @@ result["metadata"] = {
     "yfinance_available": YFINANCE_AVAILABLE,
     "ta_available": TA_AVAILABLE,
     "selenium_available": SELENIUM_AVAILABLE,
+    "scipy_available": SCIPY_AVAILABLE,
+    "statsmodels_available": STATSMODELS_AVAILABLE,
+    "arch_available": ARCH_AVAILABLE,
     "timestamp": datetime.now().isoformat()
 }
 
@@ -1564,7 +2083,7 @@ print(json.dumps(result, ensure_ascii=False, indent=2, default=str))
 `;
   }
 
-  protected parseResult(pythonOutput: string, params: MarketDataTool3Params): MarketDataTool3Result {
+  protected parseResult(pythonOutput: string, params: FinancialAnalyzerParams): FinancialAnalyzerResult {
     try {
       if (!pythonOutput.trim()) {
         return {
@@ -1585,6 +2104,10 @@ print(json.dumps(result, ensure_ascii=False, indent=2, default=str))
       const data = JSON.parse(jsonMatch[0].trim());
       const { quotes, bars, search_results, screener_results, indices, technical_indicators,
               n225_data, sp500_data, nasdaq_data, usdjpy_data,
+              rolling_stats, correlation_matrix, alpha, beta, r_squared, p_values,
+              var: varValue, cvar, method, confidence, weights, expected_return, volatility,
+              sharpe_ratio, omega, forecast, aic, bic, annual_return, annual_volatility,
+              risk_free_rate, symbols, window, stat_type, current_volatility, note,
               summary, metadata, error } = data;
 
       if (error) {
@@ -1781,6 +2304,97 @@ print(json.dumps(result, ensure_ascii=False, indent=2, default=str))
         displayContent += '\n';
       }
 
+      // === Format Statistical Analysis Results ===
+
+      // Rolling Statistics
+      if (rolling_stats) {
+        displayContent += '### 📊 Rolling Statistics\n\n';
+        displayContent += `**Window**: ${window} days | **Statistic**: ${stat_type}\n\n`;
+
+        Object.entries(rolling_stats).forEach(([symbol, values]) => {
+          if (Array.isArray(values) && values.length > 0) {
+            const recent = (values as number[]).slice(-5);
+            displayContent += `**${symbol}**: ${recent.map(v => v.toFixed(4)).join(', ')} (last 5 values)\n`;
+          }
+        });
+        displayContent += '\n';
+      }
+
+      // Correlation Matrix
+      if (correlation_matrix) {
+        displayContent += '### 📊 Correlation Matrix\n\n';
+        if (symbols && Array.isArray(symbols)) {
+          displayContent += '| Symbol | ' + symbols.join(' | ') + ' |\n';
+          displayContent += '|--------|' + symbols.map(() => '--------').join('|') + '|\n';
+
+          correlation_matrix.forEach((row: number[], i: number) => {
+            displayContent += `| **${symbols[i]}** | ${row.map(v => v.toFixed(3)).join(' | ')} |\n`;
+          });
+        } else {
+          displayContent += `\`\`\`\n${JSON.stringify(correlation_matrix, null, 2)}\n\`\`\`\n`;
+        }
+        displayContent += '\n';
+      }
+
+      // Regression Analysis (CAPM)
+      if (alpha !== undefined && beta !== undefined) {
+        displayContent += '### 📈 Regression Analysis (CAPM)\n\n';
+        displayContent += `**Alpha**: ${alpha.toFixed(6)}\n`;
+        displayContent += `**Beta**: ${Array.isArray(beta) ? beta.map(b => b.toFixed(4)).join(', ') : beta.toFixed(4)}\n`;
+        if (r_squared !== undefined) displayContent += `**R²**: ${r_squared.toFixed(4)}\n`;
+        if (p_values && Array.isArray(p_values)) {
+          displayContent += `**P-values**: ${p_values.map(p => p.toFixed(6)).join(', ')}\n`;
+        }
+        displayContent += '\n';
+      }
+
+      // VaR Analysis
+      if (varValue !== undefined) {
+        displayContent += '### ⚠️ Value at Risk (VaR)\n\n';
+        displayContent += `**VaR (${(confidence || 0.95) * 100}% confidence)**: ${varValue.toFixed(6)}\n`;
+        if (cvar !== undefined) displayContent += `**CVaR (Expected Shortfall)**: ${cvar.toFixed(6)}\n`;
+        displayContent += `**Method**: ${method || 'historical'}\n\n`;
+      }
+
+      // Portfolio Optimization
+      if (weights && Array.isArray(weights)) {
+        displayContent += '### 💼 Portfolio Optimization\n\n';
+        if (symbols && Array.isArray(symbols)) {
+          displayContent += '**Optimal Weights**:\n';
+          symbols.forEach((sym: string, i: number) => {
+            displayContent += `- ${sym}: ${(weights[i] * 100).toFixed(2)}%\n`;
+          });
+        }
+        if (expected_return !== undefined) displayContent += `\n**Expected Return**: ${(expected_return * 100).toFixed(2)}%\n`;
+        if (volatility !== undefined) displayContent += `**Volatility**: ${(volatility * 100).toFixed(2)}%\n`;
+        if (sharpe_ratio !== undefined) displayContent += `**Sharpe Ratio**: ${sharpe_ratio.toFixed(4)}\n`;
+        if (note) displayContent += `\n*${note}*\n`;
+        displayContent += '\n';
+      }
+
+      // GARCH Model
+      if (omega !== undefined) {
+        displayContent += '### 📉 GARCH Model Results\n\n';
+        displayContent += `**Omega**: ${omega.toFixed(6)}\n`;
+        if (current_volatility !== undefined) displayContent += `**Current Volatility**: ${current_volatility.toFixed(4)}\n`;
+        if (forecast && Array.isArray(forecast)) {
+          displayContent += `**Volatility Forecast**: ${forecast.map(v => v.toFixed(4)).join(', ')}\n`;
+        }
+        if (aic !== undefined) displayContent += `**AIC**: ${aic.toFixed(2)}\n`;
+        if (bic !== undefined) displayContent += `**BIC**: ${bic.toFixed(2)}\n`;
+        displayContent += '\n';
+      }
+
+      // Sharpe Ratio (standalone)
+      if (sharpe_ratio !== undefined && !weights) {
+        displayContent += '### 📊 Sharpe Ratio\n\n';
+        displayContent += `**Sharpe Ratio**: ${sharpe_ratio.toFixed(4)}\n`;
+        if (annual_return !== undefined) displayContent += `**Annual Return**: ${(annual_return * 100).toFixed(2)}%\n`;
+        if (annual_volatility !== undefined) displayContent += `**Annual Volatility**: ${(annual_volatility * 100).toFixed(2)}%\n`;
+        if (risk_free_rate !== undefined) displayContent += `**Risk-Free Rate**: ${(risk_free_rate * 100).toFixed(2)}%\n`;
+        displayContent += '\n';
+      }
+
       // Format index-specific data (get_n225, get_sp500, get_nasdaq, get_usdjpy)
       if (n225_data || sp500_data || nasdaq_data || usdjpy_data) {
         const indexData = n225_data || sp500_data || nasdaq_data || usdjpy_data;
@@ -1856,7 +2470,7 @@ print(json.dumps(result, ensure_ascii=False, indent=2, default=str))
       }
 
 
-      displayContent += '\n*🚀 **Powered by**: tvscreener (real-time screening) + yfinance (historical data & indicators)*\n';
+      // displayContent += '\n*🚀 **Powered by**: tvscreener (real-time screening) + yfinance (historical data & indicators)*\n';
 
       // Generate visualizations for frontend
       const visualizations: VisualizationData[] = [];

@@ -29,7 +29,7 @@ import { MarkItDownTool } from './markitdown-tool.js';
 import { GeminiSearchTool } from './gemini-search-tool.js';
 import { JPXInvestorTool } from './jpx-investor-tool.js';
 import { EconomicCalendarTool } from './economic-calendar-tool.js';
-import { MarketDataTool } from './market-data-tool.js';
+import { FinancialAnalyzer } from './financial-analyzer-tool.js';
 import { EconomicNewsTool } from './economic-news-tool.js';
 import { KnowledgeBaseTool } from './knowledge-base-tool.js';
 import { XlwingsDocTool } from './xlwings-doc-tool.js';
@@ -107,7 +107,7 @@ const ROLE_TOOLSET_MAP: Record<string, ToolClass[]> = {
     PythonEmbeddedTool,
     JPXInvestorTool,
     EconomicCalendarTool,
-    MarketDataTool,
+    FinancialAnalyzer,
     EconomicNewsTool,
     // MarkItDownTool,
     MemoryTool
