@@ -30,8 +30,8 @@ runs:
     - name: '📝 Print Inputs'
       shell: 'bash'
       env:
-        JSON_INPUTS: ${{ toJSON(inputs) }}
-      run: echo "$JSON_INPUTS"
+        JSON_INPUTS: '${{ toJSON(inputs) }}'
+      run: 'echo "$JSON_INPUTS"'
     - name: 'Prepare Coverage Comment'
       id: 'prep_coverage_comment'
       shell: 'bash'

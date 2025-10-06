@@ -33,8 +33,8 @@ runs:
     - name: '📝 Print Inputs'
       shell: 'bash'
       env:
-        JSON_INPUTS: ${{ toJSON(inputs) }}
-      run: echo "$JSON_INPUTS"
+        JSON_INPUTS: '${{ toJSON(inputs) }}'
+      run: 'echo "$JSON_INPUTS"'
     - name: 'Creates a Pull Request'
       if: "inputs.dry-run != 'true'"
       env:
