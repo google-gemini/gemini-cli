@@ -53,11 +53,10 @@ describe('pathCorrector', () => {
     const subDir = path.join(otherWorkspaceDir, 'sub');
     fs.mkdirSync(subDir);
     const testFile = 'file.txt';
-    const partialPath = path.join('sub', testFile);
     const fullPath = path.join(subDir, testFile);
     fs.writeFileSync(fullPath, 'content');
 
-    const result = correctPath(partialPath, mockConfig);
+    const result = correctPath(testFile, mockConfig);
 
     expect(result.error).toBeUndefined();
     expect(result.correctedPath).toBe(fullPath);
