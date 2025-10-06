@@ -36,6 +36,15 @@ describe('doesToolInvocationMatch', () => {
     expect(result).toBe(true);
   });
 
+  it('should match a command with an alias', () => {
+    const invocation = {
+      params: { command: 'wc -l' },
+    } as AnyToolInvocation;
+    const patterns = ['ShellTool(wc)'];
+    const result = doesToolInvocationMatch('ShellTool', invocation, patterns);
+    expect(result).toBe(true);
+  });
+
   it('should match a command that is a prefix', () => {
     const invocation = {
       params: { command: 'git status -v' },
