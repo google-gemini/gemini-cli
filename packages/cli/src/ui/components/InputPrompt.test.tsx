@@ -1495,7 +1495,7 @@ describe('InputPrompt', () => {
 
       const outputLines = frame!.split('\n');
       // The number of lines should be 2 for the border plus 3 for the content.
-      expect(outputLines.length).toBe(6);
+      expect(outputLines.length).toBe(5);
       unmount();
     });
   });

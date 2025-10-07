@@ -883,7 +883,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         width={mainAreaWidth}
         flexDirection="row"
         alignItems="flex-start"
-        marginBottom={shouldShowSuggestions ? 0 : 1}
         minHeight={3}
       >
         <Text
