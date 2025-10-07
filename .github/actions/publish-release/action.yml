@@ -205,11 +205,11 @@ runs:
         NODE_AUTH_TOKEN: '${{ inputs.wombat-token-a2a-server }}'
       shell: 'bash'
       run: |
-          if [ "${{ inputs.dry-run }}" == "true" ]; then
-            npm publish --dry-run --workspace="@google/gemini-cli-a2a-server" --no-tag
-          else
-            npm publish --workspace="@google/gemini-cli-a2a-server" --no-tag
-          fi
+        if [ "${{ inputs.dry-run }}" == "true" ]; then
+          npm publish --dry-run --workspace="@google/gemini-cli-a2a-server" --no-tag
+        else
+          npm publish --workspace="@google/gemini-cli-a2a-server" --no-tag
+        fi
 
     - name: '🔬 Verify NPM release by version'
       uses: './.github/actions/verify-release'

@@ -37,15 +37,15 @@ const baseConfig = {
   platform: 'node',
   format: 'esm',
   external,
-  banner: {
-    js: `import { createRequire } from 'module'; const require = createRequire(import.meta.url); globalThis.__filename = require('url').fileURLToPath(import.meta.url); globalThis.__dirname = require('path').dirname(globalThis.__filename);`,
-  },
   loader: { '.node': 'file' },
   write: true,
 };
 
 const cliConfig = {
   ...baseConfig,
+  banner: {
+    js: `import { createRequire } from 'module'; const require = createRequire(import.meta.url); globalThis.__filename = require('url').fileURLToPath(import.meta.url); globalThis.__dirname = require('path').dirname(globalThis.__filename);`,
+  },
   entryPoints: ['packages/cli/index.ts'],
   outfile: 'bundle/gemini.js',
   define: {
@@ -59,6 +59,9 @@ const cliConfig = {
 
 const a2aServerConfig = {
   ...baseConfig,
+  banner: {
+    js: `const require = (await import('module')).createRequire(import.meta.url); globalThis.__filename = require('url').fileURLToPath(import.meta.url); globalThis.__dirname = require('path').dirname(globalThis.__filename);`,
+  },
   entryPoints: ['packages/a2a-server/src/http/server.ts'],
   outfile: 'packages/a2a-server/dist/a2a-server.mjs',
   define: {
@@ -66,14 +69,21 @@ const a2aServerConfig = {
   },
 };
 
-Promise.all([
+Promise.allSettled([
   esbuild.build(cliConfig).then(({ metafile }) => {
     if (process.env.DEV === 'true') {
       writeFileSync('./bundle/esbuild.json', JSON.stringify(metafile, null, 2));
     }
   }),
   esbuild.build(a2aServerConfig),
-]).catch((error) => {
-  console.error('esbuild bundling failed:', error);
-  process.exit(1);
+]).then((results) => {
+  const [cliResult, a2aResult] = results;
+  if (cliResult.status === 'rejected') {
+    console.error('gemini.js build failed:', cliResult.reason);
+    process.exit(1);
+  }
+  // error in a2a-server bundling will not stop gemini.js bundling process
+  if (a2aResult.status === 'rejected') {
+    console.warn('a2a-server build failed:', a2aResult.reason);
+  }
 });
