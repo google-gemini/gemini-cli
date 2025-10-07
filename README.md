@@ -41,6 +41,12 @@ npm install -g @google/gemini-cli
 brew install gemini-cli
 ```
 
+#### Install globally with MacPorts
+
+```bash
+sudo port install gemini-cli
+```
+
 #### System Requirements
 
 - Node.js version 20 or higher
