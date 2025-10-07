@@ -119,9 +119,19 @@ export interface OutputSettings {
 export interface GeminiCLIExtension {
   name: string;
   version: string;
+  author?: string;
   isActive: boolean;
   path: string;
   installMetadata?: ExtensionInstallMetadata;
+}
+
+export interface ExtensionConfig {
+  name: string;
+  version: string;
+  author?: string;
+  mcpServers?: Record<string, MCPServerConfig>;
+  contextFileName?: string | string[];
+  excludeTools?: string[];
 }
 
 export interface ExtensionInstallMetadata {

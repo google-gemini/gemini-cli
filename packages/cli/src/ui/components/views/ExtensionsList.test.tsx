@@ -21,6 +21,16 @@ const mockExtensions = [
   { name: 'ext-disabled', version: '3.0.0', isActive: false },
 ];
 
+const mockExtensionsWithAuthor = [
+  {
+    name: 'ext-with-author',
+    version: '1.0.0',
+    author: 'Google',
+    isActive: true,
+  },
+  { name: 'ext-no-author', version: '2.0.0', isActive: true },
+];
+
 describe('<ExtensionsList />', () => {
   beforeEach(() => {
     vi.resetAllMocks();
@@ -70,6 +80,16 @@ describe('<ExtensionsList />', () => {
     mockUIState([mockExtensions[0]], new Map());
     const { lastFrame } = render(<ExtensionsList />);
     expect(lastFrame()).toContain('(unknown state)');
+  });
+
+  it('should display author information when available', () => {
+    mockUIState(mockExtensionsWithAuthor, new Map());
+    const { lastFrame } = render(<ExtensionsList />);
+    const output = lastFrame();
+    expect(output).toContain('ext-with-author (v1.0.0) by Google - active');
+    expect(output).toContain('ext-no-author (v2.0.0) - active');
+    // Should not contain "by" for extension without author
+    expect(output).not.toContain('ext-no-author (v2.0.0) by');
   });
 
   const stateTestCases = [

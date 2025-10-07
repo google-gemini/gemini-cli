@@ -55,6 +55,7 @@ export const ExtensionsList = () => {
             <Box key={ext.name}>
               <Text>
                 <Text color="cyan">{`${ext.name} (v${ext.version})`}</Text>
+                {ext.author && <Text color="gray">{` by ${ext.author}`}</Text>}
                 {` - ${activeString}`}
                 {<Text color={stateColor}>{` (${stateText})`}</Text>}
               </Text>
