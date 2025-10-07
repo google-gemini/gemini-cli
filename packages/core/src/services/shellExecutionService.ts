@@ -444,93 +444,99 @@ export class ShellExecutionService {
         let hasStartedOutput = false;
         let renderTimeout: NodeJS.Timeout | null = null;
 
-        const render = (finalRender = false) => {
-          if (renderTimeout) {
-            clearTimeout(renderTimeout);
+        const renderFn = () => {
+          renderTimeout = null;
+
+          if (!isStreamingRawContent) {
+            return;
           }
 
-          const renderFn = () => {
-            renderTimeout = null;
-
-            if (!isStreamingRawContent) {
-              return;
-            }
-
-            if (!shellExecutionConfig.disableDynamicLineTrimming) {
-              if (!hasStartedOutput) {
-                const bufferText = getFullBufferText(headlessTerminal);
-                if (bufferText.trim().length === 0) {
-                  return;
-                }
-                hasStartedOutput = true;
+          if (!shellExecutionConfig.disableDynamicLineTrimming) {
+            if (!hasStartedOutput) {
+              const bufferText = getFullBufferText(headlessTerminal);
+              if (bufferText.trim().length === 0) {
+                return;
               }
+              hasStartedOutput = true;
             }
+          }
 
-            const buffer = headlessTerminal.buffer.active;
-            let newOutput: AnsiOutput;
-            if (shellExecutionConfig.showColor) {
-              newOutput = serializeTerminalToObject(headlessTerminal);
-            } else {
-              const lines: AnsiOutput = [];
-              for (let y = 0; y < headlessTerminal.rows; y++) {
-                const line = buffer.getLine(buffer.viewportY + y);
-                const lineContent = line ? line.translateToString(true) : '';
-                lines.push([
-                  {
-                    text: lineContent,
-                    bold: false,
-                    italic: false,
-                    underline: false,
-                    dim: false,
-                    inverse: false,
-                    fg: '',
-                    bg: '',
-                  },
-                ]);
-              }
-              newOutput = lines;
+          const buffer = headlessTerminal.buffer.active;
+          let newOutput: AnsiOutput;
+          if (shellExecutionConfig.showColor) {
+            newOutput = serializeTerminalToObject(headlessTerminal);
+          } else {
+            const lines: AnsiOutput = [];
+            for (let y = 0; y < headlessTerminal.rows; y++) {
+              const line = buffer.getLine(buffer.viewportY + y);
+              const lineContent = line ? line.translateToString(true) : '';
+              lines.push([
+                {
+                  text: lineContent,
+                  bold: false,
+                  italic: false,
+                  underline: false,
+                  dim: false,
+                  inverse: false,
+                  fg: '',
+                  bg: '',
+                },
+              ]);
             }
+            newOutput = lines;
+          }
 
-            let lastNonEmptyLine = -1;
-            for (let i = newOutput.length - 1; i >= 0; i--) {
-              const line = newOutput[i];
-              if (
-                line
-                  .map((segment) => segment.text)
-                  .join('')
-                  .trim().length > 0
-              ) {
-                lastNonEmptyLine = i;
-                break;
-              }
+          let lastNonEmptyLine = -1;
+          for (let i = newOutput.length - 1; i >= 0; i--) {
+            const line = newOutput[i];
+            if (
+              line
+                .map((segment) => segment.text)
+                .join('')
+                .trim().length > 0
+            ) {
+              lastNonEmptyLine = i;
+              break;
             }
+          }
 
-            if (buffer.cursorY > lastNonEmptyLine) {
-              lastNonEmptyLine = buffer.cursorY;
-            }
+          if (buffer.cursorY > lastNonEmptyLine) {
+            lastNonEmptyLine = buffer.cursorY;
+          }
 
-            const trimmedOutput = newOutput.slice(0, lastNonEmptyLine + 1);
+          const trimmedOutput = newOutput.slice(0, lastNonEmptyLine + 1);
 
-            const finalOutput = shellExecutionConfig.disableDynamicLineTrimming
-              ? newOutput
-              : trimmedOutput;
+          const finalOutput = shellExecutionConfig.disableDynamicLineTrimming
+            ? newOutput
+            : trimmedOutput;
 
-            // Using stringify for a quick deep comparison.
-            if (JSON.stringify(output) !== JSON.stringify(finalOutput)) {
-              output = finalOutput;
-              onOutputEvent({
-                type: 'data',
-                chunk: finalOutput,
-              });
-            }
-          };
+          // Using stringify for a quick deep comparison.
+          if (JSON.stringify(output) !== JSON.stringify(finalOutput)) {
+            output = finalOutput;
+            onOutputEvent({
+              type: 'data',
+              chunk: finalOutput,
+            });
+          }
+        };
 
+        const render = (finalRender = false) => {
           if (finalRender) {
+            if (renderTimeout) {
+              clearTimeout(renderTimeout);
+            }
             renderFn();
             return;
           }
 
-          renderTimeout = setTimeout(renderFn, 17);
+          if (renderTimeout) {
+            return;
+          }
+
+          renderTimeout = setTimeout(() => {
+            renderFn();
+            renderTimeout = null;
+          }, 17);
         };
 
         headlessTerminal.onScroll(() => {

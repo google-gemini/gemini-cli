@@ -109,7 +109,6 @@ export const useShellCommandProcessor = (
       const executeCommand = async (
         resolve: (value: void | PromiseLike<void>) => void,
       ) => {
-        let lastUpdateTime = Date.now();
         let cumulativeStdout: string | AnsiOutput = '';
         let isBinaryStream = false;
         let binaryBytesReceived = 0;
@@ -200,10 +199,7 @@ export const useShellCommandProcessor = (
               }
 
               // Throttle pending UI updates, but allow forced updates.
-              if (
-                shouldUpdate ||
-                Date.now() - lastUpdateTime > OUTPUT_UPDATE_INTERVAL_MS
-              ) {
+              if (shouldUpdate) {
                 setPendingHistoryItem((prevItem) => {
                   if (prevItem?.type === 'tool_group') {
                     return {
@@ -217,7 +213,6 @@ export const useShellCommandProcessor = (
                   }
                   return prevItem;
                 });
-                lastUpdateTime = Date.now();
               }
             },
             abortSignal,
