@@ -88,6 +88,7 @@ from typing import List, Dict
 from dataclasses import dataclass, asdict
 from bs4 import BeautifulSoup
 import json
+import sys
 
 @dataclass
 class EconomicEventItem:
@@ -130,7 +131,7 @@ class MyFXBookEconomicCalendar:
             return "unknown"
 
         except Exception as e:
-            print(f"Failed to extract country info: {e}, link: {link}")
+            # Debug: Failed to extract country info
             return "unknown"
 
     def _get_impact_level(self, html_content: str) -> str:
@@ -198,7 +199,7 @@ class MyFXBookEconomicCalendar:
             }
 
         except Exception as e:
-            print(f"Failed to parse event data: {e}")
+            # Debug: Failed to parse event data
             return {
                 'impact': 'None',
                 'previous': 'Parse failed',
@@ -213,16 +214,11 @@ class MyFXBookEconomicCalendar:
         events = []
 
         try:
-            print(f"Starting to fetch MyFXBook economic calendar data: {self.rss_url}")
-
             # Parse RSS using feedparser
             feed = feedparser.parse(self.rss_url)
 
             if not feed.entries:
-                print("No entries found in RSS Feed")
                 return events
-
-            print(f"Successfully parsed RSS Feed, found {len(feed.entries)} events")
 
             for entry in feed.entries:
                 try:
@@ -238,7 +234,7 @@ class MyFXBookEconomicCalendar:
                         publish_date = publish_date.astimezone()
                     else:
                         publish_date = datetime.now()
-                        print(f"Event '{title}' has no valid publish time, using current time")
+                        # Debug: Event has no valid publish time
 
                     # Parse detailed data
                     event_data = self._parse_event_data(description)
@@ -261,14 +257,13 @@ class MyFXBookEconomicCalendar:
                     events.append(event)
 
                 except Exception as e:
-                    print(f"Failed to parse single event: {e}")
+                    # Debug: Failed to parse single event
                     continue
 
-            print(f"Successfully retrieved {len(events)} economic events")
             return events
 
         except Exception as e:
-            print(f"Failed to get economic events: {e}")
+            # Debug: Failed to get economic events
             return events
 
     def get_upcoming_events(self, hours_ahead: int = 24) -> List[EconomicEventItem]:
@@ -291,13 +286,12 @@ class MyFXBookEconomicCalendar:
                 if now <= event.publish_date <= future_time:
                     upcoming_events.append(event)
             except Exception as e:
-                print(f"Failed to parse event time: {e}")
+                # Debug: Failed to parse event time
                 continue
 
         # Sort by time
         upcoming_events.sort(key=lambda x: x.publish_date)
 
-        print(f"Found {len(upcoming_events)} events in the next {hours_ahead} hours")
         return upcoming_events
 
     def get_high_impact_events(self, hours_ahead: int = 48) -> List[EconomicEventItem]:
@@ -311,7 +305,6 @@ class MyFXBookEconomicCalendar:
             if event.impact in ["High", "Medium"]
         ]
 
-        print(f"Found {len(high_impact_events)} high/medium impact events")
         return high_impact_events
 
     def filter_by_countries(self, events: List[EconomicEventItem], countries: List[str]) -> List[EconomicEventItem]:
@@ -368,9 +361,6 @@ class MyFXBookEconomicCalendar:
             if event.country and event.country.lower() in actual_filter_lower:
                 filtered_events.append(event)
 
-        print(f"Filtered {len(events)} events to {len(filtered_events)} events")
-        print(f"Original filter: {countries}")
-        print(f"Mapped filter: {actual_filter}")
         return filtered_events
 
 # Execute operation
