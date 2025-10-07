@@ -207,7 +207,7 @@ Settings are organized into categories. All settings should be placed within the
 
 - **`tools.shell.enableInteractiveShell`** (boolean):
 
-  Use `node-pty` for an interactive shell experience. Fallback to `child_process` still applies. Defaults to `false`.
+  Use `node-pty` for an interactive shell experience. Fallback to `child_process` still applies. Defaults to `true`.
 
 - **`tools.core`** (array of strings):
   - **Description:** This can be used to restrict the set of built-in tools [with an allowlist](../cli/enterprise.md#restricting-tool-access). See [Built-in Tools](../core/tools-api.md#built-in-tools) for a list of core tools. The match semantics are the same as `tools.allowed`.
