@@ -5,7 +5,6 @@
  */
 
 import { execSync } from 'node:child_process';
-import * as path from 'node:path';
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
 
@@ -17,10 +16,6 @@ const argv = yargs(hideBin(process.argv)).option('c', {
 });
 
 const NUM_RUNS = 50;
-const LOG_FILE = path.join(
-  __dirname,
-  `deflake_results_${new Date().toISOString().replace(/:/g, '-')}.log`,
-);
 
 const COMMAND = argv.c;
 
@@ -52,6 +47,5 @@ for (let i = 1; i <= NUM_RUNS; i++) {
 console.log('\n--- FINAL DEFLAKE SUMMARY ---');
 console.log(`Total Runs: ${NUM_RUNS}`);
 console.log(`Total Failures: ${failures}`);
-console.log(`Results logged to: ${LOG_FILE}`);
 
 process.exit(failures > 0 ? 1 : 0);
