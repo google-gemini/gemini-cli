@@ -21,6 +21,7 @@ export function createNonInteractiveUI(): CommandContext['ui'] {
     pendingItem: null,
     setPendingItem: (_item) => {},
     toggleCorgiMode: () => {},
+    toggleDebugProfiler: () => {},
     toggleVimEnabled: async () => false,
     setGeminiMdFileCount: (_count) => {},
     reloadCommands: () => {},
