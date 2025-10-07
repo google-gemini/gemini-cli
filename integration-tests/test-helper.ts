@@ -12,6 +12,8 @@ import { env } from 'node:process';
 import { DEFAULT_GEMINI_MODEL } from '../packages/core/src/config/models.js';
 import fs from 'node:fs';
 import * as pty from '@lydell/node-pty';
+import stripAnsi from 'strip-ansi';
+import * as os from 'node:os';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -112,6 +114,15 @@ export function validateModelOutput(
   return true;
 }
 
+// Simulates typing a string one character at a time to avoid paste detection.
+export async function type(ptyProcess: pty.IPty, text: string) {
+  const delay = 5;
+  for (const char of text) {
+    ptyProcess.write(char);
+    await new Promise((resolve) => setTimeout(resolve, delay));
+  }
+}
+
 interface ParsedLog {
   attributes?: {
     'event.name'?: string;
@@ -134,6 +145,7 @@ export class TestRig {
   testDir: string | null;
   testName?: string;
   _lastRunStdout?: string;
+  _interactiveOutput = '';
 
   constructor() {
     this.bundlePath = join(__dirname, '..', 'bundle/gemini.js');
@@ -195,13 +207,32 @@ export class TestRig {
     execSync('sync', { cwd: this.testDir! });
   }
 
+  /**
+   * The command and args to use to invoke Gemini CLI. Allows us to switch
+   * between using the bundled gemini.js (the default) and using the installed
+   * 'gemini' (used to verify npm bundles).
+   */
+  private _getCommandAndArgs(extraInitialArgs: string[] = []): {
+    command: string;
+    initialArgs: string[];
+  } {
+    const isNpmReleaseTest =
+      process.env.INTEGRATION_TEST_USE_INSTALLED_GEMINI === 'true';
+    const command = isNpmReleaseTest ? 'gemini' : 'node';
+    const initialArgs = isNpmReleaseTest
+      ? extraInitialArgs
+      : [this.bundlePath, ...extraInitialArgs];
+    return { command, initialArgs };
+  }
+
   run(
     promptOrOptions:
       | string
       | { prompt?: string; stdin?: string; stdinDoesNotEnd?: boolean },
     ...args: string[]
   ): Promise<string> {
-    const commandArgs = [this.bundlePath, '--yolo'];
+    const { command, initialArgs } = this._getCommandAndArgs(['--yolo']);
+    const commandArgs = [...initialArgs];
     const execOptions: {
       cwd: string;
       encoding: 'utf-8';
@@ -227,7 +258,7 @@ export class TestRig {
 
     commandArgs.push(...args);
 
-    const child = spawn('node', commandArgs, {
+    const child = spawn(command, commandArgs, {
       cwd: this.testDir!,
       stdio: 'pipe',
       env: process.env,
@@ -331,9 +362,10 @@ export class TestRig {
     args: string[],
     options: { stdin?: string } = {},
   ): Promise<string> {
-    const commandArgs = [this.bundlePath, ...args];
+    const { command, initialArgs } = this._getCommandAndArgs();
+    const commandArgs = [...initialArgs, ...args];
 
-    const child = spawn('node', commandArgs, {
+    const child = spawn(command, commandArgs, {
       cwd: this.testDir!,
       stdio: 'pipe',
     });
@@ -762,23 +794,50 @@ export class TestRig {
     return null;
   }
 
+  async waitForText(text: string, timeout?: number): Promise<boolean> {
+    if (!timeout) {
+      timeout = this.getDefaultTimeout();
+    }
+    return this.poll(
+      () =>
+        stripAnsi(this._interactiveOutput)
+          .toLowerCase()
+          .includes(text.toLowerCase()),
+      timeout,
+      200,
+    );
+  }
+
   runInteractive(...args: string[]): {
     ptyProcess: pty.IPty;
     promise: Promise<{ exitCode: number; signal?: number; output: string }>;
   } {
-    const commandArgs = [this.bundlePath, '--yolo', ...args];
+    const { command, initialArgs } = this._getCommandAndArgs(['--yolo']);
+    const commandArgs = [...initialArgs, ...args];
+    const isWindows = os.platform() === 'win32';
 
-    const ptyProcess = pty.spawn('node', commandArgs, {
+    this._interactiveOutput = ''; // Reset output for the new run
+
+    const options: pty.IPtyForkOptions = {
       name: 'xterm-color',
       cols: 80,
       rows: 30,
       cwd: this.testDir!,
-      env: process.env as { [key: string]: string },
-    });
+      env: Object.fromEntries(
+        Object.entries(process.env).filter(([, v]) => v !== undefined),
+      ) as { [key: string]: string },
+    };
 
-    let output = '';
+    if (isWindows) {
+      // node-pty on Windows requires a shell to be specified when using winpty.
+      options.shell = process.env.COMSPEC || 'cmd.exe';
+    }
+
+    const executable = command === 'node' ? process.execPath : command;
+    const ptyProcess = pty.spawn(executable, commandArgs, options);
+
     ptyProcess.onData((data) => {
-      output += data;
+      this._interactiveOutput += data;
       if (env.KEEP_OUTPUT === 'true' || env.VERBOSE === 'true') {
         process.stdout.write(data);
       }
@@ -790,7 +849,7 @@ export class TestRig {
       output: string;
     }>((resolve) => {
       ptyProcess.onExit(({ exitCode, signal }) => {
-        resolve({ exitCode, signal, output });
+        resolve({ exitCode, signal, output: this._interactiveOutput });
       });
     });
 

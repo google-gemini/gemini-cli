@@ -68,8 +68,8 @@ export const CloudFreePrivacyNotice = ({
   }
 
   const items = [
-    { label: 'Yes', value: true },
-    { label: 'No', value: false },
+    { label: 'Yes', value: true, key: 'true' },
+    { label: 'No', value: false, key: 'false' },
   ];
 
   return (
