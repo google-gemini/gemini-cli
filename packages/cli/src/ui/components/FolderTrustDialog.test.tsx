@@ -7,7 +7,7 @@
 import { renderWithProviders } from '../../test-utils/render.js';
 import { waitFor } from '@testing-library/react';
 import { vi } from 'vitest';
-import { FolderTrustDialog, FolderTrustChoice } from './FolderTrustDialog.js';
+import { FolderTrustDialog } from './FolderTrustDialog.js';
 import * as processUtils from '../../utils/processUtils.js';
 
 vi.mock('../../utils/processUtils.js', () => ({
@@ -44,7 +44,7 @@ describe('FolderTrustDialog', () => {
     );
   });
 
-  it('should call onSelect with DO_NOT_TRUST when escape is pressed and not restarting', async () => {
+  it('should call process.exit when escape is pressed and not restarting', async () => {
     const onSelect = vi.fn();
     const { stdin } = renderWithProviders(
       <FolderTrustDialog onSelect={onSelect} isRestarting={false} />,
@@ -53,7 +53,7 @@ describe('FolderTrustDialog', () => {
     stdin.write('\x1b'); // escape key
 
     await waitFor(() => {
-      expect(onSelect).toHaveBeenCalledWith(FolderTrustChoice.DO_NOT_TRUST);
+      expect(mockedExit).toHaveBeenCalledWith(0);
     });
   });
 

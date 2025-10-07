@@ -44,7 +44,7 @@ export const FolderTrustDialog: React.FC<FolderTrustDialogProps> = ({
   useKeypress(
     (key) => {
       if (key.name === 'escape') {
-        onSelect(FolderTrustChoice.DO_NOT_TRUST);
+        process.exit(0);
       }
     },
     { isActive: !isRestarting },
@@ -65,9 +65,9 @@ export const FolderTrustDialog: React.FC<FolderTrustDialogProps> = ({
       key: `Trust parent folder (${parentFolder})`,
     },
     {
-      label: "Don't trust (esc)",
+      label: "Don't trust",
       value: FolderTrustChoice.DO_NOT_TRUST,
-      key: "Don't trust (esc)",
+      key: "Don't trust",
     },
   ];
 
