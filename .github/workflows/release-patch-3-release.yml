@@ -63,8 +63,9 @@ jobs:
 
       - name: 'Print Inputs'
         shell: 'bash'
-        run: |-
-          echo "${{ toJSON(inputs) }}"
+        env:
+          JSON_INPUTS: '${{ toJSON(inputs) }}'
+        run: 'echo "$JSON_INPUTS"'
 
       - name: 'Get Patch Version'
         id: 'patch_version'
