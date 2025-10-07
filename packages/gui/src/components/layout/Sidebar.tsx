@@ -215,8 +215,9 @@ export const Sidebar: React.FC = () => {
     }
 
     // Check role compatibility before switching
+    // Only show conflict if both session and current role are set and different
     const session = sessions.find(s => s.id === sessionId);
-    if (session && session.roleId !== currentRole) {
+    if (session && session.roleId && currentRole && session.roleId !== currentRole) {
       const sessionRoleInfo = getRoleInfo(session.roleId);
       const currentRoleInfo = getRoleInfo(currentRole);
 
