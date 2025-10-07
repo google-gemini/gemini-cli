@@ -9,6 +9,7 @@ on:
     branches:
       - 'main'
       - 'release/**'
+  # This will run the e2e CHECK for all PRs from forks, but only run the TESTS when a label is added.
   pull_request_target:
   merge_group:
   workflow_dispatch:
