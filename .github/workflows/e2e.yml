@@ -41,11 +41,12 @@ jobs:
   e2e_linux:
     name: 'E2E Test (Linux) - ${{ matrix.sandbox }}'
     if: |
-      github.event_name == 'push' ||
+      needs.merge_queue_skipper.outputs.skip == 'false' &&
+      (github.event_name == 'push' ||
       github.event_name == 'merge_group' ||
       github.event_name == 'workflow_dispatch' ||
       (github.event.pull_request.head.repo.full_name == github.repository) ||
-      github.event.label.name == 'maintainer:e2e:ok'
+      (github.event.label.name == 'maintainer:e2e:ok'))
     runs-on: 'gemini-cli-ubuntu-16-core'
     strategy:
       fail-fast: false
@@ -101,11 +102,12 @@ jobs:
   e2e_mac:
     name: 'E2E Test (macOS)'
     if: |
-      github.event_name == 'push' ||
+      needs.merge_queue_skipper.outputs.skip == 'false' &&
+      (github.event_name == 'push' ||
       github.event_name == 'merge_group' ||
       github.event_name == 'workflow_dispatch' ||
       (github.event.pull_request.head.repo.full_name == github.repository) ||
-      github.event.label.name == 'maintainer:e2e:ok'
+      (github.event.label.name == 'maintainer:e2e:ok'))
     runs-on: 'macos-latest'
     steps:
       - name: 'Checkout (fork)'
