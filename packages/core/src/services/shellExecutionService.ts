@@ -151,6 +151,36 @@ export class ShellExecutionService {
     );
   }
 
+  private static appendAndTruncate(
+    currentBuffer: string,
+    chunk: string,
+    maxSize: number,
+  ): { newBuffer: string; truncated: boolean } {
+    const chunkLength = chunk.length;
+    const currentLength = currentBuffer.length;
+    const newTotalLength = currentLength + chunkLength;
+
+    if (newTotalLength <= maxSize) {
+      return { newBuffer: currentBuffer + chunk, truncated: false };
+    }
+
+    // Truncation is needed.
+    if (chunkLength >= maxSize) {
+      // The new chunk is larger than or equal to the max buffer size.
+      // The new buffer will be the tail of the new chunk.
+      return {
+        newBuffer: chunk.substring(chunkLength - maxSize),
+        truncated: true,
+      };
+    }
+
+    // The combined buffer exceeds the max size, but the new chunk is smaller than it.
+    // We need to truncate the current buffer from the beginning to make space.
+    const charsToTrim = newTotalLength - maxSize;
+    const truncatedBuffer = currentBuffer.substring(charsToTrim);
+    return { newBuffer: truncatedBuffer + chunk, truncated: true };
+  }
+
   private static childProcessFallback(
     commandToExecute: string,
     cwd: string,
@@ -180,6 +210,8 @@ export class ShellExecutionService {
 
         let stdout = '';
         let stderr = '';
+        let stdoutTruncated = false;
+        let stderrTruncated = false;
         const outputChunks: Buffer[] = [];
         let error: Error | null = null;
         let exited = false;
@@ -216,18 +248,24 @@ export class ShellExecutionService {
             const decodedChunk = decoder.decode(data, { stream: true });
 
             if (stream === 'stdout') {
-              stdout += decodedChunk;
-              if (stdout.length > MAX_CHILD_PROCESS_BUFFER_SIZE) {
-                stdout = stdout.substring(
-                  stdout.length - MAX_CHILD_PROCESS_BUFFER_SIZE,
-                );
+              const { newBuffer, truncated } = this.appendAndTruncate(
+                stdout,
+                decodedChunk,
+                MAX_CHILD_PROCESS_BUFFER_SIZE,
+              );
+              stdout = newBuffer;
+              if (truncated) {
+                stdoutTruncated = true;
               }
             } else {
-              stderr += decodedChunk;
-              if (stderr.length > MAX_CHILD_PROCESS_BUFFER_SIZE) {
-                stderr = stderr.substring(
-                  stderr.length - MAX_CHILD_PROCESS_BUFFER_SIZE,
-                );
+              const { newBuffer, truncated } = this.appendAndTruncate(
+                stderr,
+                decodedChunk,
+                MAX_CHILD_PROCESS_BUFFER_SIZE,
+              );
+              stderr = newBuffer;
+              if (truncated) {
+                stderrTruncated = true;
               }
             }
           }
@@ -240,8 +278,15 @@ export class ShellExecutionService {
           const { finalBuffer } = cleanup();
           // Ensure we don't add an extra newline if stdout already ends with one.
           const separator = stdout.endsWith('\n') ? '' : '\n';
-          const combinedOutput =
+          let combinedOutput =
             stdout + (stderr ? (stdout ? separator : '') + stderr : '');
+
+          if (stdoutTruncated || stderrTruncated) {
+            const truncationMessage = `\n[GEMINI_CLI_WARNING: Output truncated. The buffer is limited to ${
+              MAX_CHILD_PROCESS_BUFFER_SIZE / (1024 * 1024)
+            }MB.]`;
+            combinedOutput += truncationMessage;
+          }
 
           const finalStrippedOutput = stripAnsi(combinedOutput).trim();
 
@@ -521,6 +566,10 @@ export class ShellExecutionService {
 
                 if (isStreamingRawContent) {
                   const decodedChunk = decoder.decode(data, { stream: true });
+                  if (decodedChunk.length === 0) {
+                    resolve();
+                    return;
+                  }
                   isWriting = true;
                   headlessTerminal.write(decodedChunk, () => {
                     render();

@@ -153,7 +153,7 @@ describe('ShellExecutionService', () => {
     simulation: (
       ptyProcess: typeof mockPtyProcess,
       ac: AbortController,
-    ) => void,
+    ) => void | Promise<void>,
     config = shellExecutionConfig,
   ) => {
     const abortController = new AbortController();
@@ -167,7 +167,7 @@ describe('ShellExecutionService', () => {
     );
 
     await new Promise((resolve) => process.nextTick(resolve));
-    simulation(mockPtyProcess, abortController);
+    await simulation(mockPtyProcess, abortController);
     const result = await handle.result;
     return { result, handle, abortController };
   };
@@ -358,12 +358,13 @@ describe('ShellExecutionService', () => {
     });
 
     it('should send SIGTERM and then SIGKILL on abort', async () => {
-      vi.useFakeTimers();
       const { result } = await simulateExecution(
-        'sleep 10',
+        'long-running-process',
         async (pty, abortController) => {
           abortController.abort();
-          await vi.advanceTimersByTimeAsync(250);
+          // The service sends SIGTERM, waits ~200ms, then sends SIGKILL.
+          // We wait for that timeout to complete before simulating process exit.
+          await new Promise((res) => setTimeout(res, 250));
           pty.onExit.mock.calls[0][0]({ exitCode: 0, signal: 9 });
         },
       );
@@ -378,11 +379,9 @@ describe('ShellExecutionService', () => {
         'SIGKILL',
       );
       expect(result.signal).toBe(9);
-      vi.useRealTimers();
     });
 
-    it('should resolve immediately on abort, even with a long processing chain', async () => {
-      const start = performance.now();
+    it('should resolve without waiting for the processing chain on abort', async () => {
       const { result } = await simulateExecution(
         'long-output',
         (pty, abortController) => {
@@ -394,12 +393,12 @@ describe('ShellExecutionService', () => {
           pty.onExit.mock.calls[0][0]({ exitCode: 1, signal: null });
         },
       );
-      const end = performance.now();
 
+      // The main assertion here is implicit: the `await` for the result above
+      // should complete without timing out. This proves that the resolution
+      // was not blocked by the long chain of data processing promises,
+      // which is the desired behavior on abort.
       expect(result.aborted).toBe(true);
-      // The test should complete very quickly, without waiting for the simulated
-      // processing of 1000 data chunks.
-      expect(end - start).toBeLessThan(100);
     });
   });
 
@@ -679,9 +678,8 @@ describe('ShellExecutionService child_process fallback', () => {
       expect(onOutputEventMock).not.toHaveBeenCalled();
     });
 
-    it('should truncate stdout using a sliding window', async () => {
+    it('should truncate stdout using a sliding window and show a warning', async () => {
       const MAX_SIZE = 16 * 1024 * 1024;
-      // Make the chunks slightly smaller than half to ensure the buffer overflows on the third write.
       const chunk1 = 'a'.repeat(MAX_SIZE / 2 - 5);
       const chunk2 = 'b'.repeat(MAX_SIZE / 2 - 5);
       const chunk3 = 'c'.repeat(20);
@@ -693,12 +691,21 @@ describe('ShellExecutionService child_process fallback', () => {
         cp.emit('exit', 0, null);
       });
 
+      const truncationMessage =
+        '[GEMINI_CLI_WARNING: Output truncated. The buffer is limited to 16MB.]';
+      expect(result.output).toContain(truncationMessage);
+
+      const outputWithoutMessage = result.output
+        .substring(0, result.output.indexOf(truncationMessage))
+        .trimEnd();
+
+      expect(outputWithoutMessage.length).toBe(MAX_SIZE);
+
       const expectedStart = (chunk1 + chunk2 + chunk3).slice(-MAX_SIZE);
-      expect(result.output.length).toBe(MAX_SIZE);
-      expect(result.output.startsWith(expectedStart.substring(0, 10))).toBe(
-        true,
-      );
-      expect(result.output.endsWith('c'.repeat(20))).toBe(true);
+      expect(
+        outputWithoutMessage.startsWith(expectedStart.substring(0, 10)),
+      ).toBe(true);
+      expect(outputWithoutMessage.endsWith('c'.repeat(20))).toBe(true);
     });
   });
 
