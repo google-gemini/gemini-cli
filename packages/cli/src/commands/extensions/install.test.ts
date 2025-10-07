@@ -94,7 +94,7 @@ describe('handleInstall', () => {
   });
 
   it('throws an error from an unknown source', async () => {
-    mockStat.mockRejectedValue({});
+    mockStat.mockRejectedValue(new Error('ENOENT: no such file or directory'));
     await handleInstall({
       source: 'test://google.com',
     });
