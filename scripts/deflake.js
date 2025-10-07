@@ -8,6 +8,9 @@ import { execSync } from 'node:child_process';
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
 
+// Script to deflake tests
+// Ex. npm run deflake -- --command="npm run test:e2e -- --test-name-pattern 'replace'" --runs=3
+
 async function main() {
   const argv = yargs(hideBin(process.argv))
     .option('command', {
