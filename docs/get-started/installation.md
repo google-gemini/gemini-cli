@@ -1,10 +1,10 @@
-# Gemini CLI Execution and Deployment
+# Gemini CLI Installation, Execution, and Deployment
 
-This document describes how to run Gemini CLI and its deployment architecture.
+Install and run Gemini CLI. This document provides an overview of Gemini CLI's installation methods and deployment architecture.
 
-## Running Gemini CLI
+## How to install and/or run Gemini CLI
 
-There are several ways to run Gemini CLI. The option you choose depends on how you intend to use Gemini CLI.
+There are several ways to run Gemini CLI. The recommended option depends on how you intend to use Gemini CLI.
 
 - As a standard installation. This is the most straightforward method of using Gemini CLI.
 - In a sandbox. This method offers increased security and isolation.

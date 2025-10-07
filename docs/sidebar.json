@@ -28,8 +28,8 @@
         "slug": "docs/get-started/configuration"
       },
       {
-        "label": "Deployment",
-        "slug": "docs/get-started/deployment"
+        "label": "Installation",
+        "slug": "docs/get-started/installation"
       },
       {
         "label": "Examples",
@@ -188,6 +188,10 @@
       {
         "label": "Releases",
         "slug": "docs/releases"
+      },
+      {
+        "label": "Changelog",
+        "slug": "docs/changelogs"
       },
       {
         "label": "Integration Tests",

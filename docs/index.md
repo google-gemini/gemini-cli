@@ -13,7 +13,7 @@ This documentation is organized into the following sections:
 ### Get started
 
 - **[Gemini CLI Quickstart](./get-started/index.md):** Let's get started with Gemini CLI.
-- **[Deployment](./get-started/deployment.md):** Install and run Gemini CLI.
+- **[Installation](./get-started/installation.md):** Install and run Gemini CLI.
 - **[Authentication](./get-started/authentication.md):** Authenticate Gemini CLI.
 - **[Configuration](./get-started/configuration.md):** Information on configuring the CLI.
 - **[Examples](./get-started/examples.md):** Example usage of Gemini CLI.
