@@ -11,7 +11,7 @@ export default defineConfig({
     testTimeout: 300000, // 5 minutes
     globalSetup: './globalSetup.ts',
     reporters: ['default'],
-    include: ['**/file-system-interactive.test.ts'],
+    include: ['**/*.test.ts'],
     retry: 2,
     fileParallelism: true,
     poolOptions: {
