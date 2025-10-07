@@ -9,13 +9,19 @@ import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
 
 async function main() {
-  const argv = yargs(hideBin(process.argv)).option('command', {
-    type: 'string',
-    demandOption: true,
-    description: 'The command to run',
-  }).argv;
+  const argv = yargs(hideBin(process.argv))
+    .option('command', {
+      type: 'string',
+      demandOption: true,
+      description: 'The command to run',
+    })
+    .option('runs', {
+      type: 'number',
+      default: 50,
+      description: 'The number of runs to perform',
+    }).argv;
 
-  const NUM_RUNS = 50;
+  const NUM_RUNS = argv.runs;
 
   const COMMAND = argv.command;
 
