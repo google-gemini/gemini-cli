@@ -226,6 +226,11 @@ jobs:
     steps:
       - name: 'Check E2E test results'
         run: |
+          if [[ ${{ needs.e2e_linux.result }} == 'skipped' || \
+               ${{ needs.e2e_mac.result }} == 'skipped' ]]; then
+            echo "A maintainer needs to run the e2e tests for your code changes"
+            exit 1
+          fi
           if [[ ${{ needs.e2e_linux.result }} != 'success' || \
                ${{ needs.e2e_mac.result }} != 'success' ]]; then
             echo "One or more E2E jobs failed."
