@@ -357,19 +357,23 @@ This tool uses an embedded Python 3.13.7 environment to ensure stable and consis
 # EXCEL SPECIFIC GUIDELINES
 ## Decide which python library to use between xlwings and openpyxl based on the following guidelines:
 ### When to choose xlwings:
-    - User explicitly requests to use xlwings
-    - Task involves interacting with an already opened Excel application
-    - Task requires advanced Excel features not supported by openpyxl (e.g., charts, shapes, macros)
-    - Task requires real-time interaction with Excel (e.g., updating live data, responding to user actions in Excel)
-*NOTICE*: If you're unsure how to use xlwings, or your xlwings code produces errors, refer to ${XlwingsDocTool.Name} for documentation and examples, follow the query examples provided in the tool description to find relevant information quickly
+  - User explicitly requests to use xlwings
+  - Task involves interacting with an already opened Excel application
+  - Task requires advanced Excel features not supported by openpyxl (e.g., charts, shapes, macros)
+  - Task requires real-time interaction with Excel (e.g., updating live data, responding to user actions in Excel)
+  *NOTICE*: If you're unsure how to use xlwings, or your xlwings code produces errors, refer to ${XlwingsDocTool.Name} for documentation and examples, follow the query examples provided in the tool description to find relevant information quickly
+  **CRITICAL xlwings considerations**:
+    - **UsedRangeAccuracy:** Be aware that 'sheet.used_range' might sometimes report the entire sheet's maximum range (e.g., 1048576 rows) even if actual data is much less. This can lead to COM errors or performance issues.
+    - **Robust Data Boundary Determination:** If 'sheet.used_range' is problematic, consider alternative methods to determine data boundaries, such as 'sheet.range('A1').expand('table')' or manually scanning for the last non-empty row/column.
+    - **Data Type Conversion for Comparison:** When filtering or comparing data, even for numeric values, convert cell values to strings (e.g., 'str(cell.value)') to avoid type mismatch issues.
 ### When to choose openpyxl:
-    - As default option when unsure
-    - User explicitly requests to use openpyxl
-    - Task involves complex data processing, analysis, or visualization that is better handled with pandas/matplotlib
-    - Task requires reading/writing large datasets where performance and memory efficiency are critical
-    - Task involves creating or modifying Excel files without needing to interact with an open Excel application
-    - When xlwings encounters persistent or cryptic errors (e.g., COM errors, attribute errors on chart objects) despite following documentation, consider switching to openpyxl for file-based operations (if interaction with an open instance is not strictly required) or inform the user about the technical limitations and suggest manual intervention in Excel
-*NOTICE*: You may use neither openpyxl nor xlwings, as long as the task can be accomplished with pandas/matplotlib or other Python libraries directly
+  - As default option when unsure
+  - User explicitly requests to use openpyxl
+  - Task involves complex data processing, analysis, or visualization that is better handled with pandas/matplotlib
+  - Task requires reading/writing large datasets where performance and memory efficiency are critical
+  - Task involves creating or modifying Excel files without needing to interact with an open Excel application
+  - When xlwings encounters persistent or cryptic errors (e.g., COM errors, attribute errors on chart objects) despite following documentation, consider switching to openpyxl for file-based operations (if interaction with an open instance is not strictly required) or inform the user about the technical limitations and suggest manual intervention in Excel
+  *NOTICE*: You may use neither openpyxl nor xlwings, as long as the task can be accomplished with pandas/matplotlib or other Python libraries directly
 
 ## GENERAL GUIDELINES
 - NEVER assume a worksheet has table headers; NEVER assume there is only one header row, there may be multiple header rows or no headers at all; Ferthermore, there maybe multiple tables and headers in a single worksheet, if necessary, try to identify the correct table by sampling data
