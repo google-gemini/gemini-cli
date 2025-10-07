@@ -234,7 +234,7 @@ jobs:
         run: |
           if [[ ${{ needs.e2e_linux.result }} == 'skipped' || \
                ${{ needs.e2e_mac.result }} == 'skipped' ]]; then
-            echo "A maintainer needs to run the e2e tests for your code changes"
+            echo "A maintainer needs to add the 'maintainer:e2e:ok' label (removing it if it's already there) to run the e2e tests for your code changes"
             exit 1
           fi
           if [[ ${{ needs.e2e_linux.result }} != 'success' || \
