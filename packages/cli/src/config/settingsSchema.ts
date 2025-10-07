@@ -900,7 +900,7 @@ const SETTINGS_SCHEMA = {
     category: 'Advanced',
     requiresRestart: false,
     default: false,
-    description: 'Enable the write_todos_list tool.',
+    description: 'Enable the write_todos tool.',
     showInDialog: false,
   },
   security: {
