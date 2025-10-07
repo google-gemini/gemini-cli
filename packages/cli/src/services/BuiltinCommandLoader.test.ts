@@ -4,6 +4,17 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+vi.mock('../ui/commands/profileCommand.js', async () => {
+  const { CommandKind } = await import('../ui/commands/types.js');
+  return {
+    profileCommand: {
+      name: 'profile',
+      description: 'Profile command',
+      kind: CommandKind.BUILT_IN,
+    },
+  };
+});
+
 vi.mock('../ui/commands/aboutCommand.js', async () => {
   const { CommandKind } = await import('../ui/commands/types.js');
   return {
@@ -175,5 +186,36 @@ describe('BuiltinCommandLoader', () => {
     const commands = await loader.loadCommands(new AbortController().signal);
     const modelCmd = commands.find((c) => c.name === 'model');
     expect(modelCmd).toBeUndefined();
+  });
+});
+
+describe('BuiltinCommandLoader profile', () => {
+  let mockConfig: Config;
+
+  beforeEach(() => {
+    vi.resetModules();
+    mockConfig = {
+      getFolderTrust: vi.fn().mockReturnValue(false),
+      getUseModelRouter: () => false,
+      getCheckpointingEnabled: () => false,
+    } as unknown as Config;
+  });
+
+  it('should not include profile command when isDevelopment is false', async () => {
+    process.env['NODE_ENV'] = 'production';
+    const { BuiltinCommandLoader } = await import('./BuiltinCommandLoader.js');
+    const loader = new BuiltinCommandLoader(mockConfig);
+    const commands = await loader.loadCommands(new AbortController().signal);
+    const profileCmd = commands.find((c) => c.name === 'profile');
+    expect(profileCmd).toBeUndefined();
+  });
+
+  it('should include profile command when isDevelopment is true', async () => {
+    process.env['NODE_ENV'] = 'development';
+    const { BuiltinCommandLoader } = await import('./BuiltinCommandLoader.js');
+    const loader = new BuiltinCommandLoader(mockConfig);
+    const commands = await loader.loadCommands(new AbortController().signal);
+    const profileCmd = commands.find((c) => c.name === 'profile');
+    expect(profileCmd).toBeDefined();
   });
 });

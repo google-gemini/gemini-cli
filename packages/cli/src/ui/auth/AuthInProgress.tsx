@@ -7,7 +7,7 @@
 import type React from 'react';
 import { useState, useEffect } from 'react';
 import { Box, Text } from 'ink';
-import Spinner from 'ink-spinner';
+import { CliSpinner } from '../components/CliSpinner.js';
 import { theme } from '../semantic-colors.js';
 import { useKeypress } from '../hooks/useKeypress.js';
 
@@ -53,8 +53,8 @@ export function AuthInProgress({
       ) : (
         <Box>
           <Text>
-            <Spinner type="dots" /> Waiting for auth... (Press ESC or CTRL+C to
-            cancel)
+            <CliSpinner type="dots" /> Waiting for auth... (Press ESC or CTRL+C
+            to cancel)
           </Text>
         </Box>
       )}
