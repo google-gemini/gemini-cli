@@ -12,6 +12,14 @@ import {
   type ToolResult,
 } from './tools.js';
 
+// Single source of truth for valid todo statuses
+const VALID_TODO_STATUSES = [
+  'pending',
+  'in_progress',
+  'completed',
+  'cancelled',
+] as const;
+
 // Insprired by langchain/deepagents.
 export const WRITE_TODOS_DESCRIPTION = `This tool can help you list out the current subtasks that are required to be completed for a given user request. The list of subtasks helps you keep track of the current task, organize complex queries and help ensure that you don't miss any steps. With this list, the user can also see the current progress you are making in executing a given task.
 
@@ -78,7 +86,7 @@ The agent did not use the todo list because this task could be completed by a ti
 </example>
 `;
 
-export type TodoStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled';
+export type TodoStatus = (typeof VALID_TODO_STATUSES)[number];
 
 export interface Todo {
   description: string;
@@ -157,7 +165,7 @@ export class WriteTodosTool extends BaseDeclarativeTool<
                 status: {
                   type: 'string',
                   description: 'The current status of the task.',
-                  enum: ['pending', 'in_progress', 'completed'],
+                  enum: [...VALID_TODO_STATUSES],
                 },
               },
               required: ['description', 'status'],
@@ -181,11 +189,8 @@ export class WriteTodosTool extends BaseDeclarativeTool<
       if (typeof todo !== 'object' || todo === null) {
         return 'Each todo item must be an object';
       }
-      if (typeof todo.description !== 'string' || !todo.description.trim()) {
+      if (!todo.description.trim()) {
         return 'Each todo must have a non-empty description string';
-      }
-      if (!['pending', 'in_progress', 'completed'].includes(todo.status)) {
-        return 'Each todo must have a valid status (pending, in_progress, or completed)';
       }
     }
 

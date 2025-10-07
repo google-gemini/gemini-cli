@@ -23,6 +23,16 @@ describe('WriteTodosTool', () => {
       await expect(tool.buildAndExecute(params, signal)).resolves.toBeDefined();
     });
 
+    it('should not throw for cancelled status', async () => {
+      const params: WriteTodosToolParams = {
+        todos: [
+          { description: 'Task 1', status: 'cancelled' },
+          { description: 'Task 2', status: 'pending' },
+        ],
+      };
+      await expect(tool.buildAndExecute(params, signal)).resolves.toBeDefined();
+    });
+
     it('should not throw for an empty list', async () => {
       const params: WriteTodosToolParams = {
         todos: [],
@@ -101,6 +111,23 @@ describe('WriteTodosTool', () => {
       const expectedOutput = `Successfully updated the todo list. The current list is now:
 1. [completed] First task
 2. [in_progress] Second task
+3. [pending] Third task`;
+      expect(result.llmContent).toBe(expectedOutput);
+      expect(result.returnDisplay).toBe(expectedOutput);
+    });
+
+    it('should correctly display cancelled status in the todo list', async () => {
+      const params: WriteTodosToolParams = {
+        todos: [
+          { description: 'First task', status: 'completed' },
+          { description: 'Second task', status: 'cancelled' },
+          { description: 'Third task', status: 'pending' },
+        ],
+      };
+      const result = await tool.buildAndExecute(params, signal);
+      const expectedOutput = `Successfully updated the todo list. The current list is now:
+1. [completed] First task
+2. [cancelled] Second task
 3. [pending] Third task`;
       expect(result.llmContent).toBe(expectedOutput);
       expect(result.returnDisplay).toBe(expectedOutput);
