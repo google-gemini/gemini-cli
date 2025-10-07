@@ -86,3 +86,4 @@ ignore:
   - 'thirdparty/'
   - 'third_party/'
   - 'vendor/'
+  - 'node_modules/'

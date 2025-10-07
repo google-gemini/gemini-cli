@@ -51,7 +51,30 @@ The Gemini CLI uses the `mcpServers` configuration in your `settings.json` file 
 
 ### Configure the MCP server in settings.json
 
-You can configure MCP servers at the global level in the `~/.gemini/settings.json` file or in your project's root directory, create or open the `.gemini/settings.json` file. Within the file, add the `mcpServers` configuration block.
+You can configure MCP servers in your `settings.json` file in two main ways: through the top-level `mcpServers` object for specific server definitions, and through the `mcp` object for global settings that control server discovery and execution.
+
+#### Global MCP Settings (`mcp`)
+
+The `mcp` object in your `settings.json` allows you to define global rules for all MCP servers.
+
+- **`mcp.serverCommand`** (string): A global command to start an MCP server.
+- **`mcp.allowed`** (array of strings): A list of MCP server names to allow. If this is set, only servers from this list (matching the keys in the `mcpServers` object) will be connected to.
+- **`mcp.excluded`** (array of strings): A list of MCP server names to exclude. Servers in this list will not be connected to.
+
+**Example:**
+
+```json
+{
+  "mcp": {
+    "allowed": ["my-trusted-server"],
+    "excluded": ["experimental-server"]
+  }
+}
+```
+
+#### Server-Specific Configuration (`mcpServers`)
+
+The `mcpServers` object is where you define each individual MCP server you want the CLI to connect to.
 
 ### Configuration Structure
 
@@ -92,8 +115,10 @@ Each server configuration supports the following properties:
 - **`cwd`** (string): Working directory for Stdio transport
 - **`timeout`** (number): Request timeout in milliseconds (default: 600,000ms = 10 minutes)
 - **`trust`** (boolean): When `true`, bypasses all tool call confirmations for this server (default: `false`)
-- **`includeTools`** (string[]): List of tool names to include from this MCP server. When specified, only the tools listed here will be available from this server (whitelist behavior). If not specified, all tools from the server are enabled by default.
+- **`includeTools`** (string[]): List of tool names to include from this MCP server. When specified, only the tools listed here will be available from this server (allowlist behavior). If not specified, all tools from the server are enabled by default.
 - **`excludeTools`** (string[]): List of tool names to exclude from this MCP server. Tools listed here will not be available to the model, even if they are exposed by the server. **Note:** `excludeTools` takes precedence over `includeTools` - if a tool is in both lists, it will be excluded.
+- **`targetAudience`** (string): The OAuth Client ID allowlisted on the IAP-protected application you are trying to access. Used with `authProviderType: 'service_account_impersonation'`.
+- **`targetServiceAccount`** (string): The email address of the Google Cloud Service Account to impersonate. Used with `authProviderType: 'service_account_impersonation'`.
 
 ### OAuth Support for Remote MCP Servers
 
@@ -187,6 +212,9 @@ You can specify the authentication provider type using the `authProviderType` pr
 - **`authProviderType`** (string): Specifies the authentication provider. Can be one of the following:
   - **`dynamic_discovery`** (default): The CLI will automatically discover the OAuth configuration from the server.
   - **`google_credentials`**: The CLI will use the Google Application Default Credentials (ADC) to authenticate with the server. When using this provider, you must specify the required scopes.
+  - **`service_account_impersonation`**: The CLI will impersonate a Google Cloud Service Account to authenticate with the server. This is useful for accessing IAP-protected services (this was specifically designed for Cloud Run services).
+
+#### Google Credentials
 
 ```json
 {
@@ -201,6 +229,24 @@ You can specify the authentication provider type using the `authProviderType` pr
   }
 }
 ```
+
+#### Service Account Impersonation
+
+To authenticate with a server using Service Account Impersonation, you must set the `authProviderType` to `service_account_impersonation` and provide the following properties:
+
+- **`targetAudience`** (string): The OAuth Client ID allowslisted on the IAP-protected application you are trying to access.
+- **`targetServiceAccount`** (string): The email address of the Google Cloud Service Account to impersonate.
+
+The CLI will use your local Application Default Credentials (ADC) to generate an OIDC ID token for the specified service account and audience. This token will then be used to authenticate with the MCP server.
+
+#### Setup Instructions
+
+1. **[Create](https://cloud.google.com/iap/docs/oauth-client-creation) or use an existing OAuth 2.0 client ID.** To use an existing OAuth 2.0 client ID, follow the steps in [How to share OAuth Clients](https://cloud.google.com/iap/docs/sharing-oauth-clients).
+2. **Add the OAuth ID to the allowlist for [programmatic access](https://cloud.google.com/iap/docs/sharing-oauth-clients#programmatic_access) for the application.** Since Cloud Run is not yet a supported resource type in gcloud iap, you must allowlist the Client ID on the project.
+3. **Create a service account.** [Documentation](https://cloud.google.com/iam/docs/service-accounts-create#creating), [Cloud Console Link](https://console.cloud.google.com/iam-admin/serviceaccounts)
+4. **Add both the service account and users to the IAP Policy** in the "Security" tab of the Cloud Run service itself or via gcloud.
+5. **Grant all users and groups** who will access the MCP Server the necessary permissions to [impersonate the service account](https://cloud.google.com/docs/authentication/use-service-account-impersonation) (i.e., `roles/iam.serviceAccountTokenCreator`).
+6. **[Enable](https://console.cloud.google.com/apis/library/iamcredentials.googleapis.com) the IAM Credentials API** for your project.
 
 ### Example Configurations
 
@@ -305,6 +351,21 @@ You can specify the authentication provider type using the `authProviderType` pr
       "includeTools": ["safe_tool", "file_reader", "data_processor"],
       // "excludeTools": ["dangerous_tool", "file_deleter"],
       "timeout": 30000
+    }
+  }
+}
+```
+
+### SSE MCP Server with SA Impersonation
+
+```json
+{
+  "mcpServers": {
+    "myIapProtectedServer": {
+      "url": "https://my-iap-service.run.app/sse",
+      "authProviderType": "service_account_impersonation",
+      "targetAudience": "YOUR_IAP_CLIENT_ID.apps.googleusercontent.com",
+      "targetServiceAccount": "your-sa@your-project.iam.gserviceaccount.com"
     }
   }
 }
@@ -667,9 +728,13 @@ await server.connect(transport);
 This can be included in `settings.json` under `mcpServers` with:
 
 ```json
-"nodeServer": {
-  "command": "node",
-  "args": ["filename.ts"],
+{
+  "mcpServers": {
+    "nodeServer": {
+      "command": "node",
+      "args": ["filename.ts"]
+    }
+  }
 }
 ```
 

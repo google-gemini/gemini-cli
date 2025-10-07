@@ -57,8 +57,8 @@ export interface LoadCodeAssistResponse {
  */
 export interface GeminiUserTier {
   id: UserTierId;
-  name: string;
-  description: string;
+  name?: string;
+  description?: string;
   // This value is used to declare whether a given tier requires the user to configure the project setting on the IDE settings or not.
   userDefinedCloudaicompanionProject?: boolean | null;
   isDefault?: boolean;
@@ -182,4 +182,20 @@ export interface SetCodeAssistGlobalUserSettingRequest {
 export interface CodeAssistGlobalUserSettingResponse {
   cloudaicompanionProject?: string;
   freeTierDataCollectionOptin: boolean;
+}
+
+/**
+ * Relevant fields that can be returned from a Google RPC response
+ */
+export interface GoogleRpcResponse {
+  error?: {
+    details?: GoogleRpcErrorInfo[];
+  };
+}
+
+/**
+ * Relevant fields that can be returned in the details of an error returned from GoogleRPCs
+ */
+interface GoogleRpcErrorInfo {
+  reason?: string;
 }

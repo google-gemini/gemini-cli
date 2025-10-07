@@ -32,40 +32,58 @@ export async function detectAndEnableKittyProtocol(): Promise<boolean> {
 
     let responseBuffer = '';
     let progressiveEnhancementReceived = false;
-    let checkFinished = false;
+    let timeoutId: NodeJS.Timeout | undefined;
+
+    const onTimeout = () => {
+      timeoutId = undefined;
+      process.stdin.removeListener('data', handleData);
+      if (!originalRawMode) {
+        process.stdin.setRawMode(false);
+      }
+      detectionComplete = true;
+      resolve(false);
+    };
 
     const handleData = (data: Buffer) => {
+      if (timeoutId === undefined) {
+        // Race condition. We have already timed out.
+        return;
+      }
       responseBuffer += data.toString();
 
       // Check for progressive enhancement response (CSI ? <flags> u)
       if (responseBuffer.includes('\x1b[?') && responseBuffer.includes('u')) {
         progressiveEnhancementReceived = true;
+        // Give more time to get the full set of kitty responses if we have an
+        // indication the terminal probably supports kitty and we just need to
+        // wait a bit longer for a response.
+        clearTimeout(timeoutId);
+        timeoutId = setTimeout(onTimeout, 1000);
       }
 
       // Check for device attributes response (CSI ? <attrs> c)
       if (responseBuffer.includes('\x1b[?') && responseBuffer.includes('c')) {
-        if (!checkFinished) {
-          checkFinished = true;
-          process.stdin.removeListener('data', handleData);
+        clearTimeout(timeoutId);
+        timeoutId = undefined;
+        process.stdin.removeListener('data', handleData);
 
-          if (!originalRawMode) {
-            process.stdin.setRawMode(false);
-          }
-
-          if (progressiveEnhancementReceived) {
-            // Enable the protocol
-            process.stdout.write('\x1b[>1u');
-            protocolSupported = true;
-            protocolEnabled = true;
-
-            // Set up cleanup on exit
-            process.on('exit', disableProtocol);
-            process.on('SIGTERM', disableProtocol);
-          }
-
-          detectionComplete = true;
-          resolve(protocolSupported);
+        if (!originalRawMode) {
+          process.stdin.setRawMode(false);
         }
+
+        if (progressiveEnhancementReceived) {
+          // Enable the protocol
+          process.stdout.write('\x1b[>1u');
+          protocolSupported = true;
+          protocolEnabled = true;
+
+          // Set up cleanup on exit
+          process.on('exit', disableProtocol);
+          process.on('SIGTERM', disableProtocol);
+        }
+
+        detectionComplete = true;
+        resolve(protocolSupported);
       }
     };
 
@@ -75,17 +93,10 @@ export async function detectAndEnableKittyProtocol(): Promise<boolean> {
     process.stdout.write('\x1b[?u'); // Query progressive enhancement
     process.stdout.write('\x1b[c'); // Query device attributes
 
-    // Timeout after 50ms
-    setTimeout(() => {
-      if (!checkFinished) {
-        process.stdin.removeListener('data', handleData);
-        if (!originalRawMode) {
-          process.stdin.setRawMode(false);
-        }
-        detectionComplete = true;
-        resolve(false);
-      }
-    }, 50);
+    // Timeout after 200ms
+    // When a iterm2 terminal does not have focus this can take over 90s on a
+    // fast macbook so we need a somewhat longer threshold than would be ideal.
+    timeoutId = setTimeout(onTimeout, 200);
   });
 }
 

@@ -24,30 +24,51 @@ async function getProcessInfo(pid: number): Promise<{
   name: string;
   command: string;
 }> {
-  const platform = os.platform();
-  if (platform === 'win32') {
-    const command = `wmic process where "ProcessId=${pid}" get Name,ParentProcessId,CommandLine /value`;
-    const { stdout } = await execAsync(command);
-    const nameMatch = stdout.match(/Name=([^\n]*)/);
-    const processName = nameMatch ? nameMatch[1].trim() : '';
-    const ppidMatch = stdout.match(/ParentProcessId=(\d+)/);
-    const parentPid = ppidMatch ? parseInt(ppidMatch[1], 10) : 0;
-    const commandLineMatch = stdout.match(/CommandLine=([^\n]*)/);
-    const commandLine = commandLineMatch ? commandLineMatch[1].trim() : '';
-    return { parentPid, name: processName, command: commandLine };
-  } else {
-    const command = `ps -o ppid=,command= -p ${pid}`;
-    const { stdout } = await execAsync(command);
-    const trimmedStdout = stdout.trim();
-    const ppidString = trimmedStdout.split(/\s+/)[0];
-    const parentPid = parseInt(ppidString, 10);
-    const fullCommand = trimmedStdout.substring(ppidString.length).trim();
-    const processName = path.basename(fullCommand.split(' ')[0]);
-    return {
-      parentPid: isNaN(parentPid) ? 1 : parentPid,
-      name: processName,
-      command: fullCommand,
-    };
+  try {
+    const platform = os.platform();
+    if (platform === 'win32') {
+      const powershellCommand = [
+        '$p = Get-CimInstance Win32_Process',
+        `-Filter 'ProcessId=${pid}'`,
+        '-ErrorAction SilentlyContinue;',
+        'if ($p) {',
+        '@{Name=$p.Name;ParentProcessId=$p.ParentProcessId;CommandLine=$p.CommandLine}',
+        '| ConvertTo-Json',
+        '}',
+      ].join(' ');
+      const { stdout } = await execAsync(`powershell "${powershellCommand}"`);
+      const output = stdout.trim();
+      if (!output) return { parentPid: 0, name: '', command: '' };
+      const {
+        Name = '',
+        ParentProcessId = 0,
+        CommandLine = '',
+      } = JSON.parse(output);
+      return {
+        parentPid: ParentProcessId,
+        name: Name,
+        command: CommandLine ?? '',
+      };
+    } else {
+      const command = `ps -o ppid=,command= -p ${pid}`;
+      const { stdout } = await execAsync(command);
+      const trimmedStdout = stdout.trim();
+      if (!trimmedStdout) {
+        return { parentPid: 0, name: '', command: '' };
+      }
+      const ppidString = trimmedStdout.split(/\s+/)[0];
+      const parentPid = parseInt(ppidString, 10);
+      const fullCommand = trimmedStdout.substring(ppidString.length).trim();
+      const processName = path.basename(fullCommand.split(' ')[0]);
+      return {
+        parentPid: isNaN(parentPid) ? 1 : parentPid,
+        name: processName,
+        command: fullCommand,
+      };
+    }
+  } catch (_e) {
+    console.debug(`Failed to get process info for pid ${pid}:`, _e);
+    return { parentPid: 0, name: '', command: '' };
   }
 }
 
@@ -99,9 +120,6 @@ async function getIdeProcessInfoForUnix(): Promise<{
     }
   }
 
-  console.error(
-    'Failed to find shell process in the process tree. Falling back to top-level process, which may be inaccurate. If you see this, please file a bug via /bug.',
-  );
   const { command } = await getProcessInfo(currentPid);
   return { pid: currentPid, command };
 }
@@ -163,7 +181,6 @@ async function getIdeProcessInfoForWindows(): Promise<{
  * top-level ancestor process ID and command as a fallback.
  *
  * @returns A promise that resolves to the PID and command of the IDE process.
- * @throws Will throw an error if the underlying shell commands fail.
  */
 export async function getIdeProcessInfo(): Promise<{
   pid: number;

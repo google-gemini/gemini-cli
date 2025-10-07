@@ -50,6 +50,8 @@ async function getDependencyLicense(depName, depVersion) {
       'LICENSE.md',
       'LICENSE.txt',
       'LICENSE-MIT.txt',
+      'license.md',
+      'license',
     ].filter(Boolean);
 
     let licenseFile;

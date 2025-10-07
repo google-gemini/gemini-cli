@@ -6,12 +6,12 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import {
+import type {
   CommandContext,
   SlashCommand,
   SlashCommandActionReturn,
-  CommandKind,
 } from './types.js';
+import { CommandKind } from './types.js';
 
 export const initCommand: SlashCommand = {
   name: 'init',

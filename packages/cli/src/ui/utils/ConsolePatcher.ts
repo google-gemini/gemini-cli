@@ -5,7 +5,7 @@
  */
 
 import util from 'node:util';
-import { ConsoleMessageItem } from '../types.js';
+import type { ConsoleMessageItem } from '../types.js';
 
 interface ConsolePatcherParams {
   onNewMessage?: (message: Omit<ConsoleMessageItem, 'id'>) => void;

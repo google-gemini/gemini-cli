@@ -7,13 +7,11 @@
 // File for 'gemini mcp list' command
 import type { CommandModule } from 'yargs';
 import { loadSettings } from '../../config/settings.js';
-import {
-  MCPServerConfig,
-  MCPServerStatus,
-  createTransport,
-} from '@google/gemini-cli-core';
+import type { MCPServerConfig } from '@google/gemini-cli-core';
+import { MCPServerStatus, createTransport } from '@google/gemini-cli-core';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { loadExtensions } from '../../config/extension.js';
+import { ExtensionStorage, loadExtensions } from '../../config/extension.js';
+import { ExtensionEnablementManager } from '../../config/extensions/extensionEnablement.js';
 
 const COLOR_GREEN = '\u001b[32m';
 const COLOR_YELLOW = '\u001b[33m';
@@ -23,8 +21,10 @@ const RESET_COLOR = '\u001b[0m';
 async function getMcpServersFromConfig(): Promise<
   Record<string, MCPServerConfig>
 > {
-  const settings = loadSettings(process.cwd());
-  const extensions = loadExtensions(process.cwd());
+  const settings = loadSettings();
+  const extensions = loadExtensions(
+    new ExtensionEnablementManager(ExtensionStorage.getUserExtensionsDir()),
+  );
   const mcpServers = { ...(settings.merged.mcpServers || {}) };
   for (const extension of extensions) {
     Object.entries(extension.config.mcpServers || {}).forEach(

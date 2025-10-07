@@ -7,7 +7,7 @@
 // File for 'gemini mcp add' command
 import type { CommandModule } from 'yargs';
 import { loadSettings, SettingScope } from '../../config/settings.js';
-import { MCPServerConfig } from '@google/gemini-cli-core';
+import type { MCPServerConfig } from '@google/gemini-cli-core';
 
 async function addMcpServer(
   name: string,
@@ -36,9 +36,19 @@ async function addMcpServer(
     includeTools,
     excludeTools,
   } = options;
+
+  const settings = loadSettings(process.cwd());
+  const inHome = settings.workspace.path === settings.user.path;
+
+  if (scope === 'project' && inHome) {
+    console.error(
+      'Error: Please use --scope user to edit settings in the home directory.',
+    );
+    process.exit(1);
+  }
+
   const settingsScope =
     scope === 'user' ? SettingScope.User : SettingScope.Workspace;
-  const settings = loadSettings(process.cwd());
 
   let newServer: Partial<MCPServerConfig> = {};
 

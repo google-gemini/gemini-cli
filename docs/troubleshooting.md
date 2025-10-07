@@ -24,21 +24,6 @@ This guide provides solutions to common issues and debugging tips, including top
   - **Solution:** Set the `NODE_EXTRA_CA_CERTS` environment variable to the absolute path of your corporate root CA certificate file.
     - Example: `export NODE_EXTRA_CA_CERTS=/path/to/your/corporate-ca.crt`
 
-## Frequently asked questions (FAQs)
-
-- **Q: How do I update Gemini CLI to the latest version?**
-  - A: If you installed it globally via `npm`, update it using the command `npm install -g @google/gemini-cli@latest`. If you compiled it from source, pull the latest changes from the repository, and then rebuild using the command `npm run build`.
-
-- **Q: Where are the Gemini CLI configuration or settings files stored?**
-  - A: The Gemini CLI configuration is stored in two `settings.json` files:
-    1. In your home directory: `~/.gemini/settings.json`.
-    2. In your project's root directory: `./.gemini/settings.json`.
-
-    Refer to [Gemini CLI Configuration](./cli/configuration.md) for more details.
-
-- **Q: Why don't I see cached token counts in my stats output?**
-  - A: Cached token information is only displayed when cached tokens are being used. This feature is available for API key users (Gemini API key or Google Cloud Vertex AI) but not for OAuth users (such as Google Personal/Enterprise accounts like Google Gmail or Google Workspace, respectively). This is because the Gemini Code Assist API does not support cached content creation. You can still view your total token usage using the `/stats` command in Gemini CLI.
-
 ## Common error messages and solutions
 
 - **Error: `EADDRINUSE` (Address already in use) when starting an MCP server.**
@@ -62,7 +47,7 @@ This guide provides solutions to common issues and debugging tips, including top
 
 - **Error: "Operation not permitted", "Permission denied", or similar.**
   - **Cause:** When sandboxing is enabled, Gemini CLI may attempt operations that are restricted by your sandbox configuration, such as writing outside the project directory or system temp directory.
-  - **Solution:** Refer to the [Configuration: Sandboxing](./cli/configuration.md#sandboxing) documentation for more information, including how to customize your sandbox configuration.
+  - **Solution:** Refer to the [Configuration: Sandboxing](./cli/sandbox.md) documentation for more information, including how to customize your sandbox configuration.
 
 - **Gemini CLI is not running in interactive mode in "CI" environments**
   - **Issue:** The Gemini CLI does not enter interactive mode (no prompt appears) if an environment variable starting with `CI_` (e.g., `CI_TOKEN`) is set. This is because the `is-in-ci` package, used by the underlying UI framework, detects these variables and assumes a non-interactive CI environment.
@@ -72,7 +57,19 @@ This guide provides solutions to common issues and debugging tips, including top
 - **DEBUG mode not working from project .env file**
   - **Issue:** Setting `DEBUG=true` in a project's `.env` file doesn't enable debug mode for gemini-cli.
   - **Cause:** The `DEBUG` and `DEBUG_MODE` variables are automatically excluded from project `.env` files to prevent interference with gemini-cli behavior.
-  - **Solution:** Use a `.gemini/.env` file instead, or configure the `excludedProjectEnvVars` setting in your `settings.json` to exclude fewer variables.
+  - **Solution:** Use a `.gemini/.env` file instead, or configure the `advanced.excludedEnvVars` setting in your `settings.json` to exclude fewer variables.
+
+## Exit Codes
+
+The Gemini CLI uses specific exit codes to indicate the reason for termination. This is especially useful for scripting and automation.
+
+| Exit Code | Error Type                 | Description                                                                                         |
+| --------- | -------------------------- | --------------------------------------------------------------------------------------------------- |
+| 41        | `FatalAuthenticationError` | An error occurred during the authentication process.                                                |
+| 42        | `FatalInputError`          | Invalid or missing input was provided to the CLI. (non-interactive mode only)                       |
+| 44        | `FatalSandboxError`        | An error occurred with the sandboxing environment (e.g., Docker, Podman, or Seatbelt).              |
+| 52        | `FatalConfigError`         | A configuration file (`settings.json`) is invalid or contains errors.                               |
+| 53        | `FatalTurnLimitedError`    | The maximum number of conversational turns for the session was reached. (non-interactive mode only) |
 
 ## Debugging Tips
 

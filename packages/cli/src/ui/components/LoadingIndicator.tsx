@@ -4,10 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { ThoughtSummary } from '@google/gemini-cli-core';
-import React from 'react';
+import type { ThoughtSummary } from '@google/gemini-cli-core';
+import type React from 'react';
 import { Box, Text } from 'ink';
-import { Colors } from '../colors.js';
+import { theme } from '../semantic-colors.js';
 import { useStreamingContext } from '../contexts/StreamingContext.js';
 import { StreamingState } from '../types.js';
 import { GeminiRespondingSpinner } from './GeminiRespondingSpinner.js';
@@ -62,10 +62,12 @@ export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
             />
           </Box>
           {primaryText && (
-            <Text color={Colors.AccentPurple}>{primaryText}</Text>
+            <Text color={theme.text.accent} wrap="truncate-end">
+              {primaryText}
+            </Text>
           )}
           {!isNarrow && cancelAndTimerContent && (
-            <Text color={Colors.Gray}> {cancelAndTimerContent}</Text>
+            <Text color={theme.text.secondary}> {cancelAndTimerContent}</Text>
           )}
         </Box>
         {!isNarrow && <Box flexGrow={1}>{/* Spacer */}</Box>}
@@ -73,7 +75,7 @@ export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
       </Box>
       {isNarrow && cancelAndTimerContent && (
         <Box>
-          <Text color={Colors.Gray}>{cancelAndTimerContent}</Text>
+          <Text color={theme.text.secondary}>{cancelAndTimerContent}</Text>
         </Box>
       )}
       {isNarrow && rightContent && <Box>{rightContent}</Box>}

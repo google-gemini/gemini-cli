@@ -4,16 +4,18 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { WritableStream, ReadableStream } from 'node:stream/web';
+import type { WritableStream, ReadableStream } from 'node:stream/web';
 
-import {
-  AuthType,
+import type {
   Config,
   GeminiChat,
-  logToolCall,
   ToolResult,
-  convertToFunctionResponse,
   ToolCallConfirmationDetails,
+} from '@google/gemini-cli-core';
+import {
+  AuthType,
+  logToolCall,
+  convertToFunctionResponse,
   ToolConfirmationOutcome,
   clearCachedCredentialFile,
   isNodeError,
@@ -22,19 +24,39 @@ import {
   getErrorStatus,
   MCPServerConfig,
   DiscoveredMCPTool,
+  StreamEventType,
+  DEFAULT_GEMINI_MODEL,
+  DEFAULT_GEMINI_MODEL_AUTO,
+  DEFAULT_GEMINI_FLASH_MODEL,
 } from '@google/gemini-cli-core';
 import * as acp from './acp.js';
 import { AcpFileSystemService } from './fileSystemService.js';
 import { Readable, Writable } from 'node:stream';
-import { Content, Part, FunctionCall } from '@google/genai';
-import { LoadedSettings, SettingScope } from '../config/settings.js';
+import type { Content, Part, FunctionCall } from '@google/genai';
+import type { LoadedSettings } from '../config/settings.js';
+import { SettingScope } from '../config/settings.js';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { z } from 'zod';
 
 import { randomUUID } from 'node:crypto';
-import { Extension } from '../config/extension.js';
-import { CliArgs, loadCliConfig } from '../config/config.js';
+import { ExtensionStorage, type Extension } from '../config/extension.js';
+import type { CliArgs } from '../config/config.js';
+import { loadCliConfig } from '../config/config.js';
+import { ExtensionEnablementManager } from '../config/extensions/extensionEnablement.js';
+
+/**
+ * Resolves the model to use based on the current configuration.
+ *
+ * If the model is set to "auto", it will use the flash model if in fallback
+ * mode, otherwise it will use the default model.
+ */
+export function resolveModel(model: string, isInFallbackMode: boolean): string {
+  if (model === DEFAULT_GEMINI_MODEL_AUTO) {
+    return isInFallbackMode ? DEFAULT_GEMINI_FLASH_MODEL : DEFAULT_GEMINI_MODEL;
+  }
+  return model;
+}
 
 export async function runZedIntegration(
   config: Config,
@@ -113,7 +135,11 @@ class GeminiAgent {
 
     await clearCachedCredentialFile();
     await this.config.refreshAuth(method);
-    this.settings.setValue(SettingScope.User, 'selectedAuthType', method);
+    this.settings.setValue(
+      SettingScope.User,
+      'security.auth.selectedType',
+      method,
+    );
   }
 
   async newSession({
@@ -124,9 +150,11 @@ class GeminiAgent {
     const config = await this.newSessionConfig(sessionId, cwd, mcpServers);
 
     let isAuthenticated = false;
-    if (this.settings.merged.selectedAuthType) {
+    if (this.settings.merged.security?.auth?.selectedType) {
       try {
-        await config.refreshAuth(this.settings.merged.selectedAuthType);
+        await config.refreshAuth(
+          this.settings.merged.security.auth.selectedType,
+        );
         isAuthenticated = true;
       } catch (e) {
         console.error(`Authentication failed: ${e}`);
@@ -177,6 +205,10 @@ class GeminiAgent {
     const config = await loadCliConfig(
       settings,
       this.extensions,
+      new ExtensionEnablementManager(
+        ExtensionStorage.getUserExtensionsDir(),
+        this.argv.extensions,
+      ),
       sessionId,
       this.argv,
       cwd,
@@ -244,6 +276,7 @@ class Session {
 
       try {
         const responseStream = await chat.sendMessageStream(
+          resolveModel(this.config.getModel(), this.config.isInFallbackMode()),
           {
             message: nextMessage?.parts ?? [],
             config: {
@@ -259,8 +292,12 @@ class Session {
             return { stopReason: 'cancelled' };
           }
 
-          if (resp.candidates && resp.candidates.length > 0) {
-            const candidate = resp.candidates[0];
+          if (
+            resp.type === StreamEventType.CHUNK &&
+            resp.value.candidates &&
+            resp.value.candidates.length > 0
+          ) {
+            const candidate = resp.value.candidates[0];
             for (const part of candidate.content?.parts ?? []) {
               if (!part.text) {
                 continue;
@@ -280,8 +317,8 @@ class Session {
             }
           }
 
-          if (resp.functionCalls) {
-            functionCalls.push(...resp.functionCalls);
+          if (resp.type === StreamEventType.CHUNK && resp.value.functionCalls) {
+            functionCalls.push(...resp.value.functionCalls);
           }
         }
       } catch (error) {
@@ -837,12 +874,15 @@ function toToolCallContent(toolResult: ToolResult): acp.ToolCallContent | null {
         content: { type: 'text', text: toolResult.returnDisplay },
       };
     } else {
-      return {
-        type: 'diff',
-        path: toolResult.returnDisplay.fileName,
-        oldText: toolResult.returnDisplay.originalContent,
-        newText: toolResult.returnDisplay.newContent,
-      };
+      if ('fileName' in toolResult.returnDisplay) {
+        return {
+          type: 'diff',
+          path: toolResult.returnDisplay.fileName,
+          oldText: toolResult.returnDisplay.originalContent,
+          newText: toolResult.returnDisplay.newContent,
+        };
+      }
+      return null;
     }
   } else {
     return null;

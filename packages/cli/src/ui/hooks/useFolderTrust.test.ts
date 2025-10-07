@@ -7,20 +7,23 @@
 import { vi } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useFolderTrust } from './useFolderTrust.js';
-import { LoadedSettings } from '../../config/settings.js';
+import type { LoadedSettings } from '../../config/settings.js';
 import { FolderTrustChoice } from '../components/FolderTrustDialog.js';
-import {
-  LoadedTrustedFolders,
-  TrustLevel,
-} from '../../config/trustedFolders.js';
-import * as process from 'node:process';
-
+import type { LoadedTrustedFolders } from '../../config/trustedFolders.js';
+import { TrustLevel } from '../../config/trustedFolders.js';
 import * as trustedFolders from '../../config/trustedFolders.js';
 
-vi.mock('process', () => ({
-  cwd: vi.fn(),
-  platform: 'linux',
-}));
+const mockedCwd = vi.hoisted(() => vi.fn());
+
+vi.mock('node:process', async () => {
+  const actual =
+    await vi.importActual<typeof import('node:process')>('node:process');
+  return {
+    ...actual,
+    cwd: mockedCwd,
+    platform: 'linux',
+  };
+});
 
 describe('useFolderTrust', () => {
   let mockSettings: LoadedSettings;
@@ -32,8 +35,11 @@ describe('useFolderTrust', () => {
   beforeEach(() => {
     mockSettings = {
       merged: {
-        folderTrustFeature: true,
-        folderTrust: undefined,
+        security: {
+          folderTrust: {
+            enabled: true,
+          },
+        },
       },
       setValue: vi.fn(),
     } as unknown as LoadedSettings;
@@ -46,7 +52,7 @@ describe('useFolderTrust', () => {
       .spyOn(trustedFolders, 'loadTrustedFolders')
       .mockReturnValue(mockTrustedFolders);
     isWorkspaceTrustedSpy = vi.spyOn(trustedFolders, 'isWorkspaceTrusted');
-    (process.cwd as vi.Mock).mockReturnValue('/test/path');
+    mockedCwd.mockReturnValue('/test/path');
     onTrustChange = vi.fn();
   });
 
@@ -55,7 +61,7 @@ describe('useFolderTrust', () => {
   });
 
   it('should not open dialog when folder is already trusted', () => {
-    isWorkspaceTrustedSpy.mockReturnValue(true);
+    isWorkspaceTrustedSpy.mockReturnValue({ isTrusted: true, source: 'file' });
     const { result } = renderHook(() =>
       useFolderTrust(mockSettings, onTrustChange),
     );
@@ -64,7 +70,7 @@ describe('useFolderTrust', () => {
   });
 
   it('should not open dialog when folder is already untrusted', () => {
-    isWorkspaceTrustedSpy.mockReturnValue(false);
+    isWorkspaceTrustedSpy.mockReturnValue({ isTrusted: false, source: 'file' });
     const { result } = renderHook(() =>
       useFolderTrust(mockSettings, onTrustChange),
     );
@@ -73,7 +79,10 @@ describe('useFolderTrust', () => {
   });
 
   it('should open dialog when folder trust is undefined', () => {
-    isWorkspaceTrustedSpy.mockReturnValue(undefined);
+    isWorkspaceTrustedSpy.mockReturnValue({
+      isTrusted: undefined,
+      source: undefined,
+    });
     const { result } = renderHook(() =>
       useFolderTrust(mockSettings, onTrustChange),
     );
@@ -82,14 +91,14 @@ describe('useFolderTrust', () => {
   });
 
   it('should handle TRUST_FOLDER choice', () => {
-    isWorkspaceTrustedSpy
-      .mockReturnValueOnce(undefined)
-      .mockReturnValueOnce(true);
+    isWorkspaceTrustedSpy.mockReturnValue({
+      isTrusted: undefined,
+      source: undefined,
+    });
     const { result } = renderHook(() =>
       useFolderTrust(mockSettings, onTrustChange),
     );
 
-    isWorkspaceTrustedSpy.mockReturnValue(true);
     act(() => {
       result.current.handleFolderTrustSelect(FolderTrustChoice.TRUST_FOLDER);
     });
@@ -104,9 +113,10 @@ describe('useFolderTrust', () => {
   });
 
   it('should handle TRUST_PARENT choice', () => {
-    isWorkspaceTrustedSpy
-      .mockReturnValueOnce(undefined)
-      .mockReturnValueOnce(true);
+    isWorkspaceTrustedSpy.mockReturnValue({
+      isTrusted: undefined,
+      source: undefined,
+    });
     const { result } = renderHook(() =>
       useFolderTrust(mockSettings, onTrustChange),
     );
@@ -124,9 +134,10 @@ describe('useFolderTrust', () => {
   });
 
   it('should handle DO_NOT_TRUST choice and trigger restart', () => {
-    isWorkspaceTrustedSpy
-      .mockReturnValueOnce(undefined)
-      .mockReturnValueOnce(false);
+    isWorkspaceTrustedSpy.mockReturnValue({
+      isTrusted: undefined,
+      source: undefined,
+    });
     const { result } = renderHook(() =>
       useFolderTrust(mockSettings, onTrustChange),
     );
@@ -145,7 +156,10 @@ describe('useFolderTrust', () => {
   });
 
   it('should do nothing for default choice', () => {
-    isWorkspaceTrustedSpy.mockReturnValue(undefined);
+    isWorkspaceTrustedSpy.mockReturnValue({
+      isTrusted: undefined,
+      source: undefined,
+    });
     const { result } = renderHook(() =>
       useFolderTrust(mockSettings, onTrustChange),
     );
@@ -163,7 +177,7 @@ describe('useFolderTrust', () => {
   });
 
   it('should set isRestarting to true when trust status changes from false to true', () => {
-    isWorkspaceTrustedSpy.mockReturnValueOnce(false).mockReturnValueOnce(true); // Initially untrusted, then trusted
+    isWorkspaceTrustedSpy.mockReturnValue({ isTrusted: false, source: 'file' }); // Initially untrusted
     const { result } = renderHook(() =>
       useFolderTrust(mockSettings, onTrustChange),
     );
@@ -177,9 +191,10 @@ describe('useFolderTrust', () => {
   });
 
   it('should not set isRestarting to true when trust status does not change', () => {
-    isWorkspaceTrustedSpy
-      .mockReturnValueOnce(undefined)
-      .mockReturnValueOnce(true); // Initially undefined, then trust
+    isWorkspaceTrustedSpy.mockReturnValue({
+      isTrusted: undefined,
+      source: undefined,
+    });
     const { result } = renderHook(() =>
       useFolderTrust(mockSettings, onTrustChange),
     );

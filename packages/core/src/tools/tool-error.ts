@@ -33,6 +33,7 @@ export enum ToolErrorType {
   EDIT_NO_OCCURRENCE_FOUND = 'edit_no_occurrence_found',
   EDIT_EXPECTED_OCCURRENCE_MISMATCH = 'edit_expected_occurrence_mismatch',
   EDIT_NO_CHANGE = 'edit_no_change',
+  EDIT_NO_CHANGE_LLM_JUDGEMENT = 'edit_no_change_llm_judgement',
 
   // Glob-specific Errors
   GLOB_EXECUTION_ERROR = 'glob_execution_error',
@@ -52,6 +53,9 @@ export enum ToolErrorType {
 
   // ReadManyFiles-specific Errors
   READ_MANY_FILES_SEARCH_ERROR = 'read_many_files_search_error',
+
+  // Shell errors
+  SHELL_EXECUTE_ERROR = 'shell_execute_error',
 
   // DiscoveredTool-specific Errors
   DISCOVERED_TOOL_EXECUTION_ERROR = 'discovered_tool_execution_error',
