@@ -339,7 +339,7 @@ describe('editor utils', () => {
           diffCommand.args,
           {
             stdio: 'inherit',
-            shell: false,
+            shell: process.platform === 'win32',
           },
         );
         expect(mockSpawnOn).toHaveBeenCalledWith('close', expect.any(Function));
@@ -373,29 +373,6 @@ describe('editor utils', () => {
         ).rejects.toThrow(`${editor} exited with code 1`);
       });
     }
-
-    it('should call spawn with shell:true for vscode on windows', async () => {
-      Object.defineProperty(process, 'platform', { value: 'win32' });
-      const mockSpawnOn = vi.fn((event, cb) => {
-        if (event === 'close') {
-          cb(0);
-        }
-      });
-      (spawn as Mock).mockReturnValue({ on: mockSpawnOn });
-
-      await openDiff('old.txt', 'new.txt', 'vscode', () => {});
-      const diffCommand = getDiffCommand('old.txt', 'new.txt', 'vscode')!;
-      expect(spawn).toHaveBeenCalledWith(
-        diffCommand.command,
-        diffCommand.args,
-        {
-          stdio: 'inherit',
-          shell: true,
-        },
-      );
-      expect(mockSpawnOn).toHaveBeenCalledWith('close', expect.any(Function));
-      expect(mockSpawnOn).toHaveBeenCalledWith('error', expect.any(Function));
-    });
 
     const terminalEditors: EditorType[] = ['vim', 'neovim', 'emacs'];
 
