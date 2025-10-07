@@ -4,15 +4,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { access, cp, mkdir, readdir } from 'node:fs/promises';
-import { join, dirname } from 'node:path';
+import { access, cp, mkdir, readdir, writeFile } from 'node:fs/promises';
+import { join, dirname, basename } from 'node:path';
 import type { CommandModule } from 'yargs';
 import { fileURLToPath } from 'node:url';
 import { getErrorMessage } from '../../utils/errors.js';
 
 interface NewArgs {
   path: string;
-  template: string;
+  template?: string;
 }
 
 const __filename = fileURLToPath(import.meta.url);
@@ -29,13 +29,17 @@ async function pathExists(path: string) {
   }
 }
 
-async function copyDirectory(template: string, path: string) {
+async function createDirectory(path: string) {
   if (await pathExists(path)) {
     throw new Error(`Path already exists: ${path}`);
   }
+  await mkdir(path, { recursive: true });
+}
+
+async function copyDirectory(template: string, path: string) {
+  await createDirectory(path);
 
   const examplePath = join(EXAMPLES_PATH, template);
-  await mkdir(path, { recursive: true });
   const entries = await readdir(examplePath, { withFileTypes: true });
   for (const entry of entries) {
     const srcPath = join(examplePath, entry.name);
@@ -46,10 +50,24 @@ async function copyDirectory(template: string, path: string) {
 
 async function handleNew(args: NewArgs) {
   try {
-    await copyDirectory(args.template, args.path);
-    console.log(
-      `Successfully created new extension from template "${args.template}" at ${args.path}.`,
-    );
+    if (args.template) {
+      await copyDirectory(args.template, args.path);
+      console.log(
+        `Successfully created new extension from template "${args.template}" at ${args.path}.`,
+      );
+    } else {
+      await createDirectory(args.path);
+      const extensionName = basename(args.path);
+      const manifest = {
+        name: extensionName,
+        version: '1.0.0',
+      };
+      await writeFile(
+        join(args.path, 'gemini-extension.json'),
+        JSON.stringify(manifest, null, 2),
+      );
+      console.log(`Successfully created new extension at ${args.path}.`);
+    }
     console.log(
       `You can install this using "gemini extensions link ${args.path}" to test it out.`,
     );
@@ -67,7 +85,7 @@ async function getBoilerplateChoices() {
 }
 
 export const newCommand: CommandModule = {
-  command: 'new <path> <template>',
+  command: 'new <path> [template]',
   describe: 'Create a new extension from a boilerplate example.',
   builder: async (yargs) => {
     const choices = await getBoilerplateChoices();
@@ -85,7 +103,7 @@ export const newCommand: CommandModule = {
   handler: async (args) => {
     await handleNew({
       path: args['path'] as string,
-      template: args['template'] as string,
+      template: args['template'] as string | undefined,
     });
   },
 };
