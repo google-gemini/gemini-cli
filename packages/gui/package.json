@@ -9,9 +9,17 @@
     "dev": "vite",
     "dev:electron": "concurrently \"npm run dev\" \"wait-on tcp:127.0.0.1:3000 && electron .\" -k",
     "build": "tsc && (vite build || echo 'GUI build failed - continuing for CI')",
-    "build:electron": "npm run build && tsc -p electron/tsconfig.json",
+    "build:electron": "npm run build",
+    "prepare:dist": "node scripts/prepare-build.js",
+    "clean:dist": "node scripts/clean-dist-deps.js",
+    "clean:release": "node -e \"require('fs').rmSync('release', {recursive: true, force: true})\"",
     "electron": "electron .",
-    "dist": "npm run build:electron && electron-builder",
+    "dist": "npm run clean:release && npm run build:electron && npm run prepare:dist && electron-builder && npm run clean:dist",
+    "dist:win": "npm run clean:release && npm run build:electron && npm run prepare:dist && electron-builder --win && npm run clean:dist",
+    "dist:mac": "npm run clean:release && npm run build:electron && npm run prepare:dist && electron-builder --mac && npm run clean:dist",
+    "dist:linux": "npm run clean:release && npm run build:electron && npm run prepare:dist && electron-builder --linux && npm run clean:dist",
+    "dist:all": "npm run clean:release && npm run build:electron && npm run prepare:dist && electron-builder -mwl && npm run clean:dist",
+    "publish:electron": "npm run clean:release && npm run build:electron && npm run prepare:dist && electron-builder --publish always && npm run clean:dist",
     "preview": "vite preview",
     "lint": "eslint src --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "lint:fix": "eslint src --ext ts,tsx --fix",
@@ -69,15 +77,20 @@
   "build": {
     "appId": "com.google.gemini-cli-gui",
     "productName": "Gemini CLI",
+    "electronVersion": "37.4.0",
+    "asar": false,
+    "compression": "store",
     "directories": {
       "output": "release"
     },
     "files": [
-      "dist/**/*",
-      "dist-electron/**/*",
+      "dist",
+      "electron",
       "package.json",
-      "../python-3.13.7/**/*"
+      "node_modules/@google"
     ],
+    "afterPack": "scripts/copy-python.js",
+    "npmRebuild": false,
     "mac": {
       "category": "public.app-category.developer-tools",
       "target": [
@@ -98,7 +111,8 @@
             "x64"
           ]
         }
-      ]
+      ],
+      "signAndEditExecutable": false
     },
     "linux": {
       "target": [

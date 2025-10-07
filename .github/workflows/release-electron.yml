@@ -1,0 +1,131 @@
+name: 'Release Electron App'
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g., v1.0.0)'
+        required: true
+        type: string
+      draft:
+        description: 'Create as draft release'
+        required: false
+        type: boolean
+        default: true
+      prerelease:
+        description: 'Mark as pre-release'
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  release:
+    strategy:
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+
+    runs-on: ${{ matrix.os }}
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Install Python embedded (Windows only)
+        if: runner.os == 'Windows'
+        run: node scripts/install-python-embedded.cjs
+
+      - name: Build Electron App
+        run: npm run build:electron --workspace @google/gemini-cli-gui
+        env:
+          NODE_ENV: production
+
+      - name: Package Electron App (Windows)
+        if: runner.os == 'Windows'
+        run: npm run dist:win --workspace @google/gemini-cli-gui
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Package Electron App (macOS)
+        if: runner.os == 'macOS'
+        run: npm run dist:mac --workspace @google/gemini-cli-gui
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+
+      - name: Package Electron App (Linux)
+        if: runner.os == 'Linux'
+        run: npm run dist:linux --workspace @google/gemini-cli-gui
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload artifacts (Windows)
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-installer
+          path: |
+            packages/gui/release/*.exe
+            packages/gui/release/*.zip
+          retention-days: 7
+
+      - name: Upload artifacts (macOS)
+        if: runner.os == 'macOS'
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-installer
+          path: |
+            packages/gui/release/*.dmg
+            packages/gui/release/*.zip
+          retention-days: 7
+
+      - name: Upload artifacts (Linux)
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-installer
+          path: |
+            packages/gui/release/*.AppImage
+            packages/gui/release/*.deb
+          retention-days: 7
+
+  create-release:
+    needs: release
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-artifacts
+
+      - name: Create GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ github.event.inputs.version }}
+          DRAFT: ${{ github.event.inputs.draft }}
+          PRERELEASE: ${{ github.event.inputs.prerelease }}
+        run: |
+          gh release create "${VERSION}" \
+            release-artifacts/**/* \
+            --title "Gemini CLI GUI ${VERSION}" \
+            --generate-notes \
+            ${{ github.event.inputs.draft == 'true' && '--draft' || '' }} \
+            ${{ github.event.inputs.prerelease == 'true' && '--prerelease' || '' }}
