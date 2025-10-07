@@ -18,6 +18,7 @@ import { DebugProfiler } from './DebugProfiler.js';
 
 import { useTerminalSize } from '../hooks/useTerminalSize.js';
 import { isNarrowWidth } from '../utils/isNarrowWidth.js';
+import { isDevelopment } from '../../utils/installationInfo.js';
 
 import { useUIState } from '../contexts/UIStateContext.js';
 import { useConfig } from '../contexts/ConfigContext.js';
@@ -76,6 +77,8 @@ export const Footer: React.FC = () => {
   const justifyContent = hideCWD && hideModelInfo ? 'center' : 'space-between';
   const displayVimMode = vimEnabled ? vimMode : undefined;
 
+  const showDebugProfiler = debugMode || isDevelopment;
+
   return (
     <Box
       justifyContent={justifyContent}
@@ -83,9 +86,9 @@ export const Footer: React.FC = () => {
       flexDirection={isNarrow ? 'column' : 'row'}
       alignItems={isNarrow ? 'flex-start' : 'center'}
     >
-      {(debugMode || displayVimMode || !hideCWD) && (
+      {(showDebugProfiler || displayVimMode || !hideCWD) && (
         <Box>
-          {debugMode && <DebugProfiler />}
+          {showDebugProfiler && <DebugProfiler />}
           {displayVimMode && (
             <Text color={theme.text.secondary}>[{displayVimMode}] </Text>
           )}
