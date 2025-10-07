@@ -808,6 +808,77 @@ export class TestRig {
     );
   }
 
+  /**
+   * Spawns the Gemini CLI within a pseudo-terminal (pty) to enable testing of
+   * interactive sessions. This method is crucial for validating user workflows
+   * that involve prompts, confirmations, and signal handling (e.g., Ctrl+C).
+   *
+   * It returns a `ptyProcess` object for sending input and a `promise` that
+   * resolves when the process terminates.
+   *
+   * @example
+   * const { ptyProcess, promise } = rig.runInteractive();
+   *
+   * // Wait for the initial prompt
+   * await rig.waitForText('▶');
+   *
+   * // Send a command
+   * ptyProcess.write('some command\n');
+   *
+   * // Wait for a response
+   * await rig.waitForText('Are you sure? (y/N)');
+   *
+   * // Send confirmation
+   * ptyProcess.write('y\n');
+   *
+   * // Wait for the process to exit and get the result
+   * const result = await promise;
+   * expect(result.exitCode).toBe(0);
+   * expect(result.output).toContain('Success!');
+   *
+   * @param {...string} args - Optional command-line arguments to pass to the CLI.
+   * @returns {{
+   *   ptyProcess: pty.IPty,
+   *   promise: Promise<{ exitCode: number; signal?: number; output: string }>
+   * }} An object containing the pty process instance and a promise that resolves
+   * with the exit information and complete output.
+   *
+   * @section Cross-Platform Considerations
+   *
+   * Writing robust interactive tests across different operating systems presents
+   * unique challenges, primarily due to inconsistencies in terminal emulation and
+   * signal handling between Unix-like systems (Linux, macOS) and Windows.
+   *
+   * - **Windows (`win32`):** This implementation uses `node-pty` which relies on
+   *   `winpty` on Windows. This emulation layer has known limitations. For
+   *   instance, sending signals like `Ctrl+C` (`\x03`) might not behave as
+   *   expected, especially when sent multiple times. A common pattern is that
+   *   the first `Ctrl+C` is received, but subsequent signals may be dropped or
+   *   ignored.
+   *
+   * - **Workarounds:** Tests that rely on signal handling may require platform-
+   *   specific logic. It is common to see `if (os.platform() === 'win32')`
+   *   blocks to implement workarounds, such as forcefully killing the process
+   *   (`ptyProcess.kill()`) after verifying the initial signal was handled.
+   *   The `ctrl-c-exit.test.ts` file provides a canonical example of this
+   *   approach.
+   *
+   * @section Best Practices
+   *
+   * - **Use `waitForText()` or `poll()`:** Avoid fixed-duration sleeps
+   *   (`setTimeout`). Instead, use `rig.waitForText()` or `rig.poll()` to wait
+   *   for specific output. This makes tests faster and more reliable by
+   *   eliminating race conditions.
+   * - **Wait for Prompts:** Before sending input, always wait for the
+   *   application's prompt (e.g., '▶' or '>') to ensure it is ready to
+   *   receive the next command.
+   * - **Simulate Typing:** For multi-character input, use the `type()` helper
+   *   function to send characters one by one. This can prevent issues with
+   *   applications that have "paste detection" logic.
+   * - **Debug Output:** When a test fails, the `output` property of the resolved
+   *   promise contains the full terminal buffer, which is invaluable for
+   *   debugging.
+   */
   runInteractive(...args: string[]): {
     ptyProcess: pty.IPty;
     promise: Promise<{ exitCode: number; signal?: number; output: string }>;

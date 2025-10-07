@@ -172,6 +172,83 @@ npm run test:e2e
 
 For more detailed information on the integration testing framework, please see the [Integration Tests documentation](./docs/integration-tests.md).
 
+### Writing Interactive Integration Tests
+
+Integration tests for interactive CLI features (e.g., prompts, confirmations) require special handling to simulate user input and verify terminal output. This project uses `node-pty` to run the CLI in a pseudo-terminal, which is managed by the `TestRig` helper class (`integration-tests/test-helper.ts`).
+
+#### Basic Workflow
+
+An interactive test generally follows these steps:
+
+1.  **Setup:** Instantiate `TestRig` and call `rig.setup()`.
+2.  **Start:** Call `rig.runInteractive()` to get the `ptyProcess` and a `promise` that resolves on exit.
+3.  **Wait:** Use `rig.waitForText()` to wait for the initial application prompt (e.g., `▶`) to ensure the CLI is ready.
+4.  **Interact:** Send commands to the process using `ptyProcess.write('your command\n')`.
+5.  **Verify:** Use `rig.waitForText()` again to check for the expected output or next prompt.
+6.  **Repeat:** Continue sending input and verifying output as needed for the workflow.
+7.  **Exit & Assert:** Await the `promise` and assert the final `exitCode` and the complete `output`.
+
+**Example:**
+
+```typescript
+import { describe, it, expect } from 'vitest';
+import { TestRig } from './test-helper.js';
+
+describe('interactive feature', () => {
+  it('should confirm and execute', async () => {
+    const rig = new TestRig();
+    await rig.setup('should confirm and execute');
+
+    const { ptyProcess, promise } = rig.runInteractive();
+
+    // 1. Wait for the app to be ready
+    await rig.waitForText('▶');
+
+    // 2. Send a command
+    ptyProcess.write('do-something-risky\n');
+
+    // 3. Wait for the confirmation prompt
+    await rig.waitForText('Are you sure? (y/N)');
+
+    // 4. Send confirmation
+    ptyProcess.write('y\n');
+
+    // 5. Await the final result
+    const result = await promise;
+
+    // 6. Assert the outcome
+    expect(result.exitCode).toBe(0);
+    expect(result.output).toContain('Successfully did the risky thing!');
+  });
+});
+```
+
+#### Cross-Platform Considerations
+
+Testing interactive processes across different operating systems is challenging, especially due to differences between Windows and Unix-like systems (Linux, macOS).
+
+- **Signal Handling (Ctrl+C):** Windows' terminal emulation (`winpty`) handles signals differently. For example, sending a second `Ctrl+C` signal to a process that is already handling the first one is unreliable.
+- **Test Implementation:** To write robust tests, you may need to add platform-specific code blocks. The `ctrl-c-exit.test.ts` file is the canonical example of how to handle these differences.
+
+  ```typescript
+  import * as os from 'node:os';
+
+  if (os.platform() === 'win32') {
+    // Windows-specific workaround
+    ptyProcess.kill();
+  } else {
+    // Unix-like behavior
+    ptyProcess.write('\x03'); // Send second Ctrl+C
+  }
+  ```
+
+#### Best Practices
+
+- **Never use `setTimeout`:** Rely on `rig.waitForText()` or `rig.poll()` to wait for specific output. This avoids flaky tests caused by timing issues.
+- **Wait for Prompts:** Always wait for the application's prompt before sending the next piece of input to ensure it's ready to process it.
+- **Simulate Typing:** For longer strings, use the `type()` helper function found in `test-helper.ts`. It sends characters with a small delay, which can avoid issues with applications that detect and handle pasted text differently.
+- **Debugging:** If a test fails, the `output` property on the result from the `promise` contains the entire terminal buffer from the session. Inspecting this output is the best way to debug.
+
 ### Linting and Preflight Checks
 
 To ensure code quality and formatting consistency, run the preflight check:
