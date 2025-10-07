@@ -423,8 +423,14 @@ export class GeminiProvider extends BaseModelProvider {
           throw new Error('No authentication client available for token counting');
         }
       } catch (apiError) {
+        // Check if this is a ProjectIdRequiredError that should be surfaced to the user
+        if (apiError instanceof Error && apiError.message.includes('GOOGLE_CLOUD_PROJECT')) {
+          // Re-throw this error so it reaches the frontend
+          throw apiError;
+        }
+
         console.warn(`[GeminiProvider] Official API token counting failed:`, apiError);
-        
+
         // Strategy 2: Use tiktoken for local estimation (fallback)
         console.log(`[GeminiProvider] Falling back to tiktoken for local counting`);
         try {
