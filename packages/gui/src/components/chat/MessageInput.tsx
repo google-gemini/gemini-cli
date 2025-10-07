@@ -740,6 +740,10 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(({ di
                   messages: updatedMessages,
                   updatedAt: new Date()
                 });
+
+                // CRITICAL: Only clear streaming message AFTER successfully saving to session
+                // This ensures the content is visible until it's persisted in the message list
+                setStreamingMessage('');
               }
             }
 
@@ -749,9 +753,6 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(({ di
             // Don't clear assistantContent - preserve it in case there's more content
             // Don't reset currentAssistantMessageId - keep updating the same message
             // Don't reset hasCreatedInitialMessage - the message still exists
-
-            // Only clear the streaming display since the content is now persisted
-            setStreamingMessage('');
           } else if (event.toolCall) {
             // Create a new message for tool calls if there's no current assistant message
             const toolCallMessage: ChatMessage = {
