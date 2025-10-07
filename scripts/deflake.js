@@ -7,6 +7,15 @@
 import { execSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import yargs from 'yargs';
+import { hideBin } from 'yargs/helpers';
+
+const argv = yargs(hideBin(process.argv)).option('c', {
+  alias: 'command',
+  type: 'boolean',
+  default: false,
+  description: 'The command to run',
+});
 
 const NUM_RUNS = 50;
 const LOG_FILE = path.join(
@@ -14,7 +23,7 @@ const LOG_FILE = path.join(
   `deflake_results_${new Date().toISOString().replace(/:/g, '-')}.log`,
 );
 
-const COMMAND = 'npm run test:integration:deflake';
+const COMMAND = argv.c;
 
 let failures = 0;
 const logStream = fs.createWriteStream(LOG_FILE, { flags: 'a' });
