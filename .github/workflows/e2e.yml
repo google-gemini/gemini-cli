@@ -11,7 +11,7 @@ on:
       - 'release/**'
   # This will run for PRs from forks when a label is added.
   pull_request_target:
-     types: ['labeled']
+    types: ['labeled']
   merge_group:
   workflow_dispatch:
     inputs:
