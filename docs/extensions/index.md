@@ -4,6 +4,10 @@ _This documentation is up-to-date with the v0.4.0 release._
 
 Gemini CLI extensions package prompts, MCP servers, and custom commands into a familiar and user-friendly format. With extensions, you can expand the capabilities of Gemini CLI and share those capabilities with others. They are designed to be easily installable and shareable.
 
+See [getting started docs](getting-started-extensions.md) for a guide on creating your first extension.
+
+See [releasing docs](extension-releasing.md) for an advanced guide on setting up GitHub releases.
+
 ## Extension management
 
 We offer a suite of extension management tools using `gemini extensions` commands.
@@ -14,9 +18,11 @@ Note that all of these commands will only be reflected in active CLI sessions on
 
 ### Installing an extension
 
-You can install an extension using `gemini extensions install` with either a GitHub URL source or `--path=some/local/path`.
+You can install an extension using `gemini extensions install` with either a GitHub URL or a local path`.
 
 Note that we create a copy of the installed extension, so you will need to run `gemini extensions update` to pull in changes from both locally-defined extensions and those on GitHub.
+
+NOTE: If you are installing an extension from GitHub, you'll need to have `git` installed on your machine. See [git installation instructions](https://git-scm.com/book/en/v2/Getting-Started-Installing-Git) for help.
 
 ```
 gemini extensions install https://github.com/gemini-cli-extensions/security
