@@ -619,17 +619,17 @@ export const useGeminiStream = (
     [addItem, config],
   );
 
-  const handleContextWindowWillOverflowEvent = useCallback(
-    () =>
-      addItem(
-        {
-          type: 'info',
-          text: `Sending this message will exceed the context window limit. Please try reducing the size of your message or use the \`/compress\` command to compress the chat history.`,
-        },
-        Date.now(),
-      ),
-    [addItem],
-  );
+  const handleContextWindowWillOverflowEvent = useCallback(() => {
+    onCancelSubmit();
+
+    addItem(
+      {
+        type: 'info',
+        text: `Sending this message will exceed the context window limit. Please try reducing the size of your message or use the \`/compress\` command to compress the chat history.`,
+      },
+      Date.now(),
+    );
+  }, [addItem, onCancelSubmit]);
 
   const handleLoopDetectionConfirmation = useCallback(
     (result: { userSelection: 'disable' | 'keep' }) => {

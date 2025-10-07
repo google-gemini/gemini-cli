@@ -1901,6 +1901,51 @@ describe('useGeminiStream', () => {
       });
     });
 
+    it('should call onCancelSubmit when ContextWindowWillOverflow event is received', async () => {
+      const onCancelSubmitSpy = vi.fn();
+      // Setup mock to return a stream with ContextWindowWillOverflow event
+      mockSendMessageStream.mockReturnValue(
+        (async function* () {
+          yield {
+            type: ServerGeminiEventType.ContextWindowWillOverflow,
+          };
+        })(),
+      );
+
+      const { result } = renderHook(() =>
+        useGeminiStream(
+          new MockedGeminiClientClass(mockConfig),
+          [],
+          mockAddItem,
+          mockConfig,
+          mockLoadedSettings,
+          mockOnDebugMessage,
+          mockHandleSlashCommand,
+          false,
+          () => 'vscode' as EditorType,
+          () => {},
+          () => Promise.resolve(),
+          false,
+          () => {},
+          () => {},
+          onCancelSubmitSpy,
+          () => {},
+          80,
+          24,
+        ),
+      );
+
+      // Submit a query
+      await act(async () => {
+        await result.current.submitQuery('Test overflow');
+      });
+
+      // Check that onCancelSubmit was called
+      await waitFor(() => {
+        expect(onCancelSubmitSpy).toHaveBeenCalled();
+      });
+    });
+
     it('should not add message for STOP finish reason', async () => {
       // Setup mock to return a stream with STOP finish reason
       mockSendMessageStream.mockReturnValue(
