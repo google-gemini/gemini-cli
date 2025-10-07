@@ -465,31 +465,33 @@ describe('stdin handling for banishing trailing input', () => {
     expect(mockReadStdin).not.toHaveBeenCalled();
   });
 
-  it('should NOT read from stdin when query/positional argument is provided', async () => {
+  it('should NOT read from stdin when an empty prompt is provided via -p ""', async () => {
     // Set stdin as non-TTY (piped)
     Object.defineProperty(process.stdin, 'isTTY', {
       value: false,
       configurable: true,
     });
 
-    // Mock parseArguments to return a query (positional argument)
+    // Mock parseArguments to return an empty prompt.
+    // The key is that `prompt` is `''` (defined) not `undefined`.
     mockParseArguments.mockResolvedValue({
-      prompt: undefined,
-      query: 'Hello from positional arg',
+      prompt: '',
+      query: undefined,
     });
 
-    // Mock loadCliConfig to return non-interactive config with the query
+    // Mock loadCliConfig to return non-interactive config with an empty question
     mockLoadCliConfig.mockResolvedValue(
-      createConfigMock({ getQuestion: () => 'Hello from positional arg' }),
+      createConfigMock({ getQuestion: () => '' }),
     );
 
     try {
       await main();
     } catch (e) {
+      // We expect it to exit because the prompt is empty, but after our check.
       if (!(e instanceof MockProcessExitError)) throw e;
     }
 
-    // Verify readStdin was NOT called
+    // Verify readStdin was NOT called because an explicit (though empty) prompt was given
     expect(mockReadStdin).not.toHaveBeenCalled();
   });
 
