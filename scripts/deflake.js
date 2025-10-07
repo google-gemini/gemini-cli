@@ -11,8 +11,8 @@ import { hideBin } from 'yargs/helpers';
 
 const argv = yargs(hideBin(process.argv)).option('c', {
   alias: 'command',
-  type: 'boolean',
-  default: false,
+  type: 'string',
+  demandOption: true,
   description: 'The command to run',
 });
 
