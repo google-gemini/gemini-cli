@@ -29,7 +29,9 @@ runs:
   steps:
     - name: '📝 Print Inputs'
       shell: 'bash'
-      run: 'echo "${{ toJSON(inputs) }}"'
+      env:
+        JSON_INPUTS: '${{ toJSON(inputs) }}'
+      run: 'echo "$JSON_INPUTS"'
     - name: 'Prepare Coverage Comment'
       id: 'prep_coverage_comment'
       shell: 'bash'
