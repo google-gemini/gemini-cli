@@ -365,7 +365,7 @@ This tool uses an embedded Python 3.13.7 environment to ensure stable and consis
   **CRITICAL xlwings considerations**:
     - **UsedRangeAccuracy:** Be aware that 'sheet.used_range' might sometimes report the entire sheet's maximum range (e.g., 1048576 rows) even if actual data is much less. This can lead to COM errors or performance issues.
     - **Robust Data Boundary Determination:** If 'sheet.used_range' is problematic, consider alternative methods to determine data boundaries, such as 'sheet.range('A1').expand('table')' or manually scanning for the last non-empty row/column.
-    - **Data Type Conversion for Comparison:** When filtering or comparing data, even for numeric values, convert cell values to strings (e.g., 'str(cell.value)') to avoid type mismatch issues.
+    - **Data Type Conversion for Comparison:** When filtering or comparing data, for numeric values, the value may likely be float (e.g., 42.0) even if the cell shows integer (42). Convert cell values to strings (e.g., 'str(int(float(cell.value)))') to avoid type mismatch issues.
 ### When to choose openpyxl:
   - As default option when unsure
   - User explicitly requests to use openpyxl
