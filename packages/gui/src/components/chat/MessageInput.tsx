@@ -934,7 +934,23 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(({ di
         }
       }
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'An error occurred';
+      let errorMessage = error instanceof Error ? error.message : 'An error occurred';
+
+      // Check for GOOGLE_CLOUD_PROJECT error and show a dialog
+      if (errorMessage.includes('GOOGLE_CLOUD_PROJECT')) {
+        const confirmMessage =
+          'Google Workspace Account Configuration Required\n\n' +
+          'Your Google account requires additional setup. You need to set the GOOGLE_CLOUD_PROJECT environment variable.\n\n' +
+          'Click OK to view detailed authentication instructions in your browser.';
+
+        const shouldOpenLink = confirm(confirmMessage);
+        if (shouldOpenLink) {
+          window.open('https://github.com/google-gemini/gemini-cli/blob/main/docs/get-started/authentication.md', '_blank');
+        }
+
+        errorMessage = '⚠️ Google Workspace account requires GOOGLE_CLOUD_PROJECT environment variable. Please check the authentication documentation.';
+      }
+
       console.error('Message sending failed:', errorMessage, error);
 
       // Save any streaming content before it's lost
