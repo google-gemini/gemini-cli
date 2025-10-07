@@ -15,8 +15,9 @@ import * as os from 'node:os';
 import * as https from 'node:https';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { spawnSync } from 'node:child_process';
 import { EXTENSIONS_CONFIG_FILENAME, loadExtension } from '../extension.js';
+import * as tar from 'tar';
+import extract from 'extract-zip';
 
 function getGitHubToken(): string | undefined {
   return process.env['GITHUB_TOKEN'];
@@ -270,7 +271,7 @@ export async function downloadFromGitHubRelease(
 
     await downloadFile(archiveUrl, downloadedAssetPath);
 
-    extractFile(downloadedAssetPath, destination);
+    await extractFile(downloadedAssetPath, destination);
 
     // For regular github releases, the repository is put inside of a top level
     // directory. In this case we should see exactly two file in the destination
@@ -416,27 +417,15 @@ async function downloadFile(url: string, dest: string): Promise<void> {
   });
 }
 
-function extractFile(file: string, dest: string) {
-  let args: string[];
-  let command: 'tar' | 'unzip';
+export async function extractFile(file: string, dest: string): Promise<void> {
   if (file.endsWith('.tar.gz')) {
-    args = ['-xzf', file, '-C', dest];
-    command = 'tar';
+    await tar.x({
+      file,
+      cwd: dest,
+    });
   } else if (file.endsWith('.zip')) {
-    args = [file, '-d', dest];
-    command = 'unzip';
+    await extract(file, { dir: dest });
   } else {
     throw new Error(`Unsupported file extension for extraction: ${file}`);
-  }
-
-  const result = spawnSync(command, args, { stdio: 'pipe' });
-
-  if (result.status !== 0) {
-    if (result.error) {
-      throw new Error(`Failed to spawn '${command}': ${result.error.message}`);
-    }
-    throw new Error(
-      `'${command}' command failed with exit code ${result.status}: ${result.stderr.toString()}`,
-    );
   }
 }
