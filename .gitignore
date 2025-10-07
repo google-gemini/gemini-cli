@@ -40,6 +40,10 @@ packages/cli/src/generated/
 packages/core/src/generated/
 .integration-tests/
 packages/vscode-ide-companion/*.vsix
+packages/gui/release/
+packages/gui/node_modules/@google/
+packages/gui/build-test.log
+packages/gui/final-build.log
 
 # GHA credentials
 gha-creds-*.json
@@ -51,3 +55,6 @@ packages/core/temp/
 
 # Python embedded environment - ignore all except specific files
 packages/python-3.13.7/
+
+# Windows special files
+nul
