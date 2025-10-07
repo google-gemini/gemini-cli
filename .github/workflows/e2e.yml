@@ -40,6 +40,7 @@ jobs:
 
   e2e_linux:
     name: 'E2E Test (Linux) - ${{ matrix.sandbox }}'
+    needs: 'merge_queue_skipper'
     if: |
       needs.merge_queue_skipper.outputs.skip == 'false' &&
       (github.event_name == 'push' ||
@@ -101,6 +102,7 @@ jobs:
 
   e2e_mac:
     name: 'E2E Test (macOS)'
+    needs: 'merge_queue_skipper'
     if: |
       needs.merge_queue_skipper.outputs.skip == 'false' &&
       (github.event_name == 'push' ||
