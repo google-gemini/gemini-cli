@@ -31,20 +31,21 @@ const external = [
   '@lydell/node-pty-win32-arm64',
   '@lydell/node-pty-win32-x64',
 ];
+
 const baseConfig = {
   bundle: true,
   platform: 'node',
   format: 'esm',
   external,
-  banner: {
-    js: `import { createRequire } from 'module'; const require = createRequire(import.meta.url); globalThis.__filename = require('url').fileURLToPath(import.meta.url); globalThis.__dirname = require('path').dirname(globalThis.__filename);`,
-  },
   loader: { '.node': 'file' },
   write: true,
 };
 
 const cliConfig = {
   ...baseConfig,
+  banner: {
+    js: `import { createRequire } from 'module'; const require = createRequire(import.meta.url); globalThis.__filename = require('url').fileURLToPath(import.meta.url); globalThis.__dirname = require('path').dirname(globalThis.__filename);`,
+  },
   entryPoints: ['packages/cli/index.ts'],
   outfile: 'bundle/gemini.js',
   define: {
@@ -58,8 +59,11 @@ const cliConfig = {
 
 const a2aServerConfig = {
   ...baseConfig,
+  banner: {
+    js: `const require = (await import('module')).createRequire(import.meta.url); globalThis.__filename = require('url').fileURLToPath(import.meta.url); globalThis.__dirname = require('path').dirname(globalThis.__filename);`,
+  },
   entryPoints: ['packages/a2a-server/src/http/server.ts'],
-  outfile: 'bundle/a2a-server.mjs',
+  outfile: 'packages/a2a-server/dist/a2a-server.mjs',
   define: {
     'process.env.CLI_VERSION': JSON.stringify(pkg.version),
   },
