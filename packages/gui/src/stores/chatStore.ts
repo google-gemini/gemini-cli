@@ -24,6 +24,7 @@ interface ChatState {
   compressionNotification: CompressionInfo | null; // Show compression notification
   toolConfirmation: ToolCallConfirmationDetails | null; // Tool confirmation request
   approvalMode: 'default' | 'autoEdit' | 'yolo'; // Current tool approval mode
+  inputMultilineMode: boolean; // Track if input is in multiline mode
 
   // Computed getters for backward compatibility
   get isStreaming(): boolean;
@@ -37,6 +38,7 @@ interface ChatState {
   setCompressionNotification: (info: CompressionInfo | null) => void;
   setToolConfirmation: (confirmation: ToolCallConfirmationDetails | null) => void;
   setApprovalMode: (mode: 'default' | 'autoEdit' | 'yolo') => void;
+  setInputMultilineMode: (isMultiline: boolean) => void;
   addMessage: (sessionId: string, message: ChatMessage) => void;
   updateMessage: (sessionId: string, messageId: string, updates: Partial<ChatMessage>) => void;
 }
@@ -49,6 +51,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
   compressionNotification: null,
   toolConfirmation: null,
   approvalMode: 'default',
+  inputMultilineMode: false,
 
   // Computed properties for backward compatibility
   get isStreaming() {
@@ -75,8 +78,10 @@ export const useChatStore = create<ChatState>()((set, get) => ({
   setCompressionNotification: (info: CompressionInfo | null) => set({ compressionNotification: info }),
   
   setToolConfirmation: (confirmation: ToolCallConfirmationDetails | null) => set({ toolConfirmation: confirmation }),
-  
+
   setApprovalMode: (mode: 'default' | 'autoEdit' | 'yolo') => set({ approvalMode: mode }),
+
+  setInputMultilineMode: (isMultiline: boolean) => set({ inputMultilineMode: isMultiline }),
 
   addMessage: (_sessionId: string, _message: ChatMessage) => {
     // This will be handled by appStore for persistence
