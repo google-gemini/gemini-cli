@@ -259,7 +259,9 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `undefined`
 
 - **`tools.shell.enableInteractiveShell`** (boolean):
-  - **Description:** Enables interactive terminal for running shell commands. If an interactive session cannot be started, it will fall back to a standard shell.
+  - **Description:** Enables interactive terminal for running shell commands. If
+    an interactive session cannot be started, it will fall back to a standard
+    shell.
   - **Default:** `true`
 
 - **`tools.core`** (array of strings):
