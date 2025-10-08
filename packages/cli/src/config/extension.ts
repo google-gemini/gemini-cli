@@ -39,6 +39,7 @@ import type { LoadExtensionContext } from './extensions/variableSchema.js';
 import { ExtensionEnablementManager } from './extensions/extensionEnablement.js';
 import chalk from 'chalk';
 import type { ConfirmationRequest } from '../ui/types.js';
+import { escapeAnsiCtrlCodes } from '../ui/utils/textUtils.js';
 
 export const EXTENSIONS_DIRECTORY_NAME = path.join(GEMINI_DIR, 'extensions');
 
@@ -582,7 +583,11 @@ function extensionConsentString(extensionConfig: ExtensionConfig): string {
       const source =
         mcpServer.httpUrl ??
         `${mcpServer.command || ''}${mcpServer.args ? ' ' + mcpServer.args.join(' ') : ''}`;
-      output.push(`  * ${key} (${isLocal ? 'local' : 'remote'}): ${source}`);
+      output.push(
+        escapeAnsiCtrlCodes(
+          `  * ${key} (${isLocal ? 'local' : 'remote'}): ${source}`,
+        ),
+      );
     }
   }
   if (extensionConfig.contextFileName) {
