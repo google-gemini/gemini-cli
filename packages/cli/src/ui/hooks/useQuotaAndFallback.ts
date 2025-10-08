@@ -9,8 +9,7 @@ import {
   type Config,
   type FallbackModelHandler,
   type FallbackIntent,
-  isGenericQuotaExceededError,
-  isProQuotaExceededError,
+  TerminalQuotaError,
   UserTierId,
 } from '@google/gemini-cli-core';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -63,7 +62,7 @@ export function useQuotaAndFallback({
 
       let message: string;
 
-      if (error && isProQuotaExceededError(error)) {
+      if (error instanceof TerminalQuotaError) {
         // Pro Quota specific messages (Interactive)
         if (isPaidTier) {
           message = `⚡ You have reached your daily ${failedModel} quota limit.
@@ -72,19 +71,6 @@ export function useQuotaAndFallback({
         } else {
           message = `⚡ You have reached your daily ${failedModel} quota limit.
 ⚡ You can choose to authenticate with a paid API key or continue with the fallback model.
-⚡ To increase your limits, upgrade to a Gemini Code Assist Standard or Enterprise plan with higher limits at https://goo.gle/set-up-gemini-code-assist
-⚡ Or you can utilize a Gemini API Key. See: https://goo.gle/gemini-cli-docs-auth#gemini-api-key
-⚡ You can switch authentication methods by typing /auth`;
-        }
-      } else if (error && isGenericQuotaExceededError(error)) {
-        // Generic Quota (Automatic fallback)
-        const actionMessage = `⚡ You have reached your daily quota limit.\n⚡ Automatically switching from ${failedModel} to ${fallbackModel} for the remainder of this session.`;
-
-        if (isPaidTier) {
-          message = `${actionMessage}
-⚡ To continue accessing the ${failedModel} model today, consider using /auth to switch to using a paid API key from AI Studio at https://aistudio.google.com/apikey`;
-        } else {
-          message = `${actionMessage}
 ⚡ To increase your limits, upgrade to a Gemini Code Assist Standard or Enterprise plan with higher limits at https://goo.gle/set-up-gemini-code-assist
 ⚡ Or you can utilize a Gemini API Key. See: https://goo.gle/gemini-cli-docs-auth#gemini-api-key
 ⚡ You can switch authentication methods by typing /auth`;
@@ -119,7 +105,7 @@ export function useQuotaAndFallback({
       config.setQuotaErrorOccurred(true);
 
       // Interactive Fallback for Pro quota
-      if (error && isProQuotaExceededError(error)) {
+      if (error instanceof TerminalQuotaError) {
         if (isDialogPending.current) {
           return 'stop'; // A dialog is already active, so just stop this request.
         }
