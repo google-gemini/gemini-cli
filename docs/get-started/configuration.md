@@ -259,9 +259,8 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `undefined`
 
 - **`tools.shell.enableInteractiveShell`** (boolean):
-
-  Use `node-pty` for an interactive shell experience. Fallback to
-  `child_process` still applies. Defaults to `false`.
+  - **Description:** Enables interactive terminal for running shell commands. If an interactive session cannot be started, it will fall back to a standard shell.
+  - **Default:** `true`
 
 - **`tools.core`** (array of strings):
   - **Description:** This can be used to restrict the set of built-in tools

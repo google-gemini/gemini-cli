@@ -36,6 +36,10 @@ export const EVENT_SMART_EDIT_STRATEGY = 'gemini_cli.smart_edit.strategy';
 export const EVENT_MODEL_ROUTING = 'gemini_cli.model_routing';
 export const EVENT_SMART_EDIT_CORRECTION = 'gemini_cli.smart_edit.correction';
 
+// Agent Events
+export const EVENT_AGENT_START = 'gemini_cli.agent.start';
+export const EVENT_AGENT_FINISH = 'gemini_cli.agent.finish';
+
 // Performance Events
 export const EVENT_STARTUP_PERFORMANCE = 'gemini_cli.startup.performance';
 export const EVENT_MEMORY_USAGE = 'gemini_cli.memory.usage';

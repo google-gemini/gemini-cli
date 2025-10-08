@@ -426,4 +426,23 @@ export enum EventMetadataKey {
 
   // Logs an event when the user uses the /model command.
   GEMINI_CLI_MODEL_SLASH_COMMAND = 108,
+
+  // ==========================================================================
+  // Agent Event Keys
+  // ==========================================================================
+
+  // Logs the name of the agent.
+  GEMINI_CLI_AGENT_NAME = 111,
+
+  // Logs the unique ID of the agent instance.
+  GEMINI_CLI_AGENT_ID = 112,
+
+  // Logs the duration of the agent execution in milliseconds.
+  GEMINI_CLI_AGENT_DURATION_MS = 113,
+
+  // Logs the number of turns the agent took.
+  GEMINI_CLI_AGENT_TURN_COUNT = 114,
+
+  // Logs the reason for agent termination.
+  GEMINI_CLI_AGENT_TERMINATE_REASON = 115,
 }
