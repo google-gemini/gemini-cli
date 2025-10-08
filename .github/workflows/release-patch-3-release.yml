@@ -35,6 +35,7 @@ jobs:
     permissions:
       contents: 'write'
       packages: 'write'
+      pull-requests: 'write'
       issues: 'write'
     steps:
       - name: 'Checkout'
@@ -57,7 +58,6 @@ jobs:
           cache: 'npm'
 
       - name: 'Install Dependencies'
-        working-directory: './release'
         run: |-
           npm ci
 
