@@ -648,6 +648,8 @@ export class ShellExecutionService {
                 }
               } catch (_e) {
                 // Fallback to killing just the process if the group kill fails
+                ptyProcess.kill('SIGTERM');
+                await new Promise((res) => setTimeout(res, SIGKILL_TIMEOUT_MS));
                 if (!exited) {
                   ptyProcess.kill('SIGKILL');
                 }
