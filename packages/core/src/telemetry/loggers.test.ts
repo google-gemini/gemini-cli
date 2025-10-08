@@ -38,6 +38,8 @@ import {
   EVENT_EXTENSION_INSTALL,
   EVENT_EXTENSION_UNINSTALL,
   EVENT_TOOL_OUTPUT_TRUNCATED,
+  EVENT_AGENT_START,
+  EVENT_AGENT_FINISH,
 } from './constants.js';
 import {
   logApiRequest,
@@ -56,6 +58,8 @@ import {
   logExtensionDisable,
   logExtensionInstallEvent,
   logExtensionUninstall,
+  logAgentStart,
+  logAgentFinish,
 } from './loggers.js';
 import { ToolCallDecision } from './tool-call-decision.js';
 import {
@@ -75,6 +79,8 @@ import {
   ExtensionDisableEvent,
   ExtensionInstallEvent,
   ExtensionUninstallEvent,
+  AgentStartEvent,
+  AgentFinishEvent,
 } from './types.js';
 import * as metrics from './metrics.js';
 import {
@@ -93,6 +99,7 @@ import * as uiTelemetry from './uiTelemetry.js';
 import { makeFakeConfig } from '../test-utils/config.js';
 import { ClearcutLogger } from './clearcut-logger/clearcut-logger.js';
 import { UserAccountManager } from '../utils/userAccountManager.js';
+import { AgentTerminateMode } from '../agents/types.js';
 
 describe('loggers', () => {
   const mockLogger = {
@@ -1404,6 +1411,87 @@ describe('loggers', () => {
           setting_scope: 'user',
         },
       });
+    });
+  });
+
+  describe('logAgentStart', () => {
+    const mockConfig = {
+      getSessionId: () => 'test-session-id',
+      getUsageStatisticsEnabled: () => true,
+    } as unknown as Config;
+
+    beforeEach(() => {
+      vi.spyOn(ClearcutLogger.prototype, 'logAgentStartEvent');
+    });
+
+    it('should log agent start event', () => {
+      const event = new AgentStartEvent('agent-123', 'TestAgent');
+
+      logAgentStart(mockConfig, event);
+
+      expect(ClearcutLogger.prototype.logAgentStartEvent).toHaveBeenCalledWith(
+        event,
+      );
+
+      expect(mockLogger.emit).toHaveBeenCalledWith({
+        body: 'Agent TestAgent started. ID: agent-123',
+        attributes: {
+          'session.id': 'test-session-id',
+          'user.email': 'test-user@example.com',
+          'event.name': EVENT_AGENT_START,
+          'event.timestamp': '2025-01-01T00:00:00.000Z',
+          agent_id: 'agent-123',
+          agent_name: 'TestAgent',
+        },
+      });
+    });
+  });
+
+  describe('logAgentFinish', () => {
+    const mockConfig = {
+      getSessionId: () => 'test-session-id',
+      getUsageStatisticsEnabled: () => true,
+    } as unknown as Config;
+
+    beforeEach(() => {
+      vi.spyOn(ClearcutLogger.prototype, 'logAgentFinishEvent');
+      vi.spyOn(metrics, 'recordAgentRunMetrics');
+    });
+
+    it('should log agent finish event and record metrics', () => {
+      const event = new AgentFinishEvent(
+        'agent-123',
+        'TestAgent',
+        1000,
+        5,
+        AgentTerminateMode.GOAL,
+      );
+
+      logAgentFinish(mockConfig, event);
+
+      expect(ClearcutLogger.prototype.logAgentFinishEvent).toHaveBeenCalledWith(
+        event,
+      );
+
+      expect(mockLogger.emit).toHaveBeenCalledWith({
+        body: 'Agent TestAgent finished. Reason: GOAL. Duration: 1000ms. Turns: 5.',
+        attributes: {
+          'session.id': 'test-session-id',
+          'user.email': 'test-user@example.com',
+          'event.name': EVENT_AGENT_FINISH,
+          'event.timestamp': '2025-01-01T00:00:00.000Z',
+          agent_id: 'agent-123',
+          agent_name: 'TestAgent',
+          duration_ms: 1000,
+          turn_count: 5,
+          terminate_reason: 'GOAL',
+        },
+      });
+
+      expect(metrics.recordAgentRunMetrics).toHaveBeenCalledWith(
+        mockConfig,
+        event,
+      );
     });
   });
 });
