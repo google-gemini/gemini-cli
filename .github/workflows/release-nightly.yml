@@ -53,11 +53,13 @@ jobs:
         run: 'npm ci'
 
       - name: 'Print Inputs'
-        run: |
-          echo "${{ toJSON(github.event.inputs) }}"
+        shell: 'bash'
+        env:
+          JSON_INPUTS: '${{ toJSON(github.event.inputs) }}'
+        run: 'echo "$JSON_INPUTS"'
 
       - name: 'Run Tests'
-        if: "${{github.event.inputs.force_skip_tests == 'false'}}"
+        if: "${{ github.event_name == 'schedule' || github.event.inputs.force_skip_tests == 'false' }}"
         uses: './.github/actions/run-tests'
         with:
           gemini_api_key: '${{ secrets.GEMINI_API_KEY }}'
@@ -99,11 +101,11 @@ jobs:
           wombat-token-core: '${{ secrets.WOMBAT_TOKEN_CORE }}'
           wombat-token-cli: '${{ secrets.WOMBAT_TOKEN_CLI }}'
           github-token: '${{ secrets.GITHUB_TOKEN }}'
-          dry-run: '${{ github.event.inputs.dry_run }}'
+          dry-run: "${{ github.event_name != 'schedule' && github.event.inputs.dry_run == 'true' }}"
           previous-tag: '${{ steps.nightly_version.outputs.PREVIOUS_TAG }}'
           working-directory: './release'
           skip-branch-cleanup: true
-          force-skip-tests: '${{ github.event.inputs.force_skip_tests }}'
+          force-skip-tests: "${{ github.event_name != 'schedule' && github.event.inputs.force_skip_tests == 'true' }}"
           gemini_api_key: '${{ secrets.GEMINI_API_KEY }}'
 
       - name: 'Create and Merge Pull Request'
@@ -113,11 +115,11 @@ jobs:
           pr-title: 'chore/release: bump version to ${{ steps.nightly_version.outputs.RELEASE_VERSION }}'
           pr-body: 'Automated version bump for nightly release.'
           github-token: '${{ secrets.GEMINI_CLI_ROBOT_GITHUB_PAT }}'
-          dry-run: '${{ github.event.inputs.dry_run }}'
+          dry-run: "${{ github.event_name != 'schedule' && github.event.inputs.dry_run == 'true' }}"
           working-directory: './release'
 
       - name: 'Create Issue on Failure'
-        if: "${{ failure() && github.event.inputs.dry_run != 'true' }}"
+        if: "${{ failure() && (github.event_name == 'schedule' || github.event.inputs.dry_run != 'true') }}"
         env:
           GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
           RELEASE_TAG: '${{ steps.nightly_version.outputs.RELEASE_TAG }}'
