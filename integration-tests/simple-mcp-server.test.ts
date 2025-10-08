@@ -210,6 +210,7 @@ describe('simple-mcp-server', () => {
     }
   });
 
+  //TODO -https://github.com/google-gemini/gemini-cli/issues/10738
   it.skip('should add two numbers', async () => {
     // Test directory is already set up in before hook
     // Just run the command - MCP server config is in settings.json

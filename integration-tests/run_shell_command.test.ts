@@ -197,6 +197,7 @@ describe('run_shell_command', () => {
     ).toBeTruthy();
   });
 
+  //TODO - https://github.com/google-gemini/gemini-cli/issues/10737
   it.skip('should combine multiple --allowed-tools flags', async () => {
     const rig = new TestRig();
     await rig.setup('should combine multiple --allowed-tools flags');
