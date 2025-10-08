@@ -215,12 +215,13 @@ export class SessionSelector {
   }
 
   /**
-   * Resolves a resume argument to a specific session.
+   * Finds a session by identifier (UUID or numeric index).
    *
-   * @param resumeArg - Can be "latest", a full UUID, or an index number (1-based)
-   * @returns Promise resolving to session selection result
+   * @param identifier - Can be a full UUID or an index number (1-based)
+   * @returns Promise resolving to the found SessionInfo
+   * @throws Error if the session is not found or identifier is invalid
    */
-  async resolveSession(resumeArg: string): Promise<SessionSelectionResult> {
+  async findSession(identifier: string): Promise<SessionInfo> {
     const sessions = await this.listSessions();
 
     if (sessions.length === 0) {
@@ -228,37 +229,66 @@ export class SessionSelector {
     }
 
     // Sort by startTime (oldest first, so newest sessions get highest numbers)
-    sessions.sort(
+    const sortedSessions = sessions.sort(
       (a, b) =>
         new Date(a.startTime).getTime() - new Date(b.startTime).getTime(),
     );
 
+    // Try to find by UUID first
+    const sessionByUuid = sortedSessions.find(
+      (session) => session.id === identifier,
+    );
+    if (sessionByUuid) {
+      return sessionByUuid;
+    }
+
+    // Parse as index number (1-based) - only allow numeric indexes
+    const index = parseInt(identifier, 10);
+    if (
+      !isNaN(index) &&
+      index.toString() === identifier &&
+      index > 0 &&
+      index <= sortedSessions.length
+    ) {
+      return sortedSessions[index - 1];
+    }
+
+    throw new Error(
+      `Invalid session identifier "${identifier}". Use --list-sessions to see available sessions.`,
+    );
+  }
+
+  /**
+   * Resolves a resume argument to a specific session.
+   *
+   * @param resumeArg - Can be "latest", a full UUID, or an index number (1-based)
+   * @returns Promise resolving to session selection result
+   */
+  async resolveSession(resumeArg: string): Promise<SessionSelectionResult> {
     let selectedSession: SessionInfo;
 
     if (resumeArg === 'latest') {
+      const sessions = await this.listSessions();
+
+      if (sessions.length === 0) {
+        throw new Error('No previous sessions found for this project.');
+      }
+
+      // Sort by startTime (oldest first, so newest sessions get highest numbers)
+      sessions.sort(
+        (a, b) =>
+          new Date(a.startTime).getTime() - new Date(b.startTime).getTime(),
+      );
+
       selectedSession = sessions[sessions.length - 1];
     } else {
-      // Try to find by UUID first
-      const sessionByUuid = sessions.find(
-        (session) => session.id === resumeArg,
-      );
-      if (sessionByUuid) {
-        selectedSession = sessionByUuid;
-      } else {
-        // Parse as index number (1-based) - only allow numeric indexes
-        const index = parseInt(resumeArg, 10);
-        if (
-          !isNaN(index) &&
-          index.toString() === resumeArg &&
-          index > 0 &&
-          index <= sessions.length
-        ) {
-          selectedSession = sessions[index - 1];
-        } else {
-          throw new Error(
-            `Invalid session identifier "${resumeArg}". Use --list-sessions to see available sessions, then use --resume {number}, --resume {uuid}, or --resume latest.`,
-          );
-        }
+      try {
+        selectedSession = await this.findSession(resumeArg);
+      } catch (error) {
+        // Re-throw with more detailed message for resume command
+        throw new Error(
+          `Invalid session identifier "${resumeArg}". Use --list-sessions to see available sessions, then use --resume {number}, --resume {uuid}, or --resume latest.  Error: ${error}`,
+        );
       }
     }
 
