@@ -413,6 +413,11 @@ describe('ClearcutLogger', () => {
         for (const [key, value] of Object.entries(env)) {
           vi.stubEnv(key, value);
         }
+        // Clear Cursor-specific environment variables that might interfere with tests
+        // Only clear if not explicitly testing Cursor detection
+        if (!env.CURSOR_TRACE_ID) {
+          vi.stubEnv('CURSOR_TRACE_ID', '');
+        }
         const event = logger?.createLogEvent(EventNames.API_ERROR, []);
         expect(event?.event_metadata[0][3]).toEqual({
           gemini_cli_key: EventMetadataKey.GEMINI_CLI_SURFACE,
