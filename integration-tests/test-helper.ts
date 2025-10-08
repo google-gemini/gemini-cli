@@ -10,6 +10,7 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { env } from 'node:process';
 import { DEFAULT_GEMINI_MODEL } from '../packages/core/src/config/models.js';
+import { AuthType } from '../packages/core/src/core/contentGenerator.js';
 import fs from 'node:fs';
 import * as pty from '@lydell/node-pty';
 import stripAnsi from 'strip-ansi';
@@ -181,6 +182,9 @@ export class TestRig {
         target: 'local',
         otlpEndpoint: '',
         outfile: telemetryPath,
+      },
+      auth: {
+        selectedType: AuthType.USE_GEMINI,
       },
       model: DEFAULT_GEMINI_MODEL,
       sandbox: env.GEMINI_SANDBOX !== 'false' ? env.GEMINI_SANDBOX : false,
