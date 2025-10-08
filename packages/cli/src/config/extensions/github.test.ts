@@ -38,7 +38,7 @@ vi.mock('simple-git');
 
 const fetchJsonMock = vi.hoisted(() => vi.fn());
 vi.mock('./github_fetch.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof os>();
+  const actual = await importOriginal<typeof import('./github_fetch.js')>();
   return {
     ...actual,
     fetchJson: fetchJsonMock,
