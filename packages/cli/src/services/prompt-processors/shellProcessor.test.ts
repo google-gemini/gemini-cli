@@ -70,7 +70,7 @@ describe('ShellProcessor', () => {
     mockConfig = {
       getTargetDir: vi.fn().mockReturnValue('/test/dir'),
       getApprovalMode: vi.fn().mockReturnValue(ApprovalMode.DEFAULT),
-      getShouldUseNodePtyShell: vi.fn().mockReturnValue(false),
+      getEnableInteractiveShell: vi.fn().mockReturnValue(false),
       getShellExecutionConfig: vi.fn().mockReturnValue({}),
     };
 

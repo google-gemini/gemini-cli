@@ -171,7 +171,7 @@ export class ShellProcessor implements IPromptProcessor {
           config.getTargetDir(),
           () => {},
           new AbortController().signal,
-          config.getShouldUseNodePtyShell(),
+          config.getEnableInteractiveShell(),
           shellExecutionConfig,
         );
 
