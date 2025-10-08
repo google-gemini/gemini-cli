@@ -105,22 +105,22 @@ export class GeminiProvider extends BaseModelProvider {
       if (this.configInstance) {
         authManager.setConfig(this.configInstance);
       }
-      
+
       const credentials = await authManager.getAccessCredentials('gemini');
-      
+
       if (credentials?.accessToken) {
         // User chose OAuth - use Code Assist Server pattern like CLI does
         console.log('[GeminiProvider] Initializing with OAuth via Code Assist Server');
-        
+
         // Get OAuth client from AuthManager
         const oauthClient = await this.getOAuthClient();
-        
+
         // Set up user data (project ID and tier) like CLI does
         const { setupUser } = await import('../code_assist/setup.js');
         const userData = await setupUser(oauthClient);
-        
+
         console.log(`[GeminiProvider] User setup complete - Project ID: ${userData.projectId}, Tier: ${userData.userTier}`);
-        
+
         // Create Code Assist Server for OAuth requests with proper user data
         const { CodeAssistServer } = await import('../code_assist/server.js');
         this.codeAssistServer = new CodeAssistServer(
@@ -130,15 +130,15 @@ export class GeminiProvider extends BaseModelProvider {
           `gui_session_${Date.now()}`, // sessionId
           userData.userTier
         );
-        
+
         // Don't use GoogleGenAI for OAuth, use CodeAssistServer instead
         this.googleAI = undefined;
         this.generativeModel = undefined;
       } else if (credentials?.apiKey) {
         // User chose API key - use GoogleGenAI client
         console.log('[GeminiProvider] Initializing GoogleGenAI with API key');
-        this.googleAI = new GoogleGenAI({ 
-          apiKey: credentials.apiKey 
+        this.googleAI = new GoogleGenAI({
+          apiKey: credentials.apiKey
         });
         this.generativeModel = this.googleAI.models;
         this.codeAssistServer = undefined;
@@ -146,6 +146,10 @@ export class GeminiProvider extends BaseModelProvider {
         throw new Error('No Gemini credentials available. Please authenticate first.');
       }
     } catch (error) {
+      // Re-throw ProjectIdRequiredError directly to preserve error type for frontend handling
+      if (error instanceof Error && error.constructor.name === 'ProjectIdRequiredError') {
+        throw error;
+      }
       throw new Error(`Failed to initialize GoogleGenAI: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
@@ -359,7 +363,16 @@ export class GeminiProvider extends BaseModelProvider {
     } catch (error) {
       // Log detailed error information for debugging
       console.error(`[GeminiProvider] sendMessageStream failed:`, error);
-      
+
+      // Check for ProjectIdRequiredError - preserve it for frontend handling
+      if (error instanceof Error && error.constructor.name === 'ProjectIdRequiredError') {
+        yield {
+          type: 'error',
+          error
+        };
+        return;
+      }
+
       // Check for 429 quota exceeded errors
       if (this.is429QuotaError(error)) {
         const quotaError = this.createQuotaExceededError(error);
@@ -369,9 +382,9 @@ export class GeminiProvider extends BaseModelProvider {
         };
         return;
       }
-      
+
       // If it's a 400 error related to function calls, log the request details
-      if (error instanceof Error && error.message.includes('function response parts') || 
+      if (error instanceof Error && error.message.includes('function response parts') ||
           error instanceof Error && error.message.includes('function call parts')) {
         console.error(`[GeminiProvider] Function call/response mismatch error detected in stream`);
         console.error(`[GeminiProvider] Original messages count: ${messages.length}`);
@@ -379,7 +392,7 @@ export class GeminiProvider extends BaseModelProvider {
           console.error(`  Message[${index}]: role=${msg.role}, hasToolCalls=${!!msg.toolCalls}, toolCallsCount=${msg.toolCalls?.length || 0}, tool_call_id=${msg.tool_call_id || 'none'}`);
         });
       }
-      
+
       yield {
         type: 'error',
         error: this.createError('Gemini stream error', error)

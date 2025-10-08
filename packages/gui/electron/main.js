@@ -714,6 +714,34 @@ ipcMain.handle('multimodel-send-message-stream', async (event, messages, streamI
 
         // // console.log('Stream chunk received:', chunk.type, chunk.content?.substring(0, 50))
 
+        // Handle error events - these should stop the stream immediately
+        if (chunk.type === 'error') {
+          console.error('[Main] Received error event from stream:', chunk.error)
+
+          // Format error message with more detail
+          let errorMessage = chunk.error?.message || 'Unknown error occurred'
+
+          // Add additional context for specific error types
+          if (errorMessage.includes('GOOGLE_CLOUD_PROJECT')) {
+            errorMessage = `Authentication Error: ${errorMessage}\n\nFor Workspace GCA users, you need to set the GOOGLE_CLOUD_PROJECT environment variable before starting the application.\n\nPlease restart the application with:\nset GOOGLE_CLOUD_PROJECT=your-project-id`
+          } else if (errorMessage.includes('Failed to initialize')) {
+            errorMessage = `Initialization Error: ${errorMessage}\n\nPlease check your authentication settings and try again.`
+          }
+
+          // Send error through IPC events
+          const errorData = {
+            streamId,
+            type: 'error',
+            error: errorMessage,
+            timestamp: Date.now()
+          }
+
+          event.sender.send('multimodel-stream-error', errorData)
+
+          // Break the loop to stop processing
+          break
+        }
+
         // Handle different event types
         if (chunk.type === 'compression') {
           // Send compression event
@@ -734,13 +762,13 @@ ipcMain.handle('multimodel-send-message-stream', async (event, messages, streamI
             timestamp: Date.now()
           }
           event.sender.send('multimodel-stream-chunk', chunkData)
-          
+
           // Accumulate content for final response
           if (chunk.content) {
             fullContent += chunk.content
           }
         } else {
-          // Handle other event types (tool_call, done, error, etc.)
+          // Handle other event types (tool_call, done, etc.)
           const chunkData = {
             streamId,
             type: chunk.type,
@@ -750,7 +778,7 @@ ipcMain.handle('multimodel-send-message-stream', async (event, messages, streamI
             ...chunk // Include any additional properties
           }
           event.sender.send('multimodel-stream-chunk', chunkData)
-          
+
           if (chunk.content) {
             fullContent += chunk.content
           }
