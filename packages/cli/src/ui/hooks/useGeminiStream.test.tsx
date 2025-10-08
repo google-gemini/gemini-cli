@@ -1857,6 +1857,10 @@ describe('useGeminiStream', () => {
         (async function* () {
           yield {
             type: ServerGeminiEventType.ContextWindowWillOverflow,
+            value: {
+              estimatedRequestTokenCount: 100,
+              remainingTokenCount: 50,
+            },
           };
         })(),
       );
@@ -1894,7 +1898,7 @@ describe('useGeminiStream', () => {
         expect(mockAddItem).toHaveBeenCalledWith(
           {
             type: 'info',
-            text: `Sending this message will exceed the context window limit. Please try reducing the size of your message or use the \`/compress\` command to compress the chat history.`,
+            text: `Sending this message (100 tokens) will exceed the remaining context window limit (50 tokens). Please try reducing the size of your message or use the \`/compress\` command to compress the chat history.`,
           },
           expect.any(Number),
         );
@@ -1908,6 +1912,10 @@ describe('useGeminiStream', () => {
         (async function* () {
           yield {
             type: ServerGeminiEventType.ContextWindowWillOverflow,
+            value: {
+              estimatedRequestTokenCount: 100,
+              remainingTokenCount: 50,
+            },
           };
         })(),
       );

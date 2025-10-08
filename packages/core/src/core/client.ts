@@ -481,17 +481,19 @@ export class GeminiClient {
     // Check for context window overflow
     const modelForLimitCheck = this._getEffectiveModelForCurrentTurn();
 
-    const lastPromptTokenCount = uiTelemetryService.getLastPromptTokenCount();
     const estimatedRequestTokenCount = Math.floor(
       JSON.stringify(request).length / 4,
     );
-    const totalEstimatedTokenCount =
-      lastPromptTokenCount + estimatedRequestTokenCount;
-    const limit = tokenLimit(modelForLimitCheck);
 
-    // If we are over 95% of the limit, stop and ask the user to compress.
-    if (totalEstimatedTokenCount > limit * 0.95) {
-      yield { type: GeminiEventType.ContextWindowWillOverflow };
+    const remainingTokenCount =
+      tokenLimit(modelForLimitCheck) -
+      uiTelemetryService.getLastPromptTokenCount();
+
+    if (estimatedRequestTokenCount > remainingTokenCount * 0.95) {
+      yield {
+        type: GeminiEventType.ContextWindowWillOverflow,
+        value: { estimatedRequestTokenCount, remainingTokenCount },
+      };
       return new Turn(this.getChat(), prompt_id);
     }
 

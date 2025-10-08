@@ -67,6 +67,10 @@ export type ServerGeminiRetryEvent = {
 
 export type ServerGeminiContextWindowWillOverflowEvent = {
   type: GeminiEventType.ContextWindowWillOverflow;
+  value: {
+    estimatedRequestTokenCount: number;
+    remainingTokenCount: number;
+  };
 };
 
 export interface StructuredError {
