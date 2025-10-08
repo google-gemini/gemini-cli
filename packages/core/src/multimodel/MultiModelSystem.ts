@@ -427,9 +427,19 @@ export class MultiModelSystem {
       
       // NEW: Get fresh history from SessionManager and apply context limiting each time
       const fullHistory = sessionManager.getHistory();
-      
+
+      // Quick check: skip compression if we don't have enough turns
+      const MIN_TURNS_BEFORE_COMPRESSION_CHECK = 10; // Don't even check compression until 10 turns
+      const userTurnsCount = fullHistory.filter(m => m.role === 'user').length;
+
       // Check if we need to compress before processing (like Gemini client does)
-      const compressionResult = await this.tryCompressChat(provider, sessionManager, fullHistory);
+      const compressionResult = userTurnsCount >= MIN_TURNS_BEFORE_COMPRESSION_CHECK
+        ? await this.tryCompressChat(provider, sessionManager, fullHistory)
+        : {
+            originalTokenCount: 0,
+            newTokenCount: 0,
+            compressionStatus: CompressionStatus.NOOP
+          };
       if (compressionResult.compressionStatus === CompressionStatus.COMPRESSED) {
         
         // Yield compression event to notify frontend
@@ -1194,10 +1204,40 @@ Title:`;
     const conversationMessages = historyArray.filter(m => m.role !== 'system');
     const userTurns = conversationMessages.filter(m => m.role === 'user').length;
     const TURN_COMPRESSION_THRESHOLD = 25; // Compress after 25 user turns
-    
+
     console.log(`[MultiModelSystem] Turn count check: ${userTurns} user turns vs ${TURN_COMPRESSION_THRESHOLD} threshold`);
 
-    // Calculate current token count using provider's countTokens method
+    // Get provider capabilities to determine max tokens
+    const capabilities = provider.getCapabilityInfo();
+    const tokenLimit = capabilities?.maxTokens || 10000;
+
+    // Fast pre-check: Estimate character count to avoid unnecessary token counting API calls
+    // Only call expensive token counting if we might actually need compression
+    if (!force) {
+      // Rough estimation: 1 token ≈ 4 characters for English text
+      const CHARS_PER_TOKEN = 4;
+      const totalChars = historyArray.reduce((sum, msg) => sum + msg.content.length, 0);
+
+      const estimatedTokens = totalChars / CHARS_PER_TOKEN;
+      const tokenThreshold = COMPRESSION_TOKEN_THRESHOLD;
+      const thresholdTokens = tokenThreshold * tokenLimit;
+
+      // Early exit: If estimated tokens are well below threshold AND turns are low, skip compression
+      // Use 0.9 factor to be conservative (only skip if clearly unnecessary)
+      if (estimatedTokens < thresholdTokens * 0.9 && userTurns < TURN_COMPRESSION_THRESHOLD) {
+        console.log(`[MultiModelSystem] Compression skipped: estimated ${estimatedTokens.toFixed(0)} tokens (${totalChars} chars) < ${(thresholdTokens * 0.9).toFixed(0)} threshold, ${userTurns} turns < ${TURN_COMPRESSION_THRESHOLD}`);
+        return {
+          originalTokenCount: Math.round(estimatedTokens),
+          newTokenCount: Math.round(estimatedTokens),
+          compressionStatus: CompressionStatus.NOOP,
+        };
+      }
+
+      console.log(`[MultiModelSystem] Estimated ${estimatedTokens.toFixed(0)} tokens (${totalChars} chars), may need compression, doing precise token count...`);
+    }
+
+    // Calculate precise token count using provider's countTokens method
+    // Only called when compression might be needed
     let originalTokenCount = 0;
     try {
       if (provider.countTokens) {
@@ -1229,14 +1269,10 @@ Title:`;
       };
     }
 
-    // Get provider capabilities to determine max tokens
-    const capabilities = provider.getCapabilityInfo();
-    const tokenLimit = capabilities?.maxTokens || 10000;
-
     // Check both token limit and turn count for compression triggers
     let compressionNeeded = false;
     let compressionReason = '';
-    
+
     if (!force) {
       const tokenThreshold = COMPRESSION_TOKEN_THRESHOLD;
       const thresholdTokens = tokenThreshold * tokenLimit;
