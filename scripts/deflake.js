@@ -57,7 +57,7 @@ async function main() {
     })
     .option('runs', {
       type: 'number',
-      default: 50,
+      default: 5,
       description: 'The number of runs to perform',
     }).argv;
 
