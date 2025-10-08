@@ -220,7 +220,7 @@ jobs:
         shell: 'pwsh'
         run: 'npm run test:integration:sandbox:none'
 
-  e2e_nonfork:
+  e2e:
     name: 'E2E (Non-fork)'
     needs:
       - 'e2e_linux'
@@ -229,33 +229,7 @@ jobs:
     if: |
       always() &&
       (needs.merge_queue_skipper.outputs.skip == 'false' &&
-      github.event.pull_request.head.repo.full_name == github.repository)
-    runs-on: 'gemini-cli-ubuntu-16-core'
-    steps:
-      - name: 'Check E2E test results'
-        run: |
-          if [[ ${{ needs.e2e_linux.result }} == 'skipped' || \
-               ${{ needs.e2e_mac.result }} == 'skipped' ]]; then
-            echo "E2E tests were skipped, please run them before submission"
-            exit 1
-          fi
-          if [[ ${{ needs.e2e_linux.result }} != 'success' || \
-               ${{ needs.e2e_mac.result }} != 'success' ]]; then
-            echo "One or more E2E jobs failed."
-            exit 1
-          fi
-          echo "All required E2E jobs passed!"
-
-  e2e_fork:
-    name: 'E2E (Forks)'
-    needs:
-      - 'e2e_linux'
-      - 'e2e_mac'
-      - 'merge_queue_skipper'
-    if: |
-      always() &&
-      (needs.merge_queue_skipper.outputs.skip == 'false' &&
-      github.event.pull_request.head.repo.full_name != github.repository)
+      !(github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository))
     runs-on: 'gemini-cli-ubuntu-16-core'
     steps:
       - name: 'Check E2E test results'
