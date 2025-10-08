@@ -867,7 +867,7 @@ A good instruction should concisely answer:
       if (result.error) {
         return result.error;
       }
-      params.file_path = result.correctedPath!;
+      params.file_path = result.correctedPath;
     }
 
     const workspaceContext = this.config.getWorkspaceContext();

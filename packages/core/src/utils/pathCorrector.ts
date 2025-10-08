@@ -8,10 +8,15 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { Config } from '../config/config.js';
 
-export interface PathCorrectionResult {
-  correctedPath?: string;
-  error?: string;
-}
+type SuccessfulPathCorrection = {
+  correctedPath: string;
+  error?: never;
+};
+
+type FailedPathCorrection = {
+  correctedPath?: never;
+  error: string;
+};
 
 /**
  * Attempts to correct a relative or ambiguous file path to a single, absolute path
@@ -21,6 +26,9 @@ export interface PathCorrectionResult {
  * @param config The application configuration.
  * @returns A `PathCorrectionResult` object with either a `correctedPath` or an `error`.
  */
+export type PathCorrectionResult =
+  | SuccessfulPathCorrection
+  | FailedPathCorrection;
 export function correctPath(
   filePath: string,
   config: Config,
