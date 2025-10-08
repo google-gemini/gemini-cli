@@ -244,7 +244,7 @@ export interface ConfigParameters {
   interactive?: boolean;
   trustedFolder?: boolean;
   useRipgrep?: boolean;
-  shouldUseNodePtyShell?: boolean;
+  enableInteractiveShell?: boolean;
   skipNextSpeakerCheck?: boolean;
   shellExecutionConfig?: ShellExecutionConfig;
   extensionManagement?: boolean;
@@ -333,7 +333,7 @@ export class Config {
   private readonly interactive: boolean;
   private readonly trustedFolder: boolean | undefined;
   private readonly useRipgrep: boolean;
-  private readonly shouldUseNodePtyShell: boolean;
+  private readonly enableInteractiveShell: boolean;
   private readonly skipNextSpeakerCheck: boolean;
   private shellExecutionConfig: ShellExecutionConfig;
   private readonly extensionManagement: boolean = true;
@@ -423,7 +423,7 @@ export class Config {
     this.interactive = params.interactive ?? false;
     this.trustedFolder = params.trustedFolder;
     this.useRipgrep = params.useRipgrep ?? true;
-    this.shouldUseNodePtyShell = params.shouldUseNodePtyShell ?? false;
+    this.enableInteractiveShell = params.enableInteractiveShell ?? false;
     this.skipNextSpeakerCheck = params.skipNextSpeakerCheck ?? true;
     this.shellExecutionConfig = {
       terminalWidth: params.shellExecutionConfig?.terminalWidth ?? 80,
@@ -933,8 +933,8 @@ export class Config {
     return this.useRipgrep;
   }
 
-  getShouldUseNodePtyShell(): boolean {
-    return this.shouldUseNodePtyShell;
+  getEnableInteractiveShell(): boolean {
+    return this.enableInteractiveShell;
   }
 
   getSkipNextSpeakerCheck(): boolean {
