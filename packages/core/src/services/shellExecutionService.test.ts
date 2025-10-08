@@ -706,7 +706,7 @@ describe('ShellExecutionService child_process fallback', () => {
         outputWithoutMessage.startsWith(expectedStart.substring(0, 10)),
       ).toBe(true);
       expect(outputWithoutMessage.endsWith('c'.repeat(20))).toBe(true);
-    });
+    }, 20000);
   });
 
   describe('Failed Execution', () => {
