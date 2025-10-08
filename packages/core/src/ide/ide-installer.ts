@@ -147,6 +147,17 @@ class VsCodeInstaller implements IdeInstaller {
   }
 }
 
+class JetBrainsInstaller implements IdeInstaller {
+  constructor(readonly ideInfo: IdeInfo) {}
+
+  async install(): Promise<InstallResult> {
+    return {
+      success: false,
+      message: `The ${this.ideInfo.displayName} companion extension must be installed from the JetBrains Marketplace. Go to Settings > Plugins and search for "${GEMINI_CLI_COMPANION_EXTENSION_NAME}".`,
+    };
+  }
+}
+
 export function getIdeInstaller(
   ide: IdeInfo,
   platform = process.platform,
@@ -155,6 +166,8 @@ export function getIdeInstaller(
     case IDE_DEFINITIONS.vscode.name:
     case IDE_DEFINITIONS.firebasestudio.name:
       return new VsCodeInstaller(ide, platform);
+    case IDE_DEFINITIONS.jetbrains.name:
+      return new JetBrainsInstaller(ide);
     default:
       return null;
   }
