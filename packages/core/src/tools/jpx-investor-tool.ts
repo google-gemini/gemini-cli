@@ -513,9 +513,9 @@ class JPXInvestorDataCollector:
             new_files = []
             for file_info in remote_files:
                 filename = file_info['filename']
-                local_path = os.path.join(self.cache_dir, filename)
+                local_path = self.excel_dir / filename
 
-                if not os.path.exists(local_path):
+                if not local_path.exists():
                     new_files.append(file_info)
                     print(f"New file found: {filename}")
                 else:
@@ -531,7 +531,7 @@ class JPXInvestorDataCollector:
             return []
 
     def download_new_files(self, years_back=3):
-        """Download only new files that don't exist locally"""
+        """Download only new files that don't exist locally and parse them"""
         try:
             new_files = self.check_remote_files(years_back)
 
@@ -547,21 +547,28 @@ class JPXInvestorDataCollector:
 
                     print(f"Downloading: {filename}")
 
-                    response = self.session.get(url)
+                    response = requests.get(url, headers=self.headers, timeout=60)
                     response.raise_for_status()
 
-                    output_file = os.path.join(self.cache_dir, filename)
-                    with open(output_file, 'wb') as f:
+                    local_path = self.excel_dir / filename
+                    with open(local_path, 'wb') as f:
                         f.write(response.content)
 
-                    print(f"Downloaded: {filename}")
-                    download_count += 1
+                    print(f"Downloaded: {filename} ({len(response.content)} bytes)")
+
+                    # Parse the downloaded file
+                    parsed_data = self.parse_excel_file(str(local_path))
+                    if parsed_data:
+                        self.save_processed_data(parsed_data, parsed_data['date'])
+                        download_count += 1
+
+                    time.sleep(1)  # Rate limiting
 
                 except Exception as e:
                     print(f"Failed to download {filename}: {e}")
                     continue
 
-            print(f"Successfully downloaded {download_count} new files")
+            print(f"Successfully downloaded and processed {download_count} new files")
             return download_count
 
         except Exception as e:
@@ -606,7 +613,7 @@ try:
 
     if op == "download_all":
         years_back = ${params.years_back || 2}
-        count = collector.download_new_files(years_back)
+        count = collector.download_all_available_files(years_back)
         result = {"download_count": count, "success": True}
 
     elif op == "get_latest":
