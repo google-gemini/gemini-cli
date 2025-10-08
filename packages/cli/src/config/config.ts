@@ -15,6 +15,7 @@ import type {
   FileFilteringOptions,
   MCPServerConfig,
   OutputFormat,
+  GeminiCLIExtension,
 } from '@google/gemini-cli-core';
 import { extensionsCommand } from '../commands/extensions.js';
 import {
@@ -31,12 +32,12 @@ import {
   ShellTool,
   EditTool,
   WriteFileTool,
+  SHELL_TOOL_NAMES,
   resolveTelemetrySettings,
   FatalConfigError,
 } from '@google/gemini-cli-core';
 import type { Settings } from './settings.js';
 
-import type { Extension } from './extension.js';
 import { annotateActiveExtensions } from './extension.js';
 import { getCliVersion } from '../utils/version.js';
 import { loadSandboxConfig } from './sandboxConfig.js';
@@ -400,7 +401,7 @@ export async function loadHierarchicalGeminiMemory(
   folderTrust: boolean,
   memoryImportFormat: 'flat' | 'tree' = 'tree',
   fileFilteringOptions?: FileFilteringOptions,
-): Promise<{ memoryContent: string; fileCount: number }> {
+): Promise<{ memoryContent: string; fileCount: number; filePaths: string[] }> {
   // FIX: Use real, canonical paths for a reliable comparison to handle symlinks.
   const realCwd = fs.realpathSync(path.resolve(currentWorkingDirectory));
   const realHome = fs.realpathSync(path.resolve(homedir()));
@@ -430,6 +431,36 @@ export async function loadHierarchicalGeminiMemory(
   );
 }
 
+/**
+ * Creates a filter function to determine if a tool should be excluded.
+ *
+ * In non-interactive mode, we want to disable tools that require user
+ * interaction to prevent the CLI from hanging. This function creates a predicate
+ * that returns `true` if a tool should be excluded.
+ *
+ * A tool is excluded if it's not in the `allowedToolsSet`. The shell tool
+ * has a special case: it's not excluded if any of its subcommands
+ * are in the `allowedTools` list.
+ *
+ * @param allowedTools A list of explicitly allowed tool names.
+ * @param allowedToolsSet A set of explicitly allowed tool names for quick lookups.
+ * @returns A function that takes a tool name and returns `true` if it should be excluded.
+ */
+function createToolExclusionFilter(
+  allowedTools: string[],
+  allowedToolsSet: Set<string>,
+) {
+  return (tool: string): boolean => {
+    if (tool === ShellTool.Name) {
+      // If any of the allowed tools is ShellTool (even with subcommands), don't exclude it.
+      return !allowedTools.some((allowed) =>
+        SHELL_TOOL_NAMES.some((shellName) => allowed.startsWith(shellName)),
+      );
+    }
+    return !allowedToolsSet.has(tool);
+  };
+}
+
 export function isDebugMode(argv: CliArgs): boolean {
   return (
     argv.debug ||
@@ -441,7 +472,7 @@ export function isDebugMode(argv: CliArgs): boolean {
 
 export async function loadCliConfig(
   settings: Settings,
-  extensions: Extension[],
+  extensions: GeminiCLIExtension[],
   extensionEnablementManager: ExtensionEnablementManager,
   sessionId: string,
   argv: CliArgs,
@@ -493,19 +524,20 @@ export async function loadCliConfig(
     .concat((argv.includeDirectories || []).map(resolvePath));
 
   // Call the (now wrapper) loadHierarchicalGeminiMemory which calls the server's version
-  const { memoryContent, fileCount } = await loadHierarchicalGeminiMemory(
-    cwd,
-    settings.context?.loadMemoryFromIncludeDirectories
-      ? includeDirectories
-      : [],
-    debugMode,
-    fileService,
-    settings,
-    extensionContextFilePaths,
-    trustedFolder,
-    memoryImportFormat,
-    fileFiltering,
-  );
+  const { memoryContent, fileCount, filePaths } =
+    await loadHierarchicalGeminiMemory(
+      cwd,
+      settings.context?.loadMemoryFromIncludeDirectories
+        ? includeDirectories
+        : [],
+      debugMode,
+      fileService,
+      settings,
+      extensionContextFilePaths,
+      trustedFolder,
+      memoryImportFormat,
+      fileFiltering,
+    );
 
   let mcpServers = mergeMcpServers(settings, activeExtensions);
   const question = argv.promptInteractive || argv.prompt || '';
@@ -561,6 +593,9 @@ export async function loadCliConfig(
 
   const policyEngineConfig = createPolicyEngineConfig(settings, approvalMode);
 
+  const allowedTools = argv.allowedTools || settings.tools?.allowed || [];
+  const allowedToolsSet = new Set(allowedTools);
+
   // Interactive mode: explicit -i flag or (TTY + no args + no -p flag)
   const hasQuery = !!argv.query;
   const interactive =
@@ -569,14 +604,22 @@ export async function loadCliConfig(
   // In non-interactive mode, exclude tools that require a prompt.
   const extraExcludes: string[] = [];
   if (!interactive && !argv.experimentalAcp) {
+    const defaultExcludes = [ShellTool.Name, EditTool.Name, WriteFileTool.Name];
+    const autoEditExcludes = [ShellTool.Name];
+
+    const toolExclusionFilter = createToolExclusionFilter(
+      allowedTools,
+      allowedToolsSet,
+    );
+
     switch (approvalMode) {
       case ApprovalMode.DEFAULT:
         // In default non-interactive mode, all tools that require approval are excluded.
-        extraExcludes.push(ShellTool.Name, EditTool.Name, WriteFileTool.Name);
+        extraExcludes.push(...defaultExcludes.filter(toolExclusionFilter));
         break;
       case ApprovalMode.AUTO_EDIT:
         // In auto-edit non-interactive mode, only tools that still require a prompt are excluded.
-        extraExcludes.push(ShellTool.Name);
+        extraExcludes.push(...autoEditExcludes.filter(toolExclusionFilter));
         break;
       case ApprovalMode.YOLO:
         // No extra excludes for YOLO mode.
@@ -648,7 +691,7 @@ export async function loadCliConfig(
     question,
     fullContext: argv.allFiles || false,
     coreTools: settings.tools?.core || undefined,
-    allowedTools: argv.allowedTools || settings.tools?.allowed || undefined,
+    allowedTools: allowedTools.length > 0 ? allowedTools : undefined,
     policyEngineConfig,
     excludeTools,
     toolDiscoveryCommand: settings.tools?.discoveryCommand,
@@ -657,6 +700,7 @@ export async function loadCliConfig(
     mcpServers,
     userMemory: memoryContent,
     geminiMdFileCount: fileCount,
+    geminiMdFilePaths: filePaths,
     approvalMode,
     showMemoryUsage:
       argv.showMemoryUsage || settings.ui?.showMemoryUsage || false,
@@ -743,30 +787,28 @@ function allowedMcpServers(
   return mcpServers;
 }
 
-function mergeMcpServers(settings: Settings, extensions: Extension[]) {
+function mergeMcpServers(settings: Settings, extensions: GeminiCLIExtension[]) {
   const mcpServers = { ...(settings.mcpServers || {}) };
   for (const extension of extensions) {
-    Object.entries(extension.config.mcpServers || {}).forEach(
-      ([key, server]) => {
-        if (mcpServers[key]) {
-          logger.warn(
-            `Skipping extension MCP config for server with key "${key}" as it already exists.`,
-          );
-          return;
-        }
-        mcpServers[key] = {
-          ...server,
-          extensionName: extension.config.name,
-        };
-      },
-    );
+    Object.entries(extension.mcpServers || {}).forEach(([key, server]) => {
+      if (mcpServers[key]) {
+        logger.warn(
+          `Skipping extension MCP config for server with key "${key}" as it already exists.`,
+        );
+        return;
+      }
+      mcpServers[key] = {
+        ...server,
+        extensionName: extension.name,
+      };
+    });
   }
   return mcpServers;
 }
 
 function mergeExcludeTools(
   settings: Settings,
-  extensions: Extension[],
+  extensions: GeminiCLIExtension[],
   extraExcludes?: string[] | undefined,
 ): string[] {
   const allExcludeTools = new Set([
@@ -774,7 +816,7 @@ function mergeExcludeTools(
     ...(extraExcludes || []),
   ]);
   for (const extension of extensions) {
-    for (const tool of extension.config.excludeTools || []) {
+    for (const tool of extension.excludeTools || []) {
       allExcludeTools.add(tool);
     }
   }

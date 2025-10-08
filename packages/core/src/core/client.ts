@@ -207,6 +207,10 @@ export class GeminiClient {
     return this.loopDetector;
   }
 
+  getCurrentSequenceModel(): string | null {
+    return this.currentSequenceModel;
+  }
+
   async addDirectoryContext(): Promise<void> {
     if (!this.chat) {
       return;
@@ -221,26 +225,40 @@ export class GeminiClient {
   async startChat(extraHistory?: Content[]): Promise<GeminiChat> {
     this.forceFullIdeContext = true;
     this.hasFailedCompressionAttempt = false;
-    const envParts = await getEnvironmentContext(this.config);
 
     const toolRegistry = this.config.getToolRegistry();
     const toolDeclarations = toolRegistry.getFunctionDeclarations();
     const tools: Tool[] = [{ functionDeclarations: toolDeclarations }];
 
+    // 1. Get the environment context parts as an array
+    const envParts = await getEnvironmentContext(this.config);
+
+    // 2. Convert the array of parts into a single string
+    const envContextString = envParts
+      .map((part) => part.text || '')
+      .join('\n\n');
+
+    // 3. Combine the dynamic context with the static handshake instruction
+    const allSetupText = `
+${envContextString}
+
+Reminder: Do not return an empty response when a tool call is required.
+
+My setup is complete. I will provide my first command in the next turn.
+    `.trim();
+
+    // 4. Create the history with a single, comprehensive user turn
     const history: Content[] = [
       {
         role: 'user',
-        parts: envParts,
-      },
-      {
-        role: 'model',
-        parts: [{ text: 'Got it. Thanks for the context!' }],
+        parts: [{ text: allSetupText }],
       },
       ...(extraHistory ?? []),
     ];
+
     try {
       const userMemory = this.config.getUserMemory();
-      const systemInstruction = getCoreSystemPrompt(userMemory);
+      const systemInstruction = getCoreSystemPrompt(this.config, userMemory);
       const model = this.config.getModel();
 
       const config: GenerateContentConfig = { ...this.generateContentConfig };
@@ -594,7 +612,7 @@ export class GeminiClient {
 
     try {
       const userMemory = this.config.getUserMemory();
-      const systemInstruction = getCoreSystemPrompt(userMemory);
+      const systemInstruction = getCoreSystemPrompt(this.config, userMemory);
 
       const requestConfig: GenerateContentConfig = {
         abortSignal,

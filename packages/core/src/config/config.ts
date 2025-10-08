@@ -116,12 +116,21 @@ export interface OutputSettings {
   format?: OutputFormat;
 }
 
+/**
+ * All information required in CLI to handle an extension. Defined in Core so
+ * that the collection of loaded, active, and inactive extensions can be passed
+ * around on the config object though Core does not use this information
+ * directly.
+ */
 export interface GeminiCLIExtension {
   name: string;
   version: string;
   isActive: boolean;
   path: string;
   installMetadata?: ExtensionInstallMetadata;
+  mcpServers?: Record<string, MCPServerConfig>;
+  contextFiles: string[];
+  excludeTools?: string[];
 }
 
 export interface ExtensionInstallMetadata {
@@ -208,6 +217,7 @@ export interface ConfigParameters {
   mcpServers?: Record<string, MCPServerConfig>;
   userMemory?: string;
   geminiMdFileCount?: number;
+  geminiMdFilePaths?: string[];
   approvalMode?: ApprovalMode;
   showMemoryUsage?: boolean;
   contextFileName?: string | string[];
@@ -285,6 +295,7 @@ export class Config {
   private readonly mcpServers: Record<string, MCPServerConfig> | undefined;
   private userMemory: string;
   private geminiMdFileCount: number;
+  private geminiMdFilePaths: string[];
   private approvalMode: ApprovalMode;
   private readonly showMemoryUsage: boolean;
   private readonly accessibility: AccessibilitySettings;
@@ -375,6 +386,7 @@ export class Config {
     this.mcpServers = params.mcpServers;
     this.userMemory = params.userMemory ?? '';
     this.geminiMdFileCount = params.geminiMdFileCount ?? 0;
+    this.geminiMdFilePaths = params.geminiMdFilePaths ?? [];
     this.approvalMode = params.approvalMode ?? ApprovalMode.DEFAULT;
     this.showMemoryUsage = params.showMemoryUsage ?? false;
     this.accessibility = params.accessibility ?? {};
@@ -696,6 +708,14 @@ export class Config {
 
   setGeminiMdFileCount(count: number): void {
     this.geminiMdFileCount = count;
+  }
+
+  getGeminiMdFilePaths(): string[] {
+    return this.geminiMdFilePaths;
+  }
+
+  setGeminiMdFilePaths(paths: string[]): void {
+    this.geminiMdFilePaths = paths;
   }
 
   getApprovalMode(): ApprovalMode {

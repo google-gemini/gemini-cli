@@ -31,7 +31,7 @@ test.skip('installs a local extension, verifies a command, and updates it', asyn
   }
 
   const result = await rig.runCommand(
-    ['extensions', 'install', `--path=${rig.testDir!}`],
+    ['extensions', 'install', `${rig.testDir!}`],
     { stdin: 'y\n' },
   );
   expect(result).toContain('test-extension');
