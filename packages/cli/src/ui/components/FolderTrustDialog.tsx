@@ -44,7 +44,7 @@ export const FolderTrustDialog: React.FC<FolderTrustDialogProps> = ({
   useKeypress(
     (key) => {
       if (key.name === 'escape') {
-        process.exit(0);
+        process.exit(1);
       }
     },
     { isActive: !isRestarting },

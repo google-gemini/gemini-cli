@@ -53,7 +53,7 @@ describe('FolderTrustDialog', () => {
     stdin.write('\x1b'); // escape key
 
     await waitFor(() => {
-      expect(mockedExit).toHaveBeenCalledWith(0);
+      expect(mockedExit).toHaveBeenCalledWith(1);
     });
   });
 
