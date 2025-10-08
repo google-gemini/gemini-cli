@@ -18,58 +18,12 @@ The Terms of Service and Privacy Notices applicable to the aforementioned Google
 
 If you log in with your Google account and you do not already have a Gemini Code Assist account associated with your Google account, you will be directed to the sign up flow for Gemini Code Assist for individuals. If your Google account is managed by your organization, your administrator may not permit access to Gemini Code Assist for individuals. Please see the [Gemini Code Assist for individuals FAQs](https://developers.google.com/gemini-code-assist/resources/faqs) for further information.
 
-<table>
-  <tr>
-   <td><strong>Authentication Method</strong>
-   </td>
-   <td><strong>Service(s)</strong>
-   </td>
-   <td><strong>Terms of Service</strong>
-   </td>
-   <td><strong>Privacy Notice</strong>
-   </td>
-  </tr>
-  <tr>
-   <td>Google Account
-   </td>
-   <td>Gemini Code Assist services
-   </td>
-   <td><a href="https://developers.google.com/gemini-code-assist/resources/privacy-notices">Terms of Service</a>
-   </td>
-   <td><a href="https://developers.google.com/gemini-code-assist/resources/privacy-notices">Privacy Notices</a>
-   </td>
-  </tr>
-  <tr>
-   <td>Gemini Developer API Key
-   </td>
-   <td>Gemini API - Unpaid Services
-   </td>
-   <td><a href="https://ai.google.dev/gemini-api/terms#unpaid-services">Gemini API Terms of Service - Unpaid Services</a>
-   </td>
-   <td><a href="https://policies.google.com/privacy">Google Privacy Policy</a>
-   </td>
-  </tr>
-  <tr>
-   <td>Gemini Developer API Key
-   </td>
-   <td>Gemini API - Paid Services
-   </td>
-   <td><a href="https://ai.google.dev/gemini-api/terms#paid-services">Gemini API Terms of Service - Paid Services</a>
-   </td>
-   <td><a href="https://policies.google.com/privacy">Google Privacy Policy</a>
-   </td>
-  </tr>
-  <tr>
-   <td>Vertex AI GenAI API Key
-   </td>
-   <td>Vertex AI GenAI API 
-   </td>
-   <td><a href="https://cloud.google.com/terms/service-terms/">Google Cloud Platform Terms of Service</a>
-   </td>
-   <td><a href="https://cloud.google.com/terms/cloud-privacy-notice">Google Cloud Privacy Notice</a>
-   </td>
-  </tr>
-</table>
+| Authentication Method    | Service(s)                   | Terms of Service                                                                                        | Privacy Notice                                                                                |
+| :----------------------- | :--------------------------- | :------------------------------------------------------------------------------------------------------ | :-------------------------------------------------------------------------------------------- |
+| Google Account           | Gemini Code Assist services  | [Terms of Service](https://developers.google.com/gemini-code-assist/resources/privacy-notices)          | [Privacy Notices](https://developers.google.com/gemini-code-assist/resources/privacy-notices) |
+| Gemini Developer API Key | Gemini API - Unpaid Services | [Gemini API Terms of Service - Unpaid Services](https://ai.google.dev/gemini-api/terms#unpaid-services) | [Google Privacy Policy](https://policies.google.com/privacy)                                  |
+| Gemini Developer API Key | Gemini API - Paid Services   | [Gemini API Terms of Service - Paid Services](https://ai.google.dev/gemini-api/terms#paid-services)     | [Google Privacy Policy](https://policies.google.com/privacy)                                  |
+| Vertex AI GenAI API Key  | Vertex AI GenAI API          | [Google Cloud Platform Terms of Service](https://cloud.google.com/terms/service-terms/)                 | [Google Cloud Privacy Notice](https://cloud.google.com/terms/cloud-privacy-notice)            |
 
 ## 1. If you have logged in with your Google account to Gemini Code Assist
 
