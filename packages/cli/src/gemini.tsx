@@ -357,7 +357,7 @@ export async function main() {
     if (config.getListExtensions()) {
       console.log('Installed extensions:');
       for (const extension of extensions) {
-        console.log(`- ${extension.config.name}`);
+        console.log(`- ${extension.name}`);
       }
       process.exit(0);
     }
