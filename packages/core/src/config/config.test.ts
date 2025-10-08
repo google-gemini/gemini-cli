@@ -94,6 +94,9 @@ vi.mock('../telemetry/index.js', async (importOriginal) => {
   return {
     ...actual,
     initializeTelemetry: vi.fn(),
+    uiTelemetryService: {
+      getLastPromptTokenCount: vi.fn(),
+    },
   };
 });
 
@@ -122,9 +125,25 @@ vi.mock('../ide/ide-client.js', () => ({
   },
 }));
 
+vi.mock('../agents/registry.js', () => {
+  const AgentRegistryMock = vi.fn();
+  AgentRegistryMock.prototype.initialize = vi.fn();
+  AgentRegistryMock.prototype.getAllDefinitions = vi.fn(() => []);
+  return { AgentRegistry: AgentRegistryMock };
+});
+
+vi.mock('../agents/subagent-tool-wrapper.js', () => ({
+  SubagentToolWrapper: vi.fn(),
+}));
+
 import { BaseLlmClient } from '../core/baseLlmClient.js';
+import { tokenLimit } from '../core/tokenLimits.js';
+import { uiTelemetryService } from '../telemetry/index.js';
 
 vi.mock('../core/baseLlmClient.js');
+vi.mock('../core/tokenLimits.js', () => ({
+  tokenLimit: vi.fn(),
+}));
 
 describe('Server Config (config.ts)', () => {
   const MODEL = 'gemini-pro';
@@ -355,6 +374,33 @@ describe('Server Config (config.ts)', () => {
     expect(config.getTelemetryEnabled()).toBe(TELEMETRY_SETTINGS.enabled);
   });
 
+  it('Config constructor should set telemetry useCollector to true when provided', () => {
+    const paramsWithTelemetry: ConfigParameters = {
+      ...baseParams,
+      telemetry: { enabled: true, useCollector: true },
+    };
+    const config = new Config(paramsWithTelemetry);
+    expect(config.getTelemetryUseCollector()).toBe(true);
+  });
+
+  it('Config constructor should set telemetry useCollector to false when provided', () => {
+    const paramsWithTelemetry: ConfigParameters = {
+      ...baseParams,
+      telemetry: { enabled: true, useCollector: false },
+    };
+    const config = new Config(paramsWithTelemetry);
+    expect(config.getTelemetryUseCollector()).toBe(false);
+  });
+
+  it('Config constructor should default telemetry useCollector to false if not provided', () => {
+    const paramsWithTelemetry: ConfigParameters = {
+      ...baseParams,
+      telemetry: { enabled: true },
+    };
+    const config = new Config(paramsWithTelemetry);
+    expect(config.getTelemetryUseCollector()).toBe(false);
+  });
+
   it('should have a getFileService method that returns FileDiscoveryService', () => {
     const config = new Config(baseParams);
     const fileService = config.getFileService();
@@ -387,7 +433,7 @@ describe('Server Config (config.ts)', () => {
         ...baseParams,
         usageStatisticsEnabled: true,
       });
-      await config.initialize();
+      await config.refreshAuth(AuthType.USE_GEMINI);
 
       expect(
         ClearcutLogger.prototype.logStartSessionEvent,
@@ -490,21 +536,12 @@ describe('Server Config (config.ts)', () => {
   });
 
   describe('UseRipgrep Configuration', () => {
-    it('should default useRipgrep to false when not provided', () => {
+    it('should default useRipgrep to true when not provided', () => {
       const config = new Config(baseParams);
-      expect(config.getUseRipgrep()).toBe(false);
-    });
-
-    it('should set useRipgrep to true when provided as true', () => {
-      const paramsWithRipgrep: ConfigParameters = {
-        ...baseParams,
-        useRipgrep: true,
-      };
-      const config = new Config(paramsWithRipgrep);
       expect(config.getUseRipgrep()).toBe(true);
     });
 
-    it('should set useRipgrep to false when explicitly provided as false', () => {
+    it('should set useRipgrep to false when provided as false', () => {
       const paramsWithRipgrep: ConfigParameters = {
         ...baseParams,
         useRipgrep: false,
@@ -513,13 +550,72 @@ describe('Server Config (config.ts)', () => {
       expect(config.getUseRipgrep()).toBe(false);
     });
 
-    it('should default useRipgrep to false when undefined', () => {
+    it('should set useRipgrep to true when explicitly provided as true', () => {
+      const paramsWithRipgrep: ConfigParameters = {
+        ...baseParams,
+        useRipgrep: true,
+      };
+      const config = new Config(paramsWithRipgrep);
+      expect(config.getUseRipgrep()).toBe(true);
+    });
+
+    it('should default useRipgrep to true when undefined', () => {
       const paramsWithUndefinedRipgrep: ConfigParameters = {
         ...baseParams,
         useRipgrep: undefined,
       };
       const config = new Config(paramsWithUndefinedRipgrep);
-      expect(config.getUseRipgrep()).toBe(false);
+      expect(config.getUseRipgrep()).toBe(true);
+    });
+  });
+
+  describe('UseModelRouter Configuration', () => {
+    it('should default useModelRouter to false when not provided', () => {
+      const config = new Config(baseParams);
+      expect(config.getUseModelRouter()).toBe(false);
+    });
+
+    it('should set useModelRouter to true when provided as true', () => {
+      const paramsWithModelRouter: ConfigParameters = {
+        ...baseParams,
+        useModelRouter: true,
+      };
+      const config = new Config(paramsWithModelRouter);
+      expect(config.getUseModelRouter()).toBe(true);
+    });
+
+    it('should set useModelRouter to false when explicitly provided as false', () => {
+      const paramsWithModelRouter: ConfigParameters = {
+        ...baseParams,
+        useModelRouter: false,
+      };
+      const config = new Config(paramsWithModelRouter);
+      expect(config.getUseModelRouter()).toBe(false);
+    });
+  });
+
+  describe('EnableSubagents Configuration', () => {
+    it('should default enableSubagents to false when not provided', () => {
+      const config = new Config(baseParams);
+      expect(config.getEnableSubagents()).toBe(false);
+    });
+
+    it('should set enableSubagents to true when provided as true', () => {
+      const paramsWithSubagents: ConfigParameters = {
+        ...baseParams,
+        enableSubagents: true,
+      };
+      const config = new Config(paramsWithSubagents);
+      expect(config.getEnableSubagents()).toBe(true);
+    });
+
+    it('should set enableSubagents to false when explicitly provided as false', () => {
+      const paramsWithSubagents: ConfigParameters = {
+        ...baseParams,
+        enableSubagents: false,
+      };
+      const config = new Config(paramsWithSubagents);
+      expect(config.getEnableSubagents()).toBe(false);
     });
   });
 
@@ -550,6 +646,78 @@ describe('Server Config (config.ts)', () => {
         registerToolMock as Mock
       ).mock.calls.some((call) => call[0] instanceof vi.mocked(ReadFileTool));
       expect(wasReadFileToolRegistered).toBe(false);
+    });
+
+    it('should register subagents as tools when enableSubagents is true', async () => {
+      const params: ConfigParameters = {
+        ...baseParams,
+        enableSubagents: true,
+      };
+      const config = new Config(params);
+
+      const mockAgentDefinitions = [
+        { name: 'agent1', description: 'Agent 1', instructions: 'Inst 1' },
+        { name: 'agent2', description: 'Agent 2', instructions: 'Inst 2' },
+      ];
+
+      const AgentRegistryMock = (
+        (await vi.importMock('../agents/registry.js')) as {
+          AgentRegistry: Mock;
+        }
+      ).AgentRegistry;
+      AgentRegistryMock.prototype.getAllDefinitions.mockReturnValue(
+        mockAgentDefinitions,
+      );
+
+      const SubagentToolWrapperMock = (
+        (await vi.importMock('../agents/subagent-tool-wrapper.js')) as {
+          SubagentToolWrapper: Mock;
+        }
+      ).SubagentToolWrapper;
+
+      await config.initialize();
+
+      const registerToolMock = (
+        (await vi.importMock('../tools/tool-registry')) as {
+          ToolRegistry: { prototype: { registerTool: Mock } };
+        }
+      ).ToolRegistry.prototype.registerTool;
+
+      expect(SubagentToolWrapperMock).toHaveBeenCalledTimes(2);
+      expect(SubagentToolWrapperMock).toHaveBeenCalledWith(
+        mockAgentDefinitions[0],
+        config,
+        undefined,
+      );
+      expect(SubagentToolWrapperMock).toHaveBeenCalledWith(
+        mockAgentDefinitions[1],
+        config,
+        undefined,
+      );
+
+      const calls = registerToolMock.mock.calls;
+      const registeredWrappers = calls.filter(
+        (call) => call[0] instanceof SubagentToolWrapperMock,
+      );
+      expect(registeredWrappers).toHaveLength(2);
+    });
+
+    it('should not register subagents as tools when enableSubagents is false', async () => {
+      const params: ConfigParameters = {
+        ...baseParams,
+        enableSubagents: false,
+      };
+      const config = new Config(params);
+
+      const SubagentToolWrapperMock = (
+        (await vi.importMock('../agents/subagent-tool-wrapper.js')) as {
+          SubagentToolWrapper: Mock;
+        }
+      ).SubagentToolWrapper;
+
+      await config.initialize();
+
+      expect(SubagentToolWrapperMock).not.toHaveBeenCalled();
     });
 
     describe('with minified tool class names', () => {
@@ -634,6 +802,57 @@ describe('Server Config (config.ts)', () => {
         ).mock.calls.some((call) => call[0] instanceof vi.mocked(ShellTool));
         expect(wasShellToolRegistered).toBe(true);
       });
+    });
+  });
+
+  describe('getTruncateToolOutputThreshold', () => {
+    beforeEach(() => {
+      vi.clearAllMocks();
+    });
+
+    it('should return the calculated threshold when it is smaller than the default', () => {
+      const config = new Config(baseParams);
+      vi.mocked(tokenLimit).mockReturnValue(32000);
+      vi.mocked(uiTelemetryService.getLastPromptTokenCount).mockReturnValue(
+        1000,
+      );
+      // 4 * (32000 - 1000) = 4 * 31000 = 124000
+      // default is 4_000_000
+      expect(config.getTruncateToolOutputThreshold()).toBe(124000);
+    });
+
+    it('should return the default threshold when the calculated value is larger', () => {
+      const config = new Config(baseParams);
+      vi.mocked(tokenLimit).mockReturnValue(2_000_000);
+      vi.mocked(uiTelemetryService.getLastPromptTokenCount).mockReturnValue(
+        500_000,
+      );
+      // 4 * (2_000_000 - 500_000) = 4 * 1_500_000 = 6_000_000
+      // default is 4_000_000
+      expect(config.getTruncateToolOutputThreshold()).toBe(4_000_000);
+    });
+
+    it('should use a custom truncateToolOutputThreshold if provided', () => {
+      const customParams = {
+        ...baseParams,
+        truncateToolOutputThreshold: 50000,
+      };
+      const config = new Config(customParams);
+      vi.mocked(tokenLimit).mockReturnValue(8000);
+      vi.mocked(uiTelemetryService.getLastPromptTokenCount).mockReturnValue(
+        2000,
+      );
+      // 4 * (8000 - 2000) = 4 * 6000 = 24000
+      // custom threshold is 50000
+      expect(config.getTruncateToolOutputThreshold()).toBe(24000);
+
+      vi.mocked(tokenLimit).mockReturnValue(32000);
+      vi.mocked(uiTelemetryService.getLastPromptTokenCount).mockReturnValue(
+        1000,
+      );
+      // 4 * (32000 - 1000) = 124000
+      // custom threshold is 50000
+      expect(config.getTruncateToolOutputThreshold()).toBe(50000);
     });
   });
 });

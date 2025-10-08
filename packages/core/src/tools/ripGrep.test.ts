@@ -14,7 +14,7 @@ import {
   type Mock,
 } from 'vitest';
 import type { RipGrepToolParams } from './ripGrep.js';
-import { canUseRipgrep, RipGrepTool } from './ripGrep.js';
+import { canUseRipgrep, RipGrepTool, ensureRgPath } from './ripGrep.js';
 import path from 'node:path';
 import fs from 'node:fs/promises';
 import os, { EOL } from 'node:os';
@@ -97,6 +97,49 @@ describe('canUseRipgrep', () => {
   });
 });
 
+describe('ensureRgPath', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('should return rg path if ripgrep already exists', async () => {
+    (fileExists as Mock).mockResolvedValue(true);
+    const rgPath = await ensureRgPath();
+    expect(rgPath).toBe(path.join('/mock/bin/dir', 'rg'));
+    expect(fileExists).toHaveBeenCalledOnce();
+    expect(downloadRipGrep).not.toHaveBeenCalled();
+  });
+
+  it('should return rg path if ripgrep is downloaded successfully', async () => {
+    (fileExists as Mock)
+      .mockResolvedValueOnce(false)
+      .mockResolvedValueOnce(true);
+    (downloadRipGrep as Mock).mockResolvedValue(undefined);
+    const rgPath = await ensureRgPath();
+    expect(rgPath).toBe(path.join('/mock/bin/dir', 'rg'));
+    expect(downloadRipGrep).toHaveBeenCalledOnce();
+    expect(fileExists).toHaveBeenCalledTimes(2);
+  });
+
+  it('should throw an error if ripgrep cannot be used after download attempt', async () => {
+    (fileExists as Mock).mockResolvedValue(false);
+    (downloadRipGrep as Mock).mockResolvedValue(undefined);
+    await expect(ensureRgPath()).rejects.toThrow('Cannot use ripgrep.');
+    expect(downloadRipGrep).toHaveBeenCalledOnce();
+    expect(fileExists).toHaveBeenCalledTimes(2);
+  });
+
+  it('should propagate errors from downloadRipGrep', async () => {
+    const error = new Error('Download failed');
+    (fileExists as Mock).mockResolvedValue(false);
+    (downloadRipGrep as Mock).mockRejectedValue(error);
+
+    await expect(ensureRgPath()).rejects.toThrow(error);
+    expect(fileExists).toHaveBeenCalledTimes(1);
+    expect(downloadRipGrep).toHaveBeenCalledWith('/mock/bin/dir');
+  });
+});
+
 // Helper function to create mock spawn implementations
 function createMockSpawn(
   options: {
@@ -158,6 +201,8 @@ describe('RipGrepTool', () => {
 
   beforeEach(async () => {
     vi.clearAllMocks();
+    (downloadRipGrep as Mock).mockResolvedValue(undefined);
+    (fileExists as Mock).mockResolvedValue(true);
     mockSpawn.mockClear();
     tempRootDir = await fs.mkdtemp(path.join(os.tmpdir(), 'grep-tool-root-'));
     grepTool = new RipGrepTool(mockConfig);
@@ -503,6 +548,20 @@ describe('RipGrepTool', () => {
       expect(() => grepTool.build(params)).toThrow(
         /params must have required property 'pattern'/,
       );
+    });
+
+    it('should throw an error if ripgrep is not available', async () => {
+      // Make ensureRgPath throw
+      (fileExists as Mock).mockResolvedValue(false);
+      (downloadRipGrep as Mock).mockResolvedValue(undefined);
+
+      const params: RipGrepToolParams = { pattern: 'world' };
+      const invocation = grepTool.build(params);
+
+      expect(await invocation.execute(abortSignal)).toStrictEqual({
+        llmContent: 'Error during grep search operation: Cannot use ripgrep.',
+        returnDisplay: 'Error: Cannot use ripgrep.',
+      });
     });
   });
 

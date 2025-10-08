@@ -45,6 +45,7 @@ vi.mock('../ide/ide-client.js');
 
 async function createMockConfig(
   toolRegistryMocks = {},
+  configParameters: Partial<ConfigParameters> = {},
 ): Promise<{ config: Config; toolRegistry: ToolRegistry }> {
   const configParams: ConfigParameters = {
     sessionId: 'test-session',
@@ -52,6 +53,7 @@ async function createMockConfig(
     targetDir: '.',
     debugMode: false,
     cwd: process.cwd(),
+    ...configParameters,
   };
   const config = new Config(configParams);
   await config.initialize();
@@ -767,7 +769,7 @@ describe('subagent.ts', () => {
         // Use fake timers to reliably test timeouts
         vi.useFakeTimers();
 
-        const { config } = await createMockConfig();
+        const { config } = await createMockConfig({}, { useRipgrep: false });
         const runConfig: RunConfig = { max_time_minutes: 5, max_turns: 100 };
 
         // We need to control the resolution of the sendMessageStream promise to advance the timer during execution.
@@ -812,7 +814,7 @@ describe('subagent.ts', () => {
       });
 
       it('should terminate with ERROR if the model call throws', async () => {
-        const { config } = await createMockConfig();
+        const { config } = await createMockConfig({}, { useRipgrep: false });
         mockSendMessageStream.mockRejectedValue(new Error('API Failure'));
 
         const scope = await SubAgentScope.create(

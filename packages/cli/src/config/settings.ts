@@ -28,7 +28,9 @@ import {
   getSettingsSchema,
 } from './settingsSchema.js';
 import { resolveEnvVarsInObject } from '../utils/envVarResolver.js';
-import { customDeepMerge } from '../utils/deepMerge.js';
+import { customDeepMerge, type MergeableObject } from '../utils/deepMerge.js';
+import { updateSettingsFilePreservingFormat } from '../utils/commentJson.js';
+import { disableExtension } from './extension.js';
 
 function getMergeStrategyForPath(path: string[]): MergeStrategy | undefined {
   let current: SettingDefinition | undefined = undefined;
@@ -53,7 +55,7 @@ export const USER_SETTINGS_PATH = Storage.getGlobalSettingsPath();
 export const USER_SETTINGS_DIR = path.dirname(USER_SETTINGS_PATH);
 export const DEFAULT_EXCLUDED_ENV_VARS = ['DEBUG', 'DEBUG_MODE'];
 
-const MIGRATE_V2_OVERWRITE = false;
+const MIGRATE_V2_OVERWRITE = true;
 
 const MIGRATION_MAP: Record<string, string> = {
   accessibility: 'ui.accessibility',
@@ -67,10 +69,12 @@ const MIGRATION_MAP: Record<string, string> = {
   coreTools: 'tools.core',
   contextFileName: 'context.fileName',
   customThemes: 'ui.customThemes',
+  customWittyPhrases: 'ui.customWittyPhrases',
   debugKeystrokeLogging: 'general.debugKeystrokeLogging',
   disableAutoUpdate: 'general.disableAutoUpdate',
   disableUpdateNag: 'general.disableUpdateNag',
   dnsResolutionOrder: 'advanced.dnsResolutionOrder',
+  enableMessageBusIntegration: 'tools.enableMessageBusIntegration',
   enablePromptCompletion: 'general.enablePromptCompletion',
   enforcedAuthType: 'security.auth.enforcedType',
   excludeTools: 'tools.exclude',
@@ -83,6 +87,7 @@ const MIGRATION_MAP: Record<string, string> = {
   folderTrust: 'security.folderTrust.enabled',
   hasSeenIdeIntegrationNudge: 'ide.hasSeenNudge',
   hideWindowTitle: 'ui.hideWindowTitle',
+  showStatusInTitle: 'ui.showStatusInTitle',
   hideTips: 'ui.hideTips',
   hideBanner: 'ui.hideBanner',
   hideFooter: 'ui.hideFooter',
@@ -105,7 +110,7 @@ const MIGRATION_MAP: Record<string, string> = {
   preferredEditor: 'general.preferredEditor',
   sandbox: 'tools.sandbox',
   selectedAuthType: 'security.auth.selectedType',
-  shouldUseNodePtyShell: 'tools.usePty',
+  shouldUseNodePtyShell: 'tools.shell.enableInteractiveShell',
   shellPager: 'tools.shell.pager',
   shellShowColor: 'tools.shell.showColor',
   skipNextSpeakerCheck: 'model.skipNextSpeakerCheck',
@@ -165,6 +170,20 @@ export interface AccessibilitySettings {
   screenReader?: boolean;
 }
 
+export interface SessionRetentionSettings {
+  /** Enable automatic session cleanup */
+  enabled?: boolean;
+
+  /** Maximum age of sessions to keep (e.g., "30d", "7d", "24h", "1w") */
+  maxAge?: string;
+
+  /** Alternative: Maximum number of sessions to keep (most recent) */
+  maxCount?: number;
+
+  /** Minimum retention period (safety limit, defaults to "1d") */
+  minRetention?: string;
+}
+
 export interface SettingsError {
   message: string;
   path: string;
@@ -172,7 +191,9 @@ export interface SettingsError {
 
 export interface SettingsFile {
   settings: Settings;
+  originalSettings: Settings;
   path: string;
+  rawJson?: string;
 }
 
 function setNestedProperty(
@@ -248,7 +269,28 @@ function migrateSettingsToV2(
 
   // Carry over any unrecognized keys
   for (const remainingKey of flatKeys) {
-    v2Settings[remainingKey] = flatSettings[remainingKey];
+    const existingValue = v2Settings[remainingKey];
+    const newValue = flatSettings[remainingKey];
+
+    if (
+      typeof existingValue === 'object' &&
+      existingValue !== null &&
+      !Array.isArray(existingValue) &&
+      typeof newValue === 'object' &&
+      newValue !== null &&
+      !Array.isArray(newValue)
+    ) {
+      const pathAwareGetStrategy = (path: string[]) =>
+        getMergeStrategyForPath([remainingKey, ...path]);
+      v2Settings[remainingKey] = customDeepMerge(
+        pathAwareGetStrategy,
+        {},
+        newValue as MergeableObject,
+        existingValue as MergeableObject,
+      );
+    } else {
+      v2Settings[remainingKey] = newValue;
+    }
   }
 
   return v2Settings;
@@ -406,6 +448,7 @@ export class LoadedSettings {
   setValue(scope: SettingScope, key: string, value: unknown): void {
     const settingsFile = this.forScope(scope);
     setNestedProperty(settingsFile.settings, key, value);
+    setNestedProperty(settingsFile.originalSettings, key, value);
     this._merged = this.computeMergedSettings();
     saveSettings(settingsFile);
   }
@@ -465,7 +508,7 @@ export function setUpCloudShellEnvironment(envFilePath: string | null): void {
 export function loadEnvironment(settings: Settings): void {
   const envFilePath = findEnvFile(process.cwd());
 
-  if (!isWorkspaceTrusted(settings)) {
+  if (!isWorkspaceTrusted(settings).isTrusted) {
     return;
   }
 
@@ -539,7 +582,10 @@ export function loadSettings(
     workspaceDir,
   ).getWorkspaceSettingsPath();
 
-  const loadAndMigrate = (filePath: string, scope: SettingScope): Settings => {
+  const loadAndMigrate = (
+    filePath: string,
+    scope: SettingScope,
+  ): { settings: Settings; rawJson?: string } => {
     try {
       if (fs.existsSync(filePath)) {
         const content = fs.readFileSync(filePath, 'utf-8');
@@ -554,7 +600,7 @@ export function loadSettings(
             message: 'Settings file is not a valid JSON object.',
             path: filePath,
           });
-          return {};
+          return { settings: {} };
         }
 
         let settingsObject = rawSettings as Record<string, unknown>;
@@ -582,7 +628,7 @@ export function loadSettings(
             settingsObject = migratedSettings;
           }
         }
-        return settingsObject as Settings;
+        return { settings: settingsObject as Settings, rawJson: content };
       }
     } catch (error: unknown) {
       settingsErrors.push({
@@ -590,22 +636,39 @@ export function loadSettings(
         path: filePath,
       });
     }
-    return {};
+    return { settings: {} };
   };
 
-  systemSettings = loadAndMigrate(systemSettingsPath, SettingScope.System);
-  systemDefaultSettings = loadAndMigrate(
+  const systemResult = loadAndMigrate(systemSettingsPath, SettingScope.System);
+  const systemDefaultsResult = loadAndMigrate(
     systemDefaultsPath,
     SettingScope.SystemDefaults,
   );
-  userSettings = loadAndMigrate(USER_SETTINGS_PATH, SettingScope.User);
+  const userResult = loadAndMigrate(USER_SETTINGS_PATH, SettingScope.User);
 
+  let workspaceResult: { settings: Settings; rawJson?: string } = {
+    settings: {} as Settings,
+    rawJson: undefined,
+  };
   if (realWorkspaceDir !== realHomeDir) {
-    workspaceSettings = loadAndMigrate(
+    workspaceResult = loadAndMigrate(
       workspaceSettingsPath,
       SettingScope.Workspace,
     );
   }
+
+  const systemOriginalSettings = structuredClone(systemResult.settings);
+  const systemDefaultsOriginalSettings = structuredClone(
+    systemDefaultsResult.settings,
+  );
+  const userOriginalSettings = structuredClone(userResult.settings);
+  const workspaceOriginalSettings = structuredClone(workspaceResult.settings);
+
+  // Environment variables for runtime use
+  systemSettings = resolveEnvVarsInObject(systemResult.settings);
+  systemDefaultSettings = resolveEnvVarsInObject(systemDefaultsResult.settings);
+  userSettings = resolveEnvVarsInObject(userResult.settings);
+  workspaceSettings = resolveEnvVarsInObject(workspaceResult.settings);
 
   // Support legacy theme names
   if (userSettings.ui?.theme === 'VS') {
@@ -627,7 +690,7 @@ export function loadSettings(
     userSettings,
   );
   const isTrusted =
-    isWorkspaceTrusted(initialTrustCheckSettings as Settings) ?? true;
+    isWorkspaceTrusted(initialTrustCheckSettings as Settings).isTrusted ?? true;
 
   // Create a temporary merged settings object to pass to loadEnvironment.
   const tempMergedSettings = mergeSettings(
@@ -641,11 +704,6 @@ export function loadSettings(
   // loadEnviroment depends on settings so we have to create a temp version of
   // the settings to avoid a cycle
   loadEnvironment(tempMergedSettings);
-
-  // Now that the environment is loaded, resolve variables in the settings.
-  systemSettings = resolveEnvVarsInObject(systemSettings);
-  userSettings = resolveEnvVarsInObject(userSettings);
-  workspaceSettings = resolveEnvVarsInObject(workspaceSettings);
 
   // Create LoadedSettings first
 
@@ -662,22 +720,55 @@ export function loadSettings(
     {
       path: systemSettingsPath,
       settings: systemSettings,
+      originalSettings: systemOriginalSettings,
+      rawJson: systemResult.rawJson,
     },
     {
       path: systemDefaultsPath,
       settings: systemDefaultSettings,
+      originalSettings: systemDefaultsOriginalSettings,
+      rawJson: systemDefaultsResult.rawJson,
     },
     {
       path: USER_SETTINGS_PATH,
       settings: userSettings,
+      originalSettings: userOriginalSettings,
+      rawJson: userResult.rawJson,
     },
     {
       path: workspaceSettingsPath,
       settings: workspaceSettings,
+      originalSettings: workspaceOriginalSettings,
+      rawJson: workspaceResult.rawJson,
     },
     isTrusted,
     migratedInMemorScopes,
   );
+}
+
+export function migrateDeprecatedSettings(
+  loadedSettings: LoadedSettings,
+  workspaceDir: string = process.cwd(),
+): void {
+  const processScope = (scope: SettingScope) => {
+    const settings = loadedSettings.forScope(scope).settings;
+    if (settings.extensions?.disabled) {
+      console.log(
+        `Migrating deprecated extensions.disabled settings from ${scope} settings...`,
+      );
+      for (const extension of settings.extensions.disabled ?? []) {
+        disableExtension(extension, scope, workspaceDir);
+      }
+
+      const newExtensionsValue = { ...settings.extensions };
+      newExtensionsValue.disabled = undefined;
+
+      loadedSettings.setValue(scope, 'extensions', newExtensionsValue);
+    }
+  };
+
+  processScope(SettingScope.User);
+  processScope(SettingScope.Workspace);
 }
 
 export function saveSettings(settingsFile: SettingsFile): void {
@@ -688,17 +779,17 @@ export function saveSettings(settingsFile: SettingsFile): void {
       fs.mkdirSync(dirPath, { recursive: true });
     }
 
-    let settingsToSave = settingsFile.settings;
+    let settingsToSave = settingsFile.originalSettings;
     if (!MIGRATE_V2_OVERWRITE) {
       settingsToSave = migrateSettingsToV1(
         settingsToSave as Record<string, unknown>,
       ) as Settings;
     }
 
-    fs.writeFileSync(
+    // Use the format-preserving update function
+    updateSettingsFilePreservingFormat(
       settingsFile.path,
-      JSON.stringify(settingsToSave, null, 2),
-      'utf-8',
+      settingsToSave as Record<string, unknown>,
     );
   } catch (error) {
     console.error('Error saving user settings file:', error);

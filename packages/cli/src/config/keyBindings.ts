@@ -57,6 +57,10 @@ export enum Command {
   SUBMIT_REVERSE_SEARCH = 'submitReverseSearch',
   ACCEPT_SUGGESTION_REVERSE_SEARCH = 'acceptSuggestionReverseSearch',
   TOGGLE_SHELL_INPUT_FOCUS = 'toggleShellInputFocus',
+
+  // Suggestion expansion
+  EXPAND_SUGGESTION = 'expandSuggestion',
+  COLLAPSE_SUGGESTION = 'collapseSuggestion',
 }
 
 /**
@@ -111,7 +115,7 @@ export const defaultKeyBindings: KeyBindingConfig = {
   [Command.CLEAR_SCREEN]: [{ key: 'l', ctrl: true }],
 
   // History navigation
-  [Command.HISTORY_UP]: [{ key: 'p', ctrl: true }],
+  [Command.HISTORY_UP]: [{ key: 'p', ctrl: true, shift: false }],
   [Command.HISTORY_DOWN]: [{ key: 'n', ctrl: true }],
   [Command.NAVIGATION_UP]: [{ key: 'up' }],
   [Command.NAVIGATION_DOWN]: [{ key: 'down' }],
@@ -164,4 +168,8 @@ export const defaultKeyBindings: KeyBindingConfig = {
   [Command.SUBMIT_REVERSE_SEARCH]: [{ key: 'return', ctrl: false }],
   [Command.ACCEPT_SUGGESTION_REVERSE_SEARCH]: [{ key: 'tab' }],
   [Command.TOGGLE_SHELL_INPUT_FOCUS]: [{ key: 'f', ctrl: true }],
+
+  // Suggestion expansion
+  [Command.EXPAND_SUGGESTION]: [{ key: 'right' }],
+  [Command.COLLAPSE_SUGGESTION]: [{ key: 'left' }],
 };

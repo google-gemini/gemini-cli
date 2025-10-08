@@ -7,13 +7,14 @@
 // DISCLAIMER: This is a copied version of https://github.com/googleapis/js-genai/blob/main/src/chats.ts with the intention of working around a key bug
 // where function responses are not treated as "valid" responses: https://b.corp.google.com/issues/420354090
 
-import type {
+import {
   GenerateContentResponse,
-  Content,
-  GenerateContentConfig,
-  SendMessageParameters,
-  Part,
-  Tool,
+  type Content,
+  type GenerateContentConfig,
+  type SendMessageParameters,
+  type Part,
+  type Tool,
+  FinishReason,
 } from '@google/genai';
 import { toParts } from '../code_assist/converter.js';
 import { createUserContent } from '@google/genai';
@@ -23,23 +24,22 @@ import {
   DEFAULT_GEMINI_FLASH_MODEL,
   getEffectiveModel,
 } from '../config/models.js';
-import { hasCycleInSchema } from '../tools/tools.js';
+import { hasCycleInSchema, MUTATOR_KINDS } from '../tools/tools.js';
 import type { StructuredError } from './turn.js';
 import type { CompletedToolCall } from './coreToolScheduler.js';
 import {
   logContentRetry,
   logContentRetryFailure,
-  logInvalidChunk,
 } from '../telemetry/loggers.js';
 import { ChatRecordingService } from '../services/chatRecordingService.js';
 import {
   ContentRetryEvent,
   ContentRetryFailureEvent,
-  InvalidChunkEvent,
 } from '../telemetry/types.js';
 import { handleFallback } from '../fallback/handler.js';
 import { isFunctionResponse } from '../utils/messageInspectors.js';
 import { partListUnionToString } from './geminiRequest.js';
+import { uiTelemetryService } from '../telemetry/uiTelemetry.js';
 
 export enum StreamEventType {
   /** A regular content chunk from the API. */
@@ -64,7 +64,7 @@ interface ContentRetryOptions {
 }
 
 const INVALID_CONTENT_RETRY_OPTIONS: ContentRetryOptions = {
-  maxAttempts: 3, // 1 initial call + 2 retries
+  maxAttempts: 2, // 1 initial call + 1 retry
   initialDelayMs: 500,
 };
 
@@ -80,6 +80,19 @@ function isValidResponse(response: GenerateContentResponse): boolean {
     return false;
   }
   return isValidContent(content);
+}
+
+export function isValidNonThoughtTextPart(part: Part): boolean {
+  return (
+    typeof part.text === 'string' &&
+    !part.thought &&
+    // Technically, the model should never generate parts that have text and
+    //  any of these but we don't trust them so check anyways.
+    !part.functionCall &&
+    !part.functionResponse &&
+    !part.inlineData &&
+    !part.fileData
+  );
 }
 
 function isValidContent(content: Content): boolean {
@@ -149,13 +162,16 @@ function extractCuratedHistory(comprehensiveHistory: Content[]): Content[] {
 }
 
 /**
- * Custom error to signal that a stream completed without valid content,
+ * Custom error to signal that a stream completed with invalid content,
  * which should trigger a retry.
  */
-export class EmptyStreamError extends Error {
-  constructor(message: string) {
+export class InvalidStreamError extends Error {
+  readonly type: 'NO_FINISH_REASON' | 'NO_RESPONSE_TEXT';
+
+  constructor(message: string, type: 'NO_FINISH_REASON' | 'NO_RESPONSE_TEXT') {
     super(message);
-    this.name = 'EmptyStreamError';
+    this.name = 'InvalidStreamError';
+    this.type = type;
   }
 }
 
@@ -231,6 +247,7 @@ export class GeminiChat {
         : [params.message];
       const userMessageContent = partListUnionToString(toParts(userMessage));
       this.chatRecordingService.recordMessage({
+        model,
         type: 'user',
         content: userMessageContent,
       });
@@ -261,7 +278,6 @@ export class GeminiChat {
               requestContents,
               params,
               prompt_id,
-              userContent,
             );
 
             for await (const chunk of stream) {
@@ -272,7 +288,7 @@ export class GeminiChat {
             break;
           } catch (error) {
             lastError = error;
-            const isContentError = error instanceof EmptyStreamError;
+            const isContentError = error instanceof InvalidStreamError;
 
             if (isContentError) {
               // Check if we have more attempts left.
@@ -281,8 +297,9 @@ export class GeminiChat {
                   self.config,
                   new ContentRetryEvent(
                     attempt,
-                    'EmptyStreamError',
+                    (error as InvalidStreamError).type,
                     INVALID_CONTENT_RETRY_OPTIONS.initialDelayMs,
+                    model,
                   ),
                 );
                 await new Promise((res) =>
@@ -300,18 +317,15 @@ export class GeminiChat {
         }
 
         if (lastError) {
-          if (lastError instanceof EmptyStreamError) {
+          if (lastError instanceof InvalidStreamError) {
             logContentRetryFailure(
               self.config,
               new ContentRetryFailureEvent(
                 INVALID_CONTENT_RETRY_OPTIONS.maxAttempts,
-                'EmptyStreamError',
+                (lastError as InvalidStreamError).type,
+                model,
               ),
             );
-          }
-          // If the stream fails, remove the user message that was added.
-          if (self.history[self.history.length - 1] === userContent) {
-            self.history.pop();
           }
           throw lastError;
         }
@@ -326,7 +340,6 @@ export class GeminiChat {
     requestContents: Content[],
     params: SendMessageParameters,
     prompt_id: string,
-    userContent: Content,
   ): Promise<AsyncGenerator<GenerateContentResponse>> {
     const apiCall = () => {
       const modelToUse = getEffectiveModel(
@@ -359,19 +372,11 @@ export class GeminiChat {
     ) => await handleFallback(this.config, model, authType, error);
 
     const streamResponse = await retryWithBackoff(apiCall, {
-      shouldRetry: (error: unknown) => {
-        if (error instanceof Error && error.message) {
-          if (isSchemaDepthError(error.message)) return false;
-          if (error.message.includes('429')) return true;
-          if (error.message.match(/5\d{2}/)) return true;
-        }
-        return false;
-      },
       onPersistent429: onPersistent429Callback,
       authType: this.config.getContentGeneratorConfig()?.authType,
     });
 
-    return this.processStreamResponse(streamResponse, userContent);
+    return this.processStreamResponse(model, streamResponse);
   }
 
   /**
@@ -474,23 +479,18 @@ export class GeminiChat {
   }
 
   private async *processStreamResponse(
+    model: string,
     streamResponse: AsyncGenerator<GenerateContentResponse>,
-    userInput: Content,
   ): AsyncGenerator<GenerateContentResponse> {
     const modelResponseParts: Part[] = [];
-    let hasReceivedAnyChunk = false;
-    let hasReceivedValidChunk = false;
+
     let hasToolCall = false;
-    let lastChunk: GenerateContentResponse | null = null;
-    let lastChunkIsInvalid = false;
+    let hasFinishReason = false;
 
-    for await (const chunk of streamResponse) {
-      hasReceivedAnyChunk = true;
-      lastChunk = chunk;
-
+    for await (const chunk of this.stopBeforeSecondMutator(streamResponse)) {
+      hasFinishReason =
+        chunk?.candidates?.some((candidate) => candidate.finishReason) ?? false;
       if (isValidResponse(chunk)) {
-        hasReceivedValidChunk = true;
-        lastChunkIsInvalid = false;
         const content = chunk.candidates?.[0]?.content;
         if (content?.parts) {
           if (content.parts.some((part) => part.thought)) {
@@ -500,155 +500,78 @@ export class GeminiChat {
           if (content.parts.some((part) => part.functionCall)) {
             hasToolCall = true;
           }
-          // Always add parts - thoughts will be filtered out later in recordHistory
-          modelResponseParts.push(...content.parts);
+
+          modelResponseParts.push(
+            ...content.parts.filter((part) => !part.thought),
+          );
         }
-      } else {
-        logInvalidChunk(
-          this.config,
-          new InvalidChunkEvent('Invalid chunk received from stream.'),
-        );
-        lastChunkIsInvalid = true;
       }
 
       // Record token usage if this chunk has usageMetadata
       if (chunk.usageMetadata) {
         this.chatRecordingService.recordMessageTokens(chunk.usageMetadata);
+        if (chunk.usageMetadata.promptTokenCount !== undefined) {
+          uiTelemetryService.setLastPromptTokenCount(
+            chunk.usageMetadata.promptTokenCount,
+          );
+        }
       }
 
       yield chunk; // Yield every chunk to the UI immediately.
     }
 
-    if (!hasReceivedAnyChunk) {
-      throw new EmptyStreamError('Model stream completed without any chunks.');
+    // String thoughts and consolidate text parts.
+    const consolidatedParts: Part[] = [];
+    for (const part of modelResponseParts) {
+      const lastPart = consolidatedParts[consolidatedParts.length - 1];
+      if (
+        lastPart?.text &&
+        isValidNonThoughtTextPart(lastPart) &&
+        isValidNonThoughtTextPart(part)
+      ) {
+        lastPart.text += part.text;
+      } else {
+        consolidatedParts.push(part);
+      }
     }
 
-    const hasFinishReason = lastChunk?.candidates?.some(
-      (candidate) => candidate.finishReason,
-    );
+    const responseText = consolidatedParts
+      .filter((part) => part.text)
+      .map((part) => part.text)
+      .join('')
+      .trim();
+
+    // Record model response text from the collected parts
+    if (responseText) {
+      this.chatRecordingService.recordMessage({
+        model,
+        type: 'gemini',
+        content: responseText,
+      });
+    }
 
     // Stream validation logic: A stream is considered successful if:
     // 1. There's a tool call (tool calls can end without explicit finish reasons), OR
-    // 2. There's a finish reason AND the last chunk is valid (or we haven't received any valid chunks)
+    // 2. There's a finish reason AND we have non-empty response text
     //
     // We throw an error only when there's no tool call AND:
     // - No finish reason, OR
-    // - Last chunk is invalid after receiving valid content
-    if (
-      !hasToolCall &&
-      (!hasFinishReason || (lastChunkIsInvalid && !hasReceivedValidChunk))
-    ) {
-      throw new EmptyStreamError(
-        'Model stream ended with an invalid chunk or missing finish reason.',
-      );
-    }
-
-    // Record model response text from the collected parts
-    if (modelResponseParts.length > 0) {
-      const responseText = modelResponseParts
-        .filter((part) => part.text && !part.thought)
-        .map((part) => part.text)
-        .join('');
-
-      if (responseText.trim()) {
-        this.chatRecordingService.recordMessage({
-          type: 'gemini',
-          content: responseText,
-        });
-      }
-    }
-
-    // Bundle all streamed parts into a single Content object
-    const modelOutput: Content[] =
-      modelResponseParts.length > 0
-        ? [{ role: 'model', parts: modelResponseParts }]
-        : [];
-
-    // Pass the raw, bundled data to the new, robust recordHistory
-    this.recordHistory(userInput, modelOutput);
-  }
-
-  private recordHistory(userInput: Content, modelOutput: Content[]) {
-    // Part 1: Handle the user's turn.
-
-    const lastTurn = this.history[this.history.length - 1];
-    // The only time we don't push is if it's the *exact same* object,
-    // which happens in streaming where we add it preemptively.
-    if (lastTurn !== userInput) {
-      if (lastTurn?.role === 'user') {
-        // This is an invalid sequence.
-        throw new Error('Cannot add a user turn after another user turn.');
-      }
-      this.history.push(userInput);
-    }
-
-    // Part 2: Process the model output into a final, consolidated list of turns.
-    const finalModelTurns: Content[] = [];
-    for (const content of modelOutput) {
-      // A. Preserve malformed content that has no 'parts' array.
-      if (!content.parts) {
-        finalModelTurns.push(content);
-        continue;
-      }
-
-      // B. Filter out 'thought' parts.
-      const visibleParts = content.parts.filter((part) => !part.thought);
-
-      const newTurn = { ...content, parts: visibleParts };
-      const lastTurnInFinal = finalModelTurns[finalModelTurns.length - 1];
-
-      // Consolidate this new turn with the PREVIOUS turn if they are adjacent model turns.
-      if (
-        lastTurnInFinal &&
-        lastTurnInFinal.role === 'model' &&
-        newTurn.role === 'model' &&
-        lastTurnInFinal.parts && // SAFETY CHECK: Ensure the destination has a parts array.
-        newTurn.parts
-      ) {
-        lastTurnInFinal.parts.push(...newTurn.parts);
+    // - Empty response text (e.g., only thoughts with no actual content)
+    if (!hasToolCall && (!hasFinishReason || !responseText)) {
+      if (!hasFinishReason) {
+        throw new InvalidStreamError(
+          'Model stream ended without a finish reason.',
+          'NO_FINISH_REASON',
+        );
       } else {
-        finalModelTurns.push(newTurn);
+        throw new InvalidStreamError(
+          'Model stream ended with empty response text.',
+          'NO_RESPONSE_TEXT',
+        );
       }
     }
 
-    // Part 3: Add the processed model turns to the history, with one final consolidation pass.
-    if (finalModelTurns.length > 0) {
-      // Re-consolidate parts within any turns that were merged in the previous step.
-      for (const turn of finalModelTurns) {
-        if (turn.parts && turn.parts.length > 1) {
-          const consolidatedParts: Part[] = [];
-          for (const part of turn.parts) {
-            const lastPart = consolidatedParts[consolidatedParts.length - 1];
-            if (
-              lastPart &&
-              // Ensure lastPart is a pure text part
-              typeof lastPart.text === 'string' &&
-              !lastPart.functionCall &&
-              !lastPart.functionResponse &&
-              !lastPart.inlineData &&
-              !lastPart.fileData &&
-              !lastPart.thought &&
-              // Ensure current part is a pure text part
-              typeof part.text === 'string' &&
-              !part.functionCall &&
-              !part.functionResponse &&
-              !part.inlineData &&
-              !part.fileData &&
-              !part.thought
-            ) {
-              lastPart.text += part.text;
-            } else {
-              consolidatedParts.push({ ...part });
-            }
-          }
-          turn.parts = consolidatedParts;
-        }
-      }
-      this.history.push(...finalModelTurns);
-    } else {
-      // If, after all processing, there's NO model output, add the placeholder.
-      this.history.push({ role: 'model', parts: [] });
-    }
+    this.history.push({ role: 'model', parts: consolidatedParts });
   }
 
   /**
@@ -662,7 +585,10 @@ export class GeminiChat {
    * Records completed tool calls with full metadata.
    * This is called by external components when tool calls complete, before sending responses to Gemini.
    */
-  recordCompletedToolCalls(toolCalls: CompletedToolCall[]): void {
+  recordCompletedToolCalls(
+    model: string,
+    toolCalls: CompletedToolCall[],
+  ): void {
     const toolCallRecords = toolCalls.map((call) => {
       const resultDisplayRaw = call.response?.resultDisplay;
       const resultDisplay =
@@ -679,7 +605,7 @@ export class GeminiChat {
       };
     });
 
-    this.chatRecordingService.recordToolCalls(toolCallRecords);
+    this.chatRecordingService.recordToolCalls(model, toolCallRecords);
   }
 
   /**
@@ -705,6 +631,64 @@ export class GeminiChat {
         description,
       });
     }
+  }
+
+  /**
+   * Truncates the chunkStream right before the second function call to a
+   * function that mutates state. This may involve trimming parts from a chunk
+   * as well as omtting some chunks altogether.
+   *
+   * We do this because it improves tool call quality if the model gets
+   * feedback from one mutating function call before it makes the next one.
+   */
+  private async *stopBeforeSecondMutator(
+    chunkStream: AsyncGenerator<GenerateContentResponse>,
+  ): AsyncGenerator<GenerateContentResponse> {
+    let foundMutatorFunctionCall = false;
+
+    for await (const chunk of chunkStream) {
+      const candidate = chunk.candidates?.[0];
+      const content = candidate?.content;
+      if (!candidate || !content?.parts) {
+        yield chunk;
+        continue;
+      }
+
+      const truncatedParts: Part[] = [];
+      for (const part of content.parts) {
+        if (this.isMutatorFunctionCall(part)) {
+          if (foundMutatorFunctionCall) {
+            // This is the second mutator call.
+            // Truncate and return immedaitely.
+            const newChunk = new GenerateContentResponse();
+            newChunk.candidates = [
+              {
+                ...candidate,
+                content: {
+                  ...content,
+                  parts: truncatedParts,
+                },
+                finishReason: FinishReason.STOP,
+              },
+            ];
+            yield newChunk;
+            return;
+          }
+          foundMutatorFunctionCall = true;
+        }
+        truncatedParts.push(part);
+      }
+
+      yield chunk;
+    }
+  }
+
+  private isMutatorFunctionCall(part: Part): boolean {
+    if (!part?.functionCall?.name) {
+      return false;
+    }
+    const tool = this.config.getToolRegistry().getTool(part.functionCall.name);
+    return !!tool && MUTATOR_KINDS.includes(tool.kind);
   }
 }
 
