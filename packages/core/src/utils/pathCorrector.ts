@@ -9,12 +9,12 @@ import * as path from 'node:path';
 import type { Config } from '../config/config.js';
 
 type SuccessfulPathCorrection = {
+  success: true;
   correctedPath: string;
-  error?: never;
 };
 
 type FailedPathCorrection = {
-  correctedPath?: never;
+  success: false;
   error: string;
 };
 
@@ -36,7 +36,7 @@ export function correctPath(
   // Check for direct path relative to the primary target directory.
   const directPath = path.join(config.getTargetDir(), filePath);
   if (fs.existsSync(directPath)) {
-    return { correctedPath: directPath };
+    return { success: true, correctedPath: directPath };
   }
 
   // If not found directly, search across all workspace directories for ambiguous matches.
@@ -47,15 +47,17 @@ export function correctPath(
 
   if (foundFiles.length === 0) {
     return {
+      success: false,
       error: `File not found for '${filePath}' and path is not absolute.`,
     };
   }
 
   if (foundFiles.length > 1) {
     return {
+      success: false,
       error: `The file path '${filePath}' is ambiguous and matches multiple files. Please provide a more specific path. Matches: ${foundFiles.join(', ')}`,
     };
   }
 
-  return { correctedPath: foundFiles[0] };
+  return { success: true, correctedPath: foundFiles[0] };
 }

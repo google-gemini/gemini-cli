@@ -865,10 +865,10 @@ A good instruction should concisely answer:
     if (!path.isAbsolute(filePath)) {
       // Attempt to auto-correct to an absolute path
       const result = correctPath(filePath, this.config);
-      if (result.error) {
-        return result.error;
-      } else {
+      if (result.success) {
         filePath = result.correctedPath;
+      } else {
+        return result.error;
       }
     }
     params.file_path = filePath;

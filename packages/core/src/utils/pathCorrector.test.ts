@@ -45,8 +45,10 @@ describe('pathCorrector', () => {
 
     const result = correctPath(testFile, mockConfig);
 
-    expect(result.error).toBeUndefined();
-    expect(result.correctedPath).toBe(path.join(rootDir, testFile));
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.correctedPath).toBe(path.join(rootDir, testFile));
+    }
   });
 
   it('should correct a partial relative path if it is unambiguous in another workspace dir', () => {
@@ -58,16 +60,22 @@ describe('pathCorrector', () => {
 
     const result = correctPath(testFile, mockConfig);
 
-    expect(result.error).toBeUndefined();
-    expect(result.correctedPath).toBe(fullPath);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.correctedPath).toBe(fullPath);
+    }
   });
 
   it('should return an error for a relative path that does not exist', () => {
     const result = correctPath('nonexistent.txt', mockConfig);
-    expect(result.error).toMatch(
-      /File not found for 'nonexistent.txt' and path is not absolute./,
-    );
-    expect(result.correctedPath).toBeUndefined();
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error).toMatch(
+        /File not found for 'nonexistent.txt' and path is not absolute./,
+      );
+    } else {
+      expect.fail('Expected path correction to fail.');
+    }
   });
 
   it('should return an error for an ambiguous path', () => {
@@ -81,9 +89,13 @@ describe('pathCorrector', () => {
 
     const result = correctPath(ambiguousFile, mockConfig);
 
-    expect(result.error).toMatch(
-      /The file path 'component.ts' is ambiguous and matches multiple files./,
-    );
-    expect(result.correctedPath).toBeUndefined();
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error).toMatch(
+        /The file path 'component.ts' is ambiguous and matches multiple files./,
+      );
+    } else {
+      expect.fail('Expected path correction to fail.');
+    }
   });
 });
