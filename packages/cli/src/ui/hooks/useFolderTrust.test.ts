@@ -68,6 +68,7 @@ describe('useFolderTrust', () => {
       useFolderTrust(mockSettings, onTrustChange, addItem),
     );
     expect(result.current.isFolderTrustDialogOpen).toBe(false);
+    expect(onTrustChange).toHaveBeenCalledWith(true);
   });
 
   it('should not open dialog when folder is already untrusted', () => {
@@ -76,6 +77,7 @@ describe('useFolderTrust', () => {
       useFolderTrust(mockSettings, onTrustChange, addItem),
     );
     expect(result.current.isFolderTrustDialogOpen).toBe(false);
+    expect(onTrustChange).toHaveBeenCalledWith(false);
   });
 
   it('should open dialog when folder trust is undefined', () => {
@@ -87,6 +89,7 @@ describe('useFolderTrust', () => {
       useFolderTrust(mockSettings, onTrustChange, addItem),
     );
     expect(result.current.isFolderTrustDialogOpen).toBe(true);
+    expect(onTrustChange).toHaveBeenCalledWith(undefined);
   });
 
   it('should send a message if the folder is untrusted', () => {
@@ -170,6 +173,7 @@ describe('useFolderTrust', () => {
     expect(onTrustChange).toHaveBeenLastCalledWith(false);
     expect(result.current.isRestarting).toBe(true);
     expect(result.current.isFolderTrustDialogOpen).toBe(true);
+    expect(onTrustChange).toHaveBeenCalledWith(undefined);
   });
 
   it('should do nothing for default choice', () => {

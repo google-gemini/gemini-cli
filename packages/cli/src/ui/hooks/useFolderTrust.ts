@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import type { LoadedSettings } from '../../config/settings.js';
 import { FolderTrustChoice } from '../components/FolderTrustDialog.js';
 import {
@@ -20,25 +20,30 @@ export const useFolderTrust = (
   onTrustChange: (isTrusted: boolean | undefined) => void,
   addItem: (item: HistoryItemWithoutId, timestamp: number) => number,
 ) => {
-  const [isTrusted, setIsTrusted] = useState<boolean | undefined>(
-    () => isWorkspaceTrusted(settings.merged).isTrusted,
-  );
-  const [isFolderTrustDialogOpen, setIsFolderTrustDialogOpen] = useState(
-    isTrusted === undefined,
-  );
+  const [isTrusted, setIsTrusted] = useState<boolean | undefined>(undefined);
+  const [isFolderTrustDialogOpen, setIsFolderTrustDialogOpen] = useState(false);
   const [isRestarting, setIsRestarting] = useState(false);
   const startupMessageSent = useRef(false);
 
-  if (isTrusted === false && !startupMessageSent.current) {
-    addItem(
-      {
-        type: MessageType.INFO,
-        text: 'This folder is not trusted. Some features may be disabled. Use the `/permissions` command to change the trust level.',
-      },
-      Date.now(),
-    );
-    startupMessageSent.current = true;
-  }
+  const folderTrust = settings.merged.security?.folderTrust?.enabled;
+
+  useEffect(() => {
+    const { isTrusted: trusted } = isWorkspaceTrusted(settings.merged);
+    setIsTrusted(trusted);
+    setIsFolderTrustDialogOpen(trusted === undefined);
+    onTrustChange(trusted);
+
+    if (trusted === false && !startupMessageSent.current) {
+      addItem(
+        {
+          type: MessageType.INFO,
+          text: 'This folder is not trusted. Some features may be disabled. Use the `/permissions` command to change the trust level.',
+        },
+        Date.now(),
+      );
+      startupMessageSent.current = true;
+    }
+  }, [folderTrust, onTrustChange, settings.merged, addItem]);
 
   const handleFolderTrustSelect = useCallback(
     (choice: FolderTrustChoice) => {
