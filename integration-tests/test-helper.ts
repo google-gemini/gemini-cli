@@ -176,6 +176,11 @@ export class TestRig {
     const telemetryPath = join(this.testDir, 'telemetry.log'); // Always use test directory for telemetry
 
     const settings = {
+      general: {
+        // Nightly releases sometimes becomes out of sync with local code and
+        // triggers auto-update, which causes tests to fail.
+        disableAutoUpdate: true,
+      },
       telemetry: {
         enabled: true,
         target: 'local',
