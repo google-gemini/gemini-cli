@@ -18,8 +18,9 @@ import * as path from 'node:path';
 import { EXTENSIONS_CONFIG_FILENAME, loadExtension } from '../extension.js';
 import * as tar from 'tar';
 import extract from 'extract-zip';
+import { fetchJson } from './github_fetch.js';
 
-function getGitHubToken(): string | undefined {
+export function getGitHubToken(): string | undefined {
   return process.env['GITHUB_TOKEN'];
 }
 
@@ -108,7 +109,7 @@ export function parseGitHubRepoForReleases(source: string): {
   return { owner, repo };
 }
 
-async function fetchReleaseFromGithub(
+export async function fetchReleaseFromGithub(
   owner: string,
   repo: string,
   ref?: string,
@@ -378,33 +379,6 @@ export function findReleaseAsset(assets: Asset[]): Asset | undefined {
   }
 
   return undefined;
-}
-
-async function fetchJson<T>(url: string): Promise<T> {
-  const headers: { 'User-Agent': string; Authorization?: string } = {
-    'User-Agent': 'gemini-cli',
-  };
-  const token = getGitHubToken();
-  if (token) {
-    headers.Authorization = `token ${token}`;
-  }
-  return new Promise((resolve, reject) => {
-    https
-      .get(url, { headers }, (res) => {
-        if (res.statusCode !== 200) {
-          return reject(
-            new Error(`Request failed with status code ${res.statusCode}`),
-          );
-        }
-        const chunks: Buffer[] = [];
-        res.on('data', (chunk) => chunks.push(chunk));
-        res.on('end', () => {
-          const data = Buffer.concat(chunks).toString();
-          resolve(JSON.parse(data) as T);
-        });
-      })
-      .on('error', reject);
-  });
 }
 
 async function downloadFile(url: string, dest: string): Promise<void> {
