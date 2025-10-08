@@ -5,19 +5,17 @@
  */
 
 import { useState, useEffect } from 'react';
-import {
-  type Extension,
-  getWorkspaceExtensions,
-} from '../../config/extension.js';
+import type { GeminiCLIExtension } from '@google/gemini-cli-core';
+import { getWorkspaceExtensions } from '../../config/extension.js';
 import { type LoadedSettings, SettingScope } from '../../config/settings.js';
 import process from 'node:process';
 
 export function useWorkspaceMigration(settings: LoadedSettings) {
   const [showWorkspaceMigrationDialog, setShowWorkspaceMigrationDialog] =
     useState(false);
-  const [workspaceExtensions, setWorkspaceExtensions] = useState<Extension[]>(
-    [],
-  );
+  const [workspaceExtensions, setWorkspaceExtensions] = useState<
+    GeminiCLIExtension[]
+  >([]);
 
   useEffect(() => {
     // Default to true if not set.
