@@ -167,6 +167,7 @@ export const useShellCommandProcessor = (
                     typeof cumulativeStdout === 'string'
                   ) {
                     cumulativeStdout += event.chunk;
+                    shouldUpdate = true;
                   }
                   break;
                 case 'binary_detected':
@@ -177,6 +178,7 @@ export const useShellCommandProcessor = (
                 case 'binary_progress':
                   isBinaryStream = true;
                   binaryBytesReceived = event.bytesReceived;
+                  shouldUpdate = true;
                   break;
                 default: {
                   throw new Error('An unhandled ShellOutputEvent was found.');
