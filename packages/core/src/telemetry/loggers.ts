@@ -69,6 +69,7 @@ import type {
   ModelSlashCommandEvent,
   SmartEditStrategyEvent,
   SmartEditCorrectionEvent,
+  FeedbackEvent,
 } from './types.js';
 import {
   recordApiErrorMetrics,
@@ -859,6 +860,24 @@ export function logSmartEditCorrectionEvent(
   const logger = logs.getLogger(SERVICE_NAME);
   const logRecord: LogRecord = {
     body: `Smart Edit Tool Correction: ${event.correction}`,
+    attributes,
+  };
+  logger.emit(logRecord);
+}
+
+export function logFeedback(config: Config, event: FeedbackEvent): void {
+  ClearcutLogger.getInstance(config)?.logFeedbackEvent(event);
+  if (!isTelemetrySdkInitialized()) return;
+
+  const attributes: LogAttributes = {
+    ...getCommonAttributes(config),
+    ...event,
+    'event.name': 'feedback',
+  };
+
+  const logger = logs.getLogger(SERVICE_NAME);
+  const logRecord: LogRecord = {
+    body: `Feedback received: ${event.feedback}`,
     attributes,
   };
   logger.emit(logRecord);

@@ -33,6 +33,7 @@ import type {
   ExtensionDisableEvent,
   SmartEditStrategyEvent,
   SmartEditCorrectionEvent,
+  FeedbackEvent,
 } from '../types.js';
 import { EventMetadataKey } from './event-metadata-key.js';
 import type { Config } from '../../config/config.js';
@@ -79,6 +80,7 @@ export enum EventNames {
   MODEL_SLASH_COMMAND = 'model_slash_command',
   SMART_EDIT_STRATEGY = 'smart_edit_strategy',
   SMART_EDIT_CORRECTION = 'smart_edit_correction',
+  FEEDBACK = 'feedback',
 }
 
 export interface LogResponse {
@@ -1136,6 +1138,18 @@ export class ClearcutLogger {
 
   shutdown() {
     this.logEndSessionEvent();
+  }
+
+  logFeedbackEvent(event: FeedbackEvent): void {
+    const data: EventValue[] = [
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_FEEDBACK_TEXT,
+        value: event.feedback,
+      },
+    ];
+
+    this.enqueueLogEvent(this.createLogEvent(EventNames.FEEDBACK, data));
+    this.flushIfNeeded();
   }
 
   private requeueFailedEvents(eventsToSend: LogEventEntry[][]): void {

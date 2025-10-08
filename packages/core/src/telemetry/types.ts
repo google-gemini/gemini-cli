@@ -393,6 +393,20 @@ export function makeChatCompressionEvent({
   };
 }
 
+export interface FeedbackEvent extends BaseTelemetryEvent {
+  'event.name': 'feedback';
+  'event.timestamp': string;
+  feedback: string;
+}
+
+export function makeFeedbackEvent(feedback: string): FeedbackEvent {
+  return {
+    'event.name': 'feedback',
+    'event.timestamp': new Date().toISOString(),
+    feedback,
+  };
+}
+
 export class MalformedJsonResponseEvent implements BaseTelemetryEvent {
   'event.name': 'malformed_json_response';
   'event.timestamp': string;
@@ -687,7 +701,8 @@ export type TelemetryEvent =
   | ExtensionUninstallEvent
   | ModelRoutingEvent
   | ToolOutputTruncatedEvent
-  | ModelSlashCommandEvent;
+  | ModelSlashCommandEvent
+  | FeedbackEvent;
 
 export class ExtensionDisableEvent implements BaseTelemetryEvent {
   'event.name': 'extension_disable';
