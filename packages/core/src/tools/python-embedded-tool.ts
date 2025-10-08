@@ -25,6 +25,7 @@ import { getErrorMessage } from '../utils/errors.js';
 import { ShellExecutionService } from '../services/shellExecutionService.js';
 import { XlwingsDocTool } from '../tools/xlwings-doc-tool.js';
 import { GeminiSearchTool } from '../tools/gemini-search-tool.js';
+import { KnowledgeBaseTool } from './knowledge-base-tool.js';
 
 
 export const OUTPUT_UPDATE_INTERVAL_MS = 1000;
@@ -377,6 +378,8 @@ This tool uses an embedded Python 3.13.7 environment to ensure stable and consis
 
 ## GENERAL GUIDELINES
 - NEVER assume a worksheet has table headers; NEVER assume there is only one header row, there may be multiple header rows or no headers at all; Ferthermore, there maybe multiple tables and headers in a single worksheet, if necessary, try to identify the correct table by sampling data
+- NEVER assume you can write correct python code in one attempt, always use print statement to output helpful information, if errors occur, use these message to iteratively fix your code. If you can not resolve the errors, use ${GeminiSearchTool.Name} to search for solutions or examples, if you are still stuck, inform the user about the technical limitations
+- If your python code sucessfully runs and finishes the task as expected, consider use ${KnowledgeBaseTool.Name} to save the code snippet for future reference
 
 ## User may refer column letters like "A", "B", "C", or even "XA", "XB" in complex sheets, convert them to numerical indexes use a function like this:
 \`\`\`python
@@ -398,28 +401,35 @@ def col_letter_to_index(col_letter):
   file_path = 'file_path.xlsx'
   book = None
 
-  # Iterate through Excel instances and get book
-  for app in xw.apps:
-      for wb in app.books:
-          if wb.name == file_path:
-              # Found the workbook by name
-              book = wb
-              break
-          if wb.name == os.path.basename(file_path):
-              # Found the open workbook by base name
-              book = wb
-              break
-          if wb.name == os.path.splitext(os.path.basename(file_path))[0]:
-              # Found the open workbook by name without extension
-              book = wb
-              break
-          if wb.fullname == file_path:
-              # Found the open workbook by full path
-              book = wb
-              break
-  # If not found, open it
-  if book is None:
-      book = xw.Book(file_path)
+  try:
+    # Iterate through Excel instances and get book  
+    for app in xw.apps:
+        for wb in app.books:
+            if wb.name == file_path:
+                # Found the workbook by name
+                book = wb
+                break
+            if wb.name == os.path.basename(file_path):
+                # Found the open workbook by base name
+                book = wb
+                break
+            if wb.name == os.path.splitext(os.path.basename(file_path))[0]:
+                # Found the open workbook by name without extension
+                book = wb
+                break
+            if wb.fullname == file_path:
+                # Found the open workbook by full path
+                book = wb
+                break
+    # If not found, open it
+    if book is None:
+        book = xw.Book(file_path)
+  except Exception as e:
+    # Handle exceptions (e.g., file not found, permission issues)
+  finally:
+    # Always close workbook if it was opened by this code
+    if book:
+        book.close()
   \`\`\`
 
 - Get used range and read data:
@@ -451,6 +461,22 @@ def col_letter_to_index(col_letter):
   chart.api.Axes(1).AxisTitle.Text = "X Axis Title"
   chart.api.Axes(2).HasTitle = True  # Y axis
   chart.api.Axes(2).AxisTitle.Text = "Y Axis Title"
+  \`\`\`
+
+- Cell value comparison, try these patterns to avoid mismatches:
+  \`\`\`python
+  # For numeric comparison, convert to float first to avoid type issues (e.g., 42 vs 42.0)
+  if float(cell.value) == 42.0:
+      # do something
+  # For integer comparison, convert to int first
+  if int(float(cell.value)) == 42:
+      # do something
+  # For string comparison, convert to str first
+  if str(cell.value).strip().lower() == "target":
+      # do something
+  # For robust comparison, convert to str and handle None
+  if str(cell.value or "").strip().lower() == "target":
+      # do something
   \`\`\`
 `
       ,
