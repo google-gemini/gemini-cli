@@ -51,6 +51,7 @@ interface SlashCommandProcessorActions {
   quit: (messages: HistoryItem[]) => void;
   setDebugMessage: (message: string) => void;
   toggleCorgiMode: () => void;
+  toggleDebugProfiler: () => void;
   dispatchExtensionStateUpdate: (action: ExtensionUpdateAction) => void;
   addConfirmUpdateExtensionRequest: (request: ConfirmationRequest) => void;
 }
@@ -197,6 +198,7 @@ export const useSlashCommandProcessor = (
         pendingItem,
         setPendingItem,
         toggleCorgiMode: actions.toggleCorgiMode,
+        toggleDebugProfiler: actions.toggleDebugProfiler,
         toggleVimEnabled,
         setGeminiMdFileCount,
         reloadCommands,
