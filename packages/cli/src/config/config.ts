@@ -255,6 +255,7 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
           alias: 'e',
           type: 'array',
           string: true,
+          nargs: 1,
           description:
             'A list of extensions to use. If not provided, all extensions are used.',
           coerce: (extensions: string[]) =>
