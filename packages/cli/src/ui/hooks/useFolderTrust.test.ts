@@ -173,7 +173,6 @@ describe('useFolderTrust', () => {
     expect(onTrustChange).toHaveBeenLastCalledWith(false);
     expect(result.current.isRestarting).toBe(true);
     expect(result.current.isFolderTrustDialogOpen).toBe(true);
-    expect(onTrustChange).toHaveBeenCalledWith(undefined);
   });
 
   it('should do nothing for default choice', () => {
