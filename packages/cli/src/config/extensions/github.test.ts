@@ -137,6 +137,7 @@ describe('git extension helpers', () => {
           type: 'link',
           source: '',
         },
+        contextFiles: [],
       };
       const result = await checkForExtensionUpdate(extension);
       expect(result).toBe(ExtensionUpdateState.NOT_UPDATABLE);
@@ -152,6 +153,7 @@ describe('git extension helpers', () => {
           type: 'git',
           source: '',
         },
+        contextFiles: [],
       };
       mockGit.getRemotes.mockResolvedValue([]);
       const result = await checkForExtensionUpdate(extension);
@@ -168,6 +170,7 @@ describe('git extension helpers', () => {
           type: 'git',
           source: 'my/ext',
         },
+        contextFiles: [],
       };
       mockGit.getRemotes.mockResolvedValue([
         { name: 'origin', refs: { fetch: 'http://my-repo.com' } },
@@ -189,6 +192,7 @@ describe('git extension helpers', () => {
           type: 'git',
           source: 'my/ext',
         },
+        contextFiles: [],
       };
       mockGit.getRemotes.mockResolvedValue([
         { name: 'origin', refs: { fetch: 'http://my-repo.com' } },
@@ -210,6 +214,7 @@ describe('git extension helpers', () => {
           type: 'git',
           source: 'my/ext',
         },
+        contextFiles: [],
       };
       mockGit.getRemotes.mockRejectedValue(new Error('git error'));
 

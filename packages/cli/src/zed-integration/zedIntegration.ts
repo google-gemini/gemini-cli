@@ -11,6 +11,7 @@ import type {
   GeminiChat,
   ToolResult,
   ToolCallConfirmationDetails,
+  GeminiCLIExtension,
 } from '@google/gemini-cli-core';
 import {
   AuthType,
@@ -40,7 +41,7 @@ import * as path from 'node:path';
 import { z } from 'zod';
 
 import { randomUUID } from 'node:crypto';
-import { ExtensionStorage, type Extension } from '../config/extension.js';
+import { ExtensionStorage } from '../config/extension.js';
 import type { CliArgs } from '../config/config.js';
 import { loadCliConfig } from '../config/config.js';
 import { ExtensionEnablementManager } from '../config/extensions/extensionEnablement.js';
@@ -61,7 +62,7 @@ export function resolveModel(model: string, isInFallbackMode: boolean): string {
 export async function runZedIntegration(
   config: Config,
   settings: LoadedSettings,
-  extensions: Extension[],
+  extensions: GeminiCLIExtension[],
   argv: CliArgs,
 ) {
   const stdout = Writable.toWeb(process.stdout) as WritableStream;
@@ -88,7 +89,7 @@ class GeminiAgent {
   constructor(
     private config: Config,
     private settings: LoadedSettings,
-    private extensions: Extension[],
+    private extensions: GeminiCLIExtension[],
     private argv: CliArgs,
     private client: acp.Client,
   ) {}
