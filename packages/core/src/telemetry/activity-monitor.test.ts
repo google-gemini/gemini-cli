@@ -10,7 +10,7 @@ import {
   DEFAULT_ACTIVITY_CONFIG,
   initializeActivityMonitor,
   getActivityMonitor,
-  recordUserActivity,
+  recordGlobalActivity,
   startGlobalActivityMonitoring,
   stopGlobalActivityMonitoring,
 } from './activity-monitor.js';
@@ -269,11 +269,11 @@ describe('Global activity monitoring functions', () => {
     });
   });
 
-  describe('recordUserActivity', () => {
+  describe('recordGlobalActivity', () => {
     it('should record activity through global monitor', () => {
       startGlobalActivityMonitoring(mockConfig);
 
-      recordUserActivity(ActivityType.TOOL_CALL_SCHEDULED, 'global-test');
+      recordGlobalActivity(ActivityType.TOOL_CALL_SCHEDULED, 'global-test');
 
       const monitor = getActivityMonitor();
       const stats = monitor?.getActivityStats();
@@ -285,7 +285,7 @@ describe('Global activity monitoring functions', () => {
 
       // Should not throw error
       expect(() => {
-        recordUserActivity(ActivityType.USER_INPUT_START);
+        recordGlobalActivity(ActivityType.USER_INPUT_START);
       }).not.toThrow();
     });
   });

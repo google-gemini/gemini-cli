@@ -259,9 +259,9 @@ export function getActivityMonitor(): ActivityMonitor | null {
 }
 
 /**
- * Record a user activity (convenience function)
+ * Record a user activity on the global monitor (convenience function)
  */
-export function recordUserActivity(
+export function recordGlobalActivity(
   type: ActivityType,
   context?: string,
   metadata?: Record<string, unknown>,
