@@ -781,9 +781,6 @@ describe('ClearcutLogger', () => {
         EventMetadataKey.GEMINI_CLI_AGENT_TERMINATE_REASON,
         'GOAL',
       ]);
-      expect(events[0]).not.toHaveMetadataKey(
-        EventMetadataKey.GEMINI_CLI_AGENT_ERROR_MESSAGE,
-      );
     });
 
     it('logs an event with proper fields (error)', () => {
@@ -794,7 +791,6 @@ describe('ClearcutLogger', () => {
         500,
         2,
         AgentTerminateMode.ERROR,
-        'Something went wrong',
       );
 
       logger?.logAgentFinishEvent(event);
@@ -805,10 +801,6 @@ describe('ClearcutLogger', () => {
       expect(events[0]).toHaveMetadataValue([
         EventMetadataKey.GEMINI_CLI_AGENT_TERMINATE_REASON,
         'ERROR',
-      ]);
-      expect(events[0]).toHaveMetadataValue([
-        EventMetadataKey.GEMINI_CLI_AGENT_ERROR_MESSAGE,
-        'Something went wrong',
       ]);
     });
   });

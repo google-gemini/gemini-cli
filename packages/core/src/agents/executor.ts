@@ -156,7 +156,6 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
     let turnCounter = 0;
     let terminateReason: AgentTerminateMode = AgentTerminateMode.ERROR;
     let finalResult: string | null = null;
-    let errorMessage: string | undefined;
 
     logAgentStart(
       this.runtimeContext,
@@ -233,11 +232,6 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
         terminate_reason: terminateReason,
       };
     } catch (error) {
-      // Sanitize the error for telemetry to avoid logging PII.
-      // We only log the error name (e.g. "TypeError") or a generic string.
-      // The full error message might contain sensitive data (e.g. file paths, content).
-      errorMessage = error instanceof Error ? error.name : 'UnknownError';
-
       this.emitActivity('ERROR', { error: String(error) });
       throw error; // Re-throw the error for the parent context to handle.
     } finally {
@@ -249,7 +243,6 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
           Date.now() - startTime,
           turnCounter,
           terminateReason,
-          errorMessage,
         ),
       );
     }

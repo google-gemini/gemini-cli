@@ -1107,13 +1107,6 @@ export class ClearcutLogger {
       },
     ];
 
-    if (event.error_message) {
-      data.push({
-        gemini_cli_key: EventMetadataKey.GEMINI_CLI_AGENT_ERROR_MESSAGE,
-        value: event.error_message,
-      });
-    }
-
     this.enqueueLogEvent(this.createLogEvent(EventNames.AGENT_FINISH, data));
     this.flushIfNeeded();
   }

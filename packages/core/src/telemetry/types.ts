@@ -752,7 +752,6 @@ export class AgentFinishEvent implements BaseTelemetryEvent {
   duration_ms: number;
   turn_count: number;
   terminate_reason: AgentTerminateMode;
-  error_message?: string;
 
   constructor(
     agent_id: string,
@@ -760,7 +759,6 @@ export class AgentFinishEvent implements BaseTelemetryEvent {
     duration_ms: number,
     turn_count: number,
     terminate_reason: AgentTerminateMode,
-    error_message?: string,
   ) {
     this['event.name'] = 'agent_finish';
     this['event.timestamp'] = new Date().toISOString();
@@ -769,6 +767,5 @@ export class AgentFinishEvent implements BaseTelemetryEvent {
     this.duration_ms = duration_ms;
     this.turn_count = turn_count;
     this.terminate_reason = terminate_reason;
-    this.error_message = error_message;
   }
 }

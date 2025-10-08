@@ -445,7 +445,4 @@ export enum EventMetadataKey {
 
   // Logs the reason for agent termination.
   GEMINI_CLI_AGENT_TERMINATE_REASON = 115,
-
-  // Logs the error message if the agent failed.
-  GEMINI_CLI_AGENT_ERROR_MESSAGE = 116,
 }

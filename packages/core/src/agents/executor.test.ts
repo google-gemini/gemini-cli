@@ -299,8 +299,6 @@ describe('AgentExecutor', () => {
         mockConfig,
         expect.objectContaining({
           terminate_reason: AgentTerminateMode.ERROR,
-          // Error message should be sanitized to just the error name for telemetry
-          error_message: 'Error',
         }),
       );
     });

@@ -899,7 +899,7 @@ export function logAgentFinish(config: Config, event: AgentFinishEvent): void {
 
   const logger = logs.getLogger(SERVICE_NAME);
   const logRecord: LogRecord = {
-    body: `Agent ${event.agent_name} finished. Reason: ${event.terminate_reason}. Duration: ${event.duration_ms}ms. Turns: ${event.turn_count}.${event.error_message ? ` Error: ${event.error_message}` : ''}`,
+    body: `Agent ${event.agent_name} finished. Reason: ${event.terminate_reason}. Duration: ${event.duration_ms}ms. Turns: ${event.turn_count}.`,
     attributes,
   };
   logger.emit(logRecord);

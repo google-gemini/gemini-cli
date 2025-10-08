@@ -1485,7 +1485,6 @@ describe('loggers', () => {
           duration_ms: 1000,
           turn_count: 5,
           terminate_reason: 'GOAL',
-          error_message: undefined,
         },
       });
 
