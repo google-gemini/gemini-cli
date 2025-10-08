@@ -33,7 +33,7 @@ const MODEL_SLASH_COMMAND_CALL_COUNT =
 
 // Agent Metrics
 const AGENT_RUN_COUNT = 'gemini_cli.agent.run.count';
-const AGENT_DURATION = 'gemini_cli.agent.duration';
+const AGENT_DURATION_MS = 'gemini_cli.agent.duration';
 const AGENT_TURNS = 'gemini_cli.agent.turns';
 
 // OpenTelemetry GenAI Semantic Convention Metrics
@@ -193,7 +193,7 @@ const HISTOGRAM_DEFINITIONS = {
       'routing.decision_source': string;
     },
   },
-  [AGENT_DURATION]: {
+  [AGENT_DURATION_MS]: {
     description: 'Duration of agent runs in milliseconds.',
     unit: 'ms',
     valueType: ValueType.INT,

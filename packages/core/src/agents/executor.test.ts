@@ -299,9 +299,8 @@ describe('AgentExecutor', () => {
         mockConfig,
         expect.objectContaining({
           terminate_reason: AgentTerminateMode.ERROR,
-          error_message: expect.stringContaining(
-            'Missing required input parameters',
-          ),
+          // Error message should be sanitized to just the error name for telemetry
+          error_message: 'Error',
         }),
       );
     });

@@ -114,7 +114,7 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
       definition,
       runtimeContext,
       agentToolRegistry,
-      parentPromptId, // Pass to constructor
+      parentPromptId,
       onActivity,
     );
   }
@@ -129,7 +129,7 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
     definition: AgentDefinition<TOutput>,
     runtimeContext: Config,
     toolRegistry: ToolRegistry,
-    parentPromptId: string | undefined, // Pass it in
+    parentPromptId: string | undefined,
     onActivity?: ActivityCallback,
   ) {
     this.definition = definition;
@@ -138,6 +138,8 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
     this.onActivity = onActivity;
 
     const randomIdPart = Math.random().toString(36).slice(2, 8);
+    // parentPromptId will be undefined if this agent is invoked directly
+    // (top-level), rather than as a sub-agent.
     const parentPrefix = parentPromptId ? `${parentPromptId}-` : '';
     this.agentId = `${parentPrefix}${this.definition.name}-${randomIdPart}`;
   }
@@ -231,8 +233,12 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
         terminate_reason: terminateReason,
       };
     } catch (error) {
-      errorMessage = String(error);
-      this.emitActivity('ERROR', { error: errorMessage });
+      // Sanitize the error for telemetry to avoid logging PII.
+      // We only log the error name (e.g. "TypeError") or a generic string.
+      // The full error message might contain sensitive data (e.g. file paths, content).
+      errorMessage = error instanceof Error ? error.name : 'UnknownError';
+
+      this.emitActivity('ERROR', { error: String(error) });
       throw error; // Re-throw the error for the parent context to handle.
     } finally {
       logAgentFinish(
