@@ -134,7 +134,7 @@ export async function checkForExtensionUpdate(
       );
       return ExtensionUpdateState.ERROR;
     }
-    if (newExtension.config.version !== extension.version) {
+    if (newExtension.version !== extension.version) {
       return ExtensionUpdateState.UPDATE_AVAILABLE;
     }
     return ExtensionUpdateState.UP_TO_DATE;
