@@ -861,14 +861,16 @@ A good instruction should concisely answer:
       return "The 'file_path' parameter must be non-empty.";
     }
 
-    if (!path.isAbsolute(params.file_path)) {
+    let filePath = params.file_path;
+    if (!path.isAbsolute(filePath)) {
       // Attempt to auto-correct to an absolute path
-      const result = correctPath(params.file_path, this.config);
+      const result = correctPath(filePath, this.config);
       if (result.error) {
         return result.error;
       }
-      params.file_path = result.correctedPath;
+      filePath = result.correctedPath;
     }
+    params.file_path = filePath;
 
     const workspaceContext = this.config.getWorkspaceContext();
     if (!workspaceContext.isPathWithinWorkspace(params.file_path)) {
