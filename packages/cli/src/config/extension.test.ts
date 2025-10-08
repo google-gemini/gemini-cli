@@ -880,8 +880,7 @@ describe('extension tests', () => {
       expect(mockLogExtensionInstallEvent).toHaveBeenCalled();
     });
 
-    //TODO - https://github.com/google-gemini/gemini-cli/issues/10739
-    it.skip('should show users information on their ansi escaped mcp servers when installing', async () => {
+    it('should show users information on their ansi escaped mcp servers when installing', async () => {
       const consoleInfoSpy = vi.spyOn(console, 'info');
       const sourceExtDir = createExtension({
         extensionsDir: tempHomeDir,
