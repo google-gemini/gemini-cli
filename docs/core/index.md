@@ -53,3 +53,11 @@ The memory discovery service is responsible for finding and loading the `GEMINI.
 This allows you to have global, project-level, and component-level context files, which are all combined to provide the model with the most relevant information.
 
 You can use the [`/memory` command](../cli/commands.md) to `show`, `add`, and `refresh` the content of loaded `GEMINI.md` files.
+
+## Citations
+
+When Gemini finds it is reciting text from a source it appends the citation to the output. It is enabled by default but can be disabled with the ui.showCitations setting.
+
+- When proposing an edit the citations display before giving the user the option to accept.
+- Citations are always shown at the end of the model’s turn.
+- We deduplicate citations and display them in alphabetical order.
