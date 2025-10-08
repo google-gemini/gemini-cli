@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 import { cn } from '@/utils/cn';
 
 interface MarkdownRendererProps {
@@ -232,6 +232,35 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
     return parsed;
   };
 
+  const CodeBlock: React.FC<{ content: string; language?: string }> = ({ content, language }) => {
+    const [copied, setCopied] = useState(false);
+
+    const handleCopy = () => {
+      navigator.clipboard.writeText(content);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    };
+
+    return (
+      <div className="my-4">
+        <div className="bg-muted rounded-lg overflow-hidden">
+          <div className="flex items-center justify-between px-4 py-2 bg-muted border-b border-border">
+            <span className="text-sm text-muted-foreground">{language || 'code'}</span>
+            <button
+              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+              onClick={handleCopy}
+            >
+              {copied ? 'Copied!' : 'Copy code'}
+            </button>
+          </div>
+          <pre className="p-4 text-sm text-foreground overflow-x-auto">
+            <code>{content}</code>
+          </pre>
+        </div>
+      </div>
+    );
+  };
+
   const renderContent = (items: ParsedContent[]) => {
     let numberedCounter = 1; // Counter for numbered lists
 
@@ -278,21 +307,7 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
           );
 
         case 'code':
-          return (
-            <div key={key} className="my-4">
-              <div className="bg-muted rounded-lg overflow-hidden">
-                <div className="flex items-center justify-between px-4 py-2 bg-muted border-b border-border">
-                  <span className="text-sm text-muted-foreground">{item.language || 'code'}</span>
-                  <button className="text-sm text-muted-foreground hover:text-foreground">
-                    Copy code
-                  </button>
-                </div>
-                <pre className="p-4 text-sm text-foreground overflow-x-auto">
-                  <code>{item.content}</code>
-                </pre>
-              </div>
-            </div>
-          );
+          return <CodeBlock key={key} content={item.content} language={item.language} />;
 
         case 'list':
           {
