@@ -20,7 +20,8 @@ import {
   ApiRequestPhase,
 } from './metrics.js';
 import { makeFakeConfig } from '../test-utils/config.js';
-import { ModelRoutingEvent } from './types.js';
+import { ModelRoutingEvent, AgentFinishEvent } from './types.js';
+import { AgentTerminateMode } from '../agents/types.js';
 
 const mockCounterAddFn: Mock<
   (value: number, attributes?: Attributes, context?: Context) => void
@@ -89,6 +90,7 @@ describe('Telemetry Metrics', () => {
   let recordBaselineComparisonModule: typeof import('./metrics.js').recordBaselineComparison;
   let recordGenAiClientTokenUsageModule: typeof import('./metrics.js').recordGenAiClientTokenUsage;
   let recordGenAiClientOperationDurationModule: typeof import('./metrics.js').recordGenAiClientOperationDuration;
+  let recordAgentRunMetricsModule: typeof import('./metrics.js').recordAgentRunMetrics;
 
   beforeEach(async () => {
     vi.resetModules();
@@ -121,6 +123,7 @@ describe('Telemetry Metrics', () => {
       metricsJsModule.recordGenAiClientTokenUsage;
     recordGenAiClientOperationDurationModule =
       metricsJsModule.recordGenAiClientOperationDuration;
+    recordAgentRunMetricsModule = metricsJsModule.recordAgentRunMetrics;
 
     const otelApiModule = await import('@opentelemetry/api');
 
@@ -435,6 +438,60 @@ describe('Telemetry Metrics', () => {
         'session.id': 'test-session-id',
         'routing.decision_source': 'classifier',
         'routing.error_message': 'test-error',
+      });
+    });
+  });
+
+  describe('recordAgentRunMetrics', () => {
+    const mockConfig = {
+      getSessionId: () => 'test-session-id',
+      getTelemetryEnabled: () => true,
+    } as unknown as Config;
+
+    it('should not record metrics if not initialized', () => {
+      const event = new AgentFinishEvent(
+        'agent-123',
+        'TestAgent',
+        1000,
+        5,
+        AgentTerminateMode.GOAL,
+      );
+      recordAgentRunMetricsModule(mockConfig, event);
+      expect(mockCounterAddFn).not.toHaveBeenCalled();
+      expect(mockHistogramRecordFn).not.toHaveBeenCalled();
+    });
+
+    it('should record agent run metrics', () => {
+      initializeMetricsModule(mockConfig);
+      mockCounterAddFn.mockClear();
+      mockHistogramRecordFn.mockClear();
+
+      const event = new AgentFinishEvent(
+        'agent-123',
+        'TestAgent',
+        1000,
+        5,
+        AgentTerminateMode.GOAL,
+      );
+      recordAgentRunMetricsModule(mockConfig, event);
+
+      // Verify agent run counter
+      expect(mockCounterAddFn).toHaveBeenCalledWith(1, {
+        'session.id': 'test-session-id',
+        agent_name: 'TestAgent',
+        terminate_reason: 'GOAL',
+      });
+
+      // Verify agent duration histogram
+      expect(mockHistogramRecordFn).toHaveBeenCalledWith(1000, {
+        'session.id': 'test-session-id',
+        agent_name: 'TestAgent',
+      });
+
+      // Verify agent turns histogram
+      expect(mockHistogramRecordFn).toHaveBeenCalledWith(5, {
+        'session.id': 'test-session-id',
+        agent_name: 'TestAgent',
       });
     });
   });

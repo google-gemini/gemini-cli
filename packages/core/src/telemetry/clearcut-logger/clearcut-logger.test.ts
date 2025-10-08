@@ -29,7 +29,10 @@ import {
   makeChatCompressionEvent,
   ModelRoutingEvent,
   ToolCallEvent,
+  AgentStartEvent,
+  AgentFinishEvent,
 } from '../types.js';
+import { AgentTerminateMode } from '../../agents/types.js';
 import { GIT_COMMIT_INFO, CLI_VERSION } from '../../generated/git-commit.js';
 import { UserAccountManager } from '../../utils/userAccountManager.js';
 import { InstallationManager } from '../../utils/installationManager.js';
@@ -717,6 +720,87 @@ describe('ClearcutLogger', () => {
       expect(events[0]).toHaveMetadataValue([
         EventMetadataKey.GEMINI_CLI_ROUTING_FAILURE_REASON,
         'Something went wrong',
+      ]);
+    });
+  });
+
+  describe('logAgentStartEvent', () => {
+    it('logs an event with proper fields', () => {
+      const { logger } = setup();
+      const event = new AgentStartEvent('agent-123', 'TestAgent');
+
+      logger?.logAgentStartEvent(event);
+
+      const events = getEvents(logger!);
+      expect(events.length).toBe(1);
+      expect(events[0]).toHaveEventName(EventNames.AGENT_START);
+      expect(events[0]).toHaveMetadataValue([
+        EventMetadataKey.GEMINI_CLI_AGENT_ID,
+        'agent-123',
+      ]);
+      expect(events[0]).toHaveMetadataValue([
+        EventMetadataKey.GEMINI_CLI_AGENT_NAME,
+        'TestAgent',
+      ]);
+    });
+  });
+
+  describe('logAgentFinishEvent', () => {
+    it('logs an event with proper fields (success)', () => {
+      const { logger } = setup();
+      const event = new AgentFinishEvent(
+        'agent-123',
+        'TestAgent',
+        1000,
+        5,
+        AgentTerminateMode.GOAL,
+      );
+
+      logger?.logAgentFinishEvent(event);
+
+      const events = getEvents(logger!);
+      expect(events.length).toBe(1);
+      expect(events[0]).toHaveEventName(EventNames.AGENT_FINISH);
+      expect(events[0]).toHaveMetadataValue([
+        EventMetadataKey.GEMINI_CLI_AGENT_ID,
+        'agent-123',
+      ]);
+      expect(events[0]).toHaveMetadataValue([
+        EventMetadataKey.GEMINI_CLI_AGENT_NAME,
+        'TestAgent',
+      ]);
+      expect(events[0]).toHaveMetadataValue([
+        EventMetadataKey.GEMINI_CLI_AGENT_DURATION_MS,
+        '1000',
+      ]);
+      expect(events[0]).toHaveMetadataValue([
+        EventMetadataKey.GEMINI_CLI_AGENT_TURN_COUNT,
+        '5',
+      ]);
+      expect(events[0]).toHaveMetadataValue([
+        EventMetadataKey.GEMINI_CLI_AGENT_TERMINATE_REASON,
+        'GOAL',
+      ]);
+    });
+
+    it('logs an event with proper fields (error)', () => {
+      const { logger } = setup();
+      const event = new AgentFinishEvent(
+        'agent-123',
+        'TestAgent',
+        500,
+        2,
+        AgentTerminateMode.ERROR,
+      );
+
+      logger?.logAgentFinishEvent(event);
+
+      const events = getEvents(logger!);
+      expect(events.length).toBe(1);
+      expect(events[0]).toHaveEventName(EventNames.AGENT_FINISH);
+      expect(events[0]).toHaveMetadataValue([
+        EventMetadataKey.GEMINI_CLI_AGENT_TERMINATE_REASON,
+        'ERROR',
       ]);
     });
   });
