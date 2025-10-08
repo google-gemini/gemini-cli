@@ -255,6 +255,7 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
           alias: 'e',
           type: 'array',
           string: true,
+          nargs: 1,
           description:
             'A list of extensions to use. If not provided, all extensions are used.',
           coerce: (extensions: string[]) =>
@@ -737,7 +738,8 @@ export async function loadCliConfig(
     interactive,
     trustedFolder,
     useRipgrep: settings.tools?.useRipgrep,
-    shouldUseNodePtyShell: settings.tools?.shell?.enableInteractiveShell,
+    enableInteractiveShell:
+      settings.tools?.shell?.enableInteractiveShell ?? true,
     skipNextSpeakerCheck: settings.model?.skipNextSpeakerCheck,
     enablePromptCompletion: settings.general?.enablePromptCompletion ?? false,
     truncateToolOutputThreshold: settings.tools?.truncateToolOutputThreshold,
