@@ -66,7 +66,7 @@ export async function handleInstall(args: InstallArgs) {
 }
 
 export const installCommand: CommandModule = {
-  command: 'install <source>',
+  command: 'install <source> [--auto-update] [--pre-release]',
   describe: 'Installs an extension from a git repository URL or a local path.',
   builder: (yargs) =>
     yargs
