@@ -28,7 +28,6 @@ import {
 } from '../utils/errors.js';
 import type { GeminiChat } from './geminiChat.js';
 import { parseThought, type ThoughtSummary } from '../utils/thoughtUtils.js';
-import { createUserContent } from '@google/genai';
 
 // Define a structure for tools passed to the server
 export interface ServerTool {
@@ -307,10 +306,7 @@ export class Turn {
         throw error;
       }
 
-      const contextForReport = [
-        ...this.chat.getHistory(/*curated*/ true),
-        createUserContent(req),
-      ];
+      const contextForReport = [...this.chat.getHistory(/*curated*/ true), req];
       await reportError(
         error,
         'Error when talking to Gemini API',
