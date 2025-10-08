@@ -21,6 +21,11 @@ const mockExtensions = [
   { name: 'ext-disabled', version: '3.0.0', isActive: false },
 ];
 
+const mockExtensionsWithAuthor = [
+  { name: 'ext-one', version: '1.0.0', author: 'Google', isActive: true },
+  { name: 'ext-two', version: '2.1.0', author: 'example.com', isActive: true },
+];
+
 describe('<ExtensionsList />', () => {
   beforeEach(() => {
     vi.resetAllMocks();
@@ -107,4 +112,19 @@ describe('<ExtensionsList />', () => {
       expect(lastFrame()).toContain(expectedText);
     });
   }
+
+  it('should display author when present', () => {
+    mockUIState(mockExtensionsWithAuthor, new Map());
+    const { lastFrame } = render(<ExtensionsList />);
+    const output = lastFrame();
+    expect(output).toContain('Author: Google');
+    expect(output).toContain('Author: example.com');
+  });
+
+  it('should not display author when not present', () => {
+    mockUIState([mockExtensions[0]], new Map());
+    const { lastFrame } = render(<ExtensionsList />);
+    const output = lastFrame();
+    expect(output).not.toContain('Author:');
+  });
 });

@@ -135,6 +135,7 @@ export interface CodebaseInvestigatorSettings {
 export interface GeminiCLIExtension {
   name: string;
   version: string;
+  author?: string;
   isActive: boolean;
   path: string;
   installMetadata?: ExtensionInstallMetadata;

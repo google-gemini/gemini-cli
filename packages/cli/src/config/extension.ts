@@ -62,6 +62,7 @@ export const INSTALL_WARNING_MESSAGE =
 interface ExtensionConfig {
   name: string;
   version: string;
+  author?: string;
   mcpServers?: Record<string, MCPServerConfig>;
   contextFileName?: string | string[];
   excludeTools?: string[];
@@ -256,6 +257,7 @@ export function loadExtension(
     return {
       name: config.name,
       version: config.version,
+      author: config.author,
       path: effectiveExtensionPath,
       contextFiles,
       installMetadata,
@@ -624,6 +626,9 @@ function extensionConsentString(extensionConfig: ExtensionConfig): string {
   const output: string[] = [];
   const mcpServerEntries = Object.entries(sanitizedConfig.mcpServers || {});
   output.push(`Installing extension "${sanitizedConfig.name}".`);
+  if (sanitizedConfig.author) {
+    output.push(`Author: ${sanitizedConfig.author}`);
+  }
   output.push(INSTALL_WARNING_MESSAGE);
 
   if (mcpServerEntries.length) {
@@ -774,6 +779,9 @@ export function toOutputString(
 
   const status = workspaceEnabled ? chalk.green('✓') : chalk.red('✗');
   let output = `${status} ${extension.name} (${extension.version})`;
+  if (extension.author) {
+    output += `\n Author: ${extension.author}`;
+  }
   output += `\n Path: ${extension.path}`;
   if (extension.installMetadata) {
     output += `\n Source: ${extension.installMetadata.source} (Type: ${extension.installMetadata.type})`;

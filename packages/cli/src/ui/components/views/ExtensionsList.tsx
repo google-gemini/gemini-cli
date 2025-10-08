@@ -52,12 +52,13 @@ export const ExtensionsList = () => {
           }
 
           return (
-            <Box key={ext.name}>
+            <Box key={ext.name} flexDirection="column">
               <Text>
                 <Text color="cyan">{`${ext.name} (v${ext.version})`}</Text>
                 {` - ${activeString}`}
                 {<Text color={stateColor}>{` (${stateText})`}</Text>}
               </Text>
+              {ext.author && <Text dimColor> Author: {ext.author}</Text>}
             </Box>
           );
         })}
