@@ -68,7 +68,105 @@ export class KnowledgeBaseTool extends BasePythonTool<KnowledgeBaseParams, ToolR
     super(
       KnowledgeBaseTool.Name,
       'KnowledgeBase',
-      'Store markdown content and search for relevant information using semantic similarity. Perfect for building a searchable knowledge base from documents converted by markitdown.',
+      `Store and retrieve markdown content using semantic similarity search. Build a persistent, searchable knowledge base that remembers information across conversations.
+
+# WHEN TO USE THIS TOOL
+- Save code snippets, solutions, or patterns that worked well for future reference
+- Store documentation, guides, or reference materials for later retrieval
+- Build a personal knowledge base from markdown files converted by markitdown
+- Search for previously saved solutions when facing similar problems
+- Preserve context and learnings that should persist beyond the current conversation
+
+# USAGE EXAMPLES
+
+## Example 1: Save a successful code snippet
+\`\`\`
+{
+  "op": "store",
+  "content": "# Excel Data Export\\n\\nSuccessfully exported data using xlwings:\\n\\n\`\`\`python\\nimport xlwings as xw\\nbook = xw.Book('data.xlsx')\\nsheet = book.sheets[0]\\ndata = sheet.range('A1').expand('table').value\\n\`\`\`",
+  "metadata": {
+    "title": "Excel Export with xlwings",
+    "category": "code_snippet",
+    "language": "python"
+  }
+}
+\`\`\`
+
+## Example 2: Store a markdown file
+\`\`\`
+{
+  "op": "store",
+  "file_path": "C:\\\\docs\\\\api-reference.md",
+  "metadata": {
+    "title": "API Reference Documentation",
+    "source": "company_docs",
+    "date": "2025-01-15"
+  }
+}
+\`\`\`
+
+## Example 3: Search for relevant content
+\`\`\`
+{
+  "op": "search",
+  "query": "how to read excel file with xlwings",
+  "limit": 3
+}
+\`\`\`
+
+## Example 4: Advanced search with filters
+\`\`\`
+{
+  "op": "advanced_search",
+  "query": "data visualization",
+  "where": {"category": "code_snippet", "language": "python"},
+  "similarity_threshold": 0.7,
+  "limit": 5
+}
+\`\`\`
+
+# OPERATIONS GUIDE
+
+## store - Save content to knowledge base
+- Use \`content\` parameter for direct text input (code snippets, notes)
+- Use \`file_path\` parameter to load from a markdown file
+- Add \`metadata\` to make content more searchable (title, category, tags, date, author)
+- Content is automatically split into semantic chunks for optimal retrieval
+
+## search - Find relevant content (simple semantic search)
+- Provide a natural language \`query\` describing what you're looking for
+- Returns top matching chunks with similarity scores
+- Use \`limit\` to control number of results (default: 5)
+
+## advanced_search - Powerful search with filters
+- Combine semantic search with metadata filtering
+- \`where\`: Filter by metadata (e.g., {"category": "api", "language": "python"})
+- \`where_document\`: Full-text search within content (e.g., {"$contains": "xlwings"})
+- \`similarity_threshold\`: Only return results above this score (0-1)
+- \`content_mode\`: "chunks" (default), "full" (complete docs), or "metadata_only"
+
+## get - Retrieve specific documents by ID
+- Use document IDs from previous search results
+- Useful when you know exactly which documents you need
+
+## list_collections - Show all knowledge base collections
+- Lists all available collections with their metadata
+- Useful for organizing different types of content
+
+# BEST PRACTICES
+- Save successful solutions immediately after they work
+- Use descriptive titles and consistent metadata for better searchability
+- Search before solving - check if you've encountered similar problems before
+- Organize related content into collections (e.g., "excel_automation", "api_examples")
+- Include context in metadata (date, project, source) for better filtering
+- For large documents, let the tool handle chunking automatically
+
+# TECHNICAL DETAILS
+- Uses ChromaDB for vector storage and semantic search
+- Content is automatically embedded using sentence transformers
+- Chunks are 800 characters with 100 character overlap for context preservation
+- Knowledge base is stored persistently in .gemini/knowledge_base directory
+- Similarity scores range from 0 (unrelated) to 1 (identical)`,
       ['chromadb'], // Required Python packages
       {
         properties: {
