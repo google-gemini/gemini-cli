@@ -34,6 +34,14 @@ To run a single test by its name, use the `--test-name-pattern` flag:
 npm run test:e2e -- --test-name-pattern "reads a file"
 ```
 
+### Deflaking a test
+
+Before adding a **new** integration test, you should run it (at minimum) 5 times with the deflake script to make sure that it is not flaky.
+
+```bash
+npm run deflake -- --command="npm run test:e2e -- --test-name-pattern 'interactive'"
+```
+
 ### Running all tests
 
 To run the entire suite of integration tests, use the following command:
