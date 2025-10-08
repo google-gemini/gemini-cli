@@ -16,6 +16,8 @@ import { useWorkspaceDirectories } from '@/hooks';
 import { cn } from '@/utils/cn';
 import type { ChatMessage, UniversalMessage, RoleDefinition } from '@/types';
 import { AutocompleteDropdown, useAutocomplete } from './autocomplete';
+import { RichTextInput } from './RichTextInput';
+import type { RichTextInputRef } from './RichTextInput';
 
 interface Template {
   id: string;
@@ -48,8 +50,10 @@ interface MessageInputRef {
 export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(({ disabled = false }, ref) => {
   const [message, setMessage] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const richTextInputRef = useRef<RichTextInputRef>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const streamCleanupRef = useRef<(() => void) | null>(null);
+  const [useRichTextInput] = useState(true); // Toggle between rich text and plain text input
   const [showExcelMenu, setShowExcelMenu] = useState(false);
   const [workbooks, setWorkbooks] = useState<Array<{name: string; path?: string}>>([]);
   const [worksheets, setWorksheets] = useState<{ [workbook: string]: Array<{index: number, name: string}> }>({});
@@ -361,16 +365,32 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(({ di
       setMessage(newMessage);
       // Focus the textarea after setting the message
       setTimeout(() => {
-        textareaRef.current?.focus();
+        if (useRichTextInput) {
+          richTextInputRef.current?.focus();
+        } else {
+          textareaRef.current?.focus();
+        }
         adjustTextareaHeight();
       }, 0);
     }
-  }), [adjustTextareaHeight]);
+  }), [adjustTextareaHeight, useRichTextInput]);
 
+
+  // Get the actual textarea ref for autocomplete
+  const getActualTextareaRef = useCallback(() => {
+    if (useRichTextInput) {
+      return richTextInputRef.current?.getTextareaRef() || null;
+    }
+    return textareaRef.current;
+  }, [useRichTextInput]);
 
   // Initialize autocomplete
   const autocomplete = useAutocomplete({
-    textareaRef: textareaRef as React.RefObject<HTMLTextAreaElement>,
+    textareaRef: {
+      get current() {
+        return getActualTextareaRef();
+      }
+    } as React.RefObject<HTMLTextAreaElement>,
     value: message,
     onChange: setMessage,
     onSelectionChange: (_start, _end) => {
@@ -379,15 +399,21 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(({ di
     }
   });
 
-  const handleInputChange = async (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const newValue = e.target.value;
-    const cursorPos = e.target.selectionStart;
-
-    setMessage(newValue);
+  const handleInputChange = async (value: string) => {
+    setMessage(value);
     adjustTextareaHeight();
 
     // Check for autocomplete triggers
-    await autocomplete.checkForAutocomplete(newValue, cursorPos);
+    const textarea = getActualTextareaRef();
+    if (textarea) {
+      const cursorPos = textarea.selectionStart;
+      await autocomplete.checkForAutocomplete(value, cursorPos);
+    }
+  };
+
+  const handleTextareaChangeEvent = async (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const newValue = e.target.value;
+    await handleInputChange(newValue);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -416,8 +442,9 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(({ di
   const handleTextareaClick = () => {
     // Check for autocomplete when user clicks to change cursor position
     setTimeout(async () => {
-      if (textareaRef.current) {
-        const cursorPos = textareaRef.current.selectionStart;
+      const textarea = getActualTextareaRef();
+      if (textarea) {
+        const cursorPos = textarea.selectionStart;
         await autocomplete.checkForAutocomplete(message, cursorPos);
       }
     }, 0);
@@ -741,9 +768,9 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(({ di
                   updatedAt: new Date()
                 });
 
-                // CRITICAL: Only clear streaming message AFTER successfully saving to session
-                // This ensures the content is visible until it's persisted in the message list
-                setStreamingMessage('');
+                // DON'T clear streamingMessage here - MessageList has deduplication logic
+                // that will prevent showing duplicate content (MessageList.tsx:636-638)
+                // streamingMessage will be cleared when 'done' event is received
               }
             }
 
@@ -868,28 +895,13 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(({ di
           // Clear streaming content since we've finalized the message
           setStreamingMessage('');
 
-          // Refresh messages from backend to get any tool responses
-          // Add a small delay to ensure backend processing is complete
+          // Refresh session title from backend
+          // Add a delay to ensure backend processing is complete
+          // DON'T refresh messages here - they're already correctly saved in the session
+          // Only refresh title which may be generated asynchronously
           setTimeout(async () => {
             try {
-              // Get updated messages from backend (includes any tool responses)
-              const backendMessages = await multiModelService.getDisplayMessages(activeSessionId);
-              const chatMessages = backendMessages
-                .map((msg, index) => ({
-                  id: `${activeSessionId}-${index}`,
-                  role: msg.role as 'user' | 'assistant' | 'system' | 'tool',
-                  content: msg.content,
-                  timestamp: msg.timestamp ? new Date(msg.timestamp) : new Date(),
-                  toolCalls: msg.toolCalls
-                }));
-              
-              updateSession(activeSessionId, { 
-                messages: chatMessages,
-                updatedAt: new Date() 
-              });
-              // console.log('Refreshed messages from backend, total:', chatMessages.length);
-
-              // Also refresh session info for title updates
+              // Only refresh session info for title updates
               const sessionsInfo = await multiModelService.getSessionsInfo();
               const updatedSessionInfo = sessionsInfo.find(s => s.id === activeSessionId);
               if (updatedSessionInfo) {
@@ -899,13 +911,13 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(({ di
                     title: updatedSessionInfo.title,
                     updatedAt: new Date()
                   });
-                  // console.log('Updated session title from backend:', updatedSessionInfo.title);
+                  console.log('Updated session title from backend:', updatedSessionInfo.title);
                 }
               }
             } catch (error) {
-              console.error('Failed to refresh messages and session info:', error);
+              console.error('Failed to refresh session info:', error);
             }
-          }, 500); // 500ms delay to ensure backend processing is complete
+          }, 1000); // 1000ms delay to ensure backend title generation is complete
           break;
         }
         else if (event.type === 'error') {
@@ -1011,41 +1023,335 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(({ di
   return (
     <div className="p-4">
       <div className="max-w-4xl mx-auto">
-        <div className="flex items-center gap-3">
+        <div className="flex items-start gap-3">
           <div className="flex-1 relative">
-            <Textarea
-              ref={textareaRef}
-              placeholder={disabled ? "Select a session to start chatting..." : "Type a message... (use @ for workspace directories)"}
-              value={message}
-              onChange={handleInputChange}
-              onKeyDown={handleKeyDown}
-              onClick={handleTextareaClick}
-              disabled={disabled || isStreaming || isThinking}
-              className={cn(
-                "min-h-[44px] max-h-[200px] resize-none",
-                "focus:ring-1 focus:ring-primary/50",
-                "rounded-lg",
-                "transition-all duration-200 ease-in-out",
-                // Custom scrollbar styling
-                "[&::-webkit-scrollbar]:w-2",
-                "[&::-webkit-scrollbar-track]:bg-transparent",
-                "[&::-webkit-scrollbar-thumb]:bg-muted-foreground/20",
-                "[&::-webkit-scrollbar-thumb]:rounded-full",
-                "[&::-webkit-scrollbar-thumb:hover]:bg-muted-foreground/30"
-              )}
-              style={{
-                height: 'auto',
-                paddingTop: '11px',
-                paddingBottom: '13px',
-                paddingLeft: '16px',
-                paddingRight: '100px', // space for buttons in top-right
-                fontSize: '14px',
-                lineHeight: '20px'
-              }}
-            />
+            {useRichTextInput ? (
+              <>
+                <RichTextInput
+                  ref={richTextInputRef}
+                  value={message}
+                  onChange={handleInputChange}
+                  onKeyDown={handleKeyDown}
+                  onClick={handleTextareaClick}
+                  disabled={disabled || isStreaming || isThinking}
+                  placeholder={disabled ? "Select a session to start chatting..." : "Type a message... (use @ for workspace directories)"}
+                  onExcelClick={handleExcelButtonClick}
+                  onWorkspaceClick={handleWorkspaceButtonClick}
+                  onTemplateClick={handleTemplateButtonClick}
+                  excelButton={
+                    <div className="relative" ref={excelMenuRef}>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        disabled={disabled || isLoadingWorkbooks}
+                        onClick={handleExcelButtonClick}
+                        title="Excel Workbooks"
+                      >
+                        {isLoadingWorkbooks ? (
+                          <Loader2 size={14} className="animate-spin" />
+                        ) : (
+                          <FileSpreadsheet size={14} />
+                        )}
+                      </Button>
 
-            {/* Internal buttons container - fixed at top-right */}
-            <div className="absolute right-2 top-1 flex items-center gap-1">
+                      {showExcelMenu && (
+                      <div className="absolute bottom-12 right-0 bg-card border border-border rounded-lg shadow-lg min-w-64 max-h-80 overflow-y-auto z-50">
+                        <div className="p-2">
+                          {isLoadingWorkbooks ? (
+                            <div className="flex items-center px-2 py-4 text-sm text-muted-foreground">
+                              <Loader2 size={16} className="mr-2 animate-spin" />
+                              Loading Excel workbooks...
+                            </div>
+                          ) : workbooks.length > 0 ? (
+                            <>
+                              <div className="flex items-center justify-between mb-2 px-2">
+                                <div className="text-sm font-medium text-foreground">Excel Workbooks</div>
+                                <button
+                                  onClick={handleRefreshWorkbooks}
+                                  disabled={isLoadingWorkbooks}
+                                  className="p-1 hover:bg-muted rounded transition-colors"
+                                  title="Refresh workbooks list"
+                                >
+                                  <RefreshCw
+                                    size={12}
+                                    className={cn(
+                                      "text-muted-foreground hover:text-foreground",
+                                      isLoadingWorkbooks && "animate-spin"
+                                    )}
+                                  />
+                                </button>
+                              </div>
+                              {workbooks.map((workbook, index) => (
+                                <div key={index} className="mb-1">
+                                  <div className="flex items-center gap-1">
+                                    {/* Clickable workbook name to expand/collapse worksheets */}
+                                    <button
+                                      className="flex-1 text-left px-2 py-1.5 text-sm hover:bg-muted rounded flex items-center gap-2"
+                                      onClick={() => handleWorkbookClick(workbook)}
+                                      title="Click to show worksheets"
+                                    >
+                                      {loadingWorksheets[workbook.name] ? (
+                                        <Loader2 size={14} className="text-muted-foreground animate-spin flex-shrink-0" />
+                                      ) : (
+                                        <ChevronDown
+                                          size={14}
+                                          className={cn(
+                                            "text-muted-foreground transition-transform flex-shrink-0",
+                                            expandedWorkbooks[workbook.name] ? "rotate-180" : ""
+                                          )}
+                                        />
+                                      )}
+                                      <span className="font-medium text-foreground truncate">
+                                        {workbook.name}
+                                      </span>
+                                    </button>
+
+                                    {/* Get selection button */}
+                                    <button
+                                      className="p-1.5 hover:bg-muted rounded group"
+                                      onClick={() => handleGetExcelSelection(workbook.name)}
+                                      disabled={loadingSelection[workbook.name]}
+                                      title="Get current selection"
+                                    >
+                                      {loadingSelection[workbook.name] ? (
+                                        <Loader2 size={14} className="text-muted-foreground animate-spin" />
+                                      ) : (
+                                        <Square size={14} className="text-muted-foreground group-hover:text-foreground" />
+                                      )}
+                                    </button>
+
+                                    {/* Copy path button */}
+                                    <button
+                                      className="p-1.5 hover:bg-muted rounded group"
+                                      onClick={() => handleWorkbookSelect(workbook.path || workbook.name)}
+                                      title={`Insert path: ${workbook.path || workbook.name}`}
+                                    >
+                                      <Copy size={14} className="text-muted-foreground group-hover:text-foreground" />
+                                    </button>
+                                  </div>
+
+                                  {expandedWorkbooks[workbook.name] && (
+                                    <div className="ml-4 mt-1 space-y-0.5">
+                                      {loadingWorksheets[workbook.name] ? (
+                                        <div className="flex items-center px-2 py-1 text-xs text-muted-foreground">
+                                          <Loader2 size={12} className="mr-2 animate-spin" />
+                                          Loading worksheets...
+                                        </div>
+                                      ) : worksheets[workbook.name] ? (
+                                        worksheets[workbook.name].map((worksheet) => (
+                                          <div key={worksheet.index} className="flex items-center gap-1">
+                                            <span className="flex-1 text-left px-2 py-1 text-xs text-muted-foreground">
+                                              {worksheet.index}: {worksheet.name}
+                                            </span>
+                                            <button
+                                              className="p-1 hover:bg-muted/50 rounded group"
+                                              onClick={() => handleWorksheetSelect(workbook.path || workbook.name, worksheet.name)}
+                                              title={`Insert: ${workbook.path || workbook.name}!${worksheet.name}`}
+                                            >
+                                              <Copy size={10} className="text-muted-foreground group-hover:text-foreground" />
+                                            </button>
+                                          </div>
+                                        ))
+                                      ) : null}
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
+                            </>
+                          ) : (
+                            <div className="text-sm text-muted-foreground px-2">
+                              No Excel workbooks are currently open
+                            </div>
+                          )}
+                        </div>
+                        </div>
+                      )}
+                    </div>
+                  }
+                  workspaceButton={
+                    <div className="relative" ref={workspaceMenuRef}>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        disabled={disabled}
+                        onClick={handleWorkspaceButtonClick}
+                        title="Workspace Directories"
+                      >
+                        <Folder size={14} />
+                      </Button>
+
+                      {showWorkspaceMenu && (
+                      <div className="absolute bottom-12 right-0 bg-card border border-border rounded-lg shadow-lg min-w-64 max-h-80 overflow-y-auto z-50">
+                        <div className="p-2">
+                          <div className="flex items-center justify-between mb-2 px-2">
+                            <div className="text-sm font-medium text-foreground">Workspace Directories</div>
+                            <button
+                              onClick={handleAddDirectory}
+                              className="p-1 hover:bg-muted rounded transition-colors"
+                              title="Add workspace directory"
+                            >
+                              <Plus
+                                size={12}
+                                className="text-muted-foreground hover:text-foreground"
+                              />
+                            </button>
+                          </div>
+                          {loadingDirectories ? (
+                            <div className="flex items-center px-2 py-4 text-sm text-muted-foreground">
+                              <Loader2 size={16} className="mr-2 animate-spin" />
+                              Loading directories...
+                            </div>
+                          ) : workspaceDirectories.length > 0 ? (
+                            <div className="space-y-1">
+                              {workspaceDirectories.map((directory, index) => (
+                                <button
+                                  key={index}
+                                  className="w-full text-left px-2 py-1.5 text-sm hover:bg-muted rounded flex items-center gap-2"
+                                  onClick={() => handleWorkspaceSelect(directory)}
+                                >
+                                  <Folder size={14} className="text-muted-foreground flex-shrink-0" />
+                                  <span className="truncate" title={directory}>
+                                    {directory}
+                                  </span>
+                                </button>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="space-y-2">
+                              <div className="text-sm text-muted-foreground px-2 py-2">
+                                No workspace directories configured.
+                              </div>
+                              <button
+                                onClick={handleAddDirectory}
+                                className="w-full px-2 py-2 text-sm text-primary hover:bg-muted rounded flex items-center gap-2 justify-center"
+                              >
+                                <FolderPlus size={14} />
+                                Add Directory
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                        </div>
+                      )}
+                    </div>
+                  }
+                  templateButton={
+                    <div className="relative" ref={templateMenuRef}>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        disabled={disabled || loadingTemplates}
+                        onClick={handleTemplateButtonClick}
+                        title="Prompt Templates"
+                      >
+                        {loadingTemplates ? (
+                          <Loader2 size={14} className="animate-spin" />
+                        ) : (
+                          <BookTemplate size={14} />
+                        )}
+                      </Button>
+
+                      {showTemplateMenu && (
+                      <div className="absolute bottom-12 right-0 bg-card border border-border rounded-lg shadow-lg min-w-96 max-h-80 overflow-y-auto z-50">
+                        <div className="p-2">
+                          <div className="flex items-center justify-between mb-2 px-2">
+                            <div className="text-sm font-medium text-foreground">Prompt Templates</div>
+                          </div>
+                          {loadingTemplates ? (
+                            <div className="flex items-center px-2 py-4 text-sm text-muted-foreground">
+                              <Loader2 size={16} className="mr-2 animate-spin" />
+                              Loading templates...
+                            </div>
+                          ) : templates.length > 0 ? (
+                            <div className="space-y-1">
+                              {templates.map((template, index) => (
+                                <div key={index} className="group relative">
+                                  <button
+                                    className="w-full text-left px-2 py-2 text-sm hover:bg-muted rounded pr-16"
+                                    onClick={() => handleTemplateSelect(template)}
+                                    title={template.name || `Template ${index + 1}`}
+                                  >
+                                    <div className="text-foreground line-clamp-3 whitespace-pre-wrap text-xs leading-relaxed">
+                                      {(template.content || template.template || '').substring(0, 200)}
+                                      {(template.content || template.template || '').length > 200 ? '...' : ''}
+                                    </div>
+                                    {template.name && (
+                                      <div className="text-xs text-muted-foreground truncate mt-1 font-medium">
+                                        {template.name}
+                                      </div>
+                                    )}
+                                  </button>
+
+                                  {/* Action buttons */}
+                                  <div className="absolute top-1 right-1 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <button
+                                      onClick={(e) => handleTemplateEdit(e, template)}
+                                      className="p-1 hover:bg-muted-foreground/10 rounded text-muted-foreground hover:text-foreground transition-colors"
+                                      title="Edit template"
+                                    >
+                                      <Edit size={12} />
+                                    </button>
+                                    <button
+                                      onClick={(e) => handleTemplateDelete(e, template)}
+                                      className="p-1 hover:bg-destructive/10 rounded text-muted-foreground hover:text-destructive transition-colors"
+                                      title="Delete template"
+                                    >
+                                      <Trash2 size={12} />
+                                    </button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="text-sm text-muted-foreground px-2 py-2">
+                              No custom templates found.
+                            </div>
+                          )}
+                        </div>
+                        </div>
+                      )}
+                    </div>
+                  }
+                />
+              </>
+            ) : (
+              <>
+                <Textarea
+                  ref={textareaRef}
+                  placeholder={disabled ? "Select a session to start chatting..." : "Type a message... (use @ for workspace directories)"}
+                  value={message}
+                  onChange={handleTextareaChangeEvent}
+                  onKeyDown={handleKeyDown}
+                  onClick={handleTextareaClick}
+                  disabled={disabled || isStreaming || isThinking}
+                  className={cn(
+                    "min-h-[44px] max-h-[200px] resize-none",
+                    "focus:ring-1 focus:ring-primary/50",
+                    "rounded-lg",
+                    "transition-all duration-200 ease-in-out",
+                    // Custom scrollbar styling
+                    "[&::-webkit-scrollbar]:w-2",
+                    "[&::-webkit-scrollbar-track]:bg-transparent",
+                    "[&::-webkit-scrollbar-thumb]:bg-muted-foreground/20",
+                    "[&::-webkit-scrollbar-thumb]:rounded-full",
+                    "[&::-webkit-scrollbar-thumb:hover]:bg-muted-foreground/30"
+                  )}
+                  style={{
+                    height: 'auto',
+                    paddingTop: '11px',
+                    paddingBottom: '13px',
+                    paddingLeft: '16px',
+                    paddingRight: '100px', // space for buttons in top-right
+                    fontSize: '14px',
+                    lineHeight: '20px'
+                  }}
+                />
+
+                {/* Internal buttons container - fixed at top-right */}
+                <div className="absolute right-2 top-1 flex items-center gap-1">
               {/* Excel button with dropdown menu */}
               <div className="relative" ref={excelMenuRef}>
                 <Button
@@ -1322,7 +1628,9 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(({ di
                   </div>
                 )}
               </div>
-            </div>
+                </div>
+              </>
+            )}
 
             <AutocompleteDropdown
               items={autocomplete.items}
@@ -1333,8 +1641,9 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(({ di
               visible={autocomplete.isVisible}
               onRefresh={() => {
                 // Trigger autocomplete refresh by re-checking current position
-                if (textareaRef.current) {
-                  const cursorPos = textareaRef.current.selectionStart;
+                const textarea = getActualTextareaRef();
+                if (textarea) {
+                  const cursorPos = textarea.selectionStart;
                   autocomplete.checkForAutocomplete(message, cursorPos);
                 }
               }}

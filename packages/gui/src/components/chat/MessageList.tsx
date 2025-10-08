@@ -8,7 +8,7 @@ import { useRef, useState, forwardRef, useImperativeHandle, useCallback, useEffe
 import { useVirtualizer } from '@tanstack/react-virtual';
 import type React from 'react';
 import { format } from 'date-fns';
-import { User, AlertCircle, ChevronDown, ChevronRight, BookTemplate, Target, Brain, FileText, Activity, ListTodo, ArrowDown, Hammer } from 'lucide-react';
+import { User, AlertCircle, ChevronDown, ChevronRight, BookTemplate, Target, Brain, FileText, Activity, ListTodo, ArrowDown, Hammer, Trash2 } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { Card, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -358,6 +358,7 @@ interface MessageListProps {
   toolConfirmation?: ToolCallConfirmationDetails | null;
   onToolConfirm?: (outcome: ToolConfirmationOutcome) => void;
   onTemplateSaved?: () => void;
+  onDeleteMessage?: (messageId: string) => void;
 }
 
 interface MessageListHandle {
@@ -372,8 +373,9 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(({
   toolConfirmation,
   onToolConfirm,
   onTemplateSaved,
+  onDeleteMessage,
 }, ref) => {
-  const { currentOperation } = useChatStore();
+  const { currentOperation, inputMultilineMode } = useChatStore();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [showScrollButton, setShowScrollButton] = useState(false);
@@ -588,24 +590,40 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(({
               className="mb-4"
             >
               {processedMsg.type === 'tool_execution_group' && processedMsg.data?.executions ? (
-                <div className="flex gap-3 max-w-4xl">
-                  {/* LLM Avatar */}
-                  <div className="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center bg-secondary">
-                    <Brain size={20} />
-                  </div>
-
-                  {/* Tool Execution Group */}
-                  <div className="flex-1">
-                    <ToolExecutionGroup
-                      executions={processedMsg.data.executions}
-                      timestamp={processedMsg.originalMessage.timestamp}
+                <div className="space-y-3">
+                  {/* If message has text content, show it first before tool calls */}
+                  {processedMsg.originalMessage.content?.trim() && (
+                    <MessageBubble
+                      message={{
+                        ...processedMsg.originalMessage,
+                        toolCalls: undefined // Don't duplicate tool calls in bubble
+                      }}
+                      onSaveAsTemplate={saveAsTemplate}
+                      onDelete={onDeleteMessage}
                     />
+                  )}
+
+                  {/* Then show tool execution group */}
+                  <div className="flex gap-3 max-w-4xl">
+                    {/* LLM Avatar */}
+                    <div className="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center bg-secondary">
+                      <Brain size={20} />
+                    </div>
+
+                    {/* Tool Execution Group */}
+                    <div className="flex-1">
+                      <ToolExecutionGroup
+                        executions={processedMsg.data.executions}
+                        timestamp={processedMsg.originalMessage.timestamp}
+                      />
+                    </div>
                   </div>
                 </div>
               ) : (
                 <MessageBubble
                   message={processedMsg.originalMessage}
                   onSaveAsTemplate={saveAsTemplate}
+                  onDelete={onDeleteMessage}
                 />
               )}
             </div>
@@ -665,7 +683,10 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(({
               scrollToBottom(true);
             }
           }}
-          className="absolute bottom-28 right-6 z-50 bg-primary text-primary-foreground rounded-full p-3 shadow-lg hover:bg-primary/90 transition-all duration-200 hover:scale-110 animate-in fade-in slide-in-from-bottom-2"
+          className={cn(
+            "absolute right-6 z-50 bg-primary text-primary-foreground rounded-full p-3 shadow-lg hover:bg-primary/90 transition-all duration-200 hover:scale-110 animate-in fade-in slide-in-from-bottom-2",
+            inputMultilineMode ? "bottom-64" : "bottom-28"
+          )}
           aria-label="Scroll to bottom"
         >
           <ArrowDown size={20} />
@@ -1240,10 +1261,11 @@ interface MessageBubbleProps {
   message: ChatMessage;
   isStreaming?: boolean;
   onSaveAsTemplate?: (message: ChatMessage) => void;
+  onDelete?: (messageId: string) => void;
 }
 
 
-const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isStreaming, onSaveAsTemplate }) => {
+const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isStreaming, onSaveAsTemplate, onDelete }) => {
   // Check if this message is actually a tool response (regardless of role)
   const toolResponse = parseToolResponse(message);
   const isUser = message.role === 'user' && !toolResponse; // User only if not a tool response
@@ -1394,20 +1416,38 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isStreaming, onS
                   {isStreaming && <span className="animate-pulse">●</span>}
                 </div>
                 
-                {/* Save as Template Button - only for user messages */}
-                {isUser && (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => onSaveAsTemplate?.(message)}
-                    className={cn(
-                      "h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-muted"
-                    )}
-                    title="Save as template"
-                  >
-                    <BookTemplate size={12} />
-                  </Button>
-                )}
+                {/* Action buttons */}
+                <div className="flex items-center gap-1">
+                  {/* Save as Template Button - only for user messages */}
+                  {isUser && onSaveAsTemplate && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => onSaveAsTemplate(message)}
+                      className={cn(
+                        "h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-muted"
+                      )}
+                      title="Save as template"
+                    >
+                      <BookTemplate size={12} />
+                    </Button>
+                  )}
+
+                  {/* Delete Button */}
+                  {onDelete && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => onDelete(message.id)}
+                      className={cn(
+                        "h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-destructive/10 hover:text-destructive"
+                      )}
+                      title="Delete message"
+                    >
+                      <Trash2 size={12} />
+                    </Button>
+                  )}
+                </div>
               </div>
             </div>
           </CardContent>
