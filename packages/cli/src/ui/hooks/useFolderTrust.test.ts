@@ -193,6 +193,7 @@ describe('useFolderTrust', () => {
     expect(mockTrustedFolders.setValue).not.toHaveBeenCalled();
     expect(mockSettings.setValue).not.toHaveBeenCalled();
     expect(result.current.isFolderTrustDialogOpen).toBe(true);
+    expect(onTrustChange).toHaveBeenCalledWith(undefined);
   });
 
   it('should set isRestarting to true when trust status changes from false to true', () => {
