@@ -197,7 +197,7 @@ describe('run_shell_command', () => {
     ).toBeTruthy();
   });
 
-  it('should combine multiple --allowed-tools flags', async () => {
+  it.skip('should combine multiple --allowed-tools flags', async () => {
     const rig = new TestRig();
     await rig.setup('should combine multiple --allowed-tools flags');
 

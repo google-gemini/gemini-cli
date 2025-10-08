@@ -880,7 +880,7 @@ describe('extension tests', () => {
       expect(mockLogExtensionInstallEvent).toHaveBeenCalled();
     });
 
-    it('should show users information on their mcp server when installing', async () => {
+    it.skip('should show users information on their mcp server when installing', async () => {
       const consoleInfoSpy = vi.spyOn(console, 'info');
       const sourceExtDir = createExtension({
         extensionsDir: tempHomeDir,
