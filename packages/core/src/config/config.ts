@@ -116,12 +116,21 @@ export interface OutputSettings {
   format?: OutputFormat;
 }
 
+/**
+ * All information required in CLI to handle an extension. Defined in Core so
+ * that the collection of loaded, active, and inactive extensions can be passed
+ * around on the config object though Core does not use this information
+ * directly.
+ */
 export interface GeminiCLIExtension {
   name: string;
   version: string;
   isActive: boolean;
   path: string;
   installMetadata?: ExtensionInstallMetadata;
+  mcpServers?: Record<string, MCPServerConfig>;
+  contextFiles: string[];
+  excludeTools?: string[];
 }
 
 export interface ExtensionInstallMetadata {
@@ -244,7 +253,7 @@ export interface ConfigParameters {
   interactive?: boolean;
   trustedFolder?: boolean;
   useRipgrep?: boolean;
-  shouldUseNodePtyShell?: boolean;
+  enableInteractiveShell?: boolean;
   skipNextSpeakerCheck?: boolean;
   shellExecutionConfig?: ShellExecutionConfig;
   extensionManagement?: boolean;
@@ -333,7 +342,7 @@ export class Config {
   private readonly interactive: boolean;
   private readonly trustedFolder: boolean | undefined;
   private readonly useRipgrep: boolean;
-  private readonly shouldUseNodePtyShell: boolean;
+  private readonly enableInteractiveShell: boolean;
   private readonly skipNextSpeakerCheck: boolean;
   private shellExecutionConfig: ShellExecutionConfig;
   private readonly extensionManagement: boolean = true;
@@ -427,7 +436,7 @@ export class Config {
     this.interactive = params.interactive ?? false;
     this.trustedFolder = params.trustedFolder;
     this.useRipgrep = params.useRipgrep ?? true;
-    this.shouldUseNodePtyShell = params.shouldUseNodePtyShell ?? false;
+    this.enableInteractiveShell = params.enableInteractiveShell ?? false;
     this.skipNextSpeakerCheck = params.skipNextSpeakerCheck ?? true;
     this.shellExecutionConfig = {
       terminalWidth: params.shellExecutionConfig?.terminalWidth ?? 80,
@@ -940,8 +949,8 @@ export class Config {
     return this.useRipgrep;
   }
 
-  getShouldUseNodePtyShell(): boolean {
-    return this.shouldUseNodePtyShell;
+  getEnableInteractiveShell(): boolean {
+    return this.enableInteractiveShell;
   }
 
   getSkipNextSpeakerCheck(): boolean {
