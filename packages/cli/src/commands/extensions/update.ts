@@ -53,16 +53,13 @@ export async function handleUpdate(args: UpdateArgs) {
         console.log(`Extension "${args.name}" not found.`);
         return;
       }
-      let updateState: ExtensionUpdateState | undefined;
       if (!extension.installMetadata) {
         console.log(
           `Unable to install extension "${args.name}" due to missing install metadata`,
         );
         return;
       }
-      await checkForExtensionUpdate(extension, (newState) => {
-        updateState = newState;
-      });
+      const updateState = await checkForExtensionUpdate(extension);
       if (updateState !== ExtensionUpdateState.UPDATE_AVAILABLE) {
         console.log(`Extension "${args.name}" is already up to date.`);
         return;
@@ -92,14 +89,17 @@ export async function handleUpdate(args: UpdateArgs) {
   if (args.all) {
     try {
       const extensionState = new Map();
-      await checkForAllExtensionUpdates(extensions, (action) => {
-        if (action.type === 'SET_STATE') {
-          extensionState.set(action.payload.name, {
-            status: action.payload.state,
-            processed: true, // No need to process as we will force the update.
-          });
-        }
-      });
+      await checkForAllExtensionUpdates(
+        extensions,
+        (action) => {
+          if (action.type === 'SET_STATE') {
+            extensionState.set(action.payload.name, {
+              status: action.payload.state,
+            });
+          }
+        },
+        workingDir,
+      );
       let updateInfos = await updateAllUpdatableExtensions(
         workingDir,
         requestConsentNonInteractive,
