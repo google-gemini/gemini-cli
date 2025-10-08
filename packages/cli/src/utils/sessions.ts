@@ -64,7 +64,12 @@ export async function deleteSession(
   } else {
     // Parse session index
     const index = parseInt(sessionIndex, 10);
-    if (isNaN(index) || index < 1 || index > sessions.length) {
+    if (
+      isNaN(index) ||
+      index.toString() !== sessionIndex ||
+      index < 1 ||
+      index > sortedSessions.length
+    ) {
       console.error(
         `Invalid session identifier "${sessionIndex}". Use --list-sessions to see available sessions.`,
       );
