@@ -867,8 +867,9 @@ A good instruction should concisely answer:
       const result = correctPath(filePath, this.config);
       if (result.error) {
         return result.error;
+      } else {
+        filePath = result.correctedPath;
       }
-      filePath = result.correctedPath;
     }
     params.file_path = filePath;
 
