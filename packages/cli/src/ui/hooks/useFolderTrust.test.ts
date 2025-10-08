@@ -11,14 +11,19 @@ import type { LoadedSettings } from '../../config/settings.js';
 import { FolderTrustChoice } from '../components/FolderTrustDialog.js';
 import type { LoadedTrustedFolders } from '../../config/trustedFolders.js';
 import { TrustLevel } from '../../config/trustedFolders.js';
-import * as process from 'node:process';
-
 import * as trustedFolders from '../../config/trustedFolders.js';
 
-vi.mock('process', () => ({
-  cwd: vi.fn(),
-  platform: 'linux',
-}));
+const mockedCwd = vi.hoisted(() => vi.fn());
+
+vi.mock('node:process', async () => {
+  const actual =
+    await vi.importActual<typeof import('node:process')>('node:process');
+  return {
+    ...actual,
+    cwd: mockedCwd,
+    platform: 'linux',
+  };
+});
 
 describe('useFolderTrust', () => {
   let mockSettings: LoadedSettings;
@@ -47,7 +52,7 @@ describe('useFolderTrust', () => {
       .spyOn(trustedFolders, 'loadTrustedFolders')
       .mockReturnValue(mockTrustedFolders);
     isWorkspaceTrustedSpy = vi.spyOn(trustedFolders, 'isWorkspaceTrusted');
-    (process.cwd as vi.Mock).mockReturnValue('/test/path');
+    mockedCwd.mockReturnValue('/test/path');
     onTrustChange = vi.fn();
   });
 
