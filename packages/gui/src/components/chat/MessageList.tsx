@@ -8,7 +8,7 @@ import { useRef, useState, forwardRef, useImperativeHandle, useCallback, useEffe
 import { useVirtualizer } from '@tanstack/react-virtual';
 import type React from 'react';
 import { format } from 'date-fns';
-import { User, AlertCircle, ChevronDown, ChevronRight, BookTemplate, Target, Brain, FileText, Activity, ListTodo, ArrowDown, Hammer, Trash2 } from 'lucide-react';
+import { User, AlertCircle, ChevronDown, ChevronRight, BookTemplate, Target, Brain, FileText, Activity, ListTodo, ArrowDown, Hammer, Trash2, Copy, Check } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { Card, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -1266,11 +1266,19 @@ interface MessageBubbleProps {
 
 
 const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isStreaming, onSaveAsTemplate, onDelete }) => {
+  const [copied, setCopied] = useState(false);
+
   // Check if this message is actually a tool response (regardless of role)
   const toolResponse = parseToolResponse(message);
   const isUser = message.role === 'user' && !toolResponse; // User only if not a tool response
   const isSystem = message.role === 'system';
   const isTool = message.role === 'tool' || toolResponse; // Tool if role is tool OR if content is tool format
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(message.content);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
 
   if (isSystem) {
     return (
@@ -1432,6 +1440,19 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isStreaming, onS
                       <BookTemplate size={12} />
                     </Button>
                   )}
+
+                  {/* Copy Button */}
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={handleCopy}
+                    className={cn(
+                      "h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-muted"
+                    )}
+                    title={copied ? "Copied!" : "Copy message"}
+                  >
+                    {copied ? <Check size={12} /> : <Copy size={12} />}
+                  </Button>
 
                   {/* Delete Button */}
                   {onDelete && (
