@@ -16,7 +16,7 @@ Your authentication method refers to the method you use to log into and access G
 
 The Terms of Service and Privacy Notices applicable to the aforementioned Google services are set forth in the table below.
 
-If you login with your Google account and you do not already have a Gemini Code Assist account associated with your Google account, you will be directed to the sign up flow for Gemini Code Assist for individuals. If your Google account is managed by your organization, your administrator may not permit access to Gemini Code Assist for individuals. Please see the [Gemini Code Assist for individuals FAQs](https://developers.google.com/gemini-code-assist/resources/faqs) for further information.
+If you log in with your Google account and you do not already have a Gemini Code Assist account associated with your Google account, you will be directed to the sign up flow for Gemini Code Assist for individuals. If your Google account is managed by your organization, your administrator may not permit access to Gemini Code Assist for individuals. Please see the [Gemini Code Assist for individuals FAQs](https://developers.google.com/gemini-code-assist/resources/faqs) for further information.
 
 <table>
   <tr>
@@ -97,6 +97,6 @@ If you are using a Gemini API key for authentication with a [Vertex AI GenAI API
 - Terms of Service: Your use of the Gemini CLI is governed by the [Google Cloud Platform Service Terms](https://cloud.google.com/terms/service-terms/).
 - Privacy Notice: The collection and use of your data is described in the [Google Cloud Privacy Notice](https://cloud.google.com/terms/cloud-privacy-notice).
 
-### Usage statistics opt-out
+## Usage statistics opt-out
 
 You may opt-out from sending Gemini CLI Usage Statistics to Google by following the instructions available here: [Usage Statistics Configuration](https://github.com/google-gemini/gemini-cli/blob/main/docs/get-started/configuration.md#usage-statistics).
