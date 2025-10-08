@@ -234,11 +234,8 @@ describe('git extension helpers', () => {
   });
 
   describe('fetchReleaseFromGithub', () => {
-    it('should fetch the latest pre-release if allowPreRelease is true', async () => {
-      const releases = [
-        { tag_name: 'v1.0.0-alpha', prerelease: true },
-        { tag_name: 'v0.9.0', prerelease: false },
-      ];
+    it('should fetch the latest release if allowPreRelease is true', async () => {
+      const releases = [{ tag_name: 'v1.0.0-alpha' }, { tag_name: 'v0.9.0' }];
       fetchJsonMock.mockResolvedValueOnce(releases);
 
       const result = await fetchReleaseFromGithub(
@@ -249,17 +246,14 @@ describe('git extension helpers', () => {
       );
 
       expect(fetchJsonMock).toHaveBeenCalledWith(
-        'https://api.github.com/repos/owner/repo/releases?page=1',
+        'https://api.github.com/repos/owner/repo/releases?per_page=1',
       );
       expect(result).toEqual(releases[0]);
     });
 
-    it('should fetch the latest stable release if allowPreRelease is false', async () => {
-      const releases = [
-        { tag_name: 'v1.0.0-alpha', prerelease: true },
-        { tag_name: 'v0.9.0', prerelease: false },
-      ];
-      fetchJsonMock.mockResolvedValueOnce(releases);
+    it('should fetch the latest release if allowPreRelease is false', async () => {
+      const release = { tag_name: 'v0.9.0' };
+      fetchJsonMock.mockResolvedValueOnce(release);
 
       const result = await fetchReleaseFromGithub(
         'owner',
@@ -269,13 +263,13 @@ describe('git extension helpers', () => {
       );
 
       expect(fetchJsonMock).toHaveBeenCalledWith(
-        'https://api.github.com/repos/owner/repo/releases?page=1',
+        'https://api.github.com/repos/owner/repo/releases/latest',
       );
-      expect(result).toEqual(releases[1]);
+      expect(result).toEqual(release);
     });
 
     it('should fetch a release by tag if ref is provided', async () => {
-      const release = { tag_name: 'v0.9.0', prerelease: false };
+      const release = { tag_name: 'v0.9.0' };
       fetchJsonMock.mockResolvedValueOnce(release);
 
       const result = await fetchReleaseFromGithub('owner', 'repo', 'v0.9.0');
@@ -287,47 +281,15 @@ describe('git extension helpers', () => {
     });
 
     it('should fetch latest stable release if allowPreRelease is undefined', async () => {
-      const releases = [
-        { tag_name: 'v1.0.0-alpha', prerelease: true },
-        { tag_name: 'v0.9.0', prerelease: false },
-      ];
-      fetchJsonMock.mockResolvedValueOnce(releases);
+      const release = { tag_name: 'v0.9.0' };
+      fetchJsonMock.mockResolvedValueOnce(release);
 
       const result = await fetchReleaseFromGithub('owner', 'repo');
 
       expect(fetchJsonMock).toHaveBeenCalledWith(
-        'https://api.github.com/repos/owner/repo/releases?page=1',
+        'https://api.github.com/repos/owner/repo/releases/latest',
       );
-      expect(result).toEqual(releases[1]);
-    });
-
-    it('should paginate to find a stable release', async () => {
-      const page1Releases = [
-        { tag_name: 'v1.0.0-alpha', prerelease: true },
-        { tag_name: 'v0.9.9-beta', prerelease: true },
-      ];
-      const page2Releases = [
-        { tag_name: 'v0.9.1-beta', prerelease: true },
-        { tag_name: 'v0.8.0', prerelease: false },
-      ];
-      fetchJsonMock
-        .mockResolvedValueOnce(page1Releases)
-        .mockResolvedValueOnce(page2Releases);
-
-      const result = await fetchReleaseFromGithub(
-        'owner',
-        'repo',
-        undefined,
-        false,
-      );
-
-      expect(fetchJsonMock).toHaveBeenCalledWith(
-        'https://api.github.com/repos/owner/repo/releases?page=1',
-      );
-      expect(fetchJsonMock).toHaveBeenCalledWith(
-        'https://api.github.com/repos/owner/repo/releases?page=2',
-      );
-      expect(result).toEqual(page2Releases[1]);
+      expect(result).toEqual(release);
     });
   });
 

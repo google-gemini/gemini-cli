@@ -116,30 +116,27 @@ export async function fetchReleaseFromGithub(
   allowPreRelease?: boolean,
 ): Promise<GithubReleaseData> {
   if (ref) {
-    const endpoint = ref ? `releases/tags/${ref}` : 'releases/latest';
-    const url = `https://api.github.com/repos/${owner}/${repo}/${endpoint}`;
-    return await fetchJson(url);
+    return await fetchJson(
+      `https://api.github.com/repos/${owner}/${repo}/releases/tags/${ref}`,
+    );
   }
 
-  // Search for the latest allowed release based on the preRelease setting.
-  const url = `https://api.github.com/repos/${owner}/${repo}/releases`;
-  let page = 1;
-  while (true) {
-    const releases = await fetchJson<GithubReleaseData[]>(
-      url + `?page=${page}`,
+  if (!allowPreRelease) {
+    // Grab the release that is tagged as the "latest", github does not allow
+    // this to be a pre-release so we can blindly grab it.
+    return await fetchJson(
+      `https://api.github.com/repos/${owner}/${repo}/releases/latest`,
     );
-    if (releases.length === 0) {
-      throw new Error('No releases found');
-    }
-    for (const release of releases) {
-      if (!release.prerelease) {
-        return release;
-      } else if (allowPreRelease === true) {
-        return release;
-      }
-    }
-    page++;
   }
+
+  // If pre-releases are allowed, we just grab the most recent release.
+  const releases = await fetchJson<GithubReleaseData[]>(
+    `https://api.github.com/repos/${owner}/${repo}/releases?per_page=1`,
+  );
+  if (releases.length === 0) {
+    throw new Error('No releases found');
+  }
+  return releases[0];
 }
 
 export async function checkForExtensionUpdate(
@@ -336,7 +333,6 @@ interface GithubReleaseData {
   tag_name: string;
   tarball_url?: string;
   zipball_url?: string;
-  prerelease: boolean;
 }
 
 interface Asset {
