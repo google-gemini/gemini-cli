@@ -6,7 +6,7 @@
 
 import type React from 'react';
 import { Text, useIsScreenReaderEnabled } from 'ink';
-import Spinner from 'ink-spinner';
+import { CliSpinner } from './CliSpinner.js';
 import type { SpinnerName } from 'cli-spinners';
 import { useStreamingContext } from '../contexts/StreamingContext.js';
 import { StreamingState } from '../types.js';
@@ -61,7 +61,7 @@ export const GeminiSpinner: React.FC<GeminiSpinnerProps> = ({
     <Text>{altText}</Text>
   ) : (
     <Text color={theme.text.primary}>
-      <Spinner type={spinnerType} />
+      <CliSpinner type={spinnerType} />
     </Text>
   );
 };
