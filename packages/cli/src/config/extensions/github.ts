@@ -112,10 +112,33 @@ async function fetchReleaseFromGithub(
   owner: string,
   repo: string,
   ref?: string,
+  allowPreRelease?: boolean,
 ): Promise<GithubReleaseData> {
-  const endpoint = ref ? `releases/tags/${ref}` : 'releases/latest';
-  const url = `https://api.github.com/repos/${owner}/${repo}/${endpoint}`;
-  return await fetchJson(url);
+  if (ref) {
+    const endpoint = ref ? `releases/tags/${ref}` : 'releases/latest';
+    const url = `https://api.github.com/repos/${owner}/${repo}/${endpoint}`;
+    return await fetchJson(url);
+  }
+
+  // Search for the latest allowed release based on the preRelease setting.
+  const url = `https://api.github.com/repos/${owner}/${repo}/releases`;
+  let page = 1;
+  while (true) {
+    const releases = await fetchJson<GithubReleaseData[]>(
+      url + `?page=${page}`,
+    );
+    if (releases.length === 0) {
+      throw new Error('No releases found');
+    }
+    for (const release of releases) {
+      if (!release.prerelease) {
+        return release;
+      } else if (allowPreRelease === true) {
+        return release;
+      }
+    }
+    page++;
+  }
 }
 
 export async function checkForExtensionUpdate(
@@ -195,6 +218,7 @@ export async function checkForExtensionUpdate(
         owner,
         repo,
         installMetadata.ref,
+        installMetadata.allowPreRelease,
       );
       if (releaseData.tag_name !== releaseTag) {
         return ExtensionUpdateState.UPDATE_AVAILABLE;
@@ -216,11 +240,16 @@ export async function downloadFromGitHubRelease(
   installMetadata: ExtensionInstallMetadata,
   destination: string,
 ): Promise<GitHubDownloadResult> {
-  const { source, ref } = installMetadata;
+  const { source, ref, allowPreRelease: preRelease } = installMetadata;
   const { owner, repo } = parseGitHubRepoForReleases(source);
 
   try {
-    const releaseData = await fetchReleaseFromGithub(owner, repo, ref);
+    const releaseData = await fetchReleaseFromGithub(
+      owner,
+      repo,
+      ref,
+      preRelease,
+    );
     if (!releaseData) {
       throw new Error(
         `No release data found for ${owner}/${repo} at tag ${ref}`,
@@ -306,6 +335,7 @@ interface GithubReleaseData {
   tag_name: string;
   tarball_url?: string;
   zipball_url?: string;
+  prerelease: boolean;
 }
 
 interface Asset {
