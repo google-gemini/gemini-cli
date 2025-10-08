@@ -53,8 +53,10 @@ jobs:
         run: 'npm ci'
 
       - name: 'Print Inputs'
-        run: |
-          echo "${{ toJSON(github.event.inputs) }}"
+        shell: 'bash'
+        env:
+          JSON_INPUTS: '${{ toJSON(github.event.inputs) }}'
+        run: 'echo "$JSON_INPUTS"'
 
       - name: 'Run Tests'
         if: "${{ github.event_name == 'schedule' || github.event.inputs.force_skip_tests == 'false' }}"
