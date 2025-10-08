@@ -9,6 +9,7 @@ on:
     branches:
       - 'main'
       - 'release/**'
+    types: [opened, synchronize, reopened, closed, ready_for_review]
   # This will run for PRs from forks when a label is added.
   pull_request_target:
     types: ['labeled']
