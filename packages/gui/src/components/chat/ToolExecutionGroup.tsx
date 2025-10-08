@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { ChevronDown, ChevronRight, Hammer, CheckCircle2, XCircle, Clock } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/utils/cn';
@@ -35,8 +35,43 @@ interface ToolExecutionGroupProps {
 export const ToolExecutionGroup: React.FC<ToolExecutionGroupProps> = ({ executions, timestamp }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [expandedItems, setExpandedItems] = useState<Set<number>>(new Set([0])); // First item expanded by default
+  const headerRef = useRef<HTMLDivElement>(null);
 
   if (executions.length === 0) return null;
+
+  const toggleGroupExpanded = () => {
+    if (headerRef.current) {
+      const scrollContainer = headerRef.current.closest('[data-scroll-container]') ||
+                             headerRef.current.closest('.overflow-y-auto') ||
+                             document.querySelector('[class*="overflow-y-auto"]');
+
+      if (scrollContainer) {
+        // Get the header's current position in viewport
+        const rect = headerRef.current.getBoundingClientRect();
+        const containerRect = scrollContainer.getBoundingClientRect();
+        const viewportOffset = rect.top - containerRect.top;
+
+        // Toggle state
+        setIsExpanded(!isExpanded);
+
+        // Maintain the header's position in viewport after DOM update
+        requestAnimationFrame(() => {
+          if (headerRef.current) {
+            const newRect = headerRef.current.getBoundingClientRect();
+            const newContainerRect = scrollContainer.getBoundingClientRect();
+            const newViewportOffset = newRect.top - newContainerRect.top;
+
+            // Adjust scroll to keep header at the same viewport position
+            scrollContainer.scrollTop += (newViewportOffset - viewportOffset);
+          }
+        });
+      } else {
+        setIsExpanded(!isExpanded);
+      }
+    } else {
+      setIsExpanded(!isExpanded);
+    }
+  };
 
   const toggleItemExpanded = (index: number) => {
     setExpandedItems(prev => {
@@ -70,9 +105,9 @@ export const ToolExecutionGroup: React.FC<ToolExecutionGroupProps> = ({ executio
   return (
     <div className="space-y-2">
       {/* Group header with summary */}
-      <div className="bg-muted/30 rounded-lg border border-border/50 overflow-hidden">
+      <div ref={headerRef} className="bg-muted/30 rounded-lg border border-border/50 overflow-hidden">
         <button
-          onClick={() => setIsExpanded(!isExpanded)}
+          onClick={toggleGroupExpanded}
           className="w-full px-4 py-3 flex items-center justify-between hover:bg-muted/50 transition-colors"
         >
           <div className="flex items-center gap-3">
@@ -154,6 +189,41 @@ const ToolExecutionCard: React.FC<ToolExecutionCardProps> = ({
   isNested = false
 }) => {
   const { toolCall, toolResponse } = execution;
+  const cardRef = useRef<HTMLDivElement>(null);
+
+  const handleToggle = () => {
+    if (cardRef.current) {
+      const scrollContainer = cardRef.current.closest('[data-scroll-container]') ||
+                             cardRef.current.closest('.overflow-y-auto') ||
+                             document.querySelector('[class*="overflow-y-auto"]');
+
+      if (scrollContainer) {
+        // Get the card's current position in viewport
+        const rect = cardRef.current.getBoundingClientRect();
+        const containerRect = scrollContainer.getBoundingClientRect();
+        const viewportOffset = rect.top - containerRect.top;
+
+        // Toggle state
+        onToggle();
+
+        // Maintain the card's position in viewport after DOM update
+        requestAnimationFrame(() => {
+          if (cardRef.current) {
+            const newRect = cardRef.current.getBoundingClientRect();
+            const newContainerRect = scrollContainer.getBoundingClientRect();
+            const newViewportOffset = newRect.top - newContainerRect.top;
+
+            // Adjust scroll to keep card at the same viewport position
+            scrollContainer.scrollTop += (newViewportOffset - viewportOffset);
+          }
+        });
+      } else {
+        onToggle();
+      }
+    } else {
+      onToggle();
+    }
+  };
 
   const getStatusIcon = () => {
     if (!toolResponse) {
@@ -212,18 +282,21 @@ const ToolExecutionCard: React.FC<ToolExecutionCardProps> = ({
   const hasParams = keyParams.length > 0;
 
   return (
-    <div className={cn(
-      "rounded-lg border overflow-hidden transition-all",
-      isNested ? "border-border/30" : "border-border/50",
-      toolResponse?.success === false
-        ? "border-red-200 dark:border-red-800/50 bg-red-50/30 dark:bg-red-950/10"
-        : toolResponse
-        ? "border-green-200 dark:border-green-800/50 bg-green-50/30 dark:bg-green-950/10"
-        : "border-blue-200 dark:border-blue-800/50 bg-blue-50/30 dark:bg-blue-950/10"
-    )}>
+    <div
+      ref={cardRef}
+      className={cn(
+        "rounded-lg border overflow-hidden transition-all",
+        isNested ? "border-border/30" : "border-border/50",
+        toolResponse?.success === false
+          ? "border-red-200 dark:border-red-800/50 bg-red-50/30 dark:bg-red-950/10"
+          : toolResponse
+          ? "border-green-200 dark:border-green-800/50 bg-green-50/30 dark:bg-green-950/10"
+          : "border-blue-200 dark:border-blue-800/50 bg-blue-50/30 dark:bg-blue-950/10"
+      )}
+    >
       {/* Tool execution header */}
       <button
-        onClick={onToggle}
+        onClick={handleToggle}
         className="w-full px-3 py-2.5 flex items-center justify-between hover:bg-muted/50 transition-colors"
       >
         <div className="flex items-center gap-2 flex-1 min-w-0">
