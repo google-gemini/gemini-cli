@@ -6,6 +6,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import * as crypto from 'node:crypto';
 import * as Diff from 'diff';
 import {
   BaseDeclarativeTool,
@@ -48,6 +49,15 @@ interface ReplacementResult {
   occurrences: number;
   finalOldString: string;
   finalNewString: string;
+}
+
+/**
+ * Creates a SHA256 hash of the given content.
+ * @param content The string content to hash.
+ * @returns A hex-encoded hash string.
+ */
+function hashContent(content: string): string {
+  return crypto.createHash('sha256').update(content).digest('hex');
 }
 
 function restoreTrailingNewline(
@@ -374,12 +384,30 @@ class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
     abortSignal: AbortSignal,
     originalLineEnding: '\r\n' | '\n',
   ): Promise<CalculatedEdit> {
+    // In order to keep from clobbering edits made outside our system,
+    // check if the file has been modified since we first read it.
+    let errorForLlmEditFixer = initialError.raw;
+    let contentForLlmEditFixer = currentContent;
+
+    const initialContentHash = hashContent(currentContent);
+    const onDiskContent = await this.config
+      .getFileSystemService()
+      .readTextFile(params.file_path);
+    const onDiskContentHash = hashContent(onDiskContent.replace(/\r\n/g, '\n'));
+
+    if (initialContentHash !== onDiskContentHash) {
+      // The file has changed on disk since we first read it.
+      // Use the latest content for the correction attempt.
+      contentForLlmEditFixer = onDiskContent.replace(/\r\n/g, '\n');
+      errorForLlmEditFixer = `The initial edit attempt failed with the following error: "${initialError.raw}". However, the file has been modified by either the user or an external process since that edit attempt. The file content provided to you is the latest version. Please base your correction on this new content.`;
+    }
+
     const fixedEdit = await FixLLMEditWithInstruction(
       params.instruction,
       params.old_string,
       params.new_string,
-      initialError.raw,
-      currentContent,
+      errorForLlmEditFixer,
+      contentForLlmEditFixer,
       this.config.getBaseLlmClient(),
       abortSignal,
     );
@@ -405,7 +433,7 @@ class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
         old_string: fixedEdit.search,
         new_string: fixedEdit.replace,
       },
-      currentContent,
+      currentContent: contentForLlmEditFixer,
       abortSignal,
     });
 
@@ -423,7 +451,7 @@ class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
       logSmartEditCorrectionEvent(this.config, event);
 
       return {
-        currentContent,
+        currentContent: contentForLlmEditFixer,
         newContent: currentContent,
         occurrences: 0,
         isNewFile: false,
@@ -436,7 +464,7 @@ class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
     logSmartEditCorrectionEvent(this.config, event);
 
     return {
-      currentContent,
+      currentContent: contentForLlmEditFixer,
       newContent: secondAttemptResult.newContent,
       occurrences: secondAttemptResult.occurrences,
       isNewFile: false,
