@@ -221,7 +221,7 @@ jobs:
         run: 'npm run test:integration:sandbox:none'
 
   e2e:
-    name: 'E2E (Non-fork)'
+    name: 'E2E'
     needs:
       - 'e2e_linux'
       - 'e2e_mac'
