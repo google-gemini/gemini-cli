@@ -1074,6 +1074,26 @@ const SETTINGS_SCHEMA = {
         description: 'Enable experimental subagents.',
         showInDialog: false,
       },
+      subagents: {
+        type: 'object',
+        label: 'Subagents',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: {},
+        description: 'Configuration for subagents.',
+        showInDialog: false,
+        properties: {
+          configurations: {
+            type: 'object',
+            label: 'Configurations',
+            category: 'Experimental',
+            requiresRestart: true,
+            default: {},
+            description: 'Configurations for individual subagents.',
+            showInDialog: false,
+          },
+        },
+      },
     },
   },
 
