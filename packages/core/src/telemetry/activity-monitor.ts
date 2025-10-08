@@ -62,6 +62,7 @@ export class ActivityMonitor {
   private lastSnapshotTime = 0;
   private config: ActivityMonitorConfig;
   private isActive = false;
+  private memoryMonitoringListener: ActivityListener | null = null;
 
   constructor(config: ActivityMonitorConfig = DEFAULT_ACTIVITY_CONFIG) {
     this.config = { ...config };
@@ -78,9 +79,10 @@ export class ActivityMonitor {
     this.isActive = true;
 
     // Register default memory monitoring listener
-    this.addListener((event) => {
+    this.memoryMonitoringListener = (event) => {
       this.handleMemoryMonitoringActivity(event, coreConfig);
-    });
+    };
+    this.addListener(this.memoryMonitoringListener);
 
     // Record activity monitoring start
     this.recordActivity(
@@ -98,7 +100,10 @@ export class ActivityMonitor {
     }
 
     this.isActive = false;
-    this.listeners.clear();
+    if (this.memoryMonitoringListener) {
+      this.removeListener(this.memoryMonitoringListener);
+      this.memoryMonitoringListener = null;
+    }
     this.eventBuffer = [];
   }
 
