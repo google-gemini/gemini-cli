@@ -151,6 +151,8 @@ describe('gemini.tsx main function', () => {
         getSandbox: () => false,
         getDebugMode: () => false,
         getListExtensions: () => false,
+        getListSessions: () => false,
+        getDeleteSession: () => undefined,
         getMcpServers: () => ({}),
         initialize: vi.fn(),
         getIdeMode: () => false,
@@ -283,6 +285,8 @@ describe('gemini.tsx main function kitty protocol', () => {
       getSandbox: () => false,
       getDebugMode: () => false,
       getListExtensions: () => false,
+      getListSessions: () => false,
+      getDeleteSession: () => undefined,
       getMcpServers: () => ({}),
       initialize: vi.fn(),
       getIdeMode: () => false,
@@ -329,6 +333,9 @@ describe('gemini.tsx main function kitty protocol', () => {
       screenReader: undefined,
       useSmartEdit: undefined,
       useWriteTodos: undefined,
+      resume: undefined,
+      listSessions: undefined,
+      deleteSession: undefined,
       outputFormat: undefined,
     });
 
