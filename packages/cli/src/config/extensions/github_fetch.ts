@@ -4,8 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { getGitHubToken } from './github.js';
 import * as https from 'node:https';
+
+export function getGitHubToken(): string | undefined {
+  return process.env['GITHUB_TOKEN'];
+}
 
 export async function fetchJson<T>(url: string): Promise<T> {
   const headers: { 'User-Agent': string; Authorization?: string } = {
