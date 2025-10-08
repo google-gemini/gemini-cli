@@ -626,7 +626,7 @@ export const useGeminiStream = (
       addItem(
         {
           type: 'info',
-          text: `Sending this message (${estimatedRequestTokenCount} tokens) will exceed the remaining context window limit (${remainingTokenCount} tokens). Please try reducing the size of your message or use the \`/compress\` command to compress the chat history.`,
+          text: `Sending this message (${estimatedRequestTokenCount} tokens) might exceed the remaining context window limit (${remainingTokenCount} tokens). Please try reducing the size of your message or use the \`/compress\` command to compress the chat history.`,
         },
         Date.now(),
       );
