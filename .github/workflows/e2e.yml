@@ -229,7 +229,7 @@ jobs:
     if: |
       always() &&
       (needs.merge_queue_skipper.outputs.skip == 'false' &&
-      !(github.event_name == 'pull_request_target' && github.event.pull_request.head.repo.full_name != github.repository))
+      github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: 'gemini-cli-ubuntu-16-core'
     steps:
       - name: 'Check E2E test results'
@@ -255,7 +255,7 @@ jobs:
     if: |
       always() &&
       (needs.merge_queue_skipper.outputs.skip == 'false' &&
-      github.event_name == 'pull_request_target' && github.event.pull_request.head.repo.full_name != github.repository)
+      github.event.pull_request.head.repo.full_name != github.repository)
     runs-on: 'gemini-cli-ubuntu-16-core'
     steps:
       - name: 'Check E2E test results'
