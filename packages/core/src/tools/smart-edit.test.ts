@@ -454,7 +454,7 @@ describe('SmartEditTool', () => {
       const params: EditToolParams = {
         file_path: filePath,
         instruction: 'Replace original with brand new',
-        old_string: 'original text that is slightly wrong', // This will fail first
+        old_string: 'wrong text', // This will fail first
         new_string: 'brand new text',
       };
 
@@ -556,36 +556,11 @@ describe('SmartEditTool', () => {
         file_path: filePath,
         instruction:
           'Replace "externally modified content" with "externally modified string"',
-        old_string: 'externally modified content', // This will fail initially
+        old_string: 'externally modified content', // This will fail the first attempt, triggering self-correction.
         new_string: 'externally modified string',
       };
 
-      // Control timestamps precisely to avoid race conditions.
-      const now = Date.now();
-      const lastEditTime = now - 10000; // 10 seconds ago
-
-      // Mock `getHistory` to simulate a previous edit by us.
-      (geminiClient.getHistory as Mock).mockResolvedValue([
-        {
-          role: 'model',
-          parts: [
-            {
-              functionCall: {
-                id: `replace-${lastEditTime}-123`,
-                name: 'replace',
-                args: { file_path: filePath },
-              },
-            },
-          ],
-        },
-      ]);
-
-      // Mock `fs.statSync` to make it look like the file was modified recently by someone else.
-      const statSpy = vi.spyOn(fs, 'statSync').mockReturnValue({
-        mtimeMs: now,
-      } as fs.Stats);
-
-      // Spy on `readTextFile` to confirm it gets called again.
+      // Spy on `readTextFile` to simulate an external file change between reads.
       const readTextFileSpy = vi
         .spyOn(fileSystemService, 'readTextFile')
         .mockResolvedValueOnce(initialContent) // First call in `calculateEdit`
@@ -594,21 +569,21 @@ describe('SmartEditTool', () => {
       const invocation = tool.build(params);
       await invocation.execute(new AbortController().signal);
 
-      // Assert that the self-correction LLM was called with the new content.
+      // Assert that the file was read twice (initial read, then re-read for hash comparison).
       expect(readTextFileSpy).toHaveBeenCalledTimes(2);
+
+      // Assert that the self-correction LLM was called with the updated content and a specific message.
       expect(mockFixLLMEditWithInstruction).toHaveBeenCalledWith(
         expect.any(String), // instruction
-        expect.any(String), // old_string
-        expect.any(String), // new_string
+        params.old_string,
+        params.new_string,
         expect.stringContaining(
           'However, the file has been modified by either the user or an external process',
         ), // errorForLlmEditFixer
-        externallyModifiedContent, // Newly modified content read from file during `attemptSelfCorrection`
+        externallyModifiedContent, // The new content for correction
         expect.any(Object), // baseLlmClient
         expect.any(Object), // abortSignal
       );
-
-      statSpy.mockRestore();
     });
   });
 

@@ -6,6 +6,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import * as crypto from 'node:crypto';
 import * as Diff from 'diff';
 import {
   BaseDeclarativeTool,
@@ -32,18 +33,10 @@ import { IdeClient } from '../ide/ide-client.js';
 import { FixLLMEditWithInstruction } from '../utils/llm-edit-fixer.js';
 import { applyReplacement } from './edit.js';
 import { safeLiteralReplace } from '../utils/textUtils.js';
-import { type GeminiClient } from '../core/client.js';
-import {
-  isFunctionCall,
-  isFunctionResponse,
-} from '../utils/messageInspectors.js';
 import { SmartEditStrategyEvent } from '../telemetry/types.js';
 import { logSmartEditStrategy } from '../telemetry/loggers.js';
 import { SmartEditCorrectionEvent } from '../telemetry/types.js';
 import { logSmartEditCorrectionEvent } from '../telemetry/loggers.js';
-
-// The time in milliseconds to wait before considering a file modification as external.
-const EXTERNAL_EDIT_BUFFER_MS = 2000;
 
 interface ReplacementContext {
   params: EditToolParams;
@@ -59,64 +52,12 @@ interface ReplacementResult {
 }
 
 /**
- * Extracts the timestamp from the .id value, which is in format
- * <tool.name>-<timestamp>-<uuid>
- * @param fcnId the ID value of a functionCall or functionResponse object
- * @returns -1 if the timestamp could not be extracted, else the timestamp (as a number)
+ * Creates a SHA256 hash of the given content.
+ * @param content The string content to hash.
+ * @returns A hex-encoded hash string.
  */
-function getTimestampFromFunctionId(fcnId: string): number {
-  const idParts = fcnId.split('-');
-  if (idParts.length > 2) {
-    const timestamp = parseInt(idParts[1], 10);
-    if (!isNaN(timestamp)) {
-      return timestamp;
-    }
-  }
-  return -1;
-}
-
-/**
- * Will look through the gemini client history and determine when the most recent
- * edit to a target file occurred. If no edit happened, it will return -1
- * @param filePath the path to the file
- * @param client the geminiClient, so that we can get the history
- * @returns a DateTime (as a number) of when the last edit occurred, or -1 if no edit was found.
- */
-async function findLastEditTimestamp(
-  filePath: string,
-  client: GeminiClient,
-): Promise<number> {
-  const history = (await client.getHistory()) ?? [];
-
-  // Iterate backwards to find the most recent relevant action.
-  for (const entry of history.slice().reverse()) {
-    if (!entry.parts) continue;
-
-    for (const part of entry.parts) {
-      let id: string | undefined;
-      let content: unknown;
-
-      if (isFunctionCall(entry) && part.functionCall?.name === 'replace') {
-        id = part.functionCall.id;
-        content = part.functionCall.args;
-      } else if (
-        isFunctionResponse(entry) &&
-        part.functionResponse?.name === 'replace'
-      ) {
-        id = part.functionResponse.id;
-        content = part.functionResponse.response;
-      } else {
-        continue;
-      }
-
-      // Normalize paths to handle Windows vs. POSIX differences before comparison.
-      const normalizedContent = JSON.stringify(content).replace(/\\\\/g, '/');
-      if (id && normalizedContent.includes(filePath.replace(/\\/g, '/'))) {
-        return getTimestampFromFunctionId(id);
-      }
-    }
-  }
-  return -1;
+function hashContent(content: string): string {
+  return crypto.createHash('sha256').update(content).digest('hex');
 }
 
 function restoreTrailingNewline(
@@ -444,33 +385,29 @@ class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
     originalLineEnding: '\r\n' | '\n',
   ): Promise<CalculatedEdit> {
     // In order to keep from clobbering edits made outside our system,
-    // check if there was a more recent edit to the file by the user or another
-    // external process.
+    // check if the file has been modified since we first read it.
     let errorForLlmEditFixer = initialError.raw;
-    const lastEditedByUsTime = await findLastEditTimestamp(
-      params.file_path,
-      this.config.getGeminiClient(),
-    );
+    let contentForLlmEditFixer = currentContent;
 
-    // Add a 2 second buffer to account for timing inaccuracies. If the file
-    // was modified more than 2 seconds after the last edit tool was run, we
-    // can send the LLM edit fixer a custom message and the newest file content.
-    if (lastEditedByUsTime > 0) {
-      const stats = fs.statSync(params.file_path);
-      const diff = stats.mtimeMs - lastEditedByUsTime;
-      if (diff > EXTERNAL_EDIT_BUFFER_MS) {
-        currentContent = await this.config
-          .getFileSystemService()
-          .readTextFile(params.file_path);
-        errorForLlmEditFixer = `The initial edit attempt failed with the following error: "${initialError.raw}". However, the file has been modified by either the user or an external process since that edit attempt. The file content provided to you is the latest version. Please base your correction on this new content.`;
-      }
+    const initialContentHash = hashContent(currentContent);
+    const onDiskContent = await this.config
+      .getFileSystemService()
+      .readTextFile(params.file_path);
+    const onDiskContentHash = hashContent(onDiskContent.replace(/\r\n/g, '\n'));
+
+    if (initialContentHash !== onDiskContentHash) {
+      // The file has changed on disk since we first read it.
+      // Use the latest content for the correction attempt.
+      contentForLlmEditFixer = onDiskContent.replace(/\r\n/g, '\n');
+      errorForLlmEditFixer = `The initial edit attempt failed with the following error: "${initialError.raw}". However, the file has been modified by either the user or an external process since that edit attempt. The file content provided to you is the latest version. Please base your correction on this new content.`;
     }
+
     const fixedEdit = await FixLLMEditWithInstruction(
       params.instruction,
       params.old_string,
       params.new_string,
       errorForLlmEditFixer,
-      currentContent,
+      contentForLlmEditFixer,
       this.config.getBaseLlmClient(),
       abortSignal,
     );
@@ -496,7 +433,7 @@ class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
         old_string: fixedEdit.search,
         new_string: fixedEdit.replace,
       },
-      currentContent,
+      currentContent: contentForLlmEditFixer,
       abortSignal,
     });
 
@@ -514,7 +451,7 @@ class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
       logSmartEditCorrectionEvent(this.config, event);
 
       return {
-        currentContent,
+        currentContent: contentForLlmEditFixer,
         newContent: currentContent,
         occurrences: 0,
         isNewFile: false,
@@ -527,7 +464,7 @@ class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
     logSmartEditCorrectionEvent(this.config, event);
 
     return {
-      currentContent,
+      currentContent: contentForLlmEditFixer,
       newContent: secondAttemptResult.newContent,
       occurrences: secondAttemptResult.occurrences,
       isNewFile: false,
