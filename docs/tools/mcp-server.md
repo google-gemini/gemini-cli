@@ -22,7 +22,7 @@ The Gemini CLI integrates with MCP servers through a sophisticated discovery and
 
 The discovery process is orchestrated by `discoverMcpTools()`, which:
 
-1. **Iterates through configured servers** from your `settings.json` `mcpServers` configuration
+1. **Iterates through configured servers** from your `~/.gemini/settings.json` `mcpServers` configuration
 2. **Establishes connections** using appropriate transport mechanisms (Stdio, SSE, or Streamable HTTP)
 3. **Fetches tool definitions** from each server using the MCP protocol
 4. **Sanitizes and validates** tool schemas for compatibility with the Gemini API
@@ -47,15 +47,15 @@ The Gemini CLI supports three MCP transport types:
 
 ## How to set up your MCP server
 
-The Gemini CLI uses the `mcpServers` configuration in your `settings.json` file to locate and connect to MCP servers. This configuration supports multiple servers with different transport mechanisms.
+The Gemini CLI uses the `mcpServers` configuration in your `~/.gemini/settings.json` file to locate and connect to MCP servers. This configuration supports multiple servers with different transport mechanisms.
 
-### Configure the MCP server in settings.json
+### Configure the MCP server in ~/.gemini/settings.json
 
-You can configure MCP servers in your `settings.json` file in two main ways: through the top-level `mcpServers` object for specific server definitions, and through the `mcp` object for global settings that control server discovery and execution.
+You can configure MCP servers in your `~/.gemini/settings.json` file in two main ways: through the top-level `mcpServers` object for specific server definitions, and through the `mcp` object for global settings that control server discovery and execution.
 
 #### Global MCP Settings (`mcp`)
 
-The `mcp` object in your `settings.json` allows you to define global rules for all MCP servers.
+The `mcp` object in your `~/.gemini/settings.json` allows you to define global rules for all MCP servers.
 
 - **`mcp.serverCommand`** (string): A global command to start an MCP server.
 - **`mcp.allowed`** (array of strings): A list of MCP server names to allow. If this is set, only servers from this list (matching the keys in the `mcpServers` object) will be connected to.
@@ -78,7 +78,7 @@ The `mcpServers` object is where you define each individual MCP server you want 
 
 ### Configuration Structure
 
-Add an `mcpServers` object to your `settings.json` file:
+Add an `mcpServers` object to your `~/.gemini/settings.json` file:
 
 ```json
 { ...file contains other config objects
@@ -725,7 +725,7 @@ const transport = new StdioServerTransport();
 await server.connect(transport);
 ```
 
-This can be included in `settings.json` under `mcpServers` with:
+This can be included in `~/.gemini/settings.json` under `mcpServers` with:
 
 ```json
 {
@@ -756,11 +756,11 @@ When you run this command, the Gemini CLI executes the `prompts/get` method on t
 
 ## Managing MCP Servers with `gemini mcp`
 
-While you can always configure MCP servers by manually editing your `settings.json` file, the Gemini CLI provides a convenient set of commands to manage your server configurations programmatically. These commands streamline the process of adding, listing, and removing MCP servers without needing to directly edit JSON files.
+While you can always configure MCP servers by manually editing your `~/.gemini/settings.json` file, the Gemini CLI provides a convenient set of commands to manage your server configurations programmatically. These commands streamline the process of adding, listing, and removing MCP servers without needing to directly edit JSON files.
 
 ### Adding a Server (`gemini mcp add`)
 
-The `add` command configures a new MCP server in your `settings.json`. Based on the scope (`-s, --scope`), it will be added to either the user config `~/.gemini/settings.json` or the project config `.gemini/settings.json` file.
+The `add` command configures a new MCP server in your `~/.gemini/settings.json`. Based on the scope (`-s, --scope`), it will be added to either the user config `~/.gemini/~/.gemini/settings.json` or the project config `.gemini/~/.gemini/settings.json` file.
 
 **Command:**
 
@@ -863,4 +863,4 @@ gemini mcp remove <name>
 gemini mcp remove my-server
 ```
 
-This will find and delete the "my-server" entry from the `mcpServers` object in the appropriate `settings.json` file based on the scope (`-s, --scope`).
+This will find and delete the "my-server" entry from the `mcpServers` object in the appropriate `~/.gemini/settings.json` file based on the scope (`-s, --scope`).
