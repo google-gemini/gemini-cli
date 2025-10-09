@@ -8,12 +8,19 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   checkForExtensionUpdate,
   cloneFromGit,
+  extractFile,
   findReleaseAsset,
+  fetchReleaseFromGithub,
   parseGitHubRepoForReleases,
 } from './github.js';
 import { simpleGit, type SimpleGit } from 'simple-git';
 import { ExtensionUpdateState } from '../../ui/state/extensions.js';
-import type * as os from 'node:os';
+import * as os from 'node:os';
+import * as fs from 'node:fs/promises';
+import * as fsSync from 'node:fs';
+import * as path from 'node:path';
+import * as tar from 'tar';
+import * as archiver from 'archiver';
 import type { GeminiCLIExtension } from '@google/gemini-cli-core';
 
 const mockPlatform = vi.hoisted(() => vi.fn());
@@ -28,6 +35,15 @@ vi.mock('node:os', async (importOriginal) => {
 });
 
 vi.mock('simple-git');
+
+const fetchJsonMock = vi.hoisted(() => vi.fn());
+vi.mock('./github_fetch.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./github_fetch.js')>();
+  return {
+    ...actual,
+    fetchJson: fetchJsonMock,
+  };
+});
 
 describe('git extension helpers', () => {
   afterEach(() => {
@@ -131,12 +147,9 @@ describe('git extension helpers', () => {
           type: 'link',
           source: '',
         },
+        contextFiles: [],
       };
-      let result: ExtensionUpdateState | undefined = undefined;
-      await checkForExtensionUpdate(
-        extension,
-        (newState) => (result = newState),
-      );
+      const result = await checkForExtensionUpdate(extension);
       expect(result).toBe(ExtensionUpdateState.NOT_UPDATABLE);
     });
 
@@ -150,13 +163,10 @@ describe('git extension helpers', () => {
           type: 'git',
           source: '',
         },
+        contextFiles: [],
       };
       mockGit.getRemotes.mockResolvedValue([]);
-      let result: ExtensionUpdateState | undefined = undefined;
-      await checkForExtensionUpdate(
-        extension,
-        (newState) => (result = newState),
-      );
+      const result = await checkForExtensionUpdate(extension);
       expect(result).toBe(ExtensionUpdateState.ERROR);
     });
 
@@ -170,6 +180,7 @@ describe('git extension helpers', () => {
           type: 'git',
           source: 'my/ext',
         },
+        contextFiles: [],
       };
       mockGit.getRemotes.mockResolvedValue([
         { name: 'origin', refs: { fetch: 'http://my-repo.com' } },
@@ -177,11 +188,7 @@ describe('git extension helpers', () => {
       mockGit.listRemote.mockResolvedValue('remote-hash\tHEAD');
       mockGit.revparse.mockResolvedValue('local-hash');
 
-      let result: ExtensionUpdateState | undefined = undefined;
-      await checkForExtensionUpdate(
-        extension,
-        (newState) => (result = newState),
-      );
+      const result = await checkForExtensionUpdate(extension);
       expect(result).toBe(ExtensionUpdateState.UPDATE_AVAILABLE);
     });
 
@@ -195,6 +202,7 @@ describe('git extension helpers', () => {
           type: 'git',
           source: 'my/ext',
         },
+        contextFiles: [],
       };
       mockGit.getRemotes.mockResolvedValue([
         { name: 'origin', refs: { fetch: 'http://my-repo.com' } },
@@ -202,11 +210,7 @@ describe('git extension helpers', () => {
       mockGit.listRemote.mockResolvedValue('same-hash\tHEAD');
       mockGit.revparse.mockResolvedValue('same-hash');
 
-      let result: ExtensionUpdateState | undefined = undefined;
-      await checkForExtensionUpdate(
-        extension,
-        (newState) => (result = newState),
-      );
+      const result = await checkForExtensionUpdate(extension);
       expect(result).toBe(ExtensionUpdateState.UP_TO_DATE);
     });
 
@@ -220,15 +224,72 @@ describe('git extension helpers', () => {
           type: 'git',
           source: 'my/ext',
         },
+        contextFiles: [],
       };
       mockGit.getRemotes.mockRejectedValue(new Error('git error'));
 
-      let result: ExtensionUpdateState | undefined = undefined;
-      await checkForExtensionUpdate(
-        extension,
-        (newState) => (result = newState),
-      );
+      const result = await checkForExtensionUpdate(extension);
       expect(result).toBe(ExtensionUpdateState.ERROR);
+    });
+  });
+
+  describe('fetchReleaseFromGithub', () => {
+    it('should fetch the latest release if allowPreRelease is true', async () => {
+      const releases = [{ tag_name: 'v1.0.0-alpha' }, { tag_name: 'v0.9.0' }];
+      fetchJsonMock.mockResolvedValueOnce(releases);
+
+      const result = await fetchReleaseFromGithub(
+        'owner',
+        'repo',
+        undefined,
+        true,
+      );
+
+      expect(fetchJsonMock).toHaveBeenCalledWith(
+        'https://api.github.com/repos/owner/repo/releases?per_page=1',
+      );
+      expect(result).toEqual(releases[0]);
+    });
+
+    it('should fetch the latest release if allowPreRelease is false', async () => {
+      const release = { tag_name: 'v0.9.0' };
+      fetchJsonMock.mockResolvedValueOnce(release);
+
+      const result = await fetchReleaseFromGithub(
+        'owner',
+        'repo',
+        undefined,
+        false,
+      );
+
+      expect(fetchJsonMock).toHaveBeenCalledWith(
+        'https://api.github.com/repos/owner/repo/releases/latest',
+      );
+      expect(result).toEqual(release);
+    });
+
+    it('should fetch a release by tag if ref is provided', async () => {
+      const release = { tag_name: 'v0.9.0' };
+      fetchJsonMock.mockResolvedValueOnce(release);
+
+      const result = await fetchReleaseFromGithub('owner', 'repo', 'v0.9.0');
+
+      expect(fetchJsonMock).toHaveBeenCalledWith(
+        'https://api.github.com/repos/owner/repo/releases/tags/v0.9.0',
+      );
+      expect(result).toEqual(release);
+    });
+
+    it('should fetch latest stable release if allowPreRelease is undefined', async () => {
+      const release = { tag_name: 'v0.9.0' };
+      fetchJsonMock.mockResolvedValueOnce(release);
+
+      const result = await fetchReleaseFromGithub('owner', 'repo');
+
+      expect(fetchJsonMock).toHaveBeenCalledWith(
+        'https://api.github.com/repos/owner/repo/releases/latest',
+      );
+      expect(result).toEqual(release);
     });
   });
 
@@ -292,8 +353,15 @@ describe('git extension helpers', () => {
       expect(repo).toBe('repo');
     });
 
-    it('should parse owner and repo from a full GitHub UR without .git', () => {
+    it('should parse owner and repo from a full GitHub URL without .git', () => {
       const source = 'https://github.com/owner/repo';
+      const { owner, repo } = parseGitHubRepoForReleases(source);
+      expect(owner).toBe('owner');
+      expect(repo).toBe('repo');
+    });
+
+    it('should parse owner and repo from a full GitHub URL with a trailing slash', () => {
+      const source = 'https://github.com/owner/repo/';
       const { owner, repo } = parseGitHubRepoForReleases(source);
       expect(owner).toBe('owner');
       expect(repo).toBe('repo');
@@ -339,6 +407,85 @@ describe('git extension helpers', () => {
       expect(() => parseGitHubRepoForReleases(source)).toThrow(
         'Invalid GitHub repository source: https://github.com/owner/repo/extra. Expected "owner/repo" or a github repo uri.',
       );
+    });
+  });
+
+  describe('extractFile', () => {
+    let tempDir: string;
+
+    beforeEach(async () => {
+      tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'gemini-test-'));
+    });
+
+    afterEach(async () => {
+      await fs.rm(tempDir, { recursive: true, force: true });
+    });
+
+    it('should extract a .tar.gz file', async () => {
+      const archivePath = path.join(tempDir, 'test.tar.gz');
+      const extractionDest = path.join(tempDir, 'extracted');
+      await fs.mkdir(extractionDest);
+
+      // Create a dummy file to be archived
+      const dummyFilePath = path.join(tempDir, 'test.txt');
+      await fs.writeFile(dummyFilePath, 'hello tar');
+
+      // Create the tar.gz file
+      await tar.c(
+        {
+          gzip: true,
+          file: archivePath,
+          cwd: tempDir,
+        },
+        ['test.txt'],
+      );
+
+      await extractFile(archivePath, extractionDest);
+
+      const extractedFilePath = path.join(extractionDest, 'test.txt');
+      const content = await fs.readFile(extractedFilePath, 'utf-8');
+      expect(content).toBe('hello tar');
+    });
+
+    it('should extract a .zip file', async () => {
+      const archivePath = path.join(tempDir, 'test.zip');
+      const extractionDest = path.join(tempDir, 'extracted');
+      await fs.mkdir(extractionDest);
+
+      // Create a dummy file to be archived
+      const dummyFilePath = path.join(tempDir, 'test.txt');
+      await fs.writeFile(dummyFilePath, 'hello zip');
+
+      // Create the zip file
+      const output = fsSync.createWriteStream(archivePath);
+      const archive = archiver.create('zip');
+
+      const streamFinished = new Promise((resolve, reject) => {
+        output.on('close', () => resolve(null));
+        archive.on('error', reject);
+      });
+
+      archive.pipe(output);
+      archive.file(dummyFilePath, { name: 'test.txt' });
+      await archive.finalize();
+      await streamFinished;
+
+      await extractFile(archivePath, extractionDest);
+
+      const extractedFilePath = path.join(extractionDest, 'test.txt');
+      const content = await fs.readFile(extractedFilePath, 'utf-8');
+      expect(content).toBe('hello zip');
+    });
+
+    it('should throw an error for unsupported file types', async () => {
+      const unsupportedFilePath = path.join(tempDir, 'test.txt');
+      await fs.writeFile(unsupportedFilePath, 'some content');
+      const extractionDest = path.join(tempDir, 'extracted');
+      await fs.mkdir(extractionDest);
+
+      await expect(
+        extractFile(unsupportedFilePath, extractionDest),
+      ).rejects.toThrow('Unsupported file extension for extraction:');
     });
   });
 });
