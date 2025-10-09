@@ -5,7 +5,7 @@
  */
 
 import { type DOMElement, measureElement } from 'ink';
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 import { useConfig } from '../contexts/ConfigContext.js';
 import { recordFlickerFrame } from '@google/gemini-cli-core';
 
@@ -22,7 +22,6 @@ export function useFlickerDetector(
   rootUiRef: React.RefObject<DOMElement | null>,
   terminalHeight: number,
 ) {
-  const flickerCheckInterval = useRef<NodeJS.Timeout | null>(null);
   const config = useConfig();
 
   useEffect(() => {
@@ -35,18 +34,10 @@ export function useFlickerDetector(
       }
     };
 
-    if (flickerCheckInterval.current) {
-      clearInterval(flickerCheckInterval.current);
-    }
-    flickerCheckInterval.current = setInterval(
-      checkForFlicker,
-      FLICKER_CHECK_INTERVAL_MS,
-    );
+    const intervalId = setInterval(checkForFlicker, FLICKER_CHECK_INTERVAL_MS);
 
     return () => {
-      if (flickerCheckInterval.current) {
-        clearInterval(flickerCheckInterval.current);
-      }
+      clearInterval(intervalId);
     };
   }, [terminalHeight, rootUiRef, config]);
 }
