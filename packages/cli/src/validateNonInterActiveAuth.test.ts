@@ -31,6 +31,7 @@ describe('validateNonInterActiveAuth', () => {
     processExitSpy = vi.spyOn(process, 'exit').mockImplementation((code) => {
       throw new Error(`process.exit(${code}) called`);
     });
+    vi.spyOn(auth, 'validateAuthMethod').mockReturnValue(null);
     refreshAuthMock = vi.fn().mockResolvedValue('refreshed');
     mockSettings = {
       system: { path: '', settings: {} },

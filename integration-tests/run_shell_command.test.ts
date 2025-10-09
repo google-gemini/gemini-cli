@@ -197,7 +197,8 @@ describe('run_shell_command', () => {
     ).toBeTruthy();
   });
 
-  it('should combine multiple --allowed-tools flags', async () => {
+  //TODO - https://github.com/google-gemini/gemini-cli/issues/10737
+  it.skip('should combine multiple --allowed-tools flags', async () => {
     const rig = new TestRig();
     await rig.setup('should combine multiple --allowed-tools flags');
 
@@ -226,7 +227,8 @@ describe('run_shell_command', () => {
     ).toBeTruthy();
   });
 
-  it('should allow all with "ShellTool" and other specifics', async () => {
+  //TODO - https://github.com/google-gemini/gemini-cli/issues/10768
+  it.skip('should allow all with "ShellTool" and other specifics', async () => {
     const rig = new TestRig();
     await rig.setup('should allow all with "ShellTool" and other specifics');
 

@@ -18,7 +18,7 @@ Note that all of these commands will only be reflected in active CLI sessions on
 
 ### Installing an extension
 
-You can install an extension using `gemini extensions install` with either a GitHub URL or a local path`.
+You can install an extension using `gemini extensions install` with either a GitHub URL or a local path.
 
 Note that we create a copy of the installed extension, so you will need to run `gemini extensions update` to pull in changes from both locally-defined extensions and those on GitHub.
 

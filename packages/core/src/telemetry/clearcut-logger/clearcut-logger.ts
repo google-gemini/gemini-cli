@@ -33,6 +33,8 @@ import type {
   ExtensionDisableEvent,
   SmartEditStrategyEvent,
   SmartEditCorrectionEvent,
+  AgentStartEvent,
+  AgentFinishEvent,
 } from '../types.js';
 import { EventMetadataKey } from './event-metadata-key.js';
 import type { Config } from '../../config/config.js';
@@ -79,6 +81,8 @@ export enum EventNames {
   MODEL_SLASH_COMMAND = 'model_slash_command',
   SMART_EDIT_STRATEGY = 'smart_edit_strategy',
   SMART_EDIT_CORRECTION = 'smart_edit_correction',
+  AGENT_START = 'agent_start',
+  AGENT_FINISH = 'agent_finish',
 }
 
 export interface LogResponse {
@@ -1060,6 +1064,50 @@ export class ClearcutLogger {
     this.enqueueLogEvent(
       this.createLogEvent(EventNames.SMART_EDIT_CORRECTION, data),
     );
+    this.flushIfNeeded();
+  }
+
+  logAgentStartEvent(event: AgentStartEvent): void {
+    const data: EventValue[] = [
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_AGENT_ID,
+        value: event.agent_id,
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_AGENT_NAME,
+        value: event.agent_name,
+      },
+    ];
+
+    this.enqueueLogEvent(this.createLogEvent(EventNames.AGENT_START, data));
+    this.flushIfNeeded();
+  }
+
+  logAgentFinishEvent(event: AgentFinishEvent): void {
+    const data: EventValue[] = [
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_AGENT_ID,
+        value: event.agent_id,
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_AGENT_NAME,
+        value: event.agent_name,
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_AGENT_DURATION_MS,
+        value: event.duration_ms.toString(),
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_AGENT_TURN_COUNT,
+        value: event.turn_count.toString(),
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_AGENT_TERMINATE_REASON,
+        value: event.terminate_reason,
+      },
+    ];
+
+    this.enqueueLogEvent(this.createLogEvent(EventNames.AGENT_FINISH, data));
     this.flushIfNeeded();
   }
 

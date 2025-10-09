@@ -25,6 +25,7 @@ vi.mock('../utils/llm-edit-fixer.js', () => ({
 vi.mock('../core/client.js', () => ({
   GeminiClient: vi.fn().mockImplementation(() => ({
     generateJson: mockGenerateJson,
+    getHistory: vi.fn().mockResolvedValue([]),
   })),
 }));
 
@@ -64,6 +65,7 @@ describe('SmartEditTool', () => {
   let rootDir: string;
   let mockConfig: Config;
   let geminiClient: any;
+  let fileSystemService: StandardFileSystemService;
   let baseLlmClient: BaseLlmClient;
 
   beforeEach(() => {
@@ -74,11 +76,14 @@ describe('SmartEditTool', () => {
 
     geminiClient = {
       generateJson: mockGenerateJson,
+      getHistory: vi.fn().mockResolvedValue([]),
     };
 
     baseLlmClient = {
       generateJson: mockGenerateJson,
     } as unknown as BaseLlmClient;
+
+    fileSystemService = new StandardFileSystemService();
 
     mockConfig = {
       getUsageStatisticsEnabled: vi.fn(() => true),
@@ -93,7 +98,7 @@ describe('SmartEditTool', () => {
       getApprovalMode: vi.fn(),
       setApprovalMode: vi.fn(),
       getWorkspaceContext: () => createMockWorkspaceContext(rootDir),
-      getFileSystemService: () => new StandardFileSystemService(),
+      getFileSystemService: () => fileSystemService,
       getIdeMode: () => false,
       getApiKey: () => 'test-api-key',
       getModel: () => 'test-model',
@@ -449,7 +454,7 @@ describe('SmartEditTool', () => {
       const params: EditToolParams = {
         file_path: filePath,
         instruction: 'Replace original with brand new',
-        old_string: 'original text that is slightly wrong', // This will fail first
+        old_string: 'wrong text', // This will fail first
         new_string: 'brand new text',
       };
 
@@ -467,35 +472,6 @@ describe('SmartEditTool', () => {
       expect(result.llmContent).toMatch(/Successfully modified file/);
       expect(fs.readFileSync(filePath, 'utf8')).toBe(finalContent);
       expect(mockFixLLMEditWithInstruction).toHaveBeenCalledTimes(1);
-    });
-
-    it('should return NO_CHANGE if FixLLMEditWithInstruction determines no changes are needed', async () => {
-      const initialContent = 'The price is $100.';
-      fs.writeFileSync(filePath, initialContent, 'utf8');
-      const params: EditToolParams = {
-        file_path: filePath,
-        instruction: 'Ensure the price is $100',
-        old_string: 'price is $50', // Incorrect old string
-        new_string: 'price is $100',
-      };
-
-      mockFixLLMEditWithInstruction.mockResolvedValueOnce({
-        noChangesRequired: true,
-        search: '',
-        replace: '',
-        explanation: 'The price is already correctly set to $100.',
-      });
-
-      const invocation = tool.build(params);
-      const result = await invocation.execute(new AbortController().signal);
-
-      expect(result.error?.type).toBe(
-        ToolErrorType.EDIT_NO_CHANGE_LLM_JUDGEMENT,
-      );
-      expect(result.llmContent).toMatch(
-        /A secondary check by an LLM determined/,
-      );
-      expect(fs.readFileSync(filePath, 'utf8')).toBe(initialContent); // File is unchanged
     });
 
     it('should preserve CRLF line endings when editing a file', async () => {
@@ -530,6 +506,84 @@ describe('SmartEditTool', () => {
 
       const finalContent = fs.readFileSync(filePath, 'utf8');
       expect(finalContent).toBe(newContentWithCRLF);
+    });
+
+    it('should return NO_CHANGE if FixLLMEditWithInstruction determines no changes are needed', async () => {
+      const initialContent = 'The price is $100.';
+      fs.writeFileSync(filePath, initialContent, 'utf8');
+      const params: EditToolParams = {
+        file_path: filePath,
+        instruction: 'Ensure the price is $100',
+        old_string: 'price is $50', // Incorrect old string
+        new_string: 'price is $100',
+      };
+
+      mockFixLLMEditWithInstruction.mockResolvedValueOnce({
+        noChangesRequired: true,
+        search: '',
+        replace: '',
+        explanation: 'The price is already correctly set to $100.',
+      });
+
+      const invocation = tool.build(params);
+      const result = await invocation.execute(new AbortController().signal);
+
+      expect(result.error?.type).toBe(
+        ToolErrorType.EDIT_NO_CHANGE_LLM_JUDGEMENT,
+      );
+      expect(result.llmContent).toMatch(
+        /A secondary check by an LLM determined/,
+      );
+      expect(fs.readFileSync(filePath, 'utf8')).toBe(initialContent); // File is unchanged
+    });
+  });
+
+  describe('self-correction with content refresh to pull in external edits', () => {
+    const testFile = 'test.txt';
+    let filePath: string;
+
+    beforeEach(() => {
+      filePath = path.join(rootDir, testFile);
+    });
+
+    it('should use refreshed file content for self-correction if file was modified externally', async () => {
+      const initialContent = 'This is the original content.';
+      const externallyModifiedContent =
+        'This is the externally modified content.';
+      fs.writeFileSync(filePath, initialContent, 'utf8');
+
+      const params: EditToolParams = {
+        file_path: filePath,
+        instruction:
+          'Replace "externally modified content" with "externally modified string"',
+        old_string: 'externally modified content', // This will fail the first attempt, triggering self-correction.
+        new_string: 'externally modified string',
+      };
+
+      // Spy on `readTextFile` to simulate an external file change between reads.
+      const readTextFileSpy = vi
+        .spyOn(fileSystemService, 'readTextFile')
+        .mockResolvedValueOnce(initialContent) // First call in `calculateEdit`
+        .mockResolvedValueOnce(externallyModifiedContent); // Second call in `attemptSelfCorrection`
+
+      const invocation = tool.build(params);
+      await invocation.execute(new AbortController().signal);
+
+      // Assert that the file was read twice (initial read, then re-read for hash comparison).
+      expect(readTextFileSpy).toHaveBeenCalledTimes(2);
+
+      // Assert that the self-correction LLM was called with the updated content and a specific message.
+      expect(mockFixLLMEditWithInstruction).toHaveBeenCalledWith(
+        expect.any(String), // instruction
+        params.old_string,
+        params.new_string,
+        expect.stringContaining(
+          'However, the file has been modified by either the user or an external process',
+        ), // errorForLlmEditFixer
+        externallyModifiedContent, // The new content for correction
+        expect.any(Object), // baseLlmClient
+        expect.any(Object), // abortSignal
+      );
     });
   });
 

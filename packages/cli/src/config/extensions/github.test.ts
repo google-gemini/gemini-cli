@@ -10,6 +10,7 @@ import {
   cloneFromGit,
   extractFile,
   findReleaseAsset,
+  fetchReleaseFromGithub,
   parseGitHubRepoForReleases,
 } from './github.js';
 import { simpleGit, type SimpleGit } from 'simple-git';
@@ -34,6 +35,15 @@ vi.mock('node:os', async (importOriginal) => {
 });
 
 vi.mock('simple-git');
+
+const fetchJsonMock = vi.hoisted(() => vi.fn());
+vi.mock('./github_fetch.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./github_fetch.js')>();
+  return {
+    ...actual,
+    fetchJson: fetchJsonMock,
+  };
+});
 
 describe('git extension helpers', () => {
   afterEach(() => {
@@ -137,6 +147,7 @@ describe('git extension helpers', () => {
           type: 'link',
           source: '',
         },
+        contextFiles: [],
       };
       const result = await checkForExtensionUpdate(extension);
       expect(result).toBe(ExtensionUpdateState.NOT_UPDATABLE);
@@ -152,6 +163,7 @@ describe('git extension helpers', () => {
           type: 'git',
           source: '',
         },
+        contextFiles: [],
       };
       mockGit.getRemotes.mockResolvedValue([]);
       const result = await checkForExtensionUpdate(extension);
@@ -168,6 +180,7 @@ describe('git extension helpers', () => {
           type: 'git',
           source: 'my/ext',
         },
+        contextFiles: [],
       };
       mockGit.getRemotes.mockResolvedValue([
         { name: 'origin', refs: { fetch: 'http://my-repo.com' } },
@@ -189,6 +202,7 @@ describe('git extension helpers', () => {
           type: 'git',
           source: 'my/ext',
         },
+        contextFiles: [],
       };
       mockGit.getRemotes.mockResolvedValue([
         { name: 'origin', refs: { fetch: 'http://my-repo.com' } },
@@ -210,11 +224,72 @@ describe('git extension helpers', () => {
           type: 'git',
           source: 'my/ext',
         },
+        contextFiles: [],
       };
       mockGit.getRemotes.mockRejectedValue(new Error('git error'));
 
       const result = await checkForExtensionUpdate(extension);
       expect(result).toBe(ExtensionUpdateState.ERROR);
+    });
+  });
+
+  describe('fetchReleaseFromGithub', () => {
+    it('should fetch the latest release if allowPreRelease is true', async () => {
+      const releases = [{ tag_name: 'v1.0.0-alpha' }, { tag_name: 'v0.9.0' }];
+      fetchJsonMock.mockResolvedValueOnce(releases);
+
+      const result = await fetchReleaseFromGithub(
+        'owner',
+        'repo',
+        undefined,
+        true,
+      );
+
+      expect(fetchJsonMock).toHaveBeenCalledWith(
+        'https://api.github.com/repos/owner/repo/releases?per_page=1',
+      );
+      expect(result).toEqual(releases[0]);
+    });
+
+    it('should fetch the latest release if allowPreRelease is false', async () => {
+      const release = { tag_name: 'v0.9.0' };
+      fetchJsonMock.mockResolvedValueOnce(release);
+
+      const result = await fetchReleaseFromGithub(
+        'owner',
+        'repo',
+        undefined,
+        false,
+      );
+
+      expect(fetchJsonMock).toHaveBeenCalledWith(
+        'https://api.github.com/repos/owner/repo/releases/latest',
+      );
+      expect(result).toEqual(release);
+    });
+
+    it('should fetch a release by tag if ref is provided', async () => {
+      const release = { tag_name: 'v0.9.0' };
+      fetchJsonMock.mockResolvedValueOnce(release);
+
+      const result = await fetchReleaseFromGithub('owner', 'repo', 'v0.9.0');
+
+      expect(fetchJsonMock).toHaveBeenCalledWith(
+        'https://api.github.com/repos/owner/repo/releases/tags/v0.9.0',
+      );
+      expect(result).toEqual(release);
+    });
+
+    it('should fetch latest stable release if allowPreRelease is undefined', async () => {
+      const release = { tag_name: 'v0.9.0' };
+      fetchJsonMock.mockResolvedValueOnce(release);
+
+      const result = await fetchReleaseFromGithub('owner', 'repo');
+
+      expect(fetchJsonMock).toHaveBeenCalledWith(
+        'https://api.github.com/repos/owner/repo/releases/latest',
+      );
+      expect(result).toEqual(release);
     });
   });
 

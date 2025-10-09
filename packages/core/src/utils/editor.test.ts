@@ -339,6 +339,7 @@ describe('editor utils', () => {
           diffCommand.args,
           {
             stdio: 'inherit',
+            shell: process.platform === 'win32',
           },
         );
         expect(mockSpawnOn).toHaveBeenCalledWith('close', expect.any(Function));
