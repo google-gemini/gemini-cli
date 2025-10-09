@@ -18,6 +18,7 @@ runs:
   using: 'composite'
   steps:
     - name: 'Set vars for simplified logic'
+      id: 'set_vars'
       shell: 'bash'
       env:
         CRON: '${{ inputs.cron }}'
