@@ -411,15 +411,6 @@ const SETTINGS_SCHEMA = {
         description: 'Show citations for generated text in the chat.',
         showInDialog: true,
       },
-      renderMarkdown: {
-        type: 'boolean',
-        label: 'Render Markdown',
-        category: 'UI',
-        requiresRestart: false,
-        default: true,
-        description: 'Toggle between rendered and raw markdown display',
-        showInDialog: true,
-      },
       customWittyPhrases: {
         type: 'array',
         label: 'Custom Witty Phrases',

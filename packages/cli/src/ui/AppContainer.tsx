@@ -783,9 +783,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
   const [showErrorDetails, setShowErrorDetails] = useState<boolean>(false);
   const [showToolDescriptions, setShowToolDescriptions] =
     useState<boolean>(false);
-  const [renderMarkdown, setRenderMarkdown] = useState<boolean>(
-    settings.merged.ui?.renderMarkdown ?? true,
-  );
+  const [renderMarkdown, setRenderMarkdown] = useState<boolean>(true);
 
   const [ctrlCPressedOnce, setCtrlCPressedOnce] = useState(false);
   const ctrlCTimerRef = useRef<NodeJS.Timeout | null>(null);
