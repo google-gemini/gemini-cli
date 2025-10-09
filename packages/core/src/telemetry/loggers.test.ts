@@ -694,6 +694,10 @@ describe('loggers', () => {
           success: true,
           decision: ToolCallDecision.ACCEPT,
           tool_type: 'native',
+          model_added_lines: 1,
+          model_removed_lines: 2,
+          user_added_lines: 5,
+          user_removed_lines: 6,
         },
       );
 
