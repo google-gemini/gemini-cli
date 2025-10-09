@@ -172,6 +172,9 @@ export const DebugProfiler = () => {
   }, []);
 
   useEffect(() => {
+    if (!showDebugProfiler) {
+      return;
+    }
     const flickerHandler = () => {
       profiler.totalFlickerFrames++;
       profiler.reportAction();
@@ -184,7 +187,7 @@ export const DebugProfiler = () => {
     return () => {
       appEvents.off(AppEvent.Flicker, flickerHandler);
     };
-  }, []);
+  }, [showDebugProfiler]);
 
   // Effect for updating stats
   useEffect(() => {
