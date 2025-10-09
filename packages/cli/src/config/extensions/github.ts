@@ -112,7 +112,7 @@ export async function fetchReleaseFromGithub(
   allowPreRelease?: boolean,
 ): Promise<GithubReleaseData> {
   if (ref) {
-    return await fetchJson(
+    return fetchJson(
       `https://api.github.com/repos/${owner}/${repo}/releases/tags/${ref}`,
     );
   }
@@ -120,7 +120,7 @@ export async function fetchReleaseFromGithub(
   if (!allowPreRelease) {
     // Grab the release that is tagged as the "latest", github does not allow
     // this to be a pre-release so we can blindly grab it.
-    return await fetchJson(
+    return fetchJson(
       `https://api.github.com/repos/${owner}/${repo}/releases/latest`,
     );
   }

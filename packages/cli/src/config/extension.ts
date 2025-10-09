@@ -91,9 +91,7 @@ export class ExtensionStorage {
   }
 
   static async createTmpDir(): Promise<string> {
-    return await fs.promises.mkdtemp(
-      path.join(os.tmpdir(), 'gemini-extension'),
-    );
+    return fs.promises.mkdtemp(path.join(os.tmpdir(), 'gemini-extension'));
   }
 }
 
@@ -369,7 +367,7 @@ export async function requestConsentInteractive(
   consentDescription: string,
   addExtensionUpdateConfirmationRequest: (value: ConfirmationRequest) => void,
 ): Promise<boolean> {
-  return await promptForConsentInteractive(
+  return promptForConsentInteractive(
     consentDescription + '\n\nDo you want to continue?',
     addExtensionUpdateConfirmationRequest,
   );
@@ -413,7 +411,7 @@ async function promptForConsentInteractive(
   prompt: string,
   addExtensionUpdateConfirmationRequest: (value: ConfirmationRequest) => void,
 ): Promise<boolean> {
-  return await new Promise<boolean>((resolve) => {
+  return new Promise<boolean>((resolve) => {
     addExtensionUpdateConfirmationRequest({
       prompt,
       onConfirm: (resolvedConfirmed) => {
@@ -689,7 +687,6 @@ export async function uninstallExtension(
   );
   manager.remove(extensionName);
   const storage = new ExtensionStorage(extensionName);
-
   await fs.promises.rm(storage.getExtensionDir(), {
     recursive: true,
     force: true,

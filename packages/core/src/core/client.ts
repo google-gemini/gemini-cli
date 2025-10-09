@@ -628,7 +628,6 @@ My setup is complete. I will provide my first command in the next turn.
     }
     return turn;
   }
-
   async generateContent(
     contents: Content[],
     generationConfig: GenerateContentConfig,
@@ -672,7 +671,7 @@ My setup is complete. I will provide my first command in the next turn.
         error?: unknown,
       ) =>
         // Pass the captured model to the centralized handler.
-        await handleFallback(this.config, currentAttemptModel, authType, error);
+        handleFallback(this.config, currentAttemptModel, authType, error);
 
       const result = await retryWithBackoff(apiCall, {
         onPersistent429: onPersistent429Callback,
