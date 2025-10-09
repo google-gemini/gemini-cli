@@ -655,9 +655,7 @@ export function loadExtensionConfig(
         `Invalid configuration in ${configFilePath}: missing ${!rawConfig.name ? '"name"' : '"version"'}`,
       );
     }
-    const installDir = new ExtensionStorage(
-      (rawConfig as ExtensionConfig).name,
-    ).getExtensionDir();
+    const installDir = new ExtensionStorage(rawConfig.name).getExtensionDir();
     const config = recursivelyHydrateStrings(
       rawConfig as unknown as JsonObject,
       {
