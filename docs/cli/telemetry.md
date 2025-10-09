@@ -345,6 +345,14 @@ Metrics are numerical measurements of behavior over time.
     - `success` (boolean)
     - `decision` (string: "accept", "reject", or "modify", if applicable)
     - `tool_type` (string: "mcp", or "native", if applicable)
+    - `model_added_lines` (Int, optional): Lines added by model in the proposed
+      changes, if applicable
+    - `model_removed_lines` (Int, optional): Lines removed by model in the
+      proposed changes, if applicable
+    - `user_added_lines` (Int, optional): Lines added by user edits after model
+      proposal, if applicable
+    - `user_removed_lines` (Int, optional): Lines removed by user edits after
+      model proposal, if applicable
 
 - `gemini_cli.tool.call.latency` (Histogram, ms): Measures tool call latency.
   - **Attributes**:
@@ -379,14 +387,6 @@ Metrics are numerical measurements of behavior over time.
     - `lines` (Int, if applicable): Number of lines in the file.
     - `mimetype` (string, if applicable): Mimetype of the file.
     - `extension` (string, if applicable): File extension of the file.
-    - `model_added_lines` (Int, if applicable): Number of lines added/changed by
-      the model.
-    - `model_removed_lines` (Int, if applicable): Number of lines
-      removed/changed by the model.
-    - `user_added_lines` (Int, if applicable): Number of lines added/changed by
-      user in AI proposed changes.
-    - `user_removed_lines` (Int, if applicable): Number of lines removed/changed
-      by user in AI proposed changes.
     - `programming_language` (string, if applicable): The programming language
       of the file.
 
