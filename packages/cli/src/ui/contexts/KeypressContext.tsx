@@ -327,17 +327,17 @@ export function KeypressProvider({
           };
         }
 
-        // Ctrl+letters
+        // Letters (a-z, A-Z) with or without modifiers
+        // Handle lowercase (97-122) and uppercase (65-90)
         if (
-          ctrl &&
-          keyCode >= 'a'.charCodeAt(0) &&
-          keyCode <= 'z'.charCodeAt(0)
+          (keyCode >= 'a'.charCodeAt(0) && keyCode <= 'z'.charCodeAt(0)) ||
+          (keyCode >= 'A'.charCodeAt(0) && keyCode <= 'Z'.charCodeAt(0))
         ) {
-          const letter = String.fromCharCode(keyCode);
+          const letter = String.fromCharCode(keyCode).toLowerCase();
           return {
             key: {
               name: letter,
-              ctrl: true,
+              ctrl,
               meta: alt,
               shift,
               paste: false,
@@ -603,6 +603,83 @@ export function KeypressProvider({
       if (key.name === 'return' && key.sequence === `${ESC}\r`) {
         key.meta = true;
       }
+
+      // Map common Alt+letter combinations that produce Unicode characters on macOS
+      // This handles terminals that don't send ESC sequences (like iTerm2 default)
+      const altUnicodeMap: {
+        [unicode: string]: { key: string; shift: boolean };
+      } = {
+        // Alt + lowercase letters
+        å: { key: 'a', shift: false },
+        '∫': { key: 'b', shift: false },
+        ç: { key: 'c', shift: false },
+        '∂': { key: 'd', shift: false },
+        ƒ: { key: 'f', shift: false },
+        '©': { key: 'g', shift: false },
+        '˙': { key: 'h', shift: false },
+        ˆ: { key: 'i', shift: false },
+        '∆': { key: 'j', shift: false },
+        '˚': { key: 'k', shift: false },
+        '¬': { key: 'l', shift: false },
+        µ: { key: 'm', shift: false },
+        ø: { key: 'o', shift: false },
+        π: { key: 'p', shift: false },
+        œ: { key: 'q', shift: false },
+        '®': { key: 'r', shift: false },
+        ß: { key: 's', shift: false },
+        '†': { key: 't', shift: false },
+        '√': { key: 'v', shift: false },
+        '∑': { key: 'w', shift: false },
+        '≈': { key: 'x', shift: false },
+        '¥': { key: 'y', shift: false },
+        Ω: { key: 'z', shift: false },
+        // Alt + uppercase letters (Shift+Alt)
+        Å: { key: 'a', shift: true },
+        Ø: { key: 'o', shift: true },
+        '∏': { key: 'p', shift: true },
+        Œ: { key: 'q', shift: true },
+      };
+
+      const unicodeChar = key.sequence || key.name;
+      if (
+        unicodeChar &&
+        unicodeChar.length === 1 &&
+        altUnicodeMap[unicodeChar]
+      ) {
+        const mapped = altUnicodeMap[unicodeChar];
+        broadcast({
+          name: mapped.key,
+          ctrl: false,
+          meta: true,
+          shift: mapped.shift,
+          paste: isPaste,
+          sequence: key.sequence,
+        });
+        return;
+      }
+
+      // Handle Alt/Option key combinations that come through as ESC + character
+      // This prevents Alt+P from showing as π, Alt+M as µ, etc. in VS Code terminal
+      if (
+        !key.name &&
+        key.sequence.length === 2 &&
+        key.sequence.startsWith(ESC)
+      ) {
+        const char = key.sequence[1];
+        // Only handle printable ASCII characters (a-z, A-Z, 0-9, etc.)
+        if (char && char.charCodeAt(0) >= 32 && char.charCodeAt(0) <= 126) {
+          broadcast({
+            name: char.toLowerCase(),
+            ctrl: false,
+            meta: true,
+            shift: char >= 'A' && char <= 'Z', // Detect shift from uppercase
+            paste: isPaste,
+            sequence: key.sequence,
+          });
+          return;
+        }
+      }
+
       broadcast({ ...key, paste: isPaste });
     };
 
