@@ -34,6 +34,7 @@ import {
   ToolConfirmationOutcome,
   promptIdContext,
   WRITE_FILE_TOOL_NAME,
+  tokenLimit,
 } from '@google/gemini-cli-core';
 import { type Part, type PartListUnion, FinishReason } from '@google/genai';
 import type {
@@ -642,15 +643,27 @@ export const useGeminiStream = (
     (estimatedRequestTokenCount: number, remainingTokenCount: number) => {
       onCancelSubmit();
 
+      const limit = tokenLimit(config.getModel());
+
+      const isLessThan50Percent =
+        limit > 0 && remainingTokenCount < limit * 0.5;
+
+      let text = `Sending this message (${estimatedRequestTokenCount} tokens) might exceed the remaining context window limit (${remainingTokenCount} tokens).`;
+
+      if (isLessThan50Percent) {
+        text +=
+          ' Please try reducing the size of your message or use the `/compress` command to compress the chat history.';
+      }
+
       addItem(
         {
           type: 'info',
-          text: `Sending this message (${estimatedRequestTokenCount} tokens) might exceed the remaining context window limit (${remainingTokenCount} tokens). Please try reducing the size of your message or use the \`/compress\` command to compress the chat history.`,
+          text,
         },
         Date.now(),
       );
     },
-    [addItem, onCancelSubmit],
+    [addItem, onCancelSubmit, config],
   );
 
   const handleLoopDetectionConfirmation = useCallback(

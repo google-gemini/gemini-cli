@@ -31,6 +31,7 @@ import {
   GeminiEventType as ServerGeminiEventType,
   ToolErrorType,
   ToolConfirmationOutcome,
+  tokenLimit,
 } from '@google/gemini-cli-core';
 import type { Part, PartListUnion } from '@google/genai';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
@@ -77,6 +78,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     GeminiClient: MockedGeminiClientClass,
     UserPromptEvent: MockedUserPromptEvent,
     parseAndFormatApiError: mockParseAndFormatApiError,
+    tokenLimit: vi.fn().mockReturnValue(100), // Mock tokenLimit
   };
 });
 
@@ -1854,57 +1856,119 @@ describe('useGeminiStream', () => {
       });
     });
 
-    it('should add info message for ContextWindowWillOverflow event', async () => {
-      // Setup mock to return a stream with ContextWindowWillOverflow event
-      mockSendMessageStream.mockReturnValue(
-        (async function* () {
-          yield {
-            type: ServerGeminiEventType.ContextWindowWillOverflow,
-            value: {
-              estimatedRequestTokenCount: 100,
-              remainingTokenCount: 50,
-            },
-          };
-        })(),
-      );
-
-      const { result } = renderHook(() =>
-        useGeminiStream(
-          new MockedGeminiClientClass(mockConfig),
-          [],
-          mockAddItem,
-          mockConfig,
-          mockLoadedSettings,
-          mockOnDebugMessage,
-          mockHandleSlashCommand,
-          false,
-          () => 'vscode' as EditorType,
-          () => {},
-          () => Promise.resolve(),
-          false,
-          () => {},
-          () => {},
-          () => {},
-          () => {},
-          80,
-          24,
-        ),
-      );
-
-      // Submit a query
-      await act(async () => {
-        await result.current.submitQuery('Test overflow');
+    describe('ContextWindowWillOverflow event', () => {
+      beforeEach(() => {
+        vi.mocked(tokenLimit).mockReturnValue(100);
       });
 
-      // Check that the info message was added
-      await waitFor(() => {
-        expect(mockAddItem).toHaveBeenCalledWith(
-          {
-            type: 'info',
-            text: `Sending this message (100 tokens) might exceed the remaining context window limit (50 tokens). Please try reducing the size of your message or use the \`/compress\` command to compress the chat history.`,
-          },
-          expect.any(Number),
+      it('should add message without suggestion when remaining tokens are > 50% of limit', async () => {
+        // Setup mock to return a stream with ContextWindowWillOverflow event
+        // Limit is 100, remaining is 60 (> 50)
+        mockSendMessageStream.mockReturnValue(
+          (async function* () {
+            yield {
+              type: ServerGeminiEventType.ContextWindowWillOverflow,
+              value: {
+                estimatedRequestTokenCount: 40,
+                remainingTokenCount: 60,
+              },
+            };
+          })(),
         );
+
+        const { result } = renderHook(() =>
+          useGeminiStream(
+            new MockedGeminiClientClass(mockConfig),
+            [],
+            mockAddItem,
+            mockConfig,
+            mockLoadedSettings,
+            mockOnDebugMessage,
+            mockHandleSlashCommand,
+            false,
+            () => 'vscode' as EditorType,
+            () => {},
+            () => Promise.resolve(),
+            false,
+            () => {},
+            () => {},
+            () => {},
+            () => {},
+            80,
+            24,
+          ),
+        );
+
+        // Submit a query
+        await act(async () => {
+          await result.current.submitQuery('Test overflow');
+        });
+
+        // Check that the message was added without suggestion
+        await waitFor(() => {
+          expect(mockAddItem).toHaveBeenCalledWith(
+            {
+              type: 'info',
+              text: `Sending this message (40 tokens) might exceed the remaining context window limit (60 tokens).`,
+            },
+            expect.any(Number),
+          );
+        });
+      });
+
+      it('should add message with suggestion when remaining tokens are < 50% of limit', async () => {
+        // Setup mock to return a stream with ContextWindowWillOverflow event
+        // Limit is 100, remaining is 40 (< 50)
+        mockSendMessageStream.mockReturnValue(
+          (async function* () {
+            yield {
+              type: ServerGeminiEventType.ContextWindowWillOverflow,
+              value: {
+                estimatedRequestTokenCount: 60,
+                remainingTokenCount: 40,
+              },
+            };
+          })(),
+        );
+
+        const { result } = renderHook(() =>
+          useGeminiStream(
+            new MockedGeminiClientClass(mockConfig),
+            [],
+            mockAddItem,
+            mockConfig,
+            mockLoadedSettings,
+            mockOnDebugMessage,
+            mockHandleSlashCommand,
+            false,
+            () => 'vscode' as EditorType,
+            () => {},
+            () => Promise.resolve(),
+            false,
+            () => {},
+            () => {},
+            () => {},
+            () => {},
+            80,
+            24,
+          ),
+        );
+
+        // Submit a query
+        await act(async () => {
+          await result.current.submitQuery('Test overflow');
+        });
+
+        // Check that the message was added with suggestion
+        await waitFor(() => {
+          expect(mockAddItem).toHaveBeenCalledWith(
+            {
+              type: 'info',
+              text: `Sending this message (60 tokens) might exceed the remaining context window limit (40 tokens). Please try reducing the size of your message or use the \`/compress\` command to compress the chat history.`,
+            },
+            expect.any(Number),
+          );
+        });
       });
     });
 
