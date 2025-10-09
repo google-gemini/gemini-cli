@@ -17,6 +17,7 @@ interface InstallArgs {
   source: string;
   ref?: string;
   autoUpdate?: boolean;
+  allowPreRelease?: boolean;
 }
 
 export async function handleInstall(args: InstallArgs) {
@@ -34,6 +35,7 @@ export async function handleInstall(args: InstallArgs) {
         type: 'git',
         ref: args.ref,
         autoUpdate: args.autoUpdate,
+        allowPreRelease: args.allowPreRelease,
       };
     } else {
       if (args.ref || args.autoUpdate) {
@@ -64,7 +66,7 @@ export async function handleInstall(args: InstallArgs) {
 }
 
 export const installCommand: CommandModule = {
-  command: 'install <source>',
+  command: 'install <source> [--auto-update] [--pre-release]',
   describe: 'Installs an extension from a git repository URL or a local path.',
   builder: (yargs) =>
     yargs
@@ -81,6 +83,10 @@ export const installCommand: CommandModule = {
         describe: 'Enable auto-update for this extension.',
         type: 'boolean',
       })
+      .option('pre-release', {
+        describe: 'Enable pre-release versions for this extension.',
+        type: 'boolean',
+      })
       .check((argv) => {
         if (!argv.source) {
           throw new Error('The source argument must be provided.');
@@ -92,6 +98,7 @@ export const installCommand: CommandModule = {
       source: argv['source'] as string,
       ref: argv['ref'] as string | undefined,
       autoUpdate: argv['auto-update'] as boolean | undefined,
+      allowPreRelease: argv['pre-release'] as boolean | undefined,
     });
   },
 };
