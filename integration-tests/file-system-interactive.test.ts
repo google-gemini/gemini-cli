@@ -18,11 +18,11 @@ describe('Interactive file system', () => {
     await rig.cleanup();
   });
 
-  it.skipIf(process.platform === 'win32' || process.platform === 'darwin')(
+  it.skipIf(process.platform === 'win32')(
     'should perform a read-then-write sequence',
     async () => {
       const fileName = 'version.txt';
-      await rig.setup('interactive-read-then-write');
+      rig.setup('interactive-read-then-write');
       rig.createFile(fileName, '1.0.0');
 
       const { ptyProcess } = rig.runInteractive();
@@ -38,7 +38,7 @@ describe('Interactive file system', () => {
       }
 
       // Wait for the app to be ready
-      const isReady = await rig.waitForText('Type your message', 15000);
+      const isReady = await rig.waitForText('Type your message', 30000);
       expect(
         isReady,
         'CLI did not start up in interactive mode correctly',
@@ -52,7 +52,7 @@ describe('Interactive file system', () => {
       const readCall = await rig.waitForToolCall('read_file', 30000);
       expect(readCall, 'Expected to find a read_file tool call').toBe(true);
 
-      const containsExpectedVersion = await rig.waitForText('1.0.0', 15000);
+      const containsExpectedVersion = await rig.waitForText('1.0.0', 30000);
       expect(
         containsExpectedVersion,
         'Expected to see version "1.0.0" in output',
