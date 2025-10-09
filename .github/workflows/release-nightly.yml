@@ -65,6 +65,12 @@ jobs:
           cron: ${{ github.event_name == 'schedule' || '' }}
           dry_run: ${{ github.event.inputs.dry_run }}
 
+      - name: 'Print Calculated vars'
+        shell: 'bash'
+        env:
+          JSON_VARS: '${{ toJSON(steps.vars.outputs) }}'
+        run: 'echo "$JSON_VARS"'
+
       - name: 'Run Tests'
         if: "${{ github.event_name == 'schedule' || github.event.inputs.force_skip_tests == 'false' }}"
         uses: './.github/actions/run-tests'
