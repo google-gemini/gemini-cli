@@ -18,7 +18,7 @@ describe('Interactive file system', () => {
     await rig.cleanup();
   });
 
-  it.skipIf(process.platform === 'win32' || process.platform === 'darwin')(
+  it.skipIf(process.platform === 'win32')(
     'should perform a read-then-write sequence',
     async () => {
       const fileName = 'version.txt';
