@@ -58,17 +58,12 @@ jobs:
           JSON_INPUTS: '${{ toJSON(github.event.inputs) }}'
         run: 'echo "$JSON_INPUTS"'
 
-      - name: 'Set booleans for simplified logic'
+      - name: 'Calculate Release Variables'
         id: 'vars'
-        env:
-          CRON: '${{ github.event.schedule }}'
-          DRY_RUN_INPUT: '${{ github.event.inputs.dry_run }}'
-        run: |-
-          is_dry_run="true"
-          if [[ "${CRON}" == "0 0 * * *" || "${DRY_RUN_INPUT}" == "false" ]]; then
-            is_dry_run="false"
-          fi
-          echo "is_dry_run=${is_dry_run}" >> "${GITHUB_OUTPUT}"
+        uses: './.github/actions/calculate-vars'
+        with:
+          cron: ${{ github.event_name == 'schedule' || '' }}
+          dry_run: ${{ github.event.inputs.dry_run }}
 
       - name: 'Run Tests'
         if: "${{ github.event_name == 'schedule' || github.event.inputs.force_skip_tests == 'false' }}"
