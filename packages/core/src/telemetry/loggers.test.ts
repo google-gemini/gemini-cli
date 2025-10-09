@@ -40,6 +40,7 @@ import {
   EVENT_TOOL_OUTPUT_TRUNCATED,
   EVENT_AGENT_START,
   EVENT_AGENT_FINISH,
+  EVENT_WEB_FETCH_FALLBACK_ATTEMPT,
 } from './constants.js';
 import {
   logApiRequest,
@@ -60,6 +61,7 @@ import {
   logExtensionUninstall,
   logAgentStart,
   logAgentFinish,
+  logWebFetchFallbackAttempt,
 } from './loggers.js';
 import { ToolCallDecision } from './tool-call-decision.js';
 import {
@@ -81,6 +83,7 @@ import {
   ExtensionUninstallEvent,
   AgentStartEvent,
   AgentFinishEvent,
+  WebFetchFallbackAttemptEvent,
 } from './types.js';
 import * as metrics from './metrics.js';
 import {
@@ -1492,6 +1495,38 @@ describe('loggers', () => {
         mockConfig,
         event,
       );
+    });
+  });
+
+  describe('logWebFetchFallbackAttempt', () => {
+    const mockConfig = {
+      getSessionId: () => 'test-session-id',
+      getUsageStatisticsEnabled: () => true,
+    } as unknown as Config;
+
+    beforeEach(() => {
+      vi.spyOn(ClearcutLogger.prototype, 'logWebFetchFallbackAttemptEvent');
+    });
+
+    it('should log web fetch fallback attempt event', () => {
+      const event = new WebFetchFallbackAttemptEvent('private_ip');
+
+      logWebFetchFallbackAttempt(mockConfig, event);
+
+      expect(
+        ClearcutLogger.prototype.logWebFetchFallbackAttemptEvent,
+      ).toHaveBeenCalledWith(event);
+
+      expect(mockLogger.emit).toHaveBeenCalledWith({
+        body: 'Web fetch fallback attempt. Reason: private_ip',
+        attributes: {
+          'session.id': 'test-session-id',
+          'user.email': 'test-user@example.com',
+          'event.name': EVENT_WEB_FETCH_FALLBACK_ATTEMPT,
+          'event.timestamp': '2025-01-01T00:00:00.000Z',
+          reason: 'private_ip',
+        },
+      });
     });
   });
 });

@@ -35,6 +35,8 @@ export const EVENT_MODEL_SLASH_COMMAND = 'gemini_cli.slash_command.model';
 export const EVENT_SMART_EDIT_STRATEGY = 'gemini_cli.smart_edit.strategy';
 export const EVENT_MODEL_ROUTING = 'gemini_cli.model_routing';
 export const EVENT_SMART_EDIT_CORRECTION = 'gemini_cli.smart_edit.correction';
+export const EVENT_WEB_FETCH_FALLBACK_ATTEMPT =
+  'gemini_cli.web_fetch_fallback_attempt';
 
 // Agent Events
 export const EVENT_AGENT_START = 'gemini_cli.agent.start';
