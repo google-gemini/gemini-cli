@@ -33,6 +33,7 @@ import {
   parseAndFormatApiError,
   ToolConfirmationOutcome,
   promptIdContext,
+  WRITE_FILE_TOOL_NAME,
 } from '@google/gemini-cli-core';
 import { type Part, type PartListUnion, FinishReason } from '@google/genai';
 import type {
@@ -69,7 +70,7 @@ enum StreamProcessingStatus {
   Error,
 }
 
-const EDIT_TOOL_NAMES = new Set(['replace', 'write_file']);
+const EDIT_TOOL_NAMES = new Set(['replace', WRITE_FILE_TOOL_NAME]);
 
 function showCitations(settings: LoadedSettings): boolean {
   const enabled = settings?.merged?.ui?.showCitations;
