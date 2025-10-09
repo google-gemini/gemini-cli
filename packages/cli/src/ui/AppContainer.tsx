@@ -1239,6 +1239,11 @@ Logging in with Google... Please restart Gemini CLI to continue.
     ],
   );
 
+  const exitPrivacyNotice = useCallback(
+    () => setShowPrivacyNotice(false),
+    [setShowPrivacyNotice],
+  );
+
   const uiActions: UIActions = useMemo(
     () => ({
       handleThemeSelect,
@@ -1248,7 +1253,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       onAuthError,
       handleEditorSelect,
       exitEditorDialog,
-      exitPrivacyNotice: () => setShowPrivacyNotice(false),
+      exitPrivacyNotice,
       closeSettingsDialog,
       closeModelDialog,
       closePermissionsDialog,
@@ -1273,6 +1278,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       onAuthError,
       handleEditorSelect,
       exitEditorDialog,
+      exitPrivacyNotice,
       closeSettingsDialog,
       closeModelDialog,
       closePermissionsDialog,
