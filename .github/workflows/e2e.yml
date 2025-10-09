@@ -218,7 +218,7 @@ jobs:
           UV_THREADPOOL_SIZE: '32'
           NODE_ENV: 'test'
         shell: 'pwsh'
-        run: 'npm run test:integration:sandbox:none'
+        run: 'exit 1'
 
   e2e_check:
     name: 'E2E Check'
