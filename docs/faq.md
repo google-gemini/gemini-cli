@@ -148,7 +148,7 @@ for more information.
 
 ## Not seeing your question?
 
-Search the Gemini CLI
-[Issue tracker on GitHub](https://github.com/google-gemini/gemini-cli/issues).
-If you can't find an issue similar to yours, consider creating a new GitHub
-Issue with a detailed description. Pull requests are also welcome!
+Search the
+[Gemini CLI Q&A discussions on GitHub](https://github.com/google-gemini/gemini-cli/discussions/categories/q-a)
+or
+[start a new discussion on GitHub](https://github.com/google-gemini/gemini-cli/discussions/new?category=q-a)

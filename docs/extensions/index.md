@@ -27,7 +27,7 @@ restart.
 ### Installing an extension
 
 You can install an extension using `gemini extensions install` with either a
-GitHub URL or a local path`.
+GitHub URL or a local path.
 
 Note that we create a copy of the installed extension, so you will need to run
 `gemini extensions update` to pull in changes from both locally-defined
