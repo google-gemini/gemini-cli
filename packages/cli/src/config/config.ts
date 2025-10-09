@@ -15,6 +15,7 @@ import type {
   FileFilteringOptions,
   MCPServerConfig,
   OutputFormat,
+  GeminiCLIExtension,
 } from '@google/gemini-cli-core';
 import { extensionsCommand } from '../commands/extensions.js';
 import {
@@ -30,14 +31,13 @@ import {
   FileDiscoveryService,
   ShellTool,
   EditTool,
-  WriteFileTool,
+  WRITE_FILE_TOOL_NAME,
   SHELL_TOOL_NAMES,
   resolveTelemetrySettings,
   FatalConfigError,
 } from '@google/gemini-cli-core';
 import type { Settings } from './settings.js';
 
-import type { Extension } from './extension.js';
 import { annotateActiveExtensions } from './extension.js';
 import { getCliVersion } from '../utils/version.js';
 import { loadSandboxConfig } from './sandboxConfig.js';
@@ -255,6 +255,7 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
           alias: 'e',
           type: 'array',
           string: true,
+          nargs: 1,
           description:
             'A list of extensions to use. If not provided, all extensions are used.',
           coerce: (extensions: string[]) =>
@@ -472,7 +473,7 @@ export function isDebugMode(argv: CliArgs): boolean {
 
 export async function loadCliConfig(
   settings: Settings,
-  extensions: Extension[],
+  extensions: GeminiCLIExtension[],
   extensionEnablementManager: ExtensionEnablementManager,
   sessionId: string,
   argv: CliArgs,
@@ -604,7 +605,11 @@ export async function loadCliConfig(
   // In non-interactive mode, exclude tools that require a prompt.
   const extraExcludes: string[] = [];
   if (!interactive && !argv.experimentalAcp) {
-    const defaultExcludes = [ShellTool.Name, EditTool.Name, WriteFileTool.Name];
+    const defaultExcludes = [
+      ShellTool.Name,
+      EditTool.Name,
+      WRITE_FILE_TOOL_NAME,
+    ];
     const autoEditExcludes = [ShellTool.Name];
 
     const toolExclusionFilter = createToolExclusionFilter(
@@ -737,7 +742,8 @@ export async function loadCliConfig(
     interactive,
     trustedFolder,
     useRipgrep: settings.tools?.useRipgrep,
-    shouldUseNodePtyShell: settings.tools?.shell?.enableInteractiveShell,
+    enableInteractiveShell:
+      settings.tools?.shell?.enableInteractiveShell ?? true,
     skipNextSpeakerCheck: settings.model?.skipNextSpeakerCheck,
     enablePromptCompletion: settings.general?.enablePromptCompletion ?? false,
     truncateToolOutputThreshold: settings.tools?.truncateToolOutputThreshold,
@@ -787,30 +793,28 @@ function allowedMcpServers(
   return mcpServers;
 }
 
-function mergeMcpServers(settings: Settings, extensions: Extension[]) {
+function mergeMcpServers(settings: Settings, extensions: GeminiCLIExtension[]) {
   const mcpServers = { ...(settings.mcpServers || {}) };
   for (const extension of extensions) {
-    Object.entries(extension.config.mcpServers || {}).forEach(
-      ([key, server]) => {
-        if (mcpServers[key]) {
-          logger.warn(
-            `Skipping extension MCP config for server with key "${key}" as it already exists.`,
-          );
-          return;
-        }
-        mcpServers[key] = {
-          ...server,
-          extensionName: extension.config.name,
-        };
-      },
-    );
+    Object.entries(extension.mcpServers || {}).forEach(([key, server]) => {
+      if (mcpServers[key]) {
+        logger.warn(
+          `Skipping extension MCP config for server with key "${key}" as it already exists.`,
+        );
+        return;
+      }
+      mcpServers[key] = {
+        ...server,
+        extensionName: extension.name,
+      };
+    });
   }
   return mcpServers;
 }
 
 function mergeExcludeTools(
   settings: Settings,
-  extensions: Extension[],
+  extensions: GeminiCLIExtension[],
   extraExcludes?: string[] | undefined,
 ): string[] {
   const allExcludeTools = new Set([
@@ -818,7 +822,7 @@ function mergeExcludeTools(
     ...(extraExcludes || []),
   ]);
   for (const extension of extensions) {
-    for (const tool of extension.config.excludeTools || []) {
+    for (const tool of extension.excludeTools || []) {
       allExcludeTools.add(tool);
     }
   }

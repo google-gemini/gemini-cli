@@ -195,6 +195,7 @@ export async function openDiff(
     return await new Promise<void>((resolve, reject) => {
       const childProcess = spawn(diffCommand.command, diffCommand.args, {
         stdio: 'inherit',
+        shell: process.platform === 'win32',
       });
 
       childProcess.on('close', (code) => {
