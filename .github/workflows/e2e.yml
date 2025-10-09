@@ -220,8 +220,8 @@ jobs:
         shell: 'pwsh'
         run: 'npm run test:integration:sandbox:none'
 
-  e2e:
-    name: 'E2E'
+  e2e_check:
+    name: 'E2E Check'
     needs:
       - 'e2e_linux'
       - 'e2e_mac'
