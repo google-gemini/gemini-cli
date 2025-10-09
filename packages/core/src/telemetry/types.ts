@@ -19,6 +19,7 @@ import type { FileOperation } from './metrics.js';
 export { ToolCallDecision };
 import type { ToolRegistry } from '../tools/tool-registry.js';
 import type { OutputFormat } from '../output/types.js';
+import type { AgentTerminateMode } from '../agents/types.js';
 
 export interface BaseTelemetryEvent {
   'event.name': string;
@@ -687,7 +688,9 @@ export type TelemetryEvent =
   | ExtensionUninstallEvent
   | ModelRoutingEvent
   | ToolOutputTruncatedEvent
-  | ModelSlashCommandEvent;
+  | ModelSlashCommandEvent
+  | AgentStartEvent
+  | AgentFinishEvent;
 
 export class ExtensionDisableEvent implements BaseTelemetryEvent {
   'event.name': 'extension_disable';
@@ -700,5 +703,69 @@ export class ExtensionDisableEvent implements BaseTelemetryEvent {
     this['event.timestamp'] = new Date().toISOString();
     this.extension_name = extension_name;
     this.setting_scope = settingScope;
+  }
+}
+
+export class SmartEditStrategyEvent implements BaseTelemetryEvent {
+  'event.name': 'smart_edit_strategy';
+  'event.timestamp': string;
+  strategy: string;
+
+  constructor(strategy: string) {
+    this['event.name'] = 'smart_edit_strategy';
+    this['event.timestamp'] = new Date().toISOString();
+    this.strategy = strategy;
+  }
+}
+
+export class SmartEditCorrectionEvent implements BaseTelemetryEvent {
+  'event.name': 'smart_edit_correction';
+  'event.timestamp': string;
+  correction: 'success' | 'failure';
+
+  constructor(correction: 'success' | 'failure') {
+    this['event.name'] = 'smart_edit_correction';
+    this['event.timestamp'] = new Date().toISOString();
+    this.correction = correction;
+  }
+}
+
+export class AgentStartEvent implements BaseTelemetryEvent {
+  'event.name': 'agent_start';
+  'event.timestamp': string;
+  agent_id: string;
+  agent_name: string;
+
+  constructor(agent_id: string, agent_name: string) {
+    this['event.name'] = 'agent_start';
+    this['event.timestamp'] = new Date().toISOString();
+    this.agent_id = agent_id;
+    this.agent_name = agent_name;
+  }
+}
+
+export class AgentFinishEvent implements BaseTelemetryEvent {
+  'event.name': 'agent_finish';
+  'event.timestamp': string;
+  agent_id: string;
+  agent_name: string;
+  duration_ms: number;
+  turn_count: number;
+  terminate_reason: AgentTerminateMode;
+
+  constructor(
+    agent_id: string,
+    agent_name: string,
+    duration_ms: number,
+    turn_count: number,
+    terminate_reason: AgentTerminateMode,
+  ) {
+    this['event.name'] = 'agent_finish';
+    this['event.timestamp'] = new Date().toISOString();
+    this.agent_id = agent_id;
+    this.agent_name = agent_name;
+    this.duration_ms = duration_ms;
+    this.turn_count = turn_count;
+    this.terminate_reason = terminate_reason;
   }
 }
