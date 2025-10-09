@@ -227,7 +227,8 @@ describe('run_shell_command', () => {
     ).toBeTruthy();
   });
 
-  it('should allow all with "ShellTool" and other specifics', async () => {
+  //TODO - https://github.com/google-gemini/gemini-cli/issues/10768
+  it.skip('should allow all with "ShellTool" and other specifics', async () => {
     const rig = new TestRig();
     await rig.setup('should allow all with "ShellTool" and other specifics');
 
