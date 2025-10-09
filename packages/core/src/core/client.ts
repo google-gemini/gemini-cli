@@ -603,7 +603,7 @@ My setup is complete. I will provide my first command in the next turn.
             );
             return turn;
           }
-          const nextRequest = [{ text: 'Please continue.' }];
+          const nextRequest = [{ text: 'System: Please continue.' }];
           yield* this.sendMessageStream(
             nextRequest,
             signal,
