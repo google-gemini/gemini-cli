@@ -70,6 +70,7 @@ if (process.env.DEBUG) {
   env.GEMINI_CLI_NO_RELAUNCH = 'true';
 }
 const child = spawn('node', nodeArgs, { stdio: 'inherit', env });
+
 child.on('close', (code) => {
   process.exit(code);
 });
