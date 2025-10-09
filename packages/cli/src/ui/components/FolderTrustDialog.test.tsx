@@ -44,30 +44,23 @@ describe('FolderTrustDialog', () => {
     );
   });
 
-  it('should call process.exit when escape is pressed and not restarting', async () => {
+  it('should display exit message and call process.exit and not call onSelect when escape is pressed', async () => {
     const onSelect = vi.fn();
-    const { stdin } = renderWithProviders(
+    const { lastFrame, stdin } = renderWithProviders(
       <FolderTrustDialog onSelect={onSelect} isRestarting={false} />,
     );
 
     stdin.write('\x1b'); // escape key
 
     await waitFor(() => {
+      expect(lastFrame()).toContain(
+        'A folder trust level must be selected to continue. Exiting since escape was pressed.',
+      );
+    });
+    await waitFor(() => {
       expect(mockedExit).toHaveBeenCalledWith(1);
     });
-  });
-
-  it('should not call onSelect when escape is pressed and is restarting', async () => {
-    const onSelect = vi.fn();
-    const { stdin } = renderWithProviders(
-      <FolderTrustDialog onSelect={onSelect} isRestarting={true} />,
-    );
-
-    stdin.write('\x1b'); // escape key
-
-    await waitFor(() => {
-      expect(onSelect).not.toHaveBeenCalled();
-    });
+    expect(onSelect).not.toHaveBeenCalled();
   });
 
   it('should display restart message when isRestarting is true', () => {
@@ -84,7 +77,7 @@ describe('FolderTrustDialog', () => {
     renderWithProviders(
       <FolderTrustDialog onSelect={vi.fn()} isRestarting={true} />,
     );
-    await vi.advanceTimersByTimeAsync(1000);
+    await vi.advanceTimersByTimeAsync(250);
     expect(relaunchApp).toHaveBeenCalled();
     vi.useRealTimers();
   });
