@@ -4,43 +4,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { LogRecord, LogAttributes } from '@opentelemetry/api-logs';
+import type { LogRecord } from '@opentelemetry/api-logs';
 import { logs } from '@opentelemetry/api-logs';
-import { SemanticAttributes } from '@opentelemetry/semantic-conventions';
 import type { Config } from '../config/config.js';
+import { SERVICE_NAME } from './constants.js';
 import {
   EVENT_API_ERROR,
-  EVENT_API_REQUEST,
   EVENT_API_RESPONSE,
-  EVENT_CLI_CONFIG,
-  EVENT_EXTENSION_UNINSTALL,
-  EVENT_EXTENSION_ENABLE,
-  EVENT_IDE_CONNECTION,
   EVENT_TOOL_CALL,
-  EVENT_USER_PROMPT,
-  EVENT_FLASH_FALLBACK,
-  EVENT_NEXT_SPEAKER_CHECK,
-  SERVICE_NAME,
-  EVENT_SLASH_COMMAND,
-  EVENT_CONVERSATION_FINISHED,
-  EVENT_CHAT_COMPRESSION,
-  EVENT_MALFORMED_JSON_RESPONSE,
-  EVENT_INVALID_CHUNK,
-  EVENT_CONTENT_RETRY,
-  EVENT_CONTENT_RETRY_FAILURE,
-  EVENT_FILE_OPERATION,
-  EVENT_TOOL_OUTPUT_TRUNCATED,
-  EVENT_RIPGREP_FALLBACK,
-  EVENT_MODEL_ROUTING,
-  EVENT_EXTENSION_INSTALL,
-  EVENT_MODEL_SLASH_COMMAND,
-  EVENT_EXTENSION_DISABLE,
-  EVENT_SMART_EDIT_STRATEGY,
-  EVENT_SMART_EDIT_CORRECTION,
-  EVENT_AGENT_START,
-  EVENT_AGENT_FINISH,
-  EVENT_WEB_FETCH_FALLBACK_ATTEMPT,
-} from './constants.js';
+} from './types.js';
 import type {
   ApiErrorEvent,
   ApiRequestEvent,
@@ -95,20 +67,6 @@ import { isTelemetrySdkInitialized } from './sdk.js';
 import type { UiEvent } from './uiTelemetry.js';
 import { uiTelemetryService } from './uiTelemetry.js';
 import { ClearcutLogger } from './clearcut-logger/clearcut-logger.js';
-import { safeJsonStringify } from '../utils/safeJsonStringify.js';
-import { UserAccountManager } from '../utils/userAccountManager.js';
-
-const shouldLogUserPrompts = (config: Config): boolean =>
-  config.getTelemetryLogPromptsEnabled();
-
-function getCommonAttributes(config: Config): LogAttributes {
-  const userAccountManager = new UserAccountManager();
-  const email = userAccountManager.getCachedGoogleAccount();
-  return {
-    'session.id': config.getSessionId(),
-    ...(email && { 'user.email': email }),
-  };
-}
 
 export function logCliConfiguration(
   config: Config,
@@ -117,31 +75,10 @@ export function logCliConfiguration(
   ClearcutLogger.getInstance(config)?.logStartSessionEvent(event);
   if (!isTelemetrySdkInitialized()) return;
 
-  const attributes: LogAttributes = {
-    ...getCommonAttributes(config),
-    'event.name': EVENT_CLI_CONFIG,
-    'event.timestamp': new Date().toISOString(),
-    model: event.model,
-    embedding_model: event.embedding_model,
-    sandbox_enabled: event.sandbox_enabled,
-    core_tools_enabled: event.core_tools_enabled,
-    approval_mode: event.approval_mode,
-    api_key_enabled: event.api_key_enabled,
-    vertex_ai_enabled: event.vertex_ai_enabled,
-    log_user_prompts_enabled: event.telemetry_log_user_prompts_enabled,
-    file_filtering_respect_git_ignore: event.file_filtering_respect_git_ignore,
-    debug_mode: event.debug_enabled,
-    mcp_servers: event.mcp_servers,
-    mcp_servers_count: event.mcp_servers_count,
-    mcp_tools: event.mcp_tools,
-    mcp_tools_count: event.mcp_tools_count,
-    output_format: event.output_format,
-  };
-
   const logger = logs.getLogger(SERVICE_NAME);
   const logRecord: LogRecord = {
-    body: 'CLI configuration loaded.',
-    attributes,
+    body: event.toLogBody(),
+    attributes: event.toOpenTelemetryAttributes(config),
   };
   logger.emit(logRecord);
 }
@@ -150,26 +87,10 @@ export function logUserPrompt(config: Config, event: UserPromptEvent): void {
   ClearcutLogger.getInstance(config)?.logNewPromptEvent(event);
   if (!isTelemetrySdkInitialized()) return;
 
-  const attributes: LogAttributes = {
-    ...getCommonAttributes(config),
-    'event.name': EVENT_USER_PROMPT,
-    'event.timestamp': new Date().toISOString(),
-    prompt_length: event.prompt_length,
-    prompt_id: event.prompt_id,
-  };
-
-  if (event.auth_type) {
-    attributes['auth_type'] = event.auth_type;
-  }
-
-  if (shouldLogUserPrompts(config)) {
-    attributes['prompt'] = event.prompt;
-  }
-
   const logger = logs.getLogger(SERVICE_NAME);
   const logRecord: LogRecord = {
-    body: `User prompt. Length: ${event.prompt_length}.`,
-    attributes,
+    body: event.toLogBody(),
+    attributes: event.toOpenTelemetryAttributes(config),
   };
   logger.emit(logRecord);
 }
@@ -184,24 +105,10 @@ export function logToolCall(config: Config, event: ToolCallEvent): void {
   ClearcutLogger.getInstance(config)?.logToolCallEvent(event);
   if (!isTelemetrySdkInitialized()) return;
 
-  const attributes: LogAttributes = {
-    ...getCommonAttributes(config),
-    ...event,
-    'event.name': EVENT_TOOL_CALL,
-    'event.timestamp': new Date().toISOString(),
-    function_args: safeJsonStringify(event.function_args, 2),
-  };
-  if (event.error) {
-    attributes['error.message'] = event.error;
-    if (event.error_type) {
-      attributes['error.type'] = event.error_type;
-    }
-  }
-
   const logger = logs.getLogger(SERVICE_NAME);
   const logRecord: LogRecord = {
-    body: `Tool call: ${event.function_name}${event.decision ? `. Decision: ${event.decision}` : ''}. Success: ${event.success}. Duration: ${event.duration_ms}ms.`,
-    attributes,
+    body: event.toLogBody(),
+    attributes: event.toOpenTelemetryAttributes(config),
   };
   logger.emit(logRecord);
   recordToolCallMetrics(config, event.duration_ms, {
@@ -227,17 +134,10 @@ export function logToolOutputTruncated(
   ClearcutLogger.getInstance(config)?.logToolOutputTruncatedEvent(event);
   if (!isTelemetrySdkInitialized()) return;
 
-  const attributes: LogAttributes = {
-    ...getCommonAttributes(config),
-    ...event,
-    'event.name': EVENT_TOOL_OUTPUT_TRUNCATED,
-    'event.timestamp': new Date().toISOString(),
-  };
-
   const logger = logs.getLogger(SERVICE_NAME);
   const logRecord: LogRecord = {
-    body: `Tool output truncated for ${event.tool_name}.`,
-    attributes,
+    body: event.toLogBody(),
+    attributes: event.toOpenTelemetryAttributes(config),
   };
   logger.emit(logRecord);
 }
@@ -249,31 +149,10 @@ export function logFileOperation(
   ClearcutLogger.getInstance(config)?.logFileOperationEvent(event);
   if (!isTelemetrySdkInitialized()) return;
 
-  const attributes: LogAttributes = {
-    ...getCommonAttributes(config),
-    'event.name': EVENT_FILE_OPERATION,
-    'event.timestamp': new Date().toISOString(),
-    tool_name: event.tool_name,
-    operation: event.operation,
-  };
-
-  if (event.lines) {
-    attributes['lines'] = event.lines;
-  }
-  if (event.mimetype) {
-    attributes['mimetype'] = event.mimetype;
-  }
-  if (event.extension) {
-    attributes['extension'] = event.extension;
-  }
-  if (event.programming_language) {
-    attributes['programming_language'] = event.programming_language;
-  }
-
   const logger = logs.getLogger(SERVICE_NAME);
   const logRecord: LogRecord = {
-    body: `File operation: ${event.operation}. Lines: ${event.lines}.`,
-    attributes,
+    body: event.toLogBody(),
+    attributes: event.toOpenTelemetryAttributes(config),
   };
   logger.emit(logRecord);
 
@@ -290,17 +169,10 @@ export function logApiRequest(config: Config, event: ApiRequestEvent): void {
   ClearcutLogger.getInstance(config)?.logApiRequestEvent(event);
   if (!isTelemetrySdkInitialized()) return;
 
-  const attributes: LogAttributes = {
-    ...getCommonAttributes(config),
-    ...event,
-    'event.name': EVENT_API_REQUEST,
-    'event.timestamp': new Date().toISOString(),
-  };
-
   const logger = logs.getLogger(SERVICE_NAME);
   const logRecord: LogRecord = {
-    body: `API request to ${event.model}.`,
-    attributes,
+    body: event.toLogBody(),
+    attributes: event.toOpenTelemetryAttributes(config),
   };
   logger.emit(logRecord);
 }
@@ -312,17 +184,10 @@ export function logFlashFallback(
   ClearcutLogger.getInstance(config)?.logFlashFallbackEvent();
   if (!isTelemetrySdkInitialized()) return;
 
-  const attributes: LogAttributes = {
-    ...getCommonAttributes(config),
-    ...event,
-    'event.name': EVENT_FLASH_FALLBACK,
-    'event.timestamp': new Date().toISOString(),
-  };
-
   const logger = logs.getLogger(SERVICE_NAME);
   const logRecord: LogRecord = {
-    body: `Switching to flash as Fallback.`,
-    attributes,
+    body: event.toLogBody(),
+    attributes: event.toOpenTelemetryAttributes(config),
   };
   logger.emit(logRecord);
 }
@@ -334,17 +199,10 @@ export function logRipgrepFallback(
   ClearcutLogger.getInstance(config)?.logRipgrepFallbackEvent();
   if (!isTelemetrySdkInitialized()) return;
 
-  const attributes: LogAttributes = {
-    ...getCommonAttributes(config),
-    ...event,
-    'event.name': EVENT_RIPGREP_FALLBACK,
-    'event.timestamp': new Date().toISOString(),
-  };
-
   const logger = logs.getLogger(SERVICE_NAME);
   const logRecord: LogRecord = {
-    body: `Switching to grep as fallback.`,
-    attributes,
+    body: event.toLogBody(),
+    attributes: event.toOpenTelemetryAttributes(config),
   };
   logger.emit(logRecord);
 }
@@ -359,27 +217,10 @@ export function logApiError(config: Config, event: ApiErrorEvent): void {
   ClearcutLogger.getInstance(config)?.logApiErrorEvent(event);
   if (!isTelemetrySdkInitialized()) return;
 
-  const attributes: LogAttributes = {
-    ...getCommonAttributes(config),
-    ...event,
-    'event.name': EVENT_API_ERROR,
-    'event.timestamp': new Date().toISOString(),
-    ['error.message']: event.error,
-    model_name: event.model,
-    duration: event.duration_ms,
-  };
-
-  if (event.error_type) {
-    attributes['error.type'] = event.error_type;
-  }
-  if (typeof event.status_code === 'number') {
-    attributes[SemanticAttributes.HTTP_STATUS_CODE] = event.status_code;
-  }
-
   const logger = logs.getLogger(SERVICE_NAME);
   const logRecord: LogRecord = {
-    body: `API error for ${event.model}. Error: ${event.error}. Duration: ${event.duration_ms}ms.`,
-    attributes,
+    body: event.toLogBody(),
+    attributes: event.toOpenTelemetryAttributes(config),
   };
   logger.emit(logRecord);
   recordApiErrorMetrics(config, event.duration_ms, {
@@ -409,25 +250,11 @@ export function logApiResponse(config: Config, event: ApiResponseEvent): void {
   uiTelemetryService.addEvent(uiEvent);
   ClearcutLogger.getInstance(config)?.logApiResponseEvent(event);
   if (!isTelemetrySdkInitialized()) return;
-  const attributes: LogAttributes = {
-    ...getCommonAttributes(config),
-    ...event,
-    'event.name': EVENT_API_RESPONSE,
-    'event.timestamp': new Date().toISOString(),
-  };
-  if (event.response_text) {
-    attributes['response_text'] = event.response_text;
-  }
-  if (event.status_code) {
-    if (typeof event.status_code === 'number') {
-      attributes[SemanticAttributes.HTTP_STATUS_CODE] = event.status_code;
-    }
-  }
 
   const logger = logs.getLogger(SERVICE_NAME);
   const logRecord: LogRecord = {
-    body: `API response from ${event.model}. Status: ${event.status_code || 'N/A'}. Duration: ${event.duration_ms}ms.`,
-    attributes,
+    body: event.toLogBody(),
+    attributes: event.toOpenTelemetryAttributes(config),
   };
   logger.emit(logRecord);
 
@@ -463,24 +290,27 @@ export function logLoopDetected(
   ClearcutLogger.getInstance(config)?.logLoopDetectedEvent(event);
   if (!isTelemetrySdkInitialized()) return;
 
-  const attributes: LogAttributes = {
-    ...getCommonAttributes(config),
-    ...event,
-  };
-
   const logger = logs.getLogger(SERVICE_NAME);
   const logRecord: LogRecord = {
-    body: `Loop detected. Type: ${event.loop_type}.`,
-    attributes,
+    body: event.toLogBody(),
+    attributes: event.toOpenTelemetryAttributes(config),
   };
   logger.emit(logRecord);
 }
 
 export function logLoopDetectionDisabled(
   config: Config,
-  _event: LoopDetectionDisabledEvent,
+  event: LoopDetectionDisabledEvent,
 ): void {
   ClearcutLogger.getInstance(config)?.logLoopDetectionDisabledEvent();
+  if (!isTelemetrySdkInitialized()) return;
+
+  const logger = logs.getLogger(SERVICE_NAME);
+  const logRecord: LogRecord = {
+    body: event.toLogBody(),
+    attributes: event.toOpenTelemetryAttributes(config),
+  };
+  logger.emit(logRecord);
 }
 
 export function logNextSpeakerCheck(
@@ -490,16 +320,10 @@ export function logNextSpeakerCheck(
   ClearcutLogger.getInstance(config)?.logNextSpeakerCheck(event);
   if (!isTelemetrySdkInitialized()) return;
 
-  const attributes: LogAttributes = {
-    ...getCommonAttributes(config),
-    ...event,
-    'event.name': EVENT_NEXT_SPEAKER_CHECK,
-  };
-
   const logger = logs.getLogger(SERVICE_NAME);
   const logRecord: LogRecord = {
-    body: `Next speaker check.`,
-    attributes,
+    body: event.toLogBody(),
+    attributes: event.toOpenTelemetryAttributes(config),
   };
   logger.emit(logRecord);
 }
@@ -511,16 +335,10 @@ export function logSlashCommand(
   ClearcutLogger.getInstance(config)?.logSlashCommandEvent(event);
   if (!isTelemetrySdkInitialized()) return;
 
-  const attributes: LogAttributes = {
-    ...getCommonAttributes(config),
-    ...event,
-    'event.name': EVENT_SLASH_COMMAND,
-  };
-
   const logger = logs.getLogger(SERVICE_NAME);
   const logRecord: LogRecord = {
-    body: `Slash command: ${event.command}.`,
-    attributes,
+    body: event.toLogBody(),
+    attributes: event.toOpenTelemetryAttributes(config),
   };
   logger.emit(logRecord);
 }
@@ -532,16 +350,10 @@ export function logIdeConnection(
   ClearcutLogger.getInstance(config)?.logIdeConnectionEvent(event);
   if (!isTelemetrySdkInitialized()) return;
 
-  const attributes: LogAttributes = {
-    ...getCommonAttributes(config),
-    ...event,
-    'event.name': EVENT_IDE_CONNECTION,
-  };
-
   const logger = logs.getLogger(SERVICE_NAME);
   const logRecord: LogRecord = {
-    body: `Ide connection. Type: ${event.connection_type}.`,
-    attributes,
+    body: event.toLogBody(),
+    attributes: event.toOpenTelemetryAttributes(config),
   };
   logger.emit(logRecord);
 }
@@ -553,16 +365,10 @@ export function logConversationFinishedEvent(
   ClearcutLogger.getInstance(config)?.logConversationFinishedEvent(event);
   if (!isTelemetrySdkInitialized()) return;
 
-  const attributes: LogAttributes = {
-    ...getCommonAttributes(config),
-    ...event,
-    'event.name': EVENT_CONVERSATION_FINISHED,
-  };
-
   const logger = logs.getLogger(SERVICE_NAME);
   const logRecord: LogRecord = {
-    body: `Conversation finished.`,
-    attributes,
+    body: event.toLogBody(),
+    attributes: event.toOpenTelemetryAttributes(config),
   };
   logger.emit(logRecord);
 }
@@ -573,16 +379,10 @@ export function logChatCompression(
 ): void {
   ClearcutLogger.getInstance(config)?.logChatCompressionEvent(event);
 
-  const attributes: LogAttributes = {
-    ...getCommonAttributes(config),
-    ...event,
-    'event.name': EVENT_CHAT_COMPRESSION,
-  };
-
   const logger = logs.getLogger(SERVICE_NAME);
   const logRecord: LogRecord = {
-    body: `Chat compression (Saved ${event.tokens_before - event.tokens_after} tokens)`,
-    attributes,
+    body: event.toLogBody(),
+    attributes: event.toOpenTelemetryAttributes(config),
   };
   logger.emit(logRecord);
 
@@ -598,14 +398,10 @@ export function logKittySequenceOverflow(
 ): void {
   ClearcutLogger.getInstance(config)?.logKittySequenceOverflowEvent(event);
   if (!isTelemetrySdkInitialized()) return;
-  const attributes: LogAttributes = {
-    ...getCommonAttributes(config),
-    ...event,
-  };
   const logger = logs.getLogger(SERVICE_NAME);
   const logRecord: LogRecord = {
-    body: `Kitty sequence buffer overflow: ${event.sequence_length} bytes`,
-    attributes,
+    body: event.toLogBody(),
+    attributes: event.toOpenTelemetryAttributes(config),
   };
   logger.emit(logRecord);
 }
@@ -617,16 +413,10 @@ export function logMalformedJsonResponse(
   ClearcutLogger.getInstance(config)?.logMalformedJsonResponseEvent(event);
   if (!isTelemetrySdkInitialized()) return;
 
-  const attributes: LogAttributes = {
-    ...getCommonAttributes(config),
-    ...event,
-    'event.name': EVENT_MALFORMED_JSON_RESPONSE,
-  };
-
   const logger = logs.getLogger(SERVICE_NAME);
   const logRecord: LogRecord = {
-    body: `Malformed JSON response from ${event.model}.`,
-    attributes,
+    body: event.toLogBody(),
+    attributes: event.toOpenTelemetryAttributes(config),
   };
   logger.emit(logRecord);
 }
@@ -638,20 +428,10 @@ export function logInvalidChunk(
   ClearcutLogger.getInstance(config)?.logInvalidChunkEvent(event);
   if (!isTelemetrySdkInitialized()) return;
 
-  const attributes: LogAttributes = {
-    ...getCommonAttributes(config),
-    'event.name': EVENT_INVALID_CHUNK,
-    'event.timestamp': event['event.timestamp'],
-  };
-
-  if (event.error_message) {
-    attributes['error.message'] = event.error_message;
-  }
-
   const logger = logs.getLogger(SERVICE_NAME);
   const logRecord: LogRecord = {
-    body: `Invalid chunk received from stream.`,
-    attributes,
+    body: event.toLogBody(),
+    attributes: event.toOpenTelemetryAttributes(config),
   };
   logger.emit(logRecord);
   recordInvalidChunk(config);
@@ -664,16 +444,10 @@ export function logContentRetry(
   ClearcutLogger.getInstance(config)?.logContentRetryEvent(event);
   if (!isTelemetrySdkInitialized()) return;
 
-  const attributes: LogAttributes = {
-    ...getCommonAttributes(config),
-    ...event,
-    'event.name': EVENT_CONTENT_RETRY,
-  };
-
   const logger = logs.getLogger(SERVICE_NAME);
   const logRecord: LogRecord = {
-    body: `Content retry attempt ${event.attempt_number} due to ${event.error_type}.`,
-    attributes,
+    body: event.toLogBody(),
+    attributes: event.toOpenTelemetryAttributes(config),
   };
   logger.emit(logRecord);
   recordContentRetry(config);
@@ -686,16 +460,10 @@ export function logContentRetryFailure(
   ClearcutLogger.getInstance(config)?.logContentRetryFailureEvent(event);
   if (!isTelemetrySdkInitialized()) return;
 
-  const attributes: LogAttributes = {
-    ...getCommonAttributes(config),
-    ...event,
-    'event.name': EVENT_CONTENT_RETRY_FAILURE,
-  };
-
   const logger = logs.getLogger(SERVICE_NAME);
   const logRecord: LogRecord = {
-    body: `All content retries failed after ${event.total_attempts} attempts.`,
-    attributes,
+    body: event.toLogBody(),
+    attributes: event.toOpenTelemetryAttributes(config),
   };
   logger.emit(logRecord);
   recordContentRetryFailure(config);
@@ -708,16 +476,10 @@ export function logModelRouting(
   ClearcutLogger.getInstance(config)?.logModelRoutingEvent(event);
   if (!isTelemetrySdkInitialized()) return;
 
-  const attributes: LogAttributes = {
-    ...getCommonAttributes(config),
-    ...event,
-    'event.name': EVENT_MODEL_ROUTING,
-  };
-
   const logger = logs.getLogger(SERVICE_NAME);
   const logRecord: LogRecord = {
-    body: `Model routing decision. Model: ${event.decision_model}, Source: ${event.decision_source}`,
-    attributes,
+    body: event.toLogBody(),
+    attributes: event.toOpenTelemetryAttributes(config),
   };
   logger.emit(logRecord);
   recordModelRoutingMetrics(config, event);
@@ -730,16 +492,10 @@ export function logModelSlashCommand(
   ClearcutLogger.getInstance(config)?.logModelSlashCommandEvent(event);
   if (!isTelemetrySdkInitialized()) return;
 
-  const attributes: LogAttributes = {
-    ...getCommonAttributes(config),
-    ...event,
-    'event.name': EVENT_MODEL_SLASH_COMMAND,
-  };
-
   const logger = logs.getLogger(SERVICE_NAME);
   const logRecord: LogRecord = {
-    body: `Model slash command. Model: ${event.model_name}`,
-    attributes,
+    body: event.toLogBody(),
+    attributes: event.toOpenTelemetryAttributes(config),
   };
   logger.emit(logRecord);
   recordModelSlashCommand(config, event);
@@ -752,21 +508,10 @@ export function logExtensionInstallEvent(
   ClearcutLogger.getInstance(config)?.logExtensionInstallEvent(event);
   if (!isTelemetrySdkInitialized()) return;
 
-  const attributes: LogAttributes = {
-    ...getCommonAttributes(config),
-    ...event,
-    'event.name': EVENT_EXTENSION_INSTALL,
-    'event.timestamp': new Date().toISOString(),
-    extension_name: event.extension_name,
-    extension_version: event.extension_version,
-    extension_source: event.extension_source,
-    status: event.status,
-  };
-
   const logger = logs.getLogger(SERVICE_NAME);
   const logRecord: LogRecord = {
-    body: `Installed extension ${event.extension_name}`,
-    attributes,
+    body: event.toLogBody(),
+    attributes: event.toOpenTelemetryAttributes(config),
   };
   logger.emit(logRecord);
 }
@@ -778,17 +523,10 @@ export function logExtensionUninstall(
   ClearcutLogger.getInstance(config)?.logExtensionUninstallEvent(event);
   if (!isTelemetrySdkInitialized()) return;
 
-  const attributes: LogAttributes = {
-    ...getCommonAttributes(config),
-    ...event,
-    'event.name': EVENT_EXTENSION_UNINSTALL,
-    'event.timestamp': new Date().toISOString(),
-  };
-
   const logger = logs.getLogger(SERVICE_NAME);
   const logRecord: LogRecord = {
-    body: `Uninstalled extension ${event.extension_name}`,
-    attributes,
+    body: event.toLogBody(),
+    attributes: event.toOpenTelemetryAttributes(config),
   };
   logger.emit(logRecord);
 }
@@ -800,17 +538,10 @@ export function logExtensionEnable(
   ClearcutLogger.getInstance(config)?.logExtensionEnableEvent(event);
   if (!isTelemetrySdkInitialized()) return;
 
-  const attributes: LogAttributes = {
-    ...getCommonAttributes(config),
-    ...event,
-    'event.name': EVENT_EXTENSION_ENABLE,
-    'event.timestamp': new Date().toISOString(),
-  };
-
   const logger = logs.getLogger(SERVICE_NAME);
   const logRecord: LogRecord = {
-    body: `Enabled extension ${event.extension_name}`,
-    attributes,
+    body: event.toLogBody(),
+    attributes: event.toOpenTelemetryAttributes(config),
   };
   logger.emit(logRecord);
 }
@@ -822,17 +553,10 @@ export function logExtensionDisable(
   ClearcutLogger.getInstance(config)?.logExtensionDisableEvent(event);
   if (!isTelemetrySdkInitialized()) return;
 
-  const attributes: LogAttributes = {
-    ...getCommonAttributes(config),
-    ...event,
-    'event.name': EVENT_EXTENSION_DISABLE,
-    'event.timestamp': new Date().toISOString(),
-  };
-
   const logger = logs.getLogger(SERVICE_NAME);
   const logRecord: LogRecord = {
-    body: `Disabled extension ${event.extension_name}`,
-    attributes,
+    body: event.toLogBody(),
+    attributes: event.toOpenTelemetryAttributes(config),
   };
   logger.emit(logRecord);
 }
@@ -844,16 +568,10 @@ export function logSmartEditStrategy(
   ClearcutLogger.getInstance(config)?.logSmartEditStrategyEvent(event);
   if (!isTelemetrySdkInitialized()) return;
 
-  const attributes: LogAttributes = {
-    ...getCommonAttributes(config),
-    ...event,
-    'event.name': EVENT_SMART_EDIT_STRATEGY,
-  };
-
   const logger = logs.getLogger(SERVICE_NAME);
   const logRecord: LogRecord = {
-    body: `Smart Edit Tool Strategy: ${event.strategy}`,
-    attributes,
+    body: event.toLogBody(),
+    attributes: event.toOpenTelemetryAttributes(config),
   };
   logger.emit(logRecord);
 }
@@ -865,16 +583,10 @@ export function logSmartEditCorrectionEvent(
   ClearcutLogger.getInstance(config)?.logSmartEditCorrectionEvent(event);
   if (!isTelemetrySdkInitialized()) return;
 
-  const attributes: LogAttributes = {
-    ...getCommonAttributes(config),
-    ...event,
-    'event.name': EVENT_SMART_EDIT_CORRECTION,
-  };
-
   const logger = logs.getLogger(SERVICE_NAME);
   const logRecord: LogRecord = {
-    body: `Smart Edit Correction`,
-    attributes,
+    body: event.toLogBody(),
+    attributes: event.toOpenTelemetryAttributes(config),
   };
   logger.emit(logRecord);
 }
@@ -883,16 +595,10 @@ export function logAgentStart(config: Config, event: AgentStartEvent): void {
   ClearcutLogger.getInstance(config)?.logAgentStartEvent(event);
   if (!isTelemetrySdkInitialized()) return;
 
-  const attributes: LogAttributes = {
-    ...getCommonAttributes(config),
-    ...event,
-    'event.name': EVENT_AGENT_START,
-  };
-
   const logger = logs.getLogger(SERVICE_NAME);
   const logRecord: LogRecord = {
-    body: `Agent ${event.agent_name} started. ID: ${event.agent_id}`,
-    attributes,
+    body: event.toLogBody(),
+    attributes: event.toOpenTelemetryAttributes(config),
   };
   logger.emit(logRecord);
 }
@@ -901,16 +607,10 @@ export function logAgentFinish(config: Config, event: AgentFinishEvent): void {
   ClearcutLogger.getInstance(config)?.logAgentFinishEvent(event);
   if (!isTelemetrySdkInitialized()) return;
 
-  const attributes: LogAttributes = {
-    ...getCommonAttributes(config),
-    ...event,
-    'event.name': EVENT_AGENT_FINISH,
-  };
-
   const logger = logs.getLogger(SERVICE_NAME);
   const logRecord: LogRecord = {
-    body: `Agent ${event.agent_name} finished. Reason: ${event.terminate_reason}. Duration: ${event.duration_ms}ms. Turns: ${event.turn_count}.`,
-    attributes,
+    body: event.toLogBody(),
+    attributes: event.toOpenTelemetryAttributes(config),
   };
   logger.emit(logRecord);
 
@@ -924,16 +624,10 @@ export function logWebFetchFallbackAttempt(
   ClearcutLogger.getInstance(config)?.logWebFetchFallbackAttemptEvent(event);
   if (!isTelemetrySdkInitialized()) return;
 
-  const attributes: LogAttributes = {
-    ...getCommonAttributes(config),
-    ...event,
-    'event.name': EVENT_WEB_FETCH_FALLBACK_ATTEMPT,
-  };
-
   const logger = logs.getLogger(SERVICE_NAME);
   const logRecord: LogRecord = {
-    body: `Web fetch fallback attempt. Reason: ${event.reason}`,
-    attributes,
+    body: event.toLogBody(),
+    attributes: event.toOpenTelemetryAttributes(config),
   };
   logger.emit(logRecord);
 }
