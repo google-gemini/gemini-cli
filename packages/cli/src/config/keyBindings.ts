@@ -115,7 +115,7 @@ export const defaultKeyBindings: KeyBindingConfig = {
   [Command.CLEAR_SCREEN]: [{ key: 'l', ctrl: true }],
 
   // History navigation
-  [Command.HISTORY_UP]: [{ key: 'p', ctrl: true }],
+  [Command.HISTORY_UP]: [{ key: 'p', ctrl: true, shift: false }],
   [Command.HISTORY_DOWN]: [{ key: 'n', ctrl: true }],
   [Command.NAVIGATION_UP]: [{ key: 'up' }],
   [Command.NAVIGATION_DOWN]: [{ key: 'down' }],

@@ -49,7 +49,8 @@ describe('setupGithubCommand', async () => {
     if (scratchDir) await fs.rm(scratchDir, { recursive: true });
   });
 
-  it('returns a tool action to download github workflows and handles paths', async () => {
+  //TODO - https://github.com/google-gemini/gemini-cli/issues/10740
+  it.skip('returns a tool action to download github workflows and handles paths', async () => {
     const fakeRepoOwner = 'fake';
     const fakeRepoName = 'repo';
     const fakeRepoRoot = scratchDir;

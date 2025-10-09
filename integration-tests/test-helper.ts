@@ -176,6 +176,11 @@ export class TestRig {
     const telemetryPath = join(this.testDir, 'telemetry.log'); // Always use test directory for telemetry
 
     const settings = {
+      general: {
+        // Nightly releases sometimes becomes out of sync with local code and
+        // triggers auto-update, which causes tests to fail.
+        disableAutoUpdate: true,
+      },
       telemetry: {
         enabled: true,
         target: 'local',
@@ -854,5 +859,49 @@ export class TestRig {
     });
 
     return { ptyProcess, promise };
+  }
+
+  /**
+   * Waits for an interactive session to be fully ready for input.
+   * This is a higher-level utility to be used with `runInteractive`.
+   *
+   * It handles the initial setup boilerplate:
+   * 1. Automatically handles the authentication prompt if it appears.
+   * 2. Waits for the "Type your message" prompt to ensure the CLI is ready for input.
+   *
+   * Throws an error if the session fails to become ready within the timeout.
+   *
+   * @param ptyProcess The process returned from `runInteractive`.
+   */
+  async ensureReadyForInput(ptyProcess: pty.IPty): Promise<void> {
+    const timeout = 25000;
+    const pollingInterval = 200;
+    const startTime = Date.now();
+    let authPromptHandled = false;
+
+    while (Date.now() - startTime < timeout) {
+      const output = stripAnsi(this._interactiveOutput).toLowerCase();
+
+      // If the ready prompt appears, we're done.
+      if (output.includes('type your message')) {
+        return;
+      }
+
+      // If the auth prompt appears and we haven't handled it yet.
+      if (
+        !authPromptHandled &&
+        output.includes('how would you like to authenticate')
+      ) {
+        ptyProcess.write('2');
+        authPromptHandled = true;
+      }
+
+      // Wait for the next poll.
+      await new Promise((resolve) => setTimeout(resolve, pollingInterval));
+    }
+
+    throw new Error(
+      `CLI did not start up in interactive mode correctly. Output: ${this._interactiveOutput}`,
+    );
   }
 }

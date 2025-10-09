@@ -35,7 +35,9 @@ Gemini CLI extensions can be distributed through [GitHub Releases](https://docs.
 
 Each release includes at least one archive file, which contains the full contents of the repo at the tag that it was linked to. Releases may also include [pre-built archives](#custom-pre-built-archives) if your extension requires some build step or has platform specific binaries attached to it.
 
-When checking for updates, gemini will just look for the latest release on github (you must mark it as such when creating the release), unless the user installed a specific release by passing `--ref=<some-release-tag>`. We do not at this time support opting in to pre-release releases or semver.
+When checking for updates, gemini will just look for the "latest" release on github (you must mark it as such when creating the release), unless the user installed a specific release by passing `--ref=<some-release-tag>`.
+
+You may also install extensions with the `--pre-release` flag in order to get the latest release regardless of whether it has been marked as "latest". This allows you to test that your release works before actually pushing it to all users.
 
 ### Custom pre-built archives
 

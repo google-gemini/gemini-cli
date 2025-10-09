@@ -28,6 +28,9 @@ import { MemoryTool } from '../tools/memoryTool.js';
 import { ReadFileTool } from '../tools/read-file.js';
 import { ReadManyFilesTool } from '../tools/read-many-files.js';
 import { WebSearchTool } from '../tools/web-search.js';
+import { promptIdContext } from '../utils/promptIdContext.js';
+import { logAgentStart, logAgentFinish } from '../telemetry/loggers.js';
+import { AgentStartEvent, AgentFinishEvent } from '../telemetry/types.js';
 import type {
   AgentDefinition,
   AgentInputs,
@@ -104,10 +107,14 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
       await AgentExecutor.validateTools(agentToolRegistry, definition.name);
     }
 
+    // Get the parent prompt ID from context
+    const parentPromptId = promptIdContext.getStore();
+
     return new AgentExecutor(
       definition,
       runtimeContext,
       agentToolRegistry,
+      parentPromptId,
       onActivity,
     );
   }
@@ -122,6 +129,7 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
     definition: AgentDefinition<TOutput>,
     runtimeContext: Config,
     toolRegistry: ToolRegistry,
+    parentPromptId: string | undefined,
     onActivity?: ActivityCallback,
   ) {
     this.definition = definition;
@@ -130,7 +138,10 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
     this.onActivity = onActivity;
 
     const randomIdPart = Math.random().toString(36).slice(2, 8);
-    this.agentId = `${this.definition.name}-${randomIdPart}`;
+    // parentPromptId will be undefined if this agent is invoked directly
+    // (top-level), rather than as a sub-agent.
+    const parentPrefix = parentPromptId ? `${parentPromptId}-` : '';
+    this.agentId = `${parentPrefix}${this.definition.name}-${randomIdPart}`;
   }
 
   /**
@@ -143,12 +154,17 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
   async run(inputs: AgentInputs, signal: AbortSignal): Promise<OutputObject> {
     const startTime = Date.now();
     let turnCounter = 0;
+    let terminateReason: AgentTerminateMode = AgentTerminateMode.ERROR;
+    let finalResult: string | null = null;
+
+    logAgentStart(
+      this.runtimeContext,
+      new AgentStartEvent(this.agentId, this.definition.name),
+    );
 
     try {
       const chat = await this.createChatObject(inputs);
       const tools = this.prepareToolsList();
-      let terminateReason = AgentTerminateMode.ERROR;
-      let finalResult: string | null = null;
 
       const query = this.definition.promptConfig.query
         ? templateString(this.definition.promptConfig.query, inputs)
@@ -167,14 +183,12 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
           break;
         }
 
-        // Call model
-        const promptId = `${this.runtimeContext.getSessionId()}#${this.agentId}#${turnCounter++}`;
-        const { functionCalls } = await this.callModel(
-          chat,
-          currentMessage,
-          tools,
-          signal,
+        const promptId = `${this.agentId}#${turnCounter++}`;
+
+        const { functionCalls } = await promptIdContext.run(
           promptId,
+          async () =>
+            this.callModel(chat, currentMessage, tools, signal, promptId),
         );
 
         if (signal.aborted) {
@@ -220,6 +234,17 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
     } catch (error) {
       this.emitActivity('ERROR', { error: String(error) });
       throw error; // Re-throw the error for the parent context to handle.
+    } finally {
+      logAgentFinish(
+        this.runtimeContext,
+        new AgentFinishEvent(
+          this.agentId,
+          this.definition.name,
+          Date.now() - startTime,
+          turnCounter,
+          terminateReason,
+        ),
+      );
     }
   }
 

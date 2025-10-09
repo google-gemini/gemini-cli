@@ -32,13 +32,25 @@ class MockProcessExitError extends Error {
 }
 
 // Mock dependencies
-vi.mock('./config/settings.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('./config/settings.js')>();
-  return {
-    ...actual,
-    loadSettings: vi.fn(),
-  };
-});
+vi.mock('./config/settings.js', () => ({
+  loadSettings: vi.fn().mockReturnValue({
+    merged: {
+      advanced: {},
+      security: { auth: {} },
+      ui: {},
+    },
+    setValue: vi.fn(),
+    forScope: () => ({ settings: {}, originalSettings: {}, path: '' }),
+    errors: [],
+  }),
+  migrateDeprecatedSettings: vi.fn(),
+  SettingScope: {
+    User: 'user',
+    Workspace: 'workspace',
+    System: 'system',
+    SystemDefaults: 'system-defaults',
+  },
+}));
 
 vi.mock('./config/config.js', () => ({
   loadCliConfig: vi.fn().mockResolvedValue({

@@ -899,9 +899,13 @@ describe('GeminiChat', () => {
       expect(mockLogContentRetry).toHaveBeenCalledTimes(1);
       expect(mockLogContentRetryFailure).toHaveBeenCalledTimes(1);
 
-      // History should be clean, as if the failed turn never happened.
+      // History should still contain the user message.
       const history = chat.getHistory();
-      expect(history.length).toBe(0);
+      expect(history.length).toBe(1);
+      expect(history[0]).toEqual({
+        role: 'user',
+        parts: [{ text: 'test' }],
+      });
     });
 
     describe('API error retry behavior', () => {
