@@ -2355,7 +2355,10 @@ describe('Settings Loading and Merging', () => {
       mockDisableExtension = vi.mocked(disableExtension);
 
       (mockFsExistsSync as Mock).mockReturnValue(true);
-      vi.mocked(isWorkspaceTrusted).mockReturnValue(true);
+      vi.mocked(isWorkspaceTrusted).mockReturnValue({
+        isTrusted: true,
+        source: undefined,
+      });
     });
 
     afterEach(() => {
