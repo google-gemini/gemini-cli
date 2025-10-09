@@ -4,18 +4,26 @@ Wondering what's new in Gemini CLI? This document provides key highlights and no
 
 ## v0.8.0 - Gemini CLI weekly update - 2025-09-29
 
-- 🎉**Introducing Gemini CLI Extensions**🎉:
-  - Build, manage, and customize your Gemini CLI experience with extensions.
-  - Manage your extensions at the command line with:
+- 🎉 **Announcing Gemini CLI Extensions** 🎉
+  - Completely customize your Gemini CLI experience to fit your workflow.
+  - Build and share your own Gemini CLI extensions with the world.
+  - Launching with a growing catalog of community, partner, and Google-built extensions.
+    - Check extensions from [key launch partners](https://github.com/google-gemini/gemini-cli/discussions/10718).
+  - Easy install:
+    - `gemini extensions install <github url|folder path>`
+  - Easy management:
     - `gemini extensions install|uninstall|link`
     - `gemini extensions enable|disable`
-    - `gemini extensions list|update`
-- 🎉 **Interactive shell:** Run interactive commands like `vim`, `rebase -i`, or even `gemini` 😎 directly in Gemini CLI. ([pr](https://github.com/google-gemini/gemini-cli/pull/6694) by [@galz10](https://github.com/galz10))
-- **Model selection:** Choose the Gemini model for your session with /model. ([pr](https://github.com/google-gemini/gemini-cli/pull/8940) by [@abhipatel12](https://github.com/abhipatel12))
-- **Model routing:** Gemini CLI will now intelligently pick the best model for the task. Simple queries will be sent to Flash while complex analytical or creative tasks will still use the power of Pro. This ensures your quota will last for a longer period of time. You can always opt-out of this via `/model`. ([pr](https://github.com/google-gemini/gemini-cli/pull/9262) by [@abhipatel12](https://github.com/abhipatel12))
-- **Folder trust:**
-  - Opening Gemini CLI in a folder for the first time will now surface a trust dialog. ([pr](https://github.com/google-gemini/gemini-cli/pull/5815) by [@shrutip90](https://github.com/shrutip90))
-  - Enable or disable checking folder trust holistically with `folderTrust` in your settings.json. ([pr](https://github.com/google-gemini/gemini-cli/pull/5798) by [@shrutip90](https://github.com/shrutip90))
+    - `gemini extensions list|update|new`
+  - Or use commands while running with `/extensions list|update`.
+  - Everything you need to know: [Now open for building: Introducing Gemini CLI extensions](https://blog.google/technology/developers/gemini-cli-extensions/).
+- 🎉 **Our New Home Page & Better Documentation** 🎉
+  - Check out our new home page for better getting started material, reference documentation, extensions and more!
+  - _Homepage:_ [https://geminicli.com](https://geminicli.com)
+  - ‼️*NEW documentation:* [https://geminicli.com/docs](https://geminicli.com/docs) (Have any [suggestions](https://github.com/google-gemini/gemini-cli/discussions/8722)?)
+  - _Extensions:_ [https://geminicli.com/extensions](https://geminicli.com/extensions)
+- **Non-Interactive Allowed Tools:** `--allowed-tools` will now also work in non-interactive mode. ([pr](https://github.com/google-gemini/gemini-cli/pull/9114) by [@mistergarrison](https://github.com/mistergarrison))
+- **Terminal Title Status:** See the CLI's real-time status and thoughts directly in the terminal window's title by setting `showStatusInTitle: true`. ([pr](https://github.com/google-gemini/gemini-cli/pull/4386) by [@Fridayxiao](https://github.com/Fridayxiao))
 - **Small features, polish, reliability & bug fixes:** A large amount of changes, smaller features, UI updates, reliability and bug fixes + general polish made it in this week!
 
 ## v0.7.0 - Gemini CLI weekly update - 2025-09-22

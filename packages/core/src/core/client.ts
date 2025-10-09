@@ -207,6 +207,10 @@ export class GeminiClient {
     return this.loopDetector;
   }
 
+  getCurrentSequenceModel(): string | null {
+    return this.currentSequenceModel;
+  }
+
   async addDirectoryContext(): Promise<void> {
     if (!this.chat) {
       return;
@@ -221,23 +225,37 @@ export class GeminiClient {
   async startChat(extraHistory?: Content[]): Promise<GeminiChat> {
     this.forceFullIdeContext = true;
     this.hasFailedCompressionAttempt = false;
-    const envParts = await getEnvironmentContext(this.config);
 
     const toolRegistry = this.config.getToolRegistry();
     const toolDeclarations = toolRegistry.getFunctionDeclarations();
     const tools: Tool[] = [{ functionDeclarations: toolDeclarations }];
 
+    // 1. Get the environment context parts as an array
+    const envParts = await getEnvironmentContext(this.config);
+
+    // 2. Convert the array of parts into a single string
+    const envContextString = envParts
+      .map((part) => part.text || '')
+      .join('\n\n');
+
+    // 3. Combine the dynamic context with the static handshake instruction
+    const allSetupText = `
+${envContextString}
+
+Reminder: Do not return an empty response when a tool call is required.
+
+My setup is complete. I will provide my first command in the next turn.
+    `.trim();
+
+    // 4. Create the history with a single, comprehensive user turn
     const history: Content[] = [
       {
         role: 'user',
-        parts: envParts,
-      },
-      {
-        role: 'model',
-        parts: [{ text: 'Got it. Thanks for the context!' }],
+        parts: [{ text: allSetupText }],
       },
       ...(extraHistory ?? []),
     ];
+
     try {
       const userMemory = this.config.getUserMemory();
       const systemInstruction = getCoreSystemPrompt(this.config, userMemory);
@@ -440,6 +458,19 @@ export class GeminiClient {
     }
   }
 
+  private _getEffectiveModelForCurrentTurn(): string {
+    if (this.currentSequenceModel) {
+      return this.currentSequenceModel;
+    }
+
+    const configModel = this.config.getModel();
+    const model: string =
+      configModel === DEFAULT_GEMINI_MODEL_AUTO
+        ? DEFAULT_GEMINI_MODEL
+        : configModel;
+    return getEffectiveModel(this.config.isInFallbackMode(), model);
+  }
+
   async *sendMessageStream(
     request: PartListUnion,
     signal: AbortSignal,
@@ -462,6 +493,25 @@ export class GeminiClient {
     // Ensure turns never exceeds MAX_TURNS to prevent infinite loops
     const boundedTurns = Math.min(turns, MAX_TURNS);
     if (!boundedTurns) {
+      return new Turn(this.getChat(), prompt_id);
+    }
+
+    // Check for context window overflow
+    const modelForLimitCheck = this._getEffectiveModelForCurrentTurn();
+
+    const estimatedRequestTokenCount = Math.floor(
+      JSON.stringify(request).length / 4,
+    );
+
+    const remainingTokenCount =
+      tokenLimit(modelForLimitCheck) -
+      uiTelemetryService.getLastPromptTokenCount();
+
+    if (estimatedRequestTokenCount > remainingTokenCount * 0.95) {
+      yield {
+        type: GeminiEventType.ContextWindowWillOverflow,
+        value: { estimatedRequestTokenCount, remainingTokenCount },
+      };
       return new Turn(this.getChat(), prompt_id);
     }
 
@@ -656,14 +706,7 @@ export class GeminiClient {
     // If the model is 'auto', we will use a placeholder model to check.
     // Compression occurs before we choose a model, so calling `count_tokens`
     // before the model is chosen would result in an error.
-    const configModel = this.config.getModel();
-    let model: string =
-      configModel === DEFAULT_GEMINI_MODEL_AUTO
-        ? DEFAULT_GEMINI_MODEL
-        : configModel;
-
-    // Check if the model needs to be a fallback
-    model = getEffectiveModel(this.config.isInFallbackMode(), model);
+    const model = this._getEffectiveModelForCurrentTurn();
 
     const curatedHistory = this.getChat().getHistory(true);
 

@@ -79,8 +79,8 @@ export enum EventMetadataKey {
   // Logs the tool call duration in milliseconds.
   GEMINI_CLI_TOOL_CALL_DURATION_MS = 17,
 
-  // Logs the tool call error message, if any.
-  GEMINI_CLI_TOOL_ERROR_MESSAGE = 18,
+  // Do not use.
+  DEPRECATED_GEMINI_CLI_TOOL_ERROR_MESSAGE = 18,
 
   // Logs the tool call error type, if any.
   GEMINI_CLI_TOOL_CALL_ERROR_TYPE = 19,
@@ -259,8 +259,8 @@ export enum EventMetadataKey {
   // Kitty Sequence Overflow Event Keys
   // ===========================================================================
 
-  // Logs the truncated kitty sequence.
-  GEMINI_CLI_KITTY_TRUNCATED_SEQUENCE = 52,
+  // Do not use.
+  DEPRECATED_GEMINI_CLI_KITTY_TRUNCATED_SEQUENCE = 52,
 
   // Logs the length of the kitty sequence that overflowed.
   GEMINI_CLI_KITTY_SEQUENCE_LENGTH = 53,
@@ -426,4 +426,23 @@ export enum EventMetadataKey {
 
   // Logs an event when the user uses the /model command.
   GEMINI_CLI_MODEL_SLASH_COMMAND = 108,
+
+  // ==========================================================================
+  // Agent Event Keys
+  // ==========================================================================
+
+  // Logs the name of the agent.
+  GEMINI_CLI_AGENT_NAME = 111,
+
+  // Logs the unique ID of the agent instance.
+  GEMINI_CLI_AGENT_ID = 112,
+
+  // Logs the duration of the agent execution in milliseconds.
+  GEMINI_CLI_AGENT_DURATION_MS = 113,
+
+  // Logs the number of turns the agent took.
+  GEMINI_CLI_AGENT_TURN_COUNT = 114,
+
+  // Logs the reason for agent termination.
+  GEMINI_CLI_AGENT_TERMINATE_REASON = 115,
 }
