@@ -50,6 +50,11 @@ inputs:
   gemini_api_key:
     description: 'The API key for running integration tests.'
     required: true
+  # Evaluation inputs
+  run_evaluation:
+    description: 'Run SWE-bench evaluation before publishing.'
+    required: false
+    default: 'true'
   gcp-wif-provider:
     description: 'The GCP Workload Identity Federation provider.'
     required: true
@@ -68,41 +73,39 @@ inputs:
   resolution-rate-threshold:
     description: 'The threshold for the resolution rate.'
     required: false
-    default: '90'
   tool-success-rate-threshold:
     description: 'The threshold for the tool success rate.'
     required: false
-    default: '80'
 
 runs:
   using: 'composite'
   steps:
     - name: 'Run Pre-Release Evaluation'
+      if: "${{ inputs.run_evaluation == 'true' && inputs.branch-name != '' }}"
       uses: './.github/actions/run-evaluation'
       with:
-        branch-name: '${{ inputs.branch-name }}'
-        github-token: '${{ inputs.github-token }}'
-        gcp-wif-provider: '${{ inputs.gcp-wif-provider }}'
-        gcp-project-id: '${{ inputs.gcp-project-id }}'
-        service-account-email: '${{ inputs.service-account-email }}'
-        eval-gemini-api-key: '${{ inputs.eval-gemini-api-key }}'
-        eval-gcs-bucket: '${{ inputs.eval-gcs-bucket }}'
-        resolution-rate-threshold: '${{ inputs.resolution-rate-threshold }}'
-        tool-success-rate-threshold: '${{ inputs.tool-success-rate-threshold }}'
-        working-directory: '${{ inputs.working-directory }}'
-        dry-run: '${{ inputs.dry-run }}'
+        branch-or-commit: "${{ inputs.branch-name }}"
+        github-token: "${{ inputs.github-token }}"
+        gcp-wif-provider: "${{ inputs.gcp-wif-provider }}"
+        gcp-project-id: "${{ inputs.gcp-project-id }}"
+        service-account-email: "${{ inputs.service-account-email }}"
+        eval-gemini-api-key: "${{ inputs.eval-gemini-api-key }}"
+        eval-gcs-bucket: "${{ inputs.eval-gcs-bucket }}"
+        resolution-rate-threshold: "${{ inputs.resolution-rate-threshold }}"
+        tool-success-rate-threshold: "${{ inputs.tool-success-rate-threshold }}"
+        working-directory: "${{ inputs.working-directory }}"
 
     - name: 'Configure npm for publishing'
       uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020'
       with:
-        node-version-file: '${{ inputs.working-directory }}/.nvmrc'
+        node-version-file: "${{ inputs.working-directory }}/.nvmrc"
         registry-url: 'https://wombat-dressing-room.appspot.com'
         scope: '@google'
 
     - name: '📦 Publish @google/gemini-cli-core'
-      working-directory: '${{ inputs.working-directory }}'
+      working-directory: "${{ inputs.working-directory }}"
       env:
-        NODE_AUTH_TOKEN: '${{ inputs.wombat-token-core }}'
+        NODE_AUTH_TOKEN: "${{ inputs.wombat-token-core }}"
       shell: 'bash'
       run: |
         if [ "${{ inputs.dry-run }}" == "true" ]; then
@@ -112,7 +115,7 @@ runs:
         fi
 
     - name: '🔗 Install latest core package'
-      working-directory: '${{ inputs.working-directory }}'
+      working-directory: "${{ inputs.working-directory }}"
       if: "${{ inputs.dry-run != 'true' }}"
       shell: 'bash'
       run: |
@@ -121,9 +124,9 @@ runs:
         --save-exact
 
     - name: '📦 Publish @google/gemini-cli'
-      working-directory: '${{ inputs.working-directory }}'
+      working-directory: "${{ inputs.working-directory }}"
       env:
-        NODE_AUTH_TOKEN: '${{ inputs.wombat-token-cli }}'
+        NODE_AUTH_TOKEN: "${{ inputs.wombat-token-cli }}"
       shell: 'bash'
       run: |
         if [ "${{ inputs.dry-run }}" == "true" ]; then
@@ -136,32 +139,32 @@ runs:
       uses: './.github/actions/verify-release'
       if: "${{ inputs.dry-run != 'true' && inputs.force-skip-tests != 'true' }}"
       with:
-        npm-package: '@google/gemini-cli@${{ inputs.release-version }}'
-        expected-version: '${{ inputs.release-version }}'
-        ref: '${{ inputs.branch-name }}'
-        gemini_api_key: '${{ inputs.gemini_api_key }}'
+        npm-package: "@google/gemini-cli@${{ inputs.release-version }}"
+        expected-version: "${{ inputs.release-version }}"
+        ref: "${{ inputs.branch-name }}"
+        gemini_api_key: "${{ inputs.gemini_api_key }}"
 
     - name: '🏷️ Tag release'
       uses: './.github/actions/tag-npm-release'
       if: "${{ inputs.dry-run != 'true' }}"
       with:
-        channel: '${{ inputs.npm-tag }}'
-        version: '${{ inputs.release-version }}'
-        dry-run: '${{ inputs.dry-run }}'
-        wombat-token-core: '${{ inputs.wombat-token-core }}'
-        wombat-token-cli: '${{ inputs.wombat-token-cli }}'
+        channel: "${{ inputs.npm-tag }}"
+        version: "${{ inputs.release-version }}"
+        dry-run: "${{ inputs.dry-run }}"
+        wombat-token-core: "${{ inputs.wombat-token-core }}"
+        wombat-token-cli: "${{ inputs.wombat-token-cli }}"
 
     - name: '🎁 Bundle'
-      working-directory: '${{ inputs.working-directory }}'
+      working-directory: "${{ inputs.working-directory }}"
       shell: 'bash'
       run: |
         npm run bundle
 
     - name: '🎉 Create GitHub Release'
-      working-directory: '${{ inputs.working-directory }}'
+      working-directory: "${{ inputs.working-directory }}"
       if: "${{ inputs.dry-run != 'true' && inputs.skip-github-release != 'true' && inputs.npm-tag != 'dev' }}"
       env:
-        GITHUB_TOKEN: '${{ inputs.github-token }}'
+        GITHUB_TOKEN: "${{ inputs.github-token }}"
       shell: 'bash'
       run: |
         gh release create "${{ inputs.release-tag }}" \
@@ -172,7 +175,7 @@ runs:
           --generate-notes
 
     - name: '🧹 Clean up release branch'
-      working-directory: '${{ inputs.working-directory }}'
+      working-directory: "${{ inputs.working-directory }}"
       if: "${{ inputs.dry-run != 'true' && inputs.skip-branch-cleanup != 'true' }}"
       continue-on-error: true
       shell: 'bash'

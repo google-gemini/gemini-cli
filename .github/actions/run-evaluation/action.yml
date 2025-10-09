@@ -1,9 +1,9 @@
 name: 'Run Evaluation'
-description: 'Runs the SWE-bench evaluation in a container, parses the results, and checks them against a threshold.'
+description: 'Runs the SWE-bench evaluation in a container and checks against thresholds.'
 
 inputs:
-  branch-name:
-    description: 'The branch to run the evaluation on.'
+  branch-or-commit:
+    description: 'The branch or commit to run the evaluation on.'
     required: true
   github-token:
     description: 'The GitHub token for authentication.'
@@ -36,10 +36,19 @@ inputs:
     required: false
     default: '.'
 
+outputs:
+  resolution-rate:
+    description: "The calculated resolution rate."
+    value: ${{ steps.calculate-rates.outputs.resolution-rate }}
+  tool-success-rate:
+    description: "The calculated tool success rate."
+    value: ${{ steps.calculate-rates.outputs.tool-success-rate }}
+
 runs:
   using: 'composite'
   steps:
     - name: 'Authenticate to Google Cloud'
+      id: auth
       uses: 'google-github-actions/auth@v2'
       with:
         project_id: '${{ inputs.gcp-project-id }}'
@@ -47,6 +56,7 @@ runs:
         service_account: '${{ inputs.service-account-email }}'
         token_format: 'access_token'
         access_token_scopes: 'https://www.googleapis.com/auth/cloud-platform'
+        create_credentials_file: true
 
     - name: 'Log in to GitHub Container Registry'
       uses: 'docker/login-action@184bdaa0721073962dff0199f1fb9940f07167d1' # ratchet:docker/login-action@v3
@@ -55,37 +65,64 @@ runs:
         username: '${{ github.actor }}'
         password: '${{ inputs.github-token }}'
 
-    - name: 'Run evaluation container'
+    - name: 'Run evaluation'
       shell: 'bash'
+      env:
+        IMG: 'ghcr.io/google-gemini/gemini-cli-swe-agent-eval@sha256:cd5edc4afd2245c1f575e791c0859b3c084a86bb3bd9a6762296da5162b35a8f'
       run: |
-        mkdir -p "${{ inputs.working-directory }}/experiments"
+        # Prepare directories for mounting
+        HOST_WORKDIR=$(readlink -f "${{ inputs.working-directory }}")
+        mkdir -p "$HOST_WORKDIR/experiments"
+
+        # Create a temp file for GITHUB_OUTPUT inside container
+        touch "$HOST_WORKDIR/container_github_output"
+
+        # Run container
         docker run --rm \
           --workdir /app \
           --entrypoint /bin/bash \
-          -v "${{ inputs.working-directory }}/experiments:/app/experiments" \
+          -v "$HOST_WORKDIR/experiments:/app/experiments" \
+          -v "$HOST_WORKDIR:/github/workspace" \
+          -v "${{ steps.auth.outputs.credentials_file_path }}:/gcp/creds.json" \
+          -v "$HOST_WORKDIR/container_github_output:/tmp/github_output" \
           -e GITHUB_TOKEN='${{ inputs.github-token }}' \
           -e DEFAULT_VERTEXAI_PROJECT='${{ inputs.gcp-project-id }}' \
           -e GOOGLE_CLOUD_PROJECT='${{ inputs.gcp-project-id }}' \
+          -e GOOGLE_APPLICATION_CREDENTIALS='/gcp/creds.json' \
           -e GEMINI_API_KEY='${{ inputs.eval-gemini-api-key }}' \
           -e GCLI_LOCAL_FILE_TELEMETRY='True' \
           -e EVAL_GCS_BUCKET='${{ inputs.eval-gcs-bucket }}' \
-          -e NPM_CONFIG_UPDATE_NOTIFIER='false' \
-          -e NPM_CONFIG_LOGLEVEL='error' \
-          ghcr.io/google-gemini/gemini-cli-swe-agent-eval@sha256:cd5edc4afd2245c1f575e791c0859b3c084a86bb3bd9a6762296da5162b35a8f \
-          -c "poetry run exp_run --experiment-mode=on-demand --branch-or-commit=${{ inputs.branch-name }} --model-name=gemini-2.5-pro --dataset=swebench_verified --concurrency 15 && poetry run python agent_prototypes/scripts/parse_gcli_logs_experiment.py --experiment_dir=experiments/adhoc/gcli_temp_exp --gcs-bucket='${{ inputs.eval-gcs-bucket }}' --gcs-path=gh_action_artifacts"
+          -e GITHUB_WORKSPACE='/github/workspace' \
+          -e GITHUB_OUTPUT='/tmp/github_output' \
+          $IMG \
+          -c "
+            set -e
+            cd /github/workspace
+            git clean -fdx
+            git reset --hard HEAD
+            cd /app
+            poetry run exp_run --experiment-mode=on-demand --branch-or-commit=${{ inputs.branch-or-commit }} --model-name=gemini-2.5-pro --dataset=swebench_verified --concurrency=15
+            poetry run python agent_prototypes/scripts/parse_gcli_logs_experiment.py --experiment_dir=experiments/adhoc/gcli_temp_exp --gcs-bucket='${{ inputs.eval-gcs-bucket }}' --gcs-path=gh_action_artifacts
+            poetry run bash /github/workspace/scripts/calculate_eval_success_rates.sh /app/experiments/adhoc/gcli_temp_exp/artifacts/summary_stats.md
+          "
 
-    - name: 'Get evaluation summary'
+    - name: 'Read outputs and cleanup'
       id: 'calculate-rates'
       shell: 'bash'
       run: |
-        # The eval container runs as root, so we need to change ownership back to the runner user
-        sudo chown -R "$(whoami)":"$(whoami)" "${{ inputs.working-directory }}/experiments"
-        bash ${{ inputs.working-directory }}/scripts/calculate_eval_success_rates.sh ${{ inputs.working-directory }}/experiments/adhoc/gcli_temp_exp/artifacts/summary_stats.md
+        HOST_WORKDIR=$(readlink -f "${{ inputs.working-directory }}")
+        
+        # Read outputs from container
+        if [ -f "$HOST_WORKDIR/container_github_output" ]; then
+          cat "$HOST_WORKDIR/container_github_output" >> "$GITHUB_OUTPUT"
+          rm "$HOST_WORKDIR/container_github_output"
+        fi
 
-    - name: 'Check evaluation threshold'
+        # Fix ownership of generated files
+        sudo chown -R "$(whoami)":"$(whoami)" "$HOST_WORKDIR/experiments"
+
+    - name: 'Check evaluation thresholds'
       shell: 'bash'
-      env:
-        GITHUB_TOKEN: ${{ inputs.github-token }}
       run: |
         resolution_rate=${{ steps.calculate-rates.outputs.resolution-rate }}
         tool_success_rate=${{ steps.calculate-rates.outputs.tool-success-rate }}
@@ -95,33 +132,10 @@ runs:
         echo "Resolution Rate: ${resolution_rate}% (Threshold: ${resolution_threshold}%)"
         echo "Tool Success Rate: ${tool_success_rate}% (Threshold: ${tool_threshold}%)"
 
-        if (( resolution_rate < resolution_threshold || tool_success_rate < tool_threshold )); then
-          TITLE="Pre-Release Evaluation Failed for branch ${{ inputs.branch-name }}"
-          BODY=$(cat <<EOF
-        The pre-release evaluation for branch **${{ inputs.branch-name }}** failed to meet the required thresholds.
-
-        - **Resolution Rate:** ${resolution_rate}% (Threshold: ${resolution_threshold}%)
-        - **Tool Success Rate:** ${tool_success_rate}% (Threshold: ${tool_threshold}%)
-
-        See the full run for details: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-        EOF
-          )
-          LABELS="kind/bug,release-failure,priority/p0"
-
-          if [[ "${{ inputs.dry-run }}" == "true" ]]; then
-            echo "DRY RUN: Would have created the following issue:"
-            echo "---"
-            echo "Title: $TITLE"
-            echo "Body: $BODY"
-            echo "Labels: $LABELS"
-            echo "---"
-          else
-            echo "Evaluation failed to meet the required thresholds. Creating an issue."
-            gh issue create \
-              --title "$TITLE" \
-              --body "$BODY" \
-              --label "$LABELS"
-          fi
+        # Use bc for floating point comparison
+        if (( $(echo "$resolution_rate < $resolution_threshold" | bc -l) )) || (( $(echo "$tool_success_rate < $tool_threshold" | bc -l) )); then
+          echo "Error: Evaluation failed to meet required thresholds."
+          exit 1
         else
-          echo "Evaluation meets or exceeds threshold."
+          echo "Evaluation meets or exceeds thresholds."
         fi
