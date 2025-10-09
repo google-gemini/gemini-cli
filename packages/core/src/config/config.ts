@@ -116,6 +116,14 @@ export interface OutputSettings {
   format?: OutputFormat;
 }
 
+export interface CodebaseInvestigatorSettings {
+  enabled?: boolean;
+  maxNumTurns?: number;
+  maxTimeMinutes?: number;
+  thinkingBudget?: number;
+  model?: string;
+}
+
 /**
  * All information required in CLI to handle an extension. Defined in Core so
  * that the collection of loaded, active, and inactive extensions can be passed
@@ -270,6 +278,7 @@ export interface ConfigParameters {
   useModelRouter?: boolean;
   enableMessageBusIntegration?: boolean;
   enableSubagents?: boolean;
+  codebaseInvestigatorSettings?: CodebaseInvestigatorSettings;
 }
 
 export class Config {
@@ -363,6 +372,7 @@ export class Config {
   private readonly useModelRouter: boolean;
   private readonly enableMessageBusIntegration: boolean;
   private readonly enableSubagents: boolean;
+  private readonly codebaseInvestigatorSettings?: CodebaseInvestigatorSettings;
 
   constructor(params: ConfigParameters) {
     this.sessionId = params.sessionId;
@@ -453,6 +463,7 @@ export class Config {
     this.enableMessageBusIntegration =
       params.enableMessageBusIntegration ?? false;
     this.enableSubagents = params.enableSubagents ?? false;
+    this.codebaseInvestigatorSettings = params.codebaseInvestigatorSettings;
     this.extensionManagement = params.extensionManagement ?? true;
     this.storage = new Storage(this.targetDir);
     this.enablePromptCompletion = params.enablePromptCompletion ?? false;
@@ -1034,6 +1045,10 @@ export class Config {
 
   getEnableSubagents(): boolean {
     return this.enableSubagents;
+  }
+
+  getCodebaseInvestigatorSettings(): CodebaseInvestigatorSettings | undefined {
+    return this.codebaseInvestigatorSettings;
   }
 
   async createToolRegistry(): Promise<ToolRegistry> {

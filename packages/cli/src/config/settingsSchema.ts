@@ -14,6 +14,7 @@ import type {
 import {
   DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
   DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
+  DEFAULT_GEMINI_MODEL,
 } from '@google/gemini-cli-core';
 import type { CustomTheme } from '../ui/themes/theme.js';
 import type { SessionRetentionSettings } from './settings.js';
@@ -1059,6 +1060,66 @@ const SETTINGS_SCHEMA = {
         default: false,
         description: 'Enable experimental subagents.',
         showInDialog: false,
+      },
+      codebaseInvestigatorSettings: {
+        type: 'object',
+        label: 'Codebase Investigator Settings',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: {},
+        description: 'Configuration for Codebase Investigator.',
+        showInDialog: false,
+        properties: {
+          enabled: {
+            type: 'boolean',
+            label: 'Enable Codebase Investigator',
+            category: 'Experimental',
+            requiresRestart: true,
+            default: false,
+            description: 'Enable the Codebase Investigator agent.',
+            showInDialog: true,
+          },
+          maxNumTurns: {
+            type: 'number',
+            label: 'Codebase Investigator Max Num Turns',
+            category: 'Experimental',
+            requiresRestart: true,
+            default: 15,
+            description:
+              'Maximum number of turns for the Codebase Investigator agent.',
+            showInDialog: true,
+          },
+          maxTimeMinutes: {
+            type: 'number',
+            label: 'Max Time (Minutes)',
+            category: 'Experimental',
+            requiresRestart: true,
+            default: 15,
+            description:
+              'Maximum time for the Codebase Investigator agent (in minutes).',
+            showInDialog: false,
+          },
+          thinkingBudget: {
+            type: 'number',
+            label: 'Thinking Budget',
+            category: 'Experimental',
+            requiresRestart: true,
+            default: -1,
+            description:
+              'The thinking budget for the Codebase Investigator agent.',
+            showInDialog: false,
+          },
+          model: {
+            type: 'string',
+            label: 'Model',
+            category: 'Experimental',
+            requiresRestart: true,
+            default: DEFAULT_GEMINI_MODEL,
+            description:
+              'The model to use for the Codebase Investigator agent.',
+            showInDialog: false,
+          },
+        },
       },
     },
   },
