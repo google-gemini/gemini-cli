@@ -11,6 +11,7 @@ import type {
   ExtensionInstallMetadata,
   GeminiCLIExtension,
 } from '@google/gemini-cli-core';
+import { escapeAnsiCtrlCodes } from '@google/gemini-cli-core';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
@@ -30,6 +31,7 @@ export const INSTALL_METADATA_FILENAME = '.gemini-extension-install.json';
 interface ExtensionConfig {
   name: string;
   version: string;
+  author?: string;
   mcpServers?: Record<string, MCPServerConfig>;
   contextFileName?: string | string[];
   excludeTools?: string[];
@@ -106,16 +108,20 @@ function loadExtension(extensionDir: string): GeminiCLIExtension | null {
       .map((contextFileName) => path.join(extensionDir, contextFileName))
       .filter((contextFilePath) => fs.existsSync(contextFilePath));
 
-    return {
+    const extension = {
       name: config.name,
       version: config.version,
+      author: config.author,
       path: extensionDir,
       contextFiles,
       installMetadata,
       mcpServers: config.mcpServers,
       excludeTools: config.excludeTools,
       isActive: true, // Barring any other signals extensions should be considered Active.
-    } as GeminiCLIExtension;
+    };
+
+    // Sanitize all user-provided fields once to prevent ANSI escape code injection.
+    return escapeAnsiCtrlCodes(extension) as GeminiCLIExtension;
   } catch (e) {
     logger.error(
       `Warning: error parsing extension config in ${configFilePath}: ${e}`,

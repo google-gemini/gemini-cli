@@ -19,6 +19,7 @@ export function createExtension({
   extensionsDir = 'extensions-dir',
   name = 'my-extension',
   version = '1.0.0',
+  author = undefined as string | undefined,
   addContextFile = false,
   contextFileName = undefined as string | undefined,
   mcpServers = {} as Record<string, MCPServerConfig>,
@@ -28,7 +29,7 @@ export function createExtension({
   fs.mkdirSync(extDir, { recursive: true });
   fs.writeFileSync(
     path.join(extDir, EXTENSIONS_CONFIG_FILENAME),
-    JSON.stringify({ name, version, contextFileName, mcpServers }),
+    JSON.stringify({ name, version, author, contextFileName, mcpServers }),
   );
 
   if (addContextFile) {

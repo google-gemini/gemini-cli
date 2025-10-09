@@ -41,6 +41,7 @@
     "@xterm/headless": "5.5.0",
     "ajv": "^8.17.1",
     "ajv-formats": "^3.0.0",
+    "ansi-regex": "^6.2.2",
     "chardet": "^2.1.0",
     "diff": "^7.0.0",
     "dotenv": "^17.1.0",
