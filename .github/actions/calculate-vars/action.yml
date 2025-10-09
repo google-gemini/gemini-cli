@@ -11,8 +11,13 @@ inputs:
 
 runs:
   using: 'composite'
+  outputs:
+    is_dry_run:
+      description: 'Calculated boolean string ("true" or "false") for dry run status.'
+      value: ${{ steps.vars.outputs.is_dry_run }}
   steps:
     - name: 'Set booleans for simplified logic'
+      id: 'vars'
       shell: 'bash'
       env:
         CRON: '${{ inputs.cron }}'
