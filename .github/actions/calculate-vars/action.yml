@@ -9,6 +9,11 @@ inputs:
     description: 'Whether or not this is a dry run'
     type: 'boolean'
 
+outputs:
+  is_dry_run:
+    description: 'Boolean flag indicating if the current run is a dry-run or a production release.'
+    value: '${{ steps.set_vars.outputs.is_dry_run }}'
+
 runs:
   using: 'composite'
   steps:
