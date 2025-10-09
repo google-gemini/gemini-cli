@@ -6,7 +6,8 @@
 
 import type { Attributes, Meter, Counter, Histogram } from '@opentelemetry/api';
 import { diag, metrics, ValueType } from '@opentelemetry/api';
-import { SERVICE_NAME, EVENT_CHAT_COMPRESSION } from './constants.js';
+import { SERVICE_NAME } from './constants.js';
+import { EVENT_CHAT_COMPRESSION } from './types.js';
 import type { Config } from '../config/config.js';
 import type {
   ModelRoutingEvent,

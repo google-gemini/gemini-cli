@@ -26,6 +26,7 @@ import {
   MCPServerConfig,
   DiscoveredMCPTool,
   StreamEventType,
+  ToolCallEvent,
   DEFAULT_GEMINI_MODEL,
   DEFAULT_GEMINI_MODEL_AUTO,
   DEFAULT_GEMINI_FLASH_MODEL,
@@ -369,20 +370,21 @@ class Session {
 
     const errorResponse = (error: Error) => {
       const durationMs = Date.now() - startTime;
-      logToolCall(this.config, {
-        'event.name': 'tool_call',
-        'event.timestamp': new Date().toISOString(),
-        prompt_id: promptId,
-        function_name: fc.name ?? '',
-        function_args: args,
-        duration_ms: durationMs,
-        success: false,
-        error: error.message,
-        tool_type:
+      logToolCall(
+        this.config,
+        new ToolCallEvent(
+          undefined,
+          fc.name ?? '',
+          args,
+          durationMs,
+          false,
+          promptId,
           typeof tool !== 'undefined' && tool instanceof DiscoveredMCPTool
             ? 'mcp'
             : 'native',
-      });
+          error.message,
+        ),
+      );
 
       return [
         {
@@ -488,19 +490,20 @@ class Session {
       });
 
       const durationMs = Date.now() - startTime;
-      logToolCall(this.config, {
-        'event.name': 'tool_call',
-        'event.timestamp': new Date().toISOString(),
-        function_name: fc.name,
-        function_args: args,
-        duration_ms: durationMs,
-        success: true,
-        prompt_id: promptId,
-        tool_type:
+      logToolCall(
+        this.config,
+        new ToolCallEvent(
+          undefined,
+          fc.name ?? '',
+          args,
+          durationMs,
+          true,
+          promptId,
           typeof tool !== 'undefined' && tool instanceof DiscoveredMCPTool
             ? 'mcp'
             : 'native',
-      });
+        ),
+      );
 
       return convertToFunctionResponse(fc.name, callId, toolResult.llmContent);
     } catch (e) {
