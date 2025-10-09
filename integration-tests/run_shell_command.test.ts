@@ -203,7 +203,7 @@ describe('run_shell_command', () => {
     await rig.setup('should combine multiple --allowed-tools flags');
 
     const { tool } = getLineCountCommand();
-    const prompt = `use ${tool} and ls`;
+    const prompt = `use ${tool} and ls to show me the files in the current directory`;
 
     const result = await rig.run({
       stdin: prompt,

@@ -47,6 +47,7 @@ describe('Core System Prompt (prompts.ts)', () => {
       getToolRegistry: vi.fn().mockReturnValue({
         getAllToolNames: vi.fn().mockReturnValue([]),
       }),
+      getTokenEfficient: vi.fn().mockReturnValue(true),
     } as unknown as Config;
   });
 
@@ -136,6 +137,7 @@ describe('Core System Prompt (prompts.ts)', () => {
             .fn()
             .mockReturnValue([CodebaseInvestigatorAgent.name]),
         }),
+        getTokenEfficient: vi.fn().mockReturnValue(true),
       } as unknown as Config;
     });
 

@@ -212,6 +212,10 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Skip the next speaker check.
   - **Default:** `false`
 
+- **`model.tokenEfficient`** (boolean):
+  - **Description:** Optimizes shell tool commands for token efficiency.
+  - **Default:** `true`
+
 #### `context`
 
 - **`context.fileName`** (string or array of strings):
