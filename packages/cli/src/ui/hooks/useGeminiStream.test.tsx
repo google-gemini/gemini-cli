@@ -1861,16 +1861,16 @@ describe('useGeminiStream', () => {
         vi.mocked(tokenLimit).mockReturnValue(100);
       });
 
-      it('should add message without suggestion when remaining tokens are > 50% of limit', async () => {
+      it('should add message without suggestion when remaining tokens are > 75% of limit', async () => {
         // Setup mock to return a stream with ContextWindowWillOverflow event
-        // Limit is 100, remaining is 60 (> 50)
+        // Limit is 100, remaining is 80 (> 75)
         mockSendMessageStream.mockReturnValue(
           (async function* () {
             yield {
               type: ServerGeminiEventType.ContextWindowWillOverflow,
               value: {
-                estimatedRequestTokenCount: 40,
-                remainingTokenCount: 60,
+                estimatedRequestTokenCount: 20,
+                remainingTokenCount: 80,
               },
             };
           })(),
@@ -1909,23 +1909,23 @@ describe('useGeminiStream', () => {
           expect(mockAddItem).toHaveBeenCalledWith(
             {
               type: 'info',
-              text: `Sending this message (40 tokens) might exceed the remaining context window limit (60 tokens).`,
+              text: `Sending this message (20 tokens) might exceed the remaining context window limit (80 tokens).`,
             },
             expect.any(Number),
           );
         });
       });
 
-      it('should add message with suggestion when remaining tokens are < 50% of limit', async () => {
+      it('should add message with suggestion when remaining tokens are < 75% of limit', async () => {
         // Setup mock to return a stream with ContextWindowWillOverflow event
-        // Limit is 100, remaining is 40 (< 50)
+        // Limit is 100, remaining is 70 (< 75)
         mockSendMessageStream.mockReturnValue(
           (async function* () {
             yield {
               type: ServerGeminiEventType.ContextWindowWillOverflow,
               value: {
-                estimatedRequestTokenCount: 60,
-                remainingTokenCount: 40,
+                estimatedRequestTokenCount: 30,
+                remainingTokenCount: 70,
               },
             };
           })(),
@@ -1964,7 +1964,7 @@ describe('useGeminiStream', () => {
           expect(mockAddItem).toHaveBeenCalledWith(
             {
               type: 'info',
-              text: `Sending this message (60 tokens) might exceed the remaining context window limit (40 tokens). Please try reducing the size of your message or use the \`/compress\` command to compress the chat history.`,
+              text: `Sending this message (30 tokens) might exceed the remaining context window limit (70 tokens). Please try reducing the size of your message or use the \`/compress\` command to compress the chat history.`,
             },
             expect.any(Number),
           );
