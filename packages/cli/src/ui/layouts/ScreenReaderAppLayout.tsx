@@ -18,7 +18,12 @@ export const ScreenReaderAppLayout: React.FC = () => {
   const uiState = useUIState();
 
   return (
-    <Box flexDirection="column" width="90%" height="100%">
+    <Box
+      flexDirection="column"
+      width="90%"
+      height="100%"
+      ref={uiState.rootUiRef}
+    >
       <Notifications />
       <Footer />
       <Box flexGrow={1} overflow="hidden">

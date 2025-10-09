@@ -17,7 +17,7 @@ export const DefaultAppLayout: React.FC = () => {
   const uiState = useUIState();
 
   return (
-    <Box flexDirection="column" width="90%">
+    <Box flexDirection="column" width="90%" ref={uiState.rootUiRef}>
       <MainContent />
 
       <Box flexDirection="column" ref={uiState.mainControlsRef}>

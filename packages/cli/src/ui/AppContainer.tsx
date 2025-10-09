@@ -58,6 +58,7 @@ import { useSlashCommandProcessor } from './hooks/slashCommandProcessor.js';
 import { useVimMode } from './contexts/VimModeContext.js';
 import { useConsoleMessages } from './hooks/useConsoleMessages.js';
 import { useTerminalSize } from './hooks/useTerminalSize.js';
+import { useFlickerDetector } from './hooks/useFlickerDetector.js';
 import { calculatePromptWidths } from './components/InputPrompt.js';
 import { useStdin, useStdout } from 'ink';
 import ansiEscapes from 'ansi-escapes';
@@ -209,11 +210,15 @@ export const AppContainer = (props: AppContainerProps) => {
 
   // Layout measurements
   const mainControlsRef = useRef<DOMElement>(null);
+  const rootUiRef = useRef<DOMElement>(null);
   const originalTitleRef = useRef(
     computeWindowTitle(basename(config.getTargetDir())),
   );
   const lastTitleRef = useRef<string | null>(null);
   const staticExtraHeight = 3;
+
+  // Flicker detector
+  useFlickerDetector(rootUiRef, terminalHeight);
 
   useEffect(() => {
     (async () => {
@@ -1146,6 +1151,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       terminalWidth,
       terminalHeight,
       mainControlsRef,
+      rootUiRef,
       currentIDE,
       updateInfo,
       showIdeRestartPrompt,
@@ -1225,6 +1231,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       terminalWidth,
       terminalHeight,
       mainControlsRef,
+      rootUiRef,
       currentIDE,
       updateInfo,
       showIdeRestartPrompt,

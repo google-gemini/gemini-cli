@@ -111,6 +111,7 @@ export interface UIState {
   terminalWidth: number;
   terminalHeight: number;
   mainControlsRef: React.MutableRefObject<DOMElement | null>;
+  rootUiRef: React.MutableRefObject<DOMElement | null>;
   currentIDE: IdeInfo | null;
   updateInfo: UpdateObject | null;
   showIdeRestartPrompt: boolean;

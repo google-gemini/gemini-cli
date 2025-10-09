@@ -90,6 +90,7 @@ describe('Telemetry Metrics', () => {
   let recordBaselineComparisonModule: typeof import('./metrics.js').recordBaselineComparison;
   let recordGenAiClientTokenUsageModule: typeof import('./metrics.js').recordGenAiClientTokenUsage;
   let recordGenAiClientOperationDurationModule: typeof import('./metrics.js').recordGenAiClientOperationDuration;
+  let recordFlickerFrameModule: typeof import('./metrics.js').recordFlickerFrame;
   let recordAgentRunMetricsModule: typeof import('./metrics.js').recordAgentRunMetrics;
 
   beforeEach(async () => {
@@ -123,6 +124,7 @@ describe('Telemetry Metrics', () => {
       metricsJsModule.recordGenAiClientTokenUsage;
     recordGenAiClientOperationDurationModule =
       metricsJsModule.recordGenAiClientOperationDuration;
+    recordFlickerFrameModule = metricsJsModule.recordFlickerFrame;
     recordAgentRunMetricsModule = metricsJsModule.recordAgentRunMetrics;
 
     const otelApiModule = await import('@opentelemetry/api');
@@ -136,6 +138,26 @@ describe('Telemetry Metrics', () => {
     (otelApiModule.metrics.getMeter as Mock).mockReturnValue(mockMeterInstance);
     mockCreateCounterFn.mockReturnValue(mockCounterInstance);
     mockCreateHistogramFn.mockReturnValue(mockHistogramInstance);
+  });
+
+  describe('recordFlickerFrame', () => {
+    it('does not record metrics if not initialized', () => {
+      const config = makeFakeConfig({});
+      recordFlickerFrameModule(config);
+      expect(mockCounterAddFn).not.toHaveBeenCalled();
+    });
+
+    it('records a flicker frame event when initialized', () => {
+      const config = makeFakeConfig({});
+      initializeMetricsModule(config);
+      recordFlickerFrameModule(config);
+
+      // Called for session, then for flicker
+      expect(mockCounterAddFn).toHaveBeenCalledTimes(2);
+      expect(mockCounterAddFn).toHaveBeenNthCalledWith(2, 1, {
+        'session.id': 'test-session-id',
+      });
+    });
   });
 
   describe('recordChatCompressionMetrics', () => {
