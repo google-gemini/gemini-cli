@@ -161,7 +161,11 @@ export abstract class BaseToolInvocation<
           if (response.correlationId === correlationId) {
             cleanup();
 
-            if (response.confirmed) {
+            if (response.requiresUserConfirmation) {
+              // Policy decision was ASK_USER - resolve with null to signal
+              // that legacy confirmation UI should be shown
+              resolve(null as unknown as false); // null signals: use legacy confirmation
+            } else if (response.confirmed) {
               // Tool was confirmed, return false to indicate no further confirmation needed
               resolve(false);
             } else {

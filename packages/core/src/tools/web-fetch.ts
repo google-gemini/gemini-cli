@@ -15,6 +15,7 @@ import {
   Kind,
   ToolConfirmationOutcome,
 } from './tools.js';
+import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { ToolErrorType } from './tool-error.js';
 import { getErrorMessage } from '../utils/errors.js';
 import type { Config } from '../config/config.js';
@@ -71,8 +72,9 @@ class WebFetchToolInvocation extends BaseToolInvocation<
   constructor(
     private readonly config: Config,
     params: WebFetchToolParams,
+    messageBus?: MessageBus,
   ) {
-    super(params);
+    super(params, messageBus);
   }
 
   private async executeFallback(signal: AbortSignal): Promise<ToolResult> {
@@ -145,9 +147,22 @@ ${textContent}
     return `Processing URLs and instructions from prompt: "${displayPrompt}"`;
   }
 
-  override async shouldConfirmExecute(): Promise<
-    ToolCallConfirmationDetails | false
-  > {
+  override async shouldConfirmExecute(
+    abortSignal: AbortSignal,
+  ): Promise<ToolCallConfirmationDetails | false> {
+    // Try message bus confirmation first if available
+    if (this.messageBus) {
+      const messageBusResult = await super.shouldConfirmExecute(abortSignal);
+      // null means ASK_USER - fall through to legacy confirmation
+      // false means ALLOW - no confirmation needed
+      // Error thrown means DENY - execution prevented
+      if (messageBusResult !== null) {
+        return messageBusResult;
+      }
+      // Fall through to show legacy confirmation UI for ASK_USER
+    }
+
+    // Legacy confirmation flow (no message bus OR policy decision was ASK_USER)
     if (this.config.getApprovalMode() === ApprovalMode.AUTO_EDIT) {
       return false;
     }
@@ -322,7 +337,10 @@ export class WebFetchTool extends BaseDeclarativeTool<
 > {
   static readonly Name: string = 'web_fetch';
 
-  constructor(private readonly config: Config) {
+  constructor(
+    private readonly config: Config,
+    messageBus?: MessageBus,
+  ) {
     super(
       WebFetchTool.Name,
       'WebFetch',
@@ -339,6 +357,9 @@ export class WebFetchTool extends BaseDeclarativeTool<
         required: ['prompt'],
         type: 'object',
       },
+      true, // isOutputMarkdown
+      false, // canUpdateOutput
+      messageBus,
     );
     const proxy = config.getProxy();
     if (proxy) {
@@ -363,7 +384,8 @@ export class WebFetchTool extends BaseDeclarativeTool<
 
   protected createInvocation(
     params: WebFetchToolParams,
+    messageBus?: MessageBus,
   ): ToolInvocation<WebFetchToolParams, ToolResult> {
-    return new WebFetchToolInvocation(this.config, params);
+    return new WebFetchToolInvocation(this.config, params, messageBus);
   }
 }
