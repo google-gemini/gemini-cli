@@ -21,9 +21,11 @@ describe('useLoadingIndicator', () => {
   afterEach(() => {
     vi.useRealTimers(); // Restore real timers after each test
     act(() => vi.runOnlyPendingTimers);
+    vi.restoreAllMocks();
   });
 
   it('should initialize with default values when Idle', () => {
+    vi.spyOn(Math, 'random').mockImplementation(() => 0.5); // Always witty
     const { result } = renderHook(() =>
       useLoadingIndicator(StreamingState.Idle),
     );
@@ -34,6 +36,7 @@ describe('useLoadingIndicator', () => {
   });
 
   it('should reflect values when Responding', async () => {
+    vi.spyOn(Math, 'random').mockImplementation(() => 0.5); // Always witty
     const { result } = renderHook(() =>
       useLoadingIndicator(StreamingState.Responding),
     );
@@ -82,6 +85,7 @@ describe('useLoadingIndicator', () => {
   });
 
   it('should reset elapsedTime and use a witty phrase when transitioning from WaitingForConfirmation to Responding', async () => {
+    vi.spyOn(Math, 'random').mockImplementation(() => 0.5); // Always witty
     const { result, rerender } = renderHook(
       ({ streamingState }) => useLoadingIndicator(streamingState),
       { initialProps: { streamingState: StreamingState.Responding } },
@@ -115,6 +119,7 @@ describe('useLoadingIndicator', () => {
   });
 
   it('should reset timer and phrase when streamingState changes from Responding to Idle', async () => {
+    vi.spyOn(Math, 'random').mockImplementation(() => 0.5); // Always witty
     const { result, rerender } = renderHook(
       ({ streamingState }) => useLoadingIndicator(streamingState),
       { initialProps: { streamingState: StreamingState.Responding } },
