@@ -637,6 +637,21 @@ export const useGeminiStream = (
     [addItem, config],
   );
 
+  const handleContextWindowWillOverflowEvent = useCallback(
+    (estimatedRequestTokenCount: number, remainingTokenCount: number) => {
+      onCancelSubmit();
+
+      addItem(
+        {
+          type: 'info',
+          text: `Sending this message (${estimatedRequestTokenCount} tokens) might exceed the remaining context window limit (${remainingTokenCount} tokens). Please try reducing the size of your message or use the \`/compress\` command to compress the chat history.`,
+        },
+        Date.now(),
+      );
+    },
+    [addItem, onCancelSubmit],
+  );
+
   const handleLoopDetectionConfirmation = useCallback(
     (result: { userSelection: 'disable' | 'keep' }) => {
       setLoopDetectionConfirmationRequest(null);
@@ -709,6 +724,12 @@ export const useGeminiStream = (
           case ServerGeminiEventType.MaxSessionTurns:
             handleMaxSessionTurnsEvent();
             break;
+          case ServerGeminiEventType.ContextWindowWillOverflow:
+            handleContextWindowWillOverflowEvent(
+              event.value.estimatedRequestTokenCount,
+              event.value.remainingTokenCount,
+            );
+            break;
           case ServerGeminiEventType.Finished:
             handleFinishedEvent(
               event as ServerGeminiFinishedEvent,
@@ -746,6 +767,7 @@ export const useGeminiStream = (
       handleChatCompressionEvent,
       handleFinishedEvent,
       handleMaxSessionTurnsEvent,
+      handleContextWindowWillOverflowEvent,
       handleCitationEvent,
     ],
   );
