@@ -643,18 +643,16 @@ My setup is complete. I will provide my first command in the next turn.
         ),
       );
       if (nextSpeakerCheck?.next_speaker === 'model') {
-        if (this.config.getContinueOnFailedApiCall()) {
-          const nextRequest = [{ text: 'Please continue.' }];
-          // This recursive call's events will be yielded out, but the final
-          // turn object will be from the top-level call.
-          yield* this.sendMessageStream(
-            nextRequest,
-            signal,
-            prompt_id,
-            boundedTurns - 1,
-            // isInvalidStreamRetry is false here, as this is a next speaker check
-          );
-        }
+        const nextRequest = [{ text: 'Please continue.' }];
+        // This recursive call's events will be yielded out, but the final
+        // turn object will be from the top-level call.
+        yield* this.sendMessageStream(
+          nextRequest,
+          signal,
+          prompt_id,
+          boundedTurns - 1,
+          // isInvalidStreamRetry is false here, as this is a next speaker check
+        );
       }
     }
     return turn;
