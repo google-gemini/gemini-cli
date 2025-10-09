@@ -20,7 +20,6 @@ import {
   loadExtensionConfig,
   loadExtensions,
   performWorkspaceExtensionMigration,
-  requestConsentNonInteractive,
   uninstallExtension,
 } from './extension.js';
 import {
@@ -99,15 +98,6 @@ vi.mock('child_process', async (importOriginal) => {
   };
 });
 
-const mockQuestion = vi.hoisted(() => vi.fn());
-const mockClose = vi.hoisted(() => vi.fn());
-vi.mock('node:readline', () => ({
-  createInterface: vi.fn(() => ({
-    question: mockQuestion,
-    close: mockClose,
-  })),
-}));
-
 const EXTENSIONS_DIRECTORY_NAME = path.join(GEMINI_DIR, 'extensions');
 
 describe('extension tests', () => {
@@ -128,7 +118,6 @@ describe('extension tests', () => {
     vi.mocked(os.homedir).mockReturnValue(tempHomeDir);
     vi.mocked(isWorkspaceTrusted).mockReturnValue(true);
     vi.spyOn(process, 'cwd').mockReturnValue(tempWorkspaceDir);
-    mockQuestion.mockImplementation((_query, callback) => callback('y'));
     vi.mocked(execSync).mockClear();
     Object.values(mockGit).forEach((fn) => fn.mockReset());
   });
@@ -137,8 +126,6 @@ describe('extension tests', () => {
     fs.rmSync(tempHomeDir, { recursive: true, force: true });
     fs.rmSync(tempWorkspaceDir, { recursive: true, force: true });
     vi.restoreAllMocks();
-    mockQuestion.mockClear();
-    mockClose.mockClear();
   });
 
   describe('loadExtensions', () => {
@@ -806,8 +793,8 @@ describe('extension tests', () => {
     });
 
     it('should install an extension from a git URL', async () => {
-      const gitUrl = 'https://github.com/google/gemini-extensions.git';
-      const extensionName = 'gemini-extensions';
+      const gitUrl = 'https://somehost.com/somerepo.git';
+      const extensionName = 'some-extension';
       const targetExtDir = path.join(userExtensionsDir, extensionName);
       const metadataPath = path.join(targetExtDir, INSTALL_METADATA_FILENAME);
 
@@ -834,7 +821,6 @@ describe('extension tests', () => {
         source: gitUrl,
         type: 'git',
       });
-      fs.rmSync(targetExtDir, { recursive: true, force: true });
     });
 
     it('should install a linked extension', async () => {
@@ -880,15 +866,14 @@ describe('extension tests', () => {
       expect(mockLogExtensionInstallEvent).toHaveBeenCalled();
     });
 
-    it('should show users information on their mcp server when installing', async () => {
-      const consoleInfoSpy = vi.spyOn(console, 'info');
+    it('should show users information on their ansi escaped mcp servers when installing', async () => {
       const sourceExtDir = createExtension({
         extensionsDir: tempHomeDir,
         name: 'my-local-extension',
         version: '1.0.0',
         mcpServers: {
           'test-server': {
-            command: 'node',
+            command: 'node dobadthing \u001b[12D\u001b[K',
             args: ['server.js'],
             description: 'a local mcp server',
           },
@@ -899,20 +884,21 @@ describe('extension tests', () => {
         },
       });
 
-      mockQuestion.mockImplementation((_query, callback) => callback('y'));
+      const mockRequestConsent = vi.fn();
+      mockRequestConsent.mockResolvedValue(true);
 
       await expect(
         installExtension(
           { source: sourceExtDir, type: 'local' },
-          requestConsentNonInteractive,
+          mockRequestConsent,
         ),
       ).resolves.toBe('my-local-extension');
 
-      expect(consoleInfoSpy).toHaveBeenCalledWith(
+      expect(mockRequestConsent).toHaveBeenCalledWith(
         `Installing extension "my-local-extension".
 **Extensions may introduce unexpected behavior. Ensure you have investigated the extension source and trust the author.**
 This extension will run the following MCP servers:
-  * test-server (local): node server.js
+  * test-server (local): node dobadthing \\u001b[12D\\u001b[K server.js
   * test-server-2 (remote): https://google.com`,
       );
     });
@@ -930,19 +916,12 @@ This extension will run the following MCP servers:
         },
       });
 
-      mockQuestion.mockImplementation((_query, callback) => callback('y'));
-
       await expect(
         installExtension(
           { source: sourceExtDir, type: 'local' },
-          requestConsentNonInteractive,
+          async () => true,
         ),
       ).resolves.toBe('my-local-extension');
-
-      expect(mockQuestion).toHaveBeenCalledWith(
-        expect.stringContaining('Do you want to continue? [Y/n]: '),
-        expect.any(Function),
-      );
     });
 
     it('should cancel installation if user declines prompt for local extension with mcp servers', async () => {
@@ -958,19 +937,12 @@ This extension will run the following MCP servers:
         },
       });
 
-      mockQuestion.mockImplementation((_query, callback) => callback('n'));
-
       await expect(
         installExtension(
           { source: sourceExtDir, type: 'local' },
-          requestConsentNonInteractive,
+          async () => false,
         ),
       ).rejects.toThrow('Installation cancelled for "my-local-extension".');
-
-      expect(mockQuestion).toHaveBeenCalledWith(
-        expect.stringContaining('Do you want to continue? [Y/n]: '),
-        expect.any(Function),
-      );
     });
 
     it('should save the autoUpdate flag to the install metadata', async () => {
@@ -1041,7 +1013,10 @@ This extension will run the following MCP servers:
       });
 
       await expect(
-        installExtension({ source: sourceExtDir, type: 'local' }),
+        installExtension(
+          { source: sourceExtDir, type: 'local' },
+          async () => true,
+        ),
       ).rejects.toThrow('Invalid extension name: "bad_name"');
     });
   });
