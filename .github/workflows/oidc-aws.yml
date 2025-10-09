@@ -1,0 +1,23 @@
+name: OIDC AWS (Template)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  aws-auth:
+    name: Authenticate to AWS via OIDC
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: "arn:aws:iam::{{AWS_ACCOUNT_ID}}:role/{{AWS_ROLE_NAME}}"
+          aws-region: "{{AWS_REGION}}"
+      - name: Verify identity
+        run: aws sts get-caller-identity
+
