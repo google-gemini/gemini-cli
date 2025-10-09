@@ -51,7 +51,7 @@ logging in with your Google account.
    > The browser will be redirected to a `localhost` URL that the CLI listens on
    > during setup.
 
-#### (Optional) Set your GOOGLE_CLOUD_PROJECT
+#### (Optional) Set your Google Cloud Project
 
 When you log in using a Google account, you may be prompted to select a
 `GOOGLE_CLOUD_PROJECT`.
@@ -72,11 +72,17 @@ If you fall into one of these categories, you must:
 2.  [Enable the Gemini for Cloud API](https://cloud.google.com/gemini/docs/discover/set-up-gemini#enable-api).
 3.  [Configure necessary IAM access permissions](https://cloud.google.com/gemini/docs/discover/set-up-gemini#grant-iam).
 
-To set the project ID, export the `GOOGLE_CLOUD_PROJECT` environment variable:
+To set the project ID, you can export either the `GOOGLE_CLOUD_PROJECT` or
+`GOOGLE_CLOUD_PROJECT_ID` environment variable. The CLI checks for
+`GOOGLE_CLOUD_PROJECT` first, then falls back to `GOOGLE_CLOUD_PROJECT_ID` :
 
 ```bash
 # Replace YOUR_PROJECT_ID with your actual Google Cloud Project ID
+# Using the standard variable:
 export GOOGLE_CLOUD_PROJECT="YOUR_PROJECT_ID"
+
+# Or, using the fallback variable:
+export GOOGLE_CLOUD_PROJECT_ID="YOUR_PROJECT_ID"
 ```
 
 To make this setting persistent, see
@@ -115,12 +121,14 @@ authentication options:
 #### First: Set required environment variables
 
 Regardless of your method of authentication, you'll typically need to set the
-following variables: `GOOGLE_CLOUD_PROJECT` and `GOOGLE_CLOUD_LOCATION`.
+following variables: `GOOGLE_CLOUD_PROJECT` (or `GOOGLE_CLOUD_PROJECT_ID`) and
+`GOOGLE_CLOUD_LOCATION`.
 
 To set these variables:
 
 ```bash
 # Replace with your project ID and desired location (e.g., us-central1)
+# You can use GOOGLE_CLOUD_PROJECT_ID as a fallback for GOOGLE_CLOUD_PROJECT
 export GOOGLE_CLOUD_PROJECT="YOUR_PROJECT_ID"
 export GOOGLE_CLOUD_LOCATION="YOUR_PROJECT_LOCATION"
 ```
@@ -147,7 +155,8 @@ unset GOOGLE_API_KEY GEMINI_API_KEY
     [Set up Application Default Credentials](https://cloud.google.com/docs/authentication/provide-credentials-adc)
     for details.
 
-3.  Ensure `GOOGLE_CLOUD_PROJECT` and `GOOGLE_CLOUD_LOCATION` are set.
+3.  Ensure `GOOGLE_CLOUD_PROJECT` (or `GOOGLE_CLOUD_PROJECT_ID`) and
+    `GOOGLE_CLOUD_LOCATION` are set.
 
 #### B. Vertex AI - Service Account JSON key
 
@@ -172,7 +181,8 @@ unset GOOGLE_API_KEY GEMINI_API_KEY
     export GOOGLE_APPLICATION_CREDENTIALS="/path/to/your/keyfile.json"
     ```
 
-3.  Ensure `GOOGLE_CLOUD_PROJECT` and `GOOGLE_CLOUD_LOCATION` are set.
+3.  Ensure `GOOGLE_CLOUD_PROJECT` (or `GOOGLE_CLOUD_PROJECT_ID`) and
+    `GOOGLE_CLOUD_LOCATION` are set.
 
 > **Warning:** Protect your service account key file as it provides access to
 > your resources.
@@ -248,8 +258,8 @@ variables:
     - Set `GOOGLE_GENAI_USE_VERTEXAI=true`.
     - **With Google Cloud API Key:** Set `GOOGLE_API_KEY`.
     - **With ADC:** Ensure ADC is configured (e.g., via a service account with
-      `GOOGLE_APPLICATION_CREDENTIALS`) and set `GOOGLE_CLOUD_PROJECT` and
-      `GOOGLE_CLOUD_LOCATION`.
+      `GOOGLE_APPLICATION_CREDENTIALS`) and set `GOOGLE_CLOUD_PROJECT` (or
+      `GOOGLE_CLOUD_PROJECT_ID`) and `GOOGLE_CLOUD_LOCATION`.
 
 The CLI will exit with an error in non-interactive mode if no suitable
 environment variables are found.
