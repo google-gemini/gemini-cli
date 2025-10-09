@@ -88,11 +88,13 @@ async function getGeminiMdFilePathsInternal(
   folderTrust: boolean,
   fileFilteringOptions: FileFilteringOptions,
   maxDirs: number,
+  currentDirectoryOnly: boolean = false,
 ): Promise<string[]> {
-  const dirs = new Set<string>([
-    ...includeDirectoriesToReadGemini,
-    currentWorkingDirectory,
-  ]);
+  const dirs = new Set<string>(
+    currentDirectoryOnly
+      ? [currentWorkingDirectory]
+      : [...includeDirectoriesToReadGemini, currentWorkingDirectory],
+  );
 
   // Process directories in parallel with concurrency limit to prevent EMFILE errors
   const CONCURRENT_LIMIT = 10;
@@ -111,6 +113,7 @@ async function getGeminiMdFilePathsInternal(
         folderTrust,
         fileFilteringOptions,
         maxDirs,
+        currentDirectoryOnly,
       ),
     );
 
@@ -141,11 +144,35 @@ async function getGeminiMdFilePathsInternalForEachDir(
   folderTrust: boolean,
   fileFilteringOptions: FileFilteringOptions,
   maxDirs: number,
+  currentDirectoryOnly: boolean = false,
 ): Promise<string[]> {
   const allPaths = new Set<string>();
   const geminiMdFilenames = getAllGeminiMdFilenames();
 
   for (const geminiMdFilename of geminiMdFilenames) {
+    if (currentDirectoryOnly) {
+      // Only consider the file in the current directory.
+      const candidate = path.join(path.resolve(dir), geminiMdFilename);
+      // Apply file filtering options (e.g., respectGitIgnore) before adding
+      if (fileService.shouldIgnoreFile(candidate, fileFilteringOptions)) {
+        if (debugMode) {
+          logger.debug(
+            `currentDirectoryOnly: Ignoring candidate ${candidate} due to filter rules.`,
+          );
+        }
+      } else {
+        // Avoid TOCTOU: don't check access here; defer to readGeminiMdFiles which
+        // handles errors gracefully. Just add the candidate and log.
+        allPaths.add(candidate);
+        if (debugMode) {
+          logger.debug(
+            `currentDirectoryOnly: Added candidate ${geminiMdFilename} in CWD: ${candidate}`,
+          );
+        }
+      }
+      continue; // Skip global/upward/downward/ext when currentDirectoryOnly
+    }
+
     const resolvedHome = path.resolve(userHomePath);
     const globalMemoryPath = path.join(
       resolvedHome,
@@ -226,9 +253,11 @@ async function getGeminiMdFilePathsInternalForEachDir(
     }
   }
 
-  // Add extension context file paths.
-  for (const extensionPath of extensionContextFilePaths) {
-    allPaths.add(extensionPath);
+  // Add extension context file paths only if not in currentDirectoryOnly mode.
+  if (!currentDirectoryOnly) {
+    for (const extensionPath of extensionContextFilePaths) {
+      allPaths.add(extensionPath);
+    }
   }
 
   const finalPaths = Array.from(allPaths);
@@ -348,6 +377,7 @@ export async function loadServerHierarchicalMemory(
   importFormat: 'flat' | 'tree' = 'tree',
   fileFilteringOptions?: FileFilteringOptions,
   maxDirs: number = 200,
+  currentDirectoryOnly: boolean = false,
 ): Promise<LoadServerHierarchicalMemoryResponse> {
   if (debugMode)
     logger.debug(
@@ -367,6 +397,7 @@ export async function loadServerHierarchicalMemory(
     folderTrust,
     fileFilteringOptions || DEFAULT_MEMORY_FILE_FILTERING_OPTIONS,
     maxDirs,
+    currentDirectoryOnly,
   );
   if (filePaths.length === 0) {
     if (debugMode)
