@@ -35,6 +35,7 @@ This documentation is organized into the following sections:
 - **[Gemini CLI core overview](./core/index.md):** Information about Gemini CLI core.
 - **[Memport](./core/memport.md):** Using the Memory Import Processor.
 - **[Tools API](./core/tools-api.md):** Information on how the core manages and exposes tools.
+- **[System Prompt Override](./core/system-prompt.md):** Replace built-in system instructions using `GEMINI_SYSTEM_MD`.
 
 ### Tools
 
