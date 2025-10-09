@@ -86,4 +86,31 @@ describe('JSON output', () => {
       'current auth type is oauth-personal',
     );
   });
+
+  it('should not exit on tool errors and allow model to self-correct in JSON mode', async () => {
+    const result = await rig.run(
+      'Read the contents of /path/to/nonexistent/file.txt and tell me what it says',
+      '--output-format',
+      'json',
+    );
+
+    const parsed = JSON.parse(result);
+
+    // The response should contain an actual response from the model,
+    // not a fatal error that caused the CLI to exit
+    expect(parsed).toHaveProperty('response');
+    expect(typeof parsed.response).toBe('string');
+
+    // The model should acknowledge the error in its response
+    expect(parsed.response.toLowerCase()).toMatch(
+      /cannot|does not exist|not found|unable to|error|couldn't/,
+    );
+
+    // Stats should be present, indicating the session completed normally
+    expect(parsed).toHaveProperty('stats');
+    expect(parsed.stats).toHaveProperty('tools');
+
+    // Should NOT have an error field at the top level
+    expect(parsed.error).toBeUndefined();
+  });
 });
