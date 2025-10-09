@@ -70,6 +70,11 @@ const COUNTER_DEFINITIONS = {
       success: boolean;
       decision?: 'accept' | 'reject' | 'modify' | 'auto_accept';
       tool_type?: 'native' | 'mcp';
+      // Optional diff statistics for file-modifying tools
+      model_added_lines?: number;
+      model_removed_lines?: number;
+      user_added_lines?: number;
+      user_removed_lines?: number;
     },
   },
   [API_REQUEST_COUNT]: {

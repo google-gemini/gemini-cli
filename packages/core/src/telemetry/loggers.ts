@@ -209,6 +209,14 @@ export function logToolCall(config: Config, event: ToolCallEvent): void {
     success: event.success,
     decision: event.decision,
     tool_type: event.tool_type,
+    ...(event.metadata
+      ? {
+          model_added_lines: event.metadata['model_added_lines'],
+          model_removed_lines: event.metadata['model_removed_lines'],
+          user_added_lines: event.metadata['user_added_lines'],
+          user_removed_lines: event.metadata['user_removed_lines'],
+        }
+      : {}),
   });
 }
 
