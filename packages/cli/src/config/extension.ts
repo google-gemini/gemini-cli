@@ -159,7 +159,7 @@ export function loadExtensions(
   const allExtensions = [...loadUserExtensions()];
 
   if (
-    (isWorkspaceTrusted(settings) ?? true) &&
+    isWorkspaceTrusted(settings).isTrusted &&
     // Default management setting to true
     !(settings.experimental?.extensionManagement ?? true)
   ) {
