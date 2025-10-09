@@ -176,7 +176,7 @@ export const Help: React.FC<Help> = ({ commands }) => (
     <Text color={theme.text.primary}>
       For a full list of shortcuts, see{' '}
       <Text bold color={theme.text.accent}>
-        docs/keyboard-shortcuts.md
+        docs/cli/keyboard-shortcuts.md
       </Text>
     </Text>
   </Box>
