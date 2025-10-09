@@ -4,20 +4,18 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useEffect } from 'react';
-import {
-  type Extension,
-  getWorkspaceExtensions,
-} from '../../config/extension.js';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import type { GeminiCLIExtension } from '@google/gemini-cli-core';
+import { getWorkspaceExtensions } from '../../config/extension.js';
 import { type LoadedSettings, SettingScope } from '../../config/settings.js';
 import process from 'node:process';
 
 export function useWorkspaceMigration(settings: LoadedSettings) {
   const [showWorkspaceMigrationDialog, setShowWorkspaceMigrationDialog] =
     useState(false);
-  const [workspaceExtensions, setWorkspaceExtensions] = useState<Extension[]>(
-    [],
-  );
+  const [workspaceExtensions, setWorkspaceExtensions] = useState<
+    GeminiCLIExtension[]
+  >([]);
 
   useEffect(() => {
     // Default to true if not set.
@@ -39,7 +37,7 @@ export function useWorkspaceMigration(settings: LoadedSettings) {
     settings.merged.experimental?.extensionManagement,
   ]);
 
-  const onWorkspaceMigrationDialogOpen = () => {
+  const onWorkspaceMigrationDialogOpen = useCallback(() => {
     const userSettings = settings.forScope(SettingScope.User);
     const extensionSettings = userSettings.settings.extensions || {
       disabled: [],
@@ -55,16 +53,24 @@ export function useWorkspaceMigration(settings: LoadedSettings) {
     extensionSettings.workspacesWithMigrationNudge =
       workspacesWithMigrationNudge;
     settings.setValue(SettingScope.User, 'extensions', extensionSettings);
-  };
+  }, [settings]);
 
-  const onWorkspaceMigrationDialogClose = () => {
+  const onWorkspaceMigrationDialogClose = useCallback(() => {
     setShowWorkspaceMigrationDialog(false);
-  };
+  }, [setShowWorkspaceMigrationDialog]);
 
-  return {
-    showWorkspaceMigrationDialog,
-    workspaceExtensions,
-    onWorkspaceMigrationDialogOpen,
-    onWorkspaceMigrationDialogClose,
-  };
+  return useMemo(
+    () => ({
+      showWorkspaceMigrationDialog,
+      workspaceExtensions,
+      onWorkspaceMigrationDialogOpen,
+      onWorkspaceMigrationDialogClose,
+    }),
+    [
+      showWorkspaceMigrationDialog,
+      workspaceExtensions,
+      onWorkspaceMigrationDialogOpen,
+      onWorkspaceMigrationDialogClose,
+    ],
+  );
 }

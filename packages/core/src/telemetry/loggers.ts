@@ -37,6 +37,9 @@ import {
   EVENT_EXTENSION_DISABLE,
   EVENT_SMART_EDIT_STRATEGY,
   EVENT_SMART_EDIT_CORRECTION,
+  EVENT_AGENT_START,
+  EVENT_AGENT_FINISH,
+  EVENT_WEB_FETCH_FALLBACK_ATTEMPT,
 } from './constants.js';
 import type {
   ApiErrorEvent,
@@ -69,6 +72,9 @@ import type {
   ModelSlashCommandEvent,
   SmartEditStrategyEvent,
   SmartEditCorrectionEvent,
+  AgentStartEvent,
+  AgentFinishEvent,
+  WebFetchFallbackAttemptEvent,
 } from './types.js';
 import {
   recordApiErrorMetrics,
@@ -83,6 +89,7 @@ import {
   getConventionAttributes,
   recordTokenUsageMetrics,
   recordApiResponseMetrics,
+  recordAgentRunMetrics,
 } from './metrics.js';
 import { isTelemetrySdkInitialized } from './sdk.js';
 import type { UiEvent } from './uiTelemetry.js';
@@ -858,7 +865,66 @@ export function logSmartEditCorrectionEvent(
 
   const logger = logs.getLogger(SERVICE_NAME);
   const logRecord: LogRecord = {
-    body: `Smart Edit Tool Correction: ${event.correction}`,
+    body: `Smart Edit Correction`,
+    attributes,
+  };
+  logger.emit(logRecord);
+}
+
+export function logAgentStart(config: Config, event: AgentStartEvent): void {
+  ClearcutLogger.getInstance(config)?.logAgentStartEvent(event);
+  if (!isTelemetrySdkInitialized()) return;
+
+  const attributes: LogAttributes = {
+    ...getCommonAttributes(config),
+    ...event,
+    'event.name': EVENT_AGENT_START,
+  };
+
+  const logger = logs.getLogger(SERVICE_NAME);
+  const logRecord: LogRecord = {
+    body: `Agent ${event.agent_name} started. ID: ${event.agent_id}`,
+    attributes,
+  };
+  logger.emit(logRecord);
+}
+
+export function logAgentFinish(config: Config, event: AgentFinishEvent): void {
+  ClearcutLogger.getInstance(config)?.logAgentFinishEvent(event);
+  if (!isTelemetrySdkInitialized()) return;
+
+  const attributes: LogAttributes = {
+    ...getCommonAttributes(config),
+    ...event,
+    'event.name': EVENT_AGENT_FINISH,
+  };
+
+  const logger = logs.getLogger(SERVICE_NAME);
+  const logRecord: LogRecord = {
+    body: `Agent ${event.agent_name} finished. Reason: ${event.terminate_reason}. Duration: ${event.duration_ms}ms. Turns: ${event.turn_count}.`,
+    attributes,
+  };
+  logger.emit(logRecord);
+
+  recordAgentRunMetrics(config, event);
+}
+
+export function logWebFetchFallbackAttempt(
+  config: Config,
+  event: WebFetchFallbackAttemptEvent,
+): void {
+  ClearcutLogger.getInstance(config)?.logWebFetchFallbackAttemptEvent(event);
+  if (!isTelemetrySdkInitialized()) return;
+
+  const attributes: LogAttributes = {
+    ...getCommonAttributes(config),
+    ...event,
+    'event.name': EVENT_WEB_FETCH_FALLBACK_ATTEMPT,
+  };
+
+  const logger = logs.getLogger(SERVICE_NAME);
+  const logRecord: LogRecord = {
+    body: `Web fetch fallback attempt. Reason: ${event.reason}`,
     attributes,
   };
   logger.emit(logRecord);

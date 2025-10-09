@@ -19,6 +19,7 @@ import type { FileOperation } from './metrics.js';
 export { ToolCallDecision };
 import type { ToolRegistry } from '../tools/tool-registry.js';
 import type { OutputFormat } from '../output/types.js';
+import type { AgentTerminateMode } from '../agents/types.js';
 
 export interface BaseTelemetryEvent {
   'event.name': string;
@@ -687,7 +688,10 @@ export type TelemetryEvent =
   | ExtensionUninstallEvent
   | ModelRoutingEvent
   | ToolOutputTruncatedEvent
-  | ModelSlashCommandEvent;
+  | ModelSlashCommandEvent
+  | AgentStartEvent
+  | AgentFinishEvent
+  | WebFetchFallbackAttemptEvent;
 
 export class ExtensionDisableEvent implements BaseTelemetryEvent {
   'event.name': 'extension_disable';
@@ -724,5 +728,57 @@ export class SmartEditCorrectionEvent implements BaseTelemetryEvent {
     this['event.name'] = 'smart_edit_correction';
     this['event.timestamp'] = new Date().toISOString();
     this.correction = correction;
+  }
+}
+
+export class AgentStartEvent implements BaseTelemetryEvent {
+  'event.name': 'agent_start';
+  'event.timestamp': string;
+  agent_id: string;
+  agent_name: string;
+
+  constructor(agent_id: string, agent_name: string) {
+    this['event.name'] = 'agent_start';
+    this['event.timestamp'] = new Date().toISOString();
+    this.agent_id = agent_id;
+    this.agent_name = agent_name;
+  }
+}
+
+export class AgentFinishEvent implements BaseTelemetryEvent {
+  'event.name': 'agent_finish';
+  'event.timestamp': string;
+  agent_id: string;
+  agent_name: string;
+  duration_ms: number;
+  turn_count: number;
+  terminate_reason: AgentTerminateMode;
+
+  constructor(
+    agent_id: string,
+    agent_name: string,
+    duration_ms: number,
+    turn_count: number,
+    terminate_reason: AgentTerminateMode,
+  ) {
+    this['event.name'] = 'agent_finish';
+    this['event.timestamp'] = new Date().toISOString();
+    this.agent_id = agent_id;
+    this.agent_name = agent_name;
+    this.duration_ms = duration_ms;
+    this.turn_count = turn_count;
+    this.terminate_reason = terminate_reason;
+  }
+}
+
+export class WebFetchFallbackAttemptEvent implements BaseTelemetryEvent {
+  'event.name': 'web_fetch_fallback_attempt';
+  'event.timestamp': string;
+  reason: 'private_ip' | 'primary_failed';
+
+  constructor(reason: 'private_ip' | 'primary_failed') {
+    this['event.name'] = 'web_fetch_fallback_attempt';
+    this['event.timestamp'] = new Date().toISOString();
+    this.reason = reason;
   }
 }

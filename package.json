@@ -1,6 +1,6 @@
 {
   "name": "@google/gemini-cli",
-  "version": "0.9.0-nightly.20251001.163dba7e",
+  "version": "0.10.0-nightly.20251007.c195a9aa",
   "engines": {
     "node": ">=20.0.0"
   },
@@ -14,12 +14,15 @@
     "url": "git+https://github.com/google-gemini/gemini-cli.git"
   },
   "config": {
-    "sandboxImageUri": "us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:0.9.0-nightly.20251001.163dba7e"
+    "sandboxImageUri": "us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:0.10.0-nightly.20251007.c195a9aa"
   },
   "scripts": {
-    "start": "cross-env node scripts/start.js",
+    "start": "cross-env NODE_ENV=development node scripts/start.js",
     "start:a2a-server": "CODER_AGENT_PORT=41242 npm run start --workspace @google/gemini-cli-a2a-server",
     "debug": "cross-env DEBUG=1 node --inspect-brk scripts/start.js",
+    "deflake": "node scripts/deflake.js",
+    "deflake:test:integration:sandbox:none": "npm run deflake -- --command='npm run test:integration:sandbox:none'",
+    "deflake:test:integration:sandbox:docker": "npm run deflake -- --command='npm run test:integration:sandbox:docker'",
     "auth:npm": "npx google-artifactregistry-auth",
     "auth:docker": "gcloud auth configure-docker us-west1-docker.pkg.dev",
     "auth": "npm run auth:npm && npm run auth:docker",
@@ -70,6 +73,7 @@
     "LICENSE"
   ],
   "devDependencies": {
+    "@octokit/rest": "^22.0.0",
     "@types/marked": "^5.0.2",
     "@types/mime-types": "^3.0.1",
     "@types/minimatch": "^5.1.2",
