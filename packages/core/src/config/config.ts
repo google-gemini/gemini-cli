@@ -204,8 +204,6 @@ export enum AuthProviderType {
   SERVICE_ACCOUNT_IMPERSONATION = 'service_account_impersonation',
 }
 
-import type { RunConfig, ModelConfig } from '../agents/types.js';
-
 export interface SandboxConfig {
   command: 'docker' | 'podman' | 'sandbox-exec';
   image: string;
@@ -1058,10 +1056,6 @@ export class Config {
 
   getCodebaseInvestigatorSettings(): CodebaseInvestigatorSettings | undefined {
     return this.codebaseInvestigatorSettings;
-  }
-
-  getSubagentConfigurations() {
-    return this.subagentConfigurations;
   }
 
   async createToolRegistry(): Promise<ToolRegistry> {
