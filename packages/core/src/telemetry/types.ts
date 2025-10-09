@@ -690,7 +690,8 @@ export type TelemetryEvent =
   | ToolOutputTruncatedEvent
   | ModelSlashCommandEvent
   | AgentStartEvent
-  | AgentFinishEvent;
+  | AgentFinishEvent
+  | WebFetchFallbackAttemptEvent;
 
 export class ExtensionDisableEvent implements BaseTelemetryEvent {
   'event.name': 'extension_disable';
@@ -767,5 +768,17 @@ export class AgentFinishEvent implements BaseTelemetryEvent {
     this.duration_ms = duration_ms;
     this.turn_count = turn_count;
     this.terminate_reason = terminate_reason;
+  }
+}
+
+export class WebFetchFallbackAttemptEvent implements BaseTelemetryEvent {
+  'event.name': 'web_fetch_fallback_attempt';
+  'event.timestamp': string;
+  reason: 'private_ip' | 'primary_failed';
+
+  constructor(reason: 'private_ip' | 'primary_failed') {
+    this['event.name'] = 'web_fetch_fallback_attempt';
+    this['event.timestamp'] = new Date().toISOString();
+    this.reason = reason;
   }
 }

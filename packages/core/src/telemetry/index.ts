@@ -44,6 +44,7 @@ export {
   logExtensionEnable,
   logExtensionInstallEvent,
   logExtensionUninstall,
+  logWebFetchFallbackAttempt,
 } from './loggers.js';
 export type { SlashCommandEvent, ChatCompressionEvent } from './types.js';
 export {
@@ -59,6 +60,7 @@ export {
   ConversationFinishedEvent,
   KittySequenceOverflowEvent,
   ToolOutputTruncatedEvent,
+  WebFetchFallbackAttemptEvent,
 } from './types.js';
 export { makeSlashCommandEvent, makeChatCompressionEvent } from './types.js';
 export type { TelemetryEvent } from './types.js';
