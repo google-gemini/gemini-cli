@@ -23,6 +23,7 @@ export const FRAME_TIMESTAMP_CAPACITY = 2048;
 export const profiler = {
   numFrames: 0,
   totalIdleFrames: 0,
+  totalFlickerFrames: 0,
   lastFrameStartTime: 0,
   openedDebugConsole: false,
   lastActionTimestamp: 0,
@@ -170,6 +171,21 @@ export const DebugProfiler = () => {
     return () => clearInterval(updateInterval);
   }, []);
 
+  useEffect(() => {
+    const flickerHandler = () => {
+      profiler.totalFlickerFrames++;
+      profiler.reportAction();
+      appEvents.emit(
+        AppEvent.LogError,
+        'A flicker frame was detected. This will cause UI instability.',
+      );
+    };
+    appEvents.on(AppEvent.Flicker, flickerHandler);
+    return () => {
+      appEvents.off(AppEvent.Flicker, flickerHandler);
+    };
+  }, []);
+
   // Effect for updating stats
   useEffect(() => {
     if (!showDebugProfiler) {
@@ -191,7 +207,12 @@ export const DebugProfiler = () => {
   return (
     <Text color={theme.status.warning} key={forceRefresh}>
       Renders: {profiler.numFrames} (total),{' '}
-      <Text color={theme.status.error}>{profiler.totalIdleFrames} (idle) </Text>
+      <Text color={theme.status.error}>{profiler.totalIdleFrames} (idle)</Text>
+      {profiler.totalFlickerFrames > 0 && (
+        <Text color={theme.status.error}>
+          , {profiler.totalFlickerFrames} (flicker)
+        </Text>
+      )}
     </Text>
   );
 };

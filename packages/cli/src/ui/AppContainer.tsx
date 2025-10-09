@@ -218,7 +218,10 @@ export const AppContainer = (props: AppContainerProps) => {
   const staticExtraHeight = 3;
 
   // Flicker detector
-  useFlickerDetector(rootUiRef, terminalHeight);
+  const FlickerDetector = () => {
+    useFlickerDetector(rootUiRef, terminalHeight);
+    return null;
+  };
 
   useEffect(() => {
     (async () => {
@@ -1314,6 +1317,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
               startupWarnings: props.startupWarnings || [],
             }}
           >
+            <FlickerDetector />
             <ShellFocusContext.Provider value={isFocused}>
               <App />
             </ShellFocusContext.Provider>

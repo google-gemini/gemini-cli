@@ -8,6 +8,7 @@ import { type DOMElement, measureElement } from 'ink';
 import { useEffect } from 'react';
 import { useConfig } from '../contexts/ConfigContext.js';
 import { recordFlickerFrame } from '@google/gemini-cli-core';
+import { appEvents, AppEvent } from '../../utils/events.js';
 
 const FLICKER_CHECK_INTERVAL_MS = 250;
 
@@ -30,6 +31,7 @@ export function useFlickerDetector(
         const measurement = measureElement(rootUiRef.current);
         if (measurement.height > terminalHeight) {
           recordFlickerFrame(config);
+          appEvents.emit(AppEvent.Flicker);
         }
       }
     };
