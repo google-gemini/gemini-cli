@@ -6,6 +6,10 @@
 
 /**
  * A type-safe enum for tool-related errors.
+ *
+ * Error types are categorized as:
+ * - Recoverable: LLM can self-correct (e.g., invalid params, file not found)
+ * - Fatal: System-level issues that prevent continued execution (e.g., disk full, critical I/O errors)
  */
 export enum ToolErrorType {
   // General Errors
@@ -67,4 +71,30 @@ export enum ToolErrorType {
 
   // WebSearch-specific Errors
   WEB_SEARCH_FAILED = 'web_search_failed',
+}
+
+/**
+ * Determines if a tool error type should be treated as fatal.
+ *
+ * Fatal errors are system-level issues that indicate the environment is in a bad state
+ * and continued execution is unlikely to succeed. These include:
+ * - Disk space issues (NO_SPACE_LEFT)
+ *
+ * Non-fatal errors are issues the LLM can potentially recover from by:
+ * - Correcting invalid parameters (INVALID_TOOL_PARAMS)
+ * - Trying different files (FILE_NOT_FOUND)
+ * - Respecting security boundaries (PATH_NOT_IN_WORKSPACE, PERMISSION_DENIED)
+ * - Using different tools or approaches
+ *
+ * @param errorType - The tool error type to check
+ * @returns true if the error should cause the CLI to exit, false if it's recoverable
+ */
+export function isFatalToolError(errorType?: string): boolean {
+  if (!errorType) {
+    return false;
+  }
+
+  const fatalErrors = new Set<string>([ToolErrorType.NO_SPACE_LEFT]);
+
+  return fatalErrors.has(errorType);
 }
