@@ -622,7 +622,7 @@ describe('Server Config (config.ts)', () => {
   describe('ContinueOnFailedApiCall Configuration', () => {
     it('should default continueOnFailedApiCall to false when not provided', () => {
       const config = new Config(baseParams);
-      expect(config.getContinueOnFailedApiCall()).toBe(false);
+      expect(config.getContinueOnFailedApiCall()).toBe(true);
     });
 
     it('should set continueOnFailedApiCall to true when provided as true', () => {

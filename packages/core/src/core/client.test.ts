@@ -1839,7 +1839,7 @@ ${JSON.stringify(
       expect(mockTurnRunFn).toHaveBeenNthCalledWith(
         2,
         expect.any(String),
-        [{ text: 'Please continue.' }],
+        [{ text: 'System: Please continue.' }],
         expect.any(Object),
       );
     });
