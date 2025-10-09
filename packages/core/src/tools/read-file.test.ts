@@ -38,6 +38,9 @@ describe('ReadFileTool', () => {
       getFileSystemService: () => new StandardFileSystemService(),
       getTargetDir: () => tempRootDir,
       getWorkspaceContext: () => createMockWorkspaceContext(tempRootDir),
+      storage: {
+        getProjectTempDir: () => path.join(tempRootDir, '.temp'),
+      },
     } as unknown as Config;
     tool = new ReadFileTool(mockConfigInstance);
   });
@@ -73,6 +76,24 @@ describe('ReadFileTool', () => {
       };
       expect(() => tool.build(params)).toThrow(
         /File path must be within one of the workspace directories/,
+      );
+    });
+
+    it('should allow access to files in project temp directory', () => {
+      const tempDir = path.join(tempRootDir, '.temp');
+      const params: ReadFileToolParams = {
+        absolute_path: path.join(tempDir, 'temp-file.txt'),
+      };
+      const result = tool.build(params);
+      expect(typeof result).not.toBe('string');
+    });
+
+    it('should show temp directory in error message when path is outside workspace and temp dir', () => {
+      const params: ReadFileToolParams = {
+        absolute_path: '/completely/outside/path.txt',
+      };
+      expect(() => tool.build(params)).toThrow(
+        /File path must be within one of the workspace directories.*or within the project temp directory/,
       );
     });
 
@@ -407,6 +428,24 @@ describe('ReadFileTool', () => {
       expect(result.returnDisplay).toBe(
         'Read lines 6-8 of 20 from paginated.txt',
       );
+    });
+
+    it('should successfully read files from project temp directory', async () => {
+      const tempDir = path.join(tempRootDir, '.temp');
+      await fsp.mkdir(tempDir, { recursive: true });
+      const tempFilePath = path.join(tempDir, 'temp-output.txt');
+      const tempFileContent = 'This is temporary output content';
+      await fsp.writeFile(tempFilePath, tempFileContent, 'utf-8');
+
+      const params: ReadFileToolParams = { absolute_path: tempFilePath };
+      const invocation = tool.build(params) as ToolInvocation<
+        ReadFileToolParams,
+        ToolResult
+      >;
+
+      const result = await invocation.execute(abortSignal);
+      expect(result.llmContent).toBe(tempFileContent);
+      expect(result.returnDisplay).toBe('');
     });
 
     describe('with .geminiignore', () => {

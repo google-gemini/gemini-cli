@@ -11,6 +11,7 @@ import { setupUser } from './setup.js';
 import type { HttpOptions } from './server.js';
 import { CodeAssistServer } from './server.js';
 import type { Config } from '../config/config.js';
+import { LoggingContentGenerator } from '../core/loggingContentGenerator.js';
 
 export async function createCodeAssistContentGenerator(
   httpOptions: HttpOptions,
@@ -34,4 +35,20 @@ export async function createCodeAssistContentGenerator(
   }
 
   throw new Error(`Unsupported authType: ${authType}`);
+}
+
+export function getCodeAssistServer(
+  config: Config,
+): CodeAssistServer | undefined {
+  let server = config.getContentGenerator();
+
+  // Unwrap LoggingContentGenerator if present
+  if (server instanceof LoggingContentGenerator) {
+    server = server.getWrapped();
+  }
+
+  if (!(server instanceof CodeAssistServer)) {
+    return undefined;
+  }
+  return server;
 }

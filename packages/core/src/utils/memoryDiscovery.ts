@@ -12,8 +12,8 @@ import { bfsFileSearch } from './bfsFileSearch.js';
 import { getAllGeminiMdFilenames } from '../tools/memoryTool.js';
 import type { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import { processImports } from './memoryImportProcessor.js';
-import type { FileFilteringOptions } from '../config/config.js';
-import { DEFAULT_MEMORY_FILE_FILTERING_OPTIONS } from '../config/config.js';
+import type { FileFilteringOptions } from '../config/constants.js';
+import { DEFAULT_MEMORY_FILE_FILTERING_OPTIONS } from '../config/constants.js';
 import { GEMINI_DIR } from './paths.js';
 
 // Simple console logger, similar to the one previously in CLI's config.ts
@@ -331,6 +331,7 @@ function concatenateInstructions(
 export interface LoadServerHierarchicalMemoryResponse {
   memoryContent: string;
   fileCount: number;
+  filePaths: string[];
 }
 
 /**
@@ -370,7 +371,7 @@ export async function loadServerHierarchicalMemory(
   if (filePaths.length === 0) {
     if (debugMode)
       logger.debug('No GEMINI.md files found in hierarchy of the workspace.');
-    return { memoryContent: '', fileCount: 0 };
+    return { memoryContent: '', fileCount: 0, filePaths: [] };
   }
   const contentsWithPaths = await readGeminiMdFiles(
     filePaths,
@@ -393,5 +394,6 @@ export async function loadServerHierarchicalMemory(
   return {
     memoryContent: combinedInstructions,
     fileCount: contentsWithPaths.length,
+    filePaths,
   };
 }

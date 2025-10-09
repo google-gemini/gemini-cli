@@ -9,8 +9,9 @@ import type { Config } from '../config/config.js';
 import os from 'node:os';
 import { quote } from 'shell-quote';
 import { doesToolInvocationMatch } from './tool-utils.js';
+import { spawn, type SpawnOptionsWithoutStdio } from 'node:child_process';
 
-const SHELL_TOOL_NAMES = ['run_shell_command', 'ShellTool'];
+export const SHELL_TOOL_NAMES = ['run_shell_command', 'ShellTool'];
 
 /**
  * An identifier for the shell type.
@@ -265,6 +266,11 @@ export function detectCommandSubstitution(command: string): boolean {
         return true;
       }
 
+      // >(...) process substitution - works unquoted only (not in double quotes)
+      if (char === '>' && nextChar === '(' && !inDoubleQuotes && !inBackticks) {
+        return true;
+      }
+
       // Backtick command substitution - check for opening backtick
       // (We track the state above, so this catches the start of backtick substitution)
       if (char === '`' && !inBackticks) {
@@ -318,7 +324,7 @@ export function checkCommandPermissions(
       allAllowed: false,
       disallowedCommands: [command],
       blockReason:
-        'Command substitution using $(), <(), or >() is not allowed for security reasons',
+        'Command substitution using $(), `` ` ``, <(), or >() is not allowed for security reasons',
       isHardDenial: true,
     };
   }
@@ -458,6 +464,37 @@ export function checkCommandPermissions(
  * @param config The application configuration.
  * @returns An object with 'allowed' boolean and optional 'reason' string if not allowed.
  */
+export const spawnAsync = (
+  command: string,
+  args: string[],
+  options?: SpawnOptionsWithoutStdio,
+): Promise<{ stdout: string; stderr: string }> =>
+  new Promise((resolve, reject) => {
+    const child = spawn(command, args, options);
+    let stdout = '';
+    let stderr = '';
+
+    child.stdout.on('data', (data) => {
+      stdout += data.toString();
+    });
+
+    child.stderr.on('data', (data) => {
+      stderr += data.toString();
+    });
+
+    child.on('close', (code) => {
+      if (code === 0) {
+        resolve({ stdout, stderr });
+      } else {
+        reject(new Error(`Command failed with exit code ${code}:\n${stderr}`));
+      }
+    });
+
+    child.on('error', (err) => {
+      reject(err);
+    });
+  });
+
 export function isCommandAllowed(
   command: string,
   config: Config,

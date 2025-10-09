@@ -20,7 +20,7 @@ npm run test:e2e
 
 ## Running a specific set of tests
 
-To run a subset of test files, you can use `npm run <integration test command> <file_name1> ....` where <integration test command> is either `test:e2e` or `test:integration*` and `<file_name>` is any of the `.test.js` files in the `integration-tests/` directory. For example, the following command runs `list_directory.test.js` and `write_file.test.js`:
+To run a subset of test files, you can use `npm run <integration test command> <file_name1> ....` where &lt;integration test command&gt; is either `test:e2e` or `test:integration*` and `<file_name>` is any of the `.test.js` files in the `integration-tests/` directory. For example, the following command runs `list_directory.test.js` and `write_file.test.js`:
 
 ```bash
 npm run test:e2e list_directory write_file
@@ -32,6 +32,14 @@ To run a single test by its name, use the `--test-name-pattern` flag:
 
 ```bash
 npm run test:e2e -- --test-name-pattern "reads a file"
+```
+
+### Deflaking a test
+
+Before adding a **new** integration test, you should test it at least 5 times with the deflake script to make sure that it is not flaky.
+
+```bash
+npm run deflake -- --runs=5 --command="npm run test:e2e -- --test-name-pattern '<your-new-test-name>'"
 ```
 
 ### Running all tests

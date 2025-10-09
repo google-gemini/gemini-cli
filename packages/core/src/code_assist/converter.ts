@@ -80,6 +80,7 @@ interface VertexGenerateContentResponse {
   automaticFunctionCallingHistory?: Content[];
   promptFeedback?: GenerateContentResponsePromptFeedback;
   usageMetadata?: GenerateContentResponseUsageMetadata;
+  modelVersion?: string;
 }
 
 export interface CaCountTokenRequest {
@@ -137,6 +138,7 @@ export function fromGenerateContentResponse(
   out.automaticFunctionCallingHistory = inres.automaticFunctionCallingHistory;
   out.promptFeedback = inres.promptFeedback;
   out.usageMetadata = inres.usageMetadata;
+  out.modelVersion = inres.modelVersion;
   return out;
 }
 
@@ -204,7 +206,7 @@ function toContent(content: ContentUnion): Content {
   };
 }
 
-function toParts(parts: PartUnion[]): Part[] {
+export function toParts(parts: PartUnion[]): Part[] {
   return parts.map(toPart);
 }
 

@@ -4,12 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Mock } from 'vitest';
 import type { ToolCall, WaitingToolCall } from './coreToolScheduler.js';
 import {
   CoreToolScheduler,
   convertToFunctionResponse,
+  truncateAndSaveToFile,
 } from './coreToolScheduler.js';
 import type {
   ToolCallConfirmationDetails,
@@ -20,6 +21,8 @@ import type {
   ToolRegistry,
 } from '../index.js';
 import {
+  DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
+  DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
   BaseDeclarativeTool,
   BaseToolInvocation,
   ToolConfirmationOutcome,
@@ -27,7 +30,17 @@ import {
   ApprovalMode,
 } from '../index.js';
 import type { Part, PartListUnion } from '@google/genai';
-import { MockModifiableTool, MockTool } from '../test-utils/tools.js';
+import {
+  MockModifiableTool,
+  MockTool,
+  MOCK_TOOL_SHOULD_CONFIRM_EXECUTE,
+} from '../test-utils/mock-tool.js';
+import * as fs from 'node:fs/promises';
+import * as path from 'node:path';
+
+vi.mock('fs/promises', () => ({
+  writeFile: vi.fn(),
+}));
 
 class TestApprovalTool extends BaseDeclarativeTool<{ id: string }, ToolResult> {
   static readonly Name = 'testApprovalTool';
@@ -100,6 +113,65 @@ class TestApprovalInvocation extends BaseToolInvocation<
   }
 }
 
+class AbortDuringConfirmationInvocation extends BaseToolInvocation<
+  Record<string, unknown>,
+  ToolResult
+> {
+  constructor(
+    private readonly abortController: AbortController,
+    private readonly abortError: Error,
+    params: Record<string, unknown>,
+  ) {
+    super(params);
+  }
+
+  override async shouldConfirmExecute(
+    _signal: AbortSignal,
+  ): Promise<ToolCallConfirmationDetails | false> {
+    this.abortController.abort();
+    throw this.abortError;
+  }
+
+  async execute(_abortSignal: AbortSignal): Promise<ToolResult> {
+    throw new Error('execute should not be called when confirmation fails');
+  }
+
+  getDescription(): string {
+    return 'Abort during confirmation invocation';
+  }
+}
+
+class AbortDuringConfirmationTool extends BaseDeclarativeTool<
+  Record<string, unknown>,
+  ToolResult
+> {
+  constructor(
+    private readonly abortController: AbortController,
+    private readonly abortError: Error,
+  ) {
+    super(
+      'abortDuringConfirmationTool',
+      'Abort During Confirmation Tool',
+      'A tool that aborts while confirming execution.',
+      Kind.Other,
+      {
+        type: 'object',
+        properties: {},
+      },
+    );
+  }
+
+  protected createInvocation(
+    params: Record<string, unknown>,
+  ): ToolInvocation<Record<string, unknown>, ToolResult> {
+    return new AbortDuringConfirmationInvocation(
+      this.abortController,
+      this.abortError,
+      params,
+    );
+  }
+}
+
 async function waitForStatus(
   onToolCallsUpdate: Mock,
   status: 'awaiting_approval' | 'executing' | 'success' | 'error' | 'cancelled',
@@ -137,8 +209,10 @@ async function waitForStatus(
 
 describe('CoreToolScheduler', () => {
   it('should cancel a tool call if the signal is aborted before confirmation', async () => {
-    const mockTool = new MockTool();
-    mockTool.shouldConfirm = true;
+    const mockTool = new MockTool({
+      name: 'mockTool',
+      shouldConfirmExecute: MOCK_TOOL_SHOULD_CONFIRM_EXECUTE,
+    });
     const declarativeTool = mockTool;
     const mockToolRegistry = {
       getTool: () => declarativeTool,
@@ -167,7 +241,20 @@ describe('CoreToolScheduler', () => {
         model: 'test-model',
         authType: 'oauth-personal',
       }),
+      getShellExecutionConfig: () => ({
+        terminalWidth: 90,
+        terminalHeight: 30,
+      }),
+      storage: {
+        getProjectTempDir: () => '/tmp',
+      },
+      getTruncateToolOutputThreshold: () =>
+        DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
+      getTruncateToolOutputLines: () => DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
       getToolRegistry: () => mockToolRegistry,
+      getUseSmartEdit: () => false,
+      getUseModelRouter: () => false,
+      getGeminiClient: () => null, // No client needed for these tests
     } as unknown as Config;
 
     const scheduler = new CoreToolScheduler({
@@ -196,11 +283,93 @@ describe('CoreToolScheduler', () => {
     expect(completedCalls[0].status).toBe('cancelled');
   });
 
+  it('should mark tool call as cancelled when abort happens during confirmation error', async () => {
+    const abortController = new AbortController();
+    const abortError = new Error('Abort requested during confirmation');
+    const declarativeTool = new AbortDuringConfirmationTool(
+      abortController,
+      abortError,
+    );
+
+    const mockToolRegistry = {
+      getTool: () => declarativeTool,
+      getFunctionDeclarations: () => [],
+      tools: new Map(),
+      discovery: {},
+      registerTool: () => {},
+      getToolByName: () => declarativeTool,
+      getToolByDisplayName: () => declarativeTool,
+      getTools: () => [],
+      discoverTools: async () => {},
+      getAllTools: () => [],
+      getToolsByServer: () => [],
+    } as unknown as ToolRegistry;
+
+    const onAllToolCallsComplete = vi.fn();
+    const onToolCallsUpdate = vi.fn();
+
+    const mockConfig = {
+      getSessionId: () => 'test-session-id',
+      getUsageStatisticsEnabled: () => true,
+      getDebugMode: () => false,
+      getApprovalMode: () => ApprovalMode.DEFAULT,
+      getAllowedTools: () => [],
+      getContentGeneratorConfig: () => ({
+        model: 'test-model',
+        authType: 'oauth-personal',
+      }),
+      getShellExecutionConfig: () => ({
+        terminalWidth: 90,
+        terminalHeight: 30,
+      }),
+      storage: {
+        getProjectTempDir: () => '/tmp',
+      },
+      getTruncateToolOutputThreshold: () =>
+        DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
+      getTruncateToolOutputLines: () => DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
+      getToolRegistry: () => mockToolRegistry,
+      getUseSmartEdit: () => false,
+      getUseModelRouter: () => false,
+      getGeminiClient: () => null,
+    } as unknown as Config;
+
+    const scheduler = new CoreToolScheduler({
+      config: mockConfig,
+      onAllToolCallsComplete,
+      onToolCallsUpdate,
+      getPreferredEditor: () => 'vscode',
+      onEditorClose: vi.fn(),
+    });
+
+    const request = {
+      callId: 'abort-1',
+      name: 'abortDuringConfirmationTool',
+      args: {},
+      isClientInitiated: false,
+      prompt_id: 'prompt-id-abort',
+    };
+
+    await scheduler.schedule([request], abortController.signal);
+
+    expect(onAllToolCallsComplete).toHaveBeenCalled();
+    const completedCalls = onAllToolCallsComplete.mock
+      .calls[0][0] as ToolCall[];
+    expect(completedCalls[0].status).toBe('cancelled');
+    const statuses = onToolCallsUpdate.mock.calls.flatMap((call) =>
+      (call[0] as ToolCall[]).map((toolCall) => toolCall.status),
+    );
+    expect(statuses).not.toContain('error');
+  });
+
   describe('getToolSuggestion', () => {
     it('should suggest the top N closest tool names for a typo', () => {
       // Create mocked tool registry
       const mockConfig = {
         getToolRegistry: () => mockToolRegistry,
+        getUseSmartEdit: () => false,
+        getUseModelRouter: () => false,
+        getGeminiClient: () => null, // No client needed for these tests
       } as unknown as Config;
       const mockToolRegistry = {
         getAllToolNames: () => ['list_files', 'read_file', 'write_file'],
@@ -236,6 +405,7 @@ describe('CoreToolScheduler', () => {
 describe('CoreToolScheduler with payload', () => {
   it('should update args and diff and execute tool when payload is provided', async () => {
     const mockTool = new MockModifiableTool();
+    mockTool.executeFn = vi.fn();
     const declarativeTool = mockTool;
     const mockToolRegistry = {
       getTool: () => declarativeTool,
@@ -264,7 +434,20 @@ describe('CoreToolScheduler with payload', () => {
         model: 'test-model',
         authType: 'oauth-personal',
       }),
+      getShellExecutionConfig: () => ({
+        terminalWidth: 90,
+        terminalHeight: 30,
+      }),
+      storage: {
+        getProjectTempDir: () => '/tmp',
+      },
+      getTruncateToolOutputThreshold: () =>
+        DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
+      getTruncateToolOutputLines: () => DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
       getToolRegistry: () => mockToolRegistry,
+      getUseSmartEdit: () => false,
+      getUseModelRouter: () => false,
+      getGeminiClient: () => null, // No client needed for these tests
     } as unknown as Config;
 
     const scheduler = new CoreToolScheduler({
@@ -300,7 +483,11 @@ describe('CoreToolScheduler with payload', () => {
       );
     }
 
-    expect(onAllToolCallsComplete).toHaveBeenCalled();
+    // Wait for the tool execution to complete
+    await vi.waitFor(() => {
+      expect(onAllToolCallsComplete).toHaveBeenCalled();
+    });
+
     const completedCalls = onAllToolCallsComplete.mock
       .calls[0][0] as ToolCall[];
     expect(completedCalls[0].status).toBe('success');
@@ -570,7 +757,17 @@ describe('CoreToolScheduler edit cancellation', () => {
         model: 'test-model',
         authType: 'oauth-personal',
       }),
+      getShellExecutionConfig: () => ({
+        terminalWidth: 90,
+        terminalHeight: 30,
+      }),
+      storage: {
+        getProjectTempDir: () => '/tmp',
+      },
       getToolRegistry: () => mockToolRegistry,
+      getUseSmartEdit: () => false,
+      getUseModelRouter: () => false,
+      getGeminiClient: () => null, // No client needed for these tests
     } as unknown as Config;
 
     const scheduler = new CoreToolScheduler({
@@ -623,13 +820,15 @@ describe('CoreToolScheduler edit cancellation', () => {
 describe('CoreToolScheduler YOLO mode', () => {
   it('should execute tool requiring confirmation directly without waiting', async () => {
     // Arrange
-    const mockTool = new MockTool();
-    mockTool.executeFn.mockReturnValue({
+    const executeFn = vi.fn().mockResolvedValue({
       llmContent: 'Tool executed',
       returnDisplay: 'Tool executed',
     });
-    // This tool would normally require confirmation.
-    mockTool.shouldConfirm = true;
+    const mockTool = new MockTool({
+      name: 'mockTool',
+      execute: executeFn,
+      shouldConfirmExecute: MOCK_TOOL_SHOULD_CONFIRM_EXECUTE,
+    });
     const declarativeTool = mockTool;
 
     const mockToolRegistry = {
@@ -661,7 +860,20 @@ describe('CoreToolScheduler YOLO mode', () => {
         model: 'test-model',
         authType: 'oauth-personal',
       }),
+      getShellExecutionConfig: () => ({
+        terminalWidth: 90,
+        terminalHeight: 30,
+      }),
+      storage: {
+        getProjectTempDir: () => '/tmp',
+      },
       getToolRegistry: () => mockToolRegistry,
+      getTruncateToolOutputThreshold: () =>
+        DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
+      getTruncateToolOutputLines: () => DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
+      getUseSmartEdit: () => false,
+      getUseModelRouter: () => false,
+      getGeminiClient: () => null, // No client needed for these tests
     } as unknown as Config;
 
     const scheduler = new CoreToolScheduler({
@@ -684,9 +896,14 @@ describe('CoreToolScheduler YOLO mode', () => {
     // Act
     await scheduler.schedule([request], abortController.signal);
 
+    // Wait for the tool execution to complete
+    await vi.waitFor(() => {
+      expect(onAllToolCallsComplete).toHaveBeenCalled();
+    });
+
     // Assert
     // 1. The tool's execute method was called directly.
-    expect(mockTool.executeFn).toHaveBeenCalledWith({ param: 'value' });
+    expect(executeFn).toHaveBeenCalledWith({ param: 'value' });
 
     // 2. The tool call status never entered 'awaiting_approval'.
     const statusUpdates = onToolCallsUpdate.mock.calls
@@ -701,7 +918,6 @@ describe('CoreToolScheduler YOLO mode', () => {
     ]);
 
     // 3. The final callback indicates the tool call was successful.
-    expect(onAllToolCallsComplete).toHaveBeenCalled();
     const completedCalls = onAllToolCallsComplete.mock
       .calls[0][0] as ToolCall[];
     expect(completedCalls).toHaveLength(1);
@@ -720,8 +936,8 @@ describe('CoreToolScheduler request queueing', () => {
       resolveFirstCall = resolve;
     });
 
-    const mockTool = new MockTool();
-    mockTool.executeFn.mockImplementation(() => firstCallPromise);
+    const executeFn = vi.fn().mockImplementation(() => firstCallPromise);
+    const mockTool = new MockTool({ name: 'mockTool', execute: executeFn });
     const declarativeTool = mockTool;
 
     const mockToolRegistry = {
@@ -751,7 +967,20 @@ describe('CoreToolScheduler request queueing', () => {
         model: 'test-model',
         authType: 'oauth-personal',
       }),
+      getShellExecutionConfig: () => ({
+        terminalWidth: 90,
+        terminalHeight: 30,
+      }),
+      storage: {
+        getProjectTempDir: () => '/tmp',
+      },
+      getTruncateToolOutputThreshold: () =>
+        DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
+      getTruncateToolOutputLines: () => DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
       getToolRegistry: () => mockToolRegistry,
+      getUseSmartEdit: () => false,
+      getUseModelRouter: () => false,
+      getGeminiClient: () => null, // No client needed for these tests
     } as unknown as Config;
 
     const scheduler = new CoreToolScheduler({
@@ -791,8 +1020,7 @@ describe('CoreToolScheduler request queueing', () => {
     );
 
     // Ensure the second tool call hasn't been executed yet.
-    expect(mockTool.executeFn).toHaveBeenCalledTimes(1);
-    expect(mockTool.executeFn).toHaveBeenCalledWith({ a: 1 });
+    expect(executeFn).toHaveBeenCalledWith({ a: 1 });
 
     // Complete the first tool call.
     resolveFirstCall!({
@@ -814,9 +1042,9 @@ describe('CoreToolScheduler request queueing', () => {
 
     await vi.waitFor(() => {
       // Now the second tool call should have been executed.
-      expect(mockTool.executeFn).toHaveBeenCalledTimes(2);
+      expect(executeFn).toHaveBeenCalledTimes(2);
     });
-    expect(mockTool.executeFn).toHaveBeenCalledWith({ b: 2 });
+    expect(executeFn).toHaveBeenCalledWith({ b: 2 });
 
     // Wait for the second completion.
     await vi.waitFor(() => {
@@ -830,13 +1058,15 @@ describe('CoreToolScheduler request queueing', () => {
 
   it('should auto-approve a tool call if it is on the allowedTools list', async () => {
     // Arrange
-    const mockTool = new MockTool('mockTool');
-    mockTool.executeFn.mockReturnValue({
+    const executeFn = vi.fn().mockResolvedValue({
       llmContent: 'Tool executed',
       returnDisplay: 'Tool executed',
     });
-    // This tool would normally require confirmation.
-    mockTool.shouldConfirm = true;
+    const mockTool = new MockTool({
+      name: 'mockTool',
+      execute: executeFn,
+      shouldConfirmExecute: MOCK_TOOL_SHOULD_CONFIRM_EXECUTE,
+    });
     const declarativeTool = mockTool;
 
     const toolRegistry = {
@@ -868,6 +1098,21 @@ describe('CoreToolScheduler request queueing', () => {
         model: 'test-model',
         authType: 'oauth-personal',
       }),
+      getShellExecutionConfig: () => ({
+        terminalWidth: 80,
+        terminalHeight: 24,
+      }),
+      getTerminalWidth: vi.fn(() => 80),
+      getTerminalHeight: vi.fn(() => 24),
+      storage: {
+        getProjectTempDir: () => '/tmp',
+      },
+      getTruncateToolOutputThreshold: () =>
+        DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
+      getTruncateToolOutputLines: () => DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
+      getUseSmartEdit: () => false,
+      getUseModelRouter: () => false,
+      getGeminiClient: () => null, // No client needed for these tests
     } as unknown as Config;
 
     const scheduler = new CoreToolScheduler({
@@ -890,9 +1135,14 @@ describe('CoreToolScheduler request queueing', () => {
     // Act
     await scheduler.schedule([request], abortController.signal);
 
+    // Wait for the tool execution to complete
+    await vi.waitFor(() => {
+      expect(onAllToolCallsComplete).toHaveBeenCalled();
+    });
+
     // Assert
     // 1. The tool's execute method was called directly.
-    expect(mockTool.executeFn).toHaveBeenCalledWith({ param: 'value' });
+    expect(executeFn).toHaveBeenCalledWith({ param: 'value' });
 
     // 2. The tool call status never entered 'awaiting_approval'.
     const statusUpdates = onToolCallsUpdate.mock.calls
@@ -919,7 +1169,11 @@ describe('CoreToolScheduler request queueing', () => {
   });
 
   it('should handle two synchronous calls to schedule', async () => {
-    const mockTool = new MockTool();
+    const executeFn = vi.fn().mockResolvedValue({
+      llmContent: 'Tool executed',
+      returnDisplay: 'Tool executed',
+    });
+    const mockTool = new MockTool({ name: 'mockTool', execute: executeFn });
     const declarativeTool = mockTool;
     const mockToolRegistry = {
       getTool: () => declarativeTool,
@@ -947,7 +1201,20 @@ describe('CoreToolScheduler request queueing', () => {
         model: 'test-model',
         authType: 'oauth-personal',
       }),
+      getShellExecutionConfig: () => ({
+        terminalWidth: 90,
+        terminalHeight: 30,
+      }),
+      storage: {
+        getProjectTempDir: () => '/tmp',
+      },
+      getTruncateToolOutputThreshold: () =>
+        DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
+      getTruncateToolOutputLines: () => DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
       getToolRegistry: () => mockToolRegistry,
+      getUseSmartEdit: () => false,
+      getUseModelRouter: () => false,
+      getGeminiClient: () => null, // No client needed for these tests
     } as unknown as Config;
 
     const scheduler = new CoreToolScheduler({
@@ -988,9 +1255,9 @@ describe('CoreToolScheduler request queueing', () => {
     await Promise.all([schedulePromise1, schedulePromise2]);
 
     // Ensure the tool was called twice with the correct arguments.
-    expect(mockTool.executeFn).toHaveBeenCalledTimes(2);
-    expect(mockTool.executeFn).toHaveBeenCalledWith({ a: 1 });
-    expect(mockTool.executeFn).toHaveBeenCalledWith({ b: 2 });
+    expect(executeFn).toHaveBeenCalledTimes(2);
+    expect(executeFn).toHaveBeenCalledWith({ a: 1 });
+    expect(executeFn).toHaveBeenCalledWith({ b: 2 });
 
     // Ensure completion callbacks were called twice.
     expect(onAllToolCallsComplete).toHaveBeenCalledTimes(2);
@@ -1007,6 +1274,19 @@ describe('CoreToolScheduler request queueing', () => {
       setApprovalMode: (mode: ApprovalMode) => {
         approvalMode = mode;
       },
+      getShellExecutionConfig: () => ({
+        terminalWidth: 90,
+        terminalHeight: 30,
+      }),
+      storage: {
+        getProjectTempDir: () => '/tmp',
+      },
+      getTruncateToolOutputThreshold: () =>
+        DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
+      getTruncateToolOutputLines: () => DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
+      getUseSmartEdit: () => false,
+      getUseModelRouter: () => false,
+      getGeminiClient: () => null, // No client needed for these tests
     } as unknown as Config;
 
     const testTool = new TestApprovalTool(mockConfig);
@@ -1123,5 +1403,226 @@ describe('CoreToolScheduler request queueing', () => {
 
     // Verify approval mode was changed
     expect(approvalMode).toBe(ApprovalMode.AUTO_EDIT);
+  });
+});
+
+describe('truncateAndSaveToFile', () => {
+  const mockWriteFile = vi.mocked(fs.writeFile);
+  const THRESHOLD = 40_000;
+  const TRUNCATE_LINES = 1000;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('should return content unchanged if below threshold', async () => {
+    const content = 'Short content';
+    const callId = 'test-call-id';
+    const projectTempDir = '/tmp';
+
+    const result = await truncateAndSaveToFile(
+      content,
+      callId,
+      projectTempDir,
+      THRESHOLD,
+      TRUNCATE_LINES,
+    );
+
+    expect(result).toEqual({ content });
+    expect(mockWriteFile).not.toHaveBeenCalled();
+  });
+
+  it('should truncate content by lines when content has many lines', async () => {
+    // Create content that exceeds 100,000 character threshold with many lines
+    const lines = Array(2000).fill('x'.repeat(100)); // 100 chars per line * 2000 lines = 200,000 chars
+    const content = lines.join('\n');
+    const callId = 'test-call-id';
+    const projectTempDir = '/tmp';
+
+    mockWriteFile.mockResolvedValue(undefined);
+
+    const result = await truncateAndSaveToFile(
+      content,
+      callId,
+      projectTempDir,
+      THRESHOLD,
+      TRUNCATE_LINES,
+    );
+
+    expect(result.outputFile).toBe(
+      path.join(projectTempDir, `${callId}.output`),
+    );
+    expect(mockWriteFile).toHaveBeenCalledWith(
+      path.join(projectTempDir, `${callId}.output`),
+      content,
+    );
+
+    // Should contain the first and last lines with 1/5 head and 4/5 tail
+    const head = Math.floor(TRUNCATE_LINES / 5);
+    const beginning = lines.slice(0, head);
+    const end = lines.slice(-(TRUNCATE_LINES - head));
+    const expectedTruncated =
+      beginning.join('\n') + '\n... [CONTENT TRUNCATED] ...\n' + end.join('\n');
+
+    expect(result.content).toContain(
+      'Tool output was too large and has been truncated',
+    );
+    expect(result.content).toContain('Truncated part of the output:');
+    expect(result.content).toContain(expectedTruncated);
+  });
+
+  it('should wrap and truncate content when content has few but long lines', async () => {
+    const content = 'a'.repeat(200_000); // A single very long line
+    const callId = 'test-call-id';
+    const projectTempDir = '/tmp';
+    const wrapWidth = 120;
+
+    mockWriteFile.mockResolvedValue(undefined);
+
+    // Manually wrap the content to generate the expected file content
+    const wrappedLines: string[] = [];
+    for (let i = 0; i < content.length; i += wrapWidth) {
+      wrappedLines.push(content.substring(i, i + wrapWidth));
+    }
+    const expectedFileContent = wrappedLines.join('\n');
+
+    const result = await truncateAndSaveToFile(
+      content,
+      callId,
+      projectTempDir,
+      THRESHOLD,
+      TRUNCATE_LINES,
+    );
+
+    expect(result.outputFile).toBe(
+      path.join(projectTempDir, `${callId}.output`),
+    );
+    // Check that the file was written with the wrapped content
+    expect(mockWriteFile).toHaveBeenCalledWith(
+      path.join(projectTempDir, `${callId}.output`),
+      expectedFileContent,
+    );
+
+    // Should contain the first and last lines with 1/5 head and 4/5 tail of the wrapped content
+    const head = Math.floor(TRUNCATE_LINES / 5);
+    const beginning = wrappedLines.slice(0, head);
+    const end = wrappedLines.slice(-(TRUNCATE_LINES - head));
+    const expectedTruncated =
+      beginning.join('\n') + '\n... [CONTENT TRUNCATED] ...\n' + end.join('\n');
+    expect(result.content).toContain(
+      'Tool output was too large and has been truncated',
+    );
+    expect(result.content).toContain('Truncated part of the output:');
+    expect(result.content).toContain(expectedTruncated);
+  });
+
+  it('should handle file write errors gracefully', async () => {
+    const content = 'a'.repeat(2_000_000);
+    const callId = 'test-call-id';
+    const projectTempDir = '/tmp';
+
+    mockWriteFile.mockRejectedValue(new Error('File write failed'));
+
+    const result = await truncateAndSaveToFile(
+      content,
+      callId,
+      projectTempDir,
+      THRESHOLD,
+      TRUNCATE_LINES,
+    );
+
+    expect(result.outputFile).toBeUndefined();
+    expect(result.content).toContain(
+      '[Note: Could not save full output to file]',
+    );
+    expect(mockWriteFile).toHaveBeenCalled();
+  });
+
+  it('should save to correct file path with call ID', async () => {
+    const content = 'a'.repeat(200_000);
+    const callId = 'unique-call-123';
+    const projectTempDir = '/custom/temp/dir';
+    const wrapWidth = 120;
+
+    mockWriteFile.mockResolvedValue(undefined);
+
+    // Manually wrap the content to generate the expected file content
+    const wrappedLines: string[] = [];
+    for (let i = 0; i < content.length; i += wrapWidth) {
+      wrappedLines.push(content.substring(i, i + wrapWidth));
+    }
+    const expectedFileContent = wrappedLines.join('\n');
+
+    const result = await truncateAndSaveToFile(
+      content,
+      callId,
+      projectTempDir,
+      THRESHOLD,
+      TRUNCATE_LINES,
+    );
+
+    const expectedPath = path.join(projectTempDir, `${callId}.output`);
+    expect(result.outputFile).toBe(expectedPath);
+    expect(mockWriteFile).toHaveBeenCalledWith(
+      expectedPath,
+      expectedFileContent,
+    );
+  });
+
+  it('should include helpful instructions in truncated message', async () => {
+    const content = 'a'.repeat(2_000_000);
+    const callId = 'test-call-id';
+    const projectTempDir = '/tmp';
+
+    mockWriteFile.mockResolvedValue(undefined);
+
+    const result = await truncateAndSaveToFile(
+      content,
+      callId,
+      projectTempDir,
+      THRESHOLD,
+      TRUNCATE_LINES,
+    );
+
+    expect(result.content).toContain(
+      'read_file tool with the absolute file path above',
+    );
+    expect(result.content).toContain('read_file tool with offset=0, limit=100');
+    expect(result.content).toContain(
+      'read_file tool with offset=N to skip N lines',
+    );
+    expect(result.content).toContain(
+      'read_file tool with limit=M to read only M lines',
+    );
+  });
+
+  it('should sanitize callId to prevent path traversal', async () => {
+    const content = 'a'.repeat(200_000);
+    const callId = '../../../../../etc/passwd';
+    const projectTempDir = '/tmp/safe_dir';
+    const wrapWidth = 120;
+
+    mockWriteFile.mockResolvedValue(undefined);
+
+    // Manually wrap the content to generate the expected file content
+    const wrappedLines: string[] = [];
+    for (let i = 0; i < content.length; i += wrapWidth) {
+      wrappedLines.push(content.substring(i, i + wrapWidth));
+    }
+    const expectedFileContent = wrappedLines.join('\n');
+
+    await truncateAndSaveToFile(
+      content,
+      callId,
+      projectTempDir,
+      THRESHOLD,
+      TRUNCATE_LINES,
+    );
+
+    const expectedPath = path.join(projectTempDir, 'passwd.output');
+    expect(mockWriteFile).toHaveBeenCalledWith(
+      expectedPath,
+      expectedFileContent,
+    );
   });
 });

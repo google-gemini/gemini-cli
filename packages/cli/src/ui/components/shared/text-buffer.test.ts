@@ -172,6 +172,117 @@ describe('textBufferReducer', () => {
       expect(state.undoStack[0].cursorCol).toBe(5);
     });
   });
+
+  describe('delete_word_left action', () => {
+    it('should delete a simple word', () => {
+      const stateWithText: TextBufferState = {
+        ...initialState,
+        lines: ['hello world'],
+        cursorRow: 0,
+        cursorCol: 11,
+      };
+      const action: TextBufferAction = { type: 'delete_word_left' };
+      const state = textBufferReducer(stateWithText, action);
+      expect(state.lines).toEqual(['hello ']);
+      expect(state.cursorCol).toBe(6);
+    });
+
+    it('should delete a path segment', () => {
+      const stateWithText: TextBufferState = {
+        ...initialState,
+        lines: ['path/to/file'],
+        cursorRow: 0,
+        cursorCol: 12,
+      };
+      const action: TextBufferAction = { type: 'delete_word_left' };
+      const state = textBufferReducer(stateWithText, action);
+      expect(state.lines).toEqual(['path/to/']);
+      expect(state.cursorCol).toBe(8);
+    });
+
+    it('should delete variable_name parts', () => {
+      const stateWithText: TextBufferState = {
+        ...initialState,
+        lines: ['variable_name'],
+        cursorRow: 0,
+        cursorCol: 13,
+      };
+      const action: TextBufferAction = { type: 'delete_word_left' };
+      const state = textBufferReducer(stateWithText, action);
+      expect(state.lines).toEqual(['variable_']);
+      expect(state.cursorCol).toBe(9);
+    });
+
+    it('should act like backspace at the beginning of a line', () => {
+      const stateWithText: TextBufferState = {
+        ...initialState,
+        lines: ['hello', 'world'],
+        cursorRow: 1,
+        cursorCol: 0,
+      };
+      const action: TextBufferAction = { type: 'delete_word_left' };
+      const state = textBufferReducer(stateWithText, action);
+      expect(state.lines).toEqual(['helloworld']);
+      expect(state.cursorRow).toBe(0);
+      expect(state.cursorCol).toBe(5);
+    });
+  });
+
+  describe('delete_word_right action', () => {
+    it('should delete a simple word', () => {
+      const stateWithText: TextBufferState = {
+        ...initialState,
+        lines: ['hello world'],
+        cursorRow: 0,
+        cursorCol: 0,
+      };
+      const action: TextBufferAction = { type: 'delete_word_right' };
+      const state = textBufferReducer(stateWithText, action);
+      expect(state.lines).toEqual(['world']);
+      expect(state.cursorCol).toBe(0);
+    });
+
+    it('should delete a path segment', () => {
+      const stateWithText: TextBufferState = {
+        ...initialState,
+        lines: ['path/to/file'],
+        cursorRow: 0,
+        cursorCol: 0,
+      };
+      const action: TextBufferAction = { type: 'delete_word_right' };
+      let state = textBufferReducer(stateWithText, action);
+      expect(state.lines).toEqual(['/to/file']);
+      state = textBufferReducer(state, action);
+      expect(state.lines).toEqual(['to/file']);
+    });
+
+    it('should delete variable_name parts', () => {
+      const stateWithText: TextBufferState = {
+        ...initialState,
+        lines: ['variable_name'],
+        cursorRow: 0,
+        cursorCol: 0,
+      };
+      const action: TextBufferAction = { type: 'delete_word_right' };
+      const state = textBufferReducer(stateWithText, action);
+      expect(state.lines).toEqual(['_name']);
+      expect(state.cursorCol).toBe(0);
+    });
+
+    it('should act like delete at the end of a line', () => {
+      const stateWithText: TextBufferState = {
+        ...initialState,
+        lines: ['hello', 'world'],
+        cursorRow: 0,
+        cursorCol: 5,
+      };
+      const action: TextBufferAction = { type: 'delete_word_right' };
+      const state = textBufferReducer(stateWithText, action);
+      expect(state.lines).toEqual(['helloworld']);
+      expect(state.cursorRow).toBe(0);
+      expect(state.cursorCol).toBe(5);
+    });
+  });
 });
 
 // Helper to get the state from the hook
@@ -1282,6 +1393,69 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
       expect(getBufferState(result).text).toBe('Pasted Text');
     });
 
+    it('should sanitize large text (>5000 chars) and strip unsafe characters', () => {
+      const { result } = renderHook(() =>
+        useTextBuffer({ viewport, isValidPath: () => false }),
+      );
+      const unsafeChars = '\x07\x08\x0B\x0C';
+      const largeTextWithUnsafe =
+        'safe text'.repeat(600) + unsafeChars + 'more safe text';
+
+      expect(largeTextWithUnsafe.length).toBeGreaterThan(5000);
+
+      act(() =>
+        result.current.handleInput({
+          name: '',
+          ctrl: false,
+          meta: false,
+          shift: false,
+          paste: false,
+          sequence: largeTextWithUnsafe,
+        }),
+      );
+
+      const resultText = getBufferState(result).text;
+      expect(resultText).not.toContain('\x07');
+      expect(resultText).not.toContain('\x08');
+      expect(resultText).not.toContain('\x0B');
+      expect(resultText).not.toContain('\x0C');
+      expect(resultText).toContain('safe text');
+      expect(resultText).toContain('more safe text');
+    });
+
+    it('should sanitize large ANSI text (>5000 chars) and strip escape codes', () => {
+      const { result } = renderHook(() =>
+        useTextBuffer({ viewport, isValidPath: () => false }),
+      );
+      const largeTextWithAnsi =
+        '\x1B[31m' +
+        'red text'.repeat(800) +
+        '\x1B[0m' +
+        '\x1B[32m' +
+        'green text'.repeat(200) +
+        '\x1B[0m';
+
+      expect(largeTextWithAnsi.length).toBeGreaterThan(5000);
+
+      act(() =>
+        result.current.handleInput({
+          name: '',
+          ctrl: false,
+          meta: false,
+          shift: false,
+          paste: false,
+          sequence: largeTextWithAnsi,
+        }),
+      );
+
+      const resultText = getBufferState(result).text;
+      expect(resultText).not.toContain('\x1B[31m');
+      expect(resultText).not.toContain('\x1B[32m');
+      expect(resultText).not.toContain('\x1B[0m');
+      expect(resultText).toContain('red text');
+      expect(resultText).toContain('green text');
+    });
+
     it('should not strip popular emojis', () => {
       const { result } = renderHook(() =>
         useTextBuffer({ viewport, isValidPath: () => false }),
@@ -1319,6 +1493,53 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
 
     it('should handle empty string', () => {
       expect(stripAnsi('')).toBe('');
+    });
+  });
+
+  describe('Memoization', () => {
+    it('should keep action references stable across re-renders', () => {
+      // We pass a stable `isValidPath` so that callbacks that depend on it
+      // are not recreated on every render.
+      const isValidPath = () => false;
+      const { result, rerender } = renderHook(() =>
+        useTextBuffer({ viewport, isValidPath }),
+      );
+
+      const initialInsert = result.current.insert;
+      const initialBackspace = result.current.backspace;
+      const initialMove = result.current.move;
+      const initialHandleInput = result.current.handleInput;
+
+      rerender();
+
+      expect(result.current.insert).toBe(initialInsert);
+      expect(result.current.backspace).toBe(initialBackspace);
+      expect(result.current.move).toBe(initialMove);
+      expect(result.current.handleInput).toBe(initialHandleInput);
+    });
+
+    it('should have memoized actions that operate on the latest state', () => {
+      const isValidPath = () => false;
+      const { result } = renderHook(() =>
+        useTextBuffer({ viewport, isValidPath }),
+      );
+
+      // Store a reference to the memoized insert function.
+      const memoizedInsert = result.current.insert;
+
+      // Update the buffer state.
+      act(() => {
+        result.current.insert('hello');
+      });
+      expect(getBufferState(result).text).toBe('hello');
+
+      // Now, call the original memoized function reference.
+      act(() => {
+        memoizedInsert(' world');
+      });
+
+      // It should have operated on the updated state.
+      expect(getBufferState(result).text).toBe('hello world');
     });
   });
 });

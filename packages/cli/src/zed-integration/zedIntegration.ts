@@ -11,6 +11,7 @@ import type {
   GeminiChat,
   ToolResult,
   ToolCallConfirmationDetails,
+  GeminiCLIExtension,
 } from '@google/gemini-cli-core';
 import {
   AuthType,
@@ -24,6 +25,10 @@ import {
   getErrorStatus,
   MCPServerConfig,
   DiscoveredMCPTool,
+  StreamEventType,
+  DEFAULT_GEMINI_MODEL,
+  DEFAULT_GEMINI_MODEL_AUTO,
+  DEFAULT_GEMINI_FLASH_MODEL,
 } from '@google/gemini-cli-core';
 import * as acp from './acp.js';
 import { AcpFileSystemService } from './fileSystemService.js';
@@ -36,14 +41,28 @@ import * as path from 'node:path';
 import { z } from 'zod';
 
 import { randomUUID } from 'node:crypto';
-import type { Extension } from '../config/extension.js';
+import { ExtensionStorage } from '../config/extension.js';
 import type { CliArgs } from '../config/config.js';
 import { loadCliConfig } from '../config/config.js';
+import { ExtensionEnablementManager } from '../config/extensions/extensionEnablement.js';
+
+/**
+ * Resolves the model to use based on the current configuration.
+ *
+ * If the model is set to "auto", it will use the flash model if in fallback
+ * mode, otherwise it will use the default model.
+ */
+export function resolveModel(model: string, isInFallbackMode: boolean): string {
+  if (model === DEFAULT_GEMINI_MODEL_AUTO) {
+    return isInFallbackMode ? DEFAULT_GEMINI_FLASH_MODEL : DEFAULT_GEMINI_MODEL;
+  }
+  return model;
+}
 
 export async function runZedIntegration(
   config: Config,
   settings: LoadedSettings,
-  extensions: Extension[],
+  extensions: GeminiCLIExtension[],
   argv: CliArgs,
 ) {
   const stdout = Writable.toWeb(process.stdout) as WritableStream;
@@ -70,7 +89,7 @@ class GeminiAgent {
   constructor(
     private config: Config,
     private settings: LoadedSettings,
-    private extensions: Extension[],
+    private extensions: GeminiCLIExtension[],
     private argv: CliArgs,
     private client: acp.Client,
   ) {}
@@ -187,6 +206,10 @@ class GeminiAgent {
     const config = await loadCliConfig(
       settings,
       this.extensions,
+      new ExtensionEnablementManager(
+        ExtensionStorage.getUserExtensionsDir(),
+        this.argv.extensions,
+      ),
       sessionId,
       this.argv,
       cwd,
@@ -254,6 +277,7 @@ class Session {
 
       try {
         const responseStream = await chat.sendMessageStream(
+          resolveModel(this.config.getModel(), this.config.isInFallbackMode()),
           {
             message: nextMessage?.parts ?? [],
             config: {
@@ -269,8 +293,12 @@ class Session {
             return { stopReason: 'cancelled' };
           }
 
-          if (resp.candidates && resp.candidates.length > 0) {
-            const candidate = resp.candidates[0];
+          if (
+            resp.type === StreamEventType.CHUNK &&
+            resp.value.candidates &&
+            resp.value.candidates.length > 0
+          ) {
+            const candidate = resp.value.candidates[0];
             for (const part of candidate.content?.parts ?? []) {
               if (!part.text) {
                 continue;
@@ -290,8 +318,8 @@ class Session {
             }
           }
 
-          if (resp.functionCalls) {
-            functionCalls.push(...resp.functionCalls);
+          if (resp.type === StreamEventType.CHUNK && resp.value.functionCalls) {
+            functionCalls.push(...resp.value.functionCalls);
           }
         }
       } catch (error) {
@@ -847,12 +875,15 @@ function toToolCallContent(toolResult: ToolResult): acp.ToolCallContent | null {
         content: { type: 'text', text: toolResult.returnDisplay },
       };
     } else {
-      return {
-        type: 'diff',
-        path: toolResult.returnDisplay.fileName,
-        oldText: toolResult.returnDisplay.originalContent,
-        newText: toolResult.returnDisplay.newContent,
-      };
+      if ('fileName' in toolResult.returnDisplay) {
+        return {
+          type: 'diff',
+          path: toolResult.returnDisplay.fileName,
+          oldText: toolResult.returnDisplay.originalContent,
+          newText: toolResult.returnDisplay.newContent,
+        };
+      }
+      return null;
     }
   } else {
     return null;
