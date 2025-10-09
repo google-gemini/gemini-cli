@@ -139,6 +139,7 @@ export interface ExtensionInstallMetadata {
   releaseTag?: string; // Only present for github-release installs.
   ref?: string;
   autoUpdate?: boolean;
+  allowPreRelease?: boolean;
 }
 
 import type { FileFilteringOptions } from './constants.js';
@@ -253,7 +254,7 @@ export interface ConfigParameters {
   interactive?: boolean;
   trustedFolder?: boolean;
   useRipgrep?: boolean;
-  shouldUseNodePtyShell?: boolean;
+  enableInteractiveShell?: boolean;
   skipNextSpeakerCheck?: boolean;
   shellExecutionConfig?: ShellExecutionConfig;
   extensionManagement?: boolean;
@@ -269,6 +270,7 @@ export interface ConfigParameters {
   useModelRouter?: boolean;
   enableMessageBusIntegration?: boolean;
   enableSubagents?: boolean;
+  continueOnFailedApiCall?: boolean;
 }
 
 export class Config {
@@ -342,7 +344,7 @@ export class Config {
   private readonly interactive: boolean;
   private readonly trustedFolder: boolean | undefined;
   private readonly useRipgrep: boolean;
-  private readonly shouldUseNodePtyShell: boolean;
+  private readonly enableInteractiveShell: boolean;
   private readonly skipNextSpeakerCheck: boolean;
   private shellExecutionConfig: ShellExecutionConfig;
   private readonly extensionManagement: boolean = true;
@@ -362,6 +364,7 @@ export class Config {
   private readonly useModelRouter: boolean;
   private readonly enableMessageBusIntegration: boolean;
   private readonly enableSubagents: boolean;
+  private readonly continueOnFailedApiCall: boolean;
 
   constructor(params: ConfigParameters) {
     this.sessionId = params.sessionId;
@@ -432,7 +435,7 @@ export class Config {
     this.interactive = params.interactive ?? false;
     this.trustedFolder = params.trustedFolder;
     this.useRipgrep = params.useRipgrep ?? true;
-    this.shouldUseNodePtyShell = params.shouldUseNodePtyShell ?? false;
+    this.enableInteractiveShell = params.enableInteractiveShell ?? false;
     this.skipNextSpeakerCheck = params.skipNextSpeakerCheck ?? true;
     this.shellExecutionConfig = {
       terminalWidth: params.shellExecutionConfig?.terminalWidth ?? 80,
@@ -452,6 +455,7 @@ export class Config {
     this.enableMessageBusIntegration =
       params.enableMessageBusIntegration ?? false;
     this.enableSubagents = params.enableSubagents ?? false;
+    this.continueOnFailedApiCall = params.continueOnFailedApiCall ?? true;
     this.extensionManagement = params.extensionManagement ?? true;
     this.storage = new Storage(this.targetDir);
     this.enablePromptCompletion = params.enablePromptCompletion ?? false;
@@ -942,12 +946,16 @@ export class Config {
     return this.useRipgrep;
   }
 
-  getShouldUseNodePtyShell(): boolean {
-    return this.shouldUseNodePtyShell;
+  getEnableInteractiveShell(): boolean {
+    return this.enableInteractiveShell;
   }
 
   getSkipNextSpeakerCheck(): boolean {
     return this.skipNextSpeakerCheck;
+  }
+
+  getContinueOnFailedApiCall(): boolean {
+    return this.continueOnFailedApiCall;
   }
 
   getShellExecutionConfig(): ShellExecutionConfig {

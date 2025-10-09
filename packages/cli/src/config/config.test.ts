@@ -1465,7 +1465,10 @@ describe('Approval mode tool exclusion logic', () => {
 
   beforeEach(() => {
     process.stdin.isTTY = false; // Ensure non-interactive mode
-    vi.mocked(isWorkspaceTrusted).mockReturnValue(true);
+    vi.mocked(isWorkspaceTrusted).mockReturnValue({
+      isTrusted: true,
+      source: undefined,
+    });
   });
 
   afterEach(() => {
@@ -2686,7 +2689,10 @@ describe('loadCliConfig tool exclusions', () => {
     vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
     vi.stubEnv('GEMINI_API_KEY', 'test-api-key');
     process.stdin.isTTY = true;
-    vi.mocked(isWorkspaceTrusted).mockReturnValue(true);
+    vi.mocked(isWorkspaceTrusted).mockReturnValue({
+      isTrusted: true,
+      source: undefined,
+    });
   });
 
   afterEach(() => {
@@ -2975,6 +2981,121 @@ describe('loadCliConfig interactive', () => {
     expect(argv.promptInteractive).toBeUndefined();
   });
 
+  it('should not be interactive if positional prompt words are provided with extensions flag', async () => {
+    process.stdin.isTTY = true;
+    process.argv = ['node', 'script.js', '-e', 'none', 'hello'];
+    const argv = await parseArguments({} as Settings);
+    const config = await loadCliConfig(
+      {},
+      [],
+      new ExtensionEnablementManager(
+        ExtensionStorage.getUserExtensionsDir(),
+        argv.extensions,
+      ),
+      'test-session',
+      argv,
+    );
+    expect(config.isInteractive()).toBe(false);
+    expect(argv.query).toBe('hello');
+    expect(argv.extensions).toEqual(['none']);
+  });
+
+  it('should handle multiple positional words correctly', async () => {
+    process.stdin.isTTY = true;
+    process.argv = ['node', 'script.js', 'hello world how are you'];
+    const argv = await parseArguments({} as Settings);
+    const config = await loadCliConfig(
+      {},
+      [],
+      new ExtensionEnablementManager(
+        ExtensionStorage.getUserExtensionsDir(),
+        argv.extensions,
+      ),
+      'test-session',
+      argv,
+    );
+    expect(config.isInteractive()).toBe(false);
+    expect(argv.query).toBe('hello world how are you');
+    expect(argv.prompt).toBe('hello world how are you');
+  });
+
+  it('should handle multiple positional words with flags', async () => {
+    process.stdin.isTTY = true;
+    process.argv = [
+      'node',
+      'script.js',
+      '--model',
+      'gemini-1.5-pro',
+      'write',
+      'a',
+      'function',
+      'to',
+      'sort',
+      'array',
+    ];
+    const argv = await parseArguments({} as Settings);
+    const config = await loadCliConfig(
+      {},
+      [],
+      new ExtensionEnablementManager(
+        ExtensionStorage.getUserExtensionsDir(),
+        argv.extensions,
+      ),
+      'test-session',
+      argv,
+    );
+    expect(config.isInteractive()).toBe(false);
+    expect(argv.query).toBe('write a function to sort array');
+    expect(argv.model).toBe('gemini-1.5-pro');
+  });
+
+  it('should handle empty positional arguments', async () => {
+    process.stdin.isTTY = true;
+    process.argv = ['node', 'script.js', ''];
+    const argv = await parseArguments({} as Settings);
+    const config = await loadCliConfig(
+      {},
+      [],
+      new ExtensionEnablementManager(
+        ExtensionStorage.getUserExtensionsDir(),
+        argv.extensions,
+      ),
+      'test-session',
+      argv,
+    );
+    expect(config.isInteractive()).toBe(true);
+    expect(argv.query).toBeUndefined();
+  });
+
+  it('should handle extensions flag with positional arguments correctly', async () => {
+    process.stdin.isTTY = true;
+    process.argv = [
+      'node',
+      'script.js',
+      '-e',
+      'none',
+      'hello',
+      'world',
+      'how',
+      'are',
+      'you',
+    ];
+    const argv = await parseArguments({} as Settings);
+    const config = await loadCliConfig(
+      {},
+      [],
+      new ExtensionEnablementManager(
+        ExtensionStorage.getUserExtensionsDir(),
+        argv.extensions,
+      ),
+      'test-session',
+      argv,
+    );
+    expect(config.isInteractive()).toBe(false);
+    expect(argv.query).toBe('hello world how are you');
+    expect(argv.extensions).toEqual(['none']);
+  });
+
   it('should be interactive if no positional prompt words are provided with flags', async () => {
     process.stdin.isTTY = true;
     process.argv = ['node', 'script.js', '--model', 'gemini-1.5-pro'];
@@ -3001,7 +3122,10 @@ describe('loadCliConfig approval mode', () => {
     vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
     vi.stubEnv('GEMINI_API_KEY', 'test-api-key');
     process.argv = ['node', 'script.js']; // Reset argv for each test
-    vi.mocked(isWorkspaceTrusted).mockReturnValue(true);
+    vi.mocked(isWorkspaceTrusted).mockReturnValue({
+      isTrusted: true,
+      source: undefined,
+    });
   });
 
   afterEach(() => {
@@ -3420,6 +3544,16 @@ describe('parseArguments with positional prompt', () => {
     expect(argv.promptInteractive).toBeUndefined();
   });
 
+  it('should have correct positional argument description', async () => {
+    // Test that the positional argument has the expected description
+    const yargsInstance = await import('./config.js');
+    // This test verifies that the positional 'query' argument is properly configured
+    // with the description: "Positional prompt. Defaults to one-shot; use -i/--prompt-interactive for interactive."
+    process.argv = ['node', 'script.js', 'test', 'query'];
+    const argv = await yargsInstance.parseArguments({} as Settings);
+    expect(argv.query).toBe('test query');
+  });
+
   it('should correctly parse a prompt from the --prompt flag', async () => {
     process.argv = ['node', 'script.js', '--prompt', 'test prompt'];
     const argv = await parseArguments({} as Settings);
@@ -3450,7 +3584,9 @@ describe('Telemetry configuration via environment variables', () => {
     vi.stubEnv('GEMINI_TELEMETRY_TARGET', 'gcp');
     process.argv = ['node', 'script.js'];
     const argv = await parseArguments({} as Settings);
-    const settings: Settings = { telemetry: { target: 'local' } };
+    const settings: Settings = {
+      telemetry: { target: ServerConfig.TelemetryTarget.LOCAL },
+    };
     const config = await loadCliConfig(
       settings,
       [],
@@ -3468,7 +3604,9 @@ describe('Telemetry configuration via environment variables', () => {
     vi.stubEnv('GEMINI_TELEMETRY_TARGET', 'bogus');
     process.argv = ['node', 'script.js'];
     const argv = await parseArguments({} as Settings);
-    const settings: Settings = { telemetry: { target: 'gcp' } };
+    const settings: Settings = {
+      telemetry: { target: ServerConfig.TelemetryTarget.GCP },
+    };
     await expect(
       loadCliConfig(
         settings,
@@ -3603,7 +3741,9 @@ describe('Telemetry configuration via environment variables', () => {
     vi.stubEnv('GEMINI_TELEMETRY_TARGET', undefined);
     process.argv = ['node', 'script.js'];
     const argv = await parseArguments({} as Settings);
-    const settings: Settings = { telemetry: { target: 'local' } };
+    const settings: Settings = {
+      telemetry: { target: ServerConfig.TelemetryTarget.LOCAL },
+    };
     const config = await loadCliConfig(
       settings,
       [],

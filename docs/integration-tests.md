@@ -1,16 +1,21 @@
 # Integration Tests
 
-This document provides information about the integration testing framework used in this project.
+This document provides information about the integration testing framework used
+in this project.
 
 ## Overview
 
-The integration tests are designed to validate the end-to-end functionality of the Gemini CLI. They execute the built binary in a controlled environment and verify that it behaves as expected when interacting with the file system.
+The integration tests are designed to validate the end-to-end functionality of
+the Gemini CLI. They execute the built binary in a controlled environment and
+verify that it behaves as expected when interacting with the file system.
 
-These tests are located in the `integration-tests` directory and are run using a custom test runner.
+These tests are located in the `integration-tests` directory and are run using a
+custom test runner.
 
 ## Running the tests
 
-The integration tests are not run as part of the default `npm run test` command. They must be run explicitly using the `npm run test:integration:all` script.
+The integration tests are not run as part of the default `npm run test` command.
+They must be run explicitly using the `npm run test:integration:all` script.
 
 The integration tests can also be run using the following shortcut:
 
@@ -20,7 +25,12 @@ npm run test:e2e
 
 ## Running a specific set of tests
 
-To run a subset of test files, you can use `npm run <integration test command> <file_name1> ....` where &lt;integration test command&gt; is either `test:e2e` or `test:integration*` and `<file_name>` is any of the `.test.js` files in the `integration-tests/` directory. For example, the following command runs `list_directory.test.js` and `write_file.test.js`:
+To run a subset of test files, you can use
+`npm run <integration test command> <file_name1> ....` where &lt;integration
+test command&gt; is either `test:e2e` or `test:integration*` and `<file_name>`
+is any of the `.test.js` files in the `integration-tests/` directory. For
+example, the following command runs `list_directory.test.js` and
+`write_file.test.js`:
 
 ```bash
 npm run test:e2e list_directory write_file
@@ -32,6 +42,15 @@ To run a single test by its name, use the `--test-name-pattern` flag:
 
 ```bash
 npm run test:e2e -- --test-name-pattern "reads a file"
+```
+
+### Deflaking a test
+
+Before adding a **new** integration test, you should test it at least 5 times
+with the deflake script to make sure that it is not flaky.
+
+```bash
+npm run deflake -- --runs=5 --command="npm run test:e2e -- -- --test-name-pattern '<your-new-test-name>'"
 ```
 
 ### Running all tests
@@ -61,11 +80,13 @@ npm run test:integration:sandbox:podman
 
 ## Diagnostics
 
-The integration test runner provides several options for diagnostics to help track down test failures.
+The integration test runner provides several options for diagnostics to help
+track down test failures.
 
 ### Keeping test output
 
-You can preserve the temporary files created during a test run for inspection. This is useful for debugging issues with file system operations.
+You can preserve the temporary files created during a test run for inspection.
+This is useful for debugging issues with file system operations.
 
 To keep the test output set the `KEEP_OUTPUT` environment variable to `true`.
 
@@ -73,7 +94,8 @@ To keep the test output set the `KEEP_OUTPUT` environment variable to `true`.
 KEEP_OUTPUT=true npm run test:integration:sandbox:none
 ```
 
-When output is kept, the test runner will print the path to the unique directory for the test run.
+When output is kept, the test runner will print the path to the unique directory
+for the test run.
 
 ### Verbose output
 
@@ -83,7 +105,9 @@ For more detailed debugging, set the `VERBOSE` environment variable to `true`.
 VERBOSE=true npm run test:integration:sandbox:none
 ```
 
-When using `VERBOSE=true` and `KEEP_OUTPUT=true` in the same command, the output is streamed to the console and also saved to a log file within the test's temporary directory.
+When using `VERBOSE=true` and `KEEP_OUTPUT=true` in the same command, the output
+is streamed to the console and also saved to a log file within the test's
+temporary directory.
 
 The verbose output is formatted to clearly identify the source of the logs:
 
@@ -95,7 +119,9 @@ The verbose output is formatted to clearly identify the source of the logs:
 
 ## Linting and formatting
 
-To ensure code quality and consistency, the integration test files are linted as part of the main build process. You can also manually run the linter and auto-fixer.
+To ensure code quality and consistency, the integration test files are linted as
+part of the main build process. You can also manually run the linter and
+auto-fixer.
 
 ### Running the linter
 
@@ -105,7 +131,8 @@ To check for linting errors, run the following command:
 npm run lint
 ```
 
-You can include the `:fix` flag in the command to automatically fix any fixable linting errors:
+You can include the `:fix` flag in the command to automatically fix any fixable
+linting errors:
 
 ```bash
 npm run lint:fix
@@ -113,9 +140,13 @@ npm run lint:fix
 
 ## Directory structure
 
-The integration tests create a unique directory for each test run inside the `.integration-tests` directory. Within this directory, a subdirectory is created for each test file, and within that, a subdirectory is created for each individual test case.
+The integration tests create a unique directory for each test run inside the
+`.integration-tests` directory. Within this directory, a subdirectory is created
+for each test file, and within that, a subdirectory is created for each
+individual test case.
 
-This structure makes it easy to locate the artifacts for a specific test run, file, or case.
+This structure makes it easy to locate the artifacts for a specific test run,
+file, or case.
 
 ```
 .integration-tests/
@@ -128,9 +159,13 @@ This structure makes it easy to locate the artifacts for a specific test run, fi
 
 ## Continuous integration
 
-To ensure the integration tests are always run, a GitHub Actions workflow is defined in `.github/workflows/e2e.yml`. This workflow automatically runs the integrations tests for pull requests against the `main` branch, or when a pull request is added to a merge queue.
+To ensure the integration tests are always run, a GitHub Actions workflow is
+defined in `.github/workflows/e2e.yml`. This workflow automatically runs the
+integrations tests for pull requests against the `main` branch, or when a pull
+request is added to a merge queue.
 
-The workflow runs the tests in different sandboxing environments to ensure Gemini CLI is tested across each:
+The workflow runs the tests in different sandboxing environments to ensure
+Gemini CLI is tested across each:
 
 - `sandbox:none`: Runs the tests without any sandboxing.
 - `sandbox:docker`: Runs the tests in a Docker container.
