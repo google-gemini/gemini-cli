@@ -544,27 +544,29 @@ export class GeminiClient {
       }
       yield event;
       if (event.type === GeminiEventType.InvalidStream) {
-        if (isInvalidStreamRetry) {
-          // We already retried once, so stop here.
-          logContentRetryFailure(
-            this.config,
-            new ContentRetryFailureEvent(
-              4, // 2 initial + 2 after injections
-              'FAILED_AFTER_PROMPT_INJECTION',
-              modelToUse,
-            ),
+        if (this.config.getContinueOnFailedApiCall()) {
+          if (isInvalidStreamRetry) {
+            // We already retried once, so stop here.
+            logContentRetryFailure(
+              this.config,
+              new ContentRetryFailureEvent(
+                4, // 2 initial + 2 after injections
+                'FAILED_AFTER_PROMPT_INJECTION',
+                modelToUse,
+              ),
+            );
+            return turn;
+          }
+          const nextRequest = [{ text: 'Please continue.' }];
+          yield* this.sendMessageStream(
+            nextRequest,
+            signal,
+            prompt_id,
+            boundedTurns - 1,
+            true, // Set isInvalidStreamRetry to true
           );
           return turn;
         }
-        const nextRequest = [{ text: 'Please continue.' }];
-        yield* this.sendMessageStream(
-          nextRequest,
-          signal,
-          prompt_id,
-          boundedTurns - 1,
-          true, // Set isInvalidStreamRetry to true
-        );
-        return turn;
       }
       if (event.type === GeminiEventType.Error) {
         return turn;
@@ -595,16 +597,18 @@ export class GeminiClient {
         ),
       );
       if (nextSpeakerCheck?.next_speaker === 'model') {
-        const nextRequest = [{ text: 'Please continue.' }];
-        // This recursive call's events will be yielded out, but the final
-        // turn object will be from the top-level call.
-        yield* this.sendMessageStream(
-          nextRequest,
-          signal,
-          prompt_id,
-          boundedTurns - 1,
-          // isInvalidStreamRetry is false here, as this is a next speaker check
-        );
+        if (this.config.getContinueOnFailedApiCall()) {
+          const nextRequest = [{ text: 'Please continue.' }];
+          // This recursive call's events will be yielded out, but the final
+          // turn object will be from the top-level call.
+          yield* this.sendMessageStream(
+            nextRequest,
+            signal,
+            prompt_id,
+            boundedTurns - 1,
+            // isInvalidStreamRetry is false here, as this is a next speaker check
+          );
+        }
       }
     }
     return turn;
