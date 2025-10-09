@@ -4,6 +4,8 @@ Gemini CLI's core package (`packages/core`) is the backend portion of Gemini CLI
 
 ## Navigating this section
 
+This section provides detailed documentation on the core components and functionalities of Gemini CLI. Use the links below to explore specific topics:
+
 - **[Core tools API](./tools-api.md):** Information on how tools are defined, registered, and used by the core.
 - **[Memory Import Processor](./memport.md):** Documentation for the modular GEMINI.md import feature using @file.md syntax.
 
@@ -13,7 +15,7 @@ While the `packages/cli` portion of Gemini CLI provides the user interface, `pac
 
 - **Gemini API interaction:** Securely communicating with the Google Gemini API, sending user prompts, and receiving model responses.
 - **Prompt engineering:** Constructing effective prompts for the Gemini model, potentially incorporating conversation history, tool definitions, and instructional context from `GEMINI.md` files.
-- **Tool management & orchestration:**
+- **Tool management and orchestration:**
   - Registering available tools (e.g., file system tools, shell command execution).
   - Interpreting tool use requests from the Gemini model.
   - Executing the requested tools with the provided arguments.
@@ -25,8 +27,8 @@ While the `packages/cli` portion of Gemini CLI provides the user interface, `pac
 
 The core plays a vital role in security:
 
-- **API key management:** It handles the `GEMINI_API_KEY` and ensures it's used securely when communicating with the Gemini API.
-- **Tool execution:** When tools interact with the local system (e.g., `run_shell_command`), the core (and its underlying tool implementations) must do so with appropriate caution, often involving sandboxing mechanisms to prevent unintended modifications.
+- **API key management:** The core handles the `GEMINI_API_KEY` and ensures it's used securely when communicating with the Gemini API.
+- **Tool execution:** When tools interact with the local system (e.g., `run_shell_command`), the core (and its underlying tool implementations) must do so with appropriate caution, often involving [sandboxing mechanisms](../cli/sandbox.md) to prevent unintended modifications.
 
 ## Chat history compression
 
@@ -51,6 +53,8 @@ The file discovery service is responsible for finding files in the project that 
 The memory discovery service is responsible for finding and loading the `GEMINI.md` files that provide context to the model. It searches for these files in a hierarchical manner, starting from the current working directory and moving up to the project root and the user's home directory. It also searches in subdirectories.
 
 This allows you to have global, project-level, and component-level context files, which are all combined to provide the model with the most relevant information.
+
+For more information on how `GEMINI.md` files can be modularized, see the [Memory Import Processor](./memport.md) documentation.
 
 You can use the [`/memory` command](../cli/commands.md) to `show`, `add`, and `refresh` the content of loaded `GEMINI.md` files.
 
