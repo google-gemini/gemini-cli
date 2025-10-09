@@ -759,7 +759,8 @@ export async function loadCliConfig(
     enableMessageBusIntegration:
       settings.tools?.enableMessageBusIntegration ?? false,
     enableSubagents: settings.experimental?.enableSubagents ?? false,
-    subagentConfigurations: settings.experimental?.subagents?.configurations,
+    codebaseInvestigatorSettings:
+      settings.experimental?.codebaseInvestigatorSettings,
   });
 }
 

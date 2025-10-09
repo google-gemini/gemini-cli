@@ -10,41 +10,6 @@ import { CodebaseInvestigatorAgent } from './codebase-investigator.js';
 import { type z } from 'zod';
 
 /**
- * A simple deep merge function for plain objects.
- * It merges source properties into the target object.
- *
- * @param target The target object to merge into.
- * @param source The source object with properties to merge.
- * @returns A new object with merged properties.
- */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function deepMerge(target: any, source: any) {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const isObject = (obj: any) =>
-    obj && typeof obj === 'object' && !Array.isArray(obj);
-
-  if (!isObject(target) || !isObject(source)) {
-    return source;
-  }
-
-  const output = { ...target };
-
-  for (const key in source) {
-    if (isObject(source[key])) {
-      if (key in target && isObject(target[key])) {
-        output[key] = deepMerge(target[key], source[key]);
-      } else {
-        output[key] = source[key];
-      }
-    } else {
-      output[key] = source[key];
-    }
-  }
-
-  return output;
-}
-
-/**
  * Manages the discovery, loading, validation, and registration of
  * AgentDefinitions.
  */
@@ -68,7 +33,33 @@ export class AgentRegistry {
   }
 
   private loadBuiltInAgents(): void {
-    this.registerAgent(CodebaseInvestigatorAgent);
+    const investigatorSettings = this.config.getCodebaseInvestigatorSettings();
+
+    // Only register the agent if it's enabled in the settings.
+    if (investigatorSettings?.enabled) {
+      const agentDef = {
+        ...CodebaseInvestigatorAgent,
+        modelConfig: {
+          ...CodebaseInvestigatorAgent.modelConfig,
+          model:
+            investigatorSettings.model ??
+            CodebaseInvestigatorAgent.modelConfig.model,
+          thinkingBudget:
+            investigatorSettings.thinkingBudget ??
+            CodebaseInvestigatorAgent.modelConfig.thinkingBudget,
+        },
+        runConfig: {
+          ...CodebaseInvestigatorAgent.runConfig,
+          max_time_minutes:
+            investigatorSettings.maxTimeMinutes ??
+            CodebaseInvestigatorAgent.runConfig.max_time_minutes,
+          max_turns:
+            investigatorSettings.maxNumTurns ??
+            CodebaseInvestigatorAgent.runConfig.max_turns,
+        },
+      };
+      this.registerAgent(agentDef);
+    }
   }
 
   /**
@@ -98,18 +89,7 @@ export class AgentRegistry {
    * Retrieves an agent definition by name.
    */
   getDefinition(name: string): AgentDefinition | undefined {
-    const definition = this.agents.get(name);
-    if (!definition) {
-      return undefined;
-    }
-
-    const subagentConfigurations = this.config.getSubagentConfigurations();
-    if (subagentConfigurations && subagentConfigurations[name]) {
-      const newDefinition = deepMerge(definition, subagentConfigurations[name]);
-      return newDefinition;
-    }
-
-    return definition;
+    return this.agents.get(name);
   }
 
   /**
