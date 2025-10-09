@@ -4,9 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { ICommandLoader } from './types.js';
-import { SlashCommand } from '../ui/commands/types.js';
-import { Config } from '@google/gemini-cli-core';
+import { isDevelopment } from '../utils/installationInfo.js';
+import type { ICommandLoader } from './types.js';
+import type { SlashCommand } from '../ui/commands/types.js';
+import type { Config } from '@google/gemini-cli-core';
 import { aboutCommand } from '../ui/commands/aboutCommand.js';
 import { authCommand } from '../ui/commands/authCommand.js';
 import { bugCommand } from '../ui/commands/bugCommand.js';
@@ -24,15 +25,19 @@ import { ideCommand } from '../ui/commands/ideCommand.js';
 import { initCommand } from '../ui/commands/initCommand.js';
 import { mcpCommand } from '../ui/commands/mcpCommand.js';
 import { memoryCommand } from '../ui/commands/memoryCommand.js';
+import { modelCommand } from '../ui/commands/modelCommand.js';
+import { permissionsCommand } from '../ui/commands/permissionsCommand.js';
 import { privacyCommand } from '../ui/commands/privacyCommand.js';
+import { profileCommand } from '../ui/commands/profileCommand.js';
 import { quitCommand } from '../ui/commands/quitCommand.js';
 import { restoreCommand } from '../ui/commands/restoreCommand.js';
 import { statsCommand } from '../ui/commands/statsCommand.js';
 import { themeCommand } from '../ui/commands/themeCommand.js';
 import { toolsCommand } from '../ui/commands/toolsCommand.js';
+import { settingsCommand } from '../ui/commands/settingsCommand.js';
 import { vimCommand } from '../ui/commands/vimCommand.js';
 import { setupGithubCommand } from '../ui/commands/setupGithubCommand.js';
-import { isGitHubRepository } from '../utils/gitUtils.js';
+import { terminalSetupCommand } from '../ui/commands/terminalSetupCommand.js';
 
 /**
  * Loads the core, hard-coded slash commands that are an integral part
@@ -63,18 +68,23 @@ export class BuiltinCommandLoader implements ICommandLoader {
       editorCommand,
       extensionsCommand,
       helpCommand,
-      ideCommand(this.config),
+      await ideCommand(),
       initCommand,
       mcpCommand,
       memoryCommand,
+      ...(this.config?.getUseModelRouter() ? [modelCommand] : []),
+      ...(this.config?.getFolderTrust() ? [permissionsCommand] : []),
       privacyCommand,
+      ...(isDevelopment ? [profileCommand] : []),
       quitCommand,
       restoreCommand(this.config),
       statsCommand,
       themeCommand,
       toolsCommand,
+      settingsCommand,
       vimCommand,
-      ...(isGitHubRepository() ? [setupGithubCommand] : []),
+      setupGithubCommand,
+      terminalSetupCommand,
     ];
 
     return allDefinitions.filter((cmd): cmd is SlashCommand => cmd !== null);

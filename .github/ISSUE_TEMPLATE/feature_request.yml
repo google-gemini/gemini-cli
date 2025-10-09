@@ -1,33 +1,35 @@
-name: Feature Request
-description: Suggest an idea for this project
-labels: ['kind/enhancement', 'status/need-triage']
+name: 'Feature Request'
+description: 'Suggest an idea for this project'
+labels:
+  - 'kind/enhancement'
+  - 'status/need-triage'
 body:
-  - type: markdown
+  - type: 'markdown'
     attributes:
-      value: |
-        > [!IMPORTANT]  
+      value: |-
+        > [!IMPORTANT]
         > Thanks for taking the time to suggest an enhancement!
         >
         > Please search **[existing issues](https://github.com/google-gemini/gemini-cli/issues)** to see if a similar feature has already been requested.
 
-  - type: textarea
-    id: feature
+  - type: 'textarea'
+    id: 'feature'
     attributes:
-      label: What would you like to be added?
-      description: A clear and concise description of the enhancement.
+      label: 'What would you like to be added?'
+      description: 'A clear and concise description of the enhancement.'
     validations:
       required: true
 
-  - type: textarea
-    id: rationale
+  - type: 'textarea'
+    id: 'rationale'
     attributes:
-      label: Why is this needed?
-      description: A clear and concise description of why this enhancement is needed.
+      label: 'Why is this needed?'
+      description: 'A clear and concise description of why this enhancement is needed.'
     validations:
       required: true
 
-  - type: textarea
-    id: additional-context
+  - type: 'textarea'
+    id: 'additional-context'
     attributes:
-      label: Additional context
-      description: Add any other context or screenshots about the feature request here.
+      label: 'Additional context'
+      description: 'Add any other context or screenshots about the feature request here.'

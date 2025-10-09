@@ -1,75 +1,186 @@
-name: Gemini Automated Issue Triage
+name: '🏷️ Gemini Automated Issue Triage'
 
 on:
   issues:
-    types: [opened, reopened]
+    types:
+      - 'opened'
+      - 'reopened'
+  issue_comment:
+    types:
+      - 'created'
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: 'issue number to triage'
+        required: true
+        type: 'number'
+
+concurrency:
+  group: '${{ github.workflow }}-${{ github.event.issue.number || github.event.inputs.issue_number }}'
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: 'bash'
+
+permissions:
+  contents: 'read'
+  id-token: 'write'
+  issues: 'write'
+  statuses: 'write'
+  packages: 'read'
+  actions: 'write' # Required for cancelling a workflow run
 
 jobs:
   triage-issue:
+    if: |-
+      github.repository == 'google-gemini/gemini-cli' &&
+      (
+        github.event_name == 'workflow_dispatch' ||
+        (
+          (github.event_name == 'issues' || github.event_name == 'issue_comment') &&
+          contains(github.event.issue.labels.*.name, 'status/need-triage') &&
+          (github.event_name != 'issue_comment' || (
+            contains(github.event.comment.body, '@gemini-cli /triage') &&
+            (github.event.comment.author_association == 'OWNER' || github.event.comment.author_association == 'MEMBER' || github.event.comment.author_association == 'COLLABORATOR')
+          ))
+        )
+      )
     timeout-minutes: 5
-    if: ${{ github.repository == 'google-gemini/gemini-cli' }}
-    permissions:
-      issues: write
-      contents: read
-      id-token: write
-    concurrency:
-      group: ${{ github.workflow }}-${{ github.event.issue.number }}
-      cancel-in-progress: true
-    runs-on: ubuntu-latest
+    runs-on: 'ubuntu-latest'
     steps:
-      - name: Generate GitHub App Token
-        id: generate_token
-        uses: actions/create-github-app-token@df432ceedc7162793a195dd1713ff69aefc7379e # v2
+      - name: 'Get issue data for manual trigger'
+        id: 'get_issue_data'
+        if: |-
+          github.event_name == 'workflow_dispatch'
+        uses: 'actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea'
         with:
-          app-id: ${{ secrets.APP_ID }}
-          private-key: ${{ secrets.PRIVATE_KEY }}
+          github-token: '${{ secrets.GITHUB_TOKEN }}'
+          script: |
+            const { data: issue } = await github.rest.issues.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: ${{ github.event.inputs.issue_number }},
+            });
+            core.setOutput('title', issue.title);
+            core.setOutput('body', issue.body);
+            core.setOutput('labels', issue.labels.map(label => label.name).join(','));
+            return issue;
 
-      - name: Run Gemini Issue Triage
-        uses: google-gemini/gemini-cli-action@df3f890f003d28c60a2a09d2c29e0126e4d1e2ff
-        env:
-          GITHUB_TOKEN: ${{ steps.generate_token.outputs.token }}
-          ISSUE_TITLE: ${{ github.event.issue.title }}
-          ISSUE_BODY: ${{ github.event.issue.body }}
+      - name: 'Check for triage label on manual trigger'
+        if: |-
+          github.event_name == 'workflow_dispatch' && !contains(steps.get_issue_data.outputs.labels, 'status/need-triage')
+        run: |
+          echo "Issue #${{ github.event.inputs.issue_number }} does not have the 'status/need-triage' label. Stopping workflow."
+          exit 1
+
+      - name: 'Checkout'
+        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
+
+      - name: 'Generate GitHub App Token'
+        id: 'generate_token'
+        uses: 'actions/create-github-app-token@a8d616148505b5069dccd32f177bb87d7f39123b' # ratchet:actions/create-github-app-token@v2
         with:
-          version: 0.1.8-rc.0
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          OTLP_GCP_WIF_PROVIDER: ${{ secrets.OTLP_GCP_WIF_PROVIDER }}
-          OTLP_GOOGLE_CLOUD_PROJECT: ${{ secrets.OTLP_GOOGLE_CLOUD_PROJECT }}
-          settings_json: |
+          app-id: '${{ secrets.APP_ID }}'
+          private-key: '${{ secrets.PRIVATE_KEY }}'
+          permission-issues: 'write'
+
+      - name: 'Get Repository Labels'
+        id: 'get_labels'
+        uses: 'actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea'
+        with:
+          github-token: '${{ steps.generate_token.outputs.token }}'
+          script: |-
+            const { data: labels } = await github.rest.issues.listLabelsForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+            });
+            const labelNames = labels.map(label => label.name);
+            core.setOutput('available_labels', labelNames.join(','));
+            core.info(`Found ${labelNames.length} labels: ${labelNames.join(', ')}`);
+            return labelNames;
+
+      - name: 'Run Gemini Issue Analysis'
+        uses: 'google-github-actions/run-gemini-cli@a3bf79042542528e91937b3a3a6fbc4967ee3c31' # ratchet:google-github-actions/run-gemini-cli@v0
+        id: 'gemini_issue_analysis'
+        env:
+          GITHUB_TOKEN: '' # Do not pass any auth token here since this runs on untrusted inputs
+          ISSUE_TITLE: >-
+            ${{ github.event_name == 'workflow_dispatch' && steps.get_issue_data.outputs.title || github.event.issue.title }}
+          ISSUE_BODY: >-
+            ${{ github.event_name == 'workflow_dispatch' && steps.get_issue_data.outputs.body || github.event.issue.body }}
+          ISSUE_NUMBER: >-
+            ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.issue_number || github.event.issue.number }}
+          REPOSITORY: '${{ github.repository }}'
+          AVAILABLE_LABELS: '${{ steps.get_labels.outputs.available_labels }}'
+        with:
+          gcp_workload_identity_provider: '${{ vars.GCP_WIF_PROVIDER }}'
+          gcp_project_id: '${{ vars.GOOGLE_CLOUD_PROJECT }}'
+          gcp_location: '${{ vars.GOOGLE_CLOUD_LOCATION }}'
+          gcp_service_account: '${{ vars.SERVICE_ACCOUNT_EMAIL }}'
+          gemini_api_key: '${{ secrets.GEMINI_API_KEY }}'
+          use_vertex_ai: '${{ vars.GOOGLE_GENAI_USE_VERTEXAI }}'
+          use_gemini_code_assist: '${{ vars.GOOGLE_GENAI_USE_GCA }}'
+          settings: |-
             {
+              "maxSessionTurns": 25,
               "coreTools": [
-                "run_shell_command(gh label list)",
-                "run_shell_command(gh issue edit)",
-                "run_shell_command(gh issue list)"
+                "run_shell_command(echo)"
               ],
               "telemetry": {
                 "enabled": true,
                 "target": "gcp"
-              },
-              "sandbox": false
+              }
             }
-          prompt: |
-            You are an issue triage assistant. Analyze the current GitHub issues apply the most appropriate existing labels. Do not remove labels titled help wanted or good first issue.
-            Steps:
-            1. Run: `gh label list --repo ${{ github.repository }} --limit 100` to get all available labels.
-            2. Review the issue title, body and any comments provided in the environment variables.
-            3. Ignore any existing priorities or tags on the issue. Just report your findings.
-            4. Select the most relevant labels from the existing labels, focusing on kind/*, area/*, sub-area/* and priority/*. For area/* and kind/* limit yourself to only the single most applicable label in each case. 
-            6. Apply the selected labels to this issue using: `gh issue edit ${{ github.event.issue.number }} --repo ${{ github.repository }} --add-label "label1,label2"`
-            7. For each issue please check if CLI version is present, this is usually in the output of the /about command  and will look like 0.1.5 for anything more than 6 versions older than the most recent should add the status/need-retesting label
-            8. If you see that the issue doesn’t look like it has sufficient information recommend the status/need-information label
-            9. Use Area definitions mentioned below to help you narrow down issues
-            Guidelines:
-            - Only use labels that already exist in the repository.
-            - Do not add comments or modify the issue content.
-            - Triage only the current issue.
-            - Apply only one area/ label
-            - Apply only one kind/ label
-            - Apply all applicable sub-area/* and priority/* labels based on the issue content. It's ok to have multiple of these.
-            - Once you categorize the issue if it needs information bump down the priority by 1 eg.. a p0 would become a p1 a p1 would become a p2. P2 and P3 can stay as is in this scenario.
-            Categorization Guidelines: 
+          prompt: |-
+            ## Role
+
+            You are an issue triage assistant. Analyze the current GitHub issue
+            and identify the most appropriate existing labels by only using the provided data. Use the available
+            tools to gather information; do not ask for information to be
+            provided. Do not remove the following labels titled maintainer,  help wanted or good first issue.
+
+            ## Steps
+
+            1. You are only able to use the echo command. Review the available labels in the environment variable: "${AVAILABLE_LABELS}".
+            2. Review the issue title and body provided in the environment variables: "${ISSUE_TITLE}" and "${ISSUE_BODY}".
+            3. Select the most relevant labels from the existing labels, focusing on kind/*, area/*, sub-area/* and priority/*. For area/* and kind/* limit yourself to only the single most applicable label in each case.
+            4. If the issue already has area/ label, dont try to change it. Similarly, if the issue already has a kind/ label don't change it. And if the issue already has a priority/ label do not change it for example:
+               If an issue has area/core and kind/bug  you will only add a priority/ label.
+               Instead if an issue has no labels, you will could add one lable of each kind.
+            5. For each issue please check if CLI version is present, this is usually in the output of the /about command and will look like 0.1.5 for anything more than 6 versions older than the most recent should add the status/need-retesting label.
+            6. If you see that the issue doesn't look like it has sufficient information recommend the status/need-information label and leave a comment politely requesting the relevant information, eg.. if repro steps are missing request for repro steps. if version information is missing request for version information into the explanation section below.
+            7. Output the appropriate labels for this issue in JSON format with explanation, for example:
+               ```
+               {"labels_to_set": ["kind/bug", "priority/p0"], "explanation": "This is a critical bug report affecting main functionality"}
+               ```
+            8. If the issue cannot be classified using the available labels, output:
+               ```
+               {"labels_to_set": [], "explanation": "Unable to classify this issue with available labels"}
+               ```
+            9. Use Area definitions mentioned below to help you narrow down issues.
+            10. If you think an issue might be a Priority/P0 do not apply the priority/p0 label. Instead apply a status/manual-triage label and include a note in your explanation.
+            11. If you are uncertain and have not been able to apply one each of kind/, area/ and priority/ , apply the status/manual-triage label.
+
+            ## Guidelines
+
+            - Only use labels that already exist in the repository
+            - Do not add comments or modify the issue content
+            - Triage only the current issue
+            - Identify only one area/ label
+            - Identify only one kind/ label
+            - Identify all applicable sub-area/* and priority/* labels based on the issue content. It's ok to have multiple of these
+            - Once you categorize the issue if it needs information bump down the priority by 1 eg.. a p0 would become a p1 a p1 would become a p2. P2 and P3 can stay as is in this scenario
+            - Reference all shell variables as "${VAR}" (with quotes and braces)
+            - Output only valid JSON format
+            - Do not include any explanation or additional text, just the JSON
+
+            Categorization Guidelines:
             P0: Critical / Blocker
-            - A P0 bug is a catastrophic failure that demands immediate attention. It represents a complete showstopper for a significant portion of users or for the development process itself.
+            - A P0 bug is a catastrophic failure that demands immediate attention.
+            - To be a P0 it means almost all users are running into this issue and it is blocking users from being able to use the product.
+            - You would see this in the form of many comments from different developers on the bug.
+            - It represents a complete showstopper for a significant portion of users or for the development process itself.
             Impact:
             - Blocks development or testing for the entire team.
             - Major security vulnerability that could compromise user data or system integrity.
@@ -78,14 +189,17 @@ jobs:
             Qualifier: Is the main function of the software broken?
             Example: The gemini auth login command fails with an unrecoverable error, preventing any user from authenticating and using the rest of the CLI.
             P1: High
-            - A P1 bug is a serious issue that significantly degrades the user experience or impacts a core feature. While not a complete blocker, it's a major problem that needs a fast resolution. Feature requests are almost never P1.
+            - A P1 bug is a serious issue that significantly degrades the user experience or impacts a core feature.
+            - While not a complete blocker, it's a major problem that needs a fast resolution. Feature requests are almost never P1.
+            - Once again this would be affecting many users.
+            - You would see this in the form of comments from different developers on the bug.
             Impact:
             - A core feature is broken or behaving incorrectly for a large number of users or large number of use cases.
             - Review the bug details and comments to try figure out if this issue affects a large set of use cases or if it's a narrow set of use cases.
             - Severe performance degradation making the application frustratingly slow.
             - No straightforward workaround exists, or the workaround is difficult and non-obvious.
             Qualifier: Is a key feature unusable or giving very wrong results?
-            Example: The gemini -p "..." command consistently returns a malformed JSON response or an empty result, making the CLI's primary generation feature unreliable.
+            Example: Gemini CLI enters a loop when making read-many-files tool call. I am unable to break out of the loop and gemini doesn't follow instructions subsequently.
             P2: Medium
             - A P2 bug is a moderately impactful issue. It's a noticeable problem but doesn't prevent the use of the software's main functionality.
             Impact:
@@ -105,16 +219,16 @@ jobs:
             - If users are talking about issues where the model gets downgraded from pro to flash then i want you to categorize that as a performance issue
             - This product is designed to use different models eg.. using pro, downgrading to flash etc. when users report that they dont expect the model to change those would be categorized as feature requests.
             Definition of Areas
-            area/ux: 
+            area/ux:
             - Issues concerning user-facing elements like command usability, interactive features, help docs, and perceived performance.
-            - I am seeing my screen flicker when using Gemini CLI 
-            - I am seeing the output malformed 
-            - Theme changes aren't taking effect 
+            - I am seeing my screen flicker when using Gemini CLI
+            - I am seeing the output malformed
+            - Theme changes aren't taking effect
             - My keyboard inputs arent' being recognzied
-            area/platform: 
+            area/platform:
             - Issues related to installation, packaging, OS compatibility (Windows, macOS, Linux), and the underlying CLI framework.
             area/background: Issues related to long-running background tasks, daemons, and autonomous or proactive agent features.
-            area/models: 
+            area/models:
             - i am not getting a response that is reasonable or expected. this can include things like
             - I am calling a tool and the tool is not performing as expected.
             - i am expecting a tool to be called and it is not getting called ,
@@ -128,10 +242,10 @@ jobs:
             - Memory compression
             - unexpected responses,
             - poor quality of generated code
-            area/tools: 
-            - These are primarily issues related to Model Context Protocol 
-            - These are issues that mention MCP support 
-            - feature requests asking for support for new tools. 
+            area/tools:
+            - These are primarily issues related to Model Context Protocol
+            - These are issues that mention MCP support
+            - feature requests asking for support for new tools.
             area/core: Issues with fundamental components like command parsing, configuration management, session state, and the main API client logic. Introducing multi-modality
             area/contribution: Issues related to improving the developer contribution experience, such as CI/CD pipelines, build scripts, and test automation infrastructure.
             area/authentication: Issues related to user identity, login flows, API key handling, credential storage, and access token management, unable to sign in selecting wrong authentication path etc..
@@ -143,3 +257,78 @@ jobs:
             - could also pertain to latency,
             - other general software performance like, memory usage, CPU consumption, and algorithmic efficiency.
             - Switching models from one to the other unexpectedly.
+
+      - name: 'Apply Labels to Issue'
+        if: |-
+          ${{ steps.gemini_issue_analysis.outputs.summary != '' }}
+        env:
+          REPOSITORY: '${{ github.repository }}'
+          ISSUE_NUMBER: '${{ github.event.issue.number || github.event.inputs.issue_number }}'
+          LABELS_OUTPUT: '${{ steps.gemini_issue_analysis.outputs.summary }}'
+        uses: 'actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea'
+        with:
+          github-token: '${{ steps.generate_token.outputs.token }}'
+          script: |-
+            // Strip code block markers if present
+            const rawLabels = process.env.LABELS_OUTPUT;
+            core.info(`Raw labels JSON: ${rawLabels}`);
+            let parsedLabels;
+            try {
+              const jsonMatch = rawLabels.match(/```json\s*([\s\S]*?)\s*```/);
+              if (!jsonMatch || !jsonMatch[1]) {
+                throw new Error("Could not find a ```json ... ``` block in the output.");
+              }
+              const jsonString = jsonMatch[1].trim();
+              parsedLabels = JSON.parse(jsonString);
+              core.info(`Parsed labels JSON: ${JSON.stringify(parsedLabels)}`);
+            } catch (err) {
+              core.setFailed(`Failed to parse labels JSON from Gemini output: ${err.message}\nRaw output: ${rawLabels}`);
+              return;
+            }
+
+            const issueNumber = parseInt(process.env.ISSUE_NUMBER);
+            const explanation = parsedLabels.explanation || '';
+            const labelsToSet = parsedLabels.labels_to_set || [];
+            labelsToSet.push('status/bot-triaged');
+
+            // Set labels based on triage result
+            if (labelsToSet.length > 0) {
+              await github.rest.issues.setLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issueNumber,
+                labels: labelsToSet
+              });
+              const explanationInfo = explanation ? ` - ${explanation}` : '';
+              core.info(`Successfully set labels for #${issueNumber}: ${labelsToSet.join(', ')}${explanationInfo}`);
+            } else {
+              // If no labels to set, leave the issue as is
+              const explanationInfo = explanation ? ` - ${explanation}` : '';
+              core.info(`No labels to set for #${issueNumber}, leaving as is${explanationInfo}`);
+            }
+
+            if (explanation) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issueNumber,
+                body: explanation,
+              });
+            }
+
+      - name: 'Post Issue Analysis Failure Comment'
+        if: |-
+          ${{ failure() && steps.gemini_issue_analysis.outcome == 'failure' }}
+        env:
+          ISSUE_NUMBER: '${{ github.event.issue.number || github.event.inputs.issue_number }}'
+          RUN_URL: '${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}'
+        uses: 'actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea'
+        with:
+          github-token: '${{ steps.generate_token.outputs.token }}'
+          script: |-
+            github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: parseInt(process.env.ISSUE_NUMBER),
+              body: 'There is a problem with the Gemini CLI issue triaging. Please check the [action logs](${process.env.RUN_URL}) for details.'
+            })

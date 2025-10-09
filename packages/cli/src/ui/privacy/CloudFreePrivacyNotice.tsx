@@ -4,12 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Box, Newline, Text, useInput } from 'ink';
+import { Box, Newline, Text } from 'ink';
 import { RadioButtonSelect } from '../components/shared/RadioButtonSelect.js';
 import { usePrivacySettings } from '../hooks/usePrivacySettings.js';
-import { CloudPaidPrivacyNotice } from './CloudPaidPrivacyNotice.js';
-import { Config } from '@google/gemini-cli-core';
-import { Colors } from '../colors.js';
+
+import type { Config } from '@google/gemini-cli-core';
+import { theme } from '../semantic-colors.js';
+import { useKeypress } from '../hooks/useKeypress.js';
 
 interface CloudFreePrivacyNoticeProps {
   config: Config;
@@ -23,49 +24,67 @@ export const CloudFreePrivacyNotice = ({
   const { privacyState, updateDataCollectionOptIn } =
     usePrivacySettings(config);
 
-  useInput((input, key) => {
-    if (privacyState.error && key.escape) {
-      onExit();
-    }
-  });
+  useKeypress(
+    (key) => {
+      if (
+        (privacyState.error || privacyState.isFreeTier === false) &&
+        key.name === 'escape'
+      ) {
+        onExit();
+      }
+    },
+    { isActive: true },
+  );
 
   if (privacyState.isLoading) {
-    return <Text color={Colors.Gray}>Loading...</Text>;
+    return <Text color={theme.text.secondary}>Loading...</Text>;
   }
 
   if (privacyState.error) {
     return (
       <Box flexDirection="column" marginY={1}>
-        <Text color={Colors.AccentRed}>
+        <Text color={theme.status.error}>
           Error loading Opt-in settings: {privacyState.error}
         </Text>
-        <Text color={Colors.Gray}>Press Esc to exit.</Text>
+        <Text color={theme.text.secondary}>Press Esc to exit.</Text>
       </Box>
     );
   }
 
   if (privacyState.isFreeTier === false) {
-    return <CloudPaidPrivacyNotice onExit={onExit} />;
+    return (
+      <Box flexDirection="column" marginY={1}>
+        <Text bold color={theme.text.accent}>
+          Gemini Code Assist Privacy Notice
+        </Text>
+        <Newline />
+        <Text>
+          https://developers.google.com/gemini-code-assist/resources/privacy-notices
+        </Text>
+        <Newline />
+        <Text color={theme.text.secondary}>Press Esc to exit.</Text>
+      </Box>
+    );
   }
 
   const items = [
-    { label: 'Yes', value: true },
-    { label: 'No', value: false },
+    { label: 'Yes', value: true, key: 'true' },
+    { label: 'No', value: false, key: 'false' },
   ];
 
   return (
     <Box flexDirection="column" marginY={1}>
-      <Text bold color={Colors.AccentPurple}>
+      <Text bold color={theme.text.accent}>
         Gemini Code Assist for Individuals Privacy Notice
       </Text>
       <Newline />
-      <Text>
+      <Text color={theme.text.primary}>
         This notice and our Privacy Policy
-        <Text color={Colors.AccentBlue}>[1]</Text> describe how Gemini Code
-        Assist handles your data. Please read them carefully.
+        <Text color={theme.text.link}>[1]</Text> describe how Gemini Code Assist
+        handles your data. Please read them carefully.
       </Text>
       <Newline />
-      <Text>
+      <Text color={theme.text.primary}>
         When you use Gemini Code Assist for individuals with Gemini CLI, Google
         collects your prompts, related code, generated output, code edits,
         related feature usage information, and your feedback to provide,
@@ -73,7 +92,7 @@ export const CloudFreePrivacyNotice = ({
         technologies.
       </Text>
       <Newline />
-      <Text>
+      <Text color={theme.text.primary}>
         To help with quality and improve our products (such as generative
         machine-learning models), human reviewers may read, annotate, and
         process the data collected above. We take steps to protect your privacy
@@ -86,7 +105,7 @@ export const CloudFreePrivacyNotice = ({
       </Text>
       <Newline />
       <Box flexDirection="column">
-        <Text>
+        <Text color={theme.text.primary}>
           Allow Google to use this data to develop and improve our products?
         </Text>
         <RadioButtonSelect
@@ -103,11 +122,13 @@ export const CloudFreePrivacyNotice = ({
       </Box>
       <Newline />
       <Text>
-        <Text color={Colors.AccentBlue}>[1]</Text>{' '}
+        <Text color={theme.text.link}>[1]</Text>{' '}
         https://policies.google.com/privacy
       </Text>
       <Newline />
-      <Text color={Colors.Gray}>Press Enter to choose an option and exit.</Text>
+      <Text color={theme.text.secondary}>
+        Press Enter to choose an option and exit.
+      </Text>
     </Box>
   );
 };

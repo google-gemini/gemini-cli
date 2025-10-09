@@ -4,10 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { SlashCommand, CommandContext, CommandKind } from './types.js';
+import type { SlashCommand, CommandContext } from './types.js';
+import { CommandKind } from './types.js';
 import { MessageType } from '../types.js';
-import * as os from 'os';
-import * as path from 'path';
+import * as os from 'node:os';
+import * as path from 'node:path';
+import { loadServerHierarchicalMemory } from '@google/gemini-cli-core';
 
 export function expandHomeDir(p: string): string {
   if (!p) {
@@ -16,7 +18,7 @@ export function expandHomeDir(p: string): string {
   let expandedPath = p;
   if (p.toLowerCase().startsWith('%userprofile%')) {
     expandedPath = os.homedir() + p.substring('%userprofile%'.length);
-  } else if (p.startsWith('~')) {
+  } else if (p === '~' || p.startsWith('~/')) {
     expandedPath = os.homedir() + p.substring(1);
   }
   return path.normalize(expandedPath);
@@ -90,6 +92,39 @@ export const directoryCommand: SlashCommand = {
           }
         }
 
+        try {
+          if (config.shouldLoadMemoryFromIncludeDirectories()) {
+            const { memoryContent, fileCount } =
+              await loadServerHierarchicalMemory(
+                config.getWorkingDir(),
+                [
+                  ...config.getWorkspaceContext().getDirectories(),
+                  ...pathsToAdd,
+                ],
+                config.getDebugMode(),
+                config.getFileService(),
+                config.getExtensionContextFilePaths(),
+                config.getFolderTrust(),
+                context.services.settings.merged.context?.importFormat ||
+                  'tree', // Use setting or default to 'tree'
+                config.getFileFilteringOptions(),
+                context.services.settings.merged.context?.discoveryMaxDirs,
+              );
+            config.setUserMemory(memoryContent);
+            config.setGeminiMdFileCount(fileCount);
+            context.ui.setGeminiMdFileCount(fileCount);
+          }
+          addItem(
+            {
+              type: MessageType.INFO,
+              text: `Successfully added GEMINI.md files from the following directories if there are:\n- ${added.join('\n- ')}`,
+            },
+            Date.now(),
+          );
+        } catch (error) {
+          errors.push(`Error refreshing memory: ${(error as Error).message}`);
+        }
+
         if (added.length > 0) {
           const gemini = config.getGeminiClient();
           if (gemini) {
@@ -106,13 +141,11 @@ export const directoryCommand: SlashCommand = {
 
         if (errors.length > 0) {
           addItem(
-            {
-              type: MessageType.ERROR,
-              text: errors.join('\n'),
-            },
+            { type: MessageType.ERROR, text: errors.join('\n') },
             Date.now(),
           );
         }
+        return;
       },
     },
     {

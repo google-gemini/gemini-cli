@@ -4,7 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { MessageType, HistoryItemStats } from '../types.js';
+import type { HistoryItemStats } from '../types.js';
+import { MessageType } from '../types.js';
 import { formatDuration } from '../utils/formatters.js';
 import {
   type CommandContext,

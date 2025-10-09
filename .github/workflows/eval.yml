@@ -1,0 +1,48 @@
+name: 'Eval'
+
+on:
+  workflow_dispatch:
+
+defaults:
+  run:
+    shell: 'bash'
+
+permissions:
+  contents: 'read'
+  id-token: 'write'
+  packages: 'read'
+
+jobs:
+  eval:
+    name: 'Eval'
+    if: >-
+      github.repository == 'google-gemini/gemini-cli'
+    runs-on: 'ubuntu-latest'
+    container:
+      image: 'ghcr.io/google-gemini/gemini-cli-swe-agent-eval@sha256:cd5edc4afd2245c1f575e791c0859b3c084a86bb3bd9a6762296da5162b35a8f'
+      credentials:
+        username: '${{ github.actor }}'
+        password: '${{ secrets.GITHUB_TOKEN }}'
+      env:
+        GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+        DEFAULT_VERTEXAI_PROJECT: '${{ vars.GOOGLE_CLOUD_PROJECT }}'
+        GOOGLE_CLOUD_PROJECT: '${{ vars.GOOGLE_CLOUD_PROJECT }}'
+        GEMINI_API_KEY: '${{ secrets.EVAL_GEMINI_API_KEY }}'
+        GCLI_LOCAL_FILE_TELEMETRY: 'True'
+        EVAL_GCS_BUCKET: '${{ vars.EVAL_GCS_ARTIFACTS_BUCKET }}'
+    steps:
+      - name: 'Authenticate to Google Cloud'
+        id: 'auth'
+        uses: 'google-github-actions/auth@v2' # ratchet:exclude
+        with:
+          project_id: '${{ vars.GOOGLE_CLOUD_PROJECT }}'
+          workload_identity_provider: '${{ vars.GCP_WIF_PROVIDER }}'
+          service_account: '${{ vars.SERVICE_ACCOUNT_EMAIL }}'
+          token_format: 'access_token'
+          access_token_scopes: 'https://www.googleapis.com/auth/cloud-platform'
+
+      - name: 'Run evaluation'
+        working-directory: '/app'
+        run: |
+          poetry run exp_run --experiment-mode=on-demand --branch-or-commit=${{ github.ref_name }} --model-name=gemini-2.5-pro --dataset=swebench_verified --concurrency=15
+          poetry run python agent_prototypes/scripts/parse_gcli_logs_experiment.py --experiment_dir=experiments/adhoc/gcli_temp_exp --gcs-bucket="${EVAL_GCS_BUCKET}" --gcs-path=gh_action_artifacts

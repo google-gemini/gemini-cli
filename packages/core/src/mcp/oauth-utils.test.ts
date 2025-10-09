@@ -5,11 +5,11 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import {
-  OAuthUtils,
+import type {
   OAuthAuthorizationServerMetadata,
   OAuthProtectedResourceMetadata,
 } from './oauth-utils.js';
+import { OAuthUtils } from './oauth-utils.js';
 
 // Mock fetch globally
 const mockFetch = vi.fn();
@@ -28,13 +28,49 @@ describe('OAuthUtils', () => {
   });
 
   describe('buildWellKnownUrls', () => {
-    it('should build correct well-known URLs', () => {
-      const urls = OAuthUtils.buildWellKnownUrls('https://example.com/path');
+    it('should build standard root-based URLs by default', () => {
+      const urls = OAuthUtils.buildWellKnownUrls('https://example.com/mcp');
       expect(urls.protectedResource).toBe(
         'https://example.com/.well-known/oauth-protected-resource',
       );
       expect(urls.authorizationServer).toBe(
         'https://example.com/.well-known/oauth-authorization-server',
+      );
+    });
+
+    it('should build path-based URLs when includePathSuffix is true', () => {
+      const urls = OAuthUtils.buildWellKnownUrls(
+        'https://example.com/mcp',
+        true,
+      );
+      expect(urls.protectedResource).toBe(
+        'https://example.com/.well-known/oauth-protected-resource/mcp',
+      );
+      expect(urls.authorizationServer).toBe(
+        'https://example.com/.well-known/oauth-authorization-server/mcp',
+      );
+    });
+
+    it('should handle root path correctly', () => {
+      const urls = OAuthUtils.buildWellKnownUrls('https://example.com', true);
+      expect(urls.protectedResource).toBe(
+        'https://example.com/.well-known/oauth-protected-resource',
+      );
+      expect(urls.authorizationServer).toBe(
+        'https://example.com/.well-known/oauth-authorization-server',
+      );
+    });
+
+    it('should handle trailing slash in path', () => {
+      const urls = OAuthUtils.buildWellKnownUrls(
+        'https://example.com/mcp/',
+        true,
+      );
+      expect(urls.protectedResource).toBe(
+        'https://example.com/.well-known/oauth-protected-resource/mcp',
+      );
+      expect(urls.authorizationServer).toBe(
+        'https://example.com/.well-known/oauth-authorization-server/mcp',
       );
     });
   });
@@ -103,6 +139,74 @@ describe('OAuthUtils', () => {
       );
 
       expect(result).toBeNull();
+    });
+  });
+
+  describe('discoverAuthorizationServerMetadata', () => {
+    const mockAuthServerMetadata: OAuthAuthorizationServerMetadata = {
+      issuer: 'https://auth.example.com',
+      authorization_endpoint: 'https://auth.example.com/authorize',
+      token_endpoint: 'https://auth.example.com/token',
+      scopes_supported: ['read', 'write'],
+    };
+
+    it('should handle URLs without path components correctly', async () => {
+      mockFetch
+        .mockResolvedValueOnce({
+          ok: false,
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve(mockAuthServerMetadata),
+        });
+
+      const result = await OAuthUtils.discoverAuthorizationServerMetadata(
+        'https://auth.example.com/',
+      );
+
+      expect(result).toEqual(mockAuthServerMetadata);
+
+      expect(mockFetch).nthCalledWith(
+        1,
+        'https://auth.example.com/.well-known/oauth-authorization-server',
+      );
+      expect(mockFetch).nthCalledWith(
+        2,
+        'https://auth.example.com/.well-known/openid-configuration',
+      );
+    });
+
+    it('should handle URLs with path components correctly', async () => {
+      mockFetch
+        .mockResolvedValueOnce({
+          ok: false,
+        })
+        .mockResolvedValueOnce({
+          ok: false,
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve(mockAuthServerMetadata),
+        });
+
+      const result = await OAuthUtils.discoverAuthorizationServerMetadata(
+        'https://auth.example.com/mcp',
+      );
+
+      expect(result).toEqual(mockAuthServerMetadata);
+
+      expect(mockFetch).nthCalledWith(
+        1,
+        'https://auth.example.com/.well-known/oauth-authorization-server/mcp',
+      );
+      expect(mockFetch).nthCalledWith(
+        2,
+        'https://auth.example.com/.well-known/openid-configuration/mcp',
+      );
+      expect(mockFetch).nthCalledWith(
+        3,
+        'https://auth.example.com/mcp/.well-known/openid-configuration',
+      );
     });
   });
 

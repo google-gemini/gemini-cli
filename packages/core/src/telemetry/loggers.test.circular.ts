@@ -11,10 +11,13 @@
 import { describe, it, expect } from 'vitest';
 import { logToolCall } from './loggers.js';
 import { ToolCallEvent } from './types.js';
-import { Config } from '../config/config.js';
-import { CompletedToolCall } from '../core/coreToolScheduler.js';
-import { ToolCallRequestInfo, ToolCallResponseInfo } from '../core/turn.js';
-import { Tool } from '../tools/tools.js';
+import type { Config } from '../config/config.js';
+import type { CompletedToolCall } from '../core/coreToolScheduler.js';
+import type {
+  ToolCallRequestInfo,
+  ToolCallResponseInfo,
+} from '../core/turn.js';
+import { MockTool } from '../test-utils/mock-tool.js';
 
 describe('Circular Reference Handling', () => {
   it('should handle circular references in tool function arguments', () => {
@@ -56,11 +59,13 @@ describe('Circular Reference Handling', () => {
       errorType: undefined,
     };
 
+    const tool = new MockTool({ name: 'mock-tool' });
     const mockCompletedToolCall: CompletedToolCall = {
       status: 'success',
       request: mockRequest,
       response: mockResponse,
-      tool: {} as Tool,
+      tool,
+      invocation: tool.build({}),
       durationMs: 100,
     };
 
@@ -104,11 +109,13 @@ describe('Circular Reference Handling', () => {
       errorType: undefined,
     };
 
+    const tool = new MockTool({ name: 'mock-tool' });
     const mockCompletedToolCall: CompletedToolCall = {
       status: 'success',
       request: mockRequest,
       response: mockResponse,
-      tool: {} as Tool,
+      tool,
+      invocation: tool.build({}),
       durationMs: 100,
     };
 

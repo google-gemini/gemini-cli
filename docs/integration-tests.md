@@ -20,7 +20,7 @@ npm run test:e2e
 
 ## Running a specific set of tests
 
-To run a subset of test files, you can use `npm run <integration test command> <file_name1> ....` where <integration test command> is either `test:e2e` or `test:integration*` and `<file_name>` is any of the `.test.js` files in the `integration-tests/` directory. For example, the following command runs `list_directory.test.js` and `write_file.test.js`:
+To run a subset of test files, you can use `npm run <integration test command> <file_name1> ....` where &lt;integration test command&gt; is either `test:e2e` or `test:integration*` and `<file_name>` is any of the `.test.js` files in the `integration-tests/` directory. For example, the following command runs `list_directory.test.js` and `write_file.test.js`:
 
 ```bash
 npm run test:e2e list_directory write_file
@@ -32,6 +32,14 @@ To run a single test by its name, use the `--test-name-pattern` flag:
 
 ```bash
 npm run test:e2e -- --test-name-pattern "reads a file"
+```
+
+### Deflaking a test
+
+Before adding a **new** integration test, you should test it at least 5 times with the deflake script to make sure that it is not flaky.
+
+```bash
+npm run deflake -- --runs=5 --command="npm run test:e2e -- --test-name-pattern '<your-new-test-name>'"
 ```
 
 ### Running all tests
@@ -67,13 +75,9 @@ The integration test runner provides several options for diagnostics to help tra
 
 You can preserve the temporary files created during a test run for inspection. This is useful for debugging issues with file system operations.
 
-To keep the test output, you can either use the `--keep-output` flag or set the `KEEP_OUTPUT` environment variable to `true`.
+To keep the test output set the `KEEP_OUTPUT` environment variable to `true`.
 
 ```bash
-# Using the flag
-npm run test:integration:sandbox:none -- --keep-output
-
-# Using the environment variable
 KEEP_OUTPUT=true npm run test:integration:sandbox:none
 ```
 
@@ -81,20 +85,20 @@ When output is kept, the test runner will print the path to the unique directory
 
 ### Verbose output
 
-For more detailed debugging, the `--verbose` flag streams the real-time output from the `gemini` command to the console.
+For more detailed debugging, set the `VERBOSE` environment variable to `true`.
 
 ```bash
-npm run test:integration:sandbox:none -- --verbose
+VERBOSE=true npm run test:integration:sandbox:none
 ```
 
-When using `--verbose` and `--keep-output` in the same command, the output is streamed to the console and also saved to a log file within the test's temporary directory.
+When using `VERBOSE=true` and `KEEP_OUTPUT=true` in the same command, the output is streamed to the console and also saved to a log file within the test's temporary directory.
 
 The verbose output is formatted to clearly identify the source of the logs:
 
 ```
---- TEST: <file-name-without-js>:<test-name> ---
+--- TEST: <log dir>:<test-name> ---
 ... output from the gemini command ...
---- END TEST: <file-name-without-js>:<test-name> ---
+--- END TEST: <log dir>:<test-name> ---
 ```
 
 ## Linting and formatting
@@ -109,10 +113,10 @@ To check for linting errors, run the following command:
 npm run lint
 ```
 
-You can include the `--fix` flag in the command to automatically fix any fixable linting errors:
+You can include the `:fix` flag in the command to automatically fix any fixable linting errors:
 
 ```bash
-npm run lint --fix
+npm run lint:fix
 ```
 
 ## Directory structure

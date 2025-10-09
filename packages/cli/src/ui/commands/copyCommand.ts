@@ -5,11 +5,8 @@
  */
 
 import { copyToClipboard } from '../utils/commandUtils.js';
-import {
-  CommandKind,
-  SlashCommand,
-  SlashCommandActionReturn,
-} from './types.js';
+import type { SlashCommand, SlashCommandActionReturn } from './types.js';
+import { CommandKind } from './types.js';
 
 export const copyCommand: SlashCommand = {
   name: 'copy',
@@ -53,7 +50,7 @@ export const copyCommand: SlashCommand = {
         return {
           type: 'message',
           messageType: 'error',
-          content: 'Failed to copy to the clipboard.',
+          content: `Failed to copy to the clipboard. ${message}`,
         };
       }
     } else {

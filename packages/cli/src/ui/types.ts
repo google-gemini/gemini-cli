@@ -4,10 +4,27 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {
+import type {
+  CompressionStatus,
+  MCPServerConfig,
+  ThoughtSummary,
   ToolCallConfirmationDetails,
+  ToolConfirmationOutcome,
   ToolResultDisplay,
 } from '@google/gemini-cli-core';
+import type { PartListUnion } from '@google/genai';
+import { type ReactNode } from 'react';
+
+export type { ThoughtSummary };
+
+export enum AuthState {
+  // Attemtping to authenticate or re-authenticate
+  Unauthenticated = 'unauthenticated',
+  // Auth dialog is open for user to select auth method
+  Updating = 'updating',
+  // Successfully authenticated
+  Authenticated = 'authenticated',
+}
 
 // Only defining the state enum needed by the UI
 export enum StreamingState {
@@ -50,12 +67,15 @@ export interface IndividualToolCallDisplay {
   status: ToolCallStatus;
   confirmationDetails: ToolCallConfirmationDetails | undefined;
   renderOutputAsMarkdown?: boolean;
+  ptyId?: number;
+  outputFile?: string;
 }
 
 export interface CompressionProps {
   isPending: boolean;
   originalTokenCount: number | null;
   newTokenCount: number | null;
+  compressionStatus: CompressionStatus | null;
 }
 
 export interface HistoryItemBase {
@@ -87,6 +107,11 @@ export type HistoryItemError = HistoryItemBase & {
   text: string;
 };
 
+export type HistoryItemWarning = HistoryItemBase & {
+  type: 'warning';
+  text: string;
+};
+
 export type HistoryItemAbout = HistoryItemBase & {
   type: 'about';
   cliVersion: string;
@@ -95,6 +120,12 @@ export type HistoryItemAbout = HistoryItemBase & {
   modelVersion: string;
   selectedAuthType: string;
   gcpProject: string;
+  ideClient: string;
+};
+
+export type HistoryItemHelp = HistoryItemBase & {
+  type: 'help';
+  timestamp: Date;
 };
 
 export type HistoryItemStats = HistoryItemBase & {
@@ -130,6 +161,67 @@ export type HistoryItemCompression = HistoryItemBase & {
   compression: CompressionProps;
 };
 
+export type HistoryItemExtensionsList = HistoryItemBase & {
+  type: 'extensions_list';
+};
+
+export interface ChatDetail {
+  name: string;
+  mtime: string;
+}
+
+export type HistoryItemChatList = HistoryItemBase & {
+  type: 'chat_list';
+  chats: ChatDetail[];
+};
+
+export interface ToolDefinition {
+  name: string;
+  displayName: string;
+  description?: string;
+}
+
+export type HistoryItemToolsList = HistoryItemBase & {
+  type: 'tools_list';
+  tools: ToolDefinition[];
+  showDescriptions: boolean;
+};
+
+// JSON-friendly types for using as a simple data model showing info about an
+// MCP Server.
+export interface JsonMcpTool {
+  serverName: string;
+  name: string;
+  description?: string;
+  schema?: {
+    parametersJsonSchema?: unknown;
+    parameters?: unknown;
+  };
+}
+
+export interface JsonMcpPrompt {
+  serverName: string;
+  name: string;
+  description?: string;
+}
+
+export type HistoryItemMcpStatus = HistoryItemBase & {
+  type: 'mcp_status';
+  servers: Record<string, MCPServerConfig>;
+  tools: JsonMcpTool[];
+  prompts: JsonMcpPrompt[];
+  authStatus: Record<
+    string,
+    'authenticated' | 'expired' | 'unauthenticated' | 'not-configured'
+  >;
+  blockedServers: Array<{ name: string; extensionName: string }>;
+  discoveryInProgress: boolean;
+  connectingServers: string[];
+  showDescriptions: boolean;
+  showSchema: boolean;
+  showTips: boolean;
+};
+
 // Using Omit<HistoryItem, 'id'> seems to have some issues with typescript's
 // type inference e.g. historyItem.type === 'tool_group' isn't auto-inferring that
 // 'tools' in historyItem.
@@ -141,13 +233,19 @@ export type HistoryItemWithoutId =
   | HistoryItemGeminiContent
   | HistoryItemInfo
   | HistoryItemError
+  | HistoryItemWarning
   | HistoryItemAbout
+  | HistoryItemHelp
   | HistoryItemToolGroup
   | HistoryItemStats
   | HistoryItemModelStats
   | HistoryItemToolStats
   | HistoryItemQuit
-  | HistoryItemCompression;
+  | HistoryItemCompression
+  | HistoryItemExtensionsList
+  | HistoryItemToolsList
+  | HistoryItemMcpStatus
+  | HistoryItemChatList;
 
 export type HistoryItem = HistoryItemWithoutId & { id: number };
 
@@ -155,14 +253,20 @@ export type HistoryItem = HistoryItemWithoutId & { id: number };
 export enum MessageType {
   INFO = 'info',
   ERROR = 'error',
+  WARNING = 'warning',
   USER = 'user',
   ABOUT = 'about',
+  HELP = 'help',
   STATS = 'stats',
   MODEL_STATS = 'model_stats',
   TOOL_STATS = 'tool_stats',
   QUIT = 'quit',
   GEMINI = 'gemini',
   COMPRESSION = 'compression',
+  EXTENSIONS_LIST = 'extensions_list',
+  TOOLS_LIST = 'tools_list',
+  MCP_STATUS = 'mcp_status',
+  CHAT_LIST = 'chat_list',
 }
 
 // Simplified message structure for internal feedback
@@ -181,7 +285,13 @@ export type Message =
       modelVersion: string;
       selectedAuthType: string;
       gcpProject: string;
+      ideClient: string;
       content?: string; // Optional content, not really used for ABOUT
+    }
+  | {
+      type: MessageType.HELP;
+      timestamp: Date;
+      content?: string; // Optional content, not really used for HELP
     }
   | {
       type: MessageType.STATS;
@@ -212,7 +322,7 @@ export type Message =
     };
 
 export interface ConsoleMessageItem {
-  type: 'log' | 'warn' | 'error' | 'debug';
+  type: 'log' | 'warn' | 'error' | 'debug' | 'info';
   content: string;
   count: number;
 }
@@ -223,7 +333,7 @@ export interface ConsoleMessageItem {
  */
 export interface SubmitPromptResult {
   type: 'submit_prompt';
-  content: string;
+  content: PartListUnion;
 }
 
 /**
@@ -239,3 +349,20 @@ export type SlashCommandProcessorResult =
       type: 'handled'; // Indicates the command was processed and no further action is needed.
     }
   | SubmitPromptResult;
+
+export interface ShellConfirmationRequest {
+  commands: string[];
+  onConfirm: (
+    outcome: ToolConfirmationOutcome,
+    approvedCommands?: string[],
+  ) => void;
+}
+
+export interface ConfirmationRequest {
+  prompt: ReactNode;
+  onConfirm: (confirm: boolean) => void;
+}
+
+export interface LoopDetectionConfirmationRequest {
+  onComplete: (result: { userSelection: 'disable' | 'keep' }) => void;
+}

@@ -15,6 +15,7 @@ import { MessageType } from '../types.js';
 import { GIT_COMMIT_INFO } from '../../generated/git-commit.js';
 import { formatMemoryUsage } from '../utils/formatters.js';
 import { getCliVersion } from '../../utils/version.js';
+import { IdeClient, sessionId } from '@google/gemini-cli-core';
 
 export const bugCommand: SlashCommand = {
   name: 'bug',
@@ -26,25 +27,30 @@ export const bugCommand: SlashCommand = {
 
     const osVersion = `${process.platform} ${process.version}`;
     let sandboxEnv = 'no sandbox';
-    if (process.env.SANDBOX && process.env.SANDBOX !== 'sandbox-exec') {
-      sandboxEnv = process.env.SANDBOX.replace(/^gemini-(?:code-)?/, '');
-    } else if (process.env.SANDBOX === 'sandbox-exec') {
+    if (process.env['SANDBOX'] && process.env['SANDBOX'] !== 'sandbox-exec') {
+      sandboxEnv = process.env['SANDBOX'].replace(/^gemini-(?:code-)?/, '');
+    } else if (process.env['SANDBOX'] === 'sandbox-exec') {
       sandboxEnv = `sandbox-exec (${
-        process.env.SEATBELT_PROFILE || 'unknown'
+        process.env['SEATBELT_PROFILE'] || 'unknown'
       })`;
     }
     const modelVersion = config?.getModel() || 'Unknown';
     const cliVersion = await getCliVersion();
     const memoryUsage = formatMemoryUsage(process.memoryUsage().rss);
+    const ideClient = await getIdeClientName(context);
 
-    const info = `
+    let info = `
 * **CLI Version:** ${cliVersion}
 * **Git Commit:** ${GIT_COMMIT_INFO}
+* **Session ID:** ${sessionId}
 * **Operating System:** ${osVersion}
 * **Sandbox Environment:** ${sandboxEnv}
 * **Model Version:** ${modelVersion}
 * **Memory Usage:** ${memoryUsage}
 `;
+    if (ideClient) {
+      info += `* **IDE Client:** ${ideClient}\n`;
+    }
 
     let bugReportUrl =
       'https://github.com/google-gemini/gemini-cli/issues/new?template=bug_report.yml&title={title}&info={info}';
@@ -81,3 +87,11 @@ export const bugCommand: SlashCommand = {
     }
   },
 };
+
+async function getIdeClientName(context: CommandContext) {
+  if (!context.services.config?.getIdeMode()) {
+    return '';
+  }
+  const ideClient = await IdeClient.getInstance();
+  return ideClient.getDetectedIdeDisplayName() ?? '';
+}

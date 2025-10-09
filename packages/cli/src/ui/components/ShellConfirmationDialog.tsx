@@ -5,13 +5,13 @@
  */
 
 import { ToolConfirmationOutcome } from '@google/gemini-cli-core';
-import { Box, Text, useInput } from 'ink';
-import React from 'react';
-import { Colors } from '../colors.js';
-import {
-  RadioButtonSelect,
-  RadioSelectItem,
-} from './shared/RadioButtonSelect.js';
+import { Box, Text } from 'ink';
+import type React from 'react';
+import { theme } from '../semantic-colors.js';
+import { RenderInline } from '../utils/InlineMarkdownRenderer.js';
+import type { RadioSelectItem } from './shared/RadioButtonSelect.js';
+import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
+import { useKeypress } from '../hooks/useKeypress.js';
 
 export interface ShellConfirmationRequest {
   commands: string[];
@@ -30,11 +30,14 @@ export const ShellConfirmationDialog: React.FC<
 > = ({ request }) => {
   const { commands, onConfirm } = request;
 
-  useInput((_, key) => {
-    if (key.escape) {
-      onConfirm(ToolConfirmationOutcome.Cancel);
-    }
-  });
+  useKeypress(
+    (key) => {
+      if (key.name === 'escape') {
+        onConfirm(ToolConfirmationOutcome.Cancel);
+      }
+    },
+    { isActive: true },
+  );
 
   const handleSelect = (item: ToolConfirmationOutcome) => {
     if (item === ToolConfirmationOutcome.Cancel) {
@@ -50,14 +53,17 @@ export const ShellConfirmationDialog: React.FC<
     {
       label: 'Yes, allow once',
       value: ToolConfirmationOutcome.ProceedOnce,
+      key: 'Yes, allow once',
     },
     {
       label: 'Yes, allow always for this session',
       value: ToolConfirmationOutcome.ProceedAlways,
+      key: 'Yes, allow always for this session',
     },
     {
       label: 'No (esc)',
       value: ToolConfirmationOutcome.Cancel,
+      key: 'No (esc)',
     },
   ];
 
@@ -65,31 +71,35 @@ export const ShellConfirmationDialog: React.FC<
     <Box
       flexDirection="column"
       borderStyle="round"
-      borderColor={Colors.AccentYellow}
+      borderColor={theme.status.warning}
       padding={1}
       width="100%"
       marginLeft={1}
     >
       <Box flexDirection="column" marginBottom={1}>
-        <Text bold>Shell Command Execution</Text>
-        <Text>A custom command wants to run the following shell commands:</Text>
+        <Text bold color={theme.text.primary}>
+          Shell Command Execution
+        </Text>
+        <Text color={theme.text.primary}>
+          A custom command wants to run the following shell commands:
+        </Text>
         <Box
           flexDirection="column"
           borderStyle="round"
-          borderColor={Colors.Gray}
+          borderColor={theme.border.default}
           paddingX={1}
           marginTop={1}
         >
           {commands.map((cmd) => (
-            <Text key={cmd} color={Colors.AccentCyan}>
-              {cmd}
+            <Text key={cmd} color={theme.text.link}>
+              <RenderInline text={cmd} />
             </Text>
           ))}
         </Box>
       </Box>
 
       <Box marginBottom={1}>
-        <Text>Do you want to proceed?</Text>
+        <Text color={theme.text.primary}>Do you want to proceed?</Text>
       </Box>
 
       <RadioButtonSelect items={options} onSelect={handleSelect} isFocused />

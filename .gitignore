@@ -3,14 +3,21 @@
 .env~
 
 # gemini-cli settings
-.gemini/
-!gemini/config.yaml
+# We want to keep the .gemini in the root of the repo and ignore any .gemini
+# in subdirectories. In our root .gemini we want to allow for version control
+# for subcommands.
+**/.gemini/
+!/.gemini/
+.gemini/*
+!.gemini/config.yaml
+!.gemini/commands/
 
 # Note: .gemini-clipboard/ is NOT in gitignore so Gemini can access pasted images
 
 # Dependency directory
 node_modules
 bower_components
+package-lock.json
 
 # Editors
 .idea
@@ -37,5 +44,12 @@ packages/*/coverage/
 
 # Generated files
 packages/cli/src/generated/
+packages/core/src/generated/
 .integration-tests/
 packages/vscode-ide-companion/*.vsix
+
+# GHA credentials
+gha-creds-*.json
+
+# Log files
+patch_output.log

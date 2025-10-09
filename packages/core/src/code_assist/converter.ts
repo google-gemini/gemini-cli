@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {
+import type {
   Content,
   ContentListUnion,
   ContentUnion,
@@ -12,7 +12,6 @@ import {
   GenerateContentParameters,
   CountTokensParameters,
   CountTokensResponse,
-  GenerateContentResponse,
   GenerationConfigRoutingConfig,
   MediaResolution,
   Candidate,
@@ -22,12 +21,12 @@ import {
   Part,
   SafetySetting,
   PartUnion,
-  SchemaUnion,
   SpeechConfigUnion,
   ThinkingConfig,
   ToolListUnion,
   ToolConfig,
 } from '@google/genai';
+import { GenerateContentResponse } from '@google/genai';
 
 export interface CAGenerateContentRequest {
   model: string;
@@ -61,7 +60,8 @@ interface VertexGenerationConfig {
   frequencyPenalty?: number;
   seed?: number;
   responseMimeType?: string;
-  responseSchema?: SchemaUnion;
+  responseJsonSchema?: unknown;
+  responseSchema?: unknown;
   routingConfig?: GenerationConfigRoutingConfig;
   modelSelectionConfig?: ModelSelectionConfig;
   responseModalities?: string[];
@@ -80,6 +80,7 @@ interface VertexGenerateContentResponse {
   automaticFunctionCallingHistory?: Content[];
   promptFeedback?: GenerateContentResponsePromptFeedback;
   usageMetadata?: GenerateContentResponseUsageMetadata;
+  modelVersion?: string;
 }
 
 export interface CaCountTokenRequest {
@@ -137,6 +138,7 @@ export function fromGenerateContentResponse(
   out.automaticFunctionCallingHistory = inres.automaticFunctionCallingHistory;
   out.promptFeedback = inres.promptFeedback;
   out.usageMetadata = inres.usageMetadata;
+  out.modelVersion = inres.modelVersion;
   return out;
 }
 
@@ -157,7 +159,7 @@ function toVertexGenerateContentRequest(
   };
 }
 
-function toContents(contents: ContentListUnion): Content[] {
+export function toContents(contents: ContentListUnion): Content[] {
   if (Array.isArray(contents)) {
     // it's a Content[] or a PartsUnion[]
     return contents.map(toContent);
@@ -189,17 +191,22 @@ function toContent(content: ContentUnion): Content {
     };
   }
   if ('parts' in content) {
-    // it's a Content
-    return content;
+    // it's a Content - process parts to handle thought filtering
+    return {
+      ...content,
+      parts: content.parts
+        ? toParts(content.parts.filter((p) => p != null))
+        : [],
+    };
   }
   // it's a Part
   return {
     role: 'user',
-    parts: [content as Part],
+    parts: [toPart(content as Part)],
   };
 }
 
-function toParts(parts: PartUnion[]): Part[] {
+export function toParts(parts: PartUnion[]): Part[] {
   return parts.map(toPart);
 }
 
@@ -208,6 +215,41 @@ function toPart(part: PartUnion): Part {
     // it's a string
     return { text: part };
   }
+
+  // Handle thought parts for CountToken API compatibility
+  // The CountToken API expects parts to have certain required "oneof" fields initialized,
+  // but thought parts don't conform to this schema and cause API failures
+  if ('thought' in part && part.thought) {
+    const thoughtText = `[Thought: ${part.thought}]`;
+
+    const newPart = { ...part };
+    delete (newPart as Record<string, unknown>)['thought'];
+
+    const hasApiContent =
+      'functionCall' in newPart ||
+      'functionResponse' in newPart ||
+      'inlineData' in newPart ||
+      'fileData' in newPart;
+
+    if (hasApiContent) {
+      // It's a functionCall or other non-text part. Just strip the thought.
+      return newPart;
+    }
+
+    // If no other valid API content, this must be a text part.
+    // Combine existing text (if any) with the thought, preserving other properties.
+    const text = (newPart as { text?: unknown }).text;
+    const existingText = text ? String(text) : '';
+    const combinedText = existingText
+      ? `${existingText}\n${thoughtText}`
+      : thoughtText;
+
+    return {
+      ...newPart,
+      text: combinedText,
+    };
+  }
+
   return part;
 }
 
@@ -231,6 +273,7 @@ function toVertexGenerationConfig(
     seed: config.seed,
     responseMimeType: config.responseMimeType,
     responseSchema: config.responseSchema,
+    responseJsonSchema: config.responseJsonSchema,
     routingConfig: config.routingConfig,
     modelSelectionConfig: config.modelSelectionConfig,
     responseModalities: config.responseModalities,

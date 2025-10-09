@@ -22,7 +22,7 @@ describe('checkForUpdates', () => {
     vi.useFakeTimers();
     vi.resetAllMocks();
     // Clear DEV environment variable before each test
-    delete process.env.DEV;
+    delete process.env['DEV'];
   });
 
   afterEach(() => {
@@ -31,7 +31,7 @@ describe('checkForUpdates', () => {
   });
 
   it('should return null when running from source (DEV=true)', async () => {
-    process.env.DEV = 'true';
+    process.env['DEV'] = 'true';
     getPackageJson.mockResolvedValue({
       name: 'test-package',
       version: '1.0.0',

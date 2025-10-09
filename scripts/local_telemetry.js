@@ -6,10 +6,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import path from 'path';
-import fs from 'fs';
-import { spawn, execSync } from 'child_process';
-import { fileURLToPath } from 'url';
+import path from 'node:path';
+import fs from 'node:fs';
+import { spawn, execSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import {
   BIN_DIR,
   OTEL_DIR,
@@ -82,7 +82,7 @@ async function main() {
     'otelcol-contrib',
     false, // isJaeger = false
   ).catch((e) => {
-    console.error(`��� Error getting otelcol-contrib: ${e.message}`);
+    console.error(`🛑 Error getting otelcol-contrib: ${e.message}`);
     return null;
   });
   if (!otelcolPath) process.exit(1);

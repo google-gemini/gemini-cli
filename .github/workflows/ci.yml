@@ -1,153 +1,370 @@
-# .github/workflows/ci.yml
-
-name: Gemini CLI CI
+name: 'Testing: CI'
 
 on:
   push:
-    branches: [main, release]
+    branches:
+      - 'main'
+      - 'release/**'
   pull_request:
-    branches: [main, release]
+    branches:
+      - 'main'
+      - 'release/**'
   merge_group:
+  workflow_dispatch:
+    inputs:
+      branch_ref:
+        description: 'Branch to run on'
+        required: true
+        default: 'main'
+        type: 'string'
+
+concurrency:
+  group: '${{ github.workflow }}-${{ github.head_ref || github.ref }}'
+  cancel-in-progress: |-
+    ${{ github.ref != 'refs/heads/main' && !startsWith(github.ref, 'refs/heads/release/') }}
+
+permissions:
+  checks: 'write'
+  contents: 'read'
+  statuses: 'write'
+
+defaults:
+  run:
+    shell: 'bash'
 
 jobs:
-  lint:
-    name: Lint
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read # For checkout
+  merge_queue_skipper:
+    permissions: 'read-all'
+    name: 'Merge Queue Skipper'
+    runs-on: 'gemini-cli-ubuntu-16-core'
+    outputs:
+      skip: '${{ steps.merge-queue-ci-skipper.outputs.skip-check }}'
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - id: 'merge-queue-ci-skipper'
+        uses: 'cariad-tech/merge-queue-ci-skipper@1032489e59437862c90a08a2c92809c903883772' # ratchet:cariad-tech/merge-queue-ci-skipper@main
+        with:
+          secret: '${{ secrets.GITHUB_TOKEN }}'
 
-      - name: Set up Node.js
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+  lint:
+    name: 'Lint'
+    runs-on: 'gemini-cli-ubuntu-16-core'
+    needs: 'merge_queue_skipper'
+    if: "${{needs.merge_queue_skipper.outputs.skip == 'false'}}"
+    steps:
+      - name: 'Checkout'
+        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
+        with:
+          ref: '${{ github.event.inputs.branch_ref || github.ref }}'
+          fetch-depth: 0
+
+      - name: 'Set up Node.js'
+        uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions/setup-node@v4.4.0
         with:
           node-version-file: '.nvmrc'
           cache: 'npm'
 
-      - name: Install dependencies
-        run: npm ci
+      - name: 'Install dependencies'
+        run: 'npm ci'
 
-      - name: Run formatter check
-        run: |
-          npm run format
-          git diff --exit-code
+      - name: 'Check lockfile'
+        run: 'npm run check:lockfile'
 
-      - name: Run linter
-        run: npm run lint:ci
+      - name: 'Install linters'
+        run: 'node scripts/lint.js --setup'
 
-      - name: Build project
-        run: npm run build
+      - name: 'Run ESLint'
+        run: 'node scripts/lint.js --eslint'
 
-      - name: Run type check
-        run: npm run typecheck
+      - name: 'Run actionlint'
+        run: 'node scripts/lint.js --actionlint'
 
-  test:
-    name: Test
-    runs-on: ${{ matrix.os }}
-    needs: lint
+      - name: 'Run shellcheck'
+        run: 'node scripts/lint.js --shellcheck'
+
+      - name: 'Run yamllint'
+        run: 'node scripts/lint.js --yamllint'
+
+      - name: 'Run Prettier'
+        run: 'node scripts/lint.js --prettier'
+
+      - name: 'Run sensitive keyword linter'
+        run: 'node scripts/lint.js --sensitive-keywords'
+
+  test_linux:
+    name: 'Test (Linux)'
+    runs-on: 'gemini-cli-ubuntu-16-core'
+    needs:
+      - 'lint'
+      - 'merge_queue_skipper'
+    if: "${{needs.merge_queue_skipper.outputs.skip == 'false'}}"
     permissions:
-      contents: read
-      checks: write
-      pull-requests: write
+      contents: 'read'
+      checks: 'write'
+      pull-requests: 'write'
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-        node-version: [20.x, 22.x, 24.x]
+        node-version:
+          - '20.x'
+          - '22.x'
+          - '24.x'
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - name: 'Checkout'
+        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
 
-      - name: Set up Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+      - name: 'Set up Node.js ${{ matrix.node-version }}'
+        uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions/setup-node@v4
         with:
-          node-version: ${{ matrix.node-version }}
+          node-version: '${{ matrix.node-version }}'
           cache: 'npm'
 
-      - name: Build project
-        run: npm run build
+      - name: 'Build project'
+        run: 'npm run build'
 
-      - name: Install dependencies for testing
-        run: npm ci # Install fresh dependencies using the downloaded package-lock.json
+      - name: 'Install dependencies for testing'
+        run: 'npm ci'
 
-      - name: Run tests and generate reports
-        run: npm run test:ci
+      - name: 'Run tests and generate reports'
         env:
           NO_COLOR: true
+        run: 'npm run test:ci'
 
-      - name: Publish Test Report (for non-forks)
-        if: always() && (github.event.pull_request.head.repo.full_name == github.repository)
-        uses: dorny/test-reporter@dc3a92680fcc15842eef52e8c4606ea7ce6bd3f3 # v2
+      - name: 'Bundle'
+        run: 'npm run bundle'
+
+      - name: 'Smoke test bundle'
+        run: 'node ./bundle/gemini.js --version'
+
+      - name: 'Wait for file system sync'
+        run: 'sleep 2'
+
+      - name: 'Publish Test Report (for non-forks)'
+        if: |-
+          ${{ always() && (github.event.pull_request.head.repo.full_name == github.repository) }}
+        uses: 'dorny/test-reporter@dc3a92680fcc15842eef52e8c4606ea7ce6bd3f3' # ratchet:dorny/test-reporter@v2
         with:
-          name: Test Results (Node ${{ matrix.node-version }})
-          path: packages/*/junit.xml
-          reporter: java-junit
+          name: 'Test Results (Node ${{ matrix.node-version }})'
+          path: 'packages/*/junit.xml'
+          reporter: 'java-junit'
           fail-on-error: 'false'
 
-      - name: Upload Test Results Artifact (for forks)
-        if: always() && (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository)
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - name: 'Upload Test Results Artifact (for forks)'
+        if: |-
+          ${{ always() && (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository) }}
+        uses: 'actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02' # ratchet:actions/upload-artifact@v4
         with:
-          name: test-results-fork-${{ matrix.node-version }}-${{ matrix.os }}
-          path: packages/*/junit.xml
+          name: 'test-results-fork-${{ matrix.node-version }}-${{ runner.os }}'
+          path: 'packages/*/junit.xml'
 
-      - name: Upload coverage reports
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        if: always()
-        with:
-          name: coverage-reports-${{ matrix.node-version }}-${{ matrix.os }}
-          path: packages/*/coverage
-
-  post_coverage_comment:
-    name: Post Coverage Comment
-    runs-on: ubuntu-latest
-    needs: test
-    if: always() && github.event_name == 'pull_request' && (github.event.pull_request.head.repo.full_name == github.repository)
-    continue-on-error: true
+  test_mac:
+    name: 'Test (Mac)'
+    runs-on: '${{ matrix.os }}'
+    needs:
+      - 'lint'
+      - 'merge_queue_skipper'
+    if: "${{needs.merge_queue_skipper.outputs.skip == 'false'}}"
     permissions:
-      contents: read # For checkout
-      pull-requests: write # For commenting
+      contents: 'read'
+      checks: 'write'
+      pull-requests: 'write'
+    continue-on-error: true
     strategy:
       matrix:
-        # Reduce noise by only posting the comment once
-        os: [ubuntu-latest]
-        node-version: [22.x]
+        os:
+          - 'macos-latest'
+        node-version:
+          - '20.x'
+          - '22.x'
+          - '24.x'
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - name: 'Checkout'
+        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
 
-      - name: Download coverage reports artifact
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+      - name: 'Set up Node.js ${{ matrix.node-version }}'
+        uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions/setup-node@v4
         with:
-          name: coverage-reports-${{ matrix.node-version }}-${{ matrix.os }}
-          path: coverage_artifact # Download to a specific directory
+          node-version: '${{ matrix.node-version }}'
+          cache: 'npm'
 
-      - name: Post Coverage Comment using Composite Action
-        uses: ./.github/actions/post-coverage-comment # Path to the composite action directory
+      - name: 'Build project'
+        run: 'npm run build'
+
+      - name: 'Install dependencies for testing'
+        run: 'npm ci'
+
+      - name: 'Run tests and generate reports'
+        env:
+          NO_COLOR: true
+        run: 'npm run test:ci -- --coverage.enabled=false'
+
+      - name: 'Bundle'
+        run: 'npm run bundle'
+
+      - name: 'Smoke test bundle'
+        run: 'node ./bundle/gemini.js --version'
+
+      - name: 'Wait for file system sync'
+        run: 'sleep 2'
+
+      - name: 'Publish Test Report (for non-forks)'
+        if: |-
+          ${{ always() && (github.event.pull_request.head.repo.full_name == github.repository) }}
+        uses: 'dorny/test-reporter@dc3a92680fcc15842eef52e8c4606ea7ce6bd3f3' # ratchet:dorny/test-reporter@v2
         with:
-          cli_json_file: coverage_artifact/cli/coverage/coverage-summary.json
-          core_json_file: coverage_artifact/core/coverage/coverage-summary.json
-          cli_full_text_summary_file: coverage_artifact/cli/coverage/full-text-summary.txt
-          core_full_text_summary_file: coverage_artifact/core/coverage/full-text-summary.txt
-          node_version: ${{ matrix.node-version }}
-          os: ${{ matrix.os }}
-          github_token: ${{ secrets.GITHUB_TOKEN }}
+          name: 'Test Results (Node ${{ matrix.node-version }})'
+          path: 'packages/*/junit.xml'
+          reporter: 'java-junit'
+          fail-on-error: 'false'
+
+      - name: 'Upload Test Results Artifact (for forks)'
+        if: |-
+          ${{ always() && (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository) }}
+        uses: 'actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02' # ratchet:actions/upload-artifact@v4
+        with:
+          name: 'test-results-fork-${{ matrix.node-version }}-${{ runner.os }}'
+          path: 'packages/*/junit.xml'
+
+      - name: 'Upload coverage reports'
+        if: |-
+          ${{ always() }}
+        uses: 'actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02' # ratchet:actions/upload-artifact@v4
+        with:
+          name: 'coverage-reports-${{ matrix.node-version }}-${{ matrix.os }}'
+          path: 'packages/*/coverage'
 
   codeql:
-    name: CodeQL
-    runs-on: ubuntu-latest
+    name: 'CodeQL'
+    runs-on: 'gemini-cli-ubuntu-16-core'
+    needs: 'merge_queue_skipper'
+    if: "${{needs.merge_queue_skipper.outputs.skip == 'false'}}"
     permissions:
-      actions: read
-      contents: read
-      security-events: write
+      actions: 'read'
+      contents: 'read'
+      security-events: 'write'
     steps:
-      - name: Checkout
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
-
-      - name: Initialize CodeQL
-        uses: github/codeql-action/init@181d5eefc20863364f96762470ba6f862bdef56b # v3
+      - name: 'Checkout'
+        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
         with:
-          languages: javascript
+          ref: '${{ github.event.inputs.branch_ref || github.ref }}'
 
-      - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@181d5eefc20863364f96762470ba6f862bdef56b # v3
+      - name: 'Initialize CodeQL'
+        uses: 'github/codeql-action/init@df559355d593797519d70b90fc8edd5db049e7a2' # ratchet:github/codeql-action/init@v3
+        with:
+          languages: 'javascript'
+
+      - name: 'Perform CodeQL Analysis'
+        uses: 'github/codeql-action/analyze@df559355d593797519d70b90fc8edd5db049e7a2' # ratchet:github/codeql-action/analyze@v3
+
+  # Check for changes in bundle size.
+  bundle_size:
+    name: 'Check Bundle Size'
+    needs: 'merge_queue_skipper'
+    if: "${{github.event_name == 'pull_request' && needs.merge_queue_skipper.outputs.skip == 'false'}}"
+    runs-on: 'gemini-cli-ubuntu-16-core'
+    permissions:
+      contents: 'read' # For checkout
+      pull-requests: 'write' # For commenting
+
+    steps:
+      - name: 'Checkout'
+        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
+        with:
+          ref: '${{ github.event.inputs.branch_ref || github.ref }}'
+          fetch-depth: 1
+
+      - uses: 'preactjs/compressed-size-action@946a292cd35bd1088e0d7eb92b69d1a8d5b5d76a'
+        with:
+          repo-token: '${{ secrets.GITHUB_TOKEN }}'
+          pattern: './bundle/**/*.{js,sb}'
+          minimum-change-threshold: '1000'
+          compression: 'none'
+          clean-script: 'clean'
+
+  test_windows:
+    name: 'Slow Test - Win'
+    runs-on: 'gemini-cli-windows-16-core'
+    needs: 'merge_queue_skipper'
+    if: "${{needs.merge_queue_skipper.outputs.skip == 'false'}}"
+    continue-on-error: true
+
+    steps:
+      - name: 'Checkout'
+        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
+        with:
+          ref: '${{ github.event.inputs.branch_ref || github.ref }}'
+
+      - name: 'Set up Node.js 20.x'
+        uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+
+      - name: 'Configure Windows Defender exclusions'
+        run: |
+          Add-MpPreference -ExclusionPath $env:GITHUB_WORKSPACE -Force
+          Add-MpPreference -ExclusionPath "$env:GITHUB_WORKSPACE\node_modules" -Force
+          Add-MpPreference -ExclusionPath "$env:GITHUB_WORKSPACE\packages" -Force
+          Add-MpPreference -ExclusionPath "$env:TEMP" -Force
+        shell: 'pwsh'
+
+      - name: 'Configure npm for Windows performance'
+        run: |
+          npm config set progress false
+          npm config set audit false
+          npm config set fund false
+          npm config set loglevel error
+          npm config set maxsockets 32
+          npm config set registry https://registry.npmjs.org/
+        shell: 'pwsh'
+
+      - name: 'Install dependencies'
+        run: 'npm ci'
+        shell: 'pwsh'
+
+      - name: 'Build project'
+        run: 'npm run build'
+        shell: 'pwsh'
+        env:
+          NODE_OPTIONS: '--max-old-space-size=32768 --max-semi-space-size=256'
+          UV_THREADPOOL_SIZE: '32'
+          NODE_ENV: 'production'
+
+      - name: 'Run tests and generate reports'
+        env:
+          GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
+          NO_COLOR: true
+          NODE_OPTIONS: '--max-old-space-size=32768 --max-semi-space-size=256'
+          UV_THREADPOOL_SIZE: '32'
+          NODE_ENV: 'test'
+        run: 'npm run test:ci -- --coverage.enabled=false'
+        shell: 'pwsh'
+
+      - name: 'Bundle'
+        run: 'npm run bundle'
+        shell: 'pwsh'
+
+      - name: 'Smoke test bundle'
+        run: 'node ./bundle/gemini.js --version'
+        shell: 'pwsh'
+
+  ci:
+    name: 'CI'
+    if: 'always()'
+    needs:
+      - 'lint'
+      - 'test_linux'
+      - 'test_mac'
+      - 'codeql'
+      - 'bundle_size'
+    runs-on: 'gemini-cli-ubuntu-16-core'
+    steps:
+      - name: 'Check all job results'
+        run: |
+          if [[ (${{ needs.lint.result }} != 'success' && ${{ needs.lint.result }} != 'skipped') || \
+               (${{ needs.test_linux.result }} != 'success' && ${{ needs.test_linux.result }} != 'skipped') || \
+               (${{ needs.test_mac.result }} != 'success' && ${{ needs.test_mac.result }} != 'skipped') || \
+               (${{ needs.codeql.result }} != 'success' && ${{ needs.codeql.result }} != 'skipped') || \
+               (${{ needs.bundle_size.result }} != 'success' && ${{ needs.bundle_size.result }} != 'skipped') ]]; then
+            echo "One or more CI jobs failed."
+            exit 1
+          fi
+          echo "All CI jobs passed!"

@@ -4,9 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React from 'react';
+import type React from 'react';
 import { Text, Box } from 'ink';
-import { Colors } from '../../colors.js';
+import { theme } from '../../semantic-colors.js';
+import { SCREEN_READER_USER_PREFIX } from '../../textConstants.js';
+import { isSlashCommand as checkIsSlashCommand } from '../../utils/commandUtils.js';
 
 interface UserMessageProps {
   text: string;
@@ -15,23 +17,16 @@ interface UserMessageProps {
 export const UserMessage: React.FC<UserMessageProps> = ({ text }) => {
   const prefix = '> ';
   const prefixWidth = prefix.length;
-  const isSlashCommand = text.startsWith('/');
+  const isSlashCommand = checkIsSlashCommand(text);
 
-  const textColor = isSlashCommand ? Colors.AccentPurple : Colors.Gray;
-  const borderColor = isSlashCommand ? Colors.AccentPurple : Colors.Gray;
+  const textColor = isSlashCommand ? theme.text.accent : theme.text.secondary;
 
   return (
-    <Box
-      borderStyle="round"
-      borderColor={borderColor}
-      flexDirection="row"
-      paddingX={2}
-      paddingY={0}
-      marginY={1}
-      alignSelf="flex-start"
-    >
+    <Box flexDirection="row" paddingY={0} marginY={1} alignSelf="flex-start">
       <Box width={prefixWidth}>
-        <Text color={textColor}>{prefix}</Text>
+        <Text color={theme.text.accent} aria-label={SCREEN_READER_USER_PREFIX}>
+          {prefix}
+        </Text>
       </Box>
       <Box flexGrow={1}>
         <Text wrap="wrap" color={textColor}>

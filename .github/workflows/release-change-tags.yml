@@ -1,0 +1,56 @@
+name: 'Release: Change Tags'
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'The package version to tag (e.g., 0.5.0-preview-2). This version must already exist on the npm registry.'
+        required: true
+        type: 'string'
+      channel:
+        description: 'The npm dist-tag to apply (e.g., latest, preview, nightly).'
+        required: true
+        type: 'choice'
+        options:
+          - 'latest'
+          - 'preview'
+          - 'nightly'
+      ref:
+        description: 'The branch, tag, or SHA to run from.'
+        required: false
+        type: 'string'
+        default: 'main'
+      dry-run:
+        description: 'Whether to run in dry-run mode.'
+        required: false
+        type: 'boolean'
+        default: true
+
+jobs:
+  change-tags:
+    runs-on: 'ubuntu-latest'
+    permissions:
+      packages: 'write'
+      issues: 'write'
+    steps:
+      - name: 'Checkout repository'
+        uses: 'actions/checkout@v4'
+        with:
+          ref: '${{ github.event.inputs.ref }}'
+          fetch-depth: 0
+
+      - name: 'Setup Node.js'
+        uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020'
+        with:
+          node-version-file: '.nvmrc'
+          registry-url: 'https://wombat-dressing-room.appspot.com'
+          scope: '@google'
+
+      - name: 'Change tag'
+        uses: './.github/actions/tag-npm-release'
+        with:
+          channel: '${{ github.event.inputs.channel }}'
+          version: '${{ github.event.inputs.version }}'
+          dry-run: '${{ github.event.inputs.dry-run }}'
+          wombat-token-core: '${{ secrets.WOMBAT_TOKEN_CORE }}'
+          wombat-token-cli: '${{ secrets.WOMBAT_TOKEN_CLI }}'

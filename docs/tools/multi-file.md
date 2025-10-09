@@ -29,6 +29,7 @@ Use `read_many_files` to read content from multiple files specified by paths or 
 `read_many_files` searches for files matching the provided `paths` and `include` patterns, while respecting `exclude` patterns and default excludes (if enabled).
 
 - For text files: it reads the content of each matched file (attempting to skip binary files not explicitly requested as image/PDF) and concatenates it into a single string, with a separator `--- {filePath} ---` between the content of each file. Uses UTF-8 encoding by default.
+- The tool inserts a `--- End of content ---` after the last file.
 - For image and PDF files: if explicitly requested by name or extension (e.g., `paths: ["logo.png"]` or `include: ["*.pdf"]`), the tool reads the file and returns its content as a base64 encoded string.
 - The tool attempts to detect and skip other binary files (those not matching common image/PDF types or not explicitly requested) by checking for null bytes in their initial content.
 
@@ -52,7 +53,7 @@ Read the main README, all Markdown files in the `docs` directory, and a specific
 read_many_files(paths=["README.md", "docs/**/*.md", "assets/logo.png"], exclude=["docs/OLD_README.md"])
 ```
 
-Read all JavaScript files but explicitly including test files and all JPEGs in an `images` folder:
+Read all JavaScript files but explicitly include test files and all JPEGs in an `images` folder:
 
 ```
 read_many_files(paths=["**/*.js"], include=["**/*.test.js", "images/**/*.jpg"], useDefaultExcludes=False)

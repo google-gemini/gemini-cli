@@ -4,7 +4,108 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Config } from '../config/config.js';
+import type { AnyToolInvocation } from '../index.js';
+import type { Config } from '../config/config.js';
+import os from 'node:os';
+import { quote } from 'shell-quote';
+import { doesToolInvocationMatch } from './tool-utils.js';
+import { spawn, type SpawnOptionsWithoutStdio } from 'node:child_process';
+
+export const SHELL_TOOL_NAMES = ['run_shell_command', 'ShellTool'];
+
+/**
+ * An identifier for the shell type.
+ */
+export type ShellType = 'cmd' | 'powershell' | 'bash';
+
+/**
+ * Defines the configuration required to execute a command string within a specific shell.
+ */
+export interface ShellConfiguration {
+  /** The path or name of the shell executable (e.g., 'bash', 'cmd.exe'). */
+  executable: string;
+  /**
+   * The arguments required by the shell to execute a subsequent string argument.
+   */
+  argsPrefix: string[];
+  /** An identifier for the shell type. */
+  shell: ShellType;
+}
+
+/**
+ * Determines the appropriate shell configuration for the current platform.
+ *
+ * This ensures we can execute command strings predictably and securely across platforms
+ * using the `spawn(executable, [...argsPrefix, commandString], { shell: false })` pattern.
+ *
+ * @returns The ShellConfiguration for the current environment.
+ */
+export function getShellConfiguration(): ShellConfiguration {
+  if (isWindows()) {
+    const comSpec = process.env['ComSpec'] || 'cmd.exe';
+    const executable = comSpec.toLowerCase();
+
+    if (
+      executable.endsWith('powershell.exe') ||
+      executable.endsWith('pwsh.exe')
+    ) {
+      // For PowerShell, the arguments are different.
+      // -NoProfile: Speeds up startup.
+      // -Command: Executes the following command.
+      return {
+        executable: comSpec,
+        argsPrefix: ['-NoProfile', '-Command'],
+        shell: 'powershell',
+      };
+    }
+
+    // Default to cmd.exe for anything else on Windows.
+    // Flags for CMD:
+    // /d: Skip execution of AutoRun commands.
+    // /s: Modifies the treatment of the command string (important for quoting).
+    // /c: Carries out the command specified by the string and then terminates.
+    return {
+      executable: comSpec,
+      argsPrefix: ['/d', '/s', '/c'],
+      shell: 'cmd',
+    };
+  }
+
+  // Unix-like systems (Linux, macOS)
+  return { executable: 'bash', argsPrefix: ['-c'], shell: 'bash' };
+}
+
+/**
+ * Export the platform detection constant for use in process management (e.g., killing processes).
+ */
+export const isWindows = () => os.platform() === 'win32';
+
+/**
+ * Escapes a string so that it can be safely used as a single argument
+ * in a shell command, preventing command injection.
+ *
+ * @param arg The argument string to escape.
+ * @param shell The type of shell the argument is for.
+ * @returns The shell-escaped string.
+ */
+export function escapeShellArg(arg: string, shell: ShellType): string {
+  if (!arg) {
+    return '';
+  }
+
+  switch (shell) {
+    case 'powershell':
+      // For PowerShell, wrap in single quotes and escape internal single quotes by doubling them.
+      return `'${arg.replace(/'/g, "''")}'`;
+    case 'cmd':
+      // Simple Windows escaping for cmd.exe: wrap in double quotes and escape inner double quotes.
+      return `"${arg.replace(/"/g, '""')}"`;
+    case 'bash':
+    default:
+      // POSIX shell escaping using shell-quote.
+      return quote([arg]);
+  }
+}
 
 /**
  * Splits a shell command into a list of individual commands, respecting quotes.
@@ -165,6 +266,11 @@ export function detectCommandSubstitution(command: string): boolean {
         return true;
       }
 
+      // >(...) process substitution - works unquoted only (not in double quotes)
+      if (char === '>' && nextChar === '(' && !inDoubleQuotes && !inBackticks) {
+        return true;
+      }
+
       // Backtick command substitution - check for opening backtick
       // (We track the state above, so this catches the start of backtick substitution)
       if (char === '`' && !inBackticks) {
@@ -218,37 +324,24 @@ export function checkCommandPermissions(
       allAllowed: false,
       disallowedCommands: [command],
       blockReason:
-        'Command substitution using $(), <(), or >() is not allowed for security reasons',
+        'Command substitution using $(), `` ` ``, <(), or >() is not allowed for security reasons',
       isHardDenial: true,
     };
   }
 
-  const SHELL_TOOL_NAMES = ['run_shell_command', 'ShellTool'];
   const normalize = (cmd: string): string => cmd.trim().replace(/\s+/g, ' ');
-
-  const isPrefixedBy = (cmd: string, prefix: string): boolean => {
-    if (!cmd.startsWith(prefix)) {
-      return false;
-    }
-    return cmd.length === prefix.length || cmd[prefix.length] === ' ';
-  };
-
-  const extractCommands = (tools: string[]): string[] =>
-    tools.flatMap((tool) => {
-      for (const toolName of SHELL_TOOL_NAMES) {
-        if (tool.startsWith(`${toolName}(`) && tool.endsWith(')')) {
-          return [normalize(tool.slice(toolName.length + 1, -1))];
-        }
-      }
-      return [];
-    });
-
-  const coreTools = config.getCoreTools() || [];
-  const excludeTools = config.getExcludeTools() || [];
   const commandsToValidate = splitCommands(command).map(normalize);
+  const invocation: AnyToolInvocation & { params: { command: string } } = {
+    params: { command: '' },
+  } as AnyToolInvocation & { params: { command: string } };
 
   // 1. Blocklist Check (Highest Priority)
-  if (SHELL_TOOL_NAMES.some((name) => excludeTools.includes(name))) {
+  const excludeTools = config.getExcludeTools() || [];
+  const isWildcardBlocked = SHELL_TOOL_NAMES.some((name) =>
+    excludeTools.includes(name),
+  );
+
+  if (isWildcardBlocked) {
     return {
       allAllowed: false,
       disallowedCommands: commandsToValidate,
@@ -256,9 +349,12 @@ export function checkCommandPermissions(
       isHardDenial: true,
     };
   }
-  const blockedCommands = extractCommands(excludeTools);
+
   for (const cmd of commandsToValidate) {
-    if (blockedCommands.some((blocked) => isPrefixedBy(cmd, blocked))) {
+    invocation.params['command'] = cmd;
+    if (
+      doesToolInvocationMatch('run_shell_command', invocation, excludeTools)
+    ) {
       return {
         allAllowed: false,
         disallowedCommands: [cmd],
@@ -268,7 +364,7 @@ export function checkCommandPermissions(
     }
   }
 
-  const globallyAllowedCommands = extractCommands(coreTools);
+  const coreTools = config.getCoreTools() || [];
   const isWildcardAllowed = SHELL_TOOL_NAMES.some((name) =>
     coreTools.includes(name),
   );
@@ -279,18 +375,30 @@ export function checkCommandPermissions(
     return { allAllowed: true, disallowedCommands: [] };
   }
 
+  const disallowedCommands: string[] = [];
+
   if (sessionAllowlist) {
     // "DEFAULT DENY" MODE: A session allowlist is provided.
     // All commands must be in either the session or global allowlist.
-    const disallowedCommands: string[] = [];
+    const normalizedSessionAllowlist = new Set(
+      [...sessionAllowlist].flatMap((cmd) =>
+        SHELL_TOOL_NAMES.map((name) => `${name}(${cmd})`),
+      ),
+    );
+
     for (const cmd of commandsToValidate) {
-      const isSessionAllowed = [...sessionAllowlist].some((allowed) =>
-        isPrefixedBy(cmd, normalize(allowed)),
+      invocation.params['command'] = cmd;
+      const isSessionAllowed = doesToolInvocationMatch(
+        'run_shell_command',
+        invocation,
+        [...normalizedSessionAllowlist],
       );
       if (isSessionAllowed) continue;
 
-      const isGloballyAllowed = globallyAllowedCommands.some((allowed) =>
-        isPrefixedBy(cmd, allowed),
+      const isGloballyAllowed = doesToolInvocationMatch(
+        'run_shell_command',
+        invocation,
+        coreTools,
       );
       if (isGloballyAllowed) continue;
 
@@ -301,18 +409,26 @@ export function checkCommandPermissions(
       return {
         allAllowed: false,
         disallowedCommands,
-        blockReason: `Command(s) not on the global or session allowlist.`,
+        blockReason: `Command(s) not on the global or session allowlist. Disallowed commands: ${disallowedCommands
+          .map((c) => JSON.stringify(c))
+          .join(', ')}`,
         isHardDenial: false, // This is a soft denial; confirmation is possible.
       };
     }
   } else {
     // "DEFAULT ALLOW" MODE: No session allowlist.
-    const hasSpecificAllowedCommands = globallyAllowedCommands.length > 0;
+    const hasSpecificAllowedCommands =
+      coreTools.filter((tool) =>
+        SHELL_TOOL_NAMES.some((name) => tool.startsWith(`${name}(`)),
+      ).length > 0;
+
     if (hasSpecificAllowedCommands) {
-      const disallowedCommands: string[] = [];
       for (const cmd of commandsToValidate) {
-        const isGloballyAllowed = globallyAllowedCommands.some((allowed) =>
-          isPrefixedBy(cmd, allowed),
+        invocation.params['command'] = cmd;
+        const isGloballyAllowed = doesToolInvocationMatch(
+          'run_shell_command',
+          invocation,
+          coreTools,
         );
         if (!isGloballyAllowed) {
           disallowedCommands.push(cmd);
@@ -322,7 +438,9 @@ export function checkCommandPermissions(
         return {
           allAllowed: false,
           disallowedCommands,
-          blockReason: `Command(s) not in the allowed commands list.`,
+          blockReason: `Command(s) not in the allowed commands list. Disallowed commands: ${disallowedCommands
+            .map((c) => JSON.stringify(c))
+            .join(', ')}`,
           isHardDenial: false, // This is a soft denial.
         };
       }
@@ -346,6 +464,37 @@ export function checkCommandPermissions(
  * @param config The application configuration.
  * @returns An object with 'allowed' boolean and optional 'reason' string if not allowed.
  */
+export const spawnAsync = (
+  command: string,
+  args: string[],
+  options?: SpawnOptionsWithoutStdio,
+): Promise<{ stdout: string; stderr: string }> =>
+  new Promise((resolve, reject) => {
+    const child = spawn(command, args, options);
+    let stdout = '';
+    let stderr = '';
+
+    child.stdout.on('data', (data) => {
+      stdout += data.toString();
+    });
+
+    child.stderr.on('data', (data) => {
+      stderr += data.toString();
+    });
+
+    child.on('close', (code) => {
+      if (code === 0) {
+        resolve({ stdout, stderr });
+      } else {
+        reject(new Error(`Command failed with exit code ${code}:\n${stderr}`));
+      }
+    });
+
+    child.on('error', (err) => {
+      reject(err);
+    });
+  });
+
 export function isCommandAllowed(
   command: string,
   config: Config,

@@ -4,13 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import * as fs from 'fs/promises';
-import { Dirent } from 'fs';
-import * as path from 'path';
+import * as fs from 'node:fs/promises';
+import type { Dirent } from 'node:fs';
+import * as path from 'node:path';
 import { getErrorMessage, isNodeError } from './errors.js';
-import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
-import { FileFilteringOptions } from '../config/config.js';
-import { DEFAULT_FILE_FILTERING_OPTIONS } from '../config/config.js';
+import type { FileDiscoveryService } from '../services/fileDiscoveryService.js';
+import type { FileFilteringOptions } from '../config/constants.js';
+import { DEFAULT_FILE_FILTERING_OPTIONS } from '../config/constants.js';
 
 const MAX_ITEMS = 200;
 const TRUNCATION_INDICATOR = '...';

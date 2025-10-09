@@ -4,20 +4,26 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { EditorType, openDiff } from '../utils/editor.js';
-import os from 'os';
-import path from 'path';
-import fs from 'fs';
+import type { EditorType } from '../utils/editor.js';
+import { openDiff } from '../utils/editor.js';
+import os from 'node:os';
+import path from 'node:path';
+import fs from 'node:fs';
 import * as Diff from 'diff';
 import { DEFAULT_DIFF_OPTIONS } from './diffOptions.js';
 import { isNodeError } from '../utils/errors.js';
-import { Tool } from './tools.js';
+import type {
+  AnyDeclarativeTool,
+  DeclarativeTool,
+  ToolResult,
+} from './tools.js';
 
 /**
- * A tool that supports a modify operation.
+ * A declarative tool that supports a modify operation.
  */
-export interface ModifiableTool<ToolParams> extends Tool<ToolParams> {
-  getModifyContext(abortSignal: AbortSignal): ModifyContext<ToolParams>;
+export interface ModifiableDeclarativeTool<TParams extends object>
+  extends DeclarativeTool<TParams, ToolResult> {
+  getModifyContext(abortSignal: AbortSignal): ModifyContext<TParams>;
 }
 
 export interface ModifyContext<ToolParams> {
@@ -39,9 +45,12 @@ export interface ModifyResult<ToolParams> {
   updatedDiff: string;
 }
 
-export function isModifiableTool<TParams>(
-  tool: Tool<TParams>,
-): tool is ModifiableTool<TParams> {
+/**
+ * Type guard to check if a declarative tool is modifiable.
+ */
+export function isModifiableDeclarativeTool(
+  tool: AnyDeclarativeTool,
+): tool is ModifiableDeclarativeTool<object> {
   return 'getModifyContext' in tool;
 }
 
@@ -138,6 +147,7 @@ export async function modifyWithEditor<ToolParams>(
   modifyContext: ModifyContext<ToolParams>,
   editorType: EditorType,
   _abortSignal: AbortSignal,
+  onEditorClose: () => void,
 ): Promise<ModifyResult<ToolParams>> {
   const currentContent = await modifyContext.getCurrentContent(originalParams);
   const proposedContent =
@@ -150,7 +160,7 @@ export async function modifyWithEditor<ToolParams>(
   );
 
   try {
-    await openDiff(oldPath, newPath, editorType);
+    await openDiff(oldPath, newPath, editorType, onEditorClose);
     const result = getUpdatedParams(
       oldPath,
       newPath,

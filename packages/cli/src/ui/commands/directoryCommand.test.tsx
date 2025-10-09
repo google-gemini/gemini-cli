@@ -6,11 +6,11 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { directoryCommand, expandHomeDir } from './directoryCommand.js';
-import { Config, WorkspaceContext } from '@google/gemini-cli-core';
-import { CommandContext } from './types.js';
+import type { Config, WorkspaceContext } from '@google/gemini-cli-core';
+import type { CommandContext } from './types.js';
 import { MessageType } from '../types.js';
-import * as os from 'os';
-import * as path from 'path';
+import * as os from 'node:os';
+import * as path from 'node:path';
 
 describe('directoryCommand', () => {
   let mockContext: CommandContext;
@@ -40,11 +40,24 @@ describe('directoryCommand', () => {
       getGeminiClient: vi.fn().mockReturnValue({
         addDirectoryContext: vi.fn(),
       }),
+      getWorkingDir: () => '/test/dir',
+      shouldLoadMemoryFromIncludeDirectories: () => false,
+      getDebugMode: () => false,
+      getFileService: () => ({}),
+      getExtensionContextFilePaths: () => [],
+      getFileFilteringOptions: () => ({ ignore: [], include: [] }),
+      setUserMemory: vi.fn(),
+      setGeminiMdFileCount: vi.fn(),
     } as unknown as Config;
 
     mockContext = {
       services: {
         config: mockConfig,
+        settings: {
+          merged: {
+            memoryDiscoveryMaxDirs: 1000,
+          },
+        },
       },
       ui: {
         addItem: vi.fn(),
