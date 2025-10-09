@@ -59,8 +59,9 @@ jobs:
 
       - name: 'Print Inputs'
         shell: 'bash'
-        run: |-
-          echo "${{ toJSON(inputs) }}"
+        env:
+          JSON_INPUTS: '${{ toJSON(inputs) }}'
+        run: 'echo "$JSON_INPUTS"'
 
       - name: 'Calculate Versions and SHAs'
         id: 'versions'
