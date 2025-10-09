@@ -904,7 +904,9 @@ export class ClearcutLogger {
     this.enqueueLogEvent(
       this.createLogEvent(EventNames.EXTENSION_INSTALL, data),
     );
-    this.flushToClearcut();
+    this.flushToClearcut().catch((error) => {
+      console.debug('Error flushing to Clearcut:', error);
+    });
   }
 
   logExtensionUninstallEvent(event: ExtensionUninstallEvent): void {
@@ -922,7 +924,9 @@ export class ClearcutLogger {
     this.enqueueLogEvent(
       this.createLogEvent(EventNames.EXTENSION_UNINSTALL, data),
     );
-    this.flushToClearcut();
+    this.flushToClearcut().catch((error) => {
+      console.debug('Error flushing to Clearcut:', error);
+    });
   }
 
   logToolOutputTruncatedEvent(event: ToolOutputTruncatedEvent): void {
