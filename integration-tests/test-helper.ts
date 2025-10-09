@@ -104,6 +104,8 @@ export function validateModelOutput(
       console.warn(
         'The tool was called successfully, which is the main requirement.',
       );
+      console.warn('Expected content:', expectedContent);
+      console.warn('Actual output:', result);
       return false;
     } else if (process.env.VERBOSE === 'true') {
       console.log(`${testName}: Model output validated successfully.`);
@@ -176,6 +178,11 @@ export class TestRig {
     const telemetryPath = join(this.testDir, 'telemetry.log'); // Always use test directory for telemetry
 
     const settings = {
+      general: {
+        // Nightly releases sometimes becomes out of sync with local code and
+        // triggers auto-update, which causes tests to fail.
+        disableAutoUpdate: true,
+      },
       telemetry: {
         enabled: true,
         target: 'local',

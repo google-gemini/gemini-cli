@@ -23,6 +23,10 @@ import { getResponseText } from '../utils/partUtils.js';
 import { fetchWithTimeout, isPrivateIp } from '../utils/fetch.js';
 import { convert } from 'html-to-text';
 import { ProxyAgent, setGlobalDispatcher } from 'undici';
+import {
+  logWebFetchFallbackAttempt,
+  WebFetchFallbackAttemptEvent,
+} from '../telemetry/index.js';
 
 const URL_FETCH_TIMEOUT_MS = 10000;
 const MAX_CONTENT_LENGTH = 100000;
@@ -184,6 +188,10 @@ ${textContent}
     const isPrivate = isPrivateIp(url);
 
     if (isPrivate) {
+      logWebFetchFallbackAttempt(
+        this.config,
+        new WebFetchFallbackAttemptEvent('private_ip'),
+      );
       return this.executeFallback(signal);
     }
 
@@ -243,6 +251,10 @@ ${textContent}
       }
 
       if (processingError) {
+        logWebFetchFallbackAttempt(
+          this.config,
+          new WebFetchFallbackAttemptEvent('primary_failed'),
+        );
         return this.executeFallback(signal);
       }
 
