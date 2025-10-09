@@ -34,7 +34,7 @@ To begin using Gemini CLI, you must authenticate with a Google service. The most
 3. Select your Google account.
 4. Click on **Sign in**.
 
-For other authentication options and information, see [GeminI CLI Authentication Setup](./authentication.md).
+For other authentication options and information, see [Gemini CLI Authentication Setup](./authentication.md).
 
 ## Configure
 
