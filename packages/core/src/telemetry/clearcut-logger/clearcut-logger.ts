@@ -31,6 +31,10 @@ import type {
   ExtensionEnableEvent,
   ModelSlashCommandEvent,
   ExtensionDisableEvent,
+  SmartEditStrategyEvent,
+  SmartEditCorrectionEvent,
+  AgentStartEvent,
+  AgentFinishEvent,
 } from '../types.js';
 import { EventMetadataKey } from './event-metadata-key.js';
 import type { Config } from '../../config/config.js';
@@ -39,7 +43,11 @@ import { UserAccountManager } from '../../utils/userAccountManager.js';
 import { safeJsonStringify } from '../../utils/safeJsonStringify.js';
 import { FixedDeque } from 'mnemonist';
 import { GIT_COMMIT_INFO, CLI_VERSION } from '../../generated/git-commit.js';
-import { IDE_DEFINITIONS, detectIdeFromEnv } from '../../ide/detect-ide.js';
+import {
+  IDE_DEFINITIONS,
+  detectIdeFromEnv,
+  isCloudShell,
+} from '../../ide/detect-ide.js';
 
 export enum EventNames {
   START_SESSION = 'start_session',
@@ -71,6 +79,10 @@ export enum EventNames {
   TOOL_OUTPUT_TRUNCATED = 'tool_output_truncated',
   MODEL_ROUTING = 'model_routing',
   MODEL_SLASH_COMMAND = 'model_slash_command',
+  SMART_EDIT_STRATEGY = 'smart_edit_strategy',
+  SMART_EDIT_CORRECTION = 'smart_edit_correction',
+  AGENT_START = 'agent_start',
+  AGENT_FINISH = 'agent_finish',
 }
 
 export interface LogResponse {
@@ -114,6 +126,8 @@ export interface LogRequest {
 function determineSurface(): string {
   if (process.env['SURFACE']) {
     return process.env['SURFACE'];
+  } else if (isCloudShell()) {
+    return IDE_DEFINITIONS.cloudshell.name;
   } else if (process.env['GITHUB_SHA']) {
     return 'GitHub';
   } else if (process.env['TERM_PROGRAM'] === 'vscode') {
@@ -466,10 +480,6 @@ export class ClearcutLogger {
         value: JSON.stringify(event.duration_ms),
       },
       {
-        gemini_cli_key: EventMetadataKey.GEMINI_CLI_TOOL_ERROR_MESSAGE,
-        value: JSON.stringify(event.error),
-      },
-      {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_TOOL_CALL_ERROR_TYPE,
         value: JSON.stringify(event.error_type),
       },
@@ -782,10 +792,6 @@ export class ClearcutLogger {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_KITTY_SEQUENCE_LENGTH,
         value: event.sequence_length.toString(),
       },
-      {
-        gemini_cli_key: EventMetadataKey.GEMINI_CLI_KITTY_TRUNCATED_SEQUENCE,
-        value: event.truncated_sequence,
-      },
     ];
 
     this.enqueueLogEvent(
@@ -1030,6 +1036,78 @@ export class ClearcutLogger {
     this.enqueueLogEvent(
       this.createLogEvent(EventNames.EXTENSION_DISABLE, data),
     );
+    this.flushIfNeeded();
+  }
+
+  logSmartEditStrategyEvent(event: SmartEditStrategyEvent): void {
+    const data: EventValue[] = [
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_SMART_EDIT_STRATEGY,
+        value: event.strategy,
+      },
+    ];
+
+    this.enqueueLogEvent(
+      this.createLogEvent(EventNames.SMART_EDIT_STRATEGY, data),
+    );
+    this.flushIfNeeded();
+  }
+
+  logSmartEditCorrectionEvent(event: SmartEditCorrectionEvent): void {
+    const data: EventValue[] = [
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_SMART_EDIT_CORRECTION,
+        value: event.correction,
+      },
+    ];
+
+    this.enqueueLogEvent(
+      this.createLogEvent(EventNames.SMART_EDIT_CORRECTION, data),
+    );
+    this.flushIfNeeded();
+  }
+
+  logAgentStartEvent(event: AgentStartEvent): void {
+    const data: EventValue[] = [
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_AGENT_ID,
+        value: event.agent_id,
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_AGENT_NAME,
+        value: event.agent_name,
+      },
+    ];
+
+    this.enqueueLogEvent(this.createLogEvent(EventNames.AGENT_START, data));
+    this.flushIfNeeded();
+  }
+
+  logAgentFinishEvent(event: AgentFinishEvent): void {
+    const data: EventValue[] = [
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_AGENT_ID,
+        value: event.agent_id,
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_AGENT_NAME,
+        value: event.agent_name,
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_AGENT_DURATION_MS,
+        value: event.duration_ms.toString(),
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_AGENT_TURN_COUNT,
+        value: event.turn_count.toString(),
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_AGENT_TERMINATE_REASON,
+        value: event.terminate_reason,
+      },
+    ];
+
+    this.enqueueLogEvent(this.createLogEvent(EventNames.AGENT_FINISH, data));
     this.flushIfNeeded();
   }
 

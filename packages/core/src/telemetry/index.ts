@@ -65,6 +65,15 @@ export type { TelemetryEvent } from './types.js';
 export { SpanStatusCode, ValueType } from '@opentelemetry/api';
 export { SemanticAttributes } from '@opentelemetry/semantic-conventions';
 export * from './uiTelemetry.js';
+export {
+  MemoryMonitor,
+  initializeMemoryMonitor,
+  getMemoryMonitor,
+  recordCurrentMemoryUsage,
+  startGlobalMemoryMonitoring,
+  stopGlobalMemoryMonitoring,
+} from './memory-monitor.js';
+export type { MemorySnapshot, ProcessMetrics } from './memory-monitor.js';
 export { HighWaterMarkTracker } from './high-water-mark-tracker.js';
 export { RateLimiter } from './rate-limiter.js';
 export { ActivityType } from './activity-types.js';
@@ -85,6 +94,13 @@ export {
   recordContentRetry,
   recordContentRetryFailure,
   recordModelRoutingMetrics,
+  // Custom metrics for token usage and API responses
+  recordCustomTokenUsageMetrics,
+  recordCustomApiResponseMetrics,
+  // OpenTelemetry GenAI semantic convention for token usage and operation duration
+  recordGenAiClientTokenUsage,
+  recordGenAiClientOperationDuration,
+  getConventionAttributes,
   // Performance monitoring functions
   recordStartupPerformance,
   recordMemoryUsage,
@@ -103,4 +119,8 @@ export {
   ToolExecutionPhase,
   ApiRequestPhase,
   FileOperation,
+  // OpenTelemetry Semantic Convention types
+  GenAiOperationName,
+  GenAiProviderName,
+  GenAiTokenType,
 } from './metrics.js';
