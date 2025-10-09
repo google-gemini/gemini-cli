@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import stripAnsi from 'strip-ansi';
 import type { PtyImplementation } from '../utils/getPty.js';
 import { getPty } from '../utils/getPty.js';
 import { spawn as cpSpawn } from 'node:child_process';
@@ -147,6 +146,7 @@ export class ShellExecutionService {
       cwd,
       onOutputEvent,
       abortSignal,
+      shellExecutionConfig,
     );
   }
 
@@ -155,9 +155,12 @@ export class ShellExecutionService {
     cwd: string,
     onOutputEvent: (event: ShellOutputEvent) => void,
     abortSignal: AbortSignal,
+    shellExecutionConfig: ShellExecutionConfig = {},
   ): ShellExecutionHandle {
     try {
       const isWindows = os.platform() === 'win32';
+      const cols = shellExecutionConfig.terminalWidth ?? 80;
+      const rows = shellExecutionConfig.terminalHeight ?? 30;
 
       const child = cpSpawn(commandToExecute, [], {
         cwd,
@@ -169,16 +172,20 @@ export class ShellExecutionService {
           ...process.env,
           GEMINI_CLI: '1',
           TERM: 'xterm-256color',
-          PAGER: 'cat',
+          PAGER: shellExecutionConfig.pager ?? 'cat',
         },
       });
 
       const result = new Promise<ShellExecutionResult>((resolve) => {
-        let stdoutDecoder: TextDecoder | null = null;
-        let stderrDecoder: TextDecoder | null = null;
+        const headlessTerminal = new Terminal({
+          allowProposedApi: true,
+          cols,
+          rows,
+        });
+        headlessTerminal.scrollToTop();
 
-        let stdout = '';
-        let stderr = '';
+        let processingChain = Promise.resolve();
+        let decoder: TextDecoder | null = null;
         const outputChunks: Buffer[] = [];
         let error: Error | null = null;
         let exited = false;
@@ -186,40 +193,140 @@ export class ShellExecutionService {
         let isStreamingRawContent = true;
         const MAX_SNIFF_SIZE = 4096;
         let sniffedBytes = 0;
+        let isWriting = false;
+        let hasStartedOutput = false;
+        let renderTimeout: NodeJS.Timeout | null = null;
+
+        const render = (finalRender = false) => {
+          if (renderTimeout) {
+            clearTimeout(renderTimeout);
+          }
+
+          const renderFn = () => {
+            if (!isStreamingRawContent) {
+              return;
+            }
+
+            if (!shellExecutionConfig.disableDynamicLineTrimming) {
+              if (!hasStartedOutput) {
+                const bufferText = getFullBufferText(headlessTerminal);
+                if (bufferText.trim().length === 0) {
+                  return;
+                }
+                hasStartedOutput = true;
+              }
+            }
+
+            let newOutput: AnsiOutput;
+            if (shellExecutionConfig.showColor) {
+              newOutput = serializeTerminalToObject(headlessTerminal);
+            } else {
+              const buffer = headlessTerminal.buffer.active;
+              const lines: AnsiOutput = [];
+              for (let y = 0; y < headlessTerminal.rows; y++) {
+                const line = buffer.getLine(buffer.viewportY + y);
+                const lineContent = line ? line.translateToString(true) : '';
+                lines.push([
+                  {
+                    text: lineContent,
+                    bold: false,
+                    italic: false,
+                    underline: false,
+                    dim: false,
+                    inverse: false,
+                    fg: '',
+                    bg: '',
+                  },
+                ]);
+              }
+              newOutput = lines;
+            }
+
+            let lastNonEmptyLine = -1;
+            for (let i = newOutput.length - 1; i >= 0; i--) {
+              const line = newOutput[i];
+              if (
+                line
+                  .map((segment) => segment.text)
+                  .join('')
+                  .trim().length > 0
+              ) {
+                lastNonEmptyLine = i;
+                break;
+              }
+            }
+
+            const trimmedOutput = newOutput.slice(0, lastNonEmptyLine + 1);
+
+            const finalOutput = shellExecutionConfig.disableDynamicLineTrimming
+              ? newOutput
+              : trimmedOutput;
+
+            onOutputEvent({
+              type: 'data',
+              chunk: finalOutput,
+            });
+          };
+
+          if (finalRender) {
+            renderFn();
+          } else {
+            renderTimeout = setTimeout(renderFn, 17);
+          }
+        };
+
+        headlessTerminal.onScroll(() => {
+          if (!isWriting) {
+            render();
+          }
+        });
 
         const handleOutput = (data: Buffer, stream: 'stdout' | 'stderr') => {
-          if (!stdoutDecoder || !stderrDecoder) {
-            const encoding = getCachedEncodingForBuffer(data);
-            try {
-              stdoutDecoder = new TextDecoder(encoding);
-              stderrDecoder = new TextDecoder(encoding);
-            } catch {
-              stdoutDecoder = new TextDecoder('utf-8');
-              stderrDecoder = new TextDecoder('utf-8');
-            }
-          }
+          processingChain = processingChain.then(
+            () =>
+              new Promise<void>((resolve) => {
+                if (!decoder) {
+                  const encoding = getCachedEncodingForBuffer(data);
+                  try {
+                    decoder = new TextDecoder(encoding);
+                  } catch {
+                    decoder = new TextDecoder('utf-8');
+                  }
+                }
 
-          outputChunks.push(data);
+                outputChunks.push(data);
 
-          if (isStreamingRawContent && sniffedBytes < MAX_SNIFF_SIZE) {
-            const sniffBuffer = Buffer.concat(outputChunks.slice(0, 20));
-            sniffedBytes = sniffBuffer.length;
+                if (isStreamingRawContent && sniffedBytes < MAX_SNIFF_SIZE) {
+                  const sniffBuffer = Buffer.concat(outputChunks.slice(0, 20));
+                  sniffedBytes = sniffBuffer.length;
 
-            if (isBinary(sniffBuffer)) {
-              isStreamingRawContent = false;
-            }
-          }
+                  if (isBinary(sniffBuffer)) {
+                    isStreamingRawContent = false;
+                    onOutputEvent({ type: 'binary_detected' });
+                  }
+                }
 
-          if (isStreamingRawContent) {
-            const decoder = stream === 'stdout' ? stdoutDecoder : stderrDecoder;
-            const decodedChunk = decoder.decode(data, { stream: true });
-
-            if (stream === 'stdout') {
-              stdout += decodedChunk;
-            } else {
-              stderr += decodedChunk;
-            }
-          }
+                if (isStreamingRawContent) {
+                  const decodedChunk = decoder.decode(data, { stream: true });
+                  isWriting = true;
+                  headlessTerminal.write(decodedChunk, () => {
+                    render();
+                    isWriting = false;
+                    resolve();
+                  });
+                } else {
+                  const totalBytes = outputChunks.reduce(
+                    (sum, chunk) => sum + chunk.length,
+                    0,
+                  );
+                  onOutputEvent({
+                    type: 'binary_progress',
+                    bytesReceived: totalBytes,
+                  });
+                  resolve();
+                }
+              }),
+          );
         };
 
         const handleExit = (
@@ -227,24 +334,12 @@ export class ShellExecutionService {
           signal: NodeJS.Signals | null,
         ) => {
           const { finalBuffer } = cleanup();
-          // Ensure we don't add an extra newline if stdout already ends with one.
-          const separator = stdout.endsWith('\n') ? '' : '\n';
-          const combinedOutput =
-            stdout + (stderr ? (stdout ? separator : '') + stderr : '');
-
-          const finalStrippedOutput = stripAnsi(combinedOutput).trim();
-
-          if (isStreamingRawContent) {
-            if (finalStrippedOutput) {
-              onOutputEvent({ type: 'data', chunk: finalStrippedOutput });
-            }
-          } else {
-            onOutputEvent({ type: 'binary_detected' });
-          }
+          
+          render(true);
 
           resolve({
             rawOutput: finalBuffer,
-            output: finalStrippedOutput,
+            output: getFullBufferText(headlessTerminal),
             exitCode: code,
             signal: signal ? os.constants.signals[signal] : null,
             error,
@@ -282,31 +377,25 @@ export class ShellExecutionService {
         abortSignal.addEventListener('abort', abortHandler, { once: true });
 
         child.on('exit', (code, signal) => {
-          if (child.pid) {
-            this.activePtys.delete(child.pid);
-          }
           handleExit(code, signal);
         });
 
         function cleanup() {
           exited = true;
           abortSignal.removeEventListener('abort', abortHandler);
-          if (stdoutDecoder) {
-            const remaining = stdoutDecoder.decode();
-            if (remaining) {
-              stdout += remaining;
-            }
+          if (renderTimeout) {
+            clearTimeout(renderTimeout);
           }
-          if (stderrDecoder) {
-            const remaining = stderrDecoder.decode();
+          if (decoder) {
+            const remaining = decoder.decode();
             if (remaining) {
-              stderr += remaining;
+              headlessTerminal.write(remaining);
             }
           }
 
           const finalBuffer = Buffer.concat(outputChunks);
 
-          return { stdout, stderr, finalBuffer };
+          return { finalBuffer };
         }
       });
 
@@ -376,7 +465,6 @@ export class ShellExecutionService {
 
         let processingChain = Promise.resolve();
         let decoder: TextDecoder | null = null;
-        let output: string | AnsiOutput | null = null;
         const outputChunks: Buffer[] = [];
         const error: Error | null = null;
         let exited = false;
@@ -453,14 +541,10 @@ export class ShellExecutionService {
               ? newOutput
               : trimmedOutput;
 
-            // Using stringify for a quick deep comparison.
-            if (JSON.stringify(output) !== JSON.stringify(finalOutput)) {
-              output = finalOutput;
-              onOutputEvent({
-                type: 'data',
-                chunk: finalOutput,
-              });
-            }
+            onOutputEvent({
+              type: 'data',
+              chunk: finalOutput,
+            });
           };
 
           if (finalRender) {
