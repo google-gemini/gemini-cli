@@ -22,27 +22,26 @@ describe('Interactive Mode', () => {
   it.skip('should trigger chat compression with /compress command', async () => {
     await rig.setup('interactive-compress-test');
 
-      const { ptyProcess } = rig.runInteractive();
+    const { ptyProcess } = rig.runInteractive();
 
-      let fullOutput = '';
-      ptyProcess.onData((data) => (fullOutput += data));
+    let fullOutput = '';
+    ptyProcess.onData((data) => (fullOutput += data));
 
-      const authDialogAppeared = await rig.waitForText(
-        'How would you like to authenticate',
-        5000,
-      );
+    const authDialogAppeared = await rig.waitForText(
+      'How would you like to authenticate',
+      5000,
+    );
 
-      // select the second option if auth dialog come's up
-      if (authDialogAppeared) {
-        ptyProcess.write('2');
-      }
+    // select the second option if auth dialog come's up
+    if (authDialogAppeared) {
+      ptyProcess.write('2');
+    }
 
-      // Wait for the app to be ready
-      const isReady = await rig.waitForText('Type your message', 15000);
-      expect(
-        isReady,
-        'CLI did not start up in interactive mode correctly',
-      ).toBe(true);
+    // Wait for the app to be ready
+    const isReady = await rig.waitForText('Type your message', 15000);
+    expect(isReady, 'CLI did not start up in interactive mode correctly').toBe(
+      true,
+    );
 
     const longPrompt =
       'Dont do anything except returning a 1000 token long paragragh with the <name of the scientist who discovered theory of relativity> at the end to indicate end of response. This is a moderately long sentence.';
@@ -70,27 +69,26 @@ describe('Interactive Mode', () => {
   it.skip('should handle compression failure on token inflation', async () => {
     await rig.setup('interactive-compress-test');
 
-      const { ptyProcess } = rig.runInteractive();
+    const { ptyProcess } = rig.runInteractive();
 
-      let fullOutput = '';
-      ptyProcess.onData((data) => (fullOutput += data));
+    let fullOutput = '';
+    ptyProcess.onData((data) => (fullOutput += data));
 
-      const authDialogAppeared = await rig.waitForText(
-        'How would you like to authenticate',
-        5000,
-      );
+    const authDialogAppeared = await rig.waitForText(
+      'How would you like to authenticate',
+      5000,
+    );
 
-      // select the second option if auth dialog come's up
-      if (authDialogAppeared) {
-        ptyProcess.write('2');
-      }
+    // select the second option if auth dialog come's up
+    if (authDialogAppeared) {
+      ptyProcess.write('2');
+    }
 
-      // Wait for the app to be ready
-      const isReady = await rig.waitForText('Type your message', 25000);
-      expect(
-        isReady,
-        'CLI did not start up in interactive mode correctly',
-      ).toBe(true);
+    // Wait for the app to be ready
+    const isReady = await rig.waitForText('Type your message', 25000);
+    expect(isReady, 'CLI did not start up in interactive mode correctly').toBe(
+      true,
+    );
 
     await type(ptyProcess, '/compress');
     await new Promise((resolve) => setTimeout(resolve, 100));
