@@ -62,7 +62,6 @@ jobs:
         id: 'vars'
         uses: './.github/actions/calculate-vars'
         with:
-          cron: ${{ github.event_name == 'schedule' || '' }}
           dry_run: ${{ github.event.inputs.dry_run }}
 
       - name: 'Print Calculated vars'
