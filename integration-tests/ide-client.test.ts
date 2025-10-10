@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import * as fs from 'node:fs';
 import { describe, it, expect, afterEach, vi, beforeEach } from 'vitest';
 import { TestMcpServer } from './test-mcp-server.js';
 import { TestRig } from './test-helper.js';
@@ -59,12 +60,40 @@ describe('IDE client', () => {
     const run = rig.runInteractive({ env }, '--prompt', prompt);
     ptyProcess = run.ptyProcess;
 
-    // 4. Wait until the server receives the openDiff request.
-    await vi.waitUntil(() => server!.getOpenDiffSpy().mock.calls.length > 0, {
-      timeout: 30000, // 30 second timeout
+    // 5. Race two promises:
+    //    - prematureExitPromise: Fails the test if the CLI exits before the spy is called.
+    //    - serverPromise: Succeeds the test if the spy is called.
+    const prematureExitPromise = run.promise.then(({ output }) => {
+      const errorReportPathMatch = output.match(
+        /Full report available at: (.*\.json)/,
+      );
+      let reportContent = 'No error report file found.';
+      if (errorReportPathMatch && errorReportPathMatch[1]) {
+        try {
+          // In the CI environment, the path is inside the container.
+          // We assume the /tmp directory is readable.
+          reportContent = fs.readFileSync(errorReportPathMatch[1], 'utf-8');
+        } catch (e) {
+          reportContent = `Error reading report file: ${(e as Error).message}`;
+        }
+      }
+      return Promise.reject(
+        new Error(
+          `PTY process exited prematurely with output:\n${output}\n\nError Report:\n${reportContent}`,
+        ),
+      );
     });
 
-    // 5. If we reach here, the spy was called. Assert the call.
+    const serverPromise = vi.waitUntil(
+      () => server!.getOpenDiffSpy().mock.calls.length > 0,
+      {
+        timeout: 30000, // 30 second timeout
+      },
+    );
+
+    await Promise.race([prematureExitPromise, serverPromise]);
+
+    // 6. If we reach here, serverPromise resolved first. Assert the spy was called.
     expect(server.getOpenDiffSpy()).toHaveBeenCalled();
   });
 });
