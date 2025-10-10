@@ -233,7 +233,7 @@ jobs:
   e2e_forked:
     name: 'E2E forked'
     if: |
-      github.event.pull_request.head.repo.full_name != github.repository
+      github.event.label.name == 'maintainer:e2e:ok'
     needs:
       - 'e2e_linux'
       - 'e2e_mac'
@@ -252,6 +252,9 @@ jobs:
   e2e_non_forked:
     name: 'E2E non-forked'
     if: |
+      github.event_name == 'push' ||
+      github.event_name == 'merge_group' ||
+      github.event_name == 'workflow_dispatch' ||
       github.event.pull_request.head.repo.full_name == github.repository
     needs:
       - 'e2e_linux'
