@@ -15,11 +15,13 @@ import {
   Config,
   ExtensionInstallEvent,
   ExtensionUninstallEvent,
+  ExtensionUpdateEvent,
   ExtensionDisableEvent,
   ExtensionEnableEvent,
   logExtensionEnable,
   logExtensionInstallEvent,
   logExtensionUninstall,
+  logExtensionUpdateEvent,
   logExtensionDisable,
 } from '@google/gemini-cli-core';
 import * as fs from 'node:fs';
@@ -129,7 +131,7 @@ export async function performWorkspaceExtensionMigration(
         source: extension.path,
         type: 'local',
       };
-      await installExtension(installMetadata, requestConsent);
+      await installOrUpdateExtension(installMetadata, requestConsent);
     } catch (_) {
       failedInstallNames.push(extension.name);
     }
@@ -426,12 +428,13 @@ async function promptForConsentInteractive(
   });
 }
 
-export async function installExtension(
+export async function installOrUpdateExtension(
   installMetadata: ExtensionInstallMetadata,
   requestConsent: (consent: string) => Promise<boolean>,
   cwd: string = process.cwd(),
   previousExtensionConfig?: ExtensionConfig,
 ): Promise<string> {
+  const isUpdate = !!previousExtensionConfig;
   const telemetryConfig = getTelemetryConfig(cwd);
   let newExtensionConfig: ExtensionConfig | null = null;
   let localSourcePath: string | undefined;
@@ -489,24 +492,32 @@ export async function installExtension(
       });
 
       const newExtensionName = newExtensionConfig.name;
-      const extensionStorage = new ExtensionStorage(newExtensionName);
-      const destinationPath = extensionStorage.getExtensionDir();
-
-      const installedExtensions = loadUserExtensions();
-      if (
-        installedExtensions.some(
-          (installed) => installed.name === newExtensionName,
-        )
-      ) {
-        throw new Error(
-          `Extension "${newExtensionName}" is already installed. Please uninstall it first.`,
-        );
+      if (!isUpdate) {
+        const installedExtensions = loadUserExtensions();
+        if (
+          installedExtensions.some(
+            (installed) => installed.name === newExtensionName,
+          )
+        ) {
+          throw new Error(
+            `Extension "${newExtensionName}" is already installed. Please uninstall it first.`,
+          );
+        }
       }
+
       await maybeRequestConsentOrFail(
         newExtensionConfig,
         requestConsent,
         previousExtensionConfig,
       );
+
+      const extensionStorage = new ExtensionStorage(newExtensionName);
+      const destinationPath = extensionStorage.getExtensionDir();
+
+      if (isUpdate) {
+        await uninstallExtension(newExtensionName, isUpdate, cwd);
+      }
+
       await fs.promises.mkdir(destinationPath, { recursive: true });
 
       if (
@@ -529,17 +540,30 @@ export async function installExtension(
       }
     }
 
-    logExtensionInstallEvent(
-      telemetryConfig,
-      new ExtensionInstallEvent(
-        newExtensionConfig!.name,
-        newExtensionConfig!.version,
-        installMetadata.source,
-        'success',
-      ),
-    );
+    if (isUpdate) {
+      logExtensionUpdateEvent(
+        telemetryConfig,
+        new ExtensionUpdateEvent(
+          newExtensionConfig.name,
+          newExtensionConfig.version,
+          previousExtensionConfig.version,
+          installMetadata.source,
+          'success',
+        ),
+      );
+    } else {
+      logExtensionInstallEvent(
+        telemetryConfig,
+        new ExtensionInstallEvent(
+          newExtensionConfig.name,
+          newExtensionConfig.version,
+          installMetadata.source,
+          'success',
+        ),
+      );
+      enableExtension(newExtensionConfig.name, SettingScope.User);
+    }
 
-    enableExtension(newExtensionConfig!.name, SettingScope.User);
     return newExtensionConfig!.name;
   } catch (error) {
     // Attempt to load config from the source path even if installation fails
@@ -554,15 +578,28 @@ export async function installExtension(
         // Ignore error, this is just for logging.
       }
     }
-    logExtensionInstallEvent(
-      telemetryConfig,
-      new ExtensionInstallEvent(
-        newExtensionConfig?.name ?? '',
-        newExtensionConfig?.version ?? '',
-        installMetadata.source,
-        'error',
-      ),
-    );
+    if (isUpdate) {
+      logExtensionUpdateEvent(
+        telemetryConfig,
+        new ExtensionUpdateEvent(
+          newExtensionConfig?.name ?? previousExtensionConfig.name,
+          newExtensionConfig?.version ?? '',
+          previousExtensionConfig.version,
+          installMetadata.source,
+          'error',
+        ),
+      );
+    } else {
+      logExtensionInstallEvent(
+        telemetryConfig,
+        new ExtensionInstallEvent(
+          newExtensionConfig?.name ?? '',
+          newExtensionConfig?.version ?? '',
+          installMetadata.source,
+          'error',
+        ),
+      );
+    }
     throw error;
   }
 }
@@ -679,9 +716,9 @@ export function loadExtensionConfig(
 
 export async function uninstallExtension(
   extensionIdentifier: string,
+  isUpdate: boolean,
   cwd: string = process.cwd(),
 ): Promise<void> {
-  const telemetryConfig = getTelemetryConfig(cwd);
   const installedExtensions = loadUserExtensions();
   const extensionName = installedExtensions.find(
     (installed) =>
@@ -692,17 +729,24 @@ export async function uninstallExtension(
   if (!extensionName) {
     throw new Error(`Extension not found.`);
   }
-  const manager = new ExtensionEnablementManager(
-    ExtensionStorage.getUserExtensionsDir(),
-    [extensionName],
-  );
-  manager.remove(extensionName);
   const storage = new ExtensionStorage(extensionName);
 
   await fs.promises.rm(storage.getExtensionDir(), {
     recursive: true,
     force: true,
   });
+
+  // The rest of the cleanup below here is only for true uninstalls, not
+  // uninstalls related to updates.
+  if (isUpdate) return;
+
+  const manager = new ExtensionEnablementManager(
+    ExtensionStorage.getUserExtensionsDir(),
+    [extensionName],
+  );
+  manager.remove(extensionName);
+
+  const telemetryConfig = getTelemetryConfig(cwd);
   logExtensionUninstall(
     telemetryConfig,
     new ExtensionUninstallEvent(extensionName, 'success'),
