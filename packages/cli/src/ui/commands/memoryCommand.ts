@@ -83,7 +83,7 @@ export const memoryCommand: SlashCommand = {
         try {
           const config = await context.services.config;
           if (config) {
-            const { memoryContent, fileCount } =
+            const { memoryContent, fileCount, filePaths } =
               await loadServerHierarchicalMemory(
                 config.getWorkingDir(),
                 config.shouldLoadMemoryFromIncludeDirectories()
@@ -100,6 +100,7 @@ export const memoryCommand: SlashCommand = {
               );
             config.setUserMemory(memoryContent);
             config.setGeminiMdFileCount(fileCount);
+            config.setGeminiMdFilePaths(filePaths);
 
             const successMessage =
               memoryContent.length > 0
@@ -124,6 +125,28 @@ export const memoryCommand: SlashCommand = {
             Date.now(),
           );
         }
+      },
+    },
+    {
+      name: 'list',
+      description: 'Lists the paths of the GEMINI.md files in use.',
+      kind: CommandKind.BUILT_IN,
+      action: async (context) => {
+        const filePaths = context.services.config?.getGeminiMdFilePaths() || [];
+        const fileCount = filePaths.length;
+
+        const messageContent =
+          fileCount > 0
+            ? `There are ${fileCount} GEMINI.md file(s) in use:\n\n${filePaths.join('\n')}`
+            : 'No GEMINI.md files in use.';
+
+        context.ui.addItem(
+          {
+            type: MessageType.INFO,
+            text: messageContent,
+          },
+          Date.now(),
+        );
       },
     },
   ],

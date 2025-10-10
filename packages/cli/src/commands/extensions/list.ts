@@ -17,7 +17,7 @@ export async function handleList() {
     }
     console.log(
       extensions
-        .map((extension, _): string => toOutputString(extension))
+        .map((extension, _): string => toOutputString(extension, process.cwd()))
         .join('\n\n'),
     );
   } catch (error) {

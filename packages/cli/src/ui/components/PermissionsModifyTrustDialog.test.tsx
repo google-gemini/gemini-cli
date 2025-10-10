@@ -19,7 +19,6 @@ import { usePermissionsModifyTrust } from '../hooks/usePermissionsModifyTrust.js
 const mockedCwd = vi.hoisted(() => vi.fn());
 const mockedLoadTrustedFolders = vi.hoisted(() => vi.fn());
 const mockedIsWorkspaceTrusted = vi.hoisted(() => vi.fn());
-const mockedUseSettings = vi.hoisted(() => vi.fn());
 
 // Mock the modules themselves
 vi.mock('node:process', async (importOriginal) => {
@@ -38,10 +37,6 @@ vi.mock('../../config/trustedFolders.js', () => ({
     TRUST_PARENT: 'TRUST_PARENT',
     DO_NOT_TRUST: 'DO_NOT_TRUST',
   },
-}));
-
-vi.mock('../contexts/SettingsContext.js', () => ({
-  useSettings: mockedUseSettings,
 }));
 
 vi.mock('../hooks/usePermissionsModifyTrust.js');

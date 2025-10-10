@@ -64,6 +64,7 @@ const shellExecutionConfig = {
   terminalHeight: 24,
   pager: 'cat',
   showColor: false,
+  disableDynamicLineTrimming: true,
 };
 
 const createExpectedAnsiOutput = (text: string | string[]): AnsiOutput => {
@@ -441,6 +442,7 @@ describe('ShellExecutionService', () => {
         showColor: true,
         defaultFg: '#ffffff',
         defaultBg: '#000000',
+        disableDynamicLineTrimming: true,
       };
       const mockAnsiOutput = [
         [{ text: 'hello', fg: '#ffffff', bg: '#000000' }],
@@ -458,7 +460,6 @@ describe('ShellExecutionService', () => {
 
       expect(mockSerializeTerminalToObject).toHaveBeenCalledWith(
         expect.anything(), // The terminal object
-        { defaultFg: '#ffffff', defaultBg: '#000000' },
       );
 
       expect(onOutputEventMock).toHaveBeenCalledWith(
@@ -476,7 +477,11 @@ describe('ShellExecutionService', () => {
           pty.onData.mock.calls[0][0]('a\u001b[31mred\u001b[0mword');
           pty.onExit.mock.calls[0][0]({ exitCode: 0, signal: null });
         },
-        { ...shellExecutionConfig, showColor: false },
+        {
+          ...shellExecutionConfig,
+          showColor: false,
+          disableDynamicLineTrimming: true,
+        },
       );
 
       const expected = createExpectedAnsiOutput('aredword');
@@ -498,7 +503,11 @@ describe('ShellExecutionService', () => {
           );
           pty.onExit.mock.calls[0][0]({ exitCode: 0, signal: null });
         },
-        { ...shellExecutionConfig, showColor: false },
+        {
+          ...shellExecutionConfig,
+          showColor: false,
+          disableDynamicLineTrimming: true,
+        },
       );
 
       const expected = createExpectedAnsiOutput(['line 1', 'line 2', 'line 3']);

@@ -6,7 +6,7 @@
 
 import { Box, Text } from 'ink';
 import type { CompressionProps } from '../../types.js';
-import Spinner from 'ink-spinner';
+import { CliSpinner } from '../CliSpinner.js';
 import { theme } from '../../semantic-colors.js';
 import { SCREEN_READER_MODEL_PREFIX } from '../../textConstants.js';
 import { CompressionStatus } from '@google/gemini-cli-core';
@@ -59,7 +59,7 @@ export function CompressionMessage({
     <Box flexDirection="row">
       <Box marginRight={1}>
         {isPending ? (
-          <Spinner type="dots" />
+          <CliSpinner type="dots" />
         ) : (
           <Text color={theme.text.accent}>✦</Text>
         )}

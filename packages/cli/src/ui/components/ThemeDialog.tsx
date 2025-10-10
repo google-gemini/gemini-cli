@@ -63,12 +63,14 @@ export function ThemeDialog({
       value: theme.name,
       themeNameDisplay: theme.name,
       themeTypeDisplay: capitalize(theme.type),
+      key: theme.name,
     })),
     ...customThemeNames.map((name) => ({
       label: name,
       value: name,
       themeNameDisplay: name,
       themeTypeDisplay: 'Custom',
+      key: name,
     })),
   ];
 

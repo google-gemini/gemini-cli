@@ -10,6 +10,7 @@ import type {
   GenerateContentConfig,
   GenerateContentResponse,
 } from '@google/genai';
+import { ApiError } from '@google/genai';
 import type { ContentGenerator } from '../core/contentGenerator.js';
 import {
   GeminiChat,
@@ -898,9 +899,160 @@ describe('GeminiChat', () => {
       expect(mockLogContentRetry).toHaveBeenCalledTimes(1);
       expect(mockLogContentRetryFailure).toHaveBeenCalledTimes(1);
 
-      // History should be clean, as if the failed turn never happened.
+      // History should still contain the user message.
       const history = chat.getHistory();
-      expect(history.length).toBe(0);
+      expect(history.length).toBe(1);
+      expect(history[0]).toEqual({
+        role: 'user',
+        parts: [{ text: 'test' }],
+      });
+    });
+
+    describe('API error retry behavior', () => {
+      beforeEach(() => {
+        // Use a more direct mock for retry testing
+        mockRetryWithBackoff.mockImplementation(async (apiCall) => {
+          try {
+            return await apiCall();
+          } catch (error) {
+            // Simulate the logic of defaultShouldRetry for ApiError
+            let shouldRetry = false;
+            if (error instanceof ApiError && error.message) {
+              if (
+                error.status === 429 ||
+                (error.status >= 500 && error.status < 600)
+              ) {
+                shouldRetry = true;
+              }
+              // Explicitly don't retry on these
+              if (error.status === 400) {
+                shouldRetry = false;
+              }
+            }
+
+            if (shouldRetry) {
+              // Try again
+              return await apiCall();
+            }
+            throw error;
+          }
+        });
+      });
+
+      it('should not retry on 400 Bad Request errors', async () => {
+        const error400 = new ApiError({ message: 'Bad Request', status: 400 });
+
+        vi.mocked(mockContentGenerator.generateContentStream).mockRejectedValue(
+          error400,
+        );
+
+        const stream = await chat.sendMessageStream(
+          'test-model',
+          { message: 'test' },
+          'prompt-id-400',
+        );
+
+        await expect(
+          (async () => {
+            for await (const _ of stream) {
+              /* consume stream */
+            }
+          })(),
+        ).rejects.toThrow(error400);
+
+        // Should only be called once (no retry)
+        expect(
+          mockContentGenerator.generateContentStream,
+        ).toHaveBeenCalledTimes(1);
+      });
+
+      it('should retry on 429 Rate Limit errors', async () => {
+        const error429 = new ApiError({ message: 'Rate Limited', status: 429 });
+
+        vi.mocked(mockContentGenerator.generateContentStream)
+          .mockRejectedValueOnce(error429)
+          .mockResolvedValueOnce(
+            (async function* () {
+              yield {
+                candidates: [
+                  {
+                    content: { parts: [{ text: 'Success after retry' }] },
+                    finishReason: 'STOP',
+                  },
+                ],
+              } as unknown as GenerateContentResponse;
+            })(),
+          );
+
+        const stream = await chat.sendMessageStream(
+          'test-model',
+          { message: 'test' },
+          'prompt-id-429-retry',
+        );
+
+        const events: StreamEvent[] = [];
+        for await (const event of stream) {
+          events.push(event);
+        }
+
+        // Should be called twice (initial + retry)
+        expect(
+          mockContentGenerator.generateContentStream,
+        ).toHaveBeenCalledTimes(2);
+
+        // Should have successful content
+        expect(
+          events.some(
+            (e) =>
+              e.type === StreamEventType.CHUNK &&
+              e.value.candidates?.[0]?.content?.parts?.[0]?.text ===
+                'Success after retry',
+          ),
+        ).toBe(true);
+      });
+
+      it('should retry on 5xx server errors', async () => {
+        const error500 = new ApiError({
+          message: 'Internal Server Error 500',
+          status: 500,
+        });
+
+        vi.mocked(mockContentGenerator.generateContentStream)
+          .mockRejectedValueOnce(error500)
+          .mockResolvedValueOnce(
+            (async function* () {
+              yield {
+                candidates: [
+                  {
+                    content: { parts: [{ text: 'Recovered from 500' }] },
+                    finishReason: 'STOP',
+                  },
+                ],
+              } as unknown as GenerateContentResponse;
+            })(),
+          );
+
+        const stream = await chat.sendMessageStream(
+          'test-model',
+          { message: 'test' },
+          'prompt-id-500-retry',
+        );
+
+        const events: StreamEvent[] = [];
+        for await (const event of stream) {
+          events.push(event);
+        }
+
+        // Should be called twice (initial + retry)
+        expect(
+          mockContentGenerator.generateContentStream,
+        ).toHaveBeenCalledTimes(2);
+      });
+
+      afterEach(() => {
+        // Reset to default behavior
+        mockRetryWithBackoff.mockImplementation(async (apiCall) => apiCall());
+      });
     });
   });
   it('should correctly retry and append to an existing history mid-conversation', async () => {
@@ -1427,7 +1579,8 @@ describe('GeminiChat', () => {
   });
 
   describe('Fallback Integration (Retries)', () => {
-    const error429 = Object.assign(new Error('API Error 429: Quota exceeded'), {
+    const error429 = new ApiError({
+      message: 'API Error 429: Quota exceeded',
       status: 429,
     });
 

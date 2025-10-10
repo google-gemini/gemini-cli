@@ -19,6 +19,7 @@ import { promisify } from 'node:util';
 import type { Config, SandboxConfig } from '@google/gemini-cli-core';
 import { FatalSandboxError } from '@google/gemini-cli-core';
 import { ConsolePatcher } from '../ui/utils/ConsolePatcher.js';
+import { randomBytes } from 'node:crypto';
 
 const execAsync = promisify(exec);
 
@@ -558,19 +559,38 @@ export async function start_sandbox(
       }
     }
 
-    // name container after image, plus numeric suffix to avoid conflicts
+    // name container after image, plus random suffix to avoid conflicts
     const imageName = parseImageName(image);
-    let index = 0;
-    const containerNameCheck = execSync(
-      `${config.command} ps -a --format "{{.Names}}"`,
-    )
-      .toString()
-      .trim();
-    while (containerNameCheck.includes(`${imageName}-${index}`)) {
-      index++;
+    const isIntegrationTest =
+      process.env['GEMINI_CLI_INTEGRATION_TEST'] === 'true';
+    let containerName;
+    if (isIntegrationTest) {
+      containerName = `gemini-cli-integration-test-${randomBytes(4).toString(
+        'hex',
+      )}`;
+      console.log(`ContainerName: ${containerName}`);
+    } else {
+      let index = 0;
+      const containerNameCheck = execSync(
+        `${config.command} ps -a --format "{{.Names}}"`,
+      )
+        .toString()
+        .trim();
+      while (containerNameCheck.includes(`${imageName}-${index}`)) {
+        index++;
+      }
+      containerName = `${imageName}-${index}`;
+      console.log(`ContainerName (regular): ${containerName}`);
     }
-    const containerName = `${imageName}-${index}`;
     args.push('--name', containerName, '--hostname', containerName);
+
+    // copy GEMINI_CLI_TEST_VAR for integration tests
+    if (process.env['GEMINI_CLI_TEST_VAR']) {
+      args.push(
+        '--env',
+        `GEMINI_CLI_TEST_VAR=${process.env['GEMINI_CLI_TEST_VAR']}`,
+      );
+    }
 
     // copy GEMINI_API_KEY(s)
     if (process.env['GEMINI_API_KEY']) {

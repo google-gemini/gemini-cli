@@ -35,6 +35,7 @@ jobs:
     permissions:
       contents: 'write'
       packages: 'write'
+      pull-requests: 'write'
       issues: 'write'
     steps:
       - name: 'Checkout'
@@ -57,14 +58,14 @@ jobs:
           cache: 'npm'
 
       - name: 'Install Dependencies'
-        working-directory: './release'
         run: |-
           npm ci
 
       - name: 'Print Inputs'
         shell: 'bash'
-        run: |-
-          echo "${{ toJSON(inputs) }}"
+        env:
+          JSON_INPUTS: '${{ toJSON(inputs) }}'
+        run: 'echo "$JSON_INPUTS"'
 
       - name: 'Get Patch Version'
         id: 'patch_version'
@@ -144,9 +145,9 @@ jobs:
           echo "  Previous Tag: ${{ steps.patch_version.outputs.PREVIOUS_TAG }}"
 
       - name: 'Run Tests'
+        if: "${{github.event.inputs.force_skip_tests != 'true'}}"
         uses: './.github/actions/run-tests'
         with:
-          force_skip_tests: '${{ github.event.inputs.force_skip_tests }}'
           gemini_api_key: '${{ secrets.GEMINI_API_KEY }}'
           working-directory: './release'
 
@@ -162,6 +163,7 @@ jobs:
           dry-run: '${{ github.event.inputs.dry_run }}'
           previous-tag: '${{ steps.patch_version.outputs.PREVIOUS_TAG }}'
           working-directory: './release'
+          gemini_api_key: '${{ secrets.GEMINI_API_KEY }}'
 
       - name: 'Create Issue on Failure'
         if: '${{ failure() && github.event.inputs.dry_run == false }}'

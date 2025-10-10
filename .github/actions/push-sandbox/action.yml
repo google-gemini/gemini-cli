@@ -1,0 +1,96 @@
+name: 'Build and push sandbox docker'
+description: 'Pushes sandbox docker image to container registry'
+
+inputs:
+  github-actor:
+    description: 'Github actor'
+    required: true
+  github-secret:
+    description: 'Github secret'
+    required: true
+  dockerhub-username:
+    description: 'Dockerhub username'
+    required: true
+  dockerhub-token:
+    description: 'Dockerhub PAT w/ R+W'
+    required: true
+  github-sha:
+    description: 'Github Commit SHA Hash'
+    required: true
+  github-ref-name:
+    description: 'Github ref name'
+    required: true
+  dry-run:
+    description: 'Whether this is a dry run.'
+    required: true
+    type: 'boolean'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: '📝 Print Inputs'
+      shell: 'bash'
+      env:
+        JSON_INPUTS: '${{ toJSON(inputs) }}'
+      run: 'echo "$JSON_INPUTS"'
+    - name: 'Checkout'
+      uses: 'actions/checkout@v4'
+      with:
+        ref: '${{ inputs.github-sha }}'
+        fetch-depth: 0
+    - name: 'Install Dependencies'
+      shell: 'bash'
+      run: 'npm install'
+    - name: 'npm build'
+      shell: 'bash'
+      run: 'npm run build'
+    - name: 'Set up Docker Buildx'
+      uses: 'docker/setup-buildx-action@v3'
+    - name: 'Log in to GitHub Container Registry'
+      uses: 'docker/login-action@v3'
+      with:
+        registry: 'docker.io'
+        username: '${{ inputs.dockerhub-username }}'
+        password: '${{ inputs.dockerhub-token }}'
+    - name: 'determine image tag'
+      id: 'image_tag'
+      shell: 'bash'
+      run: |-
+        SHELL_TAG_NAME="${{ inputs.github-ref-name }}"
+        FINAL_TAG="${{ inputs.github-sha }}"
+        if [[ "$SHELL_TAG_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.-]+)?$ ]]; then
+          echo "Release detected."
+          FINAL_TAG="${SHELL_TAG_NAME#v}"
+        else
+          echo "Development release detected. Using commit SHA as tag."
+        fi
+        echo "Determined image tag: $FINAL_TAG"
+        echo "FINAL_TAG=$FINAL_TAG" >> $GITHUB_OUTPUT
+    - name: 'build'
+      id: 'docker_build'
+      shell: 'bash'
+      env:
+        GEMINI_SANDBOX_IMAGE_TAG: '${{ steps.image_tag.outputs.FINAL_TAG }}'
+        GEMINI_SANDBOX: 'docker'
+      run: |-
+        npm run build:sandbox -- \
+          --image google/gemini-cli-sandbox:${{ steps.image_tag.outputs.FINAL_TAG }} \
+          --output-file final_image_uri.txt
+        echo "uri=$(cat final_image_uri.txt)" >> $GITHUB_OUTPUT
+    - name: 'publish'
+      shell: 'bash'
+      if: "${{ inputs.dry-run != 'true' }}"
+      run: |-
+        docker push "${{ steps.docker_build.outputs.uri }}"
+    - name: 'Create issue on failure'
+      if: |-
+        ${{ failure() }}
+      shell: 'bash'
+      env:
+        GITHUB_TOKEN: '${{ inputs.github-secret }}'
+        DETAILS_URL: '${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}'
+      run: |-
+        gh issue create \
+          --title "Docker build failed" \
+          --body "The docker build failed. See the full run for details: ${DETAILS_URL}" \
+          --label "kind/bug,release-failure"

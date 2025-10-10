@@ -6,12 +6,19 @@
 
 import { describe, it, expect, vi } from 'vitest';
 import { render } from 'ink-testing-library';
-import { Text } from 'ink';
+import { Text, useIsScreenReaderEnabled } from 'ink';
 import { App } from './App.js';
 import { UIStateContext, type UIState } from './contexts/UIStateContext.js';
 import { StreamingState } from './types.js';
 
-// Mock components to isolate App component testing
+vi.mock('ink', async (importOriginal) => {
+  const original = await importOriginal<typeof import('ink')>();
+  return {
+    ...original,
+    useIsScreenReaderEnabled: vi.fn(),
+  };
+});
+
 vi.mock('./components/MainContent.js', () => ({
   MainContent: () => <Text>MainContent</Text>,
 }));
@@ -34,42 +41,6 @@ vi.mock('./components/QuittingDisplay.js', () => ({
 
 vi.mock('./components/Footer.js', () => ({
   Footer: () => <Text>Footer</Text>,
-}));
-
-vi.mock('./semantic-colors.js', () => ({
-  theme: {
-    status: {
-      warning: 'yellow',
-    },
-  },
-}));
-
-// Don't mock the layout components - let them render normally so tests can see the Ctrl messages
-
-vi.mock('./hooks/useLayoutConfig.js', () => ({
-  useLayoutConfig: () => ({
-    mode: 'default',
-    shouldUseStatic: true,
-    shouldShowFooterInComposer: true,
-  }),
-}));
-
-vi.mock('./hooks/useFooterProps.js', () => ({
-  useFooterProps: () => ({
-    model: 'test-model',
-    targetDir: '/test',
-    debugMode: false,
-    branchName: 'test-branch',
-    debugMessage: '',
-    corgiMode: false,
-    errorCount: 0,
-    showErrorDetails: false,
-    showMemoryUsage: false,
-    promptTokenCount: 0,
-    nightly: false,
-    isTrustedFolder: true,
-    vimMode: undefined,
-  }),
 }));
 
 describe('App', () => {
@@ -95,6 +66,7 @@ describe('App', () => {
     );
 
     expect(lastFrame()).toContain('MainContent');
+    expect(lastFrame()).toContain('Notifications');
     expect(lastFrame()).toContain('Composer');
   });
 
@@ -126,6 +98,7 @@ describe('App', () => {
     );
 
     expect(lastFrame()).toContain('MainContent');
+    expect(lastFrame()).toContain('Notifications');
     expect(lastFrame()).toContain('DialogManager');
   });
 
@@ -159,5 +132,31 @@ describe('App', () => {
     );
 
     expect(lastFrame()).toContain('Press Ctrl+D again to exit.');
+  });
+
+  it('should render ScreenReaderAppLayout when screen reader is enabled', () => {
+    (useIsScreenReaderEnabled as vi.Mock).mockReturnValue(true);
+
+    const { lastFrame } = render(
+      <UIStateContext.Provider value={mockUIState as UIState}>
+        <App />
+      </UIStateContext.Provider>,
+    );
+
+    expect(lastFrame()).toContain(
+      'Notifications\nFooter\nMainContent\nComposer',
+    );
+  });
+
+  it('should render DefaultAppLayout when screen reader is not enabled', () => {
+    (useIsScreenReaderEnabled as vi.Mock).mockReturnValue(false);
+
+    const { lastFrame } = render(
+      <UIStateContext.Provider value={mockUIState as UIState}>
+        <App />
+      </UIStateContext.Provider>,
+    );
+
+    expect(lastFrame()).toContain('MainContent\nNotifications\nComposer');
   });
 });

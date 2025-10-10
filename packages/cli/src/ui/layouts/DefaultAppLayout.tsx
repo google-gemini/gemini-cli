@@ -5,13 +5,13 @@
  */
 
 import type React from 'react';
-import { Box, Text } from 'ink';
+import { Box } from 'ink';
 import { Notifications } from '../components/Notifications.js';
 import { MainContent } from '../components/MainContent.js';
 import { DialogManager } from '../components/DialogManager.js';
 import { Composer } from '../components/Composer.js';
+import { ExitWarning } from '../components/ExitWarning.js';
 import { useUIState } from '../contexts/UIStateContext.js';
-import { theme } from '../semantic-colors.js';
 
 export const DefaultAppLayout: React.FC = () => {
   const uiState = useUIState();
@@ -24,26 +24,15 @@ export const DefaultAppLayout: React.FC = () => {
         <Notifications />
 
         {uiState.dialogsVisible ? (
-          <DialogManager addItem={uiState.historyManager.addItem} />
+          <DialogManager
+            terminalWidth={uiState.mainAreaWidth}
+            addItem={uiState.historyManager.addItem}
+          />
         ) : (
           <Composer />
         )}
 
-        {uiState.dialogsVisible && uiState.ctrlCPressedOnce && (
-          <Box marginTop={1}>
-            <Text color={theme.status.warning}>
-              Press Ctrl+C again to exit.
-            </Text>
-          </Box>
-        )}
-
-        {uiState.dialogsVisible && uiState.ctrlDPressedOnce && (
-          <Box marginTop={1}>
-            <Text color={theme.status.warning}>
-              Press Ctrl+D again to exit.
-            </Text>
-          </Box>
-        )}
+        <ExitWarning />
       </Box>
     </Box>
   );
