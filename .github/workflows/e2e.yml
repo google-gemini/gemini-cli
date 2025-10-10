@@ -43,8 +43,7 @@ jobs:
       (github.event_name == 'push' ||
       github.event_name == 'merge_group' ||
       github.event_name == 'workflow_dispatch' ||
-      (github.event.pull_request.head.repo.full_name == github.repository) ||
-      (github.event.label.name == 'maintainer:e2e:ok'))
+      (github.event.pull_request.head.repo.full_name == github.repository))
     runs-on: 'gemini-cli-ubuntu-16-core'
     strategy:
       fail-fast: false
@@ -105,8 +104,7 @@ jobs:
       (github.event_name == 'push' ||
       github.event_name == 'merge_group' ||
       github.event_name == 'workflow_dispatch' ||
-      (github.event.pull_request.head.repo.full_name == github.repository) ||
-      (github.event.label.name == 'maintainer:e2e:ok'))
+      (github.event.pull_request.head.repo.full_name == github.repository))
     runs-on: 'macos-latest'
     steps:
       - name: 'Checkout (fork)'
@@ -154,8 +152,7 @@ jobs:
       (github.event_name == 'push' ||
       github.event_name == 'merge_group' ||
       github.event_name == 'workflow_dispatch' ||
-      (github.event.pull_request.head.repo.full_name == github.repository) ||
-      (github.event.label.name == 'maintainer:e2e:ok'))
+      (github.event.pull_request.head.repo.full_name == github.repository))
     runs-on: 'gemini-cli-windows-16-core'
     continue-on-error: true
 
