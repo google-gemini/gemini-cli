@@ -815,7 +815,10 @@ export class TestRig {
     );
   }
 
-  runInteractive(...args: string[]): {
+  runInteractive(
+    args: string[] = [],
+    envOverrides: Record<string, string> = {},
+  ): {
     ptyProcess: pty.IPty;
     promise: Promise<{ exitCode: number; signal?: number; output: string }>;
   } {
@@ -825,14 +828,19 @@ export class TestRig {
 
     this._interactiveOutput = ''; // Reset output for the new run
 
+    const combinedEnv = {
+      ...Object.fromEntries(
+        Object.entries(process.env).filter(([, v]) => v !== undefined),
+      ),
+      ...envOverrides,
+    };
+
     const options: pty.IPtyForkOptions = {
       name: 'xterm-color',
       cols: 80,
       rows: 30,
       cwd: this.testDir!,
-      env: Object.fromEntries(
-        Object.entries(process.env).filter(([, v]) => v !== undefined),
-      ) as { [key: string]: string },
+      env: combinedEnv as { [key: string]: string },
     };
 
     if (isWindows) {
