@@ -104,6 +104,17 @@ export class IdeClient {
 
   private constructor() {}
 
+  static resetForTesting() {
+    IdeClient.instancePromise = null;
+  }
+
+  /**
+   * Implements a singleton pattern for the IdeClient.
+   *
+   * The initialization is asynchronous, so we store and return the promise of
+   * the instance. This ensures that the async setup runs only once, and all
+   * subsequent calls receive the same client instance promise.
+   */
   static getInstance(): Promise<IdeClient> {
     if (!IdeClient.instancePromise) {
       IdeClient.instancePromise = (async () => {
@@ -136,7 +147,21 @@ export class IdeClient {
     this.trustChangeListeners.delete(listener);
   }
 
+  /**
+   * Establishes a connection to the IDE companion extension.
+   *
+   * This method is idempotent. It can be called multiple times, but it will
+   * only attempt to connect if not already connected. This is crucial to
+   * prevent a race condition during CLI startup where multiple components might
+   * try to initiate a connection simultaneously before the first async attempt
+   * has completed. The initial status check ensures that only the first call
+   * proceeds with the connection logic.
+   */
   async connect(): Promise<void> {
+    if (this.state.status === IDEConnectionStatus.Connected) {
+      return;
+    }
+
     if (!this.currentIde) {
       this.setState(
         IDEConnectionStatus.Disconnected,
@@ -147,6 +172,22 @@ export class IdeClient {
     }
 
     this.setState(IDEConnectionStatus.Connecting);
+
+    const portFromEnv = this.getPortFromEnv();
+    if (portFromEnv) {
+      const connected = await this.establishHttpConnection(portFromEnv);
+      if (connected) {
+        return;
+      }
+    }
+
+    const stdioConfigFromEnv = this.getStdioConfigFromEnv();
+    if (stdioConfigFromEnv) {
+      const connected = await this.establishStdioConnection(stdioConfigFromEnv);
+      if (connected) {
+        return;
+      }
+    }
 
     this.connectionConfig = await this.getConnectionConfigFromFile();
     if (this.connectionConfig?.authToken) {
@@ -182,22 +223,6 @@ export class IdeClient {
         if (connected) {
           return;
         }
-      }
-    }
-
-    const portFromEnv = this.getPortFromEnv();
-    if (portFromEnv) {
-      const connected = await this.establishHttpConnection(portFromEnv);
-      if (connected) {
-        return;
-      }
-    }
-
-    const stdioConfigFromEnv = this.getStdioConfigFromEnv();
-    if (stdioConfigFromEnv) {
-      const connected = await this.establishStdioConnection(stdioConfigFromEnv);
-      if (connected) {
-        return;
       }
     }
 
@@ -245,8 +270,8 @@ export class IdeClient {
             params: {
               name: `openDiff`,
               arguments: {
-                filePath,
-                newContent,
+                file1: filePath,
+                file2: newContent,
               },
             },
           },
@@ -420,12 +445,26 @@ export class IdeClient {
   }
 
   isDiffingEnabled(): boolean {
-    return (
+    console.log('[DEBUG] isDiffingEnabled check:');
+    console.log(`  - !!this.client: ${!!this.client}`);
+    console.log(`  - this.state.status: ${this.state.status}`);
+    console.log(
+      `  - isConnected: ${this.state.status === IDEConnectionStatus.Connected}`,
+    );
+    console.log(`  - availableTools: ${this.availableTools}`);
+    console.log(
+      `  - has openDiff: ${this.availableTools.includes('openDiff')}`,
+    );
+    console.log(
+      `  - has closeDiff: ${this.availableTools.includes('closeDiff')}`,
+    );
+    const result =
       !!this.client &&
       this.state.status === IDEConnectionStatus.Connected &&
       this.availableTools.includes('openDiff') &&
-      this.availableTools.includes('closeDiff')
-    );
+      this.availableTools.includes('closeDiff');
+    console.log(`  - result: ${result}`);
+    return result;
   }
 
   private async discoverTools(): Promise<void> {

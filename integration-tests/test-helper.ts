@@ -815,12 +815,15 @@ export class TestRig {
     );
   }
 
-  runInteractive(...args: string[]): {
+  runInteractive(
+    optionsOrFirstArg: { env?: NodeJS.ProcessEnv } | string,
+    ...remainingArgs: string[]
+  ): {
     ptyProcess: pty.IPty;
     promise: Promise<{ exitCode: number; signal?: number; output: string }>;
   } {
     const { command, initialArgs } = this._getCommandAndArgs(['--yolo']);
-    const commandArgs = [...initialArgs, ...args];
+    const commandArgs = [...initialArgs];
     const isWindows = os.platform() === 'win32';
 
     this._interactiveOutput = ''; // Reset output for the new run
@@ -830,10 +833,23 @@ export class TestRig {
       cols: 80,
       rows: 30,
       cwd: this.testDir!,
-      env: Object.fromEntries(
-        Object.entries(process.env).filter(([, v]) => v !== undefined),
-      ) as { [key: string]: string },
+      env: {
+        ...process.env,
+      } as { [key: string]: string },
     };
+
+    let args: string[];
+
+    if (typeof optionsOrFirstArg === 'string') {
+      args = [optionsOrFirstArg, ...remainingArgs];
+    } else {
+      args = remainingArgs;
+      if (optionsOrFirstArg && optionsOrFirstArg.env) {
+        options.env = { ...options.env, ...optionsOrFirstArg.env };
+      }
+    }
+
+    commandArgs.push(...args);
 
     if (isWindows) {
       // node-pty on Windows requires a shell to be specified when using winpty.
