@@ -6,7 +6,7 @@
 
 import type { CommandModule } from 'yargs';
 import {
-  installExtension,
+  installOrUpdateExtension,
   requestConsentNonInteractive,
 } from '../../config/extension.js';
 import type { ExtensionInstallMetadata } from '@google/gemini-cli-core';
@@ -54,7 +54,7 @@ export async function handleInstall(args: InstallArgs) {
       }
     }
 
-    const name = await installExtension(
+    const name = await installOrUpdateExtension(
       installMetadata,
       requestConsentNonInteractive,
     );
