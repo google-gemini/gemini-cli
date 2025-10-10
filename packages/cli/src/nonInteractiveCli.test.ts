@@ -116,8 +116,8 @@ describe('runNonInteractive', () => {
       getContentGeneratorConfig: vi.fn().mockReturnValue({}),
       getDebugMode: vi.fn().mockReturnValue(false),
       getOutputFormat: vi.fn().mockReturnValue('text'),
-      getFolderTrustFeature: vi.fn().mockReturnValue(false),
       getFolderTrust: vi.fn().mockReturnValue(false),
+      isTrustedFolder: vi.fn().mockReturnValue(false),
     } as unknown as Config;
 
     mockSettings = {
