@@ -30,16 +30,26 @@ Slash commands provide meta-level control over the CLI itself.
         checkpoints are:
         - Linux/macOS: `~/.gemini/tmp/<project_hash>/`
         - Windows: `C:\Users\<YourUsername>\.gemini\tmp\<project_hash>\`
-        - **Behavior:** Chats are saved into a project-specific directory, determined by where you run the CLI. Consequently, saved chats are only accessible when working within that same project. 
-        - When you run `/chat list`, the CLI only scans these specific directories to find available checkpoints.
-        - **Note:** These checkpoints are for manually saving and resuming conversation states. For automatic checkpoints created before file modifications, see the [Checkpointing documentation](../cli/checkpointing.md).
+        - **Behavior:** Chats are saved into a project-specific directory,
+          determined by where you run the CLI. Consequently, saved chats are
+          only accessible when working within that same project.
+        - When you run `/chat list`, the CLI only scans these specific
+          directories to find available checkpoints.
+        - **Note:** These checkpoints are for manually saving and resuming
+          conversation states. For automatic checkpoints created before file
+          modifications, see the
+          [Checkpointing documentation](../cli/checkpointing.md).
     - **`resume`**
       - **Description:** Resumes a conversation from a previous save.
       - **Usage:** `/chat resume <tag>`
-      - **Note:** You can only resume chats that were saved within the current project. To resume a chat from a different project, you must run the Gemini CLI from that project's directory. 
+      - **Note:** You can only resume chats that were saved within the current
+        project. To resume a chat from a different project, you must run the
+        Gemini CLI from that project's directory.
     - **`list`**
       - **Description:** Lists available tags for chat state resumption.
-      - **Note:** This command only lists chats saved within the current project. Because chat history is project-scoped, chats saved in other project directories will not be displayed.  
+      - **Note:** This command only lists chats saved within the current
+        project. Because chat history is project-scoped, chats saved in other
+        project directories will not be displayed.
     - **`delete`**
       - **Description:** Deletes a saved conversation checkpoint.
       - **Usage:** `/chat delete <tag>`
