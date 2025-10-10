@@ -164,6 +164,8 @@ describe('Telemetry Metrics', () => {
       expect(mockCounterAddFn).toHaveBeenCalledTimes(2);
       expect(mockCounterAddFn).toHaveBeenNthCalledWith(2, 1, {
         'session.id': 'test-session-id',
+        'installation.id': 'test-installation-id',
+        'user.email': 'test@example.com',
       });
     });
   });
