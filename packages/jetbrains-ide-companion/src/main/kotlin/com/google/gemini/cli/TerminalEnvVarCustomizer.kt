@@ -4,7 +4,7 @@ import com.intellij.openapi.components.service
 import com.intellij.openapi.project.Project
 import org.jetbrains.plugins.terminal.LocalTerminalCustomizer
 
-class TerminalEnvVarCustomizer(private val project: Project) : LocalTerminalCustomizer() {
+class TerminalEnvVarCustomizer : LocalTerminalCustomizer() {
     override fun customizeCommandAndEnvironment(
         project: Project,
         workingDirectory: String?,

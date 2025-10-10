@@ -27,7 +27,9 @@
     <notificationGroup id="Gemini CLI" displayType="BALLOON"/>
     <applicationService serviceImplementation="com.google.gemini.cli.settings.GeminiCliSettingsState"/>
     <postStartupActivity implementation="com.google.gemini.cli.GeminiCliStartupActivity"/>
-    <projectService serviceImplementation="com.google.gemini.cli.GeminiCliServerState"/>
+  </extensions>
+
+  <extensions defaultExtensionNs="org.jetbrains.plugins.terminal">
     <localTerminalCustomizer implementation="com.google.gemini.cli.TerminalEnvVarCustomizer"/>
   </extensions>
 

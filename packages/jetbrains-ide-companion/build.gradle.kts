@@ -37,7 +37,7 @@ kotlin {
 dependencies {
   intellijPlatform {
     create("IC", platformVersion)
-    plugins(listOf("org.jetbrains.plugins.terminal:241.14494.150"))
+    bundledPlugin("org.jetbrains.plugins.terminal")
     testFramework(TestFrameworkType.Platform)
   }
 
