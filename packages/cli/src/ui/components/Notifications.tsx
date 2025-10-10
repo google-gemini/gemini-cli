@@ -33,7 +33,9 @@ export const Notifications = () => {
       {isScreenReaderEnabled && (
         <Text>
           You are currently in screen reader-friendly view. To switch out, open
-          ~/.gemini/settings.json and remove the entry for {'"screenReader"'}.
+          ~/.gemini/settings.json on Mac/Linux or
+          C:\Users\YourUsername\.gemini\settings.json on Windows and remove the
+          entry for {'"screenReader"'}.
         </Text>
       )}
       {updateInfo && <UpdateNotification message={updateInfo.message} />}
