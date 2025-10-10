@@ -79,6 +79,9 @@ describe('Interactive file system', () => {
         'Expected to find a write_file or replace tool call',
       ).toBe(true);
 
+      // Wait for write file to finish
+      await rig.waitForText('Type your message', 30000);
+
       const newFileContent = rig.readFile(fileName);
       expect(newFileContent).toBe('1.0.1');
     },
