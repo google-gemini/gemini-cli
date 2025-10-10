@@ -20,6 +20,7 @@ import {
   logExtensionEnable,
   logExtensionInstallEvent,
   logExtensionUninstall,
+  logExtensionUpdateEvent,
   logExtensionDisable,
 } from '@google/gemini-cli-core';
 import * as fs from 'node:fs';
@@ -40,7 +41,6 @@ import { ExtensionEnablementManager } from './extensions/extensionEnablement.js'
 import chalk from 'chalk';
 import type { ConfirmationRequest } from '../ui/types.js';
 import { escapeAnsiCtrlCodes } from '../ui/utils/textUtils.js';
-import { logExtensionUpdateEvent } from '@google/gemini-cli-core/src/telemetry/loggers.js';
 import { ExtensionUpdateEvent } from '@google/gemini-cli-core/src/telemetry/types.js';
 
 export const EXTENSIONS_DIRECTORY_NAME = path.join(GEMINI_DIR, 'extensions');

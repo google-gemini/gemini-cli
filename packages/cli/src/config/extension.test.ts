@@ -73,6 +73,7 @@ vi.mock('./trustedFolders.js', async (importOriginal) => {
 const mockLogExtensionEnable = vi.hoisted(() => vi.fn());
 const mockLogExtensionInstallEvent = vi.hoisted(() => vi.fn());
 const mockLogExtensionUninstall = vi.hoisted(() => vi.fn());
+const mockLogExtensionUpdateEvent = vi.hoisted(() => vi.fn());
 const mockLogExtensionDisable = vi.hoisted(() => vi.fn());
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const actual =
@@ -82,6 +83,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     logExtensionEnable: mockLogExtensionEnable,
     logExtensionInstallEvent: mockLogExtensionInstallEvent,
     logExtensionUninstall: mockLogExtensionUninstall,
+    logExtensionUpdateEvent: mockLogExtensionUpdateEvent,
     logExtensionDisable: mockLogExtensionDisable,
     ExtensionEnableEvent: vi.fn(),
     ExtensionInstallEvent: vi.fn(),
@@ -851,20 +853,43 @@ describe('extension tests', () => {
       fs.rmSync(targetExtDir, { recursive: true, force: true });
     });
 
-    it('should log to clearcut on successful install', async () => {
-      const sourceExtDir = createExtension({
-        extensionsDir: tempHomeDir,
-        name: 'my-local-extension',
-        version: '1.0.0',
-      });
+    describe.each([true, false])(
+      'with previous extension config: %s',
+      (isUpdate: boolean) => {
+        it(`should log an ${isUpdate ? 'update' : 'install'} event to clearcut on success`, async () => {
+          const sourceExtDir = createExtension({
+            extensionsDir: tempHomeDir,
+            name: 'my-local-extension',
+            version: '1.1.0',
+          });
 
-      await installOrUpdateExtension(
-        { source: sourceExtDir, type: 'local' },
-        async (_) => true,
-      );
+          if (isUpdate) {
+            await installOrUpdateExtension(
+              { source: sourceExtDir, type: 'local' },
+              async (_) => true,
+            );
+          }
 
-      expect(mockLogExtensionInstallEvent).toHaveBeenCalled();
-    });
+          await installOrUpdateExtension(
+            { source: sourceExtDir, type: 'local' },
+            async (_) => true,
+            undefined,
+            isUpdate
+              ? {
+                  name: 'my-local-extension',
+                  version: '1.0.0',
+                }
+              : undefined,
+          );
+
+          if (isUpdate) {
+            expect(mockLogExtensionUpdateEvent).toHaveBeenCalled();
+          } else {
+            expect(mockLogExtensionInstallEvent).toHaveBeenCalled();
+          }
+        });
+      },
+    );
 
     it('should show users information on their ansi escaped mcp servers when installing', async () => {
       const sourceExtDir = createExtension({
@@ -988,7 +1013,13 @@ This extension will run the following MCP servers:
       });
 
       const mockRequestConsent = vi.fn();
+      // Install it and force consent first.
+      await installOrUpdateExtension(
+        { source: sourceExtDir, type: 'local' },
+        async () => true,
+      );
 
+      // Now update it without changing anything.
       await expect(
         installOrUpdateExtension(
           { source: sourceExtDir, type: 'local' },
@@ -1029,7 +1060,7 @@ This extension will run the following MCP servers:
         version: '1.0.0',
       });
 
-      await uninstallExtension('my-local-extension');
+      await uninstallExtension('my-local-extension', false);
 
       expect(fs.existsSync(sourceExtDir)).toBe(false);
     });
@@ -1046,7 +1077,7 @@ This extension will run the following MCP servers:
         version: '1.0.0',
       });
 
-      await uninstallExtension('my-local-extension');
+      await uninstallExtension('my-local-extension', false);
 
       expect(fs.existsSync(sourceExtDir)).toBe(false);
       expect(
@@ -1060,25 +1091,32 @@ This extension will run the following MCP servers:
     });
 
     it('should throw an error if the extension does not exist', async () => {
-      await expect(uninstallExtension('nonexistent-extension')).rejects.toThrow(
-        'Extension not found.',
-      );
+      await expect(
+        uninstallExtension('nonexistent-extension', false),
+      ).rejects.toThrow('Extension not found.');
     });
 
-    it('should log uninstall event', async () => {
-      createExtension({
-        extensionsDir: userExtensionsDir,
-        name: 'my-local-extension',
-        version: '1.0.0',
+    describe.each([true, false])('with isUpdate: %s', (isUpdate: boolean) => {
+      it(`should ${isUpdate ? 'not ' : ''}log uninstall event`, async () => {
+        createExtension({
+          extensionsDir: userExtensionsDir,
+          name: 'my-local-extension',
+          version: '1.0.0',
+        });
+
+        await uninstallExtension('my-local-extension', isUpdate);
+
+        if (isUpdate) {
+          expect(mockLogExtensionUninstall).not.toHaveBeenCalled();
+          expect(ExtensionUninstallEvent).not.toHaveBeenCalled();
+        } else {
+          expect(mockLogExtensionUninstall).toHaveBeenCalled();
+          expect(ExtensionUninstallEvent).toHaveBeenCalledWith(
+            'my-local-extension',
+            'success',
+          );
+        }
       });
-
-      await uninstallExtension('my-local-extension');
-
-      expect(mockLogExtensionUninstall).toHaveBeenCalled();
-      expect(ExtensionUninstallEvent).toHaveBeenCalledWith(
-        'my-local-extension',
-        'success',
-      );
     });
 
     it('should uninstall an extension by its source URL', async () => {
@@ -1093,7 +1131,7 @@ This extension will run the following MCP servers:
         },
       });
 
-      await uninstallExtension(gitUrl);
+      await uninstallExtension(gitUrl, false);
 
       expect(fs.existsSync(sourceExtDir)).toBe(false);
       expect(mockLogExtensionUninstall).toHaveBeenCalled();
@@ -1112,7 +1150,10 @@ This extension will run the following MCP servers:
       });
 
       await expect(
-        uninstallExtension('https://github.com/google/no-metadata-extension'),
+        uninstallExtension(
+          'https://github.com/google/no-metadata-extension',
+          false,
+        ),
       ).rejects.toThrow('Extension not found.');
     });
   });
