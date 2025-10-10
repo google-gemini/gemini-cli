@@ -69,7 +69,7 @@ export interface AgentDefinition<TOutput extends z.ZodTypeAny = z.ZodUnknown> {
    * @param output The raw output value from the `complete_task` tool, now strongly typed with TOutput.
    * @returns A string representation of the final output.
    */
-  processOutput?: (output: z.infer<TOutput>) => string;
+  processOutput?: (output: z.infer<TOutput>) => Promise<string>;
 }
 
 /**

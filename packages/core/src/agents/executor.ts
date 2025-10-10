@@ -447,7 +447,8 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
 
             const validatedOutput = validationResult.data;
             if (this.definition.processOutput) {
-              submittedOutput = this.definition.processOutput(validatedOutput);
+              submittedOutput =
+                await this.definition.processOutput(validatedOutput);
             } else {
               submittedOutput =
                 typeof outputValue === 'string'
