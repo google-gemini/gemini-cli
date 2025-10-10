@@ -10,17 +10,10 @@ on:
       - 'main'
       - 'release/**'
   merge_group:
-  workflow_dispatch:
-    inputs:
-      branch_ref:
-        description: 'Branch to run on'
-        required: true
-        default: 'main'
-        type: 'string'
 
 jobs:
-  trigger_e2e:
-    name: 'Trigger e2e'
+  trigger:
+    name: 'Trigger step'
     runs-on: 'gemini-cli-ubuntu-16-core'
     steps:
       - id: 'trigger-e2e'
