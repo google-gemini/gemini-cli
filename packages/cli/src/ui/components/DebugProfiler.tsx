@@ -24,6 +24,7 @@ export const profiler = {
   numFrames: 0,
   totalIdleFrames: 0,
   totalFlickerFrames: 0,
+  hasLoggedFirstFlicker: false,
   lastFrameStartTime: 0,
   openedDebugConsole: false,
   lastActionTimestamp: 0,
@@ -182,10 +183,11 @@ export const DebugProfiler = () => {
       profiler.totalFlickerFrames++;
       profiler.reportAction();
 
-      if (showDebugProfiler) {
+      if (!profiler.hasLoggedFirstFlicker) {
+        profiler.hasLoggedFirstFlicker = true;
         appEvents.emit(
           AppEvent.LogError,
-          'A flicker frame was detected. This will cause UI instability.',
+          'A flicker frame was detected. This will cause UI instability. Type `/profile` for more info.',
         );
       }
     };
@@ -193,7 +195,7 @@ export const DebugProfiler = () => {
     return () => {
       appEvents.off(AppEvent.Flicker, flickerHandler);
     };
-  }, [showDebugProfiler, constrainHeight]);
+  }, [constrainHeight]);
 
   // Effect for updating stats
   useEffect(() => {
