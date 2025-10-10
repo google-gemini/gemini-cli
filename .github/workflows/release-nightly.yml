@@ -130,14 +130,14 @@ jobs:
           dry-run: '${{ steps.vars.outputs.is_dry_run }}'
           working-directory: './release'
 
-      # - name: 'Create Issue on Failure'
-      #   if: "${{ failure() && (github.event_name == 'schedule' || github.event.inputs.dry_run != 'true') }}"
-      #   env:
-      #     GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
-      #     RELEASE_TAG: '${{ steps.nightly_version.outputs.RELEASE_TAG }}'
-      #     DETAILS_URL: '${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}'
-      #   run: |
-      #     gh issue create \
-      #       --title "Nightly Release Failed for ${RELEASE_TAG} on $(date +'%Y-%m-%d')" \
-      #       --body "The nightly-release workflow failed. See the full run for details: ${DETAILS_URL}" \
-      #       --label 'kind/bug,release-failure,priority/p0'
+      - name: 'Create Issue on Failure'
+        if: "${{ failure() && (github.event_name == 'schedule' || github.event.inputs.dry_run != 'true') }}"
+        env:
+          GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+          RELEASE_TAG: '${{ steps.nightly_version.outputs.RELEASE_TAG }}'
+          DETAILS_URL: '${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}'
+        run: |
+          gh issue create \
+            --title "Nightly Release Failed for ${RELEASE_TAG} on $(date +'%Y-%m-%d')" \
+            --body "The nightly-release workflow failed. See the full run for details: ${DETAILS_URL}" \
+            --label 'kind/bug,release-failure,priority/p0'
