@@ -175,6 +175,23 @@ function maybeToContent(content?: ContentUnion): Content | undefined {
   return toContent(content);
 }
 
+import * as fs from 'fs';
+import * as path from 'path';
+
+
+function tryLoadFileContent(input: string): string {
+  const filePath = input.trim();
+  try {
+    if (fs.statSync(filePath).isFile()) {
+      const code = fs.readFileSync(filePath, 'utf8');
+      return `Here is the current content of the file \`${path.basename(filePath)}\`:\n\n\`\`\`\n${code}\n\`\`\`\n`;
+    }
+  } catch {
+    // If any error occurs (file does not exist, permission denied, etc.), simply return the original input
+  }
+  return input;
+}
+
 function toContent(content: ContentUnion): Content {
   if (Array.isArray(content)) {
     // it's a PartsUnion[]
@@ -185,9 +202,11 @@ function toContent(content: ContentUnion): Content {
   }
   if (typeof content === 'string') {
     // it's a string
+    const promptText = tryLoadFileContent(content);
+
     return {
       role: 'user',
-      parts: [{ text: content }],
+      parts: [{ text: promptText }],
     };
   }
   if ('parts' in content) {
