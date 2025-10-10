@@ -536,7 +536,7 @@ export class ShellExecutionService {
           renderTimeout = setTimeout(() => {
             renderFn();
             renderTimeout = null;
-          }, 17);
+          }, 68);
         };
 
         headlessTerminal.onScroll(() => {
@@ -628,9 +628,23 @@ export class ShellExecutionService {
 
             if (abortSignal.aborted) {
               finalize();
-            } else {
-              processingChain.then(finalize);
+              return;
             }
+
+            const processingComplete = processingChain.then(() => 'processed');
+            const abortFired = new Promise<'aborted'>((res) => {
+              if (abortSignal.aborted) {
+                res('aborted');
+                return;
+              }
+              abortSignal.addEventListener('abort', () => res('aborted'), {
+                once: true,
+              });
+            });
+
+            Promise.race([processingComplete, abortFired]).then(() => {
+              finalize();
+            });
           },
         );
 
