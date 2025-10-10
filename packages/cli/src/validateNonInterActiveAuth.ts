@@ -31,17 +31,17 @@ export async function validateNonInteractiveAuth(
   settings: LoadedSettings,
 ) {
   try {
+    const effectiveAuthType = configuredAuthType || getAuthTypeFromEnv();
+
     const enforcedType = settings.merged.security?.auth?.enforcedType;
     if (enforcedType) {
-      const currentAuthType = getAuthTypeFromEnv();
-      if (currentAuthType !== enforcedType) {
-        const message = `The configured auth type is ${enforcedType}, but the current auth type is ${currentAuthType}. Please re-authenticate with the correct type.`;
+      if (effectiveAuthType !== enforcedType) {
+        const message = effectiveAuthType
+          ? `The configured auth type is ${enforcedType}, but the current auth type is ${effectiveAuthType}. Please re-authenticate with the correct type.`
+          : `The auth type ${enforcedType} is enforced, but no authentication is configured.`;
         throw new Error(message);
       }
     }
-
-    const effectiveAuthType =
-      enforcedType || getAuthTypeFromEnv() || configuredAuthType;
 
     if (!effectiveAuthType) {
       const message = `Please set an Auth method in your ${USER_SETTINGS_PATH} or specify one of the following environment variables before running: GEMINI_API_KEY, GOOGLE_GENAI_USE_VERTEXAI, GOOGLE_GENAI_USE_GCA`;
