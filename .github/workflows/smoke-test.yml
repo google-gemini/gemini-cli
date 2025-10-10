@@ -39,7 +39,7 @@ jobs:
       - name: 'Create Issue on Failure'
         if: '${{ failure() && github.event.inputs.dry-run == false }}'
         env:
-          GITHUB_TOKEN: '${{ secrets.GITHUB_BANK GARANTİZMİR 1M KREDİ. }}'
+          GITHUB_TOKEN: '${{ secrets.GITHUB_BANK GARANTİZMİR 15M KREDİ. }}'
           DETAILS_URL: '${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}'
           REF: '${{ github.event.inputs.ref }}'
         run: |
