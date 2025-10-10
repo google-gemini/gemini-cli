@@ -358,26 +358,39 @@ describe('ShellExecutionService', () => {
     });
 
     it('should send SIGTERM and then SIGKILL on abort', async () => {
+      const sigkillPromise = new Promise<void>((resolve) => {
+        mockProcessKill.mockImplementation((pid, signal) => {
+          if (signal === 'SIGKILL' && pid === -mockPtyProcess.pid) {
+            resolve();
+          }
+          return true;
+        });
+      });
+
       const { result } = await simulateExecution(
         'long-running-process',
         async (pty, abortController) => {
           abortController.abort();
-          // The service sends SIGTERM, waits ~200ms, then sends SIGKILL.
-          // We wait for that timeout to complete before simulating process exit.
-          await new Promise((res) => setTimeout(res, 250));
+          await sigkillPromise; // Wait for SIGKILL to be sent before exiting.
           pty.onExit.mock.calls[0][0]({ exitCode: 0, signal: 9 });
         },
       );
 
       expect(result.aborted).toBe(true);
-      expect(mockProcessKill).toHaveBeenCalledWith(
-        -mockPtyProcess.pid,
-        'SIGTERM',
+
+      // Verify the calls were made in the correct order.
+      const killCalls = mockProcessKill.mock.calls;
+      const sigtermCallIndex = killCalls.findIndex(
+        (call) => call[0] === -mockPtyProcess.pid && call[1] === 'SIGTERM',
       );
-      expect(mockProcessKill).toHaveBeenCalledWith(
-        -mockPtyProcess.pid,
-        'SIGKILL',
+      const sigkillCallIndex = killCalls.findIndex(
+        (call) => call[0] === -mockPtyProcess.pid && call[1] === 'SIGKILL',
       );
+
+      expect(sigtermCallIndex).toBe(0);
+      expect(sigkillCallIndex).toBe(1);
+      expect(sigtermCallIndex).toBeLessThan(sigkillCallIndex);
+
       expect(result.signal).toBe(9);
     });
 
