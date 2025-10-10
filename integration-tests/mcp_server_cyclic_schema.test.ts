@@ -197,8 +197,7 @@ describe('mcp server with cyclic tool schema is detected', () => {
     try {
       await rig.ensureReadyForInput(ptyProcess);
 
-      await type(ptyProcess, '/mcp list');
-      await type(ptyProcess, '\r');
+      await type(ptyProcess, '/mcp list\r');
 
       const found = await rig.waitForText('tool_with_cyclic_schema');
       expect(found).toBe(true);
