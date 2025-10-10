@@ -194,14 +194,16 @@ describe('mcp server with cyclic tool schema is detected', () => {
 
   it('mcp tool list should include tool with cyclic tool schema', async () => {
     const { ptyProcess } = rig.runInteractive();
-    await rig.ensureReadyForInput(ptyProcess);
+    try {
+      await rig.ensureReadyForInput(ptyProcess);
 
-    await type(ptyProcess, '/mcp list');
-    await type(ptyProcess, '\r');
+      await type(ptyProcess, '/mcp list');
+      await type(ptyProcess, '\r');
 
-    const found = await rig.waitForText('tool_with_cyclic_schema');
-    expect(found).toBe(true);
-
-    ptyProcess.kill();
+      const found = await rig.waitForText('tool_with_cyclic_schema');
+      expect(found).toBe(true);
+    } finally {
+      ptyProcess.kill();
+    }
   });
 });
