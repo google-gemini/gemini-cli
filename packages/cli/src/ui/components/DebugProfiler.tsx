@@ -116,6 +116,31 @@ export const profiler = {
       );
     }
   },
+
+  registerFlickerHandler(constrainHeight: boolean) {
+    const flickerHandler = () => {
+      // If we are not constraining the height, we are intentionally
+      // overflowing the screen.
+      if (!constrainHeight) {
+        return;
+      }
+
+      this.totalFlickerFrames++;
+      this.reportAction();
+
+      if (!this.hasLoggedFirstFlicker) {
+        this.hasLoggedFirstFlicker = true;
+        appEvents.emit(
+          AppEvent.LogError,
+          'A flicker frame was detected. This will cause UI instability. Type `/profile` for more info.',
+        );
+      }
+    };
+    appEvents.on(AppEvent.Flicker, flickerHandler);
+    return () => {
+      appEvents.off(AppEvent.Flicker, flickerHandler);
+    };
+  },
 };
 
 export const DebugProfiler = () => {
@@ -172,30 +197,7 @@ export const DebugProfiler = () => {
     return () => clearInterval(updateInterval);
   }, []);
 
-  useEffect(() => {
-    const flickerHandler = () => {
-      // If we are not constraining the height, we are intentionally
-      // overflowing the screen.
-      if (!constrainHeight) {
-        return;
-      }
-
-      profiler.totalFlickerFrames++;
-      profiler.reportAction();
-
-      if (!profiler.hasLoggedFirstFlicker) {
-        profiler.hasLoggedFirstFlicker = true;
-        appEvents.emit(
-          AppEvent.LogError,
-          'A flicker frame was detected. This will cause UI instability. Type `/profile` for more info.',
-        );
-      }
-    };
-    appEvents.on(AppEvent.Flicker, flickerHandler);
-    return () => {
-      appEvents.off(AppEvent.Flicker, flickerHandler);
-    };
-  }, [constrainHeight]);
+  useEffect(() => profiler.registerFlickerHandler(constrainHeight), [constrainHeight]);
 
   // Effect for updating stats
   useEffect(() => {

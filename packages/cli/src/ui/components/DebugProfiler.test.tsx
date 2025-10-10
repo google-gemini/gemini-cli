@@ -159,17 +159,15 @@ describe('DebugProfiler', () => {
   });
 
   it('should report flicker frames', () => {
-    const flickerHandler = vi.fn();
-    appEvents.on(AppEvent.Flicker, flickerHandler);
-
     const reportActionSpy = vi.spyOn(profiler, 'reportAction');
+    const cleanup = profiler.registerFlickerHandler(true);
 
     appEvents.emit(AppEvent.Flicker);
 
     expect(profiler.totalFlickerFrames).toBe(1);
     expect(reportActionSpy).toHaveBeenCalled();
 
-    appEvents.off(AppEvent.Flicker, flickerHandler);
+    cleanup();
   });
 
   it('should not report idle frames when actions are interleaved', async () => {
