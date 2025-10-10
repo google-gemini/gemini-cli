@@ -60,7 +60,8 @@ describe('ShellTool', () => {
         .fn()
         .mockReturnValue(createMockWorkspaceContext('/test/dir')),
       getGeminiClient: vi.fn(),
-      getShouldUseNodePtyShell: vi.fn().mockReturnValue(false),
+      getEnableInteractiveShell: vi.fn().mockReturnValue(false),
+      isInteractive: vi.fn().mockReturnValue(true),
     } as unknown as Config;
 
     shellTool = new ShellTool(mockConfig);

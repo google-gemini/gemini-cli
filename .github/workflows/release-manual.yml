@@ -27,8 +27,7 @@ on:
           - 'preview'
           - 'nightly'
           - 'latest'
-          - 'dev'
-        default: 'dev'
+        default: 'latest'
       dry_run:
         description: 'Run a dry-run of the release process; no branches, npm packages or GitHub releases will be created.'
         required: true
@@ -66,7 +65,10 @@ jobs:
           fetch-depth: 0
 
       - name: 'Debug Inputs'
-        run: 'echo "${{ toJSON(inputs) }}"'
+        shell: 'bash'
+        env:
+          JSON_INPUTS: '${{ toJSON(inputs) }}'
+        run: 'echo "$JSON_INPUTS"'
 
       - name: 'Setup Node.js'
         uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020'

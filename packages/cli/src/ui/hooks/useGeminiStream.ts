@@ -33,6 +33,8 @@ import {
   parseAndFormatApiError,
   ToolConfirmationOutcome,
   promptIdContext,
+  WRITE_FILE_TOOL_NAME,
+  tokenLimit,
 } from '@google/gemini-cli-core';
 import { type Part, type PartListUnion, FinishReason } from '@google/genai';
 import type {
@@ -69,7 +71,7 @@ enum StreamProcessingStatus {
   Error,
 }
 
-const EDIT_TOOL_NAMES = new Set(['replace', 'write_file']);
+const EDIT_TOOL_NAMES = new Set(['replace', WRITE_FILE_TOOL_NAME]);
 
 function showCitations(settings: LoadedSettings): boolean {
   const enabled = settings?.merged?.ui?.showCitations;
@@ -136,6 +138,24 @@ export const useGeminiStream = (
             ),
             Date.now(),
           );
+
+          // Record tool calls with full metadata before sending responses.
+          try {
+            const currentModel =
+              config.getGeminiClient().getCurrentSequenceModel() ??
+              config.getModel();
+            config
+              .getGeminiClient()
+              .getChat()
+              .recordCompletedToolCalls(
+                currentModel,
+                completedToolCallsFromScheduler,
+              );
+          } catch (error) {
+            console.error(
+              `Error recording completed tool call information: ${error}`,
+            );
+          }
 
           // Handle tool response submission immediately when tools complete
           await handleCompletedTools(
@@ -619,6 +639,33 @@ export const useGeminiStream = (
     [addItem, config],
   );
 
+  const handleContextWindowWillOverflowEvent = useCallback(
+    (estimatedRequestTokenCount: number, remainingTokenCount: number) => {
+      onCancelSubmit();
+
+      const limit = tokenLimit(config.getModel());
+
+      const isLessThan75Percent =
+        limit > 0 && remainingTokenCount < limit * 0.75;
+
+      let text = `Sending this message (${estimatedRequestTokenCount} tokens) might exceed the remaining context window limit (${remainingTokenCount} tokens).`;
+
+      if (isLessThan75Percent) {
+        text +=
+          ' Please try reducing the size of your message or use the `/compress` command to compress the chat history.';
+      }
+
+      addItem(
+        {
+          type: 'info',
+          text,
+        },
+        Date.now(),
+      );
+    },
+    [addItem, onCancelSubmit, config],
+  );
+
   const handleLoopDetectionConfirmation = useCallback(
     (result: { userSelection: 'disable' | 'keep' }) => {
       setLoopDetectionConfirmationRequest(null);
@@ -691,6 +738,12 @@ export const useGeminiStream = (
           case ServerGeminiEventType.MaxSessionTurns:
             handleMaxSessionTurnsEvent();
             break;
+          case ServerGeminiEventType.ContextWindowWillOverflow:
+            handleContextWindowWillOverflowEvent(
+              event.value.estimatedRequestTokenCount,
+              event.value.remainingTokenCount,
+            );
+            break;
           case ServerGeminiEventType.Finished:
             handleFinishedEvent(
               event as ServerGeminiFinishedEvent,
@@ -706,6 +759,7 @@ export const useGeminiStream = (
             loopDetectedRef.current = true;
             break;
           case ServerGeminiEventType.Retry:
+          case ServerGeminiEventType.InvalidStream:
             // Will add the missing logic later
             break;
           default: {
@@ -728,6 +782,7 @@ export const useGeminiStream = (
       handleChatCompressionEvent,
       handleFinishedEvent,
       handleMaxSessionTurnsEvent,
+      handleContextWindowWillOverflowEvent,
       handleCitationEvent,
     ],
   );
