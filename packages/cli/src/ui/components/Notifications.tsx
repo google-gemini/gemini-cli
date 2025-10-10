@@ -11,6 +11,11 @@ import { theme } from '../semantic-colors.js';
 import { StreamingState } from '../types.js';
 import { UpdateNotification } from './UpdateNotification.js';
 
+import { homedir } from 'node:os';
+import path from 'node:path';
+
+const settingsPath = path.join(homedir(), '.gemini', 'settings.json');
+
 export const Notifications = () => {
   const { startupWarnings } = useAppContext();
   const { initError, streamingState, updateInfo } = useUIState();
@@ -32,10 +37,8 @@ export const Notifications = () => {
     <>
       {isScreenReaderEnabled && (
         <Text>
-          You are currently in screen reader-friendly view. To switch out, open
-          ~/.gemini/settings.json on Mac/Linux or
-          C:\Users\YourUsername\.gemini\settings.json on Windows and remove the
-          entry for {'"screenReader"'}.
+          You are currently in screen reader-friendly view. To switch out, open{' '}
+          {settingsPath} and remove the entry for {'"screenReader"'}.
         </Text>
       )}
       {updateInfo && <UpdateNotification message={updateInfo.message} />}
