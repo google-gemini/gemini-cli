@@ -9,7 +9,6 @@ on:
     branches:
       - 'main'
       - 'release/**'
-    types: ['opened', 'edited', 'synchronize', 'ready_for_review', 'reopened', 'review_requested', 'auto_merge_enabled']
   # This will run for PRs from forks when a label is added.
   pull_request_target:
     types: ['labeled']
@@ -28,12 +27,6 @@ concurrency:
     ${{ github.ref != 'refs/heads/main' && !startsWith(github.ref, 'refs/heads/release/') }}
 
 jobs:
-  check_event: 
-    shell: 'bash'
-    env:
-      JSON_EVENT: '${{ toJSON(github.event) }}'
-    run: 'echo "$JSON_EVENT"'
-
   merge_queue_skipper:
     name: 'Merge Queue Skipper'
     runs-on: 'gemini-cli-ubuntu-16-core'
@@ -227,20 +220,39 @@ jobs:
         shell: 'pwsh'
         run: 'npm run test:integration:sandbox:none'
 
-  e2e:
-    name: 'E2E'
+  e2e_forked:
+    name: 'E2E forked'
     if: |
-      always()
+      github.event.pull_request.head.repo.full_name != github.repository
     needs:
       - 'e2e_linux'
       - 'e2e_mac'
       - 'e2e_windows'
     runs-on: 'gemini-cli-ubuntu-16-core'
+
+  e2e_non_forked:
+    name: 'E2E non-forked'
+    if: |
+      github.event.pull_request.head.repo.full_name == github.repository
+    needs:
+      - 'e2e_linux'
+      - 'e2e_mac'
+      - 'e2e_windows'
+    runs-on: 'gemini-cli-ubuntu-16-core'
+
+  e2e:
+    name: 'E2E'
+    if: |
+      always()
+    needs:
+      - 'e2e_forked'
+      - 'e2e_non_forked
+    runs-on: 'gemini-cli-ubuntu-16-core'
     steps:
       - name: 'Check E2E test results'
         run: |
-          if [[ ${{ needs.e2e_linux.result }} != 'success' || \
-               ${{ needs.e2e_mac.result }} != 'success' ]]; then
+          if [[ ${{ needs.e2e_forked.result }} != 'success' && \
+               ${{ needs.e2e_non_forked.result }} != 'success' ]]; then
             echo "One or more E2E jobs failed."
             exit 1
           fi
