@@ -5,16 +5,14 @@
  */
 
 import { Box, Text, useInput } from 'ink';
-import {
-  type Extension,
-  performWorkspaceExtensionMigration,
-} from '../../config/extension.js';
+import type { GeminiCLIExtension } from '@google/gemini-cli-core';
+import { performWorkspaceExtensionMigration } from '../../config/extension.js';
 import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
 import { theme } from '../semantic-colors.js';
 import { useState } from 'react';
 
 export function WorkspaceMigrationDialog(props: {
-  workspaceExtensions: Extension[];
+  workspaceExtensions: GeminiCLIExtension[];
   onOpen: () => void;
   onClose: () => void;
 }) {
@@ -92,7 +90,7 @@ export function WorkspaceMigrationDialog(props: {
 
       <Box flexDirection="column" marginTop={1} marginLeft={2}>
         {workspaceExtensions.map((extension) => (
-          <Text key={extension.config.name}>- {extension.config.name}</Text>
+          <Text key={extension.name}>- {extension.name}</Text>
         ))}
       </Box>
       <Box marginTop={1}>
