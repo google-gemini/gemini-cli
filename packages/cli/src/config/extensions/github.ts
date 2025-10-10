@@ -18,10 +18,7 @@ import * as path from 'node:path';
 import { EXTENSIONS_CONFIG_FILENAME, loadExtension } from '../extension.js';
 import * as tar from 'tar';
 import extract from 'extract-zip';
-
-function getGitHubToken(): string | undefined {
-  return process.env['GITHUB_TOKEN'];
-}
+import { fetchJson, getGitHubToken } from './github_fetch.js';
 
 /**
  * Clones a Git repository to a specified local path.
@@ -108,14 +105,34 @@ export function parseGitHubRepoForReleases(source: string): {
   return { owner, repo };
 }
 
-async function fetchReleaseFromGithub(
+export async function fetchReleaseFromGithub(
   owner: string,
   repo: string,
   ref?: string,
+  allowPreRelease?: boolean,
 ): Promise<GithubReleaseData> {
-  const endpoint = ref ? `releases/tags/${ref}` : 'releases/latest';
-  const url = `https://api.github.com/repos/${owner}/${repo}/${endpoint}`;
-  return await fetchJson(url);
+  if (ref) {
+    return await fetchJson(
+      `https://api.github.com/repos/${owner}/${repo}/releases/tags/${ref}`,
+    );
+  }
+
+  if (!allowPreRelease) {
+    // Grab the release that is tagged as the "latest", github does not allow
+    // this to be a pre-release so we can blindly grab it.
+    return await fetchJson(
+      `https://api.github.com/repos/${owner}/${repo}/releases/latest`,
+    );
+  }
+
+  // If pre-releases are allowed, we just grab the most recent release.
+  const releases = await fetchJson<GithubReleaseData[]>(
+    `https://api.github.com/repos/${owner}/${repo}/releases?per_page=1`,
+  );
+  if (releases.length === 0) {
+    throw new Error('No releases found');
+  }
+  return releases[0];
 }
 
 export async function checkForExtensionUpdate(
@@ -195,6 +212,7 @@ export async function checkForExtensionUpdate(
         owner,
         repo,
         installMetadata.ref,
+        installMetadata.allowPreRelease,
       );
       if (releaseData.tag_name !== releaseTag) {
         return ExtensionUpdateState.UPDATE_AVAILABLE;
@@ -216,11 +234,16 @@ export async function downloadFromGitHubRelease(
   installMetadata: ExtensionInstallMetadata,
   destination: string,
 ): Promise<GitHubDownloadResult> {
-  const { source, ref } = installMetadata;
+  const { source, ref, allowPreRelease: preRelease } = installMetadata;
   const { owner, repo } = parseGitHubRepoForReleases(source);
 
   try {
-    const releaseData = await fetchReleaseFromGithub(owner, repo, ref);
+    const releaseData = await fetchReleaseFromGithub(
+      owner,
+      repo,
+      ref,
+      preRelease,
+    );
     if (!releaseData) {
       throw new Error(
         `No release data found for ${owner}/${repo} at tag ${ref}`,
@@ -348,33 +371,6 @@ export function findReleaseAsset(assets: Asset[]): Asset | undefined {
   }
 
   return undefined;
-}
-
-async function fetchJson<T>(url: string): Promise<T> {
-  const headers: { 'User-Agent': string; Authorization?: string } = {
-    'User-Agent': 'gemini-cli',
-  };
-  const token = getGitHubToken();
-  if (token) {
-    headers.Authorization = `token ${token}`;
-  }
-  return new Promise((resolve, reject) => {
-    https
-      .get(url, { headers }, (res) => {
-        if (res.statusCode !== 200) {
-          return reject(
-            new Error(`Request failed with status code ${res.statusCode}`),
-          );
-        }
-        const chunks: Buffer[] = [];
-        res.on('data', (chunk) => chunks.push(chunk));
-        res.on('end', () => {
-          const data = Buffer.concat(chunks).toString();
-          resolve(JSON.parse(data) as T);
-        });
-      })
-      .on('error', reject);
-  });
 }
 
 async function downloadFile(url: string, dest: string): Promise<void> {

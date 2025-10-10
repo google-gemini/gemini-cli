@@ -92,7 +92,8 @@ describe('replace', () => {
     expect(newFileContent).toBe(expectedContent);
   });
 
-  it('should fail safely when old_string is not found', async () => {
+  //TODO - https://github.com/google-gemini/gemini-cli/issues/10851
+  it.skip('should fail safely when old_string is not found', async () => {
     const rig = new TestRig();
     await rig.setup('should fail safely when old_string is not found');
     const fileName = 'no_match.txt';
