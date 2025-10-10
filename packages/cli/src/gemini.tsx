@@ -145,6 +145,22 @@ export async function startInteractiveUI(
   workspaceRoot: string = process.cwd(),
   initializationResult: InitializationResult,
 ) {
+  // Disable line wrapping.
+  // We rely on Ink to manage all line wrapping by forcing all content to be
+  // narrower than the terminal width so there is no need for the terminal to
+  // also attempt line wrapping.
+  // Disabling line wrapping reduces Ink rendering artifacts particularly when
+  // the terminal is resized on terminals that full respect this escape code
+  // such as Ghostty. Some terminals such as Iterm2 only respect line wrapping
+  // when using the alternate buffer, which Gemini CLI does not use because we
+  // do not yet have support for scrolling in that mode.
+  process.stdout.write('\x1b[?7l');
+
+  registerCleanup(() => {
+    // Re-enable line wrapping on exit.
+    process.stdout.write('\x1b[?7h');
+  });
+
   const version = await getCliVersion();
   setWindowTitle(basename(workspaceRoot), settings);
 
