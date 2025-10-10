@@ -197,7 +197,10 @@ export const DebugProfiler = () => {
     return () => clearInterval(updateInterval);
   }, []);
 
-  useEffect(() => profiler.registerFlickerHandler(constrainHeight), [constrainHeight]);
+  useEffect(
+    () => profiler.registerFlickerHandler(constrainHeight),
+    [constrainHeight],
+  );
 
   // Effect for updating stats
   useEffect(() => {
