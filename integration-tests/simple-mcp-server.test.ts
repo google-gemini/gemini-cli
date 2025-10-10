@@ -164,7 +164,7 @@ rpc.send({
 });
 `;
 
-describe.skip('simple-mcp-server', () => {
+describe('simple-mcp-server', () => {
   const rig = new TestRig();
 
   beforeAll(async () => {
