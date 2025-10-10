@@ -20,9 +20,7 @@ import {
   loadExtensionConfig,
   loadExtensions,
   performWorkspaceExtensionMigration,
-  requestConsentNonInteractive,
   uninstallExtension,
-  type Extension,
 } from './extension.js';
 import {
   GEMINI_DIR,
@@ -100,15 +98,6 @@ vi.mock('child_process', async (importOriginal) => {
   };
 });
 
-const mockQuestion = vi.hoisted(() => vi.fn());
-const mockClose = vi.hoisted(() => vi.fn());
-vi.mock('node:readline', () => ({
-  createInterface: vi.fn(() => ({
-    question: mockQuestion,
-    close: mockClose,
-  })),
-}));
-
 const EXTENSIONS_DIRECTORY_NAME = path.join(GEMINI_DIR, 'extensions');
 
 describe('extension tests', () => {
@@ -129,7 +118,6 @@ describe('extension tests', () => {
     vi.mocked(os.homedir).mockReturnValue(tempHomeDir);
     vi.mocked(isWorkspaceTrusted).mockReturnValue(true);
     vi.spyOn(process, 'cwd').mockReturnValue(tempWorkspaceDir);
-    mockQuestion.mockImplementation((_query, callback) => callback('y'));
     vi.mocked(execSync).mockClear();
     Object.values(mockGit).forEach((fn) => fn.mockReset());
   });
@@ -138,8 +126,6 @@ describe('extension tests', () => {
     fs.rmSync(tempHomeDir, { recursive: true, force: true });
     fs.rmSync(tempWorkspaceDir, { recursive: true, force: true });
     vi.restoreAllMocks();
-    mockQuestion.mockClear();
-    mockClose.mockClear();
   });
 
   describe('loadExtensions', () => {
@@ -158,7 +144,7 @@ describe('extension tests', () => {
       );
       expect(extensions).toHaveLength(1);
       expect(extensions[0].path).toBe(extensionDir);
-      expect(extensions[0].config.name).toBe('test-extension');
+      expect(extensions[0].name).toBe('test-extension');
     });
 
     it('should load context file path when GEMINI.md is present', () => {
@@ -179,8 +165,8 @@ describe('extension tests', () => {
       );
 
       expect(extensions).toHaveLength(2);
-      const ext1 = extensions.find((e) => e.config.name === 'ext1');
-      const ext2 = extensions.find((e) => e.config.name === 'ext2');
+      const ext1 = extensions.find((e) => e.name === 'ext1');
+      const ext2 = extensions.find((e) => e.name === 'ext2');
       expect(ext1?.contextFiles).toEqual([
         path.join(userExtensionsDir, 'ext1', 'GEMINI.md'),
       ]);
@@ -201,7 +187,7 @@ describe('extension tests', () => {
       );
 
       expect(extensions).toHaveLength(1);
-      const ext1 = extensions.find((e) => e.config.name === 'ext1');
+      const ext1 = extensions.find((e) => e.name === 'ext1');
       expect(ext1?.contextFiles).toEqual([
         path.join(userExtensionsDir, 'ext1', 'my-context-file.md'),
       ]);
@@ -254,13 +240,12 @@ describe('extension tests', () => {
         new ExtensionEnablementManager(ExtensionStorage.getUserExtensionsDir()),
       );
       expect(extensions).toHaveLength(1);
-      const loadedConfig = extensions[0].config;
       const expectedCwd = path.join(
         userExtensionsDir,
         'test-extension',
         'server',
       );
-      expect(loadedConfig.mcpServers?.['test-server'].cwd).toBe(expectedCwd);
+      expect(extensions[0].mcpServers?.['test-server'].cwd).toBe(expectedCwd);
     });
 
     it('should load a linked extension correctly', async () => {
@@ -287,7 +272,7 @@ describe('extension tests', () => {
       expect(extensions).toHaveLength(1);
 
       const linkedExt = extensions[0];
-      expect(linkedExt.config.name).toBe('my-linked-extension');
+      expect(linkedExt.name).toBe('my-linked-extension');
 
       expect(linkedExt.path).toBe(sourceExtDir);
       expect(linkedExt.installMetadata).toEqual({
@@ -340,10 +325,10 @@ describe('extension tests', () => {
 
         expect(extensions).toHaveLength(1);
         const extension = extensions[0];
-        expect(extension.config.name).toBe('test-extension');
-        expect(extension.config.mcpServers).toBeDefined();
+        expect(extension.name).toBe('test-extension');
+        expect(extension.mcpServers).toBeDefined();
 
-        const serverConfig = extension.config.mcpServers?.['test-server'];
+        const serverConfig = extension.mcpServers?.['test-server'];
         expect(serverConfig).toBeDefined();
         expect(serverConfig?.env).toBeDefined();
         expect(serverConfig?.env?.API_KEY).toBe('test-api-key-123');
@@ -393,7 +378,7 @@ describe('extension tests', () => {
 
       expect(extensions).toHaveLength(1);
       const extension = extensions[0];
-      const serverConfig = extension.config.mcpServers!['test-server'];
+      const serverConfig = extension.mcpServers!['test-server'];
       expect(serverConfig.env).toBeDefined();
       expect(serverConfig.env!.MISSING_VAR).toBe('$UNDEFINED_ENV_VAR');
       expect(serverConfig.env!.MISSING_VAR_BRACES).toBe('${ALSO_UNDEFINED}');
@@ -422,7 +407,7 @@ describe('extension tests', () => {
       );
 
       expect(extensions).toHaveLength(1);
-      expect(extensions[0].config.name).toBe('good-ext');
+      expect(extensions[0].name).toBe('good-ext');
       expect(consoleSpy).toHaveBeenCalledOnce();
       expect(consoleSpy).toHaveBeenCalledWith(
         expect.stringContaining(
@@ -456,7 +441,7 @@ describe('extension tests', () => {
       );
 
       expect(extensions).toHaveLength(1);
-      expect(extensions[0].config.name).toBe('good-ext');
+      expect(extensions[0].name).toBe('good-ext');
       expect(consoleSpy).toHaveBeenCalledOnce();
       expect(consoleSpy).toHaveBeenCalledWith(
         expect.stringContaining(
@@ -485,8 +470,7 @@ describe('extension tests', () => {
         new ExtensionEnablementManager(ExtensionStorage.getUserExtensionsDir()),
       );
       expect(extensions).toHaveLength(1);
-      const loadedConfig = extensions[0].config;
-      expect(loadedConfig.mcpServers?.['test-server'].trust).toBeUndefined();
+      expect(extensions[0].mcpServers?.['test-server'].trust).toBeUndefined();
     });
 
     it('should throw an error for invalid extension names', () => {
@@ -513,21 +497,27 @@ describe('extension tests', () => {
   });
 
   describe('annotateActiveExtensions', () => {
-    const extensions: Extension[] = [
+    const extensions: GeminiCLIExtension[] = [
       {
         path: '/path/to/ext1',
-        config: { name: 'ext1', version: '1.0.0' },
+        name: 'ext1',
+        version: '1.0.0',
         contextFiles: [],
+        isActive: true,
       },
       {
         path: '/path/to/ext2',
-        config: { name: 'ext2', version: '1.0.0' },
+        name: 'ext2',
+        version: '1.0.0',
         contextFiles: [],
+        isActive: true,
       },
       {
         path: '/path/to/ext3',
-        config: { name: 'ext3', version: '1.0.0' },
+        name: 'ext3',
+        version: '1.0.0',
         contextFiles: [],
+        isActive: true,
       },
     ];
 
@@ -622,13 +612,15 @@ describe('extension tests', () => {
       });
 
       it('should be true if autoUpdate is true in install metadata', () => {
-        const extensionsWithAutoUpdate: Extension[] = extensions.map((e) => ({
-          ...e,
-          installMetadata: {
-            ...e.installMetadata!,
-            autoUpdate: true,
-          },
-        }));
+        const extensionsWithAutoUpdate: GeminiCLIExtension[] = extensions.map(
+          (e) => ({
+            ...e,
+            installMetadata: {
+              ...e.installMetadata!,
+              autoUpdate: true,
+            },
+          }),
+        );
         const activeExtensions = annotateActiveExtensions(
           extensionsWithAutoUpdate,
           tempHomeDir,
@@ -642,31 +634,37 @@ describe('extension tests', () => {
       });
 
       it('should respect the per-extension settings from install metadata', () => {
-        const extensionsWithAutoUpdate: Extension[] = [
+        const extensionsWithAutoUpdate: GeminiCLIExtension[] = [
           {
             path: '/path/to/ext1',
-            config: { name: 'ext1', version: '1.0.0' },
+            name: 'ext1',
+            version: '1.0.0',
             contextFiles: [],
             installMetadata: {
               source: 'test',
               type: 'local',
               autoUpdate: true,
             },
+            isActive: true,
           },
           {
             path: '/path/to/ext2',
-            config: { name: 'ext2', version: '1.0.0' },
+            name: 'ext2',
+            version: '1.0.0',
             contextFiles: [],
             installMetadata: {
               source: 'test',
               type: 'local',
               autoUpdate: false,
             },
+            isActive: true,
           },
           {
             path: '/path/to/ext3',
-            config: { name: 'ext3', version: '1.0.0' },
+            name: 'ext3',
+            version: '1.0.0',
             contextFiles: [],
+            isActive: true,
           },
         ];
         const activeExtensions = annotateActiveExtensions(
@@ -795,8 +793,8 @@ describe('extension tests', () => {
     });
 
     it('should install an extension from a git URL', async () => {
-      const gitUrl = 'https://github.com/google/gemini-extensions.git';
-      const extensionName = 'gemini-extensions';
+      const gitUrl = 'https://somehost.com/somerepo.git';
+      const extensionName = 'some-extension';
       const targetExtDir = path.join(userExtensionsDir, extensionName);
       const metadataPath = path.join(targetExtDir, INSTALL_METADATA_FILENAME);
 
@@ -823,7 +821,6 @@ describe('extension tests', () => {
         source: gitUrl,
         type: 'git',
       });
-      fs.rmSync(targetExtDir, { recursive: true, force: true });
     });
 
     it('should install a linked extension', async () => {
@@ -869,15 +866,14 @@ describe('extension tests', () => {
       expect(mockLogExtensionInstallEvent).toHaveBeenCalled();
     });
 
-    it('should show users information on their mcp server when installing', async () => {
-      const consoleInfoSpy = vi.spyOn(console, 'info');
+    it('should show users information on their ansi escaped mcp servers when installing', async () => {
       const sourceExtDir = createExtension({
         extensionsDir: tempHomeDir,
         name: 'my-local-extension',
         version: '1.0.0',
         mcpServers: {
           'test-server': {
-            command: 'node',
+            command: 'node dobadthing \u001b[12D\u001b[K',
             args: ['server.js'],
             description: 'a local mcp server',
           },
@@ -888,20 +884,21 @@ describe('extension tests', () => {
         },
       });
 
-      mockQuestion.mockImplementation((_query, callback) => callback('y'));
+      const mockRequestConsent = vi.fn();
+      mockRequestConsent.mockResolvedValue(true);
 
       await expect(
         installExtension(
           { source: sourceExtDir, type: 'local' },
-          requestConsentNonInteractive,
+          mockRequestConsent,
         ),
       ).resolves.toBe('my-local-extension');
 
-      expect(consoleInfoSpy).toHaveBeenCalledWith(
+      expect(mockRequestConsent).toHaveBeenCalledWith(
         `Installing extension "my-local-extension".
 **Extensions may introduce unexpected behavior. Ensure you have investigated the extension source and trust the author.**
 This extension will run the following MCP servers:
-  * test-server (local): node server.js
+  * test-server (local): node dobadthing \\u001b[12D\\u001b[K server.js
   * test-server-2 (remote): https://google.com`,
       );
     });
@@ -919,19 +916,12 @@ This extension will run the following MCP servers:
         },
       });
 
-      mockQuestion.mockImplementation((_query, callback) => callback('y'));
-
       await expect(
         installExtension(
           { source: sourceExtDir, type: 'local' },
-          requestConsentNonInteractive,
+          async () => true,
         ),
       ).resolves.toBe('my-local-extension');
-
-      expect(mockQuestion).toHaveBeenCalledWith(
-        expect.stringContaining('Do you want to continue? [Y/n]: '),
-        expect.any(Function),
-      );
     });
 
     it('should cancel installation if user declines prompt for local extension with mcp servers', async () => {
@@ -947,19 +937,12 @@ This extension will run the following MCP servers:
         },
       });
 
-      mockQuestion.mockImplementation((_query, callback) => callback('n'));
-
       await expect(
         installExtension(
           { source: sourceExtDir, type: 'local' },
-          requestConsentNonInteractive,
+          async () => false,
         ),
       ).rejects.toThrow('Installation cancelled for "my-local-extension".');
-
-      expect(mockQuestion).toHaveBeenCalledWith(
-        expect.stringContaining('Do you want to continue? [Y/n]: '),
-        expect.any(Function),
-      );
     });
 
     it('should save the autoUpdate flag to the install metadata', async () => {
@@ -1030,7 +1013,10 @@ This extension will run the following MCP servers:
       });
 
       await expect(
-        installExtension({ source: sourceExtDir, type: 'local' }),
+        installExtension(
+          { source: sourceExtDir, type: 'local' },
+          async () => true,
+        ),
       ).rejects.toThrow('Invalid extension name: "bad_name"');
     });
   });
@@ -1229,7 +1215,7 @@ This extension will run the following MCP servers:
         name: 'ext2',
         version: '1.0.0',
       });
-      const extensionsToMigrate: Extension[] = [
+      const extensionsToMigrate: GeminiCLIExtension[] = [
         loadExtension({
           extensionDir: ext1Path,
           workspaceDir: tempWorkspaceDir,
@@ -1273,15 +1259,17 @@ This extension will run the following MCP servers:
         version: '1.0.0',
       });
 
-      const extensions: Extension[] = [
+      const extensions: GeminiCLIExtension[] = [
         loadExtension({
           extensionDir: ext1Path,
           workspaceDir: tempWorkspaceDir,
         })!,
         {
           path: '/ext/path/1',
-          config: { name: 'ext2', version: '1.0.0' },
+          name: 'ext2',
+          version: '1.0.0',
           contextFiles: [],
+          isActive: true,
         },
       ];
 

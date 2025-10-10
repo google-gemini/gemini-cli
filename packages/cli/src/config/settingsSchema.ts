@@ -411,6 +411,15 @@ const SETTINGS_SCHEMA = {
         description: 'Show citations for generated text in the chat.',
         showInDialog: true,
       },
+      useFullWidth: {
+        type: 'boolean',
+        label: 'Use Full Width',
+        category: 'UI',
+        requiresRestart: false,
+        default: false,
+        description: 'Use the entire width of the terminal for output.',
+        showInDialog: true,
+      },
       customWittyPhrases: {
         type: 'array',
         label: 'Custom Witty Phrases',
@@ -713,7 +722,7 @@ const SETTINGS_SCHEMA = {
             label: 'Enable Interactive Shell',
             category: 'Tools',
             requiresRestart: true,
-            default: false,
+            default: true,
             description:
               'Use node-pty for an interactive shell experience. Fallback to child_process still applies.',
             showInDialog: true,

@@ -15,12 +15,10 @@ import * as os from 'node:os';
 import * as https from 'node:https';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { spawnSync } from 'node:child_process';
 import { EXTENSIONS_CONFIG_FILENAME, loadExtension } from '../extension.js';
-
-function getGitHubToken(): string | undefined {
-  return process.env['GITHUB_TOKEN'];
-}
+import * as tar from 'tar';
+import extract from 'extract-zip';
+import { fetchJson, getGitHubToken } from './github_fetch.js';
 
 /**
  * Clones a Git repository to a specified local path.
@@ -107,14 +105,34 @@ export function parseGitHubRepoForReleases(source: string): {
   return { owner, repo };
 }
 
-async function fetchReleaseFromGithub(
+export async function fetchReleaseFromGithub(
   owner: string,
   repo: string,
   ref?: string,
+  allowPreRelease?: boolean,
 ): Promise<GithubReleaseData> {
-  const endpoint = ref ? `releases/tags/${ref}` : 'releases/latest';
-  const url = `https://api.github.com/repos/${owner}/${repo}/${endpoint}`;
-  return await fetchJson(url);
+  if (ref) {
+    return await fetchJson(
+      `https://api.github.com/repos/${owner}/${repo}/releases/tags/${ref}`,
+    );
+  }
+
+  if (!allowPreRelease) {
+    // Grab the release that is tagged as the "latest", github does not allow
+    // this to be a pre-release so we can blindly grab it.
+    return await fetchJson(
+      `https://api.github.com/repos/${owner}/${repo}/releases/latest`,
+    );
+  }
+
+  // If pre-releases are allowed, we just grab the most recent release.
+  const releases = await fetchJson<GithubReleaseData[]>(
+    `https://api.github.com/repos/${owner}/${repo}/releases?per_page=1`,
+  );
+  if (releases.length === 0) {
+    throw new Error('No releases found');
+  }
+  return releases[0];
 }
 
 export async function checkForExtensionUpdate(
@@ -133,7 +151,7 @@ export async function checkForExtensionUpdate(
       );
       return ExtensionUpdateState.ERROR;
     }
-    if (newExtension.config.version !== extension.version) {
+    if (newExtension.version !== extension.version) {
       return ExtensionUpdateState.UPDATE_AVAILABLE;
     }
     return ExtensionUpdateState.UP_TO_DATE;
@@ -194,6 +212,7 @@ export async function checkForExtensionUpdate(
         owner,
         repo,
         installMetadata.ref,
+        installMetadata.allowPreRelease,
       );
       if (releaseData.tag_name !== releaseTag) {
         return ExtensionUpdateState.UPDATE_AVAILABLE;
@@ -215,11 +234,16 @@ export async function downloadFromGitHubRelease(
   installMetadata: ExtensionInstallMetadata,
   destination: string,
 ): Promise<GitHubDownloadResult> {
-  const { source, ref } = installMetadata;
+  const { source, ref, allowPreRelease: preRelease } = installMetadata;
   const { owner, repo } = parseGitHubRepoForReleases(source);
 
   try {
-    const releaseData = await fetchReleaseFromGithub(owner, repo, ref);
+    const releaseData = await fetchReleaseFromGithub(
+      owner,
+      repo,
+      ref,
+      preRelease,
+    );
     if (!releaseData) {
       throw new Error(
         `No release data found for ${owner}/${repo} at tag ${ref}`,
@@ -258,7 +282,7 @@ export async function downloadFromGitHubRelease(
 
     await downloadFile(archiveUrl, downloadedAssetPath);
 
-    extractFile(downloadedAssetPath, destination);
+    await extractFile(downloadedAssetPath, destination);
 
     // For regular github releases, the repository is put inside of a top level
     // directory. In this case we should see exactly two file in the destination
@@ -349,33 +373,6 @@ export function findReleaseAsset(assets: Asset[]): Asset | undefined {
   return undefined;
 }
 
-async function fetchJson<T>(url: string): Promise<T> {
-  const headers: { 'User-Agent': string; Authorization?: string } = {
-    'User-Agent': 'gemini-cli',
-  };
-  const token = getGitHubToken();
-  if (token) {
-    headers.Authorization = `token ${token}`;
-  }
-  return new Promise((resolve, reject) => {
-    https
-      .get(url, { headers }, (res) => {
-        if (res.statusCode !== 200) {
-          return reject(
-            new Error(`Request failed with status code ${res.statusCode}`),
-          );
-        }
-        const chunks: Buffer[] = [];
-        res.on('data', (chunk) => chunks.push(chunk));
-        res.on('end', () => {
-          const data = Buffer.concat(chunks).toString();
-          resolve(JSON.parse(data) as T);
-        });
-      })
-      .on('error', reject);
-  });
-}
-
 async function downloadFile(url: string, dest: string): Promise<void> {
   const headers: { 'User-agent': string; Authorization?: string } = {
     'User-agent': 'gemini-cli',
@@ -404,27 +401,15 @@ async function downloadFile(url: string, dest: string): Promise<void> {
   });
 }
 
-function extractFile(file: string, dest: string) {
-  let args: string[];
-  let command: 'tar' | 'unzip';
+export async function extractFile(file: string, dest: string): Promise<void> {
   if (file.endsWith('.tar.gz')) {
-    args = ['-xzf', file, '-C', dest];
-    command = 'tar';
+    await tar.x({
+      file,
+      cwd: dest,
+    });
   } else if (file.endsWith('.zip')) {
-    args = [file, '-d', dest];
-    command = 'unzip';
+    await extract(file, { dir: dest });
   } else {
     throw new Error(`Unsupported file extension for extraction: ${file}`);
-  }
-
-  const result = spawnSync(command, args, { stdio: 'pipe' });
-
-  if (result.status !== 0) {
-    if (result.error) {
-      throw new Error(`Failed to spawn '${command}': ${result.error.message}`);
-    }
-    throw new Error(
-      `'${command}' command failed with exit code ${result.status}: ${result.stderr.toString()}`,
-    );
   }
 }

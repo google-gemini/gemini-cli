@@ -90,7 +90,7 @@ export async function updateExtension(
       });
       throw new Error('Updated extension not found after installation.');
     }
-    const updatedVersion = updatedExtension.config.version;
+    const updatedVersion = updatedExtension.version;
     dispatchExtensionStateUpdate({
       type: 'SET_STATE',
       payload: {
