@@ -1,22 +1,6 @@
 name: 'Testing: E2E'
 
 on:
-  push:
-    branches:
-      - 'main'
-  # This will run for PRs from the base repository, providing secrets.
-  pull_request:
-    branches:
-      - 'main'
-      - 'release/**'
-  merge_group:
-  workflow_dispatch:
-    inputs:
-      branch_ref:
-        description: 'Branch to run on'
-        required: true
-        default: 'main'
-        type: 'string'
   workflow_run:
     workflows: ['Trigger E2E']
     types: ['completed']
@@ -54,17 +38,11 @@ jobs:
           - '20.x'
 
     steps:
-      - name: 'Checkout (fork)'
+      - name: 'Checkout'
         uses: 'actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955' # ratchet:actions/checkout@v5
-        if: "github.event_name == 'workflow_run'"
         with:
           ref: '${{ github.event.workflow_run.head_sha }}'
-
-      - name: 'Checkout (internal)'
-        uses: 'actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955' # ratchet:actions/checkout@v5
-        if: "github.event_name != 'pull_request_target'"
-        with:
-          ref: '${{ github.event.inputs.branch_ref || github.ref }}'
+          repository: '${{ github.event.pull_request.head.repo.full_name }}'
 
       - name: 'Set up Node.js ${{ matrix.node-version }}'
         uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions-node@v4
@@ -101,17 +79,11 @@ jobs:
       needs.merge_queue_skipper.outputs.skip == 'false'
     runs-on: 'macos-latest'
     steps:
-      - name: 'Checkout (fork)'
+      - name: 'Checkout'
         uses: 'actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955' # ratchet:actions/checkout@v5
-        if: "github.event_name == 'workflow_run'"
         with:
           ref: '${{ github.event.workflow_run.head_sha }}'
-
-      - name: 'Checkout (internal)'
-        uses: 'actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955' # ratchet:actions/checkout@v5
-        if: "github.event_name != 'pull_request_target'"
-        with:
-          ref: '${{ github.event.inputs.branch_ref || github.ref }}'
+          repository: '${{ github.event.pull_request.head.repo.full_name }}'
 
       - name: 'Set up Node.js 20.x'
         uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions-node@v4
@@ -146,17 +118,11 @@ jobs:
     continue-on-error: true
 
     steps:
-      - name: 'Checkout (fork)'
+      - name: 'Checkout'
         uses: 'actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955' # ratchet:actions/checkout@v5
-        if: "github.event_name == 'workflow_run'"
         with:
           ref: '${{ github.event.workflow_run.head_sha }}'
-
-      - name: 'Checkout (internal)'
-        uses: 'actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955' # ratchet:actions/checkout@v5
-        if: "github.event_name != 'pull_request_target'"
-        with:
-          ref: '${{ github.event.inputs.branch_ref || github.ref }}'
+          repository: '${{ github.event.pull_request.head.repo.full_name }}'
 
       - name: 'Set up Node.js 20.x'
         uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions-node@v4
