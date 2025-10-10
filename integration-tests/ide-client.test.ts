@@ -50,8 +50,7 @@ describe('IDE client', () => {
     rig.createFile('test.txt', 'original content');
 
     // 3. Run the CLI in interactive mode with the necessary environment variables.
-    const prompt =
-      'Please use the `write_file` tool to replace the content in `test.txt` from "original" to "new"';
+    const prompt = 'replace the content in `test.txt` from "original" to "new"';
     const env = {
       GEMINI_CLI_IDE_SERVER_PORT: String(port),
       TERM_PROGRAM: 'vscode',
