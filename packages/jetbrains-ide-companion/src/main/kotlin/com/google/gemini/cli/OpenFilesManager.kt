@@ -119,7 +119,12 @@ class OpenFilesManager(private val project: Project) : Disposable {
         if (file.path == activeFile.path) {
           var selectedText: String? = event.editor.selectionModel.selectedText
           if (selectedText != null && selectedText.length > MAX_SELECTED_TEXT_LENGTH) {
-            selectedText = selectedText.substring(0, MAX_SELECTED_TEXT_LENGTH) + "... [TRUNCATED]"
+            var cutIndex = MAX_SELECTED_TEXT_LENGTH
+            // Avoid cutting a surrogate pair in half
+            if (cutIndex > 0 && Character.isHighSurrogate(selectedText[cutIndex - 1])) {
+              cutIndex--
+            }
+            selectedText = selectedText.take(cutIndex) + "... [TRUNCATED]"
           }
           activeFile.selectedText = selectedText
           LOG.info("Selection changed in ${file.path}: ${selectedText?.take(50)}...")
