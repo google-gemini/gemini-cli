@@ -27,9 +27,7 @@ class GeminiCliProjectService(private val project: Project) : Disposable {
 
   override fun dispose() {
     openFilesManager?.dispose()
-    runBlocking {
-      ideServer?.stop()
-    }
+    ideServer?.stop()
     coroutineScope.cancel()
   }
 
