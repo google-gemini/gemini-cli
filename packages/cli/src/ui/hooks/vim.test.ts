@@ -131,6 +131,10 @@ describe('useVim hook', () => {
           cursorState.pos = [row, col - 1];
         }
       }),
+      // Additional properties for transformations
+      transformedToLogicalMaps: lines.map(() => []),
+      visualToTransformedMap: [],
+      transformationsByLine: lines.map(() => []),
     };
   };
 
@@ -776,6 +780,9 @@ describe('useVim hook', () => {
           redoStack: [],
           clipboard: null,
           selectionAnchor: null,
+          transformedToLogicalMaps: [[]],
+          visualToTransformedMap: [],
+          transformationsByLine: [[]],
         };
 
         const result = textBufferReducer(initialState, {
@@ -799,6 +806,9 @@ describe('useVim hook', () => {
           redoStack: [],
           clipboard: null,
           selectionAnchor: null,
+          transformedToLogicalMaps: [],
+          visualToTransformedMap: [],
+          transformationsByLine: [],
         };
 
         const result = textBufferReducer(initialState, {
@@ -822,6 +832,9 @@ describe('useVim hook', () => {
           redoStack: [],
           clipboard: null,
           selectionAnchor: null,
+          transformedToLogicalMaps: [],
+          visualToTransformedMap: [],
+          transformationsByLine: [],
         };
 
         const result = textBufferReducer(initialState, {
@@ -1296,6 +1309,9 @@ describe('useVim hook', () => {
           redoStack: [],
           clipboard: null,
           selectionAnchor: null,
+          transformedToLogicalMaps: [],
+          visualToTransformedMap: [],
+          transformationsByLine: [],
         };
 
         const result = textBufferReducer(initialState, {
@@ -1319,6 +1335,9 @@ describe('useVim hook', () => {
           redoStack: [],
           clipboard: null,
           selectionAnchor: null,
+          transformedToLogicalMaps: [],
+          visualToTransformedMap: [],
+          transformationsByLine: [],
         };
 
         const result = textBufferReducer(initialState, {
@@ -1344,6 +1363,9 @@ describe('useVim hook', () => {
           redoStack: [],
           clipboard: null,
           selectionAnchor: null,
+          transformedToLogicalMaps: [],
+          visualToTransformedMap: [],
+          transformationsByLine: [],
         };
 
         const result = textBufferReducer(initialState, {
@@ -1367,6 +1389,9 @@ describe('useVim hook', () => {
           redoStack: [],
           clipboard: null,
           selectionAnchor: null,
+          transformedToLogicalMaps: [],
+          visualToTransformedMap: [],
+          transformationsByLine: [],
         };
 
         const result = textBufferReducer(initialState, {
@@ -1392,6 +1417,9 @@ describe('useVim hook', () => {
           redoStack: [],
           clipboard: null,
           selectionAnchor: null,
+          transformedToLogicalMaps: [],
+          visualToTransformedMap: [],
+          transformationsByLine: [],
         };
 
         const result = textBufferReducer(initialState, {
@@ -1415,6 +1443,9 @@ describe('useVim hook', () => {
           redoStack: [],
           clipboard: null,
           selectionAnchor: null,
+          transformedToLogicalMaps: [],
+          visualToTransformedMap: [],
+          transformationsByLine: [],
         };
 
         const result = textBufferReducer(initialState, {
@@ -1440,6 +1471,9 @@ describe('useVim hook', () => {
           redoStack: [],
           clipboard: null,
           selectionAnchor: null,
+          transformedToLogicalMaps: [],
+          visualToTransformedMap: [],
+          transformationsByLine: [],
         };
 
         const result = textBufferReducer(initialState, {
@@ -1463,6 +1497,9 @@ describe('useVim hook', () => {
           redoStack: [],
           clipboard: null,
           selectionAnchor: null,
+          transformedToLogicalMaps: [],
+          visualToTransformedMap: [],
+          transformationsByLine: [],
         };
 
         const result = textBufferReducer(initialState, {
@@ -1488,6 +1525,9 @@ describe('useVim hook', () => {
           redoStack: [],
           clipboard: null,
           selectionAnchor: null,
+          transformedToLogicalMaps: [],
+          visualToTransformedMap: [],
+          transformationsByLine: [],
         };
 
         const result = textBufferReducer(initialState, {
@@ -1513,6 +1553,9 @@ describe('useVim hook', () => {
           redoStack: [],
           clipboard: null,
           selectionAnchor: null,
+          transformedToLogicalMaps: [],
+          visualToTransformedMap: [],
+          transformationsByLine: [],
         };
 
         const result = textBufferReducer(initialState, {
@@ -1537,6 +1580,9 @@ describe('useVim hook', () => {
           redoStack: [],
           clipboard: null,
           selectionAnchor: null,
+          transformedToLogicalMaps: [],
+          visualToTransformedMap: [],
+          transformationsByLine: [],
         };
 
         const result = textBufferReducer(initialState, {
@@ -1559,6 +1605,9 @@ describe('useVim hook', () => {
           redoStack: [],
           clipboard: null,
           selectionAnchor: null,
+          transformedToLogicalMaps: [],
+          visualToTransformedMap: [],
+          transformationsByLine: [],
         };
 
         const result = textBufferReducer(initialState, {
@@ -1582,6 +1631,9 @@ describe('useVim hook', () => {
           redoStack: [],
           clipboard: null,
           selectionAnchor: null,
+          transformedToLogicalMaps: [],
+          visualToTransformedMap: [],
+          transformationsByLine: [],
         };
 
         const result = textBufferReducer(initialState, {
@@ -1607,6 +1659,9 @@ describe('useVim hook', () => {
           redoStack: [],
           clipboard: null,
           selectionAnchor: null,
+          transformedToLogicalMaps: [],
+          visualToTransformedMap: [],
+          transformationsByLine: [],
         };
 
         const result = textBufferReducer(initialState, {
@@ -1629,6 +1684,9 @@ describe('useVim hook', () => {
           redoStack: [],
           clipboard: null,
           selectionAnchor: null,
+          transformedToLogicalMaps: [],
+          visualToTransformedMap: [],
+          transformationsByLine: [],
         };
 
         const result = textBufferReducer(initialState, {
@@ -1653,6 +1711,9 @@ describe('useVim hook', () => {
           redoStack: [],
           clipboard: null,
           selectionAnchor: null,
+          transformedToLogicalMaps: [],
+          visualToTransformedMap: [],
+          transformationsByLine: [],
         };
 
         const result = textBufferReducer(initialState, {
@@ -1675,6 +1736,9 @@ describe('useVim hook', () => {
           redoStack: [],
           clipboard: null,
           selectionAnchor: null,
+          transformedToLogicalMaps: [],
+          visualToTransformedMap: [],
+          transformationsByLine: [],
         };
 
         const result = textBufferReducer(initialState, {
