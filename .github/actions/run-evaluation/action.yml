@@ -72,7 +72,7 @@ runs:
       run: |
         # Prepare directories for mounting
         HOST_WORKDIR=$(readlink -f "${{ inputs.working-directory }}")
-        mkdir -p "$HOST_WORKDIR/experiments"
+        mkdir -p "$HOST_WORKDIR/experiments/adhoc"
 
         # Create a temp file for GITHUB_OUTPUT inside container
         touch "$HOST_WORKDIR/container_github_output"
@@ -94,15 +94,15 @@ runs:
           -e EVAL_GCS_BUCKET='${{ inputs.eval-gcs-bucket }}' \
           -e GITHUB_WORKSPACE='/github/workspace' \
           -e GITHUB_OUTPUT='/tmp/github_output' \
+          -e BRANCH_OR_COMMIT='${{ inputs.branch-or-commit }}' \
           $IMG \
           -c "
             set -e
+            git config --global --add safe.directory /github/workspace
             cd /github/workspace
-            git clean -fdx
-            git reset --hard HEAD
             cd /app
-            poetry run exp_run --experiment-mode=on-demand --branch-or-commit=${{ inputs.branch-or-commit }} --model-name=gemini-2.5-pro --dataset=swebench_verified --concurrency=15
-            poetry run python agent_prototypes/scripts/parse_gcli_logs_experiment.py --experiment_dir=experiments/adhoc/gcli_temp_exp --gcs-bucket='${{ inputs.eval-gcs-bucket }}' --gcs-path=gh_action_artifacts
+            poetry run exp_run --experiment-mode=on-demand --branch-or-commit="$BRANCH_OR_COMMIT" --model-name=gemini-2.5-pro --dataset=swebench_verified --concurrency=15
+            poetry run python agent_prototypes/scripts/parse_gcli_logs_experiment.py --experiment_dir=experiments/adhoc/gcli_temp_exp --gcs-bucket="$EVAL_GCS_BUCKET" --gcs-path=gh_action_artifacts
             poetry run bash /github/workspace/scripts/calculate_eval_success_rates.sh /app/experiments/adhoc/gcli_temp_exp/artifacts/summary_stats.md
           "
 

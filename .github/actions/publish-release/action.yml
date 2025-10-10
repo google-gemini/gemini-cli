@@ -73,9 +73,11 @@ inputs:
   resolution-rate-threshold:
     description: 'The threshold for the resolution rate.'
     required: false
+    default: '90'
   tool-success-rate-threshold:
     description: 'The threshold for the tool success rate.'
     required: false
+    default: '80'
 
 runs:
   using: 'composite'
