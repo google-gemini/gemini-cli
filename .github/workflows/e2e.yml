@@ -1,22 +1,10 @@
 name: 'Testing: E2E'
 
 on:
-  push:
-    branches:
-      - 'main'
-  # This will run for PRs from the base repository, providing secrets.
-  pull_request:
-    branches:
-      - 'main'
-      - 'release/**'
-  merge_group:
-  workflow_dispatch:
-    inputs:
-      branch_ref:
-        description: 'Branch to run on'
-        required: true
-        default: 'main'
-        type: 'string'
+  workflow_run:
+    workflows: ['Trigger E2E']
+    types:
+      - completed
 
 concurrency:
   group: '${{ github.workflow }}-${{ github.head_ref || github.ref }}'
