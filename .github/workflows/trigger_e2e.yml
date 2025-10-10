@@ -1,24 +1,8 @@
 name: 'Trigger E2E'
 
 on:
-  push:
-    branches:
-      - 'main'
-  # This will run for PRs from the base repository, providing secrets.
-  pull_request:
-    branches:
-      - 'main'
-      - 'release/**'
   pull_request_target:
-  merge_group:
-  workflow_dispatch:
-    inputs:
-      branch_ref:
-        description: 'Branch to run on'
-        required: true
-        default: 'main'
-        type: 'string'
-
+    types: ['labeled']
 jobs:
   trigger_e2e:
     name: 'Trigger e2e'
