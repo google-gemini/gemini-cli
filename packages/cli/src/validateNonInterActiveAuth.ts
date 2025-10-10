@@ -34,13 +34,11 @@ export async function validateNonInteractiveAuth(
     const effectiveAuthType = configuredAuthType || getAuthTypeFromEnv();
 
     const enforcedType = settings.merged.security?.auth?.enforcedType;
-    if (enforcedType) {
-      if (effectiveAuthType !== enforcedType) {
-        const message = effectiveAuthType
-          ? `The configured auth type is ${enforcedType}, but the current auth type is ${effectiveAuthType}. Please re-authenticate with the correct type.`
-          : `The auth type ${enforcedType} is enforced, but no authentication is configured.`;
-        throw new Error(message);
-      }
+    if (enforcedType && effectiveAuthType !== enforcedType) {
+      const message = effectiveAuthType
+        ? `The enforced authentication type is '${enforcedType}', but the current type is '${effectiveAuthType}'. Please re-authenticate with the correct type.`
+        : `The auth type '${enforcedType}' is enforced, but no authentication is configured.`;
+      throw new Error(message);
     }
 
     if (!effectiveAuthType) {

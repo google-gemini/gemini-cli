@@ -306,7 +306,7 @@ describe('validateNonInterActiveAuth', () => {
       expect((e as Error).message).toContain('process.exit(1) called');
     }
     expect(consoleErrorSpy).toHaveBeenCalledWith(
-      'The configured auth type is oauth-personal, but the current auth type is gemini-api-key. Please re-authenticate with the correct type.',
+      "The enforced authentication type is 'oauth-personal', but the current type is 'gemini-api-key'. Please re-authenticate with the correct type.",
     );
     expect(processExitSpy).toHaveBeenCalledWith(1);
   });
@@ -330,7 +330,7 @@ describe('validateNonInterActiveAuth', () => {
       expect((e as Error).message).toContain('process.exit(1) called');
     }
     expect(consoleErrorSpy).toHaveBeenCalledWith(
-      'The configured auth type is oauth-personal, but the current auth type is gemini-api-key. Please re-authenticate with the correct type.',
+      "The enforced authentication type is 'oauth-personal', but the current type is 'gemini-api-key'. Please re-authenticate with the correct type.",
     );
     expect(processExitSpy).toHaveBeenCalledWith(1);
   });
@@ -396,7 +396,7 @@ describe('validateNonInterActiveAuth', () => {
         expect(payload.error.type).toBe('Error');
         expect(payload.error.code).toBe(1);
         expect(payload.error.message).toContain(
-          'The configured auth type is gemini-api-key, but the current auth type is oauth-personal.',
+          "The enforced authentication type is 'gemini-api-key', but the current type is 'oauth-personal'. Please re-authenticate with the correct type.",
         );
       }
     });
