@@ -35,6 +35,7 @@ import {
   MockTool,
   MOCK_TOOL_SHOULD_CONFIRM_EXECUTE,
 } from '../test-utils/mock-tool.js';
+import { makeMockConfig } from '../test-utils/config';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 
@@ -399,7 +400,25 @@ describe('CoreToolScheduler', () => {
         ' Did you mean one of: "list_files", "read_file", "write_file"?',
       );
     });
+
+    it('should return an empty string if no tools are available', () => {
+  // Use the repo's test helper and override the tool registry to simulate "no tools".
+  const mockConfig = makeMockConfig({
+    getToolRegistry: () =>
+      ({
+        getAllToolNames: () => [],
+      } as unknown as ToolRegistry),
   });
+
+  const scheduler = new CoreToolScheduler({
+    config: mockConfig,
+    getPreferredEditor: () => 'vscode',
+    onEditorClose: vi.fn(),
+  });
+
+  // @ts-expect-error accessing private method
+  const suggestion = scheduler.getToolSuggestion('unknown_tool');
+  expect(suggestion).toBe('');
 });
 
 describe('CoreToolScheduler with payload', () => {

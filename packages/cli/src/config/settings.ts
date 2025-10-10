@@ -705,6 +705,12 @@ export function loadSettings(
   // the settings to avoid a cycle
   loadEnvironment(tempMergedSettings);
 
+  // Now that the environment is loaded, resolve variables in the settings.
+  systemSettings = resolveEnvVarsInObject(systemSettings);
+  systemDefaultSettings = resolveEnvVarsInObject(systemDefaultSettings);
+  userSettings = resolveEnvVarsInObject(userSettings);
+  workspaceSettings = resolveEnvVarsInObject(workspaceSettings);
+
   // Create LoadedSettings first
 
   if (settingsErrors.length > 0) {
