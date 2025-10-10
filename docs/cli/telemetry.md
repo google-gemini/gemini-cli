@@ -257,13 +257,15 @@ for Gemini CLI:
     - `mimetype` (string, if applicable)
     - `extension` (string, if applicable)
     - `programming_language` (string, if applicable)
-    - `diff_stat` (json string, if applicable): A JSON string with the following members:
+    - `diff_stat` (json string, if applicable): A JSON string with the following
+      members:
       - `ai_added_lines` (int)
       - `ai_removed_lines` (int)
       - `user_added_lines` (int)
       - `user_removed_lines` (int)
 
-- `gemini_cli.api_request`: This event occurs when making a request to Gemini API.
+- `gemini_cli.api_request`: This event occurs when making a request to Gemini
+  API.
   - **Attributes**:
     - `model`
     - `request_text` (if applicable)
@@ -277,7 +279,8 @@ for Gemini CLI:
     - `duration_ms`
     - `auth_type`
 
-- `gemini_cli.api_response`: This event occurs upon receiving a response from Gemini API.
+- `gemini_cli.api_response`: This event occurs upon receiving a response from
+  Gemini API.
   - **Attributes**:
     - `model`
     - `status_code`
@@ -291,7 +294,8 @@ for Gemini CLI:
     - `response_text` (if applicable)
     - `auth_type`
 
-- `gemini_cli.tool_output_truncated`: This event occurs when the output of a tool call is too large and gets truncated.
+- `gemini_cli.tool_output_truncated`: This event occurs when the output of a
+  tool call is too large and gets truncated.
   - **Attributes**:
     - `tool_name` (string)
     - `original_content_length` (int)
@@ -300,27 +304,32 @@ for Gemini CLI:
     - `lines` (int)
     - `prompt_id` (string)
 
-- `gemini_cli.malformed_json_response`: This event occurs when a `generateJson` response from Gemini API cannot be parsed as a json.
+- `gemini_cli.malformed_json_response`: This event occurs when a `generateJson`
+  response from Gemini API cannot be parsed as a json.
   - **Attributes**:
     - `model`
 
-- `gemini_cli.flash_fallback`: This event occurs when Gemini CLI switches to flash as fallback.
+- `gemini_cli.flash_fallback`: This event occurs when Gemini CLI switches to
+  flash as fallback.
   - **Attributes**:
     - `auth_type`
 
-- `gemini_cli.slash_command`: This event occurs when a user executes a slash command.
+- `gemini_cli.slash_command`: This event occurs when a user executes a slash
+  command.
   - **Attributes**:
     - `command` (string)
     - `subcommand` (string, if applicable)
 
 - `gemini_cli.extension_enable`: This event occurs when an extension is enabled
-- `gemini_cli.extension_install`: This event occurs when an extension is installed
+- `gemini_cli.extension_install`: This event occurs when an extension is
+  installed
   - **Attributes**:
     - `extension_name` (string)
     - `extension_version` (string)
     - `extension_source` (string)
     - `status` (string)
-- `gemini_cli.extension_uninstall`: This event occurs when an extension is uninstalled
+- `gemini_cli.extension_uninstall`: This event occurs when an extension is
+  uninstalled
 
 ### Metrics
 
@@ -336,6 +345,14 @@ Metrics are numerical measurements of behavior over time.
     - `success` (boolean)
     - `decision` (string: "accept", "reject", or "modify", if applicable)
     - `tool_type` (string: "mcp", or "native", if applicable)
+    - `model_added_lines` (Int, optional): Lines added by model in the proposed
+      changes, if applicable
+    - `model_removed_lines` (Int, optional): Lines removed by model in the
+      proposed changes, if applicable
+    - `user_added_lines` (Int, optional): Lines added by user edits after model
+      proposal, if applicable
+    - `user_removed_lines` (Int, optional): Lines removed by user edits after
+      model proposal, if applicable
 
 - `gemini_cli.tool.call.latency` (Histogram, ms): Measures tool call latency.
   - **Attributes**:
@@ -348,7 +365,8 @@ Metrics are numerical measurements of behavior over time.
     - `status_code`
     - `error_type` (if applicable)
 
-- `gemini_cli.api.request.latency` (Histogram, ms): Measures API request latency.
+- `gemini_cli.api.request.latency` (Histogram, ms): Measures API request
+  latency.
   - **Attributes**:
     - `model`
   - **Note**: This metric overlaps with `gen_ai.client.operation.duration` below
@@ -364,44 +382,54 @@ Metrics are numerical measurements of behavior over time.
 
 - `gemini_cli.file.operation.count` (Counter, Int): Counts file operations.
   - **Attributes**:
-    - `operation` (string: "create", "read", "update"): The type of file operation.
+    - `operation` (string: "create", "read", "update"): The type of file
+      operation.
     - `lines` (Int, if applicable): Number of lines in the file.
     - `mimetype` (string, if applicable): Mimetype of the file.
     - `extension` (string, if applicable): File extension of the file.
-    - `model_added_lines` (Int, if applicable): Number of lines added/changed by the model.
-    - `model_removed_lines` (Int, if applicable): Number of lines removed/changed by the model.
-    - `user_added_lines` (Int, if applicable): Number of lines added/changed by user in AI proposed changes.
-    - `user_removed_lines` (Int, if applicable): Number of lines removed/changed by user in AI proposed changes.
-    - `programming_language` (string, if applicable): The programming language of the file.
+    - `programming_language` (string, if applicable): The programming language
+      of the file.
 
-- `gemini_cli.chat_compression` (Counter, Int): Counts chat compression operations
+- `gemini_cli.chat_compression` (Counter, Int): Counts chat compression
+  operations
   - **Attributes**:
     - `tokens_before`: (Int): Number of tokens in context prior to compression
     - `tokens_after`: (Int): Number of tokens in context after compression
 
 #### GenAI Semantic Convention
 
-The following metrics comply with [OpenTelemetry GenAI semantic conventions]
-for standardized observability across GenAI applications:
+The following metrics comply with [OpenTelemetry GenAI semantic conventions] for
+standardized observability across GenAI applications:
 
-- `gen_ai.client.token.usage` (Histogram, token): Number of input and output tokens used per operation.
+- `gen_ai.client.token.usage` (Histogram, token): Number of input and output
+  tokens used per operation.
   - **Attributes**:
-    - `gen_ai.operation.name` (string): The operation type (e.g., "generate_content", "chat")
-    - `gen_ai.provider.name` (string): The GenAI provider ("gcp.gen_ai" or "gcp.vertex_ai")
+    - `gen_ai.operation.name` (string): The operation type (e.g.,
+      "generate_content", "chat")
+    - `gen_ai.provider.name` (string): The GenAI provider ("gcp.gen_ai" or
+      "gcp.vertex_ai")
     - `gen_ai.token.type` (string): The token type ("input" or "output")
-    - `gen_ai.request.model` (string, optional): The model name used for the request
-    - `gen_ai.response.model` (string, optional): The model name that generated the response
+    - `gen_ai.request.model` (string, optional): The model name used for the
+      request
+    - `gen_ai.response.model` (string, optional): The model name that generated
+      the response
     - `server.address` (string, optional): GenAI server address
     - `server.port` (int, optional): GenAI server port
 
-- `gen_ai.client.operation.duration` (Histogram, s): GenAI operation duration in seconds.
+- `gen_ai.client.operation.duration` (Histogram, s): GenAI operation duration in
+  seconds.
   - **Attributes**:
-    - `gen_ai.operation.name` (string): The operation type (e.g., "generate_content", "chat")
-    - `gen_ai.provider.name` (string): The GenAI provider ("gcp.gen_ai" or "gcp.vertex_ai")
-    - `gen_ai.request.model` (string, optional): The model name used for the request
-    - `gen_ai.response.model` (string, optional): The model name that generated the response
+    - `gen_ai.operation.name` (string): The operation type (e.g.,
+      "generate_content", "chat")
+    - `gen_ai.provider.name` (string): The GenAI provider ("gcp.gen_ai" or
+      "gcp.vertex_ai")
+    - `gen_ai.request.model` (string, optional): The model name used for the
+      request
+    - `gen_ai.response.model` (string, optional): The model name that generated
+      the response
     - `server.address` (string, optional): GenAI server address
     - `server.port` (int, optional): GenAI server port
     - `error.type` (string, optional): Error type if the operation failed
 
-[OpenTelemetry GenAI semantic conventions]: https://github.com/open-telemetry/semantic-conventions/blob/main/docs/gen-ai/gen-ai-metrics.md
+[OpenTelemetry GenAI semantic conventions]:
+  https://github.com/open-telemetry/semantic-conventions/blob/main/docs/gen-ai/gen-ai-metrics.md
