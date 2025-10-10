@@ -246,7 +246,7 @@ jobs:
       always()
     needs:
       - 'e2e_forked'
-      - 'e2e_non_forked
+      - 'e2e_non_forked'
     runs-on: 'gemini-cli-ubuntu-16-core'
     steps:
       - name: 'Check E2E test results'
