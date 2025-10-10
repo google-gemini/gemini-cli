@@ -28,6 +28,12 @@ concurrency:
     ${{ github.ref != 'refs/heads/main' && !startsWith(github.ref, 'refs/heads/release/') }}
 
 jobs:
+  check_event: 
+    shell: 'bash'
+    env:
+      JSON_EVENT: '${{ toJSON(github.event) }}'
+    run: 'echo "$JSON_EVENT"'
+
   merge_queue_skipper:
     name: 'Merge Queue Skipper'
     runs-on: 'gemini-cli-ubuntu-16-core'
