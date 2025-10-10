@@ -80,11 +80,9 @@ describe('JSON output', () => {
     expect(payload.error.type).toBe('Error');
     expect(payload.error.code).toBe(1);
     expect(payload.error.message).toContain(
-      'configured auth type is gemini-api-key',
+      "enforced authentication type is 'gemini-api-key'",
     );
-    expect(payload.error.message).toContain(
-      'current auth type is oauth-personal',
-    );
+    expect(payload.error.message).toContain("current type is 'oauth-personal'");
   });
 
   it('should not exit on tool errors and allow model to self-correct in JSON mode', async () => {
