@@ -20,7 +20,11 @@ export const DefaultAppLayout: React.FC = () => {
   useFlickerDetector(rootUiRef, terminalHeight);
 
   return (
-    <Box flexDirection="column" width={uiState.mainAreaWidth} ref={uiState.rootUiRef}>
+    <Box
+      flexDirection="column"
+      width={uiState.mainAreaWidth}
+      ref={uiState.rootUiRef}
+    >
       <MainContent />
 
       <Box flexDirection="column" ref={uiState.mainControlsRef}>

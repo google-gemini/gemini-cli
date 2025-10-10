@@ -147,13 +147,26 @@ describe('Telemetry Metrics', () => {
     mockCreateCounterFn.mockReturnValue(mockCounterInstance);
     mockCreateHistogramFn.mockReturnValue(mockHistogramInstance);
   });
-  
-    describe('recordFlickerFrame', () => {
+
+  describe('recordFlickerFrame', () => {
     it('does not record metrics if not initialized', () => {
       const config = makeFakeConfig({});
       recordFlickerFrameModule(config);
       expect(mockCounterAddFn).not.toHaveBeenCalled();
     });
+
+    it('records a flicker frame event when initialized', () => {
+      const config = makeFakeConfig({});
+      initializeMetricsModule(config);
+      recordFlickerFrameModule(config);
+
+      // Called for session, then for flicker
+      expect(mockCounterAddFn).toHaveBeenCalledTimes(2);
+      expect(mockCounterAddFn).toHaveBeenNthCalledWith(2, 1, {
+        'session.id': 'test-session-id',
+      });
+    });
+  });
 
   describe('initializeMetrics', () => {
     const mockConfig = {
