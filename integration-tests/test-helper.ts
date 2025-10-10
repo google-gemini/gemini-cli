@@ -104,6 +104,8 @@ export function validateModelOutput(
       console.warn(
         'The tool was called successfully, which is the main requirement.',
       );
+      console.warn('Expected content:', expectedContent);
+      console.warn('Actual output:', result);
       return false;
     } else if (process.env.VERBOSE === 'true') {
       console.log(`${testName}: Model output validated successfully.`);
