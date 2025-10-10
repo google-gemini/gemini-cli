@@ -212,9 +212,12 @@ export const DebugProfiler = () => {
       Renders: {profiler.numFrames} (total),{' '}
       <Text color={theme.status.error}>{profiler.totalIdleFrames} (idle)</Text>
       {profiler.totalFlickerFrames > 0 && (
-        <Text color={theme.status.error}>
-          , {profiler.totalFlickerFrames} (flicker)
-        </Text>
+        <>
+          <Text color="yellow">, </Text>
+          <Text color={theme.status.error}>
+            {profiler.totalFlickerFrames} (flicker)
+          </Text>
+        </>
       )}
     </Text>
   );
