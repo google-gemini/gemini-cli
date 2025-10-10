@@ -15,6 +15,9 @@ class TerminalEnvVarCustomizer : LocalTerminalCustomizer() {
         serverState.port?.let {
             env["GEMINI_CLI_IDE_SERVER_PORT"] = it.toString()
         }
+        serverState.token?.let {
+            env["GEMINI_CLI_IDE_SERVER_AUTH_TOKEN"] = it
+        }
         serverState.workspacePath?.let {
             env["GEMINI_CLI_IDE_WORKSPACE_PATH"] = it
         }

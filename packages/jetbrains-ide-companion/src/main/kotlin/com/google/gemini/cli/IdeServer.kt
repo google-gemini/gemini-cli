@@ -119,6 +119,7 @@ class IdeServer(private val project: Project, private val diffManager: DiffManag
   }
 
   fun start() {
+    LOG.info("IdeServer: Starting MCP IDE Server")
     ApplicationManager.getApplication().executeOnPooledThread {
       try {
         val newServer = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
@@ -128,10 +129,11 @@ class IdeServer(private val project: Project, private val diffManager: DiffManag
         server = newServer
 
         val port = newServer.address.port
-        LOG.info("MCP IDE Server V2 started on port $port")
+        LOG.info("MCP IDE Server started on port $port")
         writePortInfo(port)
+        LOG.info("IdeServer: Server startup completed, port info written")
       } catch (e: Exception) {
-        LOG.error("Failed to start MCP IDE Server V2", e)
+        LOG.error("Failed to start MCP IDE Server", e)
       }
     }
   }
@@ -363,6 +365,7 @@ class IdeServer(private val project: Project, private val diffManager: DiffManag
     LOG.info("Wrote port info to ${portFile?.absolutePath}")
     project.service<GeminiCliServerState>().apply {
       this.port = actualPort
+      this.token = authToken
       this.workspacePath = workspacePath
     }
 
@@ -427,6 +430,7 @@ class IdeServer(private val project: Project, private val diffManager: DiffManag
     portFile?.delete()
     project.service<GeminiCliServerState>().apply {
       this.port = null
+      this.token = null
       this.workspacePath = null
     }
   }
