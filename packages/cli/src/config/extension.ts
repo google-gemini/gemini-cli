@@ -27,7 +27,10 @@ import * as path from 'node:path';
 import * as os from 'node:os';
 import { SettingScope, loadSettings } from '../config/settings.js';
 import { getErrorMessage } from '../utils/errors.js';
-import { recursivelyHydrateStrings } from './extensions/variables.js';
+import {
+  recursivelyHydrateStrings,
+  type JsonObject,
+} from './extensions/variables.js';
 import { isWorkspaceTrusted } from './trustedFolders.js';
 import { resolveEnvVarsInObject } from '../utils/envVarResolver.js';
 import { randomUUID } from 'node:crypto';
@@ -156,7 +159,7 @@ export function loadExtensions(
   const allExtensions = [...loadUserExtensions()];
 
   if (
-    (isWorkspaceTrusted(settings) ?? true) &&
+    isWorkspaceTrusted(settings).isTrusted &&
     // Default management setting to true
     !(settings.experimental?.extensionManagement ?? true)
   ) {
@@ -435,7 +438,7 @@ export async function installExtension(
 
   try {
     const settings = loadSettings(cwd).merged;
-    if (!isWorkspaceTrusted(settings)) {
+    if (!isWorkspaceTrusted(settings).isTrusted) {
       throw new Error(
         `Could not install extension from untrusted folder at ${installMetadata.source}`,
       );
@@ -646,17 +649,23 @@ export function loadExtensionConfig(
   }
   try {
     const configContent = fs.readFileSync(configFilePath, 'utf-8');
-    const config = recursivelyHydrateStrings(JSON.parse(configContent), {
-      extensionPath: extensionDir,
-      workspacePath: workspaceDir,
-      '/': path.sep,
-      pathSeparator: path.sep,
-    }) as unknown as ExtensionConfig;
-    if (!config.name || !config.version) {
+    const rawConfig = JSON.parse(configContent) as ExtensionConfig;
+    if (!rawConfig.name || !rawConfig.version) {
       throw new Error(
-        `Invalid configuration in ${configFilePath}: missing ${!config.name ? '"name"' : '"version"'}`,
+        `Invalid configuration in ${configFilePath}: missing ${!rawConfig.name ? '"name"' : '"version"'}`,
       );
     }
+    const installDir = new ExtensionStorage(rawConfig.name).getExtensionDir();
+    const config = recursivelyHydrateStrings(
+      rawConfig as unknown as JsonObject,
+      {
+        extensionPath: installDir,
+        workspacePath: workspaceDir,
+        '/': path.sep,
+        pathSeparator: path.sep,
+      },
+    ) as unknown as ExtensionConfig;
+
     validateName(config.name);
     return config;
   } catch (e) {

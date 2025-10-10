@@ -116,7 +116,10 @@ describe('extension tests', () => {
     fs.mkdirSync(userExtensionsDir, { recursive: true });
 
     vi.mocked(os.homedir).mockReturnValue(tempHomeDir);
-    vi.mocked(isWorkspaceTrusted).mockReturnValue(true);
+    vi.mocked(isWorkspaceTrusted).mockReturnValue({
+      isTrusted: true,
+      source: undefined,
+    });
     vi.spyOn(process, 'cwd').mockReturnValue(tempWorkspaceDir);
     vi.mocked(execSync).mockClear();
     Object.values(mockGit).forEach((fn) => fn.mockReset());
@@ -285,8 +288,8 @@ describe('extension tests', () => {
     });
 
     it('should resolve environment variables in extension configuration', () => {
-      process.env.TEST_API_KEY = 'test-api-key-123';
-      process.env.TEST_DB_URL = 'postgresql://localhost:5432/testdb';
+      process.env['TEST_API_KEY'] = 'test-api-key-123';
+      process.env['TEST_DB_URL'] = 'postgresql://localhost:5432/testdb';
 
       try {
         const userExtensionsDir = path.join(
@@ -331,14 +334,14 @@ describe('extension tests', () => {
         const serverConfig = extension.mcpServers?.['test-server'];
         expect(serverConfig).toBeDefined();
         expect(serverConfig?.env).toBeDefined();
-        expect(serverConfig?.env?.API_KEY).toBe('test-api-key-123');
-        expect(serverConfig?.env?.DATABASE_URL).toBe(
+        expect(serverConfig?.env?.['API_KEY']).toBe('test-api-key-123');
+        expect(serverConfig?.env?.['DATABASE_URL']).toBe(
           'postgresql://localhost:5432/testdb',
         );
-        expect(serverConfig?.env?.STATIC_VALUE).toBe('no-substitution');
+        expect(serverConfig?.env?.['STATIC_VALUE']).toBe('no-substitution');
       } finally {
-        delete process.env.TEST_API_KEY;
-        delete process.env.TEST_DB_URL;
+        delete process.env['TEST_API_KEY'];
+        delete process.env['TEST_DB_URL'];
       }
     });
 
@@ -380,8 +383,8 @@ describe('extension tests', () => {
       const extension = extensions[0];
       const serverConfig = extension.mcpServers!['test-server'];
       expect(serverConfig.env).toBeDefined();
-      expect(serverConfig.env!.MISSING_VAR).toBe('$UNDEFINED_ENV_VAR');
-      expect(serverConfig.env!.MISSING_VAR_BRACES).toBe('${ALSO_UNDEFINED}');
+      expect(serverConfig.env!['MISSING_VAR']).toBe('$UNDEFINED_ENV_VAR');
+      expect(serverConfig.env!['MISSING_VAR_BRACES']).toBe('${ALSO_UNDEFINED}');
     });
 
     it('should skip extensions with invalid JSON and log a warning', () => {
@@ -1015,7 +1018,7 @@ This extension will run the following MCP servers:
       await expect(
         installExtension(
           { source: sourceExtDir, type: 'local' },
-          async () => true,
+          async (_) => true,
         ),
       ).rejects.toThrow('Invalid extension name: "bad_name"');
     });
@@ -1134,25 +1137,34 @@ This extension will run the following MCP servers:
 
     describe('folder trust', () => {
       it('refuses to install extensions from untrusted folders', async () => {
-        vi.mocked(isWorkspaceTrusted).mockReturnValue(false);
+        vi.mocked(isWorkspaceTrusted).mockReturnValue({
+          isTrusted: false,
+          source: undefined,
+        });
         const ext1Path = createExtension({
           extensionsDir: workspaceExtensionsDir,
           name: 'ext1',
           version: '1.0.0',
         });
 
-        const failed = await performWorkspaceExtensionMigration([
-          loadExtension({
-            extensionDir: ext1Path,
-            workspaceDir: tempWorkspaceDir,
-          })!,
-        ]);
+        const failed = await performWorkspaceExtensionMigration(
+          [
+            loadExtension({
+              extensionDir: ext1Path,
+              workspaceDir: tempWorkspaceDir,
+            })!,
+          ],
+          async () => true,
+        );
 
         expect(failed).toEqual(['ext1']);
       });
 
       it('does not copy extensions to the user dir', async () => {
-        vi.mocked(isWorkspaceTrusted).mockReturnValue(false);
+        vi.mocked(isWorkspaceTrusted).mockReturnValue({
+          isTrusted: false,
+          source: undefined,
+        });
         const ext1Path = createExtension({
           extensionsDir: workspaceExtensionsDir,
           name: 'ext1',
@@ -1178,7 +1190,10 @@ This extension will run the following MCP servers:
       });
 
       it('does not load any extensions in the workspace config', async () => {
-        vi.mocked(isWorkspaceTrusted).mockReturnValue(false);
+        vi.mocked(isWorkspaceTrusted).mockReturnValue({
+          isTrusted: false,
+          source: undefined,
+        });
         const ext1Path = createExtension({
           extensionsDir: workspaceExtensionsDir,
           name: 'ext1',
