@@ -10,9 +10,12 @@ import { StreamingContext } from './contexts/StreamingContext.js';
 import { QuittingDisplay } from './components/QuittingDisplay.js';
 import { ScreenReaderAppLayout } from './layouts/ScreenReaderAppLayout.js';
 import { DefaultAppLayout } from './layouts/DefaultAppLayout.js';
+import { useFlickerDetector } from './hooks/useFlickerDetector.js';
 
 export const App = () => {
   const uiState = useUIState();
+  const { rootUiRef, terminalHeight } = uiState;
+  useFlickerDetector(rootUiRef, terminalHeight);
   const isScreenReaderEnabled = useIsScreenReaderEnabled();
 
   if (uiState.quittingMessages) {

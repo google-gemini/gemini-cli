@@ -58,7 +58,6 @@ import { useSlashCommandProcessor } from './hooks/slashCommandProcessor.js';
 import { useVimMode } from './contexts/VimModeContext.js';
 import { useConsoleMessages } from './hooks/useConsoleMessages.js';
 import { useTerminalSize } from './hooks/useTerminalSize.js';
-import { useFlickerDetector } from './hooks/useFlickerDetector.js';
 import { calculatePromptWidths } from './components/InputPrompt.js';
 import { useStdin, useStdout } from 'ink';
 import ansiEscapes from 'ansi-escapes';
@@ -216,12 +215,6 @@ export const AppContainer = (props: AppContainerProps) => {
   );
   const lastTitleRef = useRef<string | null>(null);
   const staticExtraHeight = 3;
-
-  // Flicker detector
-  const FlickerDetector = () => {
-    useFlickerDetector(rootUiRef, terminalHeight);
-    return null;
-  };
 
   useEffect(() => {
     (async () => {
@@ -1317,7 +1310,6 @@ Logging in with Google... Please restart Gemini CLI to continue.
               startupWarnings: props.startupWarnings || [],
             }}
           >
-            <FlickerDetector />
             <ShellFocusContext.Provider value={isFocused}>
               <App />
             </ShellFocusContext.Provider>
