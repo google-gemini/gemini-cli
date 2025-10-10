@@ -3,8 +3,7 @@ name: 'Testing: E2E'
 on:
   workflow_run:
     workflows: ['Trigger E2E']
-    types:
-      - completed
+    types: ['completed']
 
 concurrency:
   group: '${{ github.workflow }}-${{ github.head_ref || github.ref }}'
@@ -50,7 +49,7 @@ jobs:
         uses: 'actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955' # ratchet:actions/checkout@v5
         if: "github.event_name != 'pull_request_target'"
         with:
-          ref: '${{ github.event.inputs.branch_ref || github.ref }}'
+          ref: '${{ github.event.workflow_run.head_sha }}'
 
       - name: 'Set up Node.js ${{ matrix.node-version }}'
         uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions-node@v4
@@ -98,7 +97,7 @@ jobs:
         uses: 'actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955' # ratchet:actions/checkout@v5
         if: "github.event_name != 'pull_request_target'"
         with:
-          ref: '${{ github.event.inputs.branch_ref || github.ref }}'
+          ref: '${{ github.event.workflow_run.head_sha }}'
 
       - name: 'Set up Node.js 20.x'
         uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions-node@v4
@@ -144,7 +143,7 @@ jobs:
         uses: 'actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955' # ratchet:actions/checkout@v5
         if: "github.event_name != 'pull_request_target'"
         with:
-          ref: '${{ github.event.inputs.branch_ref || github.ref }}'
+          ref: '${{ github.event.workflow_run.head_sha }}'
 
       - name: 'Set up Node.js 20.x'
         uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions-node@v4
