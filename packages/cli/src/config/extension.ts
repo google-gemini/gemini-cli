@@ -15,6 +15,7 @@ import {
   Config,
   ExtensionInstallEvent,
   ExtensionUninstallEvent,
+  ExtensionUpdateEvent,
   ExtensionDisableEvent,
   ExtensionEnableEvent,
   logExtensionEnable,
@@ -41,7 +42,6 @@ import { ExtensionEnablementManager } from './extensions/extensionEnablement.js'
 import chalk from 'chalk';
 import type { ConfirmationRequest } from '../ui/types.js';
 import { escapeAnsiCtrlCodes } from '../ui/utils/textUtils.js';
-import { ExtensionUpdateEvent } from '@google/gemini-cli-core/src/telemetry/types.js';
 
 export const EXTENSIONS_DIRECTORY_NAME = path.join(GEMINI_DIR, 'extensions');
 
