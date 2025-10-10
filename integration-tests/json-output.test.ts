@@ -103,7 +103,7 @@ describe('JSON output', () => {
 
     // The model should acknowledge the error in its response
     expect(parsed.response.toLowerCase()).toMatch(
-      /cannot|does not exist|not found|unable to|error|couldn't/,
+      /cannot|does not exist|doesn't exist|not found|unable to|error|couldn't/,
     );
 
     // Stats should be present, indicating the session completed normally
