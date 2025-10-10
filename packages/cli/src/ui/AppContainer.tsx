@@ -209,9 +209,8 @@ export const AppContainer = (props: AppContainerProps) => {
   const branchName = useGitBranchName(config.getTargetDir());
 
   // Layout measurements
-  // For performance profiling only
   const mainControlsRef = useRef<DOMElement>(null);
-  // this is for profiling only
+  // For performance profiling only
   const rootUiRef = useRef<DOMElement>(null);
   const originalTitleRef = useRef(
     computeWindowTitle(basename(config.getTargetDir())),
