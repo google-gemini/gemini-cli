@@ -246,7 +246,6 @@ export interface ConfigParameters {
   blockedMcpServers?: Array<{ name: string; extensionName: string }>;
   noBrowser?: boolean;
   summarizeToolOutput?: Record<string, SummarizeToolOutputSettings>;
-  folderTrustFeature?: boolean;
   folderTrust?: boolean;
   ideMode?: boolean;
   loadMemoryFromIncludeDirectories?: boolean;
@@ -321,7 +320,6 @@ export class Config {
   private model: string;
   private readonly extensionContextFilePaths: string[];
   private readonly noBrowser: boolean;
-  private readonly folderTrustFeature: boolean;
   private readonly folderTrust: boolean;
   private ideMode: boolean;
 
@@ -430,7 +428,6 @@ export class Config {
     this._blockedMcpServers = params.blockedMcpServers ?? [];
     this.noBrowser = params.noBrowser ?? false;
     this.summarizeToolOutput = params.summarizeToolOutput;
-    this.folderTrustFeature = params.folderTrustFeature ?? false;
     this.folderTrust = params.folderTrust ?? false;
     this.ideMode = params.ideMode ?? false;
     this.loadMemoryFromIncludeDirectories =
@@ -889,21 +886,17 @@ export class Config {
     return this.ideMode;
   }
 
-  /***
-   * TODO: Review if this is actually used at it seems it is only used but the FileCommandLoader
+  /**
+   * Returns 'true' if the folder trust feature is enabled.
    */
-  getFolderTrustFeature(): boolean {
-    return this.folderTrustFeature;
+  getFolderTrust(): boolean {
+    return this.folderTrust;
   }
 
   /**
    * Returns 'true' if the workspace is considered "trusted".
    * 'false' for untrusted.
    */
-  getFolderTrust(): boolean {
-    return this.folderTrust;
-  }
-
   isTrustedFolder(): boolean {
     // isWorkspaceTrusted in cli/src/config/trustedFolder.js returns undefined
     // when the file based trust value is unavailable, since it is mainly used
