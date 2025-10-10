@@ -62,7 +62,7 @@ jobs:
         id: 'vars'
         uses: './.github/actions/calculate-vars'
         with:
-          dry_run: ${{ github.event.inputs.dry_run }}
+          dry_run: '${{ github.event.inputs.dry_run }}'
 
       - name: 'Print Calculated vars'
         shell: 'bash'
