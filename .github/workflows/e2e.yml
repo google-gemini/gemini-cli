@@ -9,6 +9,7 @@ on:
     branches:
       - 'main'
       - 'release/**'
+    types: ['opened', 'edited', 'synchronize', 'ready_for_review', 'reopened', 'review_requested', 'auto_merge_enabled']
   # This will run for PRs from forks when a label is added.
   pull_request_target:
     types: ['labeled']
@@ -220,16 +221,10 @@ jobs:
         shell: 'pwsh'
         run: 'npm run test:integration:sandbox:none'
 
-  e2e_check:
-    name: 'E2E Check'
+  e2e:
+    name: 'E2E'
     if: |
-      always() && (
-        github.event_name == 'push' ||
-        github.event_name == 'merge_group' ||
-        github.event_name == 'workflow_dispatch' ||
-        (github.event.pull_request.head.repo.full_name == github.repository) ||
-        (github.event.label.name == 'maintainer:e2e:ok')
-      )
+      always()
     needs:
       - 'e2e_linux'
       - 'e2e_mac'
@@ -238,6 +233,11 @@ jobs:
     steps:
       - name: 'Check E2E test results'
         run: |
+          if [[ ${{ needs.e2e_linux.result }} == 'skipped' || \
+               ${{ needs.e2e_mac.result }} == 'skipped' ]]; then
+            echo "A maintainer has to add the label 'maintainer:e2e:ok' to the PR' (removing it first if it's already there)"
+            exit 1
+          fi
           if [[ ${{ needs.e2e_linux.result }} != 'success' || \
                ${{ needs.e2e_mac.result }} != 'success' ]]; then
             echo "One or more E2E jobs failed."
