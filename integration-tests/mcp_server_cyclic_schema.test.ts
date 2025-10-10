@@ -24,7 +24,7 @@
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { beforeAll, describe, expect, it } from 'vitest';
-import { TestRig } from './test-helper.js';
+import { TestRig, type } from './test-helper.js';
 
 // Create a minimal MCP server that doesn't require external dependencies
 // This implements the MCP protocol directly using Node.js built-ins
@@ -192,15 +192,17 @@ describe('mcp server with cyclic tool schema is detected', () => {
     }
   });
 
-  //TODO - https://github.com/google-gemini/gemini-cli/issues/10735
-  it.skip('mcp tool list should include tool with cyclic tool schema', async () => {
-    const tool_list_output = await rig.run('/mcp list');
-    expect(tool_list_output).toContain('tool_with_cyclic_schema');
-  });
+  it('mcp tool list should include tool with cyclic tool schema', async () => {
+    const { ptyProcess } = rig.runInteractive();
+    try {
+      await rig.ensureReadyForInput(ptyProcess);
 
-  it('gemini api call should be successful with cyclic mcp tool schema', async () => {
-    // Run any command and verify that we get a non-error response from
-    // the Gemini API.
-    await rig.run('hello');
+      await type(ptyProcess, '/mcp list\r');
+
+      const found = await rig.waitForText('tool_with_cyclic_schema');
+      expect(found).toBe(true);
+    } finally {
+      ptyProcess.kill();
+    }
   });
 });

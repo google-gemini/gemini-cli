@@ -805,7 +805,7 @@ export class TestRig {
     if (!timeout) {
       timeout = this.getDefaultTimeout();
     }
-    return this.poll(
+    const found = await this.poll(
       () =>
         stripAnsi(this._interactiveOutput)
           .toLowerCase()
@@ -813,6 +813,13 @@ export class TestRig {
       timeout,
       200,
     );
+
+    if (!found) {
+      console.error(`waitForText failed. Expected to find: "${text}"`);
+      console.error(`Actual output: "${stripAnsi(this._interactiveOutput)}"`);
+    }
+
+    return found;
   }
 
   runInteractive(...args: string[]): {
