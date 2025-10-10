@@ -73,7 +73,14 @@ function parseDurationInSeconds(duration: string): number | null {
 export function classifyGoogleError(error: unknown): unknown {
   const googleApiError = parseGoogleApiError(error);
 
-  if (!googleApiError || googleApiError.code !== 429) {
+  if (!googleApiError) {
+    const legacyFallback = extractLegacyResourceExhaustedError(error);
+    return legacyFallback
+      ? new TerminalQuotaError(legacyFallback.message, legacyFallback)
+      : error;
+  }
+
+  if (googleApiError.code !== 429) {
     return error; // Not a 429 error we can handle.
   }
 
@@ -159,4 +166,131 @@ export function classifyGoogleError(error: unknown): unknown {
     }
   }
   return error; // Fallback to original error if no specific classification fits.
+}
+
+function extractLegacyResourceExhaustedError(
+  error: unknown,
+): GoogleApiError | null {
+  if (!error || typeof error !== 'object') {
+    return null;
+  }
+
+  const statusCode =
+    typeof (error as { status?: unknown }).status === 'number'
+      ? (error as { status: number }).status
+      : undefined;
+
+  const payload = extractErrorPayload(
+    (error as { response?: unknown }).response,
+  );
+
+  const errorMessage =
+    typeof (error as { message?: unknown }).message === 'string'
+      ? (error as { message: string }).message
+      : undefined;
+
+  const matchesResourceExhausted = (message?: string): boolean =>
+    typeof message === 'string' &&
+    message.toLowerCase().includes('resource exhausted');
+
+  if (!payload) {
+    if (statusCode === 429 && matchesResourceExhausted(errorMessage)) {
+      return {
+        code: statusCode,
+        message: errorMessage!,
+        details: [],
+      };
+    }
+    return null;
+  }
+
+  const payloadStatusRaw =
+    typeof payload['status'] === 'string' ? payload['status'] : undefined;
+  const payloadStatus = payloadStatusRaw ? payloadStatusRaw.toUpperCase() : '';
+
+  const payloadMessage =
+    typeof payload['message'] === 'string' ? payload['message'] : undefined;
+  const payloadCode =
+    typeof payload['code'] === 'number'
+      ? (payload['code'] as number)
+      : (statusCode ?? 429);
+  const reasons = extractReasons(payload['errors']);
+
+  if (payloadCode !== 429) {
+    return null;
+  }
+
+  const isResourceExhausted =
+    payloadStatus === 'RESOURCE_EXHAUSTED' ||
+    matchesResourceExhausted(payloadMessage) ||
+    reasons.some((reason) =>
+      ['ratelimitexceeded', 'quotaexceeded', 'resourceexhausted'].includes(
+        reason,
+      ),
+    );
+
+  if (!isResourceExhausted) {
+    return null;
+  }
+
+  return {
+    code: payloadCode,
+    message: payloadMessage ?? errorMessage ?? 'Resource exhausted.',
+    details: [],
+  };
+}
+
+function extractErrorPayload(
+  response: unknown,
+): Record<string, unknown> | null {
+  if (!response || typeof response !== 'object') {
+    return null;
+  }
+
+  let data = (response as { data?: unknown }).data;
+  if (!data) {
+    return null;
+  }
+
+  if (typeof data === 'string') {
+    try {
+      data = JSON.parse(data);
+    } catch {
+      return null;
+    }
+  }
+
+  if (!data || typeof data !== 'object') {
+    return null;
+  }
+
+  if (
+    'error' in data &&
+    typeof (data as { error?: unknown }).error === 'object'
+  ) {
+    const nested = (data as { error: unknown }).error;
+    if (nested && typeof nested === 'object') {
+      return nested as Record<string, unknown>;
+    }
+  }
+
+  return data as Record<string, unknown>;
+}
+
+function extractReasons(errors: unknown): string[] {
+  if (!Array.isArray(errors)) {
+    return [];
+  }
+
+  return errors
+    .map((entry) => {
+      if (entry && typeof entry === 'object' && 'reason' in entry) {
+        const reason = (entry as { reason?: unknown }).reason;
+        if (typeof reason === 'string') {
+          return reason.toLowerCase();
+        }
+      }
+      return undefined;
+    })
+    .filter((reason): reason is string => typeof reason === 'string');
 }

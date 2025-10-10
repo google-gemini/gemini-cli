@@ -12,6 +12,7 @@ import {
 } from './googleQuotaErrors.js';
 import * as errorParser from './googleErrors.js';
 import type { GoogleApiError } from './googleErrors.js';
+import { ApiError } from '@google/genai';
 
 describe('classifyGoogleError', () => {
   afterEach(() => {
@@ -183,6 +184,42 @@ describe('classifyGoogleError', () => {
     vi.spyOn(errorParser, 'parseGoogleApiError').mockReturnValue(apiError);
     const result = classifyGoogleError(new Error());
     expect(result).toBeInstanceOf(TerminalQuotaError);
+  });
+
+  it('should classify RESOURCE_EXHAUSTED errors without structured details as TerminalQuotaError', () => {
+    const rawErrorPayload = {
+      error: {
+        code: 429,
+        message:
+          'Resource exhausted. Please try again later. Please refer to https://cloud.google.com/vertex-ai/generative-ai/docs/error-code-429 for more details.',
+        errors: [
+          {
+            message:
+              'Resource exhausted. Please try again later. Please refer to https://cloud.google.com/vertex-ai/generative-ai/docs/error-code-429 for more details.',
+            domain: 'global',
+            reason: 'rateLimitExceeded',
+          },
+        ],
+        status: 'RESOURCE_EXHAUSTED',
+      },
+    };
+
+    const apiError = new ApiError({
+      message: rawErrorPayload.error.message,
+      status: 429,
+    });
+
+    Object.assign(apiError, {
+      response: {
+        status: 429,
+        data: rawErrorPayload,
+      },
+    });
+
+    const result = classifyGoogleError(apiError);
+
+    expect(result).toBeInstanceOf(TerminalQuotaError);
+    expect((result as TerminalQuotaError).cause.code).toBe(429);
   });
 
   it('should return original error for 429 without specific details', () => {

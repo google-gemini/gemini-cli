@@ -336,6 +336,68 @@ describe('retryWithBackoff', () => {
       expect(mockFn).toHaveBeenCalledTimes(2);
     });
 
+    it('should trigger fallback for RESOURCE_EXHAUSTED errors without structured details', async () => {
+      const rawErrorPayload = {
+        error: {
+          code: 429,
+          message:
+            'Resource exhausted. Please try again later. Please refer to https://cloud.google.com/vertex-ai/generative-ai/docs/error-code-429 for more details.',
+          errors: [
+            {
+              message:
+                'Resource exhausted. Please try again later. Please refer to https://cloud.google.com/vertex-ai/generative-ai/docs/error-code-429 for more details.',
+              domain: 'global',
+              reason: 'rateLimitExceeded',
+            },
+          ],
+          status: 'RESOURCE_EXHAUSTED',
+        },
+      };
+
+      const apiError = new ApiError({
+        message: rawErrorPayload.error.message,
+        status: 429,
+      });
+      Object.assign(apiError, {
+        response: {
+          status: 429,
+          data: rawErrorPayload,
+        },
+      });
+
+      let fallbackActivated = false;
+      const fallbackCallback = vi
+        .fn()
+        .mockImplementation(async (_authType?: string, _error?: unknown) => {
+          fallbackActivated = true;
+          return 'gemini-2.5-flash';
+        });
+
+      const mockFn = vi.fn().mockImplementation(async () => {
+        if (!fallbackActivated) {
+          throw apiError;
+        }
+        return 'success';
+      });
+
+      const promise = retryWithBackoff(mockFn, {
+        maxAttempts: 2,
+        initialDelayMs: 1,
+        onPersistent429: async (authType?: string, error?: unknown) =>
+          await fallbackCallback(authType, error),
+        authType: AuthType.LOGIN_WITH_GOOGLE,
+      });
+
+      await vi.runAllTimersAsync();
+
+      await expect(promise).resolves.toBe('success');
+      expect(fallbackCallback).toHaveBeenCalledWith(
+        AuthType.LOGIN_WITH_GOOGLE,
+        expect.any(TerminalQuotaError),
+      );
+      expect(mockFn).toHaveBeenCalledTimes(2);
+    });
+
     it('should use retryDelayMs from RetryableQuotaError', async () => {
       const setTimeoutSpy = vi.spyOn(global, 'setTimeout');
       const mockFn = vi.fn().mockImplementation(async () => {
