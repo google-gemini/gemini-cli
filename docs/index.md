@@ -22,7 +22,7 @@ This documentation is organized into the following sections:
 
 - **[Gemini CLI Quickstart](./get-started/index.md):** Let's get started with
   Gemini CLI.
-- **[Deployment](./get-started/deployment.md):** Install and run Gemini CLI.
+- **[Installation](./get-started/installation.md):** Install and run Gemini CLI.
 - **[Authentication](./get-started/authentication.md):** Authenticate Gemini
   CLI.
 - **[Configuration](./get-started/configuration.md):** Information on
@@ -73,6 +73,8 @@ This documentation is organized into the following sections:
 
 - **[Extensions](./extensions/index.md):** How to extend the CLI with new
   functionality.
+- **[Get Started with Extensions](./extensions/getting-started-extensions.md):**
+  Learn how to build your own extension.
 - **[Extension Releasing](./extensions/extension-releasing.md):** How to release
   Gemini CLI extensions.
 
