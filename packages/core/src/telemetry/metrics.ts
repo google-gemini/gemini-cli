@@ -15,6 +15,7 @@ import type {
   AgentFinishEvent,
 } from './types.js';
 import { AuthType } from '../core/contentGenerator.js';
+import { getCommonAttributes } from './telemetryAttributes.js';
 
 const TOOL_CALL_COUNT = 'gemini_cli.tool.call.count';
 const TOOL_CALL_LATENCY = 'gemini_cli.tool.call.latency';
@@ -56,9 +57,7 @@ const REGRESSION_PERCENTAGE_CHANGE =
 const BASELINE_COMPARISON = 'gemini_cli.performance.baseline.comparison';
 
 const baseMetricDefinition = {
-  getCommonAttributes: (config: Config): Attributes => ({
-    'session.id': config.getSessionId(),
-  }),
+  getCommonAttributes,
 };
 
 const COUNTER_DEFINITIONS = {
