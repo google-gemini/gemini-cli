@@ -1732,17 +1732,19 @@ describe('InputPrompt', () => {
     });
 
     it('should not call onEscapePromptChange when not provided', async () => {
+      vi.useFakeTimers();
       props.onEscapePromptChange = undefined;
       props.buffer.setText('some text');
 
       const { stdin, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
       );
-      await wait();
+      await vi.runAllTimersAsync();
 
       stdin.write('\x1B');
-      await wait();
+      await vi.runAllTimersAsync();
 
+      vi.useRealTimers();
       unmount();
     });
 
