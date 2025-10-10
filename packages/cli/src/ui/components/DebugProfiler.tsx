@@ -118,7 +118,7 @@ export const profiler = {
 };
 
 export const DebugProfiler = () => {
-  const { showDebugProfiler } = useUIState();
+  const { showDebugProfiler, constrainHeight } = useUIState();
   const [forceRefresh, setForceRefresh] = useState(0);
 
   // Effect for listening to stdin for keypresses and stdout for resize events.
@@ -172,22 +172,28 @@ export const DebugProfiler = () => {
   }, []);
 
   useEffect(() => {
-    if (!showDebugProfiler) {
-      return;
-    }
     const flickerHandler = () => {
+      // If we are not constraining the height, we are intentionally
+      // overflowing the screen.
+      if (!constrainHeight) {
+        return;
+      }
+
       profiler.totalFlickerFrames++;
       profiler.reportAction();
-      appEvents.emit(
-        AppEvent.LogError,
-        'A flicker frame was detected. This will cause UI instability.',
-      );
+
+      if (showDebugProfiler) {
+        appEvents.emit(
+          AppEvent.LogError,
+          'A flicker frame was detected. This will cause UI instability.',
+        );
+      }
     };
     appEvents.on(AppEvent.Flicker, flickerHandler);
     return () => {
       appEvents.off(AppEvent.Flicker, flickerHandler);
     };
-  }, [showDebugProfiler]);
+  }, [showDebugProfiler, constrainHeight]);
 
   // Effect for updating stats
   useEffect(() => {

@@ -9,6 +9,7 @@ import { useEffect } from 'react';
 import { useConfig } from '../contexts/ConfigContext.js';
 import { recordFlickerFrame } from '@google/gemini-cli-core';
 import { appEvents, AppEvent } from '../../utils/events.js';
+import { useUIState } from '../contexts/UIStateContext.js';
 
 /**
  * A hook that detects when the UI flickers (renders taller than the terminal).
@@ -22,11 +23,18 @@ export function useFlickerDetector(
   terminalHeight: number,
 ) {
   const config = useConfig();
+  const { constrainHeight } = useUIState();
 
   useEffect(() => {
     if (rootUiRef.current) {
       const measurement = measureElement(rootUiRef.current);
       if (measurement.height > terminalHeight) {
+        // If we are not constraining the height, we are intentionally
+        // overflowing the screen.
+        if (!constrainHeight) {
+          return;
+        }
+
         recordFlickerFrame(config);
         appEvents.emit(AppEvent.Flicker);
       }
