@@ -50,6 +50,7 @@ This documentation is organized into the following sections:
 ### Extensions
 
 - **[Extensions](./extensions/index.md):** How to extend the CLI with new functionality.
+- **[Get Started with Extensions](./extensions/getting-started-extensions.md):** Learn how to build your own extension.
 - **[Extension Releasing](./extensions/extension-releasing.md):** How to release Gemini CLI extensions.
 
 ### IDE integration

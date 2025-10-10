@@ -160,6 +160,10 @@
         "slug": "docs/extensions"
       },
       {
+        "label": "Get Started with Extensions",
+        "slug": "docs/extensions/getting-started-extensions.md"
+      },
+      {
         "label": "Extension Releasing",
         "slug": "docs/extensions/extension-releasing"
       }
