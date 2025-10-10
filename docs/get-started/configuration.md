@@ -123,6 +123,11 @@ Settings are organized into categories. All settings should be placed within the
   - **Description:** Disable loading phrases for accessibility.
   - **Default:** `false`
 
+- **`ui.accessibility.screenReader`** (boolean):
+  - **Description:** Show plaintext interactive view that is more screen reader
+    friendly.
+  - **Default:** `false`
+
 - **`ui.customWittyPhrases`** (array of strings):
   - **Description:** A list of custom phrases to display during loading states. When provided, the CLI will cycle through these phrases instead of the default ones.
   - **Default:** `[]`
