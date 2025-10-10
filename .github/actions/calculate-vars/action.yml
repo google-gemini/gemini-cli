@@ -14,6 +14,12 @@ outputs:
 runs:
   using: 'composite'
   steps:
+    - name: 'Print inputs'
+      shell: 'bash'
+      env:
+        JSON_INPUTS: '${{ toJSON(inputs) }}'
+      run: 'echo "$JSON_INPUTS"'
+
     - name: 'Set vars for simplified logic'
       id: 'set_vars'
       shell: 'bash'
