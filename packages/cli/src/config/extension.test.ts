@@ -856,20 +856,23 @@ describe('extension tests', () => {
     describe.each([true, false])(
       'with previous extension config: %s',
       (isUpdate: boolean) => {
-        it(`should log an ${isUpdate ? 'update' : 'install'} event to clearcut on success`, async () => {
-          const sourceExtDir = createExtension({
+        let sourceExtDir: string;
+
+        beforeEach(async () => {
+          sourceExtDir = createExtension({
             extensionsDir: tempHomeDir,
             name: 'my-local-extension',
             version: '1.1.0',
           });
-
           if (isUpdate) {
             await installOrUpdateExtension(
               { source: sourceExtDir, type: 'local' },
               async (_) => true,
             );
           }
+        });
 
+        it(`should log an ${isUpdate ? 'update' : 'install'} event to clearcut on success`, async () => {
           await installOrUpdateExtension(
             { source: sourceExtDir, type: 'local' },
             async (_) => true,
@@ -886,6 +889,33 @@ describe('extension tests', () => {
             expect(mockLogExtensionUpdateEvent).toHaveBeenCalled();
           } else {
             expect(mockLogExtensionInstallEvent).toHaveBeenCalled();
+          }
+        });
+
+        it(`should ${isUpdate ? 'not ' : ''} alter the extension enablement configuration`, async () => {
+          const enablementManager = new ExtensionEnablementManager(
+            ExtensionStorage.getUserExtensionsDir(),
+          );
+          enablementManager.enable('my-local-extension', true, '/some/scope');
+
+          await installOrUpdateExtension(
+            { source: sourceExtDir, type: 'local' },
+            async (_) => true,
+            undefined,
+            isUpdate
+              ? {
+                  name: 'my-local-extension',
+                  version: '1.0.0',
+                }
+              : undefined,
+          );
+
+          const config = enablementManager.readConfig()['my-local-extension'];
+          if (isUpdate) {
+            expect(config).not.toBeUndefined();
+            expect(config.overrides).toContain('/some/scope/*');
+          } else {
+            expect(config).not.toContain('/some/scope/*');
           }
         });
       },
@@ -1115,6 +1145,28 @@ This extension will run the following MCP servers:
             'my-local-extension',
             'success',
           );
+        }
+      });
+
+      it(`should ${isUpdate ? 'not ' : ''} alter the extension enablement configuration`, async () => {
+        createExtension({
+          extensionsDir: userExtensionsDir,
+          name: 'test-extension',
+          version: '1.0.0',
+        });
+        const enablementManager = new ExtensionEnablementManager(
+          ExtensionStorage.getUserExtensionsDir(),
+        );
+        enablementManager.enable('test-extension', true, '/some/scope');
+
+        await uninstallExtension('test-extension', isUpdate);
+
+        const config = enablementManager.readConfig()['test-extension'];
+        if (isUpdate) {
+          expect(config).not.toBeUndefined();
+          expect(config.overrides).toEqual(['/some/scope/*']);
+        } else {
+          expect(config).toBeUndefined();
         }
       });
     });
