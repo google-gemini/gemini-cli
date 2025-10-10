@@ -563,6 +563,18 @@ export async function installOrUpdateExtension(
 
     return newExtensionConfig!.name;
   } catch (error) {
+    // Attempt to load config from the source path even if installation fails
+    // to get the name and version for logging.
+    if (!newExtensionConfig && localSourcePath) {
+      try {
+        newExtensionConfig = loadExtensionConfig({
+          extensionDir: localSourcePath,
+          workspaceDir: cwd,
+        });
+      } catch {
+        // Ignore error, this is just for logging.
+      }
+    }
     if (isUpdate) {
       logExtensionUpdateEvent(
         telemetryConfig,
@@ -575,18 +587,6 @@ export async function installOrUpdateExtension(
         ),
       );
     } else {
-      // Attempt to load config from the source path even if installation fails
-      // to get the name and version for logging.
-      if (!newExtensionConfig && localSourcePath) {
-        try {
-          newExtensionConfig = loadExtensionConfig({
-            extensionDir: localSourcePath,
-            workspaceDir: cwd,
-          });
-        } catch {
-          // Ignore error, this is just for logging.
-        }
-      }
       logExtensionInstallEvent(
         telemetryConfig,
         new ExtensionInstallEvent(
