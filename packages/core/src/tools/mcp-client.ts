@@ -364,8 +364,7 @@ async function handleAutomaticOAuth(
       authorizationUrl: resourceOauthConfig.authorizationUrl,
       tokenUrl: resourceOauthConfig.tokenUrl,
       // mcpServer scopes is possibly an empty array
-      scopes:
-        mcpServerScopes == null ? resourceOauthConfig.scopes : mcpServerScopes,
+      scopes: mcpServerScopes ?? resourceOauthConfig.scopes ?? [],
     };
 
     // Perform OAuth authentication
@@ -1062,10 +1061,7 @@ export async function connectToMcpServer(
                 enabled: true,
                 authorizationUrl: oauthConfig.authorizationUrl,
                 tokenUrl: oauthConfig.tokenUrl,
-                scopes:
-                  mcpServerScopes == null
-                    ? oauthConfig.scopes
-                    : mcpServerScopes,
+                scopes: mcpServerScopes ?? oauthConfig.scopes ?? [],
               };
 
               // Perform OAuth authentication
