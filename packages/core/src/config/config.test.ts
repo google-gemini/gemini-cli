@@ -7,7 +7,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { Mock } from 'vitest';
 import type { ConfigParameters, SandboxConfig } from './config.js';
-import { Config, ApprovalMode } from './config.js';
+import {
+  Config,
+  ApprovalMode,
+  DEFAULT_FILE_FILTERING_OPTIONS,
+} from './config.js';
 import * as path from 'node:path';
 import { setGeminiMdFilename as mockSetGeminiMdFilename } from '../tools/memoryTool.js';
 import {
@@ -318,7 +322,9 @@ describe('Server Config (config.ts)', () => {
 
   it('should set default file filtering settings when not provided', () => {
     const config = new Config(baseParams);
-    expect(config.getFileFilteringRespectGitIgnore()).toBe(true);
+    expect(config.getFileFilteringRespectGitIgnore()).toBe(
+      DEFAULT_FILE_FILTERING_OPTIONS.respectGitIgnore,
+    );
   });
 
   it('should set custom file filtering settings when provided', () => {
