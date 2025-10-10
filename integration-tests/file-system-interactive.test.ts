@@ -24,22 +24,7 @@ describe('Interactive file system', () => {
     rig.createFile(fileName, '1.0.0');
 
     const { ptyProcess } = rig.runInteractive();
-
-    const authDialogAppeared = await rig.waitForText(
-      'How would you like to authenticate',
-      5000,
-    );
-
-    // select the second option if auth dialog come's up
-    if (authDialogAppeared) {
-      ptyProcess.write('2');
-    }
-
-    // Wait for the app to be ready
-    const isReady = await rig.waitForText('Type your message', 30000);
-    expect(isReady, 'CLI did not start up in interactive mode correctly').toBe(
-      true,
-    );
+    await rig.ensureReadyForInput(ptyProcess);
 
     // Step 1: Read the file
     const readPrompt = `Read the version from ${fileName}`;
