@@ -18,12 +18,10 @@ describe('Interactive Mode', () => {
     await rig.cleanup();
   });
 
-  //TODO - https://github.com/google-gemini/gemini-cli/issues/10770
-  it.skip('should trigger chat compression with /compress command', async () => {
+  it('should trigger chat compression with /compress command', async () => {
     await rig.setup('interactive-compress-test');
 
-    const { ptyProcess } = rig.runInteractive();
-    await rig.ensureReadyForInput(ptyProcess);
+    const ptyProcess = await rig.runInteractive();
 
     const longPrompt =
       'Dont do anything except returning a 1000 token long paragragh with the <name of the scientist who discovered theory of relativity> at the end to indicate end of response. This is a moderately long sentence.';
@@ -51,18 +49,12 @@ describe('Interactive Mode', () => {
   it.skip('should handle compression failure on token inflation', async () => {
     await rig.setup('interactive-compress-test');
 
-    const { ptyProcess } = rig.runInteractive();
-    await rig.ensureReadyForInput(ptyProcess);
+    const ptyProcess = await rig.runInteractive();
 
     await type(ptyProcess, '/compress');
     await new Promise((resolve) => setTimeout(resolve, 100));
     await type(ptyProcess, '\r');
 
-    const compressionFailed = await rig.waitForText(
-      'compression was not beneficial',
-      25000,
-    );
-
-    expect(compressionFailed).toBe(true);
+    await rig.waitForText('compression was not beneficial', 25000);
   });
 });

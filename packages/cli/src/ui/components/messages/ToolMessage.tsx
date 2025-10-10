@@ -171,6 +171,7 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
               <AnsiOutputText
                 data={resultDisplay as AnsiOutput}
                 availableTerminalHeight={availableHeight}
+                width={childWidth}
               />
             )}
           </Box>

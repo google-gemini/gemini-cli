@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { expect } from 'vitest';
 import { execSync, spawn } from 'node:child_process';
 import { mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
@@ -188,6 +189,11 @@ export class TestRig {
         target: 'local',
         otlpEndpoint: '',
         outfile: telemetryPath,
+      },
+      security: {
+        auth: {
+          selectedType: 'gemini-api-key',
+        },
       },
       model: DEFAULT_GEMINI_MODEL,
       sandbox: env.GEMINI_SANDBOX !== 'false' ? env.GEMINI_SANDBOX : false,
@@ -801,11 +807,11 @@ export class TestRig {
     return null;
   }
 
-  async waitForText(text: string, timeout?: number): Promise<boolean> {
+  async waitForText(text: string, timeout?: number) {
     if (!timeout) {
       timeout = this.getDefaultTimeout();
     }
-    return this.poll(
+    const found = await this.poll(
       () =>
         stripAnsi(this._interactiveOutput)
           .toLowerCase()
@@ -813,12 +819,10 @@ export class TestRig {
       timeout,
       200,
     );
+    expect(found, `Did not find expected text: "${text}"`).toBe(true);
   }
 
-  runInteractive(...args: string[]): {
-    ptyProcess: pty.IPty;
-    promise: Promise<{ exitCode: number; signal?: number; output: string }>;
-  } {
+  async runInteractive(...args: string[]): Promise<pty.IPty> {
     const { command, initialArgs } = this._getCommandAndArgs(['--yolo']);
     const commandArgs = [...initialArgs, ...args];
     const isWindows = os.platform() === 'win32';
@@ -850,60 +854,9 @@ export class TestRig {
       }
     });
 
-    const promise = new Promise<{
-      exitCode: number;
-      signal?: number;
-      output: string;
-    }>((resolve) => {
-      ptyProcess.onExit(({ exitCode, signal }) => {
-        resolve({ exitCode, signal, output: this._interactiveOutput });
-      });
-    });
+    // Wait for the app to be ready
+    await this.waitForText('Type your message', 30000);
 
-    return { ptyProcess, promise };
-  }
-
-  /**
-   * Waits for an interactive session to be fully ready for input.
-   * This is a higher-level utility to be used with `runInteractive`.
-   *
-   * It handles the initial setup boilerplate:
-   * 1. Automatically handles the authentication prompt if it appears.
-   * 2. Waits for the "Type your message" prompt to ensure the CLI is ready for input.
-   *
-   * Throws an error if the session fails to become ready within the timeout.
-   *
-   * @param ptyProcess The process returned from `runInteractive`.
-   */
-  async ensureReadyForInput(ptyProcess: pty.IPty): Promise<void> {
-    const timeout = 25000;
-    const pollingInterval = 200;
-    const startTime = Date.now();
-    let authPromptHandled = false;
-
-    while (Date.now() - startTime < timeout) {
-      const output = stripAnsi(this._interactiveOutput).toLowerCase();
-
-      // If the ready prompt appears, we're done.
-      if (output.includes('type your message')) {
-        return;
-      }
-
-      // If the auth prompt appears and we haven't handled it yet.
-      if (
-        !authPromptHandled &&
-        output.includes('how would you like to authenticate')
-      ) {
-        ptyProcess.write('2');
-        authPromptHandled = true;
-      }
-
-      // Wait for the next poll.
-      await new Promise((resolve) => setTimeout(resolve, pollingInterval));
-    }
-
-    throw new Error(
-      `CLI did not start up in interactive mode correctly. Output: ${this._interactiveOutput}`,
-    );
+    return ptyProcess;
   }
 }
