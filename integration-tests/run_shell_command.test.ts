@@ -197,13 +197,14 @@ describe('run_shell_command', () => {
     ).toBeTruthy();
   });
 
-  //TODO - https://github.com/google-gemini/gemini-cli/issues/10737
-  it.skip('should combine multiple --allowed-tools flags', async () => {
+  it('should combine multiple --allowed-tools flags', async () => {
     const rig = new TestRig();
     await rig.setup('should combine multiple --allowed-tools flags');
 
     const { tool } = getLineCountCommand();
-    const prompt = `use ${tool} and ls`;
+    const prompt =
+      `use both ${tool} and ls to count the number of lines in ` +
+      `files in this directory`;
 
     const result = await rig.run({
       stdin: prompt,
@@ -227,7 +228,8 @@ describe('run_shell_command', () => {
     ).toBeTruthy();
   });
 
-  it('should allow all with "ShellTool" and other specifics', async () => {
+  //TODO - https://github.com/google-gemini/gemini-cli/issues/10768
+  it.skip('should allow all with "ShellTool" and other specifics', async () => {
     const rig = new TestRig();
     await rig.setup('should allow all with "ShellTool" and other specifics');
 
