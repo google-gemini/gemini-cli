@@ -52,7 +52,7 @@ notable changes to Gemini CLI.
 - 🎉 **Gemini CLI extensions**
   - **Flutter:** An early version to help you create, build, test, and run
     Flutter apps with Gemini CLI
-    ([extension](https://github.com/flutter/gemini-cli-extension))
+    ([extension](https://github.com/gemini-cli-extensions/flutter))
   - **nanobanana:** Integrate nanobanana into Gemini CLI
     ([extension](https://github.com/gemini-cli-extensions/nanobanana))
 - **Telemetry config via environment:** Manage telemetry settings using

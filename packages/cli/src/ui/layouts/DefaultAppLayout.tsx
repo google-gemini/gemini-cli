@@ -20,7 +20,7 @@ export const DefaultAppLayout: React.FC = () => {
   useFlickerDetector(rootUiRef, terminalHeight);
 
   return (
-    <Box flexDirection="column" width="90%" ref={uiState.rootUiRef}>
+    <Box flexDirection="column" width={uiState.mainAreaWidth} ref={uiState.rootUiRef}>
       <MainContent />
 
       <Box flexDirection="column" ref={uiState.mainControlsRef}>
@@ -28,7 +28,7 @@ export const DefaultAppLayout: React.FC = () => {
 
         {uiState.dialogsVisible ? (
           <DialogManager
-            terminalWidth={uiState.terminalWidth}
+            terminalWidth={uiState.mainAreaWidth}
             addItem={uiState.historyManager.addItem}
           />
         ) : (

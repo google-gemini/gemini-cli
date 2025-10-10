@@ -23,26 +23,6 @@ import { logs } from '@opentelemetry/api-logs';
 import { SemanticAttributes } from '@opentelemetry/semantic-conventions';
 import type { Config } from '../config/config.js';
 import {
-  EVENT_API_REQUEST,
-  EVENT_API_RESPONSE,
-  EVENT_CLI_CONFIG,
-  EVENT_TOOL_CALL,
-  EVENT_USER_PROMPT,
-  EVENT_FLASH_FALLBACK,
-  EVENT_MALFORMED_JSON_RESPONSE,
-  EVENT_FILE_OPERATION,
-  EVENT_RIPGREP_FALLBACK,
-  EVENT_MODEL_ROUTING,
-  EVENT_EXTENSION_ENABLE,
-  EVENT_EXTENSION_DISABLE,
-  EVENT_EXTENSION_INSTALL,
-  EVENT_EXTENSION_UNINSTALL,
-  EVENT_TOOL_OUTPUT_TRUNCATED,
-  EVENT_AGENT_START,
-  EVENT_AGENT_FINISH,
-  EVENT_WEB_FETCH_FALLBACK_ATTEMPT,
-} from './constants.js';
-import {
   logApiRequest,
   logApiResponse,
   logCliConfiguration,
@@ -65,6 +45,24 @@ import {
 } from './loggers.js';
 import { ToolCallDecision } from './tool-call-decision.js';
 import {
+  EVENT_API_REQUEST,
+  EVENT_API_RESPONSE,
+  EVENT_CLI_CONFIG,
+  EVENT_TOOL_CALL,
+  EVENT_USER_PROMPT,
+  EVENT_FLASH_FALLBACK,
+  EVENT_MALFORMED_JSON_RESPONSE,
+  EVENT_FILE_OPERATION,
+  EVENT_RIPGREP_FALLBACK,
+  EVENT_MODEL_ROUTING,
+  EVENT_EXTENSION_ENABLE,
+  EVENT_EXTENSION_DISABLE,
+  EVENT_EXTENSION_INSTALL,
+  EVENT_EXTENSION_UNINSTALL,
+  EVENT_TOOL_OUTPUT_TRUNCATED,
+  EVENT_AGENT_START,
+  EVENT_AGENT_FINISH,
+  EVENT_WEB_FETCH_FALLBACK_ATTEMPT,
   ApiRequestEvent,
   ApiResponseEvent,
   StartSessionEvent,
@@ -102,6 +100,7 @@ import * as uiTelemetry from './uiTelemetry.js';
 import { makeFakeConfig } from '../test-utils/config.js';
 import { ClearcutLogger } from './clearcut-logger/clearcut-logger.js';
 import { UserAccountManager } from '../utils/userAccountManager.js';
+import { InstallationManager } from '../utils/installationManager.js';
 import { AgentTerminateMode } from '../agents/types.js';
 
 describe('loggers', () => {
@@ -123,6 +122,10 @@ describe('loggers', () => {
       UserAccountManager.prototype,
       'getCachedGoogleAccount',
     ).mockReturnValue('test-user@example.com');
+    vi.spyOn(
+      InstallationManager.prototype,
+      'getInstallationId',
+    ).mockReturnValue('test-installation-id');
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2025-01-01T00:00:00.000Z'));
   });
@@ -205,6 +208,7 @@ describe('loggers', () => {
         attributes: {
           'session.id': 'test-session-id',
           'user.email': 'test-user@example.com',
+          'installation.id': 'test-installation-id',
           'event.name': EVENT_CLI_CONFIG,
           'event.timestamp': '2025-01-01T00:00:00.000Z',
           model: 'test-model',
@@ -250,6 +254,7 @@ describe('loggers', () => {
         attributes: {
           'session.id': 'test-session-id',
           'user.email': 'test-user@example.com',
+          'installation.id': 'test-installation-id',
           'event.name': EVENT_USER_PROMPT,
           'event.timestamp': '2025-01-01T00:00:00.000Z',
           prompt_length: 11,
@@ -282,6 +287,7 @@ describe('loggers', () => {
         attributes: {
           'session.id': 'test-session-id',
           'user.email': 'test-user@example.com',
+          'installation.id': 'test-installation-id',
           'event.name': EVENT_USER_PROMPT,
           'event.timestamp': '2025-01-01T00:00:00.000Z',
           prompt_length: 11,
@@ -348,6 +354,7 @@ describe('loggers', () => {
         attributes: {
           'session.id': 'test-session-id',
           'user.email': 'test-user@example.com',
+          'installation.id': 'test-installation-id',
           'event.name': EVENT_API_RESPONSE,
           'event.timestamp': '2025-01-01T00:00:00.000Z',
           [SemanticAttributes.HTTP_STATUS_CODE]: 200,
@@ -443,6 +450,7 @@ describe('loggers', () => {
         attributes: {
           'session.id': 'test-session-id',
           'user.email': 'test-user@example.com',
+          'installation.id': 'test-installation-id',
           'event.name': EVENT_API_REQUEST,
           'event.timestamp': '2025-01-01T00:00:00.000Z',
           model: 'test-model',
@@ -462,6 +470,7 @@ describe('loggers', () => {
         attributes: {
           'session.id': 'test-session-id',
           'user.email': 'test-user@example.com',
+          'installation.id': 'test-installation-id',
           'event.name': EVENT_API_REQUEST,
           'event.timestamp': '2025-01-01T00:00:00.000Z',
           model: 'test-model',
@@ -487,6 +496,7 @@ describe('loggers', () => {
         attributes: {
           'session.id': 'test-session-id',
           'user.email': 'test-user@example.com',
+          'installation.id': 'test-installation-id',
           'event.name': EVENT_FLASH_FALLBACK,
           'event.timestamp': '2025-01-01T00:00:00.000Z',
           auth_type: 'vertex-ai',
@@ -520,6 +530,7 @@ describe('loggers', () => {
         expect.objectContaining({
           'session.id': 'test-session-id',
           'user.email': 'test-user@example.com',
+          'installation.id': 'test-installation-id',
           'event.name': EVENT_RIPGREP_FALLBACK,
           error: undefined,
         }),
@@ -541,6 +552,7 @@ describe('loggers', () => {
         expect.objectContaining({
           'session.id': 'test-session-id',
           'user.email': 'test-user@example.com',
+          'installation.id': 'test-installation-id',
           'event.name': EVENT_RIPGREP_FALLBACK,
           error: 'rg not found',
         }),
@@ -653,6 +665,7 @@ describe('loggers', () => {
         attributes: {
           'session.id': 'test-session-id',
           'user.email': 'test-user@example.com',
+          'installation.id': 'test-installation-id',
           'event.name': EVENT_TOOL_CALL,
           'event.timestamp': '2025-01-01T00:00:00.000Z',
           function_name: 'test-function',
@@ -694,6 +707,10 @@ describe('loggers', () => {
           success: true,
           decision: ToolCallDecision.ACCEPT,
           tool_type: 'native',
+          model_added_lines: 1,
+          model_removed_lines: 2,
+          user_added_lines: 5,
+          user_removed_lines: 6,
         },
       );
 
@@ -736,6 +753,7 @@ describe('loggers', () => {
         attributes: {
           'session.id': 'test-session-id',
           'user.email': 'test-user@example.com',
+          'installation.id': 'test-installation-id',
           'event.name': EVENT_TOOL_CALL,
           'event.timestamp': '2025-01-01T00:00:00.000Z',
           function_name: 'test-function',
@@ -812,6 +830,7 @@ describe('loggers', () => {
         attributes: {
           'session.id': 'test-session-id',
           'user.email': 'test-user@example.com',
+          'installation.id': 'test-installation-id',
           'event.name': EVENT_TOOL_CALL,
           'event.timestamp': '2025-01-01T00:00:00.000Z',
           function_name: 'test-function',
@@ -887,6 +906,7 @@ describe('loggers', () => {
         attributes: {
           'session.id': 'test-session-id',
           'user.email': 'test-user@example.com',
+          'installation.id': 'test-installation-id',
           'event.name': EVENT_TOOL_CALL,
           'event.timestamp': '2025-01-01T00:00:00.000Z',
           function_name: 'test-function',
@@ -961,6 +981,7 @@ describe('loggers', () => {
         attributes: {
           'session.id': 'test-session-id',
           'user.email': 'test-user@example.com',
+          'installation.id': 'test-installation-id',
           'event.name': EVENT_TOOL_CALL,
           'event.timestamp': '2025-01-01T00:00:00.000Z',
           function_name: 'test-function',
@@ -1049,6 +1070,7 @@ describe('loggers', () => {
         attributes: {
           'session.id': 'test-session-id',
           'user.email': 'test-user@example.com',
+          'installation.id': 'test-installation-id',
           'event.name': EVENT_TOOL_CALL,
           'event.timestamp': '2025-01-01T00:00:00.000Z',
           function_name: 'mock_mcp_tool',
@@ -1094,6 +1116,7 @@ describe('loggers', () => {
         attributes: {
           'session.id': 'test-session-id',
           'user.email': 'test-user@example.com',
+          'installation.id': 'test-installation-id',
           'event.name': EVENT_MALFORMED_JSON_RESPONSE,
           'event.timestamp': '2025-01-01T00:00:00.000Z',
           model: 'test-model',
@@ -1138,6 +1161,7 @@ describe('loggers', () => {
         attributes: {
           'session.id': 'test-session-id',
           'user.email': 'test-user@example.com',
+          'installation.id': 'test-installation-id',
           'event.name': EVENT_FILE_OPERATION,
           'event.timestamp': '2025-01-01T00:00:00.000Z',
           tool_name: 'test-tool',
@@ -1184,6 +1208,7 @@ describe('loggers', () => {
         attributes: {
           'session.id': 'test-session-id',
           'user.email': 'test-user@example.com',
+          'installation.id': 'test-installation-id',
           'event.name': EVENT_TOOL_OUTPUT_TRUNCATED,
           'event.timestamp': '2025-01-01T00:00:00.000Z',
           eventName: 'tool_output_truncated',
@@ -1230,6 +1255,7 @@ describe('loggers', () => {
         attributes: {
           'session.id': 'test-session-id',
           'user.email': 'test-user@example.com',
+          'installation.id': 'test-installation-id',
           ...event,
           'event.name': EVENT_MODEL_ROUTING,
         },
@@ -1295,6 +1321,7 @@ describe('loggers', () => {
         attributes: {
           'session.id': 'test-session-id',
           'user.email': 'test-user@example.com',
+          'installation.id': 'test-installation-id',
           'event.name': EVENT_EXTENSION_INSTALL,
           'event.timestamp': '2025-01-01T00:00:00.000Z',
           extension_name: 'vscode',
@@ -1334,6 +1361,7 @@ describe('loggers', () => {
         attributes: {
           'session.id': 'test-session-id',
           'user.email': 'test-user@example.com',
+          'installation.id': 'test-installation-id',
           'event.name': EVENT_EXTENSION_UNINSTALL,
           'event.timestamp': '2025-01-01T00:00:00.000Z',
           extension_name: 'vscode',
@@ -1371,6 +1399,7 @@ describe('loggers', () => {
         attributes: {
           'session.id': 'test-session-id',
           'user.email': 'test-user@example.com',
+          'installation.id': 'test-installation-id',
           'event.name': EVENT_EXTENSION_ENABLE,
           'event.timestamp': '2025-01-01T00:00:00.000Z',
           extension_name: 'vscode',
@@ -1408,6 +1437,7 @@ describe('loggers', () => {
         attributes: {
           'session.id': 'test-session-id',
           'user.email': 'test-user@example.com',
+          'installation.id': 'test-installation-id',
           'event.name': EVENT_EXTENSION_DISABLE,
           'event.timestamp': '2025-01-01T00:00:00.000Z',
           extension_name: 'vscode',
@@ -1441,6 +1471,7 @@ describe('loggers', () => {
         attributes: {
           'session.id': 'test-session-id',
           'user.email': 'test-user@example.com',
+          'installation.id': 'test-installation-id',
           'event.name': EVENT_AGENT_START,
           'event.timestamp': '2025-01-01T00:00:00.000Z',
           agent_id: 'agent-123',
@@ -1481,6 +1512,7 @@ describe('loggers', () => {
         attributes: {
           'session.id': 'test-session-id',
           'user.email': 'test-user@example.com',
+          'installation.id': 'test-installation-id',
           'event.name': EVENT_AGENT_FINISH,
           'event.timestamp': '2025-01-01T00:00:00.000Z',
           agent_id: 'agent-123',
@@ -1522,6 +1554,7 @@ describe('loggers', () => {
         attributes: {
           'session.id': 'test-session-id',
           'user.email': 'test-user@example.com',
+          'installation.id': 'test-installation-id',
           'event.name': EVENT_WEB_FETCH_FALLBACK_ATTEMPT,
           'event.timestamp': '2025-01-01T00:00:00.000Z',
           reason: 'private_ip',
