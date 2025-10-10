@@ -39,10 +39,7 @@ jobs:
     name: 'E2E Test (Linux) - ${{ matrix.sandbox }}'
     needs: 'merge_queue_skipper'
     if: |
-      needs.merge_queue_skipper.outputs.skip == 'false' &&
-      (github.event_name == 'push' ||
-      github.event_name == 'merge_group' ||
-      github.event_name == 'workflow_dispatch')
+      needs.merge_queue_skipper.outputs.skip == 'false'
     runs-on: 'gemini-cli-ubuntu-16-core'
     strategy:
       fail-fast: false
@@ -99,10 +96,7 @@ jobs:
     name: 'E2E Test (macOS)'
     needs: 'merge_queue_skipper'
     if: |
-      needs.merge_queue_skipper.outputs.skip == 'false' &&
-      (github.event_name == 'push' ||
-      github.event_name == 'merge_group' ||
-      github.event_name == 'workflow_dispatch')
+      needs.merge_queue_skipper.outputs.skip == 'false'
     runs-on: 'macos-latest'
     steps:
       - name: 'Checkout (fork)'
@@ -146,10 +140,7 @@ jobs:
     name: 'Slow E2E - Win'
     needs: 'merge_queue_skipper'
     if: |
-      needs.merge_queue_skipper.outputs.skip == 'false' &&
-      (github.event_name == 'push' ||
-      github.event_name == 'merge_group' ||
-      github.event_name == 'workflow_dispatch')
+      needs.merge_queue_skipper.outputs.skip == 'false'
     runs-on: 'gemini-cli-windows-16-core'
     continue-on-error: true
 
@@ -214,11 +205,7 @@ jobs:
   e2e:
     name: 'E2E'
     if: |
-      always() && (
-        github.event_name == 'push' ||
-        github.event_name == 'merge_group' ||
-        github.event_name == 'workflow_dispatch'
-      )
+      always()
     needs:
       - 'e2e_linux'
       - 'e2e_mac'
