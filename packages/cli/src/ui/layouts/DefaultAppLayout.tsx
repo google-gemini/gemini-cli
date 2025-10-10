@@ -17,7 +17,7 @@ export const DefaultAppLayout: React.FC = () => {
   const uiState = useUIState();
 
   return (
-    <Box flexDirection="column" width="90%">
+    <Box flexDirection="column" width={uiState.mainAreaWidth}>
       <MainContent />
 
       <Box flexDirection="column" ref={uiState.mainControlsRef}>
@@ -25,7 +25,7 @@ export const DefaultAppLayout: React.FC = () => {
 
         {uiState.dialogsVisible ? (
           <DialogManager
-            terminalWidth={uiState.terminalWidth}
+            terminalWidth={uiState.mainAreaWidth}
             addItem={uiState.historyManager.addItem}
           />
         ) : (

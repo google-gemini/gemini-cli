@@ -9,7 +9,7 @@ import {
   EVENT_API_ERROR,
   EVENT_API_RESPONSE,
   EVENT_TOOL_CALL,
-} from './constants.js';
+} from './types.js';
 
 import { ToolCallDecision } from './tool-call-decision.js';
 import type {
