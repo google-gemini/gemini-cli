@@ -27,6 +27,16 @@ concurrency:
     ${{ github.ref != 'refs/heads/main' && !startsWith(github.ref, 'refs/heads/release/') }}
 
 jobs:
+  print_event:
+    name: 'Print Event'
+    runs-on: 'gemini-cli-ubuntu-16-core'
+    steps:
+      - name: 'Print'
+        env:
+          GITHUB_EVENT: '${{ toJson(github.event) }}'
+        run: |
+          echo "$GITHUB_EVENT"
+
   merge_queue_skipper:
     name: 'Merge Queue Skipper'
     runs-on: 'gemini-cli-ubuntu-16-core'
