@@ -380,7 +380,6 @@ export async function main() {
     }
 
     const wasRaw = process.stdin.isRaw;
-    let kittyProtocolDetectionComplete: Promise<boolean> | undefined;
     if (config.isInteractive() && !wasRaw && process.stdin.isTTY) {
       // Set this as early as possible to avoid spurious characters from
       // input showing up in the output.
@@ -395,11 +394,10 @@ export async function main() {
       });
 
       // Detect and enable Kitty keyboard protocol once at startup.
-      kittyProtocolDetectionComplete = detectAndEnableKittyProtocol();
+      await detectAndEnableKittyProtocol();
     }
 
     setMaxSizedBoxDebugging(isDebugMode);
-
     const initializationResult = await initializeApp(config, settings);
 
     if (
@@ -423,8 +421,6 @@ export async function main() {
 
     // Render UI, passing necessary config values. Check that there is no command line question.
     if (config.isInteractive()) {
-      // Need kitty detection to be complete before we can start the interactive UI.
-      await kittyProtocolDetectionComplete;
       await startInteractiveUI(
         config,
         settings,
