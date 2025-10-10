@@ -3,7 +3,7 @@ name: 'Testing: E2E'
 on:
   workflow_run:
     workflows: ['Trigger E2E']
-    types: ['completed']
+    types: ['requested', 'completed']
 
 concurrency:
   group: '${{ github.workflow }}-${{ github.head_ref || github.ref }}'
