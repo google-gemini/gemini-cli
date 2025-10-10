@@ -165,7 +165,7 @@ rpc.send({
 });
 `;
 
-describe.skip('mcp server with cyclic tool schema is detected', () => {
+describe('mcp server with cyclic tool schema is detected', () => {
   const rig = new TestRig();
 
   beforeAll(async () => {

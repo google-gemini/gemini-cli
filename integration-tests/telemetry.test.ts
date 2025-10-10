@@ -7,7 +7,7 @@
 import { describe, it, expect } from 'vitest';
 import { TestRig } from './test-helper.js';
 
-describe.skip('telemetry', () => {
+describe('telemetry', () => {
   it('should emit a metric and a log event', async () => {
     const rig = new TestRig();
     rig.setup('should emit a metric and a log event');

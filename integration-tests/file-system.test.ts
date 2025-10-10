@@ -9,7 +9,7 @@ import { existsSync } from 'node:fs';
 import * as path from 'node:path';
 import { TestRig, printDebugInfo, validateModelOutput } from './test-helper.js';
 
-describe.skip('file-system', () => {
+describe('file-system', () => {
   it('should be able to read a file', async () => {
     const rig = new TestRig();
     await rig.setup('should be able to read a file');

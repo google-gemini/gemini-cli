@@ -7,7 +7,7 @@
 import { describe, it, expect } from 'vitest';
 import { TestRig, printDebugInfo, validateModelOutput } from './test-helper.js';
 
-describe.skip('google_web_search', () => {
+describe('google_web_search', () => {
   it('should be able to search the web', async () => {
     const rig = new TestRig();
     await rig.setup('should be able to search the web');

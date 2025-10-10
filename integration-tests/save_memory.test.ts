@@ -7,7 +7,7 @@
 import { describe, it, expect } from 'vitest';
 import { TestRig, printDebugInfo, validateModelOutput } from './test-helper.js';
 
-describe.skip('save_memory', () => {
+describe('save_memory', () => {
   it('should be able to save to memory', async () => {
     const rig = new TestRig();
     await rig.setup('should be able to save to memory');

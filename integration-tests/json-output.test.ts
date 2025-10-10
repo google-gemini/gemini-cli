@@ -7,7 +7,7 @@
 import { expect, describe, it, beforeEach, afterEach } from 'vitest';
 import { TestRig } from './test-helper.js';
 
-describe.skip('JSON output', () => {
+describe('JSON output', () => {
   let rig: TestRig;
 
   beforeEach(async () => {

@@ -25,7 +25,7 @@ function getLineCountCommand(): { command: string; tool: string } {
   }
 }
 
-describe.skip('run_shell_command', () => {
+describe('run_shell_command', () => {
   it('should be able to run a shell command', async () => {
     const rig = new TestRig();
     await rig.setup('should be able to run a shell command');
