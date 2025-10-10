@@ -6,7 +6,8 @@
 
 import type { Attributes, Meter, Counter, Histogram } from '@opentelemetry/api';
 import { diag, metrics, ValueType } from '@opentelemetry/api';
-import { SERVICE_NAME, EVENT_CHAT_COMPRESSION } from './constants.js';
+import { SERVICE_NAME } from './constants.js';
+import { EVENT_CHAT_COMPRESSION } from './types.js';
 import type { Config } from '../config/config.js';
 import type {
   ModelRoutingEvent,
@@ -14,6 +15,7 @@ import type {
   AgentFinishEvent,
 } from './types.js';
 import { AuthType } from '../core/contentGenerator.js';
+import { getCommonAttributes } from './telemetryAttributes.js';
 
 const TOOL_CALL_COUNT = 'gemini_cli.tool.call.count';
 const TOOL_CALL_LATENCY = 'gemini_cli.tool.call.latency';
@@ -55,9 +57,7 @@ const REGRESSION_PERCENTAGE_CHANGE =
 const BASELINE_COMPARISON = 'gemini_cli.performance.baseline.comparison';
 
 const baseMetricDefinition = {
-  getCommonAttributes: (config: Config): Attributes => ({
-    'session.id': config.getSessionId(),
-  }),
+  getCommonAttributes,
 };
 
 const COUNTER_DEFINITIONS = {
@@ -70,6 +70,11 @@ const COUNTER_DEFINITIONS = {
       success: boolean;
       decision?: 'accept' | 'reject' | 'modify' | 'auto_accept';
       tool_type?: 'native' | 'mcp';
+      // Optional diff statistics for file-modifying tools
+      model_added_lines?: number;
+      model_removed_lines?: number;
+      user_added_lines?: number;
+      user_removed_lines?: number;
     },
   },
   [API_REQUEST_COUNT]: {
