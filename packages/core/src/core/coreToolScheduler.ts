@@ -1017,7 +1017,7 @@ export class CoreToolScheduler {
               'cancelled',
               'User cancelled tool execution.',
             );
-            return;
+            continue;
           }
 
           if (toolResult.error === undefined) {
