@@ -59,7 +59,8 @@ import { useVimMode } from './contexts/VimModeContext.js';
 import { useConsoleMessages } from './hooks/useConsoleMessages.js';
 import { useTerminalSize } from './hooks/useTerminalSize.js';
 import { calculatePromptWidths } from './components/InputPrompt.js';
-import { useStdin, useStdout } from 'ink';
+import { useStdout, useStdin } from 'ink';
+import { calculateMainAreaWidth } from './utils/ui-sizing.js';
 import ansiEscapes from 'ansi-escapes';
 import * as fs from 'node:fs';
 import { basename } from 'node:path';
@@ -263,13 +264,14 @@ export const AppContainer = (props: AppContainerProps) => {
     registerCleanup(consolePatcher.cleanup);
   }, [handleNewMessage, config]);
 
+  const mainAreaWidth = calculateMainAreaWidth(terminalWidth, settings);
   // Derive widths for InputPrompt using shared helper
   const { inputWidth, suggestionsWidth } = useMemo(() => {
     const { inputWidth, suggestionsWidth } =
-      calculatePromptWidths(terminalWidth);
+      calculatePromptWidths(mainAreaWidth);
     return { inputWidth, suggestionsWidth };
-  }, [terminalWidth]);
-  const mainAreaWidth = Math.floor(terminalWidth * 0.9);
+  }, [mainAreaWidth]);
+
   const staticAreaMaxItemHeight = Math.max(terminalHeight * 4, 100);
 
   const isValidPath = useCallback((filePath: string): boolean => {
@@ -796,7 +798,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
   const [showIdeRestartPrompt, setShowIdeRestartPrompt] = useState(false);
 
   const { isFolderTrustDialogOpen, handleFolderTrustSelect, isRestarting } =
-    useFolderTrust(settings, setIsTrustedFolder);
+    useFolderTrust(settings, setIsTrustedFolder, historyManager.addItem);
   const {
     needsRestart: ideNeedsRestart,
     restartReason: ideTrustRestartReason,
@@ -1239,6 +1241,11 @@ Logging in with Google... Please restart Gemini CLI to continue.
     ],
   );
 
+  const exitPrivacyNotice = useCallback(
+    () => setShowPrivacyNotice(false),
+    [setShowPrivacyNotice],
+  );
+
   const uiActions: UIActions = useMemo(
     () => ({
       handleThemeSelect,
@@ -1248,7 +1255,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       onAuthError,
       handleEditorSelect,
       exitEditorDialog,
-      exitPrivacyNotice: () => setShowPrivacyNotice(false),
+      exitPrivacyNotice,
       closeSettingsDialog,
       closeModelDialog,
       closePermissionsDialog,
@@ -1273,6 +1280,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       onAuthError,
       handleEditorSelect,
       exitEditorDialog,
+      exitPrivacyNotice,
       closeSettingsDialog,
       closeModelDialog,
       closePermissionsDialog,

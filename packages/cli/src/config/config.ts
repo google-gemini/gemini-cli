@@ -31,7 +31,7 @@ import {
   FileDiscoveryService,
   ShellTool,
   EditTool,
-  WriteFileTool,
+  WRITE_FILE_TOOL_NAME,
   SHELL_TOOL_NAMES,
   resolveTelemetrySettings,
   FatalConfigError,
@@ -605,7 +605,11 @@ export async function loadCliConfig(
   // In non-interactive mode, exclude tools that require a prompt.
   const extraExcludes: string[] = [];
   if (!interactive && !argv.experimentalAcp) {
-    const defaultExcludes = [ShellTool.Name, EditTool.Name, WriteFileTool.Name];
+    const defaultExcludes = [
+      ShellTool.Name,
+      EditTool.Name,
+      WRITE_FILE_TOOL_NAME,
+    ];
     const autoEditExcludes = [ShellTool.Name];
 
     const toolExclusionFilter = createToolExclusionFilter(

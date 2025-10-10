@@ -23,25 +23,6 @@ import { logs } from '@opentelemetry/api-logs';
 import { SemanticAttributes } from '@opentelemetry/semantic-conventions';
 import type { Config } from '../config/config.js';
 import {
-  EVENT_API_REQUEST,
-  EVENT_API_RESPONSE,
-  EVENT_CLI_CONFIG,
-  EVENT_TOOL_CALL,
-  EVENT_USER_PROMPT,
-  EVENT_FLASH_FALLBACK,
-  EVENT_MALFORMED_JSON_RESPONSE,
-  EVENT_FILE_OPERATION,
-  EVENT_RIPGREP_FALLBACK,
-  EVENT_MODEL_ROUTING,
-  EVENT_EXTENSION_ENABLE,
-  EVENT_EXTENSION_DISABLE,
-  EVENT_EXTENSION_INSTALL,
-  EVENT_EXTENSION_UNINSTALL,
-  EVENT_TOOL_OUTPUT_TRUNCATED,
-  EVENT_AGENT_START,
-  EVENT_AGENT_FINISH,
-} from './constants.js';
-import {
   logApiRequest,
   logApiResponse,
   logCliConfiguration,
@@ -60,9 +41,28 @@ import {
   logExtensionUninstall,
   logAgentStart,
   logAgentFinish,
+  logWebFetchFallbackAttempt,
 } from './loggers.js';
 import { ToolCallDecision } from './tool-call-decision.js';
 import {
+  EVENT_API_REQUEST,
+  EVENT_API_RESPONSE,
+  EVENT_CLI_CONFIG,
+  EVENT_TOOL_CALL,
+  EVENT_USER_PROMPT,
+  EVENT_FLASH_FALLBACK,
+  EVENT_MALFORMED_JSON_RESPONSE,
+  EVENT_FILE_OPERATION,
+  EVENT_RIPGREP_FALLBACK,
+  EVENT_MODEL_ROUTING,
+  EVENT_EXTENSION_ENABLE,
+  EVENT_EXTENSION_DISABLE,
+  EVENT_EXTENSION_INSTALL,
+  EVENT_EXTENSION_UNINSTALL,
+  EVENT_TOOL_OUTPUT_TRUNCATED,
+  EVENT_AGENT_START,
+  EVENT_AGENT_FINISH,
+  EVENT_WEB_FETCH_FALLBACK_ATTEMPT,
   ApiRequestEvent,
   ApiResponseEvent,
   StartSessionEvent,
@@ -81,6 +81,7 @@ import {
   ExtensionUninstallEvent,
   AgentStartEvent,
   AgentFinishEvent,
+  WebFetchFallbackAttemptEvent,
 } from './types.js';
 import * as metrics from './metrics.js';
 import {
@@ -691,6 +692,10 @@ describe('loggers', () => {
           success: true,
           decision: ToolCallDecision.ACCEPT,
           tool_type: 'native',
+          model_added_lines: 1,
+          model_removed_lines: 2,
+          user_added_lines: 5,
+          user_removed_lines: 6,
         },
       );
 
@@ -1492,6 +1497,38 @@ describe('loggers', () => {
         mockConfig,
         event,
       );
+    });
+  });
+
+  describe('logWebFetchFallbackAttempt', () => {
+    const mockConfig = {
+      getSessionId: () => 'test-session-id',
+      getUsageStatisticsEnabled: () => true,
+    } as unknown as Config;
+
+    beforeEach(() => {
+      vi.spyOn(ClearcutLogger.prototype, 'logWebFetchFallbackAttemptEvent');
+    });
+
+    it('should log web fetch fallback attempt event', () => {
+      const event = new WebFetchFallbackAttemptEvent('private_ip');
+
+      logWebFetchFallbackAttempt(mockConfig, event);
+
+      expect(
+        ClearcutLogger.prototype.logWebFetchFallbackAttemptEvent,
+      ).toHaveBeenCalledWith(event);
+
+      expect(mockLogger.emit).toHaveBeenCalledWith({
+        body: 'Web fetch fallback attempt. Reason: private_ip',
+        attributes: {
+          'session.id': 'test-session-id',
+          'user.email': 'test-user@example.com',
+          'event.name': EVENT_WEB_FETCH_FALLBACK_ATTEMPT,
+          'event.timestamp': '2025-01-01T00:00:00.000Z',
+          reason: 'private_ip',
+        },
+      });
     });
   });
 });
