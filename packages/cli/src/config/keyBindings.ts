@@ -57,6 +57,7 @@ export enum Command {
   SUBMIT_REVERSE_SEARCH = 'submitReverseSearch',
   ACCEPT_SUGGESTION_REVERSE_SEARCH = 'acceptSuggestionReverseSearch',
   TOGGLE_SHELL_INPUT_FOCUS = 'toggleShellInputFocus',
+  EXECUTE_PROMPT_COMMAND = 'executePromptCommand',
 
   // Suggestion expansion
   EXPAND_SUGGESTION = 'expandSuggestion',
@@ -140,8 +141,6 @@ export const defaultKeyBindings: KeyBindingConfig = {
   // Split into multiple data-driven bindings
   // Now also includes shift+enter for multi-line input
   [Command.NEWLINE]: [
-    { key: 'return', ctrl: true },
-    { key: 'return', command: true },
     { key: 'return', paste: true },
     { key: 'return', shift: true },
     { key: 'j', ctrl: true },
@@ -168,6 +167,10 @@ export const defaultKeyBindings: KeyBindingConfig = {
   [Command.SUBMIT_REVERSE_SEARCH]: [{ key: 'return', ctrl: false }],
   [Command.ACCEPT_SUGGESTION_REVERSE_SEARCH]: [{ key: 'tab' }],
   [Command.TOGGLE_SHELL_INPUT_FOCUS]: [{ key: 'f', ctrl: true }],
+  [Command.EXECUTE_PROMPT_COMMAND]: [
+    { key: 'return', ctrl: true },
+    { key: 'return', command: true },
+  ],
 
   // Suggestion expansion
   [Command.EXPAND_SUGGESTION]: [{ key: 'right' }],

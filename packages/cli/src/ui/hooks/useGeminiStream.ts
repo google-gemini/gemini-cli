@@ -1212,5 +1212,6 @@ export const useGeminiStream = (
     handleApprovalModeChange,
     activePtyId,
     loopDetectionConfirmationRequest,
+    handleShellCommand,
   };
 };
