@@ -129,7 +129,8 @@ export function detectIde(
 
   const isJetBrains = process.env['TERMINAL_EMULATOR']?.includes('JetBrains');
   if (isJetBrains) {
-    return verifyJetBrains(IDE_DEFINITIONS.jetbrains, ideProcessInfo);
+    const ide = detectIdeFromEnv();
+    return verifyJetBrains(ide, ideProcessInfo);
   }
 
   const isVscode = process.env['TERM_PROGRAM'] === 'vscode';

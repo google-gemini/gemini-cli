@@ -6,7 +6,11 @@
 
 import * as fs from 'node:fs';
 import { isSubpath } from '../utils/paths.js';
-import { detectIde, type IdeInfo } from '../ide/detect-ide.js';
+import {
+  detectIde,
+  detectIdeFromEnv,
+  type IdeInfo,
+} from '../ide/detect-ide.js';
 import { ideContextStore } from './ideContext.js';
 import {
   IdeContextNotificationSchema,
@@ -114,6 +118,9 @@ export class IdeClient {
           client.ideProcessInfo,
           client.connectionConfig?.ideInfo,
         );
+        if (!client.connectionConfig && client.currentIde) {
+          client.connectionConfig = client.getConnectionConfigFromEnv();
+        }
         return client;
       })();
     }
@@ -185,19 +192,37 @@ export class IdeClient {
       }
     }
 
-    const portFromEnv = this.getPortFromEnv();
-    if (portFromEnv) {
-      const connected = await this.establishHttpConnection(portFromEnv);
-      if (connected) {
-        return;
-      }
+    // Fallback to environment variables if config file is not available
+    this.connectionConfig = this.getConnectionConfigFromEnv();
+    if (this.connectionConfig?.authToken) {
+      this.authToken = this.connectionConfig.authToken;
     }
+    const { isValid: workspacePathValid, error: errorDetail } =
+      IdeClient.validateWorkspacePath(
+        this?.connectionConfig?.workspacePath,
+        process.cwd(),
+      );
 
-    const stdioConfigFromEnv = this.getStdioConfigFromEnv();
-    if (stdioConfigFromEnv) {
-      const connected = await this.establishStdioConnection(stdioConfigFromEnv);
-      if (connected) {
-        return;
+    if (!workspacePathValid) {
+      this.setState(IDEConnectionStatus.Disconnected, errorDetail, true);
+      return;
+    }
+    if (this.connectionConfig) {
+      if (this.connectionConfig.port) {
+        const connected = await this.establishHttpConnection(
+          this.connectionConfig.port,
+        );
+        if (connected) {
+          return;
+        }
+      }
+      if (this.connectionConfig.stdio) {
+        const connected = await this.establishStdioConnection(
+          this.connectionConfig.stdio,
+        );
+        if (connected) {
+          return;
+        }
       }
     }
 
@@ -540,6 +565,54 @@ export class IdeClient {
       return undefined;
     }
     return port;
+  }
+
+  private getTokenFromEnv(): string | undefined {
+    const token = process.env['GEMINI_CLI_IDE_SERVER_AUTH_TOKEN'];
+    if (!token) {
+      return undefined;
+    }
+    return token;
+  }
+
+  private getWorkspacePathFromEnv(): string | undefined {
+    const workspacePath = process.env['GEMINI_CLI_IDE_WORKSPACE_PATH'];
+    if (!workspacePath) {
+      return undefined;
+    }
+    return workspacePath;
+  }
+
+  private getConnectionConfigFromEnv():
+    | (ConnectionConfig & { workspacePath?: string; ideInfo?: IdeInfo })
+    | undefined {
+    const port = this.getPortFromEnv();
+    const authToken = this.getTokenFromEnv();
+    const stdio = this.getStdioConfigFromEnv();
+
+    const workspacePath = this.getWorkspacePathFromEnv();
+    const { isValid } = IdeClient.validateWorkspacePath(
+      workspacePath,
+      process.cwd(),
+    );
+    if (!isValid) {
+      return undefined;
+    }
+
+    const ideInfo = detectIdeFromEnv();
+
+    // If we have at least one connection method from environment variables
+    if (port || stdio) {
+      return {
+        port,
+        authToken,
+        workspacePath,
+        ideInfo,
+        stdio,
+      };
+    }
+
+    return undefined;
   }
 
   private getStdioConfigFromEnv(): StdioConfig | undefined {
