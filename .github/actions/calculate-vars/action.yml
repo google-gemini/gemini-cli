@@ -2,9 +2,6 @@ name: 'Calculate vars'
 description: 'Calculate commonly used var in our release process'
 
 inputs:
-  cron:
-    description: 'The cron for the workflow'
-    type: 'string'
   dry_run:
     description: 'Whether or not this is a dry run'
     type: 'boolean'
@@ -21,11 +18,10 @@ runs:
       id: 'set_vars'
       shell: 'bash'
       env:
-        CRON: '${{ inputs.cron }}'
         DRY_RUN_INPUT: '${{ inputs.dry_run }}'
       run: |-
         is_dry_run="true"
-        if [[ "${CRON}" == "0 0 * * *" || "${DRY_RUN_INPUT}" == "false" ]]; then
+        if [[ "${DRY_RUN_INPUT}" == "" || "${DRY_RUN_INPUT}" == "false" ]]; then
           is_dry_run="false"
         fi
         echo "is_dry_run=${is_dry_run}" >> "${GITHUB_OUTPUT}"
