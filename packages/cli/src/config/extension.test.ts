@@ -870,6 +870,8 @@ describe('extension tests', () => {
               async (_) => true,
             );
           }
+          // Clears out any calls to mocks from the above function calls.
+          vi.clearAllMocks();
         });
 
         it(`should log an ${isUpdate ? 'update' : 'install'} event to clearcut on success`, async () => {
@@ -887,8 +889,10 @@ describe('extension tests', () => {
 
           if (isUpdate) {
             expect(mockLogExtensionUpdateEvent).toHaveBeenCalled();
+            expect(mockLogExtensionInstallEvent).not.toHaveBeenCalled();
           } else {
             expect(mockLogExtensionInstallEvent).toHaveBeenCalled();
+            expect(mockLogExtensionUpdateEvent).not.toHaveBeenCalled();
           }
         });
 
