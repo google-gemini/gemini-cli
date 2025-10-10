@@ -2,6 +2,8 @@ import com.google.gemini.cli.AcceptDiffAction
 import com.google.gemini.cli.CloseDiffAction
 import com.intellij.diff.DiffContentFactory
 import com.intellij.diff.DiffManager
+import com.intellij.diff.chains.SimpleDiffRequestChain
+import com.intellij.diff.editor.ChainDiffVirtualFile
 import com.intellij.diff.requests.SimpleDiffRequest
 import com.intellij.diff.util.DiffUserDataKeys
 import com.intellij.openapi.Disposable
@@ -161,8 +163,22 @@ class DiffManager(private val project: Project) : Disposable {
 
   private fun closeDiffEditor(fileToClose: VirtualFile?, filePath: String): String? {
     val fileEditorManager = FileEditorManager.getInstance(project)
-    val actualFileToClose = fileToClose ?: fileEditorManager.openFiles.find {
-      it.getUserData(GEMINI_FILE_PATH_KEY) == filePath
+    val actualFileToClose = fileToClose ?: run {
+      var foundFile: VirtualFile? = null
+      for (file in fileEditorManager.openFiles) {
+        if (file is ChainDiffVirtualFile) {
+          val producer = file.chain.requests.firstOrNull()
+          if (producer is SimpleDiffRequestChain.DiffRequestProducerWrapper) {
+            val request = producer.request
+            val userData = request.getUserData(GEMINI_FILE_PATH_KEY)
+            if (userData == filePath) {
+              foundFile = file
+              break
+            }
+          }
+        }
+      }
+      foundFile
     }
 
     var content: String? = null
