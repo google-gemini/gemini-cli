@@ -20,10 +20,13 @@ This documentation is organized into the following sections:
 
 ### Get started
 
-- **[Gemini CLI Quickstart](./get-started/index.md):** Let's get started with Gemini CLI.
+- **[Gemini CLI Quickstart](./get-started/index.md):** Let's get started with
+  Gemini CLI.
 - **[Installation](./get-started/installation.md):** Install and run Gemini CLI.
-- **[Authentication](./get-started/authentication.md):** Authenticate Gemini CLI.
-- **[Configuration](./get-started/configuration.md):** Information on configuring the CLI.
+- **[Authentication](./get-started/authentication.md):** Authenticate Gemini
+  CLI.
+- **[Configuration](./get-started/configuration.md):** Information on
+  configuring the CLI.
 - **[Examples](./get-started/examples.md):** Example usage of Gemini CLI.
 
 ### CLI
@@ -68,9 +71,12 @@ This documentation is organized into the following sections:
 
 ### Extensions
 
-- **[Extensions](./extensions/index.md):** How to extend the CLI with new functionality.
-- **[Get Started with Extensions](./extensions/getting-started-extensions.md):** Learn how to build your own extension.
-- **[Extension Releasing](./extensions/extension-releasing.md):** How to release Gemini CLI extensions.
+- **[Extensions](./extensions/index.md):** How to extend the CLI with new
+  functionality.
+- **[Get Started with Extensions](./extensions/getting-started-extensions.md):**
+  Learn how to build your own extension.
+- **[Extension Releasing](./extensions/extension-releasing.md):** How to release
+  Gemini CLI extensions.
 
 ### IDE integration
 
