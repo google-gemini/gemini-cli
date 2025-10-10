@@ -35,6 +35,7 @@ import type {
   SmartEditCorrectionEvent,
   AgentStartEvent,
   AgentFinishEvent,
+  WebFetchFallbackAttemptEvent,
 } from '../types.js';
 import { EventMetadataKey } from './event-metadata-key.js';
 import type { Config } from '../../config/config.js';
@@ -83,6 +84,7 @@ export enum EventNames {
   SMART_EDIT_CORRECTION = 'smart_edit_correction',
   AGENT_START = 'agent_start',
   AGENT_FINISH = 'agent_finish',
+  WEB_FETCH_FALLBACK_ATTEMPT = 'web_fetch_fallback_attempt',
 }
 
 export interface LogResponse {
@@ -902,7 +904,9 @@ export class ClearcutLogger {
     this.enqueueLogEvent(
       this.createLogEvent(EventNames.EXTENSION_INSTALL, data),
     );
-    this.flushIfNeeded();
+    this.flushToClearcut().catch((error) => {
+      console.debug('Error flushing to Clearcut:', error);
+    });
   }
 
   logExtensionUninstallEvent(event: ExtensionUninstallEvent): void {
@@ -920,7 +924,9 @@ export class ClearcutLogger {
     this.enqueueLogEvent(
       this.createLogEvent(EventNames.EXTENSION_UNINSTALL, data),
     );
-    this.flushIfNeeded();
+    this.flushToClearcut().catch((error) => {
+      console.debug('Error flushing to Clearcut:', error);
+    });
   }
 
   logToolOutputTruncatedEvent(event: ToolOutputTruncatedEvent): void {
@@ -1003,7 +1009,9 @@ export class ClearcutLogger {
     this.enqueueLogEvent(
       this.createLogEvent(EventNames.EXTENSION_ENABLE, data),
     );
-    this.flushIfNeeded();
+    this.flushToClearcut().catch((error) => {
+      console.debug('Error flushing to Clearcut:', error);
+    });
   }
 
   logModelSlashCommandEvent(event: ModelSlashCommandEvent): void {
@@ -1036,7 +1044,9 @@ export class ClearcutLogger {
     this.enqueueLogEvent(
       this.createLogEvent(EventNames.EXTENSION_DISABLE, data),
     );
-    this.flushIfNeeded();
+    this.flushToClearcut().catch((error) => {
+      console.debug('Error flushing to Clearcut:', error);
+    });
   }
 
   logSmartEditStrategyEvent(event: SmartEditStrategyEvent): void {
@@ -1108,6 +1118,20 @@ export class ClearcutLogger {
     ];
 
     this.enqueueLogEvent(this.createLogEvent(EventNames.AGENT_FINISH, data));
+    this.flushIfNeeded();
+  }
+
+  logWebFetchFallbackAttemptEvent(event: WebFetchFallbackAttemptEvent): void {
+    const data: EventValue[] = [
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_WEB_FETCH_FALLBACK_REASON,
+        value: event.reason,
+      },
+    ];
+
+    this.enqueueLogEvent(
+      this.createLogEvent(EventNames.WEB_FETCH_FALLBACK_ATTEMPT, data),
+    );
     this.flushIfNeeded();
   }
 

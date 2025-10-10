@@ -1465,7 +1465,10 @@ describe('Approval mode tool exclusion logic', () => {
 
   beforeEach(() => {
     process.stdin.isTTY = false; // Ensure non-interactive mode
-    vi.mocked(isWorkspaceTrusted).mockReturnValue(true);
+    vi.mocked(isWorkspaceTrusted).mockReturnValue({
+      isTrusted: true,
+      source: undefined,
+    });
   });
 
   afterEach(() => {
@@ -2686,7 +2689,10 @@ describe('loadCliConfig tool exclusions', () => {
     vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
     vi.stubEnv('GEMINI_API_KEY', 'test-api-key');
     process.stdin.isTTY = true;
-    vi.mocked(isWorkspaceTrusted).mockReturnValue(true);
+    vi.mocked(isWorkspaceTrusted).mockReturnValue({
+      isTrusted: true,
+      source: undefined,
+    });
   });
 
   afterEach(() => {
@@ -3116,7 +3122,10 @@ describe('loadCliConfig approval mode', () => {
     vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
     vi.stubEnv('GEMINI_API_KEY', 'test-api-key');
     process.argv = ['node', 'script.js']; // Reset argv for each test
-    vi.mocked(isWorkspaceTrusted).mockReturnValue(true);
+    vi.mocked(isWorkspaceTrusted).mockReturnValue({
+      isTrusted: true,
+      source: undefined,
+    });
   });
 
   afterEach(() => {
@@ -3575,7 +3584,9 @@ describe('Telemetry configuration via environment variables', () => {
     vi.stubEnv('GEMINI_TELEMETRY_TARGET', 'gcp');
     process.argv = ['node', 'script.js'];
     const argv = await parseArguments({} as Settings);
-    const settings: Settings = { telemetry: { target: 'local' } };
+    const settings: Settings = {
+      telemetry: { target: ServerConfig.TelemetryTarget.LOCAL },
+    };
     const config = await loadCliConfig(
       settings,
       [],
@@ -3593,7 +3604,9 @@ describe('Telemetry configuration via environment variables', () => {
     vi.stubEnv('GEMINI_TELEMETRY_TARGET', 'bogus');
     process.argv = ['node', 'script.js'];
     const argv = await parseArguments({} as Settings);
-    const settings: Settings = { telemetry: { target: 'gcp' } };
+    const settings: Settings = {
+      telemetry: { target: ServerConfig.TelemetryTarget.GCP },
+    };
     await expect(
       loadCliConfig(
         settings,
@@ -3728,7 +3741,9 @@ describe('Telemetry configuration via environment variables', () => {
     vi.stubEnv('GEMINI_TELEMETRY_TARGET', undefined);
     process.argv = ['node', 'script.js'];
     const argv = await parseArguments({} as Settings);
-    const settings: Settings = { telemetry: { target: 'local' } };
+    const settings: Settings = {
+      telemetry: { target: ServerConfig.TelemetryTarget.LOCAL },
+    };
     const config = await loadCliConfig(
       settings,
       [],
