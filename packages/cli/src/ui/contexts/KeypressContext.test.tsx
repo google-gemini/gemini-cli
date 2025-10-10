@@ -956,3 +956,147 @@ describe('Drag and Drop Handling', () => {
     });
   });
 });
+
+describe('Terminal-specific Alt+key combinations', () => {
+  /**
+   *
+   * ---ITERM2----
+   * Alt+A: {"name":"a","ctrl":false,"meta":true,"shift":false,"paste":false,"sequence":"å"}
+   * Alt+O: {"name":"o","ctrl":false,"meta":true,"shift":false,"paste":false,"sequence":"ø"}
+   * Alt+M: {"name":"m","ctrl":false,"meta":true,"shift":false,"paste":false,"sequence":"µ"}
+   *
+   * ----Ghostty----
+   * Alt+A: {"name":"a","ctrl":false,"meta":true,"shift":false,"paste":false,"sequence":"\u001b[97;3u","kittyProtocol":true}
+   * Alt+O: {"name":"o","ctrl":false,"meta":true,"shift":false,"paste":false,"sequence":"\u001b[111;3u","kittyProtocol":true}
+   * Alt+M: {"name":"m","ctrl":false,"meta":true,"shift":false,"paste":false,"sequence":"\u001b[109;3u","kittyProtocol":true}
+   *
+   * ---Mac terminal----
+   * Alt+A: {"sequence":"\u001ba","name":"a","ctrl":false,"meta":true,"shift":false,"paste":false}
+   * Alt+O: {"sequence":"\u001bo","name":"o","ctrl":false,"meta":true,"shift":false,"paste":false}
+   * Alt+M: {"sequence":"\u001bm","name":"m","ctrl":false,"meta":true,"shift":false,"paste":false}
+   *
+   * --Mac vscode--
+   * Alt+A: {"name":"a","ctrl":false,"meta":true,"shift":false,"paste":false,"sequence":"å"}
+   * Alt+O: {"name":"o","ctrl":false,"meta":true,"shift":false,"paste":false,"sequence":"ø"}
+   * Alt+M: {"name":"m","ctrl":false,"meta":true,"shift":false,"paste":false,"sequence":"µ"}
+   *
+   */
+
+  let stdin: MockStdin;
+  const mockSetRawMode = vi.fn();
+
+  const wrapper = ({ children }: { children: React.ReactNode }) => (
+    <KeypressProvider kittyProtocolEnabled={true}>{children}</KeypressProvider>
+  );
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    stdin = new MockStdin();
+    (useStdin as Mock).mockReturnValue({
+      stdin,
+      setRawMode: mockSetRawMode,
+    });
+  });
+
+  // Terminals to test
+  const terminals = ['iTerm2', 'Ghostty', 'MacTerminal', 'VSCodeTerminal'];
+
+  // Key mappings: letter -> [keycode, accented character]
+  const keys: Record<string, [number, string]> = {
+    a: [97, 'å'],
+    o: [111, 'ø'],
+    m: [109, 'µ'],
+  };
+
+  it.each(
+    terminals.flatMap((terminal) =>
+      Object.entries(keys).map(([key, [keycode, accentedChar]]) => {
+        if (terminal === 'Ghostty') {
+          // Ghostty uses kitty protocol sequences
+          return {
+            terminal,
+            key,
+            kittySequence: `\x1b[${keycode};3u`,
+            expected: {
+              name: key,
+              ctrl: false,
+              meta: true,
+              shift: false,
+              paste: false,
+              kittyProtocol: true,
+            },
+          };
+        } else if (terminal === 'MacTerminal') {
+          // Mac Terminal sends ESC + letter
+          return {
+            terminal,
+            key,
+            input: {
+              sequence: `\x1b${key}`,
+              name: key,
+              ctrl: false,
+              meta: true,
+              shift: false,
+              paste: false,
+            },
+            expected: {
+              sequence: `\x1b${key}`,
+              name: key,
+              ctrl: false,
+              meta: true,
+              shift: false,
+              paste: false,
+            },
+          };
+        } else {
+          // iTerm2 and VSCode send accented characters (å, ø, µ)
+          return {
+            terminal,
+            key,
+            input: {
+              name: key,
+              ctrl: false,
+              meta: true,
+              shift: false,
+              paste: false,
+              sequence: accentedChar,
+            },
+            expected: {
+              name: key,
+              ctrl: false,
+              meta: true,
+              shift: false,
+              paste: false,
+              sequence: accentedChar,
+            },
+          };
+        }
+      }),
+    ),
+  )(
+    'should handle Alt+$key in $terminal',
+    ({
+      kittySequence,
+      input,
+      expected,
+    }: {
+      kittySequence?: string;
+      input?: Partial<Key>;
+      expected: Partial<Key>;
+    }) => {
+      const keyHandler = vi.fn();
+      const { result } = renderHook(() => useKeypressContext(), { wrapper });
+      act(() => result.current.subscribe(keyHandler));
+
+      if (kittySequence) {
+        act(() => stdin.sendKittySequence(kittySequence));
+      } else if (input) {
+        act(() => stdin.pressKey(input));
+      }
+
+      expect(keyHandler).toHaveBeenCalledWith(
+        expect.objectContaining(expected),
+      );
+    },
+  );
+});

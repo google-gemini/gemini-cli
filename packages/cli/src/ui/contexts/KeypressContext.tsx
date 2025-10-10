@@ -327,9 +327,9 @@ export function KeypressProvider({
           };
         }
 
-        // Ctrl+letters
+        // Ctrl+letters and Alt+letters
         if (
-          ctrl &&
+          (ctrl || alt) &&
           keyCode >= 'a'.charCodeAt(0) &&
           keyCode <= 'z'.charCodeAt(0)
         ) {
@@ -337,7 +337,7 @@ export function KeypressProvider({
           return {
             key: {
               name: letter,
-              ctrl: true,
+              ctrl,
               meta: alt,
               shift,
               paste: false,
