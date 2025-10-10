@@ -98,7 +98,7 @@ export const ContextSummaryDisplay: React.FC<ContextSummaryDisplayProps> = ({
 
   if (isNarrow) {
     return (
-      <Box flexDirection="column">
+      <Box flexDirection="column" paddingX={1}>
         <Text color={theme.text.secondary}>Using:</Text>
         {summaryParts.map((part, index) => (
           <Text key={index} color={theme.text.secondary}>
@@ -110,7 +110,7 @@ export const ContextSummaryDisplay: React.FC<ContextSummaryDisplayProps> = ({
   }
 
   return (
-    <Box>
+    <Box paddingX={1}>
       <Text color={theme.text.secondary}>
         Using: {summaryParts.join(' | ')}
       </Text>

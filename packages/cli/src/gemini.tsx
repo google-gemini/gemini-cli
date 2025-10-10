@@ -39,6 +39,7 @@ import {
   logUserPrompt,
   AuthType,
   getOauthClient,
+  UserPromptEvent,
 } from '@google/gemini-cli-core';
 import {
   initializeApp,
@@ -144,6 +145,22 @@ export async function startInteractiveUI(
   workspaceRoot: string = process.cwd(),
   initializationResult: InitializationResult,
 ) {
+  // Disable line wrapping.
+  // We rely on Ink to manage all line wrapping by forcing all content to be
+  // narrower than the terminal width so there is no need for the terminal to
+  // also attempt line wrapping.
+  // Disabling line wrapping reduces Ink rendering artifacts particularly when
+  // the terminal is resized on terminals that full respect this escape code
+  // such as Ghostty. Some terminals such as Iterm2 only respect line wrapping
+  // when using the alternate buffer, which Gemini CLI does not use because we
+  // do not yet have support for scrolling in that mode.
+  process.stdout.write('\x1b[?7l');
+
+  registerCleanup(() => {
+    // Re-enable line wrapping on exit.
+    process.stdout.write('\x1b[?7h');
+  });
+
   const version = await getCliVersion();
   setWindowTitle(basename(workspaceRoot), settings);
 
@@ -436,14 +453,15 @@ export async function main() {
     }
 
     const prompt_id = Math.random().toString(16).slice(2);
-    logUserPrompt(config, {
-      'event.name': 'user_prompt',
-      'event.timestamp': new Date().toISOString(),
-      prompt: input,
-      prompt_id,
-      auth_type: config.getContentGeneratorConfig()?.authType,
-      prompt_length: input.length,
-    });
+    logUserPrompt(
+      config,
+      new UserPromptEvent(
+        input.length,
+        prompt_id,
+        config.getContentGeneratorConfig()?.authType,
+        input,
+      ),
+    );
 
     const nonInteractiveConfig = await validateNonInteractiveAuth(
       settings.merged.security?.auth?.selectedType,
