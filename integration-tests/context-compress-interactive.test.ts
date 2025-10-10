@@ -18,8 +18,7 @@ describe('Interactive Mode', () => {
     await rig.cleanup();
   });
 
-  //TODO - https://github.com/google-gemini/gemini-cli/issues/10770
-  it.skip('should trigger chat compression with /compress command', async () => {
+  it('should trigger chat compression with /compress command', async () => {
     await rig.setup('interactive-compress-test');
 
     const { ptyProcess } = rig.runInteractive();
