@@ -4,11 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { vi, describe, it, expect, beforeEach, Mock } from 'vitest';
-import { copyPromptCommand } from './copyPromptCommand.js';
-import { type CommandContext } from './types.js';
+import type { Mock } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
 import { copyToClipboard } from '../utils/commandUtils.js';
+import { copyPromptCommand } from './copyPromptCommand.js';
+import { type CommandContext } from './types.js';
 
 vi.mock('../utils/commandUtils.js', () => ({
   copyToClipboard: vi.fn(),
