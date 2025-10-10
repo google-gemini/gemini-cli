@@ -326,21 +326,22 @@ async function handleAutomaticOAuth(
     console.log(`🔐 '${mcpServerName}' requires OAuth authentication`);
 
     // Always try to parse the resource metadata URI from the www-authenticate header
-    let oauthConfig;
+    let resourceOauthConfig;
     const resourceMetadataUri =
       OAuthUtils.parseWWWAuthenticateHeader(wwwAuthenticate);
     if (resourceMetadataUri) {
-      oauthConfig = await OAuthUtils.discoverOAuthConfig(resourceMetadataUri);
+      resourceOauthConfig =
+        await OAuthUtils.discoverOAuthConfig(resourceMetadataUri);
     } else if (hasNetworkTransport(mcpServerConfig)) {
       // Fallback: try to discover OAuth config from the base URL
       const serverUrl = new URL(
         mcpServerConfig.httpUrl || mcpServerConfig.url!,
       );
       const baseUrl = `${serverUrl.protocol}//${serverUrl.host}`;
-      oauthConfig = await OAuthUtils.discoverOAuthConfig(baseUrl);
+      resourceOauthConfig = await OAuthUtils.discoverOAuthConfig(baseUrl);
     }
 
-    if (!oauthConfig) {
+    if (!resourceOauthConfig) {
       console.error(
         `❌ Could not configure OAuth for '${mcpServerName}' - please authenticate manually with /mcp auth ${mcpServerName}`,
       );
@@ -350,11 +351,21 @@ async function handleAutomaticOAuth(
     // OAuth configuration discovered - proceed with authentication
 
     // Create OAuth configuration for authentication
+    const mcpServerScopes = mcpServerConfig?.oauth?.scopes || null;
+    if (mcpServerScopes && !Array.isArray(mcpServerScopes)) {
+      console.error(
+        `❌ Could not configure OAuth for '${mcpServerName}' - scopes value when present should be a string array`,
+      );
+      return false;
+    }
+
     const oauthAuthConfig = {
       enabled: true,
-      authorizationUrl: oauthConfig.authorizationUrl,
-      tokenUrl: oauthConfig.tokenUrl,
-      scopes: oauthConfig.scopes || [],
+      authorizationUrl: resourceOauthConfig.authorizationUrl,
+      tokenUrl: resourceOauthConfig.tokenUrl,
+      // mcpServer scopes is possibly an empty array
+      scopes:
+        mcpServerScopes == null ? resourceOauthConfig.scopes : mcpServerScopes,
     };
 
     // Perform OAuth authentication
@@ -1036,12 +1047,25 @@ export async function connectToMcpServer(
                 `Discovered OAuth configuration from base URL for server '${mcpServerName}'`,
               );
 
+              const mcpServerScopes = mcpServerConfig?.oauth?.scopes || null;
+              if (mcpServerScopes && !Array.isArray(mcpServerScopes)) {
+                console.error(
+                  `invalid OAuth config for '${mcpServerName}' - scopes value when present should be a string array`,
+                );
+                throw new Error(
+                  `invalid OAuth config for '${mcpServerName}' - scopes value when present should be a string array`,
+                );
+              }
+
               // Create OAuth configuration for authentication
               const oauthAuthConfig = {
                 enabled: true,
                 authorizationUrl: oauthConfig.authorizationUrl,
                 tokenUrl: oauthConfig.tokenUrl,
-                scopes: oauthConfig.scopes || [],
+                scopes:
+                  mcpServerScopes == null
+                    ? oauthConfig.scopes
+                    : mcpServerScopes,
               };
 
               // Perform OAuth authentication
