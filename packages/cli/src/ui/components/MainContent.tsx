@@ -11,6 +11,8 @@ import { OverflowProvider } from '../contexts/OverflowContext.js';
 import { useUIState } from '../contexts/UIStateContext.js';
 import { useAppContext } from '../contexts/AppContext.js';
 import { AppHeader } from './AppHeader.js';
+import { useLayoutConfig } from '../hooks/useLayoutConfig.js';
+import { useTerminalSize } from '../hooks/useTerminalSize.js';
 
 // Limit Gemini messages to a very high number of lines to mitigate performance
 // issues in the worst case if we somehow get an enormous response from Gemini.
@@ -21,6 +23,8 @@ const MAX_GEMINI_MESSAGE_LINES = 65536;
 export const MainContent = () => {
   const { version } = useAppContext();
   const uiState = useUIState();
+  const layout = useLayoutConfig();
+  const { columns: terminalWidth } = useTerminalSize();
   const {
     pendingHistoryItems,
     mainAreaWidth,
@@ -28,6 +32,46 @@ export const MainContent = () => {
     availableTerminalHeight,
   } = uiState;
 
+  // In screen reader mode, use regular layout without Static component
+
+  if (!layout.shouldUseStatic) {
+    return (
+      <OverflowProvider>
+        <Box flexDirection="column">
+          <AppHeader version={version} />
+          <HistoryList
+            history={uiState.history}
+            terminalWidth={terminalWidth}
+            staticAreaMaxItemHeight={staticAreaMaxItemHeight}
+            slashCommands={uiState.slashCommands}
+          />
+          <PendingHistoryList
+            pendingHistoryItems={pendingHistoryItems}
+            terminalWidth={mainAreaWidth}
+            availableTerminalHeight={availableTerminalHeight}
+            constrainHeight={uiState.constrainHeight}
+            isEditorDialogOpen={uiState.isEditorDialogOpen}
+          />
+          <ShowMoreLines constrainHeight={uiState.constrainHeight} />
+        </Box>
+      </OverflowProvider>
+    );
+  }
+
+  // Default mode with Static component
+  return (
+    <>
+      <OverflowProvider>
+        <Box flexDirection="column">
+          <AppHeader version={version} />
+          <HistoryList
+            history={uiState.history}
+            terminalWidth={terminalWidth}
+            staticAreaMaxItemHeight={staticAreaMaxItemHeight}
+            slashCommands={uiState.slashCommands}
+          />
+        </Box>
+      </OverflowProvider>
   return (
     <>
       <Static

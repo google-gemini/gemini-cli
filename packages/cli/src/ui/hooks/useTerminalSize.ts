@@ -4,27 +4,16 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useEffect, useState } from 'react';
+import { useStdout } from 'ink';
 
 export function useTerminalSize(): { columns: number; rows: number } {
-  const [size, setSize] = useState({
-    columns: process.stdout.columns || 60,
-    rows: process.stdout.rows || 20,
-  });
-
-  useEffect(() => {
-    function updateSize() {
-      setSize({
-        columns: process.stdout.columns || 60,
-        rows: process.stdout.rows || 20,
-      });
-    }
-
-    process.stdout.on('resize', updateSize);
-    return () => {
-      process.stdout.off('resize', updateSize);
-    };
-  }, []);
-
-  return size;
+  const { stdout } = useStdout();
+  if (!stdout) {
+    // Fallback for test environments or headless mode
+    return { columns: 80, rows: 24 };
+  }
+  return {
+    columns: stdout.columns || 60,
+    rows: stdout.rows || 20,
+  };
 }

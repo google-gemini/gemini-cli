@@ -58,9 +58,6 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
         : theme.border.default;
 
   const staticHeight = /* border */ 2 + /* marginBottom */ 1;
-  // This is a bit of a magic number, but it accounts for the border and
-  // marginLeft.
-  const innerWidth = terminalWidth - 4;
 
   // only prompt for tool approval on the first 'confirming' tool in the list
   // note, after the CTA, this automatically moves over to the next 'confirming' tool
@@ -96,7 +93,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
         Ink to render the border of the box incorrectly and span multiple lines and even
         cause tearing.
       */
-      width={terminalWidth}
+      width={terminalWidth - 2}
       borderDimColor={
         hasPending && (!isShellCommand || !isEmbeddedShellFocused)
       }
@@ -111,7 +108,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
               <ToolMessage
                 {...tool}
                 availableTerminalHeight={availableTerminalHeightPerToolMessage}
-                terminalWidth={innerWidth}
+                terminalWidth={terminalWidth - 4}
                 emphasis={
                   isConfirming
                     ? 'high'
@@ -134,7 +131,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
                   availableTerminalHeight={
                     availableTerminalHeightPerToolMessage
                   }
-                  terminalWidth={innerWidth}
+                  terminalWidth={terminalWidth - 4}
                 />
               )}
             {tool.outputFile && (

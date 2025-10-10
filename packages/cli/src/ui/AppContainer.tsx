@@ -662,7 +662,6 @@ Logging in with Google... Please restart Gemini CLI to continue.
   const handleClearScreen = useCallback(() => {
     historyManager.clearItems();
     clearConsoleMessagesState();
-    console.clear();
     refreshStatic();
   }, [historyManager, clearConsoleMessagesState, refreshStatic]);
 
@@ -696,7 +695,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
 
   // Compute available terminal height based on controls measurement
   const availableTerminalHeight = Math.max(
-    0,
+    10,
     terminalHeight - controlsHeight - staticExtraHeight - 2,
   );
 
