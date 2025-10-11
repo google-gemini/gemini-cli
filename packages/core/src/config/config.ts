@@ -125,6 +125,7 @@ export interface OutputSettings {
 export interface GeminiCLIExtension {
   name: string;
   version: string;
+  author?: string;
   isActive: boolean;
   path: string;
   installMetadata?: ExtensionInstallMetadata;

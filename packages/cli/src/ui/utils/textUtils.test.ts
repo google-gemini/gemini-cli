@@ -9,7 +9,7 @@ import type {
   ToolCallConfirmationDetails,
   ToolEditConfirmationDetails,
 } from '@google/gemini-cli-core';
-import { escapeAnsiCtrlCodes } from './textUtils.js';
+import { escapeAnsiCtrlCodes } from '@google/gemini-cli-core';
 
 describe('textUtils', () => {
   describe('escapeAnsiCtrlCodes', () => {

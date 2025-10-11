@@ -23,6 +23,7 @@ import {
   logExtensionUninstall,
   logExtensionUpdateEvent,
   logExtensionDisable,
+  escapeAnsiCtrlCodes,
 } from '@google/gemini-cli-core';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -44,7 +45,6 @@ import type { LoadExtensionContext } from './extensions/variableSchema.js';
 import { ExtensionEnablementManager } from './extensions/extensionEnablement.js';
 import chalk from 'chalk';
 import type { ConfirmationRequest } from '../ui/types.js';
-import { escapeAnsiCtrlCodes } from '../ui/utils/textUtils.js';
 
 export const EXTENSIONS_DIRECTORY_NAME = path.join(GEMINI_DIR, 'extensions');
 
@@ -61,6 +61,7 @@ export const INSTALL_METADATA_FILENAME = '.gemini-extension-install.json';
 interface ExtensionConfig {
   name: string;
   version: string;
+  author?: string;
   mcpServers?: Record<string, MCPServerConfig>;
   contextFileName?: string | string[];
   excludeTools?: string[];
@@ -252,9 +253,10 @@ export function loadExtension(
       )
       .filter((contextFilePath) => fs.existsSync(contextFilePath));
 
-    return {
+    const extension = {
       name: config.name,
       version: config.version,
+      author: config.author,
       path: effectiveExtensionPath,
       contextFiles,
       installMetadata,
@@ -262,6 +264,9 @@ export function loadExtension(
       excludeTools: config.excludeTools,
       isActive: true, // Barring any other signals extensions should be considered Active.
     };
+
+    // Sanitize all user-provided fields once to prevent ANSI escape code injection.
+    return escapeAnsiCtrlCodes(extension) as GeminiCLIExtension;
   } catch (e) {
     console.error(
       `Warning: Skipping extension in ${effectiveExtensionPath}: ${getErrorMessage(
@@ -613,6 +618,9 @@ function extensionConsentString(extensionConfig: ExtensionConfig): string {
   const output: string[] = [];
   const mcpServerEntries = Object.entries(sanitizedConfig.mcpServers || {});
   output.push(`Installing extension "${sanitizedConfig.name}".`);
+  if (sanitizedConfig.author) {
+    output.push(`Author: ${sanitizedConfig.author}`);
+  }
   output.push(
     '**Extensions may introduce unexpected behavior. Ensure you have investigated the extension source and trust the author.**',
   );
@@ -765,6 +773,9 @@ export function toOutputString(
 
   const status = workspaceEnabled ? chalk.green('✓') : chalk.red('✗');
   let output = `${status} ${extension.name} (${extension.version})`;
+  if (extension.author) {
+    output += `\n Author: ${extension.author}`;
+  }
   output += `\n Path: ${extension.path}`;
   if (extension.installMetadata) {
     output += `\n Source: ${extension.installMetadata.source} (Type: ${extension.installMetadata.type})`;
