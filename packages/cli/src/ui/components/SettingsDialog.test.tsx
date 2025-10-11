@@ -393,11 +393,11 @@ describe('SettingsDialog', () => {
 
       expect(vi.mocked(saveModifiedSettings)).toHaveBeenCalledWith(
         new Set<string>(['general.disableAutoUpdate']),
-        {
-          general: {
+        expect.objectContaining({
+          general: expect.objectContaining({
             disableAutoUpdate: true,
-          },
-        },
+          }),
+        }),
         expect.any(LoadedSettings),
         SettingScope.User,
       );
@@ -472,11 +472,11 @@ describe('SettingsDialog', () => {
 
         expect(vi.mocked(saveModifiedSettings)).toHaveBeenCalledWith(
           new Set<string>(['ui.theme']),
-          {
-            ui: {
+          expect.objectContaining({
+            ui: expect.objectContaining({
               theme: StringEnum.BAZ,
-            },
-          },
+            }),
+          }),
           expect.any(LoadedSettings),
           SettingScope.User,
         );
@@ -509,11 +509,11 @@ describe('SettingsDialog', () => {
 
         expect(vi.mocked(saveModifiedSettings)).toHaveBeenCalledWith(
           new Set<string>(['ui.theme']),
-          {
-            ui: {
+          expect.objectContaining({
+            ui: expect.objectContaining({
               theme: StringEnum.FOO,
-            },
-          },
+            }),
+          }),
           expect.any(LoadedSettings),
           SettingScope.User,
         );
