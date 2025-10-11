@@ -237,19 +237,14 @@ export const AppContainer = (props: AppContainerProps) => {
   );
 
   // Watch for model changes (e.g., from Flash fallback)
+  // Check when there's activity (new history items indicate interaction)
+  // instead of polling every second
   useEffect(() => {
-    const checkModelChange = () => {
-      const effectiveModel = getEffectiveModel();
-      if (effectiveModel !== currentModel) {
-        setCurrentModel(effectiveModel);
-      }
-    };
-
-    checkModelChange();
-    const interval = setInterval(checkModelChange, 1000); // Check every second
-
-    return () => clearInterval(interval);
-  }, [config, currentModel, getEffectiveModel]);
+    const effectiveModel = getEffectiveModel();
+    if (effectiveModel !== currentModel) {
+      setCurrentModel(effectiveModel);
+    }
+  }, [config, currentModel, getEffectiveModel, historyManager.history.length]);
 
   const {
     consoleMessages,
