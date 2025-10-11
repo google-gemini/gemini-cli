@@ -8,17 +8,12 @@ import { vi } from 'vitest';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import {
-  ExtensionStorage,
-  annotateActiveExtensions,
-  loadExtension,
-} from '../../config/extension.js';
+import { loadExtension } from '../../config/extension.js';
 import { createExtension } from '../../test-utils/createExtension.js';
 import { useExtensionUpdates } from './useExtensionUpdates.js';
 import { GEMINI_DIR, type GeminiCLIExtension } from '@google/gemini-cli-core';
 import { renderHook, waitFor } from '@testing-library/react';
 import { MessageType } from '../types.js';
-import { ExtensionEnablementManager } from '../../config/extensions/extensionEnablement.js';
 import {
   checkForAllExtensionUpdates,
   updateExtension,
@@ -114,11 +109,10 @@ describe('useExtensionUpdates', () => {
         autoUpdate: true,
       },
     });
-    const extension = annotateActiveExtensions(
-      [loadExtension({ extensionDir, workspaceDir: tempHomeDir })!],
-      tempHomeDir,
-      new ExtensionEnablementManager(ExtensionStorage.getUserExtensionsDir()),
-    )[0];
+    const extension = loadExtension({
+      extensionDir,
+      workspaceDir: tempHomeDir,
+    })!;
 
     const addItem = vi.fn();
 
@@ -178,20 +172,16 @@ describe('useExtensionUpdates', () => {
       },
     });
 
-    const extensions = annotateActiveExtensions(
-      [
-        loadExtension({
-          extensionDir: extensionDir1,
-          workspaceDir: tempHomeDir,
-        })!,
-        loadExtension({
-          extensionDir: extensionDir2,
-          workspaceDir: tempHomeDir,
-        })!,
-      ],
-      tempHomeDir,
-      new ExtensionEnablementManager(ExtensionStorage.getUserExtensionsDir()),
-    );
+    const extensions = [
+      loadExtension({
+        extensionDir: extensionDir1,
+        workspaceDir: tempHomeDir,
+      })!,
+      loadExtension({
+        extensionDir: extensionDir2,
+        workspaceDir: tempHomeDir,
+      })!,
+    ];
 
     const addItem = vi.fn();
 

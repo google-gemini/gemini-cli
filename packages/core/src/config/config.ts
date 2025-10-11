@@ -178,7 +178,7 @@ export class MCPServerConfig {
     readonly description?: string,
     readonly includeTools?: string[],
     readonly excludeTools?: string[],
-    readonly extensionName?: string,
+    readonly extension?: GeminiCLIExtension,
     // OAuth configuration
     readonly oauth?: MCPOAuthConfig,
     readonly authProviderType?: AuthProviderType,
@@ -238,7 +238,6 @@ export interface ConfigParameters {
   includeDirectories?: string[];
   bugCommand?: BugCommandSettings;
   model: string;
-  extensionContextFilePaths?: string[];
   maxSessionTurns?: number;
   experimentalZedIntegration?: boolean;
   listExtensions?: boolean;
@@ -318,7 +317,6 @@ export class Config {
   private readonly cwd: string;
   private readonly bugCommand: BugCommandSettings | undefined;
   private model: string;
-  private readonly extensionContextFilePaths: string[];
   private readonly noBrowser: boolean;
   private readonly folderTrust: boolean;
   private ideMode: boolean;
@@ -419,7 +417,6 @@ export class Config {
     this.fileDiscoveryService = params.fileDiscoveryService ?? null;
     this.bugCommand = params.bugCommand;
     this.model = params.model;
-    this.extensionContextFilePaths = params.extensionContextFilePaths ?? [];
     this.maxSessionTurns = params.maxSessionTurns ?? -1;
     this.experimentalZedIntegration =
       params.experimentalZedIntegration ?? false;
@@ -842,10 +839,6 @@ export class Config {
 
   getUsageStatisticsEnabled(): boolean {
     return this.usageStatisticsEnabled;
-  }
-
-  getExtensionContextFilePaths(): string[] {
-    return this.extensionContextFilePaths;
   }
 
   getExperimentalZedIntegration(): boolean {
