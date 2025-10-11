@@ -15,7 +15,6 @@ import {
   type Part,
   type Tool,
   FinishReason,
-  ApiError,
 } from '@google/genai';
 import { toParts } from '../code_assist/converter.js';
 import { createUserContent } from '@google/genai';
@@ -27,6 +26,7 @@ import {
 } from '../config/models.js';
 import { hasCycleInSchema, MUTATOR_KINDS } from '../tools/tools.js';
 import type { StructuredError } from './turn.js';
+import type { CompletedToolCall } from './coreToolScheduler.js';
 import {
   logContentRetry,
   logContentRetryFailure,
@@ -273,10 +273,19 @@ export class GeminiChat {
               yield { type: StreamEventType.RETRY };
             }
 
+            // If this is a retry, set temperature to 1 to encourage different output.
+            const currentParams = { ...params };
+            if (attempt > 0) {
+              currentParams.config = {
+                ...currentParams.config,
+                temperature: 1,
+              };
+            }
+
             const stream = await self.makeApiCallAndProcessStream(
               model,
               requestContents,
-              params,
+              currentParams,
               prompt_id,
             );
 
@@ -327,10 +336,6 @@ export class GeminiChat {
               ),
             );
           }
-          // If the stream fails, remove the user message that was added.
-          if (self.history[self.history.length - 1] === userContent) {
-            self.history.pop();
-          }
           throw lastError;
         }
       } finally {
@@ -376,15 +381,6 @@ export class GeminiChat {
     ) => await handleFallback(this.config, model, authType, error);
 
     const streamResponse = await retryWithBackoff(apiCall, {
-      shouldRetryOnError: (error: unknown) => {
-        if (error instanceof ApiError && error.message) {
-          if (error.status === 400) return false;
-          if (isSchemaDepthError(error.message)) return false;
-          if (error.status === 429) return true;
-          if (error.status >= 500 && error.status < 600) return true;
-        }
-        return false;
-      },
       onPersistent429: onPersistent429Callback,
       authType: this.config.getContentGeneratorConfig()?.authType,
     });
@@ -592,6 +588,33 @@ export class GeminiChat {
    */
   getChatRecordingService(): ChatRecordingService {
     return this.chatRecordingService;
+  }
+
+  /**
+   * Records completed tool calls with full metadata.
+   * This is called by external components when tool calls complete, before sending responses to Gemini.
+   */
+  recordCompletedToolCalls(
+    model: string,
+    toolCalls: CompletedToolCall[],
+  ): void {
+    const toolCallRecords = toolCalls.map((call) => {
+      const resultDisplayRaw = call.response?.resultDisplay;
+      const resultDisplay =
+        typeof resultDisplayRaw === 'string' ? resultDisplayRaw : undefined;
+
+      return {
+        id: call.request.callId,
+        name: call.request.name,
+        args: call.request.args,
+        result: call.response?.responseParts || null,
+        status: call.status as 'error' | 'success' | 'cancelled',
+        timestamp: new Date().toISOString(),
+        resultDisplay,
+      };
+    });
+
+    this.chatRecordingService.recordToolCalls(model, toolCallRecords);
   }
 
   /**

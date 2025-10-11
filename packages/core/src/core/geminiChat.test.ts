@@ -864,6 +864,72 @@ describe('GeminiChat', () => {
       expect(uiTelemetryService.setLastPromptTokenCount).not.toHaveBeenCalled();
     });
 
+    it('should set temperature to 1 on retry', async () => {
+      // Use mockImplementationOnce to provide a fresh, promise-wrapped generator for each attempt.
+      vi.mocked(mockContentGenerator.generateContentStream)
+        .mockImplementationOnce(async () =>
+          // First call returns an invalid stream
+          (async function* () {
+            yield {
+              candidates: [{ content: { parts: [{ text: '' }] } }], // Invalid empty text part
+            } as unknown as GenerateContentResponse;
+          })(),
+        )
+        .mockImplementationOnce(async () =>
+          // Second call returns a valid stream
+          (async function* () {
+            yield {
+              candidates: [
+                {
+                  content: { parts: [{ text: 'Successful response' }] },
+                  finishReason: 'STOP',
+                },
+              ],
+            } as unknown as GenerateContentResponse;
+          })(),
+        );
+
+      const stream = await chat.sendMessageStream(
+        'test-model',
+        { message: 'test', config: { temperature: 0.5 } },
+        'prompt-id-retry-temperature',
+      );
+
+      for await (const _ of stream) {
+        // consume stream
+      }
+
+      expect(mockContentGenerator.generateContentStream).toHaveBeenCalledTimes(
+        2,
+      );
+
+      // First call should have original temperature
+      expect(
+        mockContentGenerator.generateContentStream,
+      ).toHaveBeenNthCalledWith(
+        1,
+        expect.objectContaining({
+          config: expect.objectContaining({
+            temperature: 0.5,
+          }),
+        }),
+        'prompt-id-retry-temperature',
+      );
+
+      // Second call (retry) should have temperature 1
+      expect(
+        mockContentGenerator.generateContentStream,
+      ).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({
+          config: expect.objectContaining({
+            temperature: 1,
+          }),
+        }),
+        'prompt-id-retry-temperature',
+      );
+    });
+
     it('should fail after all retries on persistent invalid content and report metrics', async () => {
       vi.mocked(mockContentGenerator.generateContentStream).mockImplementation(
         async () =>
@@ -899,22 +965,38 @@ describe('GeminiChat', () => {
       expect(mockLogContentRetry).toHaveBeenCalledTimes(1);
       expect(mockLogContentRetryFailure).toHaveBeenCalledTimes(1);
 
-      // History should be clean, as if the failed turn never happened.
+      // History should still contain the user message.
       const history = chat.getHistory();
-      expect(history.length).toBe(0);
+      expect(history.length).toBe(1);
+      expect(history[0]).toEqual({
+        role: 'user',
+        parts: [{ text: 'test' }],
+      });
     });
 
     describe('API error retry behavior', () => {
       beforeEach(() => {
         // Use a more direct mock for retry testing
-        mockRetryWithBackoff.mockImplementation(async (apiCall, options) => {
+        mockRetryWithBackoff.mockImplementation(async (apiCall) => {
           try {
             return await apiCall();
           } catch (error) {
-            if (
-              options?.shouldRetryOnError &&
-              options.shouldRetryOnError(error)
-            ) {
+            // Simulate the logic of defaultShouldRetry for ApiError
+            let shouldRetry = false;
+            if (error instanceof ApiError && error.message) {
+              if (
+                error.status === 429 ||
+                (error.status >= 500 && error.status < 600)
+              ) {
+                shouldRetry = true;
+              }
+              // Explicitly don't retry on these
+              if (error.status === 400) {
+                shouldRetry = false;
+              }
+            }
+
+            if (shouldRetry) {
               // Try again
               return await apiCall();
             }
@@ -993,36 +1075,6 @@ describe('GeminiChat', () => {
                 'Success after retry',
           ),
         ).toBe(true);
-      });
-
-      it('should not retry on schema depth errors', async () => {
-        const schemaError = new ApiError({
-          message: 'Request failed: maximum schema depth exceeded',
-          status: 500,
-        });
-
-        vi.mocked(mockContentGenerator.generateContentStream).mockRejectedValue(
-          schemaError,
-        );
-
-        const stream = await chat.sendMessageStream(
-          'test-model',
-          { message: 'test' },
-          'prompt-id-schema',
-        );
-
-        await expect(
-          (async () => {
-            for await (const _ of stream) {
-              /* consume stream */
-            }
-          })(),
-        ).rejects.toThrow(schemaError);
-
-        // Should only be called once (no retry)
-        expect(
-          mockContentGenerator.generateContentStream,
-        ).toHaveBeenCalledTimes(1);
       });
 
       it('should retry on 5xx server errors', async () => {

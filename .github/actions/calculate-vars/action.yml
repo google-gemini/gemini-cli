@@ -1,0 +1,33 @@
+name: 'Calculate vars'
+description: 'Calculate commonly used var in our release process'
+
+inputs:
+  dry_run:
+    description: 'Whether or not this is a dry run'
+    type: 'boolean'
+
+outputs:
+  is_dry_run:
+    description: 'Boolean flag indicating if the current run is a dry-run or a production release.'
+    value: '${{ steps.set_vars.outputs.is_dry_run }}'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: 'Print inputs'
+      shell: 'bash'
+      env:
+        JSON_INPUTS: '${{ toJSON(inputs) }}'
+      run: 'echo "$JSON_INPUTS"'
+
+    - name: 'Set vars for simplified logic'
+      id: 'set_vars'
+      shell: 'bash'
+      env:
+        DRY_RUN_INPUT: '${{ inputs.dry_run }}'
+      run: |-
+        is_dry_run="true"
+        if [[ "${DRY_RUN_INPUT}" == "" || "${DRY_RUN_INPUT}" == "false" ]]; then
+          is_dry_run="false"
+        fi
+        echo "is_dry_run=${is_dry_run}" >> "${GITHUB_OUTPUT}"

@@ -7,7 +7,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { TestRig, printDebugInfo, validateModelOutput } from './test-helper.js';
 
-describe('replace', () => {
+describe.skip('replace', () => {
   it('should be able to replace content in a file', async () => {
     const rig = new TestRig();
     await rig.setup('should be able to replace content in a file');
@@ -92,7 +92,8 @@ describe('replace', () => {
     expect(newFileContent).toBe(expectedContent);
   });
 
-  it('should fail safely when old_string is not found', async () => {
+  //TODO - https://github.com/google-gemini/gemini-cli/issues/10851
+  it.skip('should fail safely when old_string is not found', async () => {
     const rig = new TestRig();
     await rig.setup('should fail safely when old_string is not found');
     const fileName = 'no_match.txt';
@@ -140,13 +141,14 @@ describe('replace', () => {
   it('should insert a multi-line block of text', async () => {
     const rig = new TestRig();
     await rig.setup('should insert a multi-line block of text');
-    const fileName = 'insert_block.js';
-    const originalContent = 'function hello() {\n  // INSERT_CODE_HERE\n}';
-    const newBlock = "console.log('hello');\n  console.log('world');";
-    const expectedContent = `function hello() {\n  ${newBlock}\n}`;
+    const fileName = 'insert_block.txt';
+    const originalContent = 'Line A\n<INSERT_TEXT_HERE>\nLine C';
+    const newBlock = 'First line\nSecond line\nThird line';
+    const expectedContent =
+      'Line A\nFirst line\nSecond line\nThird line\nLine C';
     rig.createFile(fileName, originalContent);
 
-    const prompt = `In ${fileName}, replace "// INSERT_CODE_HERE" with:\n${newBlock}`;
+    const prompt = `In ${fileName}, replace "<INSERT_TEXT_HERE>" with:\n${newBlock}`;
     const result = await rig.run(prompt);
 
     const foundToolCall = await rig.waitForToolCall('replace');

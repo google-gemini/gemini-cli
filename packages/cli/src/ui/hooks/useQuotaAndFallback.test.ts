@@ -19,24 +19,13 @@ import {
   type FallbackModelHandler,
   UserTierId,
   AuthType,
-  isGenericQuotaExceededError,
-  isProQuotaExceededError,
+  TerminalQuotaError,
   makeFakeConfig,
+  type GoogleApiError,
 } from '@google/gemini-cli-core';
 import { useQuotaAndFallback } from './useQuotaAndFallback.js';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
 import { AuthState, MessageType } from '../types.js';
-
-// Mock the error checking functions from the core package to control test scenarios
-vi.mock('@google/gemini-cli-core', async (importOriginal) => {
-  const original =
-    await importOriginal<typeof import('@google/gemini-cli-core')>();
-  return {
-    ...original,
-    isGenericQuotaExceededError: vi.fn(),
-    isProQuotaExceededError: vi.fn(),
-  };
-});
 
 // Use a type alias for SpyInstance as it's not directly exported
 type SpyInstance = ReturnType<typeof vi.spyOn>;
@@ -47,12 +36,15 @@ describe('useQuotaAndFallback', () => {
   let mockSetAuthState: Mock;
   let mockSetModelSwitchedFromQuotaError: Mock;
   let setFallbackHandlerSpy: SpyInstance;
-
-  const mockedIsGenericQuotaExceededError = isGenericQuotaExceededError as Mock;
-  const mockedIsProQuotaExceededError = isProQuotaExceededError as Mock;
+  let mockGoogleApiError: GoogleApiError;
 
   beforeEach(() => {
     mockConfig = makeFakeConfig();
+    mockGoogleApiError = {
+      code: 429,
+      message: 'mock error',
+      details: [],
+    };
 
     // Spy on the method that requires the private field and mock its return.
     // This is cleaner than modifying the config class for tests.
@@ -72,9 +64,6 @@ describe('useQuotaAndFallback', () => {
 
     setFallbackHandlerSpy = vi.spyOn(mockConfig, 'setFallbackModelHandler');
     vi.spyOn(mockConfig, 'setQuotaErrorOccurred');
-
-    mockedIsGenericQuotaExceededError.mockReturnValue(false);
-    mockedIsProQuotaExceededError.mockReturnValue(false);
   });
 
   afterEach(() => {
@@ -140,22 +129,6 @@ describe('useQuotaAndFallback', () => {
     describe('Automatic Fallback Scenarios', () => {
       const testCases = [
         {
-          errorType: 'generic',
-          tier: UserTierId.FREE,
-          expectedMessageSnippets: [
-            'Automatically switching from model-A to model-B',
-            'upgrade to a Gemini Code Assist Standard or Enterprise plan',
-          ],
-        },
-        {
-          errorType: 'generic',
-          tier: UserTierId.STANDARD, // Paid tier
-          expectedMessageSnippets: [
-            'Automatically switching from model-A to model-B',
-            'switch to using a paid API key from AI Studio',
-          ],
-        },
-        {
           errorType: 'other',
           tier: UserTierId.FREE,
           expectedMessageSnippets: [
@@ -175,15 +148,11 @@ describe('useQuotaAndFallback', () => {
 
       for (const { errorType, tier, expectedMessageSnippets } of testCases) {
         it(`should handle ${errorType} error for ${tier} tier correctly`, async () => {
-          mockedIsGenericQuotaExceededError.mockReturnValue(
-            errorType === 'generic',
-          );
-
           const handler = getRegisteredHandler(tier);
           const result = await handler(
             'model-A',
             'model-B',
-            new Error('quota exceeded'),
+            new Error('some error'),
           );
 
           // Automatic fallbacks should return 'stop'
@@ -207,10 +176,6 @@ describe('useQuotaAndFallback', () => {
     });
 
     describe('Interactive Fallback (Pro Quota Error)', () => {
-      beforeEach(() => {
-        mockedIsProQuotaExceededError.mockReturnValue(true);
-      });
-
       it('should set an interactive request and wait for user choice', async () => {
         const { result } = renderHook(() =>
           useQuotaAndFallback({
@@ -229,7 +194,7 @@ describe('useQuotaAndFallback', () => {
         const promise = handler(
           'gemini-pro',
           'gemini-flash',
-          new Error('pro quota'),
+          new TerminalQuotaError('pro quota', mockGoogleApiError),
         );
 
         await act(async () => {});
@@ -268,7 +233,7 @@ describe('useQuotaAndFallback', () => {
         const promise1 = handler(
           'gemini-pro',
           'gemini-flash',
-          new Error('pro quota 1'),
+          new TerminalQuotaError('pro quota 1', mockGoogleApiError),
         );
         await act(async () => {});
 
@@ -278,7 +243,7 @@ describe('useQuotaAndFallback', () => {
         const result2 = await handler(
           'gemini-pro',
           'gemini-flash',
-          new Error('pro quota 2'),
+          new TerminalQuotaError('pro quota 2', mockGoogleApiError),
         );
 
         // The lock should have stopped the second request
@@ -297,10 +262,6 @@ describe('useQuotaAndFallback', () => {
   });
 
   describe('handleProQuotaChoice', () => {
-    beforeEach(() => {
-      mockedIsProQuotaExceededError.mockReturnValue(true);
-    });
-
     it('should do nothing if there is no pending pro quota request', () => {
       const { result } = renderHook(() =>
         useQuotaAndFallback({
@@ -336,7 +297,7 @@ describe('useQuotaAndFallback', () => {
       const promise = handler(
         'gemini-pro',
         'gemini-flash',
-        new Error('pro quota'),
+        new TerminalQuotaError('pro quota', mockGoogleApiError),
       );
       await act(async () => {}); // Allow state to update
 
@@ -367,7 +328,7 @@ describe('useQuotaAndFallback', () => {
       const promise = handler(
         'gemini-pro',
         'gemini-flash',
-        new Error('pro quota'),
+        new TerminalQuotaError('pro quota', mockGoogleApiError),
       );
       await act(async () => {}); // Allow state to update
 

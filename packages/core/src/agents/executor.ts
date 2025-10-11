@@ -14,19 +14,22 @@ import type {
   FunctionCall,
   GenerateContentConfig,
   FunctionDeclaration,
+  Schema,
 } from '@google/genai';
 import { executeToolCall } from '../core/nonInteractiveToolExecutor.js';
 import { ToolRegistry } from '../tools/tool-registry.js';
 import type { ToolCallRequestInfo } from '../core/turn.js';
 import { getDirectoryContextString } from '../utils/environmentContext.js';
-import { GlobTool } from '../tools/glob.js';
 import { GrepTool } from '../tools/grep.js';
 import { RipGrepTool } from '../tools/ripGrep.js';
 import { LSTool } from '../tools/ls.js';
 import { MemoryTool } from '../tools/memoryTool.js';
 import { ReadFileTool } from '../tools/read-file.js';
 import { ReadManyFilesTool } from '../tools/read-many-files.js';
-import { WebSearchTool } from '../tools/web-search.js';
+import { GLOB_TOOL_NAME, WEB_SEARCH_TOOL_NAME } from '../tools/tool-names.js';
+import { promptIdContext } from '../utils/promptIdContext.js';
+import { logAgentStart, logAgentFinish } from '../telemetry/loggers.js';
+import { AgentStartEvent, AgentFinishEvent } from '../telemetry/types.js';
 import type {
   AgentDefinition,
   AgentInputs,
@@ -36,6 +39,8 @@ import type {
 import { AgentTerminateMode } from './types.js';
 import { templateString } from './utils.js';
 import { parseThought } from '../utils/thoughtUtils.js';
+import { type z } from 'zod';
+import { zodToJsonSchema } from 'zod-to-json-schema';
 
 /** A callback function to report on agent activity. */
 export type ActivityCallback = (activity: SubagentActivityEvent) => void;
@@ -48,8 +53,8 @@ const TASK_COMPLETE_TOOL_NAME = 'complete_task';
  * This executor runs the agent in a loop, calling tools until it calls the
  * mandatory `complete_task` tool to signal completion.
  */
-export class AgentExecutor {
-  readonly definition: AgentDefinition;
+export class AgentExecutor<TOutput extends z.ZodTypeAny> {
+  readonly definition: AgentDefinition<TOutput>;
 
   private readonly agentId: string;
   private readonly toolRegistry: ToolRegistry;
@@ -67,11 +72,11 @@ export class AgentExecutor {
    * @param onActivity An optional callback to receive activity events.
    * @returns A promise that resolves to a new `AgentExecutor` instance.
    */
-  static async create(
-    definition: AgentDefinition,
+  static async create<TOutput extends z.ZodTypeAny>(
+    definition: AgentDefinition<TOutput>,
     runtimeContext: Config,
     onActivity?: ActivityCallback,
-  ): Promise<AgentExecutor> {
+  ): Promise<AgentExecutor<TOutput>> {
     // Create an isolated tool registry for this agent instance.
     const agentToolRegistry = new ToolRegistry(runtimeContext);
     const parentToolRegistry = await runtimeContext.getToolRegistry();
@@ -101,10 +106,14 @@ export class AgentExecutor {
       await AgentExecutor.validateTools(agentToolRegistry, definition.name);
     }
 
+    // Get the parent prompt ID from context
+    const parentPromptId = promptIdContext.getStore();
+
     return new AgentExecutor(
       definition,
       runtimeContext,
       agentToolRegistry,
+      parentPromptId,
       onActivity,
     );
   }
@@ -116,9 +125,10 @@ export class AgentExecutor {
    * instantiate the class.
    */
   private constructor(
-    definition: AgentDefinition,
+    definition: AgentDefinition<TOutput>,
     runtimeContext: Config,
     toolRegistry: ToolRegistry,
+    parentPromptId: string | undefined,
     onActivity?: ActivityCallback,
   ) {
     this.definition = definition;
@@ -127,7 +137,10 @@ export class AgentExecutor {
     this.onActivity = onActivity;
 
     const randomIdPart = Math.random().toString(36).slice(2, 8);
-    this.agentId = `${this.definition.name}-${randomIdPart}`;
+    // parentPromptId will be undefined if this agent is invoked directly
+    // (top-level), rather than as a sub-agent.
+    const parentPrefix = parentPromptId ? `${parentPromptId}-` : '';
+    this.agentId = `${parentPrefix}${this.definition.name}-${randomIdPart}`;
   }
 
   /**
@@ -140,12 +153,17 @@ export class AgentExecutor {
   async run(inputs: AgentInputs, signal: AbortSignal): Promise<OutputObject> {
     const startTime = Date.now();
     let turnCounter = 0;
+    let terminateReason: AgentTerminateMode = AgentTerminateMode.ERROR;
+    let finalResult: string | null = null;
+
+    logAgentStart(
+      this.runtimeContext,
+      new AgentStartEvent(this.agentId, this.definition.name),
+    );
 
     try {
       const chat = await this.createChatObject(inputs);
       const tools = this.prepareToolsList();
-      let terminateReason = AgentTerminateMode.ERROR;
-      let finalResult: string | null = null;
 
       const query = this.definition.promptConfig.query
         ? templateString(this.definition.promptConfig.query, inputs)
@@ -164,14 +182,12 @@ export class AgentExecutor {
           break;
         }
 
-        // Call model
-        const promptId = `${this.runtimeContext.getSessionId()}#${this.agentId}#${turnCounter++}`;
-        const { functionCalls } = await this.callModel(
-          chat,
-          currentMessage,
-          tools,
-          signal,
+        const promptId = `${this.agentId}#${turnCounter++}`;
+
+        const { functionCalls } = await promptIdContext.run(
           promptId,
+          async () =>
+            this.callModel(chat, currentMessage, tools, signal, promptId),
         );
 
         if (signal.aborted) {
@@ -217,6 +233,17 @@ export class AgentExecutor {
     } catch (error) {
       this.emitActivity('ERROR', { error: String(error) });
       throw error; // Re-throw the error for the parent context to handle.
+    } finally {
+      logAgentFinish(
+        this.runtimeContext,
+        new AgentFinishEvent(
+          this.agentId,
+          this.definition.name,
+          Date.now() - startTime,
+          turnCounter,
+          terminateReason,
+        ),
+      );
     }
   }
 
@@ -397,7 +424,36 @@ export class AgentExecutor {
         if (outputConfig) {
           const outputName = outputConfig.outputName;
           if (args[outputName] !== undefined) {
-            submittedOutput = String(args[outputName]);
+            const outputValue = args[outputName];
+            const validationResult = outputConfig.schema.safeParse(outputValue);
+
+            if (!validationResult.success) {
+              taskCompleted = false; // Validation failed, revoke completion
+              const error = `Output validation failed: ${JSON.stringify(validationResult.error.flatten())}`;
+              syncResponseParts.push({
+                functionResponse: {
+                  name: TASK_COMPLETE_TOOL_NAME,
+                  response: { error },
+                  id: callId,
+                },
+              });
+              this.emitActivity('ERROR', {
+                context: 'tool_call',
+                name: functionCall.name,
+                error,
+              });
+              continue;
+            }
+
+            const validatedOutput = validationResult.data;
+            if (this.definition.processOutput) {
+              submittedOutput = this.definition.processOutput(validatedOutput);
+            } else {
+              submittedOutput =
+                typeof outputValue === 'string'
+                  ? outputValue
+                  : JSON.stringify(outputValue, null, 2);
+            }
             syncResponseParts.push({
               functionResponse: {
                 name: TASK_COMPLETE_TOOL_NAME,
@@ -573,10 +629,14 @@ export class AgentExecutor {
     };
 
     if (outputConfig) {
-      completeTool.parameters!.properties![outputConfig.outputName] = {
-        description: outputConfig.description,
-        ...(outputConfig.schema ?? { type: Type.STRING }),
-      };
+      const jsonSchema = zodToJsonSchema(outputConfig.schema);
+      const {
+        $schema: _$schema,
+        definitions: _definitions,
+        ...schema
+      } = jsonSchema;
+      completeTool.parameters!.properties![outputConfig.outputName] =
+        schema as Schema;
       completeTool.parameters!.required!.push(outputConfig.outputName);
     }
 
@@ -652,10 +712,10 @@ Important Rules:
       ReadFileTool.Name,
       GrepTool.Name,
       RipGrepTool.Name,
-      GlobTool.Name,
+      GLOB_TOOL_NAME,
       ReadManyFilesTool.Name,
       MemoryTool.Name,
-      WebSearchTool.Name,
+      WEB_SEARCH_TOOL_NAME,
     ]);
     for (const tool of toolRegistry.getAllTools()) {
       if (!allowlist.has(tool.name)) {
