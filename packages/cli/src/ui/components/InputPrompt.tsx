@@ -71,6 +71,7 @@ export interface InputPromptProps {
   onEscapePromptChange?: (showPrompt: boolean) => void;
   vimHandleInput?: (key: Key) => boolean;
   isEmbeddedShellFocused?: boolean;
+  popAllMessages?: (onPop: (messages: string | undefined) => void) => void;
 }
 
 // The input content, input container, and input suggestions list may have different widths
@@ -107,6 +108,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   onEscapePromptChange,
   vimHandleInput,
   isEmbeddedShellFocused,
+  popAllMessages,
 }) => {
   const kittyProtocol = useKittyKeyboardProtocol();
   const isShellFocused = useShellFocusState();
@@ -256,6 +258,19 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     resetReverseSearchCompletionState,
     resetCommandSearchCompletionState,
   ]);
+
+  // Helper function to handle loading queued messages into input
+  const tryLoadQueuedMessages = useCallback(() => {
+    if (buffer.text.trim() === '' && popAllMessages) {
+      popAllMessages((allMessages) => {
+        if (allMessages) {
+          buffer.setText(allMessages);
+        }
+      });
+      return true; // Indicate that messages were loaded
+    }
+    return false;
+  }, [buffer, popAllMessages]);
 
   // Handle clipboard image pasting with Ctrl+V
   const handleClipboardImage = useCallback(async () => {
@@ -566,6 +581,10 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         }
 
         if (keyMatchers[Command.HISTORY_UP](key)) {
+          // Check for queued messages first when input is empty
+          if (tryLoadQueuedMessages()) {
+            return;
+          }
           inputHistory.navigateUp();
           return;
         }
@@ -579,6 +598,10 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           (buffer.allVisualLines.length === 1 ||
             (buffer.visualCursor[0] === 0 && buffer.visualScrollRow === 0))
         ) {
+          // Check for queued messages first when input is empty
+          if (tryLoadQueuedMessages()) {
+            return;
+          }
           inputHistory.navigateUp();
           return;
         }
@@ -721,6 +744,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       commandSearchActive,
       commandSearchCompletion,
       kittyProtocol.supported,
+      tryLoadQueuedMessages,
     ],
   );
 
