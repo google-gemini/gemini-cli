@@ -11,6 +11,10 @@ import type { PartUnion } from '@google/genai';
 // eslint-disable-next-line import/no-internal-modules
 import mime from 'mime/lite';
 import type { FileSystemService } from '../services/fileSystemService.js';
+import {
+  isMimeTypeSupported,
+  UNSUPPORTED_MIME_TYPE_ERROR,
+} from './mimeUtils.js';
 import { ToolErrorType } from '../tools/tool-error.js';
 import { BINARY_EXTENSIONS } from './ignorePatterns.js';
 
@@ -433,13 +437,27 @@ export async function processSingleFileContent(
       case 'pdf':
       case 'audio':
       case 'video': {
+        const mimeType = mime.getType(filePath);
+        if (!mimeType || !isMimeTypeSupported(mimeType)) {
+          return {
+            llmContent: `Cannot read file: ${UNSUPPORTED_MIME_TYPE_ERROR} (type: ${
+              mimeType || 'unknown'
+            })`,
+            returnDisplay: `[Skipped file with unsupported MIME type: ${relativePathForDisplay}]`,
+            error: `${UNSUPPORTED_MIME_TYPE_ERROR} (path: ${filePath}, type: ${
+              mimeType || 'unknown'
+            })`,
+            errorType: ToolErrorType.READ_CONTENT_FAILURE,
+          };
+        }
+
         const contentBuffer = await fs.promises.readFile(filePath);
         const base64Data = contentBuffer.toString('base64');
         return {
           llmContent: {
             inlineData: {
               data: base64Data,
-              mimeType: mime.getType(filePath) || 'application/octet-stream',
+              mimeType,
             },
           },
           returnDisplay: `Read ${fileType} file: ${relativePathForDisplay}`,
