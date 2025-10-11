@@ -233,7 +233,9 @@ Use the `/mcp auth` command to manage OAuth authentication:
 - **`authorizationUrl`** (string): OAuth authorization endpoint (auto-discovered
   if omitted)
 - **`tokenUrl`** (string): OAuth token endpoint (auto-discovered if omitted)
-- **`scopes`** (string[]): Required OAuth scopes
+- **`scopes`** (string[]): OAuth scopes to request. Use an empty array to
+  affirmatively request no scopes. Omit this to tell Gemini CLI to request all
+  the scopes supported by the resource.
 - **`redirectUri`** (string): Custom redirect URI (defaults to
   `http://localhost:7777/oauth/callback`)
 - **`tokenParamName`** (string): Query parameter name for tokens in SSE URLs
