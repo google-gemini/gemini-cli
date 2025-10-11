@@ -159,15 +159,26 @@ export const RenderInline = React.memo(RenderInlineInternal);
 /**
  * Utility function to get the plain text length of a string with markdown formatting
  * This is useful for calculating column widths in tables
+ *
+ * Uses a multi-pass approach to handle nested formatting correctly:
+ * 1. Extract link text (which may contain formatting)
+ * 2. Strip all inline formatting markers
+ * 3. Calculate visual width with string-width
  */
 export const getPlainTextLength = (text: string): number => {
-  const cleanText = text
-    .replace(/\*\*(.*?)\*\*/g, '$1')
-    .replace(/\*(.*?)\*/g, '$1')
-    .replace(/_(.*?)_/g, '$1')
-    .replace(/~~(.*?)~~/g, '$1')
-    .replace(/`(.*?)`/g, '$1')
-    .replace(/<u>(.*?)<\/u>/g, '$1')
-    .replace(/.*\[(.*?)\]\(.*\)/g, '$1');
+  let cleanText = text;
+
+  // Step 1: Handle links - extract link text (may contain formatting like **bold**)
+  cleanText = cleanText.replace(/\[([^\]]*)\]\([^)]*\)/g, '$1');
+
+  // Step 2: Strip all formatting markers (order matters - do multi-char first)
+  cleanText = cleanText
+    .replace(/\*\*([^*]+)\*\*/g, '$1') // Bold **text**
+    .replace(/~~([^~]+)~~/g, '$1') // Strikethrough ~~text~~
+    .replace(/<u>([^<]+)<\/u>/g, '$1') // Underline <u>text</u>
+    .replace(/`([^`]+)`/g, '$1') // Inline code `text`
+    .replace(/\*([^*]+)\*/g, '$1') // Italic *text*
+    .replace(/_([^_]+)_/g, '$1'); // Italic _text_
+
   return stringWidth(cleanText);
 };
