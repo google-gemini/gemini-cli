@@ -406,6 +406,63 @@ describe('KeypressContext - Kitty Protocol', () => {
         }),
       );
     });
+
+    it('should strip ANSI escape sequences from pasted content (Issue #3408)', async () => {
+      const originalPasteWorkaround = process.env['PASTE_WORKAROUND'];
+      process.env['PASTE_WORKAROUND'] = '1';
+
+      try {
+        const keyHandler = vi.fn();
+        // Simulate a build error with ANSI color codes
+        const pastedTextWithAnsi =
+          'Error: ./src/components/city-canvas.tsx:856:1\n' +
+          '\x1b[0m \x1b[90m 854 |\x1b[39m }\x1b[0m\n' +
+          '\x1b[0m \x1b[90m 855 |\x1b[39m attempts\x1b[33m++\x1b[39m\x1b[33m;\x1b[39m\x1b[0m\n' +
+          '\x1b[0m\x1b[31m\x1b[1m>\x1b[22m\x1b[39m\x1b[90m 856 |\x1b[39m \x1b[33m.\x1b[39m }\x1b[0m';
+
+        const passthroughWrapper = ({
+          children,
+        }: {
+          children: React.ReactNode;
+        }) => (
+          <KeypressProvider kittyProtocolEnabled={true}>
+            {children}
+          </KeypressProvider>
+        );
+
+        const { result } = renderHook(() => useKeypressContext(), {
+          wrapper: passthroughWrapper,
+        });
+
+        act(() => {
+          result.current.subscribe(keyHandler);
+        });
+
+        // Simulate a bracketed paste event with ANSI codes
+        act(() => {
+          stdin.sendPaste(pastedTextWithAnsi);
+        });
+
+        await waitFor(() => {
+          expect(keyHandler).toHaveBeenCalledTimes(1);
+        });
+
+        const calledWith = keyHandler.mock.calls[0][0];
+        expect(calledWith.paste).toBe(true);
+
+        expect(calledWith.sequence).not.toContain('\x1b[');
+        expect(calledWith.sequence).not.toContain('\x1b');
+        expect(calledWith.sequence).toContain('Error:');
+        expect(calledWith.sequence).toContain('854');
+        expect(calledWith.sequence).toContain('attempts');
+      } finally {
+        if (originalPasteWorkaround === undefined) {
+          delete process.env['PASTE_WORKAROUND'];
+        } else {
+          process.env['PASTE_WORKAROUND'] = originalPasteWorkaround;
+        }
+      }
+    });
   });
 
   describe('debug keystroke logging', () => {
