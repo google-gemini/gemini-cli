@@ -4,13 +4,22 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { expect, describe, it, beforeEach, vi, afterEach } from 'vitest';
+import {
+  expect,
+  describe,
+  it,
+  beforeEach,
+  beforeAll,
+  vi,
+  afterEach,
+} from 'vitest';
 import {
   checkCommandPermissions,
   escapeShellArg,
   getCommandRoots,
   getShellConfiguration,
   isCommandAllowed,
+  initializeShellParsers,
   stripShellWrapper,
 } from './shell-utils.js';
 import type { Config } from '../config/config.js';
@@ -32,6 +41,13 @@ vi.mock('shell-quote', () => ({
 }));
 
 let config: Config;
+const isWindowsRuntime = process.platform === 'win32';
+const describeWindowsOnly = isWindowsRuntime ? describe : describe.skip;
+
+beforeAll(async () => {
+  mockPlatform.mockReturnValue('linux');
+  await initializeShellParsers();
+});
 
 beforeEach(() => {
   mockPlatform.mockReturnValue('linux');
@@ -133,37 +149,45 @@ describe('isCommandAllowed', () => {
   });
 
   describe('command substitution', () => {
-    it('should block command substitution using `$(...)`', () => {
+    it('should allow command substitution using `$(...)`', () => {
       const result = isCommandAllowed('echo $(rm -rf /)', config);
-      expect(result.allowed).toBe(false);
-      expect(result.reason).toContain('Command substitution');
+      expect(result.allowed).toBe(true);
+      expect(result.reason).toBeUndefined();
     });
 
-    it('should block command substitution using `<(...)`', () => {
+    it('should allow command substitution using `<(...)`', () => {
       const result = isCommandAllowed('diff <(ls) <(ls -a)', config);
-      expect(result.allowed).toBe(false);
-      expect(result.reason).toContain('Command substitution');
+      expect(result.allowed).toBe(true);
+      expect(result.reason).toBeUndefined();
     });
 
-    it('should block command substitution using `>(...)`', () => {
+    it('should allow command substitution using `>(...)`', () => {
       const result = isCommandAllowed(
         'echo "Log message" > >(tee log.txt)',
         config,
       );
-      expect(result.allowed).toBe(false);
-      expect(result.reason).toContain('Command substitution');
+      expect(result.allowed).toBe(true);
+      expect(result.reason).toBeUndefined();
     });
 
-    it('should block command substitution using backticks', () => {
+    it('should allow command substitution using backticks', () => {
       const result = isCommandAllowed('echo `rm -rf /`', config);
-      expect(result.allowed).toBe(false);
-      expect(result.reason).toContain('Command substitution');
+      expect(result.allowed).toBe(true);
+      expect(result.reason).toBeUndefined();
     });
 
     it('should allow substitution-like patterns inside single quotes', () => {
       config.getCoreTools = () => ['ShellTool(echo)'];
       const result = isCommandAllowed("echo '$(pwd)'", config);
       expect(result.allowed).toBe(true);
+    });
+
+    it('should block a command when parsing fails', () => {
+      const result = isCommandAllowed('ls &&', config);
+      expect(result.allowed).toBe(false);
+      expect(result.reason).toBe(
+        'Command rejected because it could not be parsed safely',
+      );
     });
   });
 });
@@ -175,6 +199,16 @@ describe('checkCommandPermissions', () => {
       expect(result).toEqual({
         allAllowed: true,
         disallowedCommands: [],
+      });
+    });
+
+    it('should block commands that cannot be parsed safely', () => {
+      const result = checkCommandPermissions('ls &&', config);
+      expect(result).toEqual({
+        allAllowed: false,
+        disallowedCommands: ['ls &&'],
+        blockReason: 'Command rejected because it could not be parsed safely',
+        isHardDenial: true,
       });
     });
 
@@ -289,6 +323,54 @@ describe('getCommandRoots', () => {
   it('should correctly parse a chained command with quotes', () => {
     const result = getCommandRoots('echo "hello" && git commit -m "feat"');
     expect(result).toEqual(['echo', 'git']);
+  });
+
+  it('should include nested command substitutions', () => {
+    const result = getCommandRoots('echo $(rm -rf /)');
+    expect(result).toEqual(['echo', 'rm']);
+  });
+
+  it('should include process substitutions', () => {
+    const result = getCommandRoots('diff <(ls) <(ls -a)');
+    expect(result).toEqual(['diff', 'ls', 'ls']);
+  });
+
+  it('should include backtick substitutions', () => {
+    const result = getCommandRoots('echo `rm -rf /`');
+    expect(result).toEqual(['echo', 'rm']);
+  });
+});
+
+describeWindowsOnly('PowerShell integration', () => {
+  const originalComSpec = process.env['ComSpec'];
+
+  beforeEach(() => {
+    mockPlatform.mockReturnValue('win32');
+    const systemRoot = process.env['SystemRoot'] || 'C:\\\\Windows';
+    process.env['ComSpec'] =
+      `${systemRoot}\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe`;
+  });
+
+  afterEach(() => {
+    if (originalComSpec === undefined) {
+      delete process.env['ComSpec'];
+    } else {
+      process.env['ComSpec'] = originalComSpec;
+    }
+  });
+
+  it('should return command roots using PowerShell AST output', () => {
+    const roots = getCommandRoots('Get-ChildItem | Select-Object Name');
+    expect(roots.length).toBeGreaterThan(0);
+    expect(roots).toContain('Get-ChildItem');
+  });
+
+  it('should block commands when PowerShell parser reports errors', () => {
+    const { allowed, reason } = isCommandAllowed('Get-ChildItem |', config);
+    expect(allowed).toBe(false);
+    expect(reason).toBe(
+      'Command rejected because it could not be parsed safely',
+    );
   });
 });
 
