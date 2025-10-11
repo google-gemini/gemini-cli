@@ -621,8 +621,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
     addMessage,
     clearQueue,
     getQueuedMessagesText,
-    popLastMessage,
-    hasMessages,
+    popAllMessages,
   } = useMessageQueue({
     isConfigInitialized,
     streamingState,
@@ -1281,8 +1280,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       onWorkspaceMigrationDialogOpen,
       onWorkspaceMigrationDialogClose,
       handleProQuotaChoice,
-      popLastMessage,
-      hasMessages,
+      popAllMessages,
     }),
     [
       handleThemeSelect,
@@ -1308,8 +1306,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       onWorkspaceMigrationDialogOpen,
       onWorkspaceMigrationDialogClose,
       handleProQuotaChoice,
-      popLastMessage,
-      hasMessages,
+      popAllMessages,
     ],
   );
 
