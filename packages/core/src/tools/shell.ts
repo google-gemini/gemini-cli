@@ -42,31 +42,6 @@ import {
 
 export const OUTPUT_UPDATE_INTERVAL_MS = 1000;
 
-// Global tracker for background processes that need to be killed on cancellation
-const globalBackgroundPIDs = new Set<number>();
-
-export function killAllBackgroundProcesses(): void {
-  for (const pid of globalBackgroundPIDs) {
-    try {
-      if (os.platform() === 'win32') {
-        spawn('taskkill', ['/pid', pid.toString(), '/f'], { stdio: 'ignore' });
-      } else {
-        process.kill(-pid, 'SIGTERM');
-        setTimeout(() => {
-          try {
-            process.kill(-pid, 'SIGKILL');
-          } catch {
-            // Process may already be dead
-          }
-        }, 200);
-      }
-    } catch {
-      // Process may already be dead
-    }
-  }
-  globalBackgroundPIDs.clear();
-}
-
 /**
  * Parses the `--allowed-tools` flag to determine which sub-commands of the
  * ShellTool are allowed. The flag can be provided multiple times.
@@ -310,8 +285,34 @@ export class ShellToolInvocation extends BaseToolInvocation<
         }
       }
 
-      // Track background processes globally for cancellation
-      backgroundPIDs.forEach((pid) => globalBackgroundPIDs.add(pid));
+      // Register cleanup handler with AbortSignal for background processes
+      if (backgroundPIDs.length > 0 && !signal.aborted) {
+        const cleanup = () => {
+          for (const pid of backgroundPIDs) {
+            try {
+              if (os.platform() === 'win32') {
+                spawn('taskkill', ['/pid', pid.toString(), '/f'], {
+                  stdio: 'ignore',
+                });
+              } else {
+                process.kill(-pid, 'SIGTERM');
+                setTimeout(() => {
+                  try {
+                    process.kill(-pid, 'SIGKILL');
+                  } catch {
+                    // Process may already be dead
+                  }
+                }, 200);
+              }
+            } catch {
+              // Process may already be dead
+            }
+          }
+        };
+
+        // Register cleanup with the AbortSignal
+        signal.addEventListener('abort', cleanup, { once: true });
+      }
 
       let llmContent = '';
       if (result.aborted) {
