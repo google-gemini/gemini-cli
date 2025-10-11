@@ -88,6 +88,7 @@ export interface CliArgs {
   useSmartEdit: boolean | undefined;
   useWriteTodos: boolean | undefined;
   outputFormat: string | undefined;
+  streamFormat: string | undefined;
 }
 
 export async function parseArguments(settings: Settings): Promise<CliArgs> {
@@ -287,6 +288,12 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
           type: 'string',
           description: 'The format of the CLI output.',
           choices: ['text', 'json'],
+        })
+        .option('stream-format', {
+          type: 'string',
+          description:
+            'Enable streaming JSON output format for non-interactive mode.',
+          choices: ['output-json'],
         })
         .deprecateOption(
           'show-memory-usage',
@@ -753,7 +760,10 @@ export async function loadCliConfig(
     useSmartEdit: argv.useSmartEdit ?? settings.useSmartEdit,
     useWriteTodos: argv.useWriteTodos ?? settings.useWriteTodos,
     output: {
-      format: (argv.outputFormat ?? settings.output?.format) as OutputFormat,
+      format:
+        argv.streamFormat === 'output-json'
+          ? ('stream-json' as OutputFormat)
+          : ((argv.outputFormat ?? settings.output?.format) as OutputFormat),
     },
     useModelRouter,
     enableMessageBusIntegration:

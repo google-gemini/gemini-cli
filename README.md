@@ -228,6 +228,13 @@ the `--output-format json` flag to get structured output:
 gemini -p "Explain the architecture of this codebase" --output-format json
 ```
 
+For real-time event streaming (useful for monitoring long-running operations),
+use `--stream-format output-json` to get newline-delimited JSON events:
+
+```bash
+gemini -p "Run tests and deploy" --stream-format output-json
+```
+
 ### Quick Examples
 
 #### Start a new project
