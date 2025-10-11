@@ -33,7 +33,7 @@ import {
   runExitCleanup,
 } from './utils/cleanup.js';
 import { getCliVersion } from './utils/version.js';
-import type { Config } from '@google/gemini-cli-core';
+import type { Config, ResumedSessionData } from '@google/gemini-cli-core';
 import {
   sessionId,
   logUserPrompt,
@@ -54,6 +54,7 @@ import { detectAndEnableKittyProtocol } from './ui/utils/kittyProtocolDetector.j
 import { checkForUpdates } from './ui/utils/updateCheck.js';
 import { handleAutoUpdate } from './utils/handleAutoUpdate.js';
 import { appEvents, AppEvent } from './utils/events.js';
+import { SessionSelector } from './utils/sessionUtils.js';
 import { computeWindowTitle } from './utils/windowTitle.js';
 import { SettingsContext } from './ui/contexts/SettingsContext.js';
 
@@ -66,6 +67,7 @@ import {
   relaunchOnExitCode,
 } from './utils/relaunch.js';
 import { loadSandboxConfig } from './config/sandboxConfig.js';
+import { deleteSession, listSessions } from './utils/sessions.js';
 import { ExtensionEnablementManager } from './config/extensions/extensionEnablement.js';
 
 export function validateDnsResolutionOrder(
@@ -379,6 +381,19 @@ export async function main() {
       process.exit(0);
     }
 
+    // Handle --list-sessions flag
+    if (config.getListSessions()) {
+      await listSessions(config);
+      process.exit(0);
+    }
+
+    // Handle --delete-session flag
+    const sessionToDelete = config.getDeleteSession();
+    if (sessionToDelete) {
+      await deleteSession(config, sessionToDelete);
+      process.exit(0);
+    }
+
     const wasRaw = process.stdin.isRaw;
     if (config.isInteractive() && !wasRaw && process.stdin.isTTY) {
       // Set this as early as possible to avoid spurious characters from
@@ -418,6 +433,26 @@ export async function main() {
       ...(await getStartupWarnings()),
       ...(await getUserStartupWarnings()),
     ];
+
+    // Handle --resume flag
+    let resumedSessionData: ResumedSessionData | undefined = undefined;
+    if (argv.resume) {
+      const sessionSelector = new SessionSelector(config);
+      try {
+        const result = await sessionSelector.resolveSession(argv.resume);
+        resumedSessionData = {
+          conversation: result.sessionData,
+          filePath: result.sessionPath,
+        };
+        // Use the existing session ID to continue recording to the same session
+        config.setSessionId(resumedSessionData.conversation.sessionId);
+      } catch (error) {
+        console.error(
+          `Error resuming session: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        );
+        process.exit(1);
+      }
+    }
 
     // Render UI, passing necessary config values. Check that there is no command line question.
     if (config.isInteractive()) {
@@ -470,7 +505,13 @@ export async function main() {
       console.log('Session ID: %s', sessionId);
     }
 
-    await runNonInteractive(nonInteractiveConfig, settings, input, prompt_id);
+    await runNonInteractive(
+      nonInteractiveConfig,
+      settings,
+      input,
+      prompt_id,
+      resumedSessionData,
+    );
     // Call cleanup before process.exit, which causes cleanup to not run
     await runExitCleanup();
     process.exit(0);
