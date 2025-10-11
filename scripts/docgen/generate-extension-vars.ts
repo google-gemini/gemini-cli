@@ -32,7 +32,10 @@ function formatVariableName(name: string): string {
 function renderTable(entries: SchemaEntry[]): string {
   const header = ['| variable | description |', '| --- | --- |'];
   const rows = entries.map(([key, value]) => {
-    const description = value.description.trim().replace(/\|/g, '\\|').replace(/\r?\n/g, '<br />');
+    const description = value.description
+      .trim()
+      .replace(/\|/g, '\\|')
+      .replace(/\r?\n/g, '<br />');
     return `| \`${formatVariableName(key)}\` | ${description} |`;
   });
 
@@ -48,14 +51,23 @@ function renderTable(entries: SchemaEntry[]): string {
 }
 
 function upsertBlock(original: string, block: string): string {
-  if (original.includes(START_MARKER) && original.includes(END_MARKER)) {
+  const hasStart = original.includes(START_MARKER);
+  const hasEnd = original.includes(END_MARKER);
+
+  if (hasStart && hasEnd) {
     const pattern = new RegExp(
       `${escapeRegExp(START_MARKER)}[\\s\\S]*?${escapeRegExp(END_MARKER)}`,
     );
     return original.replace(pattern, block);
   }
 
-  return `${original.replace(/\s*$/, '')}\n\n${block}\n`;
+  if (hasStart || hasEnd) {
+    throw new Error(
+      `Unbalanced auto-generation markers found in ${DOC_PATH}. Please fix it manually.`,
+    );
+  }
+
+  return `${original.trim()}\n\n${block}\n`;
 }
 
 function main() {
