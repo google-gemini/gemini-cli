@@ -45,6 +45,38 @@ export const DRAG_COMPLETION_TIMEOUT_MS = 100; // Broadcast full path after 100m
 export const SINGLE_QUOTE = "'";
 export const DOUBLE_QUOTE = '"';
 
+// Map of accented characters to their corresponding Alt+letter combinations
+// These are sent by iTerm2/VSCode terminals when pressing Alt+letter, but with meta:false
+const ACCENTED_CHAR_TO_LETTER: Record<string, string> = {
+  å: 'a', // Alt+A
+  '∫': 'b', // Alt+B
+  ç: 'c', // Alt+C
+  '∂': 'd', // Alt+D
+  '´': 'e', // Alt+E (acute accent)
+  ƒ: 'f', // Alt+F
+  '©': 'g', // Alt+G
+  '˙': 'h', // Alt+H (dot above)
+  ˆ: 'i', // Alt+I (circumflex)
+  '∆': 'j', // Alt+J
+  '˚': 'k', // Alt+K (ring above)
+  '¬': 'l', // Alt+L
+  µ: 'm', // Alt+M
+  '˜': 'n', // Alt+N (tilde)
+  ø: 'o', // Alt+O
+  π: 'p', // Alt+P
+  œ: 'q', // Alt+Q
+  '®': 'r', // Alt+R
+  ß: 's', // Alt+S
+  '†': 't', // Alt+T
+  '¨': 'u', // Alt+U (diaeresis)
+  '√': 'v', // Alt+V
+  '∑': 'w', // Alt+W
+  '≈': 'x', // Alt+X
+  '¥': 'y', // Alt+Y (yen symbol in VSCode, backslash in iTerm2)
+  '\\': 'y', // Alt+Y (backslash in some terminals)
+  Ω: 'z', // Alt+Z
+};
+
 export interface Key {
   name: string;
   ctrl: boolean;
@@ -432,6 +464,22 @@ export function KeypressProvider({
           }
         }, DRAG_COMPLETION_TIMEOUT_MS);
 
+        return;
+      }
+
+      // Handle special accented characters that map to Alt+letter FIRST
+      // iTerm2/VSCode send accented chars when pressing Alt+letter, but with meta:false
+      // This must come before backslash line continuation check since Alt+Y sends \
+      const mappedLetter = ACCENTED_CHAR_TO_LETTER[key.sequence];
+      if (mappedLetter && !key.meta) {
+        broadcast({
+          name: mappedLetter,
+          ctrl: false,
+          meta: true,
+          shift: false,
+          paste: isPaste,
+          sequence: key.sequence,
+        });
         return;
       }
 

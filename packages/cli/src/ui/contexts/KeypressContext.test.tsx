@@ -958,30 +958,6 @@ describe('Drag and Drop Handling', () => {
 });
 
 describe('Terminal-specific Alt+key combinations', () => {
-  /**
-   *
-   * ---ITERM2----
-   * Alt+A: {"name":"a","ctrl":false,"meta":true,"shift":false,"paste":false,"sequence":"å"}
-   * Alt+O: {"name":"o","ctrl":false,"meta":true,"shift":false,"paste":false,"sequence":"ø"}
-   * Alt+M: {"name":"m","ctrl":false,"meta":true,"shift":false,"paste":false,"sequence":"µ"}
-   *
-   * ----Ghostty----
-   * Alt+A: {"name":"a","ctrl":false,"meta":true,"shift":false,"paste":false,"sequence":"\u001b[97;3u","kittyProtocol":true}
-   * Alt+O: {"name":"o","ctrl":false,"meta":true,"shift":false,"paste":false,"sequence":"\u001b[111;3u","kittyProtocol":true}
-   * Alt+M: {"name":"m","ctrl":false,"meta":true,"shift":false,"paste":false,"sequence":"\u001b[109;3u","kittyProtocol":true}
-   *
-   * ---Mac terminal----
-   * Alt+A: {"sequence":"\u001ba","name":"a","ctrl":false,"meta":true,"shift":false,"paste":false}
-   * Alt+O: {"sequence":"\u001bo","name":"o","ctrl":false,"meta":true,"shift":false,"paste":false}
-   * Alt+M: {"sequence":"\u001bm","name":"m","ctrl":false,"meta":true,"shift":false,"paste":false}
-   *
-   * --Mac vscode--
-   * Alt+A: {"name":"a","ctrl":false,"meta":true,"shift":false,"paste":false,"sequence":"å"}
-   * Alt+O: {"name":"o","ctrl":false,"meta":true,"shift":false,"paste":false,"sequence":"ø"}
-   * Alt+M: {"name":"m","ctrl":false,"meta":true,"shift":false,"paste":false,"sequence":"µ"}
-   *
-   */
-
   let stdin: MockStdin;
   const mockSetRawMode = vi.fn();
 
@@ -1001,77 +977,81 @@ describe('Terminal-specific Alt+key combinations', () => {
   // Terminals to test
   const terminals = ['iTerm2', 'Ghostty', 'MacTerminal', 'VSCodeTerminal'];
 
-  // Key mappings: letter -> [keycode, accented character]
-  const keys: Record<string, [number, string]> = {
-    a: [97, 'å'],
-    o: [111, 'ø'],
-    m: [109, 'µ'],
+  // Key mappings: letter -> [keycode, accented character, shouldHaveMeta]
+  // Note: µ (mu) is sent with meta:false on iTerm2/VSCode
+  const keys: Record<string, [number, string, boolean]> = {
+    a: [97, 'å', true],
+    o: [111, 'ø', true],
+    m: [109, 'µ', false],
   };
 
   it.each(
     terminals.flatMap((terminal) =>
-      Object.entries(keys).map(([key, [keycode, accentedChar]]) => {
-        if (terminal === 'Ghostty') {
-          // Ghostty uses kitty protocol sequences
-          return {
-            terminal,
-            key,
-            kittySequence: `\x1b[${keycode};3u`,
-            expected: {
-              name: key,
-              ctrl: false,
-              meta: true,
-              shift: false,
-              paste: false,
-              kittyProtocol: true,
-            },
-          };
-        } else if (terminal === 'MacTerminal') {
-          // Mac Terminal sends ESC + letter
-          return {
-            terminal,
-            key,
-            input: {
-              sequence: `\x1b${key}`,
-              name: key,
-              ctrl: false,
-              meta: true,
-              shift: false,
-              paste: false,
-            },
-            expected: {
-              sequence: `\x1b${key}`,
-              name: key,
-              ctrl: false,
-              meta: true,
-              shift: false,
-              paste: false,
-            },
-          };
-        } else {
-          // iTerm2 and VSCode send accented characters (å, ø, µ)
-          return {
-            terminal,
-            key,
-            input: {
-              name: key,
-              ctrl: false,
-              meta: true,
-              shift: false,
-              paste: false,
-              sequence: accentedChar,
-            },
-            expected: {
-              name: key,
-              ctrl: false,
-              meta: true,
-              shift: false,
-              paste: false,
-              sequence: accentedChar,
-            },
-          };
-        }
-      }),
+      Object.entries(keys).map(
+        ([key, [keycode, accentedChar, shouldHaveMeta]]) => {
+          if (terminal === 'Ghostty') {
+            // Ghostty uses kitty protocol sequences
+            return {
+              terminal,
+              key,
+              kittySequence: `\x1b[${keycode};3u`,
+              expected: {
+                name: key,
+                ctrl: false,
+                meta: true,
+                shift: false,
+                paste: false,
+                kittyProtocol: true,
+              },
+            };
+          } else if (terminal === 'MacTerminal') {
+            // Mac Terminal sends ESC + letter
+            return {
+              terminal,
+              key,
+              input: {
+                sequence: `\x1b${key}`,
+                name: key,
+                ctrl: false,
+                meta: true,
+                shift: false,
+                paste: false,
+              },
+              expected: {
+                sequence: `\x1b${key}`,
+                name: key,
+                ctrl: false,
+                meta: true,
+                shift: false,
+                paste: false,
+              },
+            };
+          } else {
+            // iTerm2 and VSCode send accented characters (å, ø, µ)
+            // Note: µ comes with meta:false but gets converted to m with meta:true
+            return {
+              terminal,
+              key,
+              input: {
+                name: key,
+                ctrl: false,
+                meta: shouldHaveMeta,
+                shift: false,
+                paste: false,
+                sequence: accentedChar,
+              },
+              expected: {
+                name: key,
+                ctrl: false,
+                meta: true, // Always expect meta:true after conversion
+                shift: false,
+                paste: false,
+                sequence: accentedChar,
+              },
+            };
+          }
+        },
+      ),
     ),
   )(
     'should handle Alt+$key in $terminal',
