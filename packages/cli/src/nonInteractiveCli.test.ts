@@ -116,8 +116,8 @@ describe('runNonInteractive', () => {
       getContentGeneratorConfig: vi.fn().mockReturnValue({}),
       getDebugMode: vi.fn().mockReturnValue(false),
       getOutputFormat: vi.fn().mockReturnValue('text'),
-      getFolderTrustFeature: vi.fn().mockReturnValue(false),
       getFolderTrust: vi.fn().mockReturnValue(false),
+      isTrustedFolder: vi.fn().mockReturnValue(false),
     } as unknown as Config;
 
     mockSettings = {
@@ -872,5 +872,58 @@ describe('runNonInteractive', () => {
     expect(mockAction).toHaveBeenCalledWith(expect.any(Object), 'arg1 arg2');
 
     expect(processStdoutSpy).toHaveBeenCalledWith('Acknowledged');
+  });
+
+  it('should allow a normally-excluded tool when --allowed-tools is set', async () => {
+    // By default, ShellTool is excluded in non-interactive mode.
+    // This test ensures that --allowed-tools overrides this exclusion.
+    vi.mocked(mockConfig.getToolRegistry).mockReturnValue({
+      getTool: vi.fn().mockReturnValue({
+        name: 'ShellTool',
+        description: 'A shell tool',
+        run: vi.fn(),
+      }),
+      getFunctionDeclarations: vi.fn().mockReturnValue([{ name: 'ShellTool' }]),
+    } as unknown as ToolRegistry);
+
+    const toolCallEvent: ServerGeminiStreamEvent = {
+      type: GeminiEventType.ToolCallRequest,
+      value: {
+        callId: 'tool-shell-1',
+        name: 'ShellTool',
+        args: { command: 'ls' },
+        isClientInitiated: false,
+        prompt_id: 'prompt-id-allowed',
+      },
+    };
+    const toolResponse: Part[] = [{ text: 'file.txt' }];
+    mockCoreExecuteToolCall.mockResolvedValue({ responseParts: toolResponse });
+
+    const firstCallEvents: ServerGeminiStreamEvent[] = [toolCallEvent];
+    const secondCallEvents: ServerGeminiStreamEvent[] = [
+      { type: GeminiEventType.Content, value: 'file.txt' },
+      {
+        type: GeminiEventType.Finished,
+        value: { reason: undefined, usageMetadata: { totalTokenCount: 10 } },
+      },
+    ];
+
+    mockGeminiClient.sendMessageStream
+      .mockReturnValueOnce(createStreamFromEvents(firstCallEvents))
+      .mockReturnValueOnce(createStreamFromEvents(secondCallEvents));
+
+    await runNonInteractive(
+      mockConfig,
+      mockSettings,
+      'List the files',
+      'prompt-id-allowed',
+    );
+
+    expect(mockCoreExecuteToolCall).toHaveBeenCalledWith(
+      mockConfig,
+      expect.objectContaining({ name: 'ShellTool' }),
+      expect.any(AbortSignal),
+    );
+    expect(processStdoutSpy).toHaveBeenCalledWith('file.txt');
   });
 });

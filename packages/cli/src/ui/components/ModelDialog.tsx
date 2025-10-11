@@ -29,21 +29,25 @@ const MODEL_OPTIONS = [
     value: DEFAULT_GEMINI_MODEL_AUTO,
     title: 'Auto (recommended)',
     description: 'Let the system choose the best model for your task',
+    key: DEFAULT_GEMINI_MODEL_AUTO,
   },
   {
     value: DEFAULT_GEMINI_MODEL,
     title: 'Pro',
     description: 'For complex tasks that require deep reasoning and creativity',
+    key: DEFAULT_GEMINI_MODEL,
   },
   {
     value: DEFAULT_GEMINI_FLASH_MODEL,
     title: 'Flash',
     description: 'For tasks that need a balance of speed and reasoning',
+    key: DEFAULT_GEMINI_FLASH_MODEL,
   },
   {
     value: DEFAULT_GEMINI_FLASH_LITE_MODEL,
     title: 'Flash-Lite',
     description: 'For simple tasks that need to be done quickly',
+    key: DEFAULT_GEMINI_FLASH_LITE_MODEL,
   },
 ];
 

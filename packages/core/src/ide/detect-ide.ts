@@ -21,6 +21,10 @@ export interface IdeInfo {
   displayName: string;
 }
 
+export function isCloudShell(): boolean {
+  return !!(process.env['EDITOR_IN_CLOUD_SHELL'] || process.env['CLOUD_SHELL']);
+}
+
 export function detectIdeFromEnv(): IdeInfo {
   if (process.env['__COG_BASHRC_SOURCED']) {
     return IDE_DEFINITIONS.devin;
@@ -34,7 +38,7 @@ export function detectIdeFromEnv(): IdeInfo {
   if (process.env['CODESPACES']) {
     return IDE_DEFINITIONS.codespaces;
   }
-  if (process.env['EDITOR_IN_CLOUD_SHELL'] || process.env['CLOUD_SHELL']) {
+  if (isCloudShell()) {
     return IDE_DEFINITIONS.cloudshell;
   }
   if (process.env['TERM_PRODUCT'] === 'Trae') {

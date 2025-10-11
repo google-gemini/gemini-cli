@@ -27,14 +27,27 @@ concurrency:
     ${{ github.ref != 'refs/heads/main' && !startsWith(github.ref, 'refs/heads/release/') }}
 
 jobs:
+  merge_queue_skipper:
+    name: 'Merge Queue Skipper'
+    runs-on: 'gemini-cli-ubuntu-16-core'
+    outputs:
+      skip: '${{ steps.merge-queue-e2e-skipper.outputs.skip-check }}'
+    steps:
+      - id: 'merge-queue-e2e-skipper'
+        uses: 'cariad-tech/merge-queue-ci-skipper@1032489e59437862c90a08a2c92809c903883772' # ratchet:cariad-tech/merge-queue-ci-skipper@main
+        with:
+          secret: '${{ secrets.GITHUB_TOKEN }}'
+
   e2e_linux:
     name: 'E2E Test (Linux) - ${{ matrix.sandbox }}'
+    needs: 'merge_queue_skipper'
     if: |
-      github.event_name == 'push' ||
+      needs.merge_queue_skipper.outputs.skip == 'false' &&
+      (github.event_name == 'push' ||
       github.event_name == 'merge_group' ||
       github.event_name == 'workflow_dispatch' ||
       (github.event.pull_request.head.repo.full_name == github.repository) ||
-      (github.event.label.name == 'maintainer:e2e:ok')
+      (github.event.label.name == 'maintainer:e2e:ok'))
     runs-on: 'gemini-cli-ubuntu-16-core'
     strategy:
       fail-fast: false
@@ -89,14 +102,15 @@ jobs:
 
   e2e_mac:
     name: 'E2E Test (macOS)'
+    needs: 'merge_queue_skipper'
     if: |
-      github.event_name == 'push' ||
+      needs.merge_queue_skipper.outputs.skip == 'false' &&
+      (github.event_name == 'push' ||
       github.event_name == 'merge_group' ||
       github.event_name == 'workflow_dispatch' ||
       (github.event.pull_request.head.repo.full_name == github.repository) ||
-      (github.event.label.name == 'maintainer:e2e:ok')
+      (github.event.label.name == 'maintainer:e2e:ok'))
     runs-on: 'macos-latest'
-    continue-on-error: true
     steps:
       - name: 'Checkout (fork)'
         uses: 'actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955' # ratchet:actions/checkout@v5
@@ -126,8 +140,6 @@ jobs:
         if: "runner.os == 'macOS'"
         run: |
           npm cache clean --force
-          npm install --no-save @rollup/rollup-darwin-arm64 || true
-
       - name: 'Run E2E tests (non-Windows)'
         if: "runner.os != 'Windows'"
         env:
@@ -135,16 +147,18 @@ jobs:
           KEEP_OUTPUT: 'true'
           SANDBOX: 'sandbox:none'
           VERBOSE: 'true'
-        run: 'npx vitest run --root ./integration-tests'
+        run: 'npm run test:integration:sandbox:none'
 
   e2e_windows:
     name: 'Slow E2E - Win'
+    needs: 'merge_queue_skipper'
     if: |
-      github.event_name == 'push' ||
+      needs.merge_queue_skipper.outputs.skip == 'false' &&
+      (github.event_name == 'push' ||
       github.event_name == 'merge_group' ||
       github.event_name == 'workflow_dispatch' ||
       (github.event.pull_request.head.repo.full_name == github.repository) ||
-      (github.event.label.name == 'maintainer:e2e:ok')
+      (github.event.label.name == 'maintainer:e2e:ok'))
     runs-on: 'gemini-cli-windows-16-core'
     continue-on-error: true
 
@@ -204,7 +218,7 @@ jobs:
           UV_THREADPOOL_SIZE: '32'
           NODE_ENV: 'test'
         shell: 'pwsh'
-        run: 'npx vitest run --root ./integration-tests'
+        run: 'npm run test:integration:sandbox:none'
 
   e2e:
     name: 'E2E'
@@ -223,8 +237,9 @@ jobs:
     steps:
       - name: 'Check E2E test results'
         run: |
-          if [[ ${{ needs.e2e_linux.result }} != 'success' ]]; then
-            echo "The required E2E test job failed."
+          if [[ (${{ needs.e2e_linux.result }} != 'success' && ${{ needs.e2e_linux.result }} != 'skipped') || \
+               (${{ needs.e2e_mac.result }} != 'success' && ${{ needs.e2e_mac.result }} != 'skipped') ]]; then
+            echo "One or more E2E jobs failed."
             exit 1
           fi
-          echo "All required E2E test jobs passed!"
+          echo "All required E2E jobs passed!"

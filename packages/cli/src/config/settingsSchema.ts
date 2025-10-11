@@ -16,6 +16,8 @@ import {
   DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
 } from '@google/gemini-cli-core';
 import type { CustomTheme } from '../ui/themes/theme.js';
+import type { SessionRetentionSettings } from './settings.js';
+import { DEFAULT_MIN_RETENTION } from '../utils/sessionCleanup.js';
 
 export type SettingsType =
   | 'boolean'
@@ -185,6 +187,54 @@ const SETTINGS_SCHEMA = {
         description: 'Enable debug logging of keystrokes to the console.',
         showInDialog: true,
       },
+      sessionRetention: {
+        type: 'object',
+        label: 'Session Retention',
+        category: 'General',
+        requiresRestart: false,
+        default: undefined as SessionRetentionSettings | undefined,
+        properties: {
+          enabled: {
+            type: 'boolean',
+            label: 'Enable Session Cleanup',
+            category: 'General',
+            requiresRestart: false,
+            default: false,
+            description: 'Enable automatic session cleanup',
+            showInDialog: true,
+          },
+          maxAge: {
+            type: 'string',
+            label: 'Max Session Age',
+            category: 'General',
+            requiresRestart: false,
+            default: undefined as string | undefined,
+            description:
+              'Maximum age of sessions to keep (e.g., "30d", "7d", "24h", "1w")',
+            showInDialog: false,
+          },
+          maxCount: {
+            type: 'number',
+            label: 'Max Session Count',
+            category: 'General',
+            requiresRestart: false,
+            default: undefined as number | undefined,
+            description:
+              'Alternative: Maximum number of sessions to keep (most recent)',
+            showInDialog: false,
+          },
+          minRetention: {
+            type: 'string',
+            label: 'Min Retention Period',
+            category: 'General',
+            requiresRestart: false,
+            default: DEFAULT_MIN_RETENTION,
+            description: `Minimum retention period (safety limit, defaults to "${DEFAULT_MIN_RETENTION}")`,
+            showInDialog: false,
+          },
+        },
+        description: 'Settings for automatic session cleanup.',
+      },
     },
   },
   output: {
@@ -246,6 +296,16 @@ const SETTINGS_SCHEMA = {
         requiresRestart: true,
         default: false,
         description: 'Hide the window title bar',
+        showInDialog: true,
+      },
+      showStatusInTitle: {
+        type: 'boolean',
+        label: 'Show Status in Title',
+        category: 'UI',
+        requiresRestart: false,
+        default: false,
+        description:
+          'Show Gemini CLI status and thoughts in the terminal window title',
         showInDialog: true,
       },
       hideTips: {
@@ -351,6 +411,15 @@ const SETTINGS_SCHEMA = {
         description: 'Show citations for generated text in the chat.',
         showInDialog: true,
       },
+      useFullWidth: {
+        type: 'boolean',
+        label: 'Use Full Width',
+        category: 'UI',
+        requiresRestart: false,
+        default: false,
+        description: 'Use the entire width of the terminal for output.',
+        showInDialog: true,
+      },
       customWittyPhrases: {
         type: 'array',
         label: 'Custom Witty Phrases',
@@ -383,7 +452,7 @@ const SETTINGS_SCHEMA = {
             label: 'Screen Reader Mode',
             category: 'UI',
             requiresRestart: true,
-            default: undefined as boolean | undefined,
+            default: false,
             description:
               'Render output in plain-text to be more screen reader accessible',
             showInDialog: true,
@@ -653,7 +722,7 @@ const SETTINGS_SCHEMA = {
             label: 'Enable Interactive Shell',
             category: 'Tools',
             requiresRestart: true,
-            default: false,
+            default: true,
             description:
               'Use node-pty for an interactive shell experience. Fallback to child_process still applies.',
             showInDialog: true,
@@ -751,7 +820,7 @@ const SETTINGS_SCHEMA = {
         label: 'Enable Tool Output Truncation',
         category: 'General',
         requiresRestart: true,
-        default: false,
+        default: true,
         description: 'Enable truncation of large tool outputs.',
         showInDialog: true,
       },
@@ -986,10 +1055,19 @@ const SETTINGS_SCHEMA = {
         label: 'Use Model Router',
         category: 'Experimental',
         requiresRestart: true,
-        default: true,
+        default: false,
         description:
           'Enable model routing to route requests to the best model based on complexity.',
         showInDialog: true,
+      },
+      enableSubagents: {
+        type: 'boolean',
+        label: 'Enable Subagents',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: false,
+        description: 'Enable experimental subagents.',
+        showInDialog: false,
       },
     },
   },
@@ -1037,9 +1115,13 @@ export function getSettingsSchema(): SettingsSchemaType {
 type InferSettings<T extends SettingsSchema> = {
   -readonly [K in keyof T]?: T[K] extends { properties: SettingsSchema }
     ? InferSettings<T[K]['properties']>
-    : T[K]['default'] extends boolean
-      ? boolean
-      : T[K]['default'];
+    : T[K]['type'] extends 'enum'
+      ? T[K]['options'] extends readonly SettingEnumOption[]
+        ? T[K]['options'][number]['value']
+        : T[K]['default']
+      : T[K]['default'] extends boolean
+        ? boolean
+        : T[K]['default'];
 };
 
 export type Settings = InferSettings<SettingsSchemaType>;
