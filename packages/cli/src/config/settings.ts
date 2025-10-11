@@ -29,6 +29,7 @@ import {
 } from './settingsSchema.js';
 import { resolveEnvVarsInObject } from '../utils/envVarResolver.js';
 import { customDeepMerge, type MergeableObject } from '../utils/deepMerge.js';
+import { safeWriteFileSync } from '../utils/safeFs.js';
 import { updateSettingsFilePreservingFormat } from '../utils/commentJson.js';
 import { disableExtension } from './extension.js';
 
@@ -610,7 +611,7 @@ export function loadSettings(
             if (MIGRATE_V2_OVERWRITE) {
               try {
                 fs.renameSync(filePath, `${filePath}.orig`);
-                fs.writeFileSync(
+                safeWriteFileSync(
                   filePath,
                   JSON.stringify(migratedSettings, null, 2),
                   'utf-8',
