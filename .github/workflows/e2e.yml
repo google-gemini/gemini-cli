@@ -1,25 +1,9 @@
 name: 'Testing: E2E'
 
 on:
-  push:
-    branches:
-      - 'main'
-  # This will run for PRs from the base repository, providing secrets.
-  pull_request:
-    branches:
-      - 'main'
-      - 'release/**'
-  # This will run for PRs from forks when a label is added.
-  pull_request_target:
-    types: ['labeled']
-  merge_group:
-  workflow_dispatch:
-    inputs:
-      branch_ref:
-        description: 'Branch to run on'
-        required: true
-        default: 'main'
-        type: 'string'
+  workflow_run:
+    workflows: ['Trigger E2E']
+    types: ['completed']
 
 concurrency:
   group: '${{ github.workflow }}-${{ github.head_ref || github.ref }}'
@@ -42,12 +26,7 @@ jobs:
     name: 'E2E Test (Linux) - ${{ matrix.sandbox }}'
     needs: 'merge_queue_skipper'
     if: |
-      needs.merge_queue_skipper.outputs.skip == 'false' &&
-      (github.event_name == 'push' ||
-      github.event_name == 'merge_group' ||
-      github.event_name == 'workflow_dispatch' ||
-      (github.event.pull_request.head.repo.full_name == github.repository) ||
-      (github.event.label.name == 'maintainer:e2e:ok'))
+      needs.merge_queue_skipper.outputs.skip == 'false'
     runs-on: 'gemini-cli-ubuntu-16-core'
     strategy:
       fail-fast: false
@@ -59,18 +38,11 @@ jobs:
           - '20.x'
 
     steps:
-      - name: 'Checkout (fork)'
+      - name: 'Checkout'
         uses: 'actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955' # ratchet:actions/checkout@v5
-        if: "github.event_name == 'pull_request_target'"
         with:
-          ref: '${{ github.event.pull_request.head.sha }}'
+          ref: '${{ github.event.workflow_run.head_sha }}'
           repository: '${{ github.event.pull_request.head.repo.full_name }}'
-
-      - name: 'Checkout (internal)'
-        uses: 'actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955' # ratchet:actions/checkout@v5
-        if: "github.event_name != 'pull_request_target'"
-        with:
-          ref: '${{ github.event.inputs.branch_ref || github.ref }}'
 
       - name: 'Set up Node.js ${{ matrix.node-version }}'
         uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions-node@v4
@@ -104,26 +76,14 @@ jobs:
     name: 'E2E Test (macOS)'
     needs: 'merge_queue_skipper'
     if: |
-      needs.merge_queue_skipper.outputs.skip == 'false' &&
-      (github.event_name == 'push' ||
-      github.event_name == 'merge_group' ||
-      github.event_name == 'workflow_dispatch' ||
-      (github.event.pull_request.head.repo.full_name == github.repository) ||
-      (github.event.label.name == 'maintainer:e2e:ok'))
+      needs.merge_queue_skipper.outputs.skip == 'false'
     runs-on: 'macos-latest'
     steps:
-      - name: 'Checkout (fork)'
+      - name: 'Checkout'
         uses: 'actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955' # ratchet:actions/checkout@v5
-        if: "github.event_name == 'pull_request_target'"
         with:
-          ref: '${{ github.event.pull_request.head.sha }}'
+          ref: '${{ github.event.workflow_run.head_sha }}'
           repository: '${{ github.event.pull_request.head.repo.full_name }}'
-
-      - name: 'Checkout (internal)'
-        uses: 'actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955' # ratchet:actions/checkout@v5
-        if: "github.event_name != 'pull_request_target'"
-        with:
-          ref: '${{ github.event.inputs.branch_ref || github.ref }}'
 
       - name: 'Set up Node.js 20.x'
         uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions-node@v4
@@ -153,28 +113,16 @@ jobs:
     name: 'Slow E2E - Win'
     needs: 'merge_queue_skipper'
     if: |
-      needs.merge_queue_skipper.outputs.skip == 'false' &&
-      (github.event_name == 'push' ||
-      github.event_name == 'merge_group' ||
-      github.event_name == 'workflow_dispatch' ||
-      (github.event.pull_request.head.repo.full_name == github.repository) ||
-      (github.event.label.name == 'maintainer:e2e:ok'))
+      needs.merge_queue_skipper.outputs.skip == 'false'
     runs-on: 'gemini-cli-windows-16-core'
     continue-on-error: true
 
     steps:
-      - name: 'Checkout (fork)'
+      - name: 'Checkout'
         uses: 'actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955' # ratchet:actions/checkout@v5
-        if: "github.event_name == 'pull_request_target'"
         with:
-          ref: '${{ github.event.pull_request.head.sha }}'
+          ref: '${{ github.event.workflow_run.head_sha }}'
           repository: '${{ github.event.pull_request.head.repo.full_name }}'
-
-      - name: 'Checkout (internal)'
-        uses: 'actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955' # ratchet:actions/checkout@v5
-        if: "github.event_name != 'pull_request_target'"
-        with:
-          ref: '${{ github.event.inputs.branch_ref || github.ref }}'
 
       - name: 'Set up Node.js 20.x'
         uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions-node@v4
@@ -223,13 +171,7 @@ jobs:
   e2e:
     name: 'E2E'
     if: |
-      always() && (
-        github.event_name == 'push' ||
-        github.event_name == 'merge_group' ||
-        github.event_name == 'workflow_dispatch' ||
-        (github.event.pull_request.head.repo.full_name == github.repository) ||
-        (github.event.label.name == 'maintainer:e2e:ok')
-      )
+      always()
     needs:
       - 'e2e_linux'
       - 'e2e_mac'
@@ -237,8 +179,8 @@ jobs:
     steps:
       - name: 'Check E2E test results'
         run: |
-          if [[ (${{ needs.e2e_linux.result }} != 'success' && ${{ needs.e2e_linux.result }} != 'skipped') || \
-               (${{ needs.e2e_mac.result }} != 'success' && ${{ needs.e2e_mac.result }} != 'skipped') ]]; then
+          if [[ ${{ needs.e2e_linux.result }} != 'success' || \
+               ${{ needs.e2e_mac.result }} != 'success' ]]; then
             echo "One or more E2E jobs failed."
             exit 1
           fi
