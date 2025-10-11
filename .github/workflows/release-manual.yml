@@ -65,7 +65,10 @@ jobs:
           fetch-depth: 0
 
       - name: 'Debug Inputs'
-        run: 'echo "${{ toJSON(inputs) }}"'
+        shell: 'bash'
+        env:
+          JSON_INPUTS: '${{ toJSON(inputs) }}'
+        run: 'echo "$JSON_INPUTS"'
 
       - name: 'Setup Node.js'
         uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020'
