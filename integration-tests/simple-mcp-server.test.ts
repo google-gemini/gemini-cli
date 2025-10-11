@@ -11,7 +11,7 @@
  */
 
 import { describe, it, beforeAll, expect } from 'vitest';
-import { TestRig, validateModelOutput } from './test-helper.js';
+import { TestRig, poll, validateModelOutput } from './test-helper.js';
 import { join } from 'node:path';
 import { writeFileSync } from 'node:fs';
 
@@ -192,7 +192,7 @@ describe('simple-mcp-server', () => {
 
     // Poll for script for up to 5s
     const { accessSync, constants } = await import('node:fs');
-    const isReady = await rig.poll(
+    const isReady = await poll(
       () => {
         try {
           accessSync(testServerPath, constants.F_OK);

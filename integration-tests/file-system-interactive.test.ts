@@ -5,7 +5,7 @@
  */
 
 import { expect, describe, it, beforeEach, afterEach } from 'vitest';
-import { TestRig, type, printDebugInfo } from './test-helper.js';
+import { TestRig, printDebugInfo } from './test-helper.js';
 
 describe('Interactive file system', () => {
   let rig: TestRig;
@@ -23,22 +23,22 @@ describe('Interactive file system', () => {
     rig.setup('interactive-read-then-write');
     rig.createFile(fileName, '1.0.0');
 
-    const ptyProcess = await rig.runInteractive();
+    const run = await rig.runInteractive();
 
     // Step 1: Read the file
     const readPrompt = `Read the version from ${fileName}`;
-    await type(ptyProcess, readPrompt);
-    await type(ptyProcess, '\r');
+    await run.type(readPrompt);
+    await run.type('\r');
 
     const readCall = await rig.waitForToolCall('read_file', 30000);
     expect(readCall, 'Expected to find a read_file tool call').toBe(true);
 
-    await rig.waitForText('1.0.0', 30000);
+    await run.waitForText('1.0.0', 30000);
 
     // Step 2: Write the file
     const writePrompt = `now change the version to 1.0.1 in the file`;
-    await type(ptyProcess, writePrompt);
-    await type(ptyProcess, '\r');
+    await run.type(writePrompt);
+    await run.type('\r');
 
     const toolCall = await rig.waitForAnyToolCall(
       ['write_file', 'replace'],
@@ -46,9 +46,7 @@ describe('Interactive file system', () => {
     );
 
     if (!toolCall) {
-      printDebugInfo(rig, rig._interactiveOutput, {
-        toolCall,
-      });
+      printDebugInfo(rig, run.output, { toolCall });
     }
 
     expect(toolCall, 'Expected to find a write_file or replace tool call').toBe(

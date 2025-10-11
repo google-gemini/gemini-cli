@@ -7,35 +7,18 @@
 import { describe, it, expect } from 'vitest';
 import * as os from 'node:os';
 import { TestRig } from './test-helper.js';
-import * as pty from '@lydell/node-pty';
-
-function waitForExit(ptyProcess: pty.IPty): Promise<number> {
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(
-      () =>
-        reject(
-          new Error(`Test timed out: process did not exit within a minute.`),
-        ),
-      60000,
-    );
-    ptyProcess.onExit(({ exitCode }) => {
-      clearTimeout(timer);
-      resolve(exitCode);
-    });
-  });
-}
 
 describe('Ctrl+C exit', () => {
   it('should exit gracefully on second Ctrl+C', async () => {
     const rig = new TestRig();
     await rig.setup('should exit gracefully on second Ctrl+C');
 
-    const ptyProcess = await rig.runInteractive();
+    const run = await rig.runInteractive();
 
     // Send first Ctrl+C
-    ptyProcess.write('\x03');
+    run.type('\x03');
 
-    await rig.waitForText('Press Ctrl+C again to exit', 5000);
+    await run.waitForText('Press Ctrl+C again to exit', 5000);
 
     if (os.platform() === 'win32') {
       // This is a workaround for node-pty/winpty on Windows.
@@ -46,9 +29,9 @@ describe('Ctrl+C exit', () => {
       // To allow the test to pass, we forcefully kill the process,
       // simulating a successful exit. We accept that we cannot test the
       // graceful shutdown message on Windows in this automated context.
-      ptyProcess.kill();
+      run.kill();
 
-      const exitCode = await waitForExit(ptyProcess);
+      const exitCode = await run.waitForExit();
       // On Windows, the exit code after ptyProcess.kill() can be unpredictable
       // (often 1), so we accept any non-null exit code as a pass condition,
       // focusing on the fact that the process did terminate.
@@ -57,11 +40,11 @@ describe('Ctrl+C exit', () => {
     }
 
     // Send second Ctrl+C
-    ptyProcess.write('\x03');
+    run.type('\x03');
 
-    const exitCode = await waitForExit(ptyProcess);
+    const exitCode = await run.waitForExit();
     expect(exitCode, `Process exited with code ${exitCode}.`).toBe(0);
 
-    await rig.waitForText('Agent powering down. Goodbye!', 5000);
+    await run.waitForText('Agent powering down. Goodbye!', 5000);
   });
 });

@@ -18,6 +18,39 @@ import * as os from 'node:os';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
+// Get timeout based on environment
+function getDefaultTimeout() {
+  if (env['CI']) return 60000; // 1 minute in CI
+  if (env['GEMINI_SANDBOX']) return 30000; // 30s in containers
+  return 15000; // 15s locally
+}
+
+export async function poll(
+  predicate: () => boolean,
+  timeout: number,
+  interval: number,
+): Promise<boolean> {
+  const startTime = Date.now();
+  let attempts = 0;
+  while (Date.now() - startTime < timeout) {
+    attempts++;
+    const result = predicate();
+    if (env['VERBOSE'] === 'true' && attempts % 5 === 0) {
+      console.log(
+        `Poll attempt ${attempts}: ${result ? 'success' : 'waiting...'}`,
+      );
+    }
+    if (result) {
+      return true;
+    }
+    await new Promise((resolve) => setTimeout(resolve, interval));
+  }
+  if (env['VERBOSE'] === 'true') {
+    console.log(`Poll timed out after ${attempts} attempts`);
+  }
+  return false;
+}
+
 function sanitizeTestName(name: string) {
   return name
     .toLowerCase()
@@ -117,15 +150,6 @@ export function validateModelOutput(
   return true;
 }
 
-// Simulates typing a string one character at a time to avoid paste detection.
-export async function type(ptyProcess: pty.IPty, text: string) {
-  const delay = 5;
-  for (const char of text) {
-    ptyProcess.write(char);
-    await new Promise((resolve) => setTimeout(resolve, delay));
-  }
-}
-
 interface ParsedLog {
   attributes?: {
     'event.name'?: string;
@@ -143,23 +167,71 @@ interface ParsedLog {
   }[];
 }
 
+export class InteractiveRun {
+  ptyProcess: pty.IPty;
+  public output = '';
+
+  constructor(ptyProcess: pty.IPty) {
+    this.ptyProcess = ptyProcess;
+    ptyProcess.onData((data) => {
+      this.output += data;
+      if (env['KEEP_OUTPUT'] === 'true' || env['VERBOSE'] === 'true') {
+        process.stdout.write(data);
+      }
+    });
+  }
+
+  async waitForText(text: string, timeout?: number) {
+    if (!timeout) {
+      timeout = getDefaultTimeout();
+    }
+    const found = await poll(
+      () => stripAnsi(this.output).toLowerCase().includes(text.toLowerCase()),
+      timeout,
+      200,
+    );
+    expect(found, `Did not find expected text: "${text}"`).toBe(true);
+  }
+
+  // Simulates typing a string one character at a time to avoid paste detection.
+  async type(text: string) {
+    const delay = 5;
+    for (const char of text) {
+      this.ptyProcess.write(char);
+      await new Promise((resolve) => setTimeout(resolve, delay));
+    }
+  }
+
+  async kill() {
+    this.ptyProcess.kill();
+  }
+
+  waitForExit(): Promise<number> {
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(
+        () =>
+          reject(
+            new Error(`Test timed out: process did not exit within a minute.`),
+          ),
+        60000,
+      );
+      this.ptyProcess.onExit(({ exitCode }) => {
+        clearTimeout(timer);
+        resolve(exitCode);
+      });
+    });
+  }
+}
+
 export class TestRig {
   bundlePath: string;
   testDir: string | null;
   testName?: string;
   _lastRunStdout?: string;
-  _interactiveOutput = '';
 
   constructor() {
     this.bundlePath = join(__dirname, '..', 'bundle/gemini.js');
     this.testDir = null;
-  }
-
-  // Get timeout based on environment
-  getDefaultTimeout() {
-    if (env['CI']) return 60000; // 1 minute in CI
-    if (env['GEMINI_SANDBOX']) return 30000; // 30s in containers
-    return 15000; // 15s locally
   }
 
   setup(
@@ -456,7 +528,7 @@ export class TestRig {
     if (!logFilePath) return;
 
     // Wait for telemetry file to exist and have content
-    await this.poll(
+    await poll(
       () => {
         if (!fs.existsSync(logFilePath)) return false;
         try {
@@ -474,12 +546,12 @@ export class TestRig {
 
   async waitForTelemetryEvent(eventName: string, timeout?: number) {
     if (!timeout) {
-      timeout = this.getDefaultTimeout();
+      timeout = getDefaultTimeout();
     }
 
     await this.waitForTelemetryReady();
 
-    return this.poll(
+    return poll(
       () => {
         const logs = this._readAndParseTelemetryLog();
         return logs.some(
@@ -496,13 +568,13 @@ export class TestRig {
   async waitForToolCall(toolName: string, timeout?: number) {
     // Use environment-specific timeout
     if (!timeout) {
-      timeout = this.getDefaultTimeout();
+      timeout = getDefaultTimeout();
     }
 
     // Wait for telemetry to be ready before polling for tool calls
     await this.waitForTelemetryReady();
 
-    return this.poll(
+    return poll(
       () => {
         const toolLogs = this.readToolLogs();
         return toolLogs.some((log) => log.toolRequest.name === toolName);
@@ -515,13 +587,13 @@ export class TestRig {
   async waitForAnyToolCall(toolNames: string[], timeout?: number) {
     // Use environment-specific timeout
     if (!timeout) {
-      timeout = this.getDefaultTimeout();
+      timeout = getDefaultTimeout();
     }
 
     // Wait for telemetry to be ready before polling for tool calls
     await this.waitForTelemetryReady();
 
-    return this.poll(
+    return poll(
       () => {
         const toolLogs = this.readToolLogs();
         return toolNames.some((name) =>
@@ -531,32 +603,6 @@ export class TestRig {
       timeout,
       100,
     );
-  }
-
-  async poll(
-    predicate: () => boolean,
-    timeout: number,
-    interval: number,
-  ): Promise<boolean> {
-    const startTime = Date.now();
-    let attempts = 0;
-    while (Date.now() - startTime < timeout) {
-      attempts++;
-      const result = predicate();
-      if (env['VERBOSE'] === 'true' && attempts % 5 === 0) {
-        console.log(
-          `Poll attempt ${attempts}: ${result ? 'success' : 'waiting...'}`,
-        );
-      }
-      if (result) {
-        return true;
-      }
-      await new Promise((resolve) => setTimeout(resolve, interval));
-    }
-    if (env['VERBOSE'] === 'true') {
-      console.log(`Poll timed out after ${attempts} attempts`);
-    }
-    return false;
   }
 
   _parseToolLogsFromStdout(stdout: string) {
@@ -808,26 +854,9 @@ export class TestRig {
     return null;
   }
 
-  async waitForText(text: string, timeout?: number) {
-    if (!timeout) {
-      timeout = this.getDefaultTimeout();
-    }
-    const found = await this.poll(
-      () =>
-        stripAnsi(this._interactiveOutput)
-          .toLowerCase()
-          .includes(text.toLowerCase()),
-      timeout,
-      200,
-    );
-    expect(found, `Did not find expected text: "${text}"`).toBe(true);
-  }
-
-  async runInteractive(...args: string[]): Promise<pty.IPty> {
+  async runInteractive(...args: string[]): Promise<InteractiveRun> {
     const { command, initialArgs } = this._getCommandAndArgs(['--yolo']);
     const commandArgs = [...initialArgs, ...args];
-
-    this._interactiveOutput = ''; // Reset output for the new run
 
     const options: pty.IPtyForkOptions = {
       name: 'xterm-color',
@@ -842,16 +871,9 @@ export class TestRig {
     const executable = command === 'node' ? process.execPath : command;
     const ptyProcess = pty.spawn(executable, commandArgs, options);
 
-    ptyProcess.onData((data) => {
-      this._interactiveOutput += data;
-      if (env['KEEP_OUTPUT'] === 'true' || env['VERBOSE'] === 'true') {
-        process.stdout.write(data);
-      }
-    });
-
+    const run = new InteractiveRun(ptyProcess);
     // Wait for the app to be ready
-    await this.waitForText('Type your message', 30000);
-
-    return ptyProcess;
+    await run.waitForText('Type your message', 30000);
+    return run;
   }
 }
