@@ -35,7 +35,7 @@ describe('JSON output', () => {
     expect(typeof parsed.stats).toBe('object');
   });
 
-  it('should return a JSON error for enforced auth mismatch before running', async () => {
+  it('should return a JSON error for sd auth mismatch before running', async () => {
     process.env['GOOGLE_GENAI_USE_GCA'] = 'true';
     await rig.setup('json-output-auth-mismatch', {
       settings: {
