@@ -348,7 +348,6 @@ export const AppContainer = (props: AppContainerProps) => {
   const { proQuotaRequest, handleProQuotaChoice } = useQuotaAndFallback({
     config,
     historyManager,
-    userTier,
     setAuthState,
     setModelSwitchedFromQuotaError,
   });
