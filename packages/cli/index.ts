@@ -10,6 +10,17 @@ import './src/gemini.js';
 import { main } from './src/gemini.js';
 import { FatalError } from '@google/gemini-cli-core';
 
+// --- Global handler for unhandled promise rejections ---
+process.on('unhandledRejection', (reason) => {
+  console.error('CRITICAL: Unhandled Promise Rejection!');
+  if (reason instanceof Error) {
+    console.error(reason.stack);
+  } else {
+    console.error(String(reason));
+  }
+  process.exit(1);
+});
+
 // --- Global Entry Point ---
 main().catch((error) => {
   if (error instanceof FatalError) {
