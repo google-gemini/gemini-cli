@@ -218,10 +218,9 @@ jobs:
           RELEASE_TAG: 'v${{ needs.calculate-versions.outputs.PREVIEW_VERSION }}'
           DETAILS_URL: '${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}'
         run: |
-          gh issue create \
-            --title 'Promote Release Failed for ${RELEASE_TAG} on $(date +'%Y-%m-%d')' \
-            --body 'The promote-release workflow failed during preview publish. See the full run for details: ${DETAILS_URL}' \
-            --label 'kind/bug,release-failure,priority/p0'
+          TITLE="Promote Release Failed for ${RELEASE_TAG} on $(date +'%Y-%m-%d')"
+          BODY="The promote-release workflow failed during preview publish. See the full run for details: ${DETAILS_URL}"
+          gh issue create --title "${TITLE}" --body "${BODY}" --label 'kind/bug,release-failure,priority/p0'
 
   publish-stable:
     name: 'Publish stable'
@@ -276,10 +275,9 @@ jobs:
           RELEASE_TAG: 'v${{ needs.calculate-versions.outputs.STABLE_VERSION }}'
           DETAILS_URL: '${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}'
         run: |
-          gh issue create \
-            --title 'Promote Release Failed for ${RELEASE_TAG} on $(date +'%Y-%m-%d')' \
-            --body 'The promote-release workflow failed during stable publish. See the full run for details: ${DETAILS_URL}' \
-            --label 'kind/bug,release-failure,priority/p0'
+          TITLE="Promote Release Failed for ${RELEASE_TAG} on $(date +'%Y-%m-%d')"
+          BODY="The promote-release workflow failed during stable publish. See the full run for details: ${DETAILS_URL}"
+          gh issue create --title "${TITLE}" --body "${BODY}" --label 'kind/bug,release-failure,priority/p0'
 
   nightly-pr:
     name: 'Create Nightly PR'
@@ -352,7 +350,6 @@ jobs:
           RELEASE_TAG: 'v${{ needs.calculate-versions.outputs.NEXT_NIGHTLY_VERSION }}'
           DETAILS_URL: '${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}'
         run: |
-          gh issue create \
-            --title 'Promote Release Failed for ${RELEASE_TAG} on $(date +'%Y-%m-%d')' \
-            --body 'The promote-release workflow failed during nightly PR creation. See the full run for details: ${DETAILS_URL}' \
-            --label 'kind/bug,release-failure,priority/p0'
+          TITLE="Promote Release Failed for ${RELEASE_TAG} on $(date +'%Y-%m-%d')"
+          BODY="The promote-release workflow failed during nightly PR creation. See the full run for details: ${DETAILS_URL}"
+          gh issue create --title "${TITLE}" --body "${BODY}" --label 'kind/bug,release-failure,priority/p0'
