@@ -351,8 +351,12 @@ async function handleAutomaticOAuth(
     // OAuth configuration discovered - proceed with authentication
 
     // Create OAuth configuration for authentication
-    const mcpServerScopes = mcpServerConfig?.oauth?.scopes || null;
-    if (mcpServerScopes && !Array.isArray(mcpServerScopes)) {
+    const mcpServerScopes = mcpServerConfig?.oauth?.scopes;
+    if (
+      mcpServerScopes !== undefined &&
+      mcpServerScopes !== null &&
+      !Array.isArray(mcpServerScopes)
+    ) {
       console.error(
         `❌ Could not configure OAuth for '${mcpServerName}' - scopes value when present should be a string array`,
       );
@@ -1048,12 +1052,9 @@ export async function connectToMcpServer(
 
               const mcpServerScopes = mcpServerConfig?.oauth?.scopes || null;
               if (mcpServerScopes && !Array.isArray(mcpServerScopes)) {
-                console.error(
-                  `invalid OAuth config for '${mcpServerName}' - scopes value when present should be a string array`,
-                );
-                throw new Error(
-                  `invalid OAuth config for '${mcpServerName}' - scopes value when present should be a string array`,
-                );
+                const errorMessage = `invalid OAuth config for '${mcpServerName}' - scopes value when present must be a string array`;
+                console.error(errorMessage);
+                throw new Error(errorMessage);
               }
 
               // Create OAuth configuration for authentication
