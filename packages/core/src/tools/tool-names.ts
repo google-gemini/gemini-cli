@@ -9,6 +9,9 @@
 // need to reference a tool's name without importing the tool's implementation.
 
 export const GLOB_TOOL_NAME = 'glob';
+export const WRITE_TODOS_TOOL_NAME = 'write_todos';
+export const WRITE_FILE_TOOL_NAME = 'write_file';
+export const WEB_SEARCH_TOOL_NAME = 'google_web_search';
 
 // TODO: Migrate other tool names here to follow this pattern and prevent future circular dependencies.
 // Candidates for migration:
