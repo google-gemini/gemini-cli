@@ -13,12 +13,20 @@ import { Composer } from '../components/Composer.js';
 import { Footer } from '../components/Footer.js';
 import { ExitWarning } from '../components/ExitWarning.js';
 import { useUIState } from '../contexts/UIStateContext.js';
+import { useFlickerDetector } from '../hooks/useFlickerDetector.js';
 
 export const ScreenReaderAppLayout: React.FC = () => {
   const uiState = useUIState();
+  const { rootUiRef, terminalHeight } = uiState;
+  useFlickerDetector(rootUiRef, terminalHeight);
 
   return (
-    <Box flexDirection="column" width="90%" height="100%">
+    <Box
+      flexDirection="column"
+      width="90%"
+      height="100%"
+      ref={uiState.rootUiRef}
+    >
       <Notifications />
       <Footer />
       <Box flexGrow={1} overflow="hidden">

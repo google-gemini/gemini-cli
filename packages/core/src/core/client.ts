@@ -40,9 +40,11 @@ import { LoopDetectionService } from '../services/loopDetectionService.js';
 import { ideContextStore } from '../ide/ideContext.js';
 import {
   logChatCompression,
+  logContentRetryFailure,
   logNextSpeakerCheck,
 } from '../telemetry/loggers.js';
 import {
+  ContentRetryFailureEvent,
   makeChatCompressionEvent,
   NextSpeakerCheckEvent,
 } from '../telemetry/types.js';
@@ -476,6 +478,7 @@ My setup is complete. I will provide my first command in the next turn.
     signal: AbortSignal,
     prompt_id: string,
     turns: number = MAX_TURNS,
+    isInvalidStreamRetry: boolean = false,
   ): AsyncGenerator<ServerGeminiStreamEvent, Turn> {
     if (this.lastPromptId !== prompt_id) {
       this.loopDetector.reset(prompt_id);
@@ -586,6 +589,31 @@ My setup is complete. I will provide my first command in the next turn.
         return turn;
       }
       yield event;
+      if (event.type === GeminiEventType.InvalidStream) {
+        if (this.config.getContinueOnFailedApiCall()) {
+          if (isInvalidStreamRetry) {
+            // We already retried once, so stop here.
+            logContentRetryFailure(
+              this.config,
+              new ContentRetryFailureEvent(
+                4, // 2 initial + 2 after injections
+                'FAILED_AFTER_PROMPT_INJECTION',
+                modelToUse,
+              ),
+            );
+            return turn;
+          }
+          const nextRequest = [{ text: 'System: Please continue.' }];
+          yield* this.sendMessageStream(
+            nextRequest,
+            signal,
+            prompt_id,
+            boundedTurns - 1,
+            true, // Set isInvalidStreamRetry to true
+          );
+          return turn;
+        }
+      }
       if (event.type === GeminiEventType.Error) {
         return turn;
       }
@@ -623,6 +651,7 @@ My setup is complete. I will provide my first command in the next turn.
           signal,
           prompt_id,
           boundedTurns - 1,
+          // isInvalidStreamRetry is false here, as this is a next speaker check
         );
       }
     }
