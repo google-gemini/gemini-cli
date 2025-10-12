@@ -142,13 +142,21 @@ function isValidFilePath(path: string): boolean {
   let invalidChars: Set<string>;
   if (process.platform === 'win32') {
     // Windows reserved characters (excluding path separators / and \)
-    invalidChars = new Set(['<', '>', ':', '"', '|', '?', '*']);
+    invalidChars = new Set(['<', '>', '"', '|', '?', '*']);
   } else {
     invalidChars = new Set();
   }
 
-  for (const char of path) {
+  for (let i = 0; i < path.length; i++) {
+    const char = path[i];
     if (invalidChars.has(char)) return false;
+
+    if (process.platform === 'win32' && char === ':') {
+      // On Windows, a colon is only considered valid if it's for a drive letter (e.g., "C:").
+      if (i !== 1 || !/^[a-zA-Z]$/.test(path[0])) {
+        return false;
+      }
+    }
 
     // Disallow ASCII control characters (0x00–0x1F) and DEL (0x7F)
     const code = char.charCodeAt(0);
