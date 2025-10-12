@@ -7,7 +7,13 @@
  */
 
 import { execSync } from 'node:child_process';
-import { mkdirSync, rmSync } from 'node:fs';
+import {
+  mkdirSync,
+  rmSync,
+  readFileSync,
+  existsSync,
+  lstatSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -48,7 +54,7 @@ const platformArch = getPlatformArch();
  *   check: string;
  *   installer: string;
  *   run: string;
- * }} Linter
+ * }}
  */
 
 /**
@@ -100,7 +106,8 @@ const LINTERS = {
 function runCommand(command, stdio = 'inherit') {
   try {
     const env = { ...process.env };
-    env.PATH = `${TEMP_DIR}/actionlint:${TEMP_DIR}/shellcheck:${env.PATH}`;
+    const nodeBin = join(process.cwd(), 'node_modules', '.bin');
+    env.PATH = `${nodeBin}:${TEMP_DIR}/actionlint:${TEMP_DIR}/shellcheck:${env.PATH}`;
     if (process.platform === 'darwin') {
       env.PATH = `${env.PATH}:${process.env.HOME}/Library/Python/3.12/bin`;
     } else if (process.platform === 'linux') {
@@ -113,7 +120,7 @@ function runCommand(command, stdio = 'inherit') {
   }
 }
 
-function setupLinters() {
+export function setupLinters() {
   console.log('Setting up linters...');
   rmSync(TEMP_DIR, { recursive: true, force: true });
   mkdirSync(TEMP_DIR, { recursive: true });
@@ -133,29 +140,152 @@ function setupLinters() {
   console.log('All required linters are available.');
 }
 
-function runLinters() {
+export function runESLint() {
   console.log('\nRunning ESLint...');
   if (!runCommand('npm run lint:ci')) {
     process.exit(1);
   }
+}
 
+export function runActionlint() {
   console.log('\nRunning actionlint...');
   if (!runCommand(LINTERS.actionlint.run)) {
     process.exit(1);
   }
+}
 
+export function runShellcheck() {
   console.log('\nRunning shellcheck...');
   if (!runCommand(LINTERS.shellcheck.run)) {
     process.exit(1);
   }
+}
 
+export function runYamllint() {
   console.log('\nRunning yamllint...');
   if (!runCommand(LINTERS.yamllint.run)) {
     process.exit(1);
   }
-
-  console.log('\nAll linting checks passed!');
 }
 
-setupLinters();
-runLinters();
+export function runPrettier() {
+  console.log('\nRunning Prettier...');
+  if (!runCommand('prettier --check .')) {
+    process.exit(1);
+  }
+}
+
+export function runSensitiveKeywordLinter() {
+  console.log('\nRunning sensitive keyword linter...');
+  const SENSITIVE_PATTERN = /gemini-\d+(\.\d+)?/g;
+  const ALLOWED_KEYWORDS = new Set([
+    'gemini-2.5',
+    'gemini-2.0',
+    'gemini-1.5',
+    'gemini-1.0',
+  ]);
+
+  function getChangedFiles() {
+    const baseRef = process.env.GITHUB_BASE_REF || 'main';
+    try {
+      execSync(`git fetch origin ${baseRef}`);
+      const mergeBase = execSync(`git merge-base HEAD origin/${baseRef}`)
+        .toString()
+        .trim();
+      return execSync(`git diff --name-only ${mergeBase}..HEAD`)
+        .toString()
+        .trim()
+        .split('\n')
+        .filter(Boolean);
+    } catch (_error) {
+      console.error(`Could not get changed files against origin/${baseRef}.`);
+      try {
+        console.log('Falling back to diff against HEAD~1');
+        return execSync(`git diff --name-only HEAD~1..HEAD`)
+          .toString()
+          .trim()
+          .split('\n')
+          .filter(Boolean);
+      } catch (_fallbackError) {
+        console.error('Could not get changed files against HEAD~1 either.');
+        process.exit(1);
+      }
+    }
+  }
+
+  const changedFiles = getChangedFiles();
+  let violationsFound = false;
+
+  for (const file of changedFiles) {
+    if (!existsSync(file) || lstatSync(file).isDirectory()) {
+      continue;
+    }
+    const content = readFileSync(file, 'utf-8');
+    const lines = content.split('\n');
+    let match;
+    while ((match = SENSITIVE_PATTERN.exec(content)) !== null) {
+      const keyword = match[0];
+      if (!ALLOWED_KEYWORDS.has(keyword)) {
+        violationsFound = true;
+        const matchIndex = match.index;
+        let lineNum = 0;
+        let charCount = 0;
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          if (charCount + line.length + 1 > matchIndex) {
+            lineNum = i + 1;
+            const colNum = matchIndex - charCount + 1;
+            console.log(
+              `::warning file=${file},line=${lineNum},col=${colNum}::Found sensitive keyword "${keyword}". Please make sure this change is appropriate to submit.`,
+            );
+            break;
+          }
+          charCount += line.length + 1; // +1 for the newline
+        }
+      }
+    }
+  }
+
+  if (!violationsFound) {
+    console.log('No sensitive keyword violations found.');
+  }
+}
+
+function main() {
+  const args = process.argv.slice(2);
+
+  if (args.includes('--setup')) {
+    setupLinters();
+  }
+  if (args.includes('--eslint')) {
+    runESLint();
+  }
+  if (args.includes('--actionlint')) {
+    runActionlint();
+  }
+  if (args.includes('--shellcheck')) {
+    runShellcheck();
+  }
+  if (args.includes('--yamllint')) {
+    runYamllint();
+  }
+  if (args.includes('--prettier')) {
+    runPrettier();
+  }
+  if (args.includes('--sensitive-keywords')) {
+    runSensitiveKeywordLinter();
+  }
+
+  if (args.length === 0) {
+    setupLinters();
+    runESLint();
+    runActionlint();
+    runShellcheck();
+    runYamllint();
+    runPrettier();
+    runSensitiveKeywordLinter();
+    console.log('\nAll linting checks passed!');
+  }
+}
+
+main();

@@ -485,14 +485,20 @@ export function useSlashCompletion(props: UseSlashCompletionProps): {
   );
   const { isPerfectMatch } = usePerfectMatch(parserResult);
 
-  // Update external state - this is now much simpler and focused
+  // Clear internal state when disabled
   useEffect(() => {
-    if (!enabled || query === null) {
+    if (!enabled) {
       setSuggestions([]);
       setIsLoadingSuggestions(false);
       setIsPerfectMatch(false);
       setCompletionStart(-1);
       setCompletionEnd(-1);
+    }
+  }, [enabled, setSuggestions, setIsLoadingSuggestions, setIsPerfectMatch]);
+
+  // Update external state only when enabled
+  useEffect(() => {
+    if (!enabled || query === null) {
       return;
     }
 

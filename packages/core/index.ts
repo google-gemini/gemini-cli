@@ -23,15 +23,26 @@ export {
   DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
   DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
 } from './src/config/config.js';
-export { detectIdeFromEnv, getIdeInfo } from './src/ide/detect-ide.js';
-export { logIdeConnection } from './src/telemetry/loggers.js';
+export { detectIdeFromEnv } from './src/ide/detect-ide.js';
+export {
+  logExtensionEnable,
+  logIdeConnection,
+  logExtensionDisable,
+} from './src/telemetry/loggers.js';
 
 export {
   IdeConnectionEvent,
   IdeConnectionType,
   ExtensionInstallEvent,
+  ExtensionDisableEvent,
+  ExtensionEnableEvent,
   ExtensionUninstallEvent,
+  ExtensionUpdateEvent,
+  ModelSlashCommandEvent,
 } from './src/telemetry/types.js';
 export { makeFakeConfig } from './src/test-utils/config.js';
 export * from './src/utils/pathReader.js';
 export { ClearcutLogger } from './src/telemetry/clearcut-logger/clearcut-logger.js';
+export { logModelSlashCommand } from './src/telemetry/loggers.js';
+export * from './src/utils/googleQuotaErrors.js';
+export type { GoogleApiError } from './src/utils/googleErrors.js';

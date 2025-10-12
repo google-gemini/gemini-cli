@@ -18,8 +18,16 @@ function ruleMatches(
   stringifiedArgs: string | undefined,
 ): boolean {
   // Check tool name if specified
-  if (rule.toolName && toolCall.name !== rule.toolName) {
-    return false;
+  if (rule.toolName) {
+    // Support wildcard patterns: "serverName__*" matches "serverName__anyTool"
+    if (rule.toolName.endsWith('__*')) {
+      const prefix = rule.toolName.slice(0, -3); // Remove "__*"
+      if (!toolCall.name || !toolCall.name.startsWith(prefix + '__')) {
+        return false;
+      }
+    } else if (toolCall.name !== rule.toolName) {
+      return false;
+    }
   }
 
   // Check args pattern if specified

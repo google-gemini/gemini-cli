@@ -57,14 +57,17 @@ export const FolderTrustDialog: React.FC<FolderTrustDialogProps> = ({
     {
       label: `Trust folder (${dirName})`,
       value: FolderTrustChoice.TRUST_FOLDER,
+      key: `Trust folder (${dirName})`,
     },
     {
       label: `Trust parent folder (${parentFolder})`,
       value: FolderTrustChoice.TRUST_PARENT,
+      key: `Trust parent folder (${parentFolder})`,
     },
     {
       label: "Don't trust (esc)",
       value: FolderTrustChoice.DO_NOT_TRUST,
+      key: "Don't trust (esc)",
     },
   ];
 

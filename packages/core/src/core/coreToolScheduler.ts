@@ -799,6 +799,15 @@ export class CoreToolScheduler {
             );
           }
         } catch (error) {
+          if (signal.aborted) {
+            this.setStatusInternal(
+              reqInfo.callId,
+              'cancelled',
+              'Tool call cancelled by user.',
+            );
+            continue;
+          }
+
           this.setStatusInternal(
             reqInfo.callId,
             'error',
@@ -1078,17 +1087,25 @@ export class CoreToolScheduler {
             }
           })
           .catch((executionError: Error) => {
-            this.setStatusInternal(
-              callId,
-              'error',
-              createErrorResponse(
-                scheduledCall.request,
-                executionError instanceof Error
-                  ? executionError
-                  : new Error(String(executionError)),
-                ToolErrorType.UNHANDLED_EXCEPTION,
-              ),
-            );
+            if (signal.aborted) {
+              this.setStatusInternal(
+                callId,
+                'cancelled',
+                'User cancelled tool execution.',
+              );
+            } else {
+              this.setStatusInternal(
+                callId,
+                'error',
+                createErrorResponse(
+                  scheduledCall.request,
+                  executionError instanceof Error
+                    ? executionError
+                    : new Error(String(executionError)),
+                  ToolErrorType.UNHANDLED_EXCEPTION,
+                ),
+              );
+            }
           });
       });
     }

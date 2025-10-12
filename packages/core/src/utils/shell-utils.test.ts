@@ -145,6 +145,15 @@ describe('isCommandAllowed', () => {
       expect(result.reason).toContain('Command substitution');
     });
 
+    it('should block command substitution using `>(...)`', () => {
+      const result = isCommandAllowed(
+        'echo "Log message" > >(tee log.txt)',
+        config,
+      );
+      expect(result.allowed).toBe(false);
+      expect(result.reason).toContain('Command substitution');
+    });
+
     it('should block command substitution using backticks', () => {
       const result = isCommandAllowed('echo `rm -rf /`', config);
       expect(result.allowed).toBe(false);

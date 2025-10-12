@@ -1,0 +1,32 @@
+name: 'Verify NPM release tag'
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'The expected Gemini binary version that should be released (e.g., 0.5.0-preview-2).'
+        required: true
+        type: 'string'
+      npm-package:
+        description: 'NPM package to verify'
+        required: true
+        type: 'string'
+        default: '@google/gemini-cli@latest'
+      ref:
+        description: 'The branch, tag, or SHA to release from.'
+        required: false
+        type: 'string'
+        default: 'main'
+
+jobs:
+  build:
+    runs-on: 'ubuntu-latest'
+    steps:
+      - uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
+      - name: 'Verify release'
+        uses: './.github/actions/verify-release'
+        with:
+          npm-package: '${{github.event.inputs.npm-package}}'
+          expected-version: '${{github.event.inputs.version}}'
+          ref: '${{github.event.inputs.ref}}'
+          gemini_api_key: '${{ secrets.GEMINI_API_KEY }}'
