@@ -50,7 +50,7 @@ export const MainContent = () => {
         {(item) => item}
       </Static>
       <OverflowProvider>
-        <Box flexDirection="column">
+        <Box flexDirection="column" width={mainAreaWidth}>
           {pendingHistoryItems.map((item, i) => (
             <HistoryItemDisplay
               key={i}

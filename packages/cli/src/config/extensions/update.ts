@@ -11,8 +11,7 @@ import {
 } from '../../ui/state/extensions.js';
 import {
   copyExtension,
-  installExtension,
-  uninstallExtension,
+  installOrUpdateExtension,
   loadExtension,
   loadInstallMetadata,
   ExtensionStorage,
@@ -65,13 +64,11 @@ export async function updateExtension(
 
   const tempDir = await ExtensionStorage.createTmpDir();
   try {
-    await copyExtension(extension.path, tempDir);
     const previousExtensionConfig = await loadExtensionConfig({
       extensionDir: extension.path,
       workspaceDir: cwd,
     });
-    await uninstallExtension(extension.name, cwd);
-    await installExtension(
+    await installOrUpdateExtension(
       installMetadata,
       requestConsent,
       cwd,

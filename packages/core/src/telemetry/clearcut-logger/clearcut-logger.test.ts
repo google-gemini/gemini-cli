@@ -31,6 +31,7 @@ import {
   ToolCallEvent,
   AgentStartEvent,
   AgentFinishEvent,
+  WebFetchFallbackAttemptEvent,
 } from '../types.js';
 import { AgentTerminateMode } from '../../agents/types.js';
 import { GIT_COMMIT_INFO, CLI_VERSION } from '../../generated/git-commit.js';
@@ -943,6 +944,23 @@ describe('ClearcutLogger', () => {
       expect(events[0]).not.toHaveMetadataKey(
         EventMetadataKey.GEMINI_CLI_AI_ADDED_LINES,
       );
+    });
+  });
+
+  describe('logWebFetchFallbackAttemptEvent', () => {
+    it('logs an event with the proper name and reason', () => {
+      const { logger } = setup();
+      const event = new WebFetchFallbackAttemptEvent('private_ip');
+
+      logger?.logWebFetchFallbackAttemptEvent(event);
+
+      const events = getEvents(logger!);
+      expect(events.length).toBe(1);
+      expect(events[0]).toHaveEventName(EventNames.WEB_FETCH_FALLBACK_ATTEMPT);
+      expect(events[0]).toHaveMetadataValue([
+        EventMetadataKey.GEMINI_CLI_WEB_FETCH_FALLBACK_REASON,
+        'private_ip',
+      ]);
     });
   });
 });
