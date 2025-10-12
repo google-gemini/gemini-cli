@@ -1296,7 +1296,7 @@ export type TelemetryEvent =
   | ModelRoutingEvent
   | ToolOutputTruncatedEvent
   | ModelSlashCommandEvent
-  | FeedbackEvent;
+  | FeedbackEvent
   | AgentStartEvent
   | AgentFinishEvent
   | WebFetchFallbackAttemptEvent;
