@@ -289,7 +289,6 @@ export async function processImports(
         ) {
           continue;
         }
-        if (!(await validateImportFileType(importPath, fileBasePath))) continue;
         const fullPath = path.resolve(fileBasePath, importPath);
         const normalizedFullPath = path.normalize(fullPath);
 
@@ -297,6 +296,9 @@ export async function processImports(
         if (processedFiles.has(normalizedFullPath)) continue;
 
         try {
+          if (!(await validateImportFileType(importPath, fileBasePath)))
+            continue;
+
           await fs.access(fullPath);
           const importedContent = await fs.readFile(fullPath, 'utf-8');
 
@@ -360,16 +362,17 @@ export async function processImports(
       result += `<!-- Import failed: ${importPath} - Path traversal attempt -->`;
       continue;
     }
-    if (!(await validateImportFileType(importPath, basePath))) {
-      result += `<!-- Import failed: ${importPath} - Unsupported file type -->`;
-      continue;
-    }
     const fullPath = path.resolve(basePath, importPath);
     if (importState.processedFiles.has(fullPath)) {
       result += `<!-- File already processed: ${importPath} -->`;
       continue;
     }
     try {
+      if (!(await validateImportFileType(importPath, basePath))) {
+        result += `<!-- Import failed: ${importPath} - Unsupported file type -->`;
+        continue;
+      }
+
       await fs.access(fullPath);
       const fileContent = await fs.readFile(fullPath, 'utf-8');
       // Mark this file as processed for this import chain
@@ -435,6 +438,11 @@ export async function validateImportFileType(
   basePath: string,
 ): Promise<boolean> {
   const fullPath = path.resolve(basePath, importPath);
-  const fileType = await detectFileType(fullPath);
-  return fileType === 'text';
+
+  const stats = await fs.stat(fullPath);
+  if (stats.isFile()) {
+    const fileType = await detectFileType(fullPath);
+    return fileType === 'text';
+  }
+  return false; // directories and non-files
 }

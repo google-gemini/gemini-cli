@@ -110,6 +110,12 @@ describe('memoryImportProcessor', () => {
 
     // Mock all as text files by default
     mockedDetectFileType.mockResolvedValue('text');
+
+    mockedFs.stat.mockResolvedValue({
+      isFile: () => true,
+      isDirectory: () => false,
+      isSymbolicLink: () => false,
+    } as Awaited<ReturnType<typeof fs.stat>>);
   });
 
   afterEach(() => {
