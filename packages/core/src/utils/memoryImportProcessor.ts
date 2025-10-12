@@ -7,6 +7,7 @@
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { isSubpath } from './paths.js';
+import { detectFileType } from './fileUtils.js';
 import { marked, type Token } from 'marked';
 
 // Simple console logger for import processing
@@ -118,13 +119,8 @@ function findImports(
     // Extract the path (everything after @)
     const importPath = content.slice(i + 1, j);
 
-    // Basic validation (starts with ./ or / or letter)
-    if (
-      importPath.length > 0 &&
-      (importPath[0] === '.' ||
-        importPath[0] === '/' ||
-        isLetter(importPath[0]))
-    ) {
+    // Basic validation of the path
+    if (importPath.length > 0 && isValidFilePath(importPath)) {
       imports.push({
         start: i,
         _end: j,
@@ -142,12 +138,24 @@ function isWhitespace(char: string): boolean {
   return char === ' ' || char === '\t' || char === '\n' || char === '\r';
 }
 
-function isLetter(char: string): boolean {
-  const code = char.charCodeAt(0);
-  return (
-    (code >= 65 && code <= 90) || // A-Z
-    (code >= 97 && code <= 122)
-  ); // a-z
+function isValidFilePath(path: string): boolean {
+  let invalidChars: Set<string>;
+  if (process.platform === 'win32') {
+    // Windows reserved characters (excluding path separators / and \)
+    invalidChars = new Set(['<', '>', ':', '"', '|', '?', '*']);
+  } else {
+    invalidChars = new Set();
+  }
+
+  for (const char of path) {
+    if (invalidChars.has(char)) return false;
+
+    // Disallow ASCII control characters (0x00–0x1F) and DEL (0x7F)
+    const code = char.charCodeAt(0);
+    if (code < 0x20 || code === 0x7f) return false;
+  }
+
+  return true;
 }
 
 function findCodeRegions(content: string): Array<[number, number]> {
@@ -273,7 +281,7 @@ export async function processImports(
         ) {
           continue;
         }
-
+        if (!(await validateImportFileType(importPath, fileBasePath))) continue;
         const fullPath = path.resolve(fileBasePath, importPath);
         const normalizedFullPath = path.normalize(fullPath);
 
@@ -344,6 +352,10 @@ export async function processImports(
       result += `<!-- Import failed: ${importPath} - Path traversal attempt -->`;
       continue;
     }
+    if (!(await validateImportFileType(importPath, basePath))) {
+      result += `<!-- Import failed: ${importPath} - Unsupported file type -->`;
+      continue;
+    }
     const fullPath = path.resolve(basePath, importPath);
     if (importState.processedFiles.has(fullPath)) {
       result += `<!-- File already processed: ${importPath} -->`;
@@ -408,4 +420,13 @@ export function validateImportPath(
   return allowedDirectories.some((allowedDir) =>
     isSubpath(allowedDir, resolvedPath),
   );
+}
+
+export async function validateImportFileType(
+  importPath: string,
+  basePath: string,
+): Promise<boolean> {
+  const fullPath = path.resolve(basePath, importPath);
+  const fileType = await detectFileType(fullPath);
+  return fileType === 'text';
 }

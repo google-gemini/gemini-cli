@@ -8,7 +8,12 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { marked } from 'marked';
-import { processImports, validateImportPath } from './memoryImportProcessor.js';
+import {
+  processImports,
+  validateImportPath,
+  validateImportFileType,
+} from './memoryImportProcessor.js';
+import { detectFileType } from './fileUtils.js';
 
 // Helper function to create platform-agnostic test paths
 function testPath(...segments: string[]): string {
@@ -31,6 +36,11 @@ function testPath(...segments: string[]): string {
 
 vi.mock('fs/promises');
 const mockedFs = vi.mocked(fs);
+
+vi.mock('./fileUtils.js', () => ({
+  detectFileType: vi.fn(),
+}));
+const mockedDetectFileType = vi.mocked(detectFileType);
 
 // Mock console methods to capture warnings
 const originalConsoleWarn = console.warn;
@@ -97,6 +107,9 @@ describe('memoryImportProcessor', () => {
     console.warn = vi.fn();
     console.error = vi.fn();
     console.debug = vi.fn();
+
+    // Mock all as text files by default
+    mockedDetectFileType.mockResolvedValue('text');
   });
 
   afterEach(() => {
@@ -178,6 +191,76 @@ describe('memoryImportProcessor', () => {
         path.resolve(basePath, './instructions.txt'),
         'utf-8',
       );
+    });
+
+    it('should import valid file path with underscore and numbers', async () => {
+      const content = 'Content with @_12test.md import';
+      const basePath = testPath('test', 'path');
+      const importedContent = '# Test Content\nThis is from _12test.md file.';
+
+      mockedFs.access.mockResolvedValue(undefined);
+      mockedFs.readFile.mockResolvedValue(importedContent);
+
+      const result = await processImports(content, basePath, true);
+
+      // Verify the import was processed successfully
+      const comments = findMarkdownComments(result.content);
+      expect(
+        comments.some((c) => c.includes('Imported from: _12test.md')),
+      ).toBe(true);
+      expect(
+        comments.some((c) => c.includes('End of import from: _12test.md')),
+      ).toBe(true);
+
+      // Verify the imported content is present
+      expect(result.content).toContain(importedContent);
+
+      // Verify the file was actually read
+      expect(mockedFs.readFile).toHaveBeenCalledWith(
+        path.resolve(basePath, '_12test.md'),
+        'utf-8',
+      );
+    });
+
+    it('should reject invalid file path with special characters', async () => {
+      const content = 'Content with @./*test.md import';
+      const basePath = testPath('test', 'path');
+      const importedContent = '# Test Content\nThis is from ./*test.md file.';
+
+      mockedFs.access.mockResolvedValue(undefined);
+      mockedFs.readFile.mockResolvedValue(importedContent);
+
+      const result = await processImports(content, basePath, true);
+
+      if (process.platform === 'win32') {
+        // Verify the import was rejected due to invalid file path on Win32
+        expect(result.content).toBe(content); // Content remains unchanged
+
+        // Verify no file access was attempted
+        expect(mockedFs.access).not.toHaveBeenCalled();
+        expect(mockedFs.readFile).not.toHaveBeenCalled();
+
+        // Verify no import tree was created
+        expect(result.importTree.imports).toBeUndefined();
+      } else {
+        // On non-Windows platforms, the import should succeed
+        const comments = findMarkdownComments(result.content);
+        expect(
+          comments.some((c) => c.includes('Imported from: ./*test.md')),
+        ).toBe(true);
+        expect(
+          comments.some((c) => c.includes('End of import from: ./*test.md')),
+        ).toBe(true);
+
+        // Verify the imported content is present
+        expect(result.content).toContain(importedContent);
+
+        // Verify the file was actually read
+        expect(mockedFs.readFile).toHaveBeenCalledWith(
+          path.resolve(basePath, './*test.md'),
+          'utf-8',
+        );
+      }
     });
 
     it('should handle circular imports', async () => {
@@ -873,6 +956,59 @@ describe('memoryImportProcessor', () => {
         'file.md',
       );
       expect(validateImportPath(dotPath, basePath, [allowedPath])).toBe(true);
+    });
+  });
+
+  describe('validateImportFileType', () => {
+    beforeEach(() => {
+      vi.clearAllMocks();
+    });
+
+    it('should work with different text file extensions', async () => {
+      const testCases = [
+        './README.md',
+        './config.json',
+        './script.js',
+        './style.css',
+        './document.txt',
+        './code.py',
+        './markup.html',
+      ];
+
+      const basePath = testPath('test', 'path');
+
+      // Mock all as text files
+      mockedDetectFileType.mockResolvedValue('text');
+
+      for (const importPath of testCases) {
+        const result = await validateImportFileType(importPath, basePath);
+        expect(result).toBe(true);
+      }
+
+      expect(mockedDetectFileType).toHaveBeenCalledTimes(testCases.length);
+    });
+
+    it('should reject common binary file types', async () => {
+      const testCases = [
+        './image.jpg',
+        './photo.png',
+        './video.mp4',
+        './archive.zip',
+        './executable.exe',
+        './library.dll',
+      ];
+
+      const basePath = testPath('test', 'path');
+
+      // Mock all as binary files
+      mockedDetectFileType.mockResolvedValue('binary');
+
+      for (const importPath of testCases) {
+        const result = await validateImportFileType(importPath, basePath);
+        expect(result).toBe(false);
+      }
+
+      expect(mockedDetectFileType).toHaveBeenCalledTimes(testCases.length);
     });
   });
 });
