@@ -5,7 +5,7 @@
  */
 
 import type React from 'react';
-import { Text } from 'ink';
+import { Box, Text } from 'ink';
 import type { AnsiLine, AnsiOutput, AnsiToken } from '@google/gemini-cli-core';
 
 const DEFAULT_HEIGHT = 24;
@@ -13,34 +13,40 @@ const DEFAULT_HEIGHT = 24;
 interface AnsiOutputProps {
   data: AnsiOutput;
   availableTerminalHeight?: number;
+  width: number;
 }
 
 export const AnsiOutputText: React.FC<AnsiOutputProps> = ({
   data,
   availableTerminalHeight,
+  width,
 }) => {
   const lastLines = data.slice(
     -(availableTerminalHeight && availableTerminalHeight > 0
       ? availableTerminalHeight
       : DEFAULT_HEIGHT),
   );
-  return lastLines.map((line: AnsiLine, lineIndex: number) => (
-    <Text key={lineIndex}>
-      {line.length > 0
-        ? line.map((token: AnsiToken, tokenIndex: number) => (
-            <Text
-              key={tokenIndex}
-              color={token.inverse ? token.bg : token.fg}
-              backgroundColor={token.inverse ? token.fg : token.bg}
-              dimColor={token.dim}
-              bold={token.bold}
-              italic={token.italic}
-              underline={token.underline}
-            >
-              {token.text}
-            </Text>
-          ))
-        : null}
-    </Text>
-  ));
+  return (
+    <Box flexDirection="column" width={width} flexShrink={0}>
+      {lastLines.map((line: AnsiLine, lineIndex: number) => (
+        <Text key={lineIndex} wrap="truncate">
+          {line.length > 0
+            ? line.map((token: AnsiToken, tokenIndex: number) => (
+                <Text
+                  key={tokenIndex}
+                  color={token.inverse ? token.bg : token.fg}
+                  backgroundColor={token.inverse ? token.fg : token.bg}
+                  dimColor={token.dim}
+                  bold={token.bold}
+                  italic={token.italic}
+                  underline={token.underline}
+                >
+                  {token.text}
+                </Text>
+              ))
+            : null}
+        </Text>
+      ))}
+    </Box>
+  );
 };
