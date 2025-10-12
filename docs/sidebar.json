@@ -28,8 +28,8 @@
         "slug": "docs/get-started/configuration"
       },
       {
-        "label": "Deployment",
-        "slug": "docs/get-started/deployment"
+        "label": "Installation",
+        "slug": "docs/get-started/installation"
       },
       {
         "label": "Examples",
@@ -160,6 +160,10 @@
         "slug": "docs/extensions"
       },
       {
+        "label": "Get Started with Extensions",
+        "slug": "docs/extensions/getting-started-extensions.md"
+      },
+      {
         "label": "Extension Releasing",
         "slug": "docs/extensions/extension-releasing"
       }
@@ -188,6 +192,10 @@
       {
         "label": "Releases",
         "slug": "docs/releases"
+      },
+      {
+        "label": "Changelog",
+        "slug": "docs/changelogs"
       },
       {
         "label": "Integration Tests",
