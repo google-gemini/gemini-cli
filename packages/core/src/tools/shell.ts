@@ -251,7 +251,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
             }
           },
           signal,
-          this.config.getShouldUseNodePtyShell(),
+          this.config.getEnableInteractiveShell(),
           shellExecutionConfig ?? {},
         );
 
