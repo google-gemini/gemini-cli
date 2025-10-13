@@ -14,9 +14,6 @@ inputs:
   wombat-token-cli:
     description: 'The npm token for the @google/gemini-cli package.'
     required: true
-  wombat-token-a2a-server:
-    description: 'The npm token for the @google/gemini-cli-a2a-server package.'
-    required: true
   github-token:
     description: 'The GitHub token for creating the release.'
     required: true
@@ -172,7 +169,6 @@ runs:
       run: |
         npm install "@google/gemini-cli-core@${{ inputs.release-version }}" \
         --workspace="@google/gemini-cli" \
-        --workspace="@google/gemini-cli-a2a-server" \
         --save-exact
 
     - name: '📦 Publish @google/gemini-cli to npm'
@@ -200,19 +196,6 @@ runs:
           --workspace="@google-gemini/gemini-cli" \
           --no-tag
 
-    - name: '📦 Publish @google/gemini-cli-a2a-server'
-      if: "inputs.registry != 'github'"
-      working-directory: '${{ inputs.working-directory }}'
-      env:
-        NODE_AUTH_TOKEN: '${{ inputs.wombat-token-a2a-server }}'
-      shell: 'bash'
-      run: |
-        if [ "${{ inputs.dry-run }}" == "true" ]; then
-          npm publish --dry-run --workspace="@google/gemini-cli-a2a-server" --no-tag
-        else
-          npm publish --workspace="@google/gemini-cli-a2a-server" --no-tag
-        fi
-
     - name: '🔬 Verify NPM release by version'
       uses: './.github/actions/verify-release'
       if: "${{ inputs.dry-run != 'true' && inputs.force-skip-tests != 'true' && inputs.registry != 'github' }}"
@@ -231,7 +214,6 @@ runs:
         dry-run: '${{ inputs.dry-run }}'
         wombat-token-core: '${{ inputs.wombat-token-core }}'
         wombat-token-cli: '${{ inputs.wombat-token-cli }}'
-        wombat-token-a2a-server: '${{ inputs.wombat-token-a2a-server }}'
 
     - name: '🎉 Create GitHub Release'
       working-directory: '${{ inputs.working-directory }}'
