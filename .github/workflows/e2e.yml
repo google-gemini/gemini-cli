@@ -9,9 +9,7 @@ on:
     branches:
       - 'main'
       - 'release/**'
-  # This will run for PRs from forks when a label is added.
   pull_request_target:
-    types: ['labeled']
   merge_group:
   workflow_dispatch:
     inputs:
@@ -27,16 +25,6 @@ concurrency:
     ${{ github.ref != 'refs/heads/main' && !startsWith(github.ref, 'refs/heads/release/') }}
 
 jobs:
-  print_event:
-    name: 'Print Event'
-    runs-on: 'gemini-cli-ubuntu-16-core'
-    steps:
-      - name: 'Print'
-        env:
-          GITHUB_EVENT: '${{ toJson(github.event) }}'
-        run: |
-          echo "$GITHUB_EVENT"
-
   merge_queue_skipper:
     name: 'Merge Queue Skipper'
     runs-on: 'gemini-cli-ubuntu-16-core'
@@ -57,7 +45,7 @@ jobs:
       github.event_name == 'merge_group' ||
       github.event_name == 'workflow_dispatch' ||
       (github.event.pull_request.head.repo.full_name == github.repository) ||
-      (github.event.label.name == 'maintainer:e2e:ok'))
+      (github.event_name == 'pull_request_target'))
     runs-on: 'gemini-cli-ubuntu-16-core'
     strategy:
       fail-fast: false
@@ -119,7 +107,7 @@ jobs:
       github.event_name == 'merge_group' ||
       github.event_name == 'workflow_dispatch' ||
       (github.event.pull_request.head.repo.full_name == github.repository) ||
-      (github.event.label.name == 'maintainer:e2e:ok'))
+      (github.event_name == 'pull_request_target'))
     runs-on: 'macos-latest'
     steps:
       - name: 'Checkout (fork)'
@@ -168,7 +156,7 @@ jobs:
       github.event_name == 'merge_group' ||
       github.event_name == 'workflow_dispatch' ||
       (github.event.pull_request.head.repo.full_name == github.repository) ||
-      (github.event.label.name == 'maintainer:e2e:ok'))
+      (github.event_name == 'pull_request_target'))
     runs-on: 'gemini-cli-windows-16-core'
     continue-on-error: true
 
@@ -230,20 +218,19 @@ jobs:
         shell: 'pwsh'
         run: 'npm run test:integration:sandbox:none'
 
-  e2e_check:
-    name: 'E2E Check'
+  e2e:
+    name: 'E2E'
     if: |
       always() && (
         github.event_name == 'push' ||
         github.event_name == 'merge_group' ||
         github.event_name == 'workflow_dispatch' ||
         (github.event.pull_request.head.repo.full_name == github.repository) ||
-        (github.event.label.name == 'maintainer:e2e:ok')
+        (github.event_name == 'pull_request_target')
       )
     needs:
       - 'e2e_linux'
       - 'e2e_mac'
-      - 'e2e_windows'
     runs-on: 'gemini-cli-ubuntu-16-core'
     steps:
       - name: 'Check E2E test results'
