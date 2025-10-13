@@ -196,10 +196,25 @@ export class InteractiveRun {
 
   // Simulates typing a string one character at a time to avoid paste detection.
   async type(text: string) {
-    const delay = 5;
+    let typedSoFar = '';
     for (const char of text) {
       this.ptyProcess.write(char);
-      await new Promise((resolve) => setTimeout(resolve, delay));
+      typedSoFar += char;
+
+      // Wait for the typed sequence so far to be echoed back.
+      const found = await poll(
+        () => stripAnsi(this.output).includes(typedSoFar),
+        5000, // 5s timeout per character (generous for CI)
+        10, // check frequently
+      );
+
+      if (!found) {
+        throw new Error(
+          `Timed out waiting for typed text to appear in output: "${typedSoFar}".\nStripped output:\n${stripAnsi(
+            this.output,
+          )}`,
+        );
+      }
     }
   }
 

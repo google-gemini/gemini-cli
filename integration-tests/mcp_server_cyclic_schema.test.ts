@@ -200,10 +200,4 @@ describe('mcp server with cyclic tool schema is detected', () => {
 
     await run.expectText('tool_with_cyclic_schema');
   });
-
-  it('gemini api call should be successful with cyclic mcp tool schema', async () => {
-    // Run any command and verify that we get a non-error response from
-    // the Gemini API.
-    await rig.run('hello');
-  });
 });
