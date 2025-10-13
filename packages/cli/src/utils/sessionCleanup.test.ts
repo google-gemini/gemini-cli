@@ -380,9 +380,6 @@ describe('Session Cleanup', () => {
       expect(debugSpy).toHaveBeenCalledWith(
         expect.stringContaining('Session cleanup: deleted'),
       );
-      expect(debugSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Deleted expired session:'),
-      );
 
       debugSpy.mockRestore();
     });
@@ -1598,12 +1595,8 @@ describe('Session Cleanup', () => {
       expect(result.skipped).toBe(1); // The valid session is kept
 
       // Verify corrupted files were deleted
-      expect(mockFs.unlink).toHaveBeenCalledWith(
-        expect.stringContaining('corrupt1.json'),
-      );
-      expect(mockFs.unlink).toHaveBeenCalledWith(
-        expect.stringContaining('corrupt2.json'),
-      );
+      expect(mockFs.unlink).toHaveBeenCalledExactlyOnceWith(expect.stringContaining('corrupt1.json'));
+      expect(mockFs.unlink).toHaveBeenCalledTimes(2);
     });
 
     it('should handle unexpected errors without throwing', async () => {

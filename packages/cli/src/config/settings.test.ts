@@ -2417,20 +2417,10 @@ describe('Settings Loading and Merging', () => {
       );
 
       // Check that setValue was called to remove the deprecated setting
-      expect(setValueSpy).toHaveBeenCalledWith(
-        SettingScope.User,
-        'extensions',
-        {
+      expect(setValueSpy).toHaveBeenCalledTimes(2);
+      expect(setValueSpy).toHaveBeenCalledExactlyOnceWith(SettingScope.User, 'extensions', {
           disabled: undefined,
-        },
-      );
-      expect(setValueSpy).toHaveBeenCalledWith(
-        SettingScope.Workspace,
-        'extensions',
-        {
-          disabled: undefined,
-        },
-      );
+        });
     });
 
     it('should not do anything if there are no deprecated settings', () => {

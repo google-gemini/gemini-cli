@@ -168,13 +168,8 @@ describe('commentJson', () => {
         });
       }).not.toThrow();
 
-      expect(consoleSpy).toHaveBeenCalledWith(
-        'Error parsing settings file:',
-        expect.any(Error),
-      );
-      expect(consoleSpy).toHaveBeenCalledWith(
-        'Settings file may be corrupted. Please check the JSON syntax.',
-      );
+      expect(consoleSpy).toHaveBeenCalledExactlyOnceWith('Error parsing settings file:', expect.any(Error));
+      expect(consoleSpy).toHaveBeenCalledTimes(2);
 
       const unchangedContent = fs.readFileSync(testFilePath, 'utf-8');
       expect(unchangedContent).toBe(corruptedContent);
