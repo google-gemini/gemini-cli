@@ -15,6 +15,7 @@ import fs from 'node:fs';
 import * as pty from '@lydell/node-pty';
 import stripAnsi from 'strip-ansi';
 import * as os from 'node:os';
+import { GEMINI_DIR } from '../packages/core/src/utils/paths.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -244,7 +245,7 @@ export class TestRig {
     mkdirSync(this.testDir, { recursive: true });
 
     // Create a settings file to point the CLI to the local collector
-    const geminiDir = join(this.testDir, '.gemini');
+    const geminiDir = join(this.testDir, GEMINI_DIR);
     mkdirSync(geminiDir, { recursive: true });
     // In sandbox mode, use an absolute path for telemetry inside the container
     // The container mounts the test directory at the same path as the host
@@ -582,6 +583,34 @@ export class TestRig {
       timeout,
       100,
     );
+  }
+
+  async expectToolCallSuccess(toolNames: string[], timeout?: number) {
+    // Use environment-specific timeout
+    if (!timeout) {
+      timeout = getDefaultTimeout();
+    }
+
+    // Wait for telemetry to be ready before polling for tool calls
+    await this.waitForTelemetryReady();
+
+    const success = await poll(
+      () => {
+        const toolLogs = this.readToolLogs();
+        return toolNames.some((name) =>
+          toolLogs.some(
+            (log) => log.toolRequest.name === name && log.toolRequest.success,
+          ),
+        );
+      },
+      timeout,
+      100,
+    );
+
+    expect(
+      success,
+      `Expected to find successful toolCalls for ${JSON.stringify(toolNames)}`,
+    ).toBe(true);
   }
 
   async waitForAnyToolCall(toolNames: string[], timeout?: number) {
