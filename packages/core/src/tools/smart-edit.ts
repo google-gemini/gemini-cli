@@ -833,7 +833,7 @@ export class SmartEditTool
       5. NEVER escape \`old_string\` or \`new_string\`, that would break the exact literal text requirement.
       **Important:** If ANY of the above are not satisfied, the tool will fail. CRITICAL for \`old_string\`: Must uniquely identify the single instance to change. Include at least 3 lines of context BEFORE and AFTER the target text, matching whitespace and indentation precisely. If this string matches multiple locations, or does not match exactly, the tool will fail.
       6. Prefer to break down complex and long changes into multiple smaller atomic calls to this tool. Always check the content of the file after changes or not finding a string to match.
-      **Multiple replacements:** If there are multiple and ambiguous occurences of the \`old_string\` in the file, the tool will also fail.`,
+      **Multiple replacements:** If there are multiple and ambiguous occurrences of the \`old_string\` in the file, the tool will also fail.`,
       Kind.Edit,
       {
         properties: {
