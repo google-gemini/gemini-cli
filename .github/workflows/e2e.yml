@@ -9,9 +9,6 @@ on:
     branches:
       - 'main'
       - 'release/**'
-  # This will run for PRs from forks when a label is added.
-  pull_request_target:
-    types: ['labeled']
   merge_group:
   workflow_dispatch:
     inputs:
@@ -46,8 +43,7 @@ jobs:
       (github.event_name == 'push' ||
       github.event_name == 'merge_group' ||
       github.event_name == 'workflow_dispatch' ||
-      (github.event.pull_request.head.repo.full_name == github.repository) ||
-      (github.event.label.name == 'maintainer:e2e:ok'))
+      (github.event.pull_request.head.repo.full_name == github.repository))
     runs-on: 'gemini-cli-ubuntu-16-core'
     strategy:
       fail-fast: false
@@ -108,8 +104,7 @@ jobs:
       (github.event_name == 'push' ||
       github.event_name == 'merge_group' ||
       github.event_name == 'workflow_dispatch' ||
-      (github.event.pull_request.head.repo.full_name == github.repository) ||
-      (github.event.label.name == 'maintainer:e2e:ok'))
+      (github.event.pull_request.head.repo.full_name == github.repository))
     runs-on: 'macos-latest'
     steps:
       - name: 'Checkout (fork)'
@@ -157,8 +152,7 @@ jobs:
       (github.event_name == 'push' ||
       github.event_name == 'merge_group' ||
       github.event_name == 'workflow_dispatch' ||
-      (github.event.pull_request.head.repo.full_name == github.repository) ||
-      (github.event.label.name == 'maintainer:e2e:ok'))
+      (github.event.pull_request.head.repo.full_name == github.repository))
     runs-on: 'gemini-cli-windows-16-core'
     continue-on-error: true
 
@@ -227,8 +221,7 @@ jobs:
         github.event_name == 'push' ||
         github.event_name == 'merge_group' ||
         github.event_name == 'workflow_dispatch' ||
-        (github.event.pull_request.head.repo.full_name == github.repository) ||
-        (github.event.label.name == 'maintainer:e2e:ok')
+        (github.event.pull_request.head.repo.full_name == github.repository)
       )
     needs:
       - 'e2e_linux'
