@@ -1527,7 +1527,7 @@ describe('CoreToolScheduler Sequential Execution', () => {
     expect(completedCalls[1].status).toBe('success');
   });
 
-  it('should continue executing subsequent tools if one is cancelled', async () => {
+  it('should cancel subsequent tools when the signal is aborted.', async () => {
     // Arrange
     const abortController = new AbortController();
     let secondCallStarted = false;
