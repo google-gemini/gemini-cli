@@ -58,6 +58,7 @@
     "pre-commit": "node scripts/pre-commit.js"
   },
   "overrides": {
+    "react-devtools-core": "^6.1.2",
     "wrap-ansi": "9.0.2",
     "ansi-regex": "5.0.1",
     "cliui": {
