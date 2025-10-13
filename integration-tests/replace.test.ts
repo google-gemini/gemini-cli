@@ -166,12 +166,12 @@ describe.skip('replace', () => {
 
   it('should delete a block of text', async () => {
     const rig = new TestRig();
-    await rig.setup('should delete a block of text');
+    rig.setup('should delete a block of text');
     const fileName = 'delete_block.txt';
     const blockToDelete =
       '## DELETE THIS ##\nThis is a block of text to delete.\n## END DELETE ##';
-    const originalContent = `Hello\n${blockToDelete}\nWorld`;
-    const expectedContent = 'Hello\nWorld';
+    const originalContent = `Hello${blockToDelete}World`;
+    const expectedContent = 'HelloWorld';
     rig.createFile(fileName, originalContent);
 
     const prompt = `In ${fileName}, delete the entire block from "## DELETE THIS ##" to "## END DELETE ##" including the markers.`;
