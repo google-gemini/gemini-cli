@@ -178,7 +178,7 @@ export const ToolConfirmationMessage: React.FC<
         diffContent={confirmationDetails.fileDiff}
         filename={confirmationDetails.fileName}
         availableTerminalHeight={availableBodyContentHeight()}
-        terminalWidth={childWidth}
+        terminalWidth={terminalWidth}
       />
     );
   } else if (confirmationDetails.type === 'exec') {
@@ -210,7 +210,7 @@ export const ToolConfirmationMessage: React.FC<
     }
     bodyContent = (
       <Box flexDirection="column">
-        <Box paddingX={1} marginLeft={1}>
+        <Box paddingX={1}>
           <MaxSizedBox
             maxHeight={bodyContentHeight}
             maxWidth={Math.max(childWidth, 1)}
@@ -248,7 +248,7 @@ export const ToolConfirmationMessage: React.FC<
     });
 
     bodyContent = (
-      <Box flexDirection="column" paddingLeft={1} marginLeft={1}>
+      <Box flexDirection="column" paddingX={1}>
         <Text color={theme.text.link}>
           <RenderInline text={infoProps.prompt} />
         </Text>
@@ -270,7 +270,7 @@ export const ToolConfirmationMessage: React.FC<
     const mcpProps = confirmationDetails as ToolMcpConfirmationDetails;
 
     bodyContent = (
-      <Box flexDirection="column" paddingX={1} marginLeft={1}>
+      <Box flexDirection="column" paddingX={1}>
         <Text color={theme.text.link}>MCP Server: {mcpProps.serverName}</Text>
         <Text color={theme.text.link}>Tool: {mcpProps.toolName}</Text>
       </Box>
@@ -302,13 +302,7 @@ export const ToolConfirmationMessage: React.FC<
   }
 
   return (
-    <Box
-      flexDirection="column"
-      paddingLeft={1}
-      paddingRight={1}
-      paddingTop={0}
-      paddingBottom={1}
-    >
+    <Box flexDirection="column" paddingTop={0} paddingBottom={1}>
       {/* Body Content (Diff Renderer or Command Info) */}
       {/* No separate context display here anymore for edits */}
       <Box
@@ -316,21 +310,18 @@ export const ToolConfirmationMessage: React.FC<
         flexShrink={1}
         overflow="hidden"
         marginBottom={1}
-        borderStyle="round"
-        borderLeft={false}
-        borderRight={false}
-        borderColor={theme.border.default}
+        paddingLeft={1}
       >
         {bodyContent}
       </Box>
 
       {/* Confirmation Question */}
-      <Box marginBottom={1} flexShrink={0}>
+      <Box marginBottom={1} flexShrink={0} paddingX={1}>
         <Text color={theme.text.primary}>{question}</Text>
       </Box>
 
       {/* Select Input for Options */}
-      <Box flexShrink={0}>
+      <Box flexShrink={0} paddingX={1}>
         <RadioButtonSelect
           items={options}
           onSelect={handleSelect}

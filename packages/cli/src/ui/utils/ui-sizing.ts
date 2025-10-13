@@ -25,7 +25,12 @@ const getMainAreaWidthInternal = (terminalWidth: number): number => {
 export const calculateMainAreaWidth = (
   terminalWidth: number,
   settings: LoadedSettings,
-): number =>
-  settings.merged.ui?.useFullWidth
-    ? terminalWidth
-    : getMainAreaWidthInternal(terminalWidth);
+): number => {
+  if (settings.merged.ui?.useFullWidth) {
+    if (settings.merged.ui?.useAlternateBuffer) {
+      return terminalWidth - 1;
+    }
+    return terminalWidth;
+  }
+  return getMainAreaWidthInternal(terminalWidth);
+};

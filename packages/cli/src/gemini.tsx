@@ -164,8 +164,6 @@ export async function startInteractiveUI(
   const version = await getCliVersion();
   setWindowTitle(basename(workspaceRoot), settings);
 
-  process.stdout.write('\x1b[?7l');
-
   // Create wrapper component to use hooks inside render
   const AppWrapper = () => {
     const kittyProtocolStatus = useKittyKeyboardProtocol();
@@ -203,7 +201,8 @@ export async function startInteractiveUI(
     {
       exitOnCtrlC: false,
       isScreenReaderEnabled: config.getScreenReader(),
-      alternateBuffer: settings.merged.ui?.useAlternateBuffer
+      alternateBuffer: settings.merged.ui?.useAlternateBuffer,
+      trim: true,
     },
   );
 

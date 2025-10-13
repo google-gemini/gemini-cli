@@ -115,8 +115,22 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
   }
   // The outer box should not actually scroll unless something has gone very wrong.
   return (
-    <Box paddingX={1} paddingY={0} flexDirection="column" overflow="scroll" maxHeight={availableTerminalHeight}>
-      <Box minHeight={1}>
+    <Box
+      paddingY={0}
+      flexDirection="column"
+      overflow="scroll"
+      maxHeight={availableTerminalHeight}
+    >
+      <Box
+        minHeight={1}
+        borderStyle="round"
+        borderColor={theme.border.default}
+        paddingX={1}
+        paddingBottom={1}
+        borderTop={false}
+        borderLeft={false}
+        borderRight={false}
+      >
         <ToolStatusIndicator status={status} name={name} />
         <ToolInfo
           name={name}
@@ -134,15 +148,7 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
         {emphasis === 'high' && <TrailingIndicator />}
       </Box>
       {resultDisplay && (
-        <Box
-          width="100%"
-          borderStyle="round"
-          borderColor={theme.border.default}
-          paddingX={1}
-          borderLeft={false}
-          borderRight={false}
-          flexDirection="column"
-        >
+        <Box width="100%" flexDirection="column" paddingLeft={1}>
           <Box flexDirection="column">
             {typeof resultDisplay === 'string' && renderOutputAsMarkdown ? (
               <Box flexDirection="column">

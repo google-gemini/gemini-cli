@@ -41,7 +41,7 @@
     "fzf": "^0.5.2",
     "glob": "^10.4.5",
     "highlight.js": "^11.11.1",
-    "ink": "github:jacob314/ink#08c5062ee148d226f5e30e2f8602b97fb587c100",
+    "ink": "github:jacob314/ink#19c617bfdc1b14a2c68077a2de283ca18863e9a9",
     "ink-gradient": "^3.0.0",
     "ink-spinner": "^5.0.0",
     "lowlight": "^3.3.0",
