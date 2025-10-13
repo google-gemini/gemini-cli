@@ -8,6 +8,12 @@ export const DEFAULT_GEMINI_MODEL = 'gemini-2.5-pro';
 export const DEFAULT_GEMINI_FLASH_MODEL = 'gemini-2.5-flash';
 export const DEFAULT_GEMINI_FLASH_LITE_MODEL = 'gemini-2.5-flash-lite';
 
+// Extended model support for autonomous operation
+export const GEMINI_2_5_PRO_THINKING = 'gemini-2.5-pro-thinking';
+export const GEMINI_2_5_DEEP_RESEARCH = 'gemini-2.5-deep-research';
+export const GEMINI_3_PRO = 'gemini-3.0-pro';
+export const GEMINI_3_THINKING = 'gemini-3.0-thinking';
+
 export const DEFAULT_GEMINI_MODEL_AUTO = 'auto';
 
 export const DEFAULT_GEMINI_EMBEDDING_MODEL = 'gemini-embedding-001';
