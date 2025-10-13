@@ -608,7 +608,7 @@ export class TestRig {
 
     expect(
       success,
-      `Expected to find successful toolCalls for ${toolNames}`,
+      `Expected to find successful toolCalls for ${JSON.stringify(toolNames)}`,
     ).toBe(true);
   }
 
