@@ -1099,7 +1099,7 @@ const SETTINGS_SCHEMA = {
             label: 'Max Time (Minutes)',
             category: 'Experimental',
             requiresRestart: true,
-            default: 15,
+            default: 5,
             description:
               'Maximum time for the Codebase Investigator agent (in minutes).',
             showInDialog: false,
