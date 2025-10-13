@@ -20,6 +20,9 @@ describe('Flicker Detector', () => {
     const hasUserPromptEvent = await rig.waitForTelemetryEvent('user_prompt');
     expect(hasUserPromptEvent).toBe(true);
 
+    const sessionCountMetric = rig.readMetric('session.count');
+    expect(sessionCountMetric).not.toBeNull();
+
     // We expect NO flicker event to be found.
     const flickerMetric = rig.readMetric('ui.flicker.count');
     expect(flickerMetric).toBeNull();
