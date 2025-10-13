@@ -24,7 +24,7 @@ describe('Interactive Mode', () => {
     const run = await rig.runInteractive();
 
     const longPrompt =
-      "Don't do anything except returning a 1000 token long paragraph with the <name of the scientist who discovered theory of relativity> at the end to indicate end of response. This is a moderately long sentence.";
+      'Dont do anything except returning a 1000 token long paragraph with the <name of the scientist who discovered theory of relativity> at the end to indicate end of response. This is a moderately long sentence.';
 
     await run.type(longPrompt);
     await run.type('\r');
