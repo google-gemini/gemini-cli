@@ -1595,7 +1595,7 @@ describe('Session Cleanup', () => {
       expect(result.skipped).toBe(1); // The valid session is kept
 
       // Verify corrupted files were deleted
-       
+
       expect(mockFs.unlink).toHaveBeenCalledWith(
         expect.stringContaining('corrupt1.json'),
       );

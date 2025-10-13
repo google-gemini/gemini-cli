@@ -168,7 +168,6 @@ describe('commentJson', () => {
         });
       }).not.toThrow();
 
-       
       expect(consoleSpy).toHaveBeenCalledWith(
         'Error parsing settings file:',
         expect.any(Error),
