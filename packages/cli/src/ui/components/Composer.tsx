@@ -5,13 +5,12 @@
  */
 
 import { Box, Text, useIsScreenReaderEnabled } from 'ink';
-import { useMemo } from 'react';
 import { LoadingIndicator } from './LoadingIndicator.js';
 import { ContextSummaryDisplay } from './ContextSummaryDisplay.js';
 import { AutoAcceptIndicator } from './AutoAcceptIndicator.js';
 import { ShellModeIndicator } from './ShellModeIndicator.js';
 import { DetailedMessagesDisplay } from './DetailedMessagesDisplay.js';
-import { InputPrompt, calculatePromptWidths } from './InputPrompt.js';
+import { InputPrompt } from './InputPrompt.js';
 import { Footer } from './Footer.js';
 import { ShowMoreLines } from './ShowMoreLines.js';
 import { QueuedMessageDisplay } from './QueuedMessageDisplay.js';
@@ -40,14 +39,8 @@ export const Composer = () => {
 
   const { contextFileNames, showAutoAcceptIndicator } = uiState;
 
-  // Use the container width of InputPrompt for width of DetailedMessagesDisplay
-  const { containerWidth } = useMemo(
-    () => calculatePromptWidths(uiState.terminalWidth),
-    [uiState.terminalWidth],
-  );
-
   return (
-    <Box flexDirection="column">
+    <Box flexDirection="column" width={uiState.mainAreaWidth} flexShrink={0}>
       {!uiState.embeddedShellFocused && (
         <LoadingIndicator
           thought={
@@ -124,7 +117,7 @@ export const Composer = () => {
               maxHeight={
                 uiState.constrainHeight ? debugConsoleMaxHeight : undefined
               }
-              width={containerWidth}
+              width={uiState.mainAreaWidth}
             />
             <ShowMoreLines constrainHeight={uiState.constrainHeight} />
           </Box>
