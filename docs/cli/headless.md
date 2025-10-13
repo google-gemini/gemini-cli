@@ -227,7 +227,7 @@ UIs with live progress, and creating automation pipelines that react to events.
 
 #### When to Use Streaming JSON
 
-Use `--stream-format output-json` when you need:
+Use `--output-format stream-json` when you need:
 
 - **Real-time progress monitoring** - See tool calls and responses as they
   happen
@@ -252,13 +252,13 @@ The streaming format emits 6 event types:
 
 ```bash
 # Stream events to console
-gemini --stream-format output-json --prompt "What is 2+2?"
+gemini --output-format stream-json --prompt "What is 2+2?"
 
 # Save event stream to file
-gemini --stream-format output-json --prompt "Analyze this code" > events.jsonl
+gemini --output-format stream-json --prompt "Analyze this code" > events.jsonl
 
 # Parse with jq
-gemini --stream-format output-json --prompt "List files" | jq -r '.type'
+gemini --output-format stream-json --prompt "List files" | jq -r '.type'
 ```
 
 #### Example Output
@@ -296,17 +296,16 @@ gemini -p "List programming languages" | grep -i "python"
 
 Key command-line options for headless usage:
 
-| Option                  | Description                              | Example                                            |
-| ----------------------- | ---------------------------------------- | -------------------------------------------------- |
-| `--prompt`, `-p`        | Run in headless mode                     | `gemini -p "query"`                                |
-| `--output-format`       | Specify output format (text, json)       | `gemini -p "query" --output-format json`           |
-| `--stream-format`       | Stream events in real-time (output-json) | `gemini -p "query" --stream-format output-json`    |
-| `--model`, `-m`         | Specify the Gemini model                 | `gemini -p "query" -m gemini-2.5-flash`            |
-| `--debug`, `-d`         | Enable debug mode                        | `gemini -p "query" --debug`                        |
-| `--all-files`, `-a`     | Include all files in context             | `gemini -p "query" --all-files`                    |
-| `--include-directories` | Include additional directories           | `gemini -p "query" --include-directories src,docs` |
-| `--yolo`, `-y`          | Auto-approve all actions                 | `gemini -p "query" --yolo`                         |
-| `--approval-mode`       | Set approval mode                        | `gemini -p "query" --approval-mode auto_edit`      |
+| Option                  | Description                                     | Example                                            |
+| ----------------------- | ----------------------------------------------- | -------------------------------------------------- |
+| `--prompt`, `-p`        | Run in headless mode                            | `gemini -p "query"`                                |
+| `--output-format`       | Specify output format (text, json, stream-json) | `gemini -p "query" --output-format stream-json`    |
+| `--model`, `-m`         | Specify the Gemini model                        | `gemini -p "query" -m gemini-2.5-flash`            |
+| `--debug`, `-d`         | Enable debug mode                               | `gemini -p "query" --debug`                        |
+| `--all-files`, `-a`     | Include all files in context                    | `gemini -p "query" --all-files`                    |
+| `--include-directories` | Include additional directories                  | `gemini -p "query" --include-directories src,docs` |
+| `--yolo`, `-y`          | Auto-approve all actions                        | `gemini -p "query" --yolo`                         |
+| `--approval-mode`       | Set approval mode                               | `gemini -p "query" --approval-mode auto_edit`      |
 
 For complete details on all available configuration options, settings files, and
 environment variables, see the
