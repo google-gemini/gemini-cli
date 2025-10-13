@@ -20,7 +20,7 @@ import {
   EditTool,
   MemoryTool,
   ShellTool,
-  WriteFileTool,
+  WRITE_FILE_TOOL_NAME,
   WebFetchTool,
   WebSearchTool,
 } from '@google/gemini-cli-core';
@@ -48,7 +48,7 @@ const WRITE_TOOLS = new Set([
   EditTool.Name,
   MemoryTool.Name,
   ShellTool.Name,
-  WriteFileTool.Name,
+  WRITE_FILE_TOOL_NAME,
   WebFetchTool.Name,
 ]);
 

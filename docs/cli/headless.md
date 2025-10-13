@@ -244,7 +244,9 @@ Key command-line options for headless usage:
 | `--yolo`, `-y`          | Auto-approve all actions           | `gemini -p "query" --yolo`                         |
 | `--approval-mode`       | Set approval mode                  | `gemini -p "query" --approval-mode auto_edit`      |
 
-For complete details on all available configuration options, settings files, and environment variables, see the [Configuration Guide](../get-started/configuration.md).
+For complete details on all available configuration options, settings files, and
+environment variables, see the
+[Configuration Guide](../get-started/configuration.md).
 
 ## Examples
 
@@ -317,7 +319,8 @@ tail -5 usage.log
 
 ## Resources
 
-- [CLI Configuration](../get-started/configuration.md) - Complete configuration guide
+- [CLI Configuration](../get-started/configuration.md) - Complete configuration
+  guide
 - [Authentication](../get-started/authentication.md) - Setup authentication
 - [Commands](./commands.md) - Interactive commands reference
 - [Tutorials](./tutorials.md) - Step-by-step automation guides

@@ -13,6 +13,8 @@ describe('detectIde', () => {
 
   afterEach(() => {
     vi.unstubAllEnvs();
+    // Clear Cursor-specific environment variables that might interfere with tests
+    delete process.env['CURSOR_TRACE_ID'];
   });
 
   it('should return undefined if TERM_PROGRAM is not vscode', () => {
@@ -46,6 +48,7 @@ describe('detectIde', () => {
     vi.stubEnv('TERM_PROGRAM', 'vscode');
     vi.stubEnv('CODESPACES', 'true');
     vi.stubEnv('TERMINAL_EMULATOR', '');
+    vi.stubEnv('CURSOR_TRACE_ID', '');
     expect(detectIde(ideProcessInfo)).toBe(IDE_DEFINITIONS.codespaces);
   });
 
@@ -53,6 +56,7 @@ describe('detectIde', () => {
     vi.stubEnv('TERM_PROGRAM', 'vscode');
     vi.stubEnv('EDITOR_IN_CLOUD_SHELL', 'true');
     vi.stubEnv('TERMINAL_EMULATOR', '');
+    vi.stubEnv('CURSOR_TRACE_ID', '');
     expect(detectIde(ideProcessInfo)).toBe(IDE_DEFINITIONS.cloudshell);
   });
 
@@ -60,6 +64,7 @@ describe('detectIde', () => {
     vi.stubEnv('TERM_PROGRAM', 'vscode');
     vi.stubEnv('CLOUD_SHELL', 'true');
     vi.stubEnv('TERMINAL_EMULATOR', '');
+    vi.stubEnv('CURSOR_TRACE_ID', '');
     expect(detectIde(ideProcessInfo)).toBe(IDE_DEFINITIONS.cloudshell);
   });
 
@@ -67,6 +72,7 @@ describe('detectIde', () => {
     vi.stubEnv('TERM_PROGRAM', 'vscode');
     vi.stubEnv('TERM_PRODUCT', 'Trae');
     vi.stubEnv('TERMINAL_EMULATOR', '');
+    vi.stubEnv('CURSOR_TRACE_ID', '');
     expect(detectIde(ideProcessInfo)).toBe(IDE_DEFINITIONS.trae);
   });
 
@@ -74,6 +80,7 @@ describe('detectIde', () => {
     vi.stubEnv('TERM_PROGRAM', 'vscode');
     vi.stubEnv('MONOSPACE_ENV', 'true');
     vi.stubEnv('TERMINAL_EMULATOR', '');
+    vi.stubEnv('CURSOR_TRACE_ID', '');
     expect(detectIde(ideProcessInfo)).toBe(IDE_DEFINITIONS.firebasestudio);
   });
 
@@ -81,6 +88,7 @@ describe('detectIde', () => {
     vi.stubEnv('TERM_PROGRAM', 'vscode');
     vi.stubEnv('MONOSPACE_ENV', '');
     vi.stubEnv('TERMINAL_EMULATOR', '');
+    vi.stubEnv('CURSOR_TRACE_ID', '');
     expect(detectIde(ideProcessInfo)).toBe(IDE_DEFINITIONS.vscode);
   });
 
@@ -88,6 +96,7 @@ describe('detectIde', () => {
     vi.stubEnv('TERM_PROGRAM', 'vscode');
     vi.stubEnv('MONOSPACE_ENV', '');
     vi.stubEnv('TERMINAL_EMULATOR', '');
+    vi.stubEnv('CURSOR_TRACE_ID', '');
     expect(detectIde(ideProcessInfoNoCode)).toBe(IDE_DEFINITIONS.vscodefork);
   });
 
@@ -142,6 +151,7 @@ describe('detectIde with ideInfoFromFile', () => {
     const ideInfoFromFile = { displayName: 'Custom IDE' };
     vi.stubEnv('TERM_PROGRAM', 'vscode');
     vi.stubEnv('TERMINAL_EMULATOR', '');
+    vi.stubEnv('CURSOR_TRACE_ID', '');
     expect(detectIde(ideProcessInfo, ideInfoFromFile)).toBe(
       IDE_DEFINITIONS.vscode,
     );
@@ -151,6 +161,7 @@ describe('detectIde with ideInfoFromFile', () => {
     const ideInfoFromFile = { name: 'custom-ide' };
     vi.stubEnv('TERM_PROGRAM', 'vscode');
     vi.stubEnv('TERMINAL_EMULATOR', '');
+    vi.stubEnv('CURSOR_TRACE_ID', '');
     expect(detectIde(ideProcessInfo, ideInfoFromFile)).toBe(
       IDE_DEFINITIONS.vscode,
     );

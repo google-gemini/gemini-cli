@@ -125,7 +125,7 @@ class VsCodeInstaller implements IdeInstaller {
           'google.gemini-cli-vscode-ide-companion',
           '--force',
         ],
-        { stdio: 'pipe' },
+        { stdio: 'pipe', shell: this.platform === 'win32' },
       );
 
       if (result.status !== 0) {

@@ -153,10 +153,8 @@ describe('mcp list command', () => {
 
     mockedLoadExtensions.mockReturnValue([
       {
-        config: {
-          name: 'test-extension',
-          mcpServers: { 'extension-server': { command: '/ext/server' } },
-        },
+        name: 'test-extension',
+        mcpServers: { 'extension-server': { command: '/ext/server' } },
       },
     ]);
 

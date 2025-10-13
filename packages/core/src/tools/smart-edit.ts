@@ -6,6 +6,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import * as crypto from 'node:crypto';
 import * as Diff from 'diff';
 import {
   BaseDeclarativeTool,
@@ -37,6 +38,7 @@ import { logSmartEditStrategy } from '../telemetry/loggers.js';
 import { SmartEditCorrectionEvent } from '../telemetry/types.js';
 import { logSmartEditCorrectionEvent } from '../telemetry/loggers.js';
 
+import { correctPath } from '../utils/pathCorrector.js';
 interface ReplacementContext {
   params: EditToolParams;
   currentContent: string;
@@ -48,6 +50,15 @@ interface ReplacementResult {
   occurrences: number;
   finalOldString: string;
   finalNewString: string;
+}
+
+/**
+ * Creates a SHA256 hash of the given content.
+ * @param content The string content to hash.
+ * @returns A hex-encoded hash string.
+ */
+function hashContent(content: string): string {
+  return crypto.createHash('sha256').update(content).digest('hex');
 }
 
 function restoreTrailingNewline(
@@ -374,12 +385,30 @@ class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
     abortSignal: AbortSignal,
     originalLineEnding: '\r\n' | '\n',
   ): Promise<CalculatedEdit> {
+    // In order to keep from clobbering edits made outside our system,
+    // check if the file has been modified since we first read it.
+    let errorForLlmEditFixer = initialError.raw;
+    let contentForLlmEditFixer = currentContent;
+
+    const initialContentHash = hashContent(currentContent);
+    const onDiskContent = await this.config
+      .getFileSystemService()
+      .readTextFile(params.file_path);
+    const onDiskContentHash = hashContent(onDiskContent.replace(/\r\n/g, '\n'));
+
+    if (initialContentHash !== onDiskContentHash) {
+      // The file has changed on disk since we first read it.
+      // Use the latest content for the correction attempt.
+      contentForLlmEditFixer = onDiskContent.replace(/\r\n/g, '\n');
+      errorForLlmEditFixer = `The initial edit attempt failed with the following error: "${initialError.raw}". However, the file has been modified by either the user or an external process since that edit attempt. The file content provided to you is the latest version. Please base your correction on this new content.`;
+    }
+
     const fixedEdit = await FixLLMEditWithInstruction(
       params.instruction,
       params.old_string,
       params.new_string,
-      initialError.raw,
-      currentContent,
+      errorForLlmEditFixer,
+      contentForLlmEditFixer,
       this.config.getBaseLlmClient(),
       abortSignal,
     );
@@ -405,7 +434,7 @@ class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
         old_string: fixedEdit.search,
         new_string: fixedEdit.replace,
       },
-      currentContent,
+      currentContent: contentForLlmEditFixer,
       abortSignal,
     });
 
@@ -423,7 +452,7 @@ class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
       logSmartEditCorrectionEvent(this.config, event);
 
       return {
-        currentContent,
+        currentContent: contentForLlmEditFixer,
         newContent: currentContent,
         occurrences: 0,
         isNewFile: false,
@@ -436,7 +465,7 @@ class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
     logSmartEditCorrectionEvent(this.config, event);
 
     return {
-      currentContent,
+      currentContent: contentForLlmEditFixer,
       newContent: secondAttemptResult.newContent,
       occurrences: secondAttemptResult.occurrences,
       isNewFile: false,
@@ -849,58 +878,6 @@ A good instruction should concisely answer:
   }
 
   /**
-   * Quickly checks if the file path can be resolved directly against the workspace root.
-   * @param filePath The relative file path to check.
-   * @returns The absolute path if the file exists, otherwise null.
-   */
-  private findDirectPath(filePath: string): string | null {
-    const directPath = path.join(this.config.getTargetDir(), filePath);
-    return fs.existsSync(directPath) ? directPath : null;
-  }
-
-  /**
-   * Searches for a file across all configured workspace directories.
-   * @param filePath The file path (can be partial) to search for.
-   * @returns A list of absolute paths for all matching files found.
-   */
-  private findAmbiguousPaths(filePath: string): string[] {
-    const workspaceContext = this.config.getWorkspaceContext();
-    const fileSystem = this.config.getFileSystemService();
-    const searchPaths = workspaceContext.getDirectories();
-    return fileSystem.findFiles(filePath, searchPaths);
-  }
-
-  /**
-   * Attempts to correct a relative file path to an absolute path.
-   * This function modifies `params.file_path` in place if successful.
-   * @param params The tool parameters containing the file_path to correct.
-   * @returns An error message string if correction fails, otherwise null.
-   */
-  private correctPath(params: EditToolParams): string | null {
-    const directPath = this.findDirectPath(params.file_path);
-    if (directPath) {
-      params.file_path = directPath;
-      return null;
-    }
-
-    const foundFiles = this.findAmbiguousPaths(params.file_path);
-
-    if (foundFiles.length === 0) {
-      return `File not found for '${params.file_path}' and path is not absolute.`;
-    }
-
-    if (foundFiles.length > 1) {
-      return (
-        `The file path '${params.file_path}' is too ambiguous and matches multiple files. ` +
-        `Please provide a more specific path. Matches: ${foundFiles.join(', ')}`
-      );
-    }
-
-    params.file_path = foundFiles[0];
-    return null;
-  }
-
-  /**
    * Validates the parameters for the Edit tool
    * @param params Parameters to validate
    * @returns Error message string or null if valid
@@ -912,11 +889,17 @@ A good instruction should concisely answer:
       return "The 'file_path' parameter must be non-empty.";
     }
 
-    if (!path.isAbsolute(params.file_path)) {
+    let filePath = params.file_path;
+    if (!path.isAbsolute(filePath)) {
       // Attempt to auto-correct to an absolute path
-      const error = this.correctPath(params);
-      if (error) return error;
+      const result = correctPath(filePath, this.config);
+      if (result.success) {
+        filePath = result.correctedPath;
+      } else {
+        return result.error;
+      }
     }
+    params.file_path = filePath;
 
     const workspaceContext = this.config.getWorkspaceContext();
     if (!workspaceContext.isPathWithinWorkspace(params.file_path)) {

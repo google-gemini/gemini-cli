@@ -315,6 +315,7 @@ describe('Gemini Client (client.ts)', () => {
       getSkipNextSpeakerCheck: vi.fn().mockReturnValue(false),
       getUseSmartEdit: vi.fn().mockReturnValue(false),
       getUseModelRouter: vi.fn().mockReturnValue(false),
+      getContinueOnFailedApiCall: vi.fn(),
       getProjectRoot: vi.fn().mockReturnValue('/test/project/root'),
       storage: {
         getProjectTempDir: vi.fn().mockReturnValue('/test/temp'),
@@ -1288,6 +1289,9 @@ ${JSON.stringify(
     });
 
     it('should stop infinite loop after MAX_TURNS when nextSpeaker always returns model', async () => {
+      vi.spyOn(client['config'], 'getContinueOnFailedApiCall').mockReturnValue(
+        true,
+      );
       // Get the mocked checkNextSpeaker function and configure it to trigger infinite loop
       const { checkNextSpeaker } = await import(
         '../utils/nextSpeakerChecker.js'
@@ -1505,6 +1509,113 @@ ${JSON.stringify(
       );
     });
 
+    it('should yield ContextWindowWillOverflow when the context window is about to overflow', async () => {
+      // Arrange
+      const MOCKED_TOKEN_LIMIT = 1000;
+      vi.mocked(tokenLimit).mockReturnValue(MOCKED_TOKEN_LIMIT);
+
+      // Set last prompt token count
+      const lastPromptTokenCount = 900;
+      vi.mocked(uiTelemetryService.getLastPromptTokenCount).mockReturnValue(
+        lastPromptTokenCount,
+      );
+
+      // Remaining = 100. Threshold (95%) = 95.
+      // We need a request > 95 tokens.
+      // A string of length 400 is roughly 100 tokens.
+      const longText = 'a'.repeat(400);
+      const request: Part[] = [{ text: longText }];
+      const estimatedRequestTokenCount = Math.floor(
+        JSON.stringify(request).length / 4,
+      );
+      const remainingTokenCount = MOCKED_TOKEN_LIMIT - lastPromptTokenCount;
+
+      // Mock tryCompressChat to not compress
+      vi.spyOn(client, 'tryCompressChat').mockResolvedValue({
+        originalTokenCount: lastPromptTokenCount,
+        newTokenCount: lastPromptTokenCount,
+        compressionStatus: CompressionStatus.NOOP,
+      });
+
+      // Act
+      const stream = client.sendMessageStream(
+        request,
+        new AbortController().signal,
+        'prompt-id-overflow',
+      );
+
+      const events = await fromAsync(stream);
+
+      // Assert
+      expect(events).toContainEqual({
+        type: GeminiEventType.ContextWindowWillOverflow,
+        value: {
+          estimatedRequestTokenCount,
+          remainingTokenCount,
+        },
+      });
+      // Ensure turn.run is not called
+      expect(mockTurnRunFn).not.toHaveBeenCalled();
+    });
+
+    it("should use the sticky model's token limit for the overflow check", async () => {
+      // Arrange
+      const STICKY_MODEL = 'gemini-1.5-flash';
+      const STICKY_MODEL_LIMIT = 1000;
+      const CONFIG_MODEL_LIMIT = 2000;
+
+      // Set up token limits
+      vi.mocked(tokenLimit).mockImplementation((model) => {
+        if (model === STICKY_MODEL) return STICKY_MODEL_LIMIT;
+        return CONFIG_MODEL_LIMIT;
+      });
+
+      // Set the sticky model
+      client['currentSequenceModel'] = STICKY_MODEL;
+
+      // Set token count
+      const lastPromptTokenCount = 900;
+      vi.mocked(uiTelemetryService.getLastPromptTokenCount).mockReturnValue(
+        lastPromptTokenCount,
+      );
+
+      // Remaining (sticky) = 100. Threshold (95%) = 95.
+      // We need a request > 95 tokens.
+      const longText = 'a'.repeat(400);
+      const request: Part[] = [{ text: longText }];
+      const estimatedRequestTokenCount = Math.floor(
+        JSON.stringify(request).length / 4,
+      );
+      const remainingTokenCount = STICKY_MODEL_LIMIT - lastPromptTokenCount;
+
+      vi.spyOn(client, 'tryCompressChat').mockResolvedValue({
+        originalTokenCount: lastPromptTokenCount,
+        newTokenCount: lastPromptTokenCount,
+        compressionStatus: CompressionStatus.NOOP,
+      });
+
+      // Act
+      const stream = client.sendMessageStream(
+        request,
+        new AbortController().signal,
+        'test-session-id', // Use the same ID as the session to keep stickiness
+      );
+
+      const events = await fromAsync(stream);
+
+      // Assert
+      // Should overflow based on the sticky model's limit
+      expect(events).toContainEqual({
+        type: GeminiEventType.ContextWindowWillOverflow,
+        value: {
+          estimatedRequestTokenCount,
+          remainingTokenCount,
+        },
+      });
+      expect(tokenLimit).toHaveBeenCalledWith(STICKY_MODEL);
+      expect(mockTurnRunFn).not.toHaveBeenCalled();
+    });
+
     describe('Model Routing', () => {
       let mockRouterService: { route: Mock };
 
@@ -1675,6 +1786,131 @@ ${JSON.stringify(
           expect.any(Object),
         );
       });
+    });
+
+    it('should recursively call sendMessageStream with "Please continue." when InvalidStream event is received', async () => {
+      vi.spyOn(client['config'], 'getContinueOnFailedApiCall').mockReturnValue(
+        true,
+      );
+      // Arrange
+      const mockStream1 = (async function* () {
+        yield { type: GeminiEventType.InvalidStream };
+      })();
+      const mockStream2 = (async function* () {
+        yield { type: GeminiEventType.Content, value: 'Continued content' };
+      })();
+
+      mockTurnRunFn
+        .mockReturnValueOnce(mockStream1)
+        .mockReturnValueOnce(mockStream2);
+
+      const mockChat: Partial<GeminiChat> = {
+        addHistory: vi.fn(),
+        getHistory: vi.fn().mockReturnValue([]),
+      };
+      client['chat'] = mockChat as GeminiChat;
+
+      const initialRequest = [{ text: 'Hi' }];
+      const promptId = 'prompt-id-invalid-stream';
+      const signal = new AbortController().signal;
+
+      // Act
+      const stream = client.sendMessageStream(initialRequest, signal, promptId);
+      const events = await fromAsync(stream);
+
+      // Assert
+      expect(events).toEqual([
+        { type: GeminiEventType.InvalidStream },
+        { type: GeminiEventType.Content, value: 'Continued content' },
+      ]);
+
+      // Verify that turn.run was called twice
+      expect(mockTurnRunFn).toHaveBeenCalledTimes(2);
+
+      // First call with original request
+      expect(mockTurnRunFn).toHaveBeenNthCalledWith(
+        1,
+        expect.any(String),
+        initialRequest,
+        expect.any(Object),
+      );
+
+      // Second call with "Please continue."
+      expect(mockTurnRunFn).toHaveBeenNthCalledWith(
+        2,
+        expect.any(String),
+        [{ text: 'System: Please continue.' }],
+        expect.any(Object),
+      );
+    });
+
+    it('should not recursively call sendMessageStream with "Please continue." when InvalidStream event is received and flag is false', async () => {
+      vi.spyOn(client['config'], 'getContinueOnFailedApiCall').mockReturnValue(
+        false,
+      );
+      // Arrange
+      const mockStream1 = (async function* () {
+        yield { type: GeminiEventType.InvalidStream };
+      })();
+
+      mockTurnRunFn.mockReturnValueOnce(mockStream1);
+
+      const mockChat: Partial<GeminiChat> = {
+        addHistory: vi.fn(),
+        getHistory: vi.fn().mockReturnValue([]),
+      };
+      client['chat'] = mockChat as GeminiChat;
+
+      const initialRequest = [{ text: 'Hi' }];
+      const promptId = 'prompt-id-invalid-stream';
+      const signal = new AbortController().signal;
+
+      // Act
+      const stream = client.sendMessageStream(initialRequest, signal, promptId);
+      const events = await fromAsync(stream);
+
+      // Assert
+      expect(events).toEqual([{ type: GeminiEventType.InvalidStream }]);
+
+      // Verify that turn.run was called only once
+      expect(mockTurnRunFn).toHaveBeenCalledTimes(1);
+    });
+
+    it('should stop recursing after one retry when InvalidStream events are repeatedly received', async () => {
+      vi.spyOn(client['config'], 'getContinueOnFailedApiCall').mockReturnValue(
+        true,
+      );
+      // Arrange
+      // Always return a new invalid stream
+      mockTurnRunFn.mockImplementation(() =>
+        (async function* () {
+          yield { type: GeminiEventType.InvalidStream };
+        })(),
+      );
+
+      const mockChat: Partial<GeminiChat> = {
+        addHistory: vi.fn(),
+        getHistory: vi.fn().mockReturnValue([]),
+      };
+      client['chat'] = mockChat as GeminiChat;
+
+      const initialRequest = [{ text: 'Hi' }];
+      const promptId = 'prompt-id-infinite-invalid-stream';
+      const signal = new AbortController().signal;
+
+      // Act
+      const stream = client.sendMessageStream(initialRequest, signal, promptId);
+      const events = await fromAsync(stream);
+
+      // Assert
+      // We expect 2 InvalidStream events (original + 1 retry)
+      expect(events.length).toBe(2);
+      expect(
+        events.every((e) => e.type === GeminiEventType.InvalidStream),
+      ).toBe(true);
+
+      // Verify that turn.run was called twice
+      expect(mockTurnRunFn).toHaveBeenCalledTimes(2);
     });
 
     describe('Editor context delta', () => {
