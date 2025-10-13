@@ -6,17 +6,18 @@
 
 // Copied exactly from packages/cli/src/config/extension.ts, last PR #1026
 
-import type {
-  MCPServerConfig,
-  ExtensionInstallMetadata,
-  GeminiCLIExtension,
+import {
+  GEMINI_DIR,
+  type MCPServerConfig,
+  type ExtensionInstallMetadata,
+  type GeminiCLIExtension,
 } from '@google/gemini-cli-core';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
 import { logger } from '../utils/logger.js';
 
-export const EXTENSIONS_DIRECTORY_NAME = path.join('.gemini', 'extensions');
+export const EXTENSIONS_DIRECTORY_NAME = path.join(GEMINI_DIR, 'extensions');
 export const EXTENSIONS_CONFIG_FILENAME = 'gemini-extension.json';
 export const INSTALL_METADATA_FILENAME = '.gemini-extension-install.json';
 

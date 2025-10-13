@@ -10,9 +10,9 @@ import { isGitRepository } from '../utils/gitUtils.js';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { GEMINI_CONFIG_DIR } from '../tools/memoryTool.js';
 import type { Config } from '../config/config.js';
 import { CodebaseInvestigatorAgent } from '../agents/codebase-investigator.js';
+import { GEMINI_DIR } from '../utils/paths.js';
 
 // Mock tool names if they are dynamically generated or complex
 vi.mock('../tools/ls', () => ({ LSTool: { Name: 'list_directory' } }));
@@ -223,9 +223,7 @@ describe('Core System Prompt (prompts.ts)', () => {
     });
 
     it('should read from default path when GEMINI_SYSTEM_MD is "true"', () => {
-      const defaultPath = path.resolve(
-        path.join(GEMINI_CONFIG_DIR, 'system.md'),
-      );
+      const defaultPath = path.resolve(path.join(GEMINI_DIR, 'system.md'));
       vi.stubEnv('GEMINI_SYSTEM_MD', 'true');
       vi.mocked(fs.existsSync).mockReturnValue(true);
       vi.mocked(fs.readFileSync).mockReturnValue('custom system prompt');
@@ -236,9 +234,7 @@ describe('Core System Prompt (prompts.ts)', () => {
     });
 
     it('should read from default path when GEMINI_SYSTEM_MD is "1"', () => {
-      const defaultPath = path.resolve(
-        path.join(GEMINI_CONFIG_DIR, 'system.md'),
-      );
+      const defaultPath = path.resolve(path.join(GEMINI_DIR, 'system.md'));
       vi.stubEnv('GEMINI_SYSTEM_MD', '1');
       vi.mocked(fs.existsSync).mockReturnValue(true);
       vi.mocked(fs.readFileSync).mockReturnValue('custom system prompt');
@@ -291,9 +287,7 @@ describe('Core System Prompt (prompts.ts)', () => {
     });
 
     it('should write to default path when GEMINI_WRITE_SYSTEM_MD is "true"', () => {
-      const defaultPath = path.resolve(
-        path.join(GEMINI_CONFIG_DIR, 'system.md'),
-      );
+      const defaultPath = path.resolve(path.join(GEMINI_DIR, 'system.md'));
       vi.stubEnv('GEMINI_WRITE_SYSTEM_MD', 'true');
       getCoreSystemPrompt(mockConfig);
       expect(fs.writeFileSync).toHaveBeenCalledWith(
@@ -303,9 +297,7 @@ describe('Core System Prompt (prompts.ts)', () => {
     });
 
     it('should write to default path when GEMINI_WRITE_SYSTEM_MD is "1"', () => {
-      const defaultPath = path.resolve(
-        path.join(GEMINI_CONFIG_DIR, 'system.md'),
-      );
+      const defaultPath = path.resolve(path.join(GEMINI_DIR, 'system.md'));
       vi.stubEnv('GEMINI_WRITE_SYSTEM_MD', '1');
       getCoreSystemPrompt(mockConfig);
       expect(fs.writeFileSync).toHaveBeenCalledWith(

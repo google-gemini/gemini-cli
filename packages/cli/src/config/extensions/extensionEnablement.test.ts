@@ -9,7 +9,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { ExtensionEnablementManager, Override } from './extensionEnablement.js';
-import type { GeminiCLIExtension } from '@google/gemini-cli-core';
+
+import { GEMINI_DIR, type GeminiCLIExtension } from '@google/gemini-cli-core';
 
 // Helper to create a temporary directory for testing
 function createTestDir() {
@@ -27,7 +28,7 @@ let manager: ExtensionEnablementManager;
 describe('ExtensionEnablementManager', () => {
   beforeEach(() => {
     testDir = createTestDir();
-    configDir = path.join(testDir.path, '.gemini');
+    configDir = path.join(testDir.path, GEMINI_DIR);
     manager = new ExtensionEnablementManager(configDir);
   });
 

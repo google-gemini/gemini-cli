@@ -17,9 +17,10 @@ import { ShellTool } from '../tools/shell.js';
 import { WRITE_FILE_TOOL_NAME } from '../tools/tool-names.js';
 import process from 'node:process';
 import { isGitRepository } from '../utils/gitUtils.js';
-import { MemoryTool, GEMINI_CONFIG_DIR } from '../tools/memoryTool.js';
+import { MemoryTool } from '../tools/memoryTool.js';
 import { CodebaseInvestigatorAgent } from '../agents/codebase-investigator.js';
 import type { Config } from '../config/config.js';
+import { GEMINI_DIR } from '../utils/paths.js';
 
 export function resolvePathFromEnv(envVar?: string): {
   isSwitch: boolean;
@@ -78,7 +79,7 @@ export function getCoreSystemPrompt(
   // A flag to indicate whether the system prompt override is active.
   let systemMdEnabled = false;
   // The default path for the system prompt file. This can be overridden.
-  let systemMdPath = path.resolve(path.join(GEMINI_CONFIG_DIR, 'system.md'));
+  let systemMdPath = path.resolve(path.join(GEMINI_DIR, 'system.md'));
   // Resolve the environment variable to get either a path or a switch value.
   const systemMdResolution = resolvePathFromEnv(
     process.env['GEMINI_SYSTEM_MD'],
