@@ -1,7 +1,6 @@
 {
   "name": "@google/gemini-cli-a2a-server",
   "version": "0.10.0-nightly.20251007.c195a9aa",
-  "private": true,
   "description": "Gemini CLI A2A Server",
   "repository": {
     "type": "git",
@@ -9,7 +8,7 @@
     "directory": "packages/a2a-server"
   },
   "type": "module",
-  "main": "dist/index.js",
+  "main": "dist/server.js",
   "bin": {
     "gemini-cli-a2a-server": "dist/a2a-server.mjs"
   },
