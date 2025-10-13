@@ -11,7 +11,7 @@ import * as dotenv from 'dotenv';
 import process from 'node:process';
 import {
   FatalConfigError,
-  GEMINI_CONFIG_DIR as GEMINI_DIR,
+  GEMINI_DIR,
   getErrorMessage,
   Storage,
 } from '@google/gemini-cli-core';
@@ -48,8 +48,6 @@ function getMergeStrategyForPath(path: string[]): MergeStrategy | undefined {
 }
 
 export type { Settings, MemoryImportFormat };
-
-export const SETTINGS_DIRECTORY_NAME = '.gemini';
 
 export const USER_SETTINGS_PATH = Storage.getGlobalSettingsPath();
 export const USER_SETTINGS_DIR = path.dirname(USER_SETTINGS_PATH);
@@ -110,7 +108,7 @@ const MIGRATION_MAP: Record<string, string> = {
   preferredEditor: 'general.preferredEditor',
   sandbox: 'tools.sandbox',
   selectedAuthType: 'security.auth.selectedType',
-  shouldUseNodePtyShell: 'tools.shell.enableInteractiveShell',
+  enableInteractiveShell: 'tools.shell.enableInteractiveShell',
   shellPager: 'tools.shell.pager',
   shellShowColor: 'tools.shell.showColor',
   skipNextSpeakerCheck: 'model.skipNextSpeakerCheck',

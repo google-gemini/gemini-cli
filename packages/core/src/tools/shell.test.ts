@@ -67,7 +67,7 @@ describe('ShellTool', () => {
         .fn()
         .mockReturnValue(createMockWorkspaceContext('/test/dir')),
       getGeminiClient: vi.fn(),
-      getShouldUseNodePtyShell: vi.fn().mockReturnValue(false),
+      getEnableInteractiveShell: vi.fn().mockReturnValue(false),
       isInteractive: vi.fn().mockReturnValue(true),
     } as unknown as Config;
 
@@ -105,11 +105,16 @@ describe('ShellTool', () => {
     it('should allow a command if no restrictions are provided', () => {
       (mockConfig.getCoreTools as Mock).mockReturnValue(undefined);
       (mockConfig.getExcludeTools as Mock).mockReturnValue(undefined);
-      expect(isCommandAllowed('ls -l', mockConfig).allowed).toBe(true);
+      expect(isCommandAllowed('goodCommand --safe', mockConfig).allowed).toBe(
+        true,
+      );
     });
 
     it('should allow a command with command substitution using $()', () => {
-      const evaluation = isCommandAllowed('echo $(rm -rf /)', mockConfig);
+      const evaluation = isCommandAllowed(
+        'echo $(goodCommand --safe)',
+        mockConfig,
+      );
       expect(evaluation.allowed).toBe(true);
       expect(evaluation.reason).toBeUndefined();
     });
@@ -117,7 +122,7 @@ describe('ShellTool', () => {
 
   describe('build', () => {
     it('should return an invocation for a valid command', () => {
-      const invocation = shellTool.build({ command: 'ls -l' });
+      const invocation = shellTool.build({ command: 'goodCommand --safe' });
       expect(invocation).toBeDefined();
     });
 

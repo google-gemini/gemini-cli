@@ -32,7 +32,7 @@ vi.mock('@google/gemini-cli-core', () => ({
     getWorkspaceSettingsPath: () => '/tmp/gemini/workspace-settings.json',
     getProjectTempDir: () => '/test/home/.gemini/tmp/mocked_hash',
   })),
-  GEMINI_CONFIG_DIR: '.gemini',
+  GEMINI_DIR: '.gemini',
   getErrorMessage: (e: unknown) => (e instanceof Error ? e.message : String(e)),
 }));
 vi.mock('@modelcontextprotocol/sdk/client/index.js');
@@ -153,10 +153,8 @@ describe('mcp list command', () => {
 
     mockedLoadExtensions.mockReturnValue([
       {
-        config: {
-          name: 'test-extension',
-          mcpServers: { 'extension-server': { command: '/ext/server' } },
-        },
+        name: 'test-extension',
+        mcpServers: { 'extension-server': { command: '/ext/server' } },
       },
     ]);
 

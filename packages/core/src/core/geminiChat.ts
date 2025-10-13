@@ -7,14 +7,13 @@
 // DISCLAIMER: This is a copied version of https://github.com/googleapis/js-genai/blob/main/src/chats.ts with the intention of working around a key bug
 // where function responses are not treated as "valid" responses: https://b.corp.google.com/issues/420354090
 
-import {
+import type {
   GenerateContentResponse,
-  type Content,
-  type GenerateContentConfig,
-  type SendMessageParameters,
-  type Part,
-  type Tool,
-  FinishReason,
+  Content,
+  GenerateContentConfig,
+  SendMessageParameters,
+  Part,
+  Tool,
 } from '@google/genai';
 import { toParts } from '../code_assist/converter.js';
 import { createUserContent } from '@google/genai';
@@ -24,7 +23,7 @@ import {
   DEFAULT_GEMINI_FLASH_MODEL,
   getEffectiveModel,
 } from '../config/models.js';
-import { hasCycleInSchema, MUTATOR_KINDS } from '../tools/tools.js';
+import { hasCycleInSchema } from '../tools/tools.js';
 import type { StructuredError } from './turn.js';
 import type { CompletedToolCall } from './coreToolScheduler.js';
 import {
@@ -273,10 +272,19 @@ export class GeminiChat {
               yield { type: StreamEventType.RETRY };
             }
 
+            // If this is a retry, set temperature to 1 to encourage different output.
+            const currentParams = { ...params };
+            if (attempt > 0) {
+              currentParams.config = {
+                ...currentParams.config,
+                temperature: 1,
+              };
+            }
+
             const stream = await self.makeApiCallAndProcessStream(
               model,
               requestContents,
-              params,
+              currentParams,
               prompt_id,
             );
 
@@ -326,10 +334,6 @@ export class GeminiChat {
                 model,
               ),
             );
-          }
-          // If the stream fails, remove the user message that was added.
-          if (self.history[self.history.length - 1] === userContent) {
-            self.history.pop();
           }
           throw lastError;
         }
@@ -491,7 +495,7 @@ export class GeminiChat {
     let hasToolCall = false;
     let hasFinishReason = false;
 
-    for await (const chunk of this.stopBeforeSecondMutator(streamResponse)) {
+    for await (const chunk of streamResponse) {
       hasFinishReason =
         chunk?.candidates?.some((candidate) => candidate.finishReason) ?? false;
       if (isValidResponse(chunk)) {
@@ -635,64 +639,6 @@ export class GeminiChat {
         description,
       });
     }
-  }
-
-  /**
-   * Truncates the chunkStream right before the second function call to a
-   * function that mutates state. This may involve trimming parts from a chunk
-   * as well as omtting some chunks altogether.
-   *
-   * We do this because it improves tool call quality if the model gets
-   * feedback from one mutating function call before it makes the next one.
-   */
-  private async *stopBeforeSecondMutator(
-    chunkStream: AsyncGenerator<GenerateContentResponse>,
-  ): AsyncGenerator<GenerateContentResponse> {
-    let foundMutatorFunctionCall = false;
-
-    for await (const chunk of chunkStream) {
-      const candidate = chunk.candidates?.[0];
-      const content = candidate?.content;
-      if (!candidate || !content?.parts) {
-        yield chunk;
-        continue;
-      }
-
-      const truncatedParts: Part[] = [];
-      for (const part of content.parts) {
-        if (this.isMutatorFunctionCall(part)) {
-          if (foundMutatorFunctionCall) {
-            // This is the second mutator call.
-            // Truncate and return immedaitely.
-            const newChunk = new GenerateContentResponse();
-            newChunk.candidates = [
-              {
-                ...candidate,
-                content: {
-                  ...content,
-                  parts: truncatedParts,
-                },
-                finishReason: FinishReason.STOP,
-              },
-            ];
-            yield newChunk;
-            return;
-          }
-          foundMutatorFunctionCall = true;
-        }
-        truncatedParts.push(part);
-      }
-
-      yield chunk;
-    }
-  }
-
-  private isMutatorFunctionCall(part: Part): boolean {
-    if (!part?.functionCall?.name) {
-      return false;
-    }
-    const tool = this.config.getToolRegistry().getTool(part.functionCall.name);
-    return !!tool && MUTATOR_KINDS.includes(tool.kind);
   }
 }
 
