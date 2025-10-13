@@ -624,4 +624,25 @@ describe('E2E Tests', () => {
     assertUniqueFinalEventIsLast(events);
     expect(events.length).toBe(10);
   });
+
+  it('should propagate traceId to the Gemini client', async () => {
+    sendMessageStreamSpy.mockImplementation(async function* () {
+      yield* [{ type: 'content', value: 'Hello how are you?' }];
+    });
+
+    const agent = request.agent(app);
+    await agent
+      .post('/')
+      .send(createStreamMessageRequest('hello', 'a2a-test-message'))
+      .set('Content-Type', 'application/json')
+      .set('X-Cloud-Trace-Context', 'a2a-test-trace-id/12345;o=1')
+      .expect(200);
+
+    expect(sendMessageStreamSpy).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        traceId: 'a2a-test-trace-id',
+      }),
+    );
+  });
 });

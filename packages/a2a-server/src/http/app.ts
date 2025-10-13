@@ -88,7 +88,19 @@ export async function createApp() {
 
     let expressApp = express();
     expressApp.use((req, res, next) => {
-      requestStorage.run({ req }, next);
+      const headerTrace = req.headers['x-cloud-trace-context'];
+      const traceId = Array.isArray(headerTrace)
+        ? headerTrace[0]
+        : headerTrace || uuidv4();
+      requestStorage.run({ req, traceId }, next);
+    });
+
+    expressApp.use((req, res, next) => {
+      const store = requestStorage.getStore();
+      if (store) {
+        res.setHeader('x-cloud-trace-context', store.traceId);
+      }
+      next();
     });
 
     const appBuilder = new A2AExpressApp(requestHandler);
