@@ -5,7 +5,7 @@
  */
 
 import { expect, describe, it, beforeEach, afterEach } from 'vitest';
-import { TestRig, printDebugInfo } from './test-helper.js';
+import { TestRig } from './test-helper.js';
 
 describe('Interactive file system', () => {
   let rig: TestRig;
@@ -40,19 +40,7 @@ describe('Interactive file system', () => {
     await run.type(writePrompt);
     await run.type('\r');
 
-    const toolcallSuccess = await rig.waitForToolCallSuccess(
-      ['write_file', 'replace'],
-      30000,
-    );
-
-    if (!toolcallSuccess) {
-      printDebugInfo(rig, run.output, { toolCall: toolcallSuccess });
-    }
-
-    expect(
-      toolcallSuccess,
-      'Expected to find a completed write_file or replace tool call',
-    ).toBe(true);
+    await rig.expectToolCallSuccess(['write_file', 'replace'], 30000);
 
     const newFileContent = rig.readFile(fileName);
     expect(newFileContent).toBe('1.0.1');

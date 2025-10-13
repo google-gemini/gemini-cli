@@ -584,7 +584,7 @@ export class TestRig {
     );
   }
 
-  async waitForToolCallSuccess(toolNames: string[], timeout?: number) {
+  async expectToolCallSuccess(toolNames: string[], timeout?: number) {
     // Use environment-specific timeout
     if (!timeout) {
       timeout = getDefaultTimeout();
@@ -593,7 +593,7 @@ export class TestRig {
     // Wait for telemetry to be ready before polling for tool calls
     await this.waitForTelemetryReady();
 
-    return poll(
+    const success = await poll(
       () => {
         const toolLogs = this.readToolLogs();
         return toolNames.some((name) =>
@@ -605,6 +605,11 @@ export class TestRig {
       timeout,
       100,
     );
+
+    expect(
+      success,
+      `Expected to find successful toolCalls for ${toolNames}`,
+    ).toBe(true);
   }
 
   async waitForAnyToolCall(toolNames: string[], timeout?: number) {
