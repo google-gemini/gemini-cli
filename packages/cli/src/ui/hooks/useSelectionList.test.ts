@@ -203,8 +203,7 @@ describe('useSelectionList', () => {
         }),
       );
       pressKey('down');
-      expect(mockOnHighlight).toHaveBeenCalledTimes(1);
-      expect(mockOnHighlight).toHaveBeenCalledWith('C');
+      expect(mockOnHighlight).toHaveBeenCalledExactlyOnceWith('C');
     });
 
     it('should not move or call onHighlight if navigation results in the same index (e.g., single item)', () => {
@@ -250,8 +249,7 @@ describe('useSelectionList', () => {
         }),
       );
       pressKey('return');
-      expect(mockOnSelect).toHaveBeenCalledTimes(1);
-      expect(mockOnSelect).toHaveBeenCalledWith('C');
+      expect(mockOnSelect).toHaveBeenCalledExactlyOnceWith('C');
     });
 
     it('should not call onSelect if the active item is disabled', () => {
@@ -315,8 +313,7 @@ describe('useSelectionList', () => {
       expect(mockOnHighlight).toHaveBeenNthCalledWith(1, 'C');
       expect(mockOnHighlight).toHaveBeenNthCalledWith(2, 'D');
 
-      expect(mockOnSelect).toHaveBeenCalledTimes(1);
-      expect(mockOnSelect).toHaveBeenCalledWith('D');
+      expect(mockOnSelect).toHaveBeenCalledExactlyOnceWith('D');
       expect(mockOnSelect).not.toHaveBeenCalledWith('A');
     });
 
@@ -356,8 +353,7 @@ describe('useSelectionList', () => {
       expect(result.current.activeIndex).toBe(3);
 
       expect(mockOnHighlight).toHaveBeenCalledWith('D');
-      expect(mockOnSelect).toHaveBeenCalledTimes(1);
-      expect(mockOnSelect).toHaveBeenCalledWith('D');
+      expect(mockOnSelect).toHaveBeenCalledExactlyOnceWith('D');
     });
   });
 
@@ -450,8 +446,7 @@ describe('useSelectionList', () => {
 
       expect(result.current.activeIndex).toBe(2);
       expect(mockOnHighlight).toHaveBeenCalledWith('C');
-      expect(mockOnSelect).toHaveBeenCalledTimes(1);
-      expect(mockOnSelect).toHaveBeenCalledWith('C');
+      expect(mockOnSelect).toHaveBeenCalledExactlyOnceWith('C');
       expect(vi.getTimerCount()).toBe(0);
     });
 
@@ -478,8 +473,7 @@ describe('useSelectionList', () => {
         vi.advanceTimersByTime(1000);
       });
 
-      expect(mockOnSelect).toHaveBeenCalledTimes(1);
-      expect(mockOnSelect).toHaveBeenCalledWith('Item 1');
+      expect(mockOnSelect).toHaveBeenCalledExactlyOnceWith('Item 1');
     });
 
     it('should handle multi-digit input correctly', () => {
@@ -498,8 +492,7 @@ describe('useSelectionList', () => {
 
       expect(result.current.activeIndex).toBe(11);
 
-      expect(mockOnSelect).toHaveBeenCalledTimes(1);
-      expect(mockOnSelect).toHaveBeenCalledWith('Item 12');
+      expect(mockOnSelect).toHaveBeenCalledExactlyOnceWith('Item 12');
     });
 
     it('should reset buffer if input becomes invalid (out of bounds)', () => {
@@ -643,14 +636,14 @@ describe('useSelectionList', () => {
       pressNumber('1');
 
       pressKey('return');
-      expect(mockOnSelect).toHaveBeenCalledTimes(1);
+      expect(mockOnSelect).toHaveBeenCalledOnce();
 
       expect(vi.getTimerCount()).toBe(0);
 
       act(() => {
         vi.advanceTimersByTime(1000);
       });
-      expect(mockOnSelect).toHaveBeenCalledTimes(1);
+      expect(mockOnSelect).toHaveBeenCalledOnce();
     });
   });
 

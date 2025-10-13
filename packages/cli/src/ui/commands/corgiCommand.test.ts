@@ -24,7 +24,7 @@ describe('corgiCommand', () => {
 
     await corgiCommand.action(mockContext, '');
 
-    expect(mockContext.ui.toggleCorgiMode).toHaveBeenCalledTimes(1);
+    expect(mockContext.ui.toggleCorgiMode).toHaveBeenCalledOnce();
   });
 
   it('should have the correct name and description', () => {

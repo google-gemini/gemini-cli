@@ -267,7 +267,7 @@ describe('mcp add command', () => {
         await parser.parseAsync(`add my-new-server echo`);
 
         // We expect setValue to be called once.
-        expect(mockSetValue).toHaveBeenCalledTimes(1);
+        expect(mockSetValue).toHaveBeenCalledOnce();
 
         // We get the scope that setValue was called with.
         const calledScope = mockSetValue.mock.calls[0][0];

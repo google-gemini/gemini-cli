@@ -42,8 +42,7 @@ describe('useMemoryMonitor', () => {
     } as NodeJS.MemoryUsage);
     renderHook(() => useMemoryMonitor({ addItem }));
     vi.advanceTimersByTime(MEMORY_CHECK_INTERVAL);
-    expect(addItem).toHaveBeenCalledTimes(1);
-    expect(addItem).toHaveBeenCalledWith(
+    expect(addItem).toHaveBeenCalledExactlyOnceWith(
       {
         type: MessageType.WARNING,
         text: 'High memory usage detected: 10.50 GB. If you experience a crash, please file a bug report by running `/bug`',
@@ -58,7 +57,7 @@ describe('useMemoryMonitor', () => {
     } as NodeJS.MemoryUsage);
     const { rerender } = renderHook(() => useMemoryMonitor({ addItem }));
     vi.advanceTimersByTime(MEMORY_CHECK_INTERVAL);
-    expect(addItem).toHaveBeenCalledTimes(1);
+    expect(addItem).toHaveBeenCalledOnce();
 
     // Rerender and advance timers, should not warn again
     memoryUsageSpy.mockReturnValue({

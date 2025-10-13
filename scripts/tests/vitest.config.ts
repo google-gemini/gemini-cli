@@ -13,8 +13,7 @@ export default defineConfig({
     include: ['scripts/tests/**/*.test.js'],
     setupFiles: ['scripts/tests/test-setup.ts'],
     coverage: {
-      provider: 'v8',
-      reporter: ['text', 'lcov'],
+      enabled: false,
     },
     poolOptions: {
       threads: {

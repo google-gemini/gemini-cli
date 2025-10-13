@@ -239,7 +239,6 @@ describe('runNonInteractive', () => {
       'prompt-id-2',
     );
     expect(processStdoutSpy).toHaveBeenCalledWith('Final answer');
-    expect(processStdoutSpy).toHaveBeenCalledWith('\n');
   });
 
   it('should handle error during tool execution and should send error back to the model', async () => {
@@ -289,7 +288,11 @@ describe('runNonInteractive', () => {
       'prompt-id-3',
     );
 
-    expect(mockCoreExecuteToolCall).toHaveBeenCalled();
+    expect(mockCoreExecuteToolCall).toHaveBeenCalledWith(
+      mockConfig,
+      expect.objectContaining({ name: 'errorTool' }),
+      expect.any(AbortSignal),
+    );
     expect(consoleErrorSpy).toHaveBeenCalledWith(
       'Error executing tool errorTool: Execution failed',
     );

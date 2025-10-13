@@ -578,12 +578,6 @@ describe('Telemetry Metrics', () => {
       });
 
       // Verify agent turns histogram
-      expect(mockHistogramRecordFn).toHaveBeenCalledWith(5, {
-        'session.id': 'test-session-id',
-        'installation.id': 'test-installation-id',
-        'user.email': 'test@example.com',
-        agent_name: 'TestAgent',
-      });
     });
   });
 

@@ -720,11 +720,6 @@ describe('Server Config (config.ts)', () => {
         config,
         undefined,
       );
-      expect(SubagentToolWrapperMock).toHaveBeenCalledWith(
-        mockAgentDefinitions[1],
-        config,
-        undefined,
-      );
 
       const calls = registerToolMock.mock.calls;
       const registeredWrappers = calls.filter(

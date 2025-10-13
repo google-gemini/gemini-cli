@@ -97,7 +97,7 @@ describe('useInputHistoryStore', () => {
 
     // Should reverse the order to oldest first
     expect(result.current.inputHistory).toEqual(['oldest', 'middle', 'newest']);
-    expect(mockLogger.getPreviousUserMessages).toHaveBeenCalledTimes(1);
+    expect(mockLogger.getPreviousUserMessages).toHaveBeenCalledOnce();
   });
 
   it('should handle logger initialization failure gracefully', async () => {
@@ -143,7 +143,7 @@ describe('useInputHistoryStore', () => {
     });
 
     // Should be called only once
-    expect(mockLogger.getPreviousUserMessages).toHaveBeenCalledTimes(1);
+    expect(mockLogger.getPreviousUserMessages).toHaveBeenCalledOnce();
     expect(result.current.inputHistory).toEqual(['message2', 'message1']);
   });
 

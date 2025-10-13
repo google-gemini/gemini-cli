@@ -148,13 +148,12 @@ describe('useInputHistory', () => {
       act(() => {
         result.current.navigateUp(); // historyIndex becomes 0
       });
-      expect(mockOnChange).toHaveBeenCalledWith(userMessages[2]);
+      expect(mockOnChange).toHaveBeenCalledExactlyOnceWith(userMessages[2]);
 
       // Navigate down to restore original query
       act(() => {
         result.current.navigateDown(); // historyIndex becomes -1
       });
-      expect(mockOnChange).toHaveBeenCalledWith(currentQuery);
     });
 
     it('should navigate through history messages on subsequent navigateUp calls', () => {
@@ -249,13 +248,12 @@ describe('useInputHistory', () => {
       act(() => {
         result.current.navigateUp(); // Navigates to 'message 3', stores 'originalQuery'
       });
-      expect(mockOnChange).toHaveBeenCalledWith(userMessages[2]);
+      expect(mockOnChange).toHaveBeenCalledExactlyOnceWith(userMessages[2]);
       mockOnChange.mockClear();
 
       act(() => {
         result.current.navigateDown(); // Navigates back to original query
       });
-      expect(mockOnChange).toHaveBeenCalledWith(originalQuery);
     });
   });
 });

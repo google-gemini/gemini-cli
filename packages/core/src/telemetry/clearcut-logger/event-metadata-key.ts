@@ -437,7 +437,7 @@ export enum EventMetadataKey {
   // Logs an event when the user uses the /model command.
   GEMINI_CLI_MODEL_SLASH_COMMAND = 108,
 
-  GEMINI_CLI_FEEDBACK_TEXT = 111,
+  GEMINI_CLI_FEEDBACK_TEXT = 119,
 
   // ==========================================================================
   // Agent Event Keys

@@ -54,7 +54,8 @@ export class BuiltinCommandLoader implements ICommandLoader {
    * @param _signal An AbortSignal (unused for this synchronous loader).
    * @returns A promise that resolves to an array of `SlashCommand` objects.
    */
-  async loadCommands(): Promise<SlashCommand[]> {
+  async loadCommands(_signal: AbortSignal): Promise<SlashCommand[]> {
+    _signal.throwIfAborted();
     const allDefinitions: Array<SlashCommand | null> = [
       aboutCommand,
       authCommand,
@@ -69,7 +70,7 @@ export class BuiltinCommandLoader implements ICommandLoader {
       editorCommand,
       extensionsCommand,
       helpCommand,
-      await ideCommand(),
+      await ideCommand(_signal),
       initCommand,
       mcpCommand,
       memoryCommand,

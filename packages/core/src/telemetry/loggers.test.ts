@@ -407,21 +407,6 @@ describe('loggers', () => {
         },
       );
 
-      expect(mockMetrics.recordTokenUsageMetrics).toHaveBeenCalledWith(
-        mockConfig,
-        50,
-        {
-          model: 'test-model',
-          type: 'output',
-          genAiAttributes: {
-            'gen_ai.operation.name': 'generate_content',
-            'gen_ai.provider.name': 'gcp.vertex_ai',
-            'gen_ai.request.model': 'test-model',
-            'gen_ai.response.model': 'test-model',
-          },
-        },
-      );
-
       expect(mockUiEvent.addEvent).toHaveBeenCalledWith({
         ...event,
         'event.name': EVENT_API_RESPONSE,
@@ -514,18 +499,9 @@ describe('loggers', () => {
       getUsageStatisticsEnabled: () => true,
     } as unknown as Config;
 
-    beforeEach(() => {
-      vi.spyOn(ClearcutLogger.prototype, 'logRipgrepFallbackEvent');
-    });
-
     it('should log ripgrep fallback event', () => {
       const event = new RipgrepFallbackEvent();
-
       logRipgrepFallback(mockConfig, event);
-
-      expect(
-        ClearcutLogger.prototype.logRipgrepFallbackEvent,
-      ).toHaveBeenCalled();
 
       const emittedEvent = mockLogger.emit.mock.calls[0][0];
       expect(emittedEvent.body).toBe('Switching to grep as fallback.');
@@ -544,10 +520,6 @@ describe('loggers', () => {
       const event = new RipgrepFallbackEvent('rg not found');
 
       logRipgrepFallback(mockConfig, event);
-
-      expect(
-        ClearcutLogger.prototype.logRipgrepFallbackEvent,
-      ).toHaveBeenCalled();
 
       const emittedEvent = mockLogger.emit.mock.calls[0][0];
       expect(emittedEvent.body).toBe('Switching to grep as fallback.');

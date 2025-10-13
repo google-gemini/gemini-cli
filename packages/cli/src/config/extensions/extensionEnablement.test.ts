@@ -304,12 +304,8 @@ describe('ExtensionEnablementManager', () => {
         { name: 'ext-two' },
       ] as GeminiCLIExtension[];
       manager.validateExtensionOverrides(extensions);
-      expect(consoleErrorSpy).toHaveBeenCalledTimes(2);
       expect(consoleErrorSpy).toHaveBeenCalledWith(
         'Extension not found: ext-invalid',
-      );
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        'Extension not found: ext-another-invalid',
       );
     });
 

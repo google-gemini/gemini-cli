@@ -127,6 +127,7 @@ describe('handleAtCommand', () => {
       processedQuery: [{ text: queryWithSpaces }],
       shouldProceed: true,
     });
+
     expect(mockOnDebugMessage).toHaveBeenCalledWith(
       'Lone @ detected, will be treated as text in the modified query.',
     );
@@ -443,11 +444,8 @@ describe('handleAtCommand', () => {
         processedQuery: [{ text: query }],
         shouldProceed: true,
       });
-      expect(mockOnDebugMessage).toHaveBeenCalledWith(
+      expect(mockOnDebugMessage).toHaveBeenCalledExactlyOnceWith(
         `Path ${gitIgnoredFile} is git-ignored and will be skipped.`,
-      );
-      expect(mockOnDebugMessage).toHaveBeenCalledWith(
-        `Ignored 1 files:\nGit-ignored: ${gitIgnoredFile}`,
       );
     });
 
@@ -515,11 +513,8 @@ describe('handleAtCommand', () => {
         ],
         shouldProceed: true,
       });
-      expect(mockOnDebugMessage).toHaveBeenCalledWith(
+      expect(mockOnDebugMessage).toHaveBeenCalledExactlyOnceWith(
         `Path ${gitIgnoredFile} is git-ignored and will be skipped.`,
-      );
-      expect(mockOnDebugMessage).toHaveBeenCalledWith(
-        `Ignored 1 files:\nGit-ignored: ${gitIgnoredFile}`,
       );
     });
 
@@ -543,11 +538,8 @@ describe('handleAtCommand', () => {
         processedQuery: [{ text: query }],
         shouldProceed: true,
       });
-      expect(mockOnDebugMessage).toHaveBeenCalledWith(
+      expect(mockOnDebugMessage).toHaveBeenCalledExactlyOnceWith(
         `Path ${gitFile} is git-ignored and will be skipped.`,
-      );
-      expect(mockOnDebugMessage).toHaveBeenCalledWith(
-        `Ignored 1 files:\nGit-ignored: ${gitFile}`,
       );
     });
   });
@@ -603,11 +595,8 @@ describe('handleAtCommand', () => {
         processedQuery: [{ text: query }],
         shouldProceed: true,
       });
-      expect(mockOnDebugMessage).toHaveBeenCalledWith(
+      expect(mockOnDebugMessage).toHaveBeenCalledExactlyOnceWith(
         `Path ${geminiIgnoredFile} is gemini-ignored and will be skipped.`,
-      );
-      expect(mockOnDebugMessage).toHaveBeenCalledWith(
-        `Ignored 1 files:\nGemini-ignored: ${geminiIgnoredFile}`,
       );
     });
   });
@@ -677,11 +666,8 @@ describe('handleAtCommand', () => {
       ],
       shouldProceed: true,
     });
-    expect(mockOnDebugMessage).toHaveBeenCalledWith(
+    expect(mockOnDebugMessage).toHaveBeenCalledExactlyOnceWith(
       `Path ${geminiIgnoredFile} is gemini-ignored and will be skipped.`,
-    );
-    expect(mockOnDebugMessage).toHaveBeenCalledWith(
-      `Ignored 1 files:\nGemini-ignored: ${geminiIgnoredFile}`,
     );
   });
 

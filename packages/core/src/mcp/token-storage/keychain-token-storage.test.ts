@@ -324,11 +324,13 @@ describe('KeychainTokenStorage', () => {
         await storage.clearAll();
 
         expect(mockKeytar.deletePassword).toHaveBeenCalledTimes(2);
-        expect(mockKeytar.deletePassword).toHaveBeenCalledWith(
+        expect(mockKeytar.deletePassword).toHaveBeenNthCalledWith(
+          1,
           mockServiceName,
           'server1',
         );
-        expect(mockKeytar.deletePassword).toHaveBeenCalledWith(
+        expect(mockKeytar.deletePassword).toHaveBeenNthCalledWith(
+          2,
           mockServiceName,
           'server2',
         );

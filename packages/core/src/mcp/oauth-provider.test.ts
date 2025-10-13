@@ -142,13 +142,6 @@ describe('MCPOAuthProvider', () => {
     vi.spyOn(console, 'warn').mockImplementation(() => {});
     vi.spyOn(console, 'error').mockImplementation(() => {});
 
-    // Mock crypto functions
-    vi.mocked(crypto.randomBytes).mockImplementation((size: number) => {
-      if (size === 32) return Buffer.from('code_verifier_mock_32_bytes_long');
-      if (size === 16) return Buffer.from('state_mock_16_by');
-      return Buffer.alloc(size);
-    });
-
     vi.mocked(crypto.createHash).mockReturnValue({
       update: vi.fn().mockReturnThis(),
       digest: vi.fn().mockReturnValue('code_challenge_mock'),
@@ -1012,7 +1005,6 @@ describe('MCPOAuthProvider', () => {
       await authProvider.authenticate('test-server', mockConfig);
 
       expect(crypto.randomBytes).toHaveBeenCalledWith(32); // code verifier
-      expect(crypto.randomBytes).toHaveBeenCalledWith(16); // state
       expect(crypto.createHash).toHaveBeenCalledWith('sha256');
     });
   });

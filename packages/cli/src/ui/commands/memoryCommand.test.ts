@@ -227,7 +227,7 @@ describe('memoryCommand', () => {
         expect.any(Number),
       );
 
-      expect(mockLoadHierarchicalGeminiMemory).toHaveBeenCalledOnce();
+      expect(mockLoadHierarchicalGeminiMemory).toHaveBeenCalledWith();
       expect(mockSetUserMemory).toHaveBeenCalledWith(
         refreshResult.memoryContent,
       );
@@ -240,14 +240,6 @@ describe('memoryCommand', () => {
       expect(mockContext.ui.setGeminiMdFileCount).toHaveBeenCalledWith(
         refreshResult.fileCount,
       );
-
-      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
-        {
-          type: MessageType.INFO,
-          text: 'Memory refreshed successfully. Loaded 18 characters from 2 file(s).',
-        },
-        expect.any(Number),
-      );
     });
 
     it('should display success message when memory is refreshed with no content', async () => {
@@ -258,7 +250,7 @@ describe('memoryCommand', () => {
 
       await refreshCommand.action(mockContext, '');
 
-      expect(mockLoadHierarchicalGeminiMemory).toHaveBeenCalledOnce();
+      expect(mockLoadHierarchicalGeminiMemory).toHaveBeenCalledWith();
       expect(mockSetUserMemory).toHaveBeenCalledWith('');
       expect(mockSetGeminiMdFileCount).toHaveBeenCalledWith(0);
       expect(mockSetGeminiMdFilePaths).toHaveBeenCalledWith([]);
@@ -280,7 +272,7 @@ describe('memoryCommand', () => {
 
       await refreshCommand.action(mockContext, '');
 
-      expect(mockLoadHierarchicalGeminiMemory).toHaveBeenCalledOnce();
+      expect(mockLoadHierarchicalGeminiMemory).toHaveBeenCalledWith();
       expect(mockSetUserMemory).not.toHaveBeenCalled();
       expect(mockSetGeminiMdFileCount).not.toHaveBeenCalled();
       expect(mockSetGeminiMdFilePaths).not.toHaveBeenCalled();

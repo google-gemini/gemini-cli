@@ -12,7 +12,6 @@ import { writeFileSync } from 'node:fs';
 let esbuild;
 try {
   esbuild = (await import('esbuild')).default;
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
 } catch (_) {
   console.warn('esbuild not available, skipping bundle step');
   process.exit(0);

@@ -693,7 +693,7 @@ describe('useReactToolScheduler', () => {
       await vi.runAllTimersAsync();
     });
 
-    expect(onComplete).toHaveBeenCalledTimes(1);
+    expect(onComplete).toHaveBeenCalledOnce();
     const completedCalls = onComplete.mock.calls[0][0] as ToolCall[];
     expect(completedCalls.length).toBe(2);
 

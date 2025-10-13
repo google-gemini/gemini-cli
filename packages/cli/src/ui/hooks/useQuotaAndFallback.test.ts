@@ -81,7 +81,7 @@ describe('useQuotaAndFallback', () => {
       }),
     );
 
-    expect(setFallbackHandlerSpy).toHaveBeenCalledTimes(1);
+    expect(setFallbackHandlerSpy).toHaveBeenCalledOnce();
     expect(setFallbackHandlerSpy.mock.calls[0][0]).toBeInstanceOf(Function);
   });
 

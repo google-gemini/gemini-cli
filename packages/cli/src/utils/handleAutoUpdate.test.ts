@@ -113,8 +113,7 @@ describe('handleAutoUpdate', () => {
 
     handleAutoUpdate(mockUpdateInfo, mockSettings, '/root', mockSpawn);
 
-    expect(mockUpdateEventEmitter.emit).toHaveBeenCalledTimes(1);
-    expect(mockUpdateEventEmitter.emit).toHaveBeenCalledWith(
+    expect(mockUpdateEventEmitter.emit).toHaveBeenCalledExactlyOnceWith(
       'update-received',
       {
         message: 'An update is available!\nPlease update manually.',
@@ -150,8 +149,7 @@ describe('handleAutoUpdate', () => {
 
     handleAutoUpdate(mockUpdateInfo, mockSettings, '/root', mockSpawn);
 
-    expect(mockUpdateEventEmitter.emit).toHaveBeenCalledTimes(1);
-    expect(mockUpdateEventEmitter.emit).toHaveBeenCalledWith(
+    expect(mockUpdateEventEmitter.emit).toHaveBeenCalledExactlyOnceWith(
       'update-received',
       {
         message: 'An update is available!\nCannot determine update command.',
@@ -170,8 +168,7 @@ describe('handleAutoUpdate', () => {
 
     handleAutoUpdate(mockUpdateInfo, mockSettings, '/root', mockSpawn);
 
-    expect(mockUpdateEventEmitter.emit).toHaveBeenCalledTimes(1);
-    expect(mockUpdateEventEmitter.emit).toHaveBeenCalledWith(
+    expect(mockUpdateEventEmitter.emit).toHaveBeenCalledExactlyOnceWith(
       'update-received',
       {
         message: 'An update is available!\nThis is an additional message.',

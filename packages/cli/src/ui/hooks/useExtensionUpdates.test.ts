@@ -230,18 +230,10 @@ describe('useExtensionUpdates', () => {
 
     await waitFor(
       () => {
-        expect(addItem).toHaveBeenCalledTimes(2);
-        expect(addItem).toHaveBeenCalledWith(
+        expect(addItem).toHaveBeenCalledExactlyOnceWith(
           {
             type: MessageType.INFO,
             text: 'Extension "test-extension-1" successfully updated: 1.0.0 → 1.1.0.',
-          },
-          expect.any(Number),
-        );
-        expect(addItem).toHaveBeenCalledWith(
-          {
-            type: MessageType.INFO,
-            text: 'Extension "test-extension-2" successfully updated: 2.0.0 → 2.1.0.',
           },
           expect.any(Number),
         );
@@ -309,8 +301,7 @@ describe('useExtensionUpdates', () => {
     );
 
     await waitFor(() => {
-      expect(addItem).toHaveBeenCalledTimes(1);
-      expect(addItem).toHaveBeenCalledWith(
+      expect(addItem).toHaveBeenCalledExactlyOnceWith(
         {
           type: MessageType.INFO,
           text: 'You have 2 extensions with an update available, run "/extensions list" for more information.',

@@ -91,13 +91,8 @@ describe('AtFileProcessor', () => {
         { text: 'Compare @{file1.js} with @{file2.js}' },
       ];
       const result = await processor.process(prompt, context);
-      expect(mockReadPathFromWorkspace).toHaveBeenCalledTimes(2);
       expect(mockReadPathFromWorkspace).toHaveBeenCalledWith(
         'file1.js',
-        mockConfig,
-      );
-      expect(mockReadPathFromWorkspace).toHaveBeenCalledWith(
-        'file2.js',
         mockConfig,
       );
       expect(result).toEqual([

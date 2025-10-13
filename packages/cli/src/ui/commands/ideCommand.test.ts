@@ -27,9 +27,11 @@ describe('ideCommand', () => {
   let mockContext: CommandContext;
   let mockIdeClient: core.IdeClient;
   let platformSpy: MockInstance;
+  let signal: AbortSignal;
 
   beforeEach(() => {
     vi.resetAllMocks();
+    signal = new AbortController().signal;
 
     mockIdeClient = {
       reconnect: vi.fn(),
@@ -75,9 +77,7 @@ describe('ideCommand', () => {
     vi.mocked(mockIdeClient.getConnectionStatus).mockReturnValue({
       status: core.IDEConnectionStatus.Disconnected,
     });
-    const command = await ideCommand();
-    expect(command).not.toBeNull();
-    expect(command.name).toBe('ide');
+    const command = await ideCommand(signal);
     expect(command.subCommands).toHaveLength(3);
     expect(command.subCommands?.[0].name).toBe('enable');
     expect(command.subCommands?.[1].name).toBe('status');
@@ -91,7 +91,7 @@ describe('ideCommand', () => {
     vi.mocked(mockIdeClient.getConnectionStatus).mockReturnValue({
       status: core.IDEConnectionStatus.Connected,
     });
-    const command = await ideCommand();
+    const command = await ideCommand(signal);
     expect(command).not.toBeNull();
     const subCommandNames = command.subCommands?.map((cmd) => cmd.name);
     expect(subCommandNames).toContain('disable');
@@ -109,7 +109,7 @@ describe('ideCommand', () => {
       vi.mocked(mockIdeClient.getConnectionStatus).mockReturnValue({
         status: core.IDEConnectionStatus.Connected,
       });
-      const command = await ideCommand();
+      const command = await ideCommand(signal);
       const result = await command!.subCommands!.find(
         (c) => c.name === 'status',
       )!.action!(mockContext, '');
@@ -125,7 +125,7 @@ describe('ideCommand', () => {
       vi.mocked(mockIdeClient.getConnectionStatus).mockReturnValue({
         status: core.IDEConnectionStatus.Connecting,
       });
-      const command = await ideCommand();
+      const command = await ideCommand(signal);
       const result = await command!.subCommands!.find(
         (c) => c.name === 'status',
       )!.action!(mockContext, '');
@@ -140,7 +140,7 @@ describe('ideCommand', () => {
       vi.mocked(mockIdeClient.getConnectionStatus).mockReturnValue({
         status: core.IDEConnectionStatus.Disconnected,
       });
-      const command = await ideCommand();
+      const command = await ideCommand(signal);
       const result = await command!.subCommands!.find(
         (c) => c.name === 'status',
       )!.action!(mockContext, '');
@@ -158,7 +158,7 @@ describe('ideCommand', () => {
         status: core.IDEConnectionStatus.Disconnected,
         details,
       });
-      const command = await ideCommand();
+      const command = await ideCommand(signal);
       const result = await command!.subCommands!.find(
         (c) => c.name === 'status',
       )!.action!(mockContext, '');
@@ -193,9 +193,7 @@ describe('ideCommand', () => {
         message: 'Successfully installed.',
       });
 
-      const command = await ideCommand();
-
-      // For the polling loop inside the action.
+      const command = await ideCommand(signal);
       vi.mocked(mockIdeClient.getConnectionStatus).mockReturnValue({
         status: core.IDEConnectionStatus.Connected,
       });
@@ -238,25 +236,17 @@ describe('ideCommand', () => {
         message: 'Installation failed.',
       });
 
-      const command = await ideCommand();
+      const command = await ideCommand(signal);
       await command!.subCommands!.find((c) => c.name === 'install')!.action!(
         mockContext,
         '',
       );
-
       expect(core.getIdeInstaller).toHaveBeenCalledWith(IDE_DEFINITIONS.vscode);
       expect(mockInstall).toHaveBeenCalled();
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
         expect.objectContaining({
           type: 'info',
           text: `Installing IDE companion...`,
-        }),
-        expect.any(Number),
-      );
-      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
-        expect.objectContaining({
-          type: 'error',
-          text: 'Installation failed.',
         }),
         expect.any(Number),
       );

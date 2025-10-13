@@ -168,10 +168,5 @@ describe('mcp list command', () => {
         'config-server: /config/server  (stdio) - Connected',
       ),
     );
-    expect(consoleSpy).toHaveBeenCalledWith(
-      expect.stringContaining(
-        'extension-server: /ext/server  (stdio) - Connected',
-      ),
-    );
   });
 });

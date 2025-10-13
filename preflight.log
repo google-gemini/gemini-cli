@@ -1,0 +1,889 @@
+
+> @google/gemini-cli@0.10.0-nightly.20251007.c195a9aa preflight
+> npm run clean && npm ci && npm run format && npm run lint:ci && npm run build && npm run typecheck && npm run test:ci
+
+
+> @google/gemini-cli@0.10.0-nightly.20251007.c195a9aa clean
+> node scripts/clean.js
+
+
+> @google/gemini-cli@0.10.0-nightly.20251007.c195a9aa prepare
+> husky && npm run bundle
+
+
+> @google/gemini-cli@0.10.0-nightly.20251007.c195a9aa bundle
+> npm run generate && node esbuild.config.js && node scripts/copy_bundle_assets.js
+
+
+> @google/gemini-cli@0.10.0-nightly.20251007.c195a9aa generate
+> node scripts/generate-git-commit-info.js
+
+Assets copied to bundle/
+
+added 1388 packages, and audited 1394 packages in 11s
+
+340 packages are looking for funding
+  run `npm fund` for details
+
+found 0 vulnerabilities
+
+> @google/gemini-cli@0.10.0-nightly.20251007.c195a9aa format
+> prettier --experimental-cli --write .
+
+
+> @google/gemini-cli@0.10.0-nightly.20251007.c195a9aa lint:ci
+> npx eslint . --ext .ts,.tsx --no-warn-ignored && npx eslint integration-tests --no-warn-ignored
+
+
+> @google/gemini-cli@0.10.0-nightly.20251007.c195a9aa build
+> node scripts/build.js
+
+
+> @google/gemini-cli@0.10.0-nightly.20251007.c195a9aa generate
+> node scripts/generate-git-commit-info.js
+
+
+> @google/gemini-cli-a2a-server@0.10.0-nightly.20251007.c195a9aa build
+> node ../../scripts/build_package.js
+
+Successfully copied files.
+
+> @google/gemini-cli@0.10.0-nightly.20251007.c195a9aa build
+> node ../../scripts/build_package.js
+
+Successfully copied files.
+
+> @google/gemini-cli-core@0.10.0-nightly.20251007.c195a9aa build
+> node ../../scripts/build_package.js
+
+Successfully copied files.
+
+> @google/gemini-cli-test-utils@0.10.0-nightly.20251007.c195a9aa build
+> node ../../scripts/build_package.js
+
+Successfully copied files.
+
+> gemini-cli-vscode-ide-companion@0.10.0-nightly.20251007.c195a9aa build
+> npm run build:dev
+
+
+> gemini-cli-vscode-ide-companion@0.10.0-nightly.20251007.c195a9aa build:dev
+> npm run check-types && npm run lint && node esbuild.js
+
+
+> gemini-cli-vscode-ide-companion@0.10.0-nightly.20251007.c195a9aa check-types
+> tsc --noEmit
+
+
+> gemini-cli-vscode-ide-companion@0.10.0-nightly.20251007.c195a9aa lint
+> eslint src
+
+[watch] build started
+[watch] build finished
+
+> @google/gemini-cli@0.10.0-nightly.20251007.c195a9aa typecheck
+> npm run typecheck --workspaces --if-present
+
+
+> @google/gemini-cli-a2a-server@0.10.0-nightly.20251007.c195a9aa typecheck
+> tsc --noEmit
+
+
+> @google/gemini-cli@0.10.0-nightly.20251007.c195a9aa typecheck
+> tsc --noEmit
+
+
+> @google/gemini-cli-core@0.10.0-nightly.20251007.c195a9aa typecheck
+> tsc --noEmit
+
+
+> @google/gemini-cli-test-utils@0.10.0-nightly.20251007.c195a9aa typecheck
+> tsc --noEmit
+
+
+> @google/gemini-cli@0.10.0-nightly.20251007.c195a9aa test:ci
+> npm run test:ci --workspaces --if-present --parallel && npm run test:scripts
+
+npm warn Unknown cli config "--parallel". This will stop working in the next major version of npm.
+
+> @google/gemini-cli-a2a-server@0.10.0-nightly.20251007.c195a9aa test:ci
+> vitest run --coverage
+
+
+ RUN  v3.2.4 /home/alessio/Progetti/gemini-cli/packages/a2a-server
+      Coverage enabled with v8
+
+ ✓ src/persistence/gcs.test.ts (10 tests | 1 skipped) 28ms
+ ✓ src/agent/task.test.ts (1 test) 13ms
+ ✓ src/http/endpoints.test.ts (5 tests) 70ms
+ ✓ src/http/app.test.ts (5 tests) 57ms
+
+ Test Files  4 passed (4)
+      Tests  20 passed | 1 skipped (21)
+   Start at  11:12:26
+   Duration  3.41s (transform 1.13s, setup 0ms, collect 6.68s, tests 168ms, environment 2.49s, prepare 384ms)
+
+JUNIT report written to /home/alessio/Progetti/gemini-cli/packages/a2a-server/junit.xml
+ % Coverage report from v8
+
+> @google/gemini-cli@0.10.0-nightly.20251007.c195a9aa test:ci
+> vitest run
+
+
+ RUN  v3.2.4 /home/alessio/Progetti/gemini-cli/packages/cli
+      Coverage enabled with v8
+
+ ✓ src/config/extensions/extensionEnablement.test.ts (43 tests) 18ms
+ ✓ src/config/policy.test.ts (19 tests) 9ms
+ ✓ src/utils/settingsUtils.test.ts (73 tests) 36ms
+ ❯ src/utils/sessionCleanup.test.ts (70 tests | 1 failed) 77ms
+   ✓ Session Cleanup > cleanupExpiredSessions > should return early when cleanup is disabled 3ms
+   ✓ Session Cleanup > cleanupExpiredSessions > should return early when sessionRetention is not configured 1ms
+   ✓ Session Cleanup > cleanupExpiredSessions > should handle invalid maxAge configuration 3ms
+   ✓ Session Cleanup > cleanupExpiredSessions > should delete sessions older than maxAge 1ms
+   ✓ Session Cleanup > cleanupExpiredSessions > should never delete current session 1ms
+   ✓ Session Cleanup > cleanupExpiredSessions > should handle count-based retention 1ms
+   ✓ Session Cleanup > cleanupExpiredSessions > should handle file system errors gracefully 2ms
+   ✓ Session Cleanup > cleanupExpiredSessions > should handle empty sessions directory 1ms
+   ✓ Session Cleanup > cleanupExpiredSessions > should handle global errors gracefully 1ms
+   ✓ Session Cleanup > cleanupExpiredSessions > should respect minRetention configuration 1ms
+   ✓ Session Cleanup > cleanupExpiredSessions > should log debug information when enabled 1ms
+   ✓ Session Cleanup > Specific cleanup scenarios > should delete sessions that exceed the cutoff date 1ms
+   ✓ Session Cleanup > Specific cleanup scenarios > should NOT delete sessions within the cutoff date 1ms
+   ✓ Session Cleanup > Specific cleanup scenarios > should keep N most recent deletable sessions 1ms
+   ✓ Session Cleanup > Specific cleanup scenarios > should handle combined maxAge and maxCount retention (most restrictive wins) 1ms
+   ✓ Session Cleanup > parseRetentionPeriod format validation > should correctly parse valid format 1h 1ms
+   ✓ Session Cleanup > parseRetentionPeriod format validation > should correctly parse valid format 24h 0ms
+   ✓ Session Cleanup > parseRetentionPeriod format validation > should correctly parse valid format 168h 0ms
+   ✓ Session Cleanup > parseRetentionPeriod format validation > should correctly parse valid format 1d 0ms
+   ✓ Session Cleanup > parseRetentionPeriod format validation > should correctly parse valid format 7d 0ms
+   ✓ Session Cleanup > parseRetentionPeriod format validation > should correctly parse valid format 30d 0ms
+   ✓ Session Cleanup > parseRetentionPeriod format validation > should correctly parse valid format 365d 0ms
+   ✓ Session Cleanup > parseRetentionPeriod format validation > should correctly parse valid format 1w 0ms
+   ✓ Session Cleanup > parseRetentionPeriod format validation > should correctly parse valid format 2w 0ms
+   ✓ Session Cleanup > parseRetentionPeriod format validation > should correctly parse valid format 4w 0ms
+   ✓ Session Cleanup > parseRetentionPeriod format validation > should correctly parse valid format 52w 0ms
+   ✓ Session Cleanup > parseRetentionPeriod format validation > should correctly parse valid format 1m 0ms
+   ✓ Session Cleanup > parseRetentionPeriod format validation > should correctly parse valid format 3m 0ms
+   ✓ Session Cleanup > parseRetentionPeriod format validation > should correctly parse valid format 6m 0ms
+   ✓ Session Cleanup > parseRetentionPeriod format validation > should correctly parse valid format 12m 0ms
+   ✓ Session Cleanup > parseRetentionPeriod format validation > should reject invalid format 30 1ms
+   ✓ Session Cleanup > parseRetentionPeriod format validation > should reject invalid format 30x 1ms
+   ✓ Session Cleanup > parseRetentionPeriod format validation > should reject invalid format d 1ms
+   ✓ Session Cleanup > parseRetentionPeriod format validation > should reject invalid format 1.5d 1ms
+   ✓ Session Cleanup > parseRetentionPeriod format validation > should reject invalid format -5d 1ms
+   ✓ Session Cleanup > parseRetentionPeriod format validation > should reject invalid format 1 d 1ms
+   ✓ Session Cleanup > parseRetentionPeriod format validation > should reject invalid format 1dd 1ms
+   ✓ Session Cleanup > parseRetentionPeriod format validation > should reject invalid format abc 1ms
+   ✓ Session Cleanup > parseRetentionPeriod format validation > should reject invalid format 30s 1ms
+   ✓ Session Cleanup > parseRetentionPeriod format validation > should reject invalid format 30y 1ms
+   ✓ Session Cleanup > parseRetentionPeriod format validation > should reject invalid format 0d 1ms
+   ✓ Session Cleanup > parseRetentionPeriod format validation > should reject empty string 2ms
+   ✓ Session Cleanup > parseRetentionPeriod format validation > should handle very large numbers 1ms
+   ✓ Session Cleanup > parseRetentionPeriod format validation > should validate minRetention format 1ms
+   ✓ Session Cleanup > Configuration validation > should require either maxAge or maxCount 1ms
+   ✓ Session Cleanup > Configuration validation > should validate maxCount range 1ms
+   ✓ Session Cleanup > Configuration validation > maxAge format validation > should reject invalid maxAge format - no unit 2ms
+   ✓ Session Cleanup > Configuration validation > maxAge format validation > should reject invalid maxAge format - invalid unit 1ms
+   ✓ Session Cleanup > Configuration validation > maxAge format validation > should reject invalid maxAge format - no number 1ms
+   ✓ Session Cleanup > Configuration validation > maxAge format validation > should reject invalid maxAge format - decimal number 1ms
+   ✓ Session Cleanup > Configuration validation > maxAge format validation > should reject invalid maxAge format - negative number 1ms
+   ✓ Session Cleanup > Configuration validation > maxAge format validation > should accept valid maxAge format - hours 1ms
+   ✓ Session Cleanup > Configuration validation > maxAge format validation > should accept valid maxAge format - days 1ms
+   ✓ Session Cleanup > Configuration validation > maxAge format validation > should accept valid maxAge format - weeks 1ms
+   ✓ Session Cleanup > Configuration validation > maxAge format validation > should accept valid maxAge format - months 1ms
+   ✓ Session Cleanup > Configuration validation > minRetention validation > should reject maxAge less than default minRetention (1d) 1ms
+   ✓ Session Cleanup > Configuration validation > minRetention validation > should reject maxAge less than custom minRetention 1ms
+   ✓ Session Cleanup > Configuration validation > minRetention validation > should accept maxAge equal to minRetention 1ms
+   ✓ Session Cleanup > Configuration validation > minRetention validation > should accept maxAge greater than minRetention 1ms
+   ✓ Session Cleanup > Configuration validation > minRetention validation > should handle invalid minRetention format gracefully 1ms
+   ✓ Session Cleanup > Configuration validation > maxCount boundary validation > should accept maxCount = 1 (minimum valid) 1ms
+   ✓ Session Cleanup > Configuration validation > maxCount boundary validation > should accept maxCount = 1000 (maximum valid) 1ms
+   ✓ Session Cleanup > Configuration validation > maxCount boundary validation > should reject negative maxCount 1ms
+   ✓ Session Cleanup > Configuration validation > maxCount boundary validation > should accept valid maxCount in normal range 1ms
+   ✓ Session Cleanup > Configuration validation > combined configuration validation > should accept valid maxAge and maxCount together 1ms
+   ✓ Session Cleanup > Configuration validation > combined configuration validation > should reject if both maxAge and maxCount are invalid 1ms
+   ✓ Session Cleanup > Configuration validation > combined configuration validation > should reject if maxAge is invalid even when maxCount is valid 1ms
+   ✓ Session Cleanup > Configuration validation > should never throw an exception, always returning a result 1ms
+   × Session Cleanup > Configuration validation > should delete corrupted session files 13ms
+     → expected "unlink" to be called once with arguments: [ StringContaining "corrupt1.json" ][90m
+
+Received: 
+
+[1m  1st unlink call:
+
+[22m[2m  [[22m
+[32m-   StringContaining "corrupt1.json",[90m
+[31m+   "/tmp/test-project/chats/session-2025-01-02T10-00-00-corrupt1.json",[90m
+[2m  ][22m
+
+[1m  2nd unlink call:
+
+[22m[2m  [[22m
+[32m-   StringContaining "corrupt1.json",[90m
+[31m+   "/tmp/test-project/chats/session-2025-01-03T10-00-00-corrupt2.json",[90m
+[2m  ][22m
+[39m[90m
+
+Number of calls: [1m2[22m
+[39m
+   ✓ Session Cleanup > Configuration validation > should handle unexpected errors without throwing 1ms
+(node:680151) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 error listeners added to [Socket]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ❯ src/config/settings.test.ts (77 tests | 1 failed) 106ms
+   ✓ Settings Loading and Merging > loadSettings > should load empty settings if no files exist 6ms
+   ✓ Settings Loading and Merging > loadSettings > should load system settings if only system file exists 4ms
+   ✓ Settings Loading and Merging > loadSettings > should load user settings if only user file exists 1ms
+   ✓ Settings Loading and Merging > loadSettings > should load workspace settings if only workspace file exists 1ms
+   ✓ Settings Loading and Merging > loadSettings > should merge system, user and workspace settings, with system taking precedence over workspace, and workspace over user 2ms
+   ✓ Settings Loading and Merging > loadSettings > should correctly migrate a complex legacy (v1) settings file 3ms
+   ✓ Settings Loading and Merging > loadSettings > should rewrite allowedTools to tools.allowed during migration 1ms
+   ✓ Settings Loading and Merging > loadSettings > should correctly merge and migrate legacy array properties from multiple scopes 3ms
+   ✓ Settings Loading and Merging > loadSettings > should merge all settings files with the correct precedence 2ms
+   ✓ Settings Loading and Merging > loadSettings > should use folderTrust from workspace settings when trusted 1ms
+   ✓ Settings Loading and Merging > loadSettings > should use system folderTrust over user setting 1ms
+   ✓ Settings Loading and Merging > loadSettings > should handle contextFileName correctly when only in user settings 1ms
+   ✓ Settings Loading and Merging > loadSettings > should handle contextFileName correctly when only in workspace settings 1ms
+   ✓ Settings Loading and Merging > loadSettings > should handle excludedProjectEnvVars correctly when only in user settings 1ms
+   ✓ Settings Loading and Merging > loadSettings > should handle excludedProjectEnvVars correctly when only in workspace settings 1ms
+   ✓ Settings Loading and Merging > loadSettings > should merge excludedProjectEnvVars with workspace taking precedence over user 1ms
+   ✓ Settings Loading and Merging > loadSettings > should default contextFileName to undefined if not in any settings file 1ms
+   ✓ Settings Loading and Merging > loadSettings > should load telemetry setting from user settings 1ms
+   ✓ Settings Loading and Merging > loadSettings > should load telemetry setting from workspace settings 1ms
+   ✓ Settings Loading and Merging > loadSettings > should prioritize workspace telemetry setting over user setting 1ms
+   ✓ Settings Loading and Merging > loadSettings > should have telemetry as undefined if not in any settings file 1ms
+   ✓ Settings Loading and Merging > loadSettings > should merge MCP servers correctly, with workspace taking precedence 1ms
+   ✓ Settings Loading and Merging > loadSettings > should handle MCP servers when only in user settings 1ms
+   ✓ Settings Loading and Merging > loadSettings > should handle MCP servers when only in workspace settings 1ms
+   ✓ Settings Loading and Merging > loadSettings > should have mcpServers as undefined if not in any settings file 0ms
+   ✓ Settings Loading and Merging > loadSettings > should merge MCP servers from system, user, and workspace with system taking precedence 1ms
+   ✓ Settings Loading and Merging > loadSettings > should merge mcp allowed/excluded lists with system taking precedence over workspace 1ms
+   ✓ Settings Loading and Merging > loadSettings > should merge chatCompression settings, with workspace taking precedence 2ms
+   ✓ Settings Loading and Merging > loadSettings > should merge output format settings, with workspace taking precedence 1ms
+   ✓ Settings Loading and Merging > loadSettings > should handle chatCompression when only in user settings 1ms
+   ✓ Settings Loading and Merging > loadSettings > should have model as undefined if not in any settings file 0ms
+   ✓ Settings Loading and Merging > loadSettings > should ignore chatCompression if contextPercentageThreshold is invalid 1ms
+   ✓ Settings Loading and Merging > loadSettings > should deep merge chatCompression settings 1ms
+   ✓ Settings Loading and Merging > loadSettings > should merge includeDirectories from all scopes 1ms
+   ✓ Settings Loading and Merging > loadSettings > should handle JSON parsing errors gracefully 2ms
+   ✓ Settings Loading and Merging > loadSettings > should resolve environment variables in user settings 1ms
+   ✓ Settings Loading and Merging > loadSettings > should resolve environment variables in workspace settings 1ms
+   ✓ Settings Loading and Merging > loadSettings > should correctly resolve and merge env variables from different scopes 1ms
+   ✓ Settings Loading and Merging > loadSettings > should correctly merge dnsResolutionOrder with workspace taking precedence 1ms
+   ✓ Settings Loading and Merging > loadSettings > should use user dnsResolutionOrder if workspace is not defined 1ms
+   ✓ Settings Loading and Merging > loadSettings > should leave unresolved environment variables as is 1ms
+   ✓ Settings Loading and Merging > loadSettings > should resolve multiple environment variables in a single string 1ms
+   ✓ Settings Loading and Merging > loadSettings > should resolve environment variables in arrays 1ms
+   ✓ Settings Loading and Merging > loadSettings > should correctly pass through null, boolean, and number types, and handle undefined properties 2ms
+   ✓ Settings Loading and Merging > loadSettings > should resolve multiple concatenated environment variables in a single string value 1ms
+   ✓ Settings Loading and Merging > loadSettings > when GEMINI_CLI_SYSTEM_SETTINGS_PATH is set > should load system settings from the path specified in the environment variable 1ms
+   ✓ Settings Loading and Merging > excludedProjectEnvVars integration > should exclude DEBUG and DEBUG_MODE from project .env files by default 1ms
+   ✓ Settings Loading and Merging > excludedProjectEnvVars integration > should respect custom excludedProjectEnvVars from user settings 1ms
+   ✓ Settings Loading and Merging > excludedProjectEnvVars integration > should merge excludedProjectEnvVars with workspace taking precedence 1ms
+   ✓ Settings Loading and Merging > with workspace trust > should merge workspace settings when workspace is trusted 1ms
+   ✓ Settings Loading and Merging > with workspace trust > should NOT merge workspace settings when workspace is not trusted 1ms
+   ✓ Settings Loading and Merging > migrateSettingsToV1 > should handle an empty object 1ms
+   ✓ Settings Loading and Merging > migrateSettingsToV1 > should migrate a simple v2 settings object to v1 1ms
+   ✓ Settings Loading and Merging > migrateSettingsToV1 > should handle nested properties correctly 0ms
+   ✓ Settings Loading and Merging > migrateSettingsToV1 > should preserve mcpServers at the top level 0ms
+   ✓ Settings Loading and Merging > migrateSettingsToV1 > should carry over unrecognized top-level properties 0ms
+   ✓ Settings Loading and Merging > migrateSettingsToV1 > should handle a complex object with mixed properties 0ms
+   ✓ Settings Loading and Merging > migrateSettingsToV1 > should not migrate a v1 settings object 0ms
+   ✓ Settings Loading and Merging > migrateSettingsToV1 > should migrate a full v2 settings object to v1 1ms
+   ✓ Settings Loading and Merging > migrateSettingsToV1 > should handle partial v2 settings 0ms
+   ✓ Settings Loading and Merging > migrateSettingsToV1 > should handle settings with different data types 0ms
+   ✓ Settings Loading and Merging > migrateSettingsToV1 > should preserve unrecognized top-level keys 0ms
+   ✓ Settings Loading and Merging > migrateSettingsToV1 > should handle an empty v2 settings object 0ms
+   ✓ Settings Loading and Merging > migrateSettingsToV1 > should correctly handle mcpServers at the top level 0ms
+   ✓ Settings Loading and Merging > migrateSettingsToV1 > should correctly migrate customWittyPhrases 0ms
+   ✓ Settings Loading and Merging > loadEnvironment > sets environment variables from .env files 1ms
+   ✓ Settings Loading and Merging > loadEnvironment > does not load env files from untrusted spaces 1ms
+   ✓ Settings Loading and Merging > needsMigration > should return false for an empty object 0ms
+   ✓ Settings Loading and Merging > needsMigration > should return false for settings that are already in V2 format 0ms
+   ✓ Settings Loading and Merging > needsMigration > should return true for settings with a V1 key that needs to be moved 0ms
+   ✓ Settings Loading and Merging > needsMigration > should return true for settings with a mix of V1 and V2 keys 0ms
+   ✓ Settings Loading and Merging > needsMigration > should return false for settings with only V1 keys that are the same in V2 0ms
+   ✓ Settings Loading and Merging > needsMigration > should return true for settings with a mix of V1 keys that are the same in V2 and V1 keys that need moving 0ms
+   ✓ Settings Loading and Merging > needsMigration > should return false for settings with unrecognized keys 0ms
+   ✓ Settings Loading and Merging > needsMigration > should return false for settings with v2 keys and unrecognized keys 0ms
+   × Settings Loading and Merging > migrateDeprecatedSettings > should migrate disabled extensions from user and workspace settings 23ms
+     → expected "setValue" to be called 1 times, but got 2 times
+   ✓ Settings Loading and Merging > migrateDeprecatedSettings > should not do anything if there are no deprecated settings 2ms
+ ✓ src/services/prompt-processors/shellProcessor.test.ts (33 tests) 47ms
+ ✓ src/services/FileCommandLoader.test.ts (38 tests) 169ms
+ ✓ src/nonInteractiveCli.test.ts (18 tests) 68ms
+ ✓ src/config/extensions/github.test.ts (30 tests) 118ms
+ ✓ src/config/extension.test.ts (59 tests) 203ms
+ ✓ src/config/config.test.ts (174 tests | 1 skipped) 1185ms
+ ❯ src/services/CommandService.test.ts (11 tests | 3 failed) 52ms
+   × CommandService > should load commands from a single loader 23ms
+     → expected "spy" to be called with arguments: [][90m
+
+Received: 
+
+[1m  1st spy call:
+
+[22m[32m- [][90m
+[31m+ [[90m
+[31m+   AbortSignal {},[90m
+[31m+ ][90m
+[39m[90m
+
+Number of calls: [1m1[22m
+[39m
+   × CommandService > should aggregate commands from multiple loaders 2ms
+     → expected "spy" to be called with arguments: [][90m
+
+Received: 
+
+[1m  1st spy call:
+
+[22m[32m- [][90m
+[31m+ [[90m
+[31m+   AbortSignal {},[90m
+[31m+ ][90m
+[39m[90m
+
+Number of calls: [1m1[22m
+[39m
+   ✓ CommandService > should override commands from earlier loaders with those from later loaders 6ms
+   × CommandService > should handle loaders that return an empty array of commands gracefully 2ms
+     → expected "spy" to be called with arguments: [][90m
+
+Received: 
+
+[1m  1st spy call:
+
+[22m[32m- [][90m
+[31m+ [[90m
+[31m+   AbortSignal {},[90m
+[31m+ ][90m
+[39m[90m
+
+Number of calls: [1m1[22m
+[39m
+   ✓ CommandService > should load commands from successful loaders even if one fails 3ms
+   ✓ CommandService > getCommands should return a readonly array that cannot be mutated 3ms
+   ✓ CommandService > should pass the abort signal to all loaders 4ms
+   ✓ CommandService > should rename extension commands when they conflict 2ms
+   ✓ CommandService > should handle user/project command override correctly 2ms
+   ✓ CommandService > should handle secondary conflicts when renaming extension commands 1ms
+   ✓ CommandService > should handle multiple secondary conflicts with incrementing suffixes 1ms
+ ✓ src/utils/installationInfo.test.ts (16 tests) 19ms
+ ✓ src/services/McpPromptLoader.test.ts (25 tests) 26ms
+ ✓ src/validateNonInterActiveAuth.test.ts (17 tests) 35ms
+ ❯ src/utils/commentJson.test.ts (12 tests | 1 failed) 32ms
+   ✓ commentJson > updateSettingsFilePreservingFormat > should preserve comments when updating settings 6ms
+   ✓ commentJson > updateSettingsFilePreservingFormat > should handle nested object updates 1ms
+   ✓ commentJson > updateSettingsFilePreservingFormat > should add new fields while preserving existing structure 1ms
+   ✓ commentJson > updateSettingsFilePreservingFormat > should create file if it does not exist 0ms
+   ✓ commentJson > updateSettingsFilePreservingFormat > should handle complex real-world scenario 1ms
+   × commentJson > updateSettingsFilePreservingFormat > should handle corrupted JSON files gracefully 16ms
+     → expected "error" to be called once with arguments: [ Array(2) ][90m
+
+Received: 
+
+[1m  1st error call:
+
+[22m[2m  [[22m
+[2m    "Error parsing settings file:",[22m
+[32m-   Any<Error>,[90m
+[31m+   SyntaxError {[90m
+[31m+     "message": "Unexpected end of JSON input",[90m
+[31m+     "line": 5,[90m
+[31m+     "column": 32,[90m
+[31m+   },[90m
+[2m  ][22m
+
+[1m  2nd error call:
+
+[22m[2m  [[22m
+[32m-   "Error parsing settings file:",[90m
+[32m-   Any<Error>,[90m
+[31m+   "Settings file may be corrupted. Please check the JSON syntax.",[90m
+[2m  ][22m
+[39m[90m
+
+Number of calls: [1m2[22m
+[39m
+   ✓ commentJson > updateSettingsFilePreservingFormat > should handle array updates while preserving comments 1ms
+   ✓ commentJson > updateSettingsFilePreservingFormat > should sync nested objects, removing omitted fields 1ms
+   ✓ commentJson > updateSettingsFilePreservingFormat > should handle mcpServers field deletion properly 1ms
+   ✓ commentJson > updateSettingsFilePreservingFormat > preserves sibling-level commented-out blocks when removing another key 1ms
+   ✓ commentJson > updateSettingsFilePreservingFormat > should handle type conversion from object to array 1ms
+   ✓ commentJson > updateSettingsFilePreservingFormat > should remove both nested and non-nested objects when omitted 1ms
+ ✓ src/utils/errors.test.ts (22 tests) 33ms
+ ✓ src/config/policy-engine.integration.test.ts (12 tests) 14ms
+ ✓ src/config/trustedFolders.test.ts (21 tests) 14ms
+ ✓ src/config/settingsSchema.test.ts (16 tests) 35ms
+ ✓ src/config/extensions/update.test.ts (8 tests) 434ms
+   ✓ update tests > updateExtension > should update a git-installed extension  390ms
+ ✓ src/config/config.integration.test.ts (18 tests) 564ms
+   ✓ Configuration Integration Tests > Approval Mode Integration Tests > should parse --approval-mode=auto_edit correctly through the full argument parsing flow  418ms
+ ✓ src/utils/envVarResolver.test.ts (16 tests) 14ms
+ ✓ src/services/prompt-processors/injectionParser.test.ts (21 tests) 12ms
+[?7l]2;Gemini - cli[?7l]2;Gemini - root[?7l]2;Gemini - root ❯ src/gemini.test.tsx (9 tests | 1 failed) 585ms
+   ✓ gemini.tsx main function > verifies that we dont load the config before relaunchAppInChildProcess  520ms
+   × gemini.tsx main function > should log unhandled promise rejections and open debug console on first error 26ms
+     → expected "spy" to be called 1 times, but got 2 times
+   ✓ gemini.tsx main function kitty protocol > should call setRawMode and detectAndEnableKittyProtocol when isInteractive is true 20ms
+   ✓ validateDnsResolutionOrder > should return "ipv4first" when the input is "ipv4first" 2ms
+   ✓ validateDnsResolutionOrder > should return "verbatim" when the input is "verbatim" 1ms
+   ✓ validateDnsResolutionOrder > should return the default "ipv4first" when the input is undefined 1ms
+   ✓ validateDnsResolutionOrder > should return the default "ipv4first" and log a warning for an invalid string 2ms
+   ✓ startInteractiveUI > should render the UI with proper React context and exitOnCtrlC disabled 4ms
+   ✓ startInteractiveUI > should perform all startup tasks in correct order 5ms
+ ✓ src/commands/mcp/list.test.ts (4 tests) 24ms
+ ✓ src/utils/commands.test.ts (12 tests) 11ms
+ ✓ src/commands/mcp/add.test.ts (17 tests) 193ms
+node:internal/modules/cjs/loader:1423
+  throw err;
+  ^
+
+Error: Cannot find module '/app/cli.js'
+    at Module._resolveFilename (node:internal/modules/cjs/loader:1420:15)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1058:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1063:22)
+    at Module._load (node:internal/modules/cjs/loader:1226:37)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:244:24)
+    at Module.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:154:5)
+    at node:internal/main/run_main_module:33:47 {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: []
+}
+
+Node.js v24.10.0
+ ✓ src/utils/relaunch.test.ts (8 tests) 134ms
+ ✓ src/utils/handleAutoUpdate.test.ts (13 tests) 26ms
+ ❯ src/commands/extensions/install.test.ts (8 tests | 1 failed) 141ms
+   × extensions install command > should fail if no source is provided 102ms
+     → expected [Function] to throw error including 'Not enough non-option arguments: got …' but got 'Numero insufficiente di argomenti non…'
+   ✓ handleInstall > should install an extension from a http source 6ms
+   ✓ handleInstall > should install an extension from a https source 1ms
+   ✓ handleInstall > should install an extension from a git source 1ms
+   ✓ handleInstall > throws an error from an unknown source 2ms
+   ✓ handleInstall > should install an extension from a sso source 4ms
+   ✓ handleInstall > should install an extension from a local path 1ms
+   ✓ handleInstall > should throw an error if install extension fails 17ms
+ ✓ src/utils/gitUtils.test.ts (12 tests) 41ms
+ ✓ src/services/prompt-processors/atFileProcessor.test.ts (11 tests) 96ms
+ ✓ src/utils/userStartupWarnings.test.ts (5 tests) 40ms
+ ✓ src/utils/sessionCleanup.integration.test.ts (5 tests) 68ms
+ ✓ src/services/BuiltinCommandLoader.test.ts (10 tests) 936ms
+   ✓ BuiltinCommandLoader profile > should include profile command when isDevelopment is true  908ms
+ ✓ src/commands/mcp/remove.test.ts (6 tests) 150ms
+ ✓ src/config/keyBindings.test.ts (3 tests) 24ms
+ ✓ src/utils/deepMerge.test.ts (13 tests) 43ms
+ ✓ src/utils/readStdin.test.ts (4 tests) 35ms
+ ✓ src/test-utils/mockCommandContext.test.ts (3 tests) 22ms
+ ✓ src/utils/windowTitle.test.ts (7 tests) 11ms
+ ✓ src/config/extensions/variables.test.ts (1 test) 5ms
+ ✓ src/commands/extensions/new.test.ts (4 tests) 47ms
+ ✓ src/config/auth.test.ts (8 tests) 7ms
+ ✓ src/utils/startupWarnings.test.ts (4 tests) 11ms
+ ✓ src/commands/mcp.test.ts (3 tests) 15ms
+ ✓ src/services/prompt-processors/argumentProcessor.test.ts (2 tests) 4ms
+ ✓ src/utils/cleanup.test.ts (4 tests) 5ms
+ ✓ src/utils/processUtils.test.ts (1 test) 6ms
+ ✓ src/commands/extensions/uninstall.test.ts (1 test) 12ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 8 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/gemini.test.tsx > gemini.tsx main function > should log unhandled promise rejections and open debug console on first error
+AssertionError: expected "spy" to be called 1 times, but got 2 times
+ ❯ src/gemini.test.tsx:221:32
+    219|     await new Promise(process.nextTick);
+    220| 
+    221|     expect(appEventsMock.emit).toHaveBeenCalledTimes(1);
+       |                                ^
+    222|     expect(appEventsMock.emit).toHaveBeenCalledWith(
+    223|       AppEvent.LogError,
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/8]⎯
+
+ FAIL  src/config/settings.test.ts > Settings Loading and Merging > migrateDeprecatedSettings > should migrate disabled extensions from user and workspace settings
+AssertionError: expected "setValue" to be called 1 times, but got 2 times
+ ❯ src/config/settings.test.ts:2420:27
+    2418| 
+    2419|       // Check that setValue was called to remove the deprecated setti…
+    2420|       expect(setValueSpy).toHaveBeenCalledTimes(1);
+       |                           ^
+    2421|       expect(setValueSpy).toHaveBeenCalledWith(
+    2422|         SettingScope.User,
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/8]⎯
+
+ FAIL  src/services/CommandService.test.ts > CommandService > should load commands from a single loader
+AssertionError: expected "spy" to be called with arguments: [][90m
+
+Received: 
+
+[1m  1st spy call:
+
+[22m[32m- [][90m
+[31m+ [[90m
+[31m+   AbortSignal {},[90m
+[31m+ ][90m
+[39m[90m
+
+Number of calls: [1m1[22m
+[39m
+ ❯ src/services/CommandService.test.ts:54:37
+     52|     const commands = service.getCommands();
+     53| 
+     54|     expect(mockLoader.loadCommands).toHaveBeenCalledWith();
+       |                                     ^
+     55|     expect(commands).toHaveLength(2);
+     56|     expect(commands).toEqual(
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/8]⎯
+
+ FAIL  src/services/CommandService.test.ts > CommandService > should aggregate commands from multiple loaders
+AssertionError: expected "spy" to be called with arguments: [][90m
+
+Received: 
+
+[1m  1st spy call:
+
+[22m[32m- [][90m
+[31m+ [[90m
+[31m+   AbortSignal {},[90m
+[31m+ ][90m
+[39m[90m
+
+Number of calls: [1m1[22m
+[39m
+ ❯ src/services/CommandService.test.ts:71:34
+     69|     const commands = service.getCommands();
+     70| 
+     71|     expect(loader1.loadCommands).toHaveBeenCalledWith();
+       |                                  ^
+     72|     expect(loader2.loadCommands).toHaveBeenCalledWith();
+     73|     expect(commands).toHaveLength(2);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/8]⎯
+
+ FAIL  src/services/CommandService.test.ts > CommandService > should handle loaders that return an empty array of commands gracefully
+AssertionError: expected "spy" to be called with arguments: [][90m
+
+Received: 
+
+[1m  1st spy call:
+
+[22m[32m- [][90m
+[31m+ [[90m
+[31m+   AbortSignal {},[90m
+[31m+ ][90m
+[39m[90m
+
+Number of calls: [1m1[22m
+[39m
+ ❯ src/services/CommandService.test.ts:121:38
+    119|     const commands = service.getCommands();
+    120| 
+    121|     expect(emptyLoader.loadCommands).toHaveBeenCalledWith();
+       |                                      ^
+    122|     expect(commands).toHaveLength(2);
+    123|     expect(commands).toEqual(
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/8]⎯
+
+ FAIL  src/utils/commentJson.test.ts > commentJson > updateSettingsFilePreservingFormat > should handle corrupted JSON files gracefully
+AssertionError: expected "error" to be called once with arguments: [ Array(2) ][90m
+
+Received: 
+
+[1m  1st error call:
+
+[22m[2m  [[22m
+[2m    "Error parsing settings file:",[22m
+[32m-   Any<Error>,[90m
+[31m+   SyntaxError {[90m
+[31m+     "message": "Unexpected end of JSON input",[90m
+[31m+     "line": 5,[90m
+[31m+     "column": 32,[90m
+[31m+   },[90m
+[2m  ][22m
+
+[1m  2nd error call:
+
+[22m[2m  [[22m
+[32m-   "Error parsing settings file:",[90m
+[32m-   Any<Error>,[90m
+[31m+   "Settings file may be corrupted. Please check the JSON syntax.",[90m
+[2m  ][22m
+[39m[90m
+
+Number of calls: [1m2[22m
+[39m
+ ❯ src/utils/commentJson.test.ts:171:26
+    169|       }).not.toThrow();
+    170| 
+    171|       expect(consoleSpy).toHaveBeenCalledExactlyOnceWith(
+       |                          ^
+    172|         'Error parsing settings file:',
+    173|         expect.any(Error),
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/8]⎯
+
+ FAIL  src/utils/sessionCleanup.test.ts > Session Cleanup > Configuration validation > should delete corrupted session files
+AssertionError: expected "unlink" to be called once with arguments: [ StringContaining "corrupt1.json" ][90m
+
+Received: 
+
+[1m  1st unlink call:
+
+[22m[2m  [[22m
+[32m-   StringContaining "corrupt1.json",[90m
+[31m+   "/tmp/test-project/chats/session-2025-01-02T10-00-00-corrupt1.json",[90m
+[2m  ][22m
+
+[1m  2nd unlink call:
+
+[22m[2m  [[22m
+[32m-   StringContaining "corrupt1.json",[90m
+[31m+   "/tmp/test-project/chats/session-2025-01-03T10-00-00-corrupt2.json",[90m
+[2m  ][22m
+[39m[90m
+
+Number of calls: [1m2[22m
+[39m
+ ❯ src/utils/sessionCleanup.test.ts:1598:29
+    1596| 
+    1597|       // Verify corrupted files were deleted
+    1598|       expect(mockFs.unlink).toHaveBeenCalledExactlyOnceWith(
+       |                             ^
+    1599|         expect.stringContaining('corrupt1.json'),
+    1600|       );
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/8]⎯
+
+ FAIL  src/commands/extensions/install.test.ts > extensions install command > should fail if no source is provided
+AssertionError: expected [Function] to throw error including 'Not enough non-option arguments: got …' but got 'Numero insufficiente di argomenti non…'
+
+Expected: [32m"N[7mot enough non-option[27m arg[7mu[27mment[7ms: got 0, need at least[27m 1"[39m
+Received: [31m"N[7mumero insufficiente di[27m arg[7mo[27mment[7mi non opzione: inseriti 0, richiesti almeno[27m 1"[39m
+
+ ❯ src/commands/extensions/install.test.ts:34:53
+     32|   it('should fail if no source is provided', () => {
+     33|     const validationParser = yargs([]).command(installCommand).fail(fa…
+     34|     expect(() => validationParser.parse('install')).toThrow(
+       |                                                     ^
+     35|       'Not enough non-option arguments: got 0, need at least 1',
+     36|     );
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/8]⎯
+
+
+ Test Files  6 failed | 45 passed (51)
+      Tests  8 failed | 1018 passed | 1 skipped (1027)
+   Start at  11:12:30
+   Duration  17.60s (transform 6.61s, setup 1.38s, collect 100.99s, tests 6.01s, environment 35.40s, prepare 7.91s)
+
+JUNIT report written to /home/alessio/Progetti/gemini-cli/packages/cli/junit.xml
+npm error Lifecycle script `test:ci` failed with error:
+npm error code 1
+npm error path /home/alessio/Progetti/gemini-cli/packages/cli
+npm error workspace @google/gemini-cli@0.10.0-nightly.20251007.c195a9aa
+npm error location /home/alessio/Progetti/gemini-cli/packages/cli
+npm error command failed
+npm error command sh -c vitest run
+
+
+> @google/gemini-cli-core@0.10.0-nightly.20251007.c195a9aa test:ci
+> vitest run
+
+
+ RUN  v3.2.4 /home/alessio/Progetti/gemini-cli/packages/core
+      Coverage enabled with v8
+
+ ✓ src/mcp/oauth-provider.test.ts (21 tests) 203ms
+ ✓ src/utils/fileUtils.test.ts (65 tests) 148ms
+ ✓ src/tools/ripGrep.test.ts (45 tests) 403ms
+ ✓ src/services/shellExecutionService.test.ts (40 tests) 603ms
+ ✓ src/tools/mcp-tool.test.ts (42 tests) 147ms
+ ✓ src/code_assist/oauth2.test.ts (24 tests) 110ms
+ ✓ src/utils/memoryImportProcessor.test.ts (25 tests) 82ms
+ ✓ src/config/config.test.ts (68 tests) 133ms
+ ✓ src/telemetry/loggers.test.ts (30 tests) 99ms
+ ✓ src/core/coreToolScheduler.test.ts (28 tests) 219ms
+ ✓ src/core/client.test.ts (66 tests) 543ms
+ ✓ src/tools/edit.test.ts (54 tests) 290ms
+ ✓ src/tools/write-file.test.ts (30 tests) 264ms
+ ✓ src/core/logger.test.ts (38 tests) 215ms
+ ✓ src/ide/ide-client.test.ts (23 tests) 94ms
+ ✓ src/telemetry/clearcut-logger/clearcut-logger.test.ts (35 tests) 298ms
+ ✓ src/utils/editCorrector.test.ts (40 tests) 44ms
+ ✓ src/tools/read-many-files.test.ts (31 tests) 619ms
+ ✓ src/policy/policy-engine.test.ts (28 tests) 17ms
+ ✓ src/telemetry/memory-monitor.test.ts (31 tests) 54ms
+ ✓ src/core/subagent.test.ts (19 tests) 93ms
+ ✓ src/agents/executor.test.ts (15 tests) 61ms
+ ✓ src/utils/filesearch/fileSearch.test.ts (27 tests) 129ms
+ ✓ src/utils/editor.test.ts (113 tests) 98ms
+ ✓ src/core/turn.test.ts (19 tests) 26ms
+ ✓ src/services/loopDetectionService.test.ts (37 tests) 386ms
+ ✓ src/utils/memoryDiscovery.test.ts (16 tests) 131ms
+ ✓ src/tools/smart-edit.test.ts (24 tests) 210ms
+ ✓ src/core/prompts.test.ts (40 tests) 66ms
+ ✓ src/utils/systemEncoding.test.ts (38 tests) 23ms
+ ✓ src/telemetry/uiTelemetry.test.ts (19 tests) 26ms
+ ✓ src/tools/read-file.test.ts (28 tests) 286ms
+ ✓ src/utils/workspaceContext.test.ts (34 tests) 89ms
+ ✓ src/tools/memoryTool.test.ts (19 tests) 92ms
+ ✓ src/tools/grep.test.ts (24 tests) 235ms
+ ✓ src/mcp/oauth-token-storage.test.ts (28 tests) 24ms
+ ✓ src/utils/filesearch/crawler.test.ts (18 tests) 86ms
+ ✓ src/core/baseLlmClient.test.ts (21 tests) 34ms
+ ✓ src/tools/mcp-client.test.ts (30 tests) 454ms
+   ✓ connectToMcpServer with OAuth > should discover oauth config if not in www-authenticate header  391ms
+ ✓ src/code_assist/converter.test.ts (22 tests) 16ms
+ ✓ src/ide/ideContext.test.ts (23 tests) 19ms
+ ✓ src/utils/pathReader.test.ts (16 tests) 123ms
+ ✓ src/core/geminiChat.test.ts (33 tests) 5667ms
+   ✓ GeminiChat > sendMessageStream > should fail if the stream ends with an empty part and has no finishReason  505ms
+   ✓ GeminiChat > sendMessageStream > should throw an error when a tool call is followed by an empty stream response  506ms
+   ✓ GeminiChat > sendMessageStream > should throw InvalidStreamError when no tool call and no finish reason  504ms
+   ✓ GeminiChat > sendMessageStream > should throw InvalidStreamError when no tool call and empty response text  506ms
+   ✓ GeminiChat > sendMessageStream with retries > should yield a RETRY event when an invalid stream is encountered  505ms
+   ✓ GeminiChat > sendMessageStream with retries > should retry on invalid content, succeed, and report metrics  509ms
+   ✓ GeminiChat > sendMessageStream with retries > should set temperature to 1 on retry  503ms
+   ✓ GeminiChat > sendMessageStream with retries > should fail after all retries on persistent invalid content and report metrics  504ms
+   ✓ GeminiChat > should correctly retry and append to an existing history mid-conversation  504ms
+   ✓ GeminiChat > should retry if the model returns a completely empty stream (no chunks)  503ms
+   ✓ GeminiChat > should discard valid partial content from a failed attempt upon retry  505ms
+ ✓ src/telemetry/gcp-exporters.test.ts (18 tests) 57ms
+ ✓ src/tools/ls.test.ts (22 tests) 252ms
+ ✓ src/mcp/token-storage/keychain-token-storage.test.ts (24 tests) 195ms
+ ✓ src/tools/glob.test.ts (38 tests) 1952ms
+ ✓ src/utils/userAccountManager.test.ts (23 tests) 60ms
+ ✓ src/utils/ignorePatterns.test.ts (28 tests) 29ms
+ ✓ src/utils/getFolderStructure.test.ts (15 tests) 112ms
+ ✓ src/utils/partUtils.test.ts (37 tests) 19ms
+ ✓ src/telemetry/metrics.test.ts (55 tests) 7271ms
+ ✓ src/utils/shell-utils.test.ts (50 tests) 32ms
+ ✓ src/tools/modifiable-tool.test.ts (11 tests) 43ms
+ ✓ src/mcp/oauth-utils.test.ts (21 tests) 76ms
+ ✓ src/utils/retry.test.ts (18 tests) 105ms
+ ✓ src/tools/shell.test.ts (21 tests) 161ms
+ ✓ src/utils/paths.test.ts (55 tests) 21ms
+ ✓ src/utils/generateContentResponseUtilities.test.ts (29 tests) 20ms
+ ✓ src/tools/tool-registry.test.ts (9 tests) 168ms
+ ✓ src/utils/googleErrors.test.ts (9 tests) 15ms
+ ✓ src/output/json-formatter.test.ts (15 tests) 20ms
+ ✓ src/services/gitService.test.ts (14 tests) 117ms
+ ✓ src/mcp/token-storage/hybrid-token-storage.test.ts (11 tests) 37ms
+ ✓ src/telemetry/rate-limiter.test.ts (24 tests) 29ms
+ ✓ src/mcp/token-storage/file-token-storage.test.ts (16 tests) 931ms
+ ✓ src/utils/llm-edit-fixer.test.ts (7 tests) 18ms
+ ✓ src/routing/strategies/classifierStrategy.test.ts (8 tests) 34ms
+ ✓ src/tools/message-bus-integration.test.ts (9 tests) 131ms
+ ✓ src/utils/gitIgnoreParser.test.ts (20 tests) 92ms
+ ✓ src/services/chatRecordingService.test.ts (10 tests) 38ms
+ ✓ src/utils/bfsFileSearch.test.ts (11 tests) 129ms
+ ✓ src/utils/secure-browser-launcher.test.ts (14 tests) 29ms
+ ✓ src/confirmation-bus/message-bus.test.ts (10 tests) 24ms
+ ✓ src/code_assist/oauth-credential-storage.test.ts (12 tests) 45ms
+ ✓ src/core/nonInteractiveToolExecutor.test.ts (8 tests) 40ms
+ ✓ src/utils/errorReporting.test.ts (6 tests) 46ms
+ ✓ src/services/fileDiscoveryService.test.ts (13 tests) 114ms
+ ✓ src/agents/invocation.test.ts (11 tests) 48ms
+ ✓ src/telemetry/sdk.test.ts (9 tests) 48ms
+ ✓ src/telemetry/high-water-mark-tracker.test.ts (18 tests) 19ms
+ ✓ src/utils/googleQuotaErrors.test.ts (10 tests) 18ms
+ ✓ src/utils/environmentContext.test.ts (8 tests) 61ms
+ ✓ src/ide/process-utils.test.ts (7 tests) 25ms
+ ✓ src/utils/terminalSerializer.test.ts (16 tests) 143ms
+ ✓ src/routing/strategies/compositeStrategy.test.ts (6 tests) 24ms
+ ✓ src/tools/tools.test.ts (11 tests) 16ms
+ ✓ src/code_assist/server.test.ts (8 tests) 47ms
+ ✓ src/utils/nextSpeakerChecker.test.ts (10 tests) 38ms
+ ✓ src/mcp/token-storage/base-token-storage.test.ts (12 tests) 14ms
+ ✓ src/code_assist/setup.test.ts (7 tests) 17ms
+ ✓ src/ide/ide-installer.test.ts (11 tests) 27ms
+ ✓ src/tools/diffOptions.test.ts (9 tests) 12ms
+ ✓ src/mcp/sa-impersonation-provider.test.ts (8 tests) 40ms
+ ✓ src/tools/web-search.test.ts (9 tests) 129ms
+ ✓ src/utils/filesearch/ignore.test.ts (12 tests) 49ms
+ ✓ src/fallback/handler.test.ts (10 tests) 20ms
+ ✓ src/agents/schema-utils.test.ts (6 tests) 25ms
+ ✓ src/tools/web-fetch.test.ts (9 tests) 164ms
+ ✓ src/telemetry/activity-detector.test.ts (13 tests) 20ms
+ ✓ src/agents/utils.test.ts (12 tests) 14ms
+ ✓ src/utils/summarizer.test.ts (8 tests) 73ms
+ ✓ src/ide/detect-ide.test.ts (14 tests) 13ms
+ ✓ src/utils/filesearch/crawlCache.test.ts (9 tests) 34ms
+ ✓ src/agents/registry.test.ts (12 tests) 33ms
+ ✓ src/tools/write-todos.test.ts (9 tests) 97ms
+ ✓ src/core/contentGenerator.test.ts (8 tests) 19ms
+ ✓ src/utils/pathCorrector.test.ts (4 tests) 22ms
+ ✓ src/mcp/google-auth-provider.test.ts (8 tests) 26ms
+ ✓ src/utils/installationManager.test.ts (4 tests) 20ms
+ ✓ src/utils/textUtils.test.ts (12 tests) 8ms
+ ✓ src/telemetry/config.test.ts (11 tests) 18ms
+ ✓ src/utils/schemaValidator.test.ts (7 tests) 56ms
+ ✓ src/config/models.test.ts (9 tests) 7ms
+ ✓ src/routing/strategies/fallbackStrategy.test.ts (4 tests) 8ms
+ ✓ src/agents/subagent-tool-wrapper.test.ts (7 tests) 82ms
+ ✓ src/utils/thoughtUtils.test.ts (11 tests) 8ms
+ ✓ src/utils/safeJsonStringify.test.ts (8 tests) 7ms
+ ✓ src/utils/errorParsing.test.ts (10 tests) 10ms
+ ✓ src/utils/geminiIgnoreParser.test.ts (2 tests) 23ms
+ ✓ src/routing/strategies/overrideStrategy.test.ts (3 tests) 7ms
+ ✓ src/config/storage.test.ts (6 tests) 5ms
+ ✓ src/utils/filesearch/result-cache.test.ts (3 tests) 8ms
+ ✓ src/routing/modelRouterService.test.ts (5 tests) 39ms
+ ✓ src/telemetry/telemetry-utils.test.ts (6 tests) 7ms
+ ✓ src/services/fileSystemService.test.ts (3 tests) 13ms
+ ✓ src/routing/strategies/defaultStrategy.test.ts (1 test) 8ms
+ ✓ src/utils/formatters.test.ts (4 tests) 5ms
+ ✓ src/index.test.ts (1 test) 6ms
+ ✓ src/utils/flashFallback.test.ts (4 tests) 19ms
+ ✓ src/config/flashFallback.test.ts (6 tests) 8ms
+ ✓ src/utils/tool-utils.test.ts (8 tests) 6ms
+ ✓ src/tools/mcp-client-manager.test.ts (2 tests) 4ms
+ ✓ src/telemetry/telemetry.test.ts (2 tests) 19ms
+
+ Test Files  134 passed (134)
+      Tests  2561 passed (2561)
+   Start at  11:12:48
+   Duration  23.15s (transform 6.96s, setup 1.18s, collect 125.16s, tests 27.16s, environment 56ms, prepare 18.10s)
+
+JUNIT report written to /home/alessio/Progetti/gemini-cli/packages/core/junit.xml
+ % Coverage report from v8
+
+> gemini-cli-vscode-ide-companion@0.10.0-nightly.20251007.c195a9aa test:ci
+> vitest run --coverage
+
+
+ RUN  v3.2.4 /home/alessio/Progetti/gemini-cli/packages/vscode-ide-companion
+      Coverage enabled with v8
+
+ ✓ src/open-files-manager.test.ts (17 tests) 21ms
+ ✓ src/ide-server.test.ts (13 tests | 1 skipped) 100ms
+ ✓ src/extension.test.ts (11 tests) 44ms
+
+ Test Files  3 passed (3)
+      Tests  40 passed | 1 skipped (41)
+   Start at  11:13:12
+   Duration  726ms (transform 227ms, setup 0ms, collect 578ms, tests 165ms, environment 1ms, prepare 322ms)
+
+ % Coverage report from v8
+-------------------|---------|----------|---------|---------|-------------------
+File               | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s 
+-------------------|---------|----------|---------|---------|-------------------
+All files          |      48 |    76.19 |   53.19 |      48 |                   
+ ...-ide-companion |       0 |        0 |       0 |       0 |                   
+  esbuild.js       |       0 |        0 |       0 |       0 | 1-69              
+ ...panion/scripts |       0 |        0 |       0 |       0 |                   
+  ...de-release.js |       0 |        0 |       0 |       0 | 1-99              
+  ...te-notices.js |       0 |        0 |       0 |       0 | 1-160             
+ ...-companion/src |   61.57 |    78.78 |   55.81 |   61.57 |                   
+  diff-manager.ts  |   23.38 |       75 |      20 |   23.38 | ...37-238,241-266 
+  extension.ts     |   67.19 |       80 |      50 |   67.19 | ...04-208,213-227 
+  ide-server.ts    |   66.19 |    74.46 |   68.75 |   66.19 | ...60-463,472-489 
+  ...es-manager.ts |   94.36 |    84.84 |     100 |   94.36 | ...88,146-147,154 
+ ...nion/src/utils |   88.23 |    66.66 |     100 |   88.23 |                   
+  logger.ts        |   88.23 |    66.66 |     100 |   88.23 | 21-22             
+-------------------|---------|----------|---------|---------|-------------------

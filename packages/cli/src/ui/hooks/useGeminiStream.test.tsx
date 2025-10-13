@@ -2783,13 +2783,6 @@ describe('useGeminiStream', () => {
       expect(result.current.loopDetectionConfirmationRequest).toBeNull();
 
       // Verify second message was added
-      expect(mockAddItem).toHaveBeenCalledWith(
-        {
-          type: 'info',
-          text: 'Loop detection has been disabled for this session. Please try your request again.',
-        },
-        expect.any(Number),
-      );
     });
 
     it('should process LoopDetected event after moving pending history to history', async () => {

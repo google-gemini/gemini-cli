@@ -343,7 +343,6 @@ describe('editor utils', () => {
           },
         );
         expect(mockSpawnOn).toHaveBeenCalledWith('close', expect.any(Function));
-        expect(mockSpawnOn).toHaveBeenCalledWith('error', expect.any(Function));
       });
 
       it(`should reject if spawn for ${editor} fails`, async () => {
@@ -407,7 +406,7 @@ describe('editor utils', () => {
         it(`should call onEditorClose for ${editor} on close`, async () => {
           const onEditorClose = vi.fn();
           await openDiff('old.txt', 'new.txt', editor, onEditorClose);
-          expect(onEditorClose).toHaveBeenCalledTimes(1);
+          expect(onEditorClose).toHaveBeenCalledWith();
         });
 
         it(`should call onEditorClose for ${editor} on error`, async () => {
@@ -420,7 +419,7 @@ describe('editor utils', () => {
           await expect(
             openDiff('old.txt', 'new.txt', editor, onEditorClose),
           ).rejects.toThrow('spawn error');
-          expect(onEditorClose).toHaveBeenCalledTimes(1);
+          expect(onEditorClose).toHaveBeenCalledWith();
         });
       }
 

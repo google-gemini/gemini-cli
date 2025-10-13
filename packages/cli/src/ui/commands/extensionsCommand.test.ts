@@ -114,7 +114,6 @@ describe('extensionsCommand', () => {
       expect(mockContext.ui.setPendingItem).toHaveBeenCalledWith({
         type: MessageType.EXTENSIONS_LIST,
       });
-      expect(mockContext.ui.setPendingItem).toHaveBeenCalledWith(null);
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
         {
           type: MessageType.EXTENSIONS_LIST,
@@ -131,17 +130,9 @@ describe('extensionsCommand', () => {
       expect(mockContext.ui.setPendingItem).toHaveBeenCalledWith({
         type: MessageType.EXTENSIONS_LIST,
       });
-      expect(mockContext.ui.setPendingItem).toHaveBeenCalledWith(null);
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
         {
           type: MessageType.EXTENSIONS_LIST,
-        },
-        expect.any(Number),
-      );
-      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
-        {
-          type: MessageType.ERROR,
-          text: 'Something went wrong',
         },
         expect.any(Number),
       );
@@ -200,10 +191,9 @@ describe('extensionsCommand', () => {
           onComplete: expect.any(Function),
         },
       });
-      expect(mockContext.ui.setPendingItem).toHaveBeenCalledWith({
+      expect(mockContext.ui.setPendingItem).toHaveBeenCalledExactlyOnceWith({
         type: MessageType.EXTENSIONS_LIST,
       });
-      expect(mockContext.ui.setPendingItem).toHaveBeenCalledWith(null);
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
         {
           type: MessageType.EXTENSIONS_LIST,

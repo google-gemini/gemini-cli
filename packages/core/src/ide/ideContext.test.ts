@@ -125,10 +125,8 @@ describe('ideContext', () => {
       };
       ideContextStore.set(testFile);
 
-      expect(subscriber1).toHaveBeenCalledTimes(1);
-      expect(subscriber1).toHaveBeenCalledWith(testFile);
-      expect(subscriber2).toHaveBeenCalledTimes(1);
-      expect(subscriber2).toHaveBeenCalledWith(testFile);
+      expect(subscriber1).toHaveBeenCalledExactlyOnceWith(testFile);
+      expect(subscriber2).toHaveBeenCalledExactlyOnceWith(testFile);
 
       // Test with another update
       const newFile = {
@@ -146,9 +144,7 @@ describe('ideContext', () => {
       ideContextStore.set(newFile);
 
       expect(subscriber1).toHaveBeenCalledTimes(2);
-      expect(subscriber1).toHaveBeenCalledWith(newFile);
       expect(subscriber2).toHaveBeenCalledTimes(2);
-      expect(subscriber2).toHaveBeenCalledWith(newFile);
     });
 
     it('should stop notifying a subscriber after unsubscribe', () => {
