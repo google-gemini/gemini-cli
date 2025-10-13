@@ -108,9 +108,14 @@ describe('JSON output', () => {
       /cannot|does not exist|doesn't exist|not found|unable to|error|couldn't/,
     );
 
-    // Stats should be present, indicating the session completed normally
+    // Stats should be present, indicating the session completed normally.
     expect(parsed).toHaveProperty('stats');
+
+    // Should see one failed tool call in the stats.
     expect(parsed.stats).toHaveProperty('tools');
+    expect(parsed.stats.tools.totalCalls).toBe(1);
+    expect(parsed.stats.tools.totalFail).toBe(1);
+    expect(parsed.stats.tools.totalSuccess).toBe(0);
 
     // Should NOT have an error field at the top level
     expect(parsed.error).toBeUndefined();
