@@ -4,6 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+// --------------------------------------------------------------------------
+// IMPORTANT: When adding a new setting, especially one with `showInDialog: true`,
+// please ensure it is also documented in `docs/get-started/configuration.md`.
+// --------------------------------------------------------------------------
+
 import type {
   MCPServerConfig,
   BugCommandSettings,
@@ -452,7 +457,7 @@ const SETTINGS_SCHEMA = {
             label: 'Screen Reader Mode',
             category: 'UI',
             requiresRestart: true,
-            default: undefined as boolean | undefined,
+            default: false,
             description:
               'Render output in plain-text to be more screen reader accessible',
             showInDialog: true,
@@ -899,7 +904,7 @@ const SETTINGS_SCHEMA = {
     label: 'Use Smart Edit',
     category: 'Advanced',
     requiresRestart: false,
-    default: false,
+    default: true,
     description: 'Enable the smart-edit tool instead of the replace tool.',
     showInDialog: false,
   },
