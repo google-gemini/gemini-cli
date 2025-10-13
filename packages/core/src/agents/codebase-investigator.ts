@@ -75,8 +75,10 @@ export const CodebaseInvestigatorAgent: AgentDefinition<
   },
 
   runConfig: {
-    max_time_minutes: 5,
-    max_turns: 15,
+    // No time limit for fully autonomous operation
+    max_time_minutes: 999999,
+    // No turn limit for fully autonomous operation
+    max_turns: 999999,
   },
 
   toolConfig: {
