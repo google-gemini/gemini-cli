@@ -4,27 +4,43 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Box, Text } from 'ink';
+import { Box, Text, useIsScreenReaderEnabled } from 'ink';
 import { useAppContext } from '../contexts/AppContext.js';
 import { useUIState } from '../contexts/UIStateContext.js';
 import { theme } from '../semantic-colors.js';
 import { StreamingState } from '../types.js';
 import { UpdateNotification } from './UpdateNotification.js';
 
+import { homedir } from 'node:os';
+import path from 'node:path';
+
+const settingsPath = path.join(homedir(), '.gemini', 'settings.json');
+
 export const Notifications = () => {
   const { startupWarnings } = useAppContext();
   const { initError, streamingState, updateInfo } = useUIState();
-
+  const isScreenReaderEnabled = useIsScreenReaderEnabled();
   const showStartupWarnings = startupWarnings.length > 0;
   const showInitError =
     initError && streamingState !== StreamingState.Responding;
 
-  if (!showStartupWarnings && !showInitError && !updateInfo) {
+  if (
+    !showStartupWarnings &&
+    !showInitError &&
+    !updateInfo &&
+    !isScreenReaderEnabled
+  ) {
     return null;
   }
 
   return (
     <>
+      {isScreenReaderEnabled && (
+        <Text>
+          You are currently in screen reader-friendly view. To switch out, open{' '}
+          {settingsPath} and remove the entry for {'"screenReader"'}.
+        </Text>
+      )}
       {updateInfo && <UpdateNotification message={updateInfo.message} />}
       {showStartupWarnings && (
         <Box
