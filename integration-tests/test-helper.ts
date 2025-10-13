@@ -584,6 +584,29 @@ export class TestRig {
     );
   }
 
+  async waitForToolCallSuccess(toolNames: string[], timeout?: number) {
+    // Use environment-specific timeout
+    if (!timeout) {
+      timeout = getDefaultTimeout();
+    }
+
+    // Wait for telemetry to be ready before polling for tool calls
+    await this.waitForTelemetryReady();
+
+    return poll(
+      () => {
+        const toolLogs = this.readToolLogs();
+        return toolNames.some((name) =>
+          toolLogs.some(
+            (log) => log.toolRequest.name === name && log.toolRequest.success,
+          ),
+        );
+      },
+      timeout,
+      100,
+    );
+  }
+
   async waitForAnyToolCall(toolNames: string[], timeout?: number) {
     // Use environment-specific timeout
     if (!timeout) {

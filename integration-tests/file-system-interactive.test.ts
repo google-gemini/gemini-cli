@@ -18,7 +18,7 @@ describe('Interactive file system', () => {
     await rig.cleanup();
   });
 
-  it.skip('should perform a read-then-write sequence', async () => {
+  it('should perform a read-then-write sequence', async () => {
     const fileName = 'version.txt';
     rig.setup('interactive-read-then-write');
     rig.createFile(fileName, '1.0.0');
@@ -40,18 +40,19 @@ describe('Interactive file system', () => {
     await run.type(writePrompt);
     await run.type('\r');
 
-    const toolCall = await rig.waitForAnyToolCall(
+    const toolcallSuccess = await rig.waitForToolCallSuccess(
       ['write_file', 'replace'],
       30000,
     );
 
-    if (!toolCall) {
-      printDebugInfo(rig, run.output, { toolCall });
+    if (!toolcallSuccess) {
+      printDebugInfo(rig, run.output, { toolCall: toolcallSuccess });
     }
 
-    expect(toolCall, 'Expected to find a write_file or replace tool call').toBe(
-      true,
-    );
+    expect(
+      toolcallSuccess,
+      'Expected to find a completed write_file or replace tool call',
+    ).toBe(true);
 
     const newFileContent = rig.readFile(fileName);
     expect(newFileContent).toBe('1.0.1');
