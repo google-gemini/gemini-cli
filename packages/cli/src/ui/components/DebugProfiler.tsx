@@ -23,6 +23,8 @@ export const FRAME_TIMESTAMP_CAPACITY = 2048;
 export const profiler = {
   numFrames: 0,
   totalIdleFrames: 0,
+  totalFlickerFrames: 0,
+  hasLoggedFirstFlicker: false,
   lastFrameStartTime: 0,
   openedDebugConsole: false,
   lastActionTimestamp: 0,
@@ -114,10 +116,35 @@ export const profiler = {
       );
     }
   },
+
+  registerFlickerHandler(constrainHeight: boolean) {
+    const flickerHandler = () => {
+      // If we are not constraining the height, we are intentionally
+      // overflowing the screen.
+      if (!constrainHeight) {
+        return;
+      }
+
+      this.totalFlickerFrames++;
+      this.reportAction();
+
+      if (!this.hasLoggedFirstFlicker) {
+        this.hasLoggedFirstFlicker = true;
+        appEvents.emit(
+          AppEvent.LogError,
+          'A flicker frame was detected. This will cause UI instability. Type `/profile` for more info.',
+        );
+      }
+    };
+    appEvents.on(AppEvent.Flicker, flickerHandler);
+    return () => {
+      appEvents.off(AppEvent.Flicker, flickerHandler);
+    };
+  },
 };
 
 export const DebugProfiler = () => {
-  const { showDebugProfiler } = useUIState();
+  const { showDebugProfiler, constrainHeight } = useUIState();
   const [forceRefresh, setForceRefresh] = useState(0);
 
   // Effect for listening to stdin for keypresses and stdout for resize events.
@@ -170,6 +197,11 @@ export const DebugProfiler = () => {
     return () => clearInterval(updateInterval);
   }, []);
 
+  useEffect(
+    () => profiler.registerFlickerHandler(constrainHeight),
+    [constrainHeight],
+  );
+
   // Effect for updating stats
   useEffect(() => {
     if (!showDebugProfiler) {
@@ -191,7 +223,10 @@ export const DebugProfiler = () => {
   return (
     <Text color={theme.status.warning} key={forceRefresh}>
       Renders: {profiler.numFrames} (total),{' '}
-      <Text color={theme.status.error}>{profiler.totalIdleFrames} (idle) </Text>
+      <Text color={theme.status.error}>{profiler.totalIdleFrames} (idle)</Text>,{' '}
+      <Text color={theme.status.error}>
+        {profiler.totalFlickerFrames} (flicker)
+      </Text>
     </Text>
   );
 };
