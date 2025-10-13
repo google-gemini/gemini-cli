@@ -5,7 +5,7 @@
  */
 
 import { expect, describe, it, beforeEach, afterEach } from 'vitest';
-import { TestRig, printDebugInfo } from './test-helper.js';
+import { TestRig } from './test-helper.js';
 
 describe('Interactive file system', () => {
   let rig: TestRig;
@@ -18,7 +18,7 @@ describe('Interactive file system', () => {
     await rig.cleanup();
   });
 
-  it.skip('should perform a read-then-write sequence', async () => {
+  it('should perform a read-then-write sequence', async () => {
     const fileName = 'version.txt';
     rig.setup('interactive-read-then-write');
     rig.createFile(fileName, '1.0.0');
@@ -40,18 +40,7 @@ describe('Interactive file system', () => {
     await run.type(writePrompt);
     await run.type('\r');
 
-    const toolCall = await rig.waitForAnyToolCall(
-      ['write_file', 'replace'],
-      30000,
-    );
-
-    if (!toolCall) {
-      printDebugInfo(rig, run.output, { toolCall });
-    }
-
-    expect(toolCall, 'Expected to find a write_file or replace tool call').toBe(
-      true,
-    );
+    await rig.expectToolCallSuccess(['write_file', 'replace'], 30000);
 
     const newFileContent = rig.readFile(fileName);
     expect(newFileContent).toBe('1.0.1');
