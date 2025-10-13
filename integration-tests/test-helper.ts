@@ -218,6 +218,14 @@ export class InteractiveRun {
     }
   }
 
+  async sendKeys(text: string) {
+    const delay = 5;
+    for (const char of text) {
+      this.ptyProcess.write(char);
+      await new Promise((resolve) => setTimeout(resolve, delay));
+    }
+  }
+
   async kill() {
     this.ptyProcess.kill();
   }
