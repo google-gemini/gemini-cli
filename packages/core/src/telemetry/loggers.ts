@@ -47,6 +47,7 @@ import type {
   AgentStartEvent,
   AgentFinishEvent,
   WebFetchFallbackAttemptEvent,
+  ExtensionUpdateEvent,
 } from './types.js';
 import {
   recordApiErrorMetrics,
@@ -521,6 +522,21 @@ export function logExtensionUninstall(
   event: ExtensionUninstallEvent,
 ): void {
   ClearcutLogger.getInstance(config)?.logExtensionUninstallEvent(event);
+  if (!isTelemetrySdkInitialized()) return;
+
+  const logger = logs.getLogger(SERVICE_NAME);
+  const logRecord: LogRecord = {
+    body: event.toLogBody(),
+    attributes: event.toOpenTelemetryAttributes(config),
+  };
+  logger.emit(logRecord);
+}
+
+export function logExtensionUpdateEvent(
+  config: Config,
+  event: ExtensionUpdateEvent,
+): void {
+  ClearcutLogger.getInstance(config)?.logExtensionUpdateEvent(event);
   if (!isTelemetrySdkInitialized()) return;
 
   const logger = logs.getLogger(SERVICE_NAME);

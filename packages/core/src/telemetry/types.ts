@@ -1156,6 +1156,50 @@ export class ExtensionUninstallEvent implements BaseTelemetryEvent {
   }
 }
 
+export const EVENT_EXTENSION_UPDATE = 'gemini_cli.extension_update';
+export class ExtensionUpdateEvent implements BaseTelemetryEvent {
+  'event.name': 'extension_update';
+  'event.timestamp': string;
+  extension_name: string;
+  extension_previous_version: string;
+  extension_version: string;
+  extension_source: string;
+  status: 'success' | 'error';
+
+  constructor(
+    extension_name: string,
+    extension_version: string,
+    extension_previous_version: string,
+    extension_source: string,
+    status: 'success' | 'error',
+  ) {
+    this['event.name'] = 'extension_update';
+    this['event.timestamp'] = new Date().toISOString();
+    this.extension_name = extension_name;
+    this.extension_version = extension_version;
+    this.extension_previous_version = extension_previous_version;
+    this.extension_source = extension_source;
+    this.status = status;
+  }
+
+  toOpenTelemetryAttributes(config: Config): LogAttributes {
+    return {
+      ...getCommonAttributes(config),
+      'event.name': EVENT_EXTENSION_UPDATE,
+      'event.timestamp': this['event.timestamp'],
+      extension_name: this.extension_name,
+      extension_version: this.extension_version,
+      extension_previous_version: this.extension_previous_version,
+      extension_source: this.extension_source,
+      status: this.status,
+    };
+  }
+
+  toLogBody(): string {
+    return `Updated extension ${this.extension_name}`;
+  }
+}
+
 export const EVENT_EXTENSION_ENABLE = 'gemini_cli.extension_enable';
 export class ExtensionEnableEvent implements BaseTelemetryEvent {
   'event.name': 'extension_enable';

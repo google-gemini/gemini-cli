@@ -35,7 +35,7 @@ describe('JSON output', () => {
     expect(typeof parsed.stats).toBe('object');
   });
 
-  it('should return a JSON error for enforced auth mismatch before running', async () => {
+  it('should return a JSON error for sd auth mismatch before running', async () => {
     process.env['GOOGLE_GENAI_USE_GCA'] = 'true';
     await rig.setup('json-output-auth-mismatch', {
       settings: {
@@ -80,11 +80,9 @@ describe('JSON output', () => {
     expect(payload.error.type).toBe('Error');
     expect(payload.error.code).toBe(1);
     expect(payload.error.message).toContain(
-      'configured auth type is gemini-api-key',
+      "enforced authentication type is 'gemini-api-key'",
     );
-    expect(payload.error.message).toContain(
-      'current auth type is oauth-personal',
-    );
+    expect(payload.error.message).toContain("current type is 'oauth-personal'");
   });
 
   it('should not exit on tool errors and allow model to self-correct in JSON mode', async () => {
@@ -103,7 +101,7 @@ describe('JSON output', () => {
 
     // The model should acknowledge the error in its response
     expect(parsed.response.toLowerCase()).toMatch(
-      /cannot|does not exist|not found|unable to|error|couldn't/,
+      /cannot|does not exist|doesn't exist|not found|unable to|error|couldn't/,
     );
 
     // Stats should be present, indicating the session completed normally
