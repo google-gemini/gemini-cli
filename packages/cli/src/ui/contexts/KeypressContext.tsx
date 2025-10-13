@@ -45,36 +45,6 @@ export const DRAG_COMPLETION_TIMEOUT_MS = 100; // Broadcast full path after 100m
 export const SINGLE_QUOTE = "'";
 export const DOUBLE_QUOTE = '"';
 
-const ALT_KEY_CHARACTER_MAP: Record<string, string> = {
-  '\u00E5': 'a',
-  '\u222B': 'b',
-  '\u00E7': 'c',
-  '\u2202': 'd',
-  '\u00B4': 'e',
-  '\u0192': 'f',
-  '\u00A9': 'g',
-  '\u02D9': 'h',
-  '\u02C6': 'i',
-  '\u2206': 'j',
-  '\u02DA': 'k',
-  '\u00AC': 'l',
-  '\u00B5': 'm',
-  '\u02DC': 'n',
-  '\u00F8': 'o',
-  '\u03C0': 'p',
-  '\u0153': 'q',
-  '\u00AE': 'r',
-  '\u00DF': 's',
-  '\u2020': 't',
-  '\u00A8': 'u',
-  '\u221A': 'v',
-  '\u2211': 'w',
-  '\u2248': 'x',
-  '\u00A5': 'y',
-  '\\': 'y',
-  '\u03A9': 'z',
-};
-
 export interface Key {
   name: string;
   ctrl: boolean;
@@ -357,9 +327,9 @@ export function KeypressProvider({
           };
         }
 
-        // Ctrl+letters and Alt+letters
+        // Ctrl+letters
         if (
-          (ctrl || alt) &&
+          ctrl &&
           keyCode >= 'a'.charCodeAt(0) &&
           keyCode <= 'z'.charCodeAt(0)
         ) {
@@ -367,7 +337,7 @@ export function KeypressProvider({
           return {
             key: {
               name: letter,
-              ctrl,
+              ctrl: true,
               meta: alt,
               shift,
               paste: false,
@@ -462,19 +432,6 @@ export function KeypressProvider({
           }
         }, DRAG_COMPLETION_TIMEOUT_MS);
 
-        return;
-      }
-
-      const mappedLetter = ALT_KEY_CHARACTER_MAP[key.sequence];
-      if (mappedLetter && !key.meta) {
-        broadcast({
-          name: mappedLetter,
-          ctrl: false,
-          meta: true,
-          shift: false,
-          paste: isPaste,
-          sequence: key.sequence,
-        });
         return;
       }
 
