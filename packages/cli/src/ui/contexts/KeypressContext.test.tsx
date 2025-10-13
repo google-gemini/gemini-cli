@@ -1079,4 +1079,43 @@ describe('Terminal-specific Alt+key combinations', () => {
       );
     },
   );
+
+  describe('Backslash key handling', () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('should treat backslash as a regular keystroke', () => {
+      const keyHandler = vi.fn();
+      const { result } = renderHook(() => useKeypressContext(), { wrapper });
+      act(() => result.current.subscribe(keyHandler));
+
+      act(() =>
+        stdin.pressKey({
+          name: undefined,
+          ctrl: false,
+          meta: false,
+          shift: false,
+          paste: false,
+          sequence: '\\',
+        }),
+      );
+
+      // Advance timers to trigger the backslash timeout
+      act(() => {
+        vi.runAllTimers();
+      });
+
+      expect(keyHandler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sequence: '\\',
+          meta: false,
+        }),
+      );
+    });
+  });
 });
