@@ -99,13 +99,14 @@ describe('retryWithBackoff', () => {
     expect(mockFn).toHaveBeenCalledTimes(3);
   });
 
-  it('should default to 5 maxAttempts if no options are provided', async () => {
-    // This function will fail more than 5 times to ensure all retries are used.
+  it('should default to 3 maxAttempts if no options are provided', async () => {
+    // This function will fail more than 3 times to ensure all retries are used.
     const mockFn = createFailingFunction(10);
 
     const promise = retryWithBackoff(mockFn);
 
     // Expect it to fail with the error from the 5th attempt.
+<<<<<<< HEAD
     // eslint-disable-next-line vitest/valid-expect
     const assertionPromise = expect(promise).rejects.toThrow(
       'Simulated error attempt 5',
@@ -118,11 +119,24 @@ describe('retryWithBackoff', () => {
 
   it('should default to 5 maxAttempts if options.maxAttempts is undefined', async () => {
     // This function will fail more than 5 times to ensure all retries are used.
+=======
+    await Promise.all([
+      expect(promise).rejects.toThrow('Simulated error attempt 3'),
+      vi.runAllTimersAsync(),
+    ]);
+
+    expect(mockFn).toHaveBeenCalledTimes(3);
+  });
+
+  it('should default to 3 maxAttempts if options.maxAttempts is undefined', async () => {
+    // This function will fail more than 3 times to ensure all retries are used.
+>>>>>>> dd01af60 (refactor: set max retry attempts to 3 (#11072))
     const mockFn = createFailingFunction(10);
 
     const promise = retryWithBackoff(mockFn, { maxAttempts: undefined });
 
     // Expect it to fail with the error from the 5th attempt.
+<<<<<<< HEAD
     // eslint-disable-next-line vitest/valid-expect
     const assertionPromise = expect(promise).rejects.toThrow(
       'Simulated error attempt 5',
@@ -131,6 +145,14 @@ describe('retryWithBackoff', () => {
     await assertionPromise;
 
     expect(mockFn).toHaveBeenCalledTimes(5);
+=======
+    await Promise.all([
+      expect(promise).rejects.toThrow('Simulated error attempt 3'),
+      vi.runAllTimersAsync(),
+    ]);
+
+    expect(mockFn).toHaveBeenCalledTimes(3);
+>>>>>>> dd01af60 (refactor: set max retry attempts to 3 (#11072))
   });
 
   it('should not retry if shouldRetry returns false', async () => {

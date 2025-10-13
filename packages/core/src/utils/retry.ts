@@ -29,7 +29,11 @@ export interface RetryOptions {
 }
 
 const DEFAULT_RETRY_OPTIONS: RetryOptions = {
+<<<<<<< HEAD
   maxAttempts: 5,
+=======
+  maxAttempts: 3,
+>>>>>>> dd01af60 (refactor: set max retry attempts to 3 (#11072))
   initialDelayMs: 5000,
   maxDelayMs: 30000, // 30 seconds
   shouldRetryOnError: defaultShouldRetry,
