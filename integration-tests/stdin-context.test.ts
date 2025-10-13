@@ -22,7 +22,7 @@ describe.skip('stdin context', () => {
     const lastRequest = rig.readLastApiRequest();
     expect(lastRequest).not.toBeNull();
 
-    const historyString = lastRequest.attributes.request_text;
+    const historyString = lastRequest!.attributes!.request_text!;
 
     // TODO: This test currently fails in sandbox mode (Docker/Podman) because
     // stdin content is not properly forwarded to the container when used

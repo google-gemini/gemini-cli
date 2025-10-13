@@ -157,6 +157,7 @@ interface ParsedLog {
     function_args?: string;
     success?: boolean;
     duration_ms?: number;
+    request_text?: string;
   };
   scopeMetrics?: {
     metrics: {
@@ -314,10 +315,20 @@ export class TestRig {
   run(
     promptOrOptions:
       | string
-      | { prompt?: string; stdin?: string; stdinDoesNotEnd?: boolean },
+      | {
+          prompt?: string;
+          stdin?: string;
+          stdinDoesNotEnd?: boolean;
+          yolo?: boolean;
+        },
     ...args: string[]
   ): Promise<string> {
-    const { command, initialArgs } = this._getCommandAndArgs(['--yolo']);
+    const yolo =
+      promptOrOptions instanceof String ||
+      (promptOrOptions as { yolo?: boolean }).yolo !== false;
+    const { command, initialArgs } = this._getCommandAndArgs(
+      yolo ? ['--yolo'] : [],
+    );
     const commandArgs = [...initialArgs];
     const execOptions: {
       cwd: string;
