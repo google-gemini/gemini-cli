@@ -13,6 +13,9 @@ import {
   TerminalQuotaError,
 } from './googleQuotaErrors.js';
 
+const FETCH_FAILED_MESSAGE =
+  'exception TypeError: fetch failed sending request';
+
 export interface HttpError extends Error {
   status?: number;
 }
@@ -52,7 +55,7 @@ function defaultShouldRetry(
   if (
     retryFetchErrors &&
     error instanceof Error &&
-    error.message.includes('exception TypeError: fetch failed sending request')
+    error.message.includes(FETCH_FAILED_MESSAGE)
   ) {
     return true;
   }
