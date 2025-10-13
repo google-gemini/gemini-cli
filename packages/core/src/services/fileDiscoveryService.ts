@@ -98,20 +98,13 @@ export class FileDiscoveryService {
     onIgnoredFile: (absolutePath: string) => void,
   ): string[] {
     const manager = this.getIgnoreManagerForOptions(opts);
-    const projectRootPrefix = this.projectRoot + '/';
 
     return filePaths.filter((filePath) => {
       const absoluteFilePath = path.resolve(this.projectRoot, filePath);
-
-      // If the path is outside the project root, it cannot be ignored.
-      if (!absoluteFilePath.startsWith(projectRootPrefix)) {
-        return true;
-      }
-
       const relativePath = path.relative(this.projectRoot, absoluteFilePath);
 
-      // The root directory itself is not something we're checking.
-      if (relativePath === '') {
+      // We skip paths that are outside the project root.
+      if (relativePath === '' || relativePath.startsWith('..')) {
         return true;
       }
 
