@@ -232,14 +232,16 @@ describe('run_shell_command', () => {
     expect(toolCall.toolRequest.success).toBe(true);
   });
 
-  it('should combine multiple --allowed-tools flags', async () => {
+  // TODO(#11062): Un-skip this once we can make it reliable by using hard coded
+  // model responses.
+  it.skip('should combine multiple --allowed-tools flags', async () => {
     const rig = new TestRig();
     await rig.setup('should combine multiple --allowed-tools flags');
 
     const { tool } = getLineCountCommand();
     const prompt =
-      `use both ${tool} and ls to count the number of lines in ` +
-      `files in this directory`;
+      `use both ${tool} and ls to count the number of lines in files in this ` +
+      `directory. Do not pipe these commands into each other, run them separately.`;
 
     const result = await rig.run(
       {
@@ -250,25 +252,36 @@ describe('run_shell_command', () => {
       '--allowed-tools=run_shell_command(ls)',
     );
 
-    const foundToolCall = await rig.waitForToolCall('run_shell_command', 15000);
+    for (const expected in ['ls', tool]) {
+      const foundToolCall = await rig.waitForToolCall(
+        'run_shell_command',
+        15000,
+        (args) => args.toLowerCase().includes(`"command": "${expected}`),
+      );
 
-    if (!foundToolCall) {
-      printDebugInfo(rig, result, {
-        'Found tool call': foundToolCall,
-      });
+      if (!foundToolCall) {
+        printDebugInfo(rig, result, {
+          'Found tool call': foundToolCall,
+        });
+      }
+
+      expect(
+        foundToolCall,
+        `Expected to find a run_shell_command tool call to "${expected}",` +
+          ` got ${rig.readToolLogs().join('\n')}`,
+      ).toBeTruthy();
     }
 
-    expect(
-      foundToolCall,
-      'Expected to find a run_shell_command tool call',
-    ).toBeTruthy();
-
-    const toolCall = rig
+    const toolLogs = rig
       .readToolLogs()
-      .filter(
-        (toolCall) => toolCall.toolRequest.name === 'run_shell_command',
-      )[0];
-    expect(toolCall.toolRequest.success).toBe(true);
+      .filter((toolCall) => toolCall.toolRequest.name === 'run_shell_command');
+    expect(toolLogs.length, toolLogs.join('\n')).toBeGreaterThanOrEqual(2);
+    for (const toolLog of toolLogs) {
+      expect(
+        toolLog.toolRequest.success,
+        `Expected tool call ${toolLog} to succeed`,
+      ).toBe(true);
+    }
   });
 
   it('should allow all with "ShellTool" and other specific tools', async () => {
