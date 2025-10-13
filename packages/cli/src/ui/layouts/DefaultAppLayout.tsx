@@ -21,22 +21,31 @@ export const DefaultAppLayout: React.FC = () => {
 
   const { rootUiRef, terminalHeight } = uiState;
   useFlickerDetector(rootUiRef, terminalHeight);
-
+  // If in alternate buffer mode, need to leave room to draw the scrollbar on
+  // the right side of the terminal.
+  const width = settings.merged.ui?.useAlternateBuffer
+    ? uiState.terminalWidth
+    : uiState.mainAreaWidth;
   return (
     <Box
       flexDirection="column"
-      width={uiState.mainAreaWidth}
+      width={width}
       height={
         settings.merged.ui?.useAlternateBuffer ? terminalHeight : undefined
       }
       flexShrink={0}
+      flexGrow={0}
+      overflow="hidden"
       ref={uiState.rootUiRef}
     >
-      <Box flexGrow={1}>
-        <MainContent />
-      </Box>
+      <MainContent />
 
-      <Box flexDirection="column" ref={uiState.mainControlsRef}>
+      <Box
+        flexDirection="column"
+        ref={uiState.mainControlsRef}
+        flexShrink={0}
+        flexGrow={0}
+      >
         <Notifications />
 
         {uiState.dialogsVisible ? (

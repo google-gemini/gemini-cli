@@ -15,6 +15,7 @@ import {
   useCallback,
 } from 'react';
 import type React from 'react';
+import { theme } from '../../semantic-colors.js';
 
 import { type DOMElement, measureElement, Box } from 'ink';
 
@@ -199,10 +200,7 @@ function VirtualizedList<T>(
         scrollTop > totalHeight - scrollableContainerHeight) &&
       data.length > 0
     ) {
-      const newScrollTop = Math.max(
-        0,
-        totalHeight - scrollableContainerHeight,
-      );
+      const newScrollTop = Math.max(0, totalHeight - scrollableContainerHeight);
       setScrollAnchor(getAnchorForScrollTop(newScrollTop, offsets));
     } else if (data.length === 0) {
       // List is now empty, reset scroll to top.
@@ -420,6 +418,7 @@ function VirtualizedList<T>(
       overflowY="scroll"
       overflowX="hidden"
       scrollTop={scrollTop}
+      scrollbarThumbColor={theme.text.secondary}
       width="100%"
       height="100%"
       flexDirection="column"

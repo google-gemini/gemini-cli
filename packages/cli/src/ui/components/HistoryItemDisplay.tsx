@@ -18,6 +18,7 @@ import { GeminiMessageContent } from './messages/GeminiMessageContent.js';
 import { CompressionMessage } from './messages/CompressionMessage.js';
 import { WarningMessage } from './messages/WarningMessage.js';
 import { Box } from 'ink';
+import { theme } from '../semantic-colors.js';
 import { AboutBox } from './AboutBox.js';
 import { StatsDisplay } from './StatsDisplay.js';
 import { ModelStatsDisplay } from './ModelStatsDisplay.js';
@@ -64,6 +65,7 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
       width={terminalWidth}
       overflowY="scroll"
       overflowX="hidden"
+      scrollbarThumbColor={theme.text.secondary}
       scrollTop={Number.MAX_SAFE_INTEGER}
     >
       {/* Render standard message types */}

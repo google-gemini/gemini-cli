@@ -49,16 +49,16 @@ export const MainContent = () => {
       <Box flexDirection="column">
         {pendingHistoryItems.map((item, i) => (
           <HistoryItemDisplay
-              key={i}
-              availableTerminalHeight={
-                uiState.constrainHeight ? availableTerminalHeight : undefined
-              }
-              terminalWidth={mainAreaWidth}
-              item={{ ...item, id: 0 }}
-              isPending={true}
-              isFocused={!uiState.isEditorDialogOpen}
-              activeShellPtyId={uiState.activePtyId}
-              embeddedShellFocused={uiState.embeddedShellFocused}
+            key={i}
+            availableTerminalHeight={
+              uiState.constrainHeight ? availableTerminalHeight : undefined
+            }
+            terminalWidth={mainAreaWidth}
+            item={{ ...item, id: 0 }}
+            isPending={true}
+            isFocused={!uiState.isEditorDialogOpen}
+            activeShellPtyId={uiState.activePtyId}
+            embeddedShellFocused={uiState.embeddedShellFocused}
           />
         ))}
         <ShowMoreLines constrainHeight={uiState.constrainHeight} />
@@ -69,10 +69,11 @@ export const MainContent = () => {
   if (settings.merged.ui?.useAlternateBuffer) {
     return (
       <Scrollable
-        maxHeight={availableTerminalHeight}
         width={terminalWidth}
+        height="100%"
         hasFocus={true}
         scrollToBottom={true}
+        flexGrow={1}
       >
         <AppHeader key="app-header" version={version} />
         {historyItems}

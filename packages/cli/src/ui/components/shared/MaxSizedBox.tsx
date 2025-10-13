@@ -72,6 +72,7 @@ const WithInkScrolling: React.FC<MaxSizedBoxProps> = ({
     flexDirection="column"
     overflowY="scroll"
     overflowX="hidden"
+    scrollbarThumbColor={theme.text.secondary}
     scrollTop={overflowDirection === 'top' ? Number.MAX_SAFE_INTEGER : 0}
   >
     <Box flexShrink={0} paddingRight={1} flexDirection="column">

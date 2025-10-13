@@ -4,77 +4,201 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { useStdin } from 'ink';
-import { parse, type MouseEvent } from '../mouse/mouse.js';
+import type React from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+} from 'react';
+import { ESC } from './KeypressContext.js';
+
+export interface MouseEvent {
+  name: string;
+  ctrl: boolean;
+  meta: boolean;
+  shift: boolean;
+  col?: number;
+  row?: number;
+}
 
 export type MouseHandler = (event: MouseEvent) => void;
 
-export interface MouseContextValue {
-  subscribe(onMouseEvent: MouseHandler): void;
-  unsubscribe(onMouseEvent: MouseHandler): void;
+interface MouseContextValue {
+  subscribe: (handler: MouseHandler) => void;
+  unsubscribe: (handler: MouseHandler) => void;
 }
 
-const MouseContext = createContext<MouseContextValue>({
-  subscribe: () => {},
-  unsubscribe: () => {},
-});
+const MouseContext = createContext<MouseContextValue | undefined>(undefined);
 
 export function useMouseContext() {
-  return useContext(MouseContext);
+  const context = useContext(MouseContext);
+  if (!context) {
+    throw new Error('useMouseContext must be used within a MouseProvider');
+  }
+  return context;
 }
 
-export function MouseContextProvider({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
-  const [subscribers, setSubscribers] = useState<Set<MouseHandler>>(new Set());
-  const { stdin, isRawModeSupported } = useStdin();
+export function useMouse(handler: MouseHandler, { isActive = true } = {}) {
+  const { subscribe, unsubscribe } = useMouseContext();
 
   useEffect(() => {
-    if (!isRawModeSupported || subscribers.size === 0) {
+    if (isActive) {
+      subscribe(handler);
+      return () => unsubscribe(handler);
+    }
+  }, [isActive, handler, subscribe, unsubscribe]);
+}
+
+export function MouseProvider({
+  children,
+  mouseEventsEnabled,
+}: {
+  children: React.ReactNode;
+  mouseEventsEnabled?: boolean;
+}) {
+  const { stdin } = useStdin();
+  const subscribers = useRef<Set<MouseHandler>>(new Set()).current;
+
+  const subscribe = useCallback(
+    (handler: MouseHandler) => {
+      subscribers.add(handler);
+    },
+    [subscribers],
+  );
+
+  const unsubscribe = useCallback(
+    (handler: MouseHandler) => {
+      subscribers.delete(handler);
+    },
+    [subscribers],
+  );
+
+  useEffect(() => {
+    if (!mouseEventsEnabled) {
       return;
     }
 
-    const handleData = (data: Buffer) => {
-      const event = parse(data);
-      if (event) {
-        for (const subscriber of subscribers) {
-          subscriber(event);
-        }
+    const broadcast = (event: MouseEvent) => {
+      for (const handler of subscribers) {
+        handler(event);
       }
     };
 
-    // Enable mouse tracking
-    process.stdout.write('\x1b[?1003h\x1b[?1006h');
+    const parseSGRMouseEvent = (
+      buffer: string,
+    ): { event: MouseEvent; length: number } | null => {
+      const sgrMouseRegex = new RegExp(`^${ESC}\\[<(\\d+);(\\d+);(\\d+)([mM])`);
+      const match = buffer.match(sgrMouseRegex);
+
+      if (match) {
+        const buttonCode = parseInt(match[1], 10);
+        const col = parseInt(match[2], 10);
+        const row = parseInt(match[3], 10);
+        const action = match[4];
+        const isRelease = action === 'm';
+
+        const shift = (buttonCode & 4) !== 0;
+        const meta = (buttonCode & 8) !== 0;
+        const ctrl = (buttonCode & 16) !== 0;
+        const isMove = (buttonCode & 32) !== 0;
+
+        let name: string | null = null;
+
+        if (buttonCode === 66) {
+          name = 'mouse-scroll-left';
+        } else if (buttonCode === 67) {
+          name = 'mouse-scroll-right';
+        } else if ((buttonCode & 64) === 64) {
+          if ((buttonCode & 1) === 0) {
+            name = 'mouse-scroll-up';
+          } else {
+            name = 'mouse-scroll-down';
+          }
+        } else if (isMove) {
+          name = 'mouse-move';
+        } else {
+          const button = buttonCode & 3;
+          const type = isRelease ? 'release' : 'press';
+          switch (button) {
+            case 0:
+              name = `mouse-left-${type}`;
+              break;
+            case 1:
+              name = `mouse-middle-${type}`;
+              break;
+            case 2:
+              name = `mouse-right-${type}`;
+              break;
+            default:
+              break;
+          }
+        }
+
+        if (name) {
+          return {
+            event: {
+              name,
+              ctrl,
+              meta,
+              shift,
+              col,
+              row,
+            },
+            length: match[0].length,
+          };
+        }
+        return null;
+      }
+
+      return null;
+    };
+
+    const handleData = (data: Buffer) => {
+      let currentData = data;
+      while (currentData.length > 0) {
+        const dataStr = currentData.toString('utf-8');
+        if (dataStr.startsWith(`${ESC}[<`)) {
+          const parsed = parseSGRMouseEvent(dataStr);
+          if (parsed) {
+            broadcast(parsed.event);
+            currentData = currentData.slice(parsed.length);
+            continue;
+          }
+        }
+        break;
+      }
+    };
+
     stdin.on('data', handleData);
 
     return () => {
-      stdin.off('data', handleData);
-      // Disable mouse tracking
-      process.stdout.write('\x1b[?1003l\x1b[?1006l');
+      stdin.removeListener('data', handleData);
     };
-  }, [stdin, isRawModeSupported, subscribers]);
+  }, [stdin, mouseEventsEnabled, subscribers]);
 
-  const contextValue = useMemo(
-    () => ({
-      subscribe: (onMouseEvent: MouseHandler) => {
-        setSubscribers((prev) => new Set(prev).add(onMouseEvent));
-      },
-      unsubscribe: (onMouseEvent: MouseHandler) => {
-        setSubscribers((prev) => {
-          const next = new Set(prev);
-          next.delete(onMouseEvent);
-          return next;
-        });
-      },
-    }),
-    [],
+  return (
+    <MouseContext.Provider value={{ subscribe, unsubscribe }}>
+      {children}
+    </MouseContext.Provider>
   );
 
   return (
-    <MouseContext.Provider value={contextValue}>
+    <MouseContext.Provider value={{ subscribe, unsubscribe }}>
+      {children}
+    </MouseContext.Provider>
+  );
+
+  return (
+    <MouseContext.Provider value={{ subscribe, unsubscribe }}>
+      {children}
+    </MouseContext.Provider>
+  );
+
+  return (
+    <MouseContext.Provider value={{ subscribe, unsubscribe }}>
       {children}
     </MouseContext.Provider>
   );

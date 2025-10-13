@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { useState } from 'react';
 import { Box, Text, useIsScreenReaderEnabled } from 'ink';
 import { LoadingIndicator } from './LoadingIndicator.js';
 import { ContextSummaryDisplay } from './ContextSummaryDisplay.js';
@@ -36,11 +37,22 @@ export const Composer = () => {
   const terminalWidth = process.stdout.columns;
   const isNarrow = isNarrowWidth(terminalWidth);
   const debugConsoleMaxHeight = Math.floor(Math.max(terminalWidth * 0.2, 5));
+  const [suggestionsVisible, setSuggestionsVisible] = useState(false);
 
   const { contextFileNames, showAutoAcceptIndicator } = uiState;
+  const suggestionsPosition = settings.merged.ui?.useAlternateBuffer
+    ? 'above'
+    : 'below';
+  const hideContextSummary =
+    suggestionsVisible && suggestionsPosition === 'above';
 
   return (
-    <Box flexDirection="column" width={uiState.mainAreaWidth} flexShrink={0}>
+    <Box
+      flexDirection="column"
+      width={uiState.mainAreaWidth}
+      flexGrow={0}
+      flexShrink={0}
+    >
       {!uiState.embeddedShellFocused && (
         <LoadingIndicator
           thought={
@@ -88,7 +100,8 @@ export const Composer = () => {
           ) : uiState.showEscapePrompt ? (
             <Text color={theme.text.secondary}>Press Esc again to clear.</Text>
           ) : (
-            !settings.merged.ui?.hideContextSummary && (
+            !settings.merged.ui?.hideContextSummary &&
+            !hideContextSummary && (
               <ContextSummaryDisplay
                 ideContext={uiState.ideContextState}
                 geminiMdFileCount={uiState.geminiMdFileCount}
@@ -148,6 +161,8 @@ export const Composer = () => {
               ? "  Press 'i' for INSERT mode and 'Esc' for NORMAL mode."
               : '  Type your message or @path/to/file'
           }
+          suggestionsPosition={suggestionsPosition}
+          onSuggestionsVisibilityChange={setSuggestionsVisible}
         />
       )}
 

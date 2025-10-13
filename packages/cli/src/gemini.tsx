@@ -56,6 +56,7 @@ import { handleAutoUpdate } from './utils/handleAutoUpdate.js';
 import { appEvents, AppEvent } from './utils/events.js';
 import { computeWindowTitle } from './utils/windowTitle.js';
 import { SettingsContext } from './ui/contexts/SettingsContext.js';
+import { MouseProvider } from './ui/contexts/MouseContext.js';
 
 import { SessionStatsProvider } from './ui/contexts/SessionContext.js';
 import { VimModeProvider } from './ui/contexts/VimModeContext.js';
@@ -156,9 +157,21 @@ export async function startInteractiveUI(
   // do not yet have support for scrolling in that mode.
   process.stdout.write('\x1b[?7l');
 
+  const mouseEventsEnabled = settings.merged.ui?.useAlternateBuffer === true;
+  if (mouseEventsEnabled) {
+    // Enable mouse tracking with SGR format
+    // ?1002h = button event tracking (clicks + drags + scroll wheel)
+    // ?1006h = SGR extended mouse mode (better coordinate handling)
+    // ?1049h = alternate screen buffer
+    process.stdout.write('\u001b[?1002h\u001b[?1006h');
+  }
+
   registerCleanup(() => {
     // Re-enable line wrapping on exit.
     process.stdout.write('\x1b[?7h');
+    if (mouseEventsEnabled) {
+      process.stdout.write('\u001b[?1006l\u001b[?1002l');
+    }
   });
 
   const version = await getCliVersion();
@@ -174,17 +187,19 @@ export async function startInteractiveUI(
           config={config}
           debugKeystrokeLogging={settings.merged.general?.debugKeystrokeLogging}
         >
-          <SessionStatsProvider>
-            <VimModeProvider settings={settings}>
-              <AppContainer
-                config={config}
-                settings={settings}
-                startupWarnings={startupWarnings}
-                version={version}
-                initializationResult={initializationResult}
-              />
-            </VimModeProvider>
-          </SessionStatsProvider>
+          <MouseProvider mouseEventsEnabled={mouseEventsEnabled}>
+            <SessionStatsProvider>
+              <VimModeProvider settings={settings}>
+                <AppContainer
+                  config={config}
+                  settings={settings}
+                  startupWarnings={startupWarnings}
+                  version={version}
+                  initializationResult={initializationResult}
+                />
+              </VimModeProvider>
+            </SessionStatsProvider>
+          </MouseProvider>
         </KeypressProvider>
       </SettingsContext.Provider>
     );
@@ -202,7 +217,6 @@ export async function startInteractiveUI(
       exitOnCtrlC: false,
       isScreenReaderEnabled: config.getScreenReader(),
       alternateBuffer: settings.merged.ui?.useAlternateBuffer,
-      trim: true,
     },
   );
 

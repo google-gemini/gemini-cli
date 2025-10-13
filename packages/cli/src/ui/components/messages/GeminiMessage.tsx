@@ -38,6 +38,7 @@ export const GeminiMessage: React.FC<GeminiMessageProps> = ({
         flexDirection="column"
         overflow-x="hidden"
         overflowY="scroll"
+        scrollbarThumbColor={theme.text.secondary}
         scrollTop={Number.MAX_SAFE_INTEGER}
         maxHeight={availableTerminalHeight}
       >
