@@ -88,6 +88,7 @@ export interface CliArgs {
   useSmartEdit: boolean | undefined;
   useWriteTodos: boolean | undefined;
   outputFormat: string | undefined;
+  retryFetchErrors: boolean | undefined;
 }
 
 export async function parseArguments(settings: Settings): Promise<CliArgs> {
@@ -98,6 +99,12 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
     .usage(
       'Usage: gemini [options] [command]\n\nGemini CLI - Launch an interactive CLI, use -p/--prompt for non-interactive mode',
     )
+    .option('retry-fetch-errors', {
+      type: 'boolean',
+      description:
+        'Retry on "exception TypeError: fetch failed sending request" errors.',
+      default: false,
+    })
     .option('telemetry', {
       type: 'boolean',
       description:
@@ -759,6 +766,7 @@ export async function loadCliConfig(
     enableMessageBusIntegration:
       settings.tools?.enableMessageBusIntegration ?? false,
     enableSubagents: settings.experimental?.enableSubagents ?? false,
+    retryFetchErrors: argv.retryFetchErrors ?? false,
   });
 }
 

@@ -129,6 +129,7 @@ describe('GeminiChat', () => {
         getTool: vi.fn(),
       }),
       getContentGenerator: vi.fn().mockReturnValue(mockContentGenerator),
+      getRetryFetchErrors: vi.fn().mockReturnValue(false),
     } as unknown as Config;
 
     // Disable 429 simulation for tests
@@ -1113,6 +1114,78 @@ describe('GeminiChat', () => {
         expect(
           mockContentGenerator.generateContentStream,
         ).toHaveBeenCalledTimes(2);
+      });
+
+      it('should retry on specific fetch errors when configured', async () => {
+        // 1. Configure to retry on fetch errors
+        vi.mocked(mockConfig.getRetryFetchErrors).mockReturnValue(true);
+
+        const fetchError = new Error(
+          'exception TypeError: fetch failed sending request',
+        );
+
+        // 2. Mock API to fail once with fetch error, then succeed
+        vi.mocked(mockContentGenerator.generateContentStream)
+          .mockRejectedValueOnce(fetchError)
+          .mockResolvedValueOnce(
+            (async function* () {
+              yield {
+                candidates: [
+                  {
+                    content: { parts: [{ text: 'Success after fetch error' }] },
+                    finishReason: 'STOP',
+                  },
+                ],
+              } as unknown as GenerateContentResponse;
+            })(),
+          );
+
+        // 3. Update mockRetryWithBackoff to handle options and simulate retry
+        mockRetryWithBackoff.mockImplementation(async (apiCall, options) => {
+          try {
+            return await apiCall();
+          } catch (error) {
+            if (
+              options?.retryFetchErrors &&
+              error instanceof Error &&
+              error.message.includes(
+                'exception TypeError: fetch failed sending request',
+              )
+            ) {
+              // Retry once
+              return await apiCall();
+            }
+            throw error;
+          }
+        });
+
+        // 4. Act
+        const stream = await chat.sendMessageStream(
+          'test-model',
+          { message: 'test' },
+          'prompt-id-fetch-error-retry',
+        );
+
+        const events: StreamEvent[] = [];
+        for await (const event of stream) {
+          events.push(event);
+        }
+
+        // 5. Assert
+        // Should be called twice (initial + retry)
+        expect(
+          mockContentGenerator.generateContentStream,
+        ).toHaveBeenCalledTimes(2);
+
+        // Should have successful content
+        expect(
+          events.some(
+            (e) =>
+              e.type === StreamEventType.CHUNK &&
+              e.value.candidates?.[0]?.content?.parts?.[0]?.text ===
+                'Success after fetch error',
+          ),
+        ).toBe(true);
       });
 
       afterEach(() => {
