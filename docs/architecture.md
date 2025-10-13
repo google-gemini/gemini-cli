@@ -13,11 +13,11 @@ input:
       as handling the initial user input, presenting the final output, and
       managing the overall user experience.
     - **Key functions contained in the package:**
-      - [Input processing](../cli/commands.md)
+      - [Input processing](/docs/cli/commands.md)
       - History management
       - Display rendering
-      - [Theme and UI customization](../cli/themes.md)
-      - [CLI configuration settings](../get-started/configuration.md)
+      - [Theme and UI customization](/docs/cli/themes.md)
+      - [CLI configuration settings](/docs/get-started/configuration.md)
 
 2.  **Core package (`packages/core`):**
     - **Purpose:** This acts as the backend for the Gemini CLI. It receives
