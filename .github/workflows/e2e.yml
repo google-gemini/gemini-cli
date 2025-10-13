@@ -95,7 +95,7 @@ jobs:
         shell: 'bash'
         run: |
           if [[ "${{ matrix.sandbox }}" == "sandbox:docker" ]]; then
-            npm run test:integration:sandbox:docker
+            npm run deflake:test:integration:sandbox:docker
           else
             npm run deflake:test:integration:sandbox:none
           fi
