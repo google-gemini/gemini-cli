@@ -819,7 +819,7 @@ export class CoreToolScheduler {
           );
         }
       }
-      this.attemptExecutionOfScheduledCalls(signal);
+      await this.attemptExecutionOfScheduledCalls(signal);
       void this.checkAndNotifyCompletion();
     } finally {
       this.isScheduling = false;
@@ -894,7 +894,7 @@ export class CoreToolScheduler {
       }
       this.setStatusInternal(callId, 'scheduled');
     }
-    this.attemptExecutionOfScheduledCalls(signal);
+    await this.attemptExecutionOfScheduledCalls(signal);
   }
 
   /**
@@ -940,7 +940,9 @@ export class CoreToolScheduler {
     });
   }
 
-  private attemptExecutionOfScheduledCalls(signal: AbortSignal): void {
+  private async attemptExecutionOfScheduledCalls(
+    signal: AbortSignal,
+  ): Promise<void> {
     const allCallsFinalOrScheduled = this.toolCalls.every(
       (call) =>
         call.status === 'scheduled' ||
@@ -954,8 +956,8 @@ export class CoreToolScheduler {
         (call) => call.status === 'scheduled',
       );
 
-      callsToExecute.forEach((toolCall) => {
-        if (toolCall.status !== 'scheduled') return;
+      for (const toolCall of callsToExecute) {
+        if (toolCall.status !== 'scheduled') continue;
 
         const scheduledCall = toolCall;
         const { callId, name: toolName } = scheduledCall.request;
@@ -1007,107 +1009,106 @@ export class CoreToolScheduler {
           );
         }
 
-        promise
-          .then(async (toolResult: ToolResult) => {
-            if (signal.aborted) {
-              this.setStatusInternal(
-                callId,
-                'cancelled',
-                'User cancelled tool execution.',
-              );
-              return;
-            }
+        try {
+          const toolResult: ToolResult = await promise;
+          if (signal.aborted) {
+            this.setStatusInternal(
+              callId,
+              'cancelled',
+              'User cancelled tool execution.',
+            );
+            continue;
+          }
 
-            if (toolResult.error === undefined) {
-              let content = toolResult.llmContent;
-              let outputFile: string | undefined = undefined;
-              const contentLength =
-                typeof content === 'string' ? content.length : undefined;
-              if (
-                typeof content === 'string' &&
-                toolName === ShellTool.Name &&
-                this.config.getEnableToolOutputTruncation() &&
-                this.config.getTruncateToolOutputThreshold() > 0 &&
-                this.config.getTruncateToolOutputLines() > 0
-              ) {
-                const originalContentLength = content.length;
-                const threshold = this.config.getTruncateToolOutputThreshold();
-                const lines = this.config.getTruncateToolOutputLines();
-                const truncatedResult = await truncateAndSaveToFile(
-                  content,
-                  callId,
-                  this.config.storage.getProjectTempDir(),
-                  threshold,
-                  lines,
-                );
-                content = truncatedResult.content;
-                outputFile = truncatedResult.outputFile;
-
-                if (outputFile) {
-                  logToolOutputTruncated(
-                    this.config,
-                    new ToolOutputTruncatedEvent(
-                      scheduledCall.request.prompt_id,
-                      {
-                        toolName,
-                        originalContentLength,
-                        truncatedContentLength: content.length,
-                        threshold,
-                        lines,
-                      },
-                    ),
-                  );
-                }
-              }
-
-              const response = convertToFunctionResponse(
-                toolName,
-                callId,
+          if (toolResult.error === undefined) {
+            let content = toolResult.llmContent;
+            let outputFile: string | undefined = undefined;
+            const contentLength =
+              typeof content === 'string' ? content.length : undefined;
+            if (
+              typeof content === 'string' &&
+              toolName === ShellTool.Name &&
+              this.config.getEnableToolOutputTruncation() &&
+              this.config.getTruncateToolOutputThreshold() > 0 &&
+              this.config.getTruncateToolOutputLines() > 0
+            ) {
+              const originalContentLength = content.length;
+              const threshold = this.config.getTruncateToolOutputThreshold();
+              const lines = this.config.getTruncateToolOutputLines();
+              const truncatedResult = await truncateAndSaveToFile(
                 content,
-              );
-              const successResponse: ToolCallResponseInfo = {
                 callId,
-                responseParts: response,
-                resultDisplay: toolResult.returnDisplay,
-                error: undefined,
-                errorType: undefined,
-                outputFile,
-                contentLength,
-              };
-              this.setStatusInternal(callId, 'success', successResponse);
-            } else {
-              // It is a failure
-              const error = new Error(toolResult.error.message);
-              const errorResponse = createErrorResponse(
+                this.config.storage.getProjectTempDir(),
+                threshold,
+                lines,
+              );
+              content = truncatedResult.content;
+              outputFile = truncatedResult.outputFile;
+
+              if (outputFile) {
+                logToolOutputTruncated(
+                  this.config,
+                  new ToolOutputTruncatedEvent(
+                    scheduledCall.request.prompt_id,
+                    {
+                      toolName,
+                      originalContentLength,
+                      truncatedContentLength: content.length,
+                      threshold,
+                      lines,
+                    },
+                  ),
+                );
+              }
+            }
+
+            const response = convertToFunctionResponse(
+              toolName,
+              callId,
+              content,
+            );
+            const successResponse: ToolCallResponseInfo = {
+              callId,
+              responseParts: response,
+              resultDisplay: toolResult.returnDisplay,
+              error: undefined,
+              errorType: undefined,
+              outputFile,
+              contentLength,
+            };
+            this.setStatusInternal(callId, 'success', successResponse);
+          } else {
+            // It is a failure
+            const error = new Error(toolResult.error.message);
+            const errorResponse = createErrorResponse(
+              scheduledCall.request,
+              error,
+              toolResult.error.type,
+            );
+            this.setStatusInternal(callId, 'error', errorResponse);
+          }
+        } catch (executionError: unknown) {
+          if (signal.aborted) {
+            this.setStatusInternal(
+              callId,
+              'cancelled',
+              'User cancelled tool execution.',
+            );
+          } else {
+            this.setStatusInternal(
+              callId,
+              'error',
+              createErrorResponse(
                 scheduledCall.request,
-                error,
-                toolResult.error.type,
-              );
-              this.setStatusInternal(callId, 'error', errorResponse);
-            }
-          })
-          .catch((executionError: Error) => {
-            if (signal.aborted) {
-              this.setStatusInternal(
-                callId,
-                'cancelled',
-                'User cancelled tool execution.',
-              );
-            } else {
-              this.setStatusInternal(
-                callId,
-                'error',
-                createErrorResponse(
-                  scheduledCall.request,
-                  executionError instanceof Error
-                    ? executionError
-                    : new Error(String(executionError)),
-                  ToolErrorType.UNHANDLED_EXCEPTION,
-                ),
-              );
-            }
-          });
-      });
+                executionError instanceof Error
+                  ? executionError
+                  : new Error(String(executionError)),
+                ToolErrorType.UNHANDLED_EXCEPTION,
+              ),
+            );
+          }
+        }
+      }
     }
   }
 
