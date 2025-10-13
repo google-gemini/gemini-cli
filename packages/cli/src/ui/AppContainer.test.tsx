@@ -15,7 +15,11 @@ import {
 } from 'vitest';
 import { render, cleanup } from 'ink-testing-library';
 import { AppContainer } from './AppContainer.js';
-import { type Config, makeFakeConfig } from '@google/gemini-cli-core';
+import {
+  type Config,
+  makeFakeConfig,
+  DEFAULT_GEMINI_FLASH_MODEL,
+} from '@google/gemini-cli-core';
 import type { LoadedSettings } from '../config/settings.js';
 import type { InitializationResult } from '../core/initializer.js';
 import { useQuotaAndFallback } from './hooks/useQuotaAndFallback.js';
@@ -359,6 +363,45 @@ describe('AppContainer State Management', () => {
           />,
         );
       }).not.toThrow();
+    });
+  });
+
+  describe('Model Fallback Logic', () => {
+    it('should switch to fallback model when config is in fallback mode and history changes', () => {
+      // Arrange: Mock config to be in fallback mode
+      vi.spyOn(mockConfig, 'isInFallbackMode').mockReturnValue(true);
+      vi.spyOn(mockConfig, 'getModel').mockReturnValue('gemini-pro'); // Original model
+
+      // Act: Initial render
+      const { rerender } = render(
+        <AppContainer
+          config={mockConfig}
+          settings={mockSettings}
+          version="1.0.0"
+          initializationResult={mockInitResult}
+        />,
+      );
+
+      // Assert: The model should be the fallback model initially
+      expect(capturedUIState.currentModel).toBe(DEFAULT_GEMINI_FLASH_MODEL);
+
+      // Arrange: Simulate a history update, which triggers the effect
+      mockedUseHistory.mockReturnValue({
+        history: [{ type: 'user', text: 'hello' }], // New history
+      });
+
+      // Act: Rerender the component to apply the new history and trigger the effect
+      rerender(
+        <AppContainer
+          config={mockConfig}
+          settings={mockSettings}
+          version="1.0.0"
+          initializationResult={mockInitResult}
+        />,
+      );
+
+      // Assert: The model should remain the fallback model
+      expect(capturedUIState.currentModel).toBe(DEFAULT_GEMINI_FLASH_MODEL);
     });
   });
 
