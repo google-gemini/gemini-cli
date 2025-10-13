@@ -1595,7 +1595,14 @@ describe('Session Cleanup', () => {
       expect(result.skipped).toBe(1); // The valid session is kept
 
       // Verify corrupted files were deleted
-      expect(mockFs.unlink).toHaveBeenCalledExactlyOnceWith(expect.stringContaining('corrupt1.json'));
+       
+      expect(mockFs.unlink).toHaveBeenCalledWith(
+        expect.stringContaining('corrupt1.json'),
+      );
+      // eslint-disable-next-line vitest/prefer-called-exactly-once-with
+      expect(mockFs.unlink).toHaveBeenCalledWith(
+        expect.stringContaining('corrupt2.json'),
+      );
       expect(mockFs.unlink).toHaveBeenCalledTimes(2);
     });
 
