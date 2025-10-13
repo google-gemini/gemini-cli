@@ -16,7 +16,12 @@ import {
   OutputFormat,
   type GeminiCLIExtension,
 } from '@google/gemini-cli-core';
-import { loadCliConfig, parseArguments, type CliArgs } from './config.js';
+import {
+  loadCliConfig,
+  loadHierarchicalGeminiMemory,
+  parseArguments,
+  type CliArgs,
+} from './config.js';
 import type { Settings } from './settings.js';
 import { ExtensionStorage } from './extension.js';
 import * as ServerConfig from '@google/gemini-cli-core';

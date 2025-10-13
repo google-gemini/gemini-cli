@@ -35,7 +35,7 @@ describe('JSON output', () => {
     expect(typeof parsed.stats).toBe('object');
   });
 
-  it('should return a JSON error for enforced auth mismatch before running', async () => {
+  it('should return a JSON error for sd auth mismatch before running', async () => {
     process.env['GOOGLE_GENAI_USE_GCA'] = 'true';
     await rig.setup('json-output-auth-mismatch', {
       settings: {
@@ -80,16 +80,15 @@ describe('JSON output', () => {
     expect(payload.error.type).toBe('Error');
     expect(payload.error.code).toBe(1);
     expect(payload.error.message).toContain(
-      'configured auth type is gemini-api-key',
+      "enforced authentication type is 'gemini-api-key'",
     );
-    expect(payload.error.message).toContain(
-      'current auth type is oauth-personal',
-    );
+    expect(payload.error.message).toContain("current type is 'oauth-personal'");
   });
 
   it('should not exit on tool errors and allow model to self-correct in JSON mode', async () => {
     const result = await rig.run(
-      'Read the contents of /path/to/nonexistent/file.txt and tell me what it says',
+      `Read the contents of ${rig.testDir}/path/to/nonexistent/file.txt and tell me what it says. ` +
+        'On error, respond to the user with exactly the text "File not found".',
       '--output-format',
       'json',
     );
@@ -101,14 +100,22 @@ describe('JSON output', () => {
     expect(parsed).toHaveProperty('response');
     expect(typeof parsed.response).toBe('string');
 
-    // The model should acknowledge the error in its response
+    // The model should acknowledge the error in its response with exactly the
+    // text "File not found" based on the instruction above, but we also match
+    // some other forms. If you get flakes for this test please file an issue to
+    // come up with a more robust solution.
     expect(parsed.response.toLowerCase()).toMatch(
-      /cannot|does not exist|not found|unable to|error|couldn't/,
+      /cannot|does not exist|doesn't exist|not found|unable to|error|couldn't/,
     );
 
-    // Stats should be present, indicating the session completed normally
+    // Stats should be present, indicating the session completed normally.
     expect(parsed).toHaveProperty('stats');
+
+    // Should see one failed tool call in the stats.
     expect(parsed.stats).toHaveProperty('tools');
+    expect(parsed.stats.tools.totalCalls).toBe(1);
+    expect(parsed.stats.tools.totalFail).toBe(1);
+    expect(parsed.stats.tools.totalSuccess).toBe(0);
 
     // Should NOT have an error field at the top level
     expect(parsed.error).toBeUndefined();

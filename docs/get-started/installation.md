@@ -1,5 +1,3 @@
-Note: This page will be replaced by [installation.md](installation.md).
-
 # Gemini CLI Installation, Execution, and Deployment
 
 Install and run Gemini CLI. This document provides an overview of Gemini CLI's
