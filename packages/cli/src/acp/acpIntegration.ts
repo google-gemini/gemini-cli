@@ -60,7 +60,7 @@ export function resolveModel(model: string, isInFallbackMode: boolean): string {
   return model;
 }
 
-export async function runZedIntegration(
+export async function runAcpIntegration(
   config: Config,
   settings: LoadedSettings,
   extensions: GeminiCLIExtension[],
