@@ -208,4 +208,22 @@ describe('FileDiscoveryService', () => {
       ]);
     });
   });
+
+  describe('getGeminiIgnorePatterns', () => {
+    it('should return patterns from .geminiignore', async () => {
+      const content = '*.log\nnode_modules/\n# comment\n';
+      await createTestFile('.geminiignore', content);
+      const service = new FileDiscoveryService(projectRoot);
+
+      expect(service.getGeminiIgnorePatterns()).toEqual([
+        '*.log',
+        'node_modules/',
+      ]);
+    });
+
+    it('should return empty array if .geminiignore does not exist', async () => {
+      const service = new FileDiscoveryService(projectRoot);
+      expect(service.getGeminiIgnorePatterns()).toEqual([]);
+    });
+  });
 });

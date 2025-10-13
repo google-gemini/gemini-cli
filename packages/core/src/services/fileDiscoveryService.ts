@@ -4,10 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { GitIgnoreFilter } from '../utils/gitIgnoreParser.js';
-import type { GeminiIgnoreFilter } from '../utils/geminiIgnoreParser.js';
-import { GitIgnoreParser } from '../utils/gitIgnoreParser.js';
-import { GeminiIgnoreParser } from '../utils/geminiIgnoreParser.js';
+import {
+  createIgnoreFileType,
+  IgnoreFileManager,
+  type IgnoreFileType,
+} from '../utils/ignore-file-manager.js';
+
 import { isGitRepository } from '../utils/gitUtils.js';
 import * as path from 'node:path';
 
@@ -23,16 +25,135 @@ export interface FilterReport {
 }
 
 export class FileDiscoveryService {
-  private gitIgnoreFilter: GitIgnoreFilter | null = null;
-  private geminiIgnoreFilter: GeminiIgnoreFilter | null = null;
+  private isGitRepository: boolean = false;
+
   private projectRoot: string;
+  private managerCache: Map<string, IgnoreFileManager> = new Map();
+  private allIgnoreFileTypes: IgnoreFileType[];
 
   constructor(projectRoot: string) {
     this.projectRoot = path.resolve(projectRoot);
-    if (isGitRepository(this.projectRoot)) {
-      this.gitIgnoreFilter = new GitIgnoreParser(this.projectRoot);
+    this.isGitRepository = isGitRepository(this.projectRoot);
+
+    this.allIgnoreFileTypes = [
+      createIgnoreFileType({
+        name: '.gitignore',
+        precedence: 10,
+        staticGlobalRules: ['.git'],
+        globalRuleFilePaths: this.isGitRepository ? ['.git/info/exclude'] : [],
+      }),
+      createIgnoreFileType({ name: '.geminiignore', precedence: 20 }),
+    ];
+  }
+
+  /**
+   * Returns an IgnoreFileManager configured based on the provided options.
+   * Uses a cache to avoid recreating managers for the same options.
+   *
+   * @param options - The filtering options.
+   * @returns The configured IgnoreFileManager.
+   */
+  private getIgnoreManagerForOptions(
+    options: FilterFilesOptions,
+  ): IgnoreFileManager {
+    // Create a stable cache key from the options
+    const cacheKey = `git:${options.respectGitIgnore ?? true}|gemini:${
+      options.respectGeminiIgnore ?? true
+    }`;
+
+    if (this.managerCache.has(cacheKey)) {
+      return this.managerCache.get(cacheKey)!;
     }
-    this.geminiIgnoreFilter = new GeminiIgnoreParser(this.projectRoot);
+
+    // If not cached, determine which rule sets are active
+    let activeIgnoreTypes = this.allIgnoreFileTypes;
+    if (!options.respectGitIgnore) {
+      activeIgnoreTypes = activeIgnoreTypes.filter(
+        (type) => type.name !== '.gitignore',
+      );
+    }
+    if (!options.respectGeminiIgnore) {
+      activeIgnoreTypes = activeIgnoreTypes.filter(
+        (type) => type.name !== '.geminiignore',
+      );
+    }
+
+    // Create and cache a new manager for this specific configuration
+    const manager = new IgnoreFileManager(this.projectRoot, activeIgnoreTypes);
+    this.managerCache.set(cacheKey, manager);
+    return manager;
+  }
+
+  /**
+   * Filters a list of file paths based on the provided options.
+   *
+   * @param filePaths - The list of file paths to filter.
+   * @param opts - The filtering options.
+   * @param onIgnoredFile - A callback function to be called for each ignored file.
+   * @returns The list of filtered file paths.
+   */
+  private filterFilesInternal(
+    filePaths: string[],
+    opts: FilterFilesOptions,
+    onIgnoredFile: (absolutePath: string) => void,
+  ): string[] {
+    const manager = this.getIgnoreManagerForOptions(opts);
+    const projectRootPrefix = this.projectRoot + '/';
+
+    return filePaths.filter((filePath) => {
+      const absoluteFilePath = path.resolve(this.projectRoot, filePath);
+
+      // If the path is outside the project root, it cannot be ignored.
+      if (!absoluteFilePath.startsWith(projectRootPrefix)) {
+        return true;
+      }
+
+      const relativePath = path.relative(this.projectRoot, absoluteFilePath);
+
+      // The root directory itself is not something we're checking.
+      if (relativePath === '') {
+        return true;
+      }
+
+      // Now we have a safe, relative path to check.
+      const isIgnored = manager.isIgnored(absoluteFilePath);
+      if (isIgnored) {
+        onIgnoredFile(absoluteFilePath);
+      }
+      return !isIgnored;
+    });
+  }
+
+  filterFilesWithReport(
+    filePaths: string[],
+    opts: FilterFilesOptions = {
+      respectGitIgnore: true,
+      respectGeminiIgnore: true,
+    },
+  ): FilterReport {
+    const manager = this.getIgnoreManagerForOptions(opts);
+    let gitIgnoredCount = 0;
+    let geminiIgnoredCount = 0;
+    const filteredPaths = this.filterFilesInternal(
+      filePaths,
+      opts,
+      (absoluteFilePath) => {
+        if (
+          opts.respectGitIgnore &&
+          manager.isIgnoredBy(absoluteFilePath, '.gitignore')
+        ) {
+          gitIgnoredCount++;
+        } else if (opts.respectGeminiIgnore) {
+          geminiIgnoredCount++;
+        }
+      },
+    );
+
+    return {
+      filteredPaths,
+      gitIgnoredCount,
+      geminiIgnoredCount,
+    };
   }
 
   /**
@@ -45,74 +166,30 @@ export class FileDiscoveryService {
       respectGeminiIgnore: true,
     },
   ): string[] {
-    return filePaths.filter((filePath) => {
-      if (options.respectGitIgnore && this.shouldGitIgnoreFile(filePath)) {
-        return false;
-      }
-      if (
-        options.respectGeminiIgnore &&
-        this.shouldGeminiIgnoreFile(filePath)
-      ) {
-        return false;
-      }
-      return true;
-    });
-  }
-
-  /**
-   * Filters a list of file paths based on git ignore rules and returns a report
-   * with counts of ignored files.
-   */
-  filterFilesWithReport(
-    filePaths: string[],
-    opts: FilterFilesOptions = {
-      respectGitIgnore: true,
-      respectGeminiIgnore: true,
-    },
-  ): FilterReport {
-    const filteredPaths: string[] = [];
-    let gitIgnoredCount = 0;
-    let geminiIgnoredCount = 0;
-
-    for (const filePath of filePaths) {
-      if (opts.respectGitIgnore && this.shouldGitIgnoreFile(filePath)) {
-        gitIgnoredCount++;
-        continue;
-      }
-
-      if (opts.respectGeminiIgnore && this.shouldGeminiIgnoreFile(filePath)) {
-        geminiIgnoredCount++;
-        continue;
-      }
-
-      filteredPaths.push(filePath);
-    }
-
-    return {
-      filteredPaths,
-      gitIgnoredCount,
-      geminiIgnoredCount,
-    };
+    return this.filterFilesInternal(filePaths, options, () => {});
   }
 
   /**
    * Checks if a single file should be git-ignored
    */
   shouldGitIgnoreFile(filePath: string): boolean {
-    if (this.gitIgnoreFilter) {
-      return this.gitIgnoreFilter.isIgnored(filePath);
-    }
-    return false;
+    return (
+      this.isGitRepository &&
+      this.shouldIgnoreFile(filePath, {
+        respectGitIgnore: true,
+        respectGeminiIgnore: false,
+      })
+    );
   }
 
   /**
    * Checks if a single file should be gemini-ignored
    */
   shouldGeminiIgnoreFile(filePath: string): boolean {
-    if (this.geminiIgnoreFilter) {
-      return this.geminiIgnoreFilter.isIgnored(filePath);
-    }
-    return false;
+    return this.shouldIgnoreFile(filePath, {
+      respectGitIgnore: false,
+      respectGeminiIgnore: true,
+    });
   }
 
   /**
@@ -120,23 +197,23 @@ export class FileDiscoveryService {
    */
   shouldIgnoreFile(
     filePath: string,
-    options: FilterFilesOptions = {},
+    options: FilterFilesOptions = {
+      respectGitIgnore: true,
+      respectGeminiIgnore: true,
+    },
   ): boolean {
-    const { respectGitIgnore = true, respectGeminiIgnore = true } = options;
-
-    if (respectGitIgnore && this.shouldGitIgnoreFile(filePath)) {
-      return true;
-    }
-    if (respectGeminiIgnore && this.shouldGeminiIgnoreFile(filePath)) {
-      return true;
-    }
-    return false;
+    const filtered = this.filterFiles([filePath], options);
+    return filtered.length === 0;
   }
 
   /**
    * Returns loaded patterns from .geminiignore
    */
   getGeminiIgnorePatterns(): string[] {
-    return this.geminiIgnoreFilter?.getPatterns() ?? [];
+    const manager = this.getIgnoreManagerForOptions({
+      respectGeminiIgnore: true,
+      respectGitIgnore: false,
+    });
+    return [...manager.getRootPatterns('.geminiignore')];
   }
 }
