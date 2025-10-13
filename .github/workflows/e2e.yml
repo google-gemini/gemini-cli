@@ -9,6 +9,7 @@ on:
     branches:
       - 'main'
       - 'release/**'
+  pull_request_target:
   merge_group:
   workflow_dispatch:
     inputs:
