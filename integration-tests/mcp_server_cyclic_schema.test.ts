@@ -23,7 +23,7 @@
 
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { beforeAll, describe, expect, it } from 'vitest';
+import { beforeAll, describe, it } from 'vitest';
 import { TestRig } from './test-helper.js';
 
 // Create a minimal MCP server that doesn't require external dependencies
