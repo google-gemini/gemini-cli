@@ -38,6 +38,8 @@ jobs:
   e2e_linux:
     name: 'E2E Test (Linux) - ${{ matrix.sandbox }}'
     needs: 'merge_queue_skipper'
+    if: |
+      needs.merge_queue_skipper.outputs.skip == 'false'
     runs-on: 'gemini-cli-ubuntu-16-core'
     strategy:
       fail-fast: false
