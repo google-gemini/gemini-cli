@@ -76,6 +76,7 @@ jobs:
           dry-run: '${{ github.event.inputs.dry-run }}'
           wombat-token-core: '${{ secrets.WOMBAT_TOKEN_CORE }}'
           wombat-token-cli: '${{ secrets.WOMBAT_TOKEN_CLI }}'
+          wombat-token-a2a-server: '${{ secrets.WOMBAT_TOKEN_A2A_SERVER }}'
 
       - name: 'Deprecate Cli Npm Package'
         if: "${{ github.event.inputs.dry-run == 'false' }}"
@@ -92,6 +93,14 @@ jobs:
         shell: 'bash'
         run: |
           npm deprecate @google/gemini-core@${{ github.event.inputs.rollback_origin }} "This version has been rolled back."
+
+      - name: 'Deprecate A2A Server Npm Package'
+        if: "${{ github.event.inputs.dry-run == 'false' }}"
+        env:
+          NODE_AUTH_TOKEN: '${{ secrets.WOMBAT_TOKEN_A2A_SERVER }}'
+        shell: 'bash'
+        run: |
+          npm deprecate @google/gemini-cli-a2a-server@${{ github.event.inputs.rollback_origin }} "This version has been rolled back."
 
       - name: 'Delete Github Release'
         if: "${{ github.event.inputs.dry-run == 'false' }}"
