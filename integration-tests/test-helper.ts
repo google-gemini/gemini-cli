@@ -324,8 +324,7 @@ export class TestRig {
     ...args: string[]
   ): Promise<string> {
     const yolo =
-      promptOrOptions instanceof String ||
-      (promptOrOptions as { yolo?: boolean }).yolo !== false;
+      typeof promptOrOptions === 'string' || promptOrOptions.yolo !== false;
     const { command, initialArgs } = this._getCommandAndArgs(
       yolo ? ['--yolo'] : [],
     );
