@@ -1066,15 +1066,6 @@ const SETTINGS_SCHEMA = {
           'Enable model routing to route requests to the best model based on complexity.',
         showInDialog: true,
       },
-      enableSubagents: {
-        type: 'boolean',
-        label: 'Enable Subagents',
-        category: 'Experimental',
-        requiresRestart: true,
-        default: false,
-        description: 'Enable experimental subagents.',
-        showInDialog: false,
-      },
       codebaseInvestigatorSettings: {
         type: 'object',
         label: 'Codebase Investigator Settings',
