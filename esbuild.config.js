@@ -32,33 +32,58 @@ const external = [
   '@lydell/node-pty-win32-x64',
 ];
 
-esbuild
-  .build({
-    entryPoints: ['packages/cli/index.ts'],
-    bundle: true,
-    outfile: 'bundle/gemini.js',
-    platform: 'node',
-    format: 'esm',
-    external,
-    alias: {
-      'is-in-ci': path.resolve(
-        __dirname,
-        'packages/cli/src/patches/is-in-ci.ts',
-      ),
-    },
-    define: {
-      'process.env.CLI_VERSION': JSON.stringify(pkg.version),
-    },
-    banner: {
-      js: `import { createRequire } from 'module'; const require = createRequire(import.meta.url); globalThis.__filename = require('url').fileURLToPath(import.meta.url); globalThis.__dirname = require('path').dirname(globalThis.__filename);`,
-    },
-    loader: { '.node': 'file' },
-    metafile: true,
-    write: true,
-  })
-  .then(({ metafile }) => {
+const baseConfig = {
+  bundle: true,
+  platform: 'node',
+  format: 'esm',
+  external,
+  loader: { '.node': 'file' },
+  write: true,
+};
+
+const cliConfig = {
+  ...baseConfig,
+  banner: {
+    js: `import { createRequire } from 'module'; const require = createRequire(import.meta.url); globalThis.__filename = require('url').fileURLToPath(import.meta.url); globalThis.__dirname = require('path').dirname(globalThis.__filename);`,
+  },
+  entryPoints: ['packages/cli/index.ts'],
+  outfile: 'bundle/gemini.js',
+  define: {
+    'process.env.CLI_VERSION': JSON.stringify(pkg.version),
+  },
+  alias: {
+    'is-in-ci': path.resolve(__dirname, 'packages/cli/src/patches/is-in-ci.ts'),
+  },
+  metafile: true,
+};
+
+const a2aServerConfig = {
+  ...baseConfig,
+  banner: {
+    js: `const require = (await import('module')).createRequire(import.meta.url); globalThis.__filename = require('url').fileURLToPath(import.meta.url); globalThis.__dirname = require('path').dirname(globalThis.__filename);`,
+  },
+  entryPoints: ['packages/a2a-server/src/http/server.ts'],
+  outfile: 'packages/a2a-server/dist/a2a-server.mjs',
+  define: {
+    'process.env.CLI_VERSION': JSON.stringify(pkg.version),
+  },
+};
+
+Promise.allSettled([
+  esbuild.build(cliConfig).then(({ metafile }) => {
     if (process.env.DEV === 'true') {
       writeFileSync('./bundle/esbuild.json', JSON.stringify(metafile, null, 2));
     }
-  })
-  .catch(() => process.exit(1));
+  }),
+  esbuild.build(a2aServerConfig),
+]).then((results) => {
+  const [cliResult, a2aResult] = results;
+  if (cliResult.status === 'rejected') {
+    console.error('gemini.js build failed:', cliResult.reason);
+    process.exit(1);
+  }
+  // error in a2a-server bundling will not stop gemini.js bundling process
+  if (a2aResult.status === 'rejected') {
+    console.warn('a2a-server build failed:', a2aResult.reason);
+  }
+});
