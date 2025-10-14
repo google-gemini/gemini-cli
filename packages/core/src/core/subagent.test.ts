@@ -53,6 +53,7 @@ async function createMockConfig(
     targetDir: '.',
     debugMode: false,
     cwd: process.cwd(),
+    enableShellOutputEfficiency: false,
     ...configParameters,
   };
   const config = new Config(configParams);
