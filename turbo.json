@@ -1,0 +1,13 @@
+{
+  "$schema": "https://turborepo.org/schema.json",
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**"]
+    },
+    "bundle": {
+      "dependsOn": ["^build"],
+      "outputs": ["bundle/**", "packages/a2a-server/dist/**"]
+    }
+  }
+}

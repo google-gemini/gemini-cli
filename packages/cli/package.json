@@ -19,7 +19,8 @@
     "format": "prettier --write .",
     "test": "vitest run",
     "test:ci": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "bundle": "node esbuild.config.js && node ../../scripts/copy_bundle_assets.js"
   },
   "files": [
     "dist"
