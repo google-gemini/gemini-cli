@@ -47,6 +47,10 @@ describe('Core System Prompt (prompts.ts)', () => {
       getToolRegistry: vi.fn().mockReturnValue({
         getAllToolNames: vi.fn().mockReturnValue([]),
       }),
+      getEnableShellOutputEfficiency: vi.fn().mockReturnValue(true),
+      storage: {
+        getProjectTempDir: vi.fn().mockReturnValue('/tmp/project-temp'),
+      },
     } as unknown as Config;
   });
 
@@ -136,6 +140,10 @@ describe('Core System Prompt (prompts.ts)', () => {
             .fn()
             .mockReturnValue([CodebaseInvestigatorAgent.name]),
         }),
+        getEnableShellOutputEfficiency: vi.fn().mockReturnValue(true),
+        storage: {
+          getProjectTempDir: vi.fn().mockReturnValue('/tmp/project-temp'),
+        },
       } as unknown as Config;
     });
 

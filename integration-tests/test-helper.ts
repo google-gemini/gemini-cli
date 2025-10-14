@@ -182,7 +182,7 @@ export class InteractiveRun {
     });
   }
 
-  async waitForText(text: string, timeout?: number) {
+  async expectText(text: string, timeout?: number) {
     if (!timeout) {
       timeout = getDefaultTimeout();
     }
@@ -207,7 +207,7 @@ export class InteractiveRun {
     this.ptyProcess.kill();
   }
 
-  waitForExit(): Promise<number> {
+  expectExit(): Promise<number> {
     return new Promise((resolve, reject) => {
       const timer = setTimeout(
         () =>
@@ -902,7 +902,7 @@ export class TestRig {
 
     const run = new InteractiveRun(ptyProcess);
     // Wait for the app to be ready
-    await run.waitForText('Type your message', 30000);
+    await run.expectText('Type your message', 30000);
     return run;
   }
 }
