@@ -35,6 +35,7 @@ import type {
   OutputConfig,
 } from './types.js';
 import { AgentTerminateMode } from './types.js';
+import type { AnyDeclarativeTool, AnyToolInvocation } from '../tools/tools.js';
 
 const { mockSendMessageStream, mockExecuteToolCall } = vi.hoisted(() => ({
   mockSendMessageStream: vi.fn(),
@@ -318,18 +319,32 @@ describe('AgentExecutor', () => {
         'T1: Listing',
       );
       mockExecuteToolCall.mockResolvedValueOnce({
-        callId: 'call1',
-        resultDisplay: 'file1.txt',
-        responseParts: [
-          {
-            functionResponse: {
-              name: LSTool.Name,
-              response: { result: 'file1.txt' },
-              id: 'call1',
+        status: 'success',
+        request: {
+          callId: 'call1',
+          name: LSTool.Name,
+          args: { path: '.' },
+          isClientInitiated: false,
+          prompt_id: 'test-prompt',
+        },
+        tool: {} as AnyDeclarativeTool,
+        invocation: {} as AnyToolInvocation,
+        response: {
+          callId: 'call1',
+          resultDisplay: 'file1.txt',
+          responseParts: [
+            {
+              functionResponse: {
+                name: LSTool.Name,
+                response: { result: 'file1.txt' },
+                id: 'call1',
+              },
             },
-          },
-        ],
-        error: undefined,
+          ],
+          error: undefined,
+          errorType: undefined,
+          contentLength: undefined,
+        },
       });
 
       // Turn 2: Model calls complete_task with required output
@@ -451,13 +466,32 @@ describe('AgentExecutor', () => {
         { name: LSTool.Name, args: { path: '.' }, id: 'call1' },
       ]);
       mockExecuteToolCall.mockResolvedValueOnce({
-        callId: 'call1',
-        resultDisplay: 'ok',
-        responseParts: [
-          {
-            functionResponse: { name: LSTool.Name, response: {}, id: 'call1' },
-          },
-        ],
+        status: 'success',
+        request: {
+          callId: 'call1',
+          name: LSTool.Name,
+          args: { path: '.' },
+          isClientInitiated: false,
+          prompt_id: 'test-prompt',
+        },
+        tool: {} as AnyDeclarativeTool,
+        invocation: {} as AnyToolInvocation,
+        response: {
+          callId: 'call1',
+          resultDisplay: 'ok',
+          responseParts: [
+            {
+              functionResponse: {
+                name: LSTool.Name,
+                response: {},
+                id: 'call1',
+              },
+            },
+          ],
+          error: undefined,
+          errorType: undefined,
+          contentLength: undefined,
+        },
       });
 
       mockModelResponse(
@@ -504,13 +538,32 @@ describe('AgentExecutor', () => {
         { name: LSTool.Name, args: { path: '.' }, id: 'call1' },
       ]);
       mockExecuteToolCall.mockResolvedValueOnce({
-        callId: 'call1',
-        resultDisplay: 'ok',
-        responseParts: [
-          {
-            functionResponse: { name: LSTool.Name, response: {}, id: 'call1' },
-          },
-        ],
+        status: 'success',
+        request: {
+          callId: 'call1',
+          name: LSTool.Name,
+          args: { path: '.' },
+          isClientInitiated: false,
+          prompt_id: 'test-prompt',
+        },
+        tool: {} as AnyDeclarativeTool,
+        invocation: {} as AnyToolInvocation,
+        response: {
+          callId: 'call1',
+          resultDisplay: 'ok',
+          responseParts: [
+            {
+              functionResponse: {
+                name: LSTool.Name,
+                response: {},
+                id: 'call1',
+              },
+            },
+          ],
+          error: undefined,
+          errorType: undefined,
+          contentLength: undefined,
+        },
       });
 
       mockModelResponse([], 'I think I am done.');
@@ -675,17 +728,26 @@ describe('AgentExecutor', () => {
         if (callsStarted === 2) resolveCalls();
         await vi.advanceTimersByTimeAsync(100);
         return {
-          callId: reqInfo.callId,
-          resultDisplay: 'ok',
-          responseParts: [
-            {
-              functionResponse: {
-                name: reqInfo.name,
-                response: {},
-                id: reqInfo.callId,
+          status: 'success',
+          request: reqInfo,
+          tool: {} as AnyDeclarativeTool,
+          invocation: {} as AnyToolInvocation,
+          response: {
+            callId: reqInfo.callId,
+            resultDisplay: 'ok',
+            responseParts: [
+              {
+                functionResponse: {
+                  name: reqInfo.name,
+                  response: {},
+                  id: reqInfo.callId,
+                },
               },
-            },
-          ],
+            ],
+            error: undefined,
+            errorType: undefined,
+            contentLength: undefined,
+          },
         };
       });
 
@@ -802,11 +864,26 @@ describe('AgentExecutor', () => {
     const mockWorkResponse = (id: string) => {
       mockModelResponse([{ name: LSTool.Name, args: { path: '.' }, id }]);
       mockExecuteToolCall.mockResolvedValueOnce({
-        callId: id,
-        resultDisplay: 'ok',
-        responseParts: [
-          { functionResponse: { name: LSTool.Name, response: {}, id } },
-        ],
+        status: 'success',
+        request: {
+          callId: id,
+          name: LSTool.Name,
+          args: { path: '.' },
+          isClientInitiated: false,
+          prompt_id: 'test-prompt',
+        },
+        tool: {} as AnyDeclarativeTool,
+        invocation: {} as AnyToolInvocation,
+        response: {
+          callId: id,
+          resultDisplay: 'ok',
+          responseParts: [
+            { functionResponse: { name: LSTool.Name, response: {}, id } },
+          ],
+          error: undefined,
+          errorType: undefined,
+          contentLength: undefined,
+        },
       });
     };
 
@@ -835,12 +912,21 @@ describe('AgentExecutor', () => {
       mockModelResponse([{ name: LSTool.Name, args: { path: '.' }, id: 't1' }]);
 
       // Long running tool
-      mockExecuteToolCall.mockImplementationOnce(async () => {
+      mockExecuteToolCall.mockImplementationOnce(async (_ctx, reqInfo) => {
         await vi.advanceTimersByTimeAsync(61 * 1000);
         return {
-          callId: 't1',
-          resultDisplay: 'ok',
-          responseParts: [],
+          status: 'success',
+          request: reqInfo,
+          tool: {} as AnyDeclarativeTool,
+          invocation: {} as AnyToolInvocation,
+          response: {
+            callId: 't1',
+            resultDisplay: 'ok',
+            responseParts: [],
+            error: undefined,
+            errorType: undefined,
+            contentLength: undefined,
+          },
         };
       });
 
