@@ -12,6 +12,16 @@
       "dependsOn": ["^build", "^generate"],
       "outputs": ["dist/**"]
     },
+    "build:sandbox": {
+      "dependsOn": ["build"],
+      "cache": true,
+      "outputs": []
+    },
+    "build:vscode": {
+      "dependsOn": ["build"],
+      "cache": true,
+      "outputs": ["packages/vscode-ide-companion/*.vsix"]
+    },
     "bundle": {
       "dependsOn": ["^build"],
       "outputs": ["bundle/**", "packages/*/bundle/**"]
