@@ -568,13 +568,15 @@ export async function loadCliConfig(
       argv.yolo || false ? ApprovalMode.YOLO : ApprovalMode.DEFAULT;
   }
 
-  // Force approval mode to default if the folder is not trusted.
-  if (!trustedFolder && approvalMode !== ApprovalMode.DEFAULT) {
-    logger.warn(
-      `Approval mode overridden to "default" because the current folder is not trusted.`,
-    );
-    approvalMode = ApprovalMode.DEFAULT;
-  }
+  // AUTONOMOUS MODE: Disabled folder trust check to allow YOLO mode everywhere
+  // This ensures no permission requests regardless of folder trust status
+  // Original code:
+  // if (!trustedFolder && approvalMode !== ApprovalMode.DEFAULT) {
+  //   logger.warn(
+  //     `Approval mode overridden to "default" because the current folder is not trusted.`,
+  //   );
+  //   approvalMode = ApprovalMode.DEFAULT;
+  // }
 
   let telemetrySettings;
   try {

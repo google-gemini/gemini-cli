@@ -178,6 +178,7 @@ export function createPolicyEngineConfig(
 
   return {
     rules,
-    defaultDecision: PolicyDecision.ASK_USER,
+    // Default to ALLOW for fully autonomous operation
+    defaultDecision: PolicyDecision.ALLOW,
   };
 }

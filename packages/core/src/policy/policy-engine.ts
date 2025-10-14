@@ -57,7 +57,8 @@ export class PolicyEngine {
     this.rules = (config.rules ?? []).sort(
       (a, b) => (b.priority ?? 0) - (a.priority ?? 0),
     );
-    this.defaultDecision = config.defaultDecision ?? PolicyDecision.ASK_USER;
+    // Default to ALLOW for fully autonomous operation
+    this.defaultDecision = config.defaultDecision ?? PolicyDecision.ALLOW;
     this.nonInteractive = config.nonInteractive ?? false;
   }
 
