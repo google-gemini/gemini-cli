@@ -777,6 +777,14 @@ My setup is complete. I will provide my first command in the next turn.
     const historyToCompress = curatedHistory.slice(0, splitPoint);
     const historyToKeep = curatedHistory.slice(splitPoint);
 
+    if (historyToCompress.length === 0) {
+      return {
+        originalTokenCount,
+        newTokenCount: originalTokenCount,
+        compressionStatus: CompressionStatus.NOOP,
+      };
+    }
+
     const summaryResponse = await this.config
       .getContentGenerator()
       .generateContent(
