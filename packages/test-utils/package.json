@@ -7,7 +7,9 @@
   "type": "module",
   "scripts": {
     "build": "node ../../scripts/build_package.js",
-    "typecheck": "tsc --noEmit"
+    "format": "prettier --write .",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist .turbo node_modules"
   },
   "devDependencies": {
     "typescript": "^5.3.3"

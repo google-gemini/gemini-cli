@@ -28,7 +28,10 @@ describe('terminalSetupCommand', () => {
       message: 'Terminal configured successfully',
     });
 
-    const result = await terminalSetupCommand.action({} as CommandContext, '');
+    const result = await terminalSetupCommand.action?.(
+      {} as CommandContext,
+      '',
+    );
 
     expect(result).toEqual({
       type: 'message',
@@ -44,7 +47,10 @@ describe('terminalSetupCommand', () => {
       requiresRestart: true,
     });
 
-    const result = await terminalSetupCommand.action({} as CommandContext, '');
+    const result = await terminalSetupCommand.action?.(
+      {} as CommandContext,
+      '',
+    );
 
     expect(result).toEqual({
       type: 'message',
@@ -60,7 +66,10 @@ describe('terminalSetupCommand', () => {
       message: 'Failed to detect terminal',
     });
 
-    const result = await terminalSetupCommand.action({} as CommandContext, '');
+    const result = await terminalSetupCommand.action?.(
+      {} as CommandContext,
+      '',
+    );
 
     expect(result).toEqual({
       type: 'message',
@@ -74,7 +83,10 @@ describe('terminalSetupCommand', () => {
       new Error('Unexpected error'),
     );
 
-    const result = await terminalSetupCommand.action({} as CommandContext, '');
+    const result = await terminalSetupCommand.action?.(
+      {} as CommandContext,
+      '',
+    );
 
     expect(result).toEqual({
       type: 'message',

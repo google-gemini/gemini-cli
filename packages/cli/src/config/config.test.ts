@@ -16,12 +16,7 @@ import {
   OutputFormat,
   type GeminiCLIExtension,
 } from '@google/gemini-cli-core';
-import {
-  loadCliConfig,
-  loadHierarchicalGeminiMemory,
-  parseArguments,
-  type CliArgs,
-} from './config.js';
+import { loadCliConfig, parseArguments, type CliArgs } from './config.js';
 import type { Settings } from './settings.js';
 import { ExtensionStorage } from './extension.js';
 import * as ServerConfig from '@google/gemini-cli-core';
@@ -1169,26 +1164,12 @@ describe('Hierarchical Memory Loading (config.ts) - Placeholder Suite', () => {
   // 2. fs/promises and fs mocks correctly simulate file/directory existence,
   //    readability, and content based on paths derived from the mocked os.homedir().
   // 3. Spies on console functions (for logger output) are correctly set up if needed.
-  // Example of a previously failing test structure:
+  // Example of a previously failing test structure (requires proper mock setup):
   it.skip('should correctly use mocked homedir for global path', async () => {
-    const MOCK_GEMINI_DIR_LOCAL = path.join(
-      '/mock/home/user',
-      ServerConfig.GEMINI_DIR,
-    );
-    const MOCK_GLOBAL_PATH_LOCAL = path.join(
-      MOCK_GEMINI_DIR_LOCAL,
-      'GEMINI.md',
-    );
-    mockFs({
-      [MOCK_GLOBAL_PATH_LOCAL]: { type: 'file', content: 'GlobalContentOnly' },
-    });
-    const memory = await loadHierarchicalGeminiMemory('/some/other/cwd', false);
-    expect(memory).toBe('GlobalContentOnly');
-    expect(vi.mocked(os.homedir)).toHaveBeenCalled();
-    expect(fsPromises.readFile).toHaveBeenCalledWith(
-      MOCK_GLOBAL_PATH_LOCAL,
-      'utf-8',
-    );
+    // This test is disabled pending proper mock infrastructure
+    // loadHierarchicalGeminiMemory requires 9 parameters:
+    // (cwd, includeDirectoriesToReadGemini, debugMode, fileService, settings,
+    //  extensionContextFilePaths, folderTrust, memoryImportFormat, fileFilteringOptions)
   });
 });
 
@@ -3312,8 +3293,14 @@ describe('loadCliConfig fileFiltering', () => {
     vi.restoreAllMocks();
   });
 
+  type FileFilteringProperty =
+    | 'respectGitIgnore'
+    | 'respectGeminiIgnore'
+    | 'disableFuzzySearch'
+    | 'enableRecursiveFileSearch';
+
   const testCases: Array<{
-    property: keyof NonNullable<Settings['fileFiltering']>;
+    property: FileFilteringProperty;
     getter: (config: ServerConfig.Config) => boolean;
     value: boolean;
   }> = [

@@ -8,7 +8,7 @@ import type React from 'react';
 import { Box, Text } from 'ink';
 import Gradient from 'ink-gradient';
 import { theme } from '../semantic-colors.js';
-import { formatDuration } from '../utils/formatters.js';
+import { formatDuration, formatNumber } from '../utils/formatters.js';
 import type { ModelMetrics } from '../contexts/SessionContext.js';
 import { useSessionStats } from '../contexts/SessionContext.js';
 import {
@@ -128,12 +128,12 @@ const ModelUsageTable: React.FC<{
           </Box>
           <Box width={inputTokensWidth} justifyContent="flex-end">
             <Text color={theme.status.warning}>
-              {modelMetrics.tokens.prompt.toLocaleString()}
+              {formatNumber(modelMetrics.tokens.prompt)}
             </Text>
           </Box>
           <Box width={outputTokensWidth} justifyContent="flex-end">
             <Text color={theme.status.warning}>
-              {modelMetrics.tokens.candidates.toLocaleString()}
+              {formatNumber(modelMetrics.tokens.candidates)}
             </Text>
           </Box>
         </Box>
@@ -142,7 +142,7 @@ const ModelUsageTable: React.FC<{
         <Box flexDirection="column" marginTop={1}>
           <Text color={theme.text.primary}>
             <Text color={theme.status.success}>Savings Highlight:</Text>{' '}
-            {totalCachedTokens.toLocaleString()} ({cacheEfficiency.toFixed(1)}
+            {formatNumber(totalCachedTokens)} ({cacheEfficiency.toFixed(1)}
             %) of input tokens were served from the cache, reducing costs.
           </Text>
           <Box height={1} />

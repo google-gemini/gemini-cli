@@ -61,3 +61,12 @@ export const formatDuration = (milliseconds: number): string => {
 
   return parts.join(' ');
 };
+
+/**
+ * Formats a number with locale-independent thousand separators using commas.
+ * DRY principle: Single source of truth for all numeric formatting in UI.
+ * @param value The number to format
+ * @returns Formatted string with commas (e.g., "1,000" or "25,000")
+ */
+export const formatNumber = (value: number): string =>
+  value.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');

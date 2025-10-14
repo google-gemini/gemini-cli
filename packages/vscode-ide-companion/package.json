@@ -114,13 +114,15 @@
     "prepare": "npm run generate:notices",
     "check-types": "tsc --noEmit",
     "lint": "eslint src",
+    "format": "prettier --write .",
     "watch": "npm-run-all2 -p watch:*",
     "watch:esbuild": "node esbuild.js --watch",
     "watch:tsc": "tsc --noEmit --watch --project tsconfig.json",
     "package": "vsce package --no-dependencies",
     "test": "vitest run",
     "test:ci": "vitest run --coverage",
-    "validate:notices": "node ./scripts/validate-notices.js"
+    "validate:notices": "node ./scripts/validate-notices.js",
+    "clean": "rm -rf dist .turbo node_modules"
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",

@@ -149,10 +149,16 @@ describe('useSlashCommandProcessor', () => {
           openPrivacyNotice: vi.fn(),
           openSettingsDialog: vi.fn(),
           openModelDialog: mockOpenModelDialog,
+          openPermissionsDialog: vi.fn(),
           quit: mockSetQuittingMessages,
           setDebugMessage: vi.fn(),
           toggleCorgiMode: vi.fn(),
+          toggleDebugProfiler: vi.fn(),
+          dispatchExtensionStateUpdate: vi.fn(),
+          addConfirmUpdateExtensionRequest: vi.fn(),
         },
+        new Map(), // extensionsUpdateState
+        true, // isConfigInitialized
       ),
     );
 
@@ -454,7 +460,7 @@ describe('useSlashCommandProcessor', () => {
         name: 'loadwiththoughts',
         action: vi.fn().mockResolvedValue({
           type: 'load_history',
-          history: [{ type: MessageType.MODEL, text: 'response' }],
+          history: [{ type: MessageType.GEMINI, text: 'response' }],
           clientHistory: historyWithThoughts,
         }),
       });
@@ -899,18 +905,26 @@ describe('useSlashCommandProcessor', () => {
           mockClearItems,
           mockLoadHistory,
           vi.fn(), // refreshStatic
-          vi.fn(), // onDebugMessage
-          vi.fn(), // openThemeDialog
-          mockOpenAuthDialog,
-          vi.fn(), // openEditorDialog
-          vi.fn(), // toggleCorgiMode
-          mockSetQuittingMessages,
-          vi.fn(), // openPrivacyNotice
-
-          vi.fn(), // openSettingsDialog
-          vi.fn(), // toggleVimEnabled
           vi.fn().mockResolvedValue(false), // toggleVimEnabled
           vi.fn(), // setIsProcessing
+          vi.fn(), // setGeminiMdFileCount
+          {
+            openAuthDialog: mockOpenAuthDialog,
+            openThemeDialog: mockOpenThemeDialog,
+            openEditorDialog: vi.fn(),
+            openPrivacyNotice: vi.fn(),
+            openSettingsDialog: vi.fn(),
+            openModelDialog: mockOpenModelDialog,
+            openPermissionsDialog: vi.fn(),
+            quit: mockSetQuittingMessages,
+            setDebugMessage: vi.fn(),
+            toggleCorgiMode: vi.fn(),
+            toggleDebugProfiler: vi.fn(),
+            dispatchExtensionStateUpdate: vi.fn(),
+            addConfirmUpdateExtensionRequest: vi.fn(),
+          },
+          new Map(), // extensionsUpdateState
+          true, // isConfigInitialized
         ),
       );
 

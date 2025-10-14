@@ -13,13 +13,16 @@
   },
   "scripts": {
     "build": "node ../../scripts/build_package.js",
+    "generate": "node ../../scripts/generate-git-commit-info.js",
     "start": "node dist/index.js",
     "debug": "node --inspect-brk dist/index.js",
     "lint": "eslint . --ext .ts,.tsx",
     "format": "prettier --write .",
     "test": "vitest run",
     "test:ci": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "bundle": "node esbuild.config.js && node ../../scripts/copy_bundle_assets.js",
+    "clean": "rm -rf dist .turbo node_modules"
   },
   "files": [
     "dist"

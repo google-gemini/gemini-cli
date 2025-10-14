@@ -15,8 +15,8 @@ import {
   spawnSync,
   type SpawnOptionsWithoutStdio,
 } from 'node:child_process';
-import type { Node } from 'web-tree-sitter';
-import { Language, Parser } from 'web-tree-sitter';
+// @ts-expect-error - web-tree-sitter type definitions incorrectly specify Parser as default export; runtime only exports named exports
+import { Parser, Language, type SyntaxNode } from 'web-tree-sitter';
 
 export const SHELL_TOOL_NAMES = ['run_shell_command', 'ShellTool'];
 
@@ -169,7 +169,7 @@ function normalizeCommandName(raw: string): string {
   return trimmed.split(/[\\/]/).pop() ?? trimmed;
 }
 
-function extractNameFromNode(node: Node): string | null {
+function extractNameFromNode(node: SyntaxNode): string | null {
   switch (node.type) {
     case 'command': {
       const nameNode = node.childForFieldName('name');
@@ -193,10 +193,10 @@ function extractNameFromNode(node: Node): string | null {
 }
 
 function collectCommandDetails(
-  root: Node,
+  root: SyntaxNode,
   source: string,
 ): ParsedCommandDetail[] {
-  const stack: Node[] = [root];
+  const stack: SyntaxNode[] = [root];
   const details: ParsedCommandDetail[] = [];
 
   while (stack.length > 0) {
