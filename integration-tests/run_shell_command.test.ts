@@ -100,8 +100,7 @@ describe('run_shell_command', () => {
         stdin: prompt,
         yolo: false,
       },
-      '--allowed-tools',
-      `run_shell_command(${tool})`,
+      `--allowed-tools=run_shell_command(${tool})`,
     );
 
     const foundToolCall = await rig.waitForToolCall('run_shell_command', 15000);
@@ -138,8 +137,7 @@ describe('run_shell_command', () => {
         stdin: prompt,
         yolo: false,
       },
-      '--allowed-tools',
-      'run_shell_command',
+      '--allowed-tools=run_shell_command',
     );
 
     const foundToolCall = await rig.waitForToolCall('run_shell_command', 15000);
@@ -210,8 +208,7 @@ describe('run_shell_command', () => {
         stdin: prompt,
         yolo: false,
       },
-      `--allowed-tools`,
-      `ShellTool(${tool})`,
+      `--allowed-tools=ShellTool(${tool})`,
     );
 
     const foundToolCall = await rig.waitForToolCall('run_shell_command', 15000);
@@ -246,16 +243,14 @@ describe('run_shell_command', () => {
       `use both ${tool} and ls to count the number of lines in files in this ` +
       `directory. Do not pipe these commands into each other, run them separately.`;
 
-    const result = await rig.run({
-      stdin: prompt,
-      yolo: false,
-      args: [
-        `--allowed-tools`,
-        `run_shell_command(${tool})`,
-        '--allowed-tools',
-        'run_shell_command(ls)',
-      ],
-    });
+    const result = await rig.run(
+      {
+        stdin: prompt,
+        yolo: false,
+      },
+      `--allowed-tools=run_shell_command(${tool})`,
+      '--allowed-tools=run_shell_command(ls)',
+    );
 
     for (const expected in ['ls', tool]) {
       const foundToolCall = await rig.waitForToolCall(
@@ -303,10 +298,8 @@ describe('run_shell_command', () => {
         stdin: prompt,
         yolo: false,
       },
-      `--allowed-tools`,
-      `run_shell_command(${tool})`,
-      '--allowed-tools',
-      'run_shell_command',
+      `--allowed-tools=run_shell_command(${tool})`,
+      '--allowed-tools=run_shell_command',
     );
 
     const foundToolCall = await rig.waitForToolCall('run_shell_command', 15000);
