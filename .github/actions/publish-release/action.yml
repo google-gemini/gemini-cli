@@ -9,10 +9,13 @@ inputs:
     description: 'The npm tag to publish with (e.g., latest, preview, nightly).'
     required: true
   wombat-token-core:
-    description: 'The npm token for the @google/gemini-cli-core package.'
+    description: 'The npm token for the cli-core package.'
     required: true
   wombat-token-cli:
-    description: 'The npm token for the @google/gemini-cli package.'
+    description: 'The npm token for the cli package.'
+    required: true
+  wombat-token-a2a-server:
+    description: 'The npm token for the a2a package.'
     required: true
   github-token:
     description: 'The GitHub token for creating the release.'
@@ -48,10 +51,24 @@ inputs:
   gemini_api_key:
     description: 'The API key for running integration tests.'
     required: true
-  registry:
-    description: 'The registry to publish to.'
-    required: false
-    default: 'npm-wombat'
+  npm-registry-publish-url:
+    description: 'npm registry publish url'
+    required: true
+  npm-registry-url:
+    description: 'npm registry url'
+    required: true
+  npm-registry-scope:
+    description: 'npm registry scope'
+    required: true
+  cli-package-name:
+    description: 'The name of the cli package.'
+    required: true
+  core-package-name:
+    description: 'The name of the core package.'
+    required: true
+  a2a-package-name:
+    description: 'The name of the a2a package.'
+    required: true
 runs:
   using: 'composite'
   steps:
@@ -114,110 +131,102 @@ runs:
       run: |
         npm run bundle
 
+    # TODO: Refactor this github specific publishing script to be generalized based upon inputs.
     - name: '📦 Prepare for GitHub release'
-      if: "inputs.registry == 'github'"
+      if: "inputs.npm-registry-url == 'https://npm.pkg.github.com/'"
       working-directory: '${{ inputs.working-directory }}'
       shell: 'bash'
       run: |
         node ${{ github.workspace }}/scripts/prepare-github-release.js
 
     - name: 'Configure npm for publishing to npm'
-      if: "inputs.registry != 'github'"
       uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020'
       with:
         node-version-file: '${{ inputs.working-directory }}/.nvmrc'
-        registry-url: 'https://wombat-dressing-room.appspot.com'
-        scope: '@google'
+        registry-url: '${{inputs.npm-registry-publish-url}}'
+        scope: '${{inputs.npm-registry-scope}}'
 
-    - name: 'Configure npm for publishing to GitHub'
-      if: "inputs.registry == 'github'"
-      uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020'
+    - name: 'Get core Token'
+      uses: './.github/actions/npm-auth-token'
+      id: 'core-token'
       with:
-        node-version-file: '${{ inputs.working-directory }}/.nvmrc'
-        registry-url: 'https://npm.pkg.github.com'
-        scope: '@google-gemini'
+        package-name: '${{ inputs.core-package-name }}'
+        github-token: '${{ inputs.github-token }}'
+        wombat-token-core: '${{ inputs.wombat-token-core }}'
+        wombat-token-cli: '${{ inputs.wombat-token-cli }}'
+        wombat-token-a2a-server: '${{ inputs.wombat-token-a2a-server }}'
 
-    - name: '📦 Publish @google/gemini-cli-core to npm'
-      if: "inputs.registry != 'github'"
+    - name: '📦 Publish CORE to NPM'
       working-directory: '${{ inputs.working-directory }}'
       env:
-        NODE_AUTH_TOKEN: '${{ inputs.wombat-token-core }}'
-      shell: 'bash'
-      run: |
-        if [ "${{ inputs.dry-run }}" == "true" ]; then
-          npm publish --dry-run --workspace="@google/gemini-cli-core" --no-tag
-        else
-          npm publish --workspace="@google/gemini-cli-core" --no-tag
-        fi
-
-    - name: '📦 Publish @google-gemini/gemini-cli-core to GitHub'
-      if: "inputs.registry == 'github'"
-      working-directory: '${{ inputs.working-directory }}'
-      env:
-        NODE_AUTH_TOKEN: '${{ inputs.github-token }}'
+        NODE_AUTH_TOKEN: '${{ steps.core-token.outputs.auth-token }}'
       shell: 'bash'
       run: |
         npm publish \
           --dry-run="${{ inputs.dry-run }}" \
-          --workspace="@google-gemini/gemini-cli-core" \
+          --workspace="${{ inputs.core-package-name }}" \
           --no-tag
 
     - name: '🔗 Install latest core package'
       working-directory: '${{ inputs.working-directory }}'
-      if: "${{ inputs.dry-run != 'true' && inputs.registry != 'github' }}"
+      if: "${{ inputs.dry-run != 'true' }}"
       shell: 'bash'
       run: |
-        npm install "@google/gemini-cli-core@${{ inputs.release-version }}" \
-        --workspace="@google/gemini-cli" \
+        npm install "${{ inputs.core-package-name }}@${{ inputs.release-version }}" \
+        --workspace="${{ inputs.cli-package-name }}" \
         --save-exact
 
-    - name: '📦 Publish @google/gemini-cli to npm'
-      if: "inputs.registry != 'github'"
-      working-directory: '${{ inputs.working-directory }}'
-      env:
-        NODE_AUTH_TOKEN: '${{ inputs.wombat-token-cli }}'
-      shell: 'bash'
-      run: |
-        if [ "${{ inputs.dry-run }}" == "true" ]; then
-          npm publish --dry-run --workspace="@google/gemini-cli" --no-tag
-        else
-          npm publish --workspace="@google/gemini-cli" --no-tag
-        fi
+    - name: 'Get CLI Token'
+      uses: './.github/actions/npm-auth-token'
+      id: 'cli-token'
+      with:
+        package-name: '${{ inputs.cli-package-name }}'
+        github-token: '${{ inputs.github-token }}'
+        wombat-token-core: '${{ inputs.wombat-token-core }}'
+        wombat-token-cli: '${{ inputs.wombat-token-cli }}'
+        wombat-token-a2a-server: '${{ inputs.wombat-token-a2a-server }}'
 
-    - name: '📦 Publish @google-gemini/gemini-cli to GitHub'
-      if: "inputs.registry == 'github'"
+    - name: '📦 Publish CLI to npm'
       working-directory: '${{ inputs.working-directory }}'
       env:
-        NODE_AUTH_TOKEN: '${{ inputs.github-token }}'
+        NODE_AUTH_TOKEN: '${{ steps.cli-token.outputs.auth-token }}'
       shell: 'bash'
       run: |
         npm publish \
           --dry-run="${{ inputs.dry-run }}" \
-          --workspace="@google-gemini/gemini-cli" \
+          --workspace="${{ inputs.cli-package-name }}" \
           --no-tag
 
     - name: '🔬 Verify NPM release by version'
       uses: './.github/actions/verify-release'
-      if: "${{ inputs.dry-run != 'true' && inputs.force-skip-tests != 'true' && inputs.registry != 'github' }}"
+      if: "${{ inputs.dry-run != 'true' && inputs.force-skip-tests != 'true' }}"
       with:
-        npm-package: '@google/gemini-cli@${{ inputs.release-version }}'
+        npm-package: '${{ inputs.cli-package-name }}@${{ inputs.release-version }}'
         expected-version: '${{ inputs.release-version }}'
         ref: '${{ steps.release_branch.outputs.BRANCH_NAME }}'
         gemini_api_key: '${{ inputs.gemini_api_key }}'
+        github-token: '${{ inputs.github-token }}'
+        npm-registry-url: '${{ inputs.npm-registry-url }}'
+        npm-registry-scope: '${{ inputs.npm-registry-scope }}'
 
     - name: '🏷️ Tag release'
       uses: './.github/actions/tag-npm-release'
-      if: "${{ inputs.dry-run != 'true' && inputs.registry != 'github' }}"
+      if: "${{ inputs.dry-run != 'true' }}"
       with:
         channel: '${{ inputs.npm-tag }}'
         version: '${{ inputs.release-version }}'
         dry-run: '${{ inputs.dry-run }}'
+        github-token: '${{ inputs.github-token }}'
         wombat-token-core: '${{ inputs.wombat-token-core }}'
         wombat-token-cli: '${{ inputs.wombat-token-cli }}'
+        wombat-token-a2a-server: '${{ inputs.wombat-token-a2a-server }}'
+        cli-package-name: '${{ inputs.cli-package-name }}'
+        core-package-name: '${{ inputs.core-package-name }}'
+        a2a-package-name: '${{ inputs.a2a-package-name }}'
 
     - name: '🎉 Create GitHub Release'
       working-directory: '${{ inputs.working-directory }}'
-      if: "${{ inputs.dry-run != 'true' && inputs.skip-github-release != 'true' && inputs.npm-tag != 'dev' && inputs.registry != 'github' }}"
+      if: "${{ inputs.dry-run != 'true' && inputs.skip-github-release != 'true' && inputs.npm-tag != 'dev' && inputs.npm-registry-url != 'https://npm.pkg.github.com/' }}"
       env:
         GITHUB_TOKEN: '${{ inputs.github-token }}'
       shell: 'bash'

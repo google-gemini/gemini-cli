@@ -31,6 +31,7 @@ jobs:
   calculate-versions:
     name: 'Calculate Versions and Plan'
     runs-on: 'ubuntu-latest'
+    environment: 'prod' # TODO(richieforeman): Fully support dev env.
     outputs:
       STABLE_VERSION: '${{ steps.versions.outputs.STABLE_VERSION }}'
       STABLE_SHA: '${{ steps.versions.outputs.STABLE_SHA }}'
@@ -169,6 +170,7 @@ jobs:
     name: 'Publish preview'
     needs: ['calculate-versions', 'test']
     runs-on: 'ubuntu-latest'
+    environment: 'prod' # TODO(richieforeman): Allow this to be changed.
     permissions:
       contents: 'write'
       packages: 'write'
@@ -210,6 +212,12 @@ jobs:
           working-directory: './release'
           gemini_api_key: '${{ secrets.GEMINI_API_KEY }}'
           force-skip-tests: '${{ github.event.inputs.force_skip_tests }}'
+          npm-registry-publish-url: '${{ vars.NPM_REGISTRY_PUBLISH_URL }}'
+          npm-registry-url: '${{ vars.NPM_REGISTRY_URL }}'
+          npm-registry-scope: '${{ vars.NPM_REGISTRY_SCOPE }}'
+          cli-package-name: '${{ vars.CLI_PACKAGE_NAME }}'
+          core-package-name: '${{ vars.CORE_PACKAGE_NAME }}'
+          a2a-package-name: '${{ vars.A2A_PACKAGE_NAME }}'
 
       - name: 'Create Issue on Failure'
         if: '${{ failure() && github.event.inputs.dry_run == false }}'
@@ -227,6 +235,7 @@ jobs:
     name: 'Publish stable'
     needs: ['calculate-versions', 'test', 'publish-preview']
     runs-on: 'ubuntu-latest'
+    environment: 'prod' # TODO(richieforeman): Allow this to be changed.
     permissions:
       contents: 'write'
       packages: 'write'

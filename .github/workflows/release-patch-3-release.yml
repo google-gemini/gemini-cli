@@ -32,6 +32,7 @@ on:
 jobs:
   release:
     runs-on: 'ubuntu-latest'
+    environment: 'prod' # TODO(richieforeman): Also support dev
     permissions:
       contents: 'write'
       packages: 'write'
@@ -164,6 +165,12 @@ jobs:
           previous-tag: '${{ steps.patch_version.outputs.PREVIOUS_TAG }}'
           working-directory: './release'
           gemini_api_key: '${{ secrets.GEMINI_API_KEY }}'
+          npm-registry-publish-url: '${{ vars.NPM_REGISTRY_PUBLISH_URL }}'
+          npm-registry-url: '${{ vars.NPM_REGISTRY_URL }}'
+          npm-registry-scope: '${{ vars.NPM_REGISTRY_SCOPE }}'
+          cli-package-name: '${{ vars.CLI_PACKAGE_NAME }}'
+          core-package-name: '${{ vars.CORE_PACKAGE_NAME }}'
+          a2a-package-name: '${{ vars.A2A_PACKAGE_NAME }}'
 
       - name: 'Create Issue on Failure'
         if: '${{ failure() && github.event.inputs.dry_run == false }}'

@@ -29,6 +29,7 @@ on:
 jobs:
   change-tags:
     runs-on: 'ubuntu-latest'
+    environment: 'prod' # TODO(richieforeman): Allow this value to be changed.
     permissions:
       packages: 'write'
       issues: 'write'
@@ -54,3 +55,8 @@ jobs:
           dry-run: '${{ github.event.inputs.dry-run }}'
           wombat-token-core: '${{ secrets.WOMBAT_TOKEN_CORE }}'
           wombat-token-cli: '${{ secrets.WOMBAT_TOKEN_CLI }}'
+          wombat-token-a2a-server: '${{ secrets.WOMBAT_TOKEN_A2A_SERVER }}'
+          github-token: '${{ secrets.GITHUB_TOKEN }}'
+          cli-package-name: '${{ vars.CLI_PACKAGE_NAME }}'
+          core-package-name: '${{ vars.CORE_PACKAGE_NAME }}'
+          a2a-package-name: '${{ vars.A2A_PACKAGE_NAME }}'

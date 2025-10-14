@@ -23,6 +23,7 @@ on:
 
 jobs:
   release:
+    environment: 'prod' # TODO(richieforeman): Fully support dev env.
     runs-on: 'ubuntu-latest'
     permissions:
       contents: 'write'
@@ -119,6 +120,12 @@ jobs:
           skip-branch-cleanup: true
           force-skip-tests: "${{ github.event_name != 'schedule' && github.event.inputs.force_skip_tests == 'true' }}"
           gemini_api_key: '${{ secrets.GEMINI_API_KEY }}'
+          npm-registry-publish-url: '${{ vars.NPM_REGISTRY_PUBLISH_URL }}'
+          npm-registry-url: '${{ vars.NPM_REGISTRY_URL }}'
+          npm-registry-scope: '${{ vars.NPM_REGISTRY_SCOPE }}'
+          cli-package-name: '${{ vars.CLI_PACKAGE_NAME }}'
+          core-package-name: '${{ vars.CORE_PACKAGE_NAME }}'
+          a2a-package-name: '${{ vars.A2A_PACKAGE_NAME }}'
 
       - name: 'Create and Merge Pull Request'
         uses: './.github/actions/create-pull-request'
