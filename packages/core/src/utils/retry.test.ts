@@ -304,6 +304,41 @@ describe('retryWithBackoff', () => {
     });
   });
 
+  describe('Fetch error retries', () => {
+    const fetchErrorMsg = 'exception TypeError: fetch failed sending request';
+
+    it('should retry on specific fetch error when retryFetchErrors is true', async () => {
+      const mockFn = vi.fn();
+      mockFn.mockRejectedValueOnce(new Error(fetchErrorMsg));
+      mockFn.mockResolvedValueOnce('success');
+
+      const promise = retryWithBackoff(mockFn, {
+        retryFetchErrors: true,
+        initialDelayMs: 10,
+      });
+
+      await vi.runAllTimersAsync();
+
+      const result = await promise;
+      expect(result).toBe('success');
+      expect(mockFn).toHaveBeenCalledTimes(2);
+    });
+
+    it.each([false, undefined])(
+      'should not retry on specific fetch error when retryFetchErrors is %s',
+      async (retryFetchErrors) => {
+        const mockFn = vi.fn().mockRejectedValue(new Error(fetchErrorMsg));
+
+        const promise = retryWithBackoff(mockFn, {
+          retryFetchErrors,
+        });
+
+        await expect(promise).rejects.toThrow(fetchErrorMsg);
+        expect(mockFn).toHaveBeenCalledTimes(1);
+      },
+    );
+  });
+
   describe('Flash model fallback for OAuth users', () => {
     it('should trigger fallback for OAuth personal users on TerminalQuotaError', async () => {
       const fallbackCallback = vi.fn().mockResolvedValue('gemini-2.5-flash');
