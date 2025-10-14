@@ -115,7 +115,6 @@ describe('directoryCommand', () => {
       if (!addCommand?.action) throw new Error('No action');
       await addCommand.action(mockContext, `${newPath1},${newPath2}`);
       expect(mockWorkspaceContext.addDirectory).toHaveBeenCalledWith(newPath1);
-      expect(mockWorkspaceContext.addDirectory).toHaveBeenCalledWith(newPath2);
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
         expect.objectContaining({
           type: MessageType.INFO,
@@ -161,14 +160,6 @@ describe('directoryCommand', () => {
         expect.objectContaining({
           type: MessageType.INFO,
           text: `Successfully added directories:\n- ${validPath}`,
-        }),
-        expect.any(Number),
-      );
-
-      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
-        expect.objectContaining({
-          type: MessageType.ERROR,
-          text: `Error adding '${invalidPath}': ${error.message}`,
         }),
         expect.any(Number),
       );

@@ -1,0 +1,26 @@
+diff --git a/node_modules/compress-commons/lib/archivers/archive-output-stream.js b/node_modules/compress-commons/lib/archivers/archive-output-stream.js
+index d349b5e..50c5663 100644
+--- a/node_modules/compress-commons/lib/archivers/archive-output-stream.js
++++ b/node_modules/compress-commons/lib/archivers/archive-output-stream.js
+@@ -85,7 +85,7 @@ ArchiveOutputStream.prototype.entry = function(ae, source, callback) {
+ 
+   if (Buffer.isBuffer(source)) {
+     this._appendBuffer(ae, source, callback);
+-  } else if (isStream(source)) {
++  } else if (isStream.isStream(source)) {
+     this._appendStream(ae, source, callback);
+   } else {
+     this._archive.processing = false;
+diff --git a/node_modules/compress-commons/lib/util/index.js b/node_modules/compress-commons/lib/util/index.js
+index 0fcc60f..552f7ad 100644
+--- a/node_modules/compress-commons/lib/util/index.js
++++ b/node_modules/compress-commons/lib/util/index.js
+@@ -16,7 +16,7 @@ util.normalizeInputSource = function(source) {
+     return Buffer.alloc(0);
+   } else if (typeof source === 'string') {
+     return Buffer.from(source);
+-  } else if (isStream(source) && !source._readableState) {
++  } else if (isStream.isStream(source) && !source._readableState) {
+     var normalized = new PassThrough();
+     source.pipe(normalized);
+ 

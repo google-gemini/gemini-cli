@@ -159,6 +159,7 @@ export const AppContainer = (props: AppContainerProps) => {
     extensionsUpdateState,
     extensionsUpdateStateInternal,
     dispatchExtensionStateUpdate,
+    setExtensionsUpdateState,
     confirmUpdateExtensionRequests,
     addConfirmUpdateExtensionRequest,
   } = useExtensionUpdates(
@@ -279,7 +280,7 @@ export const AppContainer = (props: AppContainerProps) => {
   const isValidPath = useCallback((filePath: string): boolean => {
     try {
       return fs.existsSync(filePath) && fs.statSync(filePath).isFile();
-    } catch (_e) {
+    } catch (_) {
       return false;
     }
   }, []);
@@ -299,9 +300,7 @@ export const AppContainer = (props: AppContainerProps) => {
       const currentSessionUserMessages = historyManager.history
         .filter(
           (item): item is HistoryItem & { type: 'user'; text: string } =>
-            item.type === 'user' &&
-            typeof item.text === 'string' &&
-            item.text.trim() !== '',
+            item.type === 'user' && item.text.trim() !== '',
         )
         .map((item) => item.text)
         .reverse();
@@ -472,6 +471,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       toggleCorgiMode: () => setCorgiMode((prev) => !prev),
       toggleDebugProfiler,
       dispatchExtensionStateUpdate,
+      setExtensionsUpdateState,
       addConfirmUpdateExtensionRequest,
     }),
     [
@@ -485,6 +485,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       setShowPrivacyNotice,
       setCorgiMode,
       dispatchExtensionStateUpdate,
+      setExtensionsUpdateState,
       openPermissionsDialog,
       addConfirmUpdateExtensionRequest,
       toggleDebugProfiler,

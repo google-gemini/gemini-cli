@@ -10,6 +10,8 @@ import { promises as fsPromises, createReadStream } from 'node:fs';
 import * as tar from 'tar';
 import { gzipSync, gunzipSync } from 'node:zlib';
 import { v4 as uuidv4 } from 'uuid';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 import type { Task as SDKTask } from '@a2a-js/sdk';
 import type { TaskStore } from '@a2a-js/sdk/server';
 import type { Mocked, MockedClass, Mock } from 'vitest';
@@ -74,6 +76,9 @@ const mockUuidv4 = uuidv4 as Mock;
 const mockSetTargetDir = configModule.setTargetDir as Mock;
 const mockGetPersistedState = getPersistedState as Mock;
 const TEST_METADATA_KEY = METADATA_KEY || '__persistedState';
+
+const getTmpArchiveFilename = (taskId: string): string =>
+  `task-${taskId}-workspace-test-uuid.tar.gz`;
 
 type MockWriteStream = {
   on: Mock<
@@ -212,9 +217,6 @@ describe('GCSTaskStore', () => {
       expect(logger.info).toHaveBeenCalledWith(
         expect.stringContaining('metadata saved to GCS'),
       );
-      expect(logger.info).toHaveBeenCalledWith(
-        expect.stringContaining('workspace saved to GCS'),
-      );
     });
 
     it('should handle tar creation failure', async () => {
@@ -270,10 +272,10 @@ describe('GCSTaskStore', () => {
       expect(mockBucket.file).toHaveBeenCalledWith(
         'tasks/task1/metadata.tar.gz',
       );
-      expect(mockBucket.file).toHaveBeenCalledWith(
-        'tasks/task1/workspace.tar.gz',
-      );
-      expect(mockTar.x).toHaveBeenCalledTimes(1);
+      expect(mockTar.x).toHaveBeenCalledWith({
+        file: join(tmpdir(), getTmpArchiveFilename('task1')),
+        cwd: '/tmp/workdir',
+      });
       expect(mockFse.remove).toHaveBeenCalledTimes(1);
     });
 

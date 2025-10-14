@@ -33,6 +33,7 @@ import type {
   ExtensionDisableEvent,
   SmartEditStrategyEvent,
   SmartEditCorrectionEvent,
+  FeedbackEvent,
   AgentStartEvent,
   AgentFinishEvent,
   WebFetchFallbackAttemptEvent,
@@ -84,6 +85,7 @@ export enum EventNames {
   MODEL_SLASH_COMMAND = 'model_slash_command',
   SMART_EDIT_STRATEGY = 'smart_edit_strategy',
   SMART_EDIT_CORRECTION = 'smart_edit_correction',
+  FEEDBACK = 'feedback',
   AGENT_START = 'agent_start',
   AGENT_FINISH = 'agent_finish',
   WEB_FETCH_FALLBACK_ATTEMPT = 'web_fetch_fallback_attempt',
@@ -1242,6 +1244,18 @@ export class ClearcutLogger {
 
   shutdown() {
     this.logEndSessionEvent();
+  }
+
+  logFeedbackEvent(event: FeedbackEvent): void {
+    const data: EventValue[] = [
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_FEEDBACK_TEXT,
+        value: event.feedback,
+      },
+    ];
+
+    this.enqueueLogEvent(this.createLogEvent(EventNames.FEEDBACK, data));
+    this.flushIfNeeded();
   }
 
   private requeueFailedEvents(eventsToSend: LogEventEntry[][]): void {

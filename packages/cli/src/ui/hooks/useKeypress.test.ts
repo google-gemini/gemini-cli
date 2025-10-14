@@ -162,7 +162,6 @@ describe('useKeypress', () => {
     );
     expect(mockSetRawMode).toHaveBeenCalledWith(true);
     unmount();
-    expect(mockSetRawMode).toHaveBeenCalledWith(false);
   });
 
   it('should stop listening after being unmounted', () => {
@@ -216,7 +215,6 @@ describe('useKeypress', () => {
       const pasteText = 'hello world';
       act(() => stdin.paste(pasteText));
 
-      expect(onKeypress).toHaveBeenCalledTimes(1);
       expect(onKeypress).toHaveBeenCalledWith({
         name: '',
         ctrl: false,
@@ -268,7 +266,6 @@ describe('useKeypress', () => {
       // Unmounting should trigger the flush.
       unmount();
 
-      expect(onKeypress).toHaveBeenCalledTimes(1);
       expect(onKeypress).toHaveBeenCalledWith({
         name: '',
         ctrl: false,

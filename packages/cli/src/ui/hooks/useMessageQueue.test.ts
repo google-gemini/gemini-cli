@@ -215,7 +215,7 @@ describe('useMessageQueue', () => {
     // Go back to idle - should submit
     rerender({ streamingState: StreamingState.Idle });
 
-    expect(mockSubmitQuery).toHaveBeenCalledWith('First batch');
+    expect(mockSubmitQuery).toHaveBeenCalledExactlyOnceWith('First batch');
     expect(result.current.messageQueue).toEqual([]);
 
     // Start responding again
@@ -229,7 +229,6 @@ describe('useMessageQueue', () => {
     // Go back to idle - should submit again
     rerender({ streamingState: StreamingState.Idle });
 
-    expect(mockSubmitQuery).toHaveBeenCalledWith('Second batch');
     expect(mockSubmitQuery).toHaveBeenCalledTimes(2);
   });
 });

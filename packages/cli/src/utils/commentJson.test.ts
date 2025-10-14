@@ -172,9 +172,11 @@ describe('commentJson', () => {
         'Error parsing settings file:',
         expect.any(Error),
       );
+      // eslint-disable-next-line vitest/prefer-called-exactly-once-with
       expect(consoleSpy).toHaveBeenCalledWith(
         'Settings file may be corrupted. Please check the JSON syntax.',
       );
+      expect(consoleSpy).toHaveBeenCalledTimes(2);
 
       const unchangedContent = fs.readFileSync(testFilePath, 'utf-8');
       expect(unchangedContent).toBe(corruptedContent);

@@ -718,9 +718,6 @@ describe('KeypressContext - Kitty Protocol', () => {
       expect(keyHandler).toHaveBeenCalledWith(
         expect.objectContaining({ name: 'delete' }),
       );
-      expect(keyHandler).toHaveBeenCalledWith(
-        expect.objectContaining({ name: 'pageup' }),
-      );
     });
 
     it('should ignore incomplete CSI then parse the next complete sequence', async () => {

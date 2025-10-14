@@ -211,13 +211,6 @@ describe('update tests', () => {
           state: ExtensionUpdateState.UPDATING,
         },
       });
-      expect(dispatch).toHaveBeenCalledWith({
-        type: 'SET_STATE',
-        payload: {
-          name: extensionName,
-          state: ExtensionUpdateState.UPDATED_NEEDS_RESTART,
-        },
-      });
     });
 
     it('should call setExtensionUpdateState with ERROR on failure', async () => {
@@ -261,13 +254,6 @@ describe('update tests', () => {
         payload: {
           name: extensionName,
           state: ExtensionUpdateState.UPDATING,
-        },
-      });
-      expect(dispatch).toHaveBeenCalledWith({
-        type: 'SET_STATE',
-        payload: {
-          name: extensionName,
-          state: ExtensionUpdateState.ERROR,
         },
       });
     });

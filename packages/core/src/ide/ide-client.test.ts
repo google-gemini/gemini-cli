@@ -365,11 +365,13 @@ describe('IdeClient', () => {
       ).getConnectionConfigFromFile();
 
       expect(result).toEqual(validConfig);
-      expect(validateSpy).toHaveBeenCalledWith(
+      expect(validateSpy).toHaveBeenNthCalledWith(
+        1,
         '/invalid/workspace',
         '/test/workspace/sub-dir',
       );
-      expect(validateSpy).toHaveBeenCalledWith(
+      expect(validateSpy).toHaveBeenNthCalledWith(
+        2,
         '/test/workspace',
         '/test/workspace/sub-dir',
       );

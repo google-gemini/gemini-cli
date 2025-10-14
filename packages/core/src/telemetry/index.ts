@@ -63,7 +63,12 @@ export {
   ToolOutputTruncatedEvent,
   WebFetchFallbackAttemptEvent,
 } from './types.js';
-export { makeSlashCommandEvent, makeChatCompressionEvent } from './types.js';
+export {
+  makeSlashCommandEvent,
+  makeChatCompressionEvent,
+  makeFeedbackEvent,
+} from './types.js';
+export { logFeedback } from './loggers.js';
 export type { TelemetryEvent } from './types.js';
 export { SpanStatusCode, ValueType } from '@opentelemetry/api';
 export { SemanticAttributes } from '@opentelemetry/semantic-conventions';

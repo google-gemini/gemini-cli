@@ -60,7 +60,7 @@ describe('relaunchOnExitCode', () => {
       'PROCESS_EXIT_CALLED',
     );
 
-    expect(runner).toHaveBeenCalledTimes(1);
+    expect(runner).toHaveBeenCalledOnce();
     expect(processExitSpy).toHaveBeenCalledWith(0);
   });
 
@@ -89,7 +89,7 @@ describe('relaunchOnExitCode', () => {
       'PROCESS_EXIT_CALLED',
     );
 
-    expect(runner).toHaveBeenCalledTimes(1);
+    expect(runner).toHaveBeenCalledOnce();
     expect(consoleErrorSpy).toHaveBeenCalledWith(
       'Fatal error: Failed to relaunch the CLI process.',
       error,

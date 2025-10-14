@@ -13,16 +13,6 @@ import importPlugin from 'eslint-plugin-import';
 import vitest from '@vitest/eslint-plugin';
 import globals from 'globals';
 import licenseHeader from 'eslint-plugin-license-header';
-import path from 'node:path';
-import url from 'node:url';
-
-// --- ESM way to get __dirname ---
-const __filename = url.fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-// --- ---
-
-// Determine the monorepo root (assuming eslint.config.js is at the root)
-const projectRoot = __dirname;
 
 export default tseslint.config(
   {
@@ -258,9 +248,9 @@ export default tseslint.config(
       '@typescript-eslint/no-unused-vars': [
         'error',
         {
-          argsIgnorePattern: '^_',
-          varsIgnorePattern: '^_',
-          caughtErrorsIgnorePattern: '^_',
+          argsIgnorePattern: '^ _',
+          varsIgnorePattern: '^ _',
+          caughtErrorsIgnorePattern: '^ _',
         },
       ],
     },

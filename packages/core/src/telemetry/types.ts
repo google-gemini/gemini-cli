@@ -703,6 +703,20 @@ export function makeChatCompressionEvent({
   };
 }
 
+export interface FeedbackEvent extends BaseTelemetryEvent {
+  'event.name': 'feedback';
+  'event.timestamp': string;
+  feedback: string;
+}
+
+export function makeFeedbackEvent(feedback: string): FeedbackEvent {
+  return {
+    'event.name': 'feedback',
+    'event.timestamp': new Date().toISOString(),
+    feedback,
+  };
+}
+
 export const EVENT_MALFORMED_JSON_RESPONSE =
   'gemini_cli.malformed_json_response';
 export class MalformedJsonResponseEvent implements BaseTelemetryEvent {
@@ -1282,6 +1296,7 @@ export type TelemetryEvent =
   | ModelRoutingEvent
   | ToolOutputTruncatedEvent
   | ModelSlashCommandEvent
+  | FeedbackEvent
   | AgentStartEvent
   | AgentFinishEvent
   | WebFetchFallbackAttemptEvent;

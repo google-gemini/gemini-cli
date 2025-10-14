@@ -1,0 +1,12 @@
+diff --git a/node_modules/minizlib/dist/esm/index.js b/node_modules/minizlib/dist/esm/index.js
+index b70ba1f..367a57c 100644
+--- a/node_modules/minizlib/dist/esm/index.js
++++ b/node_modules/minizlib/dist/esm/index.js
+@@ -1,6 +1,6 @@
+ import assert from 'assert';
+ import { Buffer } from 'buffer';
+-import { Minipass } from 'minipass';
++import Minipass from 'minipass';
+ import * as realZlib from 'zlib';
+ import { constants } from './constants.js';
+ export { constants } from './constants.js';

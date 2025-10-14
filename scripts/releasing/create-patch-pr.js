@@ -174,7 +174,7 @@ async function main() {
           // Re-throw if it's not a conflict error
           throw error;
         }
-      } catch (_statusError) {
+      } catch {
         // Re-throw original error if we can't determine the status
         throw error;
       }
@@ -262,15 +262,15 @@ function branchExists(branchName) {
   try {
     execSync(`git ls-remote --exit-code --heads origin ${branchName}`);
     return true;
-  } catch (_e) {
+  } catch {
     return false;
   }
 }
 
 function getLatestReleaseInfo(channel) {
   console.log(`Fetching latest release info for channel: ${channel}...`);
-  const patchFrom = channel; // 'stable' or 'preview'
-  const command = `node scripts/get-release-version.js --type=patch --patch-from=${patchFrom}`;
+  // 'stable' or 'preview'
+  const command = `node scripts/get-release-version.js --type=patch --patch-from=${channel}`;
   try {
     const result = JSON.parse(execSync(command).toString().trim());
     console.log(`Current ${channel} tag: ${result.previousReleaseTag}`);
