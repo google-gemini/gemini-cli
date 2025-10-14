@@ -593,11 +593,16 @@ describe('Gemini Client (client.ts)', () => {
     it('should return NOOP if history is too short to compress', async () => {
       const { client } = setup({
         chatHistory: [{ role: 'user', parts: [{ text: 'hi' }] }],
+        originalTokenCount: 50,
       });
 
       const result = await client.tryCompressChat('prompt-id-noop', false);
 
-      expect(result.compressionStatus).toBe(CompressionStatus.NOOP);
+      expect(result).toEqual({
+        compressionStatus: CompressionStatus.NOOP,
+        originalTokenCount: 50,
+        newTokenCount: 50,
+      });
       expect(mockGenerateContentFn).not.toHaveBeenCalled();
     });
 
