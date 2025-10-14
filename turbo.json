@@ -1,8 +1,15 @@
 {
   "$schema": "https://turborepo.org/schema.json",
   "tasks": {
+    "generate": {
+      "cache": true,
+      "outputs": [
+        "packages/cli/src/generated/**",
+        "packages/core/src/generated/**"
+      ]
+    },
     "build": {
-      "dependsOn": ["^build"],
+      "dependsOn": ["^build", "^generate"],
       "outputs": ["dist/**"]
     },
     "bundle": {
@@ -12,11 +19,17 @@
     "lint": {
       "dependsOn": []
     },
+    "format": {
+      "cache": false
+    },
     "test": {
       "dependsOn": ["^build"]
     },
     "test:ci": {
       "dependsOn": ["^build"]
+    },
+    "test:scripts": {
+      "dependsOn": []
     },
     "typecheck": {
       "dependsOn": ["^build"]

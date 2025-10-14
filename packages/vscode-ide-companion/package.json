@@ -114,6 +114,7 @@
     "prepare": "npm run generate:notices",
     "check-types": "tsc --noEmit",
     "lint": "eslint src",
+    "format": "prettier --write .",
     "watch": "npm-run-all2 -p watch:*",
     "watch:esbuild": "node esbuild.js --watch",
     "watch:tsc": "tsc --noEmit --watch --project tsconfig.json",

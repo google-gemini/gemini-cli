@@ -10,6 +10,7 @@
   "main": "dist/index.js",
   "scripts": {
     "build": "node ../../scripts/build_package.js",
+    "generate": "node ../../scripts/generate-git-commit-info.js",
     "lint": "eslint . --ext .ts,.tsx",
     "format": "prettier --write .",
     "test": "vitest run",
