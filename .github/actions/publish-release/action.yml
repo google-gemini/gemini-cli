@@ -211,7 +211,7 @@ runs:
         if [ "${{ inputs.dry-run }}" == "true" ]; then
           npm publish --dry-run --workspace="@google/gemini-cli-a2a-server"
         else
-          npm publish --workspace="@google/gemini-cli-a2a-server"
+          npm publish --workspace="@google/gemini-cli-a2a-server" --access=public
         fi
 
     - name: '🔬 Verify NPM release by version'
