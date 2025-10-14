@@ -131,6 +131,7 @@ export interface GeminiCLIExtension {
   mcpServers?: Record<string, MCPServerConfig>;
   contextFiles: string[];
   excludeTools?: string[];
+  shellCommandsWithSubcommands?: string[];
 }
 
 export interface ExtensionInstallMetadata {
@@ -382,13 +383,10 @@ export class Config {
     this.fullContext = params.fullContext ?? false;
     this.coreTools = params.coreTools;
     this.allowedTools = params.allowedTools;
-    this.shellCommandsWithSubcommands = params.shellCommandsWithSubcommands ?? [
-      'git',
-      'npm',
-      'npx',
-      'gh',
-      'gh run',
-    ];
+    this.shellCommandsWithSubcommands = params.shellCommandsWithSubcommands
+      ?.length
+      ? params.shellCommandsWithSubcommands
+      : ['git', 'npm', 'npx', 'gh', 'gh run'];
     this.excludeTools = params.excludeTools;
     this.toolDiscoveryCommand = params.toolDiscoveryCommand;
     this.toolCallCommand = params.toolCallCommand;
