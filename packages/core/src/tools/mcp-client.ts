@@ -132,9 +132,7 @@ export class McpClient {
    * Discovers tools and prompts from the MCP server.
    */
   async discover(cliConfig: Config): Promise<void> {
-    if (this.status !== MCPServerStatus.CONNECTED) {
-      throw new Error('Client is not connected.');
-    }
+    this.assertConnected();
 
     const prompts = await this.discoverPrompts();
     const tools = await this.discoverTools(cliConfig);

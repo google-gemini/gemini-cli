@@ -4,6 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+// --------------------------------------------------------------------------
+// IMPORTANT: When adding a new setting, especially one with `showInDialog: true`,
+// please ensure it is also documented in `docs/get-started/configuration.md`.
+// --------------------------------------------------------------------------
+
 import type {
   MCPServerConfig,
   BugCommandSettings,
@@ -899,7 +904,7 @@ const SETTINGS_SCHEMA = {
     label: 'Use Smart Edit',
     category: 'Advanced',
     requiresRestart: false,
-    default: false,
+    default: true,
     description: 'Enable the smart-edit tool instead of the replace tool.',
     showInDialog: false,
   },

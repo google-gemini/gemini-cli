@@ -1406,6 +1406,268 @@ describe('CoreToolScheduler request queueing', () => {
   });
 });
 
+describe('CoreToolScheduler Sequential Execution', () => {
+  it('should execute tool calls in a batch sequentially', async () => {
+    // Arrange
+    let firstCallFinished = false;
+    const executeFn = vi
+      .fn()
+      .mockImplementation(async (args: { call: number }) => {
+        if (args.call === 1) {
+          // First call, wait for a bit to simulate work
+          await new Promise((resolve) => setTimeout(resolve, 50));
+          firstCallFinished = true;
+          return { llmContent: 'First call done' };
+        }
+        if (args.call === 2) {
+          // Second call, should only happen after the first is finished
+          if (!firstCallFinished) {
+            throw new Error(
+              'Second tool call started before the first one finished!',
+            );
+          }
+          return { llmContent: 'Second call done' };
+        }
+        return { llmContent: 'default' };
+      });
+
+    const mockTool = new MockTool({ name: 'mockTool', execute: executeFn });
+    const declarativeTool = mockTool;
+
+    const mockToolRegistry = {
+      getTool: () => declarativeTool,
+      getToolByName: () => declarativeTool,
+      getFunctionDeclarations: () => [],
+      tools: new Map(),
+      discovery: {},
+      registerTool: () => {},
+      getToolByDisplayName: () => declarativeTool,
+      getTools: () => [],
+      discoverTools: async () => {},
+      getAllTools: () => [],
+      getToolsByServer: () => [],
+    } as unknown as ToolRegistry;
+
+    const onAllToolCallsComplete = vi.fn();
+    const onToolCallsUpdate = vi.fn();
+
+    const mockConfig = {
+      getSessionId: () => 'test-session-id',
+      getUsageStatisticsEnabled: () => true,
+      getDebugMode: () => false,
+      getApprovalMode: () => ApprovalMode.YOLO, // Use YOLO to avoid confirmation prompts
+      getAllowedTools: () => [],
+      getContentGeneratorConfig: () => ({
+        model: 'test-model',
+        authType: 'oauth-personal',
+      }),
+      getShellExecutionConfig: () => ({
+        terminalWidth: 90,
+        terminalHeight: 30,
+      }),
+      storage: {
+        getProjectTempDir: () => '/tmp',
+      },
+      getToolRegistry: () => mockToolRegistry,
+      getTruncateToolOutputThreshold: () =>
+        DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
+      getTruncateToolOutputLines: () => DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
+      getUseSmartEdit: () => false,
+      getUseModelRouter: () => false,
+      getGeminiClient: () => null,
+    } as unknown as Config;
+
+    const scheduler = new CoreToolScheduler({
+      config: mockConfig,
+      onAllToolCallsComplete,
+      onToolCallsUpdate,
+      getPreferredEditor: () => 'vscode',
+      onEditorClose: vi.fn(),
+    });
+
+    const abortController = new AbortController();
+    const requests = [
+      {
+        callId: '1',
+        name: 'mockTool',
+        args: { call: 1 },
+        isClientInitiated: false,
+        prompt_id: 'prompt-1',
+      },
+      {
+        callId: '2',
+        name: 'mockTool',
+        args: { call: 2 },
+        isClientInitiated: false,
+        prompt_id: 'prompt-1',
+      },
+    ];
+
+    // Act
+    await scheduler.schedule(requests, abortController.signal);
+
+    // Assert
+    await vi.waitFor(() => {
+      expect(onAllToolCallsComplete).toHaveBeenCalled();
+    });
+
+    // Check that execute was called twice
+    expect(executeFn).toHaveBeenCalledTimes(2);
+
+    // Check the order of calls
+    const calls = executeFn.mock.calls;
+    expect(calls[0][0]).toEqual({ call: 1 });
+    expect(calls[1][0]).toEqual({ call: 2 });
+
+    // The onAllToolCallsComplete should be called once with both results
+    const completedCalls = onAllToolCallsComplete.mock
+      .calls[0][0] as ToolCall[];
+    expect(completedCalls).toHaveLength(2);
+    expect(completedCalls[0].status).toBe('success');
+    expect(completedCalls[1].status).toBe('success');
+  });
+
+  it('should cancel subsequent tools when the signal is aborted.', async () => {
+    // Arrange
+    const abortController = new AbortController();
+    let secondCallStarted = false;
+
+    const executeFn = vi
+      .fn()
+      .mockImplementation(async (args: { call: number }) => {
+        if (args.call === 1) {
+          return { llmContent: 'First call done' };
+        }
+        if (args.call === 2) {
+          secondCallStarted = true;
+          // This call will be cancelled while it's "running".
+          await new Promise((resolve) => setTimeout(resolve, 100));
+          // It should not return a value because it will be cancelled.
+          return { llmContent: 'Second call should not complete' };
+        }
+        if (args.call === 3) {
+          return { llmContent: 'Third call done' };
+        }
+        return { llmContent: 'default' };
+      });
+
+    const mockTool = new MockTool({ name: 'mockTool', execute: executeFn });
+    const declarativeTool = mockTool;
+
+    const mockToolRegistry = {
+      getTool: () => declarativeTool,
+      getToolByName: () => declarativeTool,
+      getFunctionDeclarations: () => [],
+      tools: new Map(),
+      discovery: {},
+      registerTool: () => {},
+      getToolByDisplayName: () => declarativeTool,
+      getTools: () => [],
+      discoverTools: async () => {},
+      getAllTools: () => [],
+      getToolsByServer: () => [],
+    } as unknown as ToolRegistry;
+
+    const onAllToolCallsComplete = vi.fn();
+    const onToolCallsUpdate = vi.fn();
+
+    const mockConfig = {
+      getSessionId: () => 'test-session-id',
+      getUsageStatisticsEnabled: () => true,
+      getDebugMode: () => false,
+      getApprovalMode: () => ApprovalMode.YOLO,
+      getAllowedTools: () => [],
+      getContentGeneratorConfig: () => ({
+        model: 'test-model',
+        authType: 'oauth-personal',
+      }),
+      getShellExecutionConfig: () => ({
+        terminalWidth: 90,
+        terminalHeight: 30,
+      }),
+      storage: {
+        getProjectTempDir: () => '/tmp',
+      },
+      getToolRegistry: () => mockToolRegistry,
+      getTruncateToolOutputThreshold: () =>
+        DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
+      getTruncateToolOutputLines: () => DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
+      getUseSmartEdit: () => false,
+      getUseModelRouter: () => false,
+      getGeminiClient: () => null,
+    } as unknown as Config;
+
+    const scheduler = new CoreToolScheduler({
+      config: mockConfig,
+      onAllToolCallsComplete,
+      onToolCallsUpdate,
+      getPreferredEditor: () => 'vscode',
+      onEditorClose: vi.fn(),
+    });
+
+    const requests = [
+      {
+        callId: '1',
+        name: 'mockTool',
+        args: { call: 1 },
+        isClientInitiated: false,
+        prompt_id: 'prompt-1',
+      },
+      {
+        callId: '2',
+        name: 'mockTool',
+        args: { call: 2 },
+        isClientInitiated: false,
+        prompt_id: 'prompt-1',
+      },
+      {
+        callId: '3',
+        name: 'mockTool',
+        args: { call: 3 },
+        isClientInitiated: false,
+        prompt_id: 'prompt-1',
+      },
+    ];
+
+    // Act
+    const schedulePromise = scheduler.schedule(
+      requests,
+      abortController.signal,
+    );
+
+    // Wait for the second call to start, then abort.
+    await vi.waitFor(() => {
+      expect(secondCallStarted).toBe(true);
+    });
+    abortController.abort();
+
+    await schedulePromise;
+
+    // Assert
+    await vi.waitFor(() => {
+      expect(onAllToolCallsComplete).toHaveBeenCalled();
+    });
+
+    // Check that execute was called for all three tools initially
+    expect(executeFn).toHaveBeenCalledTimes(3);
+    expect(executeFn).toHaveBeenCalledWith({ call: 1 });
+    expect(executeFn).toHaveBeenCalledWith({ call: 2 });
+    expect(executeFn).toHaveBeenCalledWith({ call: 3 });
+
+    const completedCalls = onAllToolCallsComplete.mock
+      .calls[0][0] as ToolCall[];
+    expect(completedCalls).toHaveLength(3);
+
+    const call1 = completedCalls.find((c) => c.request.callId === '1');
+    const call2 = completedCalls.find((c) => c.request.callId === '2');
+    const call3 = completedCalls.find((c) => c.request.callId === '3');
+
+    expect(call1?.status).toBe('success');
+    expect(call2?.status).toBe('cancelled');
+    expect(call3?.status).toBe('cancelled');
+  });
+});
+
 describe('truncateAndSaveToFile', () => {
   const mockWriteFile = vi.mocked(fs.writeFile);
   const THRESHOLD = 40_000;
