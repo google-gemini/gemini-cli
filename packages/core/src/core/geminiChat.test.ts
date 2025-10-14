@@ -1115,14 +1115,12 @@ describe('GeminiChat', () => {
       });
 
       it('should retry on specific fetch errors when configured', async () => {
-        // 1. Configure to retry on fetch errors
         vi.mocked(mockConfig.getRetryFetchErrors).mockReturnValue(true);
 
         const fetchError = new Error(
           'exception TypeError: fetch failed sending request',
         );
 
-        // 2. Mock API to fail once with fetch error, then succeed
         vi.mocked(mockContentGenerator.generateContentStream)
           .mockRejectedValueOnce(fetchError)
           .mockResolvedValueOnce(
@@ -1138,7 +1136,6 @@ describe('GeminiChat', () => {
             })(),
           );
 
-        // 3. Update mockRetryWithBackoff to handle options and simulate retry
         mockRetryWithBackoff.mockImplementation(async (apiCall, options) => {
           try {
             return await apiCall();
@@ -1150,14 +1147,12 @@ describe('GeminiChat', () => {
                 'exception TypeError: fetch failed sending request',
               )
             ) {
-              // Retry once
               return await apiCall();
             }
             throw error;
           }
         });
 
-        // 4. Act
         const stream = await chat.sendMessageStream(
           'test-model',
           { message: 'test' },
@@ -1169,13 +1164,10 @@ describe('GeminiChat', () => {
           events.push(event);
         }
 
-        // 5. Assert
-        // Should be called twice (initial + retry)
         expect(
           mockContentGenerator.generateContentStream,
         ).toHaveBeenCalledTimes(2);
 
-        // Should have successful content
         expect(
           events.some(
             (e) =>
