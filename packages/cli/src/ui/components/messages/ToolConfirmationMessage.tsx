@@ -9,13 +9,15 @@ import { useEffect, useState } from 'react';
 import { Box, Text } from 'ink';
 import { DiffRenderer } from './DiffRenderer.js';
 import { RenderInline } from '../../utils/InlineMarkdownRenderer.js';
-import type {
-  ToolCallConfirmationDetails,
-  ToolExecuteConfirmationDetails,
-  ToolMcpConfirmationDetails,
-  Config,
+import {
+  getCommandPrefix,
+  IdeClient,
+  ToolConfirmationOutcome,
+  type ToolCallConfirmationDetails,
+  type ToolExecuteConfirmationDetails,
+  type ToolMcpConfirmationDetails,
+  type Config,
 } from '@google/gemini-cli-core';
-import { IdeClient, ToolConfirmationOutcome } from '@google/gemini-cli-core';
 import type { RadioSelectItem } from '../shared/RadioButtonSelect.js';
 import { RadioButtonSelect } from '../shared/RadioButtonSelect.js';
 import { MaxSizedBox } from '../shared/MaxSizedBox.js';
@@ -93,9 +95,82 @@ export const ToolConfirmationMessage: React.FC<
   let bodyContent: React.ReactNode | null = null; // Removed contextDisplay here
   let question: string;
 
-  const options: Array<RadioSelectItem<ToolConfirmationOutcome>> = new Array<
-    RadioSelectItem<ToolConfirmationOutcome>
-  >();
+  const getItems = (): Array<RadioSelectItem<ToolConfirmationOutcome>> => {
+    const items: Array<RadioSelectItem<ToolConfirmationOutcome>> = [
+      {
+        label: 'Yes, allow once',
+        value: ToolConfirmationOutcome.ProceedOnce,
+        key: ToolConfirmationOutcome.ProceedOnce,
+      },
+    ];
+
+    if (isTrustedFolder) {
+      if (confirmationDetails.type === 'exec') {
+        const command = confirmationDetails.command;
+        const prefix = getCommandPrefix(
+          command,
+          config.getShellCommandsWithSubcommands(),
+        );
+
+        items.push({
+          label: `Yes, always allow this exact command ('${command}')`,
+          value: ToolConfirmationOutcome.ProceedAlwaysExact,
+          key: ToolConfirmationOutcome.ProceedAlwaysExact,
+        });
+
+        if (prefix !== command) {
+          items.push({
+            label: `Yes, always allow commands starting with '${prefix}'`,
+            value: ToolConfirmationOutcome.ProceedAlways,
+            key: ToolConfirmationOutcome.ProceedAlways,
+          });
+        }
+      } else if (confirmationDetails.type === 'mcp') {
+        const { toolName, serverName } = confirmationDetails;
+        items.push({
+          label: `Yes, always allow tool "${toolName}" from server "${serverName}"`,
+          value: ToolConfirmationOutcome.ProceedAlwaysTool,
+          key: ToolConfirmationOutcome.ProceedAlwaysTool,
+        });
+        items.push({
+          label: `Yes, always allow all tools from server "${serverName}"`,
+          value: ToolConfirmationOutcome.ProceedAlwaysServer,
+          key: ToolConfirmationOutcome.ProceedAlwaysServer,
+        });
+      } else if (confirmationDetails.type === 'edit') {
+        // For now, 'edit' tools don't have a specific "always allow" option
+        // beyond the server-level one, which is handled below.
+      }
+
+      // This part is a bit tricky since not all tool types have an easy-to-get server name.
+      // We can add it for MCP and potentially others if needed.
+      if (confirmationDetails.type === 'mcp') {
+        items.push({
+          label: `Yes, always allow tools from this server ('${confirmationDetails.serverName}')`,
+          value: ToolConfirmationOutcome.ProceedAlwaysServer,
+          key: ToolConfirmationOutcome.ProceedAlwaysServer,
+        });
+      }
+    }
+
+    if (confirmationDetails.type === 'edit' && !config.getIdeMode()) {
+      items.push({
+        label: 'Modify with external editor',
+        value: ToolConfirmationOutcome.ModifyWithEditor,
+        key: ToolConfirmationOutcome.ModifyWithEditor,
+      });
+    }
+
+    items.push({
+      label: 'No, suggest changes (esc)',
+      value: ToolConfirmationOutcome.Cancel,
+      key: ToolConfirmationOutcome.Cancel,
+    });
+
+    return items;
+  };
+
+  const options = getItems();
 
   // Body content is now the DiffRenderer, passing filename to it
   // The bordered box is removed from here and handled within DiffRenderer
@@ -147,32 +222,6 @@ export const ToolConfirmationMessage: React.FC<
     }
 
     question = `Apply this change?`;
-    options.push({
-      label: 'Yes, allow once',
-      value: ToolConfirmationOutcome.ProceedOnce,
-      key: 'Yes, allow once',
-    });
-    if (isTrustedFolder) {
-      options.push({
-        label: 'Yes, allow always',
-        value: ToolConfirmationOutcome.ProceedAlways,
-        key: 'Yes, allow always',
-      });
-    }
-    if (!config.getIdeMode() || !isDiffingEnabled) {
-      options.push({
-        label: 'Modify with external editor',
-        value: ToolConfirmationOutcome.ModifyWithEditor,
-        key: 'Modify with external editor',
-      });
-    }
-
-    options.push({
-      label: 'No, suggest changes (esc)',
-      value: ToolConfirmationOutcome.Cancel,
-      key: 'No, suggest changes (esc)',
-    });
-
     bodyContent = (
       <DiffRenderer
         diffContent={confirmationDetails.fileDiff}
@@ -186,24 +235,6 @@ export const ToolConfirmationMessage: React.FC<
       confirmationDetails as ToolExecuteConfirmationDetails;
 
     question = `Allow execution of: '${executionProps.rootCommand}'?`;
-    options.push({
-      label: 'Yes, allow once',
-      value: ToolConfirmationOutcome.ProceedOnce,
-      key: 'Yes, allow once',
-    });
-    if (isTrustedFolder) {
-      options.push({
-        label: `Yes, allow always ...`,
-        value: ToolConfirmationOutcome.ProceedAlways,
-        key: `Yes, allow always ...`,
-      });
-    }
-    options.push({
-      label: 'No, suggest changes (esc)',
-      value: ToolConfirmationOutcome.Cancel,
-      key: 'No, suggest changes (esc)',
-    });
-
     let bodyContentHeight = availableBodyContentHeight();
     if (bodyContentHeight !== undefined) {
       bodyContentHeight -= 2; // Account for padding;
@@ -229,24 +260,6 @@ export const ToolConfirmationMessage: React.FC<
       !(infoProps.urls.length === 1 && infoProps.urls[0] === infoProps.prompt);
 
     question = `Do you want to proceed?`;
-    options.push({
-      label: 'Yes, allow once',
-      value: ToolConfirmationOutcome.ProceedOnce,
-      key: 'Yes, allow once',
-    });
-    if (isTrustedFolder) {
-      options.push({
-        label: 'Yes, allow always',
-        value: ToolConfirmationOutcome.ProceedAlways,
-        key: 'Yes, allow always',
-      });
-    }
-    options.push({
-      label: 'No, suggest changes (esc)',
-      value: ToolConfirmationOutcome.Cancel,
-      key: 'No, suggest changes (esc)',
-    });
-
     bodyContent = (
       <Box flexDirection="column" paddingX={1} marginLeft={1}>
         <Text color={theme.text.link}>
@@ -277,28 +290,6 @@ export const ToolConfirmationMessage: React.FC<
     );
 
     question = `Allow execution of MCP tool "${mcpProps.toolName}" from server "${mcpProps.serverName}"?`;
-    options.push({
-      label: 'Yes, allow once',
-      value: ToolConfirmationOutcome.ProceedOnce,
-      key: 'Yes, allow once',
-    });
-    if (isTrustedFolder) {
-      options.push({
-        label: `Yes, always allow tool "${mcpProps.toolName}" from server "${mcpProps.serverName}"`,
-        value: ToolConfirmationOutcome.ProceedAlwaysTool, // Cast until types are updated
-        key: `Yes, always allow tool "${mcpProps.toolName}" from server "${mcpProps.serverName}"`,
-      });
-      options.push({
-        label: `Yes, always allow all tools from server "${mcpProps.serverName}"`,
-        value: ToolConfirmationOutcome.ProceedAlwaysServer,
-        key: `Yes, always allow all tools from server "${mcpProps.serverName}"`,
-      });
-    }
-    options.push({
-      label: 'No, suggest changes (esc)',
-      value: ToolConfirmationOutcome.Cancel,
-      key: 'No, suggest changes (esc)',
-    });
   }
 
   return (

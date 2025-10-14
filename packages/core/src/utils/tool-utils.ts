@@ -4,7 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { AnyDeclarativeTool, AnyToolInvocation } from '../index.js';
+import type {
+  AnyDeclarativeTool,
+  AnyToolInvocation,
+  Config,
+} from '../index.js';
 import { isTool } from '../index.js';
 import { SHELL_TOOL_NAMES } from './shell-utils.js';
 
@@ -72,4 +76,23 @@ export function doesToolInvocationMatch(
   }
 
   return false;
+}
+
+export function getMcpServerForTool(
+  config: Config,
+  toolName: string,
+): string | undefined {
+  const mcpServers = config.getMcpServers();
+  if (!mcpServers) {
+    return undefined;
+  }
+
+  for (const serverName in mcpServers) {
+    const server = mcpServers[serverName];
+    if (server.includeTools?.includes(toolName)) {
+      return serverName;
+    }
+  }
+
+  return undefined;
 }

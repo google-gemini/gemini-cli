@@ -139,6 +139,7 @@ export interface GeminiCLIExtension {
   mcpServers?: Record<string, MCPServerConfig>;
   contextFiles: string[];
   excludeTools?: string[];
+  shellCommandsWithSubcommands?: string[];
 }
 
 export interface ExtensionInstallMetadata {
@@ -219,6 +220,7 @@ export interface ConfigParameters {
   fullContext?: boolean;
   coreTools?: string[];
   allowedTools?: string[];
+  shellCommandsWithSubcommands?: string[];
   excludeTools?: string[];
   toolDiscoveryCommand?: string;
   toolCallCommand?: string;
@@ -298,6 +300,7 @@ export class Config {
   private readonly fullContext: boolean;
   private readonly coreTools: string[] | undefined;
   private readonly allowedTools: string[] | undefined;
+  private readonly shellCommandsWithSubcommands: string[];
   private readonly excludeTools: string[] | undefined;
   private readonly toolDiscoveryCommand: string | undefined;
   private readonly toolCallCommand: string | undefined;
@@ -390,6 +393,149 @@ export class Config {
     this.fullContext = params.fullContext ?? false;
     this.coreTools = params.coreTools;
     this.allowedTools = params.allowedTools;
+    this.shellCommandsWithSubcommands = params.shellCommandsWithSubcommands
+      ?.length
+      ? params.shellCommandsWithSubcommands
+      : [
+          'ansible',
+          'apt-get',
+          'aws',
+          'aws ec2',
+          'aws iam',
+          'aws s3',
+          'az',
+          'az group',
+          'az storage',
+          'az storage blob',
+          'az vm',
+          'brew',
+          'brew services',
+          'bun',
+          'bun pm',
+          'cargo',
+          'cargo component',
+          'choco',
+          'choco source',
+          'composer',
+          'conda',
+          'conda env',
+          'deno',
+          'deno jupyter',
+          'doctl',
+          'doctl compute',
+          'doctl compute droplet',
+          'docker',
+          'docker buildx',
+          'docker container',
+          'docker image',
+          'docker network',
+          'docker volume',
+          'dotnet',
+          'dotnet tool',
+          'drush',
+          'drush cache',
+          'drush config',
+          'firebase',
+          'flyctl',
+          'flyctl apps',
+          'flyctl machine',
+          'flux',
+          'flux create',
+          'flux create source',
+          'flux get',
+          'forge',
+          'gcloud',
+          'gcloud compute',
+          'gcloud compute instances',
+          'gcloud container',
+          'gcloud container clusters',
+          'gh',
+          'gh issue',
+          'gh pr',
+          'gh repo',
+          'gh run',
+          'gh workflow',
+          'git',
+          'git remote',
+          'git stash',
+          'git submodule',
+          'go',
+          'go mod',
+          'go tool',
+          'gradle',
+          'helm',
+          'helm repo',
+          'heroku',
+          'heroku apps',
+          'heroku domains',
+          'hg',
+          'istioctl',
+          'istioctl proxy-config',
+          'kubectl',
+          'kubectl config',
+          'linkerd',
+          'linkerd viz',
+          'minikube',
+          'minikube addons',
+          'minikube cache',
+          'mix',
+          'mix deps',
+          'mvn',
+          'npm',
+          'npm cache',
+          'npx',
+          'oc',
+          'oc config',
+          'openssl',
+          'pip',
+          'pip cache',
+          'pnpm',
+          'pnpm store',
+          'podman',
+          'podman container',
+          'podman image',
+          'poetry',
+          'poetry cache',
+          'poetry source',
+          'pulumi',
+          'pulumi config',
+          'pulumi stack',
+          'rails',
+          'rustup',
+          'rustup component',
+          'rustup toolchain',
+          'sam',
+          'sam remote',
+          'sbt',
+          'serverless',
+          'serverless plugin',
+          'supabase',
+          'supabase db',
+          'supabase functions',
+          'svn',
+          'systemctl',
+          'terraform',
+          'terraform state',
+          'terraform workspace',
+          'tkn',
+          'tkn pipeline',
+          'tkn taskrun',
+          'truffle',
+          'uv',
+          'uv pip',
+          'vagrant',
+          'vagrant box',
+          'vagrant plugin',
+          'vercel',
+          'vercel domains',
+          'wp-cli',
+          'wp post',
+          'wp plugin',
+          'wp user',
+          'yarn',
+          'yarn cache',
+          'yarn workspace',
+        ];
     this.excludeTools = params.excludeTools;
     this.toolDiscoveryCommand = params.toolDiscoveryCommand;
     this.toolCallCommand = params.toolCallCommand;
@@ -689,6 +835,10 @@ export class Config {
 
   getAllowedTools(): string[] | undefined {
     return this.allowedTools;
+  }
+
+  getShellCommandsWithSubcommands(): string[] {
+    return this.shellCommandsWithSubcommands;
   }
 
   getExcludeTools(): string[] | undefined {

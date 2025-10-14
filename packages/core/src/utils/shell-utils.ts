@@ -195,6 +195,39 @@ export function getCommandRoot(command: string): string | undefined {
   return undefined;
 }
 
+/**
+ * Generates a command prefix to offer for approval.
+ *
+ * @param command The full command string.
+ * @param shellCommandsWithSubcommands A list of commands that can be "stemmed" to create
+ *   more specific prefixes (e.g., 'git', 'npm', 'gh run').
+ * @returns The most specific prefix to offer for approval.
+ */
+export function getCommandPrefix(
+  command: string,
+  shellCommandsWithSubcommands: string[],
+): string {
+  const parts = command.trim().split(/\s+/);
+  if (parts.length === 0 || parts[0] === '') {
+    return '';
+  }
+
+  // Find the longest matching stemmable prefix.
+  const longestMatch = shellCommandsWithSubcommands
+    .filter((prefix) => command.startsWith(prefix + ' '))
+    .sort((a, b) => b.length - a.length)[0];
+
+  if (longestMatch) {
+    const prefixParts = longestMatch.trim().split(/\s+/);
+    if (parts.length > prefixParts.length) {
+      // Add the next level of specificity.
+      return parts.slice(0, prefixParts.length + 1).join(' ');
+    }
+  }
+
+  return parts[0];
+}
+
 export function getCommandRoots(command: string): string[] {
   if (!command) {
     return [];

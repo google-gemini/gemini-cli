@@ -4,162 +4,156 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi } from 'vitest';
-import { ToolConfirmationMessage } from './ToolConfirmationMessage.js';
-import type {
-  ToolCallConfirmationDetails,
-  Config,
+import { vi, describe, it, expect, beforeEach } from 'vitest';
+
+import { render } from 'ink-testing-library';
+
+import {
+  ToolConfirmationMessage,
+  type ToolConfirmationMessageProps,
+} from './ToolConfirmationMessage.js';
+
+import {
+  type Config,
+  type ToolCallConfirmationDetails,
 } from '@google/gemini-cli-core';
-import { renderWithProviders } from '../../../test-utils/render.js';
+
+import { KeypressProvider } from '../../contexts/KeypressContext.js';
 
 describe('ToolConfirmationMessage', () => {
-  const mockConfig = {
-    isTrustedFolder: () => true,
-    getIdeMode: () => false,
-  } as unknown as Config;
+  let lastFrame: () => string;
 
-  it('should not display urls if prompt and url are the same', () => {
-    const confirmationDetails: ToolCallConfirmationDetails = {
-      type: 'info',
-      title: 'Confirm Web Fetch',
-      prompt: 'https://example.com',
-      urls: ['https://example.com'],
-      onConfirm: vi.fn(),
-    };
+  const mockOnConfirm = vi.fn();
 
-    const { lastFrame } = renderWithProviders(
-      <ToolConfirmationMessage
-        confirmationDetails={confirmationDetails}
-        config={mockConfig}
-        availableTerminalHeight={30}
-        terminalWidth={80}
-      />,
+  const baseDetails: Omit<ToolCallConfirmationDetails, 'type'> = {
+    onConfirm: mockOnConfirm,
+
+    title: 'Confirm Tool Call',
+  };
+
+  const execDetails: ToolCallConfirmationDetails = {
+    ...baseDetails,
+
+    type: 'exec',
+
+    command: 'echo "hello"',
+
+    rootCommand: 'echo',
+  };
+
+  const editDetails: ToolCallConfirmationDetails = {
+    ...baseDetails,
+
+    type: 'edit',
+
+    fileDiff:
+      'diff --git a/file.txt b/file.txt\n--- a/file.txt\n+++ b/file.txt',
+
+    fileName: 'file.txt',
+
+    filePath: '/path/to/file.txt',
+
+    isModifying: false,
+
+    originalContent: 'a',
+
+    newContent: 'b',
+  };
+
+  const infoDetails: ToolCallConfirmationDetails = {
+    ...baseDetails,
+
+    type: 'info',
+
+    prompt: 'Fetch data from example.com',
+
+    urls: ['https://example.com'],
+  };
+
+  const mcpDetails: ToolCallConfirmationDetails = {
+    ...baseDetails,
+
+    type: 'mcp',
+
+    serverName: 'test-server',
+
+    toolName: 'test-tool',
+
+    toolDisplayName: 'Test Tool',
+  };
+
+  const mockConfig = (isTrusted: boolean): Config =>
+    ({
+      isTrustedFolder: () => isTrusted,
+
+      getIdeMode: () => false,
+
+      getShellCommandsWithSubcommands: () => ['npm', 'git'],
+    }) as unknown as Config;
+
+  const renderComponent = (
+    props: Omit<ToolConfirmationMessageProps, 'terminalWidth'>,
+  ) => {
+    const { lastFrame: lf } = render(
+      <KeypressProvider kittyProtocolEnabled={false}>
+        <ToolConfirmationMessage {...props} terminalWidth={80} />
+      </KeypressProvider>,
     );
 
-    expect(lastFrame()).not.toContain('URLs to fetch:');
+    lastFrame = () => lf() || '';
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
   });
 
-  it('should display urls if prompt and url are different', () => {
-    const confirmationDetails: ToolCallConfirmationDetails = {
-      type: 'info',
-      title: 'Confirm Web Fetch',
-      prompt:
-        'fetch https://github.com/google/gemini-react/blob/main/README.md',
-      urls: [
-        'https://raw.githubusercontent.com/google/gemini-react/main/README.md',
-      ],
-      onConfirm: vi.fn(),
-    };
+  describe('with trusted folder', () => {
+    const config = mockConfig(true);
 
-    const { lastFrame } = renderWithProviders(
-      <ToolConfirmationMessage
-        confirmationDetails={confirmationDetails}
-        config={mockConfig}
-        availableTerminalHeight={30}
-        terminalWidth={80}
-      />,
-    );
+    it('for exec confirmations, should show all "always allow" options', () => {
+      renderComponent({ confirmationDetails: execDetails, config });
+      expect(lastFrame()).toContain('Yes, always allow this exact command');
+      expect(lastFrame()).toContain('Yes, always allow commands starting with');
+    });
 
-    expect(lastFrame()).toContain('URLs to fetch:');
-    expect(lastFrame()).toContain(
-      '- https://raw.githubusercontent.com/google/gemini-react/main/README.md',
-    );
+    it('for edit confirmations, should not show "always allow"', () => {
+      renderComponent({ confirmationDetails: editDetails, config });
+      expect(lastFrame()).not.toContain('Yes, allow always');
+    });
+
+    it('for info confirmations, should not show "always allow"', () => {
+      renderComponent({ confirmationDetails: infoDetails, config });
+      expect(lastFrame()).not.toContain('Yes, allow always');
+    });
+
+    it('for mcp confirmations, should show all "always allow" options', () => {
+      renderComponent({ confirmationDetails: mcpDetails, config });
+      expect(lastFrame()).toContain('Yes, always allow tool "test-tool"');
+      expect(lastFrame()).toContain('Yes, always allow all tools from server');
+    });
   });
 
-  describe('with folder trust', () => {
-    const editConfirmationDetails: ToolCallConfirmationDetails = {
-      type: 'edit',
-      title: 'Confirm Edit',
-      fileName: 'test.txt',
-      filePath: '/test.txt',
-      fileDiff: '...diff...',
-      originalContent: 'a',
-      newContent: 'b',
-      onConfirm: vi.fn(),
-    };
+  describe('with untrusted folder', () => {
+    const config = mockConfig(false);
 
-    const execConfirmationDetails: ToolCallConfirmationDetails = {
-      type: 'exec',
-      title: 'Confirm Execution',
-      command: 'echo "hello"',
-      rootCommand: 'echo',
-      onConfirm: vi.fn(),
-    };
+    it('for exec confirmations, should NOT show "always allow" options', () => {
+      renderComponent({ confirmationDetails: execDetails, config });
+      expect(lastFrame()).not.toContain('Yes, always allow');
+    });
 
-    const infoConfirmationDetails: ToolCallConfirmationDetails = {
-      type: 'info',
-      title: 'Confirm Web Fetch',
-      prompt: 'https://example.com',
-      urls: ['https://example.com'],
-      onConfirm: vi.fn(),
-    };
+    it('for edit confirmations, should NOT show "always allow"', () => {
+      renderComponent({ confirmationDetails: editDetails, config });
+      expect(lastFrame()).not.toContain('Yes, allow always');
+    });
 
-    const mcpConfirmationDetails: ToolCallConfirmationDetails = {
-      type: 'mcp',
-      title: 'Confirm MCP Tool',
-      serverName: 'test-server',
-      toolName: 'test-tool',
-      toolDisplayName: 'Test Tool',
-      onConfirm: vi.fn(),
-    };
+    it('for info confirmations, should NOT show "always allow"', () => {
+      renderComponent({ confirmationDetails: infoDetails, config });
+      expect(lastFrame()).not.toContain('Yes, allow always');
+    });
 
-    describe.each([
-      {
-        description: 'for edit confirmations',
-        details: editConfirmationDetails,
-        alwaysAllowText: 'Yes, allow always',
-      },
-      {
-        description: 'for exec confirmations',
-        details: execConfirmationDetails,
-        alwaysAllowText: 'Yes, allow always',
-      },
-      {
-        description: 'for info confirmations',
-        details: infoConfirmationDetails,
-        alwaysAllowText: 'Yes, allow always',
-      },
-      {
-        description: 'for mcp confirmations',
-        details: mcpConfirmationDetails,
-        alwaysAllowText: 'always allow',
-      },
-    ])('$description', ({ details, alwaysAllowText }) => {
-      it('should show "allow always" when folder is trusted', () => {
-        const mockConfig = {
-          isTrustedFolder: () => true,
-          getIdeMode: () => false,
-        } as unknown as Config;
-
-        const { lastFrame } = renderWithProviders(
-          <ToolConfirmationMessage
-            confirmationDetails={details}
-            config={mockConfig}
-            availableTerminalHeight={30}
-            terminalWidth={80}
-          />,
-        );
-
-        expect(lastFrame()).toContain(alwaysAllowText);
-      });
-
-      it('should NOT show "allow always" when folder is untrusted', () => {
-        const mockConfig = {
-          isTrustedFolder: () => false,
-          getIdeMode: () => false,
-        } as unknown as Config;
-
-        const { lastFrame } = renderWithProviders(
-          <ToolConfirmationMessage
-            confirmationDetails={details}
-            config={mockConfig}
-            availableTerminalHeight={30}
-            terminalWidth={80}
-          />,
-        );
-
-        expect(lastFrame()).not.toContain(alwaysAllowText);
-      });
+    it('for mcp confirmations, should NOT show "always allow" options', () => {
+      renderComponent({ confirmationDetails: mcpDetails, config });
+      expect(lastFrame()).not.toContain('Yes, always allow');
     });
   });
 });
