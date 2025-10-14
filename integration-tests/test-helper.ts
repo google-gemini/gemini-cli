@@ -15,6 +15,7 @@ import fs from 'node:fs';
 import * as pty from '@lydell/node-pty';
 import stripAnsi from 'strip-ansi';
 import * as os from 'node:os';
+import { GEMINI_DIR } from '../packages/core/src/utils/paths.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -182,7 +183,7 @@ export class InteractiveRun {
     });
   }
 
-  async waitForText(text: string, timeout?: number) {
+  async expectText(text: string, timeout?: number) {
     if (!timeout) {
       timeout = getDefaultTimeout();
     }
@@ -207,7 +208,7 @@ export class InteractiveRun {
     this.ptyProcess.kill();
   }
 
-  waitForExit(): Promise<number> {
+  expectExit(): Promise<number> {
     return new Promise((resolve, reject) => {
       const timer = setTimeout(
         () =>
@@ -245,7 +246,7 @@ export class TestRig {
     mkdirSync(this.testDir, { recursive: true });
 
     // Create a settings file to point the CLI to the local collector
-    const geminiDir = join(this.testDir, '.gemini');
+    const geminiDir = join(this.testDir, GEMINI_DIR);
     mkdirSync(geminiDir, { recursive: true });
     // In sandbox mode, use an absolute path for telemetry inside the container
     // The container mounts the test directory at the same path as the host
@@ -602,6 +603,34 @@ export class TestRig {
     );
   }
 
+  async expectToolCallSuccess(toolNames: string[], timeout?: number) {
+    // Use environment-specific timeout
+    if (!timeout) {
+      timeout = getDefaultTimeout();
+    }
+
+    // Wait for telemetry to be ready before polling for tool calls
+    await this.waitForTelemetryReady();
+
+    const success = await poll(
+      () => {
+        const toolLogs = this.readToolLogs();
+        return toolNames.some((name) =>
+          toolLogs.some(
+            (log) => log.toolRequest.name === name && log.toolRequest.success,
+          ),
+        );
+      },
+      timeout,
+      100,
+    );
+
+    expect(
+      success,
+      `Expected to find successful toolCalls for ${JSON.stringify(toolNames)}`,
+    ).toBe(true);
+  }
+
   async waitForAnyToolCall(toolNames: string[], timeout?: number) {
     // Use environment-specific timeout
     if (!timeout) {
@@ -891,7 +920,7 @@ export class TestRig {
 
     const run = new InteractiveRun(ptyProcess);
     // Wait for the app to be ready
-    await run.waitForText('Type your message', 30000);
+    await run.expectText('Type your message', 30000);
     return run;
   }
 }

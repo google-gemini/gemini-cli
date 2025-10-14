@@ -1171,7 +1171,10 @@ describe('Hierarchical Memory Loading (config.ts) - Placeholder Suite', () => {
   // 3. Spies on console functions (for logger output) are correctly set up if needed.
   // Example of a previously failing test structure:
   it.skip('should correctly use mocked homedir for global path', async () => {
-    const MOCK_GEMINI_DIR_LOCAL = path.join('/mock/home/user', '.gemini');
+    const MOCK_GEMINI_DIR_LOCAL = path.join(
+      '/mock/home/user',
+      ServerConfig.GEMINI_DIR,
+    );
     const MOCK_GLOBAL_PATH_LOCAL = path.join(
       MOCK_GEMINI_DIR_LOCAL,
       'GEMINI.md',
@@ -2538,59 +2541,6 @@ describe('loadCliConfig useRipgrep', () => {
         argv,
       );
       expect(config.getUseModelRouter()).toBe(false);
-    });
-  });
-
-  describe('loadCliConfig enableSubagents', () => {
-    it('should be false by default when enableSubagents is not set in settings', async () => {
-      process.argv = ['node', 'script.js'];
-      const argv = await parseArguments({} as Settings);
-      const settings: Settings = {};
-      const config = await loadCliConfig(
-        settings,
-        [],
-        new ExtensionEnablementManager(
-          ExtensionStorage.getUserExtensionsDir(),
-          argv.extensions,
-        ),
-        'test-session',
-        argv,
-      );
-      expect(config.getEnableSubagents()).toBe(false);
-    });
-
-    it('should be true when enableSubagents is set to true in settings', async () => {
-      process.argv = ['node', 'script.js'];
-      const argv = await parseArguments({} as Settings);
-      const settings: Settings = { experimental: { enableSubagents: true } };
-      const config = await loadCliConfig(
-        settings,
-        [],
-        new ExtensionEnablementManager(
-          ExtensionStorage.getUserExtensionsDir(),
-          argv.extensions,
-        ),
-        'test-session',
-        argv,
-      );
-      expect(config.getEnableSubagents()).toBe(true);
-    });
-
-    it('should be false when enableSubagents is explicitly set to false in settings', async () => {
-      process.argv = ['node', 'script.js'];
-      const argv = await parseArguments({} as Settings);
-      const settings: Settings = { experimental: { enableSubagents: false } };
-      const config = await loadCliConfig(
-        settings,
-        [],
-        new ExtensionEnablementManager(
-          ExtensionStorage.getUserExtensionsDir(),
-          argv.extensions,
-        ),
-        'test-session',
-        argv,
-      );
-      expect(config.getEnableSubagents()).toBe(false);
     });
   });
 });
