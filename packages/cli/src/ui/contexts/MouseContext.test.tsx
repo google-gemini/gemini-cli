@@ -6,7 +6,7 @@
 
 import { renderHook, act } from '@testing-library/react';
 import { MouseProvider, useMouseContext, useMouse } from './MouseContext.js';
-import { vi } from 'vitest';
+import { vi, type Mock } from 'vitest';
 import type React from 'react';
 import { useStdin } from 'ink';
 import { EventEmitter } from 'node:events';
@@ -41,7 +41,7 @@ describe('MouseContext', () => {
 
   beforeEach(() => {
     stdin = new MockStdin();
-    (useStdin as vi.Mock).mockReturnValue({
+    (useStdin as Mock).mockReturnValue({
       stdin,
       setRawMode: vi.fn(),
     });
@@ -97,7 +97,7 @@ describe('MouseContext', () => {
       {
         sequence: '\x1b[<0;10;20M',
         expected: {
-          name: 'mouse-left-press',
+          name: 'left-press',
           ctrl: false,
           meta: false,
           shift: false,
@@ -106,7 +106,7 @@ describe('MouseContext', () => {
       {
         sequence: '\x1b[<0;10;20m',
         expected: {
-          name: 'mouse-left-release',
+          name: 'left-release',
           ctrl: false,
           meta: false,
           shift: false,
@@ -115,7 +115,7 @@ describe('MouseContext', () => {
       {
         sequence: '\x1b[<2;10;20M',
         expected: {
-          name: 'mouse-right-press',
+          name: 'right-press',
           ctrl: false,
           meta: false,
           shift: false,
@@ -124,7 +124,7 @@ describe('MouseContext', () => {
       {
         sequence: '\x1b[<1;10;20M',
         expected: {
-          name: 'mouse-middle-press',
+          name: 'middle-press',
           ctrl: false,
           meta: false,
           shift: false,
@@ -133,7 +133,7 @@ describe('MouseContext', () => {
       {
         sequence: '\x1b[<64;10;20M',
         expected: {
-          name: 'mouse-scroll-up',
+          name: 'scroll-up',
           ctrl: false,
           meta: false,
           shift: false,
@@ -142,7 +142,7 @@ describe('MouseContext', () => {
       {
         sequence: '\x1b[<65;10;20M',
         expected: {
-          name: 'mouse-scroll-down',
+          name: 'scroll-down',
           ctrl: false,
           meta: false,
           shift: false,
@@ -151,7 +151,7 @@ describe('MouseContext', () => {
       {
         sequence: '\x1b[<32;10;20M',
         expected: {
-          name: 'mouse-move',
+          name: 'move',
           ctrl: false,
           meta: false,
           shift: false,
@@ -159,19 +159,19 @@ describe('MouseContext', () => {
       },
       {
         sequence: '\x1b[<4;10;20M',
-        expected: { name: 'mouse-left-press', shift: true },
+        expected: { name: 'left-press', shift: true },
       }, // Shift + left press
       {
         sequence: '\x1b[<8;10;20M',
-        expected: { name: 'mouse-left-press', meta: true },
+        expected: { name: 'left-press', meta: true },
       }, // Alt + left press
       {
         sequence: '\x1b[<20;10;20M',
-        expected: { name: 'mouse-left-press', ctrl: true, shift: true },
+        expected: { name: 'left-press', ctrl: true, shift: true },
       }, // Ctrl + Shift + left press
       {
         sequence: '\x1b[<68;10;20M',
-        expected: { name: 'mouse-scroll-up', shift: true },
+        expected: { name: 'scroll-up', shift: true },
       }, // Shift + scroll up
     ])(
       'should recognize sequence "$sequence" as $expected.name',

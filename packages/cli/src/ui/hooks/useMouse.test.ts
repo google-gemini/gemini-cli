@@ -7,10 +7,7 @@
 import { renderHook } from '@testing-library/react';
 import { vi } from 'vitest';
 import { useMouse } from './useMouse.js';
-import {
-  MouseContextProvider,
-  useMouseContext,
-} from '../contexts/MouseContext.js';
+import { MouseProvider, useMouseContext } from '../contexts/MouseContext.js';
 
 vi.mock('../contexts/MouseContext.js', async (importOriginal) => {
   const actual =
@@ -35,7 +32,7 @@ describe('useMouse', () => {
 
   it('should not subscribe when isActive is false', () => {
     renderHook(() => useMouse(mockOnMouseEvent, { isActive: false }), {
-      wrapper: MouseContextProvider,
+      wrapper: MouseProvider,
     });
 
     const { subscribe } = useMouseContext();
@@ -44,7 +41,7 @@ describe('useMouse', () => {
 
   it('should subscribe when isActive is true', () => {
     renderHook(() => useMouse(mockOnMouseEvent, { isActive: true }), {
-      wrapper: MouseContextProvider,
+      wrapper: MouseProvider,
     });
 
     const { subscribe } = useMouseContext();
@@ -54,7 +51,7 @@ describe('useMouse', () => {
   it('should unsubscribe on unmount', () => {
     const { unmount } = renderHook(
       () => useMouse(mockOnMouseEvent, { isActive: true }),
-      { wrapper: MouseContextProvider },
+      { wrapper: MouseProvider },
     );
 
     const { unsubscribe } = useMouseContext();
@@ -68,7 +65,7 @@ describe('useMouse', () => {
         useMouse(mockOnMouseEvent, { isActive }),
       {
         initialProps: { isActive: true },
-        wrapper: MouseContextProvider,
+        wrapper: MouseProvider,
       },
     );
 

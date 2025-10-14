@@ -476,7 +476,7 @@ describe('KeypressContext - Kitty Protocol', () => {
 
       expect(consoleLogSpy).toHaveBeenCalledWith(
         '[DEBUG] Kitty buffer accumulating:',
-        expect.stringContaining('\x1b[27u'),
+        expect.stringContaining(JSON.stringify('\x1b[27u')),
       );
       const parsedCall = consoleLogSpy.mock.calls.find(
         (args) =>
@@ -484,7 +484,7 @@ describe('KeypressContext - Kitty Protocol', () => {
           args[0].includes('[DEBUG] Kitty sequence parsed successfully'),
       );
       expect(parsedCall).toBeTruthy();
-      expect(parsedCall?.[1]).toEqual(expect.stringContaining('\x1b[27u'));
+      expect(parsedCall?.[1]).toEqual(JSON.stringify('\x1b[27u'));
     });
 
     it('should log kitty buffer overflow when debugKeystrokeLogging is true', async () => {
@@ -506,7 +506,7 @@ describe('KeypressContext - Kitty Protocol', () => {
       });
 
       // Send an invalid long sequence to trigger overflow
-      const longInvalidSequence = '\x1b[' + 'x'.repeat(100);
+      const longInvalidSequence = '\x1b[' + '1'.repeat(100);
       act(() => {
         stdin.sendKittySequence(longInvalidSequence);
       });
@@ -604,13 +604,13 @@ describe('KeypressContext - Kitty Protocol', () => {
       // Verify debug logging for accumulation
       expect(consoleLogSpy).toHaveBeenCalledWith(
         '[DEBUG] Kitty buffer accumulating:',
-        sequence,
+        JSON.stringify(sequence),
       );
 
       // Verify warning for char codes
       expect(consoleWarnSpy).toHaveBeenCalledWith(
-        'Kitty sequence buffer has char codes:',
-        [27, 91, 49, 50],
+        'Kitty sequence buffer has content:',
+        JSON.stringify(sequence),
       );
     });
   });
@@ -1018,7 +1018,6 @@ describe('Terminal-specific Alt+key combinations', () => {
                 paste: false,
               },
               expected: {
-                sequence: `\x1b${key}`,
                 name: key,
                 ctrl: false,
                 meta: true,
@@ -1077,6 +1076,83 @@ describe('Terminal-specific Alt+key combinations', () => {
       expect(keyHandler).toHaveBeenCalledWith(
         expect.objectContaining(expected),
       );
+    },
+  );
+});
+
+describe('Mouse Event Handling', () => {
+  let stdin: MockStdin;
+  const mockSetRawMode = vi.fn();
+
+  const wrapper = ({ children }: { children: React.ReactNode }) => (
+    <KeypressProvider kittyProtocolEnabled={true}>{children}</KeypressProvider>
+  );
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    stdin = new MockStdin();
+    (useStdin as Mock).mockReturnValue({
+      stdin,
+      setRawMode: mockSetRawMode,
+    });
+  });
+
+  it.each([
+    { sequence: `\x1b[<0;10;20M`, description: 'left mouse press' },
+    { sequence: `\x1b[<0;10;20m`, description: 'left mouse release' },
+    { sequence: `\x1b[<32;15;25M`, description: 'mouse move' },
+    { sequence: `\x1b[<64;30;40M`, description: 'mouse scroll up' },
+    { sequence: `\x1b[<65;30;40M`, description: 'mouse scroll down' },
+    { sequence: `\x1b[<66;30;40M`, description: 'mouse scroll left' },
+    { sequence: `\x1b[<67;30;40M`, description: 'mouse scroll right' },
+  ])('should ignore SGR mouse event for $description', ({ sequence }) => {
+    const keyHandler = vi.fn();
+    const { result } = renderHook(() => useKeypressContext(), { wrapper });
+    act(() => result.current.subscribe(keyHandler));
+
+    act(() => stdin.sendKittySequence(sequence));
+
+    expect(keyHandler).not.toHaveBeenCalled();
+  });
+});
+
+describe('Mouse Event Handling without Kitty Protocol', () => {
+  let stdin: MockStdin;
+  const mockSetRawMode = vi.fn();
+
+  const wrapper = ({ children }: { children: React.ReactNode }) => (
+    <KeypressProvider kittyProtocolEnabled={false}>{children}</KeypressProvider>
+  );
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    stdin = new MockStdin();
+    (useStdin as Mock).mockReturnValue({
+      stdin,
+      setRawMode: mockSetRawMode,
+    });
+  });
+
+  it.each([
+    { sequence: `\x1b[<0;10;20M`, description: 'left mouse press' },
+    { sequence: `\x1b[<0;10;20m`, description: 'left mouse release' },
+    { sequence: `\x1b[<32;15;25M`, description: 'mouse move' },
+    { sequence: `\x1b[<64;30;40M`, description: 'mouse scroll up' },
+    { sequence: `\x1b[<65;30;40M`, description: 'mouse scroll down' },
+  ])(
+    'should ignore SGR mouse event for $description when kitty protocol is disabled',
+    ({ sequence }) => {
+      const keyHandler = vi.fn();
+      const { result } = renderHook(() => useKeypressContext(), { wrapper });
+      act(() => result.current.subscribe(keyHandler));
+
+      act(() => {
+        // When kitty protocol is disabled, mouse events might still be sent
+        // as raw escape sequences. We simulate this by calling pressKey.
+        stdin.pressKey({ sequence });
+      });
+
+      expect(keyHandler).not.toHaveBeenCalled();
     },
   );
 });

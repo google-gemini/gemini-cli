@@ -38,13 +38,16 @@ import {
 
 import { FOCUS_IN, FOCUS_OUT } from '../hooks/useFocus.js';
 
-const ESC = '\u001B';
+export const ESC = '\u001B';
+const SGR_EVENT_PREFIX = `${ESC}[<`;
 export const PASTE_MODE_PREFIX = `${ESC}[200~`;
 export const PASTE_MODE_SUFFIX = `${ESC}[201~`;
 export const DRAG_COMPLETION_TIMEOUT_MS = 100; // Broadcast full path after 100ms if no more input
 export const KITTY_SEQUENCE_TIMEOUT_MS = 50; // Flush incomplete kitty sequences after 50ms
 export const SINGLE_QUOTE = "'";
 export const DOUBLE_QUOTE = '"';
+// eslint-disable-next-line no-control-regex
+export const SGR_MOUSE_REGEX = /^\x1b\[<(\d+);(\d+);(\d+)([mM])/; // SGR mouse events
 
 const ALT_KEY_CHARACTER_MAP: Record<string, string> = {
   '\u00E5': 'a',
@@ -166,8 +169,44 @@ export function KeypressProvider({
     let pasteBuffer = Buffer.alloc(0);
     let kittySequenceBuffer = '';
     let kittySequenceTimeout: NodeJS.Timeout | null = null;
+    let mouseSequenceBuffer = '';
+    let mouseSequenceTimeout: NodeJS.Timeout | null = null;
     let backslashTimeout: NodeJS.Timeout | null = null;
     let waitingForEnterAfterBackslash = false;
+
+    const couldBeSGRMouseSequence = (buffer: string): boolean => {
+      if (buffer.length === 0) return true;
+      // Check if buffer is a prefix of a mouse sequence starter
+      if (SGR_EVENT_PREFIX.startsWith(buffer)) return true;
+      // Check if buffer is a mouse sequence prefix
+      if (buffer.startsWith(SGR_EVENT_PREFIX)) return true;
+
+      return false;
+    };
+
+    const flushMouseBuffer = (reason: string) => {
+      if (mouseSequenceBuffer) {
+        if (debugKeystrokeLogging) {
+          console.log(
+            `[DEBUG] Mouse sequence flushed due to ${reason}:`,
+            JSON.stringify(mouseSequenceBuffer),
+          );
+        }
+        broadcast({
+          name: '',
+          ctrl: false,
+          meta: false,
+          shift: false,
+          paste: false,
+          sequence: mouseSequenceBuffer,
+        });
+        mouseSequenceBuffer = '';
+      }
+      if (mouseSequenceTimeout) {
+        clearTimeout(mouseSequenceTimeout);
+        mouseSequenceTimeout = null;
+      }
+    };
 
     // Check if a buffer could potentially be a valid kitty sequence or its prefix
     const couldBeKittySequence = (buffer: string): boolean => {
@@ -176,6 +215,11 @@ export function KeypressProvider({
       if (buffer === ESC || buffer === `${ESC}[`) return true;
 
       if (!buffer.startsWith(`${ESC}[`)) return false;
+
+      // Check for SGR mouse event prefix
+      if (buffer.startsWith(SGR_EVENT_PREFIX)) {
+        return true;
+      }
 
       // Check for known kitty sequence patterns:
       // 1. ESC[<digit> - could be CSI-u or tilde-coded
@@ -208,51 +252,22 @@ export function KeypressProvider({
     const parseKittyPrefix = (
       buffer: string,
     ): { key: Key; length: number } | null => {
-      // SGR Mouse Events: ESC [ < button ; x ; y M
-      if (buffer.startsWith(`${ESC}[<`)) {
-        const mIndex = buffer.indexOf('M');
-        if (mIndex === -1) {
-          return null; // Incomplete sequence
-        }
-
-        const sequence = buffer.substring(0, mIndex + 1);
-        const firstSemicolon = sequence.indexOf(';');
-        if (firstSemicolon === -1) {
-          return null; // Malformed
-        }
-
-        // Button code is between '<' (index 2) and the first semicolon
-        const buttonCodeStr = sequence.substring(3, firstSemicolon);
-        const buttonCode = parseInt(buttonCodeStr, 10);
-
-        if (isNaN(buttonCode)) {
-          return null; // Malformed
-        }
-
-        let name: string | null = null;
-        if (buttonCode === 64) {
-          name = 'mouse-scroll-up';
-        } else if (buttonCode === 65) {
-          name = 'mouse-scroll-down';
-        }
-
-        if (name) {
-          return {
-            key: {
-              name,
-              ctrl: false,
-              meta: false,
-              shift: false,
-              paste: false,
-              sequence,
-              kittyProtocol: true,
-            },
-            length: sequence.length,
-          };
-        }
-        // It's a different mouse event that we don't handle, so we return
-        // null to let other parsing logic attempt to handle it or discard it.
-        return null;
+      // SGR Mouse Events: ESC [ < button ; x ; y M.
+      // These are handled by MouseContext, so we parse and ignore them here.
+      const mouseMatch = buffer.match(SGR_MOUSE_REGEX);
+      if (mouseMatch) {
+        return {
+          key: {
+            name: 'mouse-event', // Special name to be ignored by handler.
+            ctrl: false,
+            meta: false,
+            shift: false,
+            paste: false,
+            sequence: mouseMatch[0],
+            kittyProtocol: true,
+          },
+          length: mouseMatch[0].length,
+        };
       }
 
       // In older terminals ESC [ Z was used as Cursor Backward Tabulation (CBT)
@@ -522,10 +537,47 @@ export function KeypressProvider({
     const handleKeypress = (_: unknown, key: Key) => {
       if (key.sequence === FOCUS_IN || key.sequence === FOCUS_OUT) {
         flushKittyBufferOnInterrupt('focus event');
+        flushMouseBuffer('focus event');
         return;
       }
+
+      if (!kittyProtocolEnabled) {
+        if (mouseSequenceTimeout) {
+          clearTimeout(mouseSequenceTimeout);
+          mouseSequenceTimeout = null;
+        }
+
+        const potentialBuffer = mouseSequenceBuffer + key.sequence;
+        if (couldBeSGRMouseSequence(potentialBuffer)) {
+          mouseSequenceBuffer = potentialBuffer;
+
+          if (SGR_MOUSE_REGEX.test(mouseSequenceBuffer)) {
+            // Complete sequence, just drop it.
+            mouseSequenceBuffer = '';
+            return;
+          }
+
+          // Incomplete, set timeout.
+          mouseSequenceTimeout = setTimeout(() => {
+            flushMouseBuffer('timeout');
+          }, KITTY_SEQUENCE_TIMEOUT_MS);
+          return;
+        } else if (mouseSequenceBuffer) {
+          // Not a mouse sequence. Flush any existing buffer.
+          flushMouseBuffer('non-matching sequence');
+          // And then process the current key by falling through.
+        }
+      }
+
+      // SGR mouse events can be sent by terminals even if kitty protocol is not
+      // enabled for keyboard. We should ignore them.
+      if (!kittyProtocolEnabled && SGR_MOUSE_REGEX.test(key.sequence)) {
+        return;
+      }
+
       if (key.name === 'paste-start') {
         flushKittyBufferOnInterrupt('paste start');
+        flushMouseBuffer('paste start');
         isPaste = true;
         return;
       }
@@ -643,6 +695,7 @@ export function KeypressProvider({
           clearTimeout(kittySequenceTimeout);
           kittySequenceTimeout = null;
         }
+        flushMouseBuffer('ctrl-c');
         if (key.sequence === `${ESC}${KITTY_CTRL_C}`) {
           broadcast({
             name: 'c',
@@ -678,7 +731,10 @@ export function KeypressProvider({
         if (kittySequenceBuffer || (startsWithEsc && !isExcluded)) {
           kittySequenceBuffer += key.sequence;
 
-          if (debugKeystrokeLogging) {
+          if (
+            debugKeystrokeLogging &&
+            !kittySequenceBuffer.startsWith(SGR_EVENT_PREFIX)
+          ) {
             console.log(
               '[DEBUG] Kitty buffer accumulating:',
               JSON.stringify(kittySequenceBuffer),
@@ -691,16 +747,20 @@ export function KeypressProvider({
 
           while (remainingBuffer) {
             const parsed = parseKittyPrefix(remainingBuffer);
-
             if (parsed) {
-              if (debugKeystrokeLogging) {
-                const parsedSequence = remainingBuffer.slice(0, parsed.length);
-                console.log(
-                  '[DEBUG] Kitty sequence parsed successfully:',
-                  JSON.stringify(parsedSequence),
-                );
+              if (parsed.key.name !== 'mouse-event') {
+                if (debugKeystrokeLogging) {
+                  const parsedSequence = remainingBuffer.slice(
+                    0,
+                    parsed.length,
+                  );
+                  console.log(
+                    '[DEBUG] Kitty sequence parsed successfully:',
+                    JSON.stringify(parsedSequence),
+                  );
+                }
+                broadcast(parsed.key);
               }
-              broadcast(parsed.key);
               remainingBuffer = remainingBuffer.slice(parsed.length);
               parsedAny = true;
             } else {
@@ -771,7 +831,11 @@ export function KeypressProvider({
                 remainingBuffer = '';
                 parsedAny = true;
               } else {
-                if (config?.getDebugMode() || debugKeystrokeLogging) {
+                if (
+                  config?.getDebugMode() ||
+                  (debugKeystrokeLogging &&
+                    !kittySequenceBuffer.startsWith(SGR_EVENT_PREFIX))
+                ) {
                   console.warn(
                     'Kitty sequence buffer has content:',
                     JSON.stringify(kittySequenceBuffer),
@@ -905,6 +969,11 @@ export function KeypressProvider({
         kittySequenceTimeout = null;
       }
 
+      if (mouseSequenceTimeout) {
+        clearTimeout(mouseSequenceTimeout);
+        mouseSequenceTimeout = null;
+      }
+
       // Flush any pending kitty sequence data to avoid data loss on exit.
       if (kittySequenceBuffer) {
         broadcast({
@@ -916,6 +985,18 @@ export function KeypressProvider({
           sequence: kittySequenceBuffer,
         });
         kittySequenceBuffer = '';
+      }
+
+      if (mouseSequenceBuffer) {
+        broadcast({
+          name: '',
+          ctrl: false,
+          meta: false,
+          shift: false,
+          paste: false,
+          sequence: mouseSequenceBuffer,
+        });
+        mouseSequenceBuffer = '';
       }
 
       // Flush any pending paste data to avoid data loss on exit.

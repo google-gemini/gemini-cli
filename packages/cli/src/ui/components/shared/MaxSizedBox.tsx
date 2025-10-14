@@ -6,6 +6,7 @@
 
 import React, { Fragment, useContext, useEffect, useId } from 'react';
 import { Box, Text } from 'ink';
+import { Scrollable } from './Scrollable.js';
 import stringWidth from 'string-width';
 import { theme } from '../../semantic-colors.js';
 import { toCodePoints } from '../../utils/textUtils.js';
@@ -56,6 +57,7 @@ interface MaxSizedBoxProps {
   maxHeight: number | undefined;
   overflowDirection?: 'top' | 'bottom';
   additionalHiddenLinesCount?: number;
+  hasFocus?: boolean;
 }
 
 const WithInkScrolling: React.FC<MaxSizedBoxProps> = ({
@@ -63,22 +65,17 @@ const WithInkScrolling: React.FC<MaxSizedBoxProps> = ({
   maxWidth,
   maxHeight,
   overflowDirection = 'top',
+  hasFocus,
 }) => (
-  <Box
+  <Scrollable
     maxHeight={maxHeight}
-    flexShrink={1}
+    maxWidth={maxWidth}
     flexGrow={1}
-    width={maxWidth}
-    flexDirection="column"
-    overflowY="scroll"
-    overflowX="hidden"
-    scrollbarThumbColor={theme.text.secondary}
-    scrollTop={overflowDirection === 'top' ? Number.MAX_SAFE_INTEGER : 0}
+    hasFocus={hasFocus ?? false}
+    scrollToBottom={overflowDirection === 'top'}
   >
-    <Box flexShrink={0} paddingRight={1} flexDirection="column">
-      {children}
-    </Box>
-  </Box>
+    {children}
+  </Scrollable>
 );
 
 const WithoutInkScrolling: React.FC<MaxSizedBoxProps> = ({

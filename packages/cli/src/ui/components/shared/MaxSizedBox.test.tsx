@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { render } from 'ink-testing-library';
+import { renderWithProviders } from '../../../test-utils/render.js';
 import { OverflowProvider } from '../../contexts/OverflowContext.js';
 import { MaxSizedBox, setMaxSizedBoxDebugging } from './MaxSizedBox.js';
 import { Box, Text } from 'ink';
@@ -18,7 +18,7 @@ describe('<MaxSizedBox />', () => {
   setMaxSizedBoxDebugging(true);
 
   it('renders children without truncation when they fit', () => {
-    const { lastFrame } = render(
+    const { lastFrame } = renderWithProviders(
       <OverflowProvider>
         <MaxSizedBox maxWidth={80} maxHeight={10}>
           <Box>
@@ -31,7 +31,7 @@ describe('<MaxSizedBox />', () => {
   });
 
   it('hides lines when content exceeds maxHeight', () => {
-    const { lastFrame } = render(
+    const { lastFrame } = renderWithProviders(
       <OverflowProvider>
         <MaxSizedBox maxWidth={80} maxHeight={2}>
           <Box>
@@ -51,7 +51,7 @@ Line 3`);
   });
 
   it('hides lines at the end when content exceeds maxHeight and overflowDirection is bottom', () => {
-    const { lastFrame } = render(
+    const { lastFrame } = renderWithProviders(
       <OverflowProvider>
         <MaxSizedBox maxWidth={80} maxHeight={2} overflowDirection="bottom">
           <Box>
@@ -71,7 +71,7 @@ Line 3`);
   });
 
   it('wraps text that exceeds maxWidth', () => {
-    const { lastFrame } = render(
+    const { lastFrame } = renderWithProviders(
       <OverflowProvider>
         <MaxSizedBox maxWidth={10} maxHeight={5}>
           <Box>
@@ -90,7 +90,7 @@ of text`);
     const multilineText = `This part will wrap around.
 And has a line break.
   Leading spaces preserved.`;
-    const { lastFrame } = render(
+    const { lastFrame } = renderWithProviders(
       <OverflowProvider>
         <MaxSizedBox maxWidth={20} maxHeight={20}>
           <Box>
@@ -128,7 +128,7 @@ Longer No Wrap: This
   });
 
   it('handles words longer than maxWidth by splitting them', () => {
-    const { lastFrame } = render(
+    const { lastFrame } = renderWithProviders(
       <OverflowProvider>
         <MaxSizedBox maxWidth={5} maxHeight={5}>
           <Box>
@@ -146,7 +146,7 @@ ious`);
   });
 
   it('does not truncate when maxHeight is undefined', () => {
-    const { lastFrame } = render(
+    const { lastFrame } = renderWithProviders(
       <OverflowProvider>
         <MaxSizedBox maxWidth={80} maxHeight={undefined}>
           <Box>
@@ -163,7 +163,7 @@ Line 2`);
   });
 
   it('shows plural "lines" when more than one line is hidden', () => {
-    const { lastFrame } = render(
+    const { lastFrame } = renderWithProviders(
       <OverflowProvider>
         <MaxSizedBox maxWidth={80} maxHeight={2}>
           <Box>
@@ -183,7 +183,7 @@ Line 3`);
   });
 
   it('shows plural "lines" when more than one line is hidden and overflowDirection is bottom', () => {
-    const { lastFrame } = render(
+    const { lastFrame } = renderWithProviders(
       <OverflowProvider>
         <MaxSizedBox maxWidth={80} maxHeight={2} overflowDirection="bottom">
           <Box>
@@ -203,7 +203,7 @@ Line 3`);
   });
 
   it('renders an empty box for empty children', () => {
-    const { lastFrame } = render(
+    const { lastFrame } = renderWithProviders(
       <OverflowProvider>
         <MaxSizedBox maxWidth={80} maxHeight={10}></MaxSizedBox>
       </OverflowProvider>,
@@ -214,7 +214,7 @@ Line 3`);
   });
 
   it('wraps text with multi-byte unicode characters correctly', () => {
-    const { lastFrame } = render(
+    const { lastFrame } = renderWithProviders(
       <OverflowProvider>
         <MaxSizedBox maxWidth={5} maxHeight={5}>
           <Box>
@@ -231,7 +231,7 @@ Line 3`);
   });
 
   it('wraps text with multi-byte emoji characters correctly', () => {
-    const { lastFrame } = render(
+    const { lastFrame } = renderWithProviders(
       <OverflowProvider>
         <MaxSizedBox maxWidth={5} maxHeight={5}>
           <Box>
@@ -249,7 +249,7 @@ Line 3`);
   });
 
   it('falls back to an ellipsis when width is extremely small', () => {
-    const { lastFrame } = render(
+    const { lastFrame } = renderWithProviders(
       <OverflowProvider>
         <MaxSizedBox maxWidth={2} maxHeight={2}>
           <Box>
@@ -264,7 +264,7 @@ Line 3`);
   });
 
   it('truncates long non-wrapping text with ellipsis', () => {
-    const { lastFrame } = render(
+    const { lastFrame } = renderWithProviders(
       <OverflowProvider>
         <MaxSizedBox maxWidth={3} maxHeight={2}>
           <Box>
@@ -279,7 +279,7 @@ Line 3`);
   });
 
   it('truncates non-wrapping text containing line breaks', () => {
-    const { lastFrame } = render(
+    const { lastFrame } = renderWithProviders(
       <OverflowProvider>
         <MaxSizedBox maxWidth={3} maxHeight={2}>
           <Box>
@@ -294,7 +294,7 @@ Line 3`);
   });
 
   it('truncates emoji characters correctly with ellipsis', () => {
-    const { lastFrame } = render(
+    const { lastFrame } = renderWithProviders(
       <OverflowProvider>
         <MaxSizedBox maxWidth={3} maxHeight={2}>
           <Box>
@@ -309,7 +309,7 @@ Line 3`);
   });
 
   it('shows ellipsis for multiple rows with long non-wrapping text', () => {
-    const { lastFrame } = render(
+    const { lastFrame } = renderWithProviders(
       <OverflowProvider>
         <MaxSizedBox maxWidth={3} maxHeight={3}>
           <Box>
@@ -332,7 +332,7 @@ Line 3`);
   });
 
   it('accounts for additionalHiddenLinesCount', () => {
-    const { lastFrame } = render(
+    const { lastFrame } = renderWithProviders(
       <OverflowProvider>
         <MaxSizedBox maxWidth={80} maxHeight={2} additionalHiddenLinesCount={5}>
           <Box>
@@ -353,7 +353,7 @@ Line 3`);
   });
 
   it('handles React.Fragment as a child', () => {
-    const { lastFrame } = render(
+    const { lastFrame } = renderWithProviders(
       <OverflowProvider>
         <MaxSizedBox maxWidth={80} maxHeight={10}>
           <>
@@ -381,7 +381,7 @@ Line 3 direct child`);
       (_, i) => `Line ${i + 1}`,
     ).join('\n');
 
-    const { lastFrame } = render(
+    const { lastFrame } = renderWithProviders(
       <OverflowProvider>
         <MaxSizedBox maxWidth={80} maxHeight={10}>
           <Box>
@@ -405,7 +405,7 @@ Line 3 direct child`);
       (_, i) => `Line ${i + 1}`,
     ).join('\n');
 
-    const { lastFrame } = render(
+    const { lastFrame } = renderWithProviders(
       <OverflowProvider>
         <MaxSizedBox maxWidth={80} maxHeight={10} overflowDirection="bottom">
           <Box>

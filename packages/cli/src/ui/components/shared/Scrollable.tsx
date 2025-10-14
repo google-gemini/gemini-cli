@@ -4,12 +4,17 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useEffect } from 'react';
-import type React from 'react';
-import { Box } from 'ink';
+import React, {
+  useState,
+  useEffect,
+  useRef,
+  useLayoutEffect,
+  useCallback,
+} from 'react';
+import { Box, getInnerHeight, getScrollHeight, type DOMElement } from 'ink';
 import { useKeypress, type Key } from '../../hooks/useKeypress.js';
-import { useMouse, type MouseEvent } from '../../hooks/useMouse.js';
 import { theme } from '../../semantic-colors.js';
+import { useScrollable } from '../../contexts/ScrollProvider.js';
 
 interface ScrollableProps {
   children?: React.ReactNode;
@@ -33,47 +38,92 @@ export const Scrollable: React.FC<ScrollableProps> = ({
   flexGrow,
 }) => {
   const [scrollTop, setScrollTop] = useState(0);
-
+  const ref = useRef<DOMElement>(null);
+  const [size, setSize] = useState({
+    innerHeight: 0,
+    scrollHeight: 0,
+  });
+  const sizeRef = useRef(size);
   useEffect(() => {
-    if (scrollToBottom) {
-      setScrollTop(Number.MAX_SAFE_INTEGER);
+    sizeRef.current = size;
+  }, [size]);
+
+  const childrenCountRef = useRef(0);
+
+  // This effect needs to run on every render to correctly measure the container
+  // and scroll to the bottom if new children are added. The if conditions
+  // prevent infinite loops.
+  useLayoutEffect(() => {
+    if (!ref.current) {
+      return;
     }
-  }, [scrollToBottom, children]);
+    const innerHeight = getInnerHeight(ref.current);
+    const scrollHeight = getScrollHeight(ref.current);
+
+    if (
+      size.innerHeight !== innerHeight ||
+      size.scrollHeight !== scrollHeight
+    ) {
+      setSize({ innerHeight, scrollHeight });
+    }
+
+    const childCountCurrent = React.Children.count(children);
+    if (scrollToBottom && childrenCountRef.current !== childCountCurrent) {
+      console.log('Scrolling to bottom');
+      setScrollTop(Math.max(0, scrollHeight - innerHeight));
+    }
+    childrenCountRef.current = childCountCurrent;
+  }, [size.innerHeight, size.scrollHeight, children, scrollToBottom]);
+
+  const scrollBy = useCallback(
+    (delta: number) => {
+      const { scrollHeight, innerHeight } = sizeRef.current;
+      setScrollTop((prev: number) =>
+        Math.min(
+          Math.max(0, prev + delta),
+          Math.max(0, scrollHeight - innerHeight),
+        ),
+      );
+    },
+    [sizeRef],
+  );
 
   useKeypress(
     (key: Key) => {
-      if (key.name === 'mouse-scroll-up') {
-        setScrollTop((prev: number) => Math.max(0, prev - 1));
-      } else if (key.name === 'mouse-scroll-down') {
-        setScrollTop((prev: number) => prev + 1);
-      } else if (key.shift) {
+      if (key.shift) {
         if (key.name === 'up') {
-          setScrollTop((prev: number) => Math.max(0, prev - 1));
+          scrollBy(-1);
         }
         if (key.name === 'down') {
-          // Ink's <Box> will clamp the value so we don't need to know the max.
-          setScrollTop((prev: number) => prev + 1);
+          scrollBy(1);
         }
       }
     },
     { isActive: hasFocus },
   );
 
-  useMouse(
-    (event: MouseEvent) => {
-      if (event.name === 'wheel') {
-        if (event.wheelDirection === 'up') {
-          setScrollTop((prev: number) => Math.max(0, prev - 1));
-        } else if (event.wheelDirection === 'down') {
-          setScrollTop((prev: number) => prev + 1);
-        }
-      }
+  const getScrollState = useCallback(
+    () => ({
+      scrollTop,
+      scrollHeight: size.scrollHeight,
+      innerHeight: size.innerHeight,
+    }),
+    [scrollTop, size.scrollHeight, size.innerHeight],
+  );
+
+  useScrollable(
+    {
+      ref: ref as React.RefObject<DOMElement>,
+      getScrollState,
+      scrollBy,
+      hasFocus: () => hasFocus,
     },
-    { isActive: hasFocus },
+    hasFocus && ref.current !== null,
   );
 
   return (
     <Box
+      ref={ref}
       maxHeight={maxHeight}
       width={width ?? maxWidth}
       height={height}

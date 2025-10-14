@@ -4,10 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useRef, forwardRef, useImperativeHandle } from 'react';
+import { useRef, forwardRef, useImperativeHandle, useCallback } from 'react';
 import type React from 'react';
-import { useKeypress, type Key } from '../../hooks/useKeypress.js';
 import { VirtualizedList, type VirtualizedListRef } from './VirtualizedList.js';
+import { useScrollable } from '../../contexts/ScrollProvider.js';
+import { Box, type DOMElement } from 'ink';
 
 type VirtualizedListProps<T> = {
   data: T[];
@@ -30,24 +31,44 @@ function ScrollableList<T>(
 ) {
   const { hasFocus } = props;
   const virtualizedListRef = useRef<VirtualizedListRef<T>>(null);
+  const containerRef = useRef<DOMElement>(null);
 
   useImperativeHandle(ref, () => virtualizedListRef.current!, []);
 
-  useKeypress(
-    (key: Key) => {
-      if (key.shift) {
-        if (key.name === 'up') {
-          virtualizedListRef.current?.scrollBy(-1);
-        }
-        if (key.name === 'down') {
-          virtualizedListRef.current?.scrollBy(1);
-        }
-      }
-    },
-    { isActive: hasFocus },
+  const getScrollState = useCallback(
+    () =>
+      virtualizedListRef.current?.getScrollState() ?? {
+        scrollTop: 0,
+        scrollHeight: 0,
+        innerHeight: 0,
+      },
+    [],
   );
 
-  return <VirtualizedList ref={virtualizedListRef} {...props} />;
+  const scrollBy = useCallback((delta: number) => {
+    virtualizedListRef.current?.scrollBy(delta);
+  }, []);
+
+  useScrollable(
+    {
+      ref: containerRef as React.RefObject<DOMElement>,
+      getScrollState,
+      scrollBy,
+      hasFocus: () => hasFocus,
+    },
+    hasFocus && containerRef.current !== null,
+  );
+
+  return (
+    <Box
+      ref={containerRef}
+      flexGrow={1}
+      flexDirection="column"
+      overflow="hidden"
+    >
+      <VirtualizedList ref={virtualizedListRef} {...props} />
+    </Box>
+  );
 }
 
 const ScrollableListWithForwardRef = forwardRef(ScrollableList) as <T>(

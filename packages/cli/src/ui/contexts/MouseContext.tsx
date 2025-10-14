@@ -13,15 +13,28 @@ import {
   useEffect,
   useRef,
 } from 'react';
-import { ESC } from './KeypressContext.js';
+import { ESC, SGR_MOUSE_REGEX } from './KeypressContext.js';
+
+export type MouseEventName =
+  | 'left-press'
+  | 'left-release'
+  | 'right-press'
+  | 'right-release'
+  | 'middle-press'
+  | 'middle-release'
+  | 'scroll-up'
+  | 'scroll-down'
+  | 'scroll-left'
+  | 'scroll-right'
+  | 'move';
 
 export interface MouseEvent {
-  name: string;
-  ctrl: boolean;
-  meta: boolean;
+  name: MouseEventName;
+  col: number;
+  row: number;
   shift: boolean;
-  col?: number;
-  row?: number;
+  meta: boolean;
+  ctrl: boolean;
 }
 
 export type MouseHandler = (event: MouseEvent) => void;
@@ -45,19 +58,23 @@ export function useMouse(handler: MouseHandler, { isActive = true } = {}) {
   const { subscribe, unsubscribe } = useMouseContext();
 
   useEffect(() => {
-    if (isActive) {
-      subscribe(handler);
-      return () => unsubscribe(handler);
+    if (!isActive) {
+      return;
     }
+
+    subscribe(handler);
+    return () => unsubscribe(handler);
   }, [isActive, handler, subscribe, unsubscribe]);
 }
 
 export function MouseProvider({
   children,
   mouseEventsEnabled,
+  debugKeystrokeLogging,
 }: {
   children: React.ReactNode;
   mouseEventsEnabled?: boolean;
+  debugKeystrokeLogging?: boolean;
 }) {
   const { stdin } = useStdin();
   const subscribers = useRef<Set<MouseHandler>>(new Set()).current;
@@ -90,8 +107,7 @@ export function MouseProvider({
     const parseSGRMouseEvent = (
       buffer: string,
     ): { event: MouseEvent; length: number } | null => {
-      const sgrMouseRegex = new RegExp(`^${ESC}\\[<(\\d+);(\\d+);(\\d+)([mM])`);
-      const match = buffer.match(sgrMouseRegex);
+      const match = buffer.match(SGR_MOUSE_REGEX);
 
       if (match) {
         const buttonCode = parseInt(match[1], 10);
@@ -105,32 +121,32 @@ export function MouseProvider({
         const ctrl = (buttonCode & 16) !== 0;
         const isMove = (buttonCode & 32) !== 0;
 
-        let name: string | null = null;
+        let name: MouseEventName | null = null;
 
         if (buttonCode === 66) {
-          name = 'mouse-scroll-left';
+          name = 'scroll-left';
         } else if (buttonCode === 67) {
-          name = 'mouse-scroll-right';
+          name = 'scroll-right';
         } else if ((buttonCode & 64) === 64) {
           if ((buttonCode & 1) === 0) {
-            name = 'mouse-scroll-up';
+            name = 'scroll-up';
           } else {
-            name = 'mouse-scroll-down';
+            name = 'scroll-down';
           }
         } else if (isMove) {
-          name = 'mouse-move';
+          name = 'move';
         } else {
           const button = buttonCode & 3;
           const type = isRelease ? 'release' : 'press';
           switch (button) {
             case 0:
-              name = `mouse-left-${type}`;
+              name = `left-${type}`;
               break;
             case 1:
-              name = `mouse-middle-${type}`;
+              name = `middle-${type}`;
               break;
             case 2:
-              name = `mouse-right-${type}`;
+              name = `right-${type}`;
               break;
             default:
               break;
@@ -163,6 +179,12 @@ export function MouseProvider({
         if (dataStr.startsWith(`${ESC}[<`)) {
           const parsed = parseSGRMouseEvent(dataStr);
           if (parsed) {
+            if (debugKeystrokeLogging) {
+              console.log(
+                '[DEBUG] Mouse event parsed:',
+                JSON.stringify(parsed.event),
+              );
+            }
             broadcast(parsed.event);
             currentData = currentData.slice(parsed.length);
             continue;
@@ -177,25 +199,7 @@ export function MouseProvider({
     return () => {
       stdin.removeListener('data', handleData);
     };
-  }, [stdin, mouseEventsEnabled, subscribers]);
-
-  return (
-    <MouseContext.Provider value={{ subscribe, unsubscribe }}>
-      {children}
-    </MouseContext.Provider>
-  );
-
-  return (
-    <MouseContext.Provider value={{ subscribe, unsubscribe }}>
-      {children}
-    </MouseContext.Provider>
-  );
-
-  return (
-    <MouseContext.Provider value={{ subscribe, unsubscribe }}>
-      {children}
-    </MouseContext.Provider>
-  );
+  }, [stdin, mouseEventsEnabled, subscribers, debugKeystrokeLogging]);
 
   return (
     <MouseContext.Provider value={{ subscribe, unsubscribe }}>

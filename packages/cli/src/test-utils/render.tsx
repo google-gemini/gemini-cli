@@ -14,6 +14,7 @@ import { UIStateContext, type UIState } from '../ui/contexts/UIStateContext.js';
 import { ConfigContext } from '../ui/contexts/ConfigContext.js';
 import { calculateMainAreaWidth } from '../ui/utils/ui-sizing.js';
 import { VimModeProvider } from '../ui/contexts/VimModeContext.js';
+import { ScrollProvider } from '../ui/contexts/ScrollProvider.js';
 
 import { type Config } from '@google/gemini-cli-core';
 
@@ -115,7 +116,7 @@ export const renderWithProviders = (
           <VimModeProvider settings={settings}>
             <ShellFocusContext.Provider value={shellFocus}>
               <KeypressProvider kittyProtocolEnabled={kittyProtocolEnabled}>
-                {component}
+                <ScrollProvider>{component}</ScrollProvider>
               </KeypressProvider>
             </ShellFocusContext.Provider>
           </VimModeProvider>

@@ -126,7 +126,6 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
         borderStyle="round"
         borderColor={theme.border.default}
         paddingX={1}
-        paddingBottom={1}
         borderTop={false}
         borderLeft={false}
         borderRight={false}

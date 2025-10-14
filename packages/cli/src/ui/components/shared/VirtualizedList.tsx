@@ -43,6 +43,11 @@ export type VirtualizedListRef<T> = {
     viewPosition?: number;
   }) => void;
   getScrollIndex: () => number;
+  getScrollState: () => {
+    scrollTop: number;
+    scrollHeight: number;
+    innerHeight: number;
+  };
 };
 
 function findLastIndex<T>(
@@ -401,6 +406,11 @@ function VirtualizedList<T>(
         }
       },
       getScrollIndex: () => scrollAnchor.index,
+      getScrollState: () => ({
+        scrollTop,
+        scrollHeight: totalHeight,
+        innerHeight: containerHeight,
+      }),
     }),
     [
       offsets,
@@ -409,6 +419,8 @@ function VirtualizedList<T>(
       getAnchorForScrollTop,
       data,
       scrollableContainerHeight,
+      scrollTop,
+      containerHeight,
     ],
   );
 
