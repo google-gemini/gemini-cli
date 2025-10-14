@@ -19,6 +19,7 @@ vi.mock('../contexts/ConfigContext.js');
 vi.mock('../contexts/UIStateContext.js');
 vi.mock('@google/gemini-cli-core', () => ({
   recordFlickerFrame: vi.fn(),
+  GEMINI_DIR: '.gemini',
 }));
 vi.mock('ink', async (importOriginal) => {
   const original = await importOriginal<typeof import('ink')>();
