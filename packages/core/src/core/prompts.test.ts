@@ -153,7 +153,7 @@ describe('Core System Prompt (prompts.ts)', () => {
         `your **first and primary tool** must be '${CodebaseInvestigatorAgent.name}'`,
       );
       expect(prompt).toContain(
-        `Do not ignore the output of '${CodebaseInvestigatorAgent.name}'`,
+        `do not ignore the output of '${CodebaseInvestigatorAgent.name}'`,
       );
       expect(prompt).not.toContain(
         "Use 'search_file_content' and 'glob' search tools extensively",
