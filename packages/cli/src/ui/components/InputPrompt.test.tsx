@@ -2110,6 +2110,174 @@ describe('InputPrompt', () => {
     });
   });
 
+  describe('queued message editing', () => {
+    it('should load all queued messages when up arrow is pressed with empty input', async () => {
+      const mockPopAllMessages = vi.fn();
+      props.popAllMessages = mockPopAllMessages;
+      props.buffer.text = '';
+
+      const { stdin, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+      );
+      await wait();
+
+      stdin.write('\u001B[A');
+      await wait();
+
+      expect(mockPopAllMessages).toHaveBeenCalled();
+      const callback = mockPopAllMessages.mock.calls[0][0];
+
+      act(() => {
+        callback('Message 1\n\nMessage 2\n\nMessage 3');
+      });
+      expect(props.buffer.setText).toHaveBeenCalledWith(
+        'Message 1\n\nMessage 2\n\nMessage 3',
+      );
+      unmount();
+    });
+
+    it('should not load queued messages when input is not empty', async () => {
+      const mockPopAllMessages = vi.fn();
+      props.popAllMessages = mockPopAllMessages;
+      props.buffer.text = 'some text';
+
+      const { stdin, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+      );
+      await wait();
+
+      stdin.write('\u001B[A');
+      await wait();
+      expect(mockPopAllMessages).not.toHaveBeenCalled();
+      expect(mockInputHistory.navigateUp).toHaveBeenCalled();
+      unmount();
+    });
+
+    it('should handle undefined messages from popAllMessages', async () => {
+      const mockPopAllMessages = vi.fn();
+      props.popAllMessages = mockPopAllMessages;
+      props.buffer.text = '';
+
+      const { stdin, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+      );
+      await wait();
+
+      stdin.write('\u001B[A');
+      await wait();
+
+      expect(mockPopAllMessages).toHaveBeenCalled();
+      const callback = mockPopAllMessages.mock.calls[0][0];
+      act(() => {
+        callback(undefined);
+      });
+
+      expect(props.buffer.setText).not.toHaveBeenCalled();
+      expect(mockInputHistory.navigateUp).toHaveBeenCalled();
+      unmount();
+    });
+
+    it('should work with NAVIGATION_UP key as well', async () => {
+      const mockPopAllMessages = vi.fn();
+      props.popAllMessages = mockPopAllMessages;
+      props.buffer.text = '';
+      props.buffer.allVisualLines = [''];
+      props.buffer.visualCursor = [0, 0];
+      props.buffer.visualScrollRow = 0;
+
+      const { stdin, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+      );
+      await wait();
+
+      stdin.write('\u001B[A');
+      await wait();
+      expect(mockPopAllMessages).toHaveBeenCalled();
+      unmount();
+    });
+
+    it('should handle single queued message', async () => {
+      const mockPopAllMessages = vi.fn();
+      props.popAllMessages = mockPopAllMessages;
+      props.buffer.text = '';
+
+      const { stdin, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+      );
+      await wait();
+
+      stdin.write('\u001B[A');
+      await wait();
+
+      const callback = mockPopAllMessages.mock.calls[0][0];
+      act(() => {
+        callback('Single message');
+      });
+
+      expect(props.buffer.setText).toHaveBeenCalledWith('Single message');
+      unmount();
+    });
+
+    it('should only check for queued messages when buffer text is trimmed empty', async () => {
+      const mockPopAllMessages = vi.fn();
+      props.popAllMessages = mockPopAllMessages;
+      props.buffer.text = '   '; // Whitespace only
+
+      const { stdin, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+      );
+      await wait();
+
+      stdin.write('\u001B[A');
+      await wait();
+
+      expect(mockPopAllMessages).toHaveBeenCalled();
+      unmount();
+    });
+
+    it('should not call popAllMessages if it is not provided', async () => {
+      props.popAllMessages = undefined;
+      props.buffer.text = '';
+
+      const { stdin, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+      );
+      await wait();
+
+      stdin.write('\u001B[A');
+      await wait();
+
+      expect(mockInputHistory.navigateUp).toHaveBeenCalled();
+      unmount();
+    });
+
+    it('should navigate input history on fresh start when no queued messages exist', async () => {
+      const mockPopAllMessages = vi.fn();
+      props.popAllMessages = mockPopAllMessages;
+      props.buffer.text = '';
+
+      const { stdin, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+      );
+      await wait();
+
+      stdin.write('\u001B[A');
+      await wait();
+
+      expect(mockPopAllMessages).toHaveBeenCalled();
+
+      const callback = mockPopAllMessages.mock.calls[0][0];
+      act(() => {
+        callback(undefined);
+      });
+
+      expect(mockInputHistory.navigateUp).toHaveBeenCalled();
+      expect(props.buffer.setText).not.toHaveBeenCalled();
+
+      unmount();
+    });
+  });
+
   describe('snapshots', () => {
     it('should render correctly in shell mode', async () => {
       props.shellModeActive = true;
