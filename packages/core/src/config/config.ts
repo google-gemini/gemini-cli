@@ -279,6 +279,7 @@ export interface ConfigParameters {
   enableMessageBusIntegration?: boolean;
   codebaseInvestigatorSettings?: CodebaseInvestigatorSettings;
   continueOnFailedApiCall?: boolean;
+  retryFetchErrors?: boolean;
   enableShellOutputEfficiency?: boolean;
 }
 
@@ -373,6 +374,7 @@ export class Config {
   private readonly enableMessageBusIntegration: boolean;
   private readonly codebaseInvestigatorSettings?: CodebaseInvestigatorSettings;
   private readonly continueOnFailedApiCall: boolean;
+  private readonly retryFetchErrors: boolean;
   private readonly enableShellOutputEfficiency: boolean;
 
   constructor(params: ConfigParameters) {
@@ -480,6 +482,7 @@ export class Config {
     this.outputSettings = {
       format: params.output?.format ?? OutputFormat.TEXT,
     };
+    this.retryFetchErrors = params.retryFetchErrors ?? false;
 
     if (params.contextFileName) {
       setGeminiMdFilename(params.contextFileName);
@@ -969,6 +972,10 @@ export class Config {
 
   getContinueOnFailedApiCall(): boolean {
     return this.continueOnFailedApiCall;
+  }
+
+  getRetryFetchErrors(): boolean {
+    return this.retryFetchErrors;
   }
 
   getEnableShellOutputEfficiency(): boolean {
