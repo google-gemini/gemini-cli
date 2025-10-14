@@ -34,7 +34,7 @@ on:
         type: 'choice'
         options:
           - 'prod'
-          - 'dev'
+          ## - 'dev' # TODO(richieforeman) - support dev
         default: 'prod'
 
 jobs:
