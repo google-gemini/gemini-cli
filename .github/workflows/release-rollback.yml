@@ -34,7 +34,7 @@ on:
 
 jobs:
   change-tags:
-    environment: 'prod' # TODO(richieforeman): Allow this value to be changed.
+    environment: 'prod' ## TODO(richieforeman) Support Dev mode
     runs-on: 'ubuntu-latest'
     permissions:
       packages: 'write'

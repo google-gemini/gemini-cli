@@ -148,7 +148,7 @@ jobs:
           working-directory: './release'
 
       - name: 'Create Issue on Failure'
-        if: "${{ failure() && (github.event_name == 'schedule' || github.event.inputs.dry_run != 'true') }}"
+        if: "${{ failure() && github.event.inputs.environment == 'prod' && (github.event_name == 'schedule' || github.event.inputs.dry_run != 'true') }}"
         env:
           GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
           RELEASE_TAG: '${{ steps.nightly_version.outputs.RELEASE_TAG }}'
