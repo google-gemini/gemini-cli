@@ -32,7 +32,7 @@ describe('extensions install command', () => {
   it('should fail if no source is provided', () => {
     const validationParser = yargs([]).command(installCommand).fail(false);
     expect(() => validationParser.parse('install')).toThrow(
-      'Not enough non-option arguments: got 0, need at least 1',
+      /(got 0.*need at least 1|Needs args.*received 0, needs at least.*1|Hacen falta argumentos no-opcionales:.*recibido 0, necesita por lo menos 1)/i,
     );
   });
 });

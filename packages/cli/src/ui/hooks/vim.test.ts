@@ -55,14 +55,24 @@ const TEST_SEQUENCES = {
   DOWN: createKey({ sequence: 'j', name: 'j' }),
   INSERT: createKey({ sequence: 'i', name: 'i' }),
   APPEND: createKey({ sequence: 'a', name: 'a' }),
+  APPEND_EOL: createKey({ sequence: 'A', name: 'A' }),
+  OPEN_BELOW: createKey({ sequence: 'o', name: 'o' }),
+  OPEN_ABOVE: createKey({ sequence: 'O', name: 'O' }),
   DELETE_CHAR: createKey({ sequence: 'x', name: 'x' }),
   DELETE: createKey({ sequence: 'd', name: 'd' }),
+  DELETE_TO_EOL: createKey({ sequence: 'D', name: 'D' }),
   CHANGE: createKey({ sequence: 'c', name: 'c' }),
+  CHANGE_TO_EOL: createKey({ sequence: 'C', name: 'C' }),
   WORD_FORWARD: createKey({ sequence: 'w', name: 'w' }),
   WORD_BACKWARD: createKey({ sequence: 'b', name: 'b' }),
   WORD_END: createKey({ sequence: 'e', name: 'e' }),
   LINE_START: createKey({ sequence: '0', name: '0' }),
   LINE_END: createKey({ sequence: '$', name: '$' }),
+  FIRST_NON_WS: createKey({ sequence: '^', name: '^' }),
+  GOTO_LINE_G: createKey({ sequence: 'G', name: 'G' }),
+  GOTO_FIRST: createKey({ sequence: 'g', name: 'g' }),
+  DIGIT_3: createKey({ sequence: '3', name: '3' }),
+  DIGIT_2: createKey({ sequence: '2', name: '2' }),
   REPEAT: createKey({ sequence: '.', name: '.' }),
 } as const;
 
@@ -289,7 +299,7 @@ describe('useVim hook', () => {
       const { result } = renderVimHook();
 
       act(() => {
-        result.current.handleInput(TEST_SEQUENCES.REPEAT);
+        result.current.handleInput(TEST_SEQUENCES.LINE_END);
       });
 
       expect(mockBuffer.vimMoveToLineEnd).toHaveBeenCalled();
@@ -312,7 +322,7 @@ describe('useVim hook', () => {
       const { result } = renderVimHook();
 
       act(() => {
-        result.current.handleInput(TEST_SEQUENCES.REPEAT);
+        result.current.handleInput(TEST_SEQUENCES.APPEND_EOL);
       });
 
       expect(mockBuffer.vimAppendAtLineEnd).toHaveBeenCalled();
@@ -323,7 +333,7 @@ describe('useVim hook', () => {
       const { result } = renderVimHook();
 
       act(() => {
-        result.current.handleInput(TEST_SEQUENCES.REPEAT);
+        result.current.handleInput(TEST_SEQUENCES.OPEN_BELOW);
       });
 
       expect(mockBuffer.vimOpenLineBelow).toHaveBeenCalled();
@@ -334,7 +344,7 @@ describe('useVim hook', () => {
       const { result } = renderVimHook();
 
       act(() => {
-        result.current.handleInput(TEST_SEQUENCES.REPEAT);
+        result.current.handleInput(TEST_SEQUENCES.OPEN_ABOVE);
       });
 
       expect(mockBuffer.vimOpenLineAbove).toHaveBeenCalled();
@@ -381,7 +391,7 @@ describe('useVim hook', () => {
       const { result } = renderVimHook();
 
       act(() => {
-        const handled = result.current.handleInput(TEST_SEQUENCES.REPEAT);
+        const handled = result.current.handleInput(TEST_SEQUENCES.DIGIT_3);
         expect(handled).toBe(true);
       });
 
@@ -640,7 +650,7 @@ describe('useVim hook', () => {
       const { result } = renderVimHook(testBuffer);
 
       act(() => {
-        result.current.handleInput(TEST_SEQUENCES.REPEAT);
+        result.current.handleInput(TEST_SEQUENCES.DELETE_TO_EOL);
       });
       expect(testBuffer.vimDeleteToEndOfLine).toHaveBeenCalledTimes(1);
 
@@ -659,7 +669,7 @@ describe('useVim hook', () => {
       const { result } = renderVimHook(testBuffer);
 
       act(() => {
-        result.current.handleInput(TEST_SEQUENCES.REPEAT);
+        result.current.handleInput(TEST_SEQUENCES.CHANGE_TO_EOL);
       });
       expect(testBuffer.vimChangeToEndOfLine).toHaveBeenCalledTimes(1);
 
@@ -714,7 +724,7 @@ describe('useVim hook', () => {
       const { result } = renderVimHook(testBuffer);
 
       act(() => {
-        result.current.handleInput(TEST_SEQUENCES.REPEAT);
+        result.current.handleInput(TEST_SEQUENCES.FIRST_NON_WS);
       });
 
       expect(testBuffer.vimMoveToFirstNonWhitespace).toHaveBeenCalled();
@@ -725,7 +735,7 @@ describe('useVim hook', () => {
       const { result } = renderVimHook(testBuffer);
 
       act(() => {
-        result.current.handleInput(TEST_SEQUENCES.REPEAT);
+        result.current.handleInput(TEST_SEQUENCES.GOTO_LINE_G);
       });
 
       expect(testBuffer.vimMoveToLastLine).toHaveBeenCalled();
@@ -737,12 +747,12 @@ describe('useVim hook', () => {
 
       // First 'g' sets pending state
       act(() => {
-        result.current.handleInput(TEST_SEQUENCES.REPEAT);
+        result.current.handleInput(TEST_SEQUENCES.GOTO_FIRST);
       });
 
       // Second 'g' executes the command
       act(() => {
-        result.current.handleInput(TEST_SEQUENCES.REPEAT);
+        result.current.handleInput(TEST_SEQUENCES.GOTO_FIRST);
       });
 
       expect(testBuffer.vimMoveToFirstLine).toHaveBeenCalled();
@@ -753,7 +763,7 @@ describe('useVim hook', () => {
       const { result } = renderVimHook(testBuffer);
 
       act(() => {
-        result.current.handleInput(TEST_SEQUENCES.REPEAT);
+        result.current.handleInput(TEST_SEQUENCES.DIGIT_3);
       });
 
       act(() => {
@@ -840,7 +850,7 @@ describe('useVim hook', () => {
         const { result } = renderVimHook(testBuffer);
 
         act(() => {
-          result.current.handleInput(TEST_SEQUENCES.REPEAT);
+          result.current.handleInput(TEST_SEQUENCES.DIGIT_2);
         });
         act(() => {
           result.current.handleInput(TEST_SEQUENCES.DELETE);
@@ -895,7 +905,7 @@ describe('useVim hook', () => {
         const { result } = renderVimHook(testBuffer);
 
         act(() => {
-          result.current.handleInput(TEST_SEQUENCES.REPEAT);
+          result.current.handleInput(TEST_SEQUENCES.DIGIT_3);
         });
         act(() => {
           result.current.handleInput(TEST_SEQUENCES.DELETE);
@@ -930,7 +940,7 @@ describe('useVim hook', () => {
         const { result } = renderVimHook(testBuffer);
 
         act(() => {
-          result.current.handleInput(TEST_SEQUENCES.REPEAT);
+          result.current.handleInput(TEST_SEQUENCES.DIGIT_2);
         });
         act(() => {
           result.current.handleInput(TEST_SEQUENCES.CHANGE);
@@ -992,7 +1002,7 @@ describe('useVim hook', () => {
         const { result } = renderVimHook(testBuffer);
 
         act(() => {
-          result.current.handleInput(TEST_SEQUENCES.REPEAT);
+          result.current.handleInput(TEST_SEQUENCES.DIGIT_2);
         });
         act(() => {
           result.current.handleInput(TEST_SEQUENCES.CHANGE);
@@ -1030,7 +1040,7 @@ describe('useVim hook', () => {
         const { result } = renderVimHook(testBuffer);
 
         act(() => {
-          result.current.handleInput(TEST_SEQUENCES.REPEAT);
+          result.current.handleInput(TEST_SEQUENCES.DIGIT_3);
         });
         act(() => {
           result.current.handleInput(TEST_SEQUENCES.CHANGE);
@@ -1091,7 +1101,7 @@ describe('useVim hook', () => {
         const { result } = renderVimHook(testBuffer);
 
         act(() => {
-          result.current.handleInput(TEST_SEQUENCES.REPEAT);
+          result.current.handleInput(TEST_SEQUENCES.DIGIT_2);
         });
         act(() => {
           result.current.handleInput(TEST_SEQUENCES.DELETE);
@@ -1125,7 +1135,7 @@ describe('useVim hook', () => {
         const { result } = renderVimHook(testBuffer);
 
         act(() => {
-          result.current.handleInput(TEST_SEQUENCES.REPEAT);
+          result.current.handleInput(TEST_SEQUENCES.DIGIT_3);
         });
         act(() => {
           result.current.handleInput(TEST_SEQUENCES.CHANGE);
@@ -1263,7 +1273,9 @@ describe('useVim hook', () => {
       const emptyBuffer = createMockBuffer('');
       const { result } = renderVimHook(emptyBuffer);
 
-      const handled = result.current.handleInput(TEST_SEQUENCES.REPEAT);
+      const handled = result.current.handleInput(
+        createKey({ name: '!', sequence: '!' }),
+      );
 
       expect(handled).toBe(false);
     });
