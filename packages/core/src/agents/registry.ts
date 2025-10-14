@@ -33,7 +33,33 @@ export class AgentRegistry {
   }
 
   private loadBuiltInAgents(): void {
-    this.registerAgent(CodebaseInvestigatorAgent);
+    const investigatorSettings = this.config.getCodebaseInvestigatorSettings();
+
+    // Only register the agent if it's enabled in the settings.
+    if (investigatorSettings?.enabled) {
+      const agentDef = {
+        ...CodebaseInvestigatorAgent,
+        modelConfig: {
+          ...CodebaseInvestigatorAgent.modelConfig,
+          model:
+            investigatorSettings.model ??
+            CodebaseInvestigatorAgent.modelConfig.model,
+          thinkingBudget:
+            investigatorSettings.thinkingBudget ??
+            CodebaseInvestigatorAgent.modelConfig.thinkingBudget,
+        },
+        runConfig: {
+          ...CodebaseInvestigatorAgent.runConfig,
+          max_time_minutes:
+            investigatorSettings.maxTimeMinutes ??
+            CodebaseInvestigatorAgent.runConfig.max_time_minutes,
+          max_turns:
+            investigatorSettings.maxNumTurns ??
+            CodebaseInvestigatorAgent.runConfig.max_turns,
+        },
+      };
+      this.registerAgent(agentDef);
+    }
   }
 
   /**
