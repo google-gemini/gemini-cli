@@ -14,9 +14,9 @@ import {
   spawnSync,
   type SpawnOptionsWithoutStdio,
 } from 'node:child_process';
-import { createRequire as createModuleRequire } from 'node:module';
 import type { Node } from 'web-tree-sitter';
 import { Language, Parser } from 'web-tree-sitter';
+import { loadWasmBinary } from './fileUtils.js';
 
 export const SHELL_TOOL_NAMES = ['run_shell_command', 'ShellTool'];
 
@@ -43,8 +43,6 @@ let bashLanguage: Language | null = null;
 let treeSitterInitialization: Promise<void> | null = null;
 let treeSitterInitializationError: Error | null = null;
 
-const requireModule = createModuleRequire(import.meta.url);
-
 class ShellParserInitializationError extends Error {
   constructor(cause: Error) {
     super(`Failed to initialize bash parser: ${cause.message}`, { cause });
@@ -62,39 +60,6 @@ function toError(value: unknown): Error {
   return new Error('Unknown tree-sitter initialization error', {
     cause: value,
   });
-}
-
-async function readWasmBinaryFromDisk(specifier: string): Promise<Uint8Array> {
-  const fs = await import('node:fs/promises');
-  const resolvedPath = requireModule.resolve(specifier);
-  const buffer = await fs.readFile(resolvedPath);
-  return new Uint8Array(buffer);
-}
-
-async function loadWasmBinary(
-  dynamicImport: () => Promise<{ default: Uint8Array }>,
-  fallbackSpecifier: string,
-): Promise<Uint8Array> {
-  try {
-    const module = await dynamicImport();
-    if (module?.default instanceof Uint8Array) {
-      return module.default;
-    }
-  } catch (error) {
-    try {
-      return await readWasmBinaryFromDisk(fallbackSpecifier);
-    } catch {
-      throw error;
-    }
-  }
-
-  try {
-    return await readWasmBinaryFromDisk(fallbackSpecifier);
-  } catch (error) {
-    throw new Error('WASM binary module did not provide a Uint8Array export', {
-      cause: error,
-    });
-  }
 }
 
 async function loadBashLanguage(): Promise<void> {
@@ -343,7 +308,6 @@ function parsePowerShellCommandDetails(
           [POWERSHELL_COMMAND_ENV]: command,
         },
         encoding: 'utf-8',
-        maxBuffer: 1024 * 1024,
       },
     );
 
