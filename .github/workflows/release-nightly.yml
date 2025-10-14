@@ -137,6 +137,7 @@ jobs:
           a2a-package-name: '${{ vars.A2A_PACKAGE_NAME }}'
 
       - name: 'Create and Merge Pull Request'
+        if: "github.event.inputs.environment == 'prod'"
         uses: './.github/actions/create-pull-request'
         with:
           branch-name: 'release/${{ steps.nightly_version.outputs.RELEASE_TAG }}'
