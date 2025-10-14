@@ -6,13 +6,6 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { AgentExecutor, type ActivityCallback } from './executor.js';
-import type {
-  AgentDefinition,
-  AgentInputs,
-  SubagentActivityEvent,
-  OutputConfig,
-} from './types.js';
-import { AgentTerminateMode } from './types.js';
 import { makeFakeConfig } from '../test-utils/config.js';
 import { ToolRegistry } from '../tools/tool-registry.js';
 import { LSTool } from '../tools/ls.js';
@@ -32,6 +25,17 @@ import type { Config } from '../config/config.js';
 import { MockTool } from '../test-utils/mock-tool.js';
 import { getDirectoryContextString } from '../utils/environmentContext.js';
 import { z } from 'zod';
+import { promptIdContext } from '../utils/promptIdContext.js';
+import { logAgentStart, logAgentFinish } from '../telemetry/loggers.js';
+import { AgentStartEvent, AgentFinishEvent } from '../telemetry/types.js';
+import type {
+  AgentDefinition,
+  AgentInputs,
+  SubagentActivityEvent,
+  OutputConfig,
+} from './types.js';
+import { AgentTerminateMode } from './types.js';
+import type { AnyDeclarativeTool, AnyToolInvocation } from '../tools/tools.js';
 
 const { mockSendMessageStream, mockExecuteToolCall } = vi.hoisted(() => ({
   mockSendMessageStream: vi.fn(),
@@ -54,8 +58,29 @@ vi.mock('../core/nonInteractiveToolExecutor.js', () => ({
 
 vi.mock('../utils/environmentContext.js');
 
+vi.mock('../telemetry/loggers.js', () => ({
+  logAgentStart: vi.fn(),
+  logAgentFinish: vi.fn(),
+}));
+
+vi.mock('../utils/promptIdContext.js', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('../utils/promptIdContext.js')>();
+  return {
+    ...actual,
+    promptIdContext: {
+      ...actual.promptIdContext,
+      getStore: vi.fn(),
+      run: vi.fn((_id, fn) => fn()),
+    },
+  };
+});
+
 const MockedGeminiChat = vi.mocked(GeminiChat);
 const mockedGetDirectoryContextString = vi.mocked(getDirectoryContextString);
+const mockedPromptIdContext = vi.mocked(promptIdContext);
+const mockedLogAgentStart = vi.mocked(logAgentStart);
+const mockedLogAgentFinish = vi.mocked(logAgentFinish);
 
 // Constants for testing
 const TASK_COMPLETE_TOOL_NAME = 'complete_task';
@@ -160,6 +185,10 @@ describe('AgentExecutor', () => {
     vi.resetAllMocks();
     mockSendMessageStream.mockReset();
     mockExecuteToolCall.mockReset();
+    mockedLogAgentStart.mockReset();
+    mockedLogAgentFinish.mockReset();
+    mockedPromptIdContext.getStore.mockReset();
+    mockedPromptIdContext.run.mockImplementation((_id, fn) => fn());
 
     MockedGeminiChat.mockImplementation(
       () =>
@@ -229,9 +258,52 @@ describe('AgentExecutor', () => {
       expect(agentRegistry.getAllToolNames()).toHaveLength(2);
       expect(agentRegistry.getTool(MOCK_TOOL_NOT_ALLOWED.name)).toBeUndefined();
     });
+
+    it('should use parentPromptId from context to create agentId', async () => {
+      const parentId = 'parent-id';
+      mockedPromptIdContext.getStore.mockReturnValue(parentId);
+
+      const definition = createTestDefinition();
+      const executor = await AgentExecutor.create(
+        definition,
+        mockConfig,
+        onActivity,
+      );
+
+      expect(executor['agentId']).toMatch(
+        new RegExp(`^${parentId}-${definition.name}-`),
+      );
+    });
   });
 
   describe('run (Execution Loop and Logic)', () => {
+    it('should log AgentFinish with error if run throws', async () => {
+      const definition = createTestDefinition();
+      // Make the definition invalid to cause an error during run
+      definition.inputConfig.inputs = {
+        goal: { type: 'string', required: true, description: 'goal' },
+      };
+      const executor = await AgentExecutor.create(
+        definition,
+        mockConfig,
+        onActivity,
+      );
+
+      // Run without inputs to trigger validation error
+      await expect(executor.run({}, signal)).rejects.toThrow(
+        /Missing required input parameters/,
+      );
+
+      expect(mockedLogAgentStart).toHaveBeenCalledTimes(1);
+      expect(mockedLogAgentFinish).toHaveBeenCalledTimes(1);
+      expect(mockedLogAgentFinish).toHaveBeenCalledWith(
+        mockConfig,
+        expect.objectContaining({
+          terminate_reason: AgentTerminateMode.ERROR,
+        }),
+      );
+    });
+
     it('should execute successfully when model calls complete_task with output (Happy Path with Output)', async () => {
       const definition = createTestDefinition();
       const executor = await AgentExecutor.create(
@@ -247,18 +319,32 @@ describe('AgentExecutor', () => {
         'T1: Listing',
       );
       mockExecuteToolCall.mockResolvedValueOnce({
-        callId: 'call1',
-        resultDisplay: 'file1.txt',
-        responseParts: [
-          {
-            functionResponse: {
-              name: LSTool.Name,
-              response: { result: 'file1.txt' },
-              id: 'call1',
+        status: 'success',
+        request: {
+          callId: 'call1',
+          name: LSTool.Name,
+          args: { path: '.' },
+          isClientInitiated: false,
+          prompt_id: 'test-prompt',
+        },
+        tool: {} as AnyDeclarativeTool,
+        invocation: {} as AnyToolInvocation,
+        response: {
+          callId: 'call1',
+          resultDisplay: 'file1.txt',
+          responseParts: [
+            {
+              functionResponse: {
+                name: LSTool.Name,
+                response: { result: 'file1.txt' },
+                id: 'call1',
+              },
             },
-          },
-        ],
-        error: undefined,
+          ],
+          error: undefined,
+          errorType: undefined,
+          contentLength: undefined,
+        },
       });
 
       // Turn 2: Model calls complete_task with required output
@@ -312,6 +398,34 @@ describe('AgentExecutor', () => {
       expect(output.result).toBe('Found file1.txt');
       expect(output.terminate_reason).toBe(AgentTerminateMode.GOAL);
 
+      // Telemetry checks
+      expect(mockedLogAgentStart).toHaveBeenCalledTimes(1);
+      expect(mockedLogAgentStart).toHaveBeenCalledWith(
+        mockConfig,
+        expect.any(AgentStartEvent),
+      );
+      expect(mockedLogAgentFinish).toHaveBeenCalledTimes(1);
+      expect(mockedLogAgentFinish).toHaveBeenCalledWith(
+        mockConfig,
+        expect.any(AgentFinishEvent),
+      );
+      const finishEvent = mockedLogAgentFinish.mock.calls[0][1];
+      expect(finishEvent.terminate_reason).toBe(AgentTerminateMode.GOAL);
+
+      // Context checks
+      expect(mockedPromptIdContext.run).toHaveBeenCalledTimes(2); // Two turns
+      const agentId = executor['agentId'];
+      expect(mockedPromptIdContext.run).toHaveBeenNthCalledWith(
+        1,
+        `${agentId}#0`,
+        expect.any(Function),
+      );
+      expect(mockedPromptIdContext.run).toHaveBeenNthCalledWith(
+        2,
+        `${agentId}#1`,
+        expect.any(Function),
+      );
+
       expect(activities).toEqual(
         expect.arrayContaining([
           expect.objectContaining({
@@ -352,13 +466,32 @@ describe('AgentExecutor', () => {
         { name: LSTool.Name, args: { path: '.' }, id: 'call1' },
       ]);
       mockExecuteToolCall.mockResolvedValueOnce({
-        callId: 'call1',
-        resultDisplay: 'ok',
-        responseParts: [
-          {
-            functionResponse: { name: LSTool.Name, response: {}, id: 'call1' },
-          },
-        ],
+        status: 'success',
+        request: {
+          callId: 'call1',
+          name: LSTool.Name,
+          args: { path: '.' },
+          isClientInitiated: false,
+          prompt_id: 'test-prompt',
+        },
+        tool: {} as AnyDeclarativeTool,
+        invocation: {} as AnyToolInvocation,
+        response: {
+          callId: 'call1',
+          resultDisplay: 'ok',
+          responseParts: [
+            {
+              functionResponse: {
+                name: LSTool.Name,
+                response: {},
+                id: 'call1',
+              },
+            },
+          ],
+          error: undefined,
+          errorType: undefined,
+          contentLength: undefined,
+        },
       });
 
       mockModelResponse(
@@ -405,13 +538,32 @@ describe('AgentExecutor', () => {
         { name: LSTool.Name, args: { path: '.' }, id: 'call1' },
       ]);
       mockExecuteToolCall.mockResolvedValueOnce({
-        callId: 'call1',
-        resultDisplay: 'ok',
-        responseParts: [
-          {
-            functionResponse: { name: LSTool.Name, response: {}, id: 'call1' },
-          },
-        ],
+        status: 'success',
+        request: {
+          callId: 'call1',
+          name: LSTool.Name,
+          args: { path: '.' },
+          isClientInitiated: false,
+          prompt_id: 'test-prompt',
+        },
+        tool: {} as AnyDeclarativeTool,
+        invocation: {} as AnyToolInvocation,
+        response: {
+          callId: 'call1',
+          resultDisplay: 'ok',
+          responseParts: [
+            {
+              functionResponse: {
+                name: LSTool.Name,
+                response: {},
+                id: 'call1',
+              },
+            },
+          ],
+          error: undefined,
+          errorType: undefined,
+          contentLength: undefined,
+        },
       });
 
       mockModelResponse([], 'I think I am done.');
@@ -424,6 +576,14 @@ describe('AgentExecutor', () => {
 
       expect(output.terminate_reason).toBe(AgentTerminateMode.ERROR);
       expect(output.result).toBe(expectedError);
+
+      // Telemetry check for error
+      expect(mockedLogAgentFinish).toHaveBeenCalledWith(
+        mockConfig,
+        expect.objectContaining({
+          terminate_reason: AgentTerminateMode.ERROR,
+        }),
+      );
 
       expect(activities).toContainEqual(
         expect.objectContaining({
@@ -568,17 +728,26 @@ describe('AgentExecutor', () => {
         if (callsStarted === 2) resolveCalls();
         await vi.advanceTimersByTimeAsync(100);
         return {
-          callId: reqInfo.callId,
-          resultDisplay: 'ok',
-          responseParts: [
-            {
-              functionResponse: {
-                name: reqInfo.name,
-                response: {},
-                id: reqInfo.callId,
+          status: 'success',
+          request: reqInfo,
+          tool: {} as AnyDeclarativeTool,
+          invocation: {} as AnyToolInvocation,
+          response: {
+            callId: reqInfo.callId,
+            resultDisplay: 'ok',
+            responseParts: [
+              {
+                functionResponse: {
+                  name: reqInfo.name,
+                  response: {},
+                  id: reqInfo.callId,
+                },
               },
-            },
-          ],
+            ],
+            error: undefined,
+            errorType: undefined,
+            contentLength: undefined,
+          },
         };
       });
 
@@ -695,11 +864,26 @@ describe('AgentExecutor', () => {
     const mockWorkResponse = (id: string) => {
       mockModelResponse([{ name: LSTool.Name, args: { path: '.' }, id }]);
       mockExecuteToolCall.mockResolvedValueOnce({
-        callId: id,
-        resultDisplay: 'ok',
-        responseParts: [
-          { functionResponse: { name: LSTool.Name, response: {}, id } },
-        ],
+        status: 'success',
+        request: {
+          callId: id,
+          name: LSTool.Name,
+          args: { path: '.' },
+          isClientInitiated: false,
+          prompt_id: 'test-prompt',
+        },
+        tool: {} as AnyDeclarativeTool,
+        invocation: {} as AnyToolInvocation,
+        response: {
+          callId: id,
+          resultDisplay: 'ok',
+          responseParts: [
+            { functionResponse: { name: LSTool.Name, response: {}, id } },
+          ],
+          error: undefined,
+          errorType: undefined,
+          contentLength: undefined,
+        },
       });
     };
 
@@ -728,12 +912,21 @@ describe('AgentExecutor', () => {
       mockModelResponse([{ name: LSTool.Name, args: { path: '.' }, id: 't1' }]);
 
       // Long running tool
-      mockExecuteToolCall.mockImplementationOnce(async () => {
+      mockExecuteToolCall.mockImplementationOnce(async (_ctx, reqInfo) => {
         await vi.advanceTimersByTimeAsync(61 * 1000);
         return {
-          callId: 't1',
-          resultDisplay: 'ok',
-          responseParts: [],
+          status: 'success',
+          request: reqInfo,
+          tool: {} as AnyDeclarativeTool,
+          invocation: {} as AnyToolInvocation,
+          response: {
+            callId: 't1',
+            resultDisplay: 'ok',
+            responseParts: [],
+            error: undefined,
+            errorType: undefined,
+            contentLength: undefined,
+          },
         };
       });
 

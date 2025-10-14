@@ -96,34 +96,34 @@ describe('retryWithBackoff', () => {
     expect(mockFn).toHaveBeenCalledTimes(3);
   });
 
-  it('should default to 5 maxAttempts if no options are provided', async () => {
-    // This function will fail more than 5 times to ensure all retries are used.
+  it('should default to 3 maxAttempts if no options are provided', async () => {
+    // This function will fail more than 3 times to ensure all retries are used.
     const mockFn = createFailingFunction(10);
 
     const promise = retryWithBackoff(mockFn);
 
     // Expect it to fail with the error from the 5th attempt.
     await Promise.all([
-      expect(promise).rejects.toThrow('Simulated error attempt 10'),
+      expect(promise).rejects.toThrow('Simulated error attempt 3'),
       vi.runAllTimersAsync(),
     ]);
 
-    expect(mockFn).toHaveBeenCalledTimes(10);
+    expect(mockFn).toHaveBeenCalledTimes(3);
   });
 
-  it('should default to 10 maxAttempts if options.maxAttempts is undefined', async () => {
-    // This function will fail more than 5 times to ensure all retries are used.
+  it('should default to 3 maxAttempts if options.maxAttempts is undefined', async () => {
+    // This function will fail more than 3 times to ensure all retries are used.
     const mockFn = createFailingFunction(10);
 
     const promise = retryWithBackoff(mockFn, { maxAttempts: undefined });
 
     // Expect it to fail with the error from the 5th attempt.
     await Promise.all([
-      expect(promise).rejects.toThrow('Simulated error attempt 10'),
+      expect(promise).rejects.toThrow('Simulated error attempt 3'),
       vi.runAllTimersAsync(),
     ]);
 
-    expect(mockFn).toHaveBeenCalledTimes(10);
+    expect(mockFn).toHaveBeenCalledTimes(3);
   });
 
   it('should not retry if shouldRetry returns false', async () => {
@@ -302,6 +302,41 @@ describe('retryWithBackoff', () => {
       expect(d).toBeGreaterThanOrEqual(100 * 0.7);
       expect(d).toBeLessThanOrEqual(100 * 1.3);
     });
+  });
+
+  describe('Fetch error retries', () => {
+    const fetchErrorMsg = 'exception TypeError: fetch failed sending request';
+
+    it('should retry on specific fetch error when retryFetchErrors is true', async () => {
+      const mockFn = vi.fn();
+      mockFn.mockRejectedValueOnce(new Error(fetchErrorMsg));
+      mockFn.mockResolvedValueOnce('success');
+
+      const promise = retryWithBackoff(mockFn, {
+        retryFetchErrors: true,
+        initialDelayMs: 10,
+      });
+
+      await vi.runAllTimersAsync();
+
+      const result = await promise;
+      expect(result).toBe('success');
+      expect(mockFn).toHaveBeenCalledTimes(2);
+    });
+
+    it.each([false, undefined])(
+      'should not retry on specific fetch error when retryFetchErrors is %s',
+      async (retryFetchErrors) => {
+        const mockFn = vi.fn().mockRejectedValue(new Error(fetchErrorMsg));
+
+        const promise = retryWithBackoff(mockFn, {
+          retryFetchErrors,
+        });
+
+        await expect(promise).rejects.toThrow(fetchErrorMsg);
+        expect(mockFn).toHaveBeenCalledTimes(1);
+      },
+    );
   });
 
   describe('Flash model fallback for OAuth users', () => {

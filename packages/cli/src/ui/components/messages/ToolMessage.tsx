@@ -95,7 +95,7 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
   const isThisShellFocusable =
     (name === SHELL_COMMAND_NAME || name === 'Shell') &&
     status === ToolCallStatus.Executing &&
-    config?.getShouldUseNodePtyShell();
+    config?.getEnableInteractiveShell();
 
   const shouldShowFocusHint =
     isThisShellFocusable && (showFocusHint || userHasFocused);
@@ -174,6 +174,7 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
               <AnsiOutputText
                 data={resultDisplay as AnsiOutput}
                 availableTerminalHeight={availableHeight}
+                width={childWidth}
               />
             )}
           </Box>
