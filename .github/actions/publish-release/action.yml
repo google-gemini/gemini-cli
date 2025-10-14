@@ -209,9 +209,9 @@ runs:
       # Tag staging for initial release
       run: |
         if [ "${{ inputs.dry-run }}" == "true" ]; then
-          npm publish --dry-run --workspace="@google/gemini-cli-a2a-server" --tag "staging"
+          npm publish --dry-run --workspace="@google/gemini-cli-a2a-server" --no-tag
         else
-          npm publish --workspace="@google/gemini-cli-a2a-server" --tag "staging"
+          npm publish --workspace="@google/gemini-cli-a2a-server" --no-tag
         fi
 
     - name: '🔬 Verify NPM release by version'
