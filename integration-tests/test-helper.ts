@@ -545,7 +545,7 @@ export class TestRig {
         try {
           const content = readFileSync(logFilePath, 'utf-8');
           // Check if file has meaningful content (at least one complete JSON object)
-          return content.includes('"event.name"');
+          return content.includes('"scopeMetrics"');
         } catch {
           return false;
         }
@@ -908,7 +908,7 @@ export class TestRig {
     const options: pty.IPtyForkOptions = {
       name: 'xterm-color',
       cols: 80,
-      rows: 30,
+      rows: 24,
       cwd: this.testDir!,
       env: Object.fromEntries(
         Object.entries(env).filter(([, v]) => v !== undefined),
