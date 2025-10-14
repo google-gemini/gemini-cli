@@ -106,6 +106,7 @@ const MIGRATION_MAP: Record<string, string> = {
   memoryDiscoveryMaxDirs: 'context.discoveryMaxDirs',
   model: 'model.name',
   preferredEditor: 'general.preferredEditor',
+  retryFetchErrors: 'general.retryFetchErrors',
   sandbox: 'tools.sandbox',
   selectedAuthType: 'security.auth.selectedType',
   enableInteractiveShell: 'tools.shell.enableInteractiveShell',
