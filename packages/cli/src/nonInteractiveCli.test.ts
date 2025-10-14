@@ -18,6 +18,8 @@ import type {
   ToolRegistry,
   ServerGeminiStreamEvent,
   SessionMetrics,
+  AnyDeclarativeTool,
+  AnyToolInvocation,
 } from '@google/gemini-cli-core';
 import {
   executeToolCall,
@@ -213,7 +215,25 @@ describe('runNonInteractive', () => {
       },
     };
     const toolResponse: Part[] = [{ text: 'Tool response' }];
-    mockCoreExecuteToolCall.mockResolvedValue({ responseParts: toolResponse });
+    mockCoreExecuteToolCall.mockResolvedValue({
+      status: 'success',
+      request: {
+        callId: 'tool-1',
+        name: 'testTool',
+        args: { arg1: 'value1' },
+        isClientInitiated: false,
+        prompt_id: 'prompt-id-2',
+      },
+      tool: {} as AnyDeclarativeTool,
+      invocation: {} as AnyToolInvocation,
+      response: {
+        responseParts: toolResponse,
+        callId: 'tool-1',
+        error: undefined,
+        errorType: undefined,
+        contentLength: undefined,
+      },
+    });
 
     const firstCallEvents: ServerGeminiStreamEvent[] = [toolCallEvent];
     const secondCallEvents: ServerGeminiStreamEvent[] = [
@@ -263,19 +283,32 @@ describe('runNonInteractive', () => {
       },
     };
     mockCoreExecuteToolCall.mockResolvedValue({
-      error: new Error('Execution failed'),
-      errorType: ToolErrorType.EXECUTION_FAILED,
-      responseParts: [
-        {
-          functionResponse: {
-            name: 'errorTool',
-            response: {
-              output: 'Error: Execution failed',
+      status: 'error',
+      request: {
+        callId: 'tool-1',
+        name: 'errorTool',
+        args: {},
+        isClientInitiated: false,
+        prompt_id: 'prompt-id-3',
+      },
+      tool: {} as AnyDeclarativeTool,
+      response: {
+        callId: 'tool-1',
+        error: new Error('Execution failed'),
+        errorType: ToolErrorType.EXECUTION_FAILED,
+        responseParts: [
+          {
+            functionResponse: {
+              name: 'errorTool',
+              response: {
+                output: 'Error: Execution failed',
+              },
             },
           },
-        },
-      ],
-      resultDisplay: 'Execution failed',
+        ],
+        resultDisplay: 'Execution failed',
+        contentLength: undefined,
+      },
     });
     const finalResponse: ServerGeminiStreamEvent[] = [
       {
@@ -349,9 +382,22 @@ describe('runNonInteractive', () => {
       },
     };
     mockCoreExecuteToolCall.mockResolvedValue({
-      error: new Error('Tool "nonexistentTool" not found in registry.'),
-      resultDisplay: 'Tool "nonexistentTool" not found in registry.',
-      responseParts: [],
+      status: 'error',
+      request: {
+        callId: 'tool-1',
+        name: 'nonexistentTool',
+        args: {},
+        isClientInitiated: false,
+        prompt_id: 'prompt-id-5',
+      },
+      response: {
+        callId: 'tool-1',
+        error: new Error('Tool "nonexistentTool" not found in registry.'),
+        resultDisplay: 'Tool "nonexistentTool" not found in registry.',
+        responseParts: [],
+        errorType: undefined,
+        contentLength: undefined,
+      },
     });
     const finalResponse: ServerGeminiStreamEvent[] = [
       {
@@ -510,7 +556,25 @@ describe('runNonInteractive', () => {
       },
     };
     const toolResponse: Part[] = [{ text: 'Tool executed successfully' }];
-    mockCoreExecuteToolCall.mockResolvedValue({ responseParts: toolResponse });
+    mockCoreExecuteToolCall.mockResolvedValue({
+      status: 'success',
+      request: {
+        callId: 'tool-1',
+        name: 'testTool',
+        args: { arg1: 'value1' },
+        isClientInitiated: false,
+        prompt_id: 'prompt-id-tool-only',
+      },
+      tool: {} as AnyDeclarativeTool,
+      invocation: {} as AnyToolInvocation,
+      response: {
+        responseParts: toolResponse,
+        callId: 'tool-1',
+        error: undefined,
+        errorType: undefined,
+        contentLength: undefined,
+      },
+    });
 
     // First call returns only tool call, no content
     const firstCallEvents: ServerGeminiStreamEvent[] = [
@@ -906,7 +970,25 @@ describe('runNonInteractive', () => {
       },
     };
     const toolResponse: Part[] = [{ text: 'file.txt' }];
-    mockCoreExecuteToolCall.mockResolvedValue({ responseParts: toolResponse });
+    mockCoreExecuteToolCall.mockResolvedValue({
+      status: 'success',
+      request: {
+        callId: 'tool-shell-1',
+        name: 'ShellTool',
+        args: { command: 'ls' },
+        isClientInitiated: false,
+        prompt_id: 'prompt-id-allowed',
+      },
+      tool: {} as AnyDeclarativeTool,
+      invocation: {} as AnyToolInvocation,
+      response: {
+        responseParts: toolResponse,
+        callId: 'tool-shell-1',
+        error: undefined,
+        errorType: undefined,
+        contentLength: undefined,
+      },
+    });
 
     const firstCallEvents: ServerGeminiStreamEvent[] = [toolCallEvent];
     const secondCallEvents: ServerGeminiStreamEvent[] = [
