@@ -179,7 +179,7 @@ jobs:
     name: 'Publish preview'
     needs: ['calculate-versions', 'test']
     runs-on: 'ubuntu-latest'
-    environment: 'prod' # TODO(richieforeman): Allow this to be changed.
+    environment: '${{ github.event.inputs.environment }}'
     permissions:
       contents: 'write'
       packages: 'write'
