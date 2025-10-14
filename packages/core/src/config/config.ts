@@ -970,6 +970,10 @@ export class Config {
     return this.continueOnFailedApiCall;
   }
 
+  getEnableShellOutputEfficiency(): boolean {
+    return this.enableShellOutputEfficiency;
+  }
+
   getShellExecutionConfig(): ShellExecutionConfig {
     return this.shellExecutionConfig;
   }
