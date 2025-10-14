@@ -129,7 +129,7 @@ describe('commandUtils', () => {
 
         // Simulate successful execution
         setTimeout(() => {
-          mockChild.emit('close', 0);
+          mockChild.emit('exit', 0);
         }, 0);
 
         await copyToClipboard(testText);
@@ -145,7 +145,7 @@ describe('commandUtils', () => {
         // Simulate command failure
         setTimeout(() => {
           mockChild.stderr.emit('data', 'Command not found');
-          mockChild.emit('close', 1);
+          mockChild.emit('exit', 1);
         }, 0);
 
         await expect(copyToClipboard(testText)).rejects.toThrow(
@@ -183,7 +183,7 @@ describe('commandUtils', () => {
         const testText = 'Hello, world!';
 
         setTimeout(() => {
-          mockChild.emit('close', 0);
+          mockChild.emit('exit', 0);
         }, 0);
 
         await copyToClipboard(testText);
@@ -202,11 +202,11 @@ describe('commandUtils', () => {
       it('should successfully copy text to clipboard using xclip', async () => {
         const testText = 'Hello, world!';
         const linuxOptions: SpawnOptions = {
-          stdio: ['pipe', 'inherit', 'pipe'],
+          stdio: ['pipe', 'ignore', 'pipe'],
         };
 
         setTimeout(() => {
-          mockChild.emit('close', 0);
+          mockChild.emit('exit', 0);
         }, 0);
 
         await copyToClipboard(testText);
@@ -224,7 +224,7 @@ describe('commandUtils', () => {
         const testText = 'Hello, world!';
         let callCount = 0;
         const linuxOptions: SpawnOptions = {
-          stdio: ['pipe', 'inherit', 'pipe'],
+          stdio: ['pipe', 'ignore', 'pipe'],
         };
 
         mockSpawn.mockImplementation(() => {
@@ -242,11 +242,11 @@ describe('commandUtils', () => {
               const error = new Error('spawn xclip ENOENT');
               (error as NodeJS.ErrnoException).code = 'ENOENT';
               child.emit('error', error);
-              child.emit('close', 1);
+              child.emit('exit', 1);
               callCount++;
             } else {
               // Second call (xsel) succeeds
-              child.emit('close', 0);
+              child.emit('exit', 0);
             }
           }, 0);
 
@@ -274,7 +274,7 @@ describe('commandUtils', () => {
         const testText = 'Hello, world!';
         let callCount = 0;
         const linuxOptions: SpawnOptions = {
-          stdio: ['pipe', 'inherit', 'pipe'],
+          stdio: ['pipe', 'ignore', 'pipe'],
         };
 
         mockSpawn.mockImplementation(() => {
@@ -292,14 +292,14 @@ describe('commandUtils', () => {
               const error = new Error('spawn xclip ENOENT');
               (error as NodeJS.ErrnoException).code = 'ENOENT';
               child.emit('error', error);
-              child.emit('close', 1);
+              child.emit('exit', 1);
               callCount++;
             } else {
               // Second call (xsel) fails with ENOENT
               const error = new Error('spawn xsel ENOENT');
               (error as NodeJS.ErrnoException).code = 'ENOENT';
               child.emit('error', error);
-              child.emit('close', 1);
+              child.emit('exit', 1);
             }
           }, 0);
 
@@ -328,7 +328,7 @@ describe('commandUtils', () => {
         const testText = 'Hello, world!';
         let callCount = 0;
         const linuxOptions: SpawnOptions = {
-          stdio: ['pipe', 'inherit', 'pipe'],
+          stdio: ['pipe', 'ignore', 'pipe'],
         };
         const errorMsg = "Error: Can't open display:";
         const exitCode = 1;
@@ -346,11 +346,11 @@ describe('commandUtils', () => {
             // e.g., cannot connect to X server
             if (callCount === 0) {
               child.stderr.emit('data', errorMsg);
-              child.emit('close', exitCode);
+              child.emit('exit', exitCode);
               callCount++;
             } else {
               child.stderr.emit('data', errorMsg);
-              child.emit('close', exitCode);
+              child.emit('exit', exitCode);
             }
           }, 0);
 
@@ -401,7 +401,7 @@ describe('commandUtils', () => {
         const testText = 'Hello, world!';
 
         setTimeout(() => {
-          mockChild.emit('close', 1);
+          mockChild.emit('exit', 1);
         }, 0);
 
         await expect(copyToClipboard(testText)).rejects.toThrow(
@@ -411,7 +411,7 @@ describe('commandUtils', () => {
 
       it('should handle empty text', async () => {
         setTimeout(() => {
-          mockChild.emit('close', 0);
+          mockChild.emit('exit', 0);
         }, 0);
 
         await copyToClipboard('');
@@ -423,7 +423,7 @@ describe('commandUtils', () => {
         const multilineText = 'Line 1\nLine 2\nLine 3';
 
         setTimeout(() => {
-          mockChild.emit('close', 0);
+          mockChild.emit('exit', 0);
         }, 0);
 
         await copyToClipboard(multilineText);
@@ -435,7 +435,7 @@ describe('commandUtils', () => {
         const specialText = 'Special chars: !@#$%^&*()_+-=[]{}|;:,.<>?';
 
         setTimeout(() => {
-          mockChild.emit('close', 0);
+          mockChild.emit('exit', 0);
         }, 0);
 
         await copyToClipboard(specialText);

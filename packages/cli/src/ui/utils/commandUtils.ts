@@ -54,7 +54,7 @@ export const copyToClipboard = async (text: string): Promise<void> => {
         child.stderr.on('data', (chunk) => (stderr += chunk.toString()));
       }
       child.on('error', reject);
-      child.on('close', (code) => {
+      child.on('exit', (code) => {
         if (code === 0) return resolve();
         const errorMsg = stderr.trim();
         reject(
@@ -76,7 +76,7 @@ export const copyToClipboard = async (text: string): Promise<void> => {
   // - stdin: 'pipe' to write the text that needs to be copied.
   // - stdout: 'inherit' since we don't need to capture the command's output on success.
   // - stderr: 'pipe' to capture error messages (e.g., "command not found") for better error handling.
-  const linuxOptions: SpawnOptions = { stdio: ['pipe', 'inherit', 'pipe'] };
+  const linuxOptions: SpawnOptions = { stdio: ['pipe', 'ignore', 'pipe'] };
 
   switch (process.platform) {
     case 'win32':
