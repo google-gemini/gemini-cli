@@ -155,12 +155,6 @@ describe('useVim hook', () => {
     };
   };
 
-  const __createMockSettings = (vimMode = true) => ({
-    getValue: vi.fn().mockReturnValue(vimMode),
-    setValue: vi.fn(),
-    merged: { vimMode },
-  });
-
   const renderVimHook = (buffer?: Partial<TextBuffer>) =>
     renderHook(() =>
       useVim((buffer || mockBuffer) as TextBuffer, mockHandleFinalSubmit),

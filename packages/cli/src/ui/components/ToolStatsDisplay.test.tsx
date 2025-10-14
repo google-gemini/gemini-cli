@@ -8,8 +8,9 @@ import { render } from 'ink-testing-library';
 import { describe, it, expect, vi } from 'vitest';
 import { ToolStatsDisplay } from './ToolStatsDisplay.js';
 import * as SessionContext from '../contexts/SessionContext.js';
-import type { SessionMetrics } from '../contexts/SessionContext.js';
+import { createMockSessionMetrics } from '../../test-utils/testFactories.js';
 import { createMockToolCallDecisions } from '../../test-utils/render.js';
+import type { SessionMetrics } from '@google/gemini-cli-core';
 
 // Mock the context to provide controlled data for testing
 vi.mock('../contexts/SessionContext.js', async (importOriginal) => {
@@ -68,33 +69,35 @@ describe('<ToolStatsDisplay />', () => {
   });
 
   it('should display stats for a single tool correctly', () => {
-    const { lastFrame } = renderWithMockedStats({
-      models: {},
-      tools: {
-        totalCalls: 1,
-        totalSuccess: 1,
-        totalFail: 0,
-        totalDurationMs: 100,
-        totalDecisions: createMockToolCallDecisions({
-          accept: 1,
-          reject: 0,
-          modify: 0,
-        }),
-        byName: {
-          'test-tool': {
-            count: 1,
-            success: 1,
-            fail: 0,
-            durationMs: 100,
-            decisions: createMockToolCallDecisions({
-              accept: 1,
-              reject: 0,
-              modify: 0,
-            }),
+    const { lastFrame } = renderWithMockedStats(
+      createMockSessionMetrics({
+        models: {},
+        tools: {
+          totalCalls: 1,
+          totalSuccess: 1,
+          totalFail: 0,
+          totalDurationMs: 100,
+          totalDecisions: createMockToolCallDecisions({
+            accept: 1,
+            reject: 0,
+            modify: 0,
+          }),
+          byName: {
+            'test-tool': {
+              count: 1,
+              success: 1,
+              fail: 0,
+              durationMs: 100,
+              decisions: createMockToolCallDecisions({
+                accept: 1,
+                reject: 0,
+                modify: 0,
+              }),
+            },
           },
         },
-      },
-    });
+      }),
+    );
 
     const output = lastFrame();
     expect(output).toContain('test-tool');
@@ -102,44 +105,46 @@ describe('<ToolStatsDisplay />', () => {
   });
 
   it('should display stats for multiple tools correctly', () => {
-    const { lastFrame } = renderWithMockedStats({
-      models: {},
-      tools: {
-        totalCalls: 3,
-        totalSuccess: 2,
-        totalFail: 1,
-        totalDurationMs: 300,
-        totalDecisions: createMockToolCallDecisions({
-          accept: 1,
-          reject: 1,
-          modify: 1,
-        }),
-        byName: {
-          'tool-a': {
-            count: 2,
-            success: 1,
-            fail: 1,
-            durationMs: 200,
-            decisions: createMockToolCallDecisions({
-              accept: 1,
-              reject: 1,
-              modify: 0,
-            }),
-          },
-          'tool-b': {
-            count: 1,
-            success: 1,
-            fail: 0,
-            durationMs: 100,
-            decisions: createMockToolCallDecisions({
-              accept: 0,
-              reject: 0,
-              modify: 1,
-            }),
+    const { lastFrame } = renderWithMockedStats(
+      createMockSessionMetrics({
+        models: {},
+        tools: {
+          totalCalls: 3,
+          totalSuccess: 2,
+          totalFail: 1,
+          totalDurationMs: 300,
+          totalDecisions: createMockToolCallDecisions({
+            accept: 1,
+            reject: 1,
+            modify: 1,
+          }),
+          byName: {
+            'tool-a': {
+              count: 2,
+              success: 1,
+              fail: 1,
+              durationMs: 200,
+              decisions: createMockToolCallDecisions({
+                accept: 1,
+                reject: 1,
+                modify: 0,
+              }),
+            },
+            'tool-b': {
+              count: 1,
+              success: 1,
+              fail: 0,
+              durationMs: 100,
+              decisions: createMockToolCallDecisions({
+                accept: 0,
+                reject: 0,
+                modify: 1,
+              }),
+            },
           },
         },
-      },
-    });
+      }),
+    );
 
     const output = lastFrame();
     expect(output).toContain('tool-a');
@@ -148,65 +153,69 @@ describe('<ToolStatsDisplay />', () => {
   });
 
   it('should handle large values without wrapping or overlapping', () => {
-    const { lastFrame } = renderWithMockedStats({
-      models: {},
-      tools: {
-        totalCalls: 999999999,
-        totalSuccess: 888888888,
-        totalFail: 111111111,
-        totalDurationMs: 987654321,
-        totalDecisions: createMockToolCallDecisions({
-          accept: 123456789,
-          reject: 98765432,
-          modify: 12345,
-        }),
-        byName: {
-          'long-named-tool-for-testing-wrapping-and-such': {
-            count: 999999999,
-            success: 888888888,
-            fail: 111111111,
-            durationMs: 987654321,
-            decisions: createMockToolCallDecisions({
-              accept: 123456789,
-              reject: 98765432,
-              modify: 12345,
-            }),
+    const { lastFrame } = renderWithMockedStats(
+      createMockSessionMetrics({
+        models: {},
+        tools: {
+          totalCalls: 999999999,
+          totalSuccess: 888888888,
+          totalFail: 111111111,
+          totalDurationMs: 987654321,
+          totalDecisions: createMockToolCallDecisions({
+            accept: 123456789,
+            reject: 98765432,
+            modify: 12345,
+          }),
+          byName: {
+            'long-named-tool-for-testing-wrapping-and-such': {
+              count: 999999999,
+              success: 888888888,
+              fail: 111111111,
+              durationMs: 987654321,
+              decisions: createMockToolCallDecisions({
+                accept: 123456789,
+                reject: 98765432,
+                modify: 12345,
+              }),
+            },
           },
         },
-      },
-    });
+      }),
+    );
 
     expect(lastFrame()).toMatchSnapshot();
   });
 
   it('should handle zero decisions gracefully', () => {
-    const { lastFrame } = renderWithMockedStats({
-      models: {},
-      tools: {
-        totalCalls: 1,
-        totalSuccess: 1,
-        totalFail: 0,
-        totalDurationMs: 100,
-        totalDecisions: createMockToolCallDecisions({
-          accept: 0,
-          reject: 0,
-          modify: 0,
-        }),
-        byName: {
-          'test-tool': {
-            count: 1,
-            success: 1,
-            fail: 0,
-            durationMs: 100,
-            decisions: createMockToolCallDecisions({
-              accept: 0,
-              reject: 0,
-              modify: 0,
-            }),
+    const { lastFrame } = renderWithMockedStats(
+      createMockSessionMetrics({
+        models: {},
+        tools: {
+          totalCalls: 1,
+          totalSuccess: 1,
+          totalFail: 0,
+          totalDurationMs: 100,
+          totalDecisions: createMockToolCallDecisions({
+            accept: 0,
+            reject: 0,
+            modify: 0,
+          }),
+          byName: {
+            'test-tool': {
+              count: 1,
+              success: 1,
+              fail: 0,
+              durationMs: 100,
+              decisions: createMockToolCallDecisions({
+                accept: 0,
+                reject: 0,
+                modify: 0,
+              }),
+            },
           },
         },
-      },
-    });
+      }),
+    );
 
     const output = lastFrame();
     expect(output).toContain('Total Reviewed Suggestions:');

@@ -8,7 +8,10 @@ import type {
   GeminiCLIExtension,
   ExtensionInstallMetadata,
   MCPServerConfig,
- SessionMetrics , IdeContext, OpenFile } from '@google/gemini-cli-core';
+  SessionMetrics,
+  IdeContext,
+  File,
+} from '@google/gemini-cli-core';
 
 /**
  * Factory for creating GeminiCLIExtension test objects
@@ -48,21 +51,17 @@ export function createMockSessionMetrics(
       byName: {},
     },
     files: {
-      totalReads: 0,
-      totalWrites: 0,
-      totalEdits: 0,
-      byPath: {},
+      totalLinesAdded: 0,
+      totalLinesRemoved: 0,
     },
     ...overrides,
   };
 }
 
 /**
- * Factory for creating OpenFile test objects
+ * Factory for creating File (OpenFile) test objects
  */
-export function createMockOpenFile(
-  overrides: Partial<OpenFile> = {},
-): OpenFile {
+export function createMockOpenFile(overrides: Partial<File> = {}): File {
   return {
     path: '/mock/file.ts',
     timestamp: Date.now(),

@@ -29,7 +29,7 @@ describe('validateNonInterActiveAuth', () => {
   let originalEnvVertexAi: string | undefined;
   let originalEnvGcp: string | undefined;
   let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
-  let processExitSpy: ReturnType<typeof vi.spyOn<typeof process, 'exit'>>;
+  let processExitSpy: ReturnType<typeof vi.spyOn>;
   let refreshAuthMock: Mock;
   let mockSettings: LoadedSettings;
 
@@ -43,7 +43,7 @@ describe('validateNonInterActiveAuth', () => {
     consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     processExitSpy = vi.spyOn(process, 'exit').mockImplementation((code) => {
       throw new Error(`process.exit(${code}) called`);
-    });
+    }) as ReturnType<typeof vi.spyOn>;
     vi.spyOn(auth, 'validateAuthMethod').mockReturnValue(null);
     refreshAuthMock = vi.fn().mockResolvedValue('refreshed');
     mockSettings = {

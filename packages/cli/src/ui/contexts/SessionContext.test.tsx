@@ -8,11 +8,12 @@ import { type MutableRefObject } from 'react';
 import { render } from 'ink-testing-library';
 import { renderHook } from '@testing-library/react';
 import { act } from 'react-dom/test-utils';
-import type { SessionMetrics } from './SessionContext.js';
+import type { SessionMetrics } from '@google/gemini-cli-core';
 import { SessionStatsProvider, useSessionStats } from './SessionContext.js';
 import { describe, it, expect, vi } from 'vitest';
 import { uiTelemetryService } from '@google/gemini-cli-core';
 import { createMockToolCallDecisions } from '../../test-utils/render.js';
+import { createMockSessionMetrics } from '../../test-utils/testFactories.js';
 
 /**
  * A test harness component that uses the hook and exposes the context value
@@ -58,7 +59,7 @@ describe('SessionStatsContext', () => {
       </SessionStatsProvider>,
     );
 
-    const newMetrics: SessionMetrics = {
+    const newMetrics: SessionMetrics = createMockSessionMetrics({
       models: {
         'gemini-pro': {
           api: {
@@ -100,7 +101,7 @@ describe('SessionStatsContext', () => {
           },
         },
       },
-    };
+    });
 
     act(() => {
       uiTelemetryService.emit('update', {

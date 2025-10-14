@@ -31,11 +31,7 @@ const initialState: TextBufferState = {
   viewportWidth: 80,
   viewportHeight: 24,
   visualLayout: {
-    visualLayout: {
-      visualLines: [''],
-      logicalToVisualMap: [],
-      visualToLogicalMap: [],
-    },
+    visualLines: [''],
     logicalToVisualMap: [[[0, 0]]],
     visualToLogicalMap: [[0, 0]],
   },
@@ -1720,15 +1716,16 @@ describe('textBufferReducer vim operations', () => {
         cursorCol: 2,
         preferredCol: null,
         visualLayout: {
-          visualLines: [['line1'], ['line2'], ['line3']],
+          visualLines: ['line1', 'line2', 'line3'],
           logicalToVisualMap: [],
           visualToLogicalMap: [],
         },
-        visualScrollRow: 0,
-        visualCursor: { row: 1, col: 2 },
-        viewport: { width: 10, height: 5 },
+        viewportWidth: 10,
+        viewportHeight: 5,
         undoStack: [],
         redoStack: [],
+        clipboard: null,
+        selectionAnchor: null,
       };
 
       const action: TextBufferAction = {
@@ -1752,15 +1749,16 @@ describe('textBufferReducer vim operations', () => {
         cursorCol: 0,
         preferredCol: null,
         visualLayout: {
-          visualLines: [['line1'], ['line2'], ['line3'], ['line4']],
+          visualLines: ['line1', 'line2', 'line3', 'line4'],
           logicalToVisualMap: [],
           visualToLogicalMap: [],
         },
-        visualScrollRow: 0,
-        visualCursor: { row: 1, col: 0 },
-        viewport: { width: 10, height: 5 },
+        viewportWidth: 10,
+        viewportHeight: 5,
         undoStack: [],
         redoStack: [],
+        clipboard: null,
+        selectionAnchor: null,
       };
 
       const action: TextBufferAction = {
@@ -1784,15 +1782,16 @@ describe('textBufferReducer vim operations', () => {
         cursorCol: 5,
         preferredCol: null,
         visualLayout: {
-          visualLines: [['only line']],
+          visualLines: ['only line'],
           logicalToVisualMap: [],
           visualToLogicalMap: [],
         },
-        visualScrollRow: 0,
-        visualCursor: { row: 0, col: 5 },
-        viewport: { width: 10, height: 5 },
+        viewportWidth: 10,
+        viewportHeight: 5,
         undoStack: [],
         redoStack: [],
+        clipboard: null,
+        selectionAnchor: null,
       };
 
       const action: TextBufferAction = {
@@ -1816,15 +1815,16 @@ describe('textBufferReducer vim operations', () => {
         cursorCol: 0,
         preferredCol: null,
         visualLayout: {
-          visualLines: [['line1'], ['line2']],
+          visualLines: ['line1', 'line2'],
           logicalToVisualMap: [],
           visualToLogicalMap: [],
         },
-        visualScrollRow: 0,
-        visualCursor: { row: 1, col: 0 },
-        viewport: { width: 10, height: 5 },
+        viewportWidth: 10,
+        viewportHeight: 5,
         undoStack: [],
         redoStack: [],
+        clipboard: null,
+        selectionAnchor: null,
       };
 
       const action: TextBufferAction = {
@@ -1848,15 +1848,16 @@ describe('textBufferReducer vim operations', () => {
         cursorCol: 0,
         preferredCol: null,
         visualLayout: {
-          visualLines: [['line1'], ['line2'], ['line3'], ['line4']],
+          visualLines: ['line1', 'line2', 'line3', 'line4'],
           logicalToVisualMap: [],
           visualToLogicalMap: [],
         },
-        visualScrollRow: 0,
-        visualCursor: { row: 0, col: 0 },
-        viewport: { width: 10, height: 5 },
+        viewportWidth: 10,
+        viewportHeight: 5,
         undoStack: [],
         redoStack: [],
+        clipboard: null,
+        selectionAnchor: null,
       };
 
       // Delete all 4 lines with 4dd

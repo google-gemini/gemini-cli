@@ -1564,7 +1564,7 @@ describe('useGeminiStream', () => {
       const { result } = renderTestHook(awaitingApprovalToolCalls);
 
       await act(async () => {
-        await result.current.handleApprovalModeChange('require-confirmation');
+        await result.current.handleApprovalModeChange(ApprovalMode.DEFAULT);
       });
 
       // No tools should be auto-approved
