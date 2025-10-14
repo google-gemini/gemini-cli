@@ -22,6 +22,7 @@ import {
   SettingScope,
 } from './config/settings.js';
 import { themeManager } from './ui/themes/theme-manager.js';
+import { AUTO_THEME } from './ui/themes/theme.js';
 import { getStartupWarnings } from './utils/startupWarnings.js';
 import { getUserStartupWarnings } from './utils/userStartupWarnings.js';
 import { ConsolePatcher } from './ui/utils/ConsolePatcher.js';
@@ -56,6 +57,11 @@ import { handleAutoUpdate } from './utils/handleAutoUpdate.js';
 import { appEvents, AppEvent } from './utils/events.js';
 import { computeWindowTitle } from './utils/windowTitle.js';
 import { SettingsContext } from './ui/contexts/SettingsContext.js';
+import {
+  ThemeContext,
+  type TerminalBackground,
+} from './ui/contexts/ThemeContext.js';
+import { getThemePreferences } from './utils/settingsUtils.js';
 
 import { SessionStatsProvider } from './ui/contexts/SessionContext.js';
 import { VimModeProvider } from './ui/contexts/VimModeContext.js';
@@ -138,12 +144,191 @@ ${reason.stack}`
   });
 }
 
+/**
+ * Logs debug information about theme detection.
+ */
+function logThemeDebugInfo(
+  isDebugMode: boolean,
+  terminalBackground: TerminalBackground,
+  settings: LoadedSettings,
+) {
+  if (!isDebugMode) {
+    return;
+  }
+
+  console.debug(`Terminal background detected: ${terminalBackground}`);
+  console.debug(
+    `Current theme setting: ${settings.merged.ui?.theme || 'none'}`,
+  );
+}
+
+/**
+ * Applies auto theme based on terminal background detection.
+ */
+function applyAutoTheme(
+  terminalBackground: TerminalBackground,
+  themePreferences: { light: string; dark: string },
+  isDebugMode: boolean,
+) {
+  const success = themeManager.setActiveTheme(
+    AUTO_THEME,
+    terminalBackground,
+    themePreferences,
+  );
+
+  if (!success) {
+    console.warn('Warning: Could not set auto theme. Falling back to Default.');
+    themeManager.setActiveTheme('Default');
+    return;
+  }
+
+  if (isDebugMode) {
+    const resolvedThemeName = themeManager.resolveAutoThemeName(
+      terminalBackground,
+      themePreferences,
+    );
+    console.debug(
+      `Auto theme: Terminal is ${terminalBackground}, using theme "${resolvedThemeName}"`,
+    );
+  }
+}
+
+/**
+ * Checks if there's a theme/terminal background mismatch.
+ */
+function hasThemeMismatch(
+  terminalBackground: TerminalBackground,
+  themeType: string,
+): boolean {
+  if (terminalBackground === 'unknown') {
+    return false;
+  }
+
+  return (
+    (terminalBackground === 'light' && themeType === 'dark') ||
+    (terminalBackground === 'dark' && themeType === 'light')
+  );
+}
+
+/**
+ * Prompts user about theme mismatch and applies auto theme if accepted.
+ */
+async function handleThemeMismatch(
+  terminalBackground: TerminalBackground,
+  themePreferences: { light: string; dark: string },
+  settings: LoadedSettings,
+) {
+  const currentTheme = themeManager.getActiveTheme();
+
+  if (!hasThemeMismatch(terminalBackground, currentTheme.type)) {
+    return;
+  }
+
+  // TypeScript narrowing: hasThemeMismatch returns false for 'unknown',
+  // so terminalBackground must be 'light' | 'dark' here
+  const { promptEnableAutoTheme } = await import('./utils/autoThemePrompt.js');
+
+  const enabledAutoTheme = await promptEnableAutoTheme(
+    terminalBackground as 'light' | 'dark',
+    currentTheme.type,
+    settings,
+  );
+
+  if (enabledAutoTheme) {
+    themeManager.setActiveTheme(
+      AUTO_THEME,
+      terminalBackground,
+      themePreferences,
+    );
+  }
+}
+
+/**
+ * Applies a manually selected theme and checks for mismatches.
+ */
+async function applyManualTheme(
+  themeName: string,
+  terminalBackground: TerminalBackground,
+  themePreferences: { light: string; dark: string },
+  settings: LoadedSettings,
+) {
+  const success = themeManager.setActiveTheme(
+    themeName,
+    terminalBackground,
+    themePreferences,
+  );
+
+  if (!success) {
+    // If the theme is not found during initial load, log a warning and continue.
+    // The useThemeCommand hook in AppContainer.tsx will handle opening the dialog.
+    console.warn(`Warning: Theme "${themeName}" not found.`);
+    return;
+  }
+
+  await handleThemeMismatch(terminalBackground, themePreferences, settings);
+}
+
+/**
+ * Initializes theme settings by detecting terminal background and applying user preferences.
+ *
+ * @param settings The loaded user settings
+ * @param isDebugMode Whether debug mode is enabled for logging
+ * @returns The detected terminal background type
+ */
+async function initializeTheme(
+  settings: LoadedSettings,
+  isDebugMode: boolean,
+): Promise<TerminalBackground> {
+  themeManager.loadCustomThemes(settings.merged.ui?.customThemes);
+
+  const { detectTerminalBackground } = await import(
+    './utils/terminalBackground.js'
+  );
+  const terminalBackground = await detectTerminalBackground();
+
+  logThemeDebugInfo(isDebugMode, terminalBackground, settings);
+
+  const themePreferences = getThemePreferences(settings);
+  const themeName = settings.merged.ui?.theme;
+
+  // If no theme is set, check for mismatch and prompt user before applying auto theme
+  if (!themeName) {
+    // When no theme is set, `getActiveTheme()` returns the default theme. We check if it
+    // mismatches the terminal and prompt the user to switch to 'auto' mode permanently.
+    const currentTheme = themeManager.getActiveTheme();
+    if (hasThemeMismatch(terminalBackground, currentTheme.type)) {
+      await handleThemeMismatch(terminalBackground, themePreferences, settings);
+    }
+
+    // If the user accepted the prompt and enabled auto mode, apply it.
+    // Otherwise, respect their choice and keep the default theme.
+    if (settings.merged.ui?.theme === AUTO_THEME) {
+      applyAutoTheme(terminalBackground, themePreferences, isDebugMode);
+    }
+    return terminalBackground;
+  }
+
+  if (themeName === AUTO_THEME) {
+    applyAutoTheme(terminalBackground, themePreferences, isDebugMode);
+  } else {
+    await applyManualTheme(
+      themeName,
+      terminalBackground,
+      themePreferences,
+      settings,
+    );
+  }
+
+  return terminalBackground;
+}
+
 export async function startInteractiveUI(
   config: Config,
   settings: LoadedSettings,
   startupWarnings: string[],
   workspaceRoot: string = process.cwd(),
   initializationResult: InitializationResult,
+  terminalBackground: TerminalBackground,
 ) {
   // Disable line wrapping.
   // We rely on Ink to manage all line wrapping by forcing all content to be
@@ -169,23 +354,27 @@ export async function startInteractiveUI(
     const kittyProtocolStatus = useKittyKeyboardProtocol();
     return (
       <SettingsContext.Provider value={settings}>
-        <KeypressProvider
-          kittyProtocolEnabled={kittyProtocolStatus.enabled}
-          config={config}
-          debugKeystrokeLogging={settings.merged.general?.debugKeystrokeLogging}
-        >
-          <SessionStatsProvider>
-            <VimModeProvider settings={settings}>
-              <AppContainer
-                config={config}
-                settings={settings}
-                startupWarnings={startupWarnings}
-                version={version}
-                initializationResult={initializationResult}
-              />
-            </VimModeProvider>
-          </SessionStatsProvider>
-        </KeypressProvider>
+        <ThemeContext.Provider value={{ terminalBackground }}>
+          <KeypressProvider
+            kittyProtocolEnabled={kittyProtocolStatus.enabled}
+            config={config}
+            debugKeystrokeLogging={
+              settings.merged.general?.debugKeystrokeLogging
+            }
+          >
+            <SessionStatsProvider>
+              <VimModeProvider settings={settings}>
+                <AppContainer
+                  config={config}
+                  settings={settings}
+                  startupWarnings={startupWarnings}
+                  version={version}
+                  initializationResult={initializationResult}
+                />
+              </VimModeProvider>
+            </SessionStatsProvider>
+          </KeypressProvider>
+        </ThemeContext.Provider>
       </SettingsContext.Provider>
     );
   };
@@ -254,17 +443,6 @@ export async function main() {
         'selectedAuthType',
         AuthType.CLOUD_SHELL,
       );
-    }
-  }
-
-  // Load custom themes from settings
-  themeManager.loadCustomThemes(settings.merged.ui?.customThemes);
-
-  if (settings.merged.ui?.theme) {
-    if (!themeManager.setActiveTheme(settings.merged.ui?.theme)) {
-      // If the theme is not found during initial load, log a warning and continue.
-      // The useThemeCommand hook in AppContainer.tsx will handle opening the dialog.
-      console.warn(`Warning: Theme "${settings.merged.ui?.theme}" not found.`);
     }
   }
 
@@ -354,6 +532,10 @@ export async function main() {
   // We are now past the logic handling potentially launching a child process
   // to run Gemini CLI. It is now safe to perform expensive initialization that
   // may have side effects.
+
+  // Initialize theme with auto-detection and user preferences
+  const terminalBackground = await initializeTheme(settings, isDebugMode);
+
   {
     const extensionEnablementManager = new ExtensionEnablementManager(
       ExtensionStorage.getUserExtensionsDir(),
@@ -427,6 +609,7 @@ export async function main() {
         startupWarnings,
         process.cwd(),
         initializationResult,
+        terminalBackground,
       );
       return;
     }

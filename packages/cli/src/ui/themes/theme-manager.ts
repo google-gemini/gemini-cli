@@ -19,7 +19,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
 import type { Theme, ThemeType, CustomTheme } from './theme.js';
-import { createCustomTheme, validateCustomTheme } from './theme.js';
+import { createCustomTheme, validateCustomTheme, AUTO_THEME } from './theme.js';
 import type { SemanticColors } from './semantic-tokens.js';
 import { ANSI } from './ansi.js';
 import { ANSILight } from './ansi-light.js';
@@ -106,10 +106,57 @@ class ThemeManager {
 
   /**
    * Sets the active theme.
-   * @param themeName The name of the theme to set as active.
+   * @param themeName The name of the theme to set as active. Use AUTO_THEME for automatic theme based on terminal background.
+   * @param terminalBackground Optional terminal background for auto theme resolution ('light' | 'dark' | 'unknown').
+   * @param themePreferences Optional theme preferences for auto mode (light and dark theme names).
    * @returns True if the theme was successfully set, false otherwise.
    */
-  setActiveTheme(themeName: string | undefined): boolean {
+  setActiveTheme(
+    themeName: string | undefined,
+    terminalBackground?: 'light' | 'dark' | 'unknown',
+    themePreferences?: { light: string; dark: string },
+  ): boolean {
+    // Handle auto theme mode
+    if (themeName === AUTO_THEME) {
+      if (!terminalBackground || terminalBackground === 'unknown') {
+        // Fallback to default theme if terminal background can't be detected
+        const fallbackTheme = this.findThemeByName(
+          themePreferences?.dark ?? 'Default',
+        );
+        if (fallbackTheme) {
+          this.activeTheme = fallbackTheme;
+          return true;
+        }
+        return false;
+      }
+
+      // Use theme preferences to determine which theme to use
+      const preferredThemeName =
+        terminalBackground === 'light'
+          ? themePreferences?.light
+          : themePreferences?.dark;
+
+      if (preferredThemeName) {
+        const resolvedTheme = this.findThemeByName(preferredThemeName);
+        if (resolvedTheme) {
+          this.activeTheme = resolvedTheme;
+          return true;
+        }
+      }
+
+      // Fallback to built-in default if preference is not set or not found
+      const fallbackThemeName =
+        terminalBackground === 'light' ? 'Default Light' : 'Default';
+      const fallbackTheme = this.findThemeByName(fallbackThemeName);
+      if (fallbackTheme) {
+        this.activeTheme = fallbackTheme;
+        return true;
+      }
+
+      return false;
+    }
+
+    // Standard theme setting
     const theme = this.findThemeByName(themeName);
     if (!theme) {
       return false;
@@ -223,6 +270,33 @@ class ThemeManager {
    */
   getTheme(themeName: string): Theme | undefined {
     return this.findThemeByName(themeName);
+  }
+
+  /**
+   * Checks if a theme name is the special AUTO_THEME value.
+   * @param themeName The theme name to check.
+   * @returns True if the theme name is AUTO_THEME.
+   */
+  isAutoTheme(themeName: string | undefined): boolean {
+    return themeName === AUTO_THEME;
+  }
+
+  /**
+   * Resolves the actual theme name when using "auto" mode.
+   * @param terminalBackground The terminal background ('light' | 'dark' | 'unknown').
+   * @param themePreferences Theme preferences for auto mode.
+   * @returns The resolved theme name.
+   */
+  resolveAutoThemeName(
+    terminalBackground: 'light' | 'dark' | 'unknown',
+    themePreferences?: { light: string; dark: string },
+  ): string {
+    if (terminalBackground === 'unknown') {
+      return themePreferences?.dark ?? 'Default';
+    }
+    return terminalBackground === 'light'
+      ? (themePreferences?.light ?? 'Default Light')
+      : (themePreferences?.dark ?? 'Default');
   }
 
   private isPath(themeName: string): boolean {

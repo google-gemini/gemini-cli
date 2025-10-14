@@ -17,6 +17,9 @@ import { SettingScope } from '../../config/settings.js';
 import { getScopeMessageForSetting } from '../../utils/dialogScopeUtils.js';
 import { useKeypress } from '../hooks/useKeypress.js';
 import { ScopeSelector } from './shared/ScopeSelector.js';
+import { useTheme } from '../contexts/ThemeContext.js';
+import { AUTO_THEME } from '../themes/theme.js';
+import { getThemePreferences } from '../../utils/settingsUtils.js';
 
 interface ThemeDialogProps {
   /** Callback function when a theme is selected */
@@ -40,11 +43,12 @@ export function ThemeDialog({
   const [selectedScope, setSelectedScope] = useState<SettingScope>(
     SettingScope.User,
   );
+  const { terminalBackground } = useTheme();
 
   // Track the currently highlighted theme name
   const [highlightedThemeName, setHighlightedThemeName] = useState<
     string | undefined
-  >(settings.merged.ui?.theme || DEFAULT_THEME.name);
+  >(settings.merged.ui?.theme || themeManager.getActiveTheme().name);
 
   // Generate theme items filtered by selected scope
   const customThemes =
@@ -56,8 +60,15 @@ export function ThemeDialog({
     .filter((theme) => theme.type !== 'custom');
   const customThemeNames = Object.keys(customThemes);
   const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
-  // Generate theme items
+  // Generate theme items with AUTO_THEME option first
   const themeItems = [
+    {
+      label: 'Auto (match terminal)',
+      value: AUTO_THEME,
+      themeNameDisplay: 'Auto',
+      themeTypeDisplay: 'Auto-detect',
+      key: AUTO_THEME,
+    },
     ...builtInThemes.map((theme) => ({
       label: theme.name,
       value: theme.name,
@@ -222,10 +233,19 @@ export function ThemeDialog({
             </Text>
             {/* Get the Theme object for the highlighted theme, fall back to default if not found */}
             {(() => {
+              // Resolve AUTO_THEME to actual theme name
+              let themeNameToPreview =
+                highlightedThemeName || DEFAULT_THEME.name;
+              if (themeNameToPreview === AUTO_THEME) {
+                const themePreferences = getThemePreferences(settings);
+                themeNameToPreview = themeManager.resolveAutoThemeName(
+                  terminalBackground,
+                  themePreferences,
+                );
+              }
+
               const previewTheme =
-                themeManager.getTheme(
-                  highlightedThemeName || DEFAULT_THEME.name,
-                ) || DEFAULT_THEME;
+                themeManager.getTheme(themeNameToPreview) || DEFAULT_THEME;
               return (
                 <Box
                   borderStyle="single"

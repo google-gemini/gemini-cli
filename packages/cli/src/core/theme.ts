@@ -6,6 +6,7 @@
 
 import { themeManager } from '../ui/themes/theme-manager.js';
 import { type LoadedSettings } from '../config/settings.js';
+import { AUTO_THEME } from '../ui/themes/theme.js';
 
 /**
  * Validates the configured theme.
@@ -14,6 +15,10 @@ import { type LoadedSettings } from '../config/settings.js';
  */
 export function validateTheme(settings: LoadedSettings): string | null {
   const effectiveTheme = settings.merged.ui?.theme;
+  // AUTO_THEME is a special theme value that gets resolved at runtime
+  if (effectiveTheme === AUTO_THEME) {
+    return null;
+  }
   if (effectiveTheme && !themeManager.findThemeByName(effectiveTheme)) {
     return `Theme "${effectiveTheme}" not found.`;
   }
