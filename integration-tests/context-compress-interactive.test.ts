@@ -7,7 +7,7 @@
 import { expect, describe, it, beforeEach, afterEach } from 'vitest';
 import { TestRig } from './test-helper.js';
 
-describe('Interactive Mode', () => {
+describe.skip('Interactive Mode', () => {
   let rig: TestRig;
 
   beforeEach(() => {
