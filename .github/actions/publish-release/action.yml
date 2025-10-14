@@ -205,13 +205,13 @@ runs:
       working-directory: '${{ inputs.working-directory }}'
       env:
         NODE_AUTH_TOKEN: '${{ inputs.wombat-token-a2a-server }}'
-        NPM_TAG: '${{ inputs.npm-tag }}'
       shell: 'bash'
+      # Tag staging for initial release
       run: |
         if [ "${{ inputs.dry-run }}" == "true" ]; then
-          npm publish --dry-run --workspace="@google/gemini-cli-a2a-server" --tag "$NPM_TAG"
+          npm publish --dry-run --workspace="@google/gemini-cli-a2a-server" --tag "staging"
         else
-          npm publish --workspace="@google/gemini-cli-a2a-server" --tag "$NPM_TAG"
+          npm publish --workspace="@google/gemini-cli-a2a-server" --tag "staging"
         fi
 
     - name: '🔬 Verify NPM release by version'
