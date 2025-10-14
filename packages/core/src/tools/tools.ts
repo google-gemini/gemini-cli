@@ -602,7 +602,9 @@ export interface ToolEditConfirmationDetails {
 export interface ToolConfirmationPayload {
   // used to override `modifiedProposedContent` for modifiable tools in the
   // inline modify flow
-  newContent: string;
+  newContent?: string;
+  // used to specify the exact command or prefix to allow for shell commands
+  commandToAllow?: string;
 }
 
 export interface ToolExecuteConfirmationDetails {
@@ -639,6 +641,7 @@ export type ToolCallConfirmationDetails =
 export enum ToolConfirmationOutcome {
   ProceedOnce = 'proceed_once',
   ProceedAlways = 'proceed_always',
+  ProceedAlwaysExact = 'proceed_always_exact',
   ProceedAlwaysServer = 'proceed_always_server',
   ProceedAlwaysTool = 'proceed_always_tool',
   ModifyWithEditor = 'modify_with_editor',

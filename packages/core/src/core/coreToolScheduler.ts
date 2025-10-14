@@ -828,7 +828,10 @@ export class CoreToolScheduler {
 
   async handleConfirmationResponse(
     callId: string,
-    originalOnConfirm: (outcome: ToolConfirmationOutcome) => Promise<void>,
+    originalOnConfirm: (
+      outcome: ToolConfirmationOutcome,
+      payload?: ToolConfirmationPayload,
+    ) => Promise<void>,
     outcome: ToolConfirmationOutcome,
     signal: AbortSignal,
     payload?: ToolConfirmationPayload,
@@ -838,7 +841,7 @@ export class CoreToolScheduler {
     );
 
     if (toolCall && toolCall.status === 'awaiting_approval') {
-      await originalOnConfirm(outcome);
+      await originalOnConfirm(outcome, payload);
     }
 
     if (outcome === ToolConfirmationOutcome.ProceedAlways) {
@@ -910,7 +913,8 @@ export class CoreToolScheduler {
   ): Promise<void> {
     if (
       toolCall.confirmationDetails.type !== 'edit' ||
-      !isModifiableDeclarativeTool(toolCall.tool)
+      !isModifiableDeclarativeTool(toolCall.tool) ||
+      !payload.newContent
     ) {
       return;
     }
@@ -925,8 +929,12 @@ export class CoreToolScheduler {
       payload.newContent,
       toolCall.request.args,
     );
+    const filePath = modifyContext.getFilePath(toolCall.request.args);
+    if (!filePath) {
+      return;
+    }
     const updatedDiff = Diff.createPatch(
-      modifyContext.getFilePath(toolCall.request.args),
+      filePath,
       currentContent,
       payload.newContent,
       'Current',

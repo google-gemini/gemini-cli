@@ -46,3 +46,5 @@ export { ClearcutLogger } from './src/telemetry/clearcut-logger/clearcut-logger.
 export { logModelSlashCommand } from './src/telemetry/loggers.js';
 export * from './src/utils/googleQuotaErrors.js';
 export type { GoogleApiError } from './src/utils/googleErrors.js';
+export { getMcpServerForTool } from './src/utils/tool-utils.js';
+export { getCommandPrefix } from './src/utils/shell-utils.js';

@@ -100,7 +100,8 @@ export class ShellToolInvocation extends BaseToolInvocation<
   constructor(
     private readonly config: Config,
     params: ShellToolParams,
-    private readonly allowlist: Set<string>,
+    private readonly prefixAllowlist: Set<string>,
+    private readonly exactAllowlist: Set<string>,
   ) {
     super(params);
   }
@@ -123,7 +124,21 @@ export class ShellToolInvocation extends BaseToolInvocation<
     _abortSignal: AbortSignal,
   ): Promise<ToolCallConfirmationDetails | false> {
     const command = stripShellWrapper(this.params.command);
+
+    // 1. Check exact allowlist first.
+    if (this.exactAllowlist.has(command)) {
+      return false;
+    }
+
+    // 2. Check prefix allowlist.
     const rootCommands = [...new Set(getCommandRoots(command))];
+    const commandsToConfirm = rootCommands.filter(
+      (cmd) => !this.prefixAllowlist.has(cmd),
+    );
+
+    if (commandsToConfirm.length === 0) {
+      return false; // Already approved by prefix.
+    }
 
     // In non-interactive mode, we need to prevent the tool from hanging while
     // waiting for user input. If a tool is not fully allowed (e.g. via
@@ -148,22 +163,17 @@ export class ShellToolInvocation extends BaseToolInvocation<
       }
     }
 
-    const commandsToConfirm = rootCommands.filter(
-      (command) => !this.allowlist.has(command),
-    );
-
-    if (commandsToConfirm.length === 0) {
-      return false; // already approved and allowlisted
-    }
-
     const confirmationDetails: ToolExecuteConfirmationDetails = {
       type: 'exec',
       title: 'Confirm Shell Command',
       command: this.params.command,
       rootCommand: commandsToConfirm.join(', '),
       onConfirm: async (outcome: ToolConfirmationOutcome) => {
-        if (outcome === ToolConfirmationOutcome.ProceedAlways) {
-          commandsToConfirm.forEach((command) => this.allowlist.add(command));
+        if (outcome === ToolConfirmationOutcome.ProceedAlwaysExact) {
+          this.exactAllowlist.add(command);
+        } else if (outcome === ToolConfirmationOutcome.ProceedAlways) {
+          // For prefix, we add the root commands that were confirmed.
+          commandsToConfirm.forEach((cmd) => this.prefixAllowlist.add(cmd));
         }
       },
     };
@@ -415,7 +425,8 @@ export class ShellTool extends BaseDeclarativeTool<
   ToolResult
 > {
   static Name: string = 'run_shell_command';
-  private allowlist: Set<string> = new Set();
+  private prefixAllowlist: Set<string> = new Set();
+  private exactAllowlist: Set<string> = new Set();
 
   constructor(private readonly config: Config) {
     super(
@@ -486,6 +497,11 @@ export class ShellTool extends BaseDeclarativeTool<
   protected createInvocation(
     params: ShellToolParams,
   ): ToolInvocation<ShellToolParams, ToolResult> {
-    return new ShellToolInvocation(this.config, params, this.allowlist);
+    return new ShellToolInvocation(
+      this.config,
+      params,
+      this.prefixAllowlist,
+      this.exactAllowlist,
+    );
   }
 }

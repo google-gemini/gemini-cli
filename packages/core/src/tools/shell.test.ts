@@ -394,10 +394,10 @@ describe('ShellTool', () => {
       expect(confirmation).not.toBe(false);
       expect(confirmation && confirmation.type).toBe('exec');
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (confirmation as any).onConfirm(
-        ToolConfirmationOutcome.ProceedAlways,
-      );
+      // Simulate the user choosing "Always allow" for the "npm" prefix.
+      if (confirmation && confirmation.type === 'exec') {
+        await confirmation.onConfirm(ToolConfirmationOutcome.ProceedAlways);
+      }
 
       // Should now be allowlisted
       const secondInvocation = shellTool.build({ command: 'npm test' });
