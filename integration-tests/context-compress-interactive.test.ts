@@ -18,13 +18,14 @@ describe.skip('Interactive Mode', () => {
     await rig.cleanup();
   });
 
-  it('should trigger chat compression with /compress command', async () => {
+  // TODO(#11062): Make this test reliable by not using the actual Gemini model
+  it.skip('should trigger chat compression with /compress command', async () => {
     await rig.setup('interactive-compress-test');
 
     const run = await rig.runInteractive();
 
     const longPrompt =
-      'Dont do anything except returning a 1000 token long paragragh with the <name of the scientist who discovered theory of relativity> at the end to indicate end of response. This is a moderately long sentence.';
+      'Dont do anything except returning a 1000 token long paragraph with the <name of the scientist who discovered theory of relativity> at the end to indicate end of response. This is a moderately long sentence.';
 
     await run.type(longPrompt);
     await run.type('\r');
