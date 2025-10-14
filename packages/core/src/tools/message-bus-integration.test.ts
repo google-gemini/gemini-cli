@@ -216,7 +216,7 @@ describe('Message Bus Integration', () => {
       abortController.abort();
 
       await expect(confirmationPromise).rejects.toThrow(
-        'Tool confirmation aborted',
+        'Tool execution denied by policy',
       );
     });
 

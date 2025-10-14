@@ -422,10 +422,10 @@ describe('WebFetchTool', () => {
       );
 
       // Fast-forward past timeout
-      vi.advanceTimersByTime(30000);
-
+      await vi.advanceTimersByTimeAsync(30000);
       const result = await confirmationPromise;
-      expect(result).toBe(false);
+      expect(result).not.toBe(false);
+      expect(result).toHaveProperty('type', 'info');
 
       vi.useRealTimers();
     });
@@ -444,7 +444,7 @@ describe('WebFetchTool', () => {
       abortController.abort();
 
       await expect(confirmationPromise).rejects.toThrow(
-        'Tool confirmation aborted',
+        'Tool execution denied by policy.',
       );
     });
 
@@ -485,9 +485,10 @@ describe('WebFetchTool', () => {
       responseHandler(wrongResponse);
 
       // Should timeout since correct response wasn't received
-      vi.advanceTimersByTime(30000);
+      await vi.advanceTimersByTimeAsync(30000);
       const result = await confirmationPromise;
-      expect(result).toBe(false);
+      expect(result).not.toBe(false);
+      expect(result).toHaveProperty('type', 'info');
 
       vi.useRealTimers();
     });
