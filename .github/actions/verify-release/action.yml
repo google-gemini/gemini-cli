@@ -105,4 +105,4 @@ runs:
         # See https://github.com/google-gemini/gemini-cli/issues/10517
         CI: 'false'
       shell: 'bash'
-      run: 'echo ""' ###npm run test:integration:sandbox:none'
+      run: 'npm run test:integration:sandbox:none'
