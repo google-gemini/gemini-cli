@@ -2506,7 +2506,7 @@ describe('loadCliConfig useRipgrep', () => {
         'test-session',
         argv,
       );
-      expect(config.getUseModelRouter()).toBe(false);
+      expect(config.getUseModelRouter()).toBe(true);
     });
 
     it('should be true when useModelRouter is set to true in settings', async () => {
