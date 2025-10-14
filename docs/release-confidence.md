@@ -82,7 +82,7 @@ Before promoting a `preview` release to `stable`, a maintainer must manually run
     *   [ ] Validate that setting is changed
 
 *   **Function Calling:**
-    *   [ ] In interactive mode, ask gemini to "create a file named hello.md with the content 'hello workd'" and verify the file is created correctly.
+    *   [ ] In interactive mode, ask gemini to "create a file named hello.md with the content 'hello world'" and verify the file is created correctly.
 
 If any of these CUJs fail, the release is a no-go until a patch is applied to the `preview` channel.
 
