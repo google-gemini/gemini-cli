@@ -883,26 +883,37 @@ export class TestRig {
     return null;
   }
 
-  async runInteractive(...args: string[]): Promise<InteractiveRun> {
+  async runInteractive(
+    options: {
+      args?: string[];
+      env?: Record<string, string>;
+      waitForPrompt?: boolean;
+    } = {},
+  ): Promise<InteractiveRun> {
     const { command, initialArgs } = this._getCommandAndArgs(['--yolo']);
-    const commandArgs = [...initialArgs, ...args];
+    const commandArgs = [...initialArgs, ...(options.args || [])];
 
-    const options: pty.IPtyForkOptions = {
+    const ptyOptions: pty.IPtyForkOptions = {
       name: 'xterm-color',
       cols: 80,
       rows: 30,
       cwd: this.testDir!,
-      env: Object.fromEntries(
-        Object.entries(env).filter(([, v]) => v !== undefined),
-      ) as { [key: string]: string },
+      env: {
+        ...Object.fromEntries(
+          Object.entries(env).filter(([, v]) => v !== undefined),
+        ),
+        ...(options.env || {}),
+      } as { [key: string]: string },
     };
 
     const executable = command === 'node' ? process.execPath : command;
-    const ptyProcess = pty.spawn(executable, commandArgs, options);
+    const ptyProcess = pty.spawn(executable, commandArgs, ptyOptions);
 
     const run = new InteractiveRun(ptyProcess);
-    // Wait for the app to be ready
-    await run.expectText('Type your message', 30000);
+    if (options.waitForPrompt !== false) {
+      // Wait for the app to be ready
+      await run.expectText('Type your message', 30000);
+    }
     return run;
   }
 }

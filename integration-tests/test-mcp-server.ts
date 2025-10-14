@@ -4,19 +4,17 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { vi } from 'vitest';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import express from 'express';
-import { createServer, type Server as HTTPServer } from 'node:http';
-import { type AddressInfo } from 'node:net';
-import { randomUUID } from 'node:crypto';
+import { type Server as HTTPServer } from 'node:http';
 import { z } from 'zod';
 
-import { vi } from 'vitest';
+import { randomUUID } from 'node:crypto';
 
 export class TestMcpServer {
   private server: HTTPServer | undefined;
-  private port: number | undefined;
   // This spy is used to verify that the mock server received a specific request
   // from the CLI, which runs in a separate process during integration tests.
   // Spying on the client-side code directly is not possible in this scenario.
@@ -29,11 +27,13 @@ export class TestMcpServer {
   async start(): Promise<number> {
     const app = express();
     app.use(express.json());
-    const mcpServer = new McpServer({
-      name: 'test-mcp-server',
-      version: '1.0.0',
-    });
-
+    const mcpServer = new McpServer(
+      {
+        name: 'test-mcp-server',
+        version: '1.0.0',
+      },
+      { capabilities: {} },
+    );
     this._registerTools(mcpServer);
 
     const transport = new StreamableHTTPServerTransport({
@@ -42,18 +42,10 @@ export class TestMcpServer {
     mcpServer.connect(transport);
 
     app.all('/mcp', async (req, res) => {
-      await transport.handleRequest(
-        req,
-        res,
-        req.method === 'POST' ? req.body : undefined,
-      );
+      await transport.handleRequest(req, res, req.body);
     });
 
-    this.server = createServer(app);
-
-    const server = this.server;
-
-    await new Promise<void>((resolve) => {
+    return new Promise((resolve, reject) => {
       // When running in a sandbox (Docker or Podman), the CLI is in a
       // container and the test server is on the host. We must listen on
       // 0.0.0.0 to allow the container to connect to the host.
@@ -64,14 +56,15 @@ export class TestMcpServer {
           ? '0.0.0.0'
           : '127.0.0.1';
 
-      server.listen(0, host, () => {
-        const addr = server.address() as AddressInfo;
-        this.port = addr.port;
-        resolve();
+      this.server = app.listen(0, host, () => {
+        const address = this.server!.address();
+        if (address && typeof address !== 'string') {
+          resolve(address.port);
+        } else {
+          reject(new Error('Could not determine server port.'));
+        }
       });
     });
-
-    return this.port!;
   }
 
   async stop(): Promise<void> {
@@ -95,8 +88,8 @@ export class TestMcpServer {
       'openDiff',
       {
         inputSchema: {
-          file1: z.string(),
-          file2: z.string(),
+          filePath: z.string(),
+          newContent: z.string(),
         },
       },
       async (params) => {
