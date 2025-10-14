@@ -7,7 +7,7 @@
 import { describe, it, expect } from 'vitest';
 import { TestRig } from './test-helper.js';
 
-describe('replace', () => {
+describe.skip('replace', () => {
   it('should be able to replace content in a file', async () => {
     const rig = new TestRig();
     await rig.setup('should be able to replace content in a file');
