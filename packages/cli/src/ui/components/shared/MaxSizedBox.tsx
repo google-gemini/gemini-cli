@@ -57,7 +57,6 @@ interface MaxSizedBoxProps {
   maxHeight: number | undefined;
   overflowDirection?: 'top' | 'bottom';
   additionalHiddenLinesCount?: number;
-  hasFocus?: boolean;
 }
 
 const WithInkScrolling: React.FC<MaxSizedBoxProps> = ({
@@ -65,13 +64,12 @@ const WithInkScrolling: React.FC<MaxSizedBoxProps> = ({
   maxWidth,
   maxHeight,
   overflowDirection = 'top',
-  hasFocus,
 }) => (
   <Scrollable
     maxHeight={maxHeight}
     maxWidth={maxWidth}
     flexGrow={1}
-    hasFocus={hasFocus ?? false}
+    hasFocus={true}
     scrollToBottom={overflowDirection === 'top'}
   >
     {children}
