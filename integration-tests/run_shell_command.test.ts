@@ -97,7 +97,7 @@ describe('run_shell_command', () => {
     // Provide the prompt via stdin to simulate non-interactive mode
     const result = await rig.run({
       stdin: prompt,
-      args: [`--allowed-tools=run_shell_command(${tool})`],
+      args: [`--allowed-tools`, `run_shell_command(${tool})`],
     });
 
     const foundToolCall = await rig.waitForToolCall('run_shell_command', 15000);
@@ -124,7 +124,7 @@ describe('run_shell_command', () => {
 
     const result = await rig.run({
       stdin: prompt,
-      args: ['--allowed-tools=run_shell_command'],
+      args: ['--allowed-tools', 'run_shell_command'],
     });
 
     const foundToolCall = await rig.waitForToolCall('run_shell_command', 15000);
@@ -180,7 +180,7 @@ describe('run_shell_command', () => {
 
     const result = await rig.run({
       stdin: prompt,
-      args: [`--allowed-tools=ShellTool(${tool})`],
+      args: [`--allowed-tools`, `ShellTool(${tool})`],
     });
 
     const foundToolCall = await rig.waitForToolCall('run_shell_command', 15000);
@@ -209,8 +209,10 @@ describe('run_shell_command', () => {
     const result = await rig.run({
       stdin: prompt,
       args: [
-        `--allowed-tools=run_shell_command(${tool})`,
-        '--allowed-tools=run_shell_command(ls)',
+        `--allowed-tools`,
+        `run_shell_command(${tool})`,
+        '--allowed-tools',
+        'run_shell_command(ls)',
       ],
     });
 
@@ -240,8 +242,10 @@ describe('run_shell_command', () => {
     const result = await rig.run({
       stdin: prompt,
       args: [
-        `--allowed-tools=run_shell_command(${tool})`,
-        '--allowed-tools=run_shell_command',
+        `--allowed-tools`,
+        `run_shell_command(${tool})`,
+        '--allowed-tools',
+        'run_shell_command',
       ],
     });
 
