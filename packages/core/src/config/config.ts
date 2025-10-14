@@ -113,6 +113,14 @@ export interface OutputSettings {
   format?: OutputFormat;
 }
 
+export interface CodebaseInvestigatorSettings {
+  enabled?: boolean;
+  maxNumTurns?: number;
+  maxTimeMinutes?: number;
+  thinkingBudget?: number;
+  model?: string;
+}
+
 /**
  * All information required in CLI to handle an extension. Defined in Core so
  * that the collection of loaded, active, and inactive extensions can be passed
@@ -265,7 +273,7 @@ export interface ConfigParameters {
   output?: OutputSettings;
   useModelRouter?: boolean;
   enableMessageBusIntegration?: boolean;
-  enableSubagents?: boolean;
+  codebaseInvestigatorSettings?: CodebaseInvestigatorSettings;
   continueOnFailedApiCall?: boolean;
 }
 
@@ -358,7 +366,7 @@ export class Config {
   private readonly outputSettings: OutputSettings;
   private readonly useModelRouter: boolean;
   private readonly enableMessageBusIntegration: boolean;
-  private readonly enableSubagents: boolean;
+  private readonly codebaseInvestigatorSettings?: CodebaseInvestigatorSettings;
   private readonly continueOnFailedApiCall: boolean;
 
   constructor(params: ConfigParameters) {
@@ -450,7 +458,7 @@ export class Config {
     this.useModelRouter = params.useModelRouter ?? false;
     this.enableMessageBusIntegration =
       params.enableMessageBusIntegration ?? false;
-    this.enableSubagents = params.enableSubagents ?? false;
+    this.codebaseInvestigatorSettings = params.codebaseInvestigatorSettings;
     this.continueOnFailedApiCall = params.continueOnFailedApiCall ?? true;
     this.extensionManagement = params.extensionManagement ?? true;
     this.storage = new Storage(this.targetDir);
@@ -1034,8 +1042,8 @@ export class Config {
     return this.enableMessageBusIntegration;
   }
 
-  getEnableSubagents(): boolean {
-    return this.enableSubagents;
+  getCodebaseInvestigatorSettings(): CodebaseInvestigatorSettings | undefined {
+    return this.codebaseInvestigatorSettings;
   }
 
   async createToolRegistry(): Promise<ToolRegistry> {
@@ -1130,9 +1138,11 @@ export class Config {
     }
 
     // Register Subagents as Tools
-    if (this.getEnableSubagents()) {
-      const agentDefinitions = this.agentRegistry.getAllDefinitions();
-      for (const definition of agentDefinitions) {
+    if (this.getCodebaseInvestigatorSettings()?.enabled) {
+      const definition = this.agentRegistry.getDefinition(
+        'codebase_investigator',
+      );
+      if (definition) {
         // We must respect the main allowed/exclude lists for agents too.
         const excludeTools = this.getExcludeTools() || [];
         const allowedTools = this.getAllowedTools();
