@@ -9,6 +9,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { ToolStatsDisplay } from './ToolStatsDisplay.js';
 import * as SessionContext from '../contexts/SessionContext.js';
 import type { SessionMetrics } from '../contexts/SessionContext.js';
+import { createMockToolCallDecisions } from '../../test-utils/render.js';
 
 // Mock the context to provide controlled data for testing
 vi.mock('../contexts/SessionContext.js', async (importOriginal) => {
@@ -24,6 +25,7 @@ const useSessionStatsMock = vi.mocked(SessionContext.useSessionStats);
 const renderWithMockedStats = (metrics: SessionMetrics) => {
   useSessionStatsMock.mockReturnValue({
     stats: {
+      sessionId: 'test-session',
       sessionStartTime: new Date(),
       metrics,
       lastPromptTokenCount: 0,
@@ -46,8 +48,16 @@ describe('<ToolStatsDisplay />', () => {
         totalSuccess: 0,
         totalFail: 0,
         totalDurationMs: 0,
-        totalDecisions: { accept: 0, reject: 0, modify: 0 },
+        totalDecisions: createMockToolCallDecisions({
+          accept: 0,
+          reject: 0,
+          modify: 0,
+        }),
         byName: {},
+      },
+      files: {
+        totalLinesAdded: 0,
+        totalLinesRemoved: 0,
       },
     });
 
@@ -65,14 +75,22 @@ describe('<ToolStatsDisplay />', () => {
         totalSuccess: 1,
         totalFail: 0,
         totalDurationMs: 100,
-        totalDecisions: { accept: 1, reject: 0, modify: 0 },
+        totalDecisions: createMockToolCallDecisions({
+          accept: 1,
+          reject: 0,
+          modify: 0,
+        }),
         byName: {
           'test-tool': {
             count: 1,
             success: 1,
             fail: 0,
             durationMs: 100,
-            decisions: { accept: 1, reject: 0, modify: 0 },
+            decisions: createMockToolCallDecisions({
+              accept: 1,
+              reject: 0,
+              modify: 0,
+            }),
           },
         },
       },
@@ -91,21 +109,33 @@ describe('<ToolStatsDisplay />', () => {
         totalSuccess: 2,
         totalFail: 1,
         totalDurationMs: 300,
-        totalDecisions: { accept: 1, reject: 1, modify: 1 },
+        totalDecisions: createMockToolCallDecisions({
+          accept: 1,
+          reject: 1,
+          modify: 1,
+        }),
         byName: {
           'tool-a': {
             count: 2,
             success: 1,
             fail: 1,
             durationMs: 200,
-            decisions: { accept: 1, reject: 1, modify: 0 },
+            decisions: createMockToolCallDecisions({
+              accept: 1,
+              reject: 1,
+              modify: 0,
+            }),
           },
           'tool-b': {
             count: 1,
             success: 1,
             fail: 0,
             durationMs: 100,
-            decisions: { accept: 0, reject: 0, modify: 1 },
+            decisions: createMockToolCallDecisions({
+              accept: 0,
+              reject: 0,
+              modify: 1,
+            }),
           },
         },
       },
@@ -125,22 +155,22 @@ describe('<ToolStatsDisplay />', () => {
         totalSuccess: 888888888,
         totalFail: 111111111,
         totalDurationMs: 987654321,
-        totalDecisions: {
+        totalDecisions: createMockToolCallDecisions({
           accept: 123456789,
           reject: 98765432,
           modify: 12345,
-        },
+        }),
         byName: {
           'long-named-tool-for-testing-wrapping-and-such': {
             count: 999999999,
             success: 888888888,
             fail: 111111111,
             durationMs: 987654321,
-            decisions: {
+            decisions: createMockToolCallDecisions({
               accept: 123456789,
               reject: 98765432,
               modify: 12345,
-            },
+            }),
           },
         },
       },
@@ -157,14 +187,22 @@ describe('<ToolStatsDisplay />', () => {
         totalSuccess: 1,
         totalFail: 0,
         totalDurationMs: 100,
-        totalDecisions: { accept: 0, reject: 0, modify: 0 },
+        totalDecisions: createMockToolCallDecisions({
+          accept: 0,
+          reject: 0,
+          modify: 0,
+        }),
         byName: {
           'test-tool': {
             count: 1,
             success: 1,
             fail: 0,
             durationMs: 100,
-            decisions: { accept: 0, reject: 0, modify: 0 },
+            decisions: createMockToolCallDecisions({
+              accept: 0,
+              reject: 0,
+              modify: 0,
+            }),
           },
         },
       },

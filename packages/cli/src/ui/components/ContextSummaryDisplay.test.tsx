@@ -8,6 +8,10 @@ import type React from 'react';
 import { render } from 'ink-testing-library';
 import { describe, it, expect, vi } from 'vitest';
 import { ContextSummaryDisplay } from './ContextSummaryDisplay.js';
+import {
+  createMockIdeContext,
+  createMockOpenFile,
+} from '../../test-utils/testFactories.js';
 import * as useTerminalSize from '../hooks/useTerminalSize.js';
 
 vi.mock('../hooks/useTerminalSize.js', () => ({
@@ -30,11 +34,11 @@ describe('<ContextSummaryDisplay />', () => {
     contextFileNames: ['GEMINI.md'],
     mcpServers: { 'test-server': { command: 'test' } },
     showToolDescriptions: false,
-    ideContext: {
+    ideContext: createMockIdeContext({
       workspaceState: {
-        openFiles: [{ path: '/a/b/c' }],
+        openFiles: [createMockOpenFile({ path: '/a/b/c' })],
       },
-    },
+    }),
   };
 
   it('should render on a single line on a wide screen', () => {

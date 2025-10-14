@@ -10,11 +10,8 @@ import { Text, useIsScreenReaderEnabled } from 'ink';
 import { App } from './App.js';
 import { UIStateContext, type UIState } from './contexts/UIStateContext.js';
 import { StreamingState } from './types.js';
-import {
-  ConfigContext,
-  type Config,
-  type Telemetry,
-} from './contexts/ConfigContext.js';
+import { ConfigContext } from './contexts/ConfigContext.js';
+import type { Config } from '@google/gemini-cli-core';
 
 vi.mock('ink', async (importOriginal) => {
   const original = await importOriginal<typeof import('ink')>();
@@ -64,9 +61,7 @@ describe('App', () => {
     },
   };
 
-  const mockConfig = {
-    telemetry: {} as Telemetry,
-  } as Config;
+  const mockConfig = {} as Config;
 
   const renderWithProviders = (ui: React.ReactElement, state: UIState) =>
     render(
@@ -132,7 +127,9 @@ describe('App', () => {
   });
 
   it('should render ScreenReaderAppLayout when screen reader is enabled', () => {
-    (useIsScreenReaderEnabled as vi.Mock).mockReturnValue(true);
+    (useIsScreenReaderEnabled as ReturnType<typeof vi.fn>).mockReturnValue(
+      true,
+    );
 
     const { lastFrame } = renderWithProviders(<App />, mockUIState as UIState);
 
@@ -142,7 +139,9 @@ describe('App', () => {
   });
 
   it('should render DefaultAppLayout when screen reader is not enabled', () => {
-    (useIsScreenReaderEnabled as vi.Mock).mockReturnValue(false);
+    (useIsScreenReaderEnabled as ReturnType<typeof vi.fn>).mockReturnValue(
+      false,
+    );
 
     const { lastFrame } = renderWithProviders(<App />, mockUIState as UIState);
 

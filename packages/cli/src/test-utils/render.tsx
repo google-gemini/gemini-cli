@@ -14,6 +14,9 @@ import { UIStateContext, type UIState } from '../ui/contexts/UIStateContext.js';
 import { ConfigContext } from '../ui/contexts/ConfigContext.js';
 import { calculateMainAreaWidth } from '../ui/utils/ui-sizing.js';
 import { VimModeProvider } from '../ui/contexts/VimModeContext.js';
+import type { SessionStatsState } from '../ui/contexts/SessionContext.js';
+import type { TextBufferState } from '../ui/components/shared/text-buffer.js';
+import type { KittyProtocolStatus } from '../ui/hooks/useKittyKeyboardProtocol.js';
 
 import { type Config } from '@google/gemini-cli-core';
 
@@ -122,3 +125,95 @@ export const renderWithProviders = (
     </ConfigContext.Provider>,
   );
 };
+
+/**
+ * DRY Test Helper Factories - Centralized mock object creation
+ */
+
+/**
+ * Creates a complete ToolCallDecisions object with all required fields
+ */
+export const createMockToolCallDecisions = (overrides?: {
+  accept?: number;
+  reject?: number;
+  modify?: number;
+  auto_accept?: number;
+}): {
+  accept: number;
+  reject: number;
+  modify: number;
+  auto_accept: number;
+} => ({
+  accept: overrides?.accept ?? 0,
+  reject: overrides?.reject ?? 0,
+  modify: overrides?.modify ?? 0,
+  auto_accept: overrides?.auto_accept ?? 0,
+});
+
+/**
+ * Creates a complete SessionStatsState with all required fields
+ */
+export const createMockSessionStats = (
+  overrides?: Partial<{
+    sessionId: string;
+    sessionStartTime: Date;
+    lastPromptTokenCount: number;
+    promptCount: number;
+  }>,
+): SessionStatsState => ({
+  sessionId: overrides?.sessionId ?? 'test-session-id',
+  sessionStartTime: overrides?.sessionStartTime ?? new Date(),
+  metrics: {
+    models: {},
+    tools: {
+      totalCalls: 0,
+      totalSuccess: 0,
+      totalFail: 0,
+      totalDurationMs: 0,
+      totalDecisions: createMockToolCallDecisions(),
+      byName: {},
+    },
+    files: {
+      totalLinesAdded: 0,
+      totalLinesRemoved: 0,
+    },
+  },
+  lastPromptTokenCount: overrides?.lastPromptTokenCount ?? 0,
+  promptCount: overrides?.promptCount ?? 0,
+});
+
+/**
+ * Creates a complete KittyProtocolStatus with all required fields
+ */
+export const createMockKittyProtocolStatus = (overrides?: {
+  supported?: boolean;
+  enabled?: boolean;
+  checking?: boolean;
+}): KittyProtocolStatus => ({
+  supported: overrides?.supported ?? false,
+  enabled: overrides?.enabled ?? false,
+  checking: overrides?.checking ?? false,
+});
+
+/**
+ * Creates a complete TextBufferState with all required fields
+ */
+export const createMockTextBufferState = (
+  overrides?: Partial<TextBufferState>,
+): TextBufferState => ({
+  lines: overrides?.lines ?? [''],
+  cursorRow: overrides?.cursorRow ?? 0,
+  cursorCol: overrides?.cursorCol ?? 0,
+  preferredCol: overrides?.preferredCol ?? null,
+  undoStack: overrides?.undoStack ?? [],
+  redoStack: overrides?.redoStack ?? [],
+  clipboard: overrides?.clipboard ?? null,
+  selectionAnchor: overrides?.selectionAnchor ?? null,
+  viewportWidth: overrides?.viewportWidth ?? 80,
+  viewportHeight: overrides?.viewportHeight ?? 24,
+  visualLayout: overrides?.visualLayout ?? {
+    visualLines: [''],
+    logicalToVisualMap: [[[0, 0]]],
+    visualToLogicalMap: [[0, 0]],
+  },
+});

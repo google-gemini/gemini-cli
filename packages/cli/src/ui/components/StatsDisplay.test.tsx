@@ -9,6 +9,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { StatsDisplay } from './StatsDisplay.js';
 import * as SessionContext from '../contexts/SessionContext.js';
 import type { SessionMetrics } from '../contexts/SessionContext.js';
+import { createMockToolCallDecisions } from '../../test-utils/render.js';
 
 // Mock the context to provide controlled data for testing
 vi.mock('../contexts/SessionContext.js', async (importOriginal) => {
@@ -47,7 +48,11 @@ describe('<StatsDisplay />', () => {
         totalSuccess: 0,
         totalFail: 0,
         totalDurationMs: 0,
-        totalDecisions: { accept: 0, reject: 0, modify: 0 },
+        totalDecisions: createMockToolCallDecisions({
+          accept: 0,
+          reject: 0,
+          modify: 0,
+        }),
         byName: {},
       },
       files: {
@@ -97,7 +102,11 @@ describe('<StatsDisplay />', () => {
         totalSuccess: 0,
         totalFail: 0,
         totalDurationMs: 0,
-        totalDecisions: { accept: 0, reject: 0, modify: 0 },
+        totalDecisions: createMockToolCallDecisions({
+          accept: 0,
+          reject: 0,
+          modify: 0,
+        }),
         byName: {},
       },
       files: {
@@ -136,14 +145,22 @@ describe('<StatsDisplay />', () => {
         totalSuccess: 1,
         totalFail: 1,
         totalDurationMs: 123,
-        totalDecisions: { accept: 1, reject: 0, modify: 0 },
+        totalDecisions: createMockToolCallDecisions({
+          accept: 1,
+          reject: 0,
+          modify: 0,
+        }),
         byName: {
           'test-tool': {
             count: 2,
             success: 1,
             fail: 1,
             durationMs: 123,
-            decisions: { accept: 1, reject: 0, modify: 0 },
+            decisions: createMockToolCallDecisions({
+              accept: 1,
+              reject: 0,
+              modify: 0,
+            }),
           },
         },
       },
@@ -173,14 +190,22 @@ describe('<StatsDisplay />', () => {
           totalSuccess: 1,
           totalFail: 1,
           totalDurationMs: 123,
-          totalDecisions: { accept: 0, reject: 0, modify: 0 }, // No decisions
+          totalDecisions: createMockToolCallDecisions({
+            accept: 0,
+            reject: 0,
+            modify: 0,
+          }), // No decisions
           byName: {
             'test-tool': {
               count: 2,
               success: 1,
               fail: 1,
               durationMs: 123,
-              decisions: { accept: 0, reject: 0, modify: 0 },
+              decisions: createMockToolCallDecisions({
+                accept: 0,
+                reject: 0,
+                modify: 0,
+              }),
             },
           },
         },
@@ -219,7 +244,11 @@ describe('<StatsDisplay />', () => {
           totalSuccess: 0,
           totalFail: 0,
           totalDurationMs: 0,
-          totalDecisions: { accept: 0, reject: 0, modify: 0 },
+          totalDecisions: createMockToolCallDecisions({
+            accept: 0,
+            reject: 0,
+            modify: 0,
+          }),
           byName: {},
         },
         files: {
@@ -245,7 +274,11 @@ describe('<StatsDisplay />', () => {
           totalSuccess: 10,
           totalFail: 0,
           totalDurationMs: 0,
-          totalDecisions: { accept: 0, reject: 0, modify: 0 },
+          totalDecisions: createMockToolCallDecisions({
+            accept: 0,
+            reject: 0,
+            modify: 0,
+          }),
           byName: {},
         },
         files: {
@@ -265,7 +298,11 @@ describe('<StatsDisplay />', () => {
           totalSuccess: 9,
           totalFail: 1,
           totalDurationMs: 0,
-          totalDecisions: { accept: 0, reject: 0, modify: 0 },
+          totalDecisions: createMockToolCallDecisions({
+            accept: 0,
+            reject: 0,
+            modify: 0,
+          }),
           byName: {},
         },
         files: {
@@ -285,7 +322,11 @@ describe('<StatsDisplay />', () => {
           totalSuccess: 5,
           totalFail: 5,
           totalDurationMs: 0,
-          totalDecisions: { accept: 0, reject: 0, modify: 0 },
+          totalDecisions: createMockToolCallDecisions({
+            accept: 0,
+            reject: 0,
+            modify: 0,
+          }),
           byName: {},
         },
         files: {
@@ -307,7 +348,11 @@ describe('<StatsDisplay />', () => {
           totalSuccess: 1,
           totalFail: 0,
           totalDurationMs: 100,
-          totalDecisions: { accept: 0, reject: 0, modify: 0 },
+          totalDecisions: createMockToolCallDecisions({
+            accept: 0,
+            reject: 0,
+            modify: 0,
+          }),
           byName: {},
         },
         files: {
@@ -333,7 +378,11 @@ describe('<StatsDisplay />', () => {
           totalSuccess: 1,
           totalFail: 0,
           totalDurationMs: 100,
-          totalDecisions: { accept: 0, reject: 0, modify: 0 },
+          totalDecisions: createMockToolCallDecisions({
+            accept: 0,
+            reject: 0,
+            modify: 0,
+          }),
           byName: {},
         },
         files: {
@@ -358,7 +407,11 @@ describe('<StatsDisplay />', () => {
         totalSuccess: 0,
         totalFail: 0,
         totalDurationMs: 0,
-        totalDecisions: { accept: 0, reject: 0, modify: 0 },
+        totalDecisions: createMockToolCallDecisions({
+          accept: 0,
+          reject: 0,
+          modify: 0,
+        }),
         byName: {},
       },
       files: {

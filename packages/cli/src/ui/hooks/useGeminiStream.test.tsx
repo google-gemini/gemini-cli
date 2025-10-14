@@ -1377,7 +1377,7 @@ describe('useGeminiStream', () => {
           invocation: {
             getDescription: () => 'Mock description',
           } as unknown as AnyToolInvocation,
-        } as TrackedWaitingToolCall,
+        } as unknown as unknown as TrackedWaitingToolCall,
         {
           request: {
             callId: 'call2',
@@ -1403,7 +1403,7 @@ describe('useGeminiStream', () => {
           invocation: {
             getDescription: () => 'Mock description',
           } as unknown as AnyToolInvocation,
-        } as TrackedWaitingToolCall,
+        } as unknown as unknown as TrackedWaitingToolCall,
       ];
 
       const { result } = renderTestHook(awaitingApprovalToolCalls);
@@ -1455,7 +1455,7 @@ describe('useGeminiStream', () => {
           invocation: {
             getDescription: () => 'Mock description',
           } as unknown as AnyToolInvocation,
-        } as TrackedWaitingToolCall,
+        } as unknown as unknown as TrackedWaitingToolCall,
         {
           request: {
             callId: 'call2',
@@ -1481,7 +1481,7 @@ describe('useGeminiStream', () => {
           invocation: {
             getDescription: () => 'Mock description',
           } as unknown as AnyToolInvocation,
-        } as TrackedWaitingToolCall,
+        } as unknown as unknown as TrackedWaitingToolCall,
         {
           request: {
             callId: 'call3',
@@ -1507,7 +1507,7 @@ describe('useGeminiStream', () => {
           invocation: {
             getDescription: () => 'Mock description',
           } as unknown as AnyToolInvocation,
-        } as TrackedWaitingToolCall,
+        } as unknown as unknown as TrackedWaitingToolCall,
       ];
 
       const { result } = renderTestHook(awaitingApprovalToolCalls);
@@ -1558,15 +1558,13 @@ describe('useGeminiStream', () => {
           invocation: {
             getDescription: () => 'Mock description',
           } as unknown as AnyToolInvocation,
-        } as TrackedWaitingToolCall,
+        } as unknown as unknown as TrackedWaitingToolCall,
       ];
 
       const { result } = renderTestHook(awaitingApprovalToolCalls);
 
       await act(async () => {
-        await result.current.handleApprovalModeChange(
-          ApprovalMode.REQUIRE_CONFIRMATION,
-        );
+        await result.current.handleApprovalModeChange('require-confirmation');
       });
 
       // No tools should be auto-approved
@@ -1608,7 +1606,7 @@ describe('useGeminiStream', () => {
           invocation: {
             getDescription: () => 'Mock description',
           } as unknown as AnyToolInvocation,
-        } as TrackedWaitingToolCall,
+        } as unknown as unknown as TrackedWaitingToolCall,
         {
           request: {
             callId: 'call2',
@@ -1634,7 +1632,7 @@ describe('useGeminiStream', () => {
           invocation: {
             getDescription: () => 'Mock description',
           } as unknown as AnyToolInvocation,
-        } as TrackedWaitingToolCall,
+        } as unknown as unknown as TrackedWaitingToolCall,
       ];
 
       const { result } = renderTestHook(awaitingApprovalToolCalls);
@@ -1678,7 +1676,7 @@ describe('useGeminiStream', () => {
           invocation: {
             getDescription: () => 'Mock description',
           } as unknown as AnyToolInvocation,
-        } as TrackedWaitingToolCall,
+        } as unknown as unknown as TrackedWaitingToolCall,
       ];
 
       const { result } = renderTestHook(awaitingApprovalToolCalls);
@@ -1716,7 +1714,7 @@ describe('useGeminiStream', () => {
           invocation: {
             getDescription: () => 'Mock description',
           } as unknown as AnyToolInvocation,
-        } as TrackedWaitingToolCall,
+        } as unknown as unknown as TrackedWaitingToolCall,
       ];
 
       const { result } = renderTestHook(awaitingApprovalToolCalls);
@@ -1757,7 +1755,7 @@ describe('useGeminiStream', () => {
           invocation: {
             getDescription: () => 'Mock description',
           } as unknown as AnyToolInvocation,
-        } as TrackedWaitingToolCall,
+        } as unknown as unknown as TrackedWaitingToolCall,
         {
           request: {
             callId: 'call2',

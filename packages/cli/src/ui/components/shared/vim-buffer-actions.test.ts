@@ -23,6 +23,12 @@ const createTestState = (
   clipboard: null,
   selectionAnchor: null,
   viewportWidth: 80,
+  viewportHeight: 24,
+  visualLayout: {
+    visualLines: lines,
+    logicalToVisualMap: lines.map((_, i) => [[i, 0]]),
+    visualToLogicalMap: lines.map((_, i) => [i, 0]),
+  },
 });
 
 describe('vim-buffer-actions', () => {

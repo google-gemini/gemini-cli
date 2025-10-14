@@ -6,6 +6,7 @@
 
 import type { GeminiCLIExtension } from '@google/gemini-cli-core';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
+import { createMockExtension } from '../../test-utils/testFactories.js';
 import { MessageType } from '../types.js';
 import { extensionsCommand } from './extensionsCommand.js';
 import { type CommandContext } from './types.js';
@@ -221,7 +222,7 @@ describe('extensionsCommand', () => {
         throw new Error('Update completion not found');
       }
 
-      const extensionOne: GeminiCLIExtension = {
+      const extensionOne: GeminiCLIExtension = createMockExtension({
         name: 'ext-one',
         version: '1.0.0',
         isActive: true,
@@ -231,8 +232,8 @@ describe('extensionsCommand', () => {
           autoUpdate: false,
           source: 'https://github.com/some/extension.git',
         },
-      };
-      const extensionTwo: GeminiCLIExtension = {
+      });
+      const extensionTwo: GeminiCLIExtension = createMockExtension({
         name: 'another-ext',
         version: '1.0.0',
         isActive: true,
@@ -242,8 +243,8 @@ describe('extensionsCommand', () => {
           autoUpdate: false,
           source: 'https://github.com/some/extension.git',
         },
-      };
-      const allExt: GeminiCLIExtension = {
+      });
+      const allExt: GeminiCLIExtension = createMockExtension({
         name: 'all-ext',
         version: '1.0.0',
         isActive: true,
@@ -253,7 +254,7 @@ describe('extensionsCommand', () => {
           autoUpdate: false,
           source: 'https://github.com/some/extension.git',
         },
-      };
+      });
 
       it.each([
         {

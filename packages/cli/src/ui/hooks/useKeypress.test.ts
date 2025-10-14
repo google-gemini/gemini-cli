@@ -6,6 +6,7 @@
 
 import React from 'react';
 import { renderHook, act } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { Key } from './useKeypress.js';
 import { useKeypress } from './useKeypress.js';
 import { KeypressProvider } from '../contexts/KeypressContext.js';
@@ -56,8 +57,8 @@ class MockStdin extends EventEmitter {
   isTTY = true;
   isRaw = false;
   setRawMode = vi.fn();
-  on = this.addListener;
-  removeListener = this.removeListener;
+  override on = this.addListener;
+  override removeListener = super.removeListener.bind(this);
   write = vi.fn();
   resume = vi.fn();
 
@@ -112,9 +113,12 @@ describe('useKeypress', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     stdin = new MockStdin();
-    (useStdin as vi.Mock).mockReturnValue({
-      stdin,
+    vi.mocked(useStdin).mockReturnValue({
+      stdin: stdin as unknown as NodeJS.ReadStream,
       setRawMode: mockSetRawMode,
+      isRawModeSupported: true,
+      internal_exitOnCtrlC: true,
+      internal_eventEmitter: new EventEmitter(),
     });
 
     originalNodeVersion = process.versions.node;

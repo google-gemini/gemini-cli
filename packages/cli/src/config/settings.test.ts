@@ -46,7 +46,6 @@ import {
   afterEach,
   type Mocked,
   type Mock,
-  fail,
 } from 'vitest';
 import * as fs from 'node:fs'; // fs will be mocked separately
 import stripJsonComments from 'strip-json-comments'; // Will be mocked separately
@@ -1264,9 +1263,10 @@ describe('Settings Loading and Merging', () => {
         },
       );
 
+      expect(() => loadSettings(MOCK_WORKSPACE_DIR)).toThrow(FatalConfigError);
+
       try {
         loadSettings(MOCK_WORKSPACE_DIR);
-        fail('loadSettings should have thrown a FatalConfigError');
       } catch (e) {
         expect(e).toBeInstanceOf(FatalConfigError);
         const error = e as FatalConfigError;
@@ -1333,12 +1333,12 @@ describe('Settings Loading and Merging', () => {
       );
 
       const settings = loadSettings(MOCK_WORKSPACE_DIR);
-      expect((settings.workspace.settings as TestSettings)['endpoint']).toBe(
+      const workspaceSettings = settings.workspace.settings as TestSettings;
+      const workspaceNested = workspaceSettings['nested'] as { value: string };
+      expect(workspaceSettings['endpoint']).toBe(
         'workspace_endpoint_from_env/api',
       );
-      expect(
-        (settings.workspace.settings as TestSettings)['nested']['value'],
-      ).toBe('workspace_endpoint_from_env');
+      expect(workspaceNested['value']).toBe('workspace_endpoint_from_env');
       expect((settings.merged as TestSettings)['endpoint']).toBe(
         'workspace_endpoint_from_env/api',
       );
@@ -1586,21 +1586,13 @@ describe('Settings Loading and Merging', () => {
         (settings.user.settings as TestSettings)['undefinedVal'],
       ).toBeUndefined();
 
-      expect(
-        (settings.user.settings as TestSettings)['nestedObj']['nestedNull'],
-      ).toBeNull();
-      expect(
-        (settings.user.settings as TestSettings)['nestedObj']['nestedBool'],
-      ).toBe(true);
-      expect(
-        (settings.user.settings as TestSettings)['nestedObj']['nestedNum'],
-      ).toBe(0);
-      expect(
-        (settings.user.settings as TestSettings)['nestedObj']['nestedString'],
-      ).toBe('literal');
-      expect(
-        (settings.user.settings as TestSettings)['nestedObj']['anotherEnv'],
-      ).toBe('env_string_nested_value');
+      const userSettings = settings.user.settings as TestSettings;
+      const nestedObj = userSettings['nestedObj'] as Record<string, unknown>;
+      expect(nestedObj['nestedNull']).toBeNull();
+      expect(nestedObj['nestedBool']).toBe(true);
+      expect(nestedObj['nestedNum']).toBe(0);
+      expect(nestedObj['nestedString']).toBe('literal');
+      expect(nestedObj['anotherEnv']).toBe('env_string_nested_value');
 
       delete process.env['MY_ENV_STRING'];
       delete process.env['MY_ENV_STRING_NESTED'];
@@ -2136,14 +2128,14 @@ describe('Settings Loading and Merging', () => {
           vimMode: false,
         },
         model: {
-          maxSessionTurns: 0,
+          maxSessionTurns: -1, // Changed from 0 to valid value -1
         },
         context: {
           includeDirectories: [],
         },
         security: {
           folderTrust: {
-            enabled: null,
+            enabled: false, // Changed from null to boolean
           },
         },
       };
@@ -2152,9 +2144,9 @@ describe('Settings Loading and Merging', () => {
 
       expect(v1Settings).toEqual({
         vimMode: false,
-        maxSessionTurns: 0,
+        maxSessionTurns: -1,
         includeDirectories: [],
-        folderTrust: null,
+        folderTrust: false,
       });
     });
 
@@ -2342,16 +2334,16 @@ describe('Settings Loading and Merging', () => {
   });
 
   describe('migrateDeprecatedSettings', () => {
-    let mockFsExistsSync: Mocked<typeof fs.existsSync>;
-    let mockFsReadFileSync: Mocked<typeof fs.readFileSync>;
-    let mockDisableExtension: Mocked<typeof disableExtension>;
+    let mockFsExistsSync: Mock;
+    let mockFsReadFileSync: Mock;
+    let mockDisableExtension: Mock;
 
     beforeEach(() => {
       vi.resetAllMocks();
 
-      mockFsExistsSync = vi.mocked(fs.existsSync);
-      mockFsReadFileSync = vi.mocked(fs.readFileSync);
-      mockDisableExtension = vi.mocked(disableExtension);
+      mockFsExistsSync = vi.mocked(fs.existsSync) as Mock;
+      mockFsReadFileSync = vi.mocked(fs.readFileSync) as Mock;
+      mockDisableExtension = vi.mocked(disableExtension) as Mock;
 
       (mockFsExistsSync as Mock).mockReturnValue(true);
       vi.mocked(isWorkspaceTrusted).mockReturnValue({
