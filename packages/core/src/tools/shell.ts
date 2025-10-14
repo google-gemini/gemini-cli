@@ -34,6 +34,7 @@ import { formatMemoryUsage } from '../utils/formatters.js';
 import type { AnsiOutput } from '../utils/terminalSerializer.js';
 import {
   getCommandRoots,
+  initializeShellParsers,
   isCommandAllowed,
   SHELL_TOOL_NAMES,
   stripShellWrapper,
@@ -418,6 +419,9 @@ export class ShellTool extends BaseDeclarativeTool<
   private allowlist: Set<string> = new Set();
 
   constructor(private readonly config: Config) {
+    void initializeShellParsers().catch(() => {
+      // Errors are surfaced when parsing commands.
+    });
     super(
       ShellTool.Name,
       'Shell',
