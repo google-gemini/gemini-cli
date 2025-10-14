@@ -69,26 +69,8 @@ jobs:
       - name: 'Check lockfile'
         run: 'npm run check:lockfile'
 
-      - name: 'Install linters'
-        run: 'node scripts/lint.js --setup'
-
-      - name: 'Run ESLint'
-        run: 'node scripts/lint.js --eslint'
-
-      - name: 'Run actionlint'
-        run: 'node scripts/lint.js --actionlint'
-
-      - name: 'Run shellcheck'
-        run: 'node scripts/lint.js --shellcheck'
-
-      - name: 'Run yamllint'
-        run: 'node scripts/lint.js --yamllint'
-
-      - name: 'Run Prettier'
-        run: 'node scripts/lint.js --prettier'
-
-      - name: 'Run sensitive keyword linter'
-        run: 'node scripts/lint.js --sensitive-keywords'
+      - name: 'Run All Linters'
+        run: 'npm run lint:all'
 
   test_linux:
     name: 'Test (Linux)'
@@ -116,9 +98,6 @@ jobs:
         with:
           node-version: '${{ matrix.node-version }}'
           cache: 'npm'
-
-      - name: 'Build project'
-        run: 'npm run build'
 
       - name: 'Install dependencies for testing'
         run: 'npm ci'
@@ -184,9 +163,6 @@ jobs:
         with:
           node-version: '${{ matrix.node-version }}'
           cache: 'npm'
-
-      - name: 'Build project'
-        run: 'npm run build'
 
       - name: 'Install dependencies for testing'
         run: 'npm ci'
@@ -319,14 +295,6 @@ jobs:
       - name: 'Install dependencies'
         run: 'npm ci'
         shell: 'pwsh'
-
-      - name: 'Build project'
-        run: 'npm run build'
-        shell: 'pwsh'
-        env:
-          NODE_OPTIONS: '--max-old-space-size=32768 --max-semi-space-size=256'
-          UV_THREADPOOL_SIZE: '32'
-          NODE_ENV: 'production'
 
       - name: 'Run tests and generate reports'
         env:
