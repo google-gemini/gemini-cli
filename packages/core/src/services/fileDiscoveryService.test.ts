@@ -208,4 +208,121 @@ describe('FileDiscoveryService', () => {
       ]);
     });
   });
+
+  describe('readDirectFileContent', () => {
+    beforeEach(async () => {
+      await fs.mkdir(path.join(projectRoot, '.git'));
+      await createTestFile('.gitignore', 'ignored-file.txt');
+      await createTestFile('.geminiignore', 'gemini-ignored.txt');
+    });
+
+    it('should read gitignored files directly without filtering', async () => {
+      const testContent = 'This is gitignored content';
+      await createTestFile('ignored-file.txt', testContent);
+
+      const service = new FileDiscoveryService(projectRoot);
+
+      // Verify the file is actually gitignored
+      expect(
+        service.shouldGitIgnoreFile(path.join(projectRoot, 'ignored-file.txt')),
+      ).toBe(true);
+
+      // Now read it directly, bypassing ignore filters
+      const content = await service.readDirectFileContent('ignored-file.txt');
+      expect(content).toBe(testContent);
+    });
+
+    it('should read geminiignored files directly without filtering', async () => {
+      const testContent = 'This is geminiignored content';
+      await createTestFile('gemini-ignored.txt', testContent);
+
+      const service = new FileDiscoveryService(projectRoot);
+
+      // Verify the file is actually geminiignored
+      expect(
+        service.shouldGeminiIgnoreFile(
+          path.join(projectRoot, 'gemini-ignored.txt'),
+        ),
+      ).toBe(true);
+
+      // Now read it directly, bypassing ignore filters
+      const content = await service.readDirectFileContent('gemini-ignored.txt');
+      expect(content).toBe(testContent);
+    });
+
+    it('should read normal files that are not ignored', async () => {
+      const testContent = 'This is normal content';
+      await createTestFile('normal-file.txt', testContent);
+
+      const service = new FileDiscoveryService(projectRoot);
+
+      const content = await service.readDirectFileContent('normal-file.txt');
+      expect(content).toBe(testContent);
+    });
+
+    it('should accept absolute paths within project root', async () => {
+      const testContent = 'Absolute path content';
+      const absolutePath = await createTestFile(
+        'absolute-test.txt',
+        testContent,
+      );
+
+      const service = new FileDiscoveryService(projectRoot);
+
+      const content = await service.readDirectFileContent(absolutePath);
+      expect(content).toBe(testContent);
+    });
+
+    it('should reject absolute paths outside project root', async () => {
+      const outsidePath = path.join(testRootDir, 'outside.txt');
+      await fs.writeFile(outsidePath, 'Outside content');
+
+      const service = new FileDiscoveryService(projectRoot);
+
+      await expect(service.readDirectFileContent(outsidePath)).rejects.toThrow(
+        'Access denied: File path is outside the project root',
+      );
+    });
+
+    it('should reject relative paths that escape project root', async () => {
+      const outsidePath = path.join(testRootDir, 'escape.txt');
+      await fs.writeFile(outsidePath, 'Escape content');
+
+      const service = new FileDiscoveryService(projectRoot);
+
+      await expect(
+        service.readDirectFileContent('../escape.txt'),
+      ).rejects.toThrow('Access denied: File path is outside the project root');
+    });
+
+    it('should throw error for non-existent files', async () => {
+      const service = new FileDiscoveryService(projectRoot);
+
+      await expect(
+        service.readDirectFileContent('non-existent.txt'),
+      ).rejects.toThrow();
+    });
+
+    it('should handle nested directory paths', async () => {
+      const testContent = 'Nested content';
+      await createTestFile('nested/dir/file.txt', testContent);
+
+      const service = new FileDiscoveryService(projectRoot);
+
+      const content = await service.readDirectFileContent(
+        'nested/dir/file.txt',
+      );
+      expect(content).toBe(testContent);
+    });
+
+    it('should handle files with special characters in content', async () => {
+      const testContent = 'Special chars: 你好 世界 🚀 \n\t\r';
+      await createTestFile('special-chars.txt', testContent);
+
+      const service = new FileDiscoveryService(projectRoot);
+
+      const content = await service.readDirectFileContent('special-chars.txt');
+      expect(content).toBe(testContent);
+    });
+  });
 });
