@@ -92,6 +92,17 @@ export function classifyGoogleError(error: unknown): unknown {
       d['@type'] === 'type.googleapis.com/google.rpc.RetryInfo',
   );
 
+  // Handle cases where the error indicates a quota exceeded error.
+  if (
+    errorInfo?.reason === 'RESOURCE_EXHAUSTED' &&
+    googleApiError.message.includes('Quota exceeded')
+  ) {
+    return new TerminalQuotaError(
+      `Reached a quota limit: ${googleApiError.message}`,
+      googleApiError,
+    );
+  }
+
   // 1. Check for long-term limits in QuotaFailure or ErrorInfo
   if (quotaFailure) {
     for (const violation of quotaFailure.violations) {

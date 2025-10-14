@@ -202,4 +202,28 @@ describe('classifyGoogleError', () => {
     const result = classifyGoogleError(originalError);
     expect(result).toBe(originalError);
   });
+
+  it('should return TerminalQuotaError for RESOURCE_EXHAUSTED reason', () => {
+    const apiError: GoogleApiError = {
+      code: 429,
+      message: 'Quota exceeded for some reason',
+      details: [
+        {
+          '@type': 'type.googleapis.com/google.rpc.ErrorInfo',
+          reason: 'RESOURCE_EXHAUSTED',
+          domain: 'googleapis.com',
+          metadata: {
+            service: 'generativelanguage.googleapis.com',
+          },
+        },
+      ],
+    };
+    vi.spyOn(errorParser, 'parseGoogleApiError').mockReturnValue(apiError);
+    const result = classifyGoogleError(new Error());
+    expect(result).toBeInstanceOf(TerminalQuotaError);
+    expect((result as TerminalQuotaError).cause).toBe(apiError);
+    expect((result as TerminalQuotaError).message).toContain(
+      'Reached a quota limit: Quota exceeded for some reason',
+    );
+  });
 });
