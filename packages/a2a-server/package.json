@@ -10,7 +10,7 @@
   "type": "module",
   "main": "dist/index.js",
   "bin": {
-    "gemini-cli-a2a-server": "dist/a2a-server.mjs"
+    "gemini-cli-a2a-server": "bundle/a2a-server.mjs"
   },
   "scripts": {
     "build": "node ../../scripts/build_package.js",
@@ -23,7 +23,8 @@
     "bundle": "node esbuild.config.js"
   },
   "files": [
-    "dist"
+    "dist",
+    "bundle"
   ],
   "dependencies": {
     "@a2a-js/sdk": "^0.3.2",

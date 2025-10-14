@@ -49,7 +49,7 @@ const a2aServerConfig = {
     js: `const require = (await import('module')).createRequire(import.meta.url); globalThis.__filename = require('url').fileURLToPath(import.meta.url); globalThis.__dirname = require('path').dirname(globalThis.__filename);`,
   },
   entryPoints: ['src/http/server.ts'],
-  outfile: 'dist/a2a-server.mjs',
+  outfile: 'bundle/a2a-server.mjs',
   define: {
     'process.env.CLI_VERSION': JSON.stringify(pkg.version),
   },

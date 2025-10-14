@@ -7,7 +7,7 @@
     },
     "bundle": {
       "dependsOn": ["^build"],
-      "outputs": ["bundle/**", "packages/a2a-server/dist/**"]
+      "outputs": ["bundle/**", "packages/*/bundle/**"]
     }
   }
 }
