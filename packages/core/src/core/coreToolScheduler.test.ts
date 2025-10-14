@@ -1505,6 +1505,8 @@ describe('CoreToolScheduler Sequential Execution', () => {
       getUseSmartEdit: () => false,
       getUseModelRouter: () => false,
       getGeminiClient: () => null,
+      getEnableMessageBusIntegration: () => false,
+      getMessageBus: () => null,
     } as unknown as Config;
 
     const scheduler = new CoreToolScheduler({
@@ -1625,6 +1627,8 @@ describe('CoreToolScheduler Sequential Execution', () => {
       getUseSmartEdit: () => false,
       getUseModelRouter: () => false,
       getGeminiClient: () => null,
+      getEnableMessageBusIntegration: () => false,
+      getMessageBus: () => null,
     } as unknown as Config;
 
     const scheduler = new CoreToolScheduler({
