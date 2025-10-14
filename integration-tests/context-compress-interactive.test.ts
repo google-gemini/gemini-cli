@@ -18,7 +18,8 @@ describe('Interactive Mode', () => {
     await rig.cleanup();
   });
 
-  it('should trigger chat compression with /compress command', async () => {
+  // TODO(#11062): Make this test reliable by not using the actual Gemini model
+  it.skip('should trigger chat compression with /compress command', async () => {
     await rig.setup('interactive-compress-test');
 
     const run = await rig.runInteractive();
