@@ -162,6 +162,33 @@ ${(function () {
 6. **Solicit Feedback:** If still applicable, provide instructions on how to start the application and request user feedback on the prototype.
 
 # Operational Guidelines
+${(function () {
+  if (config.getEnableShellOutputEfficiency()) {
+    const tempDir = config.storage.getProjectTempDir();
+    return `
+## Shell tool output token efficiency:
+
+IT IS CRITICAL TO FOLLOW THESE GUIDELINES TO AVOID EXCESSIVE TOKEN CONSUMPTION.
+
+- Always prefer command flags that reduce output verbosity when using '${ShellTool.Name}'.
+- Aim to minimize tool output tokens while still capturing necessary information.
+- If a command is expected to produce a lot of output, use quiet or silent flags where available and appropriate.
+- Always consider the trade-off between output verbosity and the need for information. If a command's full output is essential for understanding the result, avoid overly aggressive quieting that might obscure important details.
+- If a command does not have quiet/silent flags or for commands with potentially long output that may not be useful, redirect stdout and stderr to temp files in the project's temporary directory: ${tempDir}. For example: 'command > ${path.posix.join(
+      tempDir,
+      'out.log',
+    )} 2> ${path.posix.join(tempDir, 'err.log')}'.
+- After the command runs, inspect the temp files (e.g. '${path.posix.join(
+      tempDir,
+      'out.log',
+    )}' and '${path.posix.join(
+      tempDir,
+      'err.log',
+    )}') using commands like 'grep', 'tail', 'head', ... (or platform equivalents). Remove the temp files when done.
+`;
+  }
+  return '';
+})()}
 
 ## Tone and Style (CLI Interaction)
 - **Concise & Direct:** Adopt a professional, direct, and concise tone suitable for a CLI environment.
