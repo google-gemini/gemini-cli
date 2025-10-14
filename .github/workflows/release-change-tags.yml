@@ -16,11 +16,6 @@ on:
           - 'latest'
           - 'preview'
           - 'nightly'
-      ref:
-        description: 'The branch, tag, or SHA to run from.'
-        required: false
-        type: 'string'
-        default: 'main'
       dry-run:
         description: 'Whether to run in dry-run mode.'
         required: false
@@ -46,7 +41,7 @@ jobs:
       - name: 'Checkout repository'
         uses: 'actions/checkout@v4'
         with:
-          ref: '${{ github.event.inputs.ref }}'
+          ref: '${{ github.ref }}'
           fetch-depth: 0
 
       - name: 'Setup Node.js'
