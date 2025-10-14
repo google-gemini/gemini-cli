@@ -512,7 +512,7 @@ export class TestRig {
     // Clean up test directory
     if (this.testDir && !env['KEEP_OUTPUT']) {
       try {
-        execSync(`rm -rf ${this.testDir}`);
+        fs.rmSync(this.testDir, { recursive: true, force: true });
       } catch (error) {
         // Ignore cleanup errors
         if (env['VERBOSE'] === 'true') {
