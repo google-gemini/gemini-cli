@@ -95,11 +95,14 @@ describe('run_shell_command', () => {
     const prompt = `use ${tool} to tell me how many lines there are in ${testFile}`;
 
     // Provide the prompt via stdin to simulate non-interactive mode
-    const result = await rig.run({
-      stdin: prompt,
-      yolo: false,
-      args: [`--allowed-tools', 'run_shell_command(${tool})`],
-    });
+    const result = await rig.run(
+      {
+        stdin: prompt,
+        yolo: false,
+      },
+      '--allowed-tools',
+      `run_shell_command(${tool})`,
+    );
 
     const foundToolCall = await rig.waitForToolCall('run_shell_command', 15000);
 
@@ -130,11 +133,14 @@ describe('run_shell_command', () => {
     const { tool } = getLineCountCommand();
     const prompt = `use ${tool} to tell me how many lines there are in ${testFile}`;
 
-    const result = await rig.run({
-      stdin: prompt,
-      yolo: false,
-      args: ['--allowed-tools', 'run_shell_command'],
-    });
+    const result = await rig.run(
+      {
+        stdin: prompt,
+        yolo: false,
+      },
+      '--allowed-tools',
+      'run_shell_command',
+    );
 
     const foundToolCall = await rig.waitForToolCall('run_shell_command', 15000);
 
@@ -199,11 +205,14 @@ describe('run_shell_command', () => {
     const { tool } = getLineCountCommand();
     const prompt = `use ${tool} to tell me how many lines there are in ${testFile}`;
 
-    const result = await rig.run({
-      stdin: prompt,
-      yolo: false,
-      args: [`--allowed-tools`, `ShellTool(${tool})`],
-    });
+    const result = await rig.run(
+      {
+        stdin: prompt,
+        yolo: false,
+      },
+      `--allowed-tools`,
+      `ShellTool(${tool})`,
+    );
 
     const foundToolCall = await rig.waitForToolCall('run_shell_command', 15000);
 
@@ -289,16 +298,16 @@ describe('run_shell_command', () => {
     const { tool } = getLineCountCommand();
     const prompt = `Please run the command "echo test-allow-all" and show me the output`;
 
-    const result = await rig.run({
-      stdin: prompt,
-      yolo: false,
-      args: [
-        `--allowed-tools`,
-        `run_shell_command(${tool})`,
-        '--allowed-tools',
-        'run_shell_command',
-      ],
-    });
+    const result = await rig.run(
+      {
+        stdin: prompt,
+        yolo: false,
+      },
+      `--allowed-tools`,
+      `run_shell_command(${tool})`,
+      '--allowed-tools',
+      'run_shell_command',
+    );
 
     const foundToolCall = await rig.waitForToolCall('run_shell_command', 15000);
 
