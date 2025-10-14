@@ -760,6 +760,7 @@ export async function loadCliConfig(
       settings.tools?.enableMessageBusIntegration ?? false,
     codebaseInvestigatorSettings:
       settings.experimental?.codebaseInvestigatorSettings,
+    retryFetchErrors: settings.general?.retryFetchErrors ?? false,
   });
 }
 

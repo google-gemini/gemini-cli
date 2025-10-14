@@ -127,6 +127,7 @@ describe('GeminiChat', () => {
         getTool: vi.fn(),
       }),
       getContentGenerator: vi.fn().mockReturnValue(mockContentGenerator),
+      getRetryFetchErrors: vi.fn().mockReturnValue(false),
     } as unknown as Config;
 
     // Disable 429 simulation for tests
@@ -1111,6 +1112,70 @@ describe('GeminiChat', () => {
         expect(
           mockContentGenerator.generateContentStream,
         ).toHaveBeenCalledTimes(2);
+      });
+
+      it('should retry on specific fetch errors when configured', async () => {
+        vi.mocked(mockConfig.getRetryFetchErrors).mockReturnValue(true);
+
+        const fetchError = new Error(
+          'exception TypeError: fetch failed sending request',
+        );
+
+        vi.mocked(mockContentGenerator.generateContentStream)
+          .mockRejectedValueOnce(fetchError)
+          .mockResolvedValueOnce(
+            (async function* () {
+              yield {
+                candidates: [
+                  {
+                    content: { parts: [{ text: 'Success after fetch error' }] },
+                    finishReason: 'STOP',
+                  },
+                ],
+              } as unknown as GenerateContentResponse;
+            })(),
+          );
+
+        mockRetryWithBackoff.mockImplementation(async (apiCall, options) => {
+          try {
+            return await apiCall();
+          } catch (error) {
+            if (
+              options?.retryFetchErrors &&
+              error instanceof Error &&
+              error.message.includes(
+                'exception TypeError: fetch failed sending request',
+              )
+            ) {
+              return await apiCall();
+            }
+            throw error;
+          }
+        });
+
+        const stream = await chat.sendMessageStream(
+          'test-model',
+          { message: 'test' },
+          'prompt-id-fetch-error-retry',
+        );
+
+        const events: StreamEvent[] = [];
+        for await (const event of stream) {
+          events.push(event);
+        }
+
+        expect(
+          mockContentGenerator.generateContentStream,
+        ).toHaveBeenCalledTimes(2);
+
+        expect(
+          events.some(
+            (e) =>
+              e.type === StreamEventType.CHUNK &&
+              e.value.candidates?.[0]?.content?.parts?.[0]?.text ===
+                'Success after fetch error',
+          ),
+        ).toBe(true);
       });
 
       afterEach(() => {
