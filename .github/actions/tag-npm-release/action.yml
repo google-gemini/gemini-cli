@@ -32,6 +32,11 @@ inputs:
   a2a-package-name:
     description: 'The name of the a2a package.'
     required: true
+  ref:
+    description: 'The branch, tag, or SHA to release from.'
+    required: false
+    type: 'string'
+    default: 'main'
 
 runs:
   using: 'composite'
@@ -41,6 +46,13 @@ runs:
       env:
         JSON_INPUTS: '${{ toJSON(inputs) }}'
       run: 'echo "$JSON_INPUTS"'
+
+    - name: 'Checkout'
+      uses: 'actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955' # ratchet:actions/checkout@v4
+      with:
+        path: 'verify'
+        ref: '${{ github.event.inputs.ref }}'
+        fetch-depth: 0
 
     - name: 'Setup Node.js'
       uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020'
