@@ -45,6 +45,7 @@ and use your extension.
 {
   "name": "my-first-extension",
   "version": "1.0.0",
+  "author": "Your Name",
   "mcpServers": {
     "nodeServer": {
       "command": "node",
@@ -57,6 +58,7 @@ and use your extension.
 
 - `name`: The unique name for your extension.
 - `version`: The version of your extension.
+- `author` (optional): The author of the extension (e.g., 'Google', 'Your Name', 'example.com').
 - `mcpServers`: This section defines one or more Model Context Protocol (MCP)
   servers. MCP servers are how you can add new tools for the model to use.
   - `command`, `args`, `cwd`: These fields specify how to start your server.
