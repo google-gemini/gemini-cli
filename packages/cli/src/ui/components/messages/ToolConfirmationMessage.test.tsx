@@ -88,7 +88,7 @@ describe('ToolConfirmationMessage', () => {
 
       getIdeMode: () => false,
 
-      getStemmableCommands: () => ['npm', 'git'],
+      getShellCommandsWithSubcommands: () => ['npm', 'git'],
     }) as unknown as Config;
 
   const renderComponent = (

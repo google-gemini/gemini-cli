@@ -211,7 +211,7 @@ export interface ConfigParameters {
   fullContext?: boolean;
   coreTools?: string[];
   allowedTools?: string[];
-  stemmableCommands?: string[];
+  shellCommandsWithSubcommands?: string[];
   excludeTools?: string[];
   toolDiscoveryCommand?: string;
   toolCallCommand?: string;
@@ -290,7 +290,7 @@ export class Config {
   private readonly fullContext: boolean;
   private readonly coreTools: string[] | undefined;
   private readonly allowedTools: string[] | undefined;
-  private readonly stemmableCommands: string[];
+  private readonly shellCommandsWithSubcommands: string[];
   private readonly excludeTools: string[] | undefined;
   private readonly toolDiscoveryCommand: string | undefined;
   private readonly toolCallCommand: string | undefined;
@@ -382,7 +382,7 @@ export class Config {
     this.fullContext = params.fullContext ?? false;
     this.coreTools = params.coreTools;
     this.allowedTools = params.allowedTools;
-    this.stemmableCommands = params.stemmableCommands ?? [
+    this.shellCommandsWithSubcommands = params.shellCommandsWithSubcommands ?? [
       'git',
       'npm',
       'npx',
@@ -688,8 +688,8 @@ export class Config {
     return this.allowedTools;
   }
 
-  getStemmableCommands(): string[] {
-    return this.stemmableCommands;
+  getShellCommandsWithSubcommands(): string[] {
+    return this.shellCommandsWithSubcommands;
   }
 
   getExcludeTools(): string[] | undefined {

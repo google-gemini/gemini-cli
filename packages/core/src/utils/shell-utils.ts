@@ -199,13 +199,13 @@ export function getCommandRoot(command: string): string | undefined {
  * Generates a command prefix to offer for approval.
  *
  * @param command The full command string.
- * @param stemmableCommands A list of commands that can be "stemmed" to create
+ * @param shellCommandsWithSubcommands A list of commands that can be "stemmed" to create
  *   more specific prefixes (e.g., 'git', 'npm', 'gh run').
  * @returns The most specific prefix to offer for approval.
  */
 export function getCommandPrefix(
   command: string,
-  stemmableCommands: string[],
+  shellCommandsWithSubcommands: string[],
 ): string {
   const parts = command.trim().split(/\s+/);
   if (parts.length === 0 || parts[0] === '') {
@@ -213,7 +213,7 @@ export function getCommandPrefix(
   }
 
   // Find the longest matching stemmable prefix.
-  const longestMatch = stemmableCommands
+  const longestMatch = shellCommandsWithSubcommands
     .filter((prefix) => command.startsWith(prefix + ' '))
     .sort((a, b) => b.length - a.length)[0];
 

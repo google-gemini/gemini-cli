@@ -107,7 +107,10 @@ export const ToolConfirmationMessage: React.FC<
     if (isTrustedFolder) {
       if (confirmationDetails.type === 'exec') {
         const command = confirmationDetails.command;
-        const prefix = getCommandPrefix(command, config.getStemmableCommands());
+        const prefix = getCommandPrefix(
+          command,
+          config.getShellCommandsWithSubcommands(),
+        );
 
         items.push({
           label: `Yes, always allow this exact command ('${command}')`,
