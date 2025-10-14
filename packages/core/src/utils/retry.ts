@@ -13,6 +13,9 @@ import {
   TerminalQuotaError,
 } from './googleQuotaErrors.js';
 
+const FETCH_FAILED_MESSAGE =
+  'exception TypeError: fetch failed sending request';
+
 export interface HttpError extends Error {
   status?: number;
 }
@@ -21,17 +24,18 @@ export interface RetryOptions {
   maxAttempts: number;
   initialDelayMs: number;
   maxDelayMs: number;
-  shouldRetryOnError: (error: Error) => boolean;
+  shouldRetryOnError: (error: Error, retryFetchErrors?: boolean) => boolean;
   shouldRetryOnContent?: (content: GenerateContentResponse) => boolean;
   onPersistent429?: (
     authType?: string,
     error?: unknown,
   ) => Promise<string | boolean | null>;
   authType?: string;
+  retryFetchErrors?: boolean;
 }
 
 const DEFAULT_RETRY_OPTIONS: RetryOptions = {
-  maxAttempts: 10,
+  maxAttempts: 3,
   initialDelayMs: 5000,
   maxDelayMs: 30000, // 30 seconds
   shouldRetryOnError: defaultShouldRetry,
@@ -41,9 +45,21 @@ const DEFAULT_RETRY_OPTIONS: RetryOptions = {
  * Default predicate function to determine if a retry should be attempted.
  * Retries on 429 (Too Many Requests) and 5xx server errors.
  * @param error The error object.
+ * @param retryFetchErrors Whether to retry on specific fetch errors.
  * @returns True if the error is a transient error, false otherwise.
  */
-function defaultShouldRetry(error: Error | unknown): boolean {
+function defaultShouldRetry(
+  error: Error | unknown,
+  retryFetchErrors?: boolean,
+): boolean {
+  if (
+    retryFetchErrors &&
+    error instanceof Error &&
+    error.message.includes(FETCH_FAILED_MESSAGE)
+  ) {
+    return true;
+  }
+
   // Priority check for ApiError
   if (error instanceof ApiError) {
     // Explicitly do not retry 400 (Bad Request)
@@ -96,6 +112,7 @@ export async function retryWithBackoff<T>(
     authType,
     shouldRetryOnError,
     shouldRetryOnContent,
+    retryFetchErrors,
   } = {
     ...DEFAULT_RETRY_OPTIONS,
     ...cleanOptions,
@@ -155,7 +172,10 @@ export async function retryWithBackoff<T>(
       }
 
       // Generic retry logic for other errors
-      if (attempt >= maxAttempts || !shouldRetryOnError(error as Error)) {
+      if (
+        attempt >= maxAttempts ||
+        !shouldRetryOnError(error as Error, retryFetchErrors)
+      ) {
         throw error;
       }
 

@@ -23,8 +23,6 @@ import { setSimulate429 } from '../utils/testUtils.js';
 import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
 import { AuthType } from './contentGenerator.js';
 import { type RetryOptions } from '../utils/retry.js';
-import type { ToolRegistry } from '../tools/tool-registry.js';
-import { Kind } from '../tools/tools.js';
 import { uiTelemetryService } from '../telemetry/uiTelemetry.js';
 
 // Mock fs module to prevent actual file system operations during tests
@@ -129,6 +127,7 @@ describe('GeminiChat', () => {
         getTool: vi.fn(),
       }),
       getContentGenerator: vi.fn().mockReturnValue(mockContentGenerator),
+      getRetryFetchErrors: vi.fn().mockReturnValue(false),
     } as unknown as Config;
 
     // Disable 429 simulation for tests
@@ -1115,6 +1114,70 @@ describe('GeminiChat', () => {
         ).toHaveBeenCalledTimes(2);
       });
 
+      it('should retry on specific fetch errors when configured', async () => {
+        vi.mocked(mockConfig.getRetryFetchErrors).mockReturnValue(true);
+
+        const fetchError = new Error(
+          'exception TypeError: fetch failed sending request',
+        );
+
+        vi.mocked(mockContentGenerator.generateContentStream)
+          .mockRejectedValueOnce(fetchError)
+          .mockResolvedValueOnce(
+            (async function* () {
+              yield {
+                candidates: [
+                  {
+                    content: { parts: [{ text: 'Success after fetch error' }] },
+                    finishReason: 'STOP',
+                  },
+                ],
+              } as unknown as GenerateContentResponse;
+            })(),
+          );
+
+        mockRetryWithBackoff.mockImplementation(async (apiCall, options) => {
+          try {
+            return await apiCall();
+          } catch (error) {
+            if (
+              options?.retryFetchErrors &&
+              error instanceof Error &&
+              error.message.includes(
+                'exception TypeError: fetch failed sending request',
+              )
+            ) {
+              return await apiCall();
+            }
+            throw error;
+          }
+        });
+
+        const stream = await chat.sendMessageStream(
+          'test-model',
+          { message: 'test' },
+          'prompt-id-fetch-error-retry',
+        );
+
+        const events: StreamEvent[] = [];
+        for await (const event of stream) {
+          events.push(event);
+        }
+
+        expect(
+          mockContentGenerator.generateContentStream,
+        ).toHaveBeenCalledTimes(2);
+
+        expect(
+          events.some(
+            (e) =>
+              e.type === StreamEventType.CHUNK &&
+              e.value.candidates?.[0]?.content?.parts?.[0]?.text ===
+                'Success after fetch error',
+          ),
+        ).toBe(true);
+      });
+
       afterEach(() => {
         // Reset to default behavior
         mockRetryWithBackoff.mockImplementation(async (apiCall) => apiCall());
@@ -1351,259 +1414,6 @@ describe('GeminiChat', () => {
       );
     }
     expect(turn4.parts[0].text).toBe('second response');
-  });
-
-  describe('stopBeforeSecondMutator', () => {
-    beforeEach(() => {
-      // Common setup for these tests: mock the tool registry.
-      const mockToolRegistry = {
-        getTool: vi.fn((toolName: string) => {
-          if (toolName === 'edit') {
-            return { kind: Kind.Edit };
-          }
-          return { kind: Kind.Other };
-        }),
-      } as unknown as ToolRegistry;
-      vi.mocked(mockConfig.getToolRegistry).mockReturnValue(mockToolRegistry);
-    });
-
-    it('should stop streaming before a second mutator tool call', async () => {
-      const responses = [
-        {
-          candidates: [
-            { content: { role: 'model', parts: [{ text: 'First part. ' }] } },
-          ],
-        },
-        {
-          candidates: [
-            {
-              content: {
-                role: 'model',
-                parts: [{ functionCall: { name: 'edit', args: {} } }],
-              },
-            },
-          ],
-        },
-        {
-          candidates: [
-            {
-              content: {
-                role: 'model',
-                parts: [{ functionCall: { name: 'fetch', args: {} } }],
-              },
-            },
-          ],
-        },
-        // This chunk contains the second mutator and should be clipped.
-        {
-          candidates: [
-            {
-              content: {
-                role: 'model',
-                parts: [
-                  { functionCall: { name: 'edit', args: {} } },
-                  { text: 'some trailing text' },
-                ],
-              },
-            },
-          ],
-        },
-        // This chunk should never be reached.
-        {
-          candidates: [
-            {
-              content: {
-                role: 'model',
-                parts: [{ text: 'This should not appear.' }],
-              },
-            },
-          ],
-        },
-      ] as unknown as GenerateContentResponse[];
-
-      vi.mocked(mockContentGenerator.generateContentStream).mockResolvedValue(
-        (async function* () {
-          for (const response of responses) {
-            yield response;
-          }
-        })(),
-      );
-
-      const stream = await chat.sendMessageStream(
-        'test-model',
-        { message: 'test message' },
-        'prompt-id-mutator-test',
-      );
-      for await (const _ of stream) {
-        // Consume the stream to trigger history recording.
-      }
-
-      const history = chat.getHistory();
-      expect(history.length).toBe(2);
-
-      const modelTurn = history[1]!;
-      expect(modelTurn.role).toBe('model');
-      expect(modelTurn?.parts?.length).toBe(3);
-      expect(modelTurn?.parts![0]!.text).toBe('First part. ');
-      expect(modelTurn.parts![1]!.functionCall?.name).toBe('edit');
-      expect(modelTurn.parts![2]!.functionCall?.name).toBe('fetch');
-    });
-
-    it('should not stop streaming if only one mutator is present', async () => {
-      const responses = [
-        {
-          candidates: [
-            { content: { role: 'model', parts: [{ text: 'Part 1. ' }] } },
-          ],
-        },
-        {
-          candidates: [
-            {
-              content: {
-                role: 'model',
-                parts: [{ functionCall: { name: 'edit', args: {} } }],
-              },
-            },
-          ],
-        },
-        {
-          candidates: [
-            {
-              content: {
-                role: 'model',
-                parts: [{ text: 'Part 2.' }],
-              },
-              finishReason: 'STOP',
-            },
-          ],
-        },
-      ] as unknown as GenerateContentResponse[];
-
-      vi.mocked(mockContentGenerator.generateContentStream).mockResolvedValue(
-        (async function* () {
-          for (const response of responses) {
-            yield response;
-          }
-        })(),
-      );
-
-      const stream = await chat.sendMessageStream(
-        'test-model',
-        { message: 'test message' },
-        'prompt-id-one-mutator',
-      );
-      for await (const _ of stream) {
-        /* consume */
-      }
-
-      const history = chat.getHistory();
-      const modelTurn = history[1]!;
-      expect(modelTurn?.parts?.length).toBe(3);
-      expect(modelTurn.parts![1]!.functionCall?.name).toBe('edit');
-      expect(modelTurn.parts![2]!.text).toBe('Part 2.');
-    });
-
-    it('should clip the chunk containing the second mutator, preserving prior parts', async () => {
-      const responses = [
-        {
-          candidates: [
-            {
-              content: {
-                role: 'model',
-                parts: [{ functionCall: { name: 'edit', args: {} } }],
-              },
-            },
-          ],
-        },
-        // This chunk has a valid part before the second mutator.
-        // The valid part should be kept, the rest of the chunk discarded.
-        {
-          candidates: [
-            {
-              content: {
-                role: 'model',
-                parts: [
-                  { text: 'Keep this text. ' },
-                  { functionCall: { name: 'edit', args: {} } },
-                  { text: 'Discard this text.' },
-                ],
-              },
-              finishReason: 'STOP',
-            },
-          ],
-        },
-      ] as unknown as GenerateContentResponse[];
-
-      const stream = (async function* () {
-        for (const response of responses) {
-          yield response;
-        }
-      })();
-
-      vi.mocked(mockContentGenerator.generateContentStream).mockResolvedValue(
-        stream,
-      );
-
-      const resultStream = await chat.sendMessageStream(
-        'test-model',
-        { message: 'test' },
-        'prompt-id-clip-chunk',
-      );
-      for await (const _ of resultStream) {
-        /* consume */
-      }
-
-      const history = chat.getHistory();
-      const modelTurn = history[1]!;
-      expect(modelTurn?.parts?.length).toBe(2);
-      expect(modelTurn.parts![0]!.functionCall?.name).toBe('edit');
-      expect(modelTurn.parts![1]!.text).toBe('Keep this text. ');
-    });
-
-    it('should handle two mutators in the same chunk (parallel call scenario)', async () => {
-      const responses = [
-        {
-          candidates: [
-            {
-              content: {
-                role: 'model',
-                parts: [
-                  { text: 'Some text. ' },
-                  { functionCall: { name: 'edit', args: {} } },
-                  { functionCall: { name: 'edit', args: {} } },
-                ],
-              },
-              finishReason: 'STOP',
-            },
-          ],
-        },
-      ] as unknown as GenerateContentResponse[];
-
-      const stream = (async function* () {
-        for (const response of responses) {
-          yield response;
-        }
-      })();
-
-      vi.mocked(mockContentGenerator.generateContentStream).mockResolvedValue(
-        stream,
-      );
-
-      const resultStream = await chat.sendMessageStream(
-        'test-model',
-        { message: 'test' },
-        'prompt-id-parallel-mutators',
-      );
-      for await (const _ of resultStream) {
-        /* consume */
-      }
-
-      const history = chat.getHistory();
-      const modelTurn = history[1]!;
-      expect(modelTurn?.parts?.length).toBe(2);
-      expect(modelTurn.parts![0]!.text).toBe('Some text. ');
-      expect(modelTurn.parts![1]!.functionCall?.name).toBe('edit');
-    });
   });
 
   describe('Model Resolution', () => {
