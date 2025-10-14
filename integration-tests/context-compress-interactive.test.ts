@@ -26,12 +26,12 @@ describe('Interactive Mode', () => {
     const longPrompt =
       'Dont do anything except returning a 1000 token long paragragh with the <name of the scientist who discovered theory of relativity> at the end to indicate end of response. This is a moderately long sentence.';
 
-    await run.type(longPrompt);
+    await run.sendKeys(longPrompt);
     await run.sendKeys('\r');
 
     await run.expectText('einstein', 25000);
 
-    await run.type('/compress');
+    await run.sendKeys('/compress');
     await run.sendKeys('\r');
 
     const foundEvent = await rig.waitForTelemetryEvent(
