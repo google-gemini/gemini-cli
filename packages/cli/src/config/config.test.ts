@@ -2540,7 +2540,7 @@ describe('loadCliConfig useRipgrep', () => {
         'test-session',
         argv,
       );
-      expect(config.getUseModelRouter()).toBe(true);
+      expect(config.getUseModelRouter()).toBe(false);
     });
   });
 });
