@@ -8,6 +8,7 @@ import type {
   Config,
   ToolCallRequestInfo,
   ResumedSessionData,
+  CompletedToolCall,
 } from '@google/gemini-cli-core';
 import { isSlashCommand } from './ui/utils/commandUtils.js';
 import type { LoadedSettings } from './config/settings.js';
@@ -148,12 +149,17 @@ export async function runNonInteractive(
 
         if (toolCallRequests.length > 0) {
           const toolResponseParts: Part[] = [];
+          const completedToolCalls: CompletedToolCall[] = [];
+
           for (const requestInfo of toolCallRequests) {
-            const toolResponse = await executeToolCall(
+            const completedToolCall = await executeToolCall(
               config,
               requestInfo,
               abortController.signal,
             );
+            const toolResponse = completedToolCall.response;
+
+            completedToolCalls.push(completedToolCall);
 
             if (toolResponse.error) {
               handleToolError(
@@ -171,6 +177,20 @@ export async function runNonInteractive(
               toolResponseParts.push(...toolResponse.responseParts);
             }
           }
+
+          // Record tool calls with full metadata before sending responses to Gemini
+          try {
+            const currentModel =
+              geminiClient.getCurrentSequenceModel() ?? config.getModel();
+            geminiClient
+              .getChat()
+              .recordCompletedToolCalls(currentModel, completedToolCalls);
+          } catch (error) {
+            console.error(
+              `Error recording completed tool call information: ${error}`,
+            );
+          }
+
           currentMessages = [{ role: 'user', parts: toolResponseParts }];
         } else {
           if (config.getOutputFormat() === OutputFormat.JSON) {
