@@ -8,7 +8,7 @@
     "directory": "packages/a2a-server"
   },
   "type": "module",
-  "main": "dist/index.js",
+  "main": "dist/server.js",
   "bin": {
     "gemini-cli-a2a-server": "dist/a2a-server.mjs"
   },
