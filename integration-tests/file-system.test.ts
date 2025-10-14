@@ -148,7 +148,7 @@ describe('file-system', () => {
     expect(newFileContent).toBe('1.0.1');
   });
 
-  it.skip('should replace multiple instances of a string', async () => {
+  it('should replace multiple instances of a string', async () => {
     const rig = new TestRig();
     await rig.setup('should replace multiple instances of a string');
     const fileName = 'ambiguous.txt';
@@ -157,7 +157,7 @@ describe('file-system', () => {
     rig.createFile(fileName, fileContent);
 
     const result = await rig.run(
-      `replace "test line" with "new line" in ${fileName}`,
+      `replace all occurrences of "test line" with "new line" in ${fileName}`,
     );
 
     const foundToolCall = await rig.waitForAnyToolCall([

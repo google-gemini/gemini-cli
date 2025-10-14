@@ -5,9 +5,23 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { marked } from 'marked';
+
+vi.mock('fs/promises', () => {
+  const mockReadFile = vi.fn();
+  const mockAccess = vi.fn();
+  return {
+    default: {
+      readFile: mockReadFile,
+      access: mockAccess,
+    },
+    readFile: mockReadFile,
+    access: mockAccess,
+  };
+});
+
+import * as fs from 'node:fs/promises';
 import { processImports, validateImportPath } from './memoryImportProcessor.js';
 
 // Helper function to create platform-agnostic test paths
@@ -29,7 +43,6 @@ function testPath(...segments: string[]): string {
   return path.normalize(result);
 }
 
-vi.mock('fs/promises');
 const mockedFs = vi.mocked(fs);
 
 // Mock console methods to capture warnings

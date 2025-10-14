@@ -5,14 +5,17 @@
  */
 
 import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
+
+vi.mock('fs/promises', async () => {
+  const { createFsPromisesMock } = await import(
+    '../../test-utils/mocks/fsPromisesMock.js'
+  );
+  return createFsPromisesMock();
+});
+
 import yargs, { type Argv } from 'yargs';
 import { addCommand } from './add.js';
 import { loadSettings, SettingScope } from '../../config/settings.js';
-
-vi.mock('fs/promises', () => ({
-  readFile: vi.fn(),
-  writeFile: vi.fn(),
-}));
 
 vi.mock('os', () => {
   const homedir = vi.fn(() => '/home/user');

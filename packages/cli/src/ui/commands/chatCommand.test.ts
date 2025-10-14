@@ -7,6 +7,23 @@
 import type { Mocked } from 'vitest';
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 
+vi.mock('fs/promises', () => {
+  const mockReaddir = vi.fn();
+  const mockStat = vi.fn();
+  const mockWriteFile = vi.fn();
+
+  return {
+    default: {
+      readdir: mockReaddir,
+      stat: mockStat,
+      writeFile: mockWriteFile,
+    },
+    readdir: mockReaddir,
+    stat: mockStat,
+    writeFile: mockWriteFile,
+  };
+});
+
 import type { SlashCommand, CommandContext } from './types.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
 import type { Content } from '@google/genai';
@@ -17,12 +34,6 @@ import { chatCommand, serializeHistoryToMarkdown } from './chatCommand.js';
 import type { Stats } from 'node:fs';
 import type { HistoryItemWithoutId } from '../types.js';
 import path from 'node:path';
-
-vi.mock('fs/promises', () => ({
-  stat: vi.fn(),
-  readdir: vi.fn().mockResolvedValue(['file1.txt', 'file2.txt'] as string[]),
-  writeFile: vi.fn(),
-}));
 
 describe('chatCommand', () => {
   const mockFs = fsPromises as Mocked<typeof fsPromises>;

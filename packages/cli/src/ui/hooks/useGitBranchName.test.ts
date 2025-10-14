@@ -34,7 +34,10 @@ vi.mock('node:fs', async () => {
 
 vi.mock('node:fs/promises', async () => {
   const memfs = await vi.importActual<typeof import('memfs')>('memfs');
-  return memfs.fs.promises;
+  return {
+    ...memfs.fs.promises,
+    default: memfs.fs.promises,
+  };
 });
 
 const CWD = '/test/project';

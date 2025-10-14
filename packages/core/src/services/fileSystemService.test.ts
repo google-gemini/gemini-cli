@@ -5,10 +5,22 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+
+vi.mock('fs/promises', () => {
+  const mockReadFile = vi.fn();
+  const mockWriteFile = vi.fn();
+  return {
+    default: {
+      readFile: mockReadFile,
+      writeFile: mockWriteFile,
+    },
+    readFile: mockReadFile,
+    writeFile: mockWriteFile,
+  };
+});
+
 import fs from 'node:fs/promises';
 import { StandardFileSystemService } from './fileSystemService.js';
-
-vi.mock('fs/promises');
 
 describe('StandardFileSystemService', () => {
   let fileSystem: StandardFileSystemService;

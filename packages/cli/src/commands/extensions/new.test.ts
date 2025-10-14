@@ -5,26 +5,58 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+vi.mock('node:fs/promises', () => {
+  // Create proper Dirent-like objects inside factory
+  const createDirent = (name: string, isDir: boolean) => ({
+    name,
+    isDirectory: () => isDir,
+    isFile: () => !isDir,
+    isBlockDevice: () => false,
+    isCharacterDevice: () => false,
+    isSymbolicLink: () => false,
+    isFIFO: () => false,
+    isSocket: () => false,
+  });
+
+  const fakeFiles = [
+    createDirent('context', true),
+    createDirent('custom-commands', true),
+    createDirent('mcp-server', true),
+  ];
+
+  const mockReaddir = vi.fn().mockResolvedValue(fakeFiles);
+  const mockAccess = vi.fn();
+  const mockMkdir = vi.fn();
+  const mockCp = vi.fn();
+  const mockWriteFile = vi.fn();
+
+  return {
+    default: {
+      readdir: mockReaddir,
+      access: mockAccess,
+      mkdir: mockMkdir,
+      cp: mockCp,
+      writeFile: mockWriteFile,
+    },
+    readdir: mockReaddir,
+    access: mockAccess,
+    mkdir: mockMkdir,
+    cp: mockCp,
+    writeFile: mockWriteFile,
+  };
+});
+
 import { newCommand } from './new.js';
 import yargs from 'yargs';
 import * as fsPromises from 'node:fs/promises';
 import path from 'node:path';
 
-vi.mock('node:fs/promises');
-
 const mockedFs = vi.mocked(fsPromises);
 
 describe('extensions new command', () => {
   beforeEach(() => {
-    vi.resetAllMocks();
-
-    const fakeFiles = [
-      { name: 'context', isDirectory: () => true },
-      { name: 'custom-commands', isDirectory: () => true },
-      { name: 'mcp-server', isDirectory: () => true },
-    ];
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    mockedFs.readdir.mockResolvedValue(fakeFiles as any);
+    vi.clearAllMocks();
   });
 
   it('should fail if no path is provided', async () => {

@@ -13,6 +13,14 @@ import {
   afterEach,
   type Mock,
 } from 'vitest';
+
+vi.mock('fs/promises', async () => {
+  const { createFsPromisesMock } = await import(
+    '../../test-utils/mocks/fsPromisesMock.js'
+  );
+  return createFsPromisesMock();
+});
+
 import yargs, { type Argv } from 'yargs';
 import { SettingScope, type LoadedSettings } from '../../config/settings.js';
 import { removeCommand } from './remove.js';
@@ -20,11 +28,6 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
 import { GEMINI_DIR } from '@google/gemini-cli-core';
-
-vi.mock('fs/promises', () => ({
-  readFile: vi.fn(),
-  writeFile: vi.fn(),
-}));
 
 describe('mcp remove command', () => {
   describe('unit tests with mocks', () => {
