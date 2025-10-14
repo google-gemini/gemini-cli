@@ -20,14 +20,13 @@ import { executeToolCall } from '../core/nonInteractiveToolExecutor.js';
 import { ToolRegistry } from '../tools/tool-registry.js';
 import type { ToolCallRequestInfo } from '../core/turn.js';
 import { getDirectoryContextString } from '../utils/environmentContext.js';
-import { GlobTool } from '../tools/glob.js';
 import { GrepTool } from '../tools/grep.js';
 import { RipGrepTool } from '../tools/ripGrep.js';
 import { LSTool } from '../tools/ls.js';
 import { MemoryTool } from '../tools/memoryTool.js';
 import { ReadFileTool } from '../tools/read-file.js';
 import { ReadManyFilesTool } from '../tools/read-many-files.js';
-import { WebSearchTool } from '../tools/web-search.js';
+import { GLOB_TOOL_NAME, WEB_SEARCH_TOOL_NAME } from '../tools/tool-names.js';
 import { promptIdContext } from '../utils/promptIdContext.js';
 import { logAgentStart, logAgentFinish } from '../telemetry/loggers.js';
 import { AgentStartEvent, AgentFinishEvent } from '../telemetry/types.js';
@@ -535,7 +534,7 @@ export class AgentExecutor<TOutput extends z.ZodTypeAny> {
 
       // Create a promise for the tool execution
       const executionPromise = (async () => {
-        const toolResponse = await executeToolCall(
+        const { response: toolResponse } = await executeToolCall(
           this.runtimeContext,
           requestInfo,
           signal,
@@ -713,10 +712,10 @@ Important Rules:
       ReadFileTool.Name,
       GrepTool.Name,
       RipGrepTool.Name,
-      GlobTool.Name,
+      GLOB_TOOL_NAME,
       ReadManyFilesTool.Name,
       MemoryTool.Name,
-      WebSearchTool.Name,
+      WEB_SEARCH_TOOL_NAME,
     ]);
     for (const tool of toolRegistry.getAllTools()) {
       if (!allowlist.has(tool.name)) {

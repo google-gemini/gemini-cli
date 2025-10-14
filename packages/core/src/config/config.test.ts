@@ -7,7 +7,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { Mock } from 'vitest';
 import type { ConfigParameters, SandboxConfig } from './config.js';
-import { Config, ApprovalMode } from './config.js';
+import {
+  Config,
+  ApprovalMode,
+  DEFAULT_FILE_FILTERING_OPTIONS,
+} from './config.js';
 import * as path from 'node:path';
 import { setGeminiMdFilename as mockSetGeminiMdFilename } from '../tools/memoryTool.js';
 import {
@@ -77,7 +81,7 @@ vi.mock('../tools/memoryTool', () => ({
   setGeminiMdFilename: vi.fn(),
   getCurrentGeminiMdFilename: vi.fn(() => 'GEMINI.md'), // Mock the original filename
   DEFAULT_CONTEXT_FILENAME: 'GEMINI.md',
-  GEMINI_CONFIG_DIR: '.gemini',
+  GEMINI_DIR: '.gemini',
 }));
 
 vi.mock('../core/contentGenerator.js');
@@ -129,6 +133,7 @@ vi.mock('../agents/registry.js', () => {
   const AgentRegistryMock = vi.fn();
   AgentRegistryMock.prototype.initialize = vi.fn();
   AgentRegistryMock.prototype.getAllDefinitions = vi.fn(() => []);
+  AgentRegistryMock.prototype.getDefinition = vi.fn();
   return { AgentRegistry: AgentRegistryMock };
 });
 
@@ -318,7 +323,9 @@ describe('Server Config (config.ts)', () => {
 
   it('should set default file filtering settings when not provided', () => {
     const config = new Config(baseParams);
-    expect(config.getFileFilteringRespectGitIgnore()).toBe(true);
+    expect(config.getFileFilteringRespectGitIgnore()).toBe(
+      DEFAULT_FILE_FILTERING_OPTIONS.respectGitIgnore,
+    );
   });
 
   it('should set custom file filtering settings when provided', () => {
@@ -594,28 +601,28 @@ describe('Server Config (config.ts)', () => {
     });
   });
 
-  describe('EnableSubagents Configuration', () => {
-    it('should default enableSubagents to false when not provided', () => {
+  describe('ContinueOnFailedApiCall Configuration', () => {
+    it('should default continueOnFailedApiCall to false when not provided', () => {
       const config = new Config(baseParams);
-      expect(config.getEnableSubagents()).toBe(false);
+      expect(config.getContinueOnFailedApiCall()).toBe(true);
     });
 
-    it('should set enableSubagents to true when provided as true', () => {
-      const paramsWithSubagents: ConfigParameters = {
+    it('should set continueOnFailedApiCall to true when provided as true', () => {
+      const paramsWithContinueOnFailedApiCall: ConfigParameters = {
         ...baseParams,
-        enableSubagents: true,
+        continueOnFailedApiCall: true,
       };
-      const config = new Config(paramsWithSubagents);
-      expect(config.getEnableSubagents()).toBe(true);
+      const config = new Config(paramsWithContinueOnFailedApiCall);
+      expect(config.getContinueOnFailedApiCall()).toBe(true);
     });
 
-    it('should set enableSubagents to false when explicitly provided as false', () => {
-      const paramsWithSubagents: ConfigParameters = {
+    it('should set continueOnFailedApiCall to false when explicitly provided as false', () => {
+      const paramsWithContinueOnFailedApiCall: ConfigParameters = {
         ...baseParams,
-        enableSubagents: false,
+        continueOnFailedApiCall: false,
       };
-      const config = new Config(paramsWithSubagents);
-      expect(config.getEnableSubagents()).toBe(false);
+      const config = new Config(paramsWithContinueOnFailedApiCall);
+      expect(config.getContinueOnFailedApiCall()).toBe(false);
     });
   });
 
@@ -648,25 +655,26 @@ describe('Server Config (config.ts)', () => {
       expect(wasReadFileToolRegistered).toBe(false);
     });
 
-    it('should register subagents as tools when enableSubagents is true', async () => {
+    it('should register subagents as tools when codebaseInvestigatorSettings.enabled is true', async () => {
       const params: ConfigParameters = {
         ...baseParams,
-        enableSubagents: true,
+        codebaseInvestigatorSettings: { enabled: true },
       };
       const config = new Config(params);
 
-      const mockAgentDefinitions = [
-        { name: 'agent1', description: 'Agent 1', instructions: 'Inst 1' },
-        { name: 'agent2', description: 'Agent 2', instructions: 'Inst 2' },
-      ];
+      const mockAgentDefinition = {
+        name: 'codebase-investigator',
+        description: 'Agent 1',
+        instructions: 'Inst 1',
+      };
 
       const AgentRegistryMock = (
         (await vi.importMock('../agents/registry.js')) as {
           AgentRegistry: Mock;
         }
       ).AgentRegistry;
-      AgentRegistryMock.prototype.getAllDefinitions.mockReturnValue(
-        mockAgentDefinitions,
+      AgentRegistryMock.prototype.getDefinition.mockReturnValue(
+        mockAgentDefinition,
       );
 
       const SubagentToolWrapperMock = (
@@ -683,14 +691,9 @@ describe('Server Config (config.ts)', () => {
         }
       ).ToolRegistry.prototype.registerTool;
 
-      expect(SubagentToolWrapperMock).toHaveBeenCalledTimes(2);
+      expect(SubagentToolWrapperMock).toHaveBeenCalledTimes(1);
       expect(SubagentToolWrapperMock).toHaveBeenCalledWith(
-        mockAgentDefinitions[0],
-        config,
-        undefined,
-      );
-      expect(SubagentToolWrapperMock).toHaveBeenCalledWith(
-        mockAgentDefinitions[1],
+        mockAgentDefinition,
         config,
         undefined,
       );
@@ -699,13 +702,13 @@ describe('Server Config (config.ts)', () => {
       const registeredWrappers = calls.filter(
         (call) => call[0] instanceof SubagentToolWrapperMock,
       );
-      expect(registeredWrappers).toHaveLength(2);
+      expect(registeredWrappers).toHaveLength(1);
     });
 
-    it('should not register subagents as tools when enableSubagents is false', async () => {
+    it('should not register subagents as tools when codebaseInvestigatorSettings.enabled is false', async () => {
       const params: ConfigParameters = {
         ...baseParams,
-        enableSubagents: false,
+        codebaseInvestigatorSettings: { enabled: false },
       };
       const config = new Config(params);
 

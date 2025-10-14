@@ -7,6 +7,7 @@
 // Defines valid event metadata keys for Clearcut logging.
 export enum EventMetadataKey {
   // Deleted enums: 24
+  // Next ID: 117
 
   GEMINI_CLI_KEY_UNKNOWN = 0,
 
@@ -97,6 +98,9 @@ export enum EventMetadataKey {
 
   // Logs a smart edit correction event.
   GEMINI_CLI_SMART_EDIT_CORRECTION = 110,
+
+  // Logs the reason for web fetch fallback.
+  GEMINI_CLI_WEB_FETCH_FALLBACK_REASON = 116,
 
   // ==========================================================================
   // GenAI API Request Event Keys
@@ -363,7 +367,7 @@ export enum EventMetadataKey {
   GEMINI_CLI_NODE_VERSION = 83,
 
   // ==========================================================================
-  // Extension Install Event Keys
+  // Extension Event Keys
   // ===========================================================================
 
   // Logs the name of the extension.
@@ -371,6 +375,9 @@ export enum EventMetadataKey {
 
   // Logs the version of the extension.
   GEMINI_CLI_EXTENSION_VERSION = 86,
+
+  // Logs the previous version of the extension.
+  GEMINI_CLI_EXTENSION_PREVIOUS_VERSION = 117,
 
   // Logs the source of the extension.
   GEMINI_CLI_EXTENSION_SOURCE = 87,
@@ -380,6 +387,9 @@ export enum EventMetadataKey {
 
   // Logs the status of the extension uninstall
   GEMINI_CLI_EXTENSION_UNINSTALL_STATUS = 96,
+
+  // Logs the status of the extension uninstall
+  GEMINI_CLI_EXTENSION_UPDATE_STATUS = 118,
 
   // Logs the setting scope for an extension enablement.
   GEMINI_CLI_EXTENSION_ENABLE_SETTING_SCOPE = 102,
