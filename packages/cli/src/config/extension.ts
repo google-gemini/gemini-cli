@@ -780,7 +780,7 @@ export function toOutputString(
   output += `\n Enabled (User): ${userEnabled}`;
   output += `\n Enabled (Workspace): ${workspaceEnabled}`;
   if (extension.author) {
-    output += `\n Author: ${extension.author}`;
+    output += `\n Author: ${escapeAnsiCtrlCodes(extension.author)}`;
   }
   if (extension.contextFiles.length > 0) {
     output += `\n Context files:`;
