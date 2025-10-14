@@ -715,7 +715,7 @@ export async function loadCliConfig(
     },
     telemetry: telemetrySettings,
     usageStatisticsEnabled: settings.privacy?.usageStatisticsEnabled ?? true,
-    fileFiltering: settings.context?.fileFiltering,
+    fileFiltering,
     checkpointing:
       argv.checkpointing || settings.general?.checkpointing?.enabled,
     proxy:
@@ -758,7 +758,9 @@ export async function loadCliConfig(
     useModelRouter,
     enableMessageBusIntegration:
       settings.tools?.enableMessageBusIntegration ?? false,
-    enableSubagents: settings.experimental?.enableSubagents ?? false,
+    codebaseInvestigatorSettings:
+      settings.experimental?.codebaseInvestigatorSettings,
+    retryFetchErrors: settings.general?.retryFetchErrors ?? false,
   });
 }
 
