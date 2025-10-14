@@ -34,7 +34,6 @@ import { formatMemoryUsage } from '../utils/formatters.js';
 import type { AnsiOutput } from '../utils/terminalSerializer.js';
 import {
   getCommandRoots,
-  initializeShellParsers,
   isCommandAllowed,
   SHELL_TOOL_NAMES,
   stripShellWrapper,
@@ -389,17 +388,25 @@ function getShellToolDescription(): string {
       Process Group PGID: Process group started or \`(none)\``;
 
   if (os.platform() === 'win32') {
-    return `This tool executes a given shell command as \`powershell.exe -NoProfile -Command <command>\`. Command can start background processes using PowerShell constructs such as \`Start-Process -NoNewWindow\` or \`Start-Job\`.${returnedInfo}`;
+    return `This tool executes a given shell command as \`cmd.exe /c <command>\`. Command can start background processes using \`start /b\`.${returnedInfo}`;
   } else {
     return `This tool executes a given shell command as \`bash -c <command>\`. Command can start background processes using \`&\`. Command is executed as a subprocess that leads its own process group. Command process group can be terminated as \`kill -- -PGID\` or signaled as \`kill -s SIGNAL -- -PGID\`.${returnedInfo}`;
   }
 }
 
 function getCommandDescription(): string {
+  const cmd_substitution_warning =
+    '\n*** WARNING: Command substitution using $(), `` ` ``, <(), or >() is not allowed for security reasons.';
   if (os.platform() === 'win32') {
-    return 'Exact command to execute as `powershell.exe -NoProfile -Command <command>`';
+    return (
+      'Exact command to execute as `cmd.exe /c <command>`' +
+      cmd_substitution_warning
+    );
   } else {
-    return 'Exact bash command to execute as `bash -c <command>`';
+    return (
+      'Exact bash command to execute as `bash -c <command>`' +
+      cmd_substitution_warning
+    );
   }
 }
 
@@ -411,7 +418,6 @@ export class ShellTool extends BaseDeclarativeTool<
   private allowlist: Set<string> = new Set();
 
   constructor(private readonly config: Config) {
-    void initializeShellParsers();
     super(
       ShellTool.Name,
       'Shell',
@@ -445,10 +451,6 @@ export class ShellTool extends BaseDeclarativeTool<
   protected override validateToolParamValues(
     params: ShellToolParams,
   ): string | null {
-    if (!params.command.trim()) {
-      return 'Command cannot be empty.';
-    }
-
     const commandCheck = isCommandAllowed(params.command, this.config);
     if (!commandCheck.allowed) {
       if (!commandCheck.reason) {
@@ -458,6 +460,9 @@ export class ShellTool extends BaseDeclarativeTool<
         return `Command is not allowed: ${params.command}`;
       }
       return commandCheck.reason;
+    }
+    if (!params.command.trim()) {
+      return 'Command cannot be empty.';
     }
     if (getCommandRoots(params.command).length === 0) {
       return 'Could not identify command root to obtain permission from user.';
