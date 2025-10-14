@@ -31,7 +31,7 @@ describe('Interactive Mode', () => {
 
     await run.expectText('einstein', 25000);
 
-    await run.sendKeys('/compress');
+    await run.type('/compress');
     await run.sendKeys('\r');
 
     const foundEvent = await rig.waitForTelemetryEvent(
