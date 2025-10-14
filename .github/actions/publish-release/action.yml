@@ -17,9 +17,6 @@ inputs:
   wombat-token-a2a-server:
     description: 'The npm token for the a2a package.'
     required: true
-  wombat-token-a2a-server:
-    description: 'The npm token for the @google/gemini-cli-a2a-server package.'
-    required: true
   github-token:
     description: 'The GitHub token for creating the release.'
     required: true
@@ -190,7 +187,6 @@ runs:
         wombat-token-cli: '${{ inputs.wombat-token-cli }}'
         wombat-token-a2a-server: '${{ inputs.wombat-token-a2a-server }}'
 
-
     - name: '📦 Publish CLI'
       working-directory: '${{ inputs.working-directory }}'
       env:
@@ -201,7 +197,7 @@ runs:
           --dry-run="${{ inputs.dry-run }}" \
           --workspace="${{ inputs.cli-package-name }}" \
           --no-tag
-    
+
     - name: 'Get a2a-server Token'
       uses: './.github/actions/npm-auth-token'
       id: 'a2a-token'
@@ -211,7 +207,7 @@ runs:
         wombat-token-core: '${{ inputs.wombat-token-core }}'
         wombat-token-cli: '${{ inputs.wombat-token-cli }}'
         wombat-token-a2a-server: '${{ inputs.wombat-token-a2a-server }}'
-    
+
     - name: '📦 Publish a2a'
       working-directory: '${{ inputs.working-directory }}'
       env:
