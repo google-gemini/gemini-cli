@@ -12,6 +12,7 @@ on:
         required: true
         type: 'choice'
         options:
+          - 'dev'
           - 'latest'
           - 'preview'
           - 'nightly'
