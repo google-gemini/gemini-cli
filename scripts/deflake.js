@@ -16,15 +16,7 @@ import { hideBin } from 'yargs/helpers';
  * @param {string} command The command string to execute (e.g., 'npm run test:e2e -- --watch').
  * @returns {Promise<number>} A Promise that resolves with the exit code of the process.
  */
-function runCommand(command) {
-  // Split the command string into the command name and its arguments.
-  // This handles quotes and spaces more robustly than a simple split(' ').
-  // For 'npm run test:e2e -- --test-name-pattern "replace"', it results in:
-  // cmd: 'npm', args: ['run', 'test:e2e', '--', '--test-name-pattern', 'replace']
-  const parts = command.match(/(?:[^\s"]+|"[^"]*")+/g) || [];
-  const cmd = parts[0];
-  const args = parts.slice(1).map((arg) => arg.replace(/"/g, '')); // Remove surrounding quotes
-
+function runCommand(cmd, args = []) {
   if (!cmd) {
     return Promise.resolve(1);
   }
@@ -63,6 +55,7 @@ async function main() {
 
   const NUM_RUNS = argv.runs;
   const COMMAND = argv.command;
+  const ARGS = argv._;
   let failures = 0;
 
   console.log(`--- Starting Deflake Run (${NUM_RUNS} iterations) ---`);
@@ -71,7 +64,7 @@ async function main() {
 
     try {
       // 3. Await the asynchronous command run
-      const exitCode = await runCommand(COMMAND);
+      const exitCode = await runCommand(COMMAND, ARGS);
 
       if (exitCode === 0) {
         console.log('✅ Run PASS');
