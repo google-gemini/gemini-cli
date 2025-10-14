@@ -18,7 +18,7 @@ describe('Ctrl+C exit', () => {
     // Send first Ctrl+C
     run.type('\x03');
 
-    await run.waitForText('Press Ctrl+C again to exit', 5000);
+    await run.expectText('Press Ctrl+C again to exit', 5000);
 
     if (os.platform() === 'win32') {
       // This is a workaround for node-pty/winpty on Windows.
@@ -31,7 +31,7 @@ describe('Ctrl+C exit', () => {
       // graceful shutdown message on Windows in this automated context.
       run.kill();
 
-      const exitCode = await run.waitForExit();
+      const exitCode = await run.expectExit();
       // On Windows, the exit code after ptyProcess.kill() can be unpredictable
       // (often 1), so we accept any non-null exit code as a pass condition,
       // focusing on the fact that the process did terminate.
@@ -42,9 +42,9 @@ describe('Ctrl+C exit', () => {
     // Send second Ctrl+C
     run.type('\x03');
 
-    const exitCode = await run.waitForExit();
+    const exitCode = await run.expectExit();
     expect(exitCode, `Process exited with code ${exitCode}.`).toBe(0);
 
-    await run.waitForText('Agent powering down. Goodbye!', 5000);
+    await run.expectText('Agent powering down. Goodbye!', 5000);
   });
 });

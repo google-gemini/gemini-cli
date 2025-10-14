@@ -11,10 +11,11 @@ import { theme } from '../semantic-colors.js';
 import { StreamingState } from '../types.js';
 import { UpdateNotification } from './UpdateNotification.js';
 
+import { GEMINI_DIR } from '@google/gemini-cli-core';
 import { homedir } from 'node:os';
 import path from 'node:path';
 
-const settingsPath = path.join(homedir(), '.gemini', 'settings.json');
+const settingsPath = path.join(homedir(), GEMINI_DIR, 'settings.json');
 
 export const Notifications = () => {
   const { startupWarnings } = useAppContext();

@@ -29,7 +29,7 @@ describe('Interactive Mode', () => {
     await run.type(longPrompt);
     await run.type('\r');
 
-    await run.waitForText('einstein', 25000);
+    await run.expectText('einstein', 25000);
 
     await run.type('/compress');
     // A small delay to allow React to re-render the command list.
@@ -52,8 +52,9 @@ describe('Interactive Mode', () => {
     const run = await rig.runInteractive();
 
     await run.type('/compress');
+    // A small delay to allow React to re-render the command list.
     await new Promise((resolve) => setTimeout(resolve, 100));
     await run.type('\r');
-    await run.waitForText('compression was not beneficial', 25000);
+    await run.expectText('compression was not beneficial', 25000);
   });
 });
