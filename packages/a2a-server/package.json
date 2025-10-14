@@ -20,7 +20,8 @@
     "test": "vitest run",
     "test:ci": "vitest run --coverage",
     "typecheck": "tsc --noEmit",
-    "bundle": "node esbuild.config.js"
+    "bundle": "node esbuild.config.js",
+    "clean": "rm -rf dist .turbo node_modules"
   },
   "files": [
     "dist",

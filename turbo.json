@@ -8,6 +8,24 @@
     "bundle": {
       "dependsOn": ["^build"],
       "outputs": ["bundle/**", "packages/*/bundle/**"]
+    },
+    "lint": {
+      "dependsOn": []
+    },
+    "test": {
+      "dependsOn": ["^build"]
+    },
+    "test:ci": {
+      "dependsOn": ["^build"]
+    },
+    "typecheck": {
+      "dependsOn": ["^build"]
+    },
+    "clean": {
+      "cache": false
+    },
+    "preflight": {
+      "dependsOn": ["lint", "typecheck", "test", "build"]
     }
   }
 }

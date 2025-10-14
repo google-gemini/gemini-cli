@@ -120,7 +120,8 @@
     "package": "vsce package --no-dependencies",
     "test": "vitest run",
     "test:ci": "vitest run --coverage",
-    "validate:notices": "node ./scripts/validate-notices.js"
+    "validate:notices": "node ./scripts/validate-notices.js",
+    "clean": "rm -rf dist .turbo node_modules"
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",
