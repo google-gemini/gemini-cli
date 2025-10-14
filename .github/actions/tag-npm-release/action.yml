@@ -48,7 +48,7 @@ runs:
         node-version-file: '.nvmrc'
 
     - name: 'configure .npmrc'
-      uses: './.github/actions/configure-npmrc'
+      uses: './.github/actions/setup-npmrc'
       with:
         github-token: '${{ inputs.github-token }}'
 

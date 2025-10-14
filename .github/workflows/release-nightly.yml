@@ -20,10 +20,18 @@ on:
         required: false
         type: 'string'
         default: 'main'
+      environment:
+        description: 'Environment'
+        required: false
+        type: 'choice'
+        options:
+          - 'prod'
+          - 'dev'
+        default: 'prod'
 
 jobs:
   release:
-    environment: 'prod' # TODO(richieforeman): Fully support dev env.
+    environment: '${{ github.event.inputs.environment }}'
     runs-on: 'ubuntu-latest'
     permissions:
       contents: 'write'

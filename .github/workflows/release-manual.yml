@@ -42,7 +42,7 @@ on:
         type: 'choice'
         options:
           - 'prod'
-          - 'dev' # TODO(richieforeman): Fully support dev env.
+          - 'dev'
         default: 'prod'
 
 jobs:

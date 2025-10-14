@@ -25,11 +25,19 @@ on:
         required: false
         type: 'boolean'
         default: true
+      environment:
+        description: 'Environment'
+        required: false
+        type: 'choice'
+        options:
+          - 'prod'
+          - 'dev'
+        default: 'prod'
 
 jobs:
   change-tags:
     runs-on: 'ubuntu-latest'
-    environment: 'prod' # TODO(richieforeman): Allow this value to be changed.
+    environment: '${{ github.event.inputs.environment }}'
     permissions:
       packages: 'write'
       issues: 'write'
