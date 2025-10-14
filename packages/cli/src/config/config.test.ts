@@ -2543,59 +2543,6 @@ describe('loadCliConfig useRipgrep', () => {
       expect(config.getUseModelRouter()).toBe(false);
     });
   });
-
-  describe('loadCliConfig enableSubagents', () => {
-    it('should be false by default when enableSubagents is not set in settings', async () => {
-      process.argv = ['node', 'script.js'];
-      const argv = await parseArguments({} as Settings);
-      const settings: Settings = {};
-      const config = await loadCliConfig(
-        settings,
-        [],
-        new ExtensionEnablementManager(
-          ExtensionStorage.getUserExtensionsDir(),
-          argv.extensions,
-        ),
-        'test-session',
-        argv,
-      );
-      expect(config.getEnableSubagents()).toBe(false);
-    });
-
-    it('should be true when enableSubagents is set to true in settings', async () => {
-      process.argv = ['node', 'script.js'];
-      const argv = await parseArguments({} as Settings);
-      const settings: Settings = { experimental: { enableSubagents: true } };
-      const config = await loadCliConfig(
-        settings,
-        [],
-        new ExtensionEnablementManager(
-          ExtensionStorage.getUserExtensionsDir(),
-          argv.extensions,
-        ),
-        'test-session',
-        argv,
-      );
-      expect(config.getEnableSubagents()).toBe(true);
-    });
-
-    it('should be false when enableSubagents is explicitly set to false in settings', async () => {
-      process.argv = ['node', 'script.js'];
-      const argv = await parseArguments({} as Settings);
-      const settings: Settings = { experimental: { enableSubagents: false } };
-      const config = await loadCliConfig(
-        settings,
-        [],
-        new ExtensionEnablementManager(
-          ExtensionStorage.getUserExtensionsDir(),
-          argv.extensions,
-        ),
-        'test-session',
-        argv,
-      );
-      expect(config.getEnableSubagents()).toBe(false);
-    });
-  });
 });
 
 describe('screenReader configuration', () => {
