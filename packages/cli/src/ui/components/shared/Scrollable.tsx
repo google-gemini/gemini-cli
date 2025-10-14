@@ -13,8 +13,8 @@ import React, {
 } from 'react';
 import { Box, getInnerHeight, getScrollHeight, type DOMElement } from 'ink';
 import { useKeypress, type Key } from '../../hooks/useKeypress.js';
-import { theme } from '../../semantic-colors.js';
 import { useScrollable } from '../../contexts/ScrollProvider.js';
+import { useAnimatedScrollbar } from '../../hooks/useAnimatedScrollbar.js';
 
 interface ScrollableProps {
   children?: React.ReactNode;
@@ -88,14 +88,17 @@ export const Scrollable: React.FC<ScrollableProps> = ({
     [sizeRef],
   );
 
+  const { scrollbarColor, flashScrollbar, scrollByWithAnimation } =
+    useAnimatedScrollbar(hasFocus, scrollBy);
+
   useKeypress(
     (key: Key) => {
       if (key.shift) {
         if (key.name === 'up') {
-          scrollBy(-1);
+          scrollByWithAnimation(-1);
         }
         if (key.name === 'down') {
-          scrollBy(1);
+          scrollByWithAnimation(1);
         }
       }
     },
@@ -115,8 +118,9 @@ export const Scrollable: React.FC<ScrollableProps> = ({
     {
       ref: ref as React.RefObject<DOMElement>,
       getScrollState,
-      scrollBy,
+      scrollBy: scrollByWithAnimation,
       hasFocus: () => hasFocus,
+      flashScrollbar,
     },
     hasFocus && ref.current !== null,
   );
@@ -132,7 +136,7 @@ export const Scrollable: React.FC<ScrollableProps> = ({
       overflowX="hidden"
       scrollTop={scrollTop}
       flexGrow={flexGrow}
-      scrollbarThumbColor={theme.text.secondary}
+      scrollbarThumbColor={scrollbarColor}
     >
       {/*
         This inner box is necessary to prevent the parent from shrinking

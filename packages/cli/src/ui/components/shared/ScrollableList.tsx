@@ -9,6 +9,7 @@ import type React from 'react';
 import { VirtualizedList, type VirtualizedListRef } from './VirtualizedList.js';
 import { useScrollable } from '../../contexts/ScrollProvider.js';
 import { Box, type DOMElement } from 'ink';
+import { useAnimatedScrollbar } from '../../hooks/useAnimatedScrollbar.js';
 
 type VirtualizedListProps<T> = {
   data: T[];
@@ -49,12 +50,16 @@ function ScrollableList<T>(
     virtualizedListRef.current?.scrollBy(delta);
   }, []);
 
+  const { scrollbarColor, flashScrollbar, scrollByWithAnimation } =
+    useAnimatedScrollbar(hasFocus, scrollBy);
+
   useScrollable(
     {
       ref: containerRef as React.RefObject<DOMElement>,
       getScrollState,
-      scrollBy,
+      scrollBy: scrollByWithAnimation,
       hasFocus: () => hasFocus,
+      flashScrollbar,
     },
     hasFocus && containerRef.current !== null,
   );
@@ -66,7 +71,11 @@ function ScrollableList<T>(
       flexDirection="column"
       overflow="hidden"
     >
-      <VirtualizedList ref={virtualizedListRef} {...props} />
+      <VirtualizedList
+        ref={virtualizedListRef}
+        {...props}
+        scrollbarThumbColor={scrollbarColor}
+      />
     </Box>
   );
 }

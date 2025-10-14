@@ -26,6 +26,7 @@ type VirtualizedListProps<T> = {
   keyExtractor: (item: T, index: number) => string;
   initialScrollIndex?: number;
   initialScrollOffsetInIndex?: number;
+  scrollbarThumbColor?: string;
 };
 
 export type VirtualizedListRef<T> = {
@@ -430,7 +431,7 @@ function VirtualizedList<T>(
       overflowY="scroll"
       overflowX="hidden"
       scrollTop={scrollTop}
-      scrollbarThumbColor={theme.text.secondary}
+      scrollbarThumbColor={props.scrollbarThumbColor ?? theme.text.secondary}
       width="100%"
       height="100%"
       flexDirection="column"

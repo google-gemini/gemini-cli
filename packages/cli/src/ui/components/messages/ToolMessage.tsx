@@ -124,7 +124,7 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
       <Box
         minHeight={1}
         borderStyle="round"
-        borderColor={theme.border.default}
+        borderColor={theme.background.primary}
         paddingX={1}
         borderTop={false}
         borderLeft={false}

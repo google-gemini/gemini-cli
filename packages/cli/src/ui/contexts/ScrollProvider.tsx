@@ -28,6 +28,7 @@ export interface ScrollableEntry {
   getScrollState: () => ScrollState;
   scrollBy: (delta: number) => void;
   hasFocus: () => boolean;
+  flashScrollbar: () => void;
 }
 
 interface ScrollContextType {
@@ -36,6 +37,38 @@ interface ScrollContextType {
 }
 
 const ScrollContext = createContext<ScrollContextType | null>(null);
+
+const findScrollableCandidates = (
+  mouseEvent: MouseEvent,
+  scrollables: Map<string, ScrollableEntry>,
+) => {
+  const candidates: Array<ScrollableEntry & { area: number }> = [];
+
+  for (const entry of scrollables.values()) {
+    if (!entry.ref.current || !entry.hasFocus()) {
+      continue;
+    }
+
+    const boundingBox = getBoundingBox(entry.ref.current);
+    if (!boundingBox) continue;
+
+    const { x, y, width, height } = boundingBox;
+
+    const isInside =
+      mouseEvent.col >= x &&
+      mouseEvent.col < x + width + 1 && // Intentionally add one to width to include scrollbar.
+      mouseEvent.row >= y &&
+      mouseEvent.row < y + height;
+
+    if (isInside) {
+      candidates.push({ ...entry, area: width * height });
+    }
+  }
+
+  // Sort by smallest area first
+  candidates.sort((a, b) => a.area - b.area);
+  return candidates;
+};
 
 export const ScrollProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
@@ -63,35 +96,10 @@ export const ScrollProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const handleScroll = (direction: 'up' | 'down', mouseEvent: MouseEvent) => {
     const delta = direction === 'up' ? -1 : 1;
-    const candidates: Array<ScrollableEntry & { area: number }> = [];
-
-    for (const entry of scrollablesRef.current.values()) {
-      if (!entry.ref.current || !entry.hasFocus()) {
-        continue;
-      }
-
-      const boundingBox = getBoundingBox(entry.ref.current);
-      if (!boundingBox) continue;
-
-      const { x, y, width, height } = boundingBox;
-
-      const isInside =
-        mouseEvent.col >= x &&
-        mouseEvent.col < x + width &&
-        mouseEvent.row >= y &&
-        mouseEvent.row < y + height;
-
-      if (isInside) {
-        candidates.push({ ...entry, area: width * height });
-      }
-    }
-
-    if (candidates.length === 0) {
-      return;
-    }
-
-    // Sort by smallest area first
-    candidates.sort((a, b) => a.area - b.area);
+    const candidates = findScrollableCandidates(
+      mouseEvent,
+      scrollablesRef.current,
+    );
 
     for (const candidate of candidates) {
       const { scrollTop, scrollHeight, innerHeight } =
@@ -103,13 +111,25 @@ export const ScrollProvider: React.FC<{ children: React.ReactNode }> = ({
 
       if (direction === 'up' && canScrollUp) {
         candidate.scrollBy(delta);
-        return; // Handled
+        return;
       }
 
       if (direction === 'down' && canScrollDown) {
         candidate.scrollBy(delta);
-        return; // Handled
+        return;
       }
+    }
+  };
+
+  const handleClick = (mouseEvent: MouseEvent) => {
+    const candidates = findScrollableCandidates(
+      mouseEvent,
+      scrollablesRef.current,
+    );
+
+    if (candidates.length > 0) {
+      // The first candidate is the innermost one.
+      candidates[0].flashScrollbar();
     }
   };
 
@@ -119,6 +139,8 @@ export const ScrollProvider: React.FC<{ children: React.ReactNode }> = ({
         handleScroll('up', event);
       } else if (event.name === 'scroll-down') {
         handleScroll('down', event);
+      } else if (event.name === 'left-press') {
+        handleClick(event);
       }
     },
     { isActive: true },

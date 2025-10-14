@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import tinygradient from 'tinygradient';
+
 // Mapping from common CSS color names (lowercase) to hex codes (lowercase)
 // Excludes names directly supported by Ink
 export const CSS_NAME_TO_HEX_MAP: Readonly<Record<string, string>> = {
@@ -228,4 +230,14 @@ export function resolveColor(colorValue: string): string | undefined {
     `[ColorUtils] Could not resolve color "${colorValue}" to an Ink-compatible format.`,
   );
   return undefined;
+}
+
+export function interpolateColor(
+  color1: string,
+  color2: string,
+  factor: number,
+) {
+  const gradient = tinygradient(color1, color2);
+  const color = gradient.rgbAt(factor);
+  return color.toHexString();
 }
