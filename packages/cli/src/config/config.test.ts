@@ -2070,7 +2070,7 @@ describe('loadCliConfig model selection', () => {
       argv,
     );
 
-    expect(config.getModel()).toBe(DEFAULT_GEMINI_MODEL);
+    expect(config.getModel()).toBe('auto');
   });
 
   it('always prefers model from argvs', async () => {
