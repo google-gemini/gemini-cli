@@ -963,8 +963,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       ) {
         handleSlashCommand('/ide status');
       } else if (
-        (keyMatchers[Command.SHOW_MORE_LINES](key) ||
-          keyMatchers[Command.TOGGLE_TOOL_CALL_ARGUMENTS_EXPANSION](key)) &&
+        keyMatchers[Command.SHOW_MORE_LINES](key) &&
         !enteringConstrainHeightMode
       ) {
         setConstrainHeight(false);
