@@ -196,6 +196,15 @@ jobs:
         working-directory: './release'
         run: 'npm ci'
 
+      - name: 'Build Release'
+        id: 'build'
+        uses: './.github/actions/build-release'
+        with:
+          release-version: '${{ needs.calculate-versions.outputs.PREVIEW_VERSION }}'
+          release-tag: 'v${{ needs.calculate-versions.outputs.PREVIEW_VERSION }}'
+          dry-run: '${{ github.event.inputs.dry_run }}'
+          working-directory: './release'
+
       - name: 'Publish Release'
         uses: './.github/actions/publish-release'
         with:
@@ -209,6 +218,7 @@ jobs:
           dry-run: '${{ github.event.inputs.dry_run }}'
           previous-tag: '${{ needs.calculate-versions.outputs.PREVIOUS_PREVIEW_TAG }}'
           working-directory: './release'
+          branch-name: '${{ steps.build.outputs.branch-name }}'
           gemini_api_key: '${{ secrets.GEMINI_API_KEY }}'
           force-skip-tests: '${{ github.event.inputs.force_skip_tests }}'
 
@@ -255,6 +265,15 @@ jobs:
         working-directory: './release'
         run: 'npm ci'
 
+      - name: 'Build Release'
+        id: 'build'
+        uses: './.github/actions/build-release'
+        with:
+          release-version: '${{ needs.calculate-versions.outputs.STABLE_VERSION }}'
+          release-tag: 'v${{ needs.calculate-versions.outputs.STABLE_VERSION }}'
+          dry-run: '${{ github.event.inputs.dry_run }}'
+          working-directory: './release'
+
       - name: 'Publish Release'
         uses: './.github/actions/publish-release'
         with:
@@ -268,6 +287,7 @@ jobs:
           dry-run: '${{ github.event.inputs.dry_run }}'
           previous-tag: '${{ needs.calculate-versions.outputs.PREVIOUS_STABLE_TAG }}'
           working-directory: './release'
+          branch-name: '${{ steps.build.outputs.branch-name }}'
           gemini_api_key: '${{ secrets.GEMINI_API_KEY }}'
           force-skip-tests: '${{ github.event.inputs.force_skip_tests }}'
 

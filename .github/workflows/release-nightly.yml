@@ -29,6 +29,7 @@ jobs:
       packages: 'write'
       issues: 'write'
       pull-requests: 'write'
+      actions: 'write'
     steps:
       - name: 'Checkout'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
@@ -103,6 +104,32 @@ jobs:
           echo "NPM_TAG=${NPM_TAG}" >> "${GITHUB_OUTPUT}"
           echo "PREVIOUS_TAG=${PREVIOUS_TAG}" >> "${GITHUB_OUTPUT}"
 
+      - name: 'Build Release'
+        id: 'build'
+        uses: './.github/actions/build-release'
+        with:
+          release-version: '${{ steps.nightly_version.outputs.RELEASE_VERSION }}'
+          release-tag: '${{ steps.nightly_version.outputs.RELEASE_TAG }}'
+          dry-run: '${{ github.event.inputs.dry_run }}'
+          working-directory: './release'
+
+      - name: 'Trigger Evaluation'
+        env:
+          GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+          DRY_RUN: '${{ github.event.inputs.dry_run }}'
+          INPUT_REF: '${{ github.event.inputs.ref }}'
+          RELEASE_BRANCH: '${{ steps.build.outputs.branch-name }}'
+        shell: 'bash'
+        run: |
+          if [[ "${DRY_RUN}" == "true" ]]; then
+            # Default to main if no ref is provided
+            REF="${INPUT_REF:-main}"
+          else
+            REF="${RELEASE_BRANCH}"
+          fi
+          echo "Triggering evaluation on ref: ${REF}"
+          gh workflow run eval.yml --ref "${REF}" -f branch-or-commit="${REF}" -f dry-run="${DRY_RUN}"
+
       - name: 'Publish Release'
         if: true
         uses: './.github/actions/publish-release'
@@ -117,6 +144,7 @@ jobs:
           dry-run: '${{ steps.vars.outputs.is_dry_run }}'
           previous-tag: '${{ steps.nightly_version.outputs.PREVIOUS_TAG }}'
           working-directory: './release'
+          branch-name: '${{ steps.build.outputs.branch-name }}'
           skip-branch-cleanup: true
           force-skip-tests: "${{ github.event_name != 'schedule' && github.event.inputs.force_skip_tests == 'true' }}"
           gemini_api_key: '${{ secrets.GEMINI_API_KEY }}'

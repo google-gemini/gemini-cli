@@ -51,6 +51,7 @@ jobs:
       contents: 'write'
       packages: 'write'
       issues: 'write'
+      actions: 'write'
     steps:
       - name: 'Checkout'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8'
@@ -95,6 +96,31 @@ jobs:
           gemini_api_key: '${{ secrets.GEMINI_API_KEY }}'
           working-directory: './release'
 
+      - name: 'Build Release'
+        id: 'build'
+        uses: './.github/actions/build-release'
+        with:
+          release-version: '${{ steps.release_info.outputs.RELEASE_VERSION }}'
+          release-tag: '${{ github.event.inputs.version }}'
+          dry-run: '${{ github.event.inputs.dry_run }}'
+          working-directory: './release'
+
+      - name: 'Trigger Evaluation'
+        env:
+          GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+          DRY_RUN: '${{ github.event.inputs.dry_run }}'
+          INPUT_REF: '${{ github.event.inputs.ref }}'
+          RELEASE_BRANCH: '${{ steps.build.outputs.branch-name }}'
+        shell: 'bash'
+        run: |
+          if [[ "${DRY_RUN}" == "true" ]]; then
+            REF="${INPUT_REF}"
+          else
+            REF="${RELEASE_BRANCH}"
+          fi
+          echo "Triggering evaluation on ref: ${REF}"
+          gh workflow run eval.yml --ref "${REF}" -f branch-or-commit="${REF}" -f dry-run="${DRY_RUN}"
+
       - name: 'Publish Release'
         uses: './.github/actions/publish-release'
         with:
@@ -110,6 +136,7 @@ jobs:
           previous-tag: '${{ steps.release_info.outputs.PREVIOUS_TAG }}'
           skip-github-release: '${{ github.event.inputs.skip_github_release }}'
           working-directory: './release'
+          branch-name: '${{ steps.build.outputs.branch-name }}'
           gemini_api_key: '${{ secrets.GEMINI_API_KEY }}'
           registry: '${{ github.event.inputs.registry }}'
 

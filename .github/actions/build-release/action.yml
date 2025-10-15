@@ -1,0 +1,89 @@
+name: 'Build Release'
+description: 'Builds and prepares the gemini-cli packages for release.'
+
+inputs:
+  release-version:
+    description: 'The version to release (e.g., 0.1.11).'
+    required: true
+  release-tag:
+    description: 'The release tag for the release (e.g., v0.1.11).'
+    required: true
+  dry-run:
+    description: 'Whether to run in dry-run mode.'
+    type: 'string'
+    required: true
+  working-directory:
+    description: 'The working directory to run the steps in.'
+    required: false
+    default: '.'
+
+outputs:
+  branch-name:
+    description: 'The name of the release branch.'
+    value: '${{ steps.release_branch.outputs.BRANCH_NAME }}'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: '👤 Configure Git User'
+      working-directory: '${{ inputs.working-directory }}'
+      shell: 'bash'
+      run: |
+        git config user.name "gemini-cli-robot"
+        git config user.email "gemini-cli-robot@google.com"
+
+    - name: '🌿 Create and switch to a release branch'
+      working-directory: '${{ inputs.working-directory }}'
+      id: 'release_branch'
+      shell: 'bash'
+      run: |
+        BRANCH_NAME="release/${{ inputs.release-tag }}"
+        git switch -c "${BRANCH_NAME}"
+        echo "BRANCH_NAME=${BRANCH_NAME}" >> "${GITHUB_OUTPUT}"
+
+    - name: '⬆️ Update package versions'
+      working-directory: '${{ inputs.working-directory }}'
+      shell: 'bash'
+      run: |
+        npm run release:version "${{ inputs.release-version }}"
+
+    - name: '💾 Commit and Conditionally Push package versions'
+      working-directory: '${{ inputs.working-directory }}'
+      shell: 'bash'
+      env:
+        BRANCH_NAME: '${{ steps.release_branch.outputs.BRANCH_NAME }}'
+        DRY_RUN: '${{ inputs.dry-run }}'
+        RELEASE_TAG: '${{ inputs.release-tag }}'
+      run: |-
+        git add package.json package-lock.json packages/*/package.json
+        if [[ -n $(git status --porcelain) ]]; then
+          git commit -m "chore(release): ${RELEASE_TAG}"
+          if [[ "${DRY_RUN}" == "false" ]]; then
+            echo "Pushing release branch to remote..."
+            git push --set-upstream origin "${BRANCH_NAME}" --follow-tags
+          else
+            echo "Dry run enabled. Skipping push."
+          fi
+        else
+          echo "No changes to commit."
+        fi
+
+    - name: '🛠️ Build and Prepare Packages'
+      working-directory: '${{ inputs.working-directory }}'
+      shell: 'bash'
+      run: |
+        npm run build:packages
+        npm run prepare:package
+
+    - name: '🎁 Bundle'
+      working-directory: '${{ inputs.working-directory }}'
+      shell: 'bash'
+      run: |
+        npm run bundle
+
+    - name: '📦 Prepare for GitHub release'
+      if: "inputs.registry == 'github'"
+      working-directory: '${{ inputs.working-directory }}'
+      shell: 'bash'
+      run: |
+        node ${{ github.workspace }}/scripts/prepare-github-release.js

@@ -2,6 +2,26 @@ name: 'Eval'
 
 on:
   workflow_dispatch:
+    inputs:
+      branch-or-commit:
+        description: 'The branch or commit to run the evaluation on.'
+        required: true
+        type: 'string'
+      dry-run:
+        description: 'dry run: runs evaluation without creating an issue.'
+        required: false
+        type: 'boolean'
+        default: true
+      resolution-rate-threshold:
+        description: 'The threshold for the resolution rate.'
+        required: false
+        type: 'number'
+        default: 90
+      tool-success-rate-threshold:
+        description: 'The threshold for the tool success rate.'
+        required: false
+        type: 'number'
+        default: 80
 
 defaults:
   run:
@@ -11,6 +31,7 @@ permissions:
   contents: 'read'
   id-token: 'write'
   packages: 'read'
+  issues: 'write'
 
 jobs:
   eval:
@@ -31,6 +52,11 @@ jobs:
         GCLI_LOCAL_FILE_TELEMETRY: 'True'
         EVAL_GCS_BUCKET: '${{ vars.EVAL_GCS_ARTIFACTS_BUCKET }}'
     steps:
+      - name: 'Checkout repository'
+        uses: 'actions/checkout@v4' # ratchet:exclude
+        with:
+          ref: '${{ inputs.branch-or-commit }}'
+
       - name: 'Authenticate to Google Cloud'
         id: 'auth'
         uses: 'google-github-actions/auth@v2' # ratchet:exclude
@@ -44,5 +70,48 @@ jobs:
       - name: 'Run evaluation'
         working-directory: '/app'
         run: |
-          poetry run exp_run --experiment-mode=on-demand --branch-or-commit=${{ github.ref_name }} --model-name=gemini-2.5-pro --dataset=swebench_verified --concurrency=15
+          poetry run exp_run --experiment-mode=on-demand --branch-or-commit=${{ inputs.branch-or-commit }} --model-name=gemini-2.5-pro --dataset=swebench_verified --concurrency=15
           poetry run python agent_prototypes/scripts/parse_gcli_logs_experiment.py --experiment_dir=experiments/adhoc/gcli_temp_exp --gcs-bucket="${EVAL_GCS_BUCKET}" --gcs-path=gh_action_artifacts
+
+      - name: 'Get evaluation summary'
+        id: 'calculate-rates'
+        working-directory: '/app'
+        run: |
+          poetry run bash "$GITHUB_WORKSPACE/scripts/calculate_eval_success_rates.sh" /app/experiments/adhoc/gcli_temp_exp/artifacts/summary_stats.md
+
+      - name: 'Check evaluation threshold'
+        if: '${{ steps.calculate-rates.outputs.resolution-rate <= inputs.resolution-rate-threshold || steps.calculate-rates.outputs.tool-success-rate <= inputs.tool-success-rate-threshold }}'
+        uses: 'actions/github-script@v7' # ratchet:exclude
+        with:
+          script: |
+            const resolutionRate = ${{ steps.calculate-rates.outputs.resolution-rate }};
+            const toolSuccessRate = ${{ steps.calculate-rates.outputs.tool-success-rate }};
+            const resolutionRateThreshold = ${{ inputs.resolution-rate-threshold }};
+            const toolSuccessRateThreshold = ${{ inputs.tool-success-rate-threshold }};
+            const branchOrCommit = '${{ inputs.branch-or-commit }}';
+            const runUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const dryRun = ${{ inputs.dry-run }};
+
+            const title = `⚠️ Evaluation below threshold for ${branchOrCommit}`;
+            const body = `
+            Evaluation for \`${branchOrCommit}\` failed to meet the required thresholds.
+
+            - **Resolution Rate**: ${resolutionRate}% (Threshold: ${resolutionRateThreshold}%)
+            - **Tool Success Rate**: ${toolSuccessRate}% (Threshold: ${toolSuccessRateThreshold}%)
+
+            [View Workflow Run](${runUrl})
+            `;
+
+            if (dryRun) {
+              console.log('Dry run enabled. Would create issue with:');
+              console.log(`Title: ${title}`);
+              console.log(`Body: ${body}`);
+            } else {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: title,
+                body: body,
+                labels: ['eval-failure']
+              });
+            }
