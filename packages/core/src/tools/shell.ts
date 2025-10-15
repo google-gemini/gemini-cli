@@ -90,7 +90,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
     ) {
       const allowedTools = this.config.getAllowedTools() || [];
       const [SHELL_TOOL_NAME] = SHELL_TOOL_NAMES;
-      if (doesToolInvocationMatch(SHELL_TOOL_NAME, this, allowedTools)) {
+      if (doesToolInvocationMatch(SHELL_TOOL_NAME, command, allowedTools)) {
         // If it's an allowed shell command, we don't need to confirm execution.
         return false;
       }
