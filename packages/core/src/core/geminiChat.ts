@@ -568,6 +568,8 @@ export class GeminiChat {
     // 2. The model did NOT provide a finish reason (indicating an incomplete or broken stream).
     //
     // If a finish reason IS present, an empty response text is considered a valid (empty) response.
+    // This can happen legitimately if the model's output consists solely of thoughts (which are stripped),
+    // or if the prompt was a simple command that didn't require a textual response.
     if (!hasToolCall && !hasFinishReason) {
       if (!hasFinishReason) {
         throw new InvalidStreamError(
