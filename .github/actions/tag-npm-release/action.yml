@@ -96,15 +96,25 @@ runs:
       run: |
         npm dist-tag add ${{ inputs.cli-package-name }}@${{ inputs.version }} ${{ inputs.channel }}
 
-    - name: 'Change tag for @google/gemini-cli-a2a-server'
+    - name: 'Get a2a Token'
+      uses: './.github/actions/npm-auth-token'
+      id: 'a2a-token'
+      with:
+        package-name: '${{ inputs.a2a-package-name }}'
+        github-token: '${{ inputs.github-token }}'
+        wombat-token-core: '${{ inputs.wombat-token-core }}'
+        wombat-token-cli: '${{ inputs.wombat-token-cli }}'
+        wombat-token-a2a-server: '${{ inputs.wombat-token-a2a-server }}'
+
+    - name: 'Change tag for a2a'
       if: |-
         ${{ inputs.dry-run == 'false' }}
       env:
-        NODE_AUTH_TOKEN: '${{ inputs.wombat-token-a2a-server }}'
+        NODE_AUTH_TOKEN: '${{ steps.a2a-token.outputs.auth-token }}'
       shell: 'bash'
       working-directory: '${{ inputs.working-directory }}'
       run: |
-        npm dist-tag add @google/gemini-cli-a2a-server@${{ inputs.version }} ${{ inputs.channel }}
+        npm dist-tag add ${{ inputs.a2a-package-name }}@${{ inputs.version }} ${{ inputs.channel }}
 
     - name: 'Log dry run'
       if: |-
@@ -112,4 +122,4 @@ runs:
       shell: 'bash'
       working-directory: '${{ inputs.working-directory }}'
       run: |
-        echo "Dry run: Would have added tag '${{ inputs.channel }}' to version '${{ inputs.version }}' for @google/gemini-cli and @google/gemini-cli-core."
+        echo "Dry run: Would have added tag '${{ inputs.channel }}' to version '${{ inputs.version }}' for ${{ inputs.cli-package-name }}, ${{ inputs.core-package-name }}, and ${{ inputs.a2a-package-name }}."

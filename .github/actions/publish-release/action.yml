@@ -218,7 +218,7 @@ runs:
         npm publish \
           --dry-run="${{ inputs.dry-run }}" \
           --workspace="${{ inputs.a2a-package-name }}" \
-          --no-TARGET_TAG
+          --no-tag
 
     - name: '🔬 Verify NPM release by version'
       uses: './.github/actions/verify-release'
@@ -234,7 +234,6 @@ runs:
 
     - name: '🏷️ Tag release'
       uses: './.github/actions/tag-npm-release'
-      if: "${{ inputs.dry-run != 'true' }}"
       with:
         channel: '${{ inputs.npm-tag }}'
         version: '${{ inputs.release-version }}'
