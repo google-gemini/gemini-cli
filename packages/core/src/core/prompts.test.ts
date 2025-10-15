@@ -47,6 +47,10 @@ describe('Core System Prompt (prompts.ts)', () => {
       getToolRegistry: vi.fn().mockReturnValue({
         getAllToolNames: vi.fn().mockReturnValue([]),
       }),
+      getEnableShellOutputEfficiency: vi.fn().mockReturnValue(true),
+      storage: {
+        getProjectTempDir: vi.fn().mockReturnValue('/tmp/project-temp'),
+      },
     } as unknown as Config;
   });
 
@@ -136,6 +140,10 @@ describe('Core System Prompt (prompts.ts)', () => {
             .fn()
             .mockReturnValue([CodebaseInvestigatorAgent.name]),
         }),
+        getEnableShellOutputEfficiency: vi.fn().mockReturnValue(true),
+        storage: {
+          getProjectTempDir: vi.fn().mockReturnValue('/tmp/project-temp'),
+        },
       } as unknown as Config;
     });
 
@@ -145,26 +153,10 @@ describe('Core System Prompt (prompts.ts)', () => {
         `your **first and primary tool** must be '${CodebaseInvestigatorAgent.name}'`,
       );
       expect(prompt).toContain(
-        `Do not ignore the output of '${CodebaseInvestigatorAgent.name}'`,
+        `do not ignore the output of '${CodebaseInvestigatorAgent.name}'`,
       );
       expect(prompt).not.toContain(
         "Use 'search_file_content' and 'glob' search tools extensively",
-      );
-    });
-
-    it('should include CodebaseInvestigator examples in the prompt', () => {
-      const prompt = getCoreSystemPrompt(mockConfig);
-      expect(prompt).toContain(
-        "First, I'll use the Codebase Investigator to understand the current implementation",
-      );
-      expect(prompt).toContain(
-        `[tool_call: ${CodebaseInvestigatorAgent.name} for query 'Analyze the authentication logic`,
-      );
-      expect(prompt).toContain(
-        "I'll use the Codebase Investigator to find the relevant code and APIs.",
-      );
-      expect(prompt).toContain(
-        `[tool_call: ${CodebaseInvestigatorAgent.name} for query 'Find the code responsible for updating user profile information`,
       );
     });
   });
@@ -178,22 +170,6 @@ describe('Core System Prompt (prompts.ts)', () => {
       );
       expect(prompt).toContain(
         "Use 'search_file_content' and 'glob' search tools extensively",
-      );
-    });
-
-    it('should include standard tool examples in the prompt', () => {
-      const prompt = getCoreSystemPrompt(mockConfig);
-      expect(prompt).not.toContain(
-        "First, I'll use the Codebase Investigator to understand the current implementation",
-      );
-      expect(prompt).not.toContain(
-        `[tool_call: ${CodebaseInvestigatorAgent.name} for query 'Analyze the authentication logic`,
-      );
-      expect(prompt).toContain(
-        "First, I'll analyze the code and check for a test safety net before planning any changes.",
-      );
-      expect(prompt).toContain(
-        "I'm not immediately sure how user profile information is updated. I'll search the codebase for terms like 'UserProfile'",
       );
     });
   });

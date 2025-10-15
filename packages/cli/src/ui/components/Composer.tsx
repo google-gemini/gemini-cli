@@ -58,7 +58,9 @@ export const Composer = () => {
         />
       )}
 
-      {!uiState.isConfigInitialized && <ConfigInitDisplay />}
+      {(!uiState.slashCommands || !uiState.isConfigInitialized) && (
+        <ConfigInitDisplay />
+      )}
 
       <QueuedMessageDisplay messageQueue={uiState.messageQueue} />
 
@@ -87,6 +89,8 @@ export const Composer = () => {
             </Text>
           ) : uiState.showEscapePrompt ? (
             <Text color={theme.text.secondary}>Press Esc again to clear.</Text>
+          ) : uiState.queueErrorMessage ? (
+            <Text color={theme.status.error}>{uiState.queueErrorMessage}</Text>
           ) : (
             !settings.merged.ui?.hideContextSummary && (
               <ContextSummaryDisplay
@@ -133,7 +137,7 @@ export const Composer = () => {
           userMessages={uiState.userMessages}
           onClearScreen={uiActions.handleClearScreen}
           config={config}
-          slashCommands={uiState.slashCommands}
+          slashCommands={uiState.slashCommands || []}
           commandContext={uiState.commandContext}
           shellModeActive={uiState.shellModeActive}
           setShellModeActive={uiActions.setShellModeActive}
@@ -147,6 +151,8 @@ export const Composer = () => {
               ? "  Press 'i' for INSERT mode and 'Esc' for NORMAL mode."
               : '  Type your message or @path/to/file'
           }
+          setQueueErrorMessage={uiActions.setQueueErrorMessage}
+          streamingState={uiState.streamingState}
         />
       )}
 

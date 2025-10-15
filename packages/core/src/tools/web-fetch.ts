@@ -15,6 +15,7 @@ import {
   Kind,
   ToolConfirmationOutcome,
 } from './tools.js';
+import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { ToolErrorType } from './tool-error.js';
 import { getErrorMessage } from '../utils/errors.js';
 import type { Config } from '../config/config.js';
@@ -31,10 +32,42 @@ import {
 const URL_FETCH_TIMEOUT_MS = 10000;
 const MAX_CONTENT_LENGTH = 100000;
 
-// Helper function to extract URLs from a string
-function extractUrls(text: string): string[] {
-  const urlRegex = /(https?:\/\/[^\s]+)/g;
-  return text.match(urlRegex) || [];
+/**
+ * Parses a prompt to extract valid URLs and identify malformed ones.
+ */
+export function parsePrompt(text: string): {
+  validUrls: string[];
+  errors: string[];
+} {
+  const tokens = text.split(/\s+/);
+  const validUrls: string[] = [];
+  const errors: string[] = [];
+
+  for (const token of tokens) {
+    if (!token) continue;
+
+    // Heuristic to check if the url appears to contain URL-like chars.
+    if (token.includes('://')) {
+      try {
+        // Validate with new URL()
+        const url = new URL(token);
+
+        // Allowlist protocols
+        if (['http:', 'https:'].includes(url.protocol)) {
+          validUrls.push(url.href);
+        } else {
+          errors.push(
+            `Unsupported protocol in URL: "${token}". Only http and https are supported.`,
+          );
+        }
+      } catch (_) {
+        // new URL() threw, so it's malformed according to WHATWG standard
+        errors.push(`Malformed URL detected: "${token}".`);
+      }
+    }
+  }
+
+  return { validUrls, errors };
 }
 
 // Interfaces for grounding metadata (similar to web-search.ts)
@@ -75,12 +108,13 @@ class WebFetchToolInvocation extends BaseToolInvocation<
   constructor(
     private readonly config: Config,
     params: WebFetchToolParams,
+    messageBus?: MessageBus,
   ) {
-    super(params);
+    super(params, messageBus);
   }
 
   private async executeFallback(signal: AbortSignal): Promise<ToolResult> {
-    const urls = extractUrls(this.params.prompt);
+    const { validUrls: urls } = parsePrompt(this.params.prompt);
     // For now, we only support one URL for fallback
     let url = urls[0];
 
@@ -149,16 +183,30 @@ ${textContent}
     return `Processing URLs and instructions from prompt: "${displayPrompt}"`;
   }
 
-  override async shouldConfirmExecute(): Promise<
-    ToolCallConfirmationDetails | false
-  > {
+  override async shouldConfirmExecute(
+    abortSignal: AbortSignal,
+  ): Promise<ToolCallConfirmationDetails | false> {
+    // Try message bus confirmation first if available
+    if (this.messageBus) {
+      const decision = await this.getMessageBusDecision(abortSignal);
+      if (decision === 'ALLOW') {
+        return false; // No confirmation needed
+      }
+      if (decision === 'DENY') {
+        throw new Error('Tool execution denied by policy.');
+      }
+      // if 'ASK_USER', fall through to legacy logic
+    }
+
+    // Legacy confirmation flow (no message bus OR policy decision was ASK_USER)
     if (this.config.getApprovalMode() === ApprovalMode.AUTO_EDIT) {
       return false;
     }
 
     // Perform GitHub URL conversion here to differentiate between user-provided
     // URL and the actual URL to be fetched.
-    const urls = extractUrls(this.params.prompt).map((url) => {
+    const { validUrls } = parsePrompt(this.params.prompt);
+    const urls = validUrls.map((url) => {
       if (url.includes('github.com') && url.includes('/blob/')) {
         return url
           .replace('github.com', 'raw.githubusercontent.com')
@@ -183,7 +231,7 @@ ${textContent}
 
   async execute(signal: AbortSignal): Promise<ToolResult> {
     const userPrompt = this.params.prompt;
-    const urls = extractUrls(userPrompt);
+    const { validUrls: urls } = parsePrompt(userPrompt);
     const url = urls[0];
     const isPrivate = isPrivateIp(url);
 
@@ -312,7 +360,6 @@ ${sourceListFormatted.join('\n')}`;
         0,
         50,
       )}...": ${getErrorMessage(error)}`;
-      console.error(errorMessage, error);
       return {
         llmContent: `Error: ${errorMessage}`,
         returnDisplay: `Error: ${errorMessage}`,
@@ -334,7 +381,10 @@ export class WebFetchTool extends BaseDeclarativeTool<
 > {
   static readonly Name: string = 'web_fetch';
 
-  constructor(private readonly config: Config) {
+  constructor(
+    private readonly config: Config,
+    messageBus?: MessageBus,
+  ) {
     super(
       WebFetchTool.Name,
       'WebFetch',
@@ -351,6 +401,9 @@ export class WebFetchTool extends BaseDeclarativeTool<
         required: ['prompt'],
         type: 'object',
       },
+      true, // isOutputMarkdown
+      false, // canUpdateOutput
+      messageBus,
     );
     const proxy = config.getProxy();
     if (proxy) {
@@ -364,18 +417,24 @@ export class WebFetchTool extends BaseDeclarativeTool<
     if (!params.prompt || params.prompt.trim() === '') {
       return "The 'prompt' parameter cannot be empty and must contain URL(s) and instructions.";
     }
-    if (
-      !params.prompt.includes('http://') &&
-      !params.prompt.includes('https://')
-    ) {
+
+    const { validUrls, errors } = parsePrompt(params.prompt);
+
+    if (errors.length > 0) {
+      return `Error(s) in prompt URLs:\n- ${errors.join('\n- ')}`;
+    }
+
+    if (validUrls.length === 0) {
       return "The 'prompt' must contain at least one valid URL (starting with http:// or https://).";
     }
+
     return null;
   }
 
   protected createInvocation(
     params: WebFetchToolParams,
+    messageBus?: MessageBus,
   ): ToolInvocation<WebFetchToolParams, ToolResult> {
-    return new WebFetchToolInvocation(this.config, params);
+    return new WebFetchToolInvocation(this.config, params, messageBus);
   }
 }

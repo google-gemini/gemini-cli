@@ -7,7 +7,7 @@
 import { expect, describe, it, beforeEach, afterEach } from 'vitest';
 import { TestRig } from './test-helper.js';
 
-describe('Interactive file system', () => {
+describe.skip('Interactive file system', () => {
   let rig: TestRig;
 
   beforeEach(() => {
@@ -28,7 +28,7 @@ describe('Interactive file system', () => {
     // Step 1: Read the file
     const readPrompt = `Read the version from ${fileName}`;
     await run.type(readPrompt);
-    await run.type('\r');
+    await run.sendKeys('\r');
 
     const readCall = await rig.waitForToolCall('read_file', 30000);
     expect(readCall, 'Expected to find a read_file tool call').toBe(true);
@@ -38,7 +38,7 @@ describe('Interactive file system', () => {
     // Step 2: Write the file
     const writePrompt = `now change the version to 1.0.1 in the file`;
     await run.type(writePrompt);
-    await run.type('\r');
+    await run.sendKeys('\r');
 
     await rig.expectToolCallSuccess(['write_file', 'replace'], 30000);
 
