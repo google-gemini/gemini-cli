@@ -246,6 +246,7 @@ export class SubAgentScope {
   private readonly outputConfig?: OutputConfig;
   private readonly onMessage?: (message: string) => void;
   private readonly toolRegistry: ToolRegistry;
+  private isCleanedUp = false;
 
   /**
    * Constructs a new SubAgentScope instance.
@@ -367,6 +368,8 @@ export class SubAgentScope {
   async runNonInteractive(context: ContextState): Promise<void> {
     const startTime = Date.now();
     let turnCounter = 0;
+    let abortController: AbortController | undefined;
+
     try {
       const chat = await this.createChatObject(context);
 
@@ -375,7 +378,7 @@ export class SubAgentScope {
         return;
       }
 
-      const abortController = new AbortController();
+      abortController = new AbortController();
 
       // Prepare the list of tools available to the subagent.
       const toolsList: FunctionDeclaration[] = [];
@@ -517,7 +520,16 @@ export class SubAgentScope {
     } catch (error) {
       console.error('Error during subagent execution:', error);
       this.output.terminate_reason = SubagentTerminateMode.ERROR;
+
+      // Abort any pending operations to prevent resource leaks
+      if (abortController && !abortController.signal.aborted) {
+        abortController.abort();
+      }
+
       throw error;
+    } finally {
+      // Always cleanup resources, regardless of success or failure
+      await this.cleanup();
     }
   }
 
@@ -729,5 +741,27 @@ Important Rules:
  * Once you believe all goals have been met and all required outputs have been emitted, stop calling tools.`;
 
     return finalPrompt;
+  }
+
+  /**
+   * Cleans up resources held by this subagent instance.
+   * This includes stopping MCP clients and clearing tool registry resources.
+   * Should be called when the subagent is no longer needed to prevent memory leaks.
+   */
+  async cleanup(): Promise<void> {
+    if (this.isCleanedUp) {
+      return; // Already cleaned up
+    }
+
+    // Always mark as cleaned up, even if cleanup fails
+    this.isCleanedUp = true;
+
+    try {
+      // Delegate cleanup to the ToolRegistry
+      await this.toolRegistry.cleanup();
+    } catch (error) {
+      console.warn('Error during subagent cleanup:', error);
+      // Don't throw - cleanup should be best effort
+    }
   }
 }
