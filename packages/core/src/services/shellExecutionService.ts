@@ -12,7 +12,6 @@ import { TextDecoder } from 'node:util';
 import os from 'node:os';
 import type { IPty } from '@lydell/node-pty';
 import { getCachedEncodingForBuffer } from '../utils/systemEncoding.js';
-import { getShellConfiguration } from '../utils/shell-utils.js';
 import { isBinary } from '../utils/textUtils.js';
 import pkg from '@xterm/headless';
 import {
@@ -190,14 +189,12 @@ export class ShellExecutionService {
   ): ShellExecutionHandle {
     try {
       const isWindows = os.platform() === 'win32';
-      const { executable, argsPrefix } = getShellConfiguration();
-      const spawnArgs = [...argsPrefix, commandToExecute];
 
-      const child = cpSpawn(executable, spawnArgs, {
+      const child = cpSpawn(commandToExecute, [], {
         cwd,
         stdio: ['ignore', 'pipe', 'pipe'],
-        windowsVerbatimArguments: isWindows ? false : undefined,
-        shell: false,
+        windowsVerbatimArguments: true,
+        shell: isWindows ? true : 'bash',
         detached: !isWindows,
         env: {
           ...process.env,
@@ -403,10 +400,13 @@ export class ShellExecutionService {
     try {
       const cols = shellExecutionConfig.terminalWidth ?? 80;
       const rows = shellExecutionConfig.terminalHeight ?? 30;
-      const { executable, argsPrefix } = getShellConfiguration();
-      const args = [...argsPrefix, commandToExecute];
+      const isWindows = os.platform() === 'win32';
+      const shell = isWindows ? 'cmd.exe' : 'bash';
+      const args = isWindows
+        ? `/c ${commandToExecute}`
+        : ['-c', commandToExecute];
 
-      const ptyProcess = ptyInfo.module.spawn(executable, args, {
+      const ptyProcess = ptyInfo.module.spawn(shell, args, {
         cwd,
         name: 'xterm',
         cols,

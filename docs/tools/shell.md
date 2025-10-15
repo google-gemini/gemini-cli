@@ -10,9 +10,8 @@ command, including interactive commands that require user input (e.g., `vim`,
 `git rebase -i`) if the `tools.shell.enableInteractiveShell` setting is set to
 `true`.
 
-On Windows, commands are executed with `powershell.exe -NoProfile -Command`
-(unless you explicitly point `ComSpec` at another shell). On other platforms,
-they are executed with `bash -c`.
+On Windows, commands are executed with `cmd.exe /c`. On other platforms, they
+are executed with `bash -c`.
 
 ### Arguments
 
