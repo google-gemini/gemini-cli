@@ -382,6 +382,7 @@ export class GeminiChat {
     const streamResponse = await retryWithBackoff(apiCall, {
       onPersistent429: onPersistent429Callback,
       authType: this.config.getContentGeneratorConfig()?.authType,
+      retryFetchErrors: this.config.getRetryFetchErrors(),
     });
 
     return this.processStreamResponse(model, streamResponse);
