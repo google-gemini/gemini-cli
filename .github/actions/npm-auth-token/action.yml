@@ -1,0 +1,45 @@
+name: 'NPM Auth Token'
+description: 'Generates an NPM auth token for publishing a specific package'
+
+inputs:
+  package-name:
+    description: 'The name of the package to publish'
+    required: true
+  github-token:
+    description: 'the github token'
+    required: true
+  wombat-token-core:
+    description: 'The npm token for the cli-core package.'
+    required: true
+  wombat-token-cli:
+    description: 'The npm token for the cli package.'
+    required: true
+  wombat-token-a2a-server:
+    description: 'The npm token for the a2a package.'
+    required: true
+
+outputs:
+  auth-token:
+    description: 'The generated NPM auth token'
+    value: '${{ steps.npm_auth_token.outputs.auth-token }}'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: 'Generate NPM Auth Token'
+      id: 'npm_auth_token'
+      shell: 'bash'
+      run: |
+        AUTH_TOKEN="${{ inputs.github-token }}"
+        PACKAGE_NAME="${{ inputs.package-name }}"
+        PRIVATE_REPO="@google-gemini/"
+        if [[ "$PACKAGE_NAME" == "$PRIVATE_REPO"* ]]; then
+          AUTH_TOKEN="${{ inputs.github-token }}"
+        elif [[ "$PACKAGE_NAME" == "@google/gemini-cli" ]]; then
+          AUTH_TOKEN="${{ inputs.wombat-token-cli }}"
+        elif [[ "$PACKAGE_NAME" == "@google/gemini-cli-core" ]]; then
+          AUTH_TOKEN="${{ inputs.wombat-token-core }}"
+        elif [[ "$PACKAGE_NAME" == "@google/gemini-cli-a2a-server" ]]; then
+          AUTH_TOKEN="${{ inputs.wombat-token-a2a-server }}"
+        fi
+        echo "auth-token=$AUTH_TOKEN" >> $GITHUB_OUTPUT

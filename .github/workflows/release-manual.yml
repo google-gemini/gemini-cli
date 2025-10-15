@@ -11,19 +11,12 @@ on:
         description: 'The branch, tag, or SHA to release from.'
         required: true
         type: 'string'
-      registry:
-        description: 'The registry to publish to.'
-        required: true
-        type: 'choice'
-        options:
-          - 'npm-wombat'
-          - 'github'
-        default: 'npm-wombat'
       npm_channel:
-        description: 'The npm channel to publish to (only used when registry is npm-wombat)'
+        description: 'The npm channel to publish to'
         required: true
         type: 'choice'
         options:
+          - 'dev'
           - 'preview'
           - 'nightly'
           - 'latest'
@@ -39,14 +32,23 @@ on:
         type: 'boolean'
         default: false
       skip_github_release:
-        description: 'Select to skip creating a GitHub release (only used when registry is npm-wombat)'
+        description: 'Select to skip creating a GitHub release (only used when environment is PROD)'
         required: false
         type: 'boolean'
         default: false
+      environment:
+        description: 'Environment'
+        required: false
+        type: 'choice'
+        options:
+          - 'prod'
+          - 'dev'
+        default: 'prod'
 
 jobs:
   release:
-    runs-on: 'ubuntu-latest'
+    runs-on: 'self-hosted'
+    environment: '${{ github.event.inputs.environment }}'
     permissions:
       contents: 'write'
       packages: 'write'
@@ -111,7 +113,12 @@ jobs:
           skip-github-release: '${{ github.event.inputs.skip_github_release }}'
           working-directory: './release'
           gemini_api_key: '${{ secrets.GEMINI_API_KEY }}'
-          registry: '${{ github.event.inputs.registry }}'
+          npm-registry-publish-url: '${{ vars.NPM_REGISTRY_PUBLISH_URL }}'
+          npm-registry-url: '${{ vars.NPM_REGISTRY_URL }}'
+          npm-registry-scope: '${{ vars.NPM_REGISTRY_SCOPE }}'
+          cli-package-name: '${{ vars.CLI_PACKAGE_NAME }}'
+          core-package-name: '${{ vars.CORE_PACKAGE_NAME }}'
+          a2a-package-name: '${{ vars.A2A_PACKAGE_NAME }}'
 
       - name: 'Create Issue on Failure'
         if: '${{ failure() && github.event.inputs.dry_run == false }}'
