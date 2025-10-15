@@ -152,22 +152,6 @@ export class IdeClient {
 
     this.setState(IDEConnectionStatus.Connecting);
 
-    const portFromEnv = this.getPortFromEnv();
-    if (portFromEnv) {
-      const connected = await this.establishHttpConnection(portFromEnv);
-      if (connected) {
-        return;
-      }
-    }
-
-    const stdioConfigFromEnv = this.getStdioConfigFromEnv();
-    if (stdioConfigFromEnv) {
-      const connected = await this.establishStdioConnection(stdioConfigFromEnv);
-      if (connected) {
-        return;
-      }
-    }
-
     this.connectionConfig = await this.getConnectionConfigFromFile();
     if (this.connectionConfig?.authToken) {
       this.authToken = this.connectionConfig.authToken;
@@ -202,6 +186,22 @@ export class IdeClient {
         if (connected) {
           return;
         }
+      }
+    }
+
+    const portFromEnv = this.getPortFromEnv();
+    if (portFromEnv) {
+      const connected = await this.establishHttpConnection(portFromEnv);
+      if (connected) {
+        return;
+      }
+    }
+
+    const stdioConfigFromEnv = this.getStdioConfigFromEnv();
+    if (stdioConfigFromEnv) {
+      const connected = await this.establishStdioConnection(stdioConfigFromEnv);
+      if (connected) {
+        return;
       }
     }
 
