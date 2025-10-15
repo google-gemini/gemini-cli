@@ -126,9 +126,14 @@ export async function fetchReleaseFromGithub(
   if (!allowPreRelease) {
     // Grab the release that is tagged as the "latest", github does not allow
     // this to be a pre-release so we can blindly grab it.
-    return await fetchJson(
-      `https://api.github.com/repos/${owner}/${repo}/releases/latest`,
-    );
+    try {
+      await fetchJson(
+        `https://api.github.com/repos/${owner}/${repo}/releases/latest`,
+      );
+    } catch (_) {
+      // This can fail if there is no release marked latest. In that case
+      // we want to just try the pre-release logic below.
+    }
   }
 
   // If pre-releases are allowed, we just grab the most recent release.
