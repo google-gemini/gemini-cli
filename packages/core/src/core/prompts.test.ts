@@ -51,6 +51,7 @@ describe('Core System Prompt (prompts.ts)', () => {
       storage: {
         getProjectTempDir: vi.fn().mockReturnValue('/tmp/project-temp'),
       },
+      isInteractive: vi.fn().mockReturnValue(true),
     } as unknown as Config;
   });
 
@@ -132,6 +133,14 @@ describe('Core System Prompt (prompts.ts)', () => {
     expect(prompt).toMatchSnapshot();
   });
 
+  it('should return the interactive avoidance prompt when in non-interactive mode', () => {
+    vi.stubEnv('SANDBOX', undefined);
+    mockConfig.isInteractive = vi.fn().mockReturnValue(false);
+    const prompt = getCoreSystemPrompt(mockConfig, '');
+    expect(prompt).toContain('**Interactive Commands:**'); // Check for interactive prompt
+    expect(prompt).toMatchSnapshot(); // Use snapshot for base prompt structure
+  });
+
   describe('with CodebaseInvestigator enabled', () => {
     beforeEach(() => {
       mockConfig = {
@@ -144,6 +153,7 @@ describe('Core System Prompt (prompts.ts)', () => {
         storage: {
           getProjectTempDir: vi.fn().mockReturnValue('/tmp/project-temp'),
         },
+        isInteractive: vi.fn().mockReturnValue(false),
       } as unknown as Config;
     });
 
