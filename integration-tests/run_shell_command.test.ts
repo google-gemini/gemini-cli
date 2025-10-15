@@ -13,15 +13,11 @@ const { shell } = getShellConfiguration();
 function getLineCountCommand(): { command: string; tool: string } {
   switch (shell) {
     case 'powershell':
-      return {
-        command: `(Get-Content test.txt).Length`,
-        tool: 'Get-Content',
-      };
     case 'cmd':
-      return { command: `find /c /v "" test.txt`, tool: 'find' };
+      return { command: `find /c /v`, tool: 'find' };
     case 'bash':
     default:
-      return { command: `wc -l test.txt`, tool: 'wc' };
+      return { command: `wc -l`, tool: 'wc' };
   }
 }
 
@@ -91,8 +87,8 @@ describe('run_shell_command', () => {
     await rig.setup('should run allowed sub-command in non-interactive mode');
 
     const testFile = rig.createFile('test.txt', 'Lorem\nIpsum\nDolor\n');
-    const { tool } = getLineCountCommand();
-    const prompt = `use ${tool} to tell me how many lines there are in ${testFile}`;
+    const { tool, command } = getLineCountCommand();
+    const prompt = `use ${command} to tell me how many lines there are in ${testFile}`;
 
     // Provide the prompt via stdin to simulate non-interactive mode
     const result = await rig.run(
@@ -129,8 +125,8 @@ describe('run_shell_command', () => {
     await rig.setup('should succeed with no parens in non-interactive mode');
 
     const testFile = rig.createFile('test.txt', 'Lorem\nIpsum\nDolor\n');
-    const { tool } = getLineCountCommand();
-    const prompt = `use ${tool} to tell me how many lines there are in ${testFile}`;
+    const { command } = getLineCountCommand();
+    const prompt = `use ${command} to tell me how many lines there are in ${testFile}`;
 
     const result = await rig.run(
       {
@@ -166,8 +162,8 @@ describe('run_shell_command', () => {
     await rig.setup('should succeed with --yolo mode');
 
     const testFile = rig.createFile('test.txt', 'Lorem\nIpsum\nDolor\n');
-    const { tool } = getLineCountCommand();
-    const prompt = `use ${tool} to tell me how many lines there are in ${testFile}`;
+    const { command } = getLineCountCommand();
+    const prompt = `use ${command} to tell me how many lines there are in ${testFile}`;
 
     const result = await rig.run({
       prompt: prompt,
@@ -200,8 +196,8 @@ describe('run_shell_command', () => {
     await rig.setup('should work with ShellTool alias');
 
     const testFile = rig.createFile('test.txt', 'Lorem\nIpsum\nDolor\n');
-    const { tool } = getLineCountCommand();
-    const prompt = `use ${tool} to tell me how many lines there are in ${testFile}`;
+    const { tool, command } = getLineCountCommand();
+    const prompt = `use ${command} to tell me how many lines there are in ${testFile}`;
 
     const result = await rig.run(
       {
@@ -238,9 +234,9 @@ describe('run_shell_command', () => {
     const rig = new TestRig();
     await rig.setup('should combine multiple --allowed-tools flags');
 
-    const { tool } = getLineCountCommand();
+    const { tool, command } = getLineCountCommand();
     const prompt =
-      `use both ${tool} and ls to count the number of lines in files in this ` +
+      `use both ${command} and ls to count the number of lines in files in this ` +
       `directory. Do not pipe these commands into each other, run them separately.`;
 
     const result = await rig.run(
