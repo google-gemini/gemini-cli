@@ -27,15 +27,13 @@ describe.skip('Interactive Mode', () => {
     const longPrompt =
       'Dont do anything except returning a 1000 token long paragraph with the <name of the scientist who discovered theory of relativity> at the end to indicate end of response. This is a moderately long sentence.';
 
-    await run.type(longPrompt);
-    await run.type('\r');
+    await run.sendKeys(longPrompt);
+    await run.sendKeys('\r');
 
     await run.expectText('einstein', 25000);
 
     await run.type('/compress');
-    // A small delay to allow React to re-render the command list.
-    await new Promise((resolve) => setTimeout(resolve, 100));
-    await run.type('\r');
+    await run.sendKeys('\r');
 
     const foundEvent = await rig.waitForTelemetryEvent(
       'chat_compression',
@@ -53,9 +51,7 @@ describe.skip('Interactive Mode', () => {
     const run = await rig.runInteractive();
 
     await run.type('/compress');
-    // A small delay to allow React to re-render the command list.
-    await new Promise((resolve) => setTimeout(resolve, 100));
-    await run.type('\r');
+    await run.sendKeys('\r');
     await run.expectText('compression was not beneficial', 25000);
   });
 });

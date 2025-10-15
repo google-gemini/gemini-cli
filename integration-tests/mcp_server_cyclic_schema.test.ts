@@ -23,7 +23,7 @@
 
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { beforeAll, describe, expect, it } from 'vitest';
+import { beforeAll, describe, it } from 'vitest';
 import { TestRig } from './test-helper.js';
 
 // Create a minimal MCP server that doesn't require external dependencies
@@ -192,15 +192,12 @@ describe('mcp server with cyclic tool schema is detected', () => {
     }
   });
 
-  //TODO - https://github.com/google-gemini/gemini-cli/issues/10735
-  it.skip('mcp tool list should include tool with cyclic tool schema', async () => {
-    const tool_list_output = await rig.run('/mcp list');
-    expect(tool_list_output).toContain('tool_with_cyclic_schema');
-  });
+  it('mcp tool list should include tool with cyclic tool schema', async () => {
+    const run = await rig.runInteractive();
 
-  it('gemini api call should be successful with cyclic mcp tool schema', async () => {
-    // Run any command and verify that we get a non-error response from
-    // the Gemini API.
-    await rig.run('hello');
+    await run.type('/mcp list');
+    await run.sendKeys('\r');
+
+    await run.expectText('tool_with_cyclic_schema');
   });
 });
