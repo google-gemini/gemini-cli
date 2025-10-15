@@ -44,7 +44,7 @@ generate_markdown_tree() {
         local basename_item=$(basename "$item")
 
         # Skip certain files/directories
-        if [[ "$basename_item" == "__pycache__" ]] || [[ "$basename_item" == "*.pyc" ]] || [[ "$basename_item" == "dist" ]] || [[ "$basename_item" == "node_modules" ]] || [[ "$basename_item" == *.test.ts ]]; then
+        if [[ "$basename_item" == "__pycache__" ]] || [[ "$basename_item" == "*.pyc" ]] || [[ "$basename_item" == "dist" ]] || [[ "$basename_item" == "node_modules" ]] || [[ "$basename_item" == *.test.ts ]] || [[ "$basename_item" == "cov" ]] || [[ "$basename_item" == "coverage" ]] || [[ "$basename_item" == "lcov-report" ]] || [[ "$basename_item" == "__snapshots__" ]]; then
             continue
         fi
 
