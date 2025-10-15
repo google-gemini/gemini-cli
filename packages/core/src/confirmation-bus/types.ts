@@ -24,6 +24,11 @@ export interface ToolConfirmationResponse {
   type: MessageBusType.TOOL_CONFIRMATION_RESPONSE;
   correlationId: string;
   confirmed: boolean;
+  /**
+   * When true, indicates that policy decision was ASK_USER and the tool should
+   * show its legacy confirmation UI instead of auto-proceeding.
+   */
+  requiresUserConfirmation?: boolean;
 }
 
 export interface ToolPolicyRejection {

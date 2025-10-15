@@ -50,6 +50,9 @@ export function createMockConfig(
     getEmbeddingModel: vi.fn().mockReturnValue('text-embedding-004'),
     getSessionId: vi.fn().mockReturnValue('test-session-id'),
     getUserTier: vi.fn(),
+    getEnableMessageBusIntegration: vi.fn().mockReturnValue(false),
+    getMessageBus: vi.fn(),
+    getPolicyEngine: vi.fn(),
     ...overrides,
   } as unknown as Config;
 
