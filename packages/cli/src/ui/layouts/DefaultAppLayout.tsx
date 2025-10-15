@@ -12,14 +12,19 @@ import { DialogManager } from '../components/DialogManager.js';
 import { Composer } from '../components/Composer.js';
 import { ExitWarning } from '../components/ExitWarning.js';
 import { useUIState } from '../contexts/UIStateContext.js';
+import { useFlickerDetector } from '../hooks/useFlickerDetector.js';
 
-export const DefaultAppLayout: React.FC<{ width?: string }> = ({
-  width = '90%',
-}) => {
+export const DefaultAppLayout: React.FC = () => {
   const uiState = useUIState();
+  const { rootUiRef, terminalHeight } = uiState;
+  useFlickerDetector(rootUiRef, terminalHeight);
 
   return (
-    <Box flexDirection="column" width={width}>
+    <Box
+      flexDirection="column"
+      width={uiState.mainAreaWidth}
+      ref={uiState.rootUiRef}
+    >
       <MainContent />
 
       <Box flexDirection="column" ref={uiState.mainControlsRef}>
@@ -27,7 +32,7 @@ export const DefaultAppLayout: React.FC<{ width?: string }> = ({
 
         {uiState.dialogsVisible ? (
           <DialogManager
-            terminalWidth={uiState.terminalWidth}
+            terminalWidth={uiState.mainAreaWidth}
             addItem={uiState.historyManager.addItem}
           />
         ) : (

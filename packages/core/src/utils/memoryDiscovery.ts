@@ -331,6 +331,7 @@ function concatenateInstructions(
 export interface LoadServerHierarchicalMemoryResponse {
   memoryContent: string;
   fileCount: number;
+  filePaths: string[];
 }
 
 /**
@@ -370,7 +371,7 @@ export async function loadServerHierarchicalMemory(
   if (filePaths.length === 0) {
     if (debugMode)
       logger.debug('No GEMINI.md files found in hierarchy of the workspace.');
-    return { memoryContent: '', fileCount: 0 };
+    return { memoryContent: '', fileCount: 0, filePaths: [] };
   }
   const contentsWithPaths = await readGeminiMdFiles(
     filePaths,
@@ -393,5 +394,6 @@ export async function loadServerHierarchicalMemory(
   return {
     memoryContent: combinedInstructions,
     fileCount: contentsWithPaths.length,
+    filePaths,
   };
 }

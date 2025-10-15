@@ -33,15 +33,29 @@ defaults:
     shell: 'bash'
 
 jobs:
+  merge_queue_skipper:
+    permissions: 'read-all'
+    name: 'Merge Queue Skipper'
+    runs-on: 'gemini-cli-ubuntu-16-core'
+    outputs:
+      skip: '${{ steps.merge-queue-ci-skipper.outputs.skip-check }}'
+    steps:
+      - id: 'merge-queue-ci-skipper'
+        uses: 'cariad-tech/merge-queue-ci-skipper@1032489e59437862c90a08a2c92809c903883772' # ratchet:cariad-tech/merge-queue-ci-skipper@main
+        with:
+          secret: '${{ secrets.GITHUB_TOKEN }}'
+
   lint:
     name: 'Lint'
     runs-on: 'gemini-cli-ubuntu-16-core'
+    needs: 'merge_queue_skipper'
+    if: "${{needs.merge_queue_skipper.outputs.skip == 'false'}}"
     steps:
       - name: 'Checkout'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
         with:
           ref: '${{ github.event.inputs.branch_ref || github.ref }}'
-          fetch-depth: 1
+          fetch-depth: 0
 
       - name: 'Set up Node.js'
         uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions/setup-node@v4.4.0
@@ -73,11 +87,16 @@ jobs:
       - name: 'Run Prettier'
         run: 'node scripts/lint.js --prettier'
 
+      - name: 'Run sensitive keyword linter'
+        run: 'node scripts/lint.js --sensitive-keywords'
+
   test_linux:
     name: 'Test (Linux)'
     runs-on: 'gemini-cli-ubuntu-16-core'
     needs:
       - 'lint'
+      - 'merge_queue_skipper'
+    if: "${{needs.merge_queue_skipper.outputs.skip == 'false'}}"
     permissions:
       contents: 'read'
       checks: 'write'
@@ -109,6 +128,12 @@ jobs:
           NO_COLOR: true
         run: 'npm run test:ci'
 
+      - name: 'Bundle'
+        run: 'npm run bundle'
+
+      - name: 'Smoke test bundle'
+        run: 'node ./bundle/gemini.js --version'
+
       - name: 'Wait for file system sync'
         run: 'sleep 2'
 
@@ -135,6 +160,8 @@ jobs:
     runs-on: '${{ matrix.os }}'
     needs:
       - 'lint'
+      - 'merge_queue_skipper'
+    if: "${{needs.merge_queue_skipper.outputs.skip == 'false'}}"
     permissions:
       contents: 'read'
       checks: 'write'
@@ -169,6 +196,12 @@ jobs:
           NO_COLOR: true
         run: 'npm run test:ci -- --coverage.enabled=false'
 
+      - name: 'Bundle'
+        run: 'npm run bundle'
+
+      - name: 'Smoke test bundle'
+        run: 'node ./bundle/gemini.js --version'
+
       - name: 'Wait for file system sync'
         run: 'sleep 2'
 
@@ -201,6 +234,8 @@ jobs:
   codeql:
     name: 'CodeQL'
     runs-on: 'gemini-cli-ubuntu-16-core'
+    needs: 'merge_queue_skipper'
+    if: "${{needs.merge_queue_skipper.outputs.skip == 'false'}}"
     permissions:
       actions: 'read'
       contents: 'read'
@@ -222,7 +257,8 @@ jobs:
   # Check for changes in bundle size.
   bundle_size:
     name: 'Check Bundle Size'
-    if: "github.event_name == 'pull_request'"
+    needs: 'merge_queue_skipper'
+    if: "${{github.event_name == 'pull_request' && needs.merge_queue_skipper.outputs.skip == 'false'}}"
     runs-on: 'gemini-cli-ubuntu-16-core'
     permissions:
       contents: 'read' # For checkout
@@ -246,6 +282,8 @@ jobs:
   test_windows:
     name: 'Slow Test - Win'
     runs-on: 'gemini-cli-windows-16-core'
+    needs: 'merge_queue_skipper'
+    if: "${{needs.merge_queue_skipper.outputs.skip == 'false'}}"
     continue-on-error: true
 
     steps:
@@ -298,6 +336,14 @@ jobs:
           UV_THREADPOOL_SIZE: '32'
           NODE_ENV: 'test'
         run: 'npm run test:ci -- --coverage.enabled=false'
+        shell: 'pwsh'
+
+      - name: 'Bundle'
+        run: 'npm run bundle'
+        shell: 'pwsh'
+
+      - name: 'Smoke test bundle'
+        run: 'node ./bundle/gemini.js --version'
         shell: 'pwsh'
 
   ci:

@@ -5,6 +5,7 @@
  */
 
 import type { CommandContext } from '../commands/types.js';
+import type { ExtensionUpdateAction } from '../state/extensions.js';
 
 /**
  * Creates a UI context object with no-op functions.
@@ -20,11 +21,12 @@ export function createNonInteractiveUI(): CommandContext['ui'] {
     pendingItem: null,
     setPendingItem: (_item) => {},
     toggleCorgiMode: () => {},
+    toggleDebugProfiler: () => {},
     toggleVimEnabled: async () => false,
     setGeminiMdFileCount: (_count) => {},
     reloadCommands: () => {},
     extensionsUpdateState: new Map(),
-    setExtensionsUpdateState: (_updateState) => {},
+    dispatchExtensionStateUpdate: (_action: ExtensionUpdateAction) => {},
     addConfirmUpdateExtensionRequest: (_request) => {},
   };
 }

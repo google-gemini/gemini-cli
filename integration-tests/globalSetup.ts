@@ -5,8 +5,8 @@
  */
 
 // Unset NO_COLOR environment variable to ensure consistent theme behavior between local and CI test runs
-if (process.env.NO_COLOR !== undefined) {
-  delete process.env.NO_COLOR;
+if (process.env['NO_COLOR'] !== undefined) {
+  delete process.env['NO_COLOR'];
 }
 
 import {
@@ -19,23 +19,14 @@ import {
 } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import * as os from 'node:os';
-
-import {
-  GEMINI_CONFIG_DIR,
-  DEFAULT_CONTEXT_FILENAME,
-} from '../packages/core/src/tools/memoryTool.js';
+import { getGlobalMemoryFilePath } from '../packages/core/src/tools/memoryTool.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const rootDir = join(__dirname, '..');
 const integrationTestsDir = join(rootDir, '.integration-tests');
 let runDir = ''; // Make runDir accessible in teardown
 
-const memoryFilePath = join(
-  os.homedir(),
-  GEMINI_CONFIG_DIR,
-  DEFAULT_CONTEXT_FILENAME,
-);
+const memoryFilePath = getGlobalMemoryFilePath();
 let originalMemoryContent: string | null = null;
 
 export async function setup() {
@@ -69,21 +60,21 @@ export async function setup() {
     console.error('Error cleaning up old test runs:', e);
   }
 
-  process.env.INTEGRATION_TEST_FILE_DIR = runDir;
-  process.env.GEMINI_CLI_INTEGRATION_TEST = 'true';
-  process.env.TELEMETRY_LOG_FILE = join(runDir, 'telemetry.log');
+  process.env['INTEGRATION_TEST_FILE_DIR'] = runDir;
+  process.env['GEMINI_CLI_INTEGRATION_TEST'] = 'true';
+  process.env['TELEMETRY_LOG_FILE'] = join(runDir, 'telemetry.log');
 
-  if (process.env.KEEP_OUTPUT) {
+  if (process.env['KEEP_OUTPUT']) {
     console.log(`Keeping output for test run in: ${runDir}`);
   }
-  process.env.VERBOSE = process.env.VERBOSE ?? 'false';
+  process.env['VERBOSE'] = process.env['VERBOSE'] ?? 'false';
 
   console.log(`\nIntegration test output directory: ${runDir}`);
 }
 
 export async function teardown() {
   // Cleanup the test run directory unless KEEP_OUTPUT is set
-  if (process.env.KEEP_OUTPUT !== 'true' && runDir) {
+  if (process.env['KEEP_OUTPUT'] !== 'true' && runDir) {
     await rm(runDir, { recursive: true, force: true });
   }
 

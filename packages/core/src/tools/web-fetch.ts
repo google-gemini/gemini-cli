@@ -23,14 +23,50 @@ import { getResponseText } from '../utils/partUtils.js';
 import { fetchWithTimeout, isPrivateIp } from '../utils/fetch.js';
 import { convert } from 'html-to-text';
 import { ProxyAgent, setGlobalDispatcher } from 'undici';
+import {
+  logWebFetchFallbackAttempt,
+  WebFetchFallbackAttemptEvent,
+} from '../telemetry/index.js';
 
 const URL_FETCH_TIMEOUT_MS = 10000;
 const MAX_CONTENT_LENGTH = 100000;
 
-// Helper function to extract URLs from a string
-function extractUrls(text: string): string[] {
-  const urlRegex = /(https?:\/\/[^\s]+)/g;
-  return text.match(urlRegex) || [];
+/**
+ * Parses a prompt to extract valid URLs and identify malformed ones.
+ */
+export function parsePrompt(text: string): {
+  validUrls: string[];
+  errors: string[];
+} {
+  const tokens = text.split(/\s+/);
+  const validUrls: string[] = [];
+  const errors: string[] = [];
+
+  for (const token of tokens) {
+    if (!token) continue;
+
+    // Heuristic to check if the url appears to contain URL-like chars.
+    if (token.includes('://')) {
+      try {
+        // Validate with new URL()
+        const url = new URL(token);
+
+        // Allowlist protocols
+        if (['http:', 'https:'].includes(url.protocol)) {
+          validUrls.push(url.href);
+        } else {
+          errors.push(
+            `Unsupported protocol in URL: "${token}". Only http and https are supported.`,
+          );
+        }
+      } catch (_) {
+        // new URL() threw, so it's malformed according to WHATWG standard
+        errors.push(`Malformed URL detected: "${token}".`);
+      }
+    }
+  }
+
+  return { validUrls, errors };
 }
 
 // Interfaces for grounding metadata (similar to web-search.ts)
@@ -76,7 +112,7 @@ class WebFetchToolInvocation extends BaseToolInvocation<
   }
 
   private async executeFallback(signal: AbortSignal): Promise<ToolResult> {
-    const urls = extractUrls(this.params.prompt);
+    const { validUrls: urls } = parsePrompt(this.params.prompt);
     // For now, we only support one URL for fallback
     let url = urls[0];
 
@@ -154,7 +190,8 @@ ${textContent}
 
     // Perform GitHub URL conversion here to differentiate between user-provided
     // URL and the actual URL to be fetched.
-    const urls = extractUrls(this.params.prompt).map((url) => {
+    const { validUrls } = parsePrompt(this.params.prompt);
+    const urls = validUrls.map((url) => {
       if (url.includes('github.com') && url.includes('/blob/')) {
         return url
           .replace('github.com', 'raw.githubusercontent.com')
@@ -179,11 +216,15 @@ ${textContent}
 
   async execute(signal: AbortSignal): Promise<ToolResult> {
     const userPrompt = this.params.prompt;
-    const urls = extractUrls(userPrompt);
+    const { validUrls: urls } = parsePrompt(userPrompt);
     const url = urls[0];
     const isPrivate = isPrivateIp(url);
 
     if (isPrivate) {
+      logWebFetchFallbackAttempt(
+        this.config,
+        new WebFetchFallbackAttemptEvent('private_ip'),
+      );
       return this.executeFallback(signal);
     }
 
@@ -243,6 +284,10 @@ ${textContent}
       }
 
       if (processingError) {
+        logWebFetchFallbackAttempt(
+          this.config,
+          new WebFetchFallbackAttemptEvent('primary_failed'),
+        );
         return this.executeFallback(signal);
       }
 
@@ -300,7 +345,6 @@ ${sourceListFormatted.join('\n')}`;
         0,
         50,
       )}...": ${getErrorMessage(error)}`;
-      console.error(errorMessage, error);
       return {
         llmContent: `Error: ${errorMessage}`,
         returnDisplay: `Error: ${errorMessage}`,
@@ -352,12 +396,17 @@ export class WebFetchTool extends BaseDeclarativeTool<
     if (!params.prompt || params.prompt.trim() === '') {
       return "The 'prompt' parameter cannot be empty and must contain URL(s) and instructions.";
     }
-    if (
-      !params.prompt.includes('http://') &&
-      !params.prompt.includes('https://')
-    ) {
+
+    const { validUrls, errors } = parsePrompt(params.prompt);
+
+    if (errors.length > 0) {
+      return `Error(s) in prompt URLs:\n- ${errors.join('\n- ')}`;
+    }
+
+    if (validUrls.length === 0) {
       return "The 'prompt' must contain at least one valid URL (starting with http:// or https://).";
     }
+
     return null;
   }
 

@@ -10,6 +10,8 @@ import os from 'node:os';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { ExtensionEnablementManager, Override } from './extensionEnablement.js';
 
+import { GEMINI_DIR, type GeminiCLIExtension } from '@google/gemini-cli-core';
+
 // Helper to create a temporary directory for testing
 function createTestDir() {
   const dirPath = fs.mkdtempSync(path.join(os.tmpdir(), 'gemini-test-'));
@@ -26,7 +28,7 @@ let manager: ExtensionEnablementManager;
 describe('ExtensionEnablementManager', () => {
   beforeEach(() => {
     testDir = createTestDir();
-    configDir = path.join(testDir.path, '.gemini');
+    configDir = path.join(testDir.path, GEMINI_DIR);
     manager = new ExtensionEnablementManager(configDir);
   });
 
@@ -224,6 +226,99 @@ describe('ExtensionEnablementManager', () => {
     expect(manager.isEnabled('ext-test', '/Users/chrstn/gemini-cli')).toBe(
       true,
     );
+  });
+
+  describe('extension overrides (-e <name>)', () => {
+    beforeEach(() => {
+      manager = new ExtensionEnablementManager(configDir, ['ext-test']);
+    });
+
+    it('can enable extensions, case-insensitive', () => {
+      manager.disable('ext-test', true, '/');
+      expect(manager.isEnabled('ext-test', '/')).toBe(true);
+      expect(manager.isEnabled('Ext-Test', '/')).toBe(true);
+      // Double check that it would have been disabled otherwise
+      expect(
+        new ExtensionEnablementManager(configDir).isEnabled('ext-test', '/'),
+      ).toBe(false);
+    });
+
+    it('disable all other extensions', () => {
+      manager = new ExtensionEnablementManager(configDir, ['ext-test']);
+      manager.enable('ext-test-2', true, '/');
+      expect(manager.isEnabled('ext-test-2', '/')).toBe(false);
+      // Double check that it would have been enabled otherwise
+      expect(
+        new ExtensionEnablementManager(configDir).isEnabled('ext-test-2', '/'),
+      ).toBe(true);
+    });
+
+    it('none disables all extensions', () => {
+      manager = new ExtensionEnablementManager(configDir, ['none']);
+      manager.enable('ext-test', true, '/');
+      expect(manager.isEnabled('ext-test', '/path/to/dir')).toBe(false);
+      // Double check that it would have been enabled otherwise
+      expect(
+        new ExtensionEnablementManager(configDir).isEnabled('ext-test', '/'),
+      ).toBe(true);
+    });
+  });
+
+  describe('validateExtensionOverrides', () => {
+    let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
+
+    beforeEach(() => {
+      consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    });
+
+    afterEach(() => {
+      consoleErrorSpy.mockRestore();
+    });
+
+    it('should not log an error if enabledExtensionNamesOverride is empty', () => {
+      const manager = new ExtensionEnablementManager(configDir, []);
+      manager.validateExtensionOverrides([]);
+      expect(consoleErrorSpy).not.toHaveBeenCalled();
+    });
+
+    it('should not log an error if all enabledExtensionNamesOverride are valid', () => {
+      const manager = new ExtensionEnablementManager(configDir, [
+        'ext-one',
+        'ext-two',
+      ]);
+      const extensions = [
+        { name: 'ext-one' },
+        { name: 'ext-two' },
+      ] as GeminiCLIExtension[];
+      manager.validateExtensionOverrides(extensions);
+      expect(consoleErrorSpy).not.toHaveBeenCalled();
+    });
+
+    it('should log an error for each invalid extension name in enabledExtensionNamesOverride', () => {
+      const manager = new ExtensionEnablementManager(configDir, [
+        'ext-one',
+        'ext-invalid',
+        'ext-another-invalid',
+      ]);
+      const extensions = [
+        { name: 'ext-one' },
+        { name: 'ext-two' },
+      ] as GeminiCLIExtension[];
+      manager.validateExtensionOverrides(extensions);
+      expect(consoleErrorSpy).toHaveBeenCalledTimes(2);
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        'Extension not found: ext-invalid',
+      );
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        'Extension not found: ext-another-invalid',
+      );
+    });
+
+    it('should not log an error if "none" is in enabledExtensionNamesOverride', () => {
+      const manager = new ExtensionEnablementManager(configDir, ['none']);
+      manager.validateExtensionOverrides([]);
+      expect(consoleErrorSpy).not.toHaveBeenCalled();
+    });
   });
 });
 

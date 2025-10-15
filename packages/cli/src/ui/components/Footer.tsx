@@ -14,7 +14,7 @@ import Gradient from 'ink-gradient';
 import { MemoryUsageDisplay } from './MemoryUsageDisplay.js';
 import { ContextUsageDisplay } from './ContextUsageDisplay.js';
 import { DebugProfiler } from './DebugProfiler.js';
-import { useTerminalSize } from '../hooks/useTerminalSize.js';
+import { isDevelopment } from '../../utils/installationInfo.js';
 
 import { useUIState } from '../contexts/UIStateContext.js';
 import { useConfig } from '../contexts/ConfigContext.js';
@@ -39,6 +39,7 @@ export const Footer: React.FC = () => {
     promptTokenCount,
     nightly,
     isTrustedFolder,
+    mainAreaWidth,
   } = {
     model: config.getModel(),
     targetDir: config.getTargetDir(),
@@ -51,6 +52,7 @@ export const Footer: React.FC = () => {
     promptTokenCount: uiState.sessionStats.lastPromptTokenCount,
     nightly: uiState.nightly,
     isTrustedFolder: uiState.isTrustedFolder,
+    mainAreaWidth: uiState.mainAreaWidth,
   };
 
   const showMemoryUsage =
@@ -60,24 +62,25 @@ export const Footer: React.FC = () => {
     settings.merged.ui?.footer?.hideSandboxStatus || false;
   const hideModelInfo = settings.merged.ui?.footer?.hideModelInfo || false;
 
-  const { columns: terminalWidth } = useTerminalSize();
-
-  const pathLength = Math.max(20, Math.floor(terminalWidth * 0.25));
+  const pathLength = Math.max(20, Math.floor(mainAreaWidth * 0.25));
   const displayPath = shortenPath(tildeifyPath(targetDir), pathLength);
 
   const justifyContent = hideCWD && hideModelInfo ? 'center' : 'space-between';
   const displayVimMode = vimEnabled ? vimMode : undefined;
 
+  const showDebugProfiler = debugMode || isDevelopment;
+
   return (
     <Box
       justifyContent={justifyContent}
-      width="100%"
+      width={mainAreaWidth}
       flexDirection="row"
       alignItems="center"
+      paddingX={1}
     >
-      {(debugMode || displayVimMode || !hideCWD) && (
+      {(showDebugProfiler || displayVimMode || !hideCWD) && (
         <Box>
-          {debugMode && <DebugProfiler />}
+          {showDebugProfiler && <DebugProfiler />}
           {displayVimMode && (
             <Text color={theme.text.secondary}>[{displayVimMode}] </Text>
           )}
@@ -130,7 +133,7 @@ export const Footer: React.FC = () => {
           ) : (
             <Text color={theme.status.error}>
               no sandbox
-              {terminalWidth >= 100 && (
+              {mainAreaWidth >= 100 && (
                 <Text color={theme.text.secondary}> (see /docs)</Text>
               )}
             </Text>
@@ -147,24 +150,26 @@ export const Footer: React.FC = () => {
               <ContextUsageDisplay
                 promptTokenCount={promptTokenCount}
                 model={model}
-                terminalWidth={terminalWidth}
+                terminalWidth={mainAreaWidth}
               />
             </Text>
             {showMemoryUsage && <MemoryUsageDisplay />}
           </Box>
-          <Box alignItems="center" paddingLeft={2}>
+          <Box alignItems="center">
             {corgiMode && (
-              <Text>
-                <Text color={theme.ui.symbol}>| </Text>
-                <Text color={theme.status.error}>▼</Text>
-                <Text color={theme.text.primary}>(´</Text>
-                <Text color={theme.status.error}>ᴥ</Text>
-                <Text color={theme.text.primary}>`)</Text>
-                <Text color={theme.status.error}>▼ </Text>
-              </Text>
+              <Box paddingLeft={1} flexDirection="row">
+                <Text>
+                  <Text color={theme.ui.symbol}>| </Text>
+                  <Text color={theme.status.error}>▼</Text>
+                  <Text color={theme.text.primary}>(´</Text>
+                  <Text color={theme.status.error}>ᴥ</Text>
+                  <Text color={theme.text.primary}>`)</Text>
+                  <Text color={theme.status.error}>▼</Text>
+                </Text>
+              </Box>
             )}
             {!showErrorDetails && errorCount > 0 && (
-              <Box>
+              <Box paddingLeft={1} flexDirection="row">
                 <Text color={theme.ui.symbol}>| </Text>
                 <ConsoleSummaryDisplay errorCount={errorCount} />
               </Box>

@@ -26,8 +26,8 @@ import type {
 } from '@google/gemini-cli-core';
 import type { DOMElement } from 'ink';
 import type { SessionStatsState } from '../contexts/SessionContext.js';
-import type { UpdateObject } from '../utils/updateCheck.js';
 import type { ExtensionUpdateState } from '../state/extensions.js';
+import type { UpdateObject } from '../utils/updateCheck.js';
 
 export interface ProQuotaDialogRequest {
   failedModel: string;
@@ -56,7 +56,7 @@ export interface UIState {
   isSettingsDialogOpen: boolean;
   isModelDialogOpen: boolean;
   isPermissionsDialogOpen: boolean;
-  slashCommands: readonly SlashCommand[];
+  slashCommands: readonly SlashCommand[] | undefined;
   pendingSlashCommandHistoryItems: HistoryItemWithoutId[];
   commandContext: CommandContext;
   shellConfirmationRequest: ShellConfirmationRequest | null;
@@ -111,6 +111,8 @@ export interface UIState {
   terminalWidth: number;
   terminalHeight: number;
   mainControlsRef: React.MutableRefObject<DOMElement | null>;
+  // NOTE: This is for performance profiling only.
+  rootUiRef: React.MutableRefObject<DOMElement | null>;
   currentIDE: IdeInfo | null;
   updateInfo: UpdateObject | null;
   showIdeRestartPrompt: boolean;
@@ -119,6 +121,7 @@ export interface UIState {
   extensionsUpdateState: Map<string, ExtensionUpdateState>;
   activePtyId: number | undefined;
   embeddedShellFocused: boolean;
+  showDebugProfiler: boolean;
 }
 
 export const UIStateContext = createContext<UIState | null>(null);
