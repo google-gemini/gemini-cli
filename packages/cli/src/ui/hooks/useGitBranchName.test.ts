@@ -11,7 +11,7 @@
 import type { MockedFunction } from 'vitest';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act } from 'react';
-import { renderHook, waitFor } from '@testing-library/react';
+import { renderHook } from '@testing-library/react';
 import { useGitBranchName } from './useGitBranchName.js';
 import { fs, vol } from 'memfs'; // For mocking fs
 import { spawnAsync as mockSpawnAsync } from '@google/gemini-cli-core';
@@ -130,40 +130,6 @@ describe('useGitBranchName', () => {
       rerender();
     });
     expect(result.current).toBeUndefined();
-  });
-
-  // SKIP REASON: memfs test infrastructure limitation
-  // memfs (used for mocking fs) does not properly support fs.watch() functionality.
-  // The watcher never triggers callbacks for file changes in the test environment.
-  // This is a known limitation of memfs, not a bug in the implementation.
-  // The fs.watch() feature works correctly in production as verified by manual testing.
-  // To test this properly, we would need to use real filesystem operations or a different
-  // mocking library that supports fs.watch() (e.g., mock-fs, but it has other limitations).
-  it.skip('should update branch name when .git/HEAD changes', async () => {
-    (mockSpawnAsync as MockedFunction<typeof mockSpawnAsync>)
-      .mockResolvedValueOnce({ stdout: 'main\n' } as {
-        stdout: string;
-        stderr: string;
-      })
-      .mockResolvedValueOnce({ stdout: 'develop\n' } as {
-        stdout: string;
-        stderr: string;
-      });
-
-    const { result } = renderHook(() => useGitBranchName(CWD));
-
-    await waitFor(() => {
-      expect(result.current).toBe('main');
-    });
-
-    fs.writeFileSync(GIT_LOGS_HEAD_PATH, 'ref: refs/heads/develop');
-
-    await waitFor(
-      () => {
-        expect(result.current).toBe('develop');
-      },
-      { timeout: 1000 },
-    );
   });
 
   it('should handle watcher setup error silently', async () => {

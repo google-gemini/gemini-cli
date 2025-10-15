@@ -181,7 +181,8 @@ describe('useSlashCommandProcessor', () => {
         expect(result.current.slashCommands).toHaveLength(1);
       });
 
-      expect(result.current.slashCommands[0]?.name).toBe('test');
+      expect(result.current.slashCommands).toBeDefined();
+      expect(result.current.slashCommands![0]?.name).toBe('test');
       expect(mockBuiltinLoadCommands).toHaveBeenCalledTimes(1);
       expect(mockFileLoadCommands).toHaveBeenCalledTimes(1);
       expect(mockMcpLoadCommands).toHaveBeenCalledTimes(1);
@@ -972,9 +973,10 @@ describe('useSlashCommandProcessor', () => {
 
     it('should log a simple slash command', async () => {
       const result = setupProcessorHook(loggingTestCommands);
-      await waitFor(() =>
-        expect(result.current.slashCommands.length).toBeGreaterThan(0),
-      );
+      await waitFor(() => {
+        expect(result.current.slashCommands).toBeDefined();
+        return result.current.slashCommands!.length > 0;
+      });
       await act(async () => {
         await result.current.handleSlashCommand('/logtest');
       });
@@ -991,9 +993,10 @@ describe('useSlashCommandProcessor', () => {
 
     it('logs nothing for a bogus command', async () => {
       const result = setupProcessorHook(loggingTestCommands);
-      await waitFor(() =>
-        expect(result.current.slashCommands.length).toBeGreaterThan(0),
-      );
+      await waitFor(() => {
+        expect(result.current.slashCommands).toBeDefined();
+        return result.current.slashCommands!.length > 0;
+      });
       await act(async () => {
         await result.current.handleSlashCommand('/bogusbogusbogus');
       });
@@ -1003,9 +1006,10 @@ describe('useSlashCommandProcessor', () => {
 
     it('logs a failure event for a failed command', async () => {
       const result = setupProcessorHook(loggingTestCommands);
-      await waitFor(() =>
-        expect(result.current.slashCommands.length).toBeGreaterThan(0),
-      );
+      await waitFor(() => {
+        expect(result.current.slashCommands).toBeDefined();
+        return result.current.slashCommands!.length > 0;
+      });
       await act(async () => {
         await result.current.handleSlashCommand('/fail');
       });
@@ -1022,9 +1026,10 @@ describe('useSlashCommandProcessor', () => {
 
     it('should log a slash command with a subcommand', async () => {
       const result = setupProcessorHook(loggingTestCommands);
-      await waitFor(() =>
-        expect(result.current.slashCommands.length).toBeGreaterThan(0),
-      );
+      await waitFor(() => {
+        expect(result.current.slashCommands).toBeDefined();
+        return result.current.slashCommands!.length > 0;
+      });
       await act(async () => {
         await result.current.handleSlashCommand('/logwithsub sub');
       });
@@ -1040,9 +1045,10 @@ describe('useSlashCommandProcessor', () => {
 
     it('should log the command path when an alias is used', async () => {
       const result = setupProcessorHook(loggingTestCommands);
-      await waitFor(() =>
-        expect(result.current.slashCommands.length).toBeGreaterThan(0),
-      );
+      await waitFor(() => {
+        expect(result.current.slashCommands).toBeDefined();
+        return result.current.slashCommands!.length > 0;
+      });
       await act(async () => {
         await result.current.handleSlashCommand('/la');
       });
@@ -1056,9 +1062,10 @@ describe('useSlashCommandProcessor', () => {
 
     it('should not log for unknown commands', async () => {
       const result = setupProcessorHook(loggingTestCommands);
-      await waitFor(() =>
-        expect(result.current.slashCommands.length).toBeGreaterThan(0),
-      );
+      await waitFor(() => {
+        expect(result.current.slashCommands).toBeDefined();
+        return result.current.slashCommands!.length > 0;
+      });
       await act(async () => {
         await result.current.handleSlashCommand('/unknown');
       });

@@ -49,10 +49,7 @@ describe('setupGithubCommand', async () => {
     if (scratchDir) await fs.rm(scratchDir, { recursive: true });
   });
 
-  // TODO: Re-enable when GitHub issue #10740 is resolved
-  // This test is skipped due to known issues with workflow download paths
-  // GitHub Issue: https://github.com/google-gemini/gemini-cli/issues/10740
-  it.skip('returns a tool action to download github workflows and handles paths', async () => {
+  it('returns a tool action to download github workflows and handles paths', async () => {
     const fakeRepoOwner = 'fake';
     const fakeRepoName = 'repo';
     const fakeRepoRoot = scratchDir;
