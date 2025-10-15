@@ -28,13 +28,14 @@ describe('write_file', () => {
     }
 
     const allTools = rig.readToolLogs();
-    expect(foundToolCall, 'Expected to find a write_file tool call').toBeTruthy(
+    expect(
+      foundToolCall,
       createToolCallErrorMessage(
         'write_file',
         allTools.map((t) => t.toolRequest.name),
         result,
       ),
-    );
+    ).toBeTruthy();
 
     // Validate model output - will throw if no output, warn if missing expected content
     validateModelOutput(result, 'dad.txt', 'Write file test');

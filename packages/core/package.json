@@ -1,6 +1,6 @@
 {
   "name": "@google/gemini-cli-core",
-  "version": "0.10.0-nightly.20251007.c195a9aa",
+  "version": "0.11.0-nightly.20251015.203bad7c",
   "description": "Gemini CLI Core",
   "repository": {
     "type": "git",
@@ -20,10 +20,10 @@
     "dist"
   ],
   "dependencies": {
-    "@google-cloud/logging": "^11.2.1",
+    "@google/genai": "1.16.0",
     "@google-cloud/opentelemetry-cloud-monitoring-exporter": "^0.21.0",
     "@google-cloud/opentelemetry-cloud-trace-exporter": "^3.0.0",
-    "@google/genai": "1.16.0",
+    "@google-cloud/logging": "^11.2.1",
     "@joshua.litt/get-ripgrep": "^0.0.2",
     "@modelcontextprotocol/sdk": "^1.11.0",
     "@opentelemetry/api": "^1.9.0",
@@ -61,9 +61,7 @@
     "shell-quote": "^1.8.3",
     "simple-git": "^3.28.0",
     "strip-ansi": "^7.1.0",
-    "tree-sitter-bash": "^0.25.0",
     "undici": "^7.10.0",
-    "web-tree-sitter": "^0.25.10",
     "ws": "^8.18.0"
   },
   "optionalDependencies": {
