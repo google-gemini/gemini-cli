@@ -44,7 +44,7 @@ jobs:
         with:
           npm-package: '${{vars.CLI_PACKAGE_NAME}}@${{github.event.inputs.npm-tag}}'
           expected-version: '${{github.event.inputs.version}}'
-          ref: '${{github.ref}}'
+          working-directory: '.'
           gemini_api_key: '${{ secrets.GEMINI_API_KEY }}'
           npm-registry-url: '${{ vars.NPM_REGISTRY_URL }}'
           github-token: '${{ secrets.GITHUB_TOKEN }}'
