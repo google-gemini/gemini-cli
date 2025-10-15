@@ -571,17 +571,10 @@ export class GeminiChat {
     // This can happen legitimately if the model's output consists solely of thoughts (which are stripped),
     // or if the prompt was a simple command that didn't require a textual response.
     if (!hasToolCall && !hasFinishReason) {
-      if (!hasFinishReason) {
-        throw new InvalidStreamError(
-          'Model stream ended without a finish reason.',
-          'NO_FINISH_REASON',
-        );
-      } else {
-        throw new InvalidStreamError(
-          'Model stream ended with empty response text.',
-          'NO_RESPONSE_TEXT',
-        );
-      }
+      throw new InvalidStreamError(
+        'Model stream ended without a finish reason.',
+        'NO_FINISH_REASON',
+      );
     }
 
     this.history.push({ role: 'model', parts: consolidatedParts });
