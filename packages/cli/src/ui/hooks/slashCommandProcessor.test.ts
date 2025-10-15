@@ -342,6 +342,8 @@ describe('useSlashCommandProcessor', () => {
         setMockIsProcessing,
       );
 
+      await waitFor(() => expect(result.current.slashCommands).toBeDefined());
+
       await act(async () => {
         await result.current.handleSlashCommand('/fail');
       });
