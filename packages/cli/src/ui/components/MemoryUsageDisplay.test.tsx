@@ -6,6 +6,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, cleanup } from 'ink-testing-library';
+import { waitFor } from '@testing-library/react';
 import { MemoryUsageDisplay } from './MemoryUsageDisplay.js';
 import { useUIState } from '../contexts/UIStateContext.js';
 import process from 'node:process';
@@ -25,7 +26,6 @@ describe('MemoryUsageDisplay', () => {
   let memoryUsageSpy: vi.SpyInstance;
 
   beforeEach(() => {
-    vi.useFakeTimers();
     // Spy on process.memoryUsage to track calls
     memoryUsageSpy = vi
       .spyOn(process, 'memoryUsage')
@@ -37,7 +37,6 @@ describe('MemoryUsageDisplay', () => {
 
   afterEach(() => {
     cleanup();
-    vi.useRealTimers();
     vi.restoreAllMocks();
   });
 
@@ -49,15 +48,13 @@ describe('MemoryUsageDisplay', () => {
       history: { length: 0 },
     });
 
-    const { lastFrame, rerender } = render(<MemoryUsageDisplay />);
+    const { lastFrame } = render(<MemoryUsageDisplay />);
 
-    // Since useEffect runs after the render, we need to advance timers
-    // to ensure the state update is processed.
-    await vi.runAllTimersAsync();
-    rerender(<MemoryUsageDisplay />);
-
-    expect(memoryUsageSpy).toHaveBeenCalledTimes(1);
-    expect(lastFrame()).toContain('100MB');
+    // Wait for useEffect to complete and state to update
+    await waitFor(() => {
+      expect(memoryUsageSpy).toHaveBeenCalledTimes(1);
+      expect(lastFrame()).toContain('100MB');
+    });
   });
 
   it('should update memory usage when history length changes', async () => {
@@ -70,11 +67,12 @@ describe('MemoryUsageDisplay', () => {
     mockedUseUIState.mockReturnValue(initialUiState);
 
     const { rerender, lastFrame } = render(<MemoryUsageDisplay />);
-    await vi.runAllTimersAsync();
-    rerender(<MemoryUsageDisplay />);
-    expect(lastFrame()).toContain('100MB');
 
-    // Simulate a change in history
+    await waitFor(() => {
+      expect(lastFrame()).toContain('100MB');
+    });
+
+    // Simulate a change in history - this triggers the useEffect due to dependency change
     const updatedUiState = { ...initialUiState, history: { length: 2 } };
     mockedUseUIState.mockReturnValue(updatedUiState);
     memoryUsageSpy.mockReturnValue({
@@ -82,9 +80,11 @@ describe('MemoryUsageDisplay', () => {
     } as NodeJS.MemoryUsage);
 
     rerender(<MemoryUsageDisplay />);
-    await vi.runAllTimersAsync();
 
-    expect(lastFrame()).toContain('150MB');
+    // Memory updates on history change (event-driven, not timer-based)
+    await waitFor(() => {
+      expect(lastFrame()).toContain('150MB');
+    });
   });
 
   it('should change color when memory usage is high', async () => {
@@ -98,10 +98,11 @@ describe('MemoryUsageDisplay', () => {
       rss: 2.5 * 1024 * 1024 * 1024,
     } as NodeJS.MemoryUsage);
 
-    const { lastFrame, rerender } = render(<MemoryUsageDisplay />);
-    await vi.runAllTimersAsync();
-    rerender(<MemoryUsageDisplay />);
+    const { lastFrame } = render(<MemoryUsageDisplay />);
 
-    expect(lastFrame()).toContain('2560MB');
+    // High memory threshold triggers different color
+    await waitFor(() => {
+      expect(lastFrame()).toContain('2560MB');
+    });
   });
 });
