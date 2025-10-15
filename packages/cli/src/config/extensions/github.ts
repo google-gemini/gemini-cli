@@ -217,7 +217,14 @@ export async function checkForExtensionUpdate(
         console.error(`No "source" provided for extension.`);
         return ExtensionUpdateState.ERROR;
       }
-      const { owner, repo } = parseGitHubRepoForReleases(source)!;
+      const repoInfo = parseGitHubRepoForReleases(source);
+      if (!repoInfo) {
+        console.error(
+          `Source is not a valid GitHub repository for release checks: ${source}`,
+        );
+        return ExtensionUpdateState.ERROR;
+      }
+      const { owner, repo } = repoInfo;
 
       const releaseData = await fetchReleaseFromGithub(
         owner,
