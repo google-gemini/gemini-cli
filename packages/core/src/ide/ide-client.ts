@@ -249,8 +249,8 @@ export class IdeClient {
             params: {
               name: `openDiff`,
               arguments: {
-                file1: filePath,
-                file2: newContent,
+                filePath,
+                newContent,
               },
             },
           },
