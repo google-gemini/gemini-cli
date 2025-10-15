@@ -12,7 +12,7 @@ import { SHELL_TOOL_NAMES } from './shell-utils.js';
  * Checks if a tool invocation matches any of a list of patterns.
  *
  * @param toolOrToolName The tool object or the name of the tool being invoked.
- * @param invocation The invocation object for the tool.
+ * @param invocation The invocation object for the tool or the command invoked.
  * @param patterns A list of patterns to match against.
  *   Patterns can be:
  *   - A tool name (e.g., "ReadFileTool") to match any invocation of that tool.
@@ -22,7 +22,7 @@ import { SHELL_TOOL_NAMES } from './shell-utils.js';
  */
 export function doesToolInvocationMatch(
   toolOrToolName: AnyDeclarativeTool | string,
-  invocation: AnyToolInvocation,
+  invocation: AnyToolInvocation | string,
   patterns: string[],
 ): boolean {
   let toolNames: string[];
@@ -58,14 +58,19 @@ export function doesToolInvocationMatch(
 
     const argPattern = pattern.substring(openParen + 1, pattern.length - 1);
 
-    if (
-      'command' in invocation.params &&
-      toolNames.some((name) => SHELL_TOOL_NAMES.includes(name))
-    ) {
-      const argValue = String(
-        (invocation.params as { command: string }).command,
-      );
-      if (argValue === argPattern || argValue.startsWith(argPattern + ' ')) {
+    let command: string;
+    if (typeof invocation === 'string') {
+      command = invocation;
+    } else {
+      if (!('command' in invocation.params)) {
+        // This invocation has no command - nothing to check.
+        continue;
+      }
+      command = String((invocation.params as { command: string }).command);
+    }
+
+    if (toolNames.some((name) => SHELL_TOOL_NAMES.includes(name))) {
+      if (command === argPattern || command.startsWith(argPattern + ' ')) {
         return true;
       }
     }
