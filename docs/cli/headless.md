@@ -233,12 +233,12 @@ gemini -p "List programming languages" | grep -i "python"
 
 Key command-line options for headless usage:
 
-| Option            | Description                        | Example                                  |
-| ----------------- | ---------------------------------- | ---------------------------------------- |
-| `--prompt`, `-p`  | Run in headless mode               | `gemini -p "query"`                      |
-| `--output-format` | Specify output format (text, json) | `gemini -p "query" --output-format json` |
-| `--model`, `-m`   | Specify the Gemini model           | `gemini -p "query" -m gemini-2.5-flash`  |
-| `--debug`, `-d`   | Enable debug mode                  | `gemini -p "query" --debug`              |
+| Option                  | Description                        | Example                                            |
+| ----------------------- | ---------------------------------- | -------------------------------------------------- |
+| `--prompt`, `-p`        | Run in headless mode               | `gemini -p "query"`                                |
+| `--output-format`       | Specify output format (text, json) | `gemini -p "query" --output-format json`           |
+| `--model`, `-m`         | Specify the Gemini model           | `gemini -p "query" -m gemini-2.5-flash`            |
+| `--debug`, `-d`         | Enable debug mode                  | `gemini -p "query" --debug`                        |
 | `--include-directories` | Include additional directories     | `gemini -p "query" --include-directories src,docs` |
 | `--yolo`, `-y`          | Auto-approve all actions           | `gemini -p "query" --yolo`                         |
 | `--approval-mode`       | Set approval mode                  | `gemini -p "query" --approval-mode auto_edit`      |
