@@ -227,7 +227,7 @@ for Gemini CLI:
     - `file_filtering_respect_git_ignore` (boolean)
     - `debug_mode` (boolean)
     - `mcp_servers` (string)
-    - `output_format` (string: "text" or "json")
+    - `output_format` (string: "text", "json", or "stream-json")
 
 - `gemini_cli.user_prompt`: This event occurs when a user submits a prompt.
   - **Attributes**:
