@@ -469,10 +469,10 @@ export async function installOrUpdateExtension(
         installMetadata.type = result.type;
         installMetadata.releaseTag = result.tagName;
       } else if (
-        // This repo has no github releases, and wasn't previously installed
+        // This repo has no github releases, and wasn't explicitly installed
         // from a github release, unconditionally just clone it.
         (result.failureReason === 'no release data' &&
-          installMetadata.type !== 'github-release') ||
+          installMetadata.type === 'git') ||
         // Otherwise ask the user if they would like to try a git clone.
         (await requestConsent(
           `Error downloading github release for ${installMetadata.source} with the following error: ${result.errorMessage}.\n\nWould you like to attempt to install via "git clone" instead?`,
