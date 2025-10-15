@@ -15,17 +15,24 @@ import {
   Config,
   ExtensionInstallEvent,
   ExtensionUninstallEvent,
+  ExtensionUpdateEvent,
+  ExtensionDisableEvent,
   ExtensionEnableEvent,
   logExtensionEnable,
   logExtensionInstallEvent,
   logExtensionUninstall,
+  logExtensionUpdateEvent,
+  logExtensionDisable,
 } from '@google/gemini-cli-core';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
 import { SettingScope, loadSettings } from '../config/settings.js';
 import { getErrorMessage } from '../utils/errors.js';
-import { recursivelyHydrateStrings } from './extensions/variables.js';
+import {
+  recursivelyHydrateStrings,
+  type JsonObject,
+} from './extensions/variables.js';
 import { isWorkspaceTrusted } from './trustedFolders.js';
 import { resolveEnvVarsInObject } from '../utils/envVarResolver.js';
 import { randomUUID } from 'node:crypto';
@@ -35,20 +42,23 @@ import {
 } from './extensions/github.js';
 import type { LoadExtensionContext } from './extensions/variableSchema.js';
 import { ExtensionEnablementManager } from './extensions/extensionEnablement.js';
+import chalk from 'chalk';
+import type { ConfirmationRequest } from '../ui/types.js';
+import { escapeAnsiCtrlCodes } from '../ui/utils/textUtils.js';
 
 export const EXTENSIONS_DIRECTORY_NAME = path.join(GEMINI_DIR, 'extensions');
 
 export const EXTENSIONS_CONFIG_FILENAME = 'gemini-extension.json';
 export const INSTALL_METADATA_FILENAME = '.gemini-extension-install.json';
 
-export interface Extension {
-  path: string;
-  config: ExtensionConfig;
-  contextFiles: string[];
-  installMetadata?: ExtensionInstallMetadata | undefined;
-}
-
-export interface ExtensionConfig {
+/**
+ * Extension definition as written to disk in gemini-extension.json files.
+ * This should *not* be referenced outside of the logic for reading files.
+ * If information is required for manipulating extensions (load, unload, update)
+ * outside of the loading process that data needs to be stored on the
+ * GeminiCLIExtension class defined in Core.
+ */
+interface ExtensionConfig {
   name: string;
   version: string;
   mcpServers?: Record<string, MCPServerConfig>;
@@ -92,7 +102,9 @@ export class ExtensionStorage {
   }
 }
 
-export function getWorkspaceExtensions(workspaceDir: string): Extension[] {
+export function getWorkspaceExtensions(
+  workspaceDir: string,
+): GeminiCLIExtension[] {
   // If the workspace dir is the user extensions dir, there are no workspace extensions.
   if (path.resolve(workspaceDir) === path.resolve(os.homedir())) {
     return [];
@@ -108,7 +120,8 @@ export async function copyExtension(
 }
 
 export async function performWorkspaceExtensionMigration(
-  extensions: Extension[],
+  extensions: GeminiCLIExtension[],
+  requestConsent: (consent: string) => Promise<boolean>,
 ): Promise<string[]> {
   const failedInstallNames: string[] = [];
 
@@ -118,9 +131,9 @@ export async function performWorkspaceExtensionMigration(
         source: extension.path,
         type: 'local',
       };
-      await installExtension(installMetadata);
+      await installOrUpdateExtension(installMetadata, requestConsent);
     } catch (_) {
-      failedInstallNames.push(extension.config.name);
+      failedInstallNames.push(extension.name);
     }
   }
   return failedInstallNames;
@@ -141,57 +154,55 @@ function getTelemetryConfig(cwd: string) {
 }
 
 export function loadExtensions(
+  extensionEnablementManager: ExtensionEnablementManager,
   workspaceDir: string = process.cwd(),
-): Extension[] {
+): GeminiCLIExtension[] {
   const settings = loadSettings(workspaceDir).merged;
   const allExtensions = [...loadUserExtensions()];
 
   if (
-    (isWorkspaceTrusted(settings) ?? true) &&
+    isWorkspaceTrusted(settings).isTrusted &&
     // Default management setting to true
     !(settings.experimental?.extensionManagement ?? true)
   ) {
     allExtensions.push(...getWorkspaceExtensions(workspaceDir));
   }
 
-  const uniqueExtensions = new Map<string, Extension>();
-  const manager = new ExtensionEnablementManager(
-    ExtensionStorage.getUserExtensionsDir(),
-  );
+  const uniqueExtensions = new Map<string, GeminiCLIExtension>();
 
   for (const extension of allExtensions) {
     if (
-      !uniqueExtensions.has(extension.config.name) &&
-      manager.isEnabled(extension.config.name, workspaceDir)
+      !uniqueExtensions.has(extension.name) &&
+      extensionEnablementManager.isEnabled(extension.name, workspaceDir)
     ) {
-      uniqueExtensions.set(extension.config.name, extension);
+      uniqueExtensions.set(extension.name, extension);
     }
   }
 
   return Array.from(uniqueExtensions.values());
 }
 
-export function loadUserExtensions(): Extension[] {
+export function loadUserExtensions(): GeminiCLIExtension[] {
   const userExtensions = loadExtensionsFromDir(os.homedir());
 
-  const uniqueExtensions = new Map<string, Extension>();
+  const uniqueExtensions = new Map<string, GeminiCLIExtension>();
   for (const extension of userExtensions) {
-    if (!uniqueExtensions.has(extension.config.name)) {
-      uniqueExtensions.set(extension.config.name, extension);
+    if (!uniqueExtensions.has(extension.name)) {
+      uniqueExtensions.set(extension.name, extension);
     }
   }
 
   return Array.from(uniqueExtensions.values());
 }
 
-export function loadExtensionsFromDir(dir: string): Extension[] {
+export function loadExtensionsFromDir(dir: string): GeminiCLIExtension[] {
   const storage = new Storage(dir);
   const extensionsDir = storage.getExtensionsDir();
   if (!fs.existsSync(extensionsDir)) {
     return [];
   }
 
-  const extensions: Extension[] = [];
+  const extensions: GeminiCLIExtension[] = [];
   for (const subdir of fs.readdirSync(extensionsDir)) {
     const extensionDir = path.join(extensionsDir, subdir);
 
@@ -203,7 +214,9 @@ export function loadExtensionsFromDir(dir: string): Extension[] {
   return extensions;
 }
 
-export function loadExtension(context: LoadExtensionContext): Extension | null {
+export function loadExtension(
+  context: LoadExtensionContext,
+): GeminiCLIExtension | null {
   const { extensionDir, workspaceDir } = context;
   if (!fs.statSync(extensionDir).isDirectory()) {
     return null;
@@ -240,10 +253,14 @@ export function loadExtension(context: LoadExtensionContext): Extension | null {
       .filter((contextFilePath) => fs.existsSync(contextFilePath));
 
     return {
+      name: config.name,
+      version: config.version,
       path: effectiveExtensionPath,
-      config,
       contextFiles,
       installMetadata,
+      mcpServers: config.mcpServers,
+      excludeTools: config.excludeTools,
+      isActive: true, // Barring any other signals extensions should be considered Active.
     };
   } catch (e) {
     console.error(
@@ -253,6 +270,29 @@ export function loadExtension(context: LoadExtensionContext): Extension | null {
     );
     return null;
   }
+}
+
+export function loadExtensionByName(
+  name: string,
+  workspaceDir: string = process.cwd(),
+): GeminiCLIExtension | null {
+  const userExtensionsDir = ExtensionStorage.getUserExtensionsDir();
+  if (!fs.existsSync(userExtensionsDir)) {
+    return null;
+  }
+
+  for (const subdir of fs.readdirSync(userExtensionsDir)) {
+    const extensionDir = path.join(userExtensionsDir, subdir);
+    if (!fs.statSync(extensionDir).isDirectory()) {
+      continue;
+    }
+    const extension = loadExtension({ extensionDir, workspaceDir });
+    if (extension && extension.name.toLowerCase() === name.toLowerCase()) {
+      return extension;
+    }
+  }
+
+  return null;
 }
 
 function filterMcpConfig(original: MCPServerConfig): MCPServerConfig {
@@ -291,73 +331,66 @@ function getContextFileNames(config: ExtensionConfig): string[] {
  * @param workspaceDir The current workspace directory.
  */
 export function annotateActiveExtensions(
-  extensions: Extension[],
-  enabledExtensionNames: string[],
+  extensions: GeminiCLIExtension[],
   workspaceDir: string,
+  manager: ExtensionEnablementManager,
 ): GeminiCLIExtension[] {
-  const manager = new ExtensionEnablementManager(
-    ExtensionStorage.getUserExtensionsDir(),
-  );
-  const annotatedExtensions: GeminiCLIExtension[] = [];
-  if (enabledExtensionNames.length === 0) {
-    return extensions.map((extension) => ({
-      name: extension.config.name,
-      version: extension.config.version,
-      isActive: manager.isEnabled(extension.config.name, workspaceDir),
-      path: extension.path,
-      installMetadata: extension.installMetadata,
-    }));
-  }
-
-  const lowerCaseEnabledExtensions = new Set(
-    enabledExtensionNames.map((e) => e.trim().toLowerCase()),
-  );
-
-  if (
-    lowerCaseEnabledExtensions.size === 1 &&
-    lowerCaseEnabledExtensions.has('none')
-  ) {
-    return extensions.map((extension) => ({
-      name: extension.config.name,
-      version: extension.config.version,
-      isActive: false,
-      path: extension.path,
-      installMetadata: extension.installMetadata,
-    }));
-  }
-
-  const notFoundNames = new Set(lowerCaseEnabledExtensions);
-
-  for (const extension of extensions) {
-    const lowerCaseName = extension.config.name.toLowerCase();
-    const isActive = lowerCaseEnabledExtensions.has(lowerCaseName);
-
-    if (isActive) {
-      notFoundNames.delete(lowerCaseName);
-    }
-
-    annotatedExtensions.push({
-      name: extension.config.name,
-      version: extension.config.version,
-      isActive,
-      path: extension.path,
-      installMetadata: extension.installMetadata,
-    });
-  }
-
-  for (const requestedName of notFoundNames) {
-    console.error(`Extension not found: ${requestedName}`);
-  }
-
-  return annotatedExtensions;
+  manager.validateExtensionOverrides(extensions);
+  return extensions.map((extension) => ({
+    ...extension,
+    isActive: manager.isEnabled(extension.name, workspaceDir),
+  }));
 }
 
 /**
- * Asks users a prompt and awaits for a y/n response
+ * Requests consent from the user to perform an action, by reading a Y/n
+ * character from stdin.
+ *
+ * This should not be called from interactive mode as it will break the CLI.
+ *
+ * @param consentDescription The description of the thing they will be consenting to.
+ * @returns boolean, whether they consented or not.
+ */
+export async function requestConsentNonInteractive(
+  consentDescription: string,
+): Promise<boolean> {
+  console.info(consentDescription);
+  const result = await promptForConsentNonInteractive(
+    'Do you want to continue? [Y/n]: ',
+  );
+  return result;
+}
+
+/**
+ * Requests consent from the user to perform an action, in interactive mode.
+ *
+ * This should not be called from non-interactive mode as it will not work.
+ *
+ * @param consentDescription The description of the thing they will be consenting to.
+ * @param setExtensionUpdateConfirmationRequest A function to actually add a prompt to the UI.
+ * @returns boolean, whether they consented or not.
+ */
+export async function requestConsentInteractive(
+  consentDescription: string,
+  addExtensionUpdateConfirmationRequest: (value: ConfirmationRequest) => void,
+): Promise<boolean> {
+  return await promptForConsentInteractive(
+    consentDescription + '\n\nDo you want to continue?',
+    addExtensionUpdateConfirmationRequest,
+  );
+}
+
+/**
+ * Asks users a prompt and awaits for a y/n response on stdin.
+ *
+ * This should not be called from interactive mode as it will break the CLI.
+ *
  * @param prompt A yes/no prompt to ask the user
  * @returns Whether or not the user answers 'y' (yes). Defaults to 'yes' on enter.
  */
-async function promptForContinuation(prompt: string): Promise<boolean> {
+async function promptForConsentNonInteractive(
+  prompt: string,
+): Promise<boolean> {
   const readline = await import('node:readline');
   const rl = readline.createInterface({
     input: process.stdin,
@@ -372,18 +405,43 @@ async function promptForContinuation(prompt: string): Promise<boolean> {
   });
 }
 
-export async function installExtension(
+/**
+ * Asks users an interactive yes/no prompt.
+ *
+ * This should not be called from non-interactive mode as it will break the CLI.
+ *
+ * @param prompt A markdown prompt to ask the user
+ * @param setExtensionUpdateConfirmationRequest Function to update the UI state with the confirmation request.
+ * @returns Whether or not the user answers yes.
+ */
+async function promptForConsentInteractive(
+  prompt: string,
+  addExtensionUpdateConfirmationRequest: (value: ConfirmationRequest) => void,
+): Promise<boolean> {
+  return await new Promise<boolean>((resolve) => {
+    addExtensionUpdateConfirmationRequest({
+      prompt,
+      onConfirm: (resolvedConfirmed) => {
+        resolve(resolvedConfirmed);
+      },
+    });
+  });
+}
+
+export async function installOrUpdateExtension(
   installMetadata: ExtensionInstallMetadata,
-  askConsent: boolean = false,
+  requestConsent: (consent: string) => Promise<boolean>,
   cwd: string = process.cwd(),
+  previousExtensionConfig?: ExtensionConfig,
 ): Promise<string> {
+  const isUpdate = !!previousExtensionConfig;
   const telemetryConfig = getTelemetryConfig(cwd);
   let newExtensionConfig: ExtensionConfig | null = null;
   let localSourcePath: string | undefined;
 
   try {
     const settings = loadSettings(cwd).merged;
-    if (!isWorkspaceTrusted(settings)) {
+    if (!isWorkspaceTrusted(settings).isTrusted) {
       throw new Error(
         `Could not install extension from untrusted folder at ${installMetadata.source}`,
       );
@@ -434,22 +492,32 @@ export async function installExtension(
       });
 
       const newExtensionName = newExtensionConfig.name;
+      if (!isUpdate) {
+        const installedExtensions = loadUserExtensions();
+        if (
+          installedExtensions.some(
+            (installed) => installed.name === newExtensionName,
+          )
+        ) {
+          throw new Error(
+            `Extension "${newExtensionName}" is already installed. Please uninstall it first.`,
+          );
+        }
+      }
+
+      await maybeRequestConsentOrFail(
+        newExtensionConfig,
+        requestConsent,
+        previousExtensionConfig,
+      );
+
       const extensionStorage = new ExtensionStorage(newExtensionName);
       const destinationPath = extensionStorage.getExtensionDir();
 
-      const installedExtensions = loadUserExtensions();
-      if (
-        installedExtensions.some(
-          (installed) => installed.config.name === newExtensionName,
-        )
-      ) {
-        throw new Error(
-          `Extension "${newExtensionName}" is already installed. Please uninstall it first.`,
-        );
+      if (isUpdate) {
+        await uninstallExtension(newExtensionName, isUpdate, cwd);
       }
-      if (askConsent) {
-        await requestConsent(newExtensionConfig);
-      }
+
       await fs.promises.mkdir(destinationPath, { recursive: true });
 
       if (
@@ -472,17 +540,30 @@ export async function installExtension(
       }
     }
 
-    logExtensionInstallEvent(
-      telemetryConfig,
-      new ExtensionInstallEvent(
-        newExtensionConfig!.name,
-        newExtensionConfig!.version,
-        installMetadata.source,
-        'success',
-      ),
-    );
+    if (isUpdate) {
+      logExtensionUpdateEvent(
+        telemetryConfig,
+        new ExtensionUpdateEvent(
+          newExtensionConfig.name,
+          newExtensionConfig.version,
+          previousExtensionConfig.version,
+          installMetadata.source,
+          'success',
+        ),
+      );
+    } else {
+      logExtensionInstallEvent(
+        telemetryConfig,
+        new ExtensionInstallEvent(
+          newExtensionConfig.name,
+          newExtensionConfig.version,
+          installMetadata.source,
+          'success',
+        ),
+      );
+      enableExtension(newExtensionConfig.name, SettingScope.User);
+    }
 
-    enableExtension(newExtensionConfig!.name, SettingScope.User);
     return newExtensionConfig!.name;
   } catch (error) {
     // Attempt to load config from the source path even if installation fails
@@ -497,25 +578,43 @@ export async function installExtension(
         // Ignore error, this is just for logging.
       }
     }
-    logExtensionInstallEvent(
-      telemetryConfig,
-      new ExtensionInstallEvent(
-        newExtensionConfig?.name ?? '',
-        newExtensionConfig?.version ?? '',
-        installMetadata.source,
-        'error',
-      ),
-    );
+    if (isUpdate) {
+      logExtensionUpdateEvent(
+        telemetryConfig,
+        new ExtensionUpdateEvent(
+          newExtensionConfig?.name ?? previousExtensionConfig.name,
+          newExtensionConfig?.version ?? '',
+          previousExtensionConfig.version,
+          installMetadata.source,
+          'error',
+        ),
+      );
+    } else {
+      logExtensionInstallEvent(
+        telemetryConfig,
+        new ExtensionInstallEvent(
+          newExtensionConfig?.name ?? '',
+          newExtensionConfig?.version ?? '',
+          installMetadata.source,
+          'error',
+        ),
+      );
+    }
     throw error;
   }
 }
 
-async function requestConsent(extensionConfig: ExtensionConfig) {
+/**
+ * Builds a consent string for installing an extension based on it's
+ * extensionConfig.
+ */
+function extensionConsentString(extensionConfig: ExtensionConfig): string {
+  const sanitizedConfig = escapeAnsiCtrlCodes(extensionConfig);
   const output: string[] = [];
-  const mcpServerEntries = Object.entries(extensionConfig.mcpServers || {});
-  output.push('Extensions may introduce unexpected behavior.');
+  const mcpServerEntries = Object.entries(sanitizedConfig.mcpServers || {});
+  output.push(`Installing extension "${sanitizedConfig.name}".`);
   output.push(
-    'Ensure you have investigated the extension source and trust the author.',
+    '**Extensions may introduce unexpected behavior. Ensure you have investigated the extension source and trust the author.**',
   );
 
   if (mcpServerEntries.length) {
@@ -528,22 +627,52 @@ async function requestConsent(extensionConfig: ExtensionConfig) {
       output.push(`  * ${key} (${isLocal ? 'local' : 'remote'}): ${source}`);
     }
   }
-  if (extensionConfig.contextFileName) {
+  if (sanitizedConfig.contextFileName) {
     output.push(
-      `This extension will append info to your gemini.md context using ${extensionConfig.contextFileName}`,
+      `This extension will append info to your gemini.md context using ${sanitizedConfig.contextFileName}`,
     );
   }
-  if (extensionConfig.excludeTools) {
+  if (sanitizedConfig.excludeTools) {
     output.push(
-      `This extension will exclude the following core tools: ${extensionConfig.excludeTools}`,
+      `This extension will exclude the following core tools: ${sanitizedConfig.excludeTools}`,
     );
   }
-  console.info(output.join('\n'));
-  const shouldContinue = await promptForContinuation(
-    'Do you want to continue? [Y/n]: ',
-  );
-  if (!shouldContinue) {
-    throw new Error('Installation cancelled by user.');
+  return output.join('\n');
+}
+
+/**
+ * Requests consent from the user to install an extension (extensionConfig), if
+ * there is any difference between the consent string for `extensionConfig` and
+ * `previousExtensionConfig`.
+ *
+ * Always requests consent if previousExtensionConfig is null.
+ *
+ * Throws if the user does not consent.
+ */
+async function maybeRequestConsentOrFail(
+  extensionConfig: ExtensionConfig,
+  requestConsent: (consent: string) => Promise<boolean>,
+  previousExtensionConfig?: ExtensionConfig,
+) {
+  const extensionConsent = extensionConsentString(extensionConfig);
+  if (previousExtensionConfig) {
+    const previousExtensionConsent = extensionConsentString(
+      previousExtensionConfig,
+    );
+    if (previousExtensionConsent === extensionConsent) {
+      return;
+    }
+  }
+  if (!(await requestConsent(extensionConsent))) {
+    throw new Error(`Installation cancelled for "${extensionConfig.name}".`);
+  }
+}
+
+export function validateName(name: string) {
+  if (!/^[a-zA-Z0-9-]+$/.test(name)) {
+    throw new Error(
+      `Invalid extension name: "${name}". Only letters (a-z, A-Z), numbers (0-9), and dashes (-) are allowed.`,
+    );
   }
 }
 
@@ -557,17 +686,24 @@ export function loadExtensionConfig(
   }
   try {
     const configContent = fs.readFileSync(configFilePath, 'utf-8');
-    const config = recursivelyHydrateStrings(JSON.parse(configContent), {
-      extensionPath: extensionDir,
-      workspacePath: workspaceDir,
-      '/': path.sep,
-      pathSeparator: path.sep,
-    }) as unknown as ExtensionConfig;
-    if (!config.name || !config.version) {
+    const rawConfig = JSON.parse(configContent) as ExtensionConfig;
+    if (!rawConfig.name || !rawConfig.version) {
       throw new Error(
-        `Invalid configuration in ${configFilePath}: missing ${!config.name ? '"name"' : '"version"'}`,
+        `Invalid configuration in ${configFilePath}: missing ${!rawConfig.name ? '"name"' : '"version"'}`,
       );
     }
+    const installDir = new ExtensionStorage(rawConfig.name).getExtensionDir();
+    const config = recursivelyHydrateStrings(
+      rawConfig as unknown as JsonObject,
+      {
+        extensionPath: installDir,
+        workspacePath: workspaceDir,
+        '/': path.sep,
+        pathSeparator: path.sep,
+      },
+    ) as unknown as ExtensionConfig;
+
+    validateName(config.name);
     return config;
   } catch (e) {
     throw new Error(
@@ -580,38 +716,55 @@ export function loadExtensionConfig(
 
 export async function uninstallExtension(
   extensionIdentifier: string,
+  isUpdate: boolean,
   cwd: string = process.cwd(),
 ): Promise<void> {
-  const telemetryConfig = getTelemetryConfig(cwd);
   const installedExtensions = loadUserExtensions();
   const extensionName = installedExtensions.find(
     (installed) =>
-      installed.config.name.toLowerCase() ===
-        extensionIdentifier.toLowerCase() ||
+      installed.name.toLowerCase() === extensionIdentifier.toLowerCase() ||
       installed.installMetadata?.source.toLowerCase() ===
         extensionIdentifier.toLowerCase(),
-  )?.config.name;
+  )?.name;
   if (!extensionName) {
     throw new Error(`Extension not found.`);
   }
-  const manager = new ExtensionEnablementManager(
-    ExtensionStorage.getUserExtensionsDir(),
-  );
-  manager.remove(extensionName);
   const storage = new ExtensionStorage(extensionName);
 
   await fs.promises.rm(storage.getExtensionDir(), {
     recursive: true,
     force: true,
   });
+
+  // The rest of the cleanup below here is only for true uninstalls, not
+  // uninstalls related to updates.
+  if (isUpdate) return;
+
+  const manager = new ExtensionEnablementManager(
+    ExtensionStorage.getUserExtensionsDir(),
+    [extensionName],
+  );
+  manager.remove(extensionName);
+
+  const telemetryConfig = getTelemetryConfig(cwd);
   logExtensionUninstall(
     telemetryConfig,
     new ExtensionUninstallEvent(extensionName, 'success'),
   );
 }
 
-export function toOutputString(extension: Extension): string {
-  let output = `${extension.config.name} (${extension.config.version})`;
+export function toOutputString(
+  extension: GeminiCLIExtension,
+  workspaceDir: string,
+): string {
+  const manager = new ExtensionEnablementManager(
+    ExtensionStorage.getUserExtensionsDir(),
+  );
+  const userEnabled = manager.isEnabled(extension.name, os.homedir());
+  const workspaceEnabled = manager.isEnabled(extension.name, workspaceDir);
+
+  const status = workspaceEnabled ? chalk.green('✓') : chalk.red('✗');
+  let output = `${status} ${extension.name} (${extension.version})`;
   output += `\n Path: ${extension.path}`;
   if (extension.installMetadata) {
     output += `\n Source: ${extension.installMetadata.source} (Type: ${extension.installMetadata.type})`;
@@ -622,21 +775,23 @@ export function toOutputString(extension: Extension): string {
       output += `\n Release tag: ${extension.installMetadata.releaseTag}`;
     }
   }
+  output += `\n Enabled (User): ${userEnabled}`;
+  output += `\n Enabled (Workspace): ${workspaceEnabled}`;
   if (extension.contextFiles.length > 0) {
     output += `\n Context files:`;
     extension.contextFiles.forEach((contextFile) => {
       output += `\n  ${contextFile}`;
     });
   }
-  if (extension.config.mcpServers) {
+  if (extension.mcpServers) {
     output += `\n MCP servers:`;
-    Object.keys(extension.config.mcpServers).forEach((key) => {
+    Object.keys(extension.mcpServers).forEach((key) => {
       output += `\n  ${key}`;
     });
   }
-  if (extension.config.excludeTools) {
+  if (extension.excludeTools) {
     output += `\n Excluded tools:`;
-    extension.config.excludeTools.forEach((tool) => {
+    extension.excludeTools.forEach((tool) => {
       output += `\n  ${tool}`;
     });
   }
@@ -648,15 +803,22 @@ export function disableExtension(
   scope: SettingScope,
   cwd: string = process.cwd(),
 ) {
+  const config = getTelemetryConfig(cwd);
   if (scope === SettingScope.System || scope === SettingScope.SystemDefaults) {
     throw new Error('System and SystemDefaults scopes are not supported.');
+  }
+  const extension = loadExtensionByName(name, cwd);
+  if (!extension) {
+    throw new Error(`Extension with name ${name} does not exist.`);
   }
 
   const manager = new ExtensionEnablementManager(
     ExtensionStorage.getUserExtensionsDir(),
+    [name],
   );
   const scopePath = scope === SettingScope.Workspace ? cwd : os.homedir();
   manager.disable(name, true, scopePath);
+  logExtensionDisable(config, new ExtensionDisableEvent(name, scope));
 }
 
 export function enableExtension(
@@ -666,6 +828,10 @@ export function enableExtension(
 ) {
   if (scope === SettingScope.System || scope === SettingScope.SystemDefaults) {
     throw new Error('System and SystemDefaults scopes are not supported.');
+  }
+  const extension = loadExtensionByName(name, cwd);
+  if (!extension) {
+    throw new Error(`Extension with name ${name} does not exist.`);
   }
   const manager = new ExtensionEnablementManager(
     ExtensionStorage.getUserExtensionsDir(),

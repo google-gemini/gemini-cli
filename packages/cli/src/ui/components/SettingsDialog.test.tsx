@@ -342,7 +342,7 @@ describe('SettingsDialog', () => {
 
       await wait();
 
-      expect(lastFrame()).toContain('● Folder Trust');
+      expect(lastFrame()).toContain('● Codebase Investigator Max Num Turns');
 
       unmount();
     });

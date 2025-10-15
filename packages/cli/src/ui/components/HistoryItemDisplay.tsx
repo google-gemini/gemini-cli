@@ -5,6 +5,8 @@
  */
 
 import type React from 'react';
+import { useMemo } from 'react';
+import { escapeAnsiCtrlCodes } from '../utils/textUtils.js';
 import type { HistoryItem } from '../types.js';
 import { UserMessage } from './messages/UserMessage.js';
 import { UserShellMessage } from './messages/UserShellMessage.js';
@@ -24,6 +26,10 @@ import { SessionSummaryDisplay } from './SessionSummaryDisplay.js';
 import { Help } from './Help.js';
 import type { SlashCommand } from '../commands/types.js';
 import { ExtensionsList } from './views/ExtensionsList.js';
+import { getMCPServerStatus } from '@google/gemini-cli-core';
+import { ToolsList } from './views/ToolsList.js';
+import { McpStatus } from './views/McpStatus.js';
+import { ChatList } from './views/ChatList.js';
 
 interface HistoryItemDisplayProps {
   item: HistoryItem;
@@ -34,6 +40,7 @@ interface HistoryItemDisplayProps {
   commands?: readonly SlashCommand[];
   activeShellPtyId?: number | null;
   embeddedShellFocused?: boolean;
+  availableTerminalHeightGemini?: number;
 }
 
 export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
@@ -45,60 +52,98 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
   isFocused = true,
   activeShellPtyId,
   embeddedShellFocused,
-}) => (
-  <Box flexDirection="column" key={item.id}>
-    {/* Render standard message types */}
-    {item.type === 'user' && <UserMessage text={item.text} />}
-    {item.type === 'user_shell' && <UserShellMessage text={item.text} />}
-    {item.type === 'gemini' && (
-      <GeminiMessage
-        text={item.text}
-        isPending={isPending}
-        availableTerminalHeight={availableTerminalHeight}
-        terminalWidth={terminalWidth}
-      />
-    )}
-    {item.type === 'gemini_content' && (
-      <GeminiMessageContent
-        text={item.text}
-        isPending={isPending}
-        availableTerminalHeight={availableTerminalHeight}
-        terminalWidth={terminalWidth}
-      />
-    )}
-    {item.type === 'info' && <InfoMessage text={item.text} />}
-    {item.type === 'warning' && <WarningMessage text={item.text} />}
-    {item.type === 'error' && <ErrorMessage text={item.text} />}
-    {item.type === 'about' && (
-      <AboutBox
-        cliVersion={item.cliVersion}
-        osVersion={item.osVersion}
-        sandboxEnv={item.sandboxEnv}
-        modelVersion={item.modelVersion}
-        selectedAuthType={item.selectedAuthType}
-        gcpProject={item.gcpProject}
-        ideClient={item.ideClient}
-      />
-    )}
-    {item.type === 'help' && commands && <Help commands={commands} />}
-    {item.type === 'stats' && <StatsDisplay duration={item.duration} />}
-    {item.type === 'model_stats' && <ModelStatsDisplay />}
-    {item.type === 'tool_stats' && <ToolStatsDisplay />}
-    {item.type === 'quit' && <SessionSummaryDisplay duration={item.duration} />}
-    {item.type === 'tool_group' && (
-      <ToolGroupMessage
-        toolCalls={item.tools}
-        groupId={item.id}
-        availableTerminalHeight={availableTerminalHeight}
-        terminalWidth={terminalWidth}
-        isFocused={isFocused}
-        activeShellPtyId={activeShellPtyId}
-        embeddedShellFocused={embeddedShellFocused}
-      />
-    )}
-    {item.type === 'compression' && (
-      <CompressionMessage compression={item.compression} />
-    )}
-    {item.type === 'extensions_list' && <ExtensionsList />}
-  </Box>
-);
+  availableTerminalHeightGemini,
+}) => {
+  const itemForDisplay = useMemo(() => escapeAnsiCtrlCodes(item), [item]);
+
+  return (
+    <Box flexDirection="column" key={itemForDisplay.id}>
+      {/* Render standard message types */}
+      {itemForDisplay.type === 'user' && (
+        <UserMessage text={itemForDisplay.text} />
+      )}
+      {itemForDisplay.type === 'user_shell' && (
+        <UserShellMessage text={itemForDisplay.text} />
+      )}
+      {itemForDisplay.type === 'gemini' && (
+        <GeminiMessage
+          text={itemForDisplay.text}
+          isPending={isPending}
+          availableTerminalHeight={
+            availableTerminalHeightGemini ?? availableTerminalHeight
+          }
+          terminalWidth={terminalWidth}
+        />
+      )}
+      {itemForDisplay.type === 'gemini_content' && (
+        <GeminiMessageContent
+          text={itemForDisplay.text}
+          isPending={isPending}
+          availableTerminalHeight={
+            availableTerminalHeightGemini ?? availableTerminalHeight
+          }
+          terminalWidth={terminalWidth}
+        />
+      )}
+      {itemForDisplay.type === 'info' && (
+        <InfoMessage text={itemForDisplay.text} />
+      )}
+      {itemForDisplay.type === 'warning' && (
+        <WarningMessage text={itemForDisplay.text} />
+      )}
+      {itemForDisplay.type === 'error' && (
+        <ErrorMessage text={itemForDisplay.text} />
+      )}
+      {itemForDisplay.type === 'about' && (
+        <AboutBox
+          cliVersion={itemForDisplay.cliVersion}
+          osVersion={itemForDisplay.osVersion}
+          sandboxEnv={itemForDisplay.sandboxEnv}
+          modelVersion={itemForDisplay.modelVersion}
+          selectedAuthType={itemForDisplay.selectedAuthType}
+          gcpProject={itemForDisplay.gcpProject}
+          ideClient={itemForDisplay.ideClient}
+        />
+      )}
+      {itemForDisplay.type === 'help' && commands && (
+        <Help commands={commands} />
+      )}
+      {itemForDisplay.type === 'stats' && (
+        <StatsDisplay duration={itemForDisplay.duration} />
+      )}
+      {itemForDisplay.type === 'model_stats' && <ModelStatsDisplay />}
+      {itemForDisplay.type === 'tool_stats' && <ToolStatsDisplay />}
+      {itemForDisplay.type === 'quit' && (
+        <SessionSummaryDisplay duration={itemForDisplay.duration} />
+      )}
+      {itemForDisplay.type === 'tool_group' && (
+        <ToolGroupMessage
+          toolCalls={itemForDisplay.tools}
+          groupId={itemForDisplay.id}
+          availableTerminalHeight={availableTerminalHeight}
+          terminalWidth={terminalWidth}
+          isFocused={isFocused}
+          activeShellPtyId={activeShellPtyId}
+          embeddedShellFocused={embeddedShellFocused}
+        />
+      )}
+      {itemForDisplay.type === 'compression' && (
+        <CompressionMessage compression={itemForDisplay.compression} />
+      )}
+      {itemForDisplay.type === 'extensions_list' && <ExtensionsList />}
+      {itemForDisplay.type === 'tools_list' && (
+        <ToolsList
+          terminalWidth={terminalWidth}
+          tools={itemForDisplay.tools}
+          showDescriptions={itemForDisplay.showDescriptions}
+        />
+      )}
+      {itemForDisplay.type === 'mcp_status' && (
+        <McpStatus {...itemForDisplay} serverStatus={getMCPServerStatus} />
+      )}
+      {itemForDisplay.type === 'chat_list' && (
+        <ChatList chats={itemForDisplay.chats} />
+      )}
+    </Box>
+  );
+};
