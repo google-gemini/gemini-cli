@@ -172,9 +172,9 @@ runs:
       if: "${{ inputs.dry-run != 'true' }}"
       shell: 'bash'
       run: |
-        npm install "@google/gemini-cli-core@${{ inputs.release-version }}" \
-        --workspace="@google/gemini-cli" \
-        --workspace="@google/gemini-cli-a2a-server" \
+        npm install "${{ inputs.core-package-name }}@${{ inputs.release-version }}" \
+        --workspace="${{ inputs.cli-package-name }}" \
+        --workspace="${{ inputs.a2a-package-name }}" \
         --save-exact
 
     - name: 'Get CLI Token'
@@ -218,7 +218,7 @@ runs:
         npm publish \
           --dry-run="${{ inputs.dry-run }}" \
           --workspace="${{ inputs.a2a-package-name }}" \
-          --tag "staging"
+          --no-TARGET_TAG
 
     - name: '🔬 Verify NPM release by version'
       uses: './.github/actions/verify-release'

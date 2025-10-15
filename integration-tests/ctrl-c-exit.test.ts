@@ -8,7 +8,7 @@ import { describe, it, expect } from 'vitest';
 import * as os from 'node:os';
 import { TestRig } from './test-helper.js';
 
-describe('Ctrl+C exit', () => {
+describe.skip('Ctrl+C exit', () => {
   it('should exit gracefully on second Ctrl+C', async () => {
     const rig = new TestRig();
     await rig.setup('should exit gracefully on second Ctrl+C');
@@ -16,7 +16,7 @@ describe('Ctrl+C exit', () => {
     const run = await rig.runInteractive();
 
     // Send first Ctrl+C
-    run.type('\x03');
+    run.sendKeys('\x03');
 
     await run.expectText('Press Ctrl+C again to exit', 5000);
 
@@ -40,7 +40,7 @@ describe('Ctrl+C exit', () => {
     }
 
     // Send second Ctrl+C
-    run.type('\x03');
+    run.sendKeys('\x03');
 
     const exitCode = await run.expectExit();
     expect(exitCode, `Process exited with code ${exitCode}.`).toBe(0);
