@@ -226,7 +226,7 @@ runs:
       with:
         npm-package: '${{ inputs.cli-package-name }}@${{ inputs.release-version }}'
         expected-version: '${{ inputs.release-version }}'
-        ref: '${{ steps.release_branch.outputs.BRANCH_NAME }}'
+        working-directory: '${{ inputs.working-directory }}'
         gemini_api_key: '${{ inputs.gemini_api_key }}'
         github-token: '${{ inputs.github-token }}'
         npm-registry-url: '${{ inputs.npm-registry-url }}'
@@ -246,6 +246,7 @@ runs:
         cli-package-name: '${{ inputs.cli-package-name }}'
         core-package-name: '${{ inputs.core-package-name }}'
         a2a-package-name: '${{ inputs.a2a-package-name }}'
+        working-directory: '${{ inputs.working-directory }}'
 
     - name: '🎉 Create GitHub Release'
       working-directory: '${{ inputs.working-directory }}'

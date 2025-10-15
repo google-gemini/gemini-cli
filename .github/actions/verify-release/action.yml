@@ -21,11 +21,10 @@ inputs:
   github-token:
     description: 'The GitHub token for running integration tests.'
     required: true
-  ref:
-    description: 'The branch, tag, or SHA to release from.'
+  working-directory:
+    description: 'The working directory to run the tests in.'
     required: false
-    type: 'string'
-    default: 'main'
+    default: '.'
 
 runs:
   using: 'composite'
@@ -35,13 +34,6 @@ runs:
       env:
         JSON_INPUTS: '${{ toJSON(inputs) }}'
       run: 'echo "$JSON_INPUTS"'
-
-    - name: 'Checkout'
-      uses: 'actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955' # ratchet:actions/checkout@v4
-      with:
-        path: 'verify'
-        ref: '${{ github.event.inputs.ref }}'
-        fetch-depth: 0
 
     - name: 'setup node'
       uses: 'actions/setup-node@v4'
@@ -64,12 +56,12 @@ runs:
         retry_wait_seconds: 30
         max_attempts: 10
         command: |-
-          cd ./verify
+          cd ${{ inputs.working-directory }}
           npm install --prefer-online --no-cache -g "${{ inputs.npm-package }}"
 
     - name: 'Smoke test - NPM Install'
       shell: 'bash'
-      working-directory: './verify'
+      working-directory: '${{ inputs.working-directory }}'
       run: |-
         gemini_version=$(gemini --version)
         if [ "$gemini_version" != "${{ inputs.expected-version }}" ]; then
@@ -83,7 +75,7 @@ runs:
 
     - name: 'Smoke test - NPX Run'
       shell: 'bash'
-      working-directory: './verify'
+      working-directory: '${{ inputs.working-directory }}'
       run: |-
         gemini_version=$(npx --prefer-online "${{ inputs.npm-package}}" --version)
         if [ "$gemini_version" != "${{ inputs.expected-version }}" ]; then
@@ -93,11 +85,11 @@ runs:
 
     - name: 'Install dependencies for integration tests'
       shell: 'bash'
-      working-directory: './verify'
+      working-directory: '${{ inputs.working-directory }}'
       run: 'npm ci'
 
     - name: '🔬 Run integration tests against NPM release'
-      working-directory: './verify'
+      working-directory: '${{ inputs.working-directory }}'
       env:
         GEMINI_API_KEY: '${{ inputs.gemini_api_key }}'
         INTEGRATION_TEST_USE_INSTALLED_GEMINI: 'true'
