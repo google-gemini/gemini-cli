@@ -7,6 +7,23 @@
 import type { Mocked } from 'vitest';
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 
+vi.mock('fs/promises', () => {
+  const mockReaddir = vi.fn();
+  const mockStat = vi.fn();
+  const mockWriteFile = vi.fn();
+
+  return {
+    default: {
+      readdir: mockReaddir,
+      stat: mockStat,
+      writeFile: mockWriteFile,
+    },
+    readdir: mockReaddir,
+    stat: mockStat,
+    writeFile: mockWriteFile,
+  };
+});
+
 import type { SlashCommand, CommandContext } from './types.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
 import type { Content } from '@google/genai';
@@ -17,12 +34,6 @@ import { chatCommand, serializeHistoryToMarkdown } from './chatCommand.js';
 import type { Stats } from 'node:fs';
 import type { HistoryItemWithoutId } from '../types.js';
 import path from 'node:path';
-
-vi.mock('fs/promises', () => ({
-  stat: vi.fn(),
-  readdir: vi.fn().mockResolvedValue(['file1.txt', 'file2.txt'] as string[]),
-  writeFile: vi.fn(),
-}));
 
 describe('chatCommand', () => {
   const mockFs = fsPromises as Mocked<typeof fsPromises>;
@@ -99,9 +110,11 @@ describe('chatCommand', () => {
       const date1 = new Date();
       const date2 = new Date(date1.getTime() + 1000);
 
-      mockFs.readdir.mockResolvedValue(fakeFiles);
-      mockFs.stat.mockImplementation(async (path: string): Promise<Stats> => {
-        if (path.endsWith('test1.json')) {
+      mockFs.readdir.mockResolvedValue(
+        fakeFiles as unknown as Awaited<ReturnType<typeof fsPromises.readdir>>,
+      );
+      mockFs.stat.mockImplementation(async (path): Promise<Stats> => {
+        if (path.toString().endsWith('test1.json')) {
           return { mtime: date1 } as Stats;
         }
         return { mtime: date2 } as Stats;
@@ -500,7 +513,11 @@ Hi there!`;
       const expectedPath = path.join(process.cwd(), 'my-chat.json');
       const [actualPath, actualContent] = mockFs.writeFile.mock.calls[0];
       expect(actualPath).toEqual(expectedPath);
-      const parsedContent = JSON.parse(actualContent);
+      const contentStr =
+        typeof actualContent === 'string'
+          ? actualContent
+          : actualContent.toString();
+      const parsedContent = JSON.parse(contentStr);
       expect(Array.isArray(parsedContent)).toBe(true);
       parsedContent.forEach((item: Content) => {
         expect(item).toHaveProperty('role');
@@ -515,9 +532,13 @@ Hi there!`;
       const expectedPath = path.join(process.cwd(), 'my-chat.md');
       const [actualPath, actualContent] = mockFs.writeFile.mock.calls[0];
       expect(actualPath).toEqual(expectedPath);
-      const entries = actualContent.split('\n\n---\n\n');
+      const contentStr =
+        typeof actualContent === 'string'
+          ? actualContent
+          : actualContent.toString();
+      const entries = contentStr.split('\n\n---\n\n');
       expect(entries.length).toBe(mockHistory.length);
-      entries.forEach((entry, index) => {
+      entries.forEach((entry: string, index: number) => {
         const { role, parts } = mockHistory[index];
         const text = parts.map((p) => p.text).join('');
         const roleIcon = role === 'user' ? '🧑‍💻' : '✨';

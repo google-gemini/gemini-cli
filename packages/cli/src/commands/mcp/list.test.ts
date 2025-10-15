@@ -4,7 +4,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
+import {
+  vi,
+  describe,
+  it,
+  expect,
+  beforeEach,
+  afterEach,
+  type Mock,
+} from 'vitest';
 import { listMcpServers } from './list.js';
 import { loadSettings } from '../../config/settings.js';
 import { ExtensionStorage, loadExtensions } from '../../config/extension.js';
@@ -37,24 +45,26 @@ vi.mock('@google/gemini-cli-core', () => ({
 }));
 vi.mock('@modelcontextprotocol/sdk/client/index.js');
 
-const mockedExtensionStorage = ExtensionStorage as vi.Mock;
-const mockedLoadSettings = loadSettings as vi.Mock;
-const mockedLoadExtensions = loadExtensions as vi.Mock;
-const mockedCreateTransport = createTransport as vi.Mock;
-const MockedClient = Client as vi.Mock;
+const mockedExtensionStorage = ExtensionStorage as unknown as {
+  getUserExtensionsDir: Mock;
+};
+const mockedLoadSettings = loadSettings as Mock;
+const mockedLoadExtensions = loadExtensions as Mock;
+const mockedCreateTransport = createTransport as Mock;
+const MockedClient = Client as Mock;
 
 interface MockClient {
-  connect: vi.Mock;
-  ping: vi.Mock;
-  close: vi.Mock;
+  connect: Mock;
+  ping: Mock;
+  close: Mock;
 }
 
 interface MockTransport {
-  close: vi.Mock;
+  close: Mock;
 }
 
 describe('mcp list command', () => {
-  let consoleSpy: vi.SpyInstance;
+  let consoleSpy: ReturnType<typeof vi.spyOn>;
   let mockClient: MockClient;
   let mockTransport: MockTransport;
 

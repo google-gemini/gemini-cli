@@ -232,16 +232,18 @@ describe('run_shell_command', () => {
     expect(toolCall.toolRequest.success).toBe(true);
   });
 
-  // TODO(#11062): Un-skip this once we can make it reliable by using hard coded
-  // model responses.
-  it.skip('should combine multiple --allowed-tools flags', async () => {
+  it('should combine multiple --allowed-tools flags', async () => {
     const rig = new TestRig();
     await rig.setup('should combine multiple --allowed-tools flags');
 
+    // Create test file to make requirements clearer
+    rig.createFile('test1.txt', 'line1\nline2\n');
+    rig.createFile('test2.txt', 'line1\nline2\nline3\n');
+
     const { tool } = getLineCountCommand();
     const prompt =
-      `use both ${tool} and ls to count the number of lines in files in this ` +
-      `directory. Do not pipe these commands into each other, run them separately.`;
+      `First use ls to list files, then use ${tool} to count lines in test1.txt. ` +
+      `Run these as separate commands, not piped together.`;
 
     const result = await rig.run(
       {

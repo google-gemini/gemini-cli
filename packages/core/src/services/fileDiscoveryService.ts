@@ -10,6 +10,7 @@ import { GitIgnoreParser } from '../utils/gitIgnoreParser.js';
 import { GeminiIgnoreParser } from '../utils/geminiIgnoreParser.js';
 import { isGitRepository } from '../utils/gitUtils.js';
 import * as path from 'node:path';
+import { readFile } from 'node:fs/promises';
 
 export interface FilterFilesOptions {
   respectGitIgnore?: boolean;
@@ -138,5 +139,36 @@ export class FileDiscoveryService {
    */
   getGeminiIgnorePatterns(): string[] {
     return this.geminiIgnoreFilter?.getPatterns() ?? [];
+  }
+
+  /**
+   * Reads the content of a single file directly from the workspace,
+   * bypassing any and all ignore logic (.gitignore, .geminiignore).
+   * This method is intended for explicit file references where the user
+   * has specifically requested access to a file path.
+   *
+   * @param filePath The absolute or project-relative path to the file.
+   * @returns A promise that resolves to the file content as a string.
+   * @throws An error if the file does not exist, is not readable, or is outside the project root.
+   */
+  async readDirectFileContent(filePath: string): Promise<string> {
+    // Resolve to absolute path
+    let absolutePath: string;
+    if (path.isAbsolute(filePath)) {
+      absolutePath = path.resolve(filePath);
+    } else {
+      absolutePath = path.resolve(this.projectRoot, filePath);
+    }
+
+    // Security: Ensure the resolved path is within the project root
+    if (!absolutePath.startsWith(this.projectRoot)) {
+      throw new Error(
+        `Access denied: File path is outside the project root: ${filePath}`,
+      );
+    }
+
+    // Read the file content directly, bypassing all ignore filters
+    const content = await readFile(absolutePath, 'utf-8');
+    return content;
   }
 }

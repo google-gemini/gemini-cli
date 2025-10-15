@@ -192,13 +192,19 @@ describe('memoryCommand', () => {
         services: {
           config: mockConfig,
           settings: {
+            system: {},
+            systemDefaults: {},
+            user: {},
+            workspace: {},
+            workspaceDefaults: {},
+            cliArgs: {},
             merged: {
               memoryDiscoveryMaxDirs: 1000,
               context: {
                 importFormat: 'tree',
               },
             },
-          } as LoadedSettings,
+          } as unknown as LoadedSettings,
         },
         ui: {
           setGeminiMdFileCount: vi.fn(),

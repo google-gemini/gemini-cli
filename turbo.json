@@ -1,0 +1,54 @@
+{
+  "$schema": "https://turborepo.org/schema.json",
+  "tasks": {
+    "generate": {
+      "cache": true,
+      "outputs": [
+        "packages/cli/src/generated/**",
+        "packages/core/src/generated/**"
+      ]
+    },
+    "build": {
+      "dependsOn": ["^build", "^generate"],
+      "outputs": ["dist/**"]
+    },
+    "build:sandbox": {
+      "dependsOn": ["build"],
+      "cache": true,
+      "outputs": []
+    },
+    "build:vscode": {
+      "dependsOn": ["build"],
+      "cache": true,
+      "outputs": ["packages/vscode-ide-companion/*.vsix"]
+    },
+    "bundle": {
+      "dependsOn": ["^build"],
+      "outputs": ["bundle/**", "packages/*/bundle/**"]
+    },
+    "lint": {
+      "dependsOn": []
+    },
+    "format": {
+      "cache": false
+    },
+    "test": {
+      "dependsOn": ["^build"]
+    },
+    "test:ci": {
+      "dependsOn": ["^build"]
+    },
+    "test:scripts": {
+      "dependsOn": []
+    },
+    "typecheck": {
+      "dependsOn": ["^build"]
+    },
+    "clean": {
+      "cache": false
+    },
+    "preflight": {
+      "dependsOn": ["lint", "typecheck", "test", "build"]
+    }
+  }
+}

@@ -7,7 +7,7 @@
 import type React from 'react';
 import { Box, Text } from 'ink';
 import { theme } from '../semantic-colors.js';
-import { formatDuration } from '../utils/formatters.js';
+import { formatDuration, formatNumber } from '../utils/formatters.js';
 import {
   calculateAverageLatency,
   calculateCacheHitRate,
@@ -128,7 +128,7 @@ export const ModelStatsDisplay: React.FC = () => {
       <StatRow title="API" values={[]} isSection />
       <StatRow
         title="Requests"
-        values={getModelValues((m) => m.api.totalRequests.toLocaleString())}
+        values={getModelValues((m) => formatNumber(m.api.totalRequests))}
       />
       <StatRow
         title="Errors"
@@ -140,7 +140,7 @@ export const ModelStatsDisplay: React.FC = () => {
                 m.api.totalErrors > 0 ? theme.status.error : theme.text.primary
               }
             >
-              {m.api.totalErrors.toLocaleString()} ({errorRate.toFixed(1)}%)
+              {formatNumber(m.api.totalErrors)} ({errorRate.toFixed(1)}%)
             </Text>
           );
         })}
@@ -161,14 +161,14 @@ export const ModelStatsDisplay: React.FC = () => {
         title="Total"
         values={getModelValues((m) => (
           <Text color={theme.status.warning}>
-            {m.tokens.total.toLocaleString()}
+            {formatNumber(m.tokens.total)}
           </Text>
         ))}
       />
       <StatRow
         title="Prompt"
         isSubtle
-        values={getModelValues((m) => m.tokens.prompt.toLocaleString())}
+        values={getModelValues((m) => formatNumber(m.tokens.prompt))}
       />
       {hasCached && (
         <StatRow
@@ -178,7 +178,7 @@ export const ModelStatsDisplay: React.FC = () => {
             const cacheHitRate = calculateCacheHitRate(m);
             return (
               <Text color={theme.status.success}>
-                {m.tokens.cached.toLocaleString()} ({cacheHitRate.toFixed(1)}%)
+                {formatNumber(m.tokens.cached)} ({cacheHitRate.toFixed(1)}%)
               </Text>
             );
           })}
@@ -188,20 +188,20 @@ export const ModelStatsDisplay: React.FC = () => {
         <StatRow
           title="Thoughts"
           isSubtle
-          values={getModelValues((m) => m.tokens.thoughts.toLocaleString())}
+          values={getModelValues((m) => formatNumber(m.tokens.thoughts))}
         />
       )}
       {hasTool && (
         <StatRow
           title="Tool"
           isSubtle
-          values={getModelValues((m) => m.tokens.tool.toLocaleString())}
+          values={getModelValues((m) => formatNumber(m.tokens.tool))}
         />
       )}
       <StatRow
         title="Output"
         isSubtle
-        values={getModelValues((m) => m.tokens.candidates.toLocaleString())}
+        values={getModelValues((m) => formatNumber(m.tokens.candidates))}
       />
     </Box>
   );
