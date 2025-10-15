@@ -16,7 +16,7 @@ describe.skip('Ctrl+C exit', () => {
     const run = await rig.runInteractive();
 
     // Send first Ctrl+C
-    run.type('\x03');
+    run.sendKeys('\x03');
 
     await run.expectText('Press Ctrl+C again to exit', 5000);
 
@@ -40,7 +40,7 @@ describe.skip('Ctrl+C exit', () => {
     }
 
     // Send second Ctrl+C
-    run.type('\x03');
+    run.sendKeys('\x03');
 
     const exitCode = await run.expectExit();
     expect(exitCode, `Process exited with code ${exitCode}.`).toBe(0);
