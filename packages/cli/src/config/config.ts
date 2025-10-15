@@ -105,17 +105,20 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
     })
     .option('telemetry-target', {
       type: 'string',
+      nargs: 1,
       choices: ['local', 'gcp'],
       description:
         'Set the telemetry target (local or gcp). Overrides settings files.',
     })
     .option('telemetry-otlp-endpoint', {
       type: 'string',
+      nargs: 1,
       description:
         'Set the OTLP endpoint for telemetry. Overrides environment variables and settings files.',
     })
     .option('telemetry-otlp-protocol', {
       type: 'string',
+      nargs: 1,
       choices: ['grpc', 'http'],
       description:
         'Set the OTLP protocol for telemetry (grpc or http). Overrides settings files.',
@@ -127,6 +130,7 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
     })
     .option('telemetry-outfile', {
       type: 'string',
+      nargs: 1,
       description: 'Redirect all telemetry output to the specified file.',
     })
     .deprecateOption(
@@ -161,6 +165,7 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
     })
     .option('proxy', {
       type: 'string',
+      nargs: 1,
       description:
         'Proxy for gemini client, like schema://user:password@host:port',
     })
@@ -177,16 +182,19 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
         .option('model', {
           alias: 'm',
           type: 'string',
+          nargs: 1,
           description: `Model`,
         })
         .option('prompt', {
           alias: 'p',
           type: 'string',
+          nargs: 1,
           description: 'Prompt. Appended to input on stdin (if any).',
         })
         .option('prompt-interactive', {
           alias: 'i',
           type: 'string',
+          nargs: 1,
           description:
             'Execute the provided prompt and continue in interactive mode',
         })
@@ -197,6 +205,7 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
         })
         .option('sandbox-image', {
           type: 'string',
+          nargs: 1,
           description: 'Sandbox image URI.',
         })
         .option('all-files', {
@@ -219,6 +228,7 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
         })
         .option('approval-mode', {
           type: 'string',
+          nargs: 1,
           choices: ['default', 'auto_edit', 'yolo'],
           description:
             'Set the approval mode: default (prompt for approval), auto_edit (auto-approve edit tools), yolo (auto-approve all tools)',
@@ -236,6 +246,7 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
         .option('allowed-mcp-server-names', {
           type: 'array',
           string: true,
+          nargs: 1,
           description: 'Allowed MCP server names',
           coerce: (mcpServerNames: string[]) =>
             // Handle comma-separated values
@@ -246,6 +257,7 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
         .option('allowed-tools', {
           type: 'array',
           string: true,
+          nargs: 1,
           description: 'Tools that are allowed to run without confirmation',
           coerce: (tools: string[]) =>
             // Handle comma-separated values
@@ -272,6 +284,7 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
         .option('include-directories', {
           type: 'array',
           string: true,
+          nargs: 1,
           description:
             'Additional directories to include in the workspace (comma-separated or multiple --include-directories)',
           coerce: (dirs: string[]) =>
@@ -285,6 +298,7 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
         .option('output-format', {
           alias: 'o',
           type: 'string',
+          nargs: 1,
           description: 'The format of the CLI output.',
           choices: ['text', 'json', 'stream-json'],
         })
