@@ -580,11 +580,13 @@ export class SubAgentScope {
           error: undefined,
         };
       } else {
-        toolResponse = await executeToolCall(
-          this.runtimeContext,
-          requestInfo,
-          abortController.signal,
-        );
+        toolResponse = (
+          await executeToolCall(
+            this.runtimeContext,
+            requestInfo,
+            abortController.signal,
+          )
+        ).response;
       }
 
       if (toolResponse.error) {
