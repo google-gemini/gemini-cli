@@ -467,6 +467,44 @@ describe('parseArguments', () => {
     const argv = await parseArguments({} as Settings);
     expect(argv.extensions).toEqual(['ext1', 'ext2']);
   });
+
+  it('should correctly parse positional arguments when flags with arguments are present', async () => {
+    process.argv = [
+      'node',
+      'script.js',
+      '--telemetry-target',
+      'gcp',
+      'my-positional-arg',
+    ];
+    const argv = await parseArguments({} as Settings);
+    expect(argv.telemetryTarget).toBe('gcp');
+    expect(argv.query).toBe('my-positional-arg');
+  });
+
+  it('should handle long positional prompts with multiple flags', async () => {
+    process.argv = [
+      'node',
+      'script.js',
+      '-e',
+      'none',
+      '--approval-mode=auto_edit',
+      '--allowed-tools=ShellTool',
+      '--allowed-tools=ShellTool(whoami)',
+      '--allowed-tools=ShellTool(wc)',
+      'Use whoami to write a poem in file poem.md about my username in pig latin and use wc to tell me how many lines are in the poem you wrote.',
+    ];
+    const argv = await parseArguments({} as Settings);
+    expect(argv.extensions).toEqual(['none']);
+    expect(argv.approvalMode).toBe('auto_edit');
+    expect(argv.allowedTools).toEqual([
+      'ShellTool',
+      'ShellTool(whoami)',
+      'ShellTool(wc)',
+    ]);
+    expect(argv.query).toBe(
+      'Use whoami to write a poem in file poem.md about my username in pig latin and use wc to tell me how many lines are in the poem you wrote.',
+    );
+  });
 });
 
 describe('loadCliConfig', () => {
