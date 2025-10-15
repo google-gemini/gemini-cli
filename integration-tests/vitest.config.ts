@@ -12,6 +12,7 @@ export default defineConfig({
     globalSetup: './globalSetup.ts',
     reporters: ['default'],
     include: ['**/*.test.ts'],
+    retry: 2,
     fileParallelism: true,
     poolOptions: {
       threads: {

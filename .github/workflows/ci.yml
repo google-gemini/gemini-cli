@@ -126,7 +126,7 @@ jobs:
       - name: 'Run tests and generate reports'
         env:
           NO_COLOR: true
-        run: 'npx vitest run --root ./integration-tests --retry 0 ide-client.test.ts'
+        run: 'npm run test:ci'
 
       - name: 'Bundle'
         run: 'npm run bundle'
