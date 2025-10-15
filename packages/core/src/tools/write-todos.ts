@@ -185,7 +185,7 @@ export class WriteTodosTool extends BaseDeclarativeTool<
       if (typeof todo.description !== 'string' || !todo.description.trim()) {
         return 'Each todo must have a non-empty description string';
       }
-      if (!['pending', 'in_progress', 'completed'].includes(todo.status)) {
+      if (!['pending', 'in_progress', 'completed', 'cancelled'].includes(todo.status)) {
         return 'Each todo must have a valid status (pending, in_progress, or completed)';
       }
     }
