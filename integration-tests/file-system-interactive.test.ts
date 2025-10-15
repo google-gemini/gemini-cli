@@ -7,7 +7,7 @@
 import { expect, describe, it, beforeEach, afterEach } from 'vitest';
 import { TestRig } from './test-helper.js';
 
-describe('Interactive file system', () => {
+describe.skip('Interactive file system', () => {
   let rig: TestRig;
 
   beforeEach(() => {

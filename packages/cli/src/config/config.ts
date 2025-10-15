@@ -669,7 +669,7 @@ export async function loadCliConfig(
     );
   }
 
-  const useModelRouter = settings.experimental?.useModelRouter ?? false;
+  const useModelRouter = settings.experimental?.useModelRouter ?? true;
   const defaultModel = useModelRouter
     ? DEFAULT_GEMINI_MODEL_AUTO
     : DEFAULT_GEMINI_MODEL;
@@ -760,6 +760,7 @@ export async function loadCliConfig(
       settings.tools?.enableMessageBusIntegration ?? false,
     codebaseInvestigatorSettings:
       settings.experimental?.codebaseInvestigatorSettings,
+    retryFetchErrors: settings.general?.retryFetchErrors ?? false,
   });
 }
 
