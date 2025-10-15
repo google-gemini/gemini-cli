@@ -10,7 +10,7 @@
   "type": "module",
   "main": "dist/index.js",
   "bin": {
-    "gemini-cli-a2a-server": "dist/a2a-server.mjs"
+    "gemini-cli-a2a-server": "bundle/a2a-server.mjs"
   },
   "scripts": {
     "build": "node ../../scripts/build_package.js",
@@ -19,10 +19,13 @@
     "format": "prettier --write .",
     "test": "vitest run",
     "test:ci": "vitest run --coverage",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "bundle": "node esbuild.config.js",
+    "clean": "rm -rf dist .turbo node_modules"
   },
   "files": [
-    "dist"
+    "dist",
+    "bundle"
   ],
   "dependencies": {
     "@a2a-js/sdk": "^0.3.2",

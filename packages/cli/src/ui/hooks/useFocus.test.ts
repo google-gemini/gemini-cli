@@ -29,15 +29,22 @@ const wrapper = ({ children }: { children: React.ReactNode }) =>
   React.createElement(KeypressProvider, null, children);
 
 describe('useFocus', () => {
-  let stdin: EventEmitter;
-  let stdout: { write: vi.Func };
+  let stdin: EventEmitter & {
+    resume: ReturnType<typeof vi.fn>;
+    pause: ReturnType<typeof vi.fn>;
+  };
+  let stdout: { write: ReturnType<typeof vi.fn> };
 
   beforeEach(() => {
-    stdin = new EventEmitter();
-    stdin.resume = vi.fn();
-    stdin.pause = vi.fn();
+    const emitter = new EventEmitter();
+    stdin = Object.assign(emitter, {
+      resume: vi.fn(),
+      pause: vi.fn(),
+    });
     stdout = { write: vi.fn() };
-    mockedUseStdin.mockReturnValue({ stdin } as ReturnType<typeof useStdin>);
+    mockedUseStdin.mockReturnValue({ stdin } as unknown as ReturnType<
+      typeof useStdin
+    >);
     mockedUseStdout.mockReturnValue({ stdout } as unknown as ReturnType<
       typeof useStdout
     >);

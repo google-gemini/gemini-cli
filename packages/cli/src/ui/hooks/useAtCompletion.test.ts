@@ -206,8 +206,8 @@ describe('useAtCompletion', () => {
         initialize: vi.fn().mockResolvedValue(undefined),
         search: vi
           .fn()
-          .mockImplementation(async (...args) =>
-            realFileSearch.search(...args),
+          .mockImplementation(async (pattern, options) =>
+            realFileSearch.search(pattern, options),
           ),
       };
       vi.spyOn(FileSearchFactory, 'create').mockReturnValue(mockFileSearch);

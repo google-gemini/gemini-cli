@@ -8,10 +8,12 @@ import { type MutableRefObject } from 'react';
 import { render } from 'ink-testing-library';
 import { renderHook } from '@testing-library/react';
 import { act } from 'react-dom/test-utils';
-import type { SessionMetrics } from './SessionContext.js';
+import type { SessionMetrics } from '@google/gemini-cli-core';
 import { SessionStatsProvider, useSessionStats } from './SessionContext.js';
 import { describe, it, expect, vi } from 'vitest';
 import { uiTelemetryService } from '@google/gemini-cli-core';
+import { createMockToolCallDecisions } from '../../test-utils/render.js';
+import { createMockSessionMetrics } from '../../test-utils/testFactories.js';
 
 /**
  * A test harness component that uses the hook and exposes the context value
@@ -57,7 +59,7 @@ describe('SessionStatsContext', () => {
       </SessionStatsProvider>,
     );
 
-    const newMetrics: SessionMetrics = {
+    const newMetrics: SessionMetrics = createMockSessionMetrics({
       models: {
         'gemini-pro': {
           api: {
@@ -80,26 +82,26 @@ describe('SessionStatsContext', () => {
         totalSuccess: 1,
         totalFail: 0,
         totalDurationMs: 456,
-        totalDecisions: {
+        totalDecisions: createMockToolCallDecisions({
           accept: 1,
           reject: 0,
           modify: 0,
-        },
+        }),
         byName: {
           'test-tool': {
             count: 1,
             success: 1,
             fail: 0,
             durationMs: 456,
-            decisions: {
+            decisions: createMockToolCallDecisions({
               accept: 1,
               reject: 0,
               modify: 0,
-            },
+            }),
           },
         },
       },
-    };
+    });
 
     act(() => {
       uiTelemetryService.emit('update', {
@@ -152,8 +154,12 @@ describe('SessionStatsContext', () => {
         totalSuccess: 0,
         totalFail: 0,
         totalDurationMs: 0,
-        totalDecisions: { accept: 0, reject: 0, modify: 0 },
+        totalDecisions: { accept: 0, reject: 0, modify: 0, auto_accept: 0 },
         byName: {},
+      },
+      files: {
+        totalLinesAdded: 0,
+        totalLinesRemoved: 0,
       },
     };
 

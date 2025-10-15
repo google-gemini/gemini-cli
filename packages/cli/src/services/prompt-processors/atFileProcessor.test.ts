@@ -12,25 +12,26 @@ import { MessageType } from '../../ui/types.js';
 import type { Config } from '@google/gemini-cli-core';
 import type { PartUnion } from '@google/genai';
 
-// Mock the core dependency
-const mockReadPathFromWorkspace = vi.hoisted(() => vi.fn());
-vi.mock('@google/gemini-cli-core', async (importOriginal) => {
-  const original = await importOriginal<object>();
-  return {
-    ...original,
-    readPathFromWorkspace: mockReadPathFromWorkspace,
-  };
-});
+// Mock readDirectFileContent method from FileDiscoveryService
+const mockReadDirectFileContent = vi.fn();
 
 describe('AtFileProcessor', () => {
   let context: CommandContext;
   let mockConfig: Config;
+  let mockFileService: {
+    readDirectFileContent: typeof mockReadDirectFileContent;
+  };
 
   beforeEach(() => {
     vi.clearAllMocks();
 
+    // Create mock file service with the direct access method
+    mockFileService = {
+      readDirectFileContent: mockReadDirectFileContent,
+    };
+
     mockConfig = {
-      // The processor only passes the config through, so we don't need a full mock.
+      getFileService: () => mockFileService,
     } as unknown as Config;
 
     context = createMockCommandContext({
@@ -39,11 +40,9 @@ describe('AtFileProcessor', () => {
       },
     });
 
-    // Default mock success behavior: return content wrapped in a text part.
-    mockReadPathFromWorkspace.mockImplementation(
-      async (path: string): Promise<PartUnion[]> => [
-        { text: `content of ${path}` },
-      ],
+    // Default mock success behavior: return file content as string
+    mockReadDirectFileContent.mockImplementation(
+      async (path: string): Promise<string> => `content of ${path}`,
     );
   });
 
@@ -52,7 +51,7 @@ describe('AtFileProcessor', () => {
     const prompt: PartUnion[] = [{ text: 'This is a simple prompt.' }];
     const result = await processor.process(prompt, context);
     expect(result).toEqual(prompt);
-    expect(mockReadPathFromWorkspace).not.toHaveBeenCalled();
+    expect(mockReadDirectFileContent).not.toHaveBeenCalled();
   });
 
   it('should not change the prompt if config service is missing', async () => {
@@ -65,7 +64,7 @@ describe('AtFileProcessor', () => {
     });
     const result = await processor.process(prompt, contextWithoutConfig);
     expect(result).toEqual(prompt);
-    expect(mockReadPathFromWorkspace).not.toHaveBeenCalled();
+    expect(mockReadDirectFileContent).not.toHaveBeenCalled();
   });
 
   describe('Parsing Logic', () => {
@@ -75,9 +74,8 @@ describe('AtFileProcessor', () => {
         { text: 'Analyze this file: @{path/to/file.txt}' },
       ];
       const result = await processor.process(prompt, context);
-      expect(mockReadPathFromWorkspace).toHaveBeenCalledWith(
+      expect(mockReadDirectFileContent).toHaveBeenCalledWith(
         'path/to/file.txt',
-        mockConfig,
       );
       expect(result).toEqual([
         { text: 'Analyze this file: ' },
@@ -91,15 +89,9 @@ describe('AtFileProcessor', () => {
         { text: 'Compare @{file1.js} with @{file2.js}' },
       ];
       const result = await processor.process(prompt, context);
-      expect(mockReadPathFromWorkspace).toHaveBeenCalledTimes(2);
-      expect(mockReadPathFromWorkspace).toHaveBeenCalledWith(
-        'file1.js',
-        mockConfig,
-      );
-      expect(mockReadPathFromWorkspace).toHaveBeenCalledWith(
-        'file2.js',
-        mockConfig,
-      );
+      expect(mockReadDirectFileContent).toHaveBeenCalledTimes(2);
+      expect(mockReadDirectFileContent).toHaveBeenCalledWith('file1.js');
+      expect(mockReadDirectFileContent).toHaveBeenCalledWith('file2.js');
       expect(result).toEqual([
         { text: 'Compare ' },
         { text: 'content of file1.js' },
@@ -129,9 +121,8 @@ describe('AtFileProcessor', () => {
         { text: 'Analyze @{path/with/{braces}/file.txt}' },
       ];
       const result = await processor.process(prompt, context);
-      expect(mockReadPathFromWorkspace).toHaveBeenCalledWith(
+      expect(mockReadDirectFileContent).toHaveBeenCalledWith(
         'path/with/{braces}/file.txt',
-        mockConfig,
       );
       expect(result).toEqual([
         { text: 'Analyze ' },
@@ -150,16 +141,16 @@ describe('AtFileProcessor', () => {
   });
 
   describe('Integration and Error Handling', () => {
-    it('should leave the placeholder unmodified if readPathFromWorkspace throws', async () => {
+    it('should leave the placeholder unmodified if readDirectFileContent throws', async () => {
       const processor = new AtFileProcessor();
       const prompt: PartUnion[] = [
         { text: 'Analyze @{not-found.txt} and @{good-file.txt}' },
       ];
-      mockReadPathFromWorkspace.mockImplementation(async (path: string) => {
+      mockReadDirectFileContent.mockImplementation(async (path: string) => {
         if (path === 'not-found.txt') {
           throw new Error('File not found');
         }
-        return [{ text: `content of ${path}` }];
+        return `content of ${path}`;
       });
 
       const result = await processor.process(prompt, context);
@@ -176,7 +167,7 @@ describe('AtFileProcessor', () => {
     it('should call ui.addItem with an ERROR on failure', async () => {
       const processor = new AtFileProcessor();
       const prompt: PartUnion[] = [{ text: 'Analyze @{bad-file.txt}' }];
-      mockReadPathFromWorkspace.mockRejectedValue(new Error('Access denied'));
+      mockReadDirectFileContent.mockRejectedValue(new Error('Access denied'));
 
       await processor.process(prompt, context);
 
@@ -190,25 +181,23 @@ describe('AtFileProcessor', () => {
       );
     });
 
-    it('should call ui.addItem with a WARNING if the file was ignored', async () => {
+    it('should NOT show ignored warning for explicit file references (new behavior)', async () => {
+      // With the new direct access method, files are NEVER ignored when explicitly referenced
+      // This test verifies that the old "ignored" warning path is no longer triggered
       const processor = new AtFileProcessor();
       const prompt: PartUnion[] = [{ text: 'Analyze @{ignored.txt}' }];
-      // Simulate an ignored file by returning an empty array.
-      mockReadPathFromWorkspace.mockResolvedValue([]);
+      mockReadDirectFileContent.mockResolvedValue('content of ignored.txt');
 
       const result = await processor.process(prompt, context);
 
-      // The placeholder should be removed, resulting in only the prefix.
-      expect(result).toEqual([{ text: 'Analyze ' }]);
+      // The file content should be included regardless of ignore rules
+      expect(result).toEqual([
+        { text: 'Analyze ' },
+        { text: 'content of ignored.txt' },
+      ]);
 
-      expect(context.ui.addItem).toHaveBeenCalledTimes(1);
-      expect(context.ui.addItem).toHaveBeenCalledWith(
-        {
-          type: MessageType.INFO,
-          text: "File '@{ignored.txt}' was ignored by .gitignore or .geminiignore and was not included in the prompt.",
-        },
-        expect.any(Number),
-      );
+      // NO ui.addItem should be called for ignored files anymore
+      expect(context.ui.addItem).not.toHaveBeenCalled();
     });
 
     it('should NOT call ui.addItem on success', async () => {

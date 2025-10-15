@@ -7,6 +7,7 @@
 import {
   renderWithProviders,
   createMockSettings,
+  createMockSessionStats,
 } from '../../test-utils/render.js';
 import { Footer } from './Footer.js';
 import { tildeifyPath } from '@google/gemini-cli-core';
@@ -33,7 +34,7 @@ const defaultProps = {
 };
 
 const sessionStats = {
-  sessionStats: { lastPromptTokenCount: 0, lastResponseTokenCount: 0 },
+  sessionStats: createMockSessionStats(),
 };
 
 describe('<Footer />', () => {

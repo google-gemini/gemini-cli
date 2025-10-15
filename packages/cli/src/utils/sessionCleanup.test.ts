@@ -5,15 +5,46 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+
+// Mock the fs module
+vi.mock('fs/promises', () => {
+  const mockReaddir = vi.fn();
+  const mockStat = vi.fn();
+  const mockReadFile = vi.fn();
+  const mockWriteFile = vi.fn();
+  const mockUnlink = vi.fn();
+  const mockRm = vi.fn();
+  const mockMkdir = vi.fn();
+  const mockAccess = vi.fn();
+
+  return {
+    default: {
+      readdir: mockReaddir,
+      stat: mockStat,
+      readFile: mockReadFile,
+      writeFile: mockWriteFile,
+      unlink: mockUnlink,
+      rm: mockRm,
+      mkdir: mockMkdir,
+      access: mockAccess,
+    },
+    readdir: mockReaddir,
+    stat: mockStat,
+    readFile: mockReadFile,
+    writeFile: mockWriteFile,
+    unlink: mockUnlink,
+    rm: mockRm,
+    mkdir: mockMkdir,
+    access: mockAccess,
+  };
+});
+
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { SESSION_FILE_PREFIX, type Config } from '@google/gemini-cli-core';
 import type { Settings } from '../config/settings.js';
 import { cleanupExpiredSessions } from './sessionCleanup.js';
 import { type SessionInfo, getAllSessionFiles } from './sessionUtils.js';
-
-// Mock the fs module
-vi.mock('fs/promises');
 vi.mock('./sessionUtils.js', () => ({
   getAllSessionFiles: vi.fn(),
 }));

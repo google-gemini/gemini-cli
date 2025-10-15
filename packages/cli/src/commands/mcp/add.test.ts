@@ -4,14 +4,18 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import yargs from 'yargs';
+import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
+
+vi.mock('fs/promises', async () => {
+  const { createFsPromisesMock } = await import(
+    '../../test-utils/mocks/fsPromisesMock.js'
+  );
+  return createFsPromisesMock();
+});
+
+import yargs, { type Argv } from 'yargs';
 import { addCommand } from './add.js';
 import { loadSettings, SettingScope } from '../../config/settings.js';
-
-vi.mock('fs/promises', () => ({
-  readFile: vi.fn(),
-  writeFile: vi.fn(),
-}));
 
 vi.mock('os', () => {
   const homedir = vi.fn(() => '/home/user');
@@ -31,12 +35,12 @@ vi.mock('../../config/settings.js', async () => {
   };
 });
 
-const mockedLoadSettings = loadSettings as vi.Mock;
+const mockedLoadSettings = loadSettings as Mock;
 
 describe('mcp add command', () => {
-  let parser: yargs.Argv;
-  let mockSetValue: vi.Mock;
-  let mockConsoleError: vi.Mock;
+  let parser: Argv;
+  let mockSetValue: Mock;
+  let mockConsoleError: Mock;
 
   beforeEach(() => {
     vi.resetAllMocks();
@@ -207,7 +211,7 @@ describe('mcp add command', () => {
           .spyOn(process, 'exit')
           .mockImplementation((() => {
             throw new Error('process.exit called');
-          }) as (code?: number) => never);
+          }) as (code?: string | number | null) => never);
 
         await expect(
           parser.parseAsync(`add ${serverName} ${command}`),
@@ -225,7 +229,7 @@ describe('mcp add command', () => {
           .spyOn(process, 'exit')
           .mockImplementation((() => {
             throw new Error('process.exit called');
-          }) as (code?: number) => never);
+          }) as (code?: string | number | null) => never);
 
         await expect(
           parser.parseAsync(`add --scope project ${serverName} ${command}`),

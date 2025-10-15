@@ -4,22 +4,45 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
+import {
+  describe,
+  it,
+  expect,
+  beforeEach,
+  vi,
+  afterEach,
+  beforeAll,
+  afterAll,
+} from 'vitest';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { tmpdir } from 'node:os';
-import type {
-  ConfigParameters,
-  ContentGeneratorConfig,
-} from '@google/gemini-cli-core';
+import type { ConfigParameters } from '@google/gemini-cli-core';
 import {
   Config,
   DEFAULT_FILE_FILTERING_OPTIONS,
 } from '@google/gemini-cli-core';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
+import type { Settings } from './settings.js';
 
 export const server = setupServer();
+
+/**
+ * DRY utility: Creates base ConfigParameters with all required fields
+ */
+const createBaseConfigParams = (
+  tempDir: string,
+  overrides?: Partial<ConfigParameters>,
+): ConfigParameters => ({
+  sessionId: 'test-session-id',
+  cwd: '/tmp',
+  model: 'test-model',
+  embeddingModel: 'test-embedding-model',
+  targetDir: tempDir,
+  debugMode: false,
+  ...overrides,
+});
 
 // TODO(richieforeman): Consider moving this to test setup globally.
 beforeAll(() => {
@@ -35,12 +58,6 @@ afterAll(() => {
 });
 
 const CLEARCUT_URL = 'https://play.googleapis.com/log';
-
-const TEST_CONTENT_GENERATOR_CONFIG: ContentGeneratorConfig = {
-  apiKey: 'test-key',
-  model: 'test-model',
-  userAgent: 'test-agent',
-};
 
 // Mock file discovery service and tool registry
 vi.mock('@google/gemini-cli-core', async () => {
@@ -74,15 +91,7 @@ describe('Configuration Integration Tests', () => {
 
   describe('File Filtering Configuration', () => {
     it('should load default file filtering settings', async () => {
-      const configParams: ConfigParameters = {
-        cwd: '/tmp',
-        contentGeneratorConfig: TEST_CONTENT_GENERATOR_CONFIG,
-        embeddingModel: 'test-embedding-model',
-        sandbox: false,
-        targetDir: tempDir,
-        debugMode: false,
-        fileFilteringRespectGitIgnore: undefined, // Should default to  DEFAULT_FILE_FILTERING_OPTIONS
-      };
+      const configParams = createBaseConfigParams(tempDir);
 
       const config = new Config(configParams);
 
@@ -92,17 +101,11 @@ describe('Configuration Integration Tests', () => {
     });
 
     it('should load custom file filtering settings from configuration', async () => {
-      const configParams: ConfigParameters = {
-        cwd: '/tmp',
-        contentGeneratorConfig: TEST_CONTENT_GENERATOR_CONFIG,
-        embeddingModel: 'test-embedding-model',
-        sandbox: false,
-        targetDir: tempDir,
-        debugMode: false,
+      const configParams = createBaseConfigParams(tempDir, {
         fileFiltering: {
           respectGitIgnore: false,
         },
-      };
+      });
 
       const config = new Config(configParams);
 
@@ -110,17 +113,11 @@ describe('Configuration Integration Tests', () => {
     });
 
     it('should merge user and workspace file filtering settings', async () => {
-      const configParams: ConfigParameters = {
-        cwd: '/tmp',
-        contentGeneratorConfig: TEST_CONTENT_GENERATOR_CONFIG,
-        embeddingModel: 'test-embedding-model',
-        sandbox: false,
-        targetDir: tempDir,
-        debugMode: false,
+      const configParams = createBaseConfigParams(tempDir, {
         fileFiltering: {
           respectGitIgnore: true,
         },
-      };
+      });
 
       const config = new Config(configParams);
 
@@ -130,17 +127,11 @@ describe('Configuration Integration Tests', () => {
 
   describe('Configuration Integration', () => {
     it('should handle partial configuration objects gracefully', async () => {
-      const configParams: ConfigParameters = {
-        cwd: '/tmp',
-        contentGeneratorConfig: TEST_CONTENT_GENERATOR_CONFIG,
-        embeddingModel: 'test-embedding-model',
-        sandbox: false,
-        targetDir: tempDir,
-        debugMode: false,
+      const configParams = createBaseConfigParams(tempDir, {
         fileFiltering: {
           respectGitIgnore: false,
         },
-      };
+      });
 
       const config = new Config(configParams);
 
@@ -149,15 +140,9 @@ describe('Configuration Integration Tests', () => {
     });
 
     it('should handle empty configuration objects gracefully', async () => {
-      const configParams: ConfigParameters = {
-        cwd: '/tmp',
-        contentGeneratorConfig: TEST_CONTENT_GENERATOR_CONFIG,
-        embeddingModel: 'test-embedding-model',
-        sandbox: false,
-        targetDir: tempDir,
-        debugMode: false,
+      const configParams = createBaseConfigParams(tempDir, {
         fileFiltering: {},
-      };
+      });
 
       const config = new Config(configParams);
 
@@ -168,15 +153,7 @@ describe('Configuration Integration Tests', () => {
     });
 
     it('should handle missing configuration sections gracefully', async () => {
-      const configParams: ConfigParameters = {
-        cwd: '/tmp',
-        contentGeneratorConfig: TEST_CONTENT_GENERATOR_CONFIG,
-        embeddingModel: 'test-embedding-model',
-        sandbox: false,
-        targetDir: tempDir,
-        debugMode: false,
-        // Missing fileFiltering configuration
-      };
+      const configParams = createBaseConfigParams(tempDir);
 
       const config = new Config(configParams);
 
@@ -189,17 +166,11 @@ describe('Configuration Integration Tests', () => {
 
   describe('Real-world Configuration Scenarios', () => {
     it('should handle a security-focused configuration', async () => {
-      const configParams: ConfigParameters = {
-        cwd: '/tmp',
-        contentGeneratorConfig: TEST_CONTENT_GENERATOR_CONFIG,
-        embeddingModel: 'test-embedding-model',
-        sandbox: false,
-        targetDir: tempDir,
-        debugMode: false,
+      const configParams = createBaseConfigParams(tempDir, {
         fileFiltering: {
           respectGitIgnore: true,
         },
-      };
+      });
 
       const config = new Config(configParams);
 
@@ -207,17 +178,11 @@ describe('Configuration Integration Tests', () => {
     });
 
     it('should handle a CI/CD environment configuration', async () => {
-      const configParams: ConfigParameters = {
-        cwd: '/tmp',
-        contentGeneratorConfig: TEST_CONTENT_GENERATOR_CONFIG,
-        embeddingModel: 'test-embedding-model',
-        sandbox: false,
-        targetDir: tempDir,
-        debugMode: false,
+      const configParams = createBaseConfigParams(tempDir, {
         fileFiltering: {
           respectGitIgnore: false,
-        }, // CI might need to see all files
-      };
+        },
+      });
 
       const config = new Config(configParams);
 
@@ -227,15 +192,9 @@ describe('Configuration Integration Tests', () => {
 
   describe('Checkpointing Configuration', () => {
     it('should enable checkpointing when the setting is true', async () => {
-      const configParams: ConfigParameters = {
-        cwd: '/tmp',
-        contentGeneratorConfig: TEST_CONTENT_GENERATOR_CONFIG,
-        embeddingModel: 'test-embedding-model',
-        sandbox: false,
-        targetDir: tempDir,
-        debugMode: false,
+      const configParams = createBaseConfigParams(tempDir, {
         checkpointing: true,
-      };
+      });
 
       const config = new Config(configParams);
 
@@ -245,40 +204,27 @@ describe('Configuration Integration Tests', () => {
 
   describe('Extension Context Files', () => {
     it('should have an empty array for extension context files by default', () => {
-      const configParams: ConfigParameters = {
-        cwd: '/tmp',
-        contentGeneratorConfig: TEST_CONTENT_GENERATOR_CONFIG,
-        embeddingModel: 'test-embedding-model',
-        sandbox: false,
-        targetDir: tempDir,
-        debugMode: false,
-      };
+      const configParams = createBaseConfigParams(tempDir);
       const config = new Config(configParams);
       expect(config.getExtensionContextFilePaths()).toEqual([]);
     });
 
     it('should correctly store and return extension context file paths', () => {
       const contextFiles = ['/path/to/file1.txt', '/path/to/file2.js'];
-      const configParams: ConfigParameters = {
-        cwd: '/tmp',
-        contentGeneratorConfig: TEST_CONTENT_GENERATOR_CONFIG,
-        embeddingModel: 'test-embedding-model',
-        sandbox: false,
-        targetDir: tempDir,
-        debugMode: false,
+      const configParams = createBaseConfigParams(tempDir, {
         extensionContextFilePaths: contextFiles,
-      };
+      });
       const config = new Config(configParams);
       expect(config.getExtensionContextFilePaths()).toEqual(contextFiles);
     });
   });
 
   describe('Approval Mode Integration Tests', () => {
-    let parseArguments: typeof import('./config').parseArguments;
+    let parseArguments: typeof import('./config.js').parseArguments;
 
     beforeEach(async () => {
       // Import the argument parsing function for integration testing
-      const { parseArguments: parseArgs } = await import('./config');
+      const { parseArguments: parseArgs } = await import('./config.js');
       parseArguments = parseArgs;
     });
 

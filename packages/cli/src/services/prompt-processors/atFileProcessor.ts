@@ -4,10 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {
-  flatMapTextParts,
-  readPathFromWorkspace,
-} from '@google/gemini-cli-core';
+import { flatMapTextParts } from '@google/gemini-cli-core';
 import type { CommandContext } from '../../ui/commands/types.js';
 import { MessageType } from '../../ui/types.js';
 import {
@@ -54,15 +51,11 @@ export class AtFileProcessor implements IPromptProcessor {
 
         const pathStr = injection.content;
         try {
-          const fileContentParts = await readPathFromWorkspace(pathStr, config);
-          if (fileContentParts.length === 0) {
-            const uiMessage = `File '@{${pathStr}}' was ignored by .gitignore or .geminiignore and was not included in the prompt.`;
-            context.ui.addItem(
-              { type: MessageType.INFO, text: uiMessage },
-              Date.now(),
-            );
-          }
-          output.push(...fileContentParts);
+          // Use direct file access, bypassing ignore filters for explicit file references
+          const fileDiscovery = config.getFileService();
+          const fileContent =
+            await fileDiscovery.readDirectFileContent(pathStr);
+          output.push({ text: fileContent });
         } catch (error) {
           const message =
             error instanceof Error ? error.message : String(error);

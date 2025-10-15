@@ -4,12 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { vi } from 'vitest';
 import { describe, it, expect } from 'vitest';
 import { toolsCommand } from './toolsCommand.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
 import { MessageType } from '../types.js';
-import type { Tool } from '@google/gemini-cli-core';
 
 // Mock tools for testing
 const mockTools = [
@@ -25,7 +23,7 @@ const mockTools = [
     description: 'Edits code files.',
     schema: {},
   },
-] as Tool[];
+];
 
 describe('toolsCommand', () => {
   it('should display an error if the tool registry is unavailable', async () => {
@@ -53,7 +51,7 @@ describe('toolsCommand', () => {
     const mockContext = createMockCommandContext({
       services: {
         config: {
-          getToolRegistry: () => ({ getAllTools: () => [] as Tool[] }),
+          getToolRegistry: () => ({ getAllTools: () => [] }),
         },
       },
     });
@@ -83,7 +81,8 @@ describe('toolsCommand', () => {
     if (!toolsCommand.action) throw new Error('Action not defined');
     await toolsCommand.action(mockContext, '');
 
-    const [message] = (mockContext.ui.addItem as vi.Mock).mock.calls[0];
+    const [message] = (mockContext.ui.addItem as ReturnType<typeof vi.fn>).mock
+      .calls[0];
     expect(message.type).toBe(MessageType.TOOLS_LIST);
     expect(message.showDescriptions).toBe(false);
     expect(message.tools).toHaveLength(2);
@@ -103,7 +102,8 @@ describe('toolsCommand', () => {
     if (!toolsCommand.action) throw new Error('Action not defined');
     await toolsCommand.action(mockContext, 'desc');
 
-    const [message] = (mockContext.ui.addItem as vi.Mock).mock.calls[0];
+    const [message] = (mockContext.ui.addItem as ReturnType<typeof vi.fn>).mock
+      .calls[0];
     expect(message.type).toBe(MessageType.TOOLS_LIST);
     expect(message.showDescriptions).toBe(true);
     expect(message.tools).toHaveLength(2);
