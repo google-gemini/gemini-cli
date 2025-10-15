@@ -195,7 +195,8 @@ export class InteractiveRun {
     expect(found, `Did not find expected text: "${text}"`).toBe(true);
   }
 
-  // Simulates typing a string one character at a time to avoid paste detection.
+  // This types slowly to make sure command is correct, but only work for short
+  // commands that are not multi-line, use sendKeys to type long prompts
   async type(text: string) {
     let typedSoFar = '';
     for (const char of text) {
@@ -219,6 +220,7 @@ export class InteractiveRun {
     }
   }
 
+  // Simulates typing a string one character at a time to avoid paste detection.
   async sendKeys(text: string) {
     const delay = 5;
     for (const char of text) {

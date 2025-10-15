@@ -195,9 +195,6 @@ describe('mcp server with cyclic tool schema is detected', () => {
   it('mcp tool list should include tool with cyclic tool schema', async () => {
     const run = await rig.runInteractive();
 
-    // Wait for slash commands to load
-    await new Promise((resolve) => setTimeout(resolve, 5000));
-
     await run.type('/mcp list');
     await run.sendKeys('\r');
 
