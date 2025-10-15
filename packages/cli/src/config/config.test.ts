@@ -3432,6 +3432,22 @@ describe('Output format', () => {
     expect(config.getOutputFormat()).toBe(OutputFormat.JSON);
   });
 
+  it('should accept stream-json as a valid output format', async () => {
+    process.argv = ['node', 'script.js', '--output-format', 'stream-json'];
+    const argv = await parseArguments({} as Settings);
+    const config = await loadCliConfig(
+      {},
+      [],
+      new ExtensionEnablementManager(
+        ExtensionStorage.getUserExtensionsDir(),
+        argv.extensions,
+      ),
+      'test-session',
+      argv,
+    );
+    expect(config.getOutputFormat()).toBe(OutputFormat.STREAM_JSON);
+  });
+
   it('should error on invalid --output-format argument', async () => {
     process.argv = ['node', 'script.js', '--output-format', 'yaml'];
     const mockExit = vi.spyOn(process, 'exit').mockImplementation(() => {
