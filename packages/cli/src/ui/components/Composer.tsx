@@ -58,7 +58,9 @@ export const Composer = () => {
         />
       )}
 
-      {!uiState.isConfigInitialized && <ConfigInitDisplay />}
+      {(!uiState.slashCommands || !uiState.isConfigInitialized) && (
+        <ConfigInitDisplay />
+      )}
 
       <QueuedMessageDisplay messageQueue={uiState.messageQueue} />
 
@@ -133,7 +135,7 @@ export const Composer = () => {
           userMessages={uiState.userMessages}
           onClearScreen={uiActions.handleClearScreen}
           config={config}
-          slashCommands={uiState.slashCommands}
+          slashCommands={uiState.slashCommands || []}
           commandContext={uiState.commandContext}
           shellModeActive={uiState.shellModeActive}
           setShellModeActive={uiActions.setShellModeActive}
