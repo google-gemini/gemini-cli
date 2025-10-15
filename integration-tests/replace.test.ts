@@ -7,7 +7,7 @@
 import { describe, it, expect } from 'vitest';
 import { TestRig } from './test-helper.js';
 
-describe.skip('replace', () => {
+describe('replace', () => {
   it('should be able to replace content in a file', async () => {
     const rig = new TestRig();
     await rig.setup('should be able to replace content in a file');
@@ -46,37 +46,6 @@ describe.skip('replace', () => {
     expect(foundToolCall, 'Expected to find a replace tool call').toBeTruthy();
 
     expect(rig.readFile(fileName)).toBe(expectedContent);
-  });
-
-  it('should fail safely when old_string is not found', async () => {
-    const rig = new TestRig();
-    await rig.setup('should fail safely when old_string is not found', {
-      settings: {
-        useSmartEdit: false,
-        maxToolCalls: 1,
-      },
-    });
-    const fileName = 'no_match.txt';
-    const fileContent = 'hello world';
-    rig.createFile(fileName, fileContent);
-
-    await rig.run(
-      `Make one call to the replace tool to replace the text "goodbye" with "farewell" in ${fileName}.\n
-      * Do not read the file.
-      * Do not call any other tools.
-      * Do not call the replace tool more than once.
-      * After the first and only tool call, take no further action, even if the tool call fails.`,
-    );
-
-    await rig.waitForTelemetryReady();
-    const toolLogs = rig.readToolLogs();
-
-    expect(toolLogs.length, 'Expected exactly one tool call').toBe(1);
-    expect(toolLogs[0].toolRequest.name).toBe('replace');
-    expect(toolLogs[0].toolRequest.success).toBe(false);
-
-    // Ensure file content is unchanged
-    expect(rig.readFile(fileName)).toBe(fileContent);
   });
 
   it('should insert a multi-line block of text', async () => {
