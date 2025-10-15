@@ -4,32 +4,16 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { LogRecord } from '@opentelemetry/api-logs';
+import type { LogRecord, LogAttributes } from '@opentelemetry/api-logs';
 import { logs } from '@opentelemetry/api-logs';
 import type { Config } from '../config/config.js';
 import { SERVICE_NAME } from './constants.js';
+import { getCommonAttributes } from './telemetryAttributes.js';
 import {
   EVENT_API_ERROR,
   EVENT_API_RESPONSE,
   EVENT_TOOL_CALL,
-  EVENT_USER_PROMPT,
-  EVENT_FLASH_FALLBACK,
-  EVENT_NEXT_SPEAKER_CHECK,
-  SERVICE_NAME,
-  EVENT_SLASH_COMMAND,
   EVENT_RESEARCH_OPT_IN,
-  EVENT_CONVERSATION_FINISHED,
-  EVENT_CHAT_COMPRESSION,
-  EVENT_MALFORMED_JSON_RESPONSE,
-  EVENT_INVALID_CHUNK,
-  EVENT_CONTENT_RETRY,
-  EVENT_CONTENT_RETRY_FAILURE,
-  EVENT_FILE_OPERATION,
-  EVENT_RIPGREP_FALLBACK,
-  EVENT_MODEL_ROUTING,
-  EVENT_EXTENSION_INSTALL,
-  EVENT_MODEL_SLASH_COMMAND,
-  EVENT_EXTENSION_DISABLE,
 } from './constants.js';
 import type {
   ApiErrorEvent,
