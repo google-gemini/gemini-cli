@@ -753,6 +753,17 @@ const SETTINGS_SCHEMA = {
           },
         },
       },
+      shellCommandsWithSubcommands: {
+        type: 'array',
+        label: 'Shell Commands with Subcommands',
+        category: 'Tools',
+        requiresRestart: true,
+        default: undefined as string[] | undefined,
+        description:
+          'A list of shell commands that have subcommands that can be used to create more specific command prefixes for approval.',
+        showInDialog: false,
+        mergeStrategy: MergeStrategy.UNION,
+      },
       autoAccept: {
         type: 'boolean',
         label: 'Auto Accept',

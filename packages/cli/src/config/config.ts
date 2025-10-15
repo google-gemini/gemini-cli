@@ -640,6 +640,10 @@ export async function loadCliConfig(
     activeExtensions,
     extraExcludes.length > 0 ? extraExcludes : undefined,
   );
+  const shellCommandsWithSubcommands = mergeShellCommandsWithSubcommands(
+    settings,
+    activeExtensions,
+  );
   const blockedMcpServers: Array<{ name: string; extensionName: string }> = [];
 
   if (!argv.allowedMcpServerNames) {
@@ -699,6 +703,7 @@ export async function loadCliConfig(
     allowedTools: allowedTools.length > 0 ? allowedTools : undefined,
     policyEngineConfig,
     excludeTools,
+    shellCommandsWithSubcommands,
     toolDiscoveryCommand: settings.tools?.discoveryCommand,
     toolCallCommand: settings.tools?.callCommand,
     mcpServerCommand: settings.mcp?.serverCommand,
@@ -827,4 +832,19 @@ function mergeExcludeTools(
     }
   }
   return [...allExcludeTools];
+}
+
+function mergeShellCommandsWithSubcommands(
+  settings: Settings,
+  extensions: GeminiCLIExtension[],
+): string[] {
+  const allShellCommandsWithSubcommands = new Set([
+    ...(settings.tools?.shellCommandsWithSubcommands || []),
+  ]);
+  for (const extension of extensions) {
+    for (const command of extension.shellCommandsWithSubcommands || []) {
+      allShellCommandsWithSubcommands.add(command);
+    }
+  }
+  return [...allShellCommandsWithSubcommands];
 }
