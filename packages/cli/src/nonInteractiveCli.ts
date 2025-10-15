@@ -20,6 +20,8 @@ import {
   promptIdContext,
   OutputFormat,
   JsonFormatter,
+  StreamJsonFormatter,
+  JsonStreamEventType,
   uiTelemetryService,
 } from '@google/gemini-cli-core';
 
@@ -47,6 +49,12 @@ export async function runNonInteractive(
       debugMode: config.getDebugMode(),
     });
 
+    const startTime = Date.now();
+    const streamFormatter =
+      config.getOutputFormat() === OutputFormat.STREAM_JSON
+        ? new StreamJsonFormatter()
+        : null;
+
     try {
       consolePatcher.patch();
       // Handle EPIPE errors when the output is piped to a command that closes early.
@@ -58,6 +66,16 @@ export async function runNonInteractive(
       });
 
       const geminiClient = config.getGeminiClient();
+
+      // Emit init event for streaming JSON
+      if (streamFormatter) {
+        streamFormatter.emitEvent({
+          type: JsonStreamEventType.INIT,
+          timestamp: new Date().toISOString(),
+          session_id: config.getSessionId(),
+          model: config.getModel(),
+        });
+      }
 
       const abortController = new AbortController();
 
@@ -98,6 +116,16 @@ export async function runNonInteractive(
         query = processedQuery as Part[];
       }
 
+      // Emit user message event for streaming JSON
+      if (streamFormatter) {
+        streamFormatter.emitEvent({
+          type: JsonStreamEventType.MESSAGE,
+          timestamp: new Date().toISOString(),
+          role: 'user',
+          content: input,
+        });
+      }
+
       let currentMessages: Content[] = [{ role: 'user', parts: query }];
 
       let turnCount = 0;
@@ -124,13 +152,48 @@ export async function runNonInteractive(
           }
 
           if (event.type === GeminiEventType.Content) {
-            if (config.getOutputFormat() === OutputFormat.JSON) {
+            if (streamFormatter) {
+              streamFormatter.emitEvent({
+                type: JsonStreamEventType.MESSAGE,
+                timestamp: new Date().toISOString(),
+                role: 'assistant',
+                content: event.value,
+                delta: true,
+              });
+            } else if (config.getOutputFormat() === OutputFormat.JSON) {
               responseText += event.value;
             } else {
               process.stdout.write(event.value);
             }
           } else if (event.type === GeminiEventType.ToolCallRequest) {
+            if (streamFormatter) {
+              streamFormatter.emitEvent({
+                type: JsonStreamEventType.TOOL_USE,
+                timestamp: new Date().toISOString(),
+                tool_name: event.value.name,
+                tool_id: event.value.callId,
+                parameters: event.value.args,
+              });
+            }
             toolCallRequests.push(event.value);
+          } else if (event.type === GeminiEventType.LoopDetected) {
+            if (streamFormatter) {
+              streamFormatter.emitEvent({
+                type: JsonStreamEventType.ERROR,
+                timestamp: new Date().toISOString(),
+                severity: 'warning',
+                message: 'Loop detected, stopping execution',
+              });
+            }
+          } else if (event.type === GeminiEventType.MaxSessionTurns) {
+            if (streamFormatter) {
+              streamFormatter.emitEvent({
+                type: JsonStreamEventType.ERROR,
+                timestamp: new Date().toISOString(),
+                severity: 'error',
+                message: 'Maximum session turns exceeded',
+              });
+            }
           }
         }
 
@@ -147,6 +210,25 @@ export async function runNonInteractive(
             const toolResponse = completedToolCall.response;
 
             completedToolCalls.push(completedToolCall);
+
+            if (streamFormatter) {
+              streamFormatter.emitEvent({
+                type: JsonStreamEventType.TOOL_RESULT,
+                timestamp: new Date().toISOString(),
+                tool_id: requestInfo.callId,
+                status: toolResponse.error ? 'error' : 'success',
+                output:
+                  typeof toolResponse.resultDisplay === 'string'
+                    ? toolResponse.resultDisplay
+                    : undefined,
+                error: toolResponse.error
+                  ? {
+                      type: toolResponse.errorType || 'TOOL_EXECUTION_ERROR',
+                      message: toolResponse.error.message,
+                    }
+                  : undefined,
+              });
+            }
 
             if (toolResponse.error) {
               handleToolError(
@@ -180,7 +262,17 @@ export async function runNonInteractive(
 
           currentMessages = [{ role: 'user', parts: toolResponseParts }];
         } else {
-          if (config.getOutputFormat() === OutputFormat.JSON) {
+          // Emit final result event for streaming JSON
+          if (streamFormatter) {
+            const metrics = uiTelemetryService.getMetrics();
+            const durationMs = Date.now() - startTime;
+            streamFormatter.emitEvent({
+              type: JsonStreamEventType.RESULT,
+              timestamp: new Date().toISOString(),
+              status: 'success',
+              stats: streamFormatter.convertToStreamStats(metrics, durationMs),
+            });
+          } else if (config.getOutputFormat() === OutputFormat.JSON) {
             const formatter = new JsonFormatter();
             const stats = uiTelemetryService.getMetrics();
             process.stdout.write(formatter.format(responseText, stats));
