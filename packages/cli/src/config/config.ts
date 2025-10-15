@@ -88,6 +88,7 @@ export interface CliArgs {
   useSmartEdit: boolean | undefined;
   useWriteTodos: boolean | undefined;
   outputFormat: string | undefined;
+  mockResponses: string | undefined;
 }
 
 export async function parseArguments(settings: Settings): Promise<CliArgs> {
@@ -287,6 +288,10 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
           type: 'string',
           description: 'The format of the CLI output.',
           choices: ['text', 'json'],
+        })
+        .option('mock-responses', {
+          type: 'string',
+          description: 'Path to a file with mock model responses for testing.',
         })
         .deprecateOption(
           'show-memory-usage',
@@ -760,6 +765,7 @@ export async function loadCliConfig(
       settings.tools?.enableMessageBusIntegration ?? false,
     codebaseInvestigatorSettings:
       settings.experimental?.codebaseInvestigatorSettings,
+    mockResponses: argv.mockResponses,
     retryFetchErrors: settings.general?.retryFetchErrors ?? false,
   });
 }

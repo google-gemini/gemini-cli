@@ -6,6 +6,7 @@
 
 import { expect, describe, it, beforeEach, afterEach } from 'vitest';
 import { TestRig } from './test-helper.js';
+import { join } from 'node:path';
 
 describe.skip('Interactive Mode', () => {
   let rig: TestRig;
@@ -18,19 +19,20 @@ describe.skip('Interactive Mode', () => {
     await rig.cleanup();
   });
 
-  // TODO(#11062): Make this test reliable by not using the actual Gemini model
-  it.skip('should trigger chat compression with /compress command', async () => {
-    await rig.setup('interactive-compress-test');
+  it('should trigger chat compression with /compress command', async () => {
+    await rig.setup('interactive-compress-test', {
+      mockResponsesPath: join(
+        import.meta.dirname,
+        'context-compress-interactive.compress.json',
+      ),
+    });
 
     const run = await rig.runInteractive();
 
-    const longPrompt =
-      'Dont do anything except returning a 1000 token long paragraph with the <name of the scientist who discovered theory of relativity> at the end to indicate end of response. This is a moderately long sentence.';
-
-    await run.type(longPrompt);
+    await run.type('Initial prompt');
     await run.type('\r');
 
-    await run.expectText('einstein', 25000);
+    await run.expectText('The initial response from the model', 5000);
 
     await run.type('/compress');
     // A small delay to allow React to re-render the command list.
@@ -39,23 +41,34 @@ describe.skip('Interactive Mode', () => {
 
     const foundEvent = await rig.waitForTelemetryEvent(
       'chat_compression',
-      90000,
+      5000,
     );
     expect(foundEvent, 'chat_compression telemetry event was not found').toBe(
       true,
     );
+
+    await run.expectText('Chat history compressed', 5000);
   });
 
-  //TODO - https://github.com/google-gemini/gemini-cli/issues/10769
-  it.skip('should handle compression failure on token inflation', async () => {
-    await rig.setup('interactive-compress-test');
+  it('should handle compression failure on token inflation', async () => {
+    await rig.setup('interactive-compress-test', {
+      mockResponsesPath: join(
+        import.meta.dirname,
+        'context-compress-interactive.no-compress.json',
+      ),
+    });
 
     const run = await rig.runInteractive();
+
+    await run.type('Initial prompt');
+    await run.type('\r');
+
+    await run.expectText('The initial response from the model', 25000);
 
     await run.type('/compress');
     // A small delay to allow React to re-render the command list.
     await new Promise((resolve) => setTimeout(resolve, 100));
     await run.type('\r');
-    await run.expectText('compression was not beneficial', 25000);
+    await run.expectText('compression was not beneficial', 5000);
   });
 });
