@@ -24,6 +24,7 @@ export interface FilterReport {
 export class FileDiscoveryService {
   private gitIgnoreFilter: GitIgnoreFilter | null = null;
   private geminiIgnoreFilter: GeminiIgnoreFilter | null = null;
+  private combinedIgnoreFilter: GitIgnoreFilter | null = null;
   private projectRoot: string;
 
   constructor(projectRoot: string) {
@@ -32,6 +33,15 @@ export class FileDiscoveryService {
       this.gitIgnoreFilter = new GitIgnoreParser(this.projectRoot);
     }
     this.geminiIgnoreFilter = new GeminiIgnoreParser(this.projectRoot);
+
+    if (this.gitIgnoreFilter) {
+      const geminiPatterns = this.geminiIgnoreFilter.getPatterns();
+      // Create combined parser: .gitignore + .geminiignore
+      this.combinedIgnoreFilter = new GitIgnoreParser(
+        this.projectRoot,
+        geminiPatterns,
+      );
+    }
   }
 
   /**
@@ -40,6 +50,14 @@ export class FileDiscoveryService {
   filterFiles(filePaths: string[], options: FilterFilesOptions = {}): string[] {
     const { respectGitIgnore = true, respectGeminiIgnore = true } = options;
     return filePaths.filter((filePath) => {
+      if (
+        respectGitIgnore &&
+        respectGeminiIgnore &&
+        this.combinedIgnoreFilter
+      ) {
+        return !this.combinedIgnoreFilter.isIgnored(filePath);
+      }
+
       if (respectGitIgnore && this.gitIgnoreFilter?.isIgnored(filePath)) {
         return false;
       }
