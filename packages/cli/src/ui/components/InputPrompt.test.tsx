@@ -28,6 +28,7 @@ import { useKittyKeyboardProtocol } from '../hooks/useKittyKeyboardProtocol.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
 import stripAnsi from 'strip-ansi';
 import chalk from 'chalk';
+import { StreamingState } from '../types.js';
 
 vi.mock('../hooks/useShellHistory.js');
 vi.mock('../hooks/useCommandCompletion.js');
@@ -2167,7 +2168,58 @@ describe('InputPrompt', () => {
     expect(mockBuffer.handleInput).toHaveBeenCalled();
     unmount();
   });
+  it('should prevent slash commands from being queued while streaming', async () => {
+    props.onSubmit = vi.fn();
+    props.buffer.text = '/help';
+    props.setQueueErrorMessage = vi.fn();
+    props.streamingState = StreamingState.Responding;
+    const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />);
+    await wait();
+    stdin.write('/help');
+    stdin.write('\r');
+    await wait();
+
+    expect(props.onSubmit).not.toHaveBeenCalled();
+    expect(props.setQueueErrorMessage).toHaveBeenCalledWith(
+      'Slash commands cannot be queued',
+    );
+    unmount();
+  });
+  it('should prevent shell commands from being queued while streaming', async () => {
+    props.onSubmit = vi.fn();
+    props.buffer.text = 'ls';
+    props.setQueueErrorMessage = vi.fn();
+    props.streamingState = StreamingState.Responding;
+    props.shellModeActive = true;
+    const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />);
+    await wait();
+    stdin.write('ls');
+    stdin.write('\r');
+    await wait();
+
+    expect(props.onSubmit).not.toHaveBeenCalled();
+    expect(props.setQueueErrorMessage).toHaveBeenCalledWith(
+      'Shell commands cannot be queued',
+    );
+    unmount();
+  });
+  it('should allow regular messages to be queued while streaming', async () => {
+    props.onSubmit = vi.fn();
+    props.buffer.text = 'regular message';
+    props.setQueueErrorMessage = vi.fn();
+    props.streamingState = StreamingState.Responding;
+    const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />);
+    await wait();
+    stdin.write('regular message');
+    stdin.write('\r');
+    await wait();
+
+    expect(props.onSubmit).toHaveBeenCalledWith('regular message');
+    expect(props.setQueueErrorMessage).not.toHaveBeenCalled();
+    unmount();
+  });
 });
+
 function clean(str: string | undefined): string {
   if (!str) return '';
   // Remove ANSI escape codes and trim whitespace
