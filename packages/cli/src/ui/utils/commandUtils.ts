@@ -27,7 +27,7 @@ export const isAtCommand = (query: string): boolean =>
  * @returns True if the query looks like an '/' command, false otherwise.
  */
 export const isSlashCommand = (query: string): boolean => {
-  if (typeof query !== 'string' || !query.startsWith('/')) {
+  if (!query.startsWith('/')) {
     return false;
   }
 

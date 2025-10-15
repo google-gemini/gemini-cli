@@ -226,11 +226,6 @@ export async function main() {
 
   const argv = await parseArguments(settings.merged);
 
-  // Yargs can parse a prompt with spaces as an array. Join it back.
-  if (Array.isArray(argv.prompt)) {
-    argv.prompt = argv.prompt.join(' ');
-  }
-
   // Check for invalid input combinations early to prevent crashes
   if (argv.promptInteractive && !process.stdin.isTTY) {
     console.error(

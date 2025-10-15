@@ -253,7 +253,6 @@ export class ShellToolInvocation extends BaseToolInvocation<
           signal,
           this.config.getEnableInteractiveShell(),
           shellExecutionConfig ?? {},
-          process.env,
         );
 
       if (pid && setPidCallback) {

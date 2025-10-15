@@ -136,16 +136,6 @@ export class IdeClient {
     this.trustChangeListeners.delete(listener);
   }
 
-  /**
-   * Establishes a connection to the IDE companion extension.
-   *
-   * This method is idempotent. It can be called multiple times, but it will
-   * only attempt to connect if not already connected. This is crucial to
-   * prevent a race condition during CLI startup where multiple components might
-   * try to initiate a connection simultaneously before the first async attempt
-   * has completed. The initial status check ensures that only the first call
-   * proceeds with the connection logic.
-   */
   async connect(): Promise<void> {
     if (this.state.status === IDEConnectionStatus.Connected) {
       return;
