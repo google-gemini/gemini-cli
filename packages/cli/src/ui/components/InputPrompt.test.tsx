@@ -1166,39 +1166,10 @@ describe('InputPrompt', () => {
   describe('vim mode', () => {
     // Note: vimModeEnabled property no longer exists in InputPromptProps
     // Vim mode is now managed through VimModeContext
-    it.skip('should not call buffer.handleInput when vim mode is enabled and vim handles the input', async () => {
-      // props.vimModeEnabled = true;
-      props.vimHandleInput = vi.fn().mockReturnValue(true); // Mock that vim handled it.
-      const { stdin, unmount } = renderWithProviders(
-        <InputPrompt {...props} />,
-      );
-      await wait();
+    // Previous tests for vim mode enabled/disabled are obsolete as the API changed
+    // Vim mode integration is tested through the VimModeContext tests
 
-      stdin.write('i');
-      await wait();
-
-      expect(props.vimHandleInput).toHaveBeenCalled();
-      expect(mockBuffer.handleInput).not.toHaveBeenCalled();
-      unmount();
-    });
-
-    it.skip('should call buffer.handleInput when vim mode is enabled but vim does not handle the input', async () => {
-      // props.vimModeEnabled = true;
-      props.vimHandleInput = vi.fn().mockReturnValue(false); // Mock that vim did NOT handle it.
-      const { stdin, unmount } = renderWithProviders(
-        <InputPrompt {...props} />,
-      );
-      await wait();
-
-      stdin.write('i');
-      await wait();
-
-      expect(props.vimHandleInput).toHaveBeenCalled();
-      expect(mockBuffer.handleInput).toHaveBeenCalled();
-      unmount();
-    });
-
-    it('should call handleInput when vim mode is disabled', async () => {
+    it('should call handleInput when vim does not handle the input', async () => {
       // Mock vimHandleInput to return false (vim didn't handle the input)
       props.vimHandleInput = vi.fn().mockReturnValue(false);
       const { stdin, unmount } = renderWithProviders(

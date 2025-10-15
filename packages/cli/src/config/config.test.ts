@@ -1158,19 +1158,12 @@ describe('Hierarchical Memory Loading (config.ts) - Placeholder Suite', () => {
   });
 
   // NOTE TO FUTURE DEVELOPERS:
-  // To re-enable tests for loadHierarchicalGeminiMemory, ensure that:
-  // 1. os.homedir() is reliably mocked *before* the config.ts module is loaded
-  //    and its functions (which use os.homedir()) are called.
-  // 2. fs/promises and fs mocks correctly simulate file/directory existence,
-  //    readability, and content based on paths derived from the mocked os.homedir().
-  // 3. Spies on console functions (for logger output) are correctly set up if needed.
-  // Example of a previously failing test structure (requires proper mock setup):
-  it.skip('should correctly use mocked homedir for global path', async () => {
-    // This test is disabled pending proper mock infrastructure
-    // loadHierarchicalGeminiMemory requires 9 parameters:
-    // (cwd, includeDirectoriesToReadGemini, debugMode, fileService, settings,
-    //  extensionContextFilePaths, folderTrust, memoryImportFormat, fileFilteringOptions)
-  });
+  // Test for loadHierarchicalGeminiMemory with global path would require:
+  // 1. Mocking os.homedir() before config.ts module load
+  // 2. Mocking fs/promises for file operations based on homedir
+  // 3. Proper setup of console spies for logger output
+  // This level of mock infrastructure is beyond current test scope.
+  // The function is tested indirectly through integration tests.
 });
 
 describe('mergeMcpServers', () => {
