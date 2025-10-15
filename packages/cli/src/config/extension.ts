@@ -464,16 +464,26 @@ export async function installOrUpdateExtension(
       installMetadata.type === 'github-release'
     ) {
       tempDir = await ExtensionStorage.createTmpDir();
-      try {
-        const result = await downloadFromGitHubRelease(
-          installMetadata,
-          tempDir,
-        );
+      const result = await downloadFromGitHubRelease(installMetadata, tempDir);
+      if (result.success) {
         installMetadata.type = result.type;
         installMetadata.releaseTag = result.tagName;
-      } catch (_error) {
+      } else if (
+        // This repo has no github releases, and wasn't explicitly installed
+        // from a github release, unconditionally just clone it.
+        (result.failureReason === 'no release data' &&
+          installMetadata.type === 'git') ||
+        // Otherwise ask the user if they would like to try a git clone.
+        (await requestConsent(
+          `Error downloading github release for ${installMetadata.source} with the following error: ${result.errorMessage}.\n\nWould you like to attempt to install via "git clone" instead?`,
+        ))
+      ) {
         await cloneFromGit(installMetadata, tempDir);
         installMetadata.type = 'git';
+      } else {
+        throw new Error(
+          `Failed to install extension ${installMetadata.source}: ${result.errorMessage}`,
+        );
       }
       localSourcePath = tempDir;
     } else if (
