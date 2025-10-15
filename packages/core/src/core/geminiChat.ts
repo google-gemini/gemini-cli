@@ -563,10 +563,12 @@ export class GeminiChat {
     // 1. There's a tool call (tool calls can end without explicit finish reasons), OR
     // 2. There's a finish reason AND we have non-empty response text
     //
-    // We throw an error only when there's no tool call AND:
-    // - No finish reason, OR
-    // - Empty response text (e.g., only thoughts with no actual content)
-    if (!hasToolCall && (!hasFinishReason || !responseText)) {
+    // We throw an error only when the stream ends unexpectedly. This occurs if:
+    // 1. There were no tool calls, AND
+    // 2. The model did NOT provide a finish reason (indicating an incomplete or broken stream).
+    //
+    // If a finish reason IS present, an empty response text is considered a valid (empty) response.
+    if (!hasToolCall && !hasFinishReason) {
       if (!hasFinishReason) {
         throw new InvalidStreamError(
           'Model stream ended without a finish reason.',
