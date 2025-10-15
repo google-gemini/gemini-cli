@@ -15,6 +15,13 @@ scripting, automation, CI/CD pipelines, and building AI-powered tools.
     - [JSON Output](#json-output)
       - [Response Schema](#response-schema)
       - [Example Usage](#example-usage)
+    - [Streaming JSON Output](#streaming-json-output)
+      - [When to Use Streaming JSON](#when-to-use-streaming-json)
+      - [Event Types](#event-types)
+      - [Basic Usage](#basic-usage)
+      - [Example Output](#example-output)
+      - [Processing Stream Events](#processing-stream-events)
+      - [Real-World Examples](#real-world-examples)
     - [File Redirection](#file-redirection)
   - [Configuration Options](#configuration-options)
   - [Examples](#examples)
@@ -211,6 +218,62 @@ Response:
 }
 ```
 
+### Streaming JSON Output
+
+Returns real-time events as newline-delimited JSON (JSONL). Each significant
+action (initialization, messages, tool calls, results) emits immediately as it
+occurs. This format is ideal for monitoring long-running operations, building
+UIs with live progress, and creating automation pipelines that react to events.
+
+#### When to Use Streaming JSON
+
+Use `--output-format stream-json` when you need:
+
+- **Real-time progress monitoring** - See tool calls and responses as they
+  happen
+- **Event-driven automation** - React to specific events (e.g., tool failures)
+- **Live UI updates** - Build interfaces showing AI agent activity in real-time
+- **Detailed execution logs** - Capture complete interaction history with
+  timestamps
+- **Pipeline integration** - Stream events to logging/monitoring systems
+
+#### Event Types
+
+The streaming format emits 6 event types:
+
+1. **`init`** - Session starts (includes session_id, model)
+2. **`message`** - User prompts and assistant responses
+3. **`tool_use`** - Tool call requests with parameters
+4. **`tool_result`** - Tool execution results (success/error)
+5. **`error`** - Non-fatal errors and warnings
+6. **`result`** - Final session outcome with aggregated stats
+
+#### Basic Usage
+
+```bash
+# Stream events to console
+gemini --output-format stream-json --prompt "What is 2+2?"
+
+# Save event stream to file
+gemini --output-format stream-json --prompt "Analyze this code" > events.jsonl
+
+# Parse with jq
+gemini --output-format stream-json --prompt "List files" | jq -r '.type'
+```
+
+#### Example Output
+
+Each line is a complete JSON event:
+
+```jsonl
+{"type":"init","timestamp":"2025-10-10T12:00:00.000Z","session_id":"abc123","model":"gemini-2.0-flash-exp"}
+{"type":"message","role":"user","content":"List files in current directory","timestamp":"2025-10-10T12:00:01.000Z"}
+{"type":"tool_use","tool_name":"Bash","tool_id":"bash-123","parameters":{"command":"ls -la"},"timestamp":"2025-10-10T12:00:02.000Z"}
+{"type":"tool_result","tool_id":"bash-123","status":"success","output":"file1.txt\nfile2.txt","timestamp":"2025-10-10T12:00:03.000Z"}
+{"type":"message","role":"assistant","content":"Here are the files...","delta":true,"timestamp":"2025-10-10T12:00:04.000Z"}
+{"type":"result","status":"success","stats":{"total_tokens":250,"input_tokens":50,"output_tokens":200,"duration_ms":3000,"tool_calls":1},"timestamp":"2025-10-10T12:00:05.000Z"}
+```
+
 ### File Redirection
 
 Save output to files or pipe to other commands:
@@ -233,16 +296,16 @@ gemini -p "List programming languages" | grep -i "python"
 
 Key command-line options for headless usage:
 
-| Option                  | Description                        | Example                                            |
-| ----------------------- | ---------------------------------- | -------------------------------------------------- |
-| `--prompt`, `-p`        | Run in headless mode               | `gemini -p "query"`                                |
-| `--output-format`       | Specify output format (text, json) | `gemini -p "query" --output-format json`           |
-| `--model`, `-m`         | Specify the Gemini model           | `gemini -p "query" -m gemini-2.5-flash`            |
-| `--debug`, `-d`         | Enable debug mode                  | `gemini -p "query" --debug`                        |
-| `--all-files`, `-a`     | Include all files in context       | `gemini -p "query" --all-files`                    |
-| `--include-directories` | Include additional directories     | `gemini -p "query" --include-directories src,docs` |
-| `--yolo`, `-y`          | Auto-approve all actions           | `gemini -p "query" --yolo`                         |
-| `--approval-mode`       | Set approval mode                  | `gemini -p "query" --approval-mode auto_edit`      |
+| Option                  | Description                                     | Example                                            |
+| ----------------------- | ----------------------------------------------- | -------------------------------------------------- |
+| `--prompt`, `-p`        | Run in headless mode                            | `gemini -p "query"`                                |
+| `--output-format`       | Specify output format (text, json, stream-json) | `gemini -p "query" --output-format stream-json`    |
+| `--model`, `-m`         | Specify the Gemini model                        | `gemini -p "query" -m gemini-2.5-flash`            |
+| `--debug`, `-d`         | Enable debug mode                               | `gemini -p "query" --debug`                        |
+| `--all-files`, `-a`     | Include all files in context                    | `gemini -p "query" --all-files`                    |
+| `--include-directories` | Include additional directories                  | `gemini -p "query" --include-directories src,docs` |
+| `--yolo`, `-y`          | Auto-approve all actions                        | `gemini -p "query" --yolo`                         |
+| `--approval-mode`       | Set approval mode                               | `gemini -p "query" --approval-mode auto_edit`      |
 
 For complete details on all available configuration options, settings files, and
 environment variables, see the

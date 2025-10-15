@@ -62,4 +62,4 @@ jobs:
           cli-package-name: '${{ vars.CLI_PACKAGE_NAME }}'
           core-package-name: '${{ vars.CORE_PACKAGE_NAME }}'
           a2a-package-name: '${{ vars.A2A_PACKAGE_NAME }}'
-          ref: '${{ github.ref }}'
+          working-directory: '.'
