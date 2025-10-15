@@ -158,6 +158,7 @@ interface ParsedLog {
     function_args?: string;
     success?: boolean;
     duration_ms?: number;
+    request_text?: string;
   };
   scopeMetrics?: {
     metrics: {
@@ -315,10 +316,19 @@ export class TestRig {
   run(
     promptOrOptions:
       | string
-      | { prompt?: string; stdin?: string; stdinDoesNotEnd?: boolean },
+      | {
+          prompt?: string;
+          stdin?: string;
+          stdinDoesNotEnd?: boolean;
+          yolo?: boolean;
+        },
     ...args: string[]
   ): Promise<string> {
-    const { command, initialArgs } = this._getCommandAndArgs(['--yolo']);
+    const yolo =
+      typeof promptOrOptions === 'string' || promptOrOptions.yolo !== false;
+    const { command, initialArgs } = this._getCommandAndArgs(
+      yolo ? ['--yolo'] : [],
+    );
     const commandArgs = [...initialArgs];
     const execOptions: {
       cwd: string;
@@ -535,7 +545,7 @@ export class TestRig {
         try {
           const content = readFileSync(logFilePath, 'utf-8');
           // Check if file has meaningful content (at least one complete JSON object)
-          return content.includes('"event.name"');
+          return content.includes('"scopeMetrics"');
         } catch {
           return false;
         }
@@ -566,7 +576,11 @@ export class TestRig {
     );
   }
 
-  async waitForToolCall(toolName: string, timeout?: number) {
+  async waitForToolCall(
+    toolName: string,
+    timeout?: number,
+    matchArgs?: (args: string) => boolean,
+  ) {
     // Use environment-specific timeout
     if (!timeout) {
       timeout = getDefaultTimeout();
@@ -578,7 +592,11 @@ export class TestRig {
     return poll(
       () => {
         const toolLogs = this.readToolLogs();
-        return toolLogs.some((log) => log.toolRequest.name === toolName);
+        return toolLogs.some(
+          (log) =>
+            log.toolRequest.name === toolName &&
+            (matchArgs?.call(this, log.toolRequest.args) ?? true),
+        );
       },
       timeout,
       100,
@@ -890,7 +908,7 @@ export class TestRig {
     const options: pty.IPtyForkOptions = {
       name: 'xterm-color',
       cols: 80,
-      rows: 30,
+      rows: 24,
       cwd: this.testDir!,
       env: Object.fromEntries(
         Object.entries(env).filter(([, v]) => v !== undefined),
