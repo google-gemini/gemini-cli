@@ -228,6 +228,8 @@ describe('InputPrompt', () => {
       inputWidth: 80,
       suggestionsWidth: 80,
       focus: true,
+      setQueueErrorMessage: vi.fn(),
+      streamingState: StreamingState.Idle,
     };
   });
 
