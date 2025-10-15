@@ -79,16 +79,22 @@ export async function cloneFromGit(
 export function parseGitHubRepoForReleases(source: string): {
   owner: string;
   repo: string;
-} {
+} | null {
   // Default to a github repo path, so `source` can be just an org/repo
   const parsedUrl = URL.parse(source, 'https://github.com');
+  if (!parsedUrl) {
+    throw new Error(`Invalid repo URL: ${source}`);
+  }
   // The pathname should be "/owner/repo".
   const parts = parsedUrl?.pathname
     .substring(1)
     .split('/')
     // Remove the empty segments, fixes trailing slashes
     .filter((part) => part !== '');
-  if (parts?.length !== 2 || parsedUrl?.host !== 'github.com') {
+  if (parsedUrl?.host !== 'github.com') {
+    return null;
+  }
+  if (parts?.length !== 2) {
     throw new Error(
       `Invalid GitHub repository source: ${source}. Expected "owner/repo" or a github repo uri.`,
     );
@@ -110,7 +116,7 @@ export async function fetchReleaseFromGithub(
   repo: string,
   ref?: string,
   allowPreRelease?: boolean,
-): Promise<GithubReleaseData> {
+): Promise<GithubReleaseData | null> {
   if (ref) {
     return await fetchJson(
       `https://api.github.com/repos/${owner}/${repo}/releases/tags/${ref}`,
@@ -130,7 +136,7 @@ export async function fetchReleaseFromGithub(
     `https://api.github.com/repos/${owner}/${repo}/releases?per_page=1`,
   );
   if (releases.length === 0) {
-    throw new Error('No releases found');
+    return null;
   }
   return releases[0];
 }
@@ -206,7 +212,7 @@ export async function checkForExtensionUpdate(
         console.error(`No "source" provided for extension.`);
         return ExtensionUpdateState.ERROR;
       }
-      const { owner, repo } = parseGitHubRepoForReleases(source);
+      const { owner, repo } = parseGitHubRepoForReleases(source)!;
 
       const releaseData = await fetchReleaseFromGithub(
         owner,
@@ -214,6 +220,9 @@ export async function checkForExtensionUpdate(
         installMetadata.ref,
         installMetadata.allowPreRelease,
       );
+      if (!releaseData) {
+        return ExtensionUpdateState.ERROR;
+      }
       if (releaseData.tag_name !== releaseTag) {
         return ExtensionUpdateState.UPDATE_AVAILABLE;
       }
@@ -226,28 +235,57 @@ export async function checkForExtensionUpdate(
     return ExtensionUpdateState.ERROR;
   }
 }
+
 export interface GitHubDownloadResult {
-  tagName: string;
+  tagName?: string;
   type: 'git' | 'github-release';
+  success: boolean;
+  failureReason?:
+    | 'failed to fetch release data'
+    | 'no release data'
+    | 'no release asset found'
+    | 'failed to download asset'
+    | 'failed to extract asset'
+    | 'unknown';
+  errorMessage?: string;
 }
+
 export async function downloadFromGitHubRelease(
   installMetadata: ExtensionInstallMetadata,
   destination: string,
 ): Promise<GitHubDownloadResult> {
   const { source, ref, allowPreRelease: preRelease } = installMetadata;
-  const { owner, repo } = parseGitHubRepoForReleases(source);
+  let releaseData: GithubReleaseData | null = null;
 
   try {
-    const releaseData = await fetchReleaseFromGithub(
-      owner,
-      repo,
-      ref,
-      preRelease,
-    );
-    if (!releaseData) {
-      throw new Error(
-        `No release data found for ${owner}/${repo} at tag ${ref}`,
-      );
+    const parts = parseGitHubRepoForReleases(source);
+    if (!parts) {
+      return {
+        failureReason: 'no release data',
+        success: false,
+        type: 'github-release',
+        errorMessage: `Not a github repo: ${source}`,
+      };
+    }
+    const { owner, repo } = parts;
+
+    try {
+      releaseData = await fetchReleaseFromGithub(owner, repo, ref, preRelease);
+      if (!releaseData) {
+        return {
+          failureReason: 'no release data',
+          success: false,
+          type: 'github-release',
+          errorMessage: `No release data found for ${owner}/${repo} at tag ${ref}`,
+        };
+      }
+    } catch (error) {
+      return {
+        failureReason: 'failed to fetch release data',
+        success: false,
+        type: 'github-release',
+        errorMessage: `Failed to fetch release data for ${owner}/${repo} at tag ${ref}: ${getErrorMessage(error)}`,
+      };
     }
 
     const asset = findReleaseAsset(releaseData.assets);
@@ -266,9 +304,13 @@ export async function downloadFromGitHubRelease(
       }
     }
     if (!archiveUrl) {
-      throw new Error(
-        `No assets found for release with tag ${releaseData.tag_name}`,
-      );
+      return {
+        failureReason: 'no release asset found',
+        success: false,
+        type: 'github-release',
+        tagName: releaseData.tag_name,
+        errorMessage: `No assets found for release with tag ${releaseData.tag_name}`,
+      };
     }
     let downloadedAssetPath = path.join(
       destination,
@@ -280,9 +322,29 @@ export async function downloadFromGitHubRelease(
       downloadedAssetPath += '.zip';
     }
 
-    await downloadFile(archiveUrl, downloadedAssetPath);
+    try {
+      await downloadFile(archiveUrl, downloadedAssetPath);
+    } catch (error) {
+      return {
+        failureReason: 'failed to download asset',
+        success: false,
+        type: 'github-release',
+        tagName: releaseData.tag_name,
+        errorMessage: `Failed to download asset from ${archiveUrl}: ${getErrorMessage(error)}`,
+      };
+    }
 
-    await extractFile(downloadedAssetPath, destination);
+    try {
+      await extractFile(downloadedAssetPath, destination);
+    } catch (error) {
+      return {
+        failureReason: 'failed to extract asset',
+        success: false,
+        type: 'github-release',
+        tagName: releaseData.tag_name,
+        errorMessage: `Failed to extract asset from ${downloadedAssetPath}: ${getErrorMessage(error)}`,
+      };
+    }
 
     // For regular github releases, the repository is put inside of a top level
     // directory. In this case we should see exactly two file in the destination
@@ -316,11 +378,16 @@ export async function downloadFromGitHubRelease(
     return {
       tagName: releaseData.tag_name,
       type: 'github-release',
+      success: true,
     };
   } catch (error) {
-    throw new Error(
-      `Failed to download release from ${installMetadata.source}: ${getErrorMessage(error)}`,
-    );
+    return {
+      failureReason: 'unknown',
+      success: false,
+      type: 'github-release',
+      tagName: releaseData?.tag_name,
+      errorMessage: `Failed to download release from ${installMetadata.source}: ${getErrorMessage(error)}`,
+    };
   }
 }
 
