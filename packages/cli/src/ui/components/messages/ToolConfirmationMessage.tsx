@@ -44,6 +44,7 @@ export const ToolConfirmationMessage: React.FC<
 
   const [ideClient, setIdeClient] = useState<IdeClient | null>(null);
   const [isDiffingEnabled, setIsDiffingEnabled] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -83,6 +84,8 @@ export const ToolConfirmationMessage: React.FC<
       if (!isFocused) return;
       if (key.name === 'escape' || (key.ctrl && key.name === 'c')) {
         handleConfirm(ToolConfirmationOutcome.Cancel);
+      } else if (key.ctrl && key.name === 's') {
+        setIsExpanded((prev) => !prev);
       }
     },
     { isActive: isFocused },
@@ -273,6 +276,14 @@ export const ToolConfirmationMessage: React.FC<
       <Box flexDirection="column" paddingX={1} marginLeft={1}>
         <Text color={theme.text.link}>MCP Server: {mcpProps.serverName}</Text>
         <Text color={theme.text.link}>Tool: {mcpProps.toolName}</Text>
+        {isExpanded && (
+          <Text color={theme.text.link}>
+            Arguments: {JSON.stringify(mcpProps.args, null, 2)}
+          </Text>
+        )}
+        <Text color={theme.text.secondary}>
+          (Press CTRL+s to {isExpanded ? 'collapse' : 'expand'} arguments)
+        </Text>
       </Box>
     );
 

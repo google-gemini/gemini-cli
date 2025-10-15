@@ -58,6 +58,8 @@ describe('keyMatchers', () => {
     [Command.QUIT]: (key: Key) => key.ctrl && key.name === 'c',
     [Command.EXIT]: (key: Key) => key.ctrl && key.name === 'd',
     [Command.SHOW_MORE_LINES]: (key: Key) => key.ctrl && key.name === 's',
+    [Command.TOGGLE_TOOL_CALL_ARGUMENTS_EXPANSION]: (key: Key) =>
+      key.ctrl && key.name === 's',
     [Command.REVERSE_SEARCH]: (key: Key) => key.ctrl && key.name === 'r',
     [Command.SUBMIT_REVERSE_SEARCH]: (key: Key) =>
       key.name === 'return' && !key.ctrl,
@@ -237,6 +239,13 @@ describe('keyMatchers', () => {
     },
     {
       command: Command.SHOW_MORE_LINES,
+      positive: [createKey('s', { ctrl: true })],
+      negative: [createKey('s'), createKey('l', { ctrl: true })],
+    },
+
+    // Tool calling
+    {
+      command: Command.TOGGLE_TOOL_CALL_ARGUMENTS_EXPANSION,
       positive: [createKey('s', { ctrl: true })],
       negative: [createKey('s'), createKey('l', { ctrl: true })],
     },

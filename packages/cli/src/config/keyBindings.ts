@@ -52,6 +52,9 @@ export enum Command {
   EXIT = 'exit',
   SHOW_MORE_LINES = 'showMoreLines',
 
+  // Tool calling
+  TOGGLE_TOOL_CALL_ARGUMENTS_EXPANSION = 'toggleToolCallArgumentsExpansion',
+
   // Shell commands
   REVERSE_SEARCH = 'reverseSearch',
   SUBMIT_REVERSE_SEARCH = 'submitReverseSearch',
@@ -161,6 +164,9 @@ export const defaultKeyBindings: KeyBindingConfig = {
   [Command.QUIT]: [{ key: 'c', ctrl: true }],
   [Command.EXIT]: [{ key: 'd', ctrl: true }],
   [Command.SHOW_MORE_LINES]: [{ key: 's', ctrl: true }],
+
+  // Tool calling
+  [Command.TOGGLE_TOOL_CALL_ARGUMENTS_EXPANSION]: [{ key: 's', ctrl: true }],
 
   // Shell commands
   [Command.REVERSE_SEARCH]: [{ key: 'r', ctrl: true }],
