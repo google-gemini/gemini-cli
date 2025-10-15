@@ -956,6 +956,109 @@ describe('AppContainer State Management', () => {
     });
   });
 
+  describe('Queue Error Message', () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('should set and clear the queue error message after a timeout', async () => {
+      const { rerender } = render(
+        <AppContainer
+          config={mockConfig}
+          settings={mockSettings}
+          version="1.0.0"
+          initializationResult={mockInitResult}
+        />,
+      );
+
+      expect(capturedUIState.queueErrorMessage).toBeNull();
+
+      capturedUIActions.setQueueErrorMessage('Test error');
+      rerender(
+        <AppContainer
+          config={mockConfig}
+          settings={mockSettings}
+          version="1.0.0"
+          initializationResult={mockInitResult}
+        />,
+      );
+      expect(capturedUIState.queueErrorMessage).toBe('Test error');
+
+      vi.advanceTimersByTime(3000);
+      rerender(
+        <AppContainer
+          config={mockConfig}
+          settings={mockSettings}
+          version="1.0.0"
+          initializationResult={mockInitResult}
+        />,
+      );
+      expect(capturedUIState.queueErrorMessage).toBeNull();
+    });
+
+    it('should reset the timer if a new error message is set', async () => {
+      const { rerender } = render(
+        <AppContainer
+          config={mockConfig}
+          settings={mockSettings}
+          version="1.0.0"
+          initializationResult={mockInitResult}
+        />,
+      );
+
+      capturedUIActions.setQueueErrorMessage('First error');
+      rerender(
+        <AppContainer
+          config={mockConfig}
+          settings={mockSettings}
+          version="1.0.0"
+          initializationResult={mockInitResult}
+        />,
+      );
+      expect(capturedUIState.queueErrorMessage).toBe('First error');
+
+      vi.advanceTimersByTime(1500);
+
+      capturedUIActions.setQueueErrorMessage('Second error');
+      rerender(
+        <AppContainer
+          config={mockConfig}
+          settings={mockSettings}
+          version="1.0.0"
+          initializationResult={mockInitResult}
+        />,
+      );
+      expect(capturedUIState.queueErrorMessage).toBe('Second error');
+
+      vi.advanceTimersByTime(2000);
+      rerender(
+        <AppContainer
+          config={mockConfig}
+          settings={mockSettings}
+          version="1.0.0"
+          initializationResult={mockInitResult}
+        />,
+      );
+      expect(capturedUIState.queueErrorMessage).toBe('Second error');
+
+      // 5. Advance time past the 3 second timeout from the second message
+      vi.advanceTimersByTime(1000);
+      rerender(
+        <AppContainer
+          config={mockConfig}
+          settings={mockSettings}
+          version="1.0.0"
+          initializationResult={mockInitResult}
+        />,
+      );
+      expect(capturedUIState.queueErrorMessage).toBeNull();
+    });
+  });
+
   describe('Terminal Height Calculation', () => {
     const mockedMeasureElement = measureElement as Mock;
     const mockedUseTerminalSize = useTerminalSize as Mock;

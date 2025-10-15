@@ -255,6 +255,9 @@ describe('CoreToolScheduler', () => {
       getUseSmartEdit: () => false,
       getUseModelRouter: () => false,
       getGeminiClient: () => null, // No client needed for these tests
+      getEnableMessageBusIntegration: () => false,
+      getMessageBus: () => null,
+      getPolicyEngine: () => null,
     } as unknown as Config;
 
     const scheduler = new CoreToolScheduler({
@@ -332,6 +335,9 @@ describe('CoreToolScheduler', () => {
       getUseSmartEdit: () => false,
       getUseModelRouter: () => false,
       getGeminiClient: () => null,
+      getEnableMessageBusIntegration: () => false,
+      getMessageBus: () => null,
+      getPolicyEngine: () => null,
     } as unknown as Config;
 
     const scheduler = new CoreToolScheduler({
@@ -365,15 +371,18 @@ describe('CoreToolScheduler', () => {
   describe('getToolSuggestion', () => {
     it('should suggest the top N closest tool names for a typo', () => {
       // Create mocked tool registry
+      const mockToolRegistry = {
+        getAllToolNames: () => ['list_files', 'read_file', 'write_file'],
+      } as unknown as ToolRegistry;
       const mockConfig = {
         getToolRegistry: () => mockToolRegistry,
         getUseSmartEdit: () => false,
         getUseModelRouter: () => false,
         getGeminiClient: () => null, // No client needed for these tests
+        getEnableMessageBusIntegration: () => false,
+        getMessageBus: () => null,
+        getPolicyEngine: () => null,
       } as unknown as Config;
-      const mockToolRegistry = {
-        getAllToolNames: () => ['list_files', 'read_file', 'write_file'],
-      } as unknown as ToolRegistry;
 
       // Create scheduler
       const scheduler = new CoreToolScheduler({
@@ -448,6 +457,9 @@ describe('CoreToolScheduler with payload', () => {
       getUseSmartEdit: () => false,
       getUseModelRouter: () => false,
       getGeminiClient: () => null, // No client needed for these tests
+      getEnableMessageBusIntegration: () => false,
+      getMessageBus: () => null,
+      getPolicyEngine: () => null,
     } as unknown as Config;
 
     const scheduler = new CoreToolScheduler({
@@ -768,6 +780,9 @@ describe('CoreToolScheduler edit cancellation', () => {
       getUseSmartEdit: () => false,
       getUseModelRouter: () => false,
       getGeminiClient: () => null, // No client needed for these tests
+      getEnableMessageBusIntegration: () => false,
+      getMessageBus: () => null,
+      getPolicyEngine: () => null,
     } as unknown as Config;
 
     const scheduler = new CoreToolScheduler({
@@ -874,6 +889,9 @@ describe('CoreToolScheduler YOLO mode', () => {
       getUseSmartEdit: () => false,
       getUseModelRouter: () => false,
       getGeminiClient: () => null, // No client needed for these tests
+      getEnableMessageBusIntegration: () => false,
+      getMessageBus: () => null,
+      getPolicyEngine: () => null,
     } as unknown as Config;
 
     const scheduler = new CoreToolScheduler({
@@ -981,6 +999,9 @@ describe('CoreToolScheduler request queueing', () => {
       getUseSmartEdit: () => false,
       getUseModelRouter: () => false,
       getGeminiClient: () => null, // No client needed for these tests
+      getEnableMessageBusIntegration: () => false,
+      getMessageBus: () => null,
+      getPolicyEngine: () => null,
     } as unknown as Config;
 
     const scheduler = new CoreToolScheduler({
@@ -1113,6 +1134,9 @@ describe('CoreToolScheduler request queueing', () => {
       getUseSmartEdit: () => false,
       getUseModelRouter: () => false,
       getGeminiClient: () => null, // No client needed for these tests
+      getEnableMessageBusIntegration: () => false,
+      getMessageBus: () => null,
+      getPolicyEngine: () => null,
     } as unknown as Config;
 
     const scheduler = new CoreToolScheduler({
@@ -1215,6 +1239,9 @@ describe('CoreToolScheduler request queueing', () => {
       getUseSmartEdit: () => false,
       getUseModelRouter: () => false,
       getGeminiClient: () => null, // No client needed for these tests
+      getEnableMessageBusIntegration: () => false,
+      getMessageBus: () => null,
+      getPolicyEngine: () => null,
     } as unknown as Config;
 
     const scheduler = new CoreToolScheduler({
@@ -1287,6 +1314,9 @@ describe('CoreToolScheduler request queueing', () => {
       getUseSmartEdit: () => false,
       getUseModelRouter: () => false,
       getGeminiClient: () => null, // No client needed for these tests
+      getEnableMessageBusIntegration: () => false,
+      getMessageBus: () => null,
+      getPolicyEngine: () => null,
     } as unknown as Config;
 
     const testTool = new TestApprovalTool(mockConfig);
@@ -1475,6 +1505,8 @@ describe('CoreToolScheduler Sequential Execution', () => {
       getUseSmartEdit: () => false,
       getUseModelRouter: () => false,
       getGeminiClient: () => null,
+      getEnableMessageBusIntegration: () => false,
+      getMessageBus: () => null,
     } as unknown as Config;
 
     const scheduler = new CoreToolScheduler({
@@ -1595,6 +1627,8 @@ describe('CoreToolScheduler Sequential Execution', () => {
       getUseSmartEdit: () => false,
       getUseModelRouter: () => false,
       getGeminiClient: () => null,
+      getEnableMessageBusIntegration: () => false,
+      getMessageBus: () => null,
     } as unknown as Config;
 
     const scheduler = new CoreToolScheduler({
