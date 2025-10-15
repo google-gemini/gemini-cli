@@ -44,10 +44,6 @@ vi.mock('./ShellModeIndicator.js', () => ({
   ShellModeIndicator: () => <Text>ShellModeIndicator</Text>,
 }));
 
-vi.mock('./RawMarkdownIndicator.js', () => ({
-  RawMarkdownIndicator: () => <Text>RawMarkdownIndicator</Text>,
-}));
-
 vi.mock('./DetailedMessagesDisplay.js', () => ({
   DetailedMessagesDisplay: () => <Text>DetailedMessagesDisplay</Text>,
 }));
@@ -416,7 +412,7 @@ describe('Composer', () => {
 
       const { lastFrame } = renderComposer(uiState);
 
-      expect(lastFrame()).toContain('RawMarkdownIndicator');
+      expect(lastFrame()).toContain('raw markdown mode');
     });
 
     it('does not show RawMarkdownIndicator when renderMarkdown is true', () => {
@@ -426,7 +422,7 @@ describe('Composer', () => {
 
       const { lastFrame } = renderComposer(uiState);
 
-      expect(lastFrame()).not.toContain('RawMarkdownIndicator');
+      expect(lastFrame()).not.toContain('raw markdown mode');
     });
   });
 

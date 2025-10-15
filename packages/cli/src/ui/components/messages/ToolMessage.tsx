@@ -57,7 +57,7 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
   ptyId,
   config,
 }) => {
-  const { renderMarkdown: globalRenderMarkdown } = useUIState();
+  const { renderMarkdown } = useUIState();
   const isThisShellFocused =
     (name === SHELL_COMMAND_NAME || name === 'Shell') &&
     status === ToolCallStatus.Executing &&
@@ -151,7 +151,7 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
                   isPending={false}
                   availableTerminalHeight={availableHeight}
                   terminalWidth={childWidth}
-                  renderMarkdown={globalRenderMarkdown}
+                  renderMarkdown={renderMarkdown}
                 />
               </Box>
             ) : typeof resultDisplay === 'string' && !renderOutputAsMarkdown ? (
