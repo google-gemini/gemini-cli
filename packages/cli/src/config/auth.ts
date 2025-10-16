@@ -18,7 +18,11 @@ export function validateAuthMethod(authMethod: string): string | null {
 
   if (authMethod === AuthType.USE_GEMINI) {
     if (!process.env['GEMINI_API_KEY']) {
-      return 'GEMINI_API_KEY environment variable not found. Add that to your environment and try again (no reload needed if using .env)!';
+      return (
+        'GEMINI_API_KEY not found. Find your existing key or generate a new one at: https://aistudio.google.com/apikey\n' +
+        '\n' +
+        'To continue, please set the GEMINI_API_KEY environment variable or add it to a .env file.'
+      );
     }
     return null;
   }
