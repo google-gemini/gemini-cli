@@ -23,7 +23,7 @@
 
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { beforeAll, describe, it } from 'vitest';
+import { beforeEach, afterEach, describe, it } from 'vitest';
 import { TestRig } from './test-helper.js';
 
 // Create a minimal MCP server that doesn't require external dependencies
@@ -166,9 +166,10 @@ rpc.send({
 `;
 
 describe('mcp server with cyclic tool schema is detected', () => {
-  const rig = new TestRig();
+  let rig: TestRig;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
+    rig = new TestRig();
     // Setup test directory with MCP server configuration
     await rig.setup('cyclic-schema-mcp-server', {
       settings: {
@@ -190,6 +191,10 @@ describe('mcp server with cyclic tool schema is detected', () => {
       const { chmodSync } = await import('node:fs');
       chmodSync(testServerPath, 0o755);
     }
+  });
+
+  afterEach(async (ctx) => {
+    await rig.cleanup(ctx);
   });
 
   it('mcp tool list should include tool with cyclic tool schema', async () => {

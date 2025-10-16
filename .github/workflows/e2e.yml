@@ -90,8 +90,6 @@ jobs:
       - name: 'Run E2E tests'
         env:
           GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
-          KEEP_OUTPUT: 'true'
-          VERBOSE: 'true'
         shell: 'bash'
         run: |
           if [[ "${{ matrix.sandbox }}" == "sandbox:docker" ]]; then
@@ -144,9 +142,7 @@ jobs:
         if: "runner.os != 'Windows'"
         env:
           GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
-          KEEP_OUTPUT: 'true'
           SANDBOX: 'sandbox:none'
-          VERBOSE: 'true'
         run: 'npm run test:integration:sandbox:none'
 
   e2e_windows:
@@ -211,9 +207,7 @@ jobs:
       - name: 'Run E2E tests'
         env:
           GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
-          KEEP_OUTPUT: 'true'
           SANDBOX: 'sandbox:none'
-          VERBOSE: 'true'
           NODE_OPTIONS: '--max-old-space-size=32768 --max-semi-space-size=256'
           UV_THREADPOOL_SIZE: '32'
           NODE_ENV: 'test'

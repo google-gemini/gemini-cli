@@ -4,12 +4,21 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { TestRig } from './test-helper.js';
 
 describe('Flicker Detector', () => {
+  let rig: TestRig;
+
+  beforeEach(() => {
+    rig = new TestRig();
+  });
+
+  afterEach(async (ctx) => {
+    await rig.cleanup(ctx);
+  });
+
   it('should not detect a flicker under the max height budget', async () => {
-    const rig = new TestRig();
     await rig.setup('flicker-detector-test');
 
     const run = await rig.runInteractive();

@@ -4,12 +4,21 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { TestRig } from './test-helper.js';
 
 describe('replace', () => {
+  let rig: TestRig;
+
+  beforeEach(() => {
+    rig = new TestRig();
+  });
+
+  afterEach(async (ctx) => {
+    await rig.cleanup(ctx);
+  });
+
   it('should be able to replace content in a file', async () => {
-    const rig = new TestRig();
     await rig.setup('should be able to replace content in a file');
 
     const fileName = 'file_to_replace.txt';
@@ -27,7 +36,6 @@ describe('replace', () => {
   });
 
   it('should handle $ literally when replacing text ending with $', async () => {
-    const rig = new TestRig();
     await rig.setup(
       'should handle $ literally when replacing text ending with $',
     );
@@ -49,7 +57,6 @@ describe('replace', () => {
   });
 
   it('should insert a multi-line block of text', async () => {
-    const rig = new TestRig();
     await rig.setup('should insert a multi-line block of text');
     const fileName = 'insert_block.txt';
     const originalContent = 'Line A\n<INSERT_TEXT_HERE>\nLine C';
@@ -68,7 +75,6 @@ describe('replace', () => {
   });
 
   it('should delete a block of text', async () => {
-    const rig = new TestRig();
     await rig.setup('should delete a block of text');
     const fileName = 'delete_block.txt';
     const blockToDelete =

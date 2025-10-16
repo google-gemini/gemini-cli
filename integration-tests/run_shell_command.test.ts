@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { TestRig, printDebugInfo, validateModelOutput } from './test-helper.js';
 import { getShellConfiguration } from '../packages/core/src/utils/shell-utils.js';
 
@@ -22,8 +22,17 @@ function getLineCountCommand(): { command: string; tool: string } {
 }
 
 describe('run_shell_command', () => {
+  let rig: TestRig;
+
+  beforeEach(() => {
+    rig = new TestRig();
+  });
+
+  afterEach(async (ctx) => {
+    await rig.cleanup(ctx);
+  });
+
   it('should be able to run a shell command', async () => {
-    const rig = new TestRig();
     await rig.setup('should be able to run a shell command');
 
     const prompt = `Please run the command "echo hello-world" and show me the output`;
@@ -55,7 +64,6 @@ describe('run_shell_command', () => {
   });
 
   it('should be able to run a shell command via stdin', async () => {
-    const rig = new TestRig();
     await rig.setup('should be able to run a shell command via stdin');
 
     const prompt = `Please run the command "echo test-stdin" and show me what it outputs`;
@@ -83,7 +91,6 @@ describe('run_shell_command', () => {
   });
 
   it('should run allowed sub-command in non-interactive mode', async () => {
-    const rig = new TestRig();
     await rig.setup('should run allowed sub-command in non-interactive mode');
 
     const testFile = rig.createFile('test.txt', 'Lorem\nIpsum\nDolor\n');
@@ -121,7 +128,6 @@ describe('run_shell_command', () => {
   });
 
   it('should succeed with no parens in non-interactive mode', async () => {
-    const rig = new TestRig();
     await rig.setup('should succeed with no parens in non-interactive mode');
 
     const testFile = rig.createFile('test.txt', 'Lorem\nIpsum\nDolor\n');
@@ -158,7 +164,6 @@ describe('run_shell_command', () => {
   });
 
   it('should succeed with --yolo mode', async () => {
-    const rig = new TestRig();
     await rig.setup('should succeed with --yolo mode');
 
     const testFile = rig.createFile('test.txt', 'Lorem\nIpsum\nDolor\n');
@@ -192,7 +197,6 @@ describe('run_shell_command', () => {
   });
 
   it('should work with ShellTool alias', async () => {
-    const rig = new TestRig();
     await rig.setup('should work with ShellTool alias');
 
     const testFile = rig.createFile('test.txt', 'Lorem\nIpsum\nDolor\n');
@@ -231,7 +235,6 @@ describe('run_shell_command', () => {
   // TODO(#11062): Un-skip this once we can make it reliable by using hard coded
   // model responses.
   it.skip('should combine multiple --allowed-tools flags', async () => {
-    const rig = new TestRig();
     await rig.setup('should combine multiple --allowed-tools flags');
 
     const { tool, command } = getLineCountCommand();
@@ -281,7 +284,6 @@ describe('run_shell_command', () => {
   });
 
   it('should allow all with "ShellTool" and other specific tools', async () => {
-    const rig = new TestRig();
     await rig.setup(
       'should allow all with "ShellTool" and other specific tools',
     );
@@ -328,7 +330,6 @@ describe('run_shell_command', () => {
   });
 
   it('should propagate environment variables to the child process', async () => {
-    const rig = new TestRig();
     await rig.setup('should propagate environment variables');
 
     const varName = 'GEMINI_CLI_TEST_VAR';
@@ -360,7 +361,6 @@ describe('run_shell_command', () => {
   });
 
   it('should run a platform-specific file listing command', async () => {
-    const rig = new TestRig();
     await rig.setup('should run platform-specific file listing');
     const fileName = `test-file-${Math.random().toString(36).substring(7)}.txt`;
     rig.createFile(fileName, 'test content');

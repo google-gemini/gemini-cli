@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { expect } from 'vitest';
+import { expect, TestContext } from 'vitest';
 import { execSync, spawn } from 'node:child_process';
 import { mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
@@ -32,22 +32,12 @@ export async function poll(
   interval: number,
 ): Promise<boolean> {
   const startTime = Date.now();
-  let attempts = 0;
   while (Date.now() - startTime < timeout) {
-    attempts++;
     const result = predicate();
-    if (env['VERBOSE'] === 'true' && attempts % 5 === 0) {
-      console.log(
-        `Poll attempt ${attempts}: ${result ? 'success' : 'waiting...'}`,
-      );
-    }
     if (result) {
       return true;
     }
     await new Promise((resolve) => setTimeout(resolve, interval));
-  }
-  if (env['VERBOSE'] === 'true') {
-    console.log(`Poll timed out after ${attempts} attempts`);
   }
   return false;
 }
@@ -108,7 +98,6 @@ export function printDebugInfo(
 export function validateModelOutput(
   result: string,
   expectedContent: string | (string | RegExp)[] | null = null,
-  testName = '',
 ) {
   // First, check if there's any output at all (this should fail the test if missing)
   if (!result || result.trim().length === 0) {
@@ -143,7 +132,7 @@ export function validateModelOutput(
       console.warn('Actual output:', result);
       return false;
     } else if (env['VERBOSE'] === 'true') {
-      console.log(`${testName}: Model output validated successfully.`);
+      // console.log(`${testName}: Model output validated successfully.`);
     }
     return true;
   }
@@ -177,9 +166,6 @@ export class InteractiveRun {
     this.ptyProcess = ptyProcess;
     ptyProcess.onData((data) => {
       this.output += data;
-      if (env['KEEP_OUTPUT'] === 'true' || env['VERBOSE'] === 'true') {
-        process.stdout.write(data);
-      }
     });
   }
 
@@ -255,6 +241,8 @@ export class TestRig {
   testDir: string | null;
   testName?: string;
   _lastRunStdout?: string;
+  capturedOutput: string[] = [];
+  interactiveRuns: InteractiveRun[] = [];
 
   constructor() {
     this.bundlePath = join(__dirname, '..', 'bundle/gemini.js');
@@ -380,6 +368,10 @@ export class TestRig {
 
     commandArgs.push(...args);
 
+    this.capturedOutput.push(
+      `Running command: ${command} ${commandArgs.join(' ')}\n`,
+    );
+
     const child = spawn(command, commandArgs, {
       cwd: this.testDir!,
       stdio: 'pipe',
@@ -403,16 +395,12 @@ export class TestRig {
 
     child.stdout!.on('data', (data: Buffer) => {
       stdout += data;
-      if (env['KEEP_OUTPUT'] === 'true' || env['VERBOSE'] === 'true') {
-        process.stdout.write(data);
-      }
+      this.capturedOutput.push(data.toString());
     });
 
     child.stderr!.on('data', (data: Buffer) => {
       stderr += data;
-      if (env['KEEP_OUTPUT'] === 'true' || env['VERBOSE'] === 'true') {
-        process.stderr.write(data);
-      }
+      this.capturedOutput.push(data.toString());
     });
 
     const promise = new Promise<string>((resolve, reject) => {
@@ -487,6 +475,10 @@ export class TestRig {
     const { command, initialArgs } = this._getCommandAndArgs();
     const commandArgs = [...initialArgs, ...args];
 
+    this.capturedOutput.push(
+      `Running command: ${command} ${commandArgs.join(' ')}\n`,
+    );
+
     const child = spawn(command, commandArgs, {
       cwd: this.testDir!,
       stdio: 'pipe',
@@ -502,16 +494,12 @@ export class TestRig {
 
     child.stdout!.on('data', (data: Buffer) => {
       stdout += data;
-      if (env['KEEP_OUTPUT'] === 'true' || env['VERBOSE'] === 'true') {
-        process.stdout.write(data);
-      }
+      this.capturedOutput.push(data.toString());
     });
 
     child.stderr!.on('data', (data: Buffer) => {
       stderr += data;
-      if (env['KEEP_OUTPUT'] === 'true' || env['VERBOSE'] === 'true') {
-        process.stderr.write(data);
-      }
+      this.capturedOutput.push(data.toString());
     });
 
     const promise = new Promise<string>((resolve, reject) => {
@@ -535,15 +523,24 @@ export class TestRig {
   readFile(fileName: string) {
     const filePath = join(this.testDir!, fileName);
     const content = readFileSync(filePath, 'utf-8');
-    if (env['KEEP_OUTPUT'] === 'true' || env['VERBOSE'] === 'true') {
-      console.log(`--- FILE: ${filePath} ---`);
-      console.log(content);
-      console.log(`--- END FILE: ${filePath} ---`);
-    }
+    this.capturedOutput.push(
+      `--- FILE: ${filePath} ---\n${content}\n--- END FILE: ${filePath} ---\n`,
+    );
     return content;
   }
 
-  async cleanup() {
+  async cleanup(testContext?: TestContext) {
+    // Print captured output if test failed
+    if (testContext?.task.result?.state === 'fail') {
+      console.log(`\n--- Output for test: ${this.testName} ---`);
+      console.log(this.capturedOutput.join(''));
+      for (const run of this.interactiveRuns) {
+        console.log(`--- Interactive run output ---`);
+        console.log(run.output);
+      }
+      console.log(`--- End output for test: ${this.testName} ---\n`);
+    }
+
     // Clean up test directory
     if (this.testDir && !env['KEEP_OUTPUT']) {
       try {
@@ -958,6 +955,10 @@ export class TestRig {
     const { command, initialArgs } = this._getCommandAndArgs(['--yolo']);
     const commandArgs = [...initialArgs, ...args];
 
+    this.capturedOutput.push(
+      `Running interactive command: ${command} ${commandArgs.join(' ')}\n`,
+    );
+
     const options: pty.IPtyForkOptions = {
       name: 'xterm-color',
       cols: 80,
@@ -972,6 +973,7 @@ export class TestRig {
     const ptyProcess = pty.spawn(executable, commandArgs, options);
 
     const run = new InteractiveRun(ptyProcess);
+    this.interactiveRuns.push(run);
     // Wait for the app to be ready
     await run.expectText('Type your message', 30000);
     return run;

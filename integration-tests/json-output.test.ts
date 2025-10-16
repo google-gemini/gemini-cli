@@ -15,8 +15,8 @@ describe('JSON output', () => {
     await rig.setup('json-output-test');
   });
 
-  afterEach(async () => {
-    await rig.cleanup();
+  afterEach(async (ctx) => {
+    await rig.cleanup(ctx);
   });
 
   it('should return a valid JSON with response and stats', async () => {

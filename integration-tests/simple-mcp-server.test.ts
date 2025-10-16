@@ -10,7 +10,7 @@
  * external dependencies, making it compatible with Docker sandbox mode.
  */
 
-import { describe, it, beforeAll, expect } from 'vitest';
+import { describe, it, beforeEach, afterEach, expect } from 'vitest';
 import { TestRig, poll, validateModelOutput } from './test-helper.js';
 import { join } from 'node:path';
 import { writeFileSync } from 'node:fs';
@@ -165,9 +165,10 @@ rpc.send({
 `;
 
 describe('simple-mcp-server', () => {
-  const rig = new TestRig();
+  let rig: TestRig;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
+    rig = new TestRig();
     // Setup test directory with MCP server configuration
     await rig.setup('simple-mcp-server', {
       settings: {
@@ -208,6 +209,10 @@ describe('simple-mcp-server', () => {
     if (!isReady) {
       throw new Error('MCP server script was not ready in time.');
     }
+  });
+
+  afterEach(async (ctx) => {
+    await rig.cleanup(ctx);
   });
 
   it('should add two numbers', async () => {

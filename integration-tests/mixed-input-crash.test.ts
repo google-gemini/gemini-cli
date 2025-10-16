@@ -4,12 +4,21 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { TestRig } from './test-helper.js';
 
 describe('mixed input crash prevention', () => {
+  let rig: TestRig;
+
+  beforeEach(() => {
+    rig = new TestRig();
+  });
+
+  afterEach(async (ctx) => {
+    await rig.cleanup(ctx);
+  });
+
   it('should not crash when using mixed prompt inputs', async () => {
-    const rig = new TestRig();
     rig.setup('should not crash when using mixed prompt inputs');
 
     // Test: echo "say '1'." | gemini --prompt-interactive="say '2'." say '3'.
@@ -40,7 +49,6 @@ describe('mixed input crash prevention', () => {
   });
 
   it('should provide clear error message for mixed input', async () => {
-    const rig = new TestRig();
     rig.setup('should provide clear error message for mixed input');
 
     try {

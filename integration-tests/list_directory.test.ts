@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import {
   TestRig,
   poll,
@@ -15,8 +15,17 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 
 describe('list_directory', () => {
+  let rig: TestRig;
+
+  beforeEach(() => {
+    rig = new TestRig();
+  });
+
+  afterEach(async (ctx) => {
+    await rig.cleanup(ctx);
+  });
+
   it('should be able to list a directory', async () => {
-    const rig = new TestRig();
     await rig.setup('should be able to list a directory');
     rig.createFile('file1.txt', 'file 1 content');
     rig.mkdir('subdir');

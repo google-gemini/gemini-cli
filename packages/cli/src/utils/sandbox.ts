@@ -712,10 +712,7 @@ export async function start_sandbox(
     let userFlag = '';
     const finalEntrypoint = entrypoint(workdir, cliArgs);
 
-    if (process.env['GEMINI_CLI_INTEGRATION_TEST'] === 'true') {
-      args.push('--user', 'root');
-      userFlag = '--user root';
-    } else if (await shouldUseCurrentUserInSandbox()) {
+    if (await shouldUseCurrentUserInSandbox()) {
       // For the user-creation logic to work, the container must start as root.
       // The entrypoint script then handles dropping privileges to the correct user.
       args.push('--user', 'root');
@@ -729,6 +726,8 @@ export async function start_sandbox(
       // necessary on Linux to ensure the user exists within the
       // container's /etc/passwd file, which is required by os.userInfo().
       const username = 'gemini';
+      // In integration tests, $HOME is set to the test run directory.
+      // We need to use that as the home directory inside the container.
       const homeDir = getContainerPath(os.homedir());
 
       const setupUserCommands = [
@@ -736,21 +735,26 @@ export async function start_sandbox(
         `groupadd -f -g ${gid} ${username}`,
         // Create user only if it doesn't exist. Use -o for non-unique UID.
         `id -u ${username} &>/dev/null || useradd -o -u ${uid} -g ${gid} -d ${homeDir} -s /bin/bash ${username}`,
+        // Ensure home directory exists and is owned by the user
+        `mkdir -p ${homeDir} && chown ${uid}:${gid} ${homeDir}`,
       ].join(' && ');
 
       const originalCommand = finalEntrypoint[2];
       const escapedOriginalCommand = originalCommand.replace(/'/g, "'\\''");
 
-      // Use `su -p` to preserve the environment.
-      const suCommand = `su -p ${username} -c '${escapedOriginalCommand}'`;
+      // Use `su -p` to preserve the environment, but explicitly set HOME
+      // to ensure it's correct for the new user in the container context.
+      const suCommand = `su -p ${username} -c 'HOME="${homeDir}" ${escapedOriginalCommand}'`;
 
       // The entrypoint is always `['bash', '-c', '<command>']`, so we modify the command part.
       finalEntrypoint[2] = `${setupUserCommands} && ${suCommand}`;
 
       // We still need userFlag for the simpler proxy container, which does not have this issue.
       userFlag = `--user ${uid}:${gid}`;
-      // When forcing a UID in the sandbox, $HOME can be reset to '/', so we copy $HOME as well.
-      args.push('--env', `HOME=${os.homedir()}`);
+    } else if (process.env['GEMINI_CLI_INTEGRATION_TEST'] === 'true') {
+      // On non-Linux platforms (or where user mapping is disabled), run as root in integration tests.
+      args.push('--user', 'root');
+      userFlag = '--user root';
     }
 
     // push container image name

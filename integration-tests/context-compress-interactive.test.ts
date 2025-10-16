@@ -14,8 +14,8 @@ describe('Interactive Mode', () => {
     rig = new TestRig();
   });
 
-  afterEach(async () => {
-    await rig.cleanup();
+  afterEach(async (ctx) => {
+    await rig.cleanup(ctx);
   });
 
   // TODO(#11062): Make this test reliable by not using the actual Gemini model

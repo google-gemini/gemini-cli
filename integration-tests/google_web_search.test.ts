@@ -5,12 +5,21 @@
  */
 
 import { WEB_SEARCH_TOOL_NAME } from '../packages/core/src/tools/tool-names.js';
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { TestRig, printDebugInfo, validateModelOutput } from './test-helper.js';
 
 describe(WEB_SEARCH_TOOL_NAME, () => {
+  let rig: TestRig;
+
+  beforeEach(() => {
+    rig = new TestRig();
+  });
+
+  afterEach(async (ctx) => {
+    await rig.cleanup(ctx);
+  });
+
   it('should be able to search the web', async () => {
-    const rig = new TestRig();
     await rig.setup('should be able to search the web');
 
     let result;

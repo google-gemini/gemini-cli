@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { writeFileSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { TestRig } from './test-helper.js';
@@ -50,18 +50,18 @@ const utf32BE = (s: string) => {
   return Buffer.concat([bom, payload]);
 };
 
-let rig: TestRig;
-let dir: string;
-
 d('BOM end-to-end integration', () => {
-  beforeAll(async () => {
+  let rig: TestRig;
+  let dir: string;
+
+  beforeEach(async () => {
     rig = new TestRig();
     await rig.setup('bom-integration');
     dir = rig.testDir!;
   });
 
-  afterAll(async () => {
-    await rig.cleanup();
+  afterEach(async (ctx) => {
+    await rig.cleanup(ctx);
   });
 
   async function runAndAssert(

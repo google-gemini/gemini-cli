@@ -14,8 +14,8 @@ describe.skip('Interactive file system', () => {
     rig = new TestRig();
   });
 
-  afterEach(async () => {
-    await rig.cleanup();
+  afterEach(async (ctx) => {
+    await rig.cleanup(ctx);
   });
 
   it('should perform a read-then-write sequence', async () => {

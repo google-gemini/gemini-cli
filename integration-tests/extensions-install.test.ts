@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { expect, test } from 'vitest';
+import { expect, test, beforeEach, afterEach } from 'vitest';
 import { TestRig } from './test-helper.js';
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -19,8 +19,17 @@ const extensionUpdate = `{
   "version": "0.0.2"
 }`;
 
+let rig: TestRig;
+
+beforeEach(() => {
+  rig = new TestRig();
+});
+
+afterEach(async (ctx) => {
+  await rig.cleanup(ctx);
+});
+
 test('installs a local extension, verifies a command, and updates it', async () => {
-  const rig = new TestRig();
   rig.setup('extension install test');
   const testServerPath = join(rig.testDir!, 'gemini-extension.json');
   writeFileSync(testServerPath, extension);
@@ -47,6 +56,4 @@ test('installs a local extension, verifies a command, and updates it', async () 
   expect(updateResult).toContain('0.0.2');
 
   await rig.runCommand(['extensions', 'uninstall', 'test-extension']);
-
-  await rig.cleanup();
 });
