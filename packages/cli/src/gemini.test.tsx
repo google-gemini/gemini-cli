@@ -323,14 +323,16 @@ describe('gemini.tsx main function kitty protocol', () => {
       showMemoryUsage: undefined,
       yolo: undefined,
       approvalMode: undefined,
-      telemetry: undefined,
       checkpointing: undefined,
+<<<<<<< HEAD
       telemetryTarget: undefined,
       telemetryOtlpEndpoint: undefined,
       telemetryOtlpProtocol: undefined,
       telemetryOtlpHeader: undefined,
       telemetryLogPrompts: undefined,
       telemetryOutfile: undefined,
+=======
+>>>>>>> 9049f8f8 (feat: remove deprecated telemetry flags (#11318))
       allowedMcpServerNames: undefined,
       allowedTools: undefined,
       experimentalAcp: undefined,

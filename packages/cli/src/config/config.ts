@@ -70,14 +70,16 @@ export interface CliArgs {
   showMemoryUsage: boolean | undefined;
   yolo: boolean | undefined;
   approvalMode: string | undefined;
-  telemetry: boolean | undefined;
   checkpointing: boolean | undefined;
+<<<<<<< HEAD
   telemetryTarget: string | undefined;
   telemetryOtlpEndpoint: string | undefined;
   telemetryOtlpProtocol: string | undefined;
   telemetryOtlpHeader: string[] | undefined;
   telemetryLogPrompts: boolean | undefined;
   telemetryOutfile: string | undefined;
+=======
+>>>>>>> 9049f8f8 (feat: remove deprecated telemetry flags (#11318))
   allowedMcpServerNames: string[] | undefined;
   allowedTools: string[] | undefined;
   experimentalAcp: boolean | undefined;
@@ -99,6 +101,7 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
     .usage(
       'Usage: gemini [options] [command]\n\nGemini CLI - Launch an interactive CLI, use -p/--prompt for non-interactive mode',
     )
+<<<<<<< HEAD
     .option('telemetry', {
       type: 'boolean',
       description:
@@ -163,6 +166,9 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
       'telemetry-outfile',
       'Use the "telemetry.outfile" setting in settings.json instead. This flag will be removed in a future version.',
     )
+=======
+
+>>>>>>> 9049f8f8 (feat: remove deprecated telemetry flags (#11318))
     .option('debug', {
       alias: 'd',
       type: 'boolean',
@@ -591,7 +597,6 @@ export async function loadCliConfig(
   let telemetrySettings;
   try {
     telemetrySettings = await resolveTelemetrySettings({
-      argv,
       env: process.env as unknown as Record<string, string | undefined>,
       settings: settings.telemetry,
     });
