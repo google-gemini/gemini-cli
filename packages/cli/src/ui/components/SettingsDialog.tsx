@@ -897,7 +897,7 @@ export function SettingsDialog({
         <Box height={1} />
         <Text color={theme.text.secondary}>
           (Use Enter to select
-          {showScopeSelection ? ', Tab to change focus' : ''}, Esc to close)
+          {showScopeSelection ? ', Tab to change focus' : ''})
         </Text>
         {showRestartPrompt && (
           <Text color={theme.status.warning}>
