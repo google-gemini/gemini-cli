@@ -536,7 +536,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
           config.getDebugMode(),
           config.getFileService(),
           settings.merged,
-          config.getExtensionContextFilePaths(),
+          config.getExtensions(),
           config.isTrustedFolder(),
           settings.merged.context?.importFormat || 'tree', // Use setting or default to 'tree'
           config.getFileFilteringOptions(),

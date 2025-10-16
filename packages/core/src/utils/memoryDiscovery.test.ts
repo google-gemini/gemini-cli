@@ -15,6 +15,7 @@ import {
 } from '../tools/memoryTool.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import { GEMINI_DIR } from './paths.js';
+import type { GeminiCLIExtension } from '../config/config.js';
 
 vi.mock('os', async (importOriginal) => {
   const actualOs = await importOriginal<typeof os>();
@@ -87,7 +88,7 @@ describe('loadServerHierarchicalMemory', () => {
         [],
         false,
         new FileDiscoveryService(projectRoot),
-        [],
+        [], // extensions
         false, // untrusted
       );
 
@@ -116,7 +117,7 @@ describe('loadServerHierarchicalMemory', () => {
           [],
           false,
           new FileDiscoveryService(projectRoot),
-          [],
+          [], // extensions
           false, // untrusted
         );
 
@@ -132,7 +133,7 @@ describe('loadServerHierarchicalMemory', () => {
       [],
       false,
       new FileDiscoveryService(projectRoot),
-      [],
+      [], // extensions
       DEFAULT_FOLDER_TRUST,
     );
 
@@ -154,7 +155,7 @@ describe('loadServerHierarchicalMemory', () => {
       [],
       false,
       new FileDiscoveryService(projectRoot),
-      [],
+      [], // extensions
       DEFAULT_FOLDER_TRUST,
     );
 
@@ -181,7 +182,7 @@ default context content
       [],
       false,
       new FileDiscoveryService(projectRoot),
-      [],
+      [], // extensions
       DEFAULT_FOLDER_TRUST,
     );
 
@@ -212,7 +213,7 @@ custom context content
       [],
       false,
       new FileDiscoveryService(projectRoot),
-      [],
+      [], // extensions
       DEFAULT_FOLDER_TRUST,
     );
 
@@ -247,7 +248,7 @@ cwd context content
       [],
       false,
       new FileDiscoveryService(projectRoot),
-      [],
+      [], // extensions
       DEFAULT_FOLDER_TRUST,
     );
 
@@ -279,7 +280,7 @@ Subdir custom memory
       [],
       false,
       new FileDiscoveryService(projectRoot),
-      [],
+      [], // extensions
       DEFAULT_FOLDER_TRUST,
     );
 
@@ -311,7 +312,7 @@ Src directory memory
       [],
       false,
       new FileDiscoveryService(projectRoot),
-      [],
+      [], // extensions
       DEFAULT_FOLDER_TRUST,
     );
 
@@ -355,7 +356,7 @@ Subdir memory
       [],
       false,
       new FileDiscoveryService(projectRoot),
-      [],
+      [], // extensions
       DEFAULT_FOLDER_TRUST,
     );
 
@@ -408,7 +409,7 @@ Subdir memory
       [],
       false,
       new FileDiscoveryService(projectRoot),
-      [],
+      [], // extensions
       DEFAULT_FOLDER_TRUST,
       'tree',
       {
@@ -444,7 +445,7 @@ My code memory
       [],
       true,
       new FileDiscoveryService(projectRoot),
-      [],
+      [], // extensions
       DEFAULT_FOLDER_TRUST,
       'tree', // importFormat
       {
@@ -466,7 +467,7 @@ My code memory
       [],
       false,
       new FileDiscoveryService(projectRoot),
-      [],
+      [], // extensions
       DEFAULT_FOLDER_TRUST,
     );
 
@@ -488,7 +489,12 @@ My code memory
       [],
       false,
       new FileDiscoveryService(projectRoot),
-      [extensionFilePath],
+      [
+        {
+          contextFiles: [extensionFilePath],
+          isActive: true,
+        } as GeminiCLIExtension,
+      ], // extensions
       DEFAULT_FOLDER_TRUST,
     );
 
@@ -515,7 +521,7 @@ Extension memory content
       [includedDir],
       false,
       new FileDiscoveryService(projectRoot),
-      [],
+      [], // extensions
       DEFAULT_FOLDER_TRUST,
     );
 
@@ -550,7 +556,7 @@ included directory memory
       createdFiles.map((f) => path.dirname(f)),
       false,
       new FileDiscoveryService(projectRoot),
-      [],
+      [], // extensions
       DEFAULT_FOLDER_TRUST,
     );
 
@@ -585,7 +591,7 @@ included directory memory
       [childDir, parentDir], // Deliberately include duplicates
       false,
       new FileDiscoveryService(projectRoot),
-      [],
+      [], // extensions
       DEFAULT_FOLDER_TRUST,
     );
 

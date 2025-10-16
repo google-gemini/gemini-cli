@@ -10,9 +10,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import {
   EXTENSIONS_CONFIG_FILENAME,
-  ExtensionStorage,
   INSTALL_METADATA_FILENAME,
-  annotateActiveExtensions,
   loadExtension,
 } from '../extension.js';
 import { checkForAllExtensionUpdates, updateExtension } from './update.js';
@@ -20,7 +18,6 @@ import { GEMINI_DIR } from '@google/gemini-cli-core';
 import { isWorkspaceTrusted } from '../trustedFolders.js';
 import { ExtensionUpdateState } from '../../ui/state/extensions.js';
 import { createExtension } from '../../test-utils/createExtension.js';
-import { ExtensionEnablementManager } from './extensionEnablement.js';
 
 const mockGit = {
   clone: vi.fn(),
@@ -129,16 +126,10 @@ describe('update tests', () => {
         );
       });
       mockGit.getRemotes.mockResolvedValue([{ name: 'origin' }]);
-      const extension = annotateActiveExtensions(
-        [
-          loadExtension({
-            extensionDir: targetExtDir,
-            workspaceDir: tempWorkspaceDir,
-          })!,
-        ],
-        process.cwd(),
-        new ExtensionEnablementManager(ExtensionStorage.getUserExtensionsDir()),
-      )[0];
+      const extension = loadExtension({
+        extensionDir: targetExtDir,
+        workspaceDir: tempWorkspaceDir,
+      })!;
       const updateInfo = await updateExtension(
         extension,
         tempHomeDir,
@@ -186,16 +177,10 @@ describe('update tests', () => {
       mockGit.getRemotes.mockResolvedValue([{ name: 'origin' }]);
 
       const dispatch = vi.fn();
-      const extension = annotateActiveExtensions(
-        [
-          loadExtension({
-            extensionDir,
-            workspaceDir: tempWorkspaceDir,
-          })!,
-        ],
-        process.cwd(),
-        new ExtensionEnablementManager(ExtensionStorage.getUserExtensionsDir()),
-      )[0];
+      const extension = loadExtension({
+        extensionDir,
+        workspaceDir: tempWorkspaceDir,
+      })!;
       await updateExtension(
         extension,
         tempHomeDir,
@@ -236,16 +221,10 @@ describe('update tests', () => {
       mockGit.getRemotes.mockResolvedValue([{ name: 'origin' }]);
 
       const dispatch = vi.fn();
-      const extension = annotateActiveExtensions(
-        [
-          loadExtension({
-            extensionDir,
-            workspaceDir: tempWorkspaceDir,
-          })!,
-        ],
-        process.cwd(),
-        new ExtensionEnablementManager(ExtensionStorage.getUserExtensionsDir()),
-      )[0];
+      const extension = loadExtension({
+        extensionDir,
+        workspaceDir: tempWorkspaceDir,
+      })!;
       await expect(
         updateExtension(
           extension,
@@ -284,16 +263,10 @@ describe('update tests', () => {
           type: 'git',
         },
       });
-      const extension = annotateActiveExtensions(
-        [
-          loadExtension({
-            extensionDir,
-            workspaceDir: tempWorkspaceDir,
-          })!,
-        ],
-        process.cwd(),
-        new ExtensionEnablementManager(ExtensionStorage.getUserExtensionsDir()),
-      )[0];
+      const extension = loadExtension({
+        extensionDir,
+        workspaceDir: tempWorkspaceDir,
+      })!;
 
       mockGit.getRemotes.mockResolvedValue([
         { name: 'origin', refs: { fetch: 'https://some.git/repo' } },
@@ -326,16 +299,10 @@ describe('update tests', () => {
           type: 'git',
         },
       });
-      const extension = annotateActiveExtensions(
-        [
-          loadExtension({
-            extensionDir,
-            workspaceDir: tempWorkspaceDir,
-          })!,
-        ],
-        process.cwd(),
-        new ExtensionEnablementManager(ExtensionStorage.getUserExtensionsDir()),
-      )[0];
+      const extension = loadExtension({
+        extensionDir,
+        workspaceDir: tempWorkspaceDir,
+      })!;
 
       mockGit.getRemotes.mockResolvedValue([
         { name: 'origin', refs: { fetch: 'https://some.git/repo' } },
@@ -372,16 +339,10 @@ describe('update tests', () => {
         version: '1.0.0',
         installMetadata: { source: sourceExtensionDir, type: 'local' },
       });
-      const extension = annotateActiveExtensions(
-        [
-          loadExtension({
-            extensionDir: installedExtensionDir,
-            workspaceDir: tempWorkspaceDir,
-          })!,
-        ],
-        process.cwd(),
-        new ExtensionEnablementManager(ExtensionStorage.getUserExtensionsDir()),
-      )[0];
+      const extension = loadExtension({
+        extensionDir: installedExtensionDir,
+        workspaceDir: tempWorkspaceDir,
+      })!;
       const dispatch = vi.fn();
       await checkForAllExtensionUpdates(
         [extension],
@@ -411,16 +372,10 @@ describe('update tests', () => {
         version: '1.0.0',
         installMetadata: { source: sourceExtensionDir, type: 'local' },
       });
-      const extension = annotateActiveExtensions(
-        [
-          loadExtension({
-            extensionDir: installedExtensionDir,
-            workspaceDir: tempWorkspaceDir,
-          })!,
-        ],
-        process.cwd(),
-        new ExtensionEnablementManager(ExtensionStorage.getUserExtensionsDir()),
-      )[0];
+      const extension = loadExtension({
+        extensionDir: installedExtensionDir,
+        workspaceDir: tempWorkspaceDir,
+      })!;
       const dispatch = vi.fn();
       await checkForAllExtensionUpdates(
         [extension],
@@ -446,16 +401,10 @@ describe('update tests', () => {
           type: 'git',
         },
       });
-      const extension = annotateActiveExtensions(
-        [
-          loadExtension({
-            extensionDir,
-            workspaceDir: tempWorkspaceDir,
-          })!,
-        ],
-        process.cwd(),
-        new ExtensionEnablementManager(ExtensionStorage.getUserExtensionsDir()),
-      )[0];
+      const extension = loadExtension({
+        extensionDir,
+        workspaceDir: tempWorkspaceDir,
+      })!;
 
       mockGit.getRemotes.mockRejectedValue(new Error('Git error'));
 

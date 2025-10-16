@@ -33,7 +33,7 @@ async function getMcpServersFromConfig(): Promise<
       }
       mcpServers[key] = {
         ...server,
-        extensionName: extension.name,
+        extension,
       };
     });
   }

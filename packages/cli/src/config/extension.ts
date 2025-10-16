@@ -172,12 +172,16 @@ export function loadExtensions(
   const uniqueExtensions = new Map<string, GeminiCLIExtension>();
 
   for (const extension of allExtensions) {
-    if (
-      !uniqueExtensions.has(extension.name) &&
-      extensionEnablementManager.isEnabled(extension.name, workspaceDir)
-    ) {
+    if (!uniqueExtensions.has(extension.name)) {
       uniqueExtensions.set(extension.name, extension);
     }
+  }
+
+  for (const extension of uniqueExtensions.values()) {
+    extension.isActive = extensionEnablementManager.isEnabled(
+      extension.name,
+      workspaceDir,
+    );
   }
 
   return Array.from(uniqueExtensions.values());
@@ -322,25 +326,6 @@ function getContextFileNames(config: ExtensionConfig): string[] {
     return [config.contextFileName];
   }
   return config.contextFileName;
-}
-
-/**
- * Returns an annotated list of extensions. If an extension is listed in enabledExtensionNames, it will be active.
- * If enabledExtensionNames is empty, an extension is active unless it is disabled.
- * @param extensions The base list of extensions.
- * @param enabledExtensionNames The names of explicitly enabled extensions.
- * @param workspaceDir The current workspace directory.
- */
-export function annotateActiveExtensions(
-  extensions: GeminiCLIExtension[],
-  workspaceDir: string,
-  manager: ExtensionEnablementManager,
-): GeminiCLIExtension[] {
-  manager.validateExtensionOverrides(extensions);
-  return extensions.map((extension) => ({
-    ...extension,
-    isActive: manager.isEnabled(extension.name, workspaceDir),
-  }));
 }
 
 /**

@@ -13,7 +13,6 @@ import {
   ExtensionStorage,
   INSTALL_METADATA_FILENAME,
   INSTALL_WARNING_MESSAGE,
-  annotateActiveExtensions,
   disableExtension,
   enableExtension,
   installOrUpdateExtension,
@@ -208,7 +207,7 @@ describe('extension tests', () => {
       ]);
     });
 
-    it('should filter out disabled extensions', () => {
+    it('should annotate disabled extensions', () => {
       createExtension({
         extensionsDir: userExtensionsDir,
         name: 'disabled-extension',
@@ -228,13 +227,11 @@ describe('extension tests', () => {
         ExtensionStorage.getUserExtensionsDir(),
       );
       const extensions = loadExtensions(manager);
-      const activeExtensions = annotateActiveExtensions(
-        extensions,
-        tempWorkspaceDir,
-        manager,
-      ).filter((e) => e.isActive);
-      expect(activeExtensions).toHaveLength(1);
-      expect(activeExtensions[0].name).toBe('enabled-extension');
+      expect(extensions).toHaveLength(2);
+      expect(extensions[0].name).toBe('disabled-extension');
+      expect(extensions[0].isActive).toBe(false);
+      expect(extensions[1].name).toBe('enabled-extension');
+      expect(extensions[1].isActive).toBe(true);
     });
 
     it('should hydrate variables', () => {
@@ -508,200 +505,6 @@ describe('extension tests', () => {
         expect.stringContaining('Invalid extension name: "bad_name"'),
       );
       consoleSpy.mockRestore();
-    });
-  });
-
-  describe('annotateActiveExtensions', () => {
-    const extensions: GeminiCLIExtension[] = [
-      {
-        path: '/path/to/ext1',
-        name: 'ext1',
-        version: '1.0.0',
-        contextFiles: [],
-        isActive: true,
-      },
-      {
-        path: '/path/to/ext2',
-        name: 'ext2',
-        version: '1.0.0',
-        contextFiles: [],
-        isActive: true,
-      },
-      {
-        path: '/path/to/ext3',
-        name: 'ext3',
-        version: '1.0.0',
-        contextFiles: [],
-        isActive: true,
-      },
-    ];
-
-    it('should mark all extensions as active if no enabled extensions are provided', () => {
-      const activeExtensions = annotateActiveExtensions(
-        extensions,
-        '/path/to/workspace',
-        new ExtensionEnablementManager(ExtensionStorage.getUserExtensionsDir()),
-      );
-      expect(activeExtensions).toHaveLength(3);
-      expect(activeExtensions.every((e) => e.isActive)).toBe(true);
-    });
-
-    it('should mark only the enabled extensions as active', () => {
-      const activeExtensions = annotateActiveExtensions(
-        extensions,
-        '/path/to/workspace',
-        new ExtensionEnablementManager(
-          ExtensionStorage.getUserExtensionsDir(),
-          ['ext1', 'ext3'],
-        ),
-      );
-      expect(activeExtensions).toHaveLength(3);
-      expect(activeExtensions.find((e) => e.name === 'ext1')?.isActive).toBe(
-        true,
-      );
-      expect(activeExtensions.find((e) => e.name === 'ext2')?.isActive).toBe(
-        false,
-      );
-      expect(activeExtensions.find((e) => e.name === 'ext3')?.isActive).toBe(
-        true,
-      );
-    });
-
-    it('should mark all extensions as inactive when "none" is provided', () => {
-      const activeExtensions = annotateActiveExtensions(
-        extensions,
-        '/path/to/workspace',
-        new ExtensionEnablementManager(
-          ExtensionStorage.getUserExtensionsDir(),
-          ['none'],
-        ),
-      );
-      expect(activeExtensions).toHaveLength(3);
-      expect(activeExtensions.every((e) => !e.isActive)).toBe(true);
-    });
-
-    it('should handle case-insensitivity', () => {
-      const activeExtensions = annotateActiveExtensions(
-        extensions,
-        '/path/to/workspace',
-        new ExtensionEnablementManager(
-          ExtensionStorage.getUserExtensionsDir(),
-          ['EXT1'],
-        ),
-      );
-      expect(activeExtensions.find((e) => e.name === 'ext1')?.isActive).toBe(
-        true,
-      );
-    });
-
-    it('should log an error for unknown extensions', () => {
-      const consoleSpy = vi
-        .spyOn(console, 'error')
-        .mockImplementation(() => {});
-      annotateActiveExtensions(
-        extensions,
-        '/path/to/workspace',
-        new ExtensionEnablementManager(
-          ExtensionStorage.getUserExtensionsDir(),
-          ['ext4'],
-        ),
-      );
-      expect(consoleSpy).toHaveBeenCalledWith('Extension not found: ext4');
-      consoleSpy.mockRestore();
-    });
-
-    describe('autoUpdate', () => {
-      it('should be false if autoUpdate is not set in install metadata', () => {
-        const activeExtensions = annotateActiveExtensions(
-          extensions,
-          tempHomeDir,
-          new ExtensionEnablementManager(
-            ExtensionStorage.getUserExtensionsDir(),
-          ),
-        );
-        expect(
-          activeExtensions.every(
-            (e) => e.installMetadata?.autoUpdate === false,
-          ),
-        ).toBe(false);
-      });
-
-      it('should be true if autoUpdate is true in install metadata', () => {
-        const extensionsWithAutoUpdate: GeminiCLIExtension[] = extensions.map(
-          (e) => ({
-            ...e,
-            installMetadata: {
-              ...e.installMetadata!,
-              autoUpdate: true,
-            },
-          }),
-        );
-        const activeExtensions = annotateActiveExtensions(
-          extensionsWithAutoUpdate,
-          tempHomeDir,
-          new ExtensionEnablementManager(
-            ExtensionStorage.getUserExtensionsDir(),
-          ),
-        );
-        expect(
-          activeExtensions.every((e) => e.installMetadata?.autoUpdate === true),
-        ).toBe(true);
-      });
-
-      it('should respect the per-extension settings from install metadata', () => {
-        const extensionsWithAutoUpdate: GeminiCLIExtension[] = [
-          {
-            path: '/path/to/ext1',
-            name: 'ext1',
-            version: '1.0.0',
-            contextFiles: [],
-            installMetadata: {
-              source: 'test',
-              type: 'local',
-              autoUpdate: true,
-            },
-            isActive: true,
-          },
-          {
-            path: '/path/to/ext2',
-            name: 'ext2',
-            version: '1.0.0',
-            contextFiles: [],
-            installMetadata: {
-              source: 'test',
-              type: 'local',
-              autoUpdate: false,
-            },
-            isActive: true,
-          },
-          {
-            path: '/path/to/ext3',
-            name: 'ext3',
-            version: '1.0.0',
-            contextFiles: [],
-            isActive: true,
-          },
-        ];
-        const activeExtensions = annotateActiveExtensions(
-          extensionsWithAutoUpdate,
-          tempHomeDir,
-          new ExtensionEnablementManager(
-            ExtensionStorage.getUserExtensionsDir(),
-          ),
-        );
-        expect(
-          activeExtensions.find((e) => e.name === 'ext1')?.installMetadata
-            ?.autoUpdate,
-        ).toBe(true);
-        expect(
-          activeExtensions.find((e) => e.name === 'ext2')?.installMetadata
-            ?.autoUpdate,
-        ).toBe(false);
-        expect(
-          activeExtensions.find((e) => e.name === 'ext3')?.installMetadata
-            ?.autoUpdate,
-        ).toBe(undefined);
-      });
     });
   });
 
@@ -1672,12 +1475,7 @@ This extension will run the following MCP servers:
         ExtensionStorage.getUserExtensionsDir(),
       );
       const extensions = loadExtensions(manager);
-      const activeExtensions = annotateActiveExtensions(
-        extensions,
-        tempWorkspaceDir,
-        manager,
-      );
-      return activeExtensions.filter((e) => e.isActive);
+      return extensions.filter((e) => e.isActive);
     };
 
     it('should enable an extension at the user scope', () => {
