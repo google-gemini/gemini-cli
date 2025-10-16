@@ -911,17 +911,29 @@ export class TestRig {
   }
 
   async waitForMetric(metricName: string, timeout?: number) {
-    if (!timeout) {
-      timeout = getDefaultTimeout();
-    }
-
     await this.waitForTelemetryReady();
+
+    const fullName = metricName.startsWith('gemini_cli.')
+      ? metricName
+      : `gemini_cli.${metricName}`;
 
     return poll(
       () => {
-        return this.readMetric(metricName) !== null;
+        const logs = this._readAndParseTelemetryLog();
+        for (const logData of logs) {
+          if (logData.scopeMetrics) {
+            for (const scopeMetric of logData.scopeMetrics) {
+              for (const metric of scopeMetric.metrics) {
+                if (metric.descriptor.name === fullName) {
+                  return true;
+                }
+              }
+            }
+          }
+        }
+        return false;
       },
-      timeout,
+      timeout ?? getDefaultTimeout(),
       100,
     );
   }
