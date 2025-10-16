@@ -68,27 +68,28 @@ async function main() {
   const ARGS = argv._;
   let failures = 0;
 
-  let createdDockerIgnore = false;
+  const backupDockerIgnorePath = dockerIgnorePath + '.bak';
+  let originalDockerIgnoreRenamed = false;
 
   console.log(`--- Starting Deflake Run (${NUM_RUNS} iterations) ---`);
 
   try {
     try {
-      // Check if it exists first to avoid overwriting
-      await fs.access(dockerIgnorePath);
-    } catch {
-      console.log(
-        'Creating temporary .dockerignore to exclude .integration-tests...',
-      );
-      await fs.writeFile(dockerIgnorePath, DOCKERIGNORE_CONTENT);
-      createdDockerIgnore = true;
+      // Try to rename to back up an existing .dockerignore
+      await fs.rename(dockerIgnorePath, backupDockerIgnorePath);
+      originalDockerIgnoreRenamed = true;
+    } catch (err) {
+      // If the file doesn't exist, that's fine. Otherwise, rethrow.
+      if (err.code !== 'ENOENT') throw err;
     }
+
+    // Create the temporary .dockerignore for this run.
+    await fs.writeFile(dockerIgnorePath, DOCKERIGNORE_CONTENT);
 
     for (let i = 1; i <= NUM_RUNS; i++) {
       console.log(`\n[RUN ${i}/${NUM_RUNS}]`);
 
       try {
-        // 3. Await the asynchronous command run
         const exitCode = await runCommand(COMMAND, ARGS);
 
         if (exitCode === 0) {
@@ -103,12 +104,19 @@ async function main() {
       }
     }
   } finally {
-    if (createdDockerIgnore) {
-      console.log('Cleaning up temporary .dockerignore...');
+    try {
+      // Clean up the temporary .dockerignore
+      await fs.unlink(dockerIgnorePath);
+    } catch (err) {
+      console.error('Failed to remove temporary .dockerignore:', err);
+    }
+
+    if (originalDockerIgnoreRenamed) {
       try {
-        await fs.unlink(dockerIgnorePath);
-      } catch (e) {
-        console.error('Failed to delete temporary .dockerignore:', e);
+        // Restore the original .dockerignore if it was backed up.
+        await fs.rename(backupDockerIgnorePath, dockerIgnorePath);
+      } catch (err) {
+        console.error('Failed to restore original .dockerignore:', err);
       }
     }
   }
