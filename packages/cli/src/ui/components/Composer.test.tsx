@@ -112,6 +112,7 @@ const createMockUIState = (overrides: Partial<UIState> = {}): UIState =>
     ideContextState: null,
     geminiMdFileCount: 0,
     showToolDescriptions: false,
+    renderMarkdown: true,
     filteredConsoleMessages: [],
     sessionStats: {
       lastPromptTokenCount: 0,
@@ -402,6 +403,26 @@ describe('Composer', () => {
       const { lastFrame } = renderComposer(uiState);
 
       expect(lastFrame()).toContain('ShellModeIndicator');
+    });
+
+    it('shows RawMarkdownIndicator when renderMarkdown is false', () => {
+      const uiState = createMockUIState({
+        renderMarkdown: false,
+      });
+
+      const { lastFrame } = renderComposer(uiState);
+
+      expect(lastFrame()).toContain('raw markdown mode');
+    });
+
+    it('does not show RawMarkdownIndicator when renderMarkdown is true', () => {
+      const uiState = createMockUIState({
+        renderMarkdown: true,
+      });
+
+      const { lastFrame } = renderComposer(uiState);
+
+      expect(lastFrame()).not.toContain('raw markdown mode');
     });
   });
 

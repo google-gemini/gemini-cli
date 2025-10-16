@@ -82,6 +82,7 @@ export interface UIState {
   filteredConsoleMessages: ConsoleMessageItem[];
   ideContextState: IdeContext | undefined;
   showToolDescriptions: boolean;
+  renderMarkdown: boolean;
   ctrlCPressedOnce: boolean;
   ctrlDPressedOnce: boolean;
   showEscapePrompt: boolean;
