@@ -348,21 +348,21 @@ describe('git extension helpers', () => {
   describe('parseGitHubRepoForReleases', () => {
     it('should parse owner and repo from a full GitHub URL', () => {
       const source = 'https://github.com/owner/repo.git';
-      const { owner, repo } = parseGitHubRepoForReleases(source);
+      const { owner, repo } = parseGitHubRepoForReleases(source)!;
       expect(owner).toBe('owner');
       expect(repo).toBe('repo');
     });
 
     it('should parse owner and repo from a full GitHub URL without .git', () => {
       const source = 'https://github.com/owner/repo';
-      const { owner, repo } = parseGitHubRepoForReleases(source);
+      const { owner, repo } = parseGitHubRepoForReleases(source)!;
       expect(owner).toBe('owner');
       expect(repo).toBe('repo');
     });
 
     it('should parse owner and repo from a full GitHub URL with a trailing slash', () => {
       const source = 'https://github.com/owner/repo/';
-      const { owner, repo } = parseGitHubRepoForReleases(source);
+      const { owner, repo } = parseGitHubRepoForReleases(source)!;
       expect(owner).toBe('owner');
       expect(repo).toBe('repo');
     });
@@ -374,23 +374,21 @@ describe('git extension helpers', () => {
       );
     });
 
-    it('should fail on a non-GitHub URL', () => {
+    it('should return null on a non-GitHub URL', () => {
       const source = 'https://example.com/owner/repo.git';
-      expect(() => parseGitHubRepoForReleases(source)).toThrow(
-        'Invalid GitHub repository source: https://example.com/owner/repo.git. Expected "owner/repo" or a github repo uri.',
-      );
+      expect(parseGitHubRepoForReleases(source)).toBe(null);
     });
 
     it('should parse owner and repo from a shorthand string', () => {
       const source = 'owner/repo';
-      const { owner, repo } = parseGitHubRepoForReleases(source);
+      const { owner, repo } = parseGitHubRepoForReleases(source)!;
       expect(owner).toBe('owner');
       expect(repo).toBe('repo');
     });
 
     it('should handle .git suffix in repo name', () => {
       const source = 'owner/repo.git';
-      const { owner, repo } = parseGitHubRepoForReleases(source);
+      const { owner, repo } = parseGitHubRepoForReleases(source)!;
       expect(owner).toBe('owner');
       expect(repo).toBe('repo');
     });

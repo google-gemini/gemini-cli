@@ -29,11 +29,11 @@ import {
   ExtensionDisableEvent,
   ExtensionEnableEvent,
 } from '@google/gemini-cli-core';
-import { execSync } from 'node:child_process';
 import { SettingScope } from './settings.js';
 import { isWorkspaceTrusted } from './trustedFolders.js';
 import { createExtension } from '../test-utils/createExtension.js';
 import { ExtensionEnablementManager } from './extensions/extensionEnablement.js';
+import { join } from 'node:path';
 
 const mockGit = {
   clone: vi.fn(),
@@ -46,6 +46,17 @@ const mockGit = {
   // file system interactions.
   path: vi.fn(),
 };
+
+const mockDownloadFromGithubRelease = vi.hoisted(() => vi.fn());
+
+vi.mock('./extensions/github.js', async (importOriginal) => {
+  const original =
+    await importOriginal<typeof import('./extensions/github.js')>();
+  return {
+    ...original,
+    downloadFromGitHubRelease: mockDownloadFromGithubRelease,
+  };
+});
 
 vi.mock('simple-git', () => ({
   simpleGit: vi.fn((path: string) => {
@@ -123,8 +134,6 @@ describe('extension tests', () => {
       source: undefined,
     });
     vi.spyOn(process, 'cwd').mockReturnValue(tempWorkspaceDir);
-    vi.mocked(execSync).mockClear();
-    Object.values(mockGit).forEach((fn) => fn.mockReset());
   });
 
   afterEach(() => {
@@ -813,6 +822,11 @@ describe('extension tests', () => {
         );
       });
       mockGit.getRemotes.mockResolvedValue([{ name: 'origin' }]);
+      mockDownloadFromGithubRelease.mockResolvedValue({
+        success: false,
+        failureReason: 'no release data',
+        type: 'github-release',
+      });
 
       await installOrUpdateExtension(
         { source: gitUrl, type: 'git' },
@@ -1086,6 +1100,173 @@ This extension will run the following MCP servers:
           async (_) => true,
         ),
       ).rejects.toThrow('Invalid extension name: "bad_name"');
+    });
+
+    describe('installing from github', () => {
+      const gitUrl = 'https://github.com/google/gemini-test-extension.git';
+      const extensionName = 'gemini-test-extension';
+
+      beforeEach(() => {
+        // Mock the git clone behavior for github installs that fallback to it.
+        mockGit.clone.mockImplementation(async (_, destination) => {
+          fs.mkdirSync(path.join(mockGit.path(), destination), {
+            recursive: true,
+          });
+          fs.writeFileSync(
+            path.join(mockGit.path(), destination, EXTENSIONS_CONFIG_FILENAME),
+            JSON.stringify({ name: extensionName, version: '1.0.0' }),
+          );
+        });
+        mockGit.getRemotes.mockResolvedValue([{ name: 'origin' }]);
+      });
+
+      afterEach(() => {
+        vi.restoreAllMocks();
+      });
+
+      it('should install from a github release successfully', async () => {
+        const targetExtDir = path.join(userExtensionsDir, extensionName);
+        mockDownloadFromGithubRelease.mockResolvedValue({
+          success: true,
+          tagName: 'v1.0.0',
+          type: 'github-release',
+        });
+
+        const tempDir = path.join(tempHomeDir, 'temp-ext');
+        fs.mkdirSync(tempDir, { recursive: true });
+        createExtension({
+          extensionsDir: tempDir,
+          name: extensionName,
+          version: '1.0.0',
+        });
+        vi.spyOn(ExtensionStorage, 'createTmpDir').mockResolvedValue(
+          join(tempDir, extensionName),
+        );
+
+        await installOrUpdateExtension(
+          { source: gitUrl, type: 'github-release' },
+          async () => true,
+        );
+
+        expect(fs.existsSync(targetExtDir)).toBe(true);
+        const metadataPath = path.join(targetExtDir, INSTALL_METADATA_FILENAME);
+        expect(fs.existsSync(metadataPath)).toBe(true);
+        const metadata = JSON.parse(fs.readFileSync(metadataPath, 'utf-8'));
+        expect(metadata).toEqual({
+          source: gitUrl,
+          type: 'github-release',
+          releaseTag: 'v1.0.0',
+        });
+      });
+
+      it('should fallback to git clone if github release download fails and user consents', async () => {
+        mockDownloadFromGithubRelease.mockResolvedValue({
+          success: false,
+          failureReason: 'failed to download asset',
+          errorMessage: 'download failed',
+          type: 'github-release',
+        });
+        const requestConsent = vi.fn().mockResolvedValue(true);
+
+        await installOrUpdateExtension(
+          { source: gitUrl, type: 'github-release' }, // Use github-release to force consent
+          requestConsent,
+        );
+
+        // It gets called once to ask for a git clone, and once to consent to
+        // the actual extension features.
+        expect(requestConsent).toHaveBeenCalledTimes(2);
+        expect(requestConsent).toHaveBeenCalledWith(
+          expect.stringContaining(
+            'Would you like to attempt to install via "git clone" instead?',
+          ),
+        );
+        expect(mockGit.clone).toHaveBeenCalled();
+        const metadataPath = path.join(
+          userExtensionsDir,
+          extensionName,
+          INSTALL_METADATA_FILENAME,
+        );
+        const metadata = JSON.parse(fs.readFileSync(metadataPath, 'utf-8'));
+        expect(metadata.type).toBe('git');
+      });
+
+      it('should throw an error if github release download fails and user denies consent', async () => {
+        mockDownloadFromGithubRelease.mockResolvedValue({
+          success: false,
+          errorMessage: 'download failed',
+          type: 'github-release',
+        });
+        const requestConsent = vi.fn().mockResolvedValue(false);
+
+        await expect(
+          installOrUpdateExtension(
+            { source: gitUrl, type: 'github-release' },
+            requestConsent,
+          ),
+        ).rejects.toThrow(
+          `Failed to install extension ${gitUrl}: download failed`,
+        );
+
+        expect(requestConsent).toHaveBeenCalledExactlyOnceWith(
+          expect.stringContaining(
+            'Would you like to attempt to install via "git clone" instead?',
+          ),
+        );
+        expect(mockGit.clone).not.toHaveBeenCalled();
+      });
+
+      it('should fallback to git clone without consent if no release data is found on first install', async () => {
+        mockDownloadFromGithubRelease.mockResolvedValue({
+          success: false,
+          failureReason: 'no release data',
+          type: 'github-release',
+        });
+        const requestConsent = vi.fn().mockResolvedValue(true);
+
+        await installOrUpdateExtension(
+          { source: gitUrl, type: 'git' },
+          requestConsent,
+        );
+
+        // We should not see the request to use git clone, this is a repo that
+        // has no github releases so it is the only install method.
+        expect(requestConsent).toHaveBeenCalledExactlyOnceWith(
+          expect.stringContaining(
+            'Installing extension "gemini-test-extension"',
+          ),
+        );
+        expect(mockGit.clone).toHaveBeenCalled();
+        const metadataPath = path.join(
+          userExtensionsDir,
+          extensionName,
+          INSTALL_METADATA_FILENAME,
+        );
+        const metadata = JSON.parse(fs.readFileSync(metadataPath, 'utf-8'));
+        expect(metadata.type).toBe('git');
+      });
+
+      it('should ask for consent if no release data is found for an existing github-release extension', async () => {
+        mockDownloadFromGithubRelease.mockResolvedValue({
+          success: false,
+          failureReason: 'no release data',
+          errorMessage: 'No release data found',
+          type: 'github-release',
+        });
+        const requestConsent = vi.fn().mockResolvedValue(true);
+
+        await installOrUpdateExtension(
+          { source: gitUrl, type: 'github-release' }, // Note the type
+          requestConsent,
+        );
+
+        expect(requestConsent).toHaveBeenCalledWith(
+          expect.stringContaining(
+            'Would you like to attempt to install via "git clone" instead?',
+          ),
+        );
+        expect(mockGit.clone).toHaveBeenCalled();
+      });
     });
   });
 
