@@ -46,7 +46,7 @@ interface MockConfigInstanceShape {
   getSandbox: Mock<() => boolean | string>;
   getDebugMode: Mock<() => boolean>;
   getQuestion: Mock<() => string | undefined>;
-  getFullContext: Mock<() => boolean>;
+
   getUserAgent: Mock<() => string>;
   getUserMemory: Mock<() => string>;
   getGeminiMdFileCount: Mock<() => number>;
@@ -93,7 +93,7 @@ describe('useAutoAcceptIndicator', () => {
         getQuestion: vi.fn().mockReturnValue(undefined) as Mock<
           () => string | undefined
         >,
-        getFullContext: vi.fn().mockReturnValue(false) as Mock<() => boolean>,
+
         getUserAgent: vi.fn().mockReturnValue('test-user-agent') as Mock<
           () => string
         >,
