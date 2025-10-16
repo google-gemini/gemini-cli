@@ -9,7 +9,9 @@ on:
     branches:
       - 'main'
       - 'release/**'
+  # This will run for PRs from forks when a label is added.
   pull_request_target:
+    types: ['labeled']
   merge_group:
   workflow_dispatch:
     inputs:
@@ -44,8 +46,8 @@ jobs:
       (github.event_name == 'push' ||
       github.event_name == 'merge_group' ||
       github.event_name == 'workflow_dispatch' ||
-      (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) ||
-      (github.event_name == 'pull_request_target'))
+      (github.event.pull_request.head.repo.full_name == github.repository) ||
+      (github.event.label.name == 'maintainer:e2e:ok'))
     runs-on: 'gemini-cli-ubuntu-16-core'
     strategy:
       fail-fast: false
@@ -106,8 +108,8 @@ jobs:
       (github.event_name == 'push' ||
       github.event_name == 'merge_group' ||
       github.event_name == 'workflow_dispatch' ||
-      (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) ||
-      (github.event_name == 'pull_request_target'))
+      (github.event.pull_request.head.repo.full_name == github.repository) ||
+      (github.event.label.name == 'maintainer:e2e:ok'))
     runs-on: 'macos-latest'
     steps:
       - name: 'Checkout (fork)'
@@ -155,8 +157,8 @@ jobs:
       (github.event_name == 'push' ||
       github.event_name == 'merge_group' ||
       github.event_name == 'workflow_dispatch' ||
-      (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) ||
-      (github.event_name == 'pull_request_target'))
+      (github.event.pull_request.head.repo.full_name == github.repository) ||
+      (github.event.label.name == 'maintainer:e2e:ok'))
     runs-on: 'gemini-cli-windows-16-core'
     continue-on-error: true
 
@@ -225,8 +227,8 @@ jobs:
         github.event_name == 'push' ||
         github.event_name == 'merge_group' ||
         github.event_name == 'workflow_dispatch' ||
-        (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) ||
-        (github.event_name == 'pull_request_target')
+        (github.event.pull_request.head.repo.full_name == github.repository) ||
+        (github.event.label.name == 'maintainer:e2e:ok')
       )
     needs:
       - 'e2e_linux'
@@ -235,8 +237,8 @@ jobs:
     steps:
       - name: 'Check E2E test results'
         run: |
-          if [[ ${{ needs.e2e_linux.result }} != 'success' || \
-               ${{ needs.e2e_mac.result }} != 'success' ]]; then
+          if [[ (${{ needs.e2e_linux.result }} != 'success' && ${{ needs.e2e_linux.result }} != 'skipped') || \
+               (${{ needs.e2e_mac.result }} != 'success' && ${{ needs.e2e_mac.result }} != 'skipped') ]]; then
             echo "One or more E2E jobs failed."
             exit 1
           fi
