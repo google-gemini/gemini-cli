@@ -129,7 +129,7 @@ describe('PermissionsModifyTrustDialog', () => {
     await waitFor(() => expect(lastFrame()).not.toContain('Loading...'));
 
     act(() => {
-      stdin.write('\x1b'); // escape key
+      stdin.write('\u001b[27u'); // Kitty escape key
     });
 
     await waitFor(() => {
@@ -189,7 +189,7 @@ describe('PermissionsModifyTrustDialog', () => {
 
     await waitFor(() => expect(lastFrame()).not.toContain('Loading...'));
 
-    act(() => stdin.write('\x1b')); // Press escape
+    act(() => stdin.write('\u001b[27u')); // Press kitty escape key
 
     await waitFor(() => {
       expect(mockCommitTrustLevelChange).not.toHaveBeenCalled();
