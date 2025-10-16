@@ -597,8 +597,26 @@ export const useGeminiStream = (
           userMessageTimestamp,
         );
       }
+
+      // Check for silent failure: tools executed but no model response
+      if (
+        finishReason === FinishReason.STOP &&
+        toolCalls.length > 0 &&
+        (!pendingHistoryItemRef.current ||
+          ((pendingHistoryItemRef.current.type === 'gemini' ||
+            pendingHistoryItemRef.current.type === 'gemini_content') &&
+            pendingHistoryItemRef.current.text.trim() === ''))
+      ) {
+        addItem(
+          {
+            type: 'info',
+            text: 'Tools executed successfully. No additional response from the model.',
+          },
+          userMessageTimestamp,
+        );
+      }
     },
-    [addItem],
+    [addItem, toolCalls, pendingHistoryItemRef],
   );
 
   const handleChatCompressionEvent = useCallback(
