@@ -19,7 +19,7 @@ interface InstallArgs {
   ref?: string;
   autoUpdate?: boolean;
   allowPreRelease?: boolean;
-  yes?: boolean;
+  consent?: boolean;
 }
 
 export async function handleInstall(args: InstallArgs) {
@@ -56,10 +56,10 @@ export async function handleInstall(args: InstallArgs) {
       }
     }
 
-    const requestConsent = args.yes
+    const requestConsent = args.consent
       ? () => Promise.resolve(true)
       : requestConsentNonInteractive;
-    if (args.yes) {
+    if (args.consent) {
       console.log('You have consented to the following:');
       console.log(INSTALL_WARNING_MESSAGE);
     }
@@ -96,12 +96,11 @@ export const installCommand: CommandModule = {
         describe: 'Enable pre-release versions for this extension.',
         type: 'boolean',
       })
-      .option('yes', {
+      .option('consent', {
         describe:
-          'Acknowledge the security risks of installing a third party extension and skip the confirmation prompt.',
+          'Acknowledge the security risks of installing an extension and skip the confirmation prompt.',
         type: 'boolean',
         default: false,
-        alias: 'y',
       })
       .check((argv) => {
         if (!argv.source) {
@@ -115,7 +114,7 @@ export const installCommand: CommandModule = {
       ref: argv['ref'] as string | undefined,
       autoUpdate: argv['auto-update'] as boolean | undefined,
       allowPreRelease: argv['pre-release'] as boolean | undefined,
-      yes: argv['yes'] as boolean | undefined,
+      consent: argv['consent'] as boolean | undefined,
     });
   },
 };
