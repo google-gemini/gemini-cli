@@ -168,7 +168,7 @@ describe('editCorrector', () => {
         targetDir: '/test',
         debugMode: false,
         question: undefined as string | undefined,
-        fullContext: false,
+
         coreTools: undefined as string[] | undefined,
         toolDiscoveryCommand: undefined as string | undefined,
         toolCallCommand: undefined as string | undefined,
@@ -188,7 +188,7 @@ describe('editCorrector', () => {
         getToolRegistry: vi.fn(() => mockToolRegistry),
         getDebugMode: vi.fn(() => configParams.debugMode),
         getQuestion: vi.fn(() => configParams.question),
-        getFullContext: vi.fn(() => configParams.fullContext),
+
         getCoreTools: vi.fn(() => configParams.coreTools),
         getToolDiscoveryCommand: vi.fn(() => configParams.toolDiscoveryCommand),
         getToolCallCommand: vi.fn(() => configParams.toolCallCommand),

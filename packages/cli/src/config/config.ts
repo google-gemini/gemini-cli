@@ -66,7 +66,7 @@ export interface CliArgs {
   debug: boolean | undefined;
   prompt: string | undefined;
   promptInteractive: string | undefined;
-  allFiles: boolean | undefined;
+
   showMemoryUsage: boolean | undefined;
   yolo: boolean | undefined;
   approvalMode: string | undefined;
@@ -208,12 +208,7 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
           nargs: 1,
           description: 'Sandbox image URI.',
         })
-        .option('all-files', {
-          alias: ['a'],
-          type: 'boolean',
-          description: 'Include ALL files in context?',
-          default: false,
-        })
+
         .option('show-memory-usage', {
           type: 'boolean',
           description: 'Show memory usage in status bar',
@@ -314,10 +309,7 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
           'checkpointing',
           'Use the "general.checkpointing.enabled" setting in settings.json instead. This flag will be removed in a future version.',
         )
-        .deprecateOption(
-          'all-files',
-          'Use @ includes in the application instead. This flag will be removed in a future version.',
-        )
+
         .deprecateOption(
           'prompt',
           'Use the positional prompt instead. This flag will be removed in a future version.',
@@ -708,7 +700,7 @@ export async function loadCliConfig(
       settings.context?.loadMemoryFromIncludeDirectories || false,
     debugMode,
     question,
-    fullContext: argv.allFiles || false,
+
     coreTools: settings.tools?.core || undefined,
     allowedTools: allowedTools.length > 0 ? allowedTools : undefined,
     policyEngineConfig,
