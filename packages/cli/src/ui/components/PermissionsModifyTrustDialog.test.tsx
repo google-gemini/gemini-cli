@@ -46,6 +46,7 @@ describe('PermissionsModifyTrustDialog', () => {
   let mockCommitTrustLevelChange: Mock;
 
   beforeEach(() => {
+    mockedCwd.mockReturnValue('/test/dir');
     mockUpdateTrustLevel = vi.fn();
     mockCommitTrustLevelChange = vi.fn();
     vi.mocked(usePermissionsModifyTrust).mockReturnValue({
@@ -117,6 +118,17 @@ describe('PermissionsModifyTrustDialog', () => {
       expect(lastFrame()).toContain(
         'Note: This folder behaves as a trusted folder because the connected IDE workspace is trusted.',
       );
+    });
+  });
+
+  it('should render the labels with folder names', async () => {
+    const { lastFrame } = renderWithProviders(
+      <PermissionsModifyTrustDialog onExit={vi.fn()} addItem={vi.fn()} />,
+    );
+
+    await waitFor(() => {
+      expect(lastFrame()).toContain('Trust this folder (dir)');
+      expect(lastFrame()).toContain('Trust parent folder (test)');
     });
   });
 
