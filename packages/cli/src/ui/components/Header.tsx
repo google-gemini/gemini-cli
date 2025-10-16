@@ -5,7 +5,7 @@
  */
 
 import type React from 'react';
-import { Box, Text } from 'ink';
+import { Box, Text, Newline } from 'ink';
 import Gradient from 'ink-gradient';
 import { theme } from '../semantic-colors.js';
 import { shortAsciiLogo, longAsciiLogo, tinyAsciiLogo } from './AsciiArt.js';
@@ -59,9 +59,15 @@ export const Header: React.FC<HeaderProps> = ({
           {theme.ui.gradient ? (
             <Gradient colors={theme.ui.gradient}>
               <Text>v{version}</Text>
+              <Newline />
+              <Text>AAAgent special version</Text>
             </Gradient>
           ) : (
-            <Text>v{version}</Text>
+            <>
+              <Text>v{version}</Text>
+              <Newline />
+              <Text>AAAgent special version</Text>
+            </>
           )}
         </Box>
       )}

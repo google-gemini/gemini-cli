@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": ["Bash(git restore:*)", "Bash(npm install)"],
+    "deny": [],
+    "ask": []
+  }
+}
