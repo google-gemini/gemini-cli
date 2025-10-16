@@ -288,6 +288,7 @@ export interface ConfigParameters {
   useWriteTodos?: boolean;
   policyEngineConfig?: PolicyEngineConfig;
   output?: OutputSettings;
+  useModelRouter?: boolean;
   enableMessageBusIntegration?: boolean;
   disableModelRouterForAuth?: AuthType[];
   codebaseInvestigatorSettings?: CodebaseInvestigatorSettings;
@@ -306,6 +307,8 @@ export interface ConfigParameters {
   };
   previewFeatures?: boolean;
   enableModelAvailabilityService?: boolean;
+  simpleTaskModel?: string;
+  complexTaskModel?: string;
 }
 
 export class Config {
@@ -402,6 +405,8 @@ export class Config {
   private readonly messageBus: MessageBus;
   private readonly policyEngine: PolicyEngine;
   private readonly outputSettings: OutputSettings;
+  private useModelRouter: boolean;
+  private readonly initialUseModelRouter: boolean;
   private readonly enableMessageBusIntegration: boolean;
   private readonly codebaseInvestigatorSettings: CodebaseInvestigatorSettings;
   private readonly continueOnFailedApiCall: boolean;
@@ -422,6 +427,8 @@ export class Config {
   private previewModelFallbackMode = false;
   private previewModelBypassMode = false;
   private readonly enableModelAvailabilityService: boolean;
+  private readonly simpleTaskModel: string;
+  private readonly complexTaskModel: string;
 
   constructor(params: ConfigParameters) {
     this.sessionId = params.sessionId;
@@ -520,6 +527,8 @@ export class Config {
     this.enableToolOutputTruncation = params.enableToolOutputTruncation ?? true;
     this.useSmartEdit = params.useSmartEdit ?? true;
     this.useWriteTodos = params.useWriteTodos ?? true;
+    this.initialUseModelRouter = params.useModelRouter ?? false;
+    this.useModelRouter = this.initialUseModelRouter;
     this.enableHooks = params.enableHooks ?? false;
 
     // Enable MessageBus integration if:
@@ -559,6 +568,8 @@ export class Config {
     this.disableYoloMode = params.disableYoloMode ?? false;
     this.hooks = params.hooks;
     this.experiments = params.experiments;
+    this.simpleTaskModel = params.simpleTaskModel ?? DEFAULT_GEMINI_FLASH_MODEL;
+    this.complexTaskModel = params.complexTaskModel ?? DEFAULT_GEMINI_MODEL;
 
     if (params.contextFileName) {
       setGeminiMdFilename(params.contextFileName);
@@ -1350,6 +1361,18 @@ export class Config {
     return this.outputSettings?.format
       ? this.outputSettings.format
       : OutputFormat.TEXT;
+  }
+
+  getUseModelRouter(): boolean {
+    return this.useModelRouter;
+  }
+
+  getSimpleTaskModel(): string {
+    return this.simpleTaskModel;
+  }
+
+  getComplexTaskModel(): string {
+    return this.complexTaskModel;
   }
 
   async getGitService(): Promise<GitService> {

@@ -775,6 +775,38 @@ describe('Server Config (config.ts)', () => {
     });
   });
 
+  describe('Model Router Task Models Configuration', () => {
+    it('should default simpleTaskModel to DEFAULT_GEMINI_FLASH_MODEL when not provided', () => {
+      const config = new Config(baseParams);
+      expect(config.getSimpleTaskModel()).toBe('gemini-2.5-flash');
+    });
+
+    it('should default complexTaskModel to DEFAULT_GEMINI_MODEL when not provided', () => {
+      const config = new Config(baseParams);
+      expect(config.getComplexTaskModel()).toBe('gemini-2.5-pro');
+    });
+
+    it('should set simpleTaskModel to provided value', () => {
+      const customModel = 'my-custom-flash';
+      const params: ConfigParameters = {
+        ...baseParams,
+        simpleTaskModel: customModel,
+      };
+      const config = new Config(params);
+      expect(config.getSimpleTaskModel()).toBe(customModel);
+    });
+
+    it('should set complexTaskModel to provided value', () => {
+      const customModel = 'my-custom-pro';
+      const params: ConfigParameters = {
+        ...baseParams,
+        complexTaskModel: customModel,
+      };
+      const config = new Config(params);
+      expect(config.getComplexTaskModel()).toBe(customModel);
+    });
+  });
+
   describe('createToolRegistry', () => {
     it('should register a tool if coreTools contains an argument-specific pattern', async () => {
       const params: ConfigParameters = {
