@@ -139,7 +139,10 @@ class WebFetchToolInvocation extends BaseToolInvocation<
       let textContent: string;
 
       // Only use html-to-text if content type is HTML, or if no content type is provided (assume HTML)
-      if (contentType.includes('text/html') || contentType === '') {
+      if (
+        contentType.toLowerCase().includes('text/html') ||
+        contentType === ''
+      ) {
         textContent = convert(rawContent, {
           wordwrap: false,
           selectors: [
