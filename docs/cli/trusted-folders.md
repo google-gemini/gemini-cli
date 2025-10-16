@@ -63,7 +63,8 @@ to protect you. In this mode, the following features are disabled:
     [Model Context Protocol (MCP)](../mcp/index.md) servers.
 
 7.  **Custom Commands are Not Loaded**: The CLI will not load any custom
-    commands from the project's `.gemini/commands` directory.
+    commands from .toml files, including both project-specific and global user
+    commands.
 
 Granting trust to a folder unlocks the full functionality of the Gemini CLI for
 that workspace.
