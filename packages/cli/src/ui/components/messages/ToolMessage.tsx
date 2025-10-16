@@ -175,7 +175,6 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
               'todos' in resultDisplay ? (
               <TodoListDisplay
                 todos={resultDisplay as TodoList}
-                // availableTerminalHeight={availableHeight}
                 terminalWidth={childWidth}
               />
             ) : (

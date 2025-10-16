@@ -11,7 +11,6 @@ import { theme } from '../../semantic-colors.js';
 
 export interface TodoListDisplayProps {
   todos: TodoList;
-  availableTerminalHeight?: number;
   terminalWidth: number;
 }
 const TodoStatusDisplay: React.FC<{ status: TodoStatus }> = ({ status }) => {
@@ -30,17 +29,18 @@ const TodoStatusDisplay: React.FC<{ status: TodoStatus }> = ({ status }) => {
 };
 
 export const TodoListDisplay: React.FC<TodoListDisplayProps> = ({
-  todos: data,
-  // availableTerminalHeight, // No longer needed without MaxSizedBox
+  todos,
   terminalWidth,
 }) => (
   <Box flexDirection="column" width={terminalWidth}>
-    {data.todos.map((todo: Todo, index: number) => (
-      <Box key={index} flexDirection="row" columnGap={3}>
-        <TodoStatusDisplay status={todo.status} />
-        <Text wrap="wrap" color={theme.text.primary}>
-          {todo.description}
-        </Text>
+    {todos.todos.map((todo: Todo, index: number) => (
+      <Box key={index} flexDirection="row">
+        <Box marginRight={1}>
+          <TodoStatusDisplay status={todo.status} />
+        </Box>
+        <Box flexShrink={1}>
+          <Text color={theme.text.primary}>{todo.description}</Text>
+        </Box>
       </Box>
     ))}
   </Box>
