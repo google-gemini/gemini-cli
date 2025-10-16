@@ -41,6 +41,7 @@ import {
   getAllGeminiMdFilenames,
   AuthType,
   clearCachedCredentialFile,
+  recordExitFail,
   ShellExecutionService,
 } from '@google/gemini-cli-core';
 import { validateAuthMethod } from '../config/auth.js';
@@ -794,9 +795,9 @@ Logging in with Google... Please restart Gemini CLI to continue.
   const [showToolDescriptions, setShowToolDescriptions] =
     useState<boolean>(false);
 
-  const [ctrlCPressedOnce, setCtrlCPressedOnce] = useState(false);
+  const [ctrlCPressCount, setCtrlCPressCount] = useState(0);
   const ctrlCTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const [ctrlDPressedOnce, setCtrlDPressedOnce] = useState(false);
+  const [ctrlDPressCount, setCtrlDPressCount] = useState(0);
   const ctrlDTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [constrainHeight, setConstrainHeight] = useState<boolean>(true);
   const [ideContextState, setIdeContextState] = useState<
@@ -906,24 +907,31 @@ Logging in with Google... Please restart Gemini CLI to continue.
 
   const handleExit = useCallback(
     (
-      pressedOnce: boolean,
-      setPressedOnce: (value: boolean) => void,
+      pressCount: number,
+      setPressCount: (value: number) => void,
       timerRef: React.MutableRefObject<NodeJS.Timeout | null>,
     ) => {
-      if (pressedOnce) {
+      // User has triggered exit keys multiple times within CTRL_EXIT_PROMPT_DURATION_MS
+      if (pressCount >= 2) {
+        recordExitFail(config);
+      }
+      if (pressCount >= 1) {
         if (timerRef.current) {
           clearTimeout(timerRef.current);
         }
         handleSlashCommand('/quit');
       } else {
-        setPressedOnce(true);
+        if (timerRef.current) {
+          clearTimeout(timerRef.current);
+        }
         timerRef.current = setTimeout(() => {
-          setPressedOnce(false);
+          setPressCount(0);
           timerRef.current = null;
         }, CTRL_EXIT_PROMPT_DURATION_MS);
       }
+      setPressCount(pressCount + 1);
     },
-    [handleSlashCommand],
+    [handleSlashCommand, config],
   );
 
   const handleGlobalKeypress = useCallback(
@@ -934,26 +942,17 @@ Logging in with Google... Please restart Gemini CLI to continue.
       }
 
       if (keyMatchers[Command.QUIT](key)) {
-        if (!ctrlCPressedOnce) {
-          cancelOngoingRequest?.();
-        }
+        // If the user presses Ctrl+C, we want to cancel any ongoing requests.
+        // This should happen on the first press, regardless of the count.
+        cancelOngoingRequest?.();
 
-        if (!ctrlCPressedOnce) {
-          setCtrlCPressedOnce(true);
-          ctrlCTimerRef.current = setTimeout(() => {
-            setCtrlCPressedOnce(false);
-            ctrlCTimerRef.current = null;
-          }, CTRL_EXIT_PROMPT_DURATION_MS);
-          return;
-        }
-
-        handleExit(ctrlCPressedOnce, setCtrlCPressedOnce, ctrlCTimerRef);
+        handleExit(ctrlCPressCount, setCtrlCPressCount, ctrlCTimerRef);
         return;
       } else if (keyMatchers[Command.EXIT](key)) {
         if (buffer.text.length > 0) {
           return;
         }
-        handleExit(ctrlDPressedOnce, setCtrlDPressedOnce, ctrlDTimerRef);
+        handleExit(ctrlDPressCount, setCtrlDPressCount, ctrlDTimerRef);
         return;
       }
 
@@ -999,12 +998,12 @@ Logging in with Google... Please restart Gemini CLI to continue.
       config,
       ideContextState,
       handleExit,
-      ctrlCPressedOnce,
-      setCtrlCPressedOnce,
+      ctrlCPressCount,
+      setCtrlCPressCount,
       ctrlCTimerRef,
       buffer.text.length,
-      ctrlDPressedOnce,
-      setCtrlDPressedOnce,
+      ctrlDPressCount,
+      setCtrlDPressCount,
       ctrlDTimerRef,
       handleSlashCommand,
       cancelOngoingRequest,
@@ -1139,8 +1138,8 @@ Logging in with Google... Please restart Gemini CLI to continue.
       filteredConsoleMessages,
       ideContextState,
       showToolDescriptions,
-      ctrlCPressedOnce,
-      ctrlDPressedOnce,
+      ctrlCPressedOnce: ctrlCPressCount >= 1,
+      ctrlDPressedOnce: ctrlDPressCount >= 1,
       showEscapePrompt,
       isFocused,
       elapsedTime,
@@ -1221,8 +1220,8 @@ Logging in with Google... Please restart Gemini CLI to continue.
       filteredConsoleMessages,
       ideContextState,
       showToolDescriptions,
-      ctrlCPressedOnce,
-      ctrlDPressedOnce,
+      ctrlCPressCount,
+      ctrlDPressCount,
       showEscapePrompt,
       isFocused,
       elapsedTime,
