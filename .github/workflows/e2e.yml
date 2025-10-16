@@ -1,23 +1,9 @@
 name: 'Testing: E2E'
 
 on:
-  push:
-    branches:
-      - 'main'
-  # This will run for PRs from the base repository, providing secrets.
-  pull_request:
-    branches:
-      - 'main'
-      - 'release/**'
-  pull_request_target:
-  merge_group:
-  workflow_dispatch:
-    inputs:
-      branch_ref:
-        description: 'Branch to run on'
-        required: true
-        default: 'main'
-        type: 'string'
+  workflow_run:
+    workflows: ['Trigger E2E']
+    types: ['completed']
 
 concurrency:
   group: '${{ github.workflow }}-${{ github.head_ref || github.ref }}'
@@ -36,16 +22,56 @@ jobs:
         with:
           secret: '${{ secrets.GITHUB_TOKEN }}'
 
+  download_repo_name:
+    runs-on: 'gemini-cli-ubuntu-16-core'
+    outputs:
+      repo_name: '${{ steps.output-repo-name.outputs.repo_name }}'
+    steps:
+      - name: 'Download artifact'
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # ratchet:actions/github-script@v8
+        with:
+          script: |
+            let allArtifacts = await github.rest.actions.listWorkflowRunArtifacts({
+               owner: context.repo.owner,
+               repo: context.repo.repo,
+               run_id: context.payload.workflow_run.id,
+            });
+            let matchArtifact = allArtifacts.data.artifacts.filter((artifact) => {
+              return artifact.name == "repo_name"
+            })[0];
+            let download = await github.rest.actions.downloadArtifact({
+               owner: context.repo.owner,
+               repo: context.repo.repo,
+               artifact_id: matchArtifact.id,
+               archive_format: 'zip',
+            });
+            const fs = require('fs');
+            const path = require('path');
+            const temp = '${{ runner.temp }}/artifacts';
+            if (!fs.existsSync(temp)){
+              fs.mkdirSync(temp);
+            }
+            fs.writeFileSync(path.join(temp, 'repo_name.zip'), Buffer.from(download.data));
+      - name: 'Unzip artifact'
+        run: unzip "${{ runner.temp }}/artifacts/repo_name.zip" -d "${{ runner.temp }}/artifacts"
+      - name: 'Output Repo Name'
+        id: 'output-repo-name'
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # ratchet:actions/github-script@v8
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+            const temp = '${{ runner.temp }}/artifacts';
+            const repo_name = Number(fs.readFileSync(path.join(temp, 'repo_name')));
+            core.setOutput('repo_name', repo_name);'
+          core: true
+
   e2e_linux:
     name: 'E2E Test (Linux) - ${{ matrix.sandbox }}'
     needs: 'merge_queue_skipper'
     if: |
-      needs.merge_queue_skipper.outputs.skip == 'false' &&
-      (github.event_name == 'push' ||
-      github.event_name == 'merge_group' ||
-      github.event_name == 'workflow_dispatch' ||
-      (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) ||
-      (github.event_name == 'pull_request_target'))
+      needs.merge_queue_skipper.outputs.skip == 'false'
     runs-on: 'gemini-cli-ubuntu-16-core'
     strategy:
       fail-fast: false
@@ -57,18 +83,12 @@ jobs:
           - '20.x'
 
     steps:
-      - name: 'Checkout (fork)'
+      - name: 'Checkout'
+        needs: 'download_repo_name'
         uses: 'actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955' # ratchet:actions/checkout@v5
-        if: "github.event_name == 'pull_request_target'"
         with:
-          ref: '${{ github.event.pull_request.head.sha }}'
-          repository: '${{ github.event.pull_request.head.repo.full_name }}'
-
-      - name: 'Checkout (internal)'
-        uses: 'actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955' # ratchet:actions/checkout@v5
-        if: "github.event_name != 'pull_request_target'"
-        with:
-          ref: '${{ github.event.inputs.branch_ref || github.ref }}'
+          ref: '${{ github.event.workflow_run.head_sha }}'
+          repository: '${{ needs.download_repo_name.outputs.repo_name }}'
 
       - name: 'Set up Node.js ${{ matrix.node-version }}'
         uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions-node@v4
@@ -102,26 +122,15 @@ jobs:
     name: 'E2E Test (macOS)'
     needs: 'merge_queue_skipper'
     if: |
-      needs.merge_queue_skipper.outputs.skip == 'false' &&
-      (github.event_name == 'push' ||
-      github.event_name == 'merge_group' ||
-      github.event_name == 'workflow_dispatch' ||
-      (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) ||
-      (github.event_name == 'pull_request_target'))
+      needs.merge_queue_skipper.outputs.skip == 'false'
     runs-on: 'macos-latest'
     steps:
-      - name: 'Checkout (fork)'
+      - name: 'Checkout'
+        needs: 'download_repo_name'
         uses: 'actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955' # ratchet:actions/checkout@v5
-        if: "github.event_name == 'pull_request_target'"
         with:
-          ref: '${{ github.event.pull_request.head.sha }}'
-          repository: '${{ github.event.pull_request.head.repo.full_name }}'
-
-      - name: 'Checkout (internal)'
-        uses: 'actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955' # ratchet:actions/checkout@v5
-        if: "github.event_name != 'pull_request_target'"
-        with:
-          ref: '${{ github.event.inputs.branch_ref || github.ref }}'
+          ref: '${{ github.event.workflow_run.head_sha }}'
+          repository: '${{ needs.download_repo_name.outputs.repo_name }}'
 
       - name: 'Set up Node.js 20.x'
         uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions-node@v4
@@ -151,28 +160,17 @@ jobs:
     name: 'Slow E2E - Win'
     needs: 'merge_queue_skipper'
     if: |
-      needs.merge_queue_skipper.outputs.skip == 'false' &&
-      (github.event_name == 'push' ||
-      github.event_name == 'merge_group' ||
-      github.event_name == 'workflow_dispatch' ||
-      (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) ||
-      (github.event_name == 'pull_request_target'))
+      needs.merge_queue_skipper.outputs.skip == 'false'
     runs-on: 'gemini-cli-windows-16-core'
     continue-on-error: true
 
     steps:
-      - name: 'Checkout (fork)'
+      - name: 'Checkout'
+        needs: 'download_repo_name'
         uses: 'actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955' # ratchet:actions/checkout@v5
-        if: "github.event_name == 'pull_request_target'"
         with:
-          ref: '${{ github.event.pull_request.head.sha }}'
-          repository: '${{ github.event.pull_request.head.repo.full_name }}'
-
-      - name: 'Checkout (internal)'
-        uses: 'actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955' # ratchet:actions/checkout@v5
-        if: "github.event_name != 'pull_request_target'"
-        with:
-          ref: '${{ github.event.inputs.branch_ref || github.ref }}'
+          ref: '${{ github.event.workflow_run.head_sha }}'
+          repository: '${{ needs.download_repo_name.outputs.repo_name }}'
 
       - name: 'Set up Node.js 20.x'
         uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions-node@v4
@@ -221,13 +219,7 @@ jobs:
   e2e:
     name: 'E2E'
     if: |
-      always() && (
-        github.event_name == 'push' ||
-        github.event_name == 'merge_group' ||
-        github.event_name == 'workflow_dispatch' ||
-        (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) ||
-        (github.event_name == 'pull_request_target')
-      )
+      always()
     needs:
       - 'e2e_linux'
       - 'e2e_mac'
