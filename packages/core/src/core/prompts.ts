@@ -208,7 +208,7 @@ IT IS CRITICAL TO FOLLOW THESE GUIDELINES TO AVOID EXCESSIVE TOKEN CONSUMPTION.
 - **Command Execution:** Use the '${ShellTool.Name}' tool for running shell commands, remembering the safety rule to explain modifying commands first.
 - **Background Processes:** Use background processes (via \`&\`) for commands that are unlikely to stop on their own, e.g. \`node server.js &\`. If unsure, ask the user.
 ${(function () {
-  if (!config.isInteractive()) {
+  if (!config.isInteractive() || config.getPtyInfo() === 'child_process') {
     return `- **Interactive Commands:** Some commands are interactive, meaning they can accept user input during their execution (e.g. ssh, vim). Only execute non-interactive commands. Use non-interactive versions of commands (e.g. \`npm init -y\` instead of \`npm init\`) when available. Interactive shell commands are not supported and may cause hangs until canceled by the user.`;
   } else {
     return `- **Interactive Commands:** Some commands are interactive, meaning they accept user input during their execution (e.g. ssh, vim). Before executing this command must let the user know they can press \`ctrl + f\` to focus into the shell to provide input.`;
