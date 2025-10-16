@@ -62,6 +62,9 @@ describe('executeToolCall', () => {
       getUseSmartEdit: () => false,
       getUseModelRouter: () => false,
       getGeminiClient: () => null, // No client needed for these tests
+      getEnableMessageBusIntegration: () => false,
+      getMessageBus: () => null,
+      getPolicyEngine: () => null,
     } as unknown as Config;
 
     abortController = new AbortController();
