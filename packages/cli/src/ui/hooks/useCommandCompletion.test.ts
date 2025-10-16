@@ -515,6 +515,68 @@ describe('useCommandCompletion', () => {
         '@src/file1.txt is a good file',
       );
     });
+
+    it('should complete a directory path ending with / without a trailing space', async () => {
+      setupMocks({
+        atSuggestions: [{ label: 'src/components/', value: 'src/components/' }],
+      });
+
+      const { result } = renderHook(() => {
+        const textBuffer = useTextBufferForTest('@src/comp');
+        const completion = useCommandCompletion(
+          textBuffer,
+          testDirs,
+          testRootDir,
+          [],
+          mockCommandContext,
+          false,
+          mockConfig,
+        );
+        return { ...completion, textBuffer };
+      });
+
+      await waitFor(() => {
+        expect(result.current.suggestions.length).toBe(1);
+      });
+
+      act(() => {
+        result.current.handleAutocomplete(0);
+      });
+
+      expect(result.current.textBuffer.text).toBe('@src/components/');
+    });
+
+    it('should complete a directory path ending with \\ without a trailing space', async () => {
+      setupMocks({
+        atSuggestions: [
+          { label: 'src\\components\\', value: 'src\\components\\' },
+        ],
+      });
+
+      const { result } = renderHook(() => {
+        const textBuffer = useTextBufferForTest('@src\\comp');
+        const completion = useCommandCompletion(
+          textBuffer,
+          testDirs,
+          testRootDir,
+          [],
+          mockCommandContext,
+          false,
+          mockConfig,
+        );
+        return { ...completion, textBuffer };
+      });
+
+      await waitFor(() => {
+        expect(result.current.suggestions.length).toBe(1);
+      });
+
+      act(() => {
+        result.current.handleAutocomplete(0);
+      });
+
+      expect(result.current.textBuffer.text).toBe('@src\\components\\');
+    });
   });
 
   describe('prompt completion filtering', () => {
