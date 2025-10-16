@@ -4,11 +4,16 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type { GenerateContentResponse } from '@google/genai';
+import { ApiError } from '@google/genai';
 import { AuthType } from '../core/contentGenerator.js';
 import {
   isProQuotaExceededError,
   isGenericQuotaExceededError,
 } from './quotaErrorDetection.js';
+
+const FETCH_FAILED_MESSAGE =
+  'exception TypeError: fetch failed sending request';
 
 export interface HttpError extends Error {
   status?: number;
@@ -18,39 +23,55 @@ export interface RetryOptions {
   maxAttempts: number;
   initialDelayMs: number;
   maxDelayMs: number;
-  shouldRetry: (error: Error) => boolean;
+  shouldRetryOnError: (error: Error, retryFetchErrors?: boolean) => boolean;
+  shouldRetryOnContent?: (content: GenerateContentResponse) => boolean;
   onPersistent429?: (
     authType?: string,
     error?: unknown,
   ) => Promise<string | boolean | null>;
   authType?: string;
+  retryFetchErrors?: boolean;
 }
 
 const DEFAULT_RETRY_OPTIONS: RetryOptions = {
   maxAttempts: 5,
   initialDelayMs: 5000,
   maxDelayMs: 30000, // 30 seconds
-  shouldRetry: defaultShouldRetry,
+  shouldRetryOnError: defaultShouldRetry,
 };
 
 /**
  * Default predicate function to determine if a retry should be attempted.
  * Retries on 429 (Too Many Requests) and 5xx server errors.
  * @param error The error object.
+ * @param retryFetchErrors Whether to retry on specific fetch errors.
  * @returns True if the error is a transient error, false otherwise.
  */
-function defaultShouldRetry(error: Error | unknown): boolean {
-  // Check for common transient error status codes either in message or a status property
-  if (error && typeof (error as { status?: number }).status === 'number') {
-    const status = (error as { status: number }).status;
-    if (status === 429 || (status >= 500 && status < 600)) {
-      return true;
-    }
+function defaultShouldRetry(
+  error: Error | unknown,
+  retryFetchErrors?: boolean,
+): boolean {
+  if (
+    retryFetchErrors &&
+    error instanceof Error &&
+    error.message.includes(FETCH_FAILED_MESSAGE)
+  ) {
+    return true;
   }
-  if (error instanceof Error && error.message) {
-    if (error.message.includes('429')) return true;
-    if (error.message.match(/5\d{2}/)) return true;
+
+  // Priority check for ApiError
+  if (error instanceof ApiError) {
+    // Explicitly do not retry 400 (Bad Request)
+    if (error.status === 400) return false;
+    return error.status === 429 || (error.status >= 500 && error.status < 600);
   }
+
+  // Check for status using helper (handles other error shapes)
+  const status = getErrorStatus(error);
+  if (status !== undefined) {
+    return status === 429 || (status >= 500 && status < 600);
+  }
+
   return false;
 }
 
@@ -74,16 +95,26 @@ export async function retryWithBackoff<T>(
   fn: () => Promise<T>,
   options?: Partial<RetryOptions>,
 ): Promise<T> {
+  if (options?.maxAttempts !== undefined && options.maxAttempts <= 0) {
+    throw new Error('maxAttempts must be a positive number.');
+  }
+
+  const cleanOptions = options
+    ? Object.fromEntries(Object.entries(options).filter(([_, v]) => v != null))
+    : {};
+
   const {
     maxAttempts,
     initialDelayMs,
     maxDelayMs,
     onPersistent429,
     authType,
-    shouldRetry,
+    shouldRetryOnError,
+    shouldRetryOnContent,
+    retryFetchErrors,
   } = {
     ...DEFAULT_RETRY_OPTIONS,
-    ...options,
+    ...cleanOptions,
   };
 
   let attempt = 0;
@@ -93,7 +124,20 @@ export async function retryWithBackoff<T>(
   while (attempt < maxAttempts) {
     attempt++;
     try {
-      return await fn();
+      const result = await fn();
+
+      if (
+        shouldRetryOnContent &&
+        shouldRetryOnContent(result as GenerateContentResponse)
+      ) {
+        const jitter = currentDelay * 0.3 * (Math.random() * 2 - 1);
+        const delayWithJitter = Math.max(0, currentDelay + jitter);
+        await delay(delayWithJitter);
+        currentDelay = Math.min(maxDelayMs, currentDelay * 2);
+        continue;
+      }
+
+      return result;
     } catch (error) {
       const errorStatus = getErrorStatus(error);
 
@@ -183,7 +227,10 @@ export async function retryWithBackoff<T>(
       }
 
       // Check if we've exhausted retries or shouldn't retry
-      if (attempt >= maxAttempts || !shouldRetry(error as Error)) {
+      if (
+        attempt >= maxAttempts ||
+        !shouldRetryOnError(error as Error, retryFetchErrors)
+      ) {
         throw error;
       }
 

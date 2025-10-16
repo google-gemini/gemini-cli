@@ -9,12 +9,12 @@ import { uninstallExtension } from '../../config/extension.js';
 import { getErrorMessage } from '../../utils/errors.js';
 
 interface UninstallArgs {
-  name: string;
+  name: string; // can be extension name or source URL.
 }
 
 export async function handleUninstall(args: UninstallArgs) {
   try {
-    await uninstallExtension(args.name);
+    await uninstallExtension(args.name, false);
     console.log(`Extension "${args.name}" successfully uninstalled.`);
   } catch (error) {
     console.error(getErrorMessage(error));
@@ -28,7 +28,7 @@ export const uninstallCommand: CommandModule = {
   builder: (yargs) =>
     yargs
       .positional('name', {
-        describe: 'The name of the extension to uninstall.',
+        describe: 'The name or source path of the extension to uninstall.',
         type: 'string',
       })
       .check((argv) => {

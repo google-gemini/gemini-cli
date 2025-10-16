@@ -1495,6 +1495,53 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
       expect(stripAnsi('')).toBe('');
     });
   });
+
+  describe('Memoization', () => {
+    it('should keep action references stable across re-renders', () => {
+      // We pass a stable `isValidPath` so that callbacks that depend on it
+      // are not recreated on every render.
+      const isValidPath = () => false;
+      const { result, rerender } = renderHook(() =>
+        useTextBuffer({ viewport, isValidPath }),
+      );
+
+      const initialInsert = result.current.insert;
+      const initialBackspace = result.current.backspace;
+      const initialMove = result.current.move;
+      const initialHandleInput = result.current.handleInput;
+
+      rerender();
+
+      expect(result.current.insert).toBe(initialInsert);
+      expect(result.current.backspace).toBe(initialBackspace);
+      expect(result.current.move).toBe(initialMove);
+      expect(result.current.handleInput).toBe(initialHandleInput);
+    });
+
+    it('should have memoized actions that operate on the latest state', () => {
+      const isValidPath = () => false;
+      const { result } = renderHook(() =>
+        useTextBuffer({ viewport, isValidPath }),
+      );
+
+      // Store a reference to the memoized insert function.
+      const memoizedInsert = result.current.insert;
+
+      // Update the buffer state.
+      act(() => {
+        result.current.insert('hello');
+      });
+      expect(getBufferState(result).text).toBe('hello');
+
+      // Now, call the original memoized function reference.
+      act(() => {
+        memoizedInsert(' world');
+      });
+
+      // It should have operated on the updated state.
+      expect(getBufferState(result).text).toBe('hello world');
+    });
+  });
 });
 
 describe('offsetToLogicalPos', () => {

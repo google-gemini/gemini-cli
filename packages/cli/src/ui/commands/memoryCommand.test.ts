@@ -7,16 +7,16 @@
 import type { Mock } from 'vitest';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 import { memoryCommand } from './memoryCommand.js';
-import type { SlashCommand, type CommandContext } from './types.js';
+import type { SlashCommand, CommandContext } from './types.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
 import { MessageType } from '../types.js';
 import type { LoadedSettings } from '../../config/settings.js';
 import {
   getErrorMessage,
-  loadServerHierarchicalMemory,
   type FileDiscoveryService,
 } from '@google/gemini-cli-core';
 import type { LoadServerHierarchicalMemoryResponse } from '@google/gemini-cli-core/index.js';
+import { loadHierarchicalGeminiMemory } from '../../config/config.js';
 
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const original =
@@ -27,16 +27,26 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
       if (error instanceof Error) return error.message;
       return String(error);
     }),
-    loadServerHierarchicalMemory: vi.fn(),
   };
 });
 
-const mockLoadServerHierarchicalMemory = loadServerHierarchicalMemory as Mock;
+vi.mock('../../config/config.js', async (importOriginal) => {
+  const original =
+    await importOriginal<typeof import('../../config/config.js')>();
+  return {
+    ...original,
+    loadHierarchicalGeminiMemory: vi.fn(),
+  };
+});
+
+const mockLoadHierarchicalGeminiMemory = loadHierarchicalGeminiMemory as Mock;
 
 describe('memoryCommand', () => {
   let mockContext: CommandContext;
 
-  const getSubCommand = (name: 'show' | 'add' | 'refresh'): SlashCommand => {
+  const getSubCommand = (
+    name: 'show' | 'add' | 'refresh' | 'list',
+  ): SlashCommand => {
     const subCommand = memoryCommand.subCommands?.find(
       (cmd) => cmd.name === name,
     );
@@ -151,14 +161,18 @@ describe('memoryCommand', () => {
     let refreshCommand: SlashCommand;
     let mockSetUserMemory: Mock;
     let mockSetGeminiMdFileCount: Mock;
+    let mockSetGeminiMdFilePaths: Mock;
 
     beforeEach(() => {
       refreshCommand = getSubCommand('refresh');
       mockSetUserMemory = vi.fn();
       mockSetGeminiMdFileCount = vi.fn();
+      mockSetGeminiMdFilePaths = vi.fn();
+
       const mockConfig = {
         setUserMemory: mockSetUserMemory,
         setGeminiMdFileCount: mockSetGeminiMdFileCount,
+        setGeminiMdFilePaths: mockSetGeminiMdFilePaths,
         getWorkingDir: () => '/test/dir',
         getDebugMode: () => false,
         getFileService: () => ({}) as FileDiscoveryService,
@@ -171,20 +185,26 @@ describe('memoryCommand', () => {
           ignore: [],
           include: [],
         }),
-        getFolderTrust: () => false,
+        isTrustedFolder: () => false,
       };
 
       mockContext = createMockCommandContext({
         services: {
-          config: Promise.resolve(mockConfig),
+          config: mockConfig,
           settings: {
             merged: {
               memoryDiscoveryMaxDirs: 1000,
+              context: {
+                importFormat: 'tree',
+              },
             },
           } as LoadedSettings,
         },
+        ui: {
+          setGeminiMdFileCount: vi.fn(),
+        },
       });
-      mockLoadServerHierarchicalMemory.mockClear();
+      mockLoadHierarchicalGeminiMemory.mockClear();
     });
 
     it('should display success message when memory is refreshed with content', async () => {
@@ -193,8 +213,9 @@ describe('memoryCommand', () => {
       const refreshResult: LoadServerHierarchicalMemoryResponse = {
         memoryContent: 'new memory content',
         fileCount: 2,
+        filePaths: ['/path/one/GEMINI.md', '/path/two/GEMINI.md'],
       };
-      mockLoadServerHierarchicalMemory.mockResolvedValue(refreshResult);
+      mockLoadHierarchicalGeminiMemory.mockResolvedValue(refreshResult);
 
       await refreshCommand.action(mockContext, '');
 
@@ -206,11 +227,17 @@ describe('memoryCommand', () => {
         expect.any(Number),
       );
 
-      expect(loadServerHierarchicalMemory).toHaveBeenCalledOnce();
+      expect(mockLoadHierarchicalGeminiMemory).toHaveBeenCalledOnce();
       expect(mockSetUserMemory).toHaveBeenCalledWith(
         refreshResult.memoryContent,
       );
       expect(mockSetGeminiMdFileCount).toHaveBeenCalledWith(
+        refreshResult.fileCount,
+      );
+      expect(mockSetGeminiMdFilePaths).toHaveBeenCalledWith(
+        refreshResult.filePaths,
+      );
+      expect(mockContext.ui.setGeminiMdFileCount).toHaveBeenCalledWith(
         refreshResult.fileCount,
       );
 
@@ -226,14 +253,15 @@ describe('memoryCommand', () => {
     it('should display success message when memory is refreshed with no content', async () => {
       if (!refreshCommand.action) throw new Error('Command has no action');
 
-      const refreshResult = { memoryContent: '', fileCount: 0 };
-      mockLoadServerHierarchicalMemory.mockResolvedValue(refreshResult);
+      const refreshResult = { memoryContent: '', fileCount: 0, filePaths: [] };
+      mockLoadHierarchicalGeminiMemory.mockResolvedValue(refreshResult);
 
       await refreshCommand.action(mockContext, '');
 
-      expect(loadServerHierarchicalMemory).toHaveBeenCalledOnce();
+      expect(mockLoadHierarchicalGeminiMemory).toHaveBeenCalledOnce();
       expect(mockSetUserMemory).toHaveBeenCalledWith('');
       expect(mockSetGeminiMdFileCount).toHaveBeenCalledWith(0);
+      expect(mockSetGeminiMdFilePaths).toHaveBeenCalledWith([]);
 
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
         {
@@ -248,13 +276,14 @@ describe('memoryCommand', () => {
       if (!refreshCommand.action) throw new Error('Command has no action');
 
       const error = new Error('Failed to read memory files.');
-      mockLoadServerHierarchicalMemory.mockRejectedValue(error);
+      mockLoadHierarchicalGeminiMemory.mockRejectedValue(error);
 
       await refreshCommand.action(mockContext, '');
 
-      expect(loadServerHierarchicalMemory).toHaveBeenCalledOnce();
+      expect(mockLoadHierarchicalGeminiMemory).toHaveBeenCalledOnce();
       expect(mockSetUserMemory).not.toHaveBeenCalled();
       expect(mockSetGeminiMdFileCount).not.toHaveBeenCalled();
+      expect(mockSetGeminiMdFilePaths).not.toHaveBeenCalled();
 
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
         {
@@ -286,7 +315,57 @@ describe('memoryCommand', () => {
         expect.any(Number),
       );
 
-      expect(loadServerHierarchicalMemory).not.toHaveBeenCalled();
+      expect(mockLoadHierarchicalGeminiMemory).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('/memory list', () => {
+    let listCommand: SlashCommand;
+    let mockGetGeminiMdfilePaths: Mock;
+
+    beforeEach(() => {
+      listCommand = getSubCommand('list');
+      mockGetGeminiMdfilePaths = vi.fn();
+      mockContext = createMockCommandContext({
+        services: {
+          config: {
+            getGeminiMdFilePaths: mockGetGeminiMdfilePaths,
+          },
+        },
+      });
+    });
+
+    it('should display a message if no GEMINI.md files are found', async () => {
+      if (!listCommand.action) throw new Error('Command has no action');
+
+      mockGetGeminiMdfilePaths.mockReturnValue([]);
+
+      await listCommand.action(mockContext, '');
+
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
+        {
+          type: MessageType.INFO,
+          text: 'No GEMINI.md files in use.',
+        },
+        expect.any(Number),
+      );
+    });
+
+    it('should display the file count and paths if they exist', async () => {
+      if (!listCommand.action) throw new Error('Command has no action');
+
+      const filePaths = ['/path/one/GEMINI.md', '/path/two/GEMINI.md'];
+      mockGetGeminiMdfilePaths.mockReturnValue(filePaths);
+
+      await listCommand.action(mockContext, '');
+
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
+        {
+          type: MessageType.INFO,
+          text: `There are 2 GEMINI.md file(s) in use:\n\n${filePaths.join('\n')}`,
+        },
+        expect.any(Number),
+      );
     });
   });
 });

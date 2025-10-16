@@ -7,11 +7,7 @@
 import type { Mocked } from 'vitest';
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 
-import type {
-  MessageActionReturn,
-  SlashCommand,
-  type CommandContext,
-} from './types.js';
+import type { SlashCommand, CommandContext } from './types.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
 import type { Content } from '@google/genai';
 import type { GeminiClient } from '@google/gemini-cli-core';
@@ -98,69 +94,37 @@ describe('chatCommand', () => {
       listCommand = getSubCommand('list');
     });
 
-    it('should inform when no checkpoints are found', async () => {
-      mockFs.readdir.mockImplementation(
-        (async (_: string): Promise<string[]> =>
-          [] as string[]) as unknown as typeof fsPromises.readdir,
-      );
-      const result = await listCommand?.action?.(mockContext, '');
-      expect(result).toEqual({
-        type: 'message',
-        messageType: 'info',
-        content: 'No saved conversation checkpoints found.',
-      });
-    });
-
-    it('should list found checkpoints', async () => {
+    it('should add a chat_list item to the UI', async () => {
       const fakeFiles = ['checkpoint-test1.json', 'checkpoint-test2.json'];
-      const date = new Date();
-
-      mockFs.readdir.mockImplementation(
-        (async (_: string): Promise<string[]> =>
-          fakeFiles as string[]) as unknown as typeof fsPromises.readdir,
-      );
-      mockFs.stat.mockImplementation((async (path: string): Promise<Stats> => {
-        if (path.endsWith('test1.json')) {
-          return { mtime: date } as Stats;
-        }
-        return { mtime: new Date(date.getTime() + 1000) } as Stats;
-      }) as unknown as typeof fsPromises.stat);
-
-      const result = (await listCommand?.action?.(
-        mockContext,
-        '',
-      )) as MessageActionReturn;
-
-      const content = result?.content ?? '';
-      expect(result?.type).toBe('message');
-      expect(content).toContain('List of saved conversations:');
-      const isoDate = date
-        .toISOString()
-        .match(/(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2}:\d{2})/);
-      const formattedDate = isoDate ? `${isoDate[1]} ${isoDate[2]}` : '';
-      expect(content).toContain(formattedDate);
-      const index1 = content.indexOf('- \u001b[36mtest1\u001b[0m');
-      const index2 = content.indexOf('- \u001b[36mtest2\u001b[0m');
-      expect(index1).toBeGreaterThanOrEqual(0);
-      expect(index2).toBeGreaterThan(index1);
-    });
-
-    it('should handle invalid date formats gracefully', async () => {
-      const fakeFiles = ['checkpoint-baddate.json'];
-      const badDate = {
-        toISOString: () => 'an-invalid-date-string',
-      } as Date;
+      const date1 = new Date();
+      const date2 = new Date(date1.getTime() + 1000);
 
       mockFs.readdir.mockResolvedValue(fakeFiles);
-      mockFs.stat.mockResolvedValue({ mtime: badDate } as Stats);
+      mockFs.stat.mockImplementation(async (path: string): Promise<Stats> => {
+        if (path.endsWith('test1.json')) {
+          return { mtime: date1 } as Stats;
+        }
+        return { mtime: date2 } as Stats;
+      });
 
-      const result = (await listCommand?.action?.(
-        mockContext,
-        '',
-      )) as MessageActionReturn;
+      await listCommand?.action?.(mockContext, '');
 
-      const content = result?.content ?? '';
-      expect(content).toContain('(saved on Invalid Date)');
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
+        {
+          type: 'chat_list',
+          chats: [
+            {
+              name: 'test1',
+              mtime: date1.toISOString(),
+            },
+            {
+              name: 'test2',
+              mtime: date2.toISOString(),
+            },
+          ],
+        },
+        expect.any(Number),
+      );
     });
   });
   describe('save subcommand', () => {
@@ -465,11 +429,27 @@ describe('chatCommand', () => {
       const expectedPath = path.join(process.cwd(), 'my-chat.md');
       const [actualPath, actualContent] = mockFs.writeFile.mock.calls[0];
       expect(actualPath).toEqual(expectedPath);
-      const expectedContent =
-        '**user**:\n\ncontext\n\n---\n\n' +
-        '**model**:\n\ncontext response\n\n---\n\n' +
-        '**user**:\n\nHello\n\n---\n\n' +
-        '**model**:\n\nHi there!';
+      const expectedContent = `🧑‍💻 ## USER
+
+context
+
+---
+
+✨ ## MODEL
+
+context response
+
+---
+
+🧑‍💻 ## USER
+
+Hello
+
+---
+
+✨ ## MODEL
+
+Hi there!`;
       expect(actualContent).toEqual(expectedContent);
       expect(result).toEqual({
         type: 'message',
@@ -540,13 +520,14 @@ describe('chatCommand', () => {
       entries.forEach((entry, index) => {
         const { role, parts } = mockHistory[index];
         const text = parts.map((p) => p.text).join('');
-        expect(entry).toBe(`**${role}**:\n\n${text}`);
+        const roleIcon = role === 'user' ? '🧑‍💻' : '✨';
+        expect(entry).toBe(`${roleIcon} ## ${role.toUpperCase()}\n\n${text}`);
       });
     });
   });
 
   describe('serializeHistoryToMarkdown', () => {
-    it('should correctly serialize chat history to Markdown', () => {
+    it('should correctly serialize chat history to Markdown with icons', () => {
       const history: Content[] = [
         { role: 'user', parts: [{ text: 'Hello' }] },
         { role: 'model', parts: [{ text: 'Hi there!' }] },
@@ -554,9 +535,9 @@ describe('chatCommand', () => {
       ];
 
       const expectedMarkdown =
-        '**user**:\n\nHello\n\n---\n\n' +
-        '**model**:\n\nHi there!\n\n---\n\n' +
-        '**user**:\n\nHow are you?';
+        '🧑‍💻 ## USER\n\nHello\n\n---\n\n' +
+        '✨ ## MODEL\n\nHi there!\n\n---\n\n' +
+        '🧑‍💻 ## USER\n\nHow are you?';
 
       const result = serializeHistoryToMarkdown(history);
       expect(result).toBe(expectedMarkdown);
@@ -575,12 +556,109 @@ describe('chatCommand', () => {
         { role: 'user', parts: [{ text: 'How are you?' }] },
       ];
 
-      const expectedMarkdown =
-        '**user**:\n\nHello\n\n---\n\n' +
-        '**model**:\n\n\n\n---\n\n' +
-        '**user**:\n\nHow are you?';
+      const expectedMarkdown = `🧑‍💻 ## USER
+
+Hello
+
+---
+
+✨ ## MODEL
+
+
+
+---
+
+🧑‍💻 ## USER
+
+How are you?`;
 
       const result = serializeHistoryToMarkdown(history);
+      expect(result).toBe(expectedMarkdown);
+    });
+
+    it('should correctly serialize function calls and responses', () => {
+      const history: Content[] = [
+        {
+          role: 'user',
+          parts: [{ text: 'Please call a function.' }],
+        },
+        {
+          role: 'model',
+          parts: [
+            {
+              functionCall: {
+                name: 'my-function',
+                args: { arg1: 'value1' },
+              },
+            },
+          ],
+        },
+        {
+          role: 'user',
+          parts: [
+            {
+              functionResponse: {
+                name: 'my-function',
+                response: { result: 'success' },
+              },
+            },
+          ],
+        },
+      ];
+
+      const expectedMarkdown = `🧑‍💻 ## USER
+
+Please call a function.
+
+---
+
+✨ ## MODEL
+
+**Tool Command**:
+\`\`\`json
+{
+  "name": "my-function",
+  "args": {
+    "arg1": "value1"
+  }
+}
+\`\`\`
+
+---
+
+🧑‍💻 ## USER
+
+**Tool Response**:
+\`\`\`json
+{
+  "name": "my-function",
+  "response": {
+    "result": "success"
+  }
+}
+\`\`\``;
+
+      const result = serializeHistoryToMarkdown(history);
+      expect(result).toBe(expectedMarkdown);
+    });
+
+    it('should handle items with undefined role', () => {
+      const history: Array<Partial<Content>> = [
+        { role: 'user', parts: [{ text: 'Hello' }] },
+        { parts: [{ text: 'Hi there!' }] },
+      ];
+
+      const expectedMarkdown = `🧑‍💻 ## USER
+
+Hello
+
+---
+
+✨ ## MODEL
+
+Hi there!`;
+
+      const result = serializeHistoryToMarkdown(history as Content[]);
       expect(result).toBe(expectedMarkdown);
     });
   });

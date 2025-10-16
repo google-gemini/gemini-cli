@@ -7,13 +7,19 @@
 import { renderWithProviders } from '../../test-utils/render.js';
 import { waitFor } from '@testing-library/react';
 import { vi } from 'vitest';
-import { FolderTrustDialog, FolderTrustChoice } from './FolderTrustDialog.js';
+import { FolderTrustDialog } from './FolderTrustDialog.js';
+import * as processUtils from '../../utils/processUtils.js';
+
+vi.mock('../../utils/processUtils.js', () => ({
+  relaunchApp: vi.fn(),
+}));
 
 const mockedExit = vi.hoisted(() => vi.fn());
 const mockedCwd = vi.hoisted(() => vi.fn());
 
-vi.mock('process', async () => {
-  const actual = await vi.importActual('process');
+vi.mock('node:process', async () => {
+  const actual =
+    await vi.importActual<typeof import('node:process')>('node:process');
   return {
     ...actual,
     exit: mockedExit,
@@ -38,30 +44,23 @@ describe('FolderTrustDialog', () => {
     );
   });
 
-  it('should call onSelect with DO_NOT_TRUST when escape is pressed and not restarting', async () => {
+  it('should display exit message and call process.exit and not call onSelect when escape is pressed', async () => {
     const onSelect = vi.fn();
-    const { stdin } = renderWithProviders(
+    const { lastFrame, stdin } = renderWithProviders(
       <FolderTrustDialog onSelect={onSelect} isRestarting={false} />,
     );
 
     stdin.write('\x1b'); // escape key
 
     await waitFor(() => {
-      expect(onSelect).toHaveBeenCalledWith(FolderTrustChoice.DO_NOT_TRUST);
+      expect(lastFrame()).toContain(
+        'A folder trust level must be selected to continue. Exiting since escape was pressed.',
+      );
     });
-  });
-
-  it('should not call onSelect when escape is pressed and is restarting', async () => {
-    const onSelect = vi.fn();
-    const { stdin } = renderWithProviders(
-      <FolderTrustDialog onSelect={onSelect} isRestarting={true} />,
-    );
-
-    stdin.write('\x1b'); // escape key
-
     await waitFor(() => {
-      expect(onSelect).not.toHaveBeenCalled();
+      expect(mockedExit).toHaveBeenCalledWith(1);
     });
+    expect(onSelect).not.toHaveBeenCalled();
   });
 
   it('should display restart message when isRestarting is true', () => {
@@ -69,21 +68,18 @@ describe('FolderTrustDialog', () => {
       <FolderTrustDialog onSelect={vi.fn()} isRestarting={true} />,
     );
 
-    expect(lastFrame()).toContain(
-      'To see changes, Gemini CLI must be restarted',
-    );
+    expect(lastFrame()).toContain(' Gemini CLI is restarting');
   });
 
-  it('should call process.exit when "r" is pressed and isRestarting is true', async () => {
-    const { stdin } = renderWithProviders(
+  it('should call relaunchApp when isRestarting is true', async () => {
+    vi.useFakeTimers();
+    const relaunchApp = vi.spyOn(processUtils, 'relaunchApp');
+    renderWithProviders(
       <FolderTrustDialog onSelect={vi.fn()} isRestarting={true} />,
     );
-
-    stdin.write('r');
-
-    await waitFor(() => {
-      expect(mockedExit).toHaveBeenCalledWith(0);
-    });
+    await vi.advanceTimersByTimeAsync(250);
+    expect(relaunchApp).toHaveBeenCalled();
+    vi.useRealTimers();
   });
 
   it('should not call process.exit when "r" is pressed and isRestarting is false', async () => {

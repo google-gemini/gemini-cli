@@ -1,0 +1,178 @@
+name: 'Release: Rollback change'
+
+on:
+  workflow_dispatch:
+    inputs:
+      rollback_origin:
+        description: 'The package version to rollback FROM and delete (e.g., 0.5.0-preview-2)'
+        required: true
+        type: 'string'
+      rollback_destination:
+        description: 'The package version to rollback TO (e.g., 0.5.0-preview-2). This version must already exist on the npm registry.'
+        required: false
+        type: 'string'
+      channel:
+        description: 'The npm dist-tag to apply to rollback_destination (e.g., latest, preview, nightly). REQUIRED IF rollback_destination is set.'
+        required: false
+        type: 'choice'
+        options:
+          - 'latest'
+          - 'preview'
+          - 'nightly'
+          - 'dev'
+        default: 'dev'
+      ref:
+        description: 'The branch, tag, or SHA to run from.'
+        required: false
+        type: 'string'
+        default: 'main'
+      dry-run:
+        description: 'Whether to run in dry-run mode.'
+        required: false
+        type: 'boolean'
+        default: true
+
+jobs:
+  change-tags:
+    environment: 'prod' ## TODO(richieforeman) Support Dev mode
+    runs-on: 'ubuntu-latest'
+    permissions:
+      packages: 'write'
+      issues: 'write'
+    steps:
+      - name: 'Checkout repository'
+        uses: 'actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955' # ratchet:actions/checkout@v4
+        with:
+          ref: '${{ github.event.inputs.ref }}'
+          fetch-depth: 0
+
+      - name: 'Setup Node.js'
+        uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020'
+        with:
+          node-version-file: '.nvmrc'
+          registry-url: 'https://wombat-dressing-room.appspot.com'
+          scope: '@google'
+
+      - name: 'Get Origin Version Tag'
+        id: 'origin_tag'
+        shell: 'bash'
+        run: |
+          TAG_VALUE="v${{ github.event.inputs.rollback_origin }}"
+          echo "ORIGIN_TAG=$TAG_VALUE" >> "$GITHUB_OUTPUT"
+
+      - name: 'Get Origin Commit Hash'
+        id: 'origin_hash'
+        env:
+          GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+        shell: 'bash'
+        run: |
+          echo "ORIGIN_HASH=$(git rev-parse ${{ steps.origin_tag.outputs.ORIGIN_TAG }})" >> "$GITHUB_OUTPUT"
+
+      - name: 'Change tag'
+        if: "${{ github.event.inputs.rollback_destination != '' }}"
+        uses: './.github/actions/tag-npm-release'
+        with:
+          channel: '${{ github.event.inputs.channel }}'
+          version: '${{ github.event.inputs.rollback_destination }}'
+          dry-run: '${{ github.event.inputs.dry-run }}'
+          wombat-token-core: '${{ secrets.WOMBAT_TOKEN_CORE }}'
+          wombat-token-cli: '${{ secrets.WOMBAT_TOKEN_CLI }}'
+          wombat-token-a2a-server: '${{ secrets.WOMBAT_TOKEN_A2A_SERVER }}'
+          github-token: '${{ secrets.GITHUB_TOKEN }}'
+          cli-package-name: '${{ vars.CLI_PACKAGE_NAME }}'
+          core-package-name: '${{ vars.CORE_PACKAGE_NAME }}'
+          a2a-package-name: '${{ vars.A2A_PACKAGE_NAME }}'
+
+      - name: 'Deprecate Cli Npm Package'
+        if: "${{ github.event.inputs.dry-run == 'false' }}"
+        env:
+          NODE_AUTH_TOKEN: '${{ secrets.WOMBAT_TOKEN_CLI }}'
+        shell: 'bash'
+        run: |
+          npm deprecate @google/gemini-cli@${{ github.event.inputs.rollback_origin }} "This version has been rolled back."
+
+      - name: 'Deprecate Core Npm Package'
+        if: "${{ github.event.inputs.dry-run == 'false' }}"
+        env:
+          NODE_AUTH_TOKEN: '${{ secrets.WOMBAT_TOKEN_CORE }}'
+        shell: 'bash'
+        run: |
+          npm deprecate @google/gemini-core@${{ github.event.inputs.rollback_origin }} "This version has been rolled back."
+
+      - name: 'Deprecate A2A Server Npm Package'
+        if: "${{ github.event.inputs.dry-run == 'false' }}"
+        env:
+          NODE_AUTH_TOKEN: '${{ secrets.WOMBAT_TOKEN_A2A_SERVER }}'
+        shell: 'bash'
+        run: |
+          npm deprecate @google/gemini-cli-a2a-server@${{ github.event.inputs.rollback_origin }} "This version has been rolled back."
+
+      - name: 'Delete Github Release'
+        if: "${{ github.event.inputs.dry-run == 'false' }}"
+        env:
+          GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+        shell: 'bash'
+        run: |
+          gh release delete '${{ steps.origin_tag.outputs.ORIGIN_TAG }}' --yes
+
+      - name: 'Verify Origin Release Deletion'
+        if: "${{ github.event.inputs.dry-run == 'false' }}"
+        env:
+          GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+        shell: 'bash'
+        run: |
+          TARGET_TAG="${{ steps.origin_tag.outputs.ORIGIN_TAG }}"
+          RELEASE_TAG=$(gh release view "$TARGET_TAG" --json tagName --jq .tagName)
+          if [ "$RELEASE_TAG" = "$TARGET_TAG" ]; then
+            echo '❌ Failed to delete release with tag ${{ steps.origin_tag.outputs.ORIGIN_TAG }}'
+            echo '❌ This means the release was not deleted, and the workflow should fail.'
+            exit 1
+          fi
+
+      - name: 'Add Rollback Tag'
+        id: 'rollback_tag'
+        if: "${{ github.event.inputs.dry-run == 'false' }}"
+        env:
+          GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+        shell: 'bash'
+        run: |
+          ROLLBACK_TAG_NAME="${{ steps.origin_tag.outputs.ORIGIN_TAG }}-rollback"
+          echo "ROLLBACK_TAG=$ROLLBACK_TAG_NAME" >> "$GITHUB_OUTPUT"
+          git tag "$ROLLBACK_TAG_NAME" "${{ steps.origin_hash.outputs.ORIGIN_HASH }}"
+          git push origin --tags
+
+      - name: 'Verify Rollback Tag Added'
+        if: "${{ github.event.inputs.dry-run == 'false' }}"
+        env:
+          GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+        shell: 'bash'
+        run: |
+          TARGET_TAG="${{ steps.rollback_tag.outputs.ROLLBACK_TAG }}"
+          TARGET_HASH="${{ steps.origin_hash.outputs.ORIGIN_HASH }}"
+          ROLLBACK_COMMIT=$(git rev-parse -q --verify "$TARGET_TAG")
+          if [ "$ROLLBACK_COMMIT" != "$TARGET_HASH" ]; then
+            echo '❌ Failed to add tag $TARGET_TAG to commit $TARGET_HASH'
+            echo '❌ This means the tag was not added, and the workflow should fail.'
+            exit 1
+          fi
+
+      - name: 'Log Dry run'
+        if: "${{ github.event.inputs.dry-run == 'true' }}"
+        shell: 'bash'
+        run: |
+          echo "
+          Inputs:
+          - rollback_origin: '${{ github.event.inputs.rollback_origin }}'
+          - rollback_destination: '${{ github.event.inputs.rollback_destination }}'
+          - channel: '${{ github.event.inputs.channel }}'
+          - ref: '${{ github.event.inputs.ref }}'
+
+          Outputs:
+          - ORIGIN_TAG: '${{ steps.origin_tag.outputs.ORIGIN_TAG }}'
+          - ORIGIN_HASH: '${{ steps.origin_hash.outputs.ORIGIN_HASH }}'
+          - ROLLBACK_TAG: '${{ steps.rollback_tag.outputs.ROLLBACK_TAG }}'
+
+          Would have npm deprecate @google/gemini-cli@${{ github.event.inputs.rollback_origin }} and @google/gemini-core@${{ github.event.inputs.rollback_origin }}
+          Would have deleted the github release with tag ${{ steps.origin_tag.outputs.ORIGIN_TAG }}
+          Would have added tag ${{ steps.origin_tag.outputs.ORIGIN_TAG }}-rollback to ${{ steps.origin_hash.outputs.ORIGIN_HASH }}
+          "

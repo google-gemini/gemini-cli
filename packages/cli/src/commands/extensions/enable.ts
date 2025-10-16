@@ -11,13 +11,16 @@ import { SettingScope } from '../../config/settings.js';
 
 interface EnableArgs {
   name: string;
-  scope?: SettingScope;
+  scope?: string;
 }
 
 export function handleEnable(args: EnableArgs) {
   try {
-    const scope = args.scope ? args.scope : SettingScope.User;
-    enableExtension(args.name, scope);
+    if (args.scope?.toLowerCase() === 'workspace') {
+      enableExtension(args.name, SettingScope.Workspace);
+    } else {
+      enableExtension(args.name, SettingScope.User);
+    }
     if (args.scope) {
       console.log(
         `Extension "${args.name}" successfully enabled for scope "${args.scope}".`,
@@ -45,13 +48,28 @@ export const enableCommand: CommandModule = {
         describe:
           'The scope to enable the extenison in. If not set, will be enabled in all scopes.',
         type: 'string',
-        choices: [SettingScope.User, SettingScope.Workspace],
       })
-      .check((_argv) => true),
+      .check((argv) => {
+        if (
+          argv.scope &&
+          !Object.values(SettingScope)
+            .map((s) => s.toLowerCase())
+            .includes((argv.scope as string).toLowerCase())
+        ) {
+          throw new Error(
+            `Invalid scope: ${argv.scope}. Please use one of ${Object.values(
+              SettingScope,
+            )
+              .map((s) => s.toLowerCase())
+              .join(', ')}.`,
+          );
+        }
+        return true;
+      }),
   handler: (argv) => {
     handleEnable({
       name: argv['name'] as string,
-      scope: argv['scope'] as SettingScope,
+      scope: argv['scope'] as string,
     });
   },
 };

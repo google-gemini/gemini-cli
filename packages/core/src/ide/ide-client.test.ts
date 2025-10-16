@@ -20,12 +20,7 @@ import { getIdeProcessInfo } from './process-utils.js';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
-import {
-  detectIde,
-  DetectedIde,
-  getIdeInfo,
-  type IdeInfo,
-} from './detect-ide.js';
+import { detectIde, IDE_DEFINITIONS } from './detect-ide.js';
 import * as os from 'node:os';
 import * as path from 'node:path';
 
@@ -67,10 +62,7 @@ describe('IdeClient', () => {
 
     // Mock dependencies
     vi.spyOn(process, 'cwd').mockReturnValue('/test/workspace/sub-dir');
-    vi.mocked(detectIde).mockReturnValue(DetectedIde.VSCode);
-    vi.mocked(getIdeInfo).mockReturnValue({
-      displayName: 'VS Code',
-    } as IdeInfo);
+    vi.mocked(detectIde).mockReturnValue(IDE_DEFINITIONS.vscode);
     vi.mocked(getIdeProcessInfo).mockResolvedValue({
       pid: 12345,
       command: 'test-ide',
@@ -121,7 +113,7 @@ describe('IdeClient', () => {
         'utf8',
       );
       expect(StreamableHTTPClientTransport).toHaveBeenCalledWith(
-        new URL('http://localhost:8080/mcp'),
+        new URL('http://127.0.0.1:8080/mcp'),
         expect.any(Object),
       );
       expect(mockClient.connect).toHaveBeenCalledWith(mockHttpTransport);
@@ -189,7 +181,7 @@ describe('IdeClient', () => {
       await ideClient.connect();
 
       expect(StreamableHTTPClientTransport).toHaveBeenCalledWith(
-        new URL('http://localhost:9090/mcp'),
+        new URL('http://127.0.0.1:9090/mcp'),
         expect.any(Object),
       );
       expect(mockClient.connect).toHaveBeenCalledWith(mockHttpTransport);
@@ -237,7 +229,7 @@ describe('IdeClient', () => {
       await ideClient.connect();
 
       expect(StreamableHTTPClientTransport).toHaveBeenCalledWith(
-        new URL('http://localhost:8080/mcp'),
+        new URL('http://127.0.0.1:8080/mcp'),
         expect.any(Object),
       );
       expect(ideClient.getConnectionStatus().status).toBe(
@@ -375,12 +367,10 @@ describe('IdeClient', () => {
       expect(result).toEqual(validConfig);
       expect(validateSpy).toHaveBeenCalledWith(
         '/invalid/workspace',
-        'VS Code',
         '/test/workspace/sub-dir',
       );
       expect(validateSpy).toHaveBeenCalledWith(
         '/test/workspace',
-        'VS Code',
         '/test/workspace/sub-dir',
       );
     });
@@ -672,7 +662,7 @@ describe('IdeClient', () => {
       await ideClient.connect();
 
       expect(StreamableHTTPClientTransport).toHaveBeenCalledWith(
-        new URL('http://localhost:8080/mcp'),
+        new URL('http://127.0.0.1:8080/mcp'),
         expect.objectContaining({
           requestInit: {
             headers: {

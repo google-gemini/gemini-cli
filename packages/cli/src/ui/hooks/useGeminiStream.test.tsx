@@ -31,6 +31,7 @@ import {
   GeminiEventType as ServerGeminiEventType,
   ToolErrorType,
   ToolConfirmationOutcome,
+  tokenLimit,
 } from '@google/gemini-cli-core';
 import type { Part, PartListUnion } from '@google/genai';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
@@ -50,6 +51,9 @@ const MockedGeminiClientClass = vi.hoisted(() =>
     this.startChat = mockStartChat;
     this.sendMessageStream = mockSendMessageStream;
     this.addHistory = vi.fn();
+    this.getChat = vi.fn().mockReturnValue({
+      recordCompletedToolCalls: vi.fn(),
+    });
     this.getChatRecordingService = vi.fn().mockReturnValue({
       recordThought: vi.fn(),
       initialize: vi.fn(),
@@ -74,6 +78,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     GeminiClient: MockedGeminiClientClass,
     UserPromptEvent: MockedUserPromptEvent,
     parseAndFormatApiError: mockParseAndFormatApiError,
+    tokenLimit: vi.fn().mockReturnValue(100), // Mock tokenLimit
   };
 });
 
@@ -114,7 +119,7 @@ vi.mock('./useStateAndRef.js', () => ({
       }
       ref.current = val;
     });
-    return [ref, setVal];
+    return [val, ref, setVal];
   }),
 }));
 
@@ -1851,6 +1856,171 @@ describe('useGeminiStream', () => {
       });
     });
 
+    describe('ContextWindowWillOverflow event', () => {
+      beforeEach(() => {
+        vi.mocked(tokenLimit).mockReturnValue(100);
+      });
+
+      it('should add message without suggestion when remaining tokens are > 75% of limit', async () => {
+        // Setup mock to return a stream with ContextWindowWillOverflow event
+        // Limit is 100, remaining is 80 (> 75)
+        mockSendMessageStream.mockReturnValue(
+          (async function* () {
+            yield {
+              type: ServerGeminiEventType.ContextWindowWillOverflow,
+              value: {
+                estimatedRequestTokenCount: 20,
+                remainingTokenCount: 80,
+              },
+            };
+          })(),
+        );
+
+        const { result } = renderHook(() =>
+          useGeminiStream(
+            new MockedGeminiClientClass(mockConfig),
+            [],
+            mockAddItem,
+            mockConfig,
+            mockLoadedSettings,
+            mockOnDebugMessage,
+            mockHandleSlashCommand,
+            false,
+            () => 'vscode' as EditorType,
+            () => {},
+            () => Promise.resolve(),
+            false,
+            () => {},
+            () => {},
+            () => {},
+            () => {},
+            80,
+            24,
+          ),
+        );
+
+        // Submit a query
+        await act(async () => {
+          await result.current.submitQuery('Test overflow');
+        });
+
+        // Check that the message was added without suggestion
+        await waitFor(() => {
+          expect(mockAddItem).toHaveBeenCalledWith(
+            {
+              type: 'info',
+              text: `Sending this message (20 tokens) might exceed the remaining context window limit (80 tokens).`,
+            },
+            expect.any(Number),
+          );
+        });
+      });
+
+      it('should add message with suggestion when remaining tokens are < 75% of limit', async () => {
+        // Setup mock to return a stream with ContextWindowWillOverflow event
+        // Limit is 100, remaining is 70 (< 75)
+        mockSendMessageStream.mockReturnValue(
+          (async function* () {
+            yield {
+              type: ServerGeminiEventType.ContextWindowWillOverflow,
+              value: {
+                estimatedRequestTokenCount: 30,
+                remainingTokenCount: 70,
+              },
+            };
+          })(),
+        );
+
+        const { result } = renderHook(() =>
+          useGeminiStream(
+            new MockedGeminiClientClass(mockConfig),
+            [],
+            mockAddItem,
+            mockConfig,
+            mockLoadedSettings,
+            mockOnDebugMessage,
+            mockHandleSlashCommand,
+            false,
+            () => 'vscode' as EditorType,
+            () => {},
+            () => Promise.resolve(),
+            false,
+            () => {},
+            () => {},
+            () => {},
+            () => {},
+            80,
+            24,
+          ),
+        );
+
+        // Submit a query
+        await act(async () => {
+          await result.current.submitQuery('Test overflow');
+        });
+
+        // Check that the message was added with suggestion
+        await waitFor(() => {
+          expect(mockAddItem).toHaveBeenCalledWith(
+            {
+              type: 'info',
+              text: `Sending this message (30 tokens) might exceed the remaining context window limit (70 tokens). Please try reducing the size of your message or use the \`/compress\` command to compress the chat history.`,
+            },
+            expect.any(Number),
+          );
+        });
+      });
+    });
+
+    it('should call onCancelSubmit when ContextWindowWillOverflow event is received', async () => {
+      const onCancelSubmitSpy = vi.fn();
+      // Setup mock to return a stream with ContextWindowWillOverflow event
+      mockSendMessageStream.mockReturnValue(
+        (async function* () {
+          yield {
+            type: ServerGeminiEventType.ContextWindowWillOverflow,
+            value: {
+              estimatedRequestTokenCount: 100,
+              remainingTokenCount: 50,
+            },
+          };
+        })(),
+      );
+
+      const { result } = renderHook(() =>
+        useGeminiStream(
+          new MockedGeminiClientClass(mockConfig),
+          [],
+          mockAddItem,
+          mockConfig,
+          mockLoadedSettings,
+          mockOnDebugMessage,
+          mockHandleSlashCommand,
+          false,
+          () => 'vscode' as EditorType,
+          () => {},
+          () => Promise.resolve(),
+          false,
+          () => {},
+          () => {},
+          onCancelSubmitSpy,
+          () => {},
+          80,
+          24,
+        ),
+      );
+
+      // Submit a query
+      await act(async () => {
+        await result.current.submitQuery('Test overflow');
+      });
+
+      // Check that onCancelSubmit was called
+      await waitFor(() => {
+        expect(onCancelSubmitSpy).toHaveBeenCalled();
+      });
+    });
+
     it('should not add message for STOP finish reason', async () => {
       // Setup mock to return a stream with STOP finish reason
       mockSendMessageStream.mockReturnValue(
@@ -2214,6 +2384,72 @@ describe('useGeminiStream', () => {
           expect.any(Number),
         );
       });
+    });
+
+    it('should memoize pendingHistoryItems', () => {
+      mockUseReactToolScheduler.mockReturnValue([
+        [],
+        mockScheduleToolCalls,
+        mockCancelAllToolCalls,
+        mockMarkToolsAsSubmitted,
+      ]);
+
+      const { result, rerender } = renderHook(() =>
+        useGeminiStream(
+          mockConfig.getGeminiClient(),
+          [],
+          mockAddItem,
+          mockConfig,
+          mockLoadedSettings,
+          mockOnDebugMessage,
+          mockHandleSlashCommand,
+          false,
+          () => 'vscode' as EditorType,
+          () => {},
+          () => Promise.resolve(),
+          false,
+          () => {},
+          () => {},
+          () => {},
+          () => {},
+          80,
+          24,
+        ),
+      );
+
+      const firstResult = result.current.pendingHistoryItems;
+      rerender();
+      const secondResult = result.current.pendingHistoryItems;
+
+      expect(firstResult).toStrictEqual(secondResult);
+
+      const newToolCalls: TrackedToolCall[] = [
+        {
+          request: { callId: 'call1', name: 'tool1', args: {} },
+          status: 'executing',
+          tool: {
+            name: 'tool1',
+            displayName: 'tool1',
+            description: 'desc1',
+            build: vi.fn(),
+          },
+          invocation: {
+            getDescription: () => 'Mock description',
+          },
+        } as unknown as TrackedExecutingToolCall,
+      ];
+
+      mockUseReactToolScheduler.mockReturnValue([
+        newToolCalls,
+        mockScheduleToolCalls,
+        mockCancelAllToolCalls,
+        mockMarkToolsAsSubmitted,
+      ]);
+
+      rerender();
+      const thirdResult = result.current.pendingHistoryItems;
+
+      expect(thirdResult).not.toStrictEqual(secondResult);
     });
 
     it('should reset thought to null when user cancels', async () => {
