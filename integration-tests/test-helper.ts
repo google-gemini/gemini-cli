@@ -910,6 +910,34 @@ export class TestRig {
     return apiRequests.pop() || null;
   }
 
+  async waitForMetric(metricName: string, timeout?: number) {
+    await this.waitForTelemetryReady();
+
+    const fullName = metricName.startsWith('gemini_cli.')
+      ? metricName
+      : `gemini_cli.${metricName}`;
+
+    return poll(
+      () => {
+        const logs = this._readAndParseTelemetryLog();
+        for (const logData of logs) {
+          if (logData.scopeMetrics) {
+            for (const scopeMetric of logData.scopeMetrics) {
+              for (const metric of scopeMetric.metrics) {
+                if (metric.descriptor.name === fullName) {
+                  return true;
+                }
+              }
+            }
+          }
+        }
+        return false;
+      },
+      timeout ?? getDefaultTimeout(),
+      100,
+    );
+  }
+
   readMetric(metricName: string): Record<string, unknown> | null {
     const logs = this._readAndParseTelemetryLog();
     for (const logData of logs) {
