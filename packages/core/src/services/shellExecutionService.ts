@@ -96,7 +96,7 @@ const getFullBufferText = (terminal: pkg.Terminal): string => {
     const lineContent = line ? line.translateToString() : '';
     lines.push(lineContent);
   }
-  return lines.join('\n').trimEnd();
+  return lines.join('').trimEnd();
 };
 
 /**
