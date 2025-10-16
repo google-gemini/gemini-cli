@@ -60,7 +60,7 @@ const editorCommands: Record<
   cursor: { win32: ['cursor'], default: ['cursor'] },
   vim: { win32: ['vim'], default: ['vim'] },
   neovim: { win32: ['nvim'], default: ['nvim'] },
-  zed: { win32: ['zed'], default: ['zed', 'zeditor'] },
+  zed: { win32: ['zed'], default: ['zed', 'zeditor', 'zedit'] },
   emacs: { win32: ['emacs.exe'], default: ['emacs'] },
 };
 
