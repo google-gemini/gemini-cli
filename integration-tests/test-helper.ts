@@ -910,6 +910,22 @@ export class TestRig {
     return apiRequests.pop() || null;
   }
 
+  async waitForMetric(metricName: string, timeout?: number) {
+    if (!timeout) {
+      timeout = getDefaultTimeout();
+    }
+
+    await this.waitForTelemetryReady();
+
+    return poll(
+      () => {
+        return this.readMetric(metricName) !== null;
+      },
+      timeout,
+      100,
+    );
+  }
+
   readMetric(metricName: string): Record<string, unknown> | null {
     const logs = this._readAndParseTelemetryLog();
     for (const logData of logs) {
