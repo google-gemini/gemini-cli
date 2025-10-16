@@ -467,6 +467,44 @@ describe('parseArguments', () => {
     const argv = await parseArguments({} as Settings);
     expect(argv.extensions).toEqual(['ext1', 'ext2']);
   });
+
+  it('should correctly parse positional arguments when flags with arguments are present', async () => {
+    process.argv = [
+      'node',
+      'script.js',
+      '--telemetry-target',
+      'gcp',
+      'my-positional-arg',
+    ];
+    const argv = await parseArguments({} as Settings);
+    expect(argv.telemetryTarget).toBe('gcp');
+    expect(argv.query).toBe('my-positional-arg');
+  });
+
+  it('should handle long positional prompts with multiple flags', async () => {
+    process.argv = [
+      'node',
+      'script.js',
+      '-e',
+      'none',
+      '--approval-mode=auto_edit',
+      '--allowed-tools=ShellTool',
+      '--allowed-tools=ShellTool(whoami)',
+      '--allowed-tools=ShellTool(wc)',
+      'Use whoami to write a poem in file poem.md about my username in pig latin and use wc to tell me how many lines are in the poem you wrote.',
+    ];
+    const argv = await parseArguments({} as Settings);
+    expect(argv.extensions).toEqual(['none']);
+    expect(argv.approvalMode).toBe('auto_edit');
+    expect(argv.allowedTools).toEqual([
+      'ShellTool',
+      'ShellTool(whoami)',
+      'ShellTool(wc)',
+    ]);
+    expect(argv.query).toBe(
+      'Use whoami to write a poem in file poem.md about my username in pig latin and use wc to tell me how many lines are in the poem you wrote.',
+    );
+  });
 });
 
 describe('loadCliConfig', () => {
@@ -1171,7 +1209,10 @@ describe('Hierarchical Memory Loading (config.ts) - Placeholder Suite', () => {
   // 3. Spies on console functions (for logger output) are correctly set up if needed.
   // Example of a previously failing test structure:
   it.skip('should correctly use mocked homedir for global path', async () => {
-    const MOCK_GEMINI_DIR_LOCAL = path.join('/mock/home/user', '.gemini');
+    const MOCK_GEMINI_DIR_LOCAL = path.join(
+      '/mock/home/user',
+      ServerConfig.GEMINI_DIR,
+    );
     const MOCK_GLOBAL_PATH_LOCAL = path.join(
       MOCK_GEMINI_DIR_LOCAL,
       'GEMINI.md',
@@ -2067,7 +2108,7 @@ describe('loadCliConfig model selection', () => {
       argv,
     );
 
-    expect(config.getModel()).toBe(DEFAULT_GEMINI_MODEL);
+    expect(config.getModel()).toBe('auto');
   });
 
   it('always prefers model from argvs', async () => {
@@ -2503,7 +2544,7 @@ describe('loadCliConfig useRipgrep', () => {
         'test-session',
         argv,
       );
-      expect(config.getUseModelRouter()).toBe(false);
+      expect(config.getUseModelRouter()).toBe(true);
     });
 
     it('should be true when useModelRouter is set to true in settings', async () => {
@@ -2538,59 +2579,6 @@ describe('loadCliConfig useRipgrep', () => {
         argv,
       );
       expect(config.getUseModelRouter()).toBe(false);
-    });
-  });
-
-  describe('loadCliConfig enableSubagents', () => {
-    it('should be false by default when enableSubagents is not set in settings', async () => {
-      process.argv = ['node', 'script.js'];
-      const argv = await parseArguments({} as Settings);
-      const settings: Settings = {};
-      const config = await loadCliConfig(
-        settings,
-        [],
-        new ExtensionEnablementManager(
-          ExtensionStorage.getUserExtensionsDir(),
-          argv.extensions,
-        ),
-        'test-session',
-        argv,
-      );
-      expect(config.getEnableSubagents()).toBe(false);
-    });
-
-    it('should be true when enableSubagents is set to true in settings', async () => {
-      process.argv = ['node', 'script.js'];
-      const argv = await parseArguments({} as Settings);
-      const settings: Settings = { experimental: { enableSubagents: true } };
-      const config = await loadCliConfig(
-        settings,
-        [],
-        new ExtensionEnablementManager(
-          ExtensionStorage.getUserExtensionsDir(),
-          argv.extensions,
-        ),
-        'test-session',
-        argv,
-      );
-      expect(config.getEnableSubagents()).toBe(true);
-    });
-
-    it('should be false when enableSubagents is explicitly set to false in settings', async () => {
-      process.argv = ['node', 'script.js'];
-      const argv = await parseArguments({} as Settings);
-      const settings: Settings = { experimental: { enableSubagents: false } };
-      const config = await loadCliConfig(
-        settings,
-        [],
-        new ExtensionEnablementManager(
-          ExtensionStorage.getUserExtensionsDir(),
-          argv.extensions,
-        ),
-        'test-session',
-        argv,
-      );
-      expect(config.getEnableSubagents()).toBe(false);
     });
   });
 });
@@ -3480,6 +3468,22 @@ describe('Output format', () => {
       argv,
     );
     expect(config.getOutputFormat()).toBe(OutputFormat.JSON);
+  });
+
+  it('should accept stream-json as a valid output format', async () => {
+    process.argv = ['node', 'script.js', '--output-format', 'stream-json'];
+    const argv = await parseArguments({} as Settings);
+    const config = await loadCliConfig(
+      {},
+      [],
+      new ExtensionEnablementManager(
+        ExtensionStorage.getUserExtensionsDir(),
+        argv.extensions,
+      ),
+      'test-session',
+      argv,
+    );
+    expect(config.getOutputFormat()).toBe(OutputFormat.STREAM_JSON);
   });
 
   it('should error on invalid --output-format argument', async () => {
