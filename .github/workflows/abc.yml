@@ -10,12 +10,12 @@ jobs:
     # This condition prevents duplicate runs for forks.
     # It runs for all pull_request_target events (forks)
     # and for pull_request events that are NOT from a fork.
-    if: github.event_name == 'pull_request_target' || github.event.pull_request.head.repo.full_name == github.repository
-    runs-on: ubuntu-latest
+    if: "github.event_name == 'pull_request_target' || github.event.pull_request.head.repo.full_name == github.repository"
+    runs-on: 'ubuntu-latest'
 
     # For PRs from forks (pull_request_target), require approval via an environment.
     # For internal PRs (pull_request), run without approval.
-    environment: ${{ github.event_name == 'pull_request_target' && 'e2e-on-fork' || null }}
+    environment: "${{ github.event_name == 'pull_request_target' && 'e2e-on-fork' || null }}"
 
     steps:
       # For PRs from forks, we need to checkout the head of the PR from the fork's repo.
