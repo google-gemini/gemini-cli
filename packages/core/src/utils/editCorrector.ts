@@ -8,6 +8,7 @@ import type { Content, GenerateContentConfig } from '@google/genai';
 import type { GeminiClient } from '../core/client.js';
 import type { BaseLlmClient } from '../core/baseLlmClient.js';
 import type { EditToolParams } from '../tools/edit.js';
+import { createHash } from 'node:crypto';
 import { EditTool } from '../tools/edit.js';
 import { WRITE_FILE_TOOL_NAME } from '../tools/tool-names.js';
 import { ReadFileTool } from '../tools/read-file.js';
@@ -177,7 +178,11 @@ export async function ensureCorrectEdit(
   baseLlmClient: BaseLlmClient,
   abortSignal: AbortSignal,
 ): Promise<CorrectedEditResult> {
-  const cacheKey = `${currentContent}---${originalParams.old_string}---${originalParams.new_string}`;
+  const cacheKey = createHash('sha256')
+    .update(createHash('sha256').update(currentContent).digest())
+    .update(createHash('sha256').update(originalParams.old_string).digest())
+    .update(createHash('sha256').update(originalParams.new_string).digest())
+    .digest('hex');
   const cachedResult = editCorrectionCache.get(cacheKey);
   if (cachedResult) {
     return cachedResult;
