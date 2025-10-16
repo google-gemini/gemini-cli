@@ -458,11 +458,8 @@ describe('extension tests', () => {
       expect(extensions[0].name).toBe('good-ext');
       expect(consoleSpy).toHaveBeenCalledOnce();
       expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining(
-          `Warning: Skipping extension in ${badExtDir}: Failed to load extension config from ${badConfigPath}: Invalid configuration in ${badConfigPath}: missing "name"`,
-        ),
+        expect.stringContaining(`Warning: Skipping extension in ${badExtDir}`),
       );
-
       consoleSpy.mockRestore();
     });
 
@@ -507,6 +504,42 @@ describe('extension tests', () => {
         expect.stringContaining('Invalid extension name: "bad_name"'),
       );
       consoleSpy.mockRestore();
+    });
+  });
+
+  describe('loadExtensionConfig', () => {
+    it('should load a valid extension config', () => {
+      const extensionDir = createExtension({
+        extensionsDir: userExtensionsDir,
+        name: 'test-extension',
+        version: '1.0.0',
+        tags: ['design', 'cloud'],
+      });
+
+      const config = loadExtensionConfig({
+        extensionDir,
+        workspaceDir: tempWorkspaceDir,
+      });
+
+      expect(config.name).toBe('test-extension');
+      expect(config.version).toBe('1.0.0');
+      expect(config.tags).toEqual(['design', 'cloud']);
+    });
+
+    it('should throw an error for invalid tags', () => {
+      const extensionDir = createExtension({
+        extensionsDir: userExtensionsDir,
+        name: 'test-extension',
+        version: '1.0.0',
+        tags: ['design', 'invalid-tag'],
+      });
+
+      expect(() =>
+        loadExtensionConfig({
+          extensionDir,
+          workspaceDir: tempWorkspaceDir,
+        }),
+      ).toThrow('Invalid enum value');
     });
   });
 
@@ -801,9 +834,7 @@ describe('extension tests', () => {
           { source: sourceExtDir, type: 'local' },
           async (_) => true,
         ),
-      ).rejects.toThrow(
-        `Invalid configuration in ${configPath}: missing "name"`,
-      );
+      ).rejects.toThrow('Required');
     });
 
     it('should install an extension from a git URL', async () => {

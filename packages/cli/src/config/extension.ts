@@ -45,11 +45,21 @@ import { ExtensionEnablementManager } from './extensions/extensionEnablement.js'
 import chalk from 'chalk';
 import type { ConfirmationRequest } from '../ui/types.js';
 import { escapeAnsiCtrlCodes } from '../ui/utils/textUtils.js';
+import { z } from 'zod';
 
 export const EXTENSIONS_DIRECTORY_NAME = path.join(GEMINI_DIR, 'extensions');
 
 export const EXTENSIONS_CONFIG_FILENAME = 'gemini-extension.json';
 export const INSTALL_METADATA_FILENAME = '.gemini-extension-install.json';
+
+export enum ValidTags {
+  DESIGN = 'design',
+  DATABASES = 'databases',
+  CLOUD = 'cloud',
+  SERVICES = 'services',
+  DEVOPS = 'devops',
+  UTILITIES = 'utilities',
+}
 
 /**
  * Extension definition as written to disk in gemini-extension.json files.
@@ -58,13 +68,21 @@ export const INSTALL_METADATA_FILENAME = '.gemini-extension-install.json';
  * outside of the loading process that data needs to be stored on the
  * GeminiCLIExtension class defined in Core.
  */
-interface ExtensionConfig {
-  name: string;
-  version: string;
+export const extensionConfigSchema = z.object({
+  name: z.string(),
+  version: z.string(),
+  tags: z.array(z.nativeEnum(ValidTags)).optional(),
+  mcpServers: z.record(z.unknown()).optional(),
+  contextFileName: z.union([z.string(), z.array(z.string())]).optional(),
+  excludeTools: z.array(z.string()).optional(),
+});
+
+type ExtensionConfigSchema = z.infer<typeof extensionConfigSchema>;
+
+// TODO(#11264): zod-ify MCP server schema
+type ExtensionConfig = Omit<ExtensionConfigSchema, 'mcpServers'> & {
   mcpServers?: Record<string, MCPServerConfig>;
-  contextFileName?: string | string[];
-  excludeTools?: string[];
-}
+};
 
 export interface ExtensionUpdateInfo {
   name: string;
@@ -694,17 +712,19 @@ export function loadExtensionConfig(
   if (!fs.existsSync(configFilePath)) {
     throw new Error(`Configuration file not found at ${configFilePath}`);
   }
+  // TODO(#11264): upgrade zod and use schema.decode()
   try {
     const configContent = fs.readFileSync(configFilePath, 'utf-8');
-    const rawConfig = JSON.parse(configContent) as ExtensionConfig;
-    if (!rawConfig.name || !rawConfig.version) {
-      throw new Error(
-        `Invalid configuration in ${configFilePath}: missing ${!rawConfig.name ? '"name"' : '"version"'}`,
-      );
-    }
-    const installDir = new ExtensionStorage(rawConfig.name).getExtensionDir();
+    const parsedConfig = extensionConfigSchema.parse(
+      JSON.parse(configContent) as unknown,
+    );
+
+    const installDir = new ExtensionStorage(
+      parsedConfig.name,
+    ).getExtensionDir();
+    // TODO(#11264): use zod types instead of JsonObject
     const config = recursivelyHydrateStrings(
-      rawConfig as unknown as JsonObject,
+      parsedConfig as unknown as JsonObject,
       {
         extensionPath: installDir,
         workspacePath: workspaceDir,
