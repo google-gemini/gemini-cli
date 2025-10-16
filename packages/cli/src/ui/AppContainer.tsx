@@ -802,6 +802,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
   const [showErrorDetails, setShowErrorDetails] = useState<boolean>(false);
   const [showToolDescriptions, setShowToolDescriptions] =
     useState<boolean>(false);
+  const [renderMarkdown, setRenderMarkdown] = useState<boolean>(true);
 
   const [ctrlCPressedOnce, setCtrlCPressedOnce] = useState(false);
   const ctrlCTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -985,6 +986,13 @@ Logging in with Google... Please restart Gemini CLI to continue.
             appAbortController.current.signal,
           );
         }
+      } else if (keyMatchers[Command.TOGGLE_MARKDOWN](key)) {
+        setRenderMarkdown((prev) => {
+          const newValue = !prev;
+          // Force re-render of static content
+          refreshStatic();
+          return newValue;
+        });
       } else if (
         keyMatchers[Command.TOGGLE_IDE_CONTEXT_DETAIL](key) &&
         config.getIdeMode() &&
@@ -1023,6 +1031,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       activePtyId,
       embeddedShellFocused,
       settings.merged.general?.debugKeystrokeLogging,
+      refreshStatic,
     ],
   );
 
@@ -1151,6 +1160,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       filteredConsoleMessages,
       ideContextState,
       showToolDescriptions,
+      renderMarkdown,
       ctrlCPressedOnce,
       ctrlDPressedOnce,
       showEscapePrompt,
@@ -1233,6 +1243,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       filteredConsoleMessages,
       ideContextState,
       showToolDescriptions,
+      renderMarkdown,
       ctrlCPressedOnce,
       ctrlDPressedOnce,
       showEscapePrompt,

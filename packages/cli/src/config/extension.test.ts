@@ -12,6 +12,7 @@ import {
   EXTENSIONS_CONFIG_FILENAME,
   ExtensionStorage,
   INSTALL_METADATA_FILENAME,
+  INSTALL_WARNING_MESSAGE,
   annotateActiveExtensions,
   disableExtension,
   enableExtension,
@@ -972,7 +973,7 @@ describe('extension tests', () => {
 
       expect(mockRequestConsent).toHaveBeenCalledWith(
         `Installing extension "my-local-extension".
-**Extensions may introduce unexpected behavior. Ensure you have investigated the extension source and trust the author.**
+${INSTALL_WARNING_MESSAGE}
 This extension will run the following MCP servers:
   * test-server (local): node dobadthing \\u001b[12D\\u001b[K server.js
   * test-server-2 (remote): https://google.com`,
