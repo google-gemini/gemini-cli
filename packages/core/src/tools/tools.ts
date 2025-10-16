@@ -541,7 +541,18 @@ export function hasCycleInSchema(schema: object): boolean {
   return traverse(schema, new Set<string>(), new Set<string>());
 }
 
-export type ToolResultDisplay = string | FileDiff | AnsiOutput;
+export interface TodoList {
+  todos: Todo[];
+}
+
+export type ToolResultDisplay = string | FileDiff | AnsiOutput | TodoList;
+
+export type TodoStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled';
+
+export interface Todo {
+  description: string;
+  status: TodoStatus;
+}
 
 export interface FileDiff {
   fileDiff: string;
