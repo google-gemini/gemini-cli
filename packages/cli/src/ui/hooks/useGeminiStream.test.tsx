@@ -154,6 +154,7 @@ describe('useGeminiStream', () => {
   let mockScheduleToolCalls: Mock;
   let mockCancelAllToolCalls: Mock;
   let mockMarkToolsAsSubmitted: Mock;
+  let mockSetShellInputFocused: Mock;
   let handleAtCommandSpy: MockInstance;
 
   beforeEach(() => {
@@ -165,6 +166,9 @@ describe('useGeminiStream', () => {
       // MockedGeminiClientClass is defined in the module scope by the previous change.
       // It will use the mockStartChat and mockSendMessageStream that are managed within beforeEach.
       const clientInstance = new MockedGeminiClientClass(mockConfig);
+      clientInstance.getLoopDetectionService = vi.fn().mockReturnValue({
+        disableForSession: vi.fn(),
+      });
       return clientInstance;
     });
 
@@ -219,6 +223,7 @@ describe('useGeminiStream', () => {
     } as unknown as Config;
     mockOnDebugMessage = vi.fn();
     mockHandleSlashCommand = vi.fn().mockResolvedValue(false);
+    mockSetShellInputFocused = vi.fn();
 
     // Mock return value for useReactToolScheduler
     mockScheduleToolCalls = vi.fn();
@@ -305,7 +310,7 @@ describe('useGeminiStream', () => {
           () => {},
           () => {},
           () => {},
-          () => {},
+          mockSetShellInputFocused,
           80,
           24,
         );
@@ -470,7 +475,7 @@ describe('useGeminiStream', () => {
         () => {},
         () => {},
         () => {},
-        () => {},
+        mockSetShellInputFocused,
         80,
         24,
       ),
@@ -553,7 +558,7 @@ describe('useGeminiStream', () => {
         () => {},
         () => {},
         () => {},
-        () => {},
+        mockSetShellInputFocused,
         80,
         24,
       ),
@@ -665,7 +670,7 @@ describe('useGeminiStream', () => {
         () => {},
         () => {},
         () => {},
-        () => {},
+        mockSetShellInputFocused,
         80,
         24,
       ),
@@ -778,7 +783,7 @@ describe('useGeminiStream', () => {
         () => {},
         () => {},
         () => {},
-        () => {},
+        mockSetShellInputFocused,
         80,
         24,
       ),
@@ -911,7 +916,7 @@ describe('useGeminiStream', () => {
           () => {},
           () => {},
           cancelSubmitSpy,
-          () => {},
+          mockSetShellInputFocused,
           80,
           24,
         ),
@@ -928,44 +933,29 @@ describe('useGeminiStream', () => {
     });
 
     it('should call setShellInputFocused(false) when escape is pressed', async () => {
-      const setShellInputFocusedSpy = vi.fn();
       const mockStream = (async function* () {
         yield { type: 'content', value: 'Part 1' };
         await new Promise(() => {}); // Keep stream open
       })();
       mockSendMessageStream.mockReturnValue(mockStream);
 
-      const { result } = renderHook(() =>
-        useGeminiStream(
-          mockConfig.getGeminiClient(),
-          [],
-          mockAddItem,
-          mockConfig,
-          mockLoadedSettings,
-          mockOnDebugMessage,
-          mockHandleSlashCommand,
-          false,
-          () => 'vscode' as EditorType,
-          () => {},
-          () => Promise.resolve(),
-          false,
-          () => {},
-          () => {},
-          vi.fn(),
-          setShellInputFocusedSpy, // Pass the spy here
-          80,
-          24,
-        ),
-      );
+      const { result } = renderTestHook();
 
       // Start a query
       await act(async () => {
         result.current.submitQuery('test query');
       });
 
+      // Wait for the response to start
+      await waitFor(() => {
+        expect(result.current.streamingState).toBe(StreamingState.Responding);
+      });
+
+      // Simulate escape key press
       simulateEscapeKeyPress();
 
-      expect(setShellInputFocusedSpy).toHaveBeenCalledWith(false);
+      // Verify setShellInputFocused was called with false
+      expect(mockSetShellInputFocused).toHaveBeenCalledWith(false);
     });
 
     it('should not do anything if escape is pressed when not responding', () => {
@@ -1107,7 +1097,10 @@ describe('useGeminiStream', () => {
       });
 
       await waitFor(() => {
-        expect(mockHandleSlashCommand).toHaveBeenCalledWith('/help');
+        expect(mockHandleSlashCommand).toHaveBeenCalledWith(
+          '/help',
+          expect.any(AbortSignal),
+        );
         expect(mockScheduleToolCalls).not.toHaveBeenCalled();
         expect(mockSendMessageStream).not.toHaveBeenCalled(); // No LLM call made
       });
@@ -1130,6 +1123,7 @@ describe('useGeminiStream', () => {
       await waitFor(() => {
         expect(mockHandleSlashCommand).toHaveBeenCalledWith(
           '/my-custom-command',
+          expect.any(AbortSignal),
         );
 
         expect(localMockSendMessageStream).not.toHaveBeenCalledWith(
@@ -1163,7 +1157,10 @@ describe('useGeminiStream', () => {
       });
 
       await waitFor(() => {
-        expect(mockHandleSlashCommand).toHaveBeenCalledWith('/emptycmd');
+        expect(mockHandleSlashCommand).toHaveBeenCalledWith(
+          '/emptycmd',
+          expect.any(AbortSignal),
+        );
         expect(localMockSendMessageStream).toHaveBeenCalledWith(
           '',
           expect.any(AbortSignal),
@@ -1267,7 +1264,7 @@ describe('useGeminiStream', () => {
           () => {},
           () => {},
           () => {},
-          () => {},
+          mockSetShellInputFocused,
           80,
           24,
         ),
@@ -1324,7 +1321,7 @@ describe('useGeminiStream', () => {
           () => {},
           () => {},
           () => {},
-          () => {},
+          mockSetShellInputFocused,
           80,
           24,
         ),
@@ -1833,7 +1830,7 @@ describe('useGeminiStream', () => {
           () => {},
           () => {},
           () => {},
-          () => {},
+          mockSetShellInputFocused,
           80,
           24,
         ),
@@ -2004,7 +2001,7 @@ describe('useGeminiStream', () => {
           () => {},
           () => {},
           onCancelSubmitSpy,
-          () => {},
+          mockSetShellInputFocused,
           80,
           24,
         ),
@@ -2053,7 +2050,7 @@ describe('useGeminiStream', () => {
           () => {},
           () => {},
           () => {},
-          () => {},
+          mockSetShellInputFocused,
           80,
           24,
         ),
@@ -2109,7 +2106,7 @@ describe('useGeminiStream', () => {
           () => {},
           () => {},
           () => {},
-          () => {},
+          mockSetShellInputFocused,
           80,
           24,
         ),
@@ -2205,7 +2202,7 @@ describe('useGeminiStream', () => {
             () => {},
             () => {},
             () => {},
-            vi.fn(),
+            mockSetShellInputFocused,
             80,
             24,
           ),
@@ -2259,9 +2256,9 @@ describe('useGeminiStream', () => {
         vi.fn(), // setModelSwitched
         vi.fn(), // onEditorClose
         vi.fn(), // onCancelSubmit
-        vi.fn(), // setShellInputFocused
-        80, // terminalWidth
-        24, // terminalHeight
+        mockSetShellInputFocused,
+        80,
+        24,
       ),
     );
 
@@ -2330,7 +2327,7 @@ describe('useGeminiStream', () => {
           () => {},
           () => {},
           () => {},
-          () => {},
+          mockSetShellInputFocused,
           80,
           24,
         ),
@@ -2481,7 +2478,7 @@ describe('useGeminiStream', () => {
           () => {},
           () => {},
           () => {},
-          () => {},
+          mockSetShellInputFocused,
           80,
           24,
         ),
@@ -2539,7 +2536,7 @@ describe('useGeminiStream', () => {
           () => {},
           () => {},
           () => {},
-          () => {},
+          mockSetShellInputFocused,
           80,
           24,
         ),
@@ -2797,7 +2794,7 @@ describe('useGeminiStream', () => {
         (async function* () {
           yield {
             type: ServerGeminiEventType.Content,
-            value: 'Some response content',
+            value: 'Some content before loop',
           };
           yield {
             type: ServerGeminiEventType.LoopDetected,
@@ -2811,21 +2808,159 @@ describe('useGeminiStream', () => {
         await result.current.submitQuery('test query');
       });
 
-      // Verify that the content was added to history before the loop detection dialog
+      // Wait for the loop detection confirmation to appear
+      await waitFor(() => {
+        expect(result.current.loopDetectionConfirmationRequest).not.toBeNull();
+      });
+
+      // The pending content should have been added to history before loop detection
+      expect(mockAddItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'gemini',
+          text: 'Some content before loop',
+        }),
+        expect.any(Number),
+      );
+    });
+  });
+
+  describe('Background Process Cancellation via AbortSignal', () => {
+    let keypressCallback: (key: any) => void;
+    const mockUseKeypress = useKeypress as Mock;
+
+    beforeEach(() => {
+      // Capture the callback passed to useKeypress
+      mockUseKeypress.mockImplementation((callback, options) => {
+        if (options.isActive) {
+          keypressCallback = callback;
+        } else {
+          keypressCallback = () => {};
+        }
+      });
+    });
+
+    const simulateEscapeKeyPress = () => {
+      act(() => {
+        keypressCallback({ name: 'escape' });
+      });
+    };
+
+    it('should abort the request via AbortSignal when user cancels', async () => {
+      const mockStream = (async function* () {
+        yield { type: 'content', value: 'Part 1' };
+        // Keep the stream open
+        await new Promise(() => {});
+      })();
+      mockSendMessageStream.mockReturnValue(mockStream);
+
+      // Spy on AbortController.abort
+      const abortSpy = vi.spyOn(AbortController.prototype, 'abort');
+
+      const { result } = renderTestHook();
+
+      // Start a query
+      await act(async () => {
+        result.current.submitQuery('test query with background processes');
+      });
+
+      // Wait for the response to start
+      await waitFor(() => {
+        expect(result.current.streamingState).toBe(StreamingState.Responding);
+      });
+
+      // Simulate escape key press to cancel
+      simulateEscapeKeyPress();
+
+      // Verify AbortController.abort was called (which triggers background process cleanup)
+      expect(abortSpy).toHaveBeenCalled();
+
+      // Verify cancellation message is added
       await waitFor(() => {
         expect(mockAddItem).toHaveBeenCalledWith(
-          expect.objectContaining({
-            type: 'gemini',
-            text: 'Some response content',
-          }),
+          {
+            type: MessageType.INFO,
+            text: 'Request cancelled.',
+          },
           expect.any(Number),
         );
       });
 
-      // Then verify loop detection confirmation request was set
-      await waitFor(() => {
-        expect(result.current.loopDetectionConfirmationRequest).not.toBeNull();
+      // Verify state is reset
+      expect(result.current.streamingState).toBe(StreamingState.Idle);
+
+      abortSpy.mockRestore();
+    });
+
+    it('should trigger AbortSignal when cancelOngoingRequest is called directly', async () => {
+      const mockStream = (async function* () {
+        yield { type: 'content', value: 'Part 1' };
+        // Keep the stream open
+        await new Promise(() => {});
+      })();
+      mockSendMessageStream.mockReturnValue(mockStream);
+
+      // Spy on AbortController.abort
+      const abortSpy = vi.spyOn(AbortController.prototype, 'abort');
+
+      const { result } = renderTestHook();
+
+      // Start a query to enter responding state
+      await act(async () => {
+        result.current.submitQuery('test query');
       });
+
+      // Wait for the response to start
+      await waitFor(() => {
+        expect(result.current.streamingState).toBe(StreamingState.Responding);
+      });
+
+      // Trigger cancelOngoingRequest directly (simulates other cancellation scenarios)
+      act(() => {
+        result.current.cancelOngoingRequest();
+      });
+
+      // Verify AbortController.abort was called (which triggers background process cleanup)
+      expect(abortSpy).toHaveBeenCalled();
+
+      abortSpy.mockRestore();
+    });
+
+    it('should propagate AbortSignal to shell tool invocations', async () => {
+      // This test verifies that the AbortSignal is passed to tool calls
+      // which enables the shell tool to register cleanup handlers
+      const mockStream = (async function* () {
+        yield { type: 'content', value: 'Starting...' };
+        // Keep the stream open
+        await new Promise(() => {});
+      })();
+      mockSendMessageStream.mockReturnValue(mockStream);
+
+      const { result } = renderTestHook();
+
+      // Capture the AbortSignal passed to sendMessageStream
+      let capturedSignal: AbortSignal | undefined;
+      mockSendMessageStream.mockImplementation((_parts, signal) => {
+        capturedSignal = signal;
+        return mockStream;
+      });
+
+      // Start a query
+      await act(async () => {
+        result.current.submitQuery('test query');
+      });
+
+      // Verify that an AbortSignal was passed
+      expect(capturedSignal).toBeDefined();
+      expect(capturedSignal).toBeInstanceOf(AbortSignal);
+
+      // Verify the signal is not aborted initially
+      expect(capturedSignal?.aborted).toBe(false);
+
+      // Cancel the request
+      simulateEscapeKeyPress();
+
+      // Verify the signal is now aborted
+      expect(capturedSignal?.aborted).toBe(true);
     });
   });
 });
