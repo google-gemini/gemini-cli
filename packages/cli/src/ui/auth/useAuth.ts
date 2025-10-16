@@ -33,9 +33,11 @@ export const useAuthCommand = (settings: LoadedSettings, config: Config) => {
   const [authError, setAuthError] = useState<string | null>(null);
 
   const onAuthError = useCallback(
-    (error: string) => {
+    (error: string | null) => {
       setAuthError(error);
-      setAuthState(AuthState.Updating);
+      if (error) {
+        setAuthState(AuthState.Updating);
+      }
     },
     [setAuthError, setAuthState],
   );

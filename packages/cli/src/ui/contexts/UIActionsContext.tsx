@@ -23,7 +23,7 @@ export interface UIActions {
     scope: SettingScope,
   ) => void;
   setAuthState: (state: AuthState) => void;
-  onAuthError: (error: string) => void;
+  onAuthError: (error: string | null) => void;
   handleEditorSelect: (
     editorType: EditorType | undefined,
     scope: SettingScope,
