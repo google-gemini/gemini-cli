@@ -78,7 +78,7 @@ export abstract class BaseToolInvocation<
     protected readonly messageBus?: MessageBus,
   ) {
     if (this.messageBus) {
-      console.log(
+      console.debug(
         `[DEBUG] Tool ${this.constructor.name} created with messageBus: YES`,
       );
     }
@@ -93,27 +93,17 @@ export abstract class BaseToolInvocation<
   shouldConfirmExecute(
     _abortSignal: AbortSignal,
   ): Promise<ToolCallConfirmationDetails | false> {
-    // If message bus is available, use it for confirmation
-    if (this.messageBus) {
-      console.log(
-        `[DEBUG] Using message bus for tool confirmation: ${this.constructor.name}`,
-      );
-      return this.handleMessageBusConfirmation(_abortSignal);
-    }
-
-    // Fall back to existing confirmation flow
+    // Default implementation for tools that don't override it.
     return Promise.resolve(false);
   }
 
-  /**
-   * Handle tool confirmation using the message bus.
-   * This method publishes a confirmation request and waits for the response.
-   */
-  protected async handleMessageBusConfirmation(
+  protected getMessageBusDecision(
     abortSignal: AbortSignal,
-  ): Promise<ToolCallConfirmationDetails | false> {
+  ): Promise<'ALLOW' | 'DENY' | 'ASK_USER'> {
     if (!this.messageBus) {
-      return false;
+      // If there's no message bus, we can't make a decision, so we allow.
+      // The legacy confirmation flow will still apply if the tool needs it.
+      return Promise.resolve('ALLOW');
     }
 
     const correlationId = randomUUID();
@@ -122,85 +112,74 @@ export abstract class BaseToolInvocation<
       args: this.params as Record<string, unknown>,
     };
 
-    return new Promise<ToolCallConfirmationDetails | false>(
-      (resolve, reject) => {
-        if (!this.messageBus) {
-          resolve(false);
-          return;
+    return new Promise<'ALLOW' | 'DENY' | 'ASK_USER'>((resolve) => {
+      if (!this.messageBus) {
+        resolve('ALLOW');
+        return;
+      }
+
+      let timeoutId: NodeJS.Timeout | undefined;
+
+      const cleanup = () => {
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+          timeoutId = undefined;
         }
-
-        let timeoutId: NodeJS.Timeout | undefined;
-
-        // Centralized cleanup function
-        const cleanup = () => {
-          if (timeoutId) {
-            clearTimeout(timeoutId);
-            timeoutId = undefined;
-          }
-          abortSignal.removeEventListener('abort', abortHandler);
-          this.messageBus?.unsubscribe(
-            MessageBusType.TOOL_CONFIRMATION_RESPONSE,
-            responseHandler,
-          );
-        };
-
-        // Set up abort handler
-        const abortHandler = () => {
-          cleanup();
-          reject(new Error('Tool confirmation aborted'));
-        };
-
-        // Check if already aborted
-        if (abortSignal.aborted) {
-          reject(new Error('Tool confirmation aborted'));
-          return;
-        }
-
-        // Set up response handler
-        const responseHandler = (response: ToolConfirmationResponse) => {
-          if (response.correlationId === correlationId) {
-            cleanup();
-
-            if (response.confirmed) {
-              // Tool was confirmed, return false to indicate no further confirmation needed
-              resolve(false);
-            } else {
-              // Tool was denied, reject to prevent execution
-              reject(new Error('Tool execution denied by policy'));
-            }
-          }
-        };
-
-        // Add event listener for abort signal
-        abortSignal.addEventListener('abort', abortHandler);
-
-        // Set up timeout
-        timeoutId = setTimeout(() => {
-          cleanup();
-          resolve(false);
-        }, 30000); // 30 second timeout
-
-        // Subscribe to response
-        this.messageBus.subscribe(
+        abortSignal.removeEventListener('abort', abortHandler);
+        this.messageBus?.unsubscribe(
           MessageBusType.TOOL_CONFIRMATION_RESPONSE,
           responseHandler,
         );
+      };
 
-        // Publish confirmation request
-        const request: ToolConfirmationRequest = {
-          type: MessageBusType.TOOL_CONFIRMATION_REQUEST,
-          toolCall,
-          correlationId,
-        };
+      const abortHandler = () => {
+        cleanup();
+        resolve('DENY');
+      };
 
-        try {
-          this.messageBus.publish(request);
-        } catch (_error) {
+      if (abortSignal.aborted) {
+        resolve('DENY');
+        return;
+      }
+
+      const responseHandler = (response: ToolConfirmationResponse) => {
+        if (response.correlationId === correlationId) {
           cleanup();
-          resolve(false);
+          if (response.requiresUserConfirmation) {
+            resolve('ASK_USER');
+          } else if (response.confirmed) {
+            resolve('ALLOW');
+          } else {
+            resolve('DENY');
+          }
         }
-      },
-    );
+      };
+
+      abortSignal.addEventListener('abort', abortHandler);
+
+      timeoutId = setTimeout(() => {
+        cleanup();
+        resolve('ASK_USER'); // Default to ASK_USER on timeout
+      }, 30000);
+
+      this.messageBus.subscribe(
+        MessageBusType.TOOL_CONFIRMATION_RESPONSE,
+        responseHandler,
+      );
+
+      const request: ToolConfirmationRequest = {
+        type: MessageBusType.TOOL_CONFIRMATION_REQUEST,
+        toolCall,
+        correlationId,
+      };
+
+      try {
+        this.messageBus.publish(request);
+      } catch (_error) {
+        cleanup();
+        resolve('ALLOW');
+      }
+    });
   }
 
   abstract execute(
