@@ -330,5 +330,32 @@ describe('SettingsSchema', () => {
         getSettingsSchema().experimental.properties.useModelRouter.default,
       ).toBe(true);
     });
+
+    it('should have enableFinishTool setting in schema', () => {
+      expect(
+        getSettingsSchema().experimental.properties.enableFinishTool,
+      ).toBeDefined();
+      expect(
+        getSettingsSchema().experimental.properties.enableFinishTool.type,
+      ).toBe('boolean');
+      expect(
+        getSettingsSchema().experimental.properties.enableFinishTool.category,
+      ).toBe('Experimental');
+      expect(
+        getSettingsSchema().experimental.properties.enableFinishTool.default,
+      ).toBe(false);
+      expect(
+        getSettingsSchema().experimental.properties.enableFinishTool
+          .requiresRestart,
+      ).toBe(true);
+      expect(
+        getSettingsSchema().experimental.properties.enableFinishTool
+          .showInDialog,
+      ).toBe(false);
+      expect(
+        getSettingsSchema().experimental.properties.enableFinishTool
+          .description,
+      ).toBe('Enable the finish tool to explicitly end a turn.');
+    });
   });
 });

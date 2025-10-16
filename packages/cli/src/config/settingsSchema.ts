@@ -1076,6 +1076,15 @@ const SETTINGS_SCHEMA = {
           'Enable model routing to route requests to the best model based on complexity.',
         showInDialog: true,
       },
+      enableFinishTool: {
+        type: 'boolean',
+        label: 'Enable Finish Tool',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: false,
+        description: 'Enable the finish tool to explicitly end a turn.',
+        showInDialog: false,
+      },
       codebaseInvestigatorSettings: {
         type: 'object',
         label: 'Codebase Investigator Settings',

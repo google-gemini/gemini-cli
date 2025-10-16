@@ -83,6 +83,7 @@ const MIGRATION_MAP: Record<string, string> = {
   fileFiltering: 'context.fileFiltering',
   folderTrustFeature: 'security.folderTrust.featureEnabled',
   folderTrust: 'security.folderTrust.enabled',
+  enableFinishTool: 'experimental.enableFinishTool',
   hasSeenIdeIntegrationNudge: 'ide.hasSeenNudge',
   hideWindowTitle: 'ui.hideWindowTitle',
   showStatusInTitle: 'ui.showStatusInTitle',

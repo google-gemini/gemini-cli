@@ -28,12 +28,12 @@ import { GitService } from '../services/gitService.js';
 import { ClearcutLogger } from '../telemetry/clearcut-logger/clearcut-logger.js';
 
 import { ShellTool } from '../tools/shell.js';
-import { ReadFileTool } from '../tools/read-file.js';
 import { GrepTool } from '../tools/grep.js';
 import { RipGrepTool, canUseRipgrep } from '../tools/ripGrep.js';
 import { logRipgrepFallback } from '../telemetry/loggers.js';
 import { RipgrepFallbackEvent } from '../telemetry/types.js';
 import { ToolRegistry } from '../tools/tool-registry.js';
+import { FinishTool } from '../tools/finish.js';
 
 vi.mock('fs', async (importOriginal) => {
   const actual = await importOriginal<typeof import('fs')>();
@@ -647,12 +647,60 @@ describe('Server Config (config.ts)', () => {
         (call) => call[0] instanceof vi.mocked(ShellTool),
       );
       expect(wasShellToolRegistered).toBe(true);
+    });
 
-      // Check that registerTool was NOT called for ReadFileTool
-      const wasReadFileToolRegistered = (
-        registerToolMock as Mock
-      ).mock.calls.some((call) => call[0] instanceof vi.mocked(ReadFileTool));
-      expect(wasReadFileToolRegistered).toBe(false);
+    describe('FinishTool registration', () => {
+      it('should register FinishTool when enableFinishTool is true', async () => {
+        const params: ConfigParameters = {
+          ...baseParams,
+          enableFinishTool: true,
+        };
+        const config = new Config(params);
+        await config.initialize();
+
+        const registerToolMock = (
+          (await vi.importMock('../tools/tool-registry')) as {
+            ToolRegistry: { prototype: { registerTool: Mock } };
+          }
+        ).ToolRegistry.prototype.registerTool;
+
+        const wasFinishToolRegistered = (
+          registerToolMock as Mock
+        ).mock.calls.some((call) => call[0] instanceof vi.mocked(FinishTool));
+        expect(wasFinishToolRegistered).toBe(true);
+      });
+
+      it('should not register FinishTool when enableFinishTool is false or undefined', async () => {
+        const paramsFalse: ConfigParameters = {
+          ...baseParams,
+          enableFinishTool: false,
+        };
+        const configFalse = new Config(paramsFalse);
+        await configFalse.initialize();
+
+        const registerToolMock = (
+          (await vi.importMock('../tools/tool-registry')) as {
+            ToolRegistry: { prototype: { registerTool: Mock } };
+          }
+        ).ToolRegistry.prototype.registerTool;
+
+        let wasFinishToolRegistered = (
+          registerToolMock as Mock
+        ).mock.calls.some((call) => call[0] instanceof vi.mocked(FinishTool));
+        expect(wasFinishToolRegistered).toBe(false);
+
+        // Reset mock for the next check
+        vi.clearAllMocks();
+
+        const paramsUndefined: ConfigParameters = { ...baseParams };
+        const configUndefined = new Config(paramsUndefined);
+        await configUndefined.initialize();
+
+        wasFinishToolRegistered = (registerToolMock as Mock).mock.calls.some(
+          (call) => call[0] instanceof vi.mocked(FinishTool),
+        );
+        expect(wasFinishToolRegistered).toBe(false);
+      });
     });
 
     it('should register subagents as tools when codebaseInvestigatorSettings.enabled is true', async () => {
