@@ -46,6 +46,8 @@ import { StartSessionEvent } from '../telemetry/index.js';
 import {
   DEFAULT_GEMINI_EMBEDDING_MODEL,
   DEFAULT_GEMINI_FLASH_MODEL,
+  DEFAULT_GEMINI_MODEL,
+  DEFAULT_THINKING_MODE,
 } from './models.js';
 import { shouldAttemptBrowserLaunch } from '../utils/browser.js';
 import type { MCPOAuthConfig } from '../mcp/oauth-provider.js';
@@ -372,7 +374,7 @@ export class Config {
   private readonly outputSettings: OutputSettings;
   private readonly useModelRouter: boolean;
   private readonly enableMessageBusIntegration: boolean;
-  private readonly codebaseInvestigatorSettings?: CodebaseInvestigatorSettings;
+  private readonly codebaseInvestigatorSettings: CodebaseInvestigatorSettings;
   private readonly continueOnFailedApiCall: boolean;
   private readonly retryFetchErrors: boolean;
   private readonly enableShellOutputEfficiency: boolean;
@@ -469,7 +471,15 @@ export class Config {
     this.useModelRouter = params.useModelRouter ?? false;
     this.enableMessageBusIntegration =
       params.enableMessageBusIntegration ?? false;
-    this.codebaseInvestigatorSettings = params.codebaseInvestigatorSettings;
+    this.codebaseInvestigatorSettings = {
+      enabled: params.codebaseInvestigatorSettings?.enabled ?? true,
+      maxNumTurns: params.codebaseInvestigatorSettings?.maxNumTurns ?? 15,
+      maxTimeMinutes: params.codebaseInvestigatorSettings?.maxTimeMinutes ?? 5,
+      thinkingBudget:
+        params.codebaseInvestigatorSettings?.thinkingBudget ??
+        DEFAULT_THINKING_MODE,
+      model: params.codebaseInvestigatorSettings?.model ?? DEFAULT_GEMINI_MODEL,
+    };
     this.continueOnFailedApiCall = params.continueOnFailedApiCall ?? true;
     this.enableShellOutputEfficiency =
       params.enableShellOutputEfficiency ?? true;
@@ -1068,7 +1078,7 @@ export class Config {
     return this.enableMessageBusIntegration;
   }
 
-  getCodebaseInvestigatorSettings(): CodebaseInvestigatorSettings | undefined {
+  getCodebaseInvestigatorSettings(): CodebaseInvestigatorSettings {
     return this.codebaseInvestigatorSettings;
   }
 
@@ -1164,7 +1174,7 @@ export class Config {
     }
 
     // Register Subagents as Tools
-    if (this.getCodebaseInvestigatorSettings()?.enabled) {
+    if (this.getCodebaseInvestigatorSettings().enabled) {
       const definition = this.agentRegistry.getDefinition(
         'codebase_investigator',
       );
