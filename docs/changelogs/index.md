@@ -246,7 +246,7 @@ notable changes to Gemini CLI.
   `"showCitations": true`
   ([pr](https://github.com/google-gemini/gemini-cli/pull/7350) by
   [@scidomino](https://github.com/scidomino))
-- **Pro Quota Ddalog:** Handle daily Pro model usage limits with an interactive
+- **Pro Quota Dialog:** Handle daily Pro model usage limits with an interactive
   dialog that lets you immediately switch auth or fallback.
   ([pr](https://github.com/google-gemini/gemini-cli/pull/7094) by
   [@JayadityaGit](https://github.com/JayadityaGit))
