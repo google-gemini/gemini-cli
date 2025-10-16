@@ -14,7 +14,7 @@ export interface TodoListDisplayProps {
   availableTerminalHeight?: number;
   terminalWidth: number;
 }
-const TodoDisplay: React.FC<{ status: TodoStatus }> = ({ status }) => {
+const TodoStatusDisplay: React.FC<{ status: TodoStatus }> = ({ status }) => {
   switch (status) {
     case 'completed':
       return <Text color={theme.status.success}>✓</Text>;
@@ -37,7 +37,7 @@ export const TodoListDisplay: React.FC<TodoListDisplayProps> = ({
   <Box flexDirection="column" width={terminalWidth}>
     {data.todos.map((todo: Todo, index: number) => (
       <Box key={index} flexDirection="row" columnGap={3}>
-        <TodoDisplay status={todo.status} />
+        <TodoStatusDisplay status={todo.status} />
         <Text wrap="wrap" color={theme.text.primary}>
           {todo.description}
         </Text>
