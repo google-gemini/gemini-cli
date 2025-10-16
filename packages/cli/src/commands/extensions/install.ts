@@ -6,6 +6,7 @@
 
 import type { CommandModule } from 'yargs';
 import {
+  INSTALL_WARNING_MESSAGE,
   installOrUpdateExtension,
   requestConsentNonInteractive,
 } from '../../config/extension.js';
@@ -18,6 +19,7 @@ interface InstallArgs {
   ref?: string;
   autoUpdate?: boolean;
   allowPreRelease?: boolean;
+  consent?: boolean;
 }
 
 export async function handleInstall(args: InstallArgs) {
@@ -54,9 +56,16 @@ export async function handleInstall(args: InstallArgs) {
       }
     }
 
+    const requestConsent = args.consent
+      ? () => Promise.resolve(true)
+      : requestConsentNonInteractive;
+    if (args.consent) {
+      console.log('You have consented to the following:');
+      console.log(INSTALL_WARNING_MESSAGE);
+    }
     const name = await installOrUpdateExtension(
       installMetadata,
-      requestConsentNonInteractive,
+      requestConsent,
     );
     console.log(`Extension "${name}" installed successfully and enabled.`);
   } catch (error) {
@@ -87,6 +96,12 @@ export const installCommand: CommandModule = {
         describe: 'Enable pre-release versions for this extension.',
         type: 'boolean',
       })
+      .option('consent', {
+        describe:
+          'Acknowledge the security risks of installing an extension and skip the confirmation prompt.',
+        type: 'boolean',
+        default: false,
+      })
       .check((argv) => {
         if (!argv.source) {
           throw new Error('The source argument must be provided.');
@@ -99,6 +114,7 @@ export const installCommand: CommandModule = {
       ref: argv['ref'] as string | undefined,
       autoUpdate: argv['auto-update'] as boolean | undefined,
       allowPreRelease: argv['pre-release'] as boolean | undefined,
+      consent: argv['consent'] as boolean | undefined,
     });
   },
 };
