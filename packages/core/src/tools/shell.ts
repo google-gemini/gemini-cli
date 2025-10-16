@@ -22,6 +22,7 @@ import {
   ToolConfirmationOutcome,
   Kind,
 } from './tools.js';
+import { ApprovalMode } from '../config/config.js';
 import { getErrorMessage } from '../utils/errors.js';
 import { summarizeToolOutput } from '../utils/summarizer.js';
 import type {
@@ -34,8 +35,10 @@ import type { AnsiOutput } from '../utils/terminalSerializer.js';
 import {
   getCommandRoots,
   isCommandAllowed,
+  SHELL_TOOL_NAMES,
   stripShellWrapper,
 } from '../utils/shell-utils.js';
+import { doesToolInvocationMatch } from '../utils/tool-utils.js';
 
 export const OUTPUT_UPDATE_INTERVAL_MS = 1000;
 
@@ -76,6 +79,27 @@ export class ShellToolInvocation extends BaseToolInvocation<
   ): Promise<ToolCallConfirmationDetails | false> {
     const command = stripShellWrapper(this.params.command);
     const rootCommands = [...new Set(getCommandRoots(command))];
+
+    // In non-interactive mode, we need to prevent the tool from hanging while
+    // waiting for user input. If a tool is not fully allowed (e.g. via
+    // --allowed-tools="ShellTool(wc)"), we should throw an error instead of
+    // prompting for confirmation. This check is skipped in YOLO mode.
+    if (
+      !this.config.isInteractive() &&
+      this.config.getApprovalMode() !== ApprovalMode.YOLO
+    ) {
+      const allowedTools = this.config.getAllowedTools() || [];
+      const [SHELL_TOOL_NAME] = SHELL_TOOL_NAMES;
+      if (doesToolInvocationMatch(SHELL_TOOL_NAME, command, allowedTools)) {
+        // If it's an allowed shell command, we don't need to confirm execution.
+        return false;
+      }
+
+      throw new Error(
+        `Command "${command}" is not in the list of allowed tools for non-interactive mode.`,
+      );
+    }
+
     const commandsToConfirm = rootCommands.filter(
       (command) => !this.allowlist.has(command),
     );
@@ -179,7 +203,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
             }
           },
           signal,
-          this.config.getShouldUseNodePtyShell(),
+          this.config.getEnableInteractiveShell(),
           shellExecutionConfig ?? {},
         );
 

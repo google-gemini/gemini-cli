@@ -6,52 +6,55 @@
 
 import type { CommandModule } from 'yargs';
 import {
-  installExtension,
+  installOrUpdateExtension,
   requestConsentNonInteractive,
 } from '../../config/extension.js';
 import type { ExtensionInstallMetadata } from '@google/gemini-cli-core';
-
 import { getErrorMessage } from '../../utils/errors.js';
+import { stat } from 'node:fs/promises';
 
 interface InstallArgs {
-  source?: string;
-  path?: string;
+  source: string;
   ref?: string;
   autoUpdate?: boolean;
+  allowPreRelease?: boolean;
 }
 
 export async function handleInstall(args: InstallArgs) {
   try {
     let installMetadata: ExtensionInstallMetadata;
-    if (args.source) {
-      const { source } = args;
-      if (
-        source.startsWith('http://') ||
-        source.startsWith('https://') ||
-        source.startsWith('git@') ||
-        source.startsWith('sso://')
-      ) {
-        installMetadata = {
-          source,
-          type: 'git',
-          ref: args.ref,
-          autoUpdate: args.autoUpdate,
-        };
-      } else {
-        throw new Error(`The source "${source}" is not a valid URL format.`);
-      }
-    } else if (args.path) {
+    const { source } = args;
+    if (
+      source.startsWith('http://') ||
+      source.startsWith('https://') ||
+      source.startsWith('git@') ||
+      source.startsWith('sso://')
+    ) {
       installMetadata = {
-        source: args.path,
-        type: 'local',
+        source,
+        type: 'git',
+        ref: args.ref,
         autoUpdate: args.autoUpdate,
+        allowPreRelease: args.allowPreRelease,
       };
     } else {
-      // This should not be reached due to the yargs check.
-      throw new Error('Either --source or --path must be provided.');
+      if (args.ref || args.autoUpdate) {
+        throw new Error(
+          '--ref and --auto-update are not applicable for local extensions.',
+        );
+      }
+      try {
+        await stat(source);
+        installMetadata = {
+          source,
+          type: 'local',
+        };
+      } catch {
+        throw new Error('Install source not found.');
+      }
     }
 
-    const name = await installExtension(
+    const name = await installOrUpdateExtension(
       installMetadata,
       requestConsentNonInteractive,
     );
@@ -63,17 +66,14 @@ export async function handleInstall(args: InstallArgs) {
 }
 
 export const installCommand: CommandModule = {
-  command: 'install [<source>] [--path] [--ref] [--auto-update]',
+  command: 'install <source> [--auto-update] [--pre-release]',
   describe: 'Installs an extension from a git repository URL or a local path.',
   builder: (yargs) =>
     yargs
       .positional('source', {
-        describe: 'The github URL of the extension to install.',
+        describe: 'The github URL or local path of the extension to install.',
         type: 'string',
-      })
-      .option('path', {
-        describe: 'Path to a local extension directory.',
-        type: 'string',
+        demandOption: true,
       })
       .option('ref', {
         describe: 'The git ref to install from.',
@@ -83,21 +83,22 @@ export const installCommand: CommandModule = {
         describe: 'Enable auto-update for this extension.',
         type: 'boolean',
       })
-      .conflicts('source', 'path')
-      .conflicts('path', 'ref')
-      .conflicts('path', 'auto-update')
+      .option('pre-release', {
+        describe: 'Enable pre-release versions for this extension.',
+        type: 'boolean',
+      })
       .check((argv) => {
-        if (!argv.source && !argv.path) {
-          throw new Error('Either source or --path must be provided.');
+        if (!argv.source) {
+          throw new Error('The source argument must be provided.');
         }
         return true;
       }),
   handler: async (argv) => {
     await handleInstall({
-      source: argv['source'] as string | undefined,
-      path: argv['path'] as string | undefined,
+      source: argv['source'] as string,
       ref: argv['ref'] as string | undefined,
       autoUpdate: argv['auto-update'] as boolean | undefined,
+      allowPreRelease: argv['pre-release'] as boolean | undefined,
     });
   },
 };

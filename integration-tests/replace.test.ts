@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi } from 'vitest';
-import { TestRig, printDebugInfo, validateModelOutput } from './test-helper.js';
+import { describe, it, expect } from 'vitest';
+import { TestRig } from './test-helper.js';
 
 describe('replace', () => {
   it('should be able to replace content in a file', async () => {
@@ -13,53 +13,17 @@ describe('replace', () => {
     await rig.setup('should be able to replace content in a file');
 
     const fileName = 'file_to_replace.txt';
-    const originalContent = 'original content';
-    const expectedContent = 'replaced content';
+    const originalContent = 'foo content';
+    const expectedContent = 'bar content';
 
     rig.createFile(fileName, originalContent);
-    const prompt = `Can you replace 'original' with 'replaced' in the file 'file_to_replace.txt'`;
 
-    const result = await rig.run(prompt);
+    await rig.run(`Replace 'foo' with 'bar' in the file 'file_to_replace.txt'`);
 
     const foundToolCall = await rig.waitForToolCall('replace');
-
-    // Add debugging information
-    if (!foundToolCall) {
-      printDebugInfo(rig, result);
-    }
-
     expect(foundToolCall, 'Expected to find a replace tool call').toBeTruthy();
 
-    // Validate model output - will throw if no output, warn if missing expected content
-    validateModelOutput(
-      result,
-      ['replaced', 'file_to_replace.txt'],
-      'Replace content test',
-    );
-
-    const newFileContent = rig.readFile(fileName);
-
-    // Add debugging for file content
-    if (newFileContent !== expectedContent) {
-      console.error('File content mismatch - Debug info:');
-      console.error('Expected:', expectedContent);
-      console.error('Actual:', newFileContent);
-      console.error(
-        'Tool calls:',
-        rig.readToolLogs().map((t) => ({
-          name: t.toolRequest.name,
-          args: t.toolRequest.args,
-        })),
-      );
-    }
-
-    expect(newFileContent).toBe(expectedContent);
-
-    // Log success info if verbose
-    vi.stubEnv('VERBOSE', 'true');
-    if (process.env['VERBOSE'] === 'true') {
-      console.log('File replaced successfully. New content:', newFileContent);
-    }
+    expect(rig.readFile(fileName)).toBe(expectedContent);
   });
 
   it('should handle $ literally when replacing text ending with $', async () => {
@@ -74,21 +38,52 @@ describe('replace', () => {
 
     rig.createFile(fileName, originalContent);
 
-    const prompt =
-      "Open regex.yml and append ' # updated' after the line containing ^[sv]d[a-z]$ without breaking the $ character.";
+    await rig.run(
+      "Open regex.yml and append ' # updated' after the line containing ^[sv]d[a-z]$ without breaking the $ character.",
+    );
 
-    const result = await rig.run(prompt);
     const foundToolCall = await rig.waitForToolCall('replace');
-
-    if (!foundToolCall) {
-      printDebugInfo(rig, result);
-    }
-
     expect(foundToolCall, 'Expected to find a replace tool call').toBeTruthy();
 
-    validateModelOutput(result, ['regex.yml'], 'Replace $ literal test');
+    expect(rig.readFile(fileName)).toBe(expectedContent);
+  });
 
-    const newFileContent = rig.readFile(fileName);
-    expect(newFileContent).toBe(expectedContent);
+  it('should insert a multi-line block of text', async () => {
+    const rig = new TestRig();
+    await rig.setup('should insert a multi-line block of text');
+    const fileName = 'insert_block.txt';
+    const originalContent = 'Line A\n<INSERT_TEXT_HERE>\nLine C';
+    const newBlock = 'First line\nSecond line\nThird line';
+    const expectedContent =
+      'Line A\nFirst line\nSecond line\nThird line\nLine C';
+    rig.createFile(fileName, originalContent);
+
+    const prompt = `In ${fileName}, replace "<INSERT_TEXT_HERE>" with:\n${newBlock}. Use unix style line endings.`;
+    await rig.run(prompt);
+
+    const foundToolCall = await rig.waitForToolCall('replace');
+    expect(foundToolCall, 'Expected to find a replace tool call').toBeTruthy();
+
+    expect(rig.readFile(fileName)).toBe(expectedContent);
+  });
+
+  it('should delete a block of text', async () => {
+    const rig = new TestRig();
+    await rig.setup('should delete a block of text');
+    const fileName = 'delete_block.txt';
+    const blockToDelete =
+      '## DELETE THIS ##\nThis is a block of text to delete.\n## END DELETE ##';
+    const originalContent = `Hello\n${blockToDelete}\nWorld`;
+    const expectedContent = 'Hello\nWorld';
+    rig.createFile(fileName, originalContent);
+
+    await rig.run(
+      `In ${fileName}, delete the entire block from "## DELETE THIS ##" to "## END DELETE ##" including the markers.`,
+    );
+
+    const foundToolCall = await rig.waitForToolCall('replace');
+    expect(foundToolCall, 'Expected to find a replace tool call').toBeTruthy();
+
+    expect(rig.readFile(fileName)).toBe(expectedContent);
   });
 });

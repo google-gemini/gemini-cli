@@ -200,4 +200,123 @@ describe('FixLLMEditWithInstruction', () => {
       expect(mockGenerateJson).toHaveBeenCalledTimes(2);
     });
   });
+
+  describe('cache collision prevention', () => {
+    it('should prevent cache collisions when parameters contain separator sequences', async () => {
+      // This test would have failed with the old string concatenation approach
+      // but passes with JSON.stringify implementation
+
+      const firstResponse: SearchReplaceEdit = {
+        search: 'original text',
+        replace: 'first replacement',
+        noChangesRequired: false,
+        explanation: 'First edit correction',
+      };
+
+      const secondResponse: SearchReplaceEdit = {
+        search: 'different text',
+        replace: 'second replacement',
+        noChangesRequired: false,
+        explanation: 'Second edit correction',
+      };
+
+      mockGenerateJson
+        .mockResolvedValueOnce(firstResponse)
+        .mockResolvedValueOnce(secondResponse);
+
+      const testPromptId = 'cache-collision-test';
+
+      await promptIdContext.run(testPromptId, async () => {
+        // Scenario 1: Parameters that would create collision with string concatenation
+        // Cache key with old method would be: "Fix YAML---content---update--some---data--error"
+        const call1 = await FixLLMEditWithInstruction(
+          'Fix YAML', // instruction
+          'content', // old_string
+          'update--some', // new_string (contains --)
+          'data', // current_content
+          'error', // error
+          mockBaseLlmClient,
+          abortSignal,
+        );
+
+        // Scenario 2: Different parameters that would create same cache key with concatenation
+        // Cache key with old method would be: "Fix YAML---content---update--some---data--error"
+        const call2 = await FixLLMEditWithInstruction(
+          'Fix YAML---content---update', // instruction (contains ---)
+          'some---data', // old_string (contains ---)
+          'error', // new_string
+          '', // current_content
+          '', // error
+          mockBaseLlmClient,
+          abortSignal,
+        );
+
+        // With the fixed JSON.stringify approach, these should be different
+        // and each should get its own LLM response
+        expect(call1).toEqual(firstResponse);
+        expect(call2).toEqual(secondResponse);
+        expect(call1).not.toEqual(call2);
+
+        // Most importantly: the LLM should be called TWICE, not once
+        // (proving no cache collision occurred)
+        expect(mockGenerateJson).toHaveBeenCalledTimes(2);
+      });
+    });
+
+    it('should handle YAML frontmatter without cache collisions', async () => {
+      // Real-world test case with YAML frontmatter containing ---
+
+      const yamlResponse: SearchReplaceEdit = {
+        search: '---\ntitle: Old\n---',
+        replace: '---\ntitle: New\n---',
+        noChangesRequired: false,
+        explanation: 'Updated YAML frontmatter',
+      };
+
+      const contentResponse: SearchReplaceEdit = {
+        search: 'old content',
+        replace: 'new content',
+        noChangesRequired: false,
+        explanation: 'Updated content',
+      };
+
+      mockGenerateJson
+        .mockResolvedValueOnce(yamlResponse)
+        .mockResolvedValueOnce(contentResponse);
+
+      const testPromptId = 'yaml-frontmatter-test';
+
+      await promptIdContext.run(testPromptId, async () => {
+        // Call 1: Edit YAML frontmatter
+        const yamlEdit = await FixLLMEditWithInstruction(
+          'Update YAML frontmatter',
+          '---\ntitle: Old\n---', // Contains ---
+          '---\ntitle: New\n---', // Contains ---
+          'Some markdown content',
+          'YAML parse error',
+          mockBaseLlmClient,
+          abortSignal,
+        );
+
+        // Call 2: Edit regular content
+        const contentEdit = await FixLLMEditWithInstruction(
+          'Update content',
+          'old content',
+          'new content',
+          'Different file content',
+          'Content not found',
+          mockBaseLlmClient,
+          abortSignal,
+        );
+
+        // Verify both calls succeeded with different results
+        expect(yamlEdit).toEqual(yamlResponse);
+        expect(contentEdit).toEqual(contentResponse);
+        expect(yamlEdit).not.toEqual(contentEdit);
+
+        // Verify no cache collision - both calls should hit the LLM
+        expect(mockGenerateJson).toHaveBeenCalledTimes(2);
+      });
+    });
+  });
 });

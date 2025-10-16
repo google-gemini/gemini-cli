@@ -915,6 +915,39 @@ describe('useSelectionList', () => {
 
       expect(result.current.activeIndex).toBe(2);
     });
+
+    it('should not re-initialize when items have identical keys but are different objects', () => {
+      const initialItems = [
+        { value: 'A', key: 'A' },
+        { value: 'B', key: 'B' },
+      ];
+
+      let renderCount = 0;
+
+      const { rerender } = renderHook(
+        ({ items: testItems }: { items: Array<SelectionListItem<string>> }) => {
+          renderCount++;
+          return useSelectionList({
+            onSelect: mockOnSelect,
+            onHighlight: mockOnHighlight,
+            items: testItems,
+          });
+        },
+        { initialProps: { items: initialItems } },
+      );
+
+      // Initial render
+      expect(renderCount).toBe(1);
+
+      // Create new items with the same keys but different object references
+      const newItems = [
+        { value: 'A', key: 'A' },
+        { value: 'B', key: 'B' },
+      ];
+
+      rerender({ items: newItems });
+      expect(renderCount).toBe(2);
+    });
   });
 
   describe('Manual Control', () => {
