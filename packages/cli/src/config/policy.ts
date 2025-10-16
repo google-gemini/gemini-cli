@@ -21,7 +21,7 @@ import {
   MemoryTool,
   ShellTool,
   WRITE_FILE_TOOL_NAME,
-  WebFetchTool,
+  WEB_FETCH_TOOL_NAME,
   WebSearchTool,
 } from '@google/gemini-cli-core';
 import type { Settings } from './settings.js';
@@ -49,7 +49,7 @@ const WRITE_TOOLS = new Set([
   MemoryTool.Name,
   ShellTool.Name,
   WRITE_FILE_TOOL_NAME,
-  WebFetchTool.Name,
+  WEB_FETCH_TOOL_NAME,
 ]);
 
 export function createPolicyEngineConfig(
