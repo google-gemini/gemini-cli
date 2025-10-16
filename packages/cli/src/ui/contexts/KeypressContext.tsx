@@ -71,7 +71,6 @@ const ALT_KEY_CHARACTER_MAP: Record<string, string> = {
   '\u2211': 'w',
   '\u2248': 'x',
   '\u00A5': 'y',
-  '\\': 'y',
   '\u03A9': 'z',
 };
 

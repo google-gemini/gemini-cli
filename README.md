@@ -11,6 +11,8 @@ Gemini CLI is an open-source AI agent that brings the power of Gemini directly
 into your terminal. It provides lightweight access to Gemini, giving you the
 most direct path from your prompt to our model.
 
+Learn all about Gemini CLI in our [documentation](https://geminicli.com/docs/).
+
 ## 🚀 Why Gemini CLI?
 
 - **🎯 Free tier**: 60 requests/min and 1,000 requests/day with personal Google
@@ -226,6 +228,13 @@ the `--output-format json` flag to get structured output:
 
 ```bash
 gemini -p "Explain the architecture of this codebase" --output-format json
+```
+
+For real-time event streaming (useful for monitoring long-running operations),
+use `--output-format stream-json` to get newline-delimited JSON events:
+
+```bash
+gemini -p "Run tests and deploy" --output-format stream-json
 ```
 
 ### Quick Examples
