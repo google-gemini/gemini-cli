@@ -21,6 +21,7 @@ import {
 } from '../../constants.js';
 import { theme } from '../../semantic-colors.js';
 import type { AnsiOutput, Config } from '@google/gemini-cli-core';
+import { useUIState } from '../../contexts/UIStateContext.js';
 
 const STATIC_HEIGHT = 1;
 const RESERVED_LINE_COUNT = 5; // for tool name, status, padding etc.
@@ -56,6 +57,7 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
   ptyId,
   config,
 }) => {
+  const { renderMarkdown } = useUIState();
   const isThisShellFocused =
     (name === SHELL_COMMAND_NAME || name === 'Shell') &&
     status === ToolCallStatus.Executing &&
@@ -149,6 +151,7 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
                   isPending={false}
                   availableTerminalHeight={availableHeight}
                   terminalWidth={childWidth}
+                  renderMarkdown={renderMarkdown}
                 />
               </Box>
             ) : typeof resultDisplay === 'string' && !renderOutputAsMarkdown ? (
