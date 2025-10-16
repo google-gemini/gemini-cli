@@ -50,7 +50,8 @@ export const EXTENSIONS_DIRECTORY_NAME = path.join(GEMINI_DIR, 'extensions');
 
 export const EXTENSIONS_CONFIG_FILENAME = 'gemini-extension.json';
 export const INSTALL_METADATA_FILENAME = '.gemini-extension-install.json';
-
+export const INSTALL_WARNING_MESSAGE =
+  '**The extension you are about to install may have been created by a third-party developer and sourced from a public repository. Google does not vet, endorse, or guarantee the functionality or security of extensions. Please carefully inspect any extension and its source code before installing to understand the permissions it requires and the actions it may perform.**';
 /**
  * Extension definition as written to disk in gemini-extension.json files.
  * This should *not* be referenced outside of the logic for reading files.
@@ -623,9 +624,7 @@ function extensionConsentString(extensionConfig: ExtensionConfig): string {
   const output: string[] = [];
   const mcpServerEntries = Object.entries(sanitizedConfig.mcpServers || {});
   output.push(`Installing extension "${sanitizedConfig.name}".`);
-  output.push(
-    '**Extensions may introduce unexpected behavior. Ensure you have investigated the extension source and trust the author.**',
-  );
+  output.push(INSTALL_WARNING_MESSAGE);
 
   if (mcpServerEntries.length) {
     output.push('This extension will run the following MCP servers:');

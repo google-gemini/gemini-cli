@@ -114,7 +114,7 @@ describe('runNonInteractive', () => {
         getProjectTempDir: vi.fn().mockReturnValue('/test/project/.gemini/tmp'),
       },
       getIdeMode: vi.fn().mockReturnValue(false),
-      getFullContext: vi.fn().mockReturnValue(false),
+
       getContentGeneratorConfig: vi.fn().mockReturnValue({}),
       getDebugMode: vi.fn().mockReturnValue(false),
       getOutputFormat: vi.fn().mockReturnValue('text'),

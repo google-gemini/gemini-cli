@@ -10,6 +10,7 @@ import { ContextSummaryDisplay } from './ContextSummaryDisplay.js';
 import { AutoAcceptIndicator } from './AutoAcceptIndicator.js';
 import { ShellModeIndicator } from './ShellModeIndicator.js';
 import { DetailedMessagesDisplay } from './DetailedMessagesDisplay.js';
+import { RawMarkdownIndicator } from './RawMarkdownIndicator.js';
 import { InputPrompt } from './InputPrompt.js';
 import { Footer } from './Footer.js';
 import { ShowMoreLines } from './ShowMoreLines.js';
@@ -110,6 +111,7 @@ export const Composer = () => {
               <AutoAcceptIndicator approvalMode={showAutoAcceptIndicator} />
             )}
           {uiState.shellModeActive && <ShellModeIndicator />}
+          {!uiState.renderMarkdown && <RawMarkdownIndicator />}
         </Box>
       </Box>
 
