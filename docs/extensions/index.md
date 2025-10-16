@@ -7,6 +7,9 @@ familiar and user-friendly format. With extensions, you can expand the
 capabilities of Gemini CLI and share those capabilities with others. They are
 designed to be easily installable and shareable.
 
+To see examples of extensions, you can browse a gallery of
+[Gemini CLI extensions](https://geminicli.com/extensions/browse/).
+
 See [getting started docs](getting-started-extensions.md) for a guide on
 creating your first extension.
 

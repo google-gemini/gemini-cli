@@ -1,0 +1,41 @@
+name: 'Website issue'
+description: 'Report an issue with the Gemini CLI Website and Gemini CLI Extensions Gallery'
+labels:
+  - 'area/website'
+  - 'status/need-triage'
+body:
+  - type: 'markdown'
+    attributes:
+      value: |-
+        > [!IMPORTANT]
+        > Thanks for taking the time to report an issue with the Gemini CLI Website
+        >
+        > Please search **[existing issues](https://github.com/google-gemini/gemini-cli/issues?q=is%3Aissue+is%3Aopen+label%3Aarea%2Fwebsite)**  to see if a similar feature has already been requested.
+  - type: 'input'
+    id: 'url'
+    attributes:
+      label: 'URL of the page with the issue'
+      description: 'Please provide the URL where the issue occurs.'
+    validations:
+      required: true
+
+  - type: 'textarea'
+    id: 'problem'
+    attributes:
+      label: 'What is the problem?'
+      description: 'A clear and concise description of what the bug or issue is.'
+    validations:
+      required: true
+
+  - type: 'textarea'
+    id: 'expected'
+    attributes:
+      label: 'What did you expect to happen?'
+    validations:
+      required: true
+
+  - type: 'textarea'
+    id: 'additional-context'
+    attributes:
+      label: 'Additional context'
+      description: 'Add any other context or screenshots about the issue here.'
