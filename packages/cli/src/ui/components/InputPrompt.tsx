@@ -29,12 +29,14 @@ import {
   buildSegmentsForVisualSlice,
 } from '../utils/highlight.js';
 import { useKittyKeyboardProtocol } from '../hooks/useKittyKeyboardProtocol.js';
+import { takeAndAddScreenshot } from '../utils/screenshotUtils.js';
 import {
   clipboardHasImage,
   saveClipboardImage,
   cleanupOldClipboardImages,
 } from '../utils/clipboardUtils.js';
 import * as path from 'node:path';
+import * as fs from 'node:fs/promises';
 import { SCREEN_READER_USER_PREFIX } from '../textConstants.js';
 import { useShellFocusState } from '../contexts/ShellFocusContext.js';
 import { useUIState } from '../contexts/UIStateContext.js';
@@ -143,6 +145,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   ]);
   const [expandedSuggestionIndex, setExpandedSuggestionIndex] =
     useState<number>(-1);
+  const [isPasting, setIsPasting] = useState(false);
   const shellHistory = useShellHistory(config.getProjectRoot());
   const shellHistoryData = shellHistory.history;
 
@@ -289,55 +292,105 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   ]);
 
   // Handle clipboard image pasting with Ctrl+V
-  const handleClipboardImage = useCallback(async () => {
+  const handleClipboardImage = useCallback(async (): Promise<boolean> => {
     try {
-      if (await clipboardHasImage()) {
-        const imagePath = await saveClipboardImage(config.getTargetDir());
-        if (imagePath) {
-          // Clean up old images
-          cleanupOldClipboardImages(config.getTargetDir()).catch(() => {
-            // Ignore cleanup errors
-          });
+      const hasImage = await clipboardHasImage();
+      if (!hasImage) {
+        console.log('No image found in clipboard');
+        return false;
+      }
 
-          // Get relative path from current directory
-          const relativePath = path.relative(config.getTargetDir(), imagePath);
+      const targetDir = config.getTargetDir();
 
-          // Insert @path reference at cursor position
-          const insertText = `@${relativePath}`;
-          const currentText = buffer.text;
-          const [row, col] = buffer.cursor;
+      try {
+        // Clean up old images first
+        await cleanupOldClipboardImages(targetDir).catch(() => {
+          // Ignore cleanup errors
+        });
 
-          // Calculate offset from row/col
-          let offset = 0;
-          for (let i = 0; i < row; i++) {
-            offset += buffer.lines[i].length + 1; // +1 for newline
-          }
-          offset += col;
+        const saveResult = await saveClipboardImage(targetDir);
 
-          // Add spaces around the path if needed
-          let textToInsert = insertText;
-          const charBefore = offset > 0 ? currentText[offset - 1] : '';
-          const charAfter =
-            offset < currentText.length ? currentText[offset] : '';
-
-          if (charBefore && charBefore !== ' ' && charBefore !== '\n') {
-            textToInsert = ' ' + textToInsert;
-          }
-          if (!charAfter || (charAfter !== ' ' && charAfter !== '\n')) {
-            textToInsert = textToInsert + ' ';
-          }
-
-          // Insert at cursor position
-          buffer.replaceRangeByOffset(offset, offset, textToInsert);
+        if (!saveResult?.filePath) {
+          console.error('Failed to save image from clipboard');
+          return false;
         }
+
+        // Insert the file path with friendly name in markdown format: [screenshot-1](@path/to/image.png)
+        const relativePath = path.relative(process.cwd(), saveResult.filePath);
+        const displayName = saveResult.displayName || 'screenshot';
+        const markdownLink = `[${displayName}](@${relativePath})`;
+
+        // Insert the markdown link at the current cursor position using replaceRangeByOffset
+        const cursorPos = buffer.cursor;
+        const lines = buffer.lines;
+
+        // Calculate the offset for the cursor position
+        let offset = 0;
+        for (let i = 0; i < cursorPos[0]; i++) {
+          offset += lines[i].length + 1; // +1 for newline
+        }
+        offset += cursorPos[1];
+
+        // Insert at cursor position
+        buffer.replaceRangeByOffset(offset, offset, markdownLink);
+
+        // Update cursor position
+        buffer.cursor = [cursorPos[0], cursorPos[1] + markdownLink.length];
+
+        console.log(`Added image: ${markdownLink}`);
+        return true;
+      } catch (error) {
+        console.error('Error processing clipboard image:', error);
+        return false;
       }
     } catch (error) {
       console.error('Error handling clipboard image:', error);
+      return false;
+    }
+  }, [buffer, config]);
+
+  // Handle taking a screenshot
+  const handleScreenshot = useCallback(async () => {
+    if (!config) return;
+
+    try {
+      const targetDir = config.getTargetDir();
+      const screenshotsDir = path.join(targetDir, '.gemini-cli', 'screenshots');
+      await fs.mkdir(screenshotsDir, { recursive: true });
+      const screenshotMarkdown = await takeAndAddScreenshot(screenshotsDir);
+      if (screenshotMarkdown) {
+        // Insert the screenshot markdown at the current cursor position
+        const cursorPos = buffer.cursor;
+        let offset = 0;
+        for (let i = 0; i < cursorPos[0]; i++) {
+          offset += buffer.lines[i].length + 1; // +1 for newline
+        }
+        offset += cursorPos[1];
+
+        buffer.replaceRangeByOffset(offset, offset, screenshotMarkdown);
+
+        // Update cursor position
+        buffer.cursor = [
+          cursorPos[0],
+          cursorPos[1] + screenshotMarkdown.length,
+        ];
+
+        console.log(`Added screenshot: ${screenshotMarkdown}`);
+      } else {
+        console.error('Failed to take screenshot');
+      }
+    } catch (error) {
+      console.error('Error taking screenshot:', error);
     }
   }, [buffer, config]);
 
   const handleInput = useCallback(
     (key: Key) => {
+      // Ignore input during paste operations to prevent race conditions, except for enter
+      if (isPasting && key.name !== 'return') {
+        return;
+      }
+
       // TODO(jacobr): this special case is likely not needed anymore.
       // We should probably stop supporting paste if the InputPrompt is not
       // focused.
@@ -370,8 +423,22 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
             pasteTimeoutRef.current = null;
           }, 40);
         }
-        // Ensure we never accidentally interpret paste as regular input.
-        buffer.handleInput(key);
+        // Clear the paste protection after a safe delay
+        pasteTimeoutRef.current = setTimeout(() => {
+          setRecentUnsafePasteTime(null);
+          pasteTimeoutRef.current = null;
+        }, 40);
+
+        // Check for clipboard image and handle it
+        const handlePaste = async () => {
+          const imageHandled = await handleClipboardImage();
+          if (!imageHandled) {
+            // If no image was handled, process as regular paste
+            buffer.handleInput(key);
+          }
+        };
+        setIsPasting(true);
+        void handlePaste().finally(() => setIsPasting(false));
         return;
       }
 
@@ -709,7 +776,14 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
       // Ctrl+V for clipboard image paste
       if (keyMatchers[Command.PASTE_CLIPBOARD_IMAGE](key)) {
-        handleClipboardImage();
+        // Check for Shift key to determine if we should take a screenshot
+        if (key.shift) {
+          console.log('Taking screenshot...');
+          handleScreenshot();
+        } else {
+          console.log('Pasting image from clipboard...');
+          handleClipboardImage();
+        }
         return;
       }
 
@@ -753,6 +827,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       commandSearchActive,
       commandSearchCompletion,
       kittyProtocol.supported,
+      handleScreenshot,
+      isPasting,
     ],
   );
 

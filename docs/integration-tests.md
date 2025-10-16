@@ -35,6 +35,33 @@ The integration tests can also be run using the following shortcut:
 npm run test:e2e
 ```
 
+## System Requirements
+
+Some integration tests require platform-specific tools to be available on your
+system:
+
+### Clipboard Tests
+
+The clipboard E2E tests (`clipboardUtils.e2e.test.ts`) require clipboard
+utilities:
+
+- **macOS**: Requires `osascript` and `pbpaste` (pre-installed)
+- **Linux**: Requires `xclip` or `xsel` clipboard utilities
+- **Windows**: Requires PowerShell (pre-installed)
+
+Install missing clipboard tools if you encounter skipped tests:
+
+```bash
+# Linux with apt
+sudo apt-get install xclip
+
+# Or alternative
+sudo apt-get install xsel
+```
+
+**Note**: Clipboard tests will be automatically skipped if the required tools
+are not available, with a warning message indicating the missing dependency.
+
 ## Running a specific set of tests
 
 To run a subset of test files, you can use
