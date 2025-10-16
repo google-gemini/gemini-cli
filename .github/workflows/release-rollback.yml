@@ -105,7 +105,7 @@ jobs:
           wombat-token-a2a-server: '${{ secrets.WOMBAT_TOKEN_A2A_SERVER }}'
 
       - name: 'Deprecate Cli Npm Package'
-        if: "${{ github.event.inputs.dry-run == 'false' }}"
+        if: "${{ github.event.inputs.dry-run == 'false' && github.event.inputs.environment == 'prod' }}"
         env:
           NODE_AUTH_TOKEN: '${{ steps.cli-token.outputs.auth-token }}'
         shell: 'bash'
@@ -123,7 +123,7 @@ jobs:
           wombat-token-a2a-server: '${{ secrets.WOMBAT_TOKEN_A2A_SERVER }}'
 
       - name: 'Deprecate Core Npm Package'
-        if: "${{ github.event.inputs.dry-run == 'false' }}"
+        if: "${{ github.event.inputs.dry-run == 'false' && github.event.inputs.environment == 'prod' }}"
         env:
           NODE_AUTH_TOKEN: '${{ steps.core-token.outputs.auth-token }}'
         shell: 'bash'
@@ -141,7 +141,7 @@ jobs:
           wombat-token-a2a-server: '${{ secrets.WOMBAT_TOKEN_A2A_SERVER }}'
 
       - name: 'Deprecate A2A Server Npm Package'
-        if: "${{ github.event.inputs.dry-run == 'false' }}"
+        if: "${{ github.event.inputs.dry-run == 'false' && github.event.inputs.environment == 'prod'  }}"
         env:
           NODE_AUTH_TOKEN: '${{ steps.a2a-token.outputs.auth-token }}'
         shell: 'bash'
@@ -149,7 +149,7 @@ jobs:
           npm deprecate ${{ vars.A2A_PACKAGE_NAME }}@${{ github.event.inputs.rollback_origin }} "This version has been rolled back."
 
       - name: 'Delete Github Release'
-        if: "${{ github.event.inputs.dry-run == 'false' && inputs.environment == 'prod'}}"
+        if: "${{ github.event.inputs.dry-run == 'false' && github.event.inputs.environment == 'prod'}}"
         env:
           GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
         shell: 'bash'
