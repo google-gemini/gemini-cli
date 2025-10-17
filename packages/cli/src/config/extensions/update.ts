@@ -11,8 +11,7 @@ import {
 } from '../../ui/state/extensions.js';
 import {
   copyExtension,
-  installExtension,
-  uninstallExtension,
+  installOrUpdateExtension,
   loadExtension,
   loadInstallMetadata,
   ExtensionStorage,
@@ -65,13 +64,11 @@ export async function updateExtension(
 
   const tempDir = await ExtensionStorage.createTmpDir();
   try {
-    await copyExtension(extension.path, tempDir);
     const previousExtensionConfig = await loadExtensionConfig({
       extensionDir: extension.path,
       workspaceDir: cwd,
     });
-    await uninstallExtension(extension.name, cwd);
-    await installExtension(
+    await installOrUpdateExtension(
       installMetadata,
       requestConsent,
       cwd,
@@ -90,7 +87,7 @@ export async function updateExtension(
       });
       throw new Error('Updated extension not found after installation.');
     }
-    const updatedVersion = updatedExtension.config.version;
+    const updatedVersion = updatedExtension.version;
     dispatchExtensionStateUpdate({
       type: 'SET_STATE',
       payload: {
@@ -154,6 +151,7 @@ export interface ExtensionUpdateCheckResult {
 export async function checkForAllExtensionUpdates(
   extensions: GeminiCLIExtension[],
   dispatch: (action: ExtensionUpdateAction) => void,
+  cwd: string = process.cwd(),
 ): Promise<void> {
   dispatch({ type: 'BATCH_CHECK_START' });
   const promises: Array<Promise<void>> = [];
@@ -168,13 +166,20 @@ export async function checkForAllExtensionUpdates(
       });
       continue;
     }
+    dispatch({
+      type: 'SET_STATE',
+      payload: {
+        name: extension.name,
+        state: ExtensionUpdateState.CHECKING_FOR_UPDATES,
+      },
+    });
     promises.push(
-      checkForExtensionUpdate(extension, (updatedState) => {
+      checkForExtensionUpdate(extension, cwd).then((state) =>
         dispatch({
           type: 'SET_STATE',
-          payload: { name: extension.name, state: updatedState },
-        });
-      }),
+          payload: { name: extension.name, state },
+        }),
+      ),
     );
   }
   await Promise.all(promises);

@@ -9,6 +9,7 @@ import {
   describe,
   it,
   expect,
+  beforeAll,
   beforeEach,
   afterEach,
   type Mock,
@@ -23,7 +24,10 @@ vi.mock('os');
 vi.mock('crypto');
 vi.mock('../utils/summarizer.js');
 
-import { isCommandAllowed } from '../utils/shell-utils.js';
+import {
+  initializeShellParsers,
+  isCommandAllowed,
+} from '../utils/shell-utils.js';
 import { ShellTool } from './shell.js';
 import { type Config } from '../config/config.js';
 import {
@@ -41,6 +45,9 @@ import { ToolConfirmationOutcome } from './tools.js';
 import { OUTPUT_UPDATE_INTERVAL_MS } from './shell.js';
 import { createMockWorkspaceContext } from '../test-utils/mockWorkspaceContext.js';
 
+const originalComSpec = process.env['ComSpec'];
+const itWindowsOnly = process.platform === 'win32' ? it : it.skip;
+
 describe('ShellTool', () => {
   let shellTool: ShellTool;
   let mockConfig: Config;
@@ -51,6 +58,8 @@ describe('ShellTool', () => {
     vi.clearAllMocks();
 
     mockConfig = {
+      getAllowedTools: vi.fn().mockReturnValue([]),
+      getApprovalMode: vi.fn().mockReturnValue('strict'),
       getCoreTools: vi.fn().mockReturnValue([]),
       getExcludeTools: vi.fn().mockReturnValue([]),
       getDebugMode: vi.fn().mockReturnValue(false),
@@ -60,7 +69,8 @@ describe('ShellTool', () => {
         .fn()
         .mockReturnValue(createMockWorkspaceContext('/test/dir')),
       getGeminiClient: vi.fn(),
-      getShouldUseNodePtyShell: vi.fn().mockReturnValue(false),
+      getEnableInteractiveShell: vi.fn().mockReturnValue(false),
+      isInteractive: vi.fn().mockReturnValue(true),
     } as unknown as Config;
 
     shellTool = new ShellTool(mockConfig);
@@ -70,6 +80,8 @@ describe('ShellTool', () => {
     (vi.mocked(crypto.randomBytes) as Mock).mockReturnValue(
       Buffer.from('abcdef', 'hex'),
     );
+    process.env['ComSpec'] =
+      'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe';
 
     // Capture the output callback to simulate streaming events from the service
     mockShellExecutionService.mockImplementation((_cmd, _cwd, callback) => {
@@ -83,23 +95,36 @@ describe('ShellTool', () => {
     });
   });
 
+  afterEach(() => {
+    if (originalComSpec === undefined) {
+      delete process.env['ComSpec'];
+    } else {
+      process.env['ComSpec'] = originalComSpec;
+    }
+  });
+
   describe('isCommandAllowed', () => {
     it('should allow a command if no restrictions are provided', () => {
       (mockConfig.getCoreTools as Mock).mockReturnValue(undefined);
       (mockConfig.getExcludeTools as Mock).mockReturnValue(undefined);
-      expect(isCommandAllowed('ls -l', mockConfig).allowed).toBe(true);
+      expect(isCommandAllowed('goodCommand --safe', mockConfig).allowed).toBe(
+        true,
+      );
     });
 
-    it('should block a command with command substitution using $()', () => {
-      expect(isCommandAllowed('echo $(rm -rf /)', mockConfig).allowed).toBe(
-        false,
+    it('should allow a command with command substitution using $()', () => {
+      const evaluation = isCommandAllowed(
+        'echo $(goodCommand --safe)',
+        mockConfig,
       );
+      expect(evaluation.allowed).toBe(true);
+      expect(evaluation.reason).toBeUndefined();
     });
   });
 
   describe('build', () => {
     it('should return an invocation for a valid command', () => {
-      const invocation = shellTool.build({ command: 'ls -l' });
+      const invocation = shellTool.build({ command: 'goodCommand --safe' });
       expect(invocation).toBeDefined();
     });
 
@@ -206,7 +231,7 @@ describe('ShellTool', () => {
       );
     });
 
-    it('should not wrap command on windows', async () => {
+    itWindowsOnly('should not wrap command on windows', async () => {
       vi.mocked(os.platform).mockReturnValue('win32');
       const invocation = shellTool.build({ command: 'dir' });
       const promise = invocation.execute(mockAbortSignal);
@@ -409,6 +434,52 @@ describe('ShellTool', () => {
     it('should throw an error if validation fails', () => {
       expect(() => shellTool.build({ command: '' })).toThrow();
     });
+
+    describe('in non-interactive mode', () => {
+      beforeEach(() => {
+        (mockConfig.isInteractive as Mock).mockReturnValue(false);
+      });
+
+      it('should not throw an error or block for an allowed command', async () => {
+        (mockConfig.getAllowedTools as Mock).mockReturnValue(['ShellTool(wc)']);
+        const invocation = shellTool.build({ command: 'wc -l foo.txt' });
+        const confirmation = await invocation.shouldConfirmExecute(
+          new AbortController().signal,
+        );
+        expect(confirmation).toBe(false);
+      });
+
+      it('should not throw an error or block for an allowed command with arguments', async () => {
+        (mockConfig.getAllowedTools as Mock).mockReturnValue([
+          'ShellTool(wc -l)',
+        ]);
+        const invocation = shellTool.build({ command: 'wc -l foo.txt' });
+        const confirmation = await invocation.shouldConfirmExecute(
+          new AbortController().signal,
+        );
+        expect(confirmation).toBe(false);
+      });
+
+      it('should throw an error for command that is not allowed', async () => {
+        (mockConfig.getAllowedTools as Mock).mockReturnValue([
+          'ShellTool(wc -l)',
+        ]);
+        const invocation = shellTool.build({ command: 'madeupcommand' });
+        await expect(
+          invocation.shouldConfirmExecute(new AbortController().signal),
+        ).rejects.toThrow('madeupcommand');
+      });
+
+      it('should throw an error for a command that is a prefix of an allowed command', async () => {
+        (mockConfig.getAllowedTools as Mock).mockReturnValue([
+          'ShellTool(wc -l)',
+        ]);
+        const invocation = shellTool.build({ command: 'wc' });
+        await expect(
+          invocation.shouldConfirmExecute(new AbortController().signal),
+        ).rejects.toThrow('wc');
+      });
+    });
   });
 
   describe('getDescription', () => {
@@ -424,4 +495,7 @@ describe('ShellTool', () => {
       expect(shellTool.description).toMatchSnapshot();
     });
   });
+});
+beforeAll(async () => {
+  await initializeShellParsers();
 });

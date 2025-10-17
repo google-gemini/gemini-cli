@@ -70,13 +70,14 @@ describe('useExtensionUpdates', () => {
           source: 'https://some/repo',
           autoUpdate: false,
         },
+        contextFiles: [],
       },
     ];
     const addItem = vi.fn();
     const cwd = '/test/cwd';
 
     vi.mocked(checkForAllExtensionUpdates).mockImplementation(
-      async (extensions, dispatch) => {
+      async (_extensions, dispatch, _cwd) => {
         dispatch({
           type: 'SET_STATE',
           payload: {
@@ -122,7 +123,7 @@ describe('useExtensionUpdates', () => {
     const addItem = vi.fn();
 
     vi.mocked(checkForAllExtensionUpdates).mockImplementation(
-      async (extensions, dispatch) => {
+      async (_extensions, dispatch, _cwd) => {
         dispatch({
           type: 'SET_STATE',
           payload: {
@@ -195,7 +196,7 @@ describe('useExtensionUpdates', () => {
     const addItem = vi.fn();
 
     vi.mocked(checkForAllExtensionUpdates).mockImplementation(
-      async (extensions, dispatch) => {
+      async (_extensions, dispatch, _cwd) => {
         dispatch({
           type: 'SET_STATE',
           payload: {
@@ -262,6 +263,7 @@ describe('useExtensionUpdates', () => {
           source: 'https://some/repo1',
           autoUpdate: false,
         },
+        contextFiles: [],
       },
       {
         name: 'test-extension-2',
@@ -274,13 +276,14 @@ describe('useExtensionUpdates', () => {
           source: 'https://some/repo2',
           autoUpdate: false,
         },
+        contextFiles: [],
       },
     ];
     const addItem = vi.fn();
     const cwd = '/test/cwd';
 
     vi.mocked(checkForAllExtensionUpdates).mockImplementation(
-      async (extensions, dispatch) => {
+      async (_extensions, dispatch, _cwd) => {
         dispatch({ type: 'BATCH_CHECK_START' });
         dispatch({
           type: 'SET_STATE',

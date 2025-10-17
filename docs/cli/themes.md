@@ -1,10 +1,13 @@
 # Themes
 
-Gemini CLI supports a variety of themes to customize its color scheme and appearance. You can change the theme to suit your preferences via the `/theme` command or `"theme":` configuration setting.
+Gemini CLI supports a variety of themes to customize its color scheme and
+appearance. You can change the theme to suit your preferences via the `/theme`
+command or `"theme":` configuration setting.
 
 ## Available Themes
 
-Gemini CLI comes with a selection of pre-defined themes, which you can list using the `/theme` command within Gemini CLI:
+Gemini CLI comes with a selection of pre-defined themes, which you can list
+using the `/theme` command within Gemini CLI:
 
 - **Dark Themes:**
   - `ANSI`
@@ -25,24 +28,33 @@ Gemini CLI comes with a selection of pre-defined themes, which you can list usin
 
 1.  Enter `/theme` into Gemini CLI.
 2.  A dialog or selection prompt appears, listing the available themes.
-3.  Using the arrow keys, select a theme. Some interfaces might offer a live preview or highlight as you select.
+3.  Using the arrow keys, select a theme. Some interfaces might offer a live
+    preview or highlight as you select.
 4.  Confirm your selection to apply the theme.
 
-**Note:** If a theme is defined in your `settings.json` file (either by name or by a file path), you must remove the `"theme"` setting from the file before you can change the theme using the `/theme` command.
+**Note:** If a theme is defined in your `settings.json` file (either by name or
+by a file path), you must remove the `"theme"` setting from the file before you
+can change the theme using the `/theme` command.
 
 ### Theme Persistence
 
-Selected themes are saved in Gemini CLI's [configuration](../get-started/configuration.md) so your preference is remembered across sessions.
+Selected themes are saved in Gemini CLI's
+[configuration](../get-started/configuration.md) so your preference is
+remembered across sessions.
 
 ---
 
 ## Custom Color Themes
 
-Gemini CLI allows you to create your own custom color themes by specifying them in your `settings.json` file. This gives you full control over the color palette used in the CLI.
+Gemini CLI allows you to create your own custom color themes by specifying them
+in your `settings.json` file. This gives you full control over the color palette
+used in the CLI.
 
 ### How to Define a Custom Theme
 
-Add a `customThemes` block to your user, project, or system `settings.json` file. Each custom theme is defined as an object with a unique name and a set of color keys. For example:
+Add a `customThemes` block to your user, project, or system `settings.json`
+file. Each custom theme is defined as an object with a unique name and a set of
+color keys. For example:
 
 ```json
 {
@@ -92,15 +104,23 @@ Add a `customThemes` block to your user, project, or system `settings.json` file
 - `Comment`
 - `Gray`
 
-You can use either hex codes (e.g., `#FF0000`) **or** standard CSS color names (e.g., `coral`, `teal`, `blue`) for any color value. See [CSS color names](https://developer.mozilla.org/en-US/docs/Web/CSS/color_value#color_keywords) for a full list of supported names.
+You can use either hex codes (e.g., `#FF0000`) **or** standard CSS color names
+(e.g., `coral`, `teal`, `blue`) for any color value. See
+[CSS color names](https://developer.mozilla.org/en-US/docs/Web/CSS/color_value#color_keywords)
+for a full list of supported names.
 
-You can define multiple custom themes by adding more entries to the `customThemes` object.
+You can define multiple custom themes by adding more entries to the
+`customThemes` object.
 
 ### Loading Themes from a File
 
-In addition to defining custom themes in `settings.json`, you can also load a theme directly from a JSON file by specifying the file path in your `settings.json`. This is useful for sharing themes or keeping them separate from your main configuration.
+In addition to defining custom themes in `settings.json`, you can also load a
+theme directly from a JSON file by specifying the file path in your
+`settings.json`. This is useful for sharing themes or keeping them separate from
+your main configuration.
 
-To load a theme from a file, set the `theme` property in your `settings.json` to the path of your theme file:
+To load a theme from a file, set the `theme` property in your `settings.json` to
+the path of your theme file:
 
 ```json
 {
@@ -110,7 +130,8 @@ To load a theme from a file, set the `theme` property in your `settings.json` to
 }
 ```
 
-The theme file must be a valid JSON file that follows the same structure as a custom theme defined in `settings.json`.
+The theme file must be a valid JSON file that follows the same structure as a
+custom theme defined in `settings.json`.
 
 **Example `my-theme.json`:**
 
@@ -136,7 +157,11 @@ The theme file must be a valid JSON file that follows the same structure as a cu
 }
 ```
 
-**Security Note:** For your safety, Gemini CLI will only load theme files that are located within your home directory. If you attempt to load a theme from outside your home directory, a warning will be displayed and the theme will not be loaded. This is to prevent loading potentially malicious theme files from untrusted sources.
+**Security Note:** For your safety, Gemini CLI will only load theme files that
+are located within your home directory. If you attempt to load a theme from
+outside your home directory, a warning will be displayed and the theme will not
+be loaded. This is to prevent loading potentially malicious theme files from
+untrusted sources.
 
 ### Example Custom Theme
 
@@ -144,9 +169,13 @@ The theme file must be a valid JSON file that follows the same structure as a cu
 
 ### Using Your Custom Theme
 
-- Select your custom theme using the `/theme` command in Gemini CLI. Your custom theme will appear in the theme selection dialog.
-- Or, set it as the default by adding `"theme": "MyCustomTheme"` to the `ui` object in your `settings.json`.
-- Custom themes can be set at the user, project, or system level, and follow the same [configuration precedence](../get-started/configuration.md) as other settings.
+- Select your custom theme using the `/theme` command in Gemini CLI. Your custom
+  theme will appear in the theme selection dialog.
+- Or, set it as the default by adding `"theme": "MyCustomTheme"` to the `ui`
+  object in your `settings.json`.
+- Custom themes can be set at the user, project, or system level, and follow the
+  same [configuration precedence](../get-started/configuration.md) as other
+  settings.
 
 ---
 

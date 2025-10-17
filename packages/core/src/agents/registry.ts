@@ -7,13 +7,15 @@
 import type { Config } from '../config/config.js';
 import type { AgentDefinition } from './types.js';
 import { CodebaseInvestigatorAgent } from './codebase-investigator.js';
+import { type z } from 'zod';
 
 /**
  * Manages the discovery, loading, validation, and registration of
  * AgentDefinitions.
  */
 export class AgentRegistry {
-  private readonly agents = new Map<string, AgentDefinition>();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private readonly agents = new Map<string, AgentDefinition<any>>();
 
   constructor(private readonly config: Config) {}
 
@@ -31,7 +33,33 @@ export class AgentRegistry {
   }
 
   private loadBuiltInAgents(): void {
-    this.registerAgent(CodebaseInvestigatorAgent);
+    const investigatorSettings = this.config.getCodebaseInvestigatorSettings();
+
+    // Only register the agent if it's enabled in the settings.
+    if (investigatorSettings?.enabled) {
+      const agentDef = {
+        ...CodebaseInvestigatorAgent,
+        modelConfig: {
+          ...CodebaseInvestigatorAgent.modelConfig,
+          model:
+            investigatorSettings.model ??
+            CodebaseInvestigatorAgent.modelConfig.model,
+          thinkingBudget:
+            investigatorSettings.thinkingBudget ??
+            CodebaseInvestigatorAgent.modelConfig.thinkingBudget,
+        },
+        runConfig: {
+          ...CodebaseInvestigatorAgent.runConfig,
+          max_time_minutes:
+            investigatorSettings.maxTimeMinutes ??
+            CodebaseInvestigatorAgent.runConfig.max_time_minutes,
+          max_turns:
+            investigatorSettings.maxNumTurns ??
+            CodebaseInvestigatorAgent.runConfig.max_turns,
+        },
+      };
+      this.registerAgent(agentDef);
+    }
   }
 
   /**
@@ -39,7 +67,9 @@ export class AgentRegistry {
    * it will be overwritten, respecting the precedence established by the
    * initialization order.
    */
-  protected registerAgent(definition: AgentDefinition): void {
+  protected registerAgent<TOutput extends z.ZodTypeAny>(
+    definition: AgentDefinition<TOutput>,
+  ): void {
     // Basic validation
     if (!definition.name || !definition.description) {
       console.warn(

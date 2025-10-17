@@ -9,7 +9,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { ExtensionEnablementManager, Override } from './extensionEnablement.js';
-import type { Extension } from '../extension.js';
+
+import { GEMINI_DIR, type GeminiCLIExtension } from '@google/gemini-cli-core';
 
 // Helper to create a temporary directory for testing
 function createTestDir() {
@@ -27,7 +28,7 @@ let manager: ExtensionEnablementManager;
 describe('ExtensionEnablementManager', () => {
   beforeEach(() => {
     testDir = createTestDir();
-    configDir = path.join(testDir.path, '.gemini');
+    configDir = path.join(testDir.path, GEMINI_DIR);
     manager = new ExtensionEnablementManager(configDir);
   });
 
@@ -286,9 +287,9 @@ describe('ExtensionEnablementManager', () => {
         'ext-two',
       ]);
       const extensions = [
-        { config: { name: 'ext-one' } },
-        { config: { name: 'ext-two' } },
-      ] as Extension[];
+        { name: 'ext-one' },
+        { name: 'ext-two' },
+      ] as GeminiCLIExtension[];
       manager.validateExtensionOverrides(extensions);
       expect(consoleErrorSpy).not.toHaveBeenCalled();
     });
@@ -300,9 +301,9 @@ describe('ExtensionEnablementManager', () => {
         'ext-another-invalid',
       ]);
       const extensions = [
-        { config: { name: 'ext-one' } },
-        { config: { name: 'ext-two' } },
-      ] as Extension[];
+        { name: 'ext-one' },
+        { name: 'ext-two' },
+      ] as GeminiCLIExtension[];
       manager.validateExtensionOverrides(extensions);
       expect(consoleErrorSpy).toHaveBeenCalledTimes(2);
       expect(consoleErrorSpy).toHaveBeenCalledWith(
