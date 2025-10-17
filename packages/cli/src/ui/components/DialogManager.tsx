@@ -16,7 +16,6 @@ import { AuthInProgress } from '../auth/AuthInProgress.js';
 import { AuthDialog } from '../auth/AuthDialog.js';
 import { EditorSettingsDialog } from './EditorSettingsDialog.js';
 import { PrivacyNotice } from '../privacy/PrivacyNotice.js';
-import { WorkspaceMigrationDialog } from './WorkspaceMigrationDialog.js';
 import { ProQuotaDialog } from './ProQuotaDialog.js';
 import { PermissionsModifyTrustDialog } from './PermissionsModifyTrustDialog.js';
 import { ModelDialog } from './ModelDialog.js';
@@ -49,15 +48,6 @@ export const DialogManager = ({
 
   if (uiState.showIdeRestartPrompt) {
     return <IdeTrustChangeDialog reason={uiState.ideTrustRestartReason} />;
-  }
-  if (uiState.showWorkspaceMigrationDialog) {
-    return (
-      <WorkspaceMigrationDialog
-        workspaceExtensions={uiState.workspaceExtensions}
-        onOpen={uiActions.onWorkspaceMigrationDialogOpen}
-        onClose={uiActions.onWorkspaceMigrationDialogClose}
-      />
-    );
   }
   if (uiState.proQuotaRequest) {
     return (

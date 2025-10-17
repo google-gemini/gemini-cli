@@ -42,8 +42,6 @@ export interface UIActions {
   refreshStatic: () => void;
   handleFinalSubmit: (value: string) => void;
   handleClearScreen: () => void;
-  onWorkspaceMigrationDialogOpen: () => void;
-  onWorkspaceMigrationDialogClose: () => void;
   handleProQuotaChoice: (choice: 'auth' | 'continue') => void;
   setQueueErrorMessage: (message: string | null) => void;
   popAllMessages: (onPop: (messages: string | undefined) => void) => void;
