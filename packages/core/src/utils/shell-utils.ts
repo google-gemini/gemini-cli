@@ -299,7 +299,11 @@ function collectRedirections(root: Node, source: string): RedirectionDetail[] {
             (child) =>
               child?.type === '>' ||
               child?.type === '>>' ||
-              child?.type === '<',
+              child?.type === '<' ||
+              child?.type === '&>' ||
+              child?.type === '&>>' ||
+              child?.type === '<>' ||
+              child?.type === '>|',
           );
           const operator = operatorNode
             ? source.slice(operatorNode.startIndex, operatorNode.endIndex)
@@ -646,7 +650,10 @@ function isPathOutsideWorkspace(
       // If it's a relative path with .., it might escape
       // We'll resolve it against a workspace dir to check
       if (workspaceDirs.length === 0) {
-        return false; // No workspace restriction
+        // If there are no workspace directories, we cannot safely resolve
+        // a relative path. Treat it as unsafe, consistent with how
+        // absolute paths are handled in this scenario.
+        return true;
       }
       expandedPath = path.resolve(workspaceDirs[0], expandedPath);
     }
