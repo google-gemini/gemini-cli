@@ -211,7 +211,9 @@ describe('SettingsDialog', () => {
       const output = lastFrame();
       expect(output).toContain('Settings');
       expect(output).toContain('Apply To');
-      expect(output).toContain('Use Enter to select, Tab to change focus');
+      expect(output).toContain(
+        'Use Enter to select, Tab to change focus, Esc to close',
+      );
     });
 
     it('should accept availableTerminalHeight prop without errors', () => {
@@ -231,7 +233,7 @@ describe('SettingsDialog', () => {
       const output = lastFrame();
       // Should still render properly with the height prop
       expect(output).toContain('Settings');
-      expect(output).toContain('Use Enter to select');
+      expect(output).toContain('Use Enter to select, Esc to close');
     });
 
     it('should show settings list with default values', () => {
@@ -1086,7 +1088,7 @@ describe('SettingsDialog', () => {
       expect(lastFrame()).toContain('Apply To'); // Scope section
       expect(lastFrame()).toContain('User Settings'); // Scope options (no numbers when settings focused)
       expect(lastFrame()).toContain(
-        '(Use Enter to select, Tab to change focus)',
+        '(Use Enter to select, Tab to change focus, Esc to close)',
       ); // Help text
 
       // This test validates the complete UI structure is available for user workflow

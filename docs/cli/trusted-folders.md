@@ -59,6 +59,13 @@ to protect you. In this mode, the following features are disabled:
 5.  **Automatic Memory Loading is Disabled**: The CLI will not automatically
     load files into context from directories specified in local settings.
 
+6.  **MCP Servers Do Not Connect**: The CLI will not attempt to connect to any
+    [Model Context Protocol (MCP)](../mcp/index.md) servers.
+
+7.  **Custom Commands are Not Loaded**: The CLI will not load any custom
+    commands from .toml files, including both project-specific and global user
+    commands.
+
 Granting trust to a folder unlocks the full functionality of the Gemini CLI for
 that workspace.
 
