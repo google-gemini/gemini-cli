@@ -1,6 +1,11 @@
 {
   "permissions": {
-    "allow": ["Bash(git restore:*)", "Bash(npm install)"],
+    "allow": [
+      "Bash(git restore:*)",
+      "Bash(npm install)",
+      "Bash(npm run build:*)",
+      "Bash(npx tsc:*)"
+    ],
     "deny": [],
     "ask": []
   }

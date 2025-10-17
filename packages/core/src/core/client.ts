@@ -243,6 +243,12 @@ export class GeminiClient {
       const systemInstruction = getCoreSystemPrompt(this.config, userMemory);
       const model = this.config.getModel();
 
+      console.log(
+        '[austin] Client.startChat: systemInstruction=',
+        systemInstruction,
+        ' history',
+        history,
+      );
       const config: GenerateContentConfig = { ...this.generateContentConfig };
 
       if (isThinkingSupported(model)) {
@@ -451,6 +457,7 @@ export class GeminiClient {
       this.lastPromptId = prompt_id;
       this.currentSequenceModel = null;
     }
+
     this.sessionTurnCount++;
     if (
       this.config.getMaxSessionTurns() > 0 &&

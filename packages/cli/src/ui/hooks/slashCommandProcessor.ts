@@ -256,6 +256,7 @@ export const useSlashCommandProcessor = (
   useEffect(() => {
     const controller = new AbortController();
     const load = async () => {
+      // Load commands
       const loaders = [
         new McpPromptLoader(config),
         new BuiltinCommandLoader(config),
@@ -275,6 +276,7 @@ export const useSlashCommandProcessor = (
     };
   }, [config, reloadTrigger, isConfigInitialized]);
 
+  // Handle a slash command input
   const handleSlashCommand = useCallback(
     async (
       rawQuery: PartListUnion,

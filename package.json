@@ -19,7 +19,7 @@
   "scripts": {
     "start": "cross-env node scripts/start.js",
     "start:a2a-server": "CODER_AGENT_PORT=41242 npm run start --workspace @google/gemini-cli-a2a-server",
-    "debug": "cross-env DEBUG=1 node --inspect-brk scripts/start.js",
+    "debug": "cross-env DEBUG=1 node --inspect scripts/start.js",
     "auth:npm": "npx google-artifactregistry-auth",
     "auth:docker": "gcloud auth configure-docker us-west1-docker.pkg.dev",
     "auth": "npm run auth:npm && npm run auth:docker",
