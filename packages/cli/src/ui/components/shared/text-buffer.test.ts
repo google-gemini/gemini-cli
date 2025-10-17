@@ -21,6 +21,10 @@ import {
   findWordEndInLine,
   findNextWordStartInLine,
   isWordCharStrict,
+  getTransformationsForLine,
+  calculateTransformedLine,
+  getTransformUnderCursor,
+  getTransformedImagePath,
 } from './text-buffer.js';
 import { cpLen } from '../../utils/textUtils.js';
 
@@ -33,6 +37,16 @@ const initialState: TextBufferState = {
   redoStack: [],
   clipboard: null,
   selectionAnchor: null,
+  viewportWidth: 80,
+  viewportHeight: 24,
+  transformationsByLine: [[]],
+  visualLayout: {
+    visualLines: [''],
+    logicalToVisualMap: [[[0, 0]]],
+    visualToLogicalMap: [[0, 0]],
+    transformedToLogicalMaps: [[]],
+    visualToTransformedMap: [],
+  },
 };
 
 describe('textBufferReducer', () => {
@@ -1559,6 +1573,7 @@ describe('offsetToLogicalPos', () => {
 
   it('should handle multi-line text', () => {
     const text = 'hello\nworld\n123';
+
     // "hello" (5) + \n (1) + "world" (5) + \n (1) + "123" (3)
     // h e l l o \n w o r l d \n 1 2 3
     // 0 1 2 3 4  5  6 7 8 9 0  1  2 3 4
@@ -1708,12 +1723,24 @@ describe('textBufferReducer vim operations', () => {
         cursorRow: 1,
         cursorCol: 2,
         preferredCol: null,
-        visualLines: [['line1'], ['line2'], ['line3']],
-        visualScrollRow: 0,
-        visualCursor: { row: 1, col: 2 },
-        viewport: { width: 10, height: 5 },
         undoStack: [],
         redoStack: [],
+        clipboard: null,
+        selectionAnchor: null,
+        viewportWidth: 10,
+        viewportHeight: 5,
+        transformationsByLine: [[], [], []],
+        visualLayout: {
+          visualLines: ['line1', 'line2', 'line3'],
+          logicalToVisualMap: [[[0, 0]], [[1, 0]], [[2, 0]]],
+          visualToLogicalMap: [
+            [0, 0],
+            [1, 0],
+            [2, 0],
+          ],
+          transformedToLogicalMaps: [[], [], []],
+          visualToTransformedMap: [],
+        },
       };
 
       const action: TextBufferAction = {
@@ -1736,12 +1763,25 @@ describe('textBufferReducer vim operations', () => {
         cursorRow: 1,
         cursorCol: 0,
         preferredCol: null,
-        visualLines: [['line1'], ['line2'], ['line3'], ['line4']],
-        visualScrollRow: 0,
-        visualCursor: { row: 1, col: 0 },
-        viewport: { width: 10, height: 5 },
         undoStack: [],
         redoStack: [],
+        clipboard: null,
+        selectionAnchor: null,
+        viewportWidth: 10,
+        viewportHeight: 5,
+        transformationsByLine: [[], [], [], []],
+        visualLayout: {
+          visualLines: ['line1', 'line2', 'line3', 'line4'],
+          logicalToVisualMap: [[[0, 0]], [[1, 0]], [[2, 0]], [[3, 0]]],
+          visualToLogicalMap: [
+            [0, 0],
+            [1, 0],
+            [2, 0],
+            [3, 0],
+          ],
+          transformedToLogicalMaps: [[], [], [], []],
+          visualToTransformedMap: [],
+        },
       };
 
       const action: TextBufferAction = {
@@ -1764,12 +1804,20 @@ describe('textBufferReducer vim operations', () => {
         cursorRow: 0,
         cursorCol: 5,
         preferredCol: null,
-        visualLines: [['only line']],
-        visualScrollRow: 0,
-        visualCursor: { row: 0, col: 5 },
-        viewport: { width: 10, height: 5 },
         undoStack: [],
         redoStack: [],
+        clipboard: null,
+        selectionAnchor: null,
+        viewportWidth: 10,
+        viewportHeight: 5,
+        transformationsByLine: [[]],
+        visualLayout: {
+          visualLines: ['only line'],
+          logicalToVisualMap: [[[0, 0]]],
+          visualToLogicalMap: [[0, 0]],
+          transformedToLogicalMaps: [[]],
+          visualToTransformedMap: [],
+        },
       };
 
       const action: TextBufferAction = {
@@ -1792,12 +1840,23 @@ describe('textBufferReducer vim operations', () => {
         cursorRow: 1,
         cursorCol: 0,
         preferredCol: null,
-        visualLines: [['line1'], ['line2']],
-        visualScrollRow: 0,
-        visualCursor: { row: 1, col: 0 },
-        viewport: { width: 10, height: 5 },
         undoStack: [],
         redoStack: [],
+        clipboard: null,
+        selectionAnchor: null,
+        viewportWidth: 10,
+        viewportHeight: 5,
+        transformationsByLine: [[], []],
+        visualLayout: {
+          visualLines: ['line1', 'line2'],
+          logicalToVisualMap: [[[0, 0]], [[1, 0]]],
+          visualToLogicalMap: [
+            [0, 0],
+            [1, 0],
+          ],
+          transformedToLogicalMaps: [[], []],
+          visualToTransformedMap: [],
+        },
       };
 
       const action: TextBufferAction = {
@@ -1820,12 +1879,25 @@ describe('textBufferReducer vim operations', () => {
         cursorRow: 0,
         cursorCol: 0,
         preferredCol: null,
-        visualLines: [['line1'], ['line2'], ['line3'], ['line4']],
-        visualScrollRow: 0,
-        visualCursor: { row: 0, col: 0 },
-        viewport: { width: 10, height: 5 },
         undoStack: [],
         redoStack: [],
+        clipboard: null,
+        selectionAnchor: null,
+        viewportWidth: 10,
+        viewportHeight: 5,
+        transformationsByLine: [[], [], [], []],
+        visualLayout: {
+          visualLines: ['line1', 'line2', 'line3', 'line4'],
+          logicalToVisualMap: [[[0, 0]], [[1, 0]], [[2, 0]], [[3, 0]]],
+          visualToLogicalMap: [
+            [0, 0],
+            [1, 0],
+            [2, 0],
+            [3, 0],
+          ],
+          transformedToLogicalMaps: [[], [], [], []],
+          visualToTransformedMap: [],
+        },
       };
 
       // Delete all 4 lines with 4dd
@@ -1946,6 +2018,167 @@ describe('Unicode helper functions', () => {
     it('should handle Chinese and Arabic text', () => {
       expect(cpLen('hello 你好 world')).toBe(14); // 5 + 1 + 2 + 1 + 5 = 14
       expect(cpLen('hello مرحبا world')).toBe(17);
+    });
+  });
+});
+
+describe('Transformation Utilities', () => {
+  describe('getTransformedImagePath', () => {
+    it('should transform a simple image path', () => {
+      expect(getTransformedImagePath('@test.png')).toBe('[Image @test.png]');
+    });
+
+    it('should handle paths with directories', () => {
+      expect(getTransformedImagePath('@path/to/image.jpg')).toBe(
+        '[Image image.jpg]',
+      );
+    });
+
+    it('should truncate long filenames', () => {
+      expect(getTransformedImagePath('@verylongfilename1234567890.png')).toBe(
+        '[Image ...1234567890.png]',
+      );
+    });
+
+    it('should handle different image extensions', () => {
+      expect(getTransformedImagePath('@test.jpg')).toBe('[Image @test.jpg]');
+      expect(getTransformedImagePath('@test.jpeg')).toBe('[Image @test.jpeg]');
+      expect(getTransformedImagePath('@test.gif')).toBe('[Image @test.gif]');
+      expect(getTransformedImagePath('@test.webp')).toBe('[Image @test.webp]');
+      expect(getTransformedImagePath('@test.svg')).toBe('[Image @test.svg]');
+      expect(getTransformedImagePath('@test.bmp')).toBe('[Image @test.bmp]');
+    });
+  });
+
+  describe('getTransformationsForLine', () => {
+    it('should find transformations in a line', () => {
+      const line = 'Check out @test.png and @another.jpg';
+      const result = getTransformationsForLine(line);
+
+      expect(result).toHaveLength(2);
+      expect(result[0]).toMatchObject({
+        logicalText: '@test.png',
+        collaspedText: '[Image @test.png]',
+      });
+      expect(result[1]).toMatchObject({
+        logicalText: '@another.jpg',
+        collaspedText: '[Image @another.jpg]',
+      });
+    });
+
+    it('should handle no transformations', () => {
+      const line = 'Just some regular text';
+      const result = getTransformationsForLine(line);
+      expect(result).toEqual([]);
+    });
+
+    it('should handle empty line', () => {
+      const result = getTransformationsForLine('');
+      expect(result).toEqual([]);
+    });
+
+    it('should merge multiple transformations in a row', () => {
+      const line = '@a.png@b.png@c.png';
+      const result = getTransformationsForLine(line);
+      expect(result).toHaveLength(1);
+    });
+
+    it('should handle multiple transformations in a row', () => {
+      const line = '@a.png @b.png @c.png';
+      const result = getTransformationsForLine(line);
+      expect(result).toHaveLength(3);
+    });
+  });
+
+  describe('getTransformUnderCursor', () => {
+    const transformations = [
+      {
+        logStart: 5,
+        logEnd: 14,
+        logicalText: '@test.png',
+        collaspedText: '[Image @test.png]',
+      },
+      {
+        logStart: 20,
+        logEnd: 31,
+        logicalText: '@another.jpg',
+        collaspedText: '[Image @another.jpg]',
+      },
+    ];
+
+    it('should find transformation when cursor is inside it', () => {
+      const result = getTransformUnderCursor(0, 7, [transformations]);
+      expect(result).toEqual(transformations[0]);
+    });
+
+    it('should find transformation when cursor is at start', () => {
+      const result = getTransformUnderCursor(0, 5, [transformations]);
+      expect(result).toEqual(transformations[0]);
+    });
+
+    it('should find transformation when cursor is at end', () => {
+      const result = getTransformUnderCursor(0, 14, [transformations]);
+      expect(result).toEqual(transformations[0]);
+    });
+
+    it('should return null when cursor is not on a transformation', () => {
+      const result = getTransformUnderCursor(0, 2, [transformations]);
+      expect(result).toBeNull();
+    });
+
+    it('should handle empty transformations array', () => {
+      const result = getTransformUnderCursor(0, 5, []);
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('calculateTransformedLine', () => {
+    it('should transform a line with one transformation', () => {
+      const line = 'Check out @test.png';
+      const transformations = getTransformationsForLine(line);
+      const result = calculateTransformedLine(line, 0, [0, 0], transformations);
+
+      expect(result.transformedLine).toBe('Check out [Image @test.png]');
+      expect(result.transformedToLogMap).toHaveLength(28); // Length includes all characters in the transformed line
+
+      // Test that we have proper mappings
+      expect(result.transformedToLogMap[0]).toBe(0); // 'C'
+      expect(result.transformedToLogMap[9]).toBe(9); // ' ' before transformation
+    });
+
+    it('should handle cursor inside transformation', () => {
+      const line = 'Check out @test.png';
+      const transformations = getTransformationsForLine(line);
+      // Cursor at '@' (position 10 in the line)
+      const result = calculateTransformedLine(
+        line,
+        0,
+        [0, 10],
+        transformations,
+      );
+
+      // Should show full path when cursor is on it
+      expect(result.transformedLine).toBe('Check out @test.png');
+      // When expanded, each character maps to itself
+      expect(result.transformedToLogMap[10]).toBe(10); // '@'
+    });
+
+    it('should handle line with no transformations', () => {
+      const line = 'Just some text';
+      const result = calculateTransformedLine(line, 0, [0, 0], []);
+
+      expect(result.transformedLine).toBe(line);
+      // Each visual position should map directly to logical position + trailing
+      expect(result.transformedToLogMap).toHaveLength(15); // 14 chars + 1 trailing
+      expect(result.transformedToLogMap[0]).toBe(0);
+      expect(result.transformedToLogMap[13]).toBe(13);
+      expect(result.transformedToLogMap[14]).toBe(14); // Trailing position
+    });
+
+    it('should handle empty line', () => {
+      const result = calculateTransformedLine('', 0, [0, 0], []);
+      expect(result.transformedLine).toBe('');
+      expect(result.transformedToLogMap).toEqual([0]); // Just the trailing position
     });
   });
 });
