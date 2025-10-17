@@ -168,6 +168,21 @@ export async function retryWithBackoff<T>(
 
       if (classifiedError instanceof RetryableQuotaError) {
         if (attempt >= maxAttempts) {
+          if (onPersistent429 && authType === AuthType.LOGIN_WITH_GOOGLE) {
+            try {
+              const fallbackModel = await onPersistent429(
+                authType,
+                classifiedError,
+              );
+              if (fallbackModel) {
+                attempt = 0; // Reset attempts and retry with the new model.
+                currentDelay = initialDelayMs;
+                continue;
+              }
+            } catch (fallbackError) {
+              console.warn('Model fallback failed:', fallbackError);
+            }
+          }
           throw classifiedError;
         }
         console.warn(
