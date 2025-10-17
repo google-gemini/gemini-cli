@@ -195,8 +195,33 @@ export class InteractiveRun {
     expect(found, `Did not find expected text: "${text}"`).toBe(true);
   }
 
-  // Simulates typing a string one character at a time to avoid paste detection.
+  // This types slowly to make sure command is correct, but only work for short
+  // commands that are not multi-line, use sendKeys to type long prompts
   async type(text: string) {
+    let typedSoFar = '';
+    for (const char of text) {
+      this.ptyProcess.write(char);
+      typedSoFar += char;
+
+      // Wait for the typed sequence so far to be echoed back.
+      const found = await poll(
+        () => stripAnsi(this.output).includes(typedSoFar),
+        5000, // 5s timeout per character (generous for CI)
+        10, // check frequently
+      );
+
+      if (!found) {
+        throw new Error(
+          `Timed out waiting for typed text to appear in output: "${typedSoFar}".\nStripped output:\n${stripAnsi(
+            this.output,
+          )}`,
+        );
+      }
+    }
+  }
+
+  // Simulates typing a string one character at a time to avoid paste detection.
+  async sendKeys(text: string) {
     const delay = 5;
     for (const char of text) {
       this.ptyProcess.write(char);
@@ -883,6 +908,34 @@ export class TestRig {
         logData.attributes['event.name'] === 'gemini_cli.api_request',
     );
     return apiRequests.pop() || null;
+  }
+
+  async waitForMetric(metricName: string, timeout?: number) {
+    await this.waitForTelemetryReady();
+
+    const fullName = metricName.startsWith('gemini_cli.')
+      ? metricName
+      : `gemini_cli.${metricName}`;
+
+    return poll(
+      () => {
+        const logs = this._readAndParseTelemetryLog();
+        for (const logData of logs) {
+          if (logData.scopeMetrics) {
+            for (const scopeMetric of logData.scopeMetrics) {
+              for (const metric of scopeMetric.metrics) {
+                if (metric.descriptor.name === fullName) {
+                  return true;
+                }
+              }
+            }
+          }
+        }
+        return false;
+      },
+      timeout ?? getDefaultTimeout(),
+      100,
+    );
   }
 
   readMetric(metricName: string): Record<string, unknown> | null {

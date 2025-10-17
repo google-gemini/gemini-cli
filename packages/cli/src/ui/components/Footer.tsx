@@ -170,7 +170,7 @@ export const Footer: React.FC = () => {
             )}
             {!showErrorDetails && errorCount > 0 && (
               <Box paddingLeft={1} flexDirection="row">
-                <Text color={theme.ui.symbol}>| </Text>
+                <Text color={theme.ui.comment}>| </Text>
                 <ConsoleSummaryDisplay errorCount={errorCount} />
               </Box>
             )}

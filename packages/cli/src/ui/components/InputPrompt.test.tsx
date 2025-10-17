@@ -28,6 +28,7 @@ import { useKittyKeyboardProtocol } from '../hooks/useKittyKeyboardProtocol.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
 import stripAnsi from 'strip-ansi';
 import chalk from 'chalk';
+import { StreamingState } from '../types.js';
 
 vi.mock('../hooks/useShellHistory.js');
 vi.mock('../hooks/useCommandCompletion.js');
@@ -1615,6 +1616,7 @@ describe('InputPrompt', () => {
 
         const { stdin, unmount } = renderWithProviders(
           <InputPrompt {...props} />,
+          { kittyProtocolEnabled: true },
         );
         await vi.runAllTimersAsync();
 
@@ -1660,6 +1662,7 @@ describe('InputPrompt', () => {
 
       const { stdin, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
+        { kittyProtocolEnabled: false },
       );
       await wait();
 
@@ -1681,6 +1684,7 @@ describe('InputPrompt', () => {
 
       const { stdin, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
+        { kittyProtocolEnabled: false },
       );
 
       stdin.write('\x1B');
@@ -1702,6 +1706,7 @@ describe('InputPrompt', () => {
 
       const { stdin, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
+        { kittyProtocolEnabled: false },
       );
       await wait();
 
@@ -1721,6 +1726,7 @@ describe('InputPrompt', () => {
 
       const { stdin, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
+        { kittyProtocolEnabled: false },
       );
       await wait();
 
@@ -1732,23 +1738,27 @@ describe('InputPrompt', () => {
     });
 
     it('should not call onEscapePromptChange when not provided', async () => {
+      vi.useFakeTimers();
       props.onEscapePromptChange = undefined;
       props.buffer.setText('some text');
 
       const { stdin, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
+        { kittyProtocolEnabled: false },
       );
-      await wait();
+      await vi.runAllTimersAsync();
 
       stdin.write('\x1B');
-      await wait();
+      await vi.runAllTimersAsync();
 
+      vi.useRealTimers();
       unmount();
     });
 
     it('should not interfere with existing keyboard shortcuts', async () => {
       const { stdin, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
+        { kittyProtocolEnabled: false },
       );
       await wait();
 
@@ -1820,6 +1830,7 @@ describe('InputPrompt', () => {
       stdin.write('\x12');
       await wait();
       stdin.write('\x1B');
+      stdin.write('\u001b[27u'); // Press kitty escape key
 
       await waitFor(() => {
         expect(stdout.lastFrame()).not.toContain('(r:)');
@@ -1921,7 +1932,7 @@ describe('InputPrompt', () => {
       stdin.write('\x12');
       await wait();
       expect(stdout.lastFrame()).toContain('(r:)');
-      stdin.write('\x1B');
+      stdin.write('\u001b[27u'); // Press kitty escape key
 
       await waitFor(() => {
         expect(stdout.lastFrame()).not.toContain('(r:)');
@@ -2109,6 +2120,174 @@ describe('InputPrompt', () => {
     });
   });
 
+  describe('queued message editing', () => {
+    it('should load all queued messages when up arrow is pressed with empty input', async () => {
+      const mockPopAllMessages = vi.fn();
+      props.popAllMessages = mockPopAllMessages;
+      props.buffer.text = '';
+
+      const { stdin, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+      );
+      await wait();
+
+      stdin.write('\u001B[A');
+      await wait();
+
+      expect(mockPopAllMessages).toHaveBeenCalled();
+      const callback = mockPopAllMessages.mock.calls[0][0];
+
+      act(() => {
+        callback('Message 1\n\nMessage 2\n\nMessage 3');
+      });
+      expect(props.buffer.setText).toHaveBeenCalledWith(
+        'Message 1\n\nMessage 2\n\nMessage 3',
+      );
+      unmount();
+    });
+
+    it('should not load queued messages when input is not empty', async () => {
+      const mockPopAllMessages = vi.fn();
+      props.popAllMessages = mockPopAllMessages;
+      props.buffer.text = 'some text';
+
+      const { stdin, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+      );
+      await wait();
+
+      stdin.write('\u001B[A');
+      await wait();
+      expect(mockPopAllMessages).not.toHaveBeenCalled();
+      expect(mockInputHistory.navigateUp).toHaveBeenCalled();
+      unmount();
+    });
+
+    it('should handle undefined messages from popAllMessages', async () => {
+      const mockPopAllMessages = vi.fn();
+      props.popAllMessages = mockPopAllMessages;
+      props.buffer.text = '';
+
+      const { stdin, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+      );
+      await wait();
+
+      stdin.write('\u001B[A');
+      await wait();
+
+      expect(mockPopAllMessages).toHaveBeenCalled();
+      const callback = mockPopAllMessages.mock.calls[0][0];
+      act(() => {
+        callback(undefined);
+      });
+
+      expect(props.buffer.setText).not.toHaveBeenCalled();
+      expect(mockInputHistory.navigateUp).toHaveBeenCalled();
+      unmount();
+    });
+
+    it('should work with NAVIGATION_UP key as well', async () => {
+      const mockPopAllMessages = vi.fn();
+      props.popAllMessages = mockPopAllMessages;
+      props.buffer.text = '';
+      props.buffer.allVisualLines = [''];
+      props.buffer.visualCursor = [0, 0];
+      props.buffer.visualScrollRow = 0;
+
+      const { stdin, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+      );
+      await wait();
+
+      stdin.write('\u001B[A');
+      await wait();
+      expect(mockPopAllMessages).toHaveBeenCalled();
+      unmount();
+    });
+
+    it('should handle single queued message', async () => {
+      const mockPopAllMessages = vi.fn();
+      props.popAllMessages = mockPopAllMessages;
+      props.buffer.text = '';
+
+      const { stdin, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+      );
+      await wait();
+
+      stdin.write('\u001B[A');
+      await wait();
+
+      const callback = mockPopAllMessages.mock.calls[0][0];
+      act(() => {
+        callback('Single message');
+      });
+
+      expect(props.buffer.setText).toHaveBeenCalledWith('Single message');
+      unmount();
+    });
+
+    it('should only check for queued messages when buffer text is trimmed empty', async () => {
+      const mockPopAllMessages = vi.fn();
+      props.popAllMessages = mockPopAllMessages;
+      props.buffer.text = '   '; // Whitespace only
+
+      const { stdin, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+      );
+      await wait();
+
+      stdin.write('\u001B[A');
+      await wait();
+
+      expect(mockPopAllMessages).toHaveBeenCalled();
+      unmount();
+    });
+
+    it('should not call popAllMessages if it is not provided', async () => {
+      props.popAllMessages = undefined;
+      props.buffer.text = '';
+
+      const { stdin, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+      );
+      await wait();
+
+      stdin.write('\u001B[A');
+      await wait();
+
+      expect(mockInputHistory.navigateUp).toHaveBeenCalled();
+      unmount();
+    });
+
+    it('should navigate input history on fresh start when no queued messages exist', async () => {
+      const mockPopAllMessages = vi.fn();
+      props.popAllMessages = mockPopAllMessages;
+      props.buffer.text = '';
+
+      const { stdin, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+      );
+      await wait();
+
+      stdin.write('\u001B[A');
+      await wait();
+
+      expect(mockPopAllMessages).toHaveBeenCalled();
+
+      const callback = mockPopAllMessages.mock.calls[0][0];
+      act(() => {
+        callback(undefined);
+      });
+
+      expect(mockInputHistory.navigateUp).toHaveBeenCalled();
+      expect(props.buffer.setText).not.toHaveBeenCalled();
+
+      unmount();
+    });
+  });
+
   describe('snapshots', () => {
     it('should render correctly in shell mode', async () => {
       props.shellModeActive = true;
@@ -2167,7 +2346,58 @@ describe('InputPrompt', () => {
     expect(mockBuffer.handleInput).toHaveBeenCalled();
     unmount();
   });
+  it('should prevent slash commands from being queued while streaming', async () => {
+    props.onSubmit = vi.fn();
+    props.buffer.text = '/help';
+    props.setQueueErrorMessage = vi.fn();
+    props.streamingState = StreamingState.Responding;
+    const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />);
+    await wait();
+    stdin.write('/help');
+    stdin.write('\r');
+    await wait();
+
+    expect(props.onSubmit).not.toHaveBeenCalled();
+    expect(props.setQueueErrorMessage).toHaveBeenCalledWith(
+      'Slash commands cannot be queued',
+    );
+    unmount();
+  });
+  it('should prevent shell commands from being queued while streaming', async () => {
+    props.onSubmit = vi.fn();
+    props.buffer.text = 'ls';
+    props.setQueueErrorMessage = vi.fn();
+    props.streamingState = StreamingState.Responding;
+    props.shellModeActive = true;
+    const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />);
+    await wait();
+    stdin.write('ls');
+    stdin.write('\r');
+    await wait();
+
+    expect(props.onSubmit).not.toHaveBeenCalled();
+    expect(props.setQueueErrorMessage).toHaveBeenCalledWith(
+      'Shell commands cannot be queued',
+    );
+    unmount();
+  });
+  it('should allow regular messages to be queued while streaming', async () => {
+    props.onSubmit = vi.fn();
+    props.buffer.text = 'regular message';
+    props.setQueueErrorMessage = vi.fn();
+    props.streamingState = StreamingState.Responding;
+    const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />);
+    await wait();
+    stdin.write('regular message');
+    stdin.write('\r');
+    await wait();
+
+    expect(props.onSubmit).toHaveBeenCalledWith('regular message');
+    expect(props.setQueueErrorMessage).not.toHaveBeenCalled();
+    unmount();
+  });
 });
+
 function clean(str: string | undefined): string {
   if (!str) return '';
   // Remove ANSI escape codes and trim whitespace
