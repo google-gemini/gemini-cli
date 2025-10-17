@@ -962,12 +962,16 @@ export class Config {
     return this.chatCompression;
   }
 
-  isInteractive(): boolean {
-    return this.interactive;
+  isInteractiveShellEnabled(): boolean {
+    return (
+      this.interactive &&
+      this.ptyInfo !== 'child_process' &&
+      this.enableInteractiveShell
+    );
   }
 
-  getPtyInfo(): string {
-    return this.ptyInfo;
+  isInteractive(): boolean {
+    return this.interactive;
   }
 
   getUseRipgrep(): boolean {

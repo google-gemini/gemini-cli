@@ -52,7 +52,7 @@ describe('Core System Prompt (prompts.ts)', () => {
         getProjectTempDir: vi.fn().mockReturnValue('/tmp/project-temp'),
       },
       isInteractive: vi.fn().mockReturnValue(true),
-      getPtyInfo: vi.fn().mockReturnValue('node-pty'),
+      isInteractiveShellEnabled: vi.fn().mockReturnValue(true),
     } as unknown as Config;
   });
 
@@ -155,7 +155,7 @@ describe('Core System Prompt (prompts.ts)', () => {
           getProjectTempDir: vi.fn().mockReturnValue('/tmp/project-temp'),
         },
         isInteractive: vi.fn().mockReturnValue(false),
-        getPtyInfo: vi.fn().mockReturnValue('child_process'),
+        isInteractiveShellEnabled: vi.fn().mockReturnValue(false),
       } as unknown as Config;
     });
 
