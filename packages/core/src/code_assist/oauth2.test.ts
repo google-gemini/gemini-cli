@@ -14,7 +14,7 @@ import {
   clearOauthClientCache,
 } from './oauth2.js';
 import { UserAccountManager } from '../utils/userAccountManager.js';
-import { OAuth2Client, Compute } from 'google-auth-library';
+import { OAuth2Client, Compute, GoogleAuth } from 'google-auth-library';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import http from 'node:http';
@@ -273,6 +273,44 @@ describe('oauth2', () => {
       consoleLogSpy.mockRestore();
     });
 
+    describe('BYOID workflow', () => {
+      it('should use BYOID credentials from GOOGLE_APPLICATION_CREDENTIALS if available', async () => {
+        // No default creds file exists
+        const byoidCredentials = {
+          type: 'external_account_authorized_user',
+          client_id: 'mock-client-id',
+        };
+        const envCredsPath = path.join(tempHomeDir, 'env_creds.json');
+        await fs.promises.writeFile(
+          envCredsPath,
+          JSON.stringify(byoidCredentials),
+        );
+        vi.stubEnv('GOOGLE_APPLICATION_CREDENTIALS', envCredsPath);
+
+        const mockExternalClient = {
+          getAccessToken: vi
+            .fn()
+            .mockResolvedValue({ token: 'fake-byoid-token' }),
+        };
+
+        const mockFromJSON = vi.fn().mockResolvedValue(mockExternalClient);
+        (GoogleAuth as unknown as Mock).mockImplementation(() => ({
+          fromJSON: mockFromJSON,
+        }));
+
+        const client = await getOauthClient(
+          AuthType.LOGIN_WITH_GOOGLE,
+          mockConfig,
+        );
+
+        expect(mockFromJSON).toHaveBeenCalledWith(byoidCredentials);
+        expect(client).toBe(mockExternalClient);
+        expect(mockExternalClient.getAccessToken).toHaveBeenCalled();
+        // make sure no OAuthClient is created
+        expect(OAuth2Client).not.toHaveBeenCalled();
+      });
+    });
+
     describe('in Cloud Shell', () => {
       const mockGetAccessToken = vi.fn();
       let mockComputeClient: Compute;
@@ -290,6 +328,7 @@ describe('oauth2', () => {
       });
 
       it('should attempt to load cached credentials first', async () => {
+        vi.clearAllMocks();
         const cachedCreds = { refresh_token: 'cached-token' };
         const credsPath = path.join(
           tempHomeDir,
