@@ -36,11 +36,12 @@ export function isBinary(
   data: Buffer | null | undefined,
   sampleSize = 512,
 ): boolean {
-  if (!data) {
+  if (!data || data.length === 0) {
     return false;
   }
 
-  const sample = data.length > sampleSize ? data.subarray(0, sampleSize) : data;
+  const sample =
+    data.length >= sampleSize ? data.subarray(0, sampleSize) : data;
 
   for (const byte of sample) {
     // The presence of a NULL byte (0x00) is one of the most reliable
