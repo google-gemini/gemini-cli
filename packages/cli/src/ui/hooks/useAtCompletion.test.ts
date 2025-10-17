@@ -140,9 +140,8 @@ describe('useAtCompletion', () => {
     });
 
     it('should perform a case-insensitive search by lowercasing the pattern', async () => {
-      testRootDir = await createTmpDir({ 'file.txt': '' });
+      testRootDir = await createTmpDir({ 'cRaZycAsE.txt': '' });
 
-      // Use a real FileSearch instance to ensure end-to-end behavior.
       const fileSearch = FileSearchFactory.create({
         projectRoot: testRootDir,
         ignoreDirs: [],
@@ -154,24 +153,23 @@ describe('useAtCompletion', () => {
       });
       await fileSearch.initialize();
 
-      // Spy on the real search method to verify the pattern.
-      const searchSpy = vi.spyOn(fileSearch, 'search');
-
-      // Mock the factory to return our real instance.
       vi.spyOn(FileSearchFactory, 'create').mockReturnValue(fileSearch);
 
       const { result } = renderHook(() =>
-        useTestHarnessForAtCompletion(true, 'File', mockConfig, testRootDir),
+        useTestHarnessForAtCompletion(
+          true,
+          'CrAzYCaSe',
+          mockConfig,
+          testRootDir,
+        ),
       );
 
+      // The hook should find 'cRaZycAsE.txt' even though the pattern is 'CrAzYCaSe'.
       await waitFor(() => {
         expect(result.current.suggestions.map((s) => s.value)).toEqual([
-          'file.txt',
+          'cRaZycAsE.txt',
         ]);
       });
-
-      // Expect the search to have been called with the lowercased pattern.
-      expect(searchSpy).toHaveBeenCalledWith('file', expect.any(Object));
     });
   });
 
