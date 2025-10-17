@@ -14,6 +14,7 @@ import { OTLPMetricExporter as OTLPMetricExporterHttp } from '@opentelemetry/exp
 import { CompressionAlgorithm } from '@opentelemetry/otlp-exporter-base';
 import { credentials } from '@grpc/grpc-js';
 import * as fs from 'node:fs';
+import { Buffer } from 'node:buffer';
 import { NodeSDK } from '@opentelemetry/sdk-node';
 import { SemanticResourceAttributes } from '@opentelemetry/semantic-conventions';
 import { resourceFromAttributes } from '@opentelemetry/resources';
@@ -105,6 +106,21 @@ export function initializeTelemetry(config: Config): void {
     process.env['GOOGLE_CLOUD_PROJECT'];
   const corporateSslRootFilePath = config.getTelemetrySslRootFilePath();
 
+  let corporateSslRootCert: Uint8Array | undefined;
+  if (corporateSslRootFilePath) {
+    try {
+      corporateSslRootCert = fs.readFileSync(corporateSslRootFilePath);
+    } catch (err) {
+      if (config.getDebugMode()) {
+        console.error(
+          `Failed to read telemetry SSL root cert at ${corporateSslRootFilePath}:`,
+          err,
+        );
+      }
+      corporateSslRootCert = undefined;
+    }
+  }
+
   const useDirectGcpExport =
     telemetryTarget === TelemetryTarget.GCP && !!gcpProjectId && !useCollector;
 
@@ -131,8 +147,8 @@ export function initializeTelemetry(config: Config): void {
     });
   } else if (useOtlp) {
     if (otlpProtocol === 'http') {
-      const httpAgentOptions = corporateSslRootFilePath
-        ? { ca: fs.readFileSync(corporateSslRootFilePath) }
+      const httpAgentOptions = corporateSslRootCert
+        ? { ca: Buffer.from(corporateSslRootCert) }
         : undefined;
 
       spanExporter = new OTLPTraceExporterHttp({
@@ -152,8 +168,8 @@ export function initializeTelemetry(config: Config): void {
       });
     } else {
       // grpc
-      const grpcCredentials = corporateSslRootFilePath
-        ? credentials.createSsl(fs.readFileSync(corporateSslRootFilePath))
+      const grpcCredentials = corporateSslRootCert
+        ? credentials.createSsl(Buffer.from(corporateSslRootCert))
         : undefined;
 
       spanExporter = new OTLPTraceExporter({

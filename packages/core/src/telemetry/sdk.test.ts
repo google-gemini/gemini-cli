@@ -294,7 +294,9 @@ describe('Telemetry SDK', () => {
     initializeTelemetry(mockConfig);
 
     expect(fs.readFileSync).toHaveBeenCalledWith(fakePath);
-    expect(credentials.createSsl).toHaveBeenCalledWith('fake-cert-content');
+    expect(credentials.createSsl).toHaveBeenCalledWith(
+      Buffer.from('fake-cert-content'),
+    );
     expect(OTLPTraceExporter).toHaveBeenCalledWith(
       expect.objectContaining({
         credentials: mockSslCreds,
