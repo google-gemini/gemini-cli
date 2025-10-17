@@ -60,7 +60,7 @@ to protect you. In this mode, the following features are disabled:
     load files into context from directories specified in local settings.
 
 6.  **MCP Servers Do Not Connect**: The CLI will not attempt to connect to any
-    [Model Context Protocol (MCP)](../mcp/index.md) servers.
+    [Model Context Protocol (MCP)](../tools/mcp-server.md) servers.
 
 7.  **Custom Commands are Not Loaded**: The CLI will not load any custom
     commands from .toml files, including both project-specific and global user
