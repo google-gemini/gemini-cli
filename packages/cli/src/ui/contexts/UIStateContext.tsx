@@ -56,7 +56,7 @@ export interface UIState {
   isSettingsDialogOpen: boolean;
   isModelDialogOpen: boolean;
   isPermissionsDialogOpen: boolean;
-  slashCommands: readonly SlashCommand[];
+  slashCommands: readonly SlashCommand[] | undefined;
   pendingSlashCommandHistoryItems: HistoryItemWithoutId[];
   commandContext: CommandContext;
   shellConfirmationRequest: ShellConfirmationRequest | null;
@@ -82,6 +82,7 @@ export interface UIState {
   filteredConsoleMessages: ConsoleMessageItem[];
   ideContextState: IdeContext | undefined;
   showToolDescriptions: boolean;
+  renderMarkdown: boolean;
   ctrlCPressedOnce: boolean;
   ctrlDPressedOnce: boolean;
   showEscapePrompt: boolean;
@@ -89,6 +90,7 @@ export interface UIState {
   currentLoadingPhrase: string;
   historyRemountKey: number;
   messageQueue: string[];
+  queueErrorMessage: string | null;
   showAutoAcceptIndicator: ApprovalMode;
   showWorkspaceMigrationDialog: boolean;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
