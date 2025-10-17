@@ -6,6 +6,7 @@
 
 import type { Config } from '@google/gemini-cli-core';
 import {
+  debugLogger,
   KittySequenceOverflowEvent,
   logKittySequenceOverflow,
 } from '@google/gemini-cli-core';
@@ -450,7 +451,7 @@ export function KeypressProvider({
     const flushKittyBufferOnInterrupt = (reason: string) => {
       if (kittySequenceBuffer) {
         if (debugKeystrokeLogging) {
-          console.log(
+          debugLogger.log(
             `[DEBUG] Kitty sequence flushed due to ${reason}:`,
             JSON.stringify(kittySequenceBuffer),
           );
@@ -585,7 +586,7 @@ export function KeypressProvider({
         key.sequence === `${ESC}${KITTY_CTRL_C}`
       ) {
         if (kittySequenceBuffer && debugKeystrokeLogging) {
-          console.log(
+          debugLogger.log(
             '[DEBUG] Kitty buffer cleared on Ctrl+C:',
             kittySequenceBuffer,
           );
@@ -631,7 +632,7 @@ export function KeypressProvider({
           kittySequenceBuffer += key.sequence;
 
           if (debugKeystrokeLogging) {
-            console.log(
+            debugLogger.log(
               '[DEBUG] Kitty buffer accumulating:',
               JSON.stringify(kittySequenceBuffer),
             );
@@ -647,7 +648,7 @@ export function KeypressProvider({
             if (parsed) {
               if (debugKeystrokeLogging) {
                 const parsedSequence = remainingBuffer.slice(0, parsed.length);
-                console.log(
+                debugLogger.log(
                   '[DEBUG] Kitty sequence parsed successfully:',
                   JSON.stringify(parsedSequence),
                 );
@@ -664,7 +665,7 @@ export function KeypressProvider({
               if (nextEscIndex !== -1) {
                 const garbage = remainingBuffer.slice(0, nextEscIndex);
                 if (debugKeystrokeLogging) {
-                  console.log(
+                  debugLogger.log(
                     '[DEBUG] Dropping incomplete sequence before next ESC:',
                     JSON.stringify(garbage),
                   );
@@ -681,7 +682,7 @@ export function KeypressProvider({
               if (!couldBeValid) {
                 // Not a kitty sequence - flush as regular input immediately
                 if (debugKeystrokeLogging) {
-                  console.log(
+                  debugLogger.log(
                     '[DEBUG] Not a kitty sequence, flushing:',
                     JSON.stringify(remainingBuffer),
                   );
@@ -699,7 +700,7 @@ export function KeypressProvider({
               } else if (remainingBuffer.length > MAX_KITTY_SEQUENCE_LENGTH) {
                 // Buffer overflow - log and clear
                 if (debugKeystrokeLogging) {
-                  console.log(
+                  debugLogger.log(
                     '[DEBUG] Kitty buffer overflow, clearing:',
                     JSON.stringify(remainingBuffer),
                   );
@@ -724,7 +725,7 @@ export function KeypressProvider({
                 parsedAny = true;
               } else {
                 if (config?.getDebugMode() || debugKeystrokeLogging) {
-                  console.warn(
+                  debugLogger.warn(
                     'Kitty sequence buffer has content:',
                     JSON.stringify(kittySequenceBuffer),
                   );
@@ -733,7 +734,7 @@ export function KeypressProvider({
                 kittySequenceTimeout = setTimeout(() => {
                   if (kittySequenceBuffer) {
                     if (debugKeystrokeLogging) {
-                      console.log(
+                      debugLogger.log(
                         '[DEBUG] Kitty sequence timeout, flushing:',
                         JSON.stringify(kittySequenceBuffer),
                       );
