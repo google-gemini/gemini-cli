@@ -95,6 +95,13 @@ Slash commands provide meta-level control over the CLI itself.
   - **Description:** Lists all active extensions in the current Gemini CLI
     session. See [Gemini CLI Extensions](../extensions/index.md).
 
+- **`/git`**
+  - **Description:** Git-related commands.
+  - **Sub-commands:**
+    - **`commit`**:
+      - **Description:** Generate a commit message for the currently staged changes.
+      - **Usage:** `/git commit`
+
 - **`/help`** (or **`/?`**)
   - **Description:** Display help information about Gemini CLI, including
     available commands and their usage.
