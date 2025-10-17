@@ -769,4 +769,24 @@ describe('checkForUnsafeRedirections', () => {
     expect(result.isOutsideWorkspace).toBe(true);
     expect(result.unsafeTargets).toContain('/tmp/file.txt');
   });
+
+  it('should block redirection to a dynamic path with variable expansion', () => {
+    const result = checkForUnsafeRedirections(
+      'echo test > $DANGEROUS_PATH',
+      ['/workspace'],
+      '/workspace',
+    );
+    expect(result.isOutsideWorkspace).toBe(true);
+    expect(result.unsafeTargets).toContain('$DANGEROUS_PATH');
+  });
+
+  it('should block redirection to a dynamic path with command substitution', () => {
+    const result = checkForUnsafeRedirections(
+      'echo test > /tmp/$(whoami).txt',
+      ['/workspace'],
+      '/workspace',
+    );
+    expect(result.isOutsideWorkspace).toBe(true);
+    expect(result.unsafeTargets).toContain('/tmp/$(whoami).txt');
+  });
 });

@@ -122,6 +122,7 @@ interface RedirectionDetail {
   type: 'input' | 'output' | 'append' | 'pipe' | 'heredoc';
   target?: string;
   operator: string;
+  isDynamic?: boolean;
 }
 
 interface RedirectionCheckResult {
@@ -294,6 +295,12 @@ function collectRedirections(root: Node, source: string): RedirectionDetail[] {
             .slice(destination.startIndex, destination.endIndex)
             .trim();
 
+          // A redirection target is dynamic if it contains any shell expansions.
+          // We cannot safely validate dynamic paths, so they must be blocked.
+          const isDynamic =
+            destination.descendantsOfType('expansion').length > 0 ||
+            destination.descendantsOfType('command_substitution').length > 0;
+
           // Determine redirect type by looking at the operator
           const operatorNode = current.children.find(
             (child) =>
@@ -320,6 +327,7 @@ function collectRedirections(root: Node, source: string): RedirectionDetail[] {
             type,
             target: destinationText,
             operator,
+            isDynamic,
           });
         }
         break;
@@ -708,7 +716,10 @@ export function checkForUnsafeRedirections(
   for (const redir of redirections) {
     // Only check file redirections with targets
     if (redir.target && redir.type !== 'pipe' && redir.type !== 'heredoc') {
-      if (isPathOutsideWorkspace(redir.target, workspaceDirs, cwd)) {
+      if (
+        redir.isDynamic ||
+        isPathOutsideWorkspace(redir.target, workspaceDirs, cwd)
+      ) {
         unsafeTargets.push(redir.target);
       }
     }
