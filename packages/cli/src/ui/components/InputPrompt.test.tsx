@@ -789,6 +789,7 @@ describe('InputPrompt', () => {
         mockSlashCommands,
         mockCommandContext,
         false,
+        false,
         expect.any(Object),
       );
 
@@ -815,6 +816,7 @@ describe('InputPrompt', () => {
         path.join('test', 'project', 'src'),
         mockSlashCommands,
         mockCommandContext,
+        false,
         false,
         expect.any(Object),
       );
@@ -843,6 +845,7 @@ describe('InputPrompt', () => {
         mockSlashCommands,
         mockCommandContext,
         false,
+        false,
         expect.any(Object),
       );
 
@@ -870,6 +873,7 @@ describe('InputPrompt', () => {
         mockSlashCommands,
         mockCommandContext,
         false,
+        false,
         expect.any(Object),
       );
 
@@ -896,6 +900,7 @@ describe('InputPrompt', () => {
         path.join('test', 'project', 'src'),
         mockSlashCommands,
         mockCommandContext,
+        false,
         false,
         expect.any(Object),
       );
@@ -925,6 +930,7 @@ describe('InputPrompt', () => {
         mockSlashCommands,
         mockCommandContext,
         false,
+        false,
         expect.any(Object),
       );
 
@@ -951,6 +957,7 @@ describe('InputPrompt', () => {
         path.join('test', 'project', 'src'),
         mockSlashCommands,
         mockCommandContext,
+        false,
         false,
         expect.any(Object),
       );
@@ -980,6 +987,7 @@ describe('InputPrompt', () => {
         mockSlashCommands,
         mockCommandContext,
         false,
+        false,
         expect.any(Object),
       );
 
@@ -1007,6 +1015,7 @@ describe('InputPrompt', () => {
         path.join('test', 'project', 'src'),
         mockSlashCommands,
         mockCommandContext,
+        false,
         false,
         expect.any(Object),
       );
@@ -1036,6 +1045,7 @@ describe('InputPrompt', () => {
         mockSlashCommands,
         mockCommandContext,
         false,
+        false,
         expect.any(Object),
       );
 
@@ -1063,6 +1073,7 @@ describe('InputPrompt', () => {
         path.join('test', 'project', 'src'),
         mockSlashCommands,
         mockCommandContext,
+        false,
         false,
         expect.any(Object),
       );
@@ -1094,6 +1105,7 @@ describe('InputPrompt', () => {
         mockSlashCommands,
         mockCommandContext,
         false,
+        false,
         expect.any(Object),
       );
 
@@ -1121,6 +1133,7 @@ describe('InputPrompt', () => {
         path.join('test', 'project', 'src'),
         mockSlashCommands,
         mockCommandContext,
+        false,
         false,
         expect.any(Object),
       );
@@ -1152,6 +1165,7 @@ describe('InputPrompt', () => {
         mockSlashCommands,
         mockCommandContext,
         false,
+        false,
         expect.any(Object),
       );
 
@@ -1161,7 +1175,6 @@ describe('InputPrompt', () => {
 
   describe('vim mode', () => {
     it('should not call buffer.handleInput when vim mode is enabled and vim handles the input', async () => {
-      props.vimModeEnabled = true;
       props.vimHandleInput = vi.fn().mockReturnValue(true); // Mock that vim handled it.
       const { stdin, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
@@ -1177,7 +1190,6 @@ describe('InputPrompt', () => {
     });
 
     it('should call buffer.handleInput when vim mode is enabled but vim does not handle the input', async () => {
-      props.vimModeEnabled = true;
       props.vimHandleInput = vi.fn().mockReturnValue(false); // Mock that vim did NOT handle it.
       const { stdin, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
