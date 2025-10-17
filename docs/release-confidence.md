@@ -68,8 +68,8 @@ The weekly release cadence promotes code from `main` -> `nightly` -> `preview`
 
 ### 2. Critical User Journey (CUJ) Checklist
 
-Before promoting a `preview` release to `stable`, a release manager must manually run
-through this checklist.
+Before promoting a `preview` release to `stable`, a release manager must
+manually run through this checklist.
 
 - **Setup:**
   - [ ] Uninstall any existing global version:
@@ -115,10 +115,10 @@ use cases.
 
 **Definition of Tiers:**
 
--   **Tier 1:** Industry-Moving News 🚀
--   **Tier 2:** Important News for Our Users 📣
--   **Tier 3:** Relevant, but Not Life-Changing 💡
--   **Tier 4:** Bug Fixes ⚒️
+- **Tier 1:** Industry-Moving News 🚀
+- **Tier 2:** Important News for Our Users 📣
+- **Tier 3:** Relevant, but Not Life-Changing 💡
+- **Tier 4:** Bug Fixes ⚒️
 
 **Requirement:**
 
@@ -129,10 +129,10 @@ Tier 2 launch.
 
 A bug bash should be considered for any release that involves:
 
--   A blog post
--   Coordinated social media announcements
--   Media relations or press outreach
--   A "Turbo" launch event
+- A blog post
+- Coordinated social media announcements
+- Media relations or press outreach
+- A "Turbo" launch event
 
 ## Level 3: Telemetry & Data Review
 
