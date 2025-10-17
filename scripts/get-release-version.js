@@ -433,7 +433,6 @@ export function getVersion(options = {}) {
       versionData = getPreviewVersion(args);
       break;
     case 'patch':
-      console.log(args);
       versionData = getPatchVersion(args);
       break;
     default:
