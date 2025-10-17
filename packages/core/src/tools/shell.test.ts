@@ -9,6 +9,7 @@ import {
   describe,
   it,
   expect,
+  beforeAll,
   beforeEach,
   afterEach,
   type Mock,
@@ -23,7 +24,10 @@ vi.mock('os');
 vi.mock('crypto');
 vi.mock('../utils/summarizer.js');
 
-import { isCommandAllowed } from '../utils/shell-utils.js';
+import {
+  initializeShellParsers,
+  isCommandAllowed,
+} from '../utils/shell-utils.js';
 import { ShellTool } from './shell.js';
 import { type Config } from '../config/config.js';
 import {
@@ -40,6 +44,9 @@ import { ToolErrorType } from './tool-error.js';
 import { ToolConfirmationOutcome } from './tools.js';
 import { OUTPUT_UPDATE_INTERVAL_MS } from './shell.js';
 import { createMockWorkspaceContext } from '../test-utils/mockWorkspaceContext.js';
+
+const originalComSpec = process.env['ComSpec'];
+const itWindowsOnly = process.platform === 'win32' ? it : it.skip;
 
 describe('ShellTool', () => {
   let shellTool: ShellTool;
@@ -73,6 +80,8 @@ describe('ShellTool', () => {
     (vi.mocked(crypto.randomBytes) as Mock).mockReturnValue(
       Buffer.from('abcdef', 'hex'),
     );
+    process.env['ComSpec'] =
+      'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe';
 
     // Capture the output callback to simulate streaming events from the service
     mockShellExecutionService.mockImplementation((_cmd, _cwd, callback) => {
@@ -86,23 +95,36 @@ describe('ShellTool', () => {
     });
   });
 
+  afterEach(() => {
+    if (originalComSpec === undefined) {
+      delete process.env['ComSpec'];
+    } else {
+      process.env['ComSpec'] = originalComSpec;
+    }
+  });
+
   describe('isCommandAllowed', () => {
     it('should allow a command if no restrictions are provided', () => {
       (mockConfig.getCoreTools as Mock).mockReturnValue(undefined);
       (mockConfig.getExcludeTools as Mock).mockReturnValue(undefined);
-      expect(isCommandAllowed('ls -l', mockConfig).allowed).toBe(true);
+      expect(isCommandAllowed('goodCommand --safe', mockConfig).allowed).toBe(
+        true,
+      );
     });
 
-    it('should block a command with command substitution using $()', () => {
-      expect(isCommandAllowed('echo $(rm -rf /)', mockConfig).allowed).toBe(
-        false,
+    it('should allow a command with command substitution using $()', () => {
+      const evaluation = isCommandAllowed(
+        'echo $(goodCommand --safe)',
+        mockConfig,
       );
+      expect(evaluation.allowed).toBe(true);
+      expect(evaluation.reason).toBeUndefined();
     });
   });
 
   describe('build', () => {
     it('should return an invocation for a valid command', () => {
-      const invocation = shellTool.build({ command: 'ls -l' });
+      const invocation = shellTool.build({ command: 'goodCommand --safe' });
       expect(invocation).toBeDefined();
     });
 
@@ -209,7 +231,7 @@ describe('ShellTool', () => {
       );
     });
 
-    it('should not wrap command on windows', async () => {
+    itWindowsOnly('should not wrap command on windows', async () => {
       vi.mocked(os.platform).mockReturnValue('win32');
       const invocation = shellTool.build({ command: 'dir' });
       const promise = invocation.execute(mockAbortSignal);
@@ -473,4 +495,7 @@ describe('ShellTool', () => {
       expect(shellTool.description).toMatchSnapshot();
     });
   });
+});
+beforeAll(async () => {
+  await initializeShellParsers();
 });

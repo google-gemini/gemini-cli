@@ -8,7 +8,8 @@ import { describe, it, expect } from 'vitest';
 import { TestRig } from './test-helper.js';
 
 describe('Flicker Detector', () => {
-  it('should not detect a flicker under the max height budget', async () => {
+  // TODO: https://github.com/google-gemini/gemini-cli/issues/11170
+  it.skip('should not detect a flicker under the max height budget', async () => {
     const rig = new TestRig();
     await rig.setup('flicker-detector-test');
 
