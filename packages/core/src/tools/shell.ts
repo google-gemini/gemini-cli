@@ -406,9 +406,11 @@ export class ShellTool extends BaseDeclarativeTool<
 
     // Check for unsafe file redirections outside workspace
     const workspaceDirs = this.config.getWorkspaceContext().getDirectories();
+    const cwd = params.directory || this.config.getTargetDir();
     const redirectionCheck = checkForUnsafeRedirections(
       params.command,
       workspaceDirs,
+      cwd,
     );
 
     if (redirectionCheck.isOutsideWorkspace) {

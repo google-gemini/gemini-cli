@@ -639,23 +639,24 @@ function unquotePath(filePath: string): string {
 function isPathOutsideWorkspace(
   targetPath: string,
   workspaceDirs: readonly string[],
+  cwd: string,
 ): boolean {
   try {
     // Expand tilde and remove quotes
     let expandedPath = expandTilde(unquotePath(targetPath));
 
     // Resolve relative paths (but don't validate existence)
-    // For relative paths, we assume they're relative to CWD which should be in workspace
+    // For relative paths, we resolve them against the command's CWD
     if (!path.isAbsolute(expandedPath)) {
       // If it's a relative path with .., it might escape
-      // We'll resolve it against a workspace dir to check
+      // We'll resolve it against the command's CWD to check
       if (workspaceDirs.length === 0) {
         // If there are no workspace directories, we cannot safely resolve
         // a relative path. Treat it as unsafe, consistent with how
         // absolute paths are handled in this scenario.
         return true;
       }
-      expandedPath = path.resolve(workspaceDirs[0], expandedPath);
+      expandedPath = path.resolve(cwd, expandedPath);
     }
 
     // Check if the resolved path is within any workspace directory
@@ -683,11 +684,13 @@ function isPathOutsideWorkspace(
  *
  * @param command The shell command string to check
  * @param workspaceDirs Array of absolute paths to workspace directories
+ * @param cwd The current working directory where the command will execute
  * @returns Information about redirections and whether any are unsafe
  */
 export function checkForUnsafeRedirections(
   command: string,
   workspaceDirs: readonly string[],
+  cwd: string,
 ): RedirectionCheckResult {
   const tree = parseCommandTree(command);
   if (!tree) {
@@ -705,7 +708,7 @@ export function checkForUnsafeRedirections(
   for (const redir of redirections) {
     // Only check file redirections with targets
     if (redir.target && redir.type !== 'pipe' && redir.type !== 'heredoc') {
-      if (isPathOutsideWorkspace(redir.target, workspaceDirs)) {
+      if (isPathOutsideWorkspace(redir.target, workspaceDirs, cwd)) {
         unsafeTargets.push(redir.target);
       }
     }
@@ -773,7 +776,12 @@ export function checkCommandPermissions(
 
   // Check for unsafe redirections (e.g., output to files outside workspace)
   const workspaceDirs = config.getWorkspaceContext?.().getDirectories() || [];
-  const redirectionCheck = checkForUnsafeRedirections(command, workspaceDirs);
+  const cwd = config.getTargetDir();
+  const redirectionCheck = checkForUnsafeRedirections(
+    command,
+    workspaceDirs,
+    cwd,
+  );
 
   if (redirectionCheck.isOutsideWorkspace) {
     const targets = redirectionCheck.unsafeTargets.join(', ');
