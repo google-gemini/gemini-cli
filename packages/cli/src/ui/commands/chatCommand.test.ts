@@ -99,8 +99,10 @@ describe('chatCommand', () => {
       const date1 = new Date();
       const date2 = new Date(date1.getTime() + 1000);
 
-      mockFs.readdir.mockResolvedValue(fakeFiles);
-      mockFs.stat.mockImplementation(async (path: string): Promise<Stats> => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      mockFs.readdir.mockResolvedValue(fakeFiles as any);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      mockFs.stat.mockImplementation(async (path: any): Promise<Stats> => {
         if (path.endsWith('test1.json')) {
           return { mtime: date1 } as Stats;
         }
@@ -500,7 +502,7 @@ Hi there!`;
       const expectedPath = path.join(process.cwd(), 'my-chat.json');
       const [actualPath, actualContent] = mockFs.writeFile.mock.calls[0];
       expect(actualPath).toEqual(expectedPath);
-      const parsedContent = JSON.parse(actualContent);
+      const parsedContent = JSON.parse(actualContent as string);
       expect(Array.isArray(parsedContent)).toBe(true);
       parsedContent.forEach((item: Content) => {
         expect(item).toHaveProperty('role');
@@ -515,9 +517,9 @@ Hi there!`;
       const expectedPath = path.join(process.cwd(), 'my-chat.md');
       const [actualPath, actualContent] = mockFs.writeFile.mock.calls[0];
       expect(actualPath).toEqual(expectedPath);
-      const entries = actualContent.split('\n\n---\n\n');
+      const entries = (actualContent as string).split('\n\n---\n\n');
       expect(entries.length).toBe(mockHistory.length);
-      entries.forEach((entry, index) => {
+      entries.forEach((entry: string, index: number) => {
         const { role, parts } = mockHistory[index];
         const text = parts.map((p) => p.text).join('');
         const roleIcon = role === 'user' ? '🧑‍💻' : '✨';

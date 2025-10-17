@@ -198,7 +198,7 @@ describe('memoryCommand', () => {
                 importFormat: 'tree',
               },
             },
-          } as LoadedSettings,
+          } as unknown as LoadedSettings,
         },
         ui: {
           setGeminiMdFileCount: vi.fn(),
