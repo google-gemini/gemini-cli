@@ -4,113 +4,82 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-export enum DetectedIde {
-  Devin = 'devin',
-  Replit = 'replit',
-  Cursor = 'cursor',
-  CloudShell = 'cloudshell',
-  Codespaces = 'codespaces',
-  FirebaseStudio = 'firebasestudio',
-  Trae = 'trae',
-  VSCode = 'vscode',
-  VSCodeFork = 'vscodefork',
-}
+export const IDE_DEFINITIONS = {
+  devin: { name: 'devin', displayName: 'Devin' },
+  replit: { name: 'replit', displayName: 'Replit' },
+  cursor: { name: 'cursor', displayName: 'Cursor' },
+  cloudshell: { name: 'cloudshell', displayName: 'Cloud Shell' },
+  codespaces: { name: 'codespaces', displayName: 'GitHub Codespaces' },
+  firebasestudio: { name: 'firebasestudio', displayName: 'Firebase Studio' },
+  trae: { name: 'trae', displayName: 'Trae' },
+  vscode: { name: 'vscode', displayName: 'VS Code' },
+  vscodefork: { name: 'vscodefork', displayName: 'IDE' },
+} as const;
 
 export interface IdeInfo {
+  name: string;
   displayName: string;
 }
 
-export function getIdeInfo(ide: DetectedIde): IdeInfo {
-  switch (ide) {
-    case DetectedIde.Devin:
-      return {
-        displayName: 'Devin',
-      };
-    case DetectedIde.Replit:
-      return {
-        displayName: 'Replit',
-      };
-    case DetectedIde.Cursor:
-      return {
-        displayName: 'Cursor',
-      };
-    case DetectedIde.CloudShell:
-      return {
-        displayName: 'Cloud Shell',
-      };
-    case DetectedIde.Codespaces:
-      return {
-        displayName: 'GitHub Codespaces',
-      };
-    case DetectedIde.FirebaseStudio:
-      return {
-        displayName: 'Firebase Studio',
-      };
-    case DetectedIde.Trae:
-      return {
-        displayName: 'Trae',
-      };
-    case DetectedIde.VSCode:
-      return {
-        displayName: 'VS Code',
-      };
-    case DetectedIde.VSCodeFork:
-      return {
-        displayName: 'IDE',
-      };
-    default: {
-      // This ensures that if a new IDE is added to the enum, we get a compile-time error.
-      const exhaustiveCheck: never = ide;
-      return exhaustiveCheck;
-    }
-  }
+export function isCloudShell(): boolean {
+  return !!(process.env['EDITOR_IN_CLOUD_SHELL'] || process.env['CLOUD_SHELL']);
 }
 
-export function detectIdeFromEnv(): DetectedIde {
+export function detectIdeFromEnv(): IdeInfo {
   if (process.env['__COG_BASHRC_SOURCED']) {
-    return DetectedIde.Devin;
+    return IDE_DEFINITIONS.devin;
   }
   if (process.env['REPLIT_USER']) {
-    return DetectedIde.Replit;
+    return IDE_DEFINITIONS.replit;
   }
   if (process.env['CURSOR_TRACE_ID']) {
-    return DetectedIde.Cursor;
+    return IDE_DEFINITIONS.cursor;
   }
   if (process.env['CODESPACES']) {
-    return DetectedIde.Codespaces;
+    return IDE_DEFINITIONS.codespaces;
   }
-  if (process.env['EDITOR_IN_CLOUD_SHELL'] || process.env['CLOUD_SHELL']) {
-    return DetectedIde.CloudShell;
+  if (isCloudShell()) {
+    return IDE_DEFINITIONS.cloudshell;
   }
   if (process.env['TERM_PRODUCT'] === 'Trae') {
-    return DetectedIde.Trae;
+    return IDE_DEFINITIONS.trae;
   }
   if (process.env['MONOSPACE_ENV']) {
-    return DetectedIde.FirebaseStudio;
+    return IDE_DEFINITIONS.firebasestudio;
   }
-  return DetectedIde.VSCode;
+  return IDE_DEFINITIONS.vscode;
 }
 
 function verifyVSCode(
-  ide: DetectedIde,
+  ide: IdeInfo,
   ideProcessInfo: {
     pid: number;
     command: string;
   },
-): DetectedIde {
-  if (ide !== DetectedIde.VSCode) {
+): IdeInfo {
+  if (ide.name !== IDE_DEFINITIONS.vscode.name) {
     return ide;
   }
   if (ideProcessInfo.command.toLowerCase().includes('code')) {
-    return DetectedIde.VSCode;
+    return IDE_DEFINITIONS.vscode;
   }
-  return DetectedIde.VSCodeFork;
+  return IDE_DEFINITIONS.vscodefork;
 }
 
-export function detectIde(ideProcessInfo: {
-  pid: number;
-  command: string;
-}): DetectedIde | undefined {
+export function detectIde(
+  ideProcessInfo: {
+    pid: number;
+    command: string;
+  },
+  ideInfoFromFile?: { name?: string; displayName?: string },
+): IdeInfo | undefined {
+  if (ideInfoFromFile?.name && ideInfoFromFile.displayName) {
+    return {
+      name: ideInfoFromFile.name,
+      displayName: ideInfoFromFile.displayName,
+    };
+  }
+
   // Only VSCode-based integrations are currently supported.
   if (process.env['TERM_PROGRAM'] !== 'vscode') {
     return undefined;

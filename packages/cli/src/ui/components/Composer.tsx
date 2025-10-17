@@ -4,15 +4,17 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Box, Text } from 'ink';
+import { Box, Text, useIsScreenReaderEnabled } from 'ink';
 import { LoadingIndicator } from './LoadingIndicator.js';
 import { ContextSummaryDisplay } from './ContextSummaryDisplay.js';
 import { AutoAcceptIndicator } from './AutoAcceptIndicator.js';
 import { ShellModeIndicator } from './ShellModeIndicator.js';
 import { DetailedMessagesDisplay } from './DetailedMessagesDisplay.js';
+import { RawMarkdownIndicator } from './RawMarkdownIndicator.js';
 import { InputPrompt } from './InputPrompt.js';
-import { Footer, type FooterProps } from './Footer.js';
+import { Footer } from './Footer.js';
 import { ShowMoreLines } from './ShowMoreLines.js';
+import { QueuedMessageDisplay } from './QueuedMessageDisplay.js';
 import { OverflowProvider } from '../contexts/OverflowContext.js';
 import { theme } from '../semantic-colors.js';
 import { isNarrowWidth } from '../utils/isNarrowWidth.js';
@@ -25,43 +27,22 @@ import { ApprovalMode } from '@google/gemini-cli-core';
 import { StreamingState } from '../types.js';
 import { ConfigInitDisplay } from '../components/ConfigInitDisplay.js';
 
-const MAX_DISPLAYED_QUEUED_MESSAGES = 3;
-
 export const Composer = () => {
   const config = useConfig();
   const settings = useSettings();
+  const isScreenReaderEnabled = useIsScreenReaderEnabled();
   const uiState = useUIState();
   const uiActions = useUIActions();
-  const { vimEnabled, vimMode } = useVimMode();
+  const { vimEnabled } = useVimMode();
   const terminalWidth = process.stdout.columns;
   const isNarrow = isNarrowWidth(terminalWidth);
   const debugConsoleMaxHeight = Math.floor(Math.max(terminalWidth * 0.2, 5));
 
   const { contextFileNames, showAutoAcceptIndicator } = uiState;
 
-  // Build footer props from context values
-  const footerProps: Omit<FooterProps, 'vimMode'> = {
-    model: config.getModel(),
-    targetDir: config.getTargetDir(),
-    debugMode: config.getDebugMode(),
-    branchName: uiState.branchName,
-    debugMessage: uiState.debugMessage,
-    corgiMode: uiState.corgiMode,
-    errorCount: uiState.errorCount,
-    showErrorDetails: uiState.showErrorDetails,
-    showMemoryUsage:
-      config.getDebugMode() || settings.merged.ui?.showMemoryUsage || false,
-    promptTokenCount: uiState.sessionStats.lastPromptTokenCount,
-    nightly: uiState.nightly,
-    isTrustedFolder: uiState.isTrustedFolder,
-    hideCWD: settings.merged.ui?.footer?.hideCWD || false,
-    hideSandboxStatus: settings.merged.ui?.footer?.hideSandboxStatus || false,
-    hideModelInfo: settings.merged.ui?.footer?.hideModelInfo || false,
-  };
-
   return (
-    <Box flexDirection="column">
-      {!uiState.shellFocused && (
+    <Box flexDirection="column" width={uiState.mainAreaWidth} flexShrink={0}>
+      {!uiState.embeddedShellFocused && (
         <LoadingIndicator
           thought={
             uiState.streamingState === StreamingState.WaitingForConfirmation ||
@@ -78,35 +59,11 @@ export const Composer = () => {
         />
       )}
 
-      {!uiState.isConfigInitialized && <ConfigInitDisplay />}
-
-      {uiState.messageQueue.length > 0 && (
-        <Box flexDirection="column" marginTop={1}>
-          {uiState.messageQueue
-            .slice(0, MAX_DISPLAYED_QUEUED_MESSAGES)
-            .map((message, index) => {
-              const preview = message.replace(/\s+/g, ' ');
-
-              return (
-                <Box key={index} paddingLeft={2} width="100%">
-                  <Text dimColor wrap="truncate">
-                    {preview}
-                  </Text>
-                </Box>
-              );
-            })}
-          {uiState.messageQueue.length > MAX_DISPLAYED_QUEUED_MESSAGES && (
-            <Box paddingLeft={2}>
-              <Text dimColor>
-                ... (+
-                {uiState.messageQueue.length -
-                  MAX_DISPLAYED_QUEUED_MESSAGES}{' '}
-                more)
-              </Text>
-            </Box>
-          )}
-        </Box>
+      {(!uiState.slashCommands || !uiState.isConfigInitialized) && (
+        <ConfigInitDisplay />
       )}
+
+      <QueuedMessageDisplay messageQueue={uiState.messageQueue} />
 
       <Box
         marginTop={1}
@@ -133,6 +90,8 @@ export const Composer = () => {
             </Text>
           ) : uiState.showEscapePrompt ? (
             <Text color={theme.text.secondary}>Press Esc again to clear.</Text>
+          ) : uiState.queueErrorMessage ? (
+            <Text color={theme.status.error}>{uiState.queueErrorMessage}</Text>
           ) : (
             !settings.merged.ui?.hideContextSummary && (
               <ContextSummaryDisplay
@@ -152,6 +111,7 @@ export const Composer = () => {
               <AutoAcceptIndicator approvalMode={showAutoAcceptIndicator} />
             )}
           {uiState.shellModeActive && <ShellModeIndicator />}
+          {!uiState.renderMarkdown && <RawMarkdownIndicator />}
         </Box>
       </Box>
 
@@ -163,7 +123,7 @@ export const Composer = () => {
               maxHeight={
                 uiState.constrainHeight ? debugConsoleMaxHeight : undefined
               }
-              width={uiState.inputWidth}
+              width={uiState.mainAreaWidth}
             />
             <ShowMoreLines constrainHeight={uiState.constrainHeight} />
           </Box>
@@ -179,26 +139,27 @@ export const Composer = () => {
           userMessages={uiState.userMessages}
           onClearScreen={uiActions.handleClearScreen}
           config={config}
-          slashCommands={uiState.slashCommands}
+          slashCommands={uiState.slashCommands || []}
           commandContext={uiState.commandContext}
           shellModeActive={uiState.shellModeActive}
           setShellModeActive={uiActions.setShellModeActive}
           approvalMode={showAutoAcceptIndicator}
           onEscapePromptChange={uiActions.onEscapePromptChange}
-          focus={uiState.isFocused}
+          focus={true}
           vimHandleInput={uiActions.vimHandleInput}
-          isShellFocused={uiState.shellFocused}
+          isEmbeddedShellFocused={uiState.embeddedShellFocused}
+          popAllMessages={uiActions.popAllMessages}
           placeholder={
             vimEnabled
               ? "  Press 'i' for INSERT mode and 'Esc' for NORMAL mode."
               : '  Type your message or @path/to/file'
           }
+          setQueueErrorMessage={uiActions.setQueueErrorMessage}
+          streamingState={uiState.streamingState}
         />
       )}
 
-      {!settings.merged.ui?.hideFooter && (
-        <Footer {...footerProps} vimMode={vimEnabled ? vimMode : undefined} />
-      )}
+      {!settings.merged.ui?.hideFooter && !isScreenReaderEnabled && <Footer />}
     </Box>
   );
 };

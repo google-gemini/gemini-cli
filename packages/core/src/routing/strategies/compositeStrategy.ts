@@ -92,17 +92,18 @@ export class CompositeStrategy implements TerminalStrategy {
     startTime: number,
   ): RoutingDecision {
     const endTime = performance.now();
-    const totalLatency = endTime - startTime;
-
-    // Combine the source paths: composite_name/child_source (e.g. 'router/default')
     const compositeSource = `${this.name}/${decision.metadata.source}`;
+
+    // Use the child's latency if it's a meaningful (non-zero) value,
+    // otherwise use the total time spent in the composite strategy.
+    const latency = decision.metadata.latencyMs || endTime - startTime;
 
     return {
       ...decision,
       metadata: {
         ...decision.metadata,
         source: compositeSource,
-        latencyMs: decision.metadata.latencyMs || totalLatency,
+        latencyMs: Math.round(latency), // Round to ensure int for telemetry.
       },
     };
   }

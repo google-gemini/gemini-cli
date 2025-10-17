@@ -32,20 +32,34 @@ class MockProcessExitError extends Error {
 }
 
 // Mock dependencies
-vi.mock('./config/settings.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('./config/settings.js')>();
-  return {
-    ...actual,
-    loadSettings: vi.fn(),
-  };
-});
+vi.mock('./config/settings.js', () => ({
+  loadSettings: vi.fn().mockReturnValue({
+    merged: {
+      advanced: {},
+      security: { auth: {} },
+      ui: {},
+    },
+    setValue: vi.fn(),
+    forScope: () => ({ settings: {}, originalSettings: {}, path: '' }),
+    errors: [],
+  }),
+  migrateDeprecatedSettings: vi.fn(),
+  SettingScope: {
+    User: 'user',
+    Workspace: 'workspace',
+    System: 'system',
+    SystemDefaults: 'system-defaults',
+  },
+}));
 
 vi.mock('./config/config.js', () => ({
   loadCliConfig: vi.fn().mockResolvedValue({
     getSandbox: vi.fn(() => false),
     getQuestion: vi.fn(() => ''),
+    isInteractive: () => false,
   } as unknown as Config),
-  parseArguments: vi.fn().mockResolvedValue({ sessionSummary: null }),
+  parseArguments: vi.fn().mockResolvedValue({}),
+  isDebugMode: vi.fn(() => false),
 }));
 
 vi.mock('read-package-up', () => ({
@@ -76,17 +90,19 @@ vi.mock('./utils/sandbox.js', () => ({
   start_sandbox: vi.fn(() => Promise.resolve()), // Mock as an async function that resolves
 }));
 
+vi.mock('./utils/relaunch.js', () => ({
+  relaunchAppInChildProcess: vi.fn(),
+}));
+
+vi.mock('./config/sandboxConfig.js', () => ({
+  loadSandboxConfig: vi.fn(),
+}));
+
 describe('gemini.tsx main function', () => {
   let originalEnvGeminiSandbox: string | undefined;
   let originalEnvSandbox: string | undefined;
   let initialUnhandledRejectionListeners: NodeJS.UnhandledRejectionListener[] =
     [];
-
-  const processExitSpy = vi
-    .spyOn(process, 'exit')
-    .mockImplementation((code) => {
-      throw new MockProcessExitError(code);
-    });
 
   beforeEach(() => {
     // Store and clear sandbox-related env variables to ensure a consistent test environment
@@ -123,7 +139,73 @@ describe('gemini.tsx main function', () => {
     vi.restoreAllMocks();
   });
 
+  it('verifies that we dont load the config before relaunchAppInChildProcess', async () => {
+    const processExitSpy = vi
+      .spyOn(process, 'exit')
+      .mockImplementation((code) => {
+        throw new MockProcessExitError(code);
+      });
+    const { relaunchAppInChildProcess } = await import('./utils/relaunch.js');
+    const { loadCliConfig } = await import('./config/config.js');
+    const { loadSettings } = await import('./config/settings.js');
+    const { loadSandboxConfig } = await import('./config/sandboxConfig.js');
+    vi.mocked(loadSandboxConfig).mockResolvedValue(undefined);
+
+    const callOrder: string[] = [];
+    vi.mocked(relaunchAppInChildProcess).mockImplementation(async () => {
+      callOrder.push('relaunch');
+    });
+    vi.mocked(loadCliConfig).mockImplementation(async () => {
+      callOrder.push('loadCliConfig');
+      return {
+        isInteractive: () => false,
+        getQuestion: () => '',
+        getSandbox: () => false,
+        getDebugMode: () => false,
+        getListExtensions: () => false,
+        getMcpServers: () => ({}),
+        initialize: vi.fn(),
+        getIdeMode: () => false,
+        getExperimentalZedIntegration: () => false,
+        getScreenReader: () => false,
+        getGeminiMdFileCount: () => 0,
+        getProjectRoot: () => '/',
+      } as unknown as Config;
+    });
+    vi.mocked(loadSettings).mockReturnValue({
+      errors: [],
+      merged: {
+        advanced: { autoConfigureMemory: true },
+        security: { auth: {} },
+        ui: {},
+      },
+      setValue: vi.fn(),
+      forScope: () => ({ settings: {}, originalSettings: {}, path: '' }),
+    } as never);
+    try {
+      await main();
+    } catch (e) {
+      // Mocked process exit throws an error.
+      if (!(e instanceof MockProcessExitError)) throw e;
+    }
+
+    // It is critical that we call relaunch before loadCliConfig to avoid
+    // loading config in the outer process when we are going to relaunch.
+    // By ensuring we don't load the config we also ensure we don't trigger any
+    // operations that might require loading the config such as such as
+    // initializing mcp servers.
+    // For the sandbox case we still have to load a partial cli config.
+    // we can authorize outside the sandbox.
+    expect(callOrder).toEqual(['relaunch', 'loadCliConfig']);
+    processExitSpy.mockRestore();
+  });
+
   it('should log unhandled promise rejections and open debug console on first error', async () => {
+    const processExitSpy = vi
+      .spyOn(process, 'exit')
+      .mockImplementation((code) => {
+        throw new MockProcessExitError(code);
+      });
     const appEventsMock = vi.mocked(appEvents);
     const rejectionError = new Error('Test unhandled rejection');
 
@@ -163,11 +245,16 @@ describe('gemini.tsx main function', () => {
 });
 
 describe('gemini.tsx main function kitty protocol', () => {
+  let originalEnvNoRelaunch: string | undefined;
   let setRawModeSpy: MockInstance<
     (mode: boolean) => NodeJS.ReadStream & { fd: 0 }
   >;
 
   beforeEach(() => {
+    // Set no relaunch in tests since process spawning causing issues in tests
+    originalEnvNoRelaunch = process.env['GEMINI_CLI_NO_RELAUNCH'];
+    process.env['GEMINI_CLI_NO_RELAUNCH'] = 'true';
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     if (!(process.stdin as any).setRawMode) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -183,6 +270,15 @@ describe('gemini.tsx main function kitty protocol', () => {
       value: false,
       configurable: true,
     });
+  });
+
+  afterEach(() => {
+    // Restore original env variables
+    if (originalEnvNoRelaunch !== undefined) {
+      process.env['GEMINI_CLI_NO_RELAUNCH'] = originalEnvNoRelaunch;
+    } else {
+      delete process.env['GEMINI_CLI_NO_RELAUNCH'];
+    }
   });
 
   it('should call setRawMode and detectAndEnableKittyProtocol when isInteractive is true', async () => {
@@ -214,6 +310,7 @@ describe('gemini.tsx main function kitty protocol', () => {
         ui: {},
       },
       setValue: vi.fn(),
+      forScope: () => ({ settings: {}, originalSettings: {}, path: '' }),
     } as never);
     vi.mocked(parseArguments).mockResolvedValue({
       model: undefined,
@@ -222,17 +319,11 @@ describe('gemini.tsx main function kitty protocol', () => {
       debug: undefined,
       prompt: undefined,
       promptInteractive: undefined,
-      allFiles: undefined,
+      query: undefined,
       showMemoryUsage: undefined,
       yolo: undefined,
       approvalMode: undefined,
-      telemetry: undefined,
       checkpointing: undefined,
-      telemetryTarget: undefined,
-      telemetryOtlpEndpoint: undefined,
-      telemetryOtlpProtocol: undefined,
-      telemetryLogPrompts: undefined,
-      telemetryOutfile: undefined,
       allowedMcpServerNames: undefined,
       allowedTools: undefined,
       experimentalAcp: undefined,
@@ -242,8 +333,7 @@ describe('gemini.tsx main function kitty protocol', () => {
       includeDirectories: undefined,
       screenReader: undefined,
       useSmartEdit: undefined,
-      sessionSummary: undefined,
-      promptWords: undefined,
+      useWriteTodos: undefined,
       outputFormat: undefined,
     });
 
@@ -385,7 +475,7 @@ describe('startInteractiveUI', () => {
 
     // Verify all startup tasks were called
     expect(getCliVersion).toHaveBeenCalledTimes(1);
-    expect(registerCleanup).toHaveBeenCalledTimes(1);
+    expect(registerCleanup).toHaveBeenCalledTimes(2);
 
     // Verify cleanup handler is registered with unmount function
     const cleanupFn = vi.mocked(registerCleanup).mock.calls[0][0];
@@ -395,5 +485,48 @@ describe('startInteractiveUI', () => {
     // We need a small delay to let it execute
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(checkForUpdates).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    {
+      screenReader: true,
+      expectedCalls: [],
+      name: 'should not disable line wrapping in screen reader mode',
+    },
+    {
+      screenReader: false,
+      expectedCalls: [['\x1b[?7l']],
+      name: 'should disable line wrapping when not in screen reader mode',
+    },
+  ])('$name', async ({ screenReader, expectedCalls }) => {
+    const writeSpy = vi
+      .spyOn(process.stdout, 'write')
+      .mockImplementation(() => true);
+    const mockConfigWithScreenReader = {
+      ...mockConfig,
+      getScreenReader: () => screenReader,
+    } as Config;
+
+    const mockInitializationResult = {
+      authError: null,
+      themeError: null,
+      shouldOpenAuthDialog: false,
+      geminiMdFileCount: 0,
+    };
+
+    await startInteractiveUI(
+      mockConfigWithScreenReader,
+      mockSettings,
+      mockStartupWarnings,
+      mockWorkspaceRoot,
+      mockInitializationResult,
+    );
+
+    if (expectedCalls.length > 0) {
+      expect(writeSpy).toHaveBeenCalledWith(expectedCalls[0][0]);
+    } else {
+      expect(writeSpy).not.toHaveBeenCalledWith('\x1b[?7l');
+    }
+    writeSpy.mockRestore();
   });
 });

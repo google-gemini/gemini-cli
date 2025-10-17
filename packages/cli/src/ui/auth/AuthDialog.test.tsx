@@ -73,7 +73,7 @@ describe('AuthDialog', () => {
     settings: LoadedSettings;
     setAuthState: (state: AuthState) => void;
     authError: string | null;
-    onAuthError: (error: string) => void;
+    onAuthError: (error: string | null) => void;
   };
   const originalEnv = { ...process.env };
 
@@ -110,6 +110,7 @@ describe('AuthDialog', () => {
     expect(items).toContainEqual({
       label: 'Use Cloud Shell user credentials',
       value: AuthType.CLOUD_SHELL,
+      key: AuthType.CLOUD_SHELL,
     });
   });
 

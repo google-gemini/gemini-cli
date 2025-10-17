@@ -65,8 +65,16 @@ export function EditorSettingsDialog({
   }
 
   const scopeItems = [
-    { label: 'User Settings', value: SettingScope.User },
-    { label: 'Workspace Settings', value: SettingScope.Workspace },
+    {
+      label: 'User Settings',
+      value: SettingScope.User,
+      key: SettingScope.User,
+    },
+    {
+      label: 'Workspace Settings',
+      value: SettingScope.Workspace,
+      key: SettingScope.Workspace,
+    },
   ];
 
   const handleEditorSelect = (editorType: EditorType | 'not_set') => {
@@ -127,6 +135,7 @@ export function EditorSettingsDialog({
             label: item.name,
             value: item.type,
             disabled: item.disabled,
+            key: item.type,
           }))}
           initialIndex={editorIndex}
           onSelect={handleEditorSelect}

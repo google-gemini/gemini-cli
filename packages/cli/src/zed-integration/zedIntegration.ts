@@ -11,6 +11,7 @@ import type {
   GeminiChat,
   ToolResult,
   ToolCallConfirmationDetails,
+  GeminiCLIExtension,
 } from '@google/gemini-cli-core';
 import {
   AuthType,
@@ -25,6 +26,10 @@ import {
   MCPServerConfig,
   DiscoveredMCPTool,
   StreamEventType,
+  ToolCallEvent,
+  DEFAULT_GEMINI_MODEL,
+  DEFAULT_GEMINI_MODEL_AUTO,
+  DEFAULT_GEMINI_FLASH_MODEL,
 } from '@google/gemini-cli-core';
 import * as acp from './acp.js';
 import { AcpFileSystemService } from './fileSystemService.js';
@@ -37,14 +42,28 @@ import * as path from 'node:path';
 import { z } from 'zod';
 
 import { randomUUID } from 'node:crypto';
-import type { Extension } from '../config/extension.js';
+import { ExtensionStorage } from '../config/extension.js';
 import type { CliArgs } from '../config/config.js';
 import { loadCliConfig } from '../config/config.js';
+import { ExtensionEnablementManager } from '../config/extensions/extensionEnablement.js';
+
+/**
+ * Resolves the model to use based on the current configuration.
+ *
+ * If the model is set to "auto", it will use the flash model if in fallback
+ * mode, otherwise it will use the default model.
+ */
+export function resolveModel(model: string, isInFallbackMode: boolean): string {
+  if (model === DEFAULT_GEMINI_MODEL_AUTO) {
+    return isInFallbackMode ? DEFAULT_GEMINI_FLASH_MODEL : DEFAULT_GEMINI_MODEL;
+  }
+  return model;
+}
 
 export async function runZedIntegration(
   config: Config,
   settings: LoadedSettings,
-  extensions: Extension[],
+  extensions: GeminiCLIExtension[],
   argv: CliArgs,
 ) {
   const stdout = Writable.toWeb(process.stdout) as WritableStream;
@@ -71,7 +90,7 @@ class GeminiAgent {
   constructor(
     private config: Config,
     private settings: LoadedSettings,
-    private extensions: Extension[],
+    private extensions: GeminiCLIExtension[],
     private argv: CliArgs,
     private client: acp.Client,
   ) {}
@@ -188,6 +207,10 @@ class GeminiAgent {
     const config = await loadCliConfig(
       settings,
       this.extensions,
+      new ExtensionEnablementManager(
+        ExtensionStorage.getUserExtensionsDir(),
+        this.argv.extensions,
+      ),
       sessionId,
       this.argv,
       cwd,
@@ -255,7 +278,7 @@ class Session {
 
       try {
         const responseStream = await chat.sendMessageStream(
-          this.config.getModel(),
+          resolveModel(this.config.getModel(), this.config.isInFallbackMode()),
           {
             message: nextMessage?.parts ?? [],
             config: {
@@ -347,20 +370,21 @@ class Session {
 
     const errorResponse = (error: Error) => {
       const durationMs = Date.now() - startTime;
-      logToolCall(this.config, {
-        'event.name': 'tool_call',
-        'event.timestamp': new Date().toISOString(),
-        prompt_id: promptId,
-        function_name: fc.name ?? '',
-        function_args: args,
-        duration_ms: durationMs,
-        success: false,
-        error: error.message,
-        tool_type:
+      logToolCall(
+        this.config,
+        new ToolCallEvent(
+          undefined,
+          fc.name ?? '',
+          args,
+          durationMs,
+          false,
+          promptId,
           typeof tool !== 'undefined' && tool instanceof DiscoveredMCPTool
             ? 'mcp'
             : 'native',
-      });
+          error.message,
+        ),
+      );
 
       return [
         {
@@ -466,19 +490,20 @@ class Session {
       });
 
       const durationMs = Date.now() - startTime;
-      logToolCall(this.config, {
-        'event.name': 'tool_call',
-        'event.timestamp': new Date().toISOString(),
-        function_name: fc.name,
-        function_args: args,
-        duration_ms: durationMs,
-        success: true,
-        prompt_id: promptId,
-        tool_type:
+      logToolCall(
+        this.config,
+        new ToolCallEvent(
+          undefined,
+          fc.name ?? '',
+          args,
+          durationMs,
+          true,
+          promptId,
           typeof tool !== 'undefined' && tool instanceof DiscoveredMCPTool
             ? 'mcp'
             : 'native',
-      });
+        ),
+      );
 
       return convertToFunctionResponse(fc.name, callId, toolResult.llmContent);
     } catch (e) {

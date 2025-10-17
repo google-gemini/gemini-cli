@@ -21,13 +21,13 @@ import type {
   IdeContext,
   ApprovalMode,
   UserTierId,
-  DetectedIde,
+  IdeInfo,
   FallbackIntent,
 } from '@google/gemini-cli-core';
 import type { DOMElement } from 'ink';
 import type { SessionStatsState } from '../contexts/SessionContext.js';
-import type { UpdateObject } from '../utils/updateCheck.js';
 import type { ExtensionUpdateState } from '../state/extensions.js';
+import type { UpdateObject } from '../utils/updateCheck.js';
 
 export interface ProQuotaDialogRequest {
   failedModel: string;
@@ -35,8 +35,12 @@ export interface ProQuotaDialogRequest {
   resolve: (intent: FallbackIntent) => void;
 }
 
+import { type UseHistoryManagerReturn } from '../hooks/useHistoryManager.js';
+import { type RestartReason } from '../hooks/useIdeTrustListener.js';
+
 export interface UIState {
   history: HistoryItem[];
+  historyManager: UseHistoryManagerReturn;
   isThemeDialogOpen: boolean;
   themeError: string | null;
   isAuthenticating: boolean;
@@ -50,11 +54,14 @@ export interface UIState {
   debugMessage: string;
   quittingMessages: HistoryItem[] | null;
   isSettingsDialogOpen: boolean;
-  slashCommands: readonly SlashCommand[];
+  isModelDialogOpen: boolean;
+  isPermissionsDialogOpen: boolean;
+  slashCommands: readonly SlashCommand[] | undefined;
   pendingSlashCommandHistoryItems: HistoryItemWithoutId[];
   commandContext: CommandContext;
   shellConfirmationRequest: ShellConfirmationRequest | null;
   confirmationRequest: ConfirmationRequest | null;
+  confirmUpdateExtensionRequests: ConfirmationRequest[];
   loopDetectionConfirmationRequest: LoopDetectionConfirmationRequest | null;
   geminiMdFileCount: number;
   streamingState: StreamingState;
@@ -75,14 +82,15 @@ export interface UIState {
   filteredConsoleMessages: ConsoleMessageItem[];
   ideContextState: IdeContext | undefined;
   showToolDescriptions: boolean;
+  renderMarkdown: boolean;
   ctrlCPressedOnce: boolean;
   ctrlDPressedOnce: boolean;
   showEscapePrompt: boolean;
-  isFocused: boolean;
   elapsedTime: number;
   currentLoadingPhrase: string;
   historyRemountKey: number;
   messageQueue: string[];
+  queueErrorMessage: string | null;
   showAutoAcceptIndicator: ApprovalMode;
   showWorkspaceMigrationDialog: boolean;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -105,13 +113,17 @@ export interface UIState {
   terminalWidth: number;
   terminalHeight: number;
   mainControlsRef: React.MutableRefObject<DOMElement | null>;
-  currentIDE: DetectedIde | null;
+  // NOTE: This is for performance profiling only.
+  rootUiRef: React.MutableRefObject<DOMElement | null>;
+  currentIDE: IdeInfo | null;
   updateInfo: UpdateObject | null;
   showIdeRestartPrompt: boolean;
+  ideTrustRestartReason: RestartReason;
   isRestarting: boolean;
   extensionsUpdateState: Map<string, ExtensionUpdateState>;
   activePtyId: number | undefined;
-  shellFocused: boolean;
+  embeddedShellFocused: boolean;
+  showDebugProfiler: boolean;
 }
 
 export const UIStateContext = createContext<UIState | null>(null);

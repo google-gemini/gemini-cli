@@ -34,6 +34,7 @@ import type {
 } from './modifiable-tool.js';
 import { IdeClient } from '../ide/ide-client.js';
 import { safeLiteralReplace } from '../utils/textUtils.js';
+import { EDIT_TOOL_NAME } from './tool-names.js';
 
 export function applyReplacement(
   currentContent: string | null,
@@ -251,6 +252,9 @@ class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
     try {
       editData = await this.calculateEdit(this.params, abortSignal);
     } catch (error) {
+      if (abortSignal.aborted) {
+        throw error;
+      }
       const errorMsg = error instanceof Error ? error.message : String(error);
       console.log(`Error preparing edit: ${errorMsg}`);
       return false;
@@ -336,6 +340,9 @@ class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
     try {
       editData = await this.calculateEdit(this.params, signal);
     } catch (error) {
+      if (signal.aborted) {
+        throw error;
+      }
       const errorMsg = error instanceof Error ? error.message : String(error);
       return {
         llmContent: `Error preparing edit: ${errorMsg}`,
@@ -458,7 +465,7 @@ export class EditTool
   extends BaseDeclarativeTool<EditToolParams, ToolResult>
   implements ModifiableDeclarativeTool<EditToolParams>
 {
-  static readonly Name = 'replace';
+  static readonly Name = EDIT_TOOL_NAME;
   constructor(private readonly config: Config) {
     super(
       EditTool.Name,
