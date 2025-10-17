@@ -114,7 +114,9 @@ export function PermissionsModifyTrustDialog({
           initialIndex={initialIndex}
         />
         <Box marginTop={1}>
-          <Text color={theme.text.secondary}>(Use Enter to select)</Text>
+          <Text color={theme.text.secondary}>
+            (Use Enter to select, Esc to close)
+          </Text>
         </Box>
       </Box>
       {needsRestart && (
