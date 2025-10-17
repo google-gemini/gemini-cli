@@ -21,7 +21,6 @@ import { type ProQuotaDialogRequest } from '../contexts/UIStateContext.js';
 interface UseQuotaAndFallbackArgs {
   config: Config;
   historyManager: UseHistoryManagerReturn;
-  userTier: UserTierId | undefined;
   setAuthState: (state: AuthState) => void;
   setModelSwitchedFromQuotaError: (value: boolean) => void;
 }
@@ -29,7 +28,6 @@ interface UseQuotaAndFallbackArgs {
 export function useQuotaAndFallback({
   config,
   historyManager,
-  userTier,
   setAuthState,
   setModelSwitchedFromQuotaError,
 }: UseQuotaAndFallbackArgs) {
@@ -57,7 +55,8 @@ export function useQuotaAndFallback({
         return null;
       }
 
-      // Use actual user tier if available; otherwise, default to FREE tier behavior (safe default)
+      // Use config.getUserTier as the single source of truth for user tier information
+      const userTier = config.getUserTier();
       const isPaidTier =
         userTier === UserTierId.LEGACY || userTier === UserTierId.STANDARD;
 
@@ -142,7 +141,7 @@ export function useQuotaAndFallback({
     };
 
     config.setFallbackModelHandler(fallbackHandler);
-  }, [config, historyManager, userTier, setModelSwitchedFromQuotaError]);
+  }, [config, historyManager, setModelSwitchedFromQuotaError]);
 
   const handleProQuotaChoice = useCallback(
     (choice: 'auth' | 'continue') => {
