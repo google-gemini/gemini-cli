@@ -9,6 +9,7 @@ import {
   OAuth2Client,
   Compute,
   CodeChallengeMethod,
+  GoogleAuth,
 } from 'google-auth-library';
 import * as http from 'node:http';
 import url from 'node:url';
@@ -447,7 +448,24 @@ async function loadCachedCredentials(client: OAuth2Client): Promise<boolean> {
 
   for (const keyFile of pathsToTry) {
     try {
-      const creds = await fs.readFile(keyFile, 'utf-8');
+      const credsStr = await fs.readFile(keyFile, 'utf-8');
+      const creds = JSON.parse(credsStr);
+      if (creds.type === 'external_account_authorized_user') {
+        const auth = new GoogleAuth({
+          scopes: OAUTH_SCOPE,
+        });
+        const externalAccountAuthorizedUserClient = await auth.fromJSON(creds);
+        const token =
+          await externalAccountAuthorizedUserClient.getAccessToken();
+        if (token) {
+          client.setCredentials({
+            access_token: token.token,
+          });
+          return true;
+        }
+      } else {
+        client.setCredentials(creds);
+      }
       client.setCredentials(JSON.parse(creds));
 
       // This will verify locally that the credentials look good.
