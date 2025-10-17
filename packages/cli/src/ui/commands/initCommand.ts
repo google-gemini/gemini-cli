@@ -63,7 +63,7 @@ You are an AI agent that brings the power of Gemini directly into the terminal. 
     *   Start by listing the files and directories to get a high-level overview of the structure.
     *   Read the README file (e.g., \`README.md\`, \`README.txt\`) if it exists. This is often the best place to start.
 
-2.  **Iterative Deep Dive (up to 10 files):
+2.  **Iterative Deep Dive (up to 10 files):**
     *   Based on your initial findings, select a few files that seem most important (e.g., configuration files, main source files, documentation).
     *   Read them. As you learn more, refine your understanding and decide which files to read next. You don't need to decide all 10 files at once. Let your discoveries guide your exploration.
 
