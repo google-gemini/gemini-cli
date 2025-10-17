@@ -4,8 +4,16 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
-import yargs from 'yargs';
+import {
+  vi,
+  describe,
+  it,
+  expect,
+  beforeEach,
+  afterEach,
+  type Mock,
+} from 'vitest';
+import yargs, { type Argv } from 'yargs';
 import { SettingScope, type LoadedSettings } from '../../config/settings.js';
 import { removeCommand } from './remove.js';
 import * as fs from 'node:fs';
@@ -20,8 +28,8 @@ vi.mock('fs/promises', () => ({
 
 describe('mcp remove command', () => {
   describe('unit tests with mocks', () => {
-    let parser: yargs.Argv;
-    let mockSetValue: vi.Mock;
+    let parser: Argv;
+    let mockSetValue: Mock;
     let mockSettings: Record<string, unknown>;
 
     beforeEach(async () => {
@@ -42,7 +50,9 @@ describe('mcp remove command', () => {
       ).mockReturnValue({
         forScope: () => ({ settings: mockSettings }),
         setValue: mockSetValue,
-      } as Partial<LoadedSettings> as LoadedSettings);
+        workspace: { path: '/path/to/project' },
+        user: { path: '/home/user' },
+      } as unknown as LoadedSettings);
 
       const yargsInstance = yargs([]).command(removeCommand);
       parser = yargsInstance;
@@ -73,7 +83,7 @@ describe('mcp remove command', () => {
     let tempDir: string;
     let settingsDir: string;
     let settingsPath: string;
-    let parser: yargs.Argv;
+    let parser: Argv;
     let cwdSpy: ReturnType<typeof vi.spyOn>;
 
     beforeEach(() => {
