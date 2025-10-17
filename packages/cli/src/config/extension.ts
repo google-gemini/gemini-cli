@@ -50,7 +50,8 @@ export const EXTENSIONS_DIRECTORY_NAME = path.join(GEMINI_DIR, 'extensions');
 
 export const EXTENSIONS_CONFIG_FILENAME = 'gemini-extension.json';
 export const INSTALL_METADATA_FILENAME = '.gemini-extension-install.json';
-
+export const INSTALL_WARNING_MESSAGE =
+  '**The extension you are about to install may have been created by a third-party developer and sourced from a public repository. Google does not vet, endorse, or guarantee the functionality or security of extensions. Please carefully inspect any extension and its source code before installing to understand the permissions it requires and the actions it may perform.**';
 /**
  * Extension definition as written to disk in gemini-extension.json files.
  * This should *not* be referenced outside of the logic for reading files.
@@ -464,16 +465,26 @@ export async function installOrUpdateExtension(
       installMetadata.type === 'github-release'
     ) {
       tempDir = await ExtensionStorage.createTmpDir();
-      try {
-        const result = await downloadFromGitHubRelease(
-          installMetadata,
-          tempDir,
-        );
+      const result = await downloadFromGitHubRelease(installMetadata, tempDir);
+      if (result.success) {
         installMetadata.type = result.type;
         installMetadata.releaseTag = result.tagName;
-      } catch (_error) {
+      } else if (
+        // This repo has no github releases, and wasn't explicitly installed
+        // from a github release, unconditionally just clone it.
+        (result.failureReason === 'no release data' &&
+          installMetadata.type === 'git') ||
+        // Otherwise ask the user if they would like to try a git clone.
+        (await requestConsent(
+          `Error downloading github release for ${installMetadata.source} with the following error: ${result.errorMessage}.\n\nWould you like to attempt to install via "git clone" instead?`,
+        ))
+      ) {
         await cloneFromGit(installMetadata, tempDir);
         installMetadata.type = 'git';
+      } else {
+        throw new Error(
+          `Failed to install extension ${installMetadata.source}: ${result.errorMessage}`,
+        );
       }
       localSourcePath = tempDir;
     } else if (
@@ -613,9 +624,7 @@ function extensionConsentString(extensionConfig: ExtensionConfig): string {
   const output: string[] = [];
   const mcpServerEntries = Object.entries(sanitizedConfig.mcpServers || {});
   output.push(`Installing extension "${sanitizedConfig.name}".`);
-  output.push(
-    '**Extensions may introduce unexpected behavior. Ensure you have investigated the extension source and trust the author.**',
-  );
+  output.push(INSTALL_WARNING_MESSAGE);
 
   if (mcpServerEntries.length) {
     output.push('This extension will run the following MCP servers:');
