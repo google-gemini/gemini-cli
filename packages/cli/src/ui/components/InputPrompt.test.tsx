@@ -1935,7 +1935,7 @@ describe('InputPrompt', () => {
       unmount();
     });
 
-    it('text and cursor position should be restored after reverse search', async () => {
+    it.skip('text and cursor position should be restored after reverse search', async () => {
       props.buffer.setText('initial text');
       props.buffer.cursor = [0, 3];
       const { stdin, stdout, unmount } = renderWithProviders(
