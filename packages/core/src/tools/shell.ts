@@ -34,58 +34,14 @@ import { formatMemoryUsage } from '../utils/formatters.js';
 import type { AnsiOutput } from '../utils/terminalSerializer.js';
 import {
   getCommandRoots,
+  initializeShellParsers,
   isCommandAllowed,
   SHELL_TOOL_NAMES,
   stripShellWrapper,
 } from '../utils/shell-utils.js';
+import { doesToolInvocationMatch } from '../utils/tool-utils.js';
 
 export const OUTPUT_UPDATE_INTERVAL_MS = 1000;
-
-/**
- * Parses the `--allowed-tools` flag to determine which sub-commands of the
- * ShellTool are allowed. The flag can be provided multiple times.
- *
- * @param allowedTools The list of allowed tools from the config.
- * @returns A Set of allowed sub-commands, or null if all commands are allowed.
- *  - `null`: All sub-commands are allowed (e.g., --allowed-tools="ShellTool").
- *  - `Set<string>`: A set of specifically allowed sub-commands (e.g., --allowed-tools="ShellTool(wc)" --allowed-tools="ShellTool(ls)").
- *  - `Set<>` (empty): No sub-commands are allowed (e.g., --allowed-tools="ShellTool()").
- */
-function parseAllowedSubcommands(
-  allowedTools: readonly string[],
-): Set<string> | null {
-  const shellToolEntries = allowedTools.filter((tool) =>
-    SHELL_TOOL_NAMES.some((name) => tool.startsWith(name)),
-  );
-
-  if (shellToolEntries.length === 0) {
-    return new Set(); // ShellTool not mentioned, so no subcommands are allowed.
-  }
-
-  // If any entry is just "run_shell_command" or "ShellTool", all subcommands are allowed.
-  if (shellToolEntries.some((entry) => SHELL_TOOL_NAMES.includes(entry))) {
-    return null;
-  }
-
-  const allSubcommands = new Set<string>();
-  const toolNamePattern = SHELL_TOOL_NAMES.join('|');
-  const regex = new RegExp(`^(${toolNamePattern})\\((.*)\\)$`);
-
-  for (const entry of shellToolEntries) {
-    const match = entry.match(regex);
-    if (match) {
-      const subcommands = match[2];
-      if (subcommands) {
-        subcommands
-          .split(',')
-          .map((s) => s.trim())
-          .forEach((s) => s && allSubcommands.add(s));
-      }
-    }
-  }
-
-  return allSubcommands;
-}
 
 export interface ShellToolParams {
   command: string;
@@ -133,19 +89,16 @@ export class ShellToolInvocation extends BaseToolInvocation<
       !this.config.isInteractive() &&
       this.config.getApprovalMode() !== ApprovalMode.YOLO
     ) {
-      const allowed = this.config.getAllowedTools() || [];
-      const allowedSubcommands = parseAllowedSubcommands(allowed);
-      if (allowedSubcommands !== null) {
-        // Not all commands are allowed, so we need to check.
-        const allCommandsAllowed = rootCommands.every((cmd) =>
-          allowedSubcommands.has(cmd),
-        );
-        if (!allCommandsAllowed) {
-          throw new Error(
-            `Command "${command}" is not in the list of allowed tools for non-interactive mode.`,
-          );
-        }
+      const allowedTools = this.config.getAllowedTools() || [];
+      const [SHELL_TOOL_NAME] = SHELL_TOOL_NAMES;
+      if (doesToolInvocationMatch(SHELL_TOOL_NAME, command, allowedTools)) {
+        // If it's an allowed shell command, we don't need to confirm execution.
+        return false;
       }
+
+      throw new Error(
+        `Command "${command}" is not in the list of allowed tools for non-interactive mode.`,
+      );
     }
 
     const commandsToConfirm = rootCommands.filter(
@@ -388,25 +341,17 @@ function getShellToolDescription(): string {
       Process Group PGID: Process group started or \`(none)\``;
 
   if (os.platform() === 'win32') {
-    return `This tool executes a given shell command as \`cmd.exe /c <command>\`. Command can start background processes using \`start /b\`.${returnedInfo}`;
+    return `This tool executes a given shell command as \`powershell.exe -NoProfile -Command <command>\`. Command can start background processes using PowerShell constructs such as \`Start-Process -NoNewWindow\` or \`Start-Job\`.${returnedInfo}`;
   } else {
     return `This tool executes a given shell command as \`bash -c <command>\`. Command can start background processes using \`&\`. Command is executed as a subprocess that leads its own process group. Command process group can be terminated as \`kill -- -PGID\` or signaled as \`kill -s SIGNAL -- -PGID\`.${returnedInfo}`;
   }
 }
 
 function getCommandDescription(): string {
-  const cmd_substitution_warning =
-    '\n*** WARNING: Command substitution using $(), `` ` ``, <(), or >() is not allowed for security reasons.';
   if (os.platform() === 'win32') {
-    return (
-      'Exact command to execute as `cmd.exe /c <command>`' +
-      cmd_substitution_warning
-    );
+    return 'Exact command to execute as `powershell.exe -NoProfile -Command <command>`';
   } else {
-    return (
-      'Exact bash command to execute as `bash -c <command>`' +
-      cmd_substitution_warning
-    );
+    return 'Exact bash command to execute as `bash -c <command>`';
   }
 }
 
@@ -418,6 +363,9 @@ export class ShellTool extends BaseDeclarativeTool<
   private allowlist: Set<string> = new Set();
 
   constructor(private readonly config: Config) {
+    void initializeShellParsers().catch(() => {
+      // Errors are surfaced when parsing commands.
+    });
     super(
       ShellTool.Name,
       'Shell',
@@ -451,6 +399,10 @@ export class ShellTool extends BaseDeclarativeTool<
   protected override validateToolParamValues(
     params: ShellToolParams,
   ): string | null {
+    if (!params.command.trim()) {
+      return 'Command cannot be empty.';
+    }
+
     const commandCheck = isCommandAllowed(params.command, this.config);
     if (!commandCheck.allowed) {
       if (!commandCheck.reason) {
@@ -460,9 +412,6 @@ export class ShellTool extends BaseDeclarativeTool<
         return `Command is not allowed: ${params.command}`;
       }
       return commandCheck.reason;
-    }
-    if (!params.command.trim()) {
-      return 'Command cannot be empty.';
     }
     if (getCommandRoots(params.command).length === 0) {
       return 'Could not identify command root to obtain permission from user.';

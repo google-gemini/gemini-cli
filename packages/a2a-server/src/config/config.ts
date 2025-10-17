@@ -17,7 +17,7 @@ import {
   FileDiscoveryService,
   ApprovalMode,
   loadServerHierarchicalMemory,
-  GEMINI_CONFIG_DIR,
+  GEMINI_DIR,
   DEFAULT_GEMINI_EMBEDDING_MODEL,
   DEFAULT_GEMINI_MODEL,
   type GeminiCLIExtension,
@@ -44,7 +44,7 @@ export async function loadConfig(
     targetDir: workspaceDir, // Or a specific directory the agent operates on
     debugMode: process.env['DEBUG'] === 'true' || false,
     question: '', // Not used in server mode directly like CLI
-    fullContext: false, // Server might have different context needs
+
     coreTools: settings.coreTools || undefined,
     excludeTools: settings.excludeTools || undefined,
     showMemoryUsage: settings.showMemoryUsage || false,
@@ -176,7 +176,7 @@ function findEnvFile(startDir: string): string | null {
   let currentDir = path.resolve(startDir);
   while (true) {
     // prefer gemini-specific .env under GEMINI_DIR
-    const geminiEnvPath = path.join(currentDir, GEMINI_CONFIG_DIR, '.env');
+    const geminiEnvPath = path.join(currentDir, GEMINI_DIR, '.env');
     if (fs.existsSync(geminiEnvPath)) {
       return geminiEnvPath;
     }
@@ -187,11 +187,7 @@ function findEnvFile(startDir: string): string | null {
     const parentDir = path.dirname(currentDir);
     if (parentDir === currentDir || !parentDir) {
       // check .env under home as fallback, again preferring gemini-specific .env
-      const homeGeminiEnvPath = path.join(
-        process.cwd(),
-        GEMINI_CONFIG_DIR,
-        '.env',
-      );
+      const homeGeminiEnvPath = path.join(process.cwd(), GEMINI_DIR, '.env');
       if (fs.existsSync(homeGeminiEnvPath)) {
         return homeGeminiEnvPath;
       }

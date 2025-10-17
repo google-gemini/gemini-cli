@@ -105,7 +105,7 @@ describe('SmartEditTool', () => {
       getSandbox: () => false,
       getDebugMode: () => false,
       getQuestion: () => undefined,
-      getFullContext: () => false,
+
       getToolDiscoveryCommand: () => undefined,
       getToolCallCommand: () => undefined,
       getMcpServerCommand: () => undefined,
