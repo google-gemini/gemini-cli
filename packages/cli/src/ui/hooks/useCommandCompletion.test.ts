@@ -121,6 +121,7 @@ describe('useCommandCompletion', () => {
             [],
             mockCommandContext,
             false,
+            false,
             mockConfig,
           ),
         );
@@ -145,6 +146,7 @@ describe('useCommandCompletion', () => {
             testRootDir,
             [],
             mockCommandContext,
+            false,
             false,
             mockConfig,
           );
@@ -179,6 +181,7 @@ describe('useCommandCompletion', () => {
             [],
             mockCommandContext,
             false,
+            false,
             mockConfig,
           ),
         );
@@ -207,6 +210,7 @@ describe('useCommandCompletion', () => {
             [],
             mockCommandContext,
             false,
+            false,
             mockConfig,
           ),
         );
@@ -233,6 +237,7 @@ describe('useCommandCompletion', () => {
             [],
             mockCommandContext,
             false,
+            false,
             mockConfig,
           ),
         );
@@ -244,6 +249,58 @@ describe('useCommandCompletion', () => {
               pattern: 'file1',
             }),
           );
+        });
+      });
+
+      it('should show slash command suggestions when shellModeActive is false', async () => {
+        setupMocks({
+          slashSuggestions: [{ label: 'clear', value: 'clear' }],
+        });
+
+        const { result } = renderHook(() => {
+          const textBuffer = useTextBufferForTest('/');
+          const completion = useCommandCompletion(
+            textBuffer,
+            testDirs,
+            testRootDir,
+            [],
+            mockCommandContext,
+            false,
+            false, // shellModeActive
+            mockConfig,
+          );
+          return { ...completion, textBuffer };
+        });
+
+        await waitFor(() => {
+          expect(result.current.suggestions.length).toBe(1);
+          expect(result.current.showSuggestions).toBe(true);
+        });
+      });
+
+      it('should not show slash command suggestions when shellModeActive is true', async () => {
+        setupMocks({
+          slashSuggestions: [{ label: 'clear', value: 'clear' }],
+        });
+
+        const { result } = renderHook(() => {
+          const textBuffer = useTextBufferForTest('/');
+          const completion = useCommandCompletion(
+            textBuffer,
+            testDirs,
+            testRootDir,
+            [],
+            mockCommandContext,
+            false,
+            true, // shellModeActive
+            mockConfig,
+          );
+          return { ...completion, textBuffer };
+        });
+
+        await waitFor(() => {
+          expect(result.current.suggestions.length).toBe(0);
+          expect(result.current.showSuggestions).toBe(false);
         });
       });
     });
@@ -272,6 +329,7 @@ describe('useCommandCompletion', () => {
             [],
             mockCommandContext,
             false,
+            false,
             mockConfig,
           ),
         );
@@ -293,6 +351,7 @@ describe('useCommandCompletion', () => {
             [],
             mockCommandContext,
             false,
+            false,
             mockConfig,
           ),
         );
@@ -312,6 +371,7 @@ describe('useCommandCompletion', () => {
             testRootDir,
             [],
             mockCommandContext,
+            false,
             false,
             mockConfig,
           ),
@@ -338,6 +398,7 @@ describe('useCommandCompletion', () => {
             testRootDir,
             [],
             mockCommandContext,
+            false,
             false,
             mockConfig,
           ),
@@ -367,6 +428,7 @@ describe('useCommandCompletion', () => {
             testRootDir,
             [],
             mockCommandContext,
+            false,
             false,
             mockConfig,
           ),
@@ -405,6 +467,7 @@ describe('useCommandCompletion', () => {
             [],
             mockCommandContext,
             false,
+            false,
             mockConfig,
           ),
         );
@@ -435,6 +498,7 @@ describe('useCommandCompletion', () => {
           [],
           mockCommandContext,
           false,
+          false,
           mockConfig,
         );
         return { ...completion, textBuffer };
@@ -464,6 +528,7 @@ describe('useCommandCompletion', () => {
           testRootDir,
           [],
           mockCommandContext,
+          false,
           false,
           mockConfig,
         );
@@ -498,6 +563,7 @@ describe('useCommandCompletion', () => {
           [],
           mockCommandContext,
           false,
+          false,
           mockConfig,
         );
         return { ...completion, textBuffer };
@@ -529,6 +595,7 @@ describe('useCommandCompletion', () => {
           testRootDir,
           [],
           mockCommandContext,
+          false,
           false,
           mockConfig,
         );
@@ -562,6 +629,7 @@ describe('useCommandCompletion', () => {
           [],
           mockCommandContext,
           false,
+          false,
           mockConfig,
         );
         return { ...completion, textBuffer };
@@ -594,6 +662,7 @@ describe('useCommandCompletion', () => {
           [],
           mockCommandContext,
           false,
+          false,
           mockConfig,
         );
         return { ...completion, textBuffer };
@@ -619,6 +688,7 @@ describe('useCommandCompletion', () => {
           [],
           mockCommandContext,
           false,
+          false,
           mockConfig,
         );
         return { ...completion, textBuffer };
@@ -643,6 +713,7 @@ describe('useCommandCompletion', () => {
           testRootDir,
           [],
           mockCommandContext,
+          false,
           false,
           mockConfig,
         );
