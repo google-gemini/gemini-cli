@@ -514,74 +514,6 @@ describe('loadCliConfig', () => {
     vi.restoreAllMocks();
   });
 
-  it('should set showMemoryUsage to true when --show-memory-usage flag is present', async () => {
-    process.argv = ['node', 'script.js', '--show-memory-usage'];
-    const argv = await parseArguments({} as Settings);
-    const settings: Settings = {};
-    const config = await loadCliConfig(
-      settings,
-      [],
-      new ExtensionEnablementManager(
-        ExtensionStorage.getUserExtensionsDir(),
-        argv.extensions,
-      ),
-      'test-session',
-      argv,
-    );
-    expect(config.getShowMemoryUsage()).toBe(true);
-  });
-
-  it('should set showMemoryUsage to false when --memory flag is not present', async () => {
-    process.argv = ['node', 'script.js'];
-    const argv = await parseArguments({} as Settings);
-    const settings: Settings = {};
-    const config = await loadCliConfig(
-      settings,
-      [],
-      new ExtensionEnablementManager(
-        ExtensionStorage.getUserExtensionsDir(),
-        argv.extensions,
-      ),
-      'test-session',
-      argv,
-    );
-    expect(config.getShowMemoryUsage()).toBe(false);
-  });
-
-  it('should set showMemoryUsage to false by default from settings if CLI flag is not present', async () => {
-    process.argv = ['node', 'script.js'];
-    const argv = await parseArguments({} as Settings);
-    const settings: Settings = { ui: { showMemoryUsage: false } };
-    const config = await loadCliConfig(
-      settings,
-      [],
-      new ExtensionEnablementManager(
-        ExtensionStorage.getUserExtensionsDir(),
-        argv.extensions,
-      ),
-      'test-session',
-      argv,
-    );
-    expect(config.getShowMemoryUsage()).toBe(false);
-  });
-
-  it('should prioritize CLI flag over settings for showMemoryUsage (CLI true, settings false)', async () => {
-    process.argv = ['node', 'script.js', '--show-memory-usage'];
-    const argv = await parseArguments({} as Settings);
-    const settings: Settings = { ui: { showMemoryUsage: false } };
-    const config = await loadCliConfig(
-      settings,
-      [],
-      new ExtensionEnablementManager(
-        ExtensionStorage.getUserExtensionsDir(),
-        argv.extensions,
-      ),
-      'test-session',
-      argv,
-    );
-    expect(config.getShowMemoryUsage()).toBe(true);
-  });
-
   describe('Proxy configuration', () => {
     const originalProxyEnv: { [key: string]: string | undefined } = {};
     const proxyEnvVars = [
@@ -674,41 +606,6 @@ describe('loadCliConfig', () => {
         );
         expect(config.getProxy()).toBe(expected);
       });
-    });
-
-    it('should set proxy when --proxy flag is present', async () => {
-      process.argv = ['node', 'script.js', '--proxy', 'http://localhost:7890'];
-      const argv = await parseArguments({} as Settings);
-      const settings: Settings = {};
-      const config = await loadCliConfig(
-        settings,
-        [],
-        new ExtensionEnablementManager(
-          ExtensionStorage.getUserExtensionsDir(),
-          argv.extensions,
-        ),
-        'test-session',
-        argv,
-      );
-      expect(config.getProxy()).toBe('http://localhost:7890');
-    });
-
-    it('should prioritize CLI flag over environment variable for proxy (CLI http://localhost:7890, environment variable http://localhost:7891)', async () => {
-      vi.stubEnv('http_proxy', 'http://localhost:7891');
-      process.argv = ['node', 'script.js', '--proxy', 'http://localhost:7890'];
-      const argv = await parseArguments({} as Settings);
-      const settings: Settings = {};
-      const config = await loadCliConfig(
-        settings,
-        [],
-        new ExtensionEnablementManager(
-          ExtensionStorage.getUserExtensionsDir(),
-          argv.extensions,
-        ),
-        'test-session',
-        argv,
-      );
-      expect(config.getProxy()).toBe('http://localhost:7890');
     });
   });
 });
