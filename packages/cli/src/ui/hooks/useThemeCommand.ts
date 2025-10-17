@@ -8,7 +8,10 @@ import { useState, useCallback } from 'react';
 import { themeManager } from '../themes/theme-manager.js';
 import type { LoadedSettings, SettingScope } from '../../config/settings.js'; // Import LoadedSettings, AppSettings, MergedSetting
 import { type HistoryItem, MessageType } from '../types.js';
+import { useTheme } from '../contexts/ThemeContext.js';
+import { AUTO_THEME } from '../themes/theme.js';
 import process from 'node:process';
+import { getThemePreferences } from '../../utils/settingsUtils.js';
 
 interface UseThemeCommandReturn {
   isThemeDialogOpen: boolean;
@@ -28,6 +31,7 @@ export const useThemeCommand = (
 ): UseThemeCommandReturn => {
   const [isThemeDialogOpen, setIsThemeDialogOpen] =
     useState(!!initialThemeError);
+  const { terminalBackground } = useTheme();
 
   const openThemeDialog = useCallback(() => {
     if (process.env['NO_COLOR']) {
@@ -45,15 +49,33 @@ export const useThemeCommand = (
 
   const applyTheme = useCallback(
     (themeName: string | undefined) => {
-      if (!themeManager.setActiveTheme(themeName)) {
-        // If theme is not found, open the theme selection dialog and set error message
-        setIsThemeDialogOpen(true);
-        setThemeError(`Theme "${themeName}" not found.`);
+      // For AUTO_THEME, use cached terminal background from context
+      if (themeName === AUTO_THEME) {
+        const themePreferences = getThemePreferences(loadedSettings);
+
+        if (
+          !themeManager.setActiveTheme(
+            themeName,
+            terminalBackground,
+            themePreferences,
+          )
+        ) {
+          setIsThemeDialogOpen(true);
+          setThemeError('Could not set auto theme.');
+        } else {
+          setThemeError(null);
+        }
       } else {
-        setThemeError(null); // Clear any previous theme error on success
+        if (!themeManager.setActiveTheme(themeName)) {
+          // If theme is not found, open the theme selection dialog and set error message
+          setIsThemeDialogOpen(true);
+          setThemeError(`Theme "${themeName}" not found.`);
+        } else {
+          setThemeError(null); // Clear any previous theme error on success
+        }
       }
     },
-    [setThemeError],
+    [setThemeError, loadedSettings, terminalBackground],
   );
 
   const handleThemeHighlight = useCallback(
@@ -66,6 +88,14 @@ export const useThemeCommand = (
   const handleThemeSelect = useCallback(
     (themeName: string | undefined, scope: SettingScope) => {
       try {
+        // Allow AUTO_THEME regardless of scope
+        if (themeName === AUTO_THEME) {
+          loadedSettings.setValue(scope, 'ui.theme', themeName);
+          applyTheme(loadedSettings.merged.ui?.theme);
+          setThemeError(null);
+          return;
+        }
+
         // Merge user and workspace custom themes (workspace takes precedence)
         const mergedCustomThemes = {
           ...(loadedSettings.user.settings.ui?.customThemes || {}),

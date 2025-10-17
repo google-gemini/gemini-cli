@@ -10,6 +10,11 @@ import { resolveColor } from './color-utils.js';
 
 export type ThemeType = 'light' | 'dark' | 'ansi' | 'custom';
 
+/**
+ * Special theme value that automatically selects a theme based on terminal background.
+ */
+export const AUTO_THEME = 'auto' as const;
+
 export interface ColorsTheme {
   type: ThemeType;
   Background: string;

@@ -293,8 +293,52 @@ const SETTINGS_SCHEMA = {
         category: 'UI',
         requiresRestart: false,
         default: undefined as string | undefined,
-        description: 'The color theme for the UI.',
+        description:
+          'The color theme for the UI. Use "auto" to automatically match your terminal background (light/dark).',
         showInDialog: false,
+      },
+      autoThemePrompt: {
+        type: 'boolean',
+        label: 'Auto Theme Prompt',
+        category: 'UI',
+        requiresRestart: false,
+        default: true,
+        description:
+          'Show a one-time prompt to enable auto theme when terminal/theme mismatch is detected.',
+        showInDialog: false,
+      },
+      themePreferences: {
+        type: 'object',
+        label: 'Theme Preferences',
+        category: 'UI',
+        requiresRestart: false,
+        default: {
+          light: 'Default Light',
+          dark: 'Default',
+        } as { light: string; dark: string },
+        description:
+          'Preferred themes for auto mode. Specify which themes to use for light and dark terminal backgrounds.',
+        showInDialog: false,
+        properties: {
+          light: {
+            type: 'string',
+            label: 'Light Theme',
+            category: 'UI',
+            requiresRestart: false,
+            default: 'Default Light',
+            description: 'Theme to use when terminal has a light background.',
+            showInDialog: false,
+          },
+          dark: {
+            type: 'string',
+            label: 'Dark Theme',
+            category: 'UI',
+            requiresRestart: false,
+            default: 'Default',
+            description: 'Theme to use when terminal has a dark background.',
+            showInDialog: false,
+          },
+        },
       },
       customThemes: {
         type: 'object',
