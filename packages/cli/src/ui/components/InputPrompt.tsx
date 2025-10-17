@@ -155,6 +155,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     slashCommands,
     commandContext,
     reverseSearchActive,
+    shellModeActive,
     config,
   );
 
