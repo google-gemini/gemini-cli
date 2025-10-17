@@ -20,7 +20,7 @@ describe.skip('Interactive file system', () => {
 
   it('should perform a read-then-write sequence', async () => {
     const fileName = 'version.txt';
-    rig.setup('interactive-read-then-write');
+    await rig.setup('interactive-read-then-write');
     rig.createFile(fileName, '1.0.0');
 
     const run = await rig.runInteractive();
@@ -41,6 +41,9 @@ describe.skip('Interactive file system', () => {
     await run.sendKeys('\r');
 
     await rig.expectToolCallSuccess(['write_file', 'replace'], 30000);
+
+    // Wait for telemetry to flush and file system to sync, especially in sandboxed environments
+    await rig.waitForTelemetryReady();
 
     const newFileContent = rig.readFile(fileName);
     expect(newFileContent).toBe('1.0.1');
