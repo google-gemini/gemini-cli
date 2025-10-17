@@ -31,14 +31,14 @@ describe('<ContextSummaryDisplay />', () => {
     mcpServers: { 'test-server': { command: 'test' } },
     ideContext: {
       workspaceState: {
-        openFiles: [{ path: '/a/b/c' }],
+        openFiles: [{ path: '/a/b/c', timestamp: Date.now() }],
       },
     },
   };
 
   it('should render on a single line on a wide screen', () => {
     const { lastFrame } = renderWithWidth(120, baseProps);
-    const output = lastFrame();
+    const output = lastFrame()!;
     expect(output).toContain(
       'Using: 1 open file (ctrl+g to view) | 1 GEMINI.md file | 1 MCP server',
     );
@@ -48,7 +48,7 @@ describe('<ContextSummaryDisplay />', () => {
 
   it('should render on multiple lines on a narrow screen', () => {
     const { lastFrame } = renderWithWidth(60, baseProps);
-    const output = lastFrame();
+    const output = lastFrame()!;
     const expectedLines = [
       ' Using:',
       '   - 1 open file (ctrl+g to view)',
@@ -62,12 +62,12 @@ describe('<ContextSummaryDisplay />', () => {
   it('should switch layout at the 80-column breakpoint', () => {
     // At 80 columns, should be on one line
     const { lastFrame: wideFrame } = renderWithWidth(80, baseProps);
-    expect(wideFrame().includes('\n')).toBe(false);
+    expect(wideFrame()!.includes('\n')).toBe(false);
 
     // At 79 columns, should be on multiple lines
     const { lastFrame: narrowFrame } = renderWithWidth(79, baseProps);
-    expect(narrowFrame().includes('\n')).toBe(true);
-    expect(narrowFrame().split('\n').length).toBe(4);
+    expect(narrowFrame()!.includes('\n')).toBe(true);
+    expect(narrowFrame()!.split('\n').length).toBe(4);
   });
 
   it('should not render empty parts', () => {
@@ -79,7 +79,7 @@ describe('<ContextSummaryDisplay />', () => {
     };
     const { lastFrame } = renderWithWidth(60, props);
     const expectedLines = [' Using:', '   - 1 open file (ctrl+g to view)'];
-    const actualLines = lastFrame().split('\n');
+    const actualLines = lastFrame()!.split('\n');
     expect(actualLines).toEqual(expectedLines);
   });
 });

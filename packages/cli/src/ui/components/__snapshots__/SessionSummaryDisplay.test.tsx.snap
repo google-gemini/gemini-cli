@@ -6,7 +6,7 @@ exports[`<SessionSummaryDisplay /> > renders the summary display with a title 1`
 │  Agent powering down. Goodbye!                                                                   │
 │                                                                                                  │
 │  Interaction Summary                                                                             │
-│  Session ID:                                                                                     │
+│  Session ID:                 test-session                                                        │
 │  Tool Calls:                 0 ( ✓ 0 x 0 )                                                       │
 │  Success Rate:               0.0%                                                                │
 │  Code Changes:               +42 -15                                                             │
