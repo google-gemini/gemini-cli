@@ -464,9 +464,8 @@ async function loadCachedCredentials(client: OAuth2Client): Promise<boolean> {
           return true;
         }
       } else {
-        client.setCredentials(creds);
+        client.setCredentials(JSON.parse(creds));
       }
-      client.setCredentials(JSON.parse(creds));
 
       // This will verify locally that the credentials look good.
       const { token } = await client.getAccessToken();
