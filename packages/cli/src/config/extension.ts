@@ -65,6 +65,7 @@ interface ExtensionConfig {
   mcpServers?: Record<string, MCPServerConfig>;
   contextFileName?: string | string[];
   excludeTools?: string[];
+  author?: string;
 }
 
 export interface ExtensionUpdateInfo {
@@ -261,6 +262,7 @@ export function loadExtension(
       installMetadata,
       mcpServers: config.mcpServers,
       excludeTools: config.excludeTools,
+      author: config.author,
       isActive: true, // Barring any other signals extensions should be considered Active.
     };
   } catch (e) {
@@ -786,6 +788,9 @@ export function toOutputString(
   }
   output += `\n Enabled (User): ${userEnabled}`;
   output += `\n Enabled (Workspace): ${workspaceEnabled}`;
+  if (extension.author) {
+    output += `\n Author: ${escapeAnsiCtrlCodes(extension.author)}`;
+  }
   if (extension.contextFiles.length > 0) {
     output += `\n Context files:`;
     extension.contextFiles.forEach((contextFile) => {
