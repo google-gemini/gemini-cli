@@ -1,5 +1,27 @@
 # Gemini CLI Releases
 
+## `dev` vs `prod` environment
+
+Our release flows support both `dev` and `prod` environments.
+
+The `dev` environment pushes to a private Github-hosted NPM repository, with the
+package names beginning with `@google-gemini/**` instead of `@google/**`.
+
+The `prod` environment pushes to the public global NPM registry via Wombat
+Dressing Room, which is Google's system for managing NPM packages in the
+`@google/**` namespace. The packages are all named `@google/**`.
+
+More information can be found about these systems in the
+[maintainer repo guide](https://github.com/google-gemini/maintainers-gemini-cli/blob/main/npm.md)
+
+### Package scopes
+
+| Package    | `prod` (Wombat Dressing Room) | `dev` (Github Private NPM Repo)           |
+| ---------- | ----------------------------- | ----------------------------------------- |
+| CLI        | @google/gemini-cli            | @google-gemini/gemini-cli                 |
+| Core       | @google/gemini-cli-core       | @google-gemini/gemini-cli-core A2A Server |
+| A2A Server | @google/gemini-cli-a2a-server | @google-gemini/gemini-cli-a2a-server      |
+
 ## Release Cadence and Tags
 
 We will follow https://semver.org/ as closely as possible but will call out when
@@ -112,6 +134,10 @@ specific version from any branch, tag, or commit SHA.
       recommended for production releases.
     - **Skip GitHub Release**: Set to `true` to skip creating a GitHub release
       and create an npm release only.
+    - **Environment**: Select the appropriate environment. The `dev` environment
+      is intended for testing. The `prod` environment is intended for production
+      releases. `prod` is the default and will require authorization from a
+      release administrator.
 5.  Click **Run workflow**.
 
 The workflow will then proceed to test (if not skipped), build, and publish the
@@ -140,11 +166,15 @@ require a full release cycle.
     - **Channel**: The npm `dist-tag` to apply (e.g., `preview`, `stable`).
     - **Dry Run**: Leave as `true` to log the action without making changes, or
       set to `false` to perform the live tag change.
+    - **Environment**: Select the appropriate environment. The `dev` environment
+      is intended for testing. The `prod` environment is intended for production
+      releases. `prod` is the default and will require authorization from a
+      release administrator.
 5.  Click **Run workflow**.
 
-The workflow will then run `npm dist-tag add` for both the `@google/gemini-cli`
-and `@google/gemini-cli-core` packages, pointing the specified channel to the
-specified version.
+The workflow will then run `npm dist-tag add` for the appropriate `gemini-cli`,
+`gemini-cli-core` and `gemini-cli-a2a-server` packages, pointing the specified
+channel to the specified version.
 
 ## Patching
 
