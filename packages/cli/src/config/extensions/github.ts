@@ -158,7 +158,8 @@ export async function checkForExtensionUpdate(
     });
     if (!newExtension) {
       console.error(
-        `Failed to check for update for local extension "${extension.name}". Could not load extension from source path: ${installMetadata.source}`,
+        `Failed to check for update for local extension "${extension.name}". Could not load extension from source path: ${installMetadata.source}. ` +
+          `Please verify the source path exists and contains a valid extension.`,
       );
       return ExtensionUpdateState.ERROR;
     }

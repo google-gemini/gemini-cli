@@ -26,7 +26,11 @@ export const useLogger = (storage: Storage) => {
       .then(() => {
         setLogger(newLogger);
       })
-      .catch(() => {});
+      .catch((error) => {
+        // Log initialization errors but don't block the UI
+        // The app can continue without a logger, messages just won't be persisted
+        console.error('Failed to initialize logger:', error);
+      });
   }, [storage]);
 
   return logger;
