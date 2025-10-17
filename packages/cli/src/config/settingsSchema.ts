@@ -994,6 +994,16 @@ const SETTINGS_SCHEMA = {
             description: 'Whether to use an external authentication flow.',
             showInDialog: false,
           },
+          alwaysFallbackToApiKey: {
+            type: 'boolean',
+            label: 'Always Fallback to API Key',
+            category: 'Security',
+            requiresRestart: false,
+            default: false,
+            description:
+              'Automatically switch to API key auth when hitting quota limits',
+            showInDialog: true,
+          },
         },
       },
     },

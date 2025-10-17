@@ -12,12 +12,14 @@ import { theme } from '../semantic-colors.js';
 interface ProQuotaDialogProps {
   failedModel: string;
   fallbackModel: string;
-  onChoice: (choice: 'auth' | 'continue') => void;
+  hasApiKey: boolean;
+  onChoice: (choice: 'auth' | 'continue' | 'api-key') => void;
 }
 
 export function ProQuotaDialog({
   failedModel,
   fallbackModel,
+  hasApiKey,
   onChoice,
 }: ProQuotaDialogProps): React.JSX.Element {
   const items = [
@@ -31,9 +33,18 @@ export function ProQuotaDialog({
       value: 'continue' as const,
       key: 'continue',
     },
+    ...(hasApiKey
+      ? [
+          {
+            label: 'Always fallback to API key',
+            value: 'api-key' as const,
+            key: 'api-key',
+          },
+        ]
+      : []),
   ];
 
-  const handleSelect = (choice: 'auth' | 'continue') => {
+  const handleSelect = (choice: 'auth' | 'continue' | 'api-key') => {
     onChoice(choice);
   };
 

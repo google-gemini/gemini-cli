@@ -24,6 +24,7 @@ describe('ProQuotaDialog', () => {
       <ProQuotaDialog
         failedModel="gemini-2.5-pro"
         fallbackModel="gemini-2.5-flash"
+        hasApiKey={false}
         onChoice={() => {}}
       />,
     );
@@ -57,6 +58,7 @@ describe('ProQuotaDialog', () => {
       <ProQuotaDialog
         failedModel="gemini-2.5-pro"
         fallbackModel="gemini-2.5-flash"
+        hasApiKey={false}
         onChoice={mockOnChoice}
       />,
     );
@@ -76,6 +78,7 @@ describe('ProQuotaDialog', () => {
       <ProQuotaDialog
         failedModel="gemini-2.5-pro"
         fallbackModel="gemini-2.5-flash"
+        hasApiKey={false}
         onChoice={mockOnChoice}
       />,
     );

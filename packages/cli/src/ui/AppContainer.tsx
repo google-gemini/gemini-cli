@@ -356,6 +356,7 @@ export const AppContainer = (props: AppContainerProps) => {
     userTier,
     setAuthState,
     setModelSwitchedFromQuotaError,
+    settings,
   });
 
   // Derive auth state variables for backward compatibility with UIStateContext

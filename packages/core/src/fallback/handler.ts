@@ -17,6 +17,16 @@ export async function handleFallback(
 ): Promise<string | boolean | null> {
   // Applicability Checks
   if (authType !== AuthType.LOGIN_WITH_GOOGLE) return null;
+  const currentAuthType = config.getContentGeneratorConfig()?.authType;
+  if (
+    currentAuthType === AuthType.LOGIN_WITH_GOOGLE &&
+    config.getAlwaysFallbackToApiKey() &&
+    process.env['GEMINI_API_KEY']
+  ) {
+    // Session-only switch to API key auth
+    await config.refreshAuth(AuthType.USE_GEMINI);
+    return true; // Signal retry with new auth
+  }
 
   const fallbackModel = DEFAULT_GEMINI_FLASH_MODEL;
 

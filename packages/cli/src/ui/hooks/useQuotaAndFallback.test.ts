@@ -46,6 +46,7 @@ describe('useQuotaAndFallback', () => {
   let mockHistoryManager: UseHistoryManagerReturn;
   let mockSetAuthState: Mock;
   let mockSetModelSwitchedFromQuotaError: Mock;
+  let mockSettings: { setValue: Mock };
   let setFallbackHandlerSpy: SpyInstance;
 
   const mockedIsGenericQuotaExceededError = isGenericQuotaExceededError as Mock;
@@ -69,6 +70,9 @@ describe('useQuotaAndFallback', () => {
     };
     mockSetAuthState = vi.fn();
     mockSetModelSwitchedFromQuotaError = vi.fn();
+    mockSettings = {
+      setValue: vi.fn(),
+    };
 
     setFallbackHandlerSpy = vi.spyOn(mockConfig, 'setFallbackModelHandler');
     vi.spyOn(mockConfig, 'setQuotaErrorOccurred');
@@ -89,6 +93,7 @@ describe('useQuotaAndFallback', () => {
         userTier: UserTierId.FREE,
         setAuthState: mockSetAuthState,
         setModelSwitchedFromQuotaError: mockSetModelSwitchedFromQuotaError,
+        settings: mockSettings,
       }),
     );
 
@@ -109,6 +114,7 @@ describe('useQuotaAndFallback', () => {
             userTier: props.userTier,
             setAuthState: mockSetAuthState,
             setModelSwitchedFromQuotaError: mockSetModelSwitchedFromQuotaError,
+            settings: mockSettings,
           }),
         { initialProps: { userTier } },
       );
@@ -219,6 +225,7 @@ describe('useQuotaAndFallback', () => {
             userTier: UserTierId.FREE,
             setAuthState: mockSetAuthState,
             setModelSwitchedFromQuotaError: mockSetModelSwitchedFromQuotaError,
+            settings: mockSettings,
           }),
         );
 
@@ -259,6 +266,7 @@ describe('useQuotaAndFallback', () => {
             userTier: UserTierId.FREE,
             setAuthState: mockSetAuthState,
             setModelSwitchedFromQuotaError: mockSetModelSwitchedFromQuotaError,
+            settings: mockSettings,
           }),
         );
 
@@ -309,6 +317,7 @@ describe('useQuotaAndFallback', () => {
           userTier: UserTierId.FREE,
           setAuthState: mockSetAuthState,
           setModelSwitchedFromQuotaError: mockSetModelSwitchedFromQuotaError,
+          settings: mockSettings,
         }),
       );
 
@@ -328,6 +337,7 @@ describe('useQuotaAndFallback', () => {
           userTier: UserTierId.FREE,
           setAuthState: mockSetAuthState,
           setModelSwitchedFromQuotaError: mockSetModelSwitchedFromQuotaError,
+          settings: mockSettings,
         }),
       );
 
@@ -358,6 +368,7 @@ describe('useQuotaAndFallback', () => {
           userTier: UserTierId.FREE,
           setAuthState: mockSetAuthState,
           setModelSwitchedFromQuotaError: mockSetModelSwitchedFromQuotaError,
+          settings: mockSettings,
         }),
       );
 

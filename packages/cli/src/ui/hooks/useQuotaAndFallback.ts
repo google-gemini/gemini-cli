@@ -17,6 +17,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { type UseHistoryManagerReturn } from './useHistoryManager.js';
 import { AuthState, MessageType } from '../types.js';
 import { type ProQuotaDialogRequest } from '../contexts/UIStateContext.js';
+import { SettingScope } from '../../config/settings.js';
 
 interface UseQuotaAndFallbackArgs {
   config: Config;
@@ -24,6 +25,9 @@ interface UseQuotaAndFallbackArgs {
   userTier: UserTierId | undefined;
   setAuthState: (state: AuthState) => void;
   setModelSwitchedFromQuotaError: (value: boolean) => void;
+  settings: {
+    setValue: (scope: SettingScope, key: string, value: unknown) => void;
+  };
 }
 
 export function useQuotaAndFallback({
@@ -32,6 +36,7 @@ export function useQuotaAndFallback({
   userTier,
   setAuthState,
   setModelSwitchedFromQuotaError,
+  settings,
 }: UseQuotaAndFallbackArgs) {
   const [proQuotaRequest, setProQuotaRequest] =
     useState<ProQuotaDialogRequest | null>(null);
@@ -145,27 +150,70 @@ export function useQuotaAndFallback({
   }, [config, historyManager, userTier, setModelSwitchedFromQuotaError]);
 
   const handleProQuotaChoice = useCallback(
-    (choice: 'auth' | 'continue') => {
+    async (choice: 'auth' | 'continue' | 'api-key') => {
       if (!proQuotaRequest) return;
 
-      const intent: FallbackIntent = choice === 'auth' ? 'auth' : 'retry';
-      proQuotaRequest.resolve(intent);
+      if (choice === 'api-key') {
+        // Set the flag to always fallback to API key
+        await settings.setValue(
+          SettingScope.User,
+          'security.auth.alwaysFallbackToApiKey',
+          true,
+        );
+
+        // Immediately switch to API key auth for this session
+        if (process.env['GEMINI_API_KEY']) {
+          try {
+            await config.refreshAuth(AuthType.USE_GEMINI);
+            historyManager.addItem(
+              {
+                type: MessageType.INFO,
+                text: '✓ Switched to API key authentication. This session will now use your API key, and future sessions will automatically fallback when quota is exceeded.',
+              },
+              Date.now(),
+            );
+          } catch (error) {
+            historyManager.addItem(
+              {
+                type: MessageType.INFO,
+                text: `Failed to switch to API key: ${error instanceof Error ? error.message : String(error)}. Setting saved for future sessions.`,
+              },
+              Date.now(),
+            );
+          }
+        } else {
+          historyManager.addItem(
+            {
+              type: MessageType.INFO,
+              text: 'Enabled API key fallback for future sessions. Set GEMINI_API_KEY environment variable to use API key authentication.',
+            },
+            Date.now(),
+          );
+        }
+
+        // After setting the flag and switching auth, proceed with retry
+        proQuotaRequest.resolve('retry');
+      } else {
+        const intent: FallbackIntent = choice === 'auth' ? 'auth' : 'retry';
+        proQuotaRequest.resolve(intent);
+
+        if (choice === 'auth') {
+          setAuthState(AuthState.Updating);
+        } else {
+          historyManager.addItem(
+            {
+              type: MessageType.INFO,
+              text: 'Switched to fallback model. Tip: Press Ctrl+P (or Up Arrow) to recall your previous prompt and submit it again if you wish.',
+            },
+            Date.now(),
+          );
+        }
+      }
+
       setProQuotaRequest(null);
       isDialogPending.current = false; // Reset the flag here
-
-      if (choice === 'auth') {
-        setAuthState(AuthState.Updating);
-      } else {
-        historyManager.addItem(
-          {
-            type: MessageType.INFO,
-            text: 'Switched to fallback model. Tip: Press Ctrl+P (or Up Arrow) to recall your previous prompt and submit it again if you wish.',
-          },
-          Date.now(),
-        );
-      }
     },
-    [proQuotaRequest, setAuthState, historyManager],
+    [proQuotaRequest, setAuthState, historyManager, settings, config],
   );
 
   return {

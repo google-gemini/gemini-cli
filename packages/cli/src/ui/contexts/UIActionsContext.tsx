@@ -44,7 +44,7 @@ export interface UIActions {
   handleClearScreen: () => void;
   onWorkspaceMigrationDialogOpen: () => void;
   onWorkspaceMigrationDialogClose: () => void;
-  handleProQuotaChoice: (choice: 'auth' | 'continue') => void;
+  handleProQuotaChoice: (choice: 'auth' | 'continue' | 'api-key') => void;
   setQueueErrorMessage: (message: string | null) => void;
   popAllMessages: (onPop: (messages: string | undefined) => void) => void;
 }
