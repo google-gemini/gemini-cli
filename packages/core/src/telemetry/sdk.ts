@@ -12,6 +12,8 @@ import { OTLPTraceExporter as OTLPTraceExporterHttp } from '@opentelemetry/expor
 import { OTLPLogExporter as OTLPLogExporterHttp } from '@opentelemetry/exporter-logs-otlp-http';
 import { OTLPMetricExporter as OTLPMetricExporterHttp } from '@opentelemetry/exporter-metrics-otlp-http';
 import { CompressionAlgorithm } from '@opentelemetry/otlp-exporter-base';
+import { credentials } from '@grpc/grpc-js';
+import * as fs from 'node:fs';
 import { NodeSDK } from '@opentelemetry/sdk-node';
 import { SemanticResourceAttributes } from '@opentelemetry/semantic-conventions';
 import { resourceFromAttributes } from '@opentelemetry/resources';
@@ -101,6 +103,8 @@ export function initializeTelemetry(config: Config): void {
   const gcpProjectId =
     process.env['OTLP_GOOGLE_CLOUD_PROJECT'] ||
     process.env['GOOGLE_CLOUD_PROJECT'];
+  const corporateSslRootFilePath = config.getTelemetrySslRootFilePath();
+
   const useDirectGcpExport =
     telemetryTarget === TelemetryTarget.GCP && !!gcpProjectId && !useCollector;
 
@@ -127,32 +131,46 @@ export function initializeTelemetry(config: Config): void {
     });
   } else if (useOtlp) {
     if (otlpProtocol === 'http') {
+      const httpAgentOptions = corporateSslRootFilePath
+        ? { ca: fs.readFileSync(corporateSslRootFilePath) }
+        : undefined;
+
       spanExporter = new OTLPTraceExporterHttp({
         url: parsedEndpoint,
+        httpAgentOptions,
       });
       logExporter = new OTLPLogExporterHttp({
         url: parsedEndpoint,
+        httpAgentOptions,
       });
       metricReader = new PeriodicExportingMetricReader({
         exporter: new OTLPMetricExporterHttp({
           url: parsedEndpoint,
+          httpAgentOptions,
         }),
         exportIntervalMillis: 10000,
       });
     } else {
       // grpc
+      const grpcCredentials = corporateSslRootFilePath
+        ? credentials.createSsl(fs.readFileSync(corporateSslRootFilePath))
+        : undefined;
+
       spanExporter = new OTLPTraceExporter({
         url: parsedEndpoint,
         compression: CompressionAlgorithm.GZIP,
+        credentials: grpcCredentials,
       });
       logExporter = new OTLPLogExporter({
         url: parsedEndpoint,
         compression: CompressionAlgorithm.GZIP,
+        credentials: grpcCredentials,
       });
       metricReader = new PeriodicExportingMetricReader({
         exporter: new OTLPMetricExporter({
           url: parsedEndpoint,
           compression: CompressionAlgorithm.GZIP,
+          credentials: grpcCredentials,
         }),
         exportIntervalMillis: 10000,
       });

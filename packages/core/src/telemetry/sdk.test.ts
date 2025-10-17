@@ -23,6 +23,9 @@ import { TelemetryTarget } from './index.js';
 
 import * as os from 'node:os';
 import * as path from 'node:path';
+import * as fs from 'node:fs';
+import { Buffer } from 'node:buffer';
+import { credentials, type ChannelCredentials } from '@grpc/grpc-js';
 
 vi.mock('@opentelemetry/exporter-trace-otlp-grpc');
 vi.mock('@opentelemetry/exporter-logs-otlp-grpc');
@@ -32,6 +35,8 @@ vi.mock('@opentelemetry/exporter-logs-otlp-http');
 vi.mock('@opentelemetry/exporter-metrics-otlp-http');
 vi.mock('@opentelemetry/sdk-node');
 vi.mock('./gcp-exporters.js');
+vi.mock('@grpc/grpc-js');
+vi.mock('node:fs');
 
 describe('Telemetry SDK', () => {
   let mockConfig: Config;
@@ -45,6 +50,7 @@ describe('Telemetry SDK', () => {
       getTelemetryTarget: () => 'local',
       getTelemetryUseCollector: () => false,
       getTelemetryOutfile: () => undefined,
+      getTelemetrySslRootFilePath: () => undefined,
       getDebugMode: () => false,
       getSessionId: () => 'test-session',
     } as unknown as Config;
@@ -72,25 +78,62 @@ describe('Telemetry SDK', () => {
     expect(NodeSDK.prototype.start).toHaveBeenCalled();
   });
 
-  it('should use HTTP exporters when protocol is http', () => {
-    vi.spyOn(mockConfig, 'getTelemetryEnabled').mockReturnValue(true);
+  it('should use HTTP exporters without SSL when protocol is http and no sslRootsFilePath is provided', () => {
     vi.spyOn(mockConfig, 'getTelemetryOtlpProtocol').mockReturnValue('http');
     vi.spyOn(mockConfig, 'getTelemetryOtlpEndpoint').mockReturnValue(
       'http://localhost:4318',
     );
+    vi.spyOn(mockConfig, 'getTelemetrySslRootFilePath').mockReturnValue(
+      undefined,
+    );
 
     initializeTelemetry(mockConfig);
 
+    expect(fs.readFileSync).not.toHaveBeenCalled();
     expect(OTLPTraceExporterHttp).toHaveBeenCalledWith({
       url: 'http://localhost:4318/',
+      httpAgentOptions: undefined,
     });
     expect(OTLPLogExporterHttp).toHaveBeenCalledWith({
       url: 'http://localhost:4318/',
+      httpAgentOptions: undefined,
     });
     expect(OTLPMetricExporterHttp).toHaveBeenCalledWith({
       url: 'http://localhost:4318/',
+      httpAgentOptions: undefined,
     });
     expect(NodeSDK.prototype.start).toHaveBeenCalled();
+  });
+
+  it('should use SSL credentials for http when sslRootFilePath is provided', () => {
+    const fakePath = '/fake/path/to/roots.pem';
+    vi.spyOn(mockConfig, 'getTelemetryOtlpProtocol').mockReturnValue('http');
+    vi.spyOn(mockConfig, 'getTelemetryOtlpEndpoint').mockReturnValue(
+      'http://localhost:4318',
+    );
+    vi.spyOn(mockConfig, 'getTelemetrySslRootFilePath').mockReturnValue(
+      fakePath,
+    );
+    vi.mocked(fs.readFileSync).mockReturnValue(
+      Buffer.from('fake-cert-content'),
+    );
+
+    initializeTelemetry(mockConfig);
+
+    expect(fs.readFileSync).toHaveBeenCalledWith(fakePath);
+    const expectedHttpAgentOptions = { ca: Buffer.from('fake-cert-content') };
+    expect(OTLPTraceExporterHttp).toHaveBeenCalledWith({
+      url: 'http://localhost:4318/',
+      httpAgentOptions: expectedHttpAgentOptions,
+    });
+    expect(OTLPLogExporterHttp).toHaveBeenCalledWith({
+      url: 'http://localhost:4318/',
+      httpAgentOptions: expectedHttpAgentOptions,
+    });
+    expect(OTLPMetricExporterHttp).toHaveBeenCalledWith({
+      url: 'http://localhost:4318/',
+      httpAgentOptions: expectedHttpAgentOptions,
+    });
   });
 
   it('should parse gRPC endpoint correctly', () => {
@@ -235,5 +278,57 @@ describe('Telemetry SDK', () => {
     expect(OTLPLogExporterHttp).not.toHaveBeenCalled();
     expect(OTLPMetricExporterHttp).not.toHaveBeenCalled();
     expect(NodeSDK.prototype.start).toHaveBeenCalled();
+  });
+
+  it('should use SSL credentials for grpc when sslRootFilePath is provided', () => {
+    const fakePath = '/fake/path/to/roots.pem';
+    const mockSslCreds = {} as ChannelCredentials;
+    vi.mocked(credentials.createSsl).mockReturnValue(mockSslCreds);
+
+    vi.spyOn(mockConfig, 'getTelemetrySslRootFilePath').mockReturnValue(
+      fakePath,
+    );
+
+    vi.mocked(fs.readFileSync).mockReturnValue('fake-cert-content');
+
+    initializeTelemetry(mockConfig);
+
+    expect(fs.readFileSync).toHaveBeenCalledWith(fakePath);
+    expect(credentials.createSsl).toHaveBeenCalledWith('fake-cert-content');
+    expect(OTLPTraceExporter).toHaveBeenCalledWith(
+      expect.objectContaining({
+        credentials: mockSslCreds,
+      }),
+    );
+    expect(OTLPLogExporter).toHaveBeenCalledWith(
+      expect.objectContaining({
+        credentials: mockSslCreds,
+      }),
+    );
+    expect(OTLPMetricExporter).toHaveBeenCalledWith(
+      expect.objectContaining({
+        credentials: mockSslCreds,
+      }),
+    );
+  });
+
+  it('should not use SSL credentials for grpc when sslRootFilePath is not provided', () => {
+    initializeTelemetry(mockConfig);
+
+    expect(fs.readFileSync).not.toHaveBeenCalled();
+    expect(credentials.createSsl).not.toHaveBeenCalled();
+
+    expect(OTLPTraceExporter).toHaveBeenCalledWith({
+      url: 'http://localhost:4317',
+      compression: 'gzip',
+    });
+    expect(OTLPLogExporter).toHaveBeenCalledWith({
+      url: 'http://localhost:4317',
+      compression: 'gzip',
+    });
+    expect(OTLPMetricExporter).toHaveBeenCalledWith({
+      url: 'http://localhost:4317',
+      compression: 'gzip',
+    });
   });
 });

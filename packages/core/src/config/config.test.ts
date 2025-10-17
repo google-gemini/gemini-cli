@@ -540,6 +540,25 @@ describe('Server Config (config.ts)', () => {
       const config = new Config(paramsWithoutTelemetry);
       expect(config.getTelemetryOtlpProtocol()).toBe('grpc');
     });
+
+    it('should return provided SSL root file path', () => {
+      const sslPath = '/path/to/cert.pem';
+      const params: ConfigParameters = {
+        ...baseParams,
+        telemetry: { enabled: true, rootCertPath: sslPath },
+      };
+      const config = new Config(params);
+      expect(config.getTelemetrySslRootFilePath()).toBe(sslPath);
+    });
+
+    it('should return undefined for SSL root file path if not provided', () => {
+      const params: ConfigParameters = {
+        ...baseParams,
+        telemetry: { enabled: true },
+      };
+      const config = new Config(params);
+      expect(config.getTelemetrySslRootFilePath()).toBeUndefined();
+    });
   });
 
   describe('UseRipgrep Configuration', () => {
