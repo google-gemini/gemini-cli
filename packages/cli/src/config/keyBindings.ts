@@ -46,7 +46,6 @@ export enum Command {
 
   // App level bindings
   SHOW_ERROR_DETAILS = 'showErrorDetails',
-  TOGGLE_TOOL_DESCRIPTIONS = 'toggleToolDescriptions',
   TOGGLE_IDE_CONTEXT_DETAIL = 'toggleIDEContextDetail',
   TOGGLE_MARKDOWN = 'toggleMarkdown',
   QUIT = 'quit',
@@ -157,7 +156,6 @@ export const defaultKeyBindings: KeyBindingConfig = {
 
   // App level bindings
   [Command.SHOW_ERROR_DETAILS]: [{ key: 'o', ctrl: true }],
-  [Command.TOGGLE_TOOL_DESCRIPTIONS]: [{ key: 't', ctrl: true }],
   [Command.TOGGLE_IDE_CONTEXT_DETAIL]: [{ key: 'g', ctrl: true }],
   [Command.TOGGLE_MARKDOWN]: [{ key: 'm', command: true }],
   [Command.QUIT]: [{ key: 'c', ctrl: true }],
