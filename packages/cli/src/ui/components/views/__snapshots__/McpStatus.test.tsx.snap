@@ -136,23 +136,6 @@ A test server
 "
 `;
 
-exports[`McpStatus > renders correctly with tips enabled 1`] = `
-"Configured MCP servers:
-
-🟢 server-1 - Ready (1 tool)
-A test server
-  Tools:
-  - tool-1
-    A test tool
-
-
-💡 Tips:
-  - Use /mcp desc to show server and tool descriptions
-  - Use /mcp schema to show tool parameter schemas
-  - Use /mcp nodesc to hide descriptions
-  - Use /mcp auth <server-name> to authenticate with OAuth-enabled servers"
-`;
-
 exports[`McpStatus > renders correctly with unauthenticated OAuth status 1`] = `
 "Configured MCP servers:
 
