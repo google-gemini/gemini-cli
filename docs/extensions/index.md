@@ -137,6 +137,7 @@ The file has the following structure:
 {
   "name": "my-extension",
   "version": "1.0.0",
+  "author": "Your Name or Organization",
   "mcpServers": {
     "my-server": {
       "command": "node my-server.js"
@@ -154,6 +155,10 @@ The file has the following structure:
   your extension in the CLI. Note that we expect this name to match the
   extension directory name.
 - `version`: The version of the extension.
+- `author` (optional): A string representing the author or organization that
+  created the extension. This can be a person's name (e.g., "Christine Betts"),
+  an organization (e.g., "Google"), or a website (e.g., "example.com"). This
+  field is displayed when listing extensions to help users identify the source.
 - `mcpServers`: A map of MCP servers to configure. The key is the name of the
   server, and the value is the server configuration. These servers will be
   loaded on startup just like MCP servers configured in a

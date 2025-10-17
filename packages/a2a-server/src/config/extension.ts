@@ -31,6 +31,7 @@ export const INSTALL_METADATA_FILENAME = '.gemini-extension-install.json';
 interface ExtensionConfig {
   name: string;
   version: string;
+  author?: string;
   mcpServers?: Record<string, MCPServerConfig>;
   contextFileName?: string | string[];
   excludeTools?: string[];
@@ -110,6 +111,7 @@ function loadExtension(extensionDir: string): GeminiCLIExtension | null {
     return {
       name: config.name,
       version: config.version,
+      author: config.author,
       path: extensionDir,
       contextFiles,
       installMetadata,

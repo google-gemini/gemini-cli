@@ -21,6 +21,8 @@ import {
   loadExtensionConfig,
   loadExtensions,
   performWorkspaceExtensionMigration,
+  requestConsentNonInteractive,
+  toOutputString,
   uninstallExtension,
 } from './extension.js';
 import {
@@ -111,6 +113,14 @@ vi.mock('child_process', async (importOriginal) => {
     execSync: vi.fn(),
   };
 });
+
+const mockQuestion = vi.hoisted(() => vi.fn());
+vi.mock('node:readline', () => ({
+  createInterface: () => ({
+    question: mockQuestion,
+    close: vi.fn(),
+  }),
+}));
 
 const EXTENSIONS_DIRECTORY_NAME = path.join(GEMINI_DIR, 'extensions');
 
@@ -508,6 +518,72 @@ describe('extension tests', () => {
         expect.stringContaining('Invalid extension name: "bad_name"'),
       );
       consoleSpy.mockRestore();
+    });
+
+    it('should load extension with author field', () => {
+      createExtension({
+        extensionsDir: userExtensionsDir,
+        name: 'test-extension',
+        version: '1.0.0',
+        author: 'Google',
+      });
+
+      const extensions = loadExtensions(
+        new ExtensionEnablementManager(ExtensionStorage.getUserExtensionsDir()),
+      );
+
+      expect(extensions).toHaveLength(1);
+      expect(extensions[0].name).toBe('test-extension');
+      expect(extensions[0].author).toBe('Google');
+    });
+
+    it('should load extension without author field for backward compatibility', () => {
+      createExtension({
+        extensionsDir: userExtensionsDir,
+        name: 'test-extension',
+        version: '1.0.0',
+      });
+
+      const extensions = loadExtensions(
+        new ExtensionEnablementManager(ExtensionStorage.getUserExtensionsDir()),
+      );
+
+      expect(extensions).toHaveLength(1);
+      expect(extensions[0].name).toBe('test-extension');
+      expect(extensions[0].author).toBeUndefined();
+    });
+
+    it('should display author in toOutputString', () => {
+      createExtension({
+        extensionsDir: userExtensionsDir,
+        name: 'test-extension',
+        version: '1.0.0',
+        author: 'Christine Betts',
+      });
+
+      const extensions = loadExtensions(
+        new ExtensionEnablementManager(ExtensionStorage.getUserExtensionsDir()),
+      );
+      const output = toOutputString(extensions[0], tempWorkspaceDir);
+
+      expect(output).toContain('test-extension (1.0.0)');
+      expect(output).toContain('Author: Christine Betts');
+    });
+
+    it('should not display author line when author is not present', () => {
+      createExtension({
+        extensionsDir: userExtensionsDir,
+        name: 'test-extension',
+        version: '1.0.0',
+      });
+
+      const extensions = loadExtensions(
+        new ExtensionEnablementManager(ExtensionStorage.getUserExtensionsDir()),
+      );
+      const output = toOutputString(extensions[0], tempWorkspaceDir);
+
+      expect(output).toContain('test-extension (1.0.0)');
+      expect(output).not.toContain('Author:');
     });
   });
 
@@ -978,6 +1054,69 @@ This extension will run the following MCP servers:
   * test-server (local): node dobadthing \\u001b[12D\\u001b[K server.js
   * test-server-2 (remote): https://google.com`,
       );
+    });
+
+    it('should display author in consent prompt when author field is present', async () => {
+      const consoleInfoSpy = vi.spyOn(console, 'info');
+      const sourceExtDir = createExtension({
+        extensionsDir: tempHomeDir,
+        name: 'my-extension-with-author',
+        version: '1.0.0',
+        author: 'Christine Betts',
+        mcpServers: {
+          'test-server': {
+            command: 'node',
+            args: ['server.js'],
+          },
+        },
+      });
+
+      mockQuestion.mockImplementation((_query, callback) => callback('y'));
+
+      await expect(
+        installOrUpdateExtension(
+          { source: sourceExtDir, type: 'local' },
+          requestConsentNonInteractive,
+        ),
+      ).resolves.toBe('my-extension-with-author');
+
+      expect(consoleInfoSpy).toHaveBeenCalledWith(
+        `Installing extension "my-extension-with-author".
+Author: Christine Betts
+**Extensions may introduce unexpected behavior. Ensure you have investigated the extension source and trust the author.**
+This extension will run the following MCP servers:
+  * test-server (local): node server.js`,
+      );
+    });
+
+    it('should not display author line in consent prompt when author field is absent', async () => {
+      const consoleInfoSpy = vi.spyOn(console, 'info');
+      const sourceExtDir = createExtension({
+        extensionsDir: tempHomeDir,
+        name: 'my-extension-no-author',
+        version: '1.0.0',
+        mcpServers: {
+          'test-server': {
+            command: 'node',
+            args: ['server.js'],
+          },
+        },
+      });
+
+      mockQuestion.mockImplementation((_query, callback) => callback('y'));
+
+      await expect(
+        installOrUpdateExtension(
+          { source: sourceExtDir, type: 'local' },
+          requestConsentNonInteractive,
+        ),
+      ).resolves.toBe('my-extension-no-author');
+
+      const consentCall = consoleInfoSpy.mock.calls.find((call) =>
+        call[0].includes('Installing extension'),
+      );
+      expect(consentCall).toBeDefined();
+      expect(consentCall![0]).not.toContain('Author:');
     });
 
     it('should continue installation if user accepts prompt for local extension with mcp servers', async () => {
