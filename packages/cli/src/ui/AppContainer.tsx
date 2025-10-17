@@ -621,12 +621,17 @@ Logging in with Google... Please restart Gemini CLI to continue.
     onApprovalModeChange: handleApprovalModeChange,
   });
 
-  const { messageQueue, addMessage, clearQueue, getQueuedMessagesText } =
-    useMessageQueue({
-      isConfigInitialized,
-      streamingState,
-      submitQuery,
-    });
+  const {
+    messageQueue,
+    addMessage,
+    clearQueue,
+    getQueuedMessagesText,
+    popAllMessages,
+  } = useMessageQueue({
+    isConfigInitialized,
+    streamingState,
+    submitQuery,
+  });
 
   cancelHandlerRef.current = useCallback(() => {
     const pendingHistoryItems = [
@@ -1306,6 +1311,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       onWorkspaceMigrationDialogClose,
       handleProQuotaChoice,
       setQueueErrorMessage,
+      popAllMessages,
     }),
     [
       handleThemeSelect,
@@ -1332,6 +1338,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       onWorkspaceMigrationDialogClose,
       handleProQuotaChoice,
       setQueueErrorMessage,
+      popAllMessages,
     ],
   );
 

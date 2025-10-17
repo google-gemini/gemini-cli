@@ -232,4 +232,160 @@ describe('useMessageQueue', () => {
     expect(mockSubmitQuery).toHaveBeenCalledWith('Second batch');
     expect(mockSubmitQuery).toHaveBeenCalledTimes(2);
   });
+
+  describe('popAllMessages', () => {
+    it('should pop all messages and return them joined with double newlines', () => {
+      const { result } = renderHook(() =>
+        useMessageQueue({
+          isConfigInitialized: true,
+          streamingState: StreamingState.Responding,
+          submitQuery: mockSubmitQuery,
+        }),
+      );
+
+      // Add multiple messages
+      act(() => {
+        result.current.addMessage('Message 1');
+        result.current.addMessage('Message 2');
+        result.current.addMessage('Message 3');
+      });
+
+      expect(result.current.messageQueue).toEqual([
+        'Message 1',
+        'Message 2',
+        'Message 3',
+      ]);
+
+      // Pop all messages
+      let poppedMessages: string | undefined;
+      act(() => {
+        result.current.popAllMessages((messages) => {
+          poppedMessages = messages;
+        });
+      });
+
+      expect(poppedMessages).toBe('Message 1\n\nMessage 2\n\nMessage 3');
+      expect(result.current.messageQueue).toEqual([]);
+    });
+
+    it('should return undefined when queue is empty', () => {
+      const { result } = renderHook(() =>
+        useMessageQueue({
+          isConfigInitialized: true,
+          streamingState: StreamingState.Responding,
+          submitQuery: mockSubmitQuery,
+        }),
+      );
+
+      let poppedMessages: string | undefined = 'not-undefined';
+      act(() => {
+        result.current.popAllMessages((messages) => {
+          poppedMessages = messages;
+        });
+      });
+
+      expect(poppedMessages).toBeUndefined();
+      expect(result.current.messageQueue).toEqual([]);
+    });
+
+    it('should handle single message correctly', () => {
+      const { result } = renderHook(() =>
+        useMessageQueue({
+          isConfigInitialized: true,
+          streamingState: StreamingState.Responding,
+          submitQuery: mockSubmitQuery,
+        }),
+      );
+
+      act(() => {
+        result.current.addMessage('Single message');
+      });
+
+      let poppedMessages: string | undefined;
+      act(() => {
+        result.current.popAllMessages((messages) => {
+          poppedMessages = messages;
+        });
+      });
+
+      expect(poppedMessages).toBe('Single message');
+      expect(result.current.messageQueue).toEqual([]);
+    });
+
+    it('should clear the entire queue after popping', () => {
+      const { result } = renderHook(() =>
+        useMessageQueue({
+          isConfigInitialized: true,
+          streamingState: StreamingState.Responding,
+          submitQuery: mockSubmitQuery,
+        }),
+      );
+
+      act(() => {
+        result.current.addMessage('Message 1');
+        result.current.addMessage('Message 2');
+      });
+
+      act(() => {
+        result.current.popAllMessages(() => {});
+      });
+
+      // Queue should be empty
+      expect(result.current.messageQueue).toEqual([]);
+      expect(result.current.getQueuedMessagesText()).toBe('');
+
+      // Popping again should return undefined
+      let secondPop: string | undefined = 'not-undefined';
+      act(() => {
+        result.current.popAllMessages((messages) => {
+          secondPop = messages;
+        });
+      });
+
+      expect(secondPop).toBeUndefined();
+    });
+
+    it('should work correctly with state updates', () => {
+      const { result } = renderHook(() =>
+        useMessageQueue({
+          isConfigInitialized: true,
+          streamingState: StreamingState.Responding,
+          submitQuery: mockSubmitQuery,
+        }),
+      );
+
+      // Add messages
+      act(() => {
+        result.current.addMessage('First');
+        result.current.addMessage('Second');
+      });
+
+      // Pop all messages
+      let firstPop: string | undefined;
+      act(() => {
+        result.current.popAllMessages((messages) => {
+          firstPop = messages;
+        });
+      });
+
+      expect(firstPop).toBe('First\n\nSecond');
+
+      // Add new messages after popping
+      act(() => {
+        result.current.addMessage('Third');
+        result.current.addMessage('Fourth');
+      });
+
+      // Pop again
+      let secondPop: string | undefined;
+      act(() => {
+        result.current.popAllMessages((messages) => {
+          secondPop = messages;
+        });
+      });
+
+      expect(secondPop).toBe('Third\n\nFourth');
+      expect(result.current.messageQueue).toEqual([]);
+    });
+  });
 });

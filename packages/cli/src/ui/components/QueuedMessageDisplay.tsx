@@ -21,13 +21,16 @@ export const QueuedMessageDisplay = ({
 
   return (
     <Box flexDirection="column" marginTop={1}>
+      <Box paddingLeft={2}>
+        <Text dimColor>Queued (press ↑ to edit):</Text>
+      </Box>
       {messageQueue
         .slice(0, MAX_DISPLAYED_QUEUED_MESSAGES)
         .map((message, index) => {
           const preview = message.replace(/\s+/g, ' ');
 
           return (
-            <Box key={index} paddingLeft={2} width="100%">
+            <Box key={index} paddingLeft={4} width="100%">
               <Text dimColor wrap="truncate">
                 {preview}
               </Text>
@@ -35,7 +38,7 @@ export const QueuedMessageDisplay = ({
           );
         })}
       {messageQueue.length > MAX_DISPLAYED_QUEUED_MESSAGES && (
-        <Box paddingLeft={2}>
+        <Box paddingLeft={4}>
           <Text dimColor>
             ... (+
             {messageQueue.length - MAX_DISPLAYED_QUEUED_MESSAGES} more)
