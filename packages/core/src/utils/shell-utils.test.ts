@@ -24,6 +24,7 @@ import {
   stripShellWrapper,
 } from './shell-utils.js';
 import type { Config } from '../config/config.js';
+import type { WorkspaceContext } from './workspaceContext.js';
 
 const mockPlatform = vi.hoisted(() => vi.fn());
 const mockHomedir = vi.hoisted(() => vi.fn());
@@ -200,9 +201,10 @@ describe('isCommandAllowed', () => {
 
   describe('with unsafe redirections', () => {
     beforeEach(() => {
-      config.getWorkspaceContext = () => ({
-        getDirectories: () => ['/workspace'],
-      });
+      config.getWorkspaceContext = () =>
+        ({
+          getDirectories: () => ['/workspace'],
+        }) as Partial<WorkspaceContext> as WorkspaceContext;
     });
 
     it('should block output redirection to home directory', () => {
@@ -234,9 +236,10 @@ describe('isCommandAllowed', () => {
     });
 
     it('should block path traversal attempts', () => {
-      config.getWorkspaceContext = () => ({
-        getDirectories: () => ['/workspace/project/subdir'],
-      });
+      config.getWorkspaceContext = () =>
+        ({
+          getDirectories: () => ['/workspace/project/subdir'],
+        }) as Partial<WorkspaceContext> as WorkspaceContext;
       const result = isCommandAllowed(
         'cat secret > ../../../etc/passwd',
         config,

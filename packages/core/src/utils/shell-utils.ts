@@ -5,7 +5,7 @@
  */
 
 import type { AnyToolInvocation } from '../index.js';
-import type { Config } from '../config.js';
+import type { Config } from '../config/config.js';
 import os from 'node:os';
 import path from 'node:path';
 import { quote } from 'shell-quote';
@@ -297,7 +297,9 @@ function collectRedirections(root: Node, source: string): RedirectionDetail[] {
           // Determine redirect type by looking at the operator
           const operatorNode = current.children.find(
             (child) =>
-              child.type === '>' || child.type === '>>' || child.type === '<',
+              child?.type === '>' ||
+              child?.type === '>>' ||
+              child?.type === '<',
           );
           const operator = operatorNode
             ? source.slice(operatorNode.startIndex, operatorNode.endIndex)
@@ -632,7 +634,7 @@ function unquotePath(filePath: string): string {
  */
 function isPathOutsideWorkspace(
   targetPath: string,
-  workspaceDirs: string[],
+  workspaceDirs: readonly string[],
 ): boolean {
   try {
     // Expand tilde and remove quotes
@@ -678,7 +680,7 @@ function isPathOutsideWorkspace(
  */
 export function checkForUnsafeRedirections(
   command: string,
-  workspaceDirs: string[],
+  workspaceDirs: readonly string[],
 ): RedirectionCheckResult {
   const tree = parseCommandTree(command);
   if (!tree) {
@@ -867,7 +869,7 @@ export function checkCommandPermissions(
   } else {
     // "DEFAULT ALLOW" MODE: No session allowlist.
     const hasSpecificAllowedCommands =
-      coreTools.filter((tool) =>
+      coreTools.filter((tool: string) =>
         SHELL_TOOL_NAMES.some((name) => tool.startsWith(`${name}(`)),
       ).length > 0;
 
