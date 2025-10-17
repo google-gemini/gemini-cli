@@ -609,6 +609,7 @@ export async function discoverTools(
             mcpServerConfig.trust,
             undefined,
             cliConfig,
+            mcpServerConfig.extensionName,
           ),
         );
       } catch (error) {

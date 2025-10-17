@@ -262,6 +262,7 @@ export abstract class DeclarativeTool<
     readonly isOutputMarkdown: boolean = true,
     readonly canUpdateOutput: boolean = false,
     readonly messageBus?: MessageBus,
+    readonly extensionId?: string,
   ) {}
 
   get schema(): FunctionDeclaration {

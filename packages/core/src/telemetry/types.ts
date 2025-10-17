@@ -54,6 +54,8 @@ export class StartSessionEvent implements BaseTelemetryEvent {
   mcp_tools_count?: number;
   mcp_tools?: string;
   output_format: OutputFormat;
+  extensions_count: number;
+  extensions: string;
 
   constructor(config: Config, toolRegistry?: ToolRegistry) {
     const generatorConfig = config.getContentGeneratorConfig();
@@ -85,6 +87,9 @@ export class StartSessionEvent implements BaseTelemetryEvent {
       config.getFileFilteringRespectGitIgnore();
     this.mcp_servers_count = mcpServers ? Object.keys(mcpServers).length : 0;
     this.output_format = config.getOutputFormat();
+    const extensions = config.getExtensions();
+    this.extensions_count = extensions.length;
+    this.extensions = extensions.map((e) => e.name).join(',');
     if (toolRegistry) {
       const mcpTools = toolRegistry
         .getAllTools()
@@ -116,6 +121,8 @@ export class StartSessionEvent implements BaseTelemetryEvent {
       mcp_tools: this.mcp_tools,
       mcp_tools_count: this.mcp_tools_count,
       output_format: this.output_format,
+      extensions_count: this.extensions_count,
+      extensions: this.extensions,
     };
   }
 
@@ -198,6 +205,7 @@ export class ToolCallEvent implements BaseTelemetryEvent {
   tool_type: 'native' | 'mcp';
   content_length?: number;
   mcp_server_name?: string;
+  extension_id?: string;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   metadata?: { [key: string]: any };
 
@@ -243,8 +251,10 @@ export class ToolCallEvent implements BaseTelemetryEvent {
       ) {
         this.tool_type = 'mcp';
         this.mcp_server_name = call.tool.serverName;
+        this.extension_id = call.tool.extensionId;
       } else {
         this.tool_type = 'native';
+        this.extension_id = call.tool?.extensionId;
       }
 
       if (
@@ -292,6 +302,7 @@ export class ToolCallEvent implements BaseTelemetryEvent {
       tool_type: this.tool_type,
       content_length: this.content_length,
       mcp_server_name: this.mcp_server_name,
+      extension_id: this.extension_id,
       metadata: this.metadata,
     };
 
@@ -627,6 +638,7 @@ export interface SlashCommandEvent extends BaseTelemetryEvent {
   command: string;
   subcommand?: string;
   status?: SlashCommandStatus;
+  extension_id?: string;
   toOpenTelemetryAttributes(config: Config): LogAttributes;
   toLogBody(): string;
 }
@@ -635,6 +647,7 @@ export function makeSlashCommandEvent({
   command,
   subcommand,
   status,
+  extension_id,
 }: Omit<
   SlashCommandEvent,
   CommonFields | 'toOpenTelemetryAttributes' | 'toLogBody'
@@ -645,6 +658,7 @@ export function makeSlashCommandEvent({
     command,
     subcommand,
     status,
+    extension_id,
     toOpenTelemetryAttributes(config: Config): LogAttributes {
       return {
         ...getCommonAttributes(config),
@@ -653,6 +667,7 @@ export function makeSlashCommandEvent({
         command: this.command,
         subcommand: this.subcommand,
         status: this.status,
+        extension_id: this.extension_id,
       };
     },
     toLogBody(): string {

@@ -391,6 +391,12 @@ export enum EventMetadataKey {
   // Logs the status of the extension uninstall
   GEMINI_CLI_EXTENSION_UPDATE_STATUS = 118,
 
+  // Logs the count of extensions in Start Session Event
+  GEMINI_CLI_START_SESSION_EXTENSIONS_COUNT = 119,
+
+  // Logs the name of extensions as a comma-separated string
+  GEMINI_CLI_START_SESSION_EXTENSIONS = 120,
+
   // Logs the setting scope for an extension enablement.
   GEMINI_CLI_EXTENSION_ENABLE_SETTING_SCOPE = 102,
 

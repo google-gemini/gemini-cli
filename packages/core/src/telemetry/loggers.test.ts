@@ -201,6 +201,7 @@ describe('loggers', () => {
         getTargetDir: () => 'target-dir',
         getProxy: () => 'http://test.proxy.com:8080',
         getOutputFormat: () => OutputFormat.JSON,
+        getExtensions: () => [],
       } as unknown as Config;
 
       const startSessionEvent = new StartSessionEvent(mockConfig);
@@ -229,6 +230,8 @@ describe('loggers', () => {
           mcp_tools: undefined,
           mcp_tools_count: undefined,
           output_format: 'json',
+          extensions: '',
+          extensions_count: 0,
         },
       });
     });
@@ -1042,6 +1045,10 @@ describe('loggers', () => {
           },
           required: ['arg1', 'arg2'],
         },
+        false,
+        undefined,
+        undefined,
+        'test-extension',
       );
 
       const call: CompletedToolCall = {
@@ -1076,6 +1083,7 @@ describe('loggers', () => {
           'installation.id': 'test-installation-id',
           'event.name': EVENT_TOOL_CALL,
           'event.timestamp': '2025-01-01T00:00:00.000Z',
+          extension_id: 'test-extension',
           function_name: 'mock_mcp_tool',
           function_args: JSON.stringify(
             {
@@ -1094,6 +1102,7 @@ describe('loggers', () => {
           error: undefined,
           error_type: undefined,
           metadata: undefined,
+          content_length: undefined,
         },
       });
     });

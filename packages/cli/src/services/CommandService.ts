@@ -82,6 +82,7 @@ export class CommandService {
       commandMap.set(finalName, {
         ...cmd,
         name: finalName,
+        extension_id: cmd.extensionName,
       });
     }
 
