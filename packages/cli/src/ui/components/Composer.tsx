@@ -100,7 +100,6 @@ export const Composer = () => {
                 contextFileNames={contextFileNames}
                 mcpServers={config.getMcpServers()}
                 blockedMcpServers={config.getBlockedMcpServers()}
-                showToolDescriptions={uiState.showToolDescriptions}
               />
             )
           )}
