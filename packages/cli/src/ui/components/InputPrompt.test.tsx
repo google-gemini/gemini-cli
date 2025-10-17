@@ -1616,6 +1616,7 @@ describe('InputPrompt', () => {
 
         const { stdin, unmount } = renderWithProviders(
           <InputPrompt {...props} />,
+          { kittyProtocolEnabled: true },
         );
         await vi.runAllTimersAsync();
 
@@ -1661,6 +1662,7 @@ describe('InputPrompt', () => {
 
       const { stdin, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
+        { kittyProtocolEnabled: false },
       );
       await wait();
 
@@ -1682,6 +1684,7 @@ describe('InputPrompt', () => {
 
       const { stdin, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
+        { kittyProtocolEnabled: false },
       );
 
       stdin.write('\x1B');
@@ -1703,6 +1706,7 @@ describe('InputPrompt', () => {
 
       const { stdin, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
+        { kittyProtocolEnabled: false },
       );
       await wait();
 
@@ -1722,6 +1726,7 @@ describe('InputPrompt', () => {
 
       const { stdin, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
+        { kittyProtocolEnabled: false },
       );
       await wait();
 
@@ -1733,23 +1738,27 @@ describe('InputPrompt', () => {
     });
 
     it('should not call onEscapePromptChange when not provided', async () => {
+      vi.useFakeTimers();
       props.onEscapePromptChange = undefined;
       props.buffer.setText('some text');
 
       const { stdin, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
+        { kittyProtocolEnabled: false },
       );
-      await wait();
+      await vi.runAllTimersAsync();
 
       stdin.write('\x1B');
-      await wait();
+      await vi.runAllTimersAsync();
 
+      vi.useRealTimers();
       unmount();
     });
 
     it('should not interfere with existing keyboard shortcuts', async () => {
       const { stdin, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
+        { kittyProtocolEnabled: false },
       );
       await wait();
 
@@ -1821,6 +1830,7 @@ describe('InputPrompt', () => {
       stdin.write('\x12');
       await wait();
       stdin.write('\x1B');
+      stdin.write('\u001b[27u'); // Press kitty escape key
 
       await waitFor(() => {
         expect(stdout.lastFrame()).not.toContain('(r:)');
@@ -1922,7 +1932,7 @@ describe('InputPrompt', () => {
       stdin.write('\x12');
       await wait();
       expect(stdout.lastFrame()).toContain('(r:)');
-      stdin.write('\x1B');
+      stdin.write('\u001b[27u'); // Press kitty escape key
 
       await waitFor(() => {
         expect(stdout.lastFrame()).not.toContain('(r:)');
