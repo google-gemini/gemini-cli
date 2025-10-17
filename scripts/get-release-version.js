@@ -359,7 +359,8 @@ function getPreviewVersion(args) {
   };
 }
 
-function getPatchVersion(patchFrom) {
+function getPatchVersion(args) {
+  const patchFrom = args['patch-from'];
   if (!patchFrom || (patchFrom !== 'stable' && patchFrom !== TAG_PREVIEW)) {
     throw new Error(
       'Patch type must be specified with --patch-from=stable or --patch-from=preview',
@@ -368,6 +369,7 @@ function getPatchVersion(patchFrom) {
   const distTag = patchFrom === 'stable' ? TAG_LATEST : TAG_PREVIEW;
   const { latestVersion, latestTag } = getAndVerifyTags({
     npmDistTag: distTag,
+    args,
   });
 
   if (patchFrom === 'stable') {
@@ -407,7 +409,7 @@ function getPatchVersion(patchFrom) {
 
 export function getVersion(options = {}) {
   const args = { ...getArgs(), ...options };
-  const type = args['type']; // Nightly is the default.
+  const type = args['type'] || TAG_NIGHTLY; // Nightly is the default.
 
   let versionData;
   switch (type) {
@@ -415,7 +417,7 @@ export function getVersion(options = {}) {
       versionData = getNightlyVersion();
       // Nightly versions include a git hash, so conflicts are highly unlikely
       // and indicate a problem. We'll still validate but not auto-increment.
-      if (doesVersionExist(versionData.releaseVersion)) {
+      if (doesVersionExist({ args, version: versionData.releaseVersion })) {
         throw new Error(
           `Version conflict! Nightly version ${versionData.releaseVersion} already exists.`,
         );
@@ -431,7 +433,8 @@ export function getVersion(options = {}) {
       versionData = getPreviewVersion(args);
       break;
     case 'patch':
-      versionData = getPatchVersion(args['patch-from']);
+      console.log(args);
+      versionData = getPatchVersion(args);
       break;
     default:
       throw new Error(`Unknown release type: ${type}`);
@@ -440,7 +443,7 @@ export function getVersion(options = {}) {
   // For patchable versions, check for existence and increment if needed.
   if (type === 'stable' || type === TAG_PREVIEW || type === 'patch') {
     let releaseVersion = versionData.releaseVersion;
-    while (doesVersionExist(releaseVersion)) {
+    while (doesVersionExist({ args, version: releaseVersion })) {
       console.error(`Version ${releaseVersion} exists, incrementing.`);
       if (releaseVersion.includes('-preview.')) {
         // Increment preview number: 0.6.0-preview.2 -> 0.6.0-preview.3
