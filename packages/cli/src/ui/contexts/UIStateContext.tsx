@@ -82,6 +82,7 @@ export interface UIState {
   filteredConsoleMessages: ConsoleMessageItem[];
   ideContextState: IdeContext | undefined;
   showToolDescriptions: boolean;
+  renderMarkdown: boolean;
   ctrlCPressedOnce: boolean;
   ctrlDPressedOnce: boolean;
   showEscapePrompt: boolean;
@@ -89,6 +90,7 @@ export interface UIState {
   currentLoadingPhrase: string;
   historyRemountKey: number;
   messageQueue: string[];
+  queueErrorMessage: string | null;
   showAutoAcceptIndicator: ApprovalMode;
   showWorkspaceMigrationDialog: boolean;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

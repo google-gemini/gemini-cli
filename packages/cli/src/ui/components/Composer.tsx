@@ -10,6 +10,7 @@ import { ContextSummaryDisplay } from './ContextSummaryDisplay.js';
 import { AutoAcceptIndicator } from './AutoAcceptIndicator.js';
 import { ShellModeIndicator } from './ShellModeIndicator.js';
 import { DetailedMessagesDisplay } from './DetailedMessagesDisplay.js';
+import { RawMarkdownIndicator } from './RawMarkdownIndicator.js';
 import { InputPrompt } from './InputPrompt.js';
 import { Footer } from './Footer.js';
 import { ShowMoreLines } from './ShowMoreLines.js';
@@ -89,6 +90,8 @@ export const Composer = () => {
             </Text>
           ) : uiState.showEscapePrompt ? (
             <Text color={theme.text.secondary}>Press Esc again to clear.</Text>
+          ) : uiState.queueErrorMessage ? (
+            <Text color={theme.status.error}>{uiState.queueErrorMessage}</Text>
           ) : (
             !settings.merged.ui?.hideContextSummary && (
               <ContextSummaryDisplay
@@ -108,6 +111,7 @@ export const Composer = () => {
               <AutoAcceptIndicator approvalMode={showAutoAcceptIndicator} />
             )}
           {uiState.shellModeActive && <ShellModeIndicator />}
+          {!uiState.renderMarkdown && <RawMarkdownIndicator />}
         </Box>
       </Box>
 
@@ -144,11 +148,14 @@ export const Composer = () => {
           focus={true}
           vimHandleInput={uiActions.vimHandleInput}
           isEmbeddedShellFocused={uiState.embeddedShellFocused}
+          popAllMessages={uiActions.popAllMessages}
           placeholder={
             vimEnabled
               ? "  Press 'i' for INSERT mode and 'Esc' for NORMAL mode."
               : '  Type your message or @path/to/file'
           }
+          setQueueErrorMessage={uiActions.setQueueErrorMessage}
+          streamingState={uiState.streamingState}
         />
       )}
 

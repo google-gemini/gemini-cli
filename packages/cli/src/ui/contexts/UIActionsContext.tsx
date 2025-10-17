@@ -23,7 +23,7 @@ export interface UIActions {
     scope: SettingScope,
   ) => void;
   setAuthState: (state: AuthState) => void;
-  onAuthError: (error: string) => void;
+  onAuthError: (error: string | null) => void;
   handleEditorSelect: (
     editorType: EditorType | undefined,
     scope: SettingScope,
@@ -45,6 +45,8 @@ export interface UIActions {
   onWorkspaceMigrationDialogOpen: () => void;
   onWorkspaceMigrationDialogClose: () => void;
   handleProQuotaChoice: (choice: 'auth' | 'continue') => void;
+  setQueueErrorMessage: (message: string | null) => void;
+  popAllMessages: (onPop: (messages: string | undefined) => void) => void;
 }
 
 export const UIActionsContext = createContext<UIActions | null>(null);
