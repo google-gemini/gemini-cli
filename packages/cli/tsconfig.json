@@ -16,6 +16,7 @@
   "exclude": [
     "node_modules",
     "dist",
+    // TODO(5691): Fix type errors and remove excludes.
     "src/nonInteractiveCli.test.ts",
     "src/services/FileCommandLoader.test.ts",
     "src/services/prompt-processors/argumentProcessor.test.ts",
