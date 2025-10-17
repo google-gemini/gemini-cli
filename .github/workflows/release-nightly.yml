@@ -93,7 +93,7 @@ jobs:
           GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
         run: |
           # Calculate the version using the centralized script
-          VERSION_JSON=$(node scripts/get-release-version.js --type=nightly)
+          VERSION_JSON=$(node scripts/get-release-version.js --cli-package-name ${{ vars.CLI_PACKAGE_NAME }} --type=nightly)
 
           # Extract values for logging and outputs
           RELEASE_TAG=$(echo "${VERSION_JSON}" | jq -r .releaseTag)
