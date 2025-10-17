@@ -29,7 +29,6 @@ describe('<ContextSummaryDisplay />', () => {
     geminiMdFileCount: 1,
     contextFileNames: ['GEMINI.md'],
     mcpServers: { 'test-server': { command: 'test' } },
-    showToolDescriptions: false,
     ideContext: {
       workspaceState: {
         openFiles: [{ path: '/a/b/c' }],
@@ -41,7 +40,7 @@ describe('<ContextSummaryDisplay />', () => {
     const { lastFrame } = renderWithWidth(120, baseProps);
     const output = lastFrame();
     expect(output).toContain(
-      'Using: 1 open file (ctrl+g to view) | 1 GEMINI.md file | 1 MCP server (ctrl+t to view)',
+      'Using: 1 open file (ctrl+g to view) | 1 GEMINI.md file | 1 MCP server',
     );
     // Check for absence of newlines
     expect(output.includes('\n')).toBe(false);
@@ -54,7 +53,7 @@ describe('<ContextSummaryDisplay />', () => {
       ' Using:',
       '   - 1 open file (ctrl+g to view)',
       '   - 1 GEMINI.md file',
-      '   - 1 MCP server (ctrl+t to view)',
+      '   - 1 MCP server',
     ];
     const actualLines = output.split('\n');
     expect(actualLines).toEqual(expectedLines);
