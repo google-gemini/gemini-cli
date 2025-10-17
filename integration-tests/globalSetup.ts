@@ -9,38 +9,28 @@ if (process.env['NO_COLOR'] !== undefined) {
   delete process.env['NO_COLOR'];
 }
 
-import {
-  mkdir,
-  readdir,
-  rm,
-  readFile,
-  writeFile,
-  unlink,
-} from 'node:fs/promises';
+import { mkdir, readdir, rm } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { getGlobalMemoryFilePath } from '../packages/core/src/tools/memoryTool.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const rootDir = join(__dirname, '..');
 const integrationTestsDir = join(rootDir, '.integration-tests');
 let runDir = ''; // Make runDir accessible in teardown
 
-const memoryFilePath = getGlobalMemoryFilePath();
-let originalMemoryContent: string | null = null;
-
 export async function setup() {
-  try {
-    originalMemoryContent = await readFile(memoryFilePath, 'utf-8');
-  } catch (e) {
-    if ((e as NodeJS.ErrnoException).code !== 'ENOENT') {
-      throw e;
-    }
-    // File doesn't exist, which is fine.
-  }
-
   runDir = join(integrationTestsDir, `${Date.now()}`);
   await mkdir(runDir, { recursive: true });
+
+  // Set the home directory to the test run directory to avoid conflicts
+  // with the user's local config.
+  process.env['HOME'] = runDir;
+  if (process.platform === 'win32') {
+    process.env['USERPROFILE'] = runDir;
+  }
+  // We also need to set the config dir explicitly, since the code might
+  // construct the path before the HOME env var is set.
+  process.env['GEMINI_CONFIG_DIR'] = join(runDir, '.gemini');
 
   // Clean up old test runs, but keep the latest few for debugging
   try {
@@ -76,16 +66,5 @@ export async function teardown() {
   // Cleanup the test run directory unless KEEP_OUTPUT is set
   if (process.env['KEEP_OUTPUT'] !== 'true' && runDir) {
     await rm(runDir, { recursive: true, force: true });
-  }
-
-  if (originalMemoryContent !== null) {
-    await mkdir(dirname(memoryFilePath), { recursive: true });
-    await writeFile(memoryFilePath, originalMemoryContent, 'utf-8');
-  } else {
-    try {
-      await unlink(memoryFilePath);
-    } catch {
-      // File might not exist if the test failed before creating it.
-    }
   }
 }
