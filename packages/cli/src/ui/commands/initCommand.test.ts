@@ -76,7 +76,13 @@ describe('initCommand', () => {
     );
 
     // Assert: Check that the correct prompt is submitted
+    if (!result) {
+      throw new Error('Expected result to be defined');
+    }
     expect(result.type).toBe('submit_prompt');
+    if (result.type !== 'submit_prompt') {
+      throw new Error('Expected result type to be submit_prompt');
+    }
     expect(result.content).toContain(
       'You are an AI agent that brings the power of Gemini',
     );

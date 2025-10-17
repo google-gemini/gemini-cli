@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { Mocked } from 'vitest';
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 
 import type { SlashCommand, CommandContext } from './types.js';
@@ -14,18 +13,14 @@ import type { GeminiClient } from '@google/gemini-cli-core';
 
 import * as fsPromises from 'node:fs/promises';
 import { chatCommand, serializeHistoryToMarkdown } from './chatCommand.js';
-import type { Stats } from 'node:fs';
+import type { Stats, PathLike } from 'node:fs';
 import type { HistoryItemWithoutId } from '../types.js';
 import path from 'node:path';
 
-vi.mock('fs/promises', () => ({
-  stat: vi.fn(),
-  readdir: vi.fn().mockResolvedValue(['file1.txt', 'file2.txt'] as string[]),
-  writeFile: vi.fn(),
-}));
+vi.mock('node:fs/promises');
 
 describe('chatCommand', () => {
-  const mockFs = fsPromises as Mocked<typeof fsPromises>;
+  const mockFs = vi.mocked(fsPromises);
 
   let mockContext: CommandContext;
   let mockGetChat: ReturnType<typeof vi.fn>;
@@ -75,6 +70,10 @@ describe('chatCommand', () => {
         },
       },
     });
+
+    mockFs.readdir.mockReset();
+    mockFs.stat.mockReset();
+    mockFs.writeFile.mockReset();
   });
 
   afterEach(() => {
@@ -99,9 +98,9 @@ describe('chatCommand', () => {
       const date1 = new Date();
       const date2 = new Date(date1.getTime() + 1000);
 
-      mockFs.readdir.mockResolvedValue(fakeFiles);
-      mockFs.stat.mockImplementation(async (path: string): Promise<Stats> => {
-        if (path.endsWith('test1.json')) {
+      mockFs.readdir.mockResolvedValue(fakeFiles as any);
+      mockFs.stat.mockImplementation(async (path: PathLike): Promise<Stats> => {
+        if (path.toString().endsWith('test1.json')) {
           return { mtime: date1 } as Stats;
         }
         return { mtime: date2 } as Stats;
@@ -275,17 +274,11 @@ describe('chatCommand', () => {
     describe('completion', () => {
       it('should provide completion suggestions', async () => {
         const fakeFiles = ['checkpoint-alpha.json', 'checkpoint-beta.json'];
-        mockFs.readdir.mockImplementation(
-          (async (_: string): Promise<string[]> =>
-            fakeFiles as string[]) as unknown as typeof fsPromises.readdir,
-        );
+        mockFs.readdir.mockResolvedValue(fakeFiles as any);
 
-        mockFs.stat.mockImplementation(
-          (async (_: string): Promise<Stats> =>
-            ({
-              mtime: new Date(),
-            }) as Stats) as unknown as typeof fsPromises.stat,
-        );
+        mockFs.stat.mockResolvedValue({
+          mtime: new Date(),
+        } as Stats);
 
         const result = await resumeCommand?.completion?.(mockContext, 'a');
 
@@ -295,18 +288,15 @@ describe('chatCommand', () => {
       it('should suggest filenames sorted by modified time (newest first)', async () => {
         const fakeFiles = ['checkpoint-test1.json', 'checkpoint-test2.json'];
         const date = new Date();
-        mockFs.readdir.mockImplementation(
-          (async (_: string): Promise<string[]> =>
-            fakeFiles as string[]) as unknown as typeof fsPromises.readdir,
+        mockFs.readdir.mockResolvedValue(fakeFiles as any);
+        mockFs.stat.mockImplementation(
+          async (path: PathLike): Promise<Stats> => {
+            if (path.toString().endsWith('test1.json')) {
+              return { mtime: date } as Stats;
+            }
+            return { mtime: new Date(date.getTime() + 1000) } as Stats;
+          },
         );
-        mockFs.stat.mockImplementation((async (
-          path: string,
-        ): Promise<Stats> => {
-          if (path.endsWith('test1.json')) {
-            return { mtime: date } as Stats;
-          }
-          return { mtime: new Date(date.getTime() + 1000) } as Stats;
-        }) as unknown as typeof fsPromises.stat);
 
         const result = await resumeCommand?.completion?.(mockContext, '');
         // Sort items by last modified time (newest first)
@@ -355,17 +345,11 @@ describe('chatCommand', () => {
     describe('completion', () => {
       it('should provide completion suggestions', async () => {
         const fakeFiles = ['checkpoint-alpha.json', 'checkpoint-beta.json'];
-        mockFs.readdir.mockImplementation(
-          (async (_: string): Promise<string[]> =>
-            fakeFiles as string[]) as unknown as typeof fsPromises.readdir,
-        );
+        mockFs.readdir.mockResolvedValue(fakeFiles as any);
 
-        mockFs.stat.mockImplementation(
-          (async (_: string): Promise<Stats> =>
-            ({
-              mtime: new Date(),
-            }) as Stats) as unknown as typeof fsPromises.stat,
-        );
+        mockFs.stat.mockResolvedValue({
+          mtime: new Date(),
+        } as Stats);
 
         const result = await deleteCommand?.completion?.(mockContext, 'a');
 
@@ -500,7 +484,7 @@ Hi there!`;
       const expectedPath = path.join(process.cwd(), 'my-chat.json');
       const [actualPath, actualContent] = mockFs.writeFile.mock.calls[0];
       expect(actualPath).toEqual(expectedPath);
-      const parsedContent = JSON.parse(actualContent);
+      const parsedContent = JSON.parse(actualContent as string);
       expect(Array.isArray(parsedContent)).toBe(true);
       parsedContent.forEach((item: Content) => {
         expect(item).toHaveProperty('role');
@@ -515,9 +499,9 @@ Hi there!`;
       const expectedPath = path.join(process.cwd(), 'my-chat.md');
       const [actualPath, actualContent] = mockFs.writeFile.mock.calls[0];
       expect(actualPath).toEqual(expectedPath);
-      const entries = actualContent.split('\n\n---\n\n');
+      const entries = (actualContent as string).split('\n\n---\n\n');
       expect(entries.length).toBe(mockHistory.length);
-      entries.forEach((entry, index) => {
+      entries.forEach((entry: string, index: number) => {
         const { role, parts } = mockHistory[index];
         const text = parts.map((p) => p.text).join('');
         const roleIcon = role === 'user' ? '🧑‍💻' : '✨';
