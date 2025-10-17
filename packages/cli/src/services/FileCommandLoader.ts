@@ -121,10 +121,15 @@ export class FileCommandLoader implements ICommandLoader {
         allCommands.push(...commands);
       } catch (error) {
         if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+          const errorMessage =
+            error instanceof Error ? error.message : String(error);
           console.error(
-            `[FileCommandLoader] Error loading commands from ${dirInfo.path}:`,
-            error,
+            `[FileCommandLoader] Error loading commands from ${dirInfo.path}: ${errorMessage}`,
           );
+          // Log stack trace for debugging in case it's not an ENOENT error
+          if (error instanceof Error && error.stack) {
+            console.error(`[FileCommandLoader] Stack trace:`, error.stack);
+          }
         }
       }
     }

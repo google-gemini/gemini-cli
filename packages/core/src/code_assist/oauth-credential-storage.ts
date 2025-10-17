@@ -87,7 +87,17 @@ export class OAuthCredentialStorage {
 
       // Also try to remove the old file if it exists
       const oldFilePath = path.join(os.homedir(), GEMINI_DIR, OAUTH_FILE);
-      await fs.rm(oldFilePath, { force: true }).catch(() => {});
+      await fs.rm(oldFilePath, { force: true }).catch((error) => {
+        // Ignore file not found errors, log others
+        if (
+          error &&
+          typeof error === 'object' &&
+          'code' in error &&
+          error.code !== 'ENOENT'
+        ) {
+          console.warn('Failed to remove old OAuth file:', error);
+        }
+      });
     } catch (error: unknown) {
       console.error(error);
       throw new Error('Failed to clear OAuth credentials');
@@ -123,7 +133,17 @@ export class OAuthCredentialStorage {
     await this.saveCredentials(credentials);
 
     // Remove old file after successful migration
-    await fs.rm(oldFilePath, { force: true }).catch(() => {});
+    await fs.rm(oldFilePath, { force: true }).catch((error) => {
+      // Ignore file not found errors, log others
+      if (
+        error &&
+        typeof error === 'object' &&
+        'code' in error &&
+        error.code !== 'ENOENT'
+      ) {
+        console.warn('Failed to remove old OAuth file after migration:', error);
+      }
+    });
 
     return credentials;
   }

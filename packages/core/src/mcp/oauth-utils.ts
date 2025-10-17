@@ -87,9 +87,20 @@ export class OAuthUtils {
   static async fetchProtectedResourceMetadata(
     resourceMetadataUrl: string,
   ): Promise<OAuthProtectedResourceMetadata | null> {
+    // Validate URL format
+    try {
+      new URL(resourceMetadataUrl);
+    } catch (_error) {
+      console.debug(`Invalid resource metadata URL: ${resourceMetadataUrl}`);
+      return null;
+    }
+
     try {
       const response = await fetch(resourceMetadataUrl);
       if (!response.ok) {
+        console.debug(
+          `Failed to fetch protected resource metadata: HTTP ${response.status} ${response.statusText}`,
+        );
         return null;
       }
       return (await response.json()) as OAuthProtectedResourceMetadata;
@@ -110,9 +121,22 @@ export class OAuthUtils {
   static async fetchAuthorizationServerMetadata(
     authServerMetadataUrl: string,
   ): Promise<OAuthAuthorizationServerMetadata | null> {
+    // Validate URL format
+    try {
+      new URL(authServerMetadataUrl);
+    } catch (_error) {
+      console.debug(
+        `Invalid authorization server metadata URL: ${authServerMetadataUrl}`,
+      );
+      return null;
+    }
+
     try {
       const response = await fetch(authServerMetadataUrl);
       if (!response.ok) {
+        console.debug(
+          `Failed to fetch authorization server metadata: HTTP ${response.status} ${response.statusText}`,
+        );
         return null;
       }
       return (await response.json()) as OAuthAuthorizationServerMetadata;

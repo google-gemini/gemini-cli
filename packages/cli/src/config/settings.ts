@@ -616,9 +616,9 @@ export function loadSettings(
                 );
               } catch (e) {
                 console.error(
-                  `Error migrating settings file on disk: ${getErrorMessage(
+                  `Error migrating settings file on disk at ${filePath}: ${getErrorMessage(
                     e,
-                  )}`,
+                  )}. The settings file may need manual migration.`,
                 );
               }
             } else {
