@@ -58,6 +58,11 @@ jobs:
           node-version-file: '.nvmrc'
           cache: 'npm'
 
+      - name: 'configure .npmrc'
+        uses: './.github/actions/setup-npmrc'
+        with:
+          github-token: '${{ secrets.GITHUB_TOKEN }}'
+
       - name: 'Install Script Dependencies'
         run: 'npm install yargs'
 
