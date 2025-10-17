@@ -148,6 +148,7 @@ export const Composer = () => {
           focus={true}
           vimHandleInput={uiActions.vimHandleInput}
           isEmbeddedShellFocused={uiState.embeddedShellFocused}
+          popAllMessages={uiActions.popAllMessages}
           placeholder={
             vimEnabled
               ? "  Press 'i' for INSERT mode and 'Esc' for NORMAL mode."
