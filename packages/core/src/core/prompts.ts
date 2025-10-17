@@ -7,13 +7,12 @@
 import path from 'node:path';
 import fs from 'node:fs';
 import os from 'node:os';
-import { EditTool } from '../tools/edit.js';
 import { GlobTool } from '../tools/glob.js';
 import { GrepTool } from '../tools/grep.js';
 import { ReadFileTool } from '../tools/read-file.js';
 import { ReadManyFilesTool } from '../tools/read-many-files.js';
 import { ShellTool } from '../tools/shell.js';
-import { WRITE_FILE_TOOL_NAME } from '../tools/tool-names.js';
+import { EDIT_TOOL_NAME, WRITE_FILE_TOOL_NAME } from '../tools/tool-names.js';
 import process from 'node:process';
 import { isGitRepository } from '../utils/gitUtils.js';
 import { MemoryTool } from '../tools/memoryTool.js';
@@ -136,14 +135,14 @@ ${(function () {
 1. **Understand:** Think about the user's request and the relevant codebase context. Use '${GrepTool.Name}' and '${GlobTool.Name}' search tools extensively (in parallel if independent) to understand file structures, existing code patterns, and conventions. Use '${ReadFileTool.Name}' and '${ReadManyFilesTool.Name}' to understand context and validate any assumptions you may have.
 2. **Plan:** Build a coherent and grounded (based on the understanding in step 1) plan for how you intend to resolve the user's task. Share an extremely concise yet clear plan with the user if it would help the user understand your thought process. As part of the plan, you should use an iterative development process that includes writing unit tests to verify your changes. Use output logs or debug statements as part of this process to arrive at a solution.`;
 })()}
-3. **Implement:** Use the available tools (e.g., '${EditTool.Name}', '${WRITE_FILE_TOOL_NAME}' '${ShellTool.Name}' ...) to act on the plan, strictly adhering to the project's established conventions (detailed under 'Core Mandates').
+3. **Implement:** Use the available tools (e.g., '${EDIT_TOOL_NAME}', '${WRITE_FILE_TOOL_NAME}' '${ShellTool.Name}' ...) to act on the plan, strictly adhering to the project's established conventions (detailed under 'Core Mandates').
 4. **Verify (Tests):** If applicable and feasible, verify the changes using the project's testing procedures. Identify the correct test commands and frameworks by examining 'README' files, build/package configuration (e.g., 'package.json'), or existing test execution patterns. NEVER assume standard test commands.
 5. **Verify (Standards):** VERY IMPORTANT: After making code changes, execute the project-specific build, linting and type-checking commands (e.g., 'tsc', 'npm run lint', 'ruff check .') that you have identified for this project (or obtained from the user). This ensures code quality and adherence to standards. If unsure about these commands, you can ask the user if they'd like you to run them and if so how to.
 6. **Finalize:** After all verification passes, consider the task complete. Do not remove or revert any changes or created files (like tests). Await the user's next instruction.
 
 ## New Applications
 
-**Goal:** Autonomously implement and deliver a visually appealing, substantially complete, and functional prototype. Utilize all tools at your disposal to implement the application. Some tools you may especially find useful are '${WRITE_FILE_TOOL_NAME}', '${EditTool.Name}' and '${ShellTool.Name}'.
+**Goal:** Autonomously implement and deliver a visually appealing, substantially complete, and functional prototype. Utilize all tools at your disposal to implement the application. Some tools you may especially find useful are '${WRITE_FILE_TOOL_NAME}', '${EDIT_TOOL_NAME}' and '${ShellTool.Name}'.
 
 1. **Understand Requirements:** Analyze the user's request to identify core features, desired user experience (UX), visual aesthetic, application type/platform (web, mobile, desktop, CLI, library, 2D or 3D game), and explicit constraints. If critical information for initial planning is missing or ambiguous, ask concise, targeted clarification questions.
 2. **Propose Plan:** Formulate an internal development plan. Present a clear, concise, high-level summary to the user. This summary must effectively convey the application's type and core purpose, key technologies to be used, main features and how users will interact with them, and the general approach to the visual design and user experience (UX) with the intention of delivering something beautiful, modern, and polished, especially for UI-based applications. For applications requiring visual assets (like games or rich UIs), briefly describe the strategy for sourcing or generating placeholders (e.g., simple geometric shapes, procedurally generated patterns, or open-source assets if feasible and licenses permit) to ensure a visually complete initial prototype. Ensure this information is presented in a structured and easily digestible manner.

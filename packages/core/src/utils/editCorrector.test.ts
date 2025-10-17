@@ -8,7 +8,7 @@
 import type { Mock } from 'vitest';
 import { vi, describe, it, expect, beforeEach, type Mocked } from 'vitest';
 import * as fs from 'node:fs';
-import { EditTool } from '../tools/edit.js';
+import { EDIT_TOOL_NAME } from '../tools/tool-names.js';
 import type { BaseLlmClient } from '../core/baseLlmClient.js';
 
 // MOCKS
@@ -582,8 +582,8 @@ describe('editCorrector', () => {
             parts: [
               {
                 functionResponse: {
-                  name: EditTool.Name,
-                  id: `${EditTool.Name}-${lastEditTime}-123`,
+                  name: EDIT_TOOL_NAME,
+                  id: `${EDIT_TOOL_NAME}-${lastEditTime}-123`,
                   response: {
                     output: {
                       llmContent: `Successfully modified file: ${filePath}`,
