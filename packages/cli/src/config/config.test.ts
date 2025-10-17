@@ -8,13 +8,13 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import {
-  ShellTool,
   EditTool,
   WriteFileTool,
   DEFAULT_GEMINI_MODEL,
   DEFAULT_GEMINI_MODEL_AUTO,
   OutputFormat,
   type GeminiCLIExtension,
+  SHELL_TOOL_NAME,
 } from '@google/gemini-cli-core';
 import {
   loadCliConfig,
@@ -753,7 +753,7 @@ describe('mergeMcpServers', () => {
 });
 
 describe('mergeExcludeTools', () => {
-  const defaultExcludes = [ShellTool.Name, EditTool.Name, WriteFileTool.Name];
+  const defaultExcludes = [SHELL_TOOL_NAME, EditTool.Name, WriteFileTool.Name];
   const originalIsTTY = process.stdin.isTTY;
 
   beforeEach(() => {
@@ -1021,7 +1021,7 @@ describe('Approval mode tool exclusion logic', () => {
     );
 
     const excludedTools = config.getExcludeTools();
-    expect(excludedTools).toContain(ShellTool.Name);
+    expect(excludedTools).toContain(SHELL_TOOL_NAME);
     expect(excludedTools).toContain(EditTool.Name);
     expect(excludedTools).toContain(WriteFileTool.Name);
   });
@@ -1051,7 +1051,7 @@ describe('Approval mode tool exclusion logic', () => {
     );
 
     const excludedTools = config.getExcludeTools();
-    expect(excludedTools).toContain(ShellTool.Name);
+    expect(excludedTools).toContain(SHELL_TOOL_NAME);
     expect(excludedTools).toContain(EditTool.Name);
     expect(excludedTools).toContain(WriteFileTool.Name);
   });
@@ -1081,7 +1081,7 @@ describe('Approval mode tool exclusion logic', () => {
     );
 
     const excludedTools = config.getExcludeTools();
-    expect(excludedTools).toContain(ShellTool.Name);
+    expect(excludedTools).toContain(SHELL_TOOL_NAME);
     expect(excludedTools).not.toContain(EditTool.Name);
     expect(excludedTools).not.toContain(WriteFileTool.Name);
   });
@@ -1111,7 +1111,7 @@ describe('Approval mode tool exclusion logic', () => {
     );
 
     const excludedTools = config.getExcludeTools();
-    expect(excludedTools).not.toContain(ShellTool.Name);
+    expect(excludedTools).not.toContain(SHELL_TOOL_NAME);
     expect(excludedTools).not.toContain(EditTool.Name);
     expect(excludedTools).not.toContain(WriteFileTool.Name);
   });
@@ -1134,7 +1134,7 @@ describe('Approval mode tool exclusion logic', () => {
     );
 
     const excludedTools = config.getExcludeTools();
-    expect(excludedTools).not.toContain(ShellTool.Name);
+    expect(excludedTools).not.toContain(SHELL_TOOL_NAME);
     expect(excludedTools).not.toContain(EditTool.Name);
     expect(excludedTools).not.toContain(WriteFileTool.Name);
   });
@@ -1168,7 +1168,7 @@ describe('Approval mode tool exclusion logic', () => {
       );
 
       const excludedTools = config.getExcludeTools();
-      expect(excludedTools).not.toContain(ShellTool.Name);
+      expect(excludedTools).not.toContain(SHELL_TOOL_NAME);
       expect(excludedTools).not.toContain(EditTool.Name);
       expect(excludedTools).not.toContain(WriteFileTool.Name);
     }
@@ -1200,7 +1200,7 @@ describe('Approval mode tool exclusion logic', () => {
 
     const excludedTools = config.getExcludeTools();
     expect(excludedTools).toContain('custom_tool'); // From settings
-    expect(excludedTools).toContain(ShellTool.Name); // From approval mode
+    expect(excludedTools).toContain(SHELL_TOOL_NAME); // From approval mode
     expect(excludedTools).not.toContain(EditTool.Name); // Should be allowed in auto_edit
     expect(excludedTools).not.toContain(WriteFileTool.Name); // Should be allowed in auto_edit
   });
@@ -2274,7 +2274,7 @@ describe('loadCliConfig tool exclusions', () => {
       'test-session',
       argv,
     );
-    expect(config.getExcludeTools()).not.toContain(ShellTool.Name);
+    expect(config.getExcludeTools()).not.toContain(SHELL_TOOL_NAME);
   });
 
   it('should not exclude shell tool in non-interactive mode when --allowed-tools="run_shell_command" is set', async () => {
@@ -2298,7 +2298,7 @@ describe('loadCliConfig tool exclusions', () => {
       'test-session',
       argv,
     );
-    expect(config.getExcludeTools()).not.toContain(ShellTool.Name);
+    expect(config.getExcludeTools()).not.toContain(SHELL_TOOL_NAME);
   });
 
   it('should not exclude shell tool in non-interactive mode when --allowed-tools="ShellTool(wc)" is set', async () => {
@@ -2322,7 +2322,7 @@ describe('loadCliConfig tool exclusions', () => {
       'test-session',
       argv,
     );
-    expect(config.getExcludeTools()).not.toContain(ShellTool.Name);
+    expect(config.getExcludeTools()).not.toContain(SHELL_TOOL_NAME);
   });
 });
 
