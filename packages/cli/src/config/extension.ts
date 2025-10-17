@@ -35,10 +35,11 @@ import {
 } from './extensions/variables.js';
 import { isWorkspaceTrusted } from './trustedFolders.js';
 import { resolveEnvVarsInObject } from '../utils/envVarResolver.js';
-import { randomUUID } from 'node:crypto';
+import { randomUUID, createHash } from 'node:crypto';
 import {
   cloneFromGit,
   downloadFromGitHubRelease,
+  tryParseGithubUrl,
 } from './extensions/github.js';
 import type { LoadExtensionContext } from './extensions/variableSchema.js';
 import { ExtensionEnablementManager } from './extensions/extensionEnablement.js';
@@ -253,6 +254,28 @@ export function loadExtension(
       )
       .filter((contextFilePath) => fs.existsSync(contextFilePath));
 
+    // IDs are created by hashing details of the installation source in order to
+    // deduplicate extensions with conflicting names and also obfuscate any
+    // potentially sensitive information such as private git urls, system paths,
+    // or project names.
+    const hash = createHash('sha256');
+    const githubUrlParts =
+      installMetadata &&
+      (installMetadata.type === 'git' ||
+        installMetadata.type === 'github-release')
+        ? tryParseGithubUrl(installMetadata.source)
+        : null;
+    if (githubUrlParts) {
+      // For github repos, we use the https URI to the repo as the ID.
+      hash.update(
+        `https://github.com/${githubUrlParts.owner}/${githubUrlParts.repo}`,
+      );
+    } else {
+      hash.update(installMetadata?.source ?? config.name);
+    }
+
+    const id = hash.digest('hex');
+
     return {
       name: config.name,
       version: config.version,
@@ -262,6 +285,7 @@ export function loadExtension(
       mcpServers: config.mcpServers,
       excludeTools: config.excludeTools,
       isActive: true, // Barring any other signals extensions should be considered Active.
+      id,
     };
   } catch (e) {
     console.error(
@@ -465,26 +489,36 @@ export async function installOrUpdateExtension(
       installMetadata.type === 'github-release'
     ) {
       tempDir = await ExtensionStorage.createTmpDir();
-      const result = await downloadFromGitHubRelease(installMetadata, tempDir);
-      if (result.success) {
-        installMetadata.type = result.type;
-        installMetadata.releaseTag = result.tagName;
-      } else if (
-        // This repo has no github releases, and wasn't explicitly installed
-        // from a github release, unconditionally just clone it.
-        (result.failureReason === 'no release data' &&
-          installMetadata.type === 'git') ||
-        // Otherwise ask the user if they would like to try a git clone.
-        (await requestConsent(
-          `Error downloading github release for ${installMetadata.source} with the following error: ${result.errorMessage}.\n\nWould you like to attempt to install via "git clone" instead?`,
-        ))
-      ) {
+      const parsedGithubParts = tryParseGithubUrl(installMetadata.source);
+      if (!parsedGithubParts) {
         await cloneFromGit(installMetadata, tempDir);
         installMetadata.type = 'git';
       } else {
-        throw new Error(
-          `Failed to install extension ${installMetadata.source}: ${result.errorMessage}`,
+        const result = await downloadFromGitHubRelease(
+          installMetadata,
+          tempDir,
+          parsedGithubParts,
         );
+        if (result.success) {
+          installMetadata.type = result.type;
+          installMetadata.releaseTag = result.tagName;
+        } else if (
+          // This repo has no github releases, and wasn't explicitly installed
+          // from a github release, unconditionally just clone it.
+          (result.failureReason === 'no release data' &&
+            installMetadata.type === 'git') ||
+          // Otherwise ask the user if they would like to try a git clone.
+          (await requestConsent(
+            `Error downloading github release for ${installMetadata.source} with the following error: ${result.errorMessage}.\n\nWould you like to attempt to install via "git clone" instead?`,
+          ))
+        ) {
+          await cloneFromGit(installMetadata, tempDir);
+          installMetadata.type = 'git';
+        } else {
+          throw new Error(
+            `Failed to install extension ${installMetadata.source}: ${result.errorMessage}`,
+          );
+        }
       }
       localSourcePath = tempDir;
     } else if (
