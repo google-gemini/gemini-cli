@@ -111,7 +111,6 @@ const createMockUIState = (overrides: Partial<UIState> = {}): UIState =>
     showEscapePrompt: false,
     ideContextState: null,
     geminiMdFileCount: 0,
-    showToolDescriptions: false,
     renderMarkdown: true,
     filteredConsoleMessages: [],
     sessionStats: {

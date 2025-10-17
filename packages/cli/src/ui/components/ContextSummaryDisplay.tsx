@@ -16,7 +16,6 @@ interface ContextSummaryDisplayProps {
   contextFileNames: string[];
   mcpServers?: Record<string, MCPServerConfig>;
   blockedMcpServers?: Array<{ name: string; extensionName: string }>;
-  showToolDescriptions?: boolean;
   ideContext?: IdeContext;
 }
 
@@ -25,7 +24,6 @@ export const ContextSummaryDisplay: React.FC<ContextSummaryDisplayProps> = ({
   contextFileNames,
   mcpServers,
   blockedMcpServers,
-  showToolDescriptions,
   ideContext,
 }) => {
   const { columns: terminalWidth } = useTerminalSize();
@@ -82,16 +80,7 @@ export const ContextSummaryDisplay: React.FC<ContextSummaryDisplayProps> = ({
       }
       parts.push(blockedText);
     }
-    let text = parts.join(', ');
-    // Add ctrl+t hint when MCP servers are available
-    if (mcpServers && Object.keys(mcpServers).length > 0) {
-      if (showToolDescriptions) {
-        text += ' (ctrl+t to toggle)';
-      } else {
-        text += ' (ctrl+t to view)';
-      }
-    }
-    return text;
+    return parts.join(', ');
   })();
 
   const summaryParts = [openFilesText, geminiMdText, mcpText].filter(Boolean);

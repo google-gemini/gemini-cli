@@ -270,10 +270,6 @@ export const McpStatus: React.FC<McpStatusProps> = ({
             <Text color={theme.text.accent}>/mcp auth &lt;server-name&gt;</Text>{' '}
             to authenticate with OAuth-enabled servers
           </Text>
-          <Text>
-            {'  '}- Press <Text color={theme.text.accent}>Ctrl+T</Text> to
-            toggle tool descriptions on/off
-          </Text>
         </Box>
       )}
     </Box>

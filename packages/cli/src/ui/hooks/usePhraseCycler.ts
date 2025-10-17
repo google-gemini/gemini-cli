@@ -211,7 +211,6 @@ export const INFORMATIVE_TIPS = [
   'Clear your screen at any time with Ctrl+L...',
   'Toggle the debug console display with Ctrl+O...',
   'See full, untruncated responses with Ctrl+S...',
-  'Show or hide tool descriptions with Ctrl+T...',
   'Toggle auto-approval (YOLO mode) for all tools with Ctrl+Y...',
   'Toggle shell mode by typing ! in an empty prompt...',
   'Insert a newline with a backslash (\\) followed by Enter...',
