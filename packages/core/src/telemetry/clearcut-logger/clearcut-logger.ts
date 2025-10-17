@@ -42,7 +42,10 @@ import { EventMetadataKey } from './event-metadata-key.js';
 import type { Config } from '../../config/config.js';
 import { InstallationManager } from '../../utils/installationManager.js';
 import { UserAccountManager } from '../../utils/userAccountManager.js';
-import { safeJsonStringify } from '../../utils/safeJsonStringify.js';
+import {
+  safeJsonStringify,
+  safeJsonStringifyBooleanValuesOnly,
+} from '../../utils/safeJsonStringify.js';
 import { FixedDeque } from 'mnemonist';
 import { GIT_COMMIT_INFO, CLI_VERSION } from '../../generated/git-commit.js';
 import {
@@ -1217,12 +1220,7 @@ export class ClearcutLogger {
       },
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_USER_SETTINGS,
-        value: safeJsonStringify([
-          {
-            smart_edit_enabled: this.config?.getUseSmartEdit() ?? false,
-            model_router_enabled: this.config?.getUseModelRouter() ?? false,
-          },
-        ]),
+        value: this.getConfigJson(),
       },
     ];
     return [...data, ...defaultLogMetadata];
@@ -1238,6 +1236,12 @@ export class ClearcutLogger {
     } else {
       throw new Error('Unsupported proxy type');
     }
+  }
+
+  getConfigJson() {
+    const configJson = safeJsonStringifyBooleanValuesOnly(this.config);
+    console.debug(configJson);
+    return safeJsonStringifyBooleanValuesOnly(this.config);
   }
 
   shutdown() {
