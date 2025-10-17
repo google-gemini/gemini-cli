@@ -1245,6 +1245,7 @@ This extension will run the following MCP servers:
           success: true,
           tagName: 'v1.0.0',
           type: 'github-release',
+          canonicalSourceUrl: gitUrl,
         });
 
         const tempDir = path.join(tempHomeDir, 'temp-ext');

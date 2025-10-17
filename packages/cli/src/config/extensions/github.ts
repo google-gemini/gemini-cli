@@ -79,6 +79,7 @@ export async function cloneFromGit(
 export function parseGitHubRepoForReleases(source: string): {
   owner: string;
   repo: string;
+  canonicalSourceUrl: string;
 } | null {
   // Default to a github repo path, so `source` can be just an org/repo
   const parsedUrl = URL.parse(source, 'https://github.com');
@@ -108,7 +109,11 @@ export function parseGitHubRepoForReleases(source: string): {
     );
   }
 
-  return { owner, repo };
+  return {
+    owner,
+    repo,
+    canonicalSourceUrl: `https://github.com/${owner}/${repo}`,
+  };
 }
 
 export async function fetchReleaseFromGithub(
@@ -248,20 +253,26 @@ export async function checkForExtensionUpdate(
   }
 }
 
-export interface GitHubDownloadResult {
-  tagName?: string;
-  type: 'git' | 'github-release';
-  success: boolean;
-  failureReason?:
-    | 'failed to fetch release data'
-    | 'no release data'
-    | 'no release asset found'
-    | 'failed to download asset'
-    | 'failed to extract asset'
-    | 'unknown';
-  errorMessage?: string;
-}
-
+export type GitHubDownloadResult =
+  | {
+      tagName?: string;
+      type: 'git' | 'github-release';
+      success: false;
+      failureReason:
+        | 'failed to fetch release data'
+        | 'no release data'
+        | 'no release asset found'
+        | 'failed to download asset'
+        | 'failed to extract asset'
+        | 'unknown';
+      errorMessage: string;
+    }
+  | {
+      tagName?: string;
+      type: 'git' | 'github-release';
+      canonicalSourceUrl: string;
+      success: true;
+    };
 export async function downloadFromGitHubRelease(
   installMetadata: ExtensionInstallMetadata,
   destination: string,
@@ -279,7 +290,7 @@ export async function downloadFromGitHubRelease(
         errorMessage: `Not a github repo: ${source}`,
       };
     }
-    const { owner, repo } = parts;
+    const { owner, repo, canonicalSourceUrl } = parts;
 
     try {
       releaseData = await fetchReleaseFromGithub(owner, repo, ref, preRelease);
@@ -391,6 +402,7 @@ export async function downloadFromGitHubRelease(
       tagName: releaseData.tag_name,
       type: 'github-release',
       success: true,
+      canonicalSourceUrl,
     };
   } catch (error) {
     return {

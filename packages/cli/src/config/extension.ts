@@ -488,6 +488,7 @@ export async function installOrUpdateExtension(
       if (result.success) {
         installMetadata.type = result.type;
         installMetadata.releaseTag = result.tagName;
+        installMetadata.source = result.canonicalSourceUrl;
       } else if (
         // This repo has no github releases, and wasn't explicitly installed
         // from a github release, unconditionally just clone it.
