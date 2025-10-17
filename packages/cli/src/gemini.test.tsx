@@ -486,4 +486,47 @@ describe('startInteractiveUI', () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(checkForUpdates).toHaveBeenCalledTimes(1);
   });
+
+  it.each([
+    {
+      screenReader: true,
+      expectedCalls: [],
+      name: 'should not disable line wrapping in screen reader mode',
+    },
+    {
+      screenReader: false,
+      expectedCalls: [['\x1b[?7l']],
+      name: 'should disable line wrapping when not in screen reader mode',
+    },
+  ])('$name', async ({ screenReader, expectedCalls }) => {
+    const writeSpy = vi
+      .spyOn(process.stdout, 'write')
+      .mockImplementation(() => true);
+    const mockConfigWithScreenReader = {
+      ...mockConfig,
+      getScreenReader: () => screenReader,
+    } as Config;
+
+    const mockInitializationResult = {
+      authError: null,
+      themeError: null,
+      shouldOpenAuthDialog: false,
+      geminiMdFileCount: 0,
+    };
+
+    await startInteractiveUI(
+      mockConfigWithScreenReader,
+      mockSettings,
+      mockStartupWarnings,
+      mockWorkspaceRoot,
+      mockInitializationResult,
+    );
+
+    if (expectedCalls.length > 0) {
+      expect(writeSpy).toHaveBeenCalledWith(expectedCalls[0][0]);
+    } else {
+      expect(writeSpy).not.toHaveBeenCalledWith('\x1b[?7l');
+    }
+    writeSpy.mockRestore();
+  });
 });
