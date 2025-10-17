@@ -609,6 +609,7 @@ export interface ToolMcpConfirmationDetails {
   serverName: string;
   toolName: string;
   toolDisplayName: string;
+  args: Record<string, unknown>;
   onConfirm: (outcome: ToolConfirmationOutcome) => Promise<void>;
 }
 
