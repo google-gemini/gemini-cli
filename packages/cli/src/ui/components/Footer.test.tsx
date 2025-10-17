@@ -4,12 +4,27 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   renderWithProviders,
   createMockSettings,
 } from '../../test-utils/render.js';
 import { Footer } from './Footer.js';
 import { tildeifyPath } from '@google/gemini-cli-core';
+import { Text } from 'ink';
+
+// Mock installationInfo
+const isDevelopmentMock = vi.hoisted(() => ({ value: false }));
+vi.mock('../../utils/installationInfo.js', () => ({
+  get isDevelopment() {
+    return isDevelopmentMock.value;
+  },
+}));
+
+// Mock ConsoleSummaryDisplay
+vi.mock('./ConsoleSummaryDisplay.js', () => ({
+  ConsoleSummaryDisplay: () => <Text>ConsoleSummaryDisplay</Text>,
+}));
 
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const original =
@@ -37,6 +52,10 @@ const sessionStats = {
 };
 
 describe('<Footer />', () => {
+  beforeEach(() => {
+    isDevelopmentMock.value = false;
+  });
+
   it('renders the component', () => {
     const { lastFrame } = renderWithProviders(<Footer />, {
       width: 120,
@@ -154,6 +173,44 @@ describe('<Footer />', () => {
       expect(lastFrame()).toContain('untrusted');
       expect(lastFrame()).not.toMatch(/test-sandbox/s);
       vi.unstubAllEnvs();
+    });
+  });
+
+  describe('Console Summary Display', () => {
+    it('shows ConsoleSummaryDisplay in development when there are errors', () => {
+      isDevelopmentMock.value = true;
+      const { lastFrame } = renderWithProviders(<Footer />, {
+        width: 120,
+        uiState: { ...sessionStats, errorCount: 1, showErrorDetails: false },
+      });
+      expect(lastFrame()).toContain('ConsoleSummaryDisplay');
+    });
+
+    it('does not show ConsoleSummaryDisplay in production even when there are errors', () => {
+      isDevelopmentMock.value = false;
+      const { lastFrame } = renderWithProviders(<Footer />, {
+        width: 120,
+        uiState: { ...sessionStats, errorCount: 1, showErrorDetails: false },
+      });
+      expect(lastFrame()).not.toContain('ConsoleSummaryDisplay');
+    });
+
+    it('does not show ConsoleSummaryDisplay when there are no errors', () => {
+      isDevelopmentMock.value = true;
+      const { lastFrame } = renderWithProviders(<Footer />, {
+        width: 120,
+        uiState: { ...sessionStats, errorCount: 0, showErrorDetails: false },
+      });
+      expect(lastFrame()).not.toContain('ConsoleSummaryDisplay');
+    });
+
+    it('does not show ConsoleSummaryDisplay when error details are shown', () => {
+      isDevelopmentMock.value = true;
+      const { lastFrame } = renderWithProviders(<Footer />, {
+        width: 120,
+        uiState: { ...sessionStats, errorCount: 1, showErrorDetails: true },
+      });
+      expect(lastFrame()).not.toContain('ConsoleSummaryDisplay');
     });
   });
 

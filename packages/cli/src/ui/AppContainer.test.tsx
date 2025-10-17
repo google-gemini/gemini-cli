@@ -25,6 +25,15 @@ import {
   type UIActions,
 } from './contexts/UIActionsContext.js';
 import { useContext } from 'react';
+import { useKeypress, type Key } from './hooks/useKeypress.js';
+
+// Mock installationInfo
+const isDevelopmentMock = vi.hoisted(() => ({ value: false }));
+vi.mock('../utils/installationInfo.js', () => ({
+  get isDevelopment() {
+    return isDevelopmentMock.value;
+  },
+}));
 
 // Mock useStdout to capture terminal title writes
 let mockStdout: { write: ReturnType<typeof vi.fn> };
@@ -115,6 +124,7 @@ describe('AppContainer State Management', () => {
   let mockConfig: Config;
   let mockSettings: LoadedSettings;
   let mockInitResult: InitializationResult;
+  let keypressHandler: (key: Key) => void;
 
   // Create typed mocks for all hooks
   const mockedUseQuotaAndFallback = useQuotaAndFallback as Mock;
@@ -139,9 +149,11 @@ describe('AppContainer State Management', () => {
   const mockedUseTextBuffer = useTextBuffer as Mock;
   const mockedUseLogger = useLogger as Mock;
   const mockedUseLoadingIndicator = useLoadingIndicator as Mock;
+  const mockedUseKeypress = useKeypress as Mock;
 
   beforeEach(() => {
     vi.clearAllMocks();
+    isDevelopmentMock.value = false;
 
     // Initialize mock stdout for terminal title tests
     mockStdout = { write: vi.fn() };
@@ -259,6 +271,9 @@ describe('AppContainer State Management', () => {
     mockedUseLoadingIndicator.mockReturnValue({
       elapsedTime: '0.0s',
       currentLoadingPhrase: '',
+    });
+    mockedUseKeypress.mockImplementation((handler) => {
+      keypressHandler = handler;
     });
 
     // Mock Config
@@ -1255,6 +1270,78 @@ describe('AppContainer State Management', () => {
       expect(mockHandleSlashCommand).not.toHaveBeenCalledWith('/quit');
 
       vi.useRealTimers();
+    });
+
+    it('toggles showErrorDetails on Ctrl+O in development', () => {
+      isDevelopmentMock.value = true;
+
+      const { rerender } = render(
+        <AppContainer
+          config={mockConfig}
+          settings={mockSettings}
+          version="1.0.0"
+          initializationResult={mockInitResult}
+        />,
+      );
+
+      expect(capturedUIState.showErrorDetails).toBe(false);
+
+      // Simulate Ctrl+O
+      const ctrlO: Key = {
+        name: 'o',
+        ctrl: true,
+        meta: false,
+        shift: false,
+        paste: false,
+        sequence: '\x0F',
+      };
+      keypressHandler(ctrlO);
+      rerender(
+        <AppContainer
+          config={mockConfig}
+          settings={mockSettings}
+          version="1.0.0"
+          initializationResult={mockInitResult}
+        />,
+      );
+
+      expect(capturedUIState.showErrorDetails).toBe(true);
+    });
+
+    it('does not toggle showErrorDetails on Ctrl+O in production', () => {
+      isDevelopmentMock.value = false;
+
+      const { rerender } = render(
+        <AppContainer
+          config={mockConfig}
+          settings={mockSettings}
+          version="1.0.0"
+          initializationResult={mockInitResult}
+        />,
+      );
+
+      expect(capturedUIState.showErrorDetails).toBe(false);
+
+      // Simulate Ctrl+O
+      const ctrlO: Key = {
+        name: 'o',
+        ctrl: true,
+        meta: false,
+        shift: false,
+        paste: false,
+        sequence: '\x0F',
+      };
+      keypressHandler(ctrlO);
+      rerender(
+        <AppContainer
+          config={mockConfig}
+          settings={mockSettings}
+          version="1.0.0"
+          initializationResult={mockInitResult}
+        />,
+      );
+
+      expect(capturedUIState.showErrorDetails).toBe(false);
     });
   });
 

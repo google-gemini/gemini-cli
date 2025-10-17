@@ -168,7 +168,7 @@ export const Footer: React.FC = () => {
                 </Text>
               </Box>
             )}
-            {!showErrorDetails && errorCount > 0 && (
+            {isDevelopment && !showErrorDetails && errorCount > 0 && (
               <Box paddingLeft={1} flexDirection="row">
                 <Text color={theme.ui.comment}>| </Text>
                 <ConsoleSummaryDisplay errorCount={errorCount} />

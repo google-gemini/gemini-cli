@@ -91,6 +91,7 @@ import { useSessionStats } from './contexts/SessionContext.js';
 import { useGitBranchName } from './hooks/useGitBranchName.js';
 import { useExtensionUpdates } from './hooks/useExtensionUpdates.js';
 import { ShellFocusContext } from './contexts/ShellFocusContext.js';
+import { isDevelopment } from '../utils/installationInfo.js';
 
 const CTRL_EXIT_PROMPT_DURATION_MS = 1000;
 const QUEUE_ERROR_DISPLAY_DURATION_MS = 3000;
@@ -858,8 +859,10 @@ Logging in with Google... Please restart Gemini CLI to continue.
 
   useEffect(() => {
     const openDebugConsole = () => {
-      setShowErrorDetails(true);
-      setConstrainHeight(false);
+      if (isDevelopment) {
+        setShowErrorDetails(true);
+        setConstrainHeight(false);
+      }
     };
     appEvents.on(AppEvent.OpenDebugConsole, openDebugConsole);
 
@@ -968,7 +971,9 @@ Logging in with Google... Please restart Gemini CLI to continue.
       }
 
       if (keyMatchers[Command.SHOW_ERROR_DETAILS](key)) {
-        setShowErrorDetails((prev) => !prev);
+        if (isDevelopment) {
+          setShowErrorDetails((prev) => !prev);
+        }
       } else if (keyMatchers[Command.TOGGLE_MARKDOWN](key)) {
         setRenderMarkdown((prev) => {
           const newValue = !prev;
