@@ -44,7 +44,12 @@ export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
       : null;
 
   return (
-    <Box paddingLeft={0} flexDirection="column">
+    <Box
+      paddingLeft={0}
+      flexDirection="column"
+      aria-live="polite"
+      aria-busy={true}
+    >
       {/* Main loading line */}
       <Box
         width="100%"
