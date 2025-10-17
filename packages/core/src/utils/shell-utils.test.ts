@@ -15,6 +15,7 @@ import {
 } from 'vitest';
 import {
   checkCommandPermissions,
+  checkForUnsafeRedirections,
   escapeShellArg,
   getCommandRoots,
   getShellConfiguration,
@@ -194,6 +195,53 @@ describe('isCommandAllowed', () => {
       expect(result.reason).toBe(
         'Command rejected because it could not be parsed safely',
       );
+    });
+  });
+
+  describe('with unsafe redirections', () => {
+    beforeEach(() => {
+      config.getWorkspaceContext = () => ({
+        getDirectories: () => ['/workspace'],
+      });
+    });
+
+    it('should block output redirection to home directory', () => {
+      mockHomedir.mockReturnValue('/home/user');
+      const result = isCommandAllowed('wc README.md > ~/output.txt', config);
+      expect(result.allowed).toBe(false);
+      expect(result.reason).toContain('file redirection');
+      expect(result.reason).toContain('outside the workspace');
+      expect(result.reason).toContain('~/output.txt');
+    });
+
+    it('should block output redirection to /tmp', () => {
+      const result = isCommandAllowed('echo secret > /tmp/data.txt', config);
+      expect(result.allowed).toBe(false);
+      expect(result.reason).toContain('/tmp/data.txt');
+    });
+
+    it('should allow redirections within workspace', () => {
+      const result = isCommandAllowed('echo test > output.txt', config);
+      expect(result.allowed).toBe(true);
+    });
+
+    it('should allow absolute paths within workspace', () => {
+      const result = isCommandAllowed(
+        'echo test > /workspace/logs/out.txt',
+        config,
+      );
+      expect(result.allowed).toBe(true);
+    });
+
+    it('should block path traversal attempts', () => {
+      config.getWorkspaceContext = () => ({
+        getDirectories: () => ['/workspace/project/subdir'],
+      });
+      const result = isCommandAllowed(
+        'cat secret > ../../../etc/passwd',
+        config,
+      );
+      expect(result.allowed).toBe(false);
     });
   });
 });
@@ -549,5 +597,141 @@ describe('getShellConfiguration', () => {
       expect(config.argsPrefix).toEqual(['-NoProfile', '-Command']);
       expect(config.shell).toBe('powershell');
     });
+  });
+});
+
+describe('checkForUnsafeRedirections', () => {
+  beforeEach(() => {
+    mockHomedir.mockReturnValue('/home/user');
+  });
+
+  it('should detect output redirection to home directory', () => {
+    const result = checkForUnsafeRedirections('wc README.md > ~/output.txt', [
+      '/workspace',
+    ]);
+    expect(result.hasRedirection).toBe(true);
+    expect(result.isOutsideWorkspace).toBe(true);
+    expect(result.unsafeTargets).toContain('~/output.txt');
+  });
+
+  it('should detect append redirection (>>)', () => {
+    const result = checkForUnsafeRedirections('echo test >> /tmp/log.txt', [
+      '/workspace',
+    ]);
+    expect(result.hasRedirection).toBe(true);
+    expect(result.isOutsideWorkspace).toBe(true);
+    expect(result.unsafeTargets).toContain('/tmp/log.txt');
+  });
+
+  it('should detect input redirection (<)', () => {
+    const result = checkForUnsafeRedirections('cat < /etc/passwd', [
+      '/workspace',
+    ]);
+    expect(result.hasRedirection).toBe(true);
+    expect(result.isOutsideWorkspace).toBe(true);
+    expect(result.unsafeTargets).toContain('/etc/passwd');
+  });
+
+  it('should detect pipe operators', () => {
+    const result = checkForUnsafeRedirections('ls | grep test', ['/workspace']);
+    expect(result.hasRedirection).toBe(true);
+    expect(result.redirections.some((r) => r.type === 'pipe')).toBe(true);
+  });
+
+  it('should allow redirections within workspace', () => {
+    const result = checkForUnsafeRedirections('echo test > output.txt', [
+      '/workspace',
+    ]);
+    expect(result.hasRedirection).toBe(true);
+    expect(result.isOutsideWorkspace).toBe(false);
+    expect(result.unsafeTargets).toHaveLength(0);
+  });
+
+  it('should allow absolute paths within workspace', () => {
+    const result = checkForUnsafeRedirections(
+      'echo test > /workspace/subdir/output.txt',
+      ['/workspace'],
+    );
+    expect(result.hasRedirection).toBe(true);
+    expect(result.isOutsideWorkspace).toBe(false);
+    expect(result.unsafeTargets).toHaveLength(0);
+  });
+
+  it('should block absolute paths outside workspace', () => {
+    const result = checkForUnsafeRedirections('cat data > /tmp/exposed.txt', [
+      '/workspace',
+    ]);
+    expect(result.hasRedirection).toBe(true);
+    expect(result.isOutsideWorkspace).toBe(true);
+    expect(result.unsafeTargets).toContain('/tmp/exposed.txt');
+  });
+
+  it('should handle quoted file paths', () => {
+    const result = checkForUnsafeRedirections(
+      'echo test > "/tmp/output file.txt"',
+      ['/workspace'],
+    );
+    expect(result.hasRedirection).toBe(true);
+    expect(result.isOutsideWorkspace).toBe(true);
+  });
+
+  it('should detect path traversal with ../', () => {
+    const result = checkForUnsafeRedirections(
+      'echo secret > ../../outside.txt',
+      ['/workspace/proj/subdir'],
+    );
+    expect(result.hasRedirection).toBe(true);
+    expect(result.isOutsideWorkspace).toBe(true);
+  });
+
+  it('should allow relative paths within workspace', () => {
+    const result = checkForUnsafeRedirections('echo test > ./logs/output.txt', [
+      '/workspace',
+    ]);
+    expect(result.hasRedirection).toBe(true);
+    expect(result.isOutsideWorkspace).toBe(false);
+  });
+
+  it('should handle multiple redirections in one command', () => {
+    const result = checkForUnsafeRedirections(
+      'cat input.txt > /tmp/out.txt 2> /tmp/err.txt',
+      ['/workspace'],
+    );
+    expect(result.hasRedirection).toBe(true);
+    expect(result.isOutsideWorkspace).toBe(true);
+    expect(result.unsafeTargets.length).toBeGreaterThan(0);
+  });
+
+  it('should allow heredocs (no target to validate)', () => {
+    const result = checkForUnsafeRedirections('cat << EOF\ntest\nEOF', [
+      '/workspace',
+    ]);
+    expect(result.hasRedirection).toBe(true);
+    expect(result.redirections.some((r) => r.type === 'heredoc')).toBe(true);
+    expect(result.isOutsideWorkspace).toBe(false);
+  });
+
+  it('should return empty result for commands without redirections', () => {
+    const result = checkForUnsafeRedirections('ls -la', ['/workspace']);
+    expect(result.hasRedirection).toBe(false);
+    expect(result.isOutsideWorkspace).toBe(false);
+    expect(result.unsafeTargets).toHaveLength(0);
+  });
+
+  it('should handle commands with multiple workspace directories', () => {
+    const result = checkForUnsafeRedirections(
+      'echo test > /workspace2/output.txt',
+      ['/workspace1', '/workspace2', '/workspace3'],
+    );
+    expect(result.hasRedirection).toBe(true);
+    expect(result.isOutsideWorkspace).toBe(false);
+  });
+
+  it('should block absolute path redirections when no workspace dirs specified', () => {
+    const result = checkForUnsafeRedirections('echo test > /tmp/file.txt', []);
+    // When no workspace directories are defined, absolute paths are considered unsafe
+    // since there's no workspace boundary to validate against
+    expect(result.isOutsideWorkspace).toBe(true);
+    expect(result.unsafeTargets).toContain('/tmp/file.txt');
   });
 });

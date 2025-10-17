@@ -33,6 +33,7 @@ import { ShellExecutionService } from '../services/shellExecutionService.js';
 import { formatMemoryUsage } from '../utils/formatters.js';
 import type { AnsiOutput } from '../utils/terminalSerializer.js';
 import {
+  checkForUnsafeRedirections,
   getCommandRoots,
   initializeShellParsers,
   isCommandAllowed,
@@ -403,6 +404,18 @@ export class ShellTool extends BaseDeclarativeTool<
       return 'Command cannot be empty.';
     }
 
+    // Check for unsafe file redirections outside workspace
+    const workspaceDirs = this.config.getWorkspaceContext().getDirectories();
+    const redirectionCheck = checkForUnsafeRedirections(
+      params.command,
+      workspaceDirs,
+    );
+
+    if (redirectionCheck.isOutsideWorkspace) {
+      const targets = redirectionCheck.unsafeTargets.join(', ');
+      return `Command uses file redirection to paths outside the workspace: ${targets}. Redirections are only allowed to files within the workspace for security reasons.`;
+    }
+
     const commandCheck = isCommandAllowed(params.command, this.config);
     if (!commandCheck.allowed) {
       if (!commandCheck.reason) {
@@ -420,7 +433,6 @@ export class ShellTool extends BaseDeclarativeTool<
       if (!path.isAbsolute(params.directory)) {
         return 'Directory must be an absolute path.';
       }
-      const workspaceDirs = this.config.getWorkspaceContext().getDirectories();
       const isWithinWorkspace = workspaceDirs.some((wsDir) =>
         params.directory!.startsWith(wsDir),
       );

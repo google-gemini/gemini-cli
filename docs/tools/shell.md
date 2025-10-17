@@ -149,6 +149,86 @@ including complex TUIs, will be rendered correctly.
   background. The `Background PIDs` field will contain the process ID of the
   background process.
 
+## File Redirection Security
+
+The Gemini CLI enforces workspace boundaries for file redirections to prevent
+accidental or malicious writes to files outside your project directory. This
+security feature protects your system from commands that attempt to read from or
+write to files outside the workspace.
+
+### Allowed Redirections
+
+Redirections are **only allowed** to files within your workspace directories:
+
+- **Relative paths within workspace:** `echo "data" > output.txt`
+- **Absolute paths within workspace:** `cat data > /workspace/logs/file.txt`
+- **Subdirectories within workspace:** `ls > ./subdir/list.txt`
+
+### Blocked Redirections
+
+The following types of redirections are **blocked** for security:
+
+- **Home directory:** `wc README.md > ~/output.txt` ❌
+- **Absolute paths outside workspace:** `echo secret > /tmp/data.txt` ❌
+- **Path traversal attempts:** `cat file > ../../etc/passwd` ❌
+- **System directories:** `ls > /var/log/gemini.log` ❌
+
+### Redirection Operators
+
+The security validation applies to all file redirection operators:
+
+- **Output redirection (`>`):** Writes stdout to a file
+- **Append redirection (`>>`):** Appends stdout to a file
+- **Input redirection (`<`):** Reads stdin from a file
+- **Error redirection (`2>`, `2>>`):** Redirects stderr to a file
+
+### Examples
+
+**Allowed:**
+
+```bash
+# Relative path in workspace
+echo "Build complete" > build.log
+
+# Absolute path in workspace subdirectory
+npm test > /workspace/project/test-results.txt
+
+# Piping within workspace operations
+cat data.csv | grep "error" > errors.txt
+```
+
+**Blocked:**
+
+```bash
+# Home directory redirection
+wc README.md > ~/wc_output.txt
+# Error: Command uses file redirection to paths outside the workspace
+
+# System directory
+echo "log" > /var/log/app.log
+# Error: Command uses file redirection to paths outside the workspace
+
+# Path traversal
+cat secret.key > ../../../tmp/exposed.txt
+# Error: Command uses file redirection to paths outside the workspace
+```
+
+### Security Rationale
+
+This protection prevents:
+
+1. **Accidental data leaks:** Commands cannot write sensitive data outside your
+   project
+2. **System file overwrites:** Prevents accidental corruption of system files
+3. **Malicious file access:** Blocks attempts to read or modify files outside
+   the workspace
+4. **Path traversal attacks:** Detects and blocks `../` attempts to escape the
+   workspace
+
+If you need to work with files outside your workspace, use the dedicated file
+tools (`read_file`, `write_file`) which have their own security controls, or
+copy files into your workspace first.
+
 ## Environment Variables
 
 When `run_shell_command` executes a command, it sets the `GEMINI_CLI=1`

@@ -5,8 +5,9 @@
  */
 
 import type { AnyToolInvocation } from '../index.js';
-import type { Config } from '../config/config.js';
+import type { Config } from '../config.js';
 import os from 'node:os';
+import path from 'node:path';
 import { quote } from 'shell-quote';
 import { doesToolInvocationMatch } from './tool-utils.js';
 import {
@@ -115,6 +116,19 @@ interface ParsedCommandDetail {
 interface CommandParseResult {
   details: ParsedCommandDetail[];
   hasError: boolean;
+}
+
+interface RedirectionDetail {
+  type: 'input' | 'output' | 'append' | 'pipe' | 'heredoc';
+  target?: string;
+  operator: string;
+}
+
+interface RedirectionCheckResult {
+  hasRedirection: boolean;
+  redirections: RedirectionDetail[];
+  unsafeTargets: string[];
+  isOutsideWorkspace: boolean;
 }
 
 const POWERSHELL_COMMAND_ENV = '__GCLI_POWERSHELL_COMMAND__';
@@ -254,6 +268,86 @@ function collectCommandDetails(
   }
 
   return details;
+}
+
+/**
+ * Collects all redirections from a bash AST.
+ * This includes file redirections (>, >>, <), heredocs (<<), and pipes (|).
+ */
+function collectRedirections(root: Node, source: string): RedirectionDetail[] {
+  const stack: Node[] = [root];
+  const redirections: RedirectionDetail[] = [];
+
+  while (stack.length > 0) {
+    const current = stack.pop();
+    if (!current) {
+      continue;
+    }
+
+    switch (current.type) {
+      case 'file_redirect': {
+        // Handle >, >>, <, etc.
+        const destination = current.childForFieldName('destination');
+
+        if (destination) {
+          const destinationText = source
+            .slice(destination.startIndex, destination.endIndex)
+            .trim();
+
+          // Determine redirect type by looking at the operator
+          const operatorNode = current.children.find(
+            (child) =>
+              child.type === '>' || child.type === '>>' || child.type === '<',
+          );
+          const operator = operatorNode
+            ? source.slice(operatorNode.startIndex, operatorNode.endIndex)
+            : '>';
+
+          let type: RedirectionDetail['type'] = 'output';
+          if (operator === '>>') {
+            type = 'append';
+          } else if (operator === '<') {
+            type = 'input';
+          }
+
+          redirections.push({
+            type,
+            target: destinationText,
+            operator,
+          });
+        }
+        break;
+      }
+      case 'heredoc_redirect': {
+        redirections.push({
+          type: 'heredoc',
+          operator: '<<',
+        });
+        break;
+      }
+      case 'pipeline': {
+        // A pipeline contains multiple commands connected by |
+        redirections.push({
+          type: 'pipe',
+          operator: '|',
+        });
+        break;
+      }
+      default:
+        // No redirection-related node types to handle
+        break;
+    }
+
+    // Continue traversing the tree
+    for (let i = current.namedChildCount - 1; i >= 0; i -= 1) {
+      const child = current.namedChild(i);
+      if (child) {
+        stack.push(child);
+      }
+    }
+  }
+
+  return redirections;
 }
 
 function parseBashCommandDetails(command: string): CommandParseResult | null {
@@ -508,6 +602,115 @@ export function stripShellWrapper(command: string): string {
 }
 
 /**
+ * Expands tilde (~) in file paths to the home directory.
+ */
+function expandTilde(filePath: string): string {
+  if (filePath.startsWith('~/') || filePath === '~') {
+    return path.join(os.homedir(), filePath.slice(1));
+  }
+  return filePath;
+}
+
+/**
+ * Removes quotes from a file path if present.
+ */
+function unquotePath(filePath: string): string {
+  const trimmed = filePath.trim();
+  if (trimmed.length >= 2) {
+    const first = trimmed[0];
+    const last = trimmed[trimmed.length - 1];
+    if ((first === '"' && last === '"') || (first === "'" && last === "'")) {
+      return trimmed.slice(1, -1);
+    }
+  }
+  return trimmed;
+}
+
+/**
+ * Checks if a redirection target path is outside the allowed workspace directories.
+ * Returns true if the path escapes the workspace.
+ */
+function isPathOutsideWorkspace(
+  targetPath: string,
+  workspaceDirs: string[],
+): boolean {
+  try {
+    // Expand tilde and remove quotes
+    let expandedPath = expandTilde(unquotePath(targetPath));
+
+    // Resolve relative paths (but don't validate existence)
+    // For relative paths, we assume they're relative to CWD which should be in workspace
+    if (!path.isAbsolute(expandedPath)) {
+      // If it's a relative path with .., it might escape
+      // We'll resolve it against a workspace dir to check
+      if (workspaceDirs.length === 0) {
+        return false; // No workspace restriction
+      }
+      expandedPath = path.resolve(workspaceDirs[0], expandedPath);
+    }
+
+    // Check if the resolved path is within any workspace directory
+    const normalizedPath = path.normalize(expandedPath);
+    for (const wsDir of workspaceDirs) {
+      const normalizedWsDir = path.normalize(wsDir);
+      if (
+        normalizedPath === normalizedWsDir ||
+        normalizedPath.startsWith(normalizedWsDir + path.sep)
+      ) {
+        return false; // Path is inside workspace
+      }
+    }
+
+    return true; // Path is outside all workspace directories
+  } catch {
+    // If path parsing fails, treat as potentially unsafe
+    return true;
+  }
+}
+
+/**
+ * Checks a shell command for unsafe redirections that target files outside
+ * the workspace directories.
+ *
+ * @param command The shell command string to check
+ * @param workspaceDirs Array of absolute paths to workspace directories
+ * @returns Information about redirections and whether any are unsafe
+ */
+export function checkForUnsafeRedirections(
+  command: string,
+  workspaceDirs: string[],
+): RedirectionCheckResult {
+  const tree = parseCommandTree(command);
+  if (!tree) {
+    return {
+      hasRedirection: false,
+      redirections: [],
+      unsafeTargets: [],
+      isOutsideWorkspace: false,
+    };
+  }
+
+  const redirections = collectRedirections(tree.rootNode, command);
+  const unsafeTargets: string[] = [];
+
+  for (const redir of redirections) {
+    // Only check file redirections with targets
+    if (redir.target && redir.type !== 'pipe' && redir.type !== 'heredoc') {
+      if (isPathOutsideWorkspace(redir.target, workspaceDirs)) {
+        unsafeTargets.push(redir.target);
+      }
+    }
+  }
+
+  return {
+    hasRedirection: redirections.length > 0,
+    redirections,
+    unsafeTargets,
+    isOutsideWorkspace: unsafeTargets.length > 0,
+  };
+}
+
+/**
  * Detects command substitution patterns in a shell command, following bash quoting rules:
  * - Single quotes ('): Everything literal, no substitution possible
  * - Double quotes ("): Command substitution with $() and backticks unless escaped with \
@@ -555,6 +758,20 @@ export function checkCommandPermissions(
       allAllowed: false,
       disallowedCommands: [command],
       blockReason: 'Command rejected because it could not be parsed safely',
+      isHardDenial: true,
+    };
+  }
+
+  // Check for unsafe redirections (e.g., output to files outside workspace)
+  const workspaceDirs = config.getWorkspaceContext?.().getDirectories() || [];
+  const redirectionCheck = checkForUnsafeRedirections(command, workspaceDirs);
+
+  if (redirectionCheck.isOutsideWorkspace) {
+    const targets = redirectionCheck.unsafeTargets.join(', ');
+    return {
+      allAllowed: false,
+      disallowedCommands: [command],
+      blockReason: `Command uses file redirection to paths outside the workspace: ${targets}. This is not allowed for security reasons.`,
       isHardDenial: true,
     };
   }
