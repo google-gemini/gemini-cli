@@ -253,22 +253,12 @@ export function loadExtension(
       )
       .filter((contextFilePath) => fs.existsSync(contextFilePath));
 
-    // IDs are created by hashing parts of the extension metadata in order to
-    // obfuscate any potentially sensitive information such as private
-    // git urls or project names.
+    // IDs are created by hashing the installation source of the extension or
+    // the extension name, in order to deduplicate extensions with conflicting
+    // names and also obfuscate any potentially sensitive information such as
+    // private git urls, system paths, or project names.
     const hash = createHash('sha256');
-    switch (installMetadata?.type) {
-      case 'git':
-      case 'github-release':
-        // For git and github-release installs, identify the extension based on the
-        // source it was installed from. This allows us to distinguish between
-        // extensions that happen to have the same name but are actually different.
-        hash.update(installMetadata.source);
-        break;
-      default:
-        // For all other install types, just use the name.
-        hash.update(config.name);
-    }
+    hash.update(installMetadata?.source ?? config.name);
     const id = hash.digest('hex');
 
     return {

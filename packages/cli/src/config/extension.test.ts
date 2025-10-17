@@ -556,7 +556,7 @@ describe('extension tests', () => {
         expect(extension?.id).toBe(expectedHash);
       });
 
-      it('should generate id from name for local extension', () => {
+      it('should generate id from the original source for local extension', () => {
         const extensionDir = createExtension({
           extensionsDir: userExtensionsDir,
           name: 'local-ext-name',
@@ -573,12 +573,12 @@ describe('extension tests', () => {
         });
 
         const expectedHash = createHash('sha256')
-          .update('local-ext-name')
+          .update('/some/path')
           .digest('hex');
         expect(extension?.id).toBe(expectedHash);
       });
 
-      it('should generate id from name for link extension', async () => {
+      it('should generate id from the original source for linked extensions', async () => {
         const extDevelopmentDir = path.join(tempHomeDir, 'local_extensions');
         const actualExtensionDir = createExtension({
           extensionsDir: extDevelopmentDir,
@@ -600,7 +600,7 @@ describe('extension tests', () => {
         });
 
         const expectedHash = createHash('sha256')
-          .update('link-ext-name')
+          .update(actualExtensionDir)
           .digest('hex');
         expect(extension?.id).toBe(expectedHash);
       });
