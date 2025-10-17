@@ -13,6 +13,43 @@ import mime from 'mime/lite';
 import type { FileSystemService } from '../services/fileSystemService.js';
 import { ToolErrorType } from '../tools/tool-error.js';
 import { BINARY_EXTENSIONS } from './ignorePatterns.js';
+import { createRequire as createModuleRequire } from 'node:module';
+
+const requireModule = createModuleRequire(import.meta.url);
+
+export async function readWasmBinaryFromDisk(
+  specifier: string,
+): Promise<Uint8Array> {
+  const resolvedPath = requireModule.resolve(specifier);
+  const buffer = await fsPromises.readFile(resolvedPath);
+  return new Uint8Array(buffer);
+}
+
+export async function loadWasmBinary(
+  dynamicImport: () => Promise<{ default: Uint8Array }>,
+  fallbackSpecifier: string,
+): Promise<Uint8Array> {
+  try {
+    const module = await dynamicImport();
+    if (module?.default instanceof Uint8Array) {
+      return module.default;
+    }
+  } catch (error) {
+    try {
+      return await readWasmBinaryFromDisk(fallbackSpecifier);
+    } catch {
+      throw error;
+    }
+  }
+
+  try {
+    return await readWasmBinaryFromDisk(fallbackSpecifier);
+  } catch (error) {
+    throw new Error('WASM binary module did not provide a Uint8Array export', {
+      cause: error,
+    });
+  }
+}
 
 // Constants for text file processing
 const DEFAULT_MAX_LINES_TEXT_FILE = 2000;
