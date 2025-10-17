@@ -315,14 +315,13 @@ describe('gemini.tsx main function kitty protocol', () => {
     vi.mocked(parseArguments).mockResolvedValue({
       model: undefined,
       sandbox: undefined,
-      sandboxImage: undefined,
       debug: undefined,
       prompt: undefined,
       promptInteractive: undefined,
       query: undefined,
-      showMemoryUsage: undefined,
       yolo: undefined,
       approvalMode: undefined,
+<<<<<<< HEAD
       checkpointing: undefined,
 <<<<<<< HEAD
       telemetryTarget: undefined,
@@ -333,12 +332,13 @@ describe('gemini.tsx main function kitty protocol', () => {
       telemetryOutfile: undefined,
 =======
 >>>>>>> 9049f8f8 (feat: remove deprecated telemetry flags (#11318))
+=======
+>>>>>>> be25e2cb (feat: Remove deprecated flags (#11338))
       allowedMcpServerNames: undefined,
       allowedTools: undefined,
       experimentalAcp: undefined,
       extensions: undefined,
       listExtensions: undefined,
-      proxy: undefined,
       includeDirectories: undefined,
       screenReader: undefined,
       useSmartEdit: undefined,
