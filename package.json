@@ -6,7 +6,8 @@
   },
   "type": "module",
   "workspaces": [
-    "packages/*"
+    "packages/*",
+    "!third_party/**"
   ],
   "private": "true",
   "repository": {
@@ -27,6 +28,7 @@
     "auth:docker": "gcloud auth configure-docker us-west1-docker.pkg.dev",
     "auth": "npm run auth:npm && npm run auth:docker",
     "generate": "node scripts/generate-git-commit-info.js",
+    "prebuild": "node scripts/vendor-ink.js",
     "build": "node scripts/build.js",
     "build-and-start": "npm run build && npm run start",
     "build:vscode": "node scripts/build_vscode_companion.js",

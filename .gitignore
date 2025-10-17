@@ -53,3 +53,4 @@ gha-creds-*.json
 
 # Log files
 patch_output.log
+\n# Vendored dependencies\nthird_party/ink/
