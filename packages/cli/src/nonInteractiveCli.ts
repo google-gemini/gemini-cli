@@ -198,6 +198,9 @@ export async function runNonInteractive(
         }
 
         if (toolCallRequests.length > 0) {
+          if (config.getOutputFormat() !== OutputFormat.JSON) {
+            process.stdout.write('\n');
+          }
           const toolResponseParts: Part[] = [];
           const completedToolCalls: CompletedToolCall[] = [];
 
