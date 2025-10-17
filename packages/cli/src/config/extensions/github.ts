@@ -76,25 +76,30 @@ export async function cloneFromGit(
   }
 }
 
-export function parseGitHubRepoForReleases(source: string): {
+export interface GithubRepoInfo {
   owner: string;
   repo: string;
-  canonicalSourceUrl: string;
-} | null {
+}
+
+export function tryParseGithubUrl(source: string): GithubRepoInfo | null {
+  // First step in normalizing a github ssh URI to the https form.
+  if (source.startsWith('git@github.com:')) {
+    source = source.replace('git@github.com:', '');
+  }
   // Default to a github repo path, so `source` can be just an org/repo
   const parsedUrl = URL.parse(source, 'https://github.com');
   if (!parsedUrl) {
     throw new Error(`Invalid repo URL: ${source}`);
   }
-  // The pathname should be "/owner/repo".
-  const parts = parsedUrl?.pathname
-    .substring(1)
-    .split('/')
-    // Remove the empty segments, fixes trailing slashes
-    .filter((part) => part !== '');
   if (parsedUrl?.host !== 'github.com') {
     return null;
   }
+  // The pathname should be "/owner/repo".
+  const parts = parsedUrl?.pathname
+    .split('/')
+    // Remove the empty segments, fixes trailing and leading slashes
+    .filter((part) => part !== '');
+
   if (parts?.length !== 2) {
     throw new Error(
       `Invalid GitHub repository source: ${source}. Expected "owner/repo" or a github repo uri.`,
@@ -103,16 +108,9 @@ export function parseGitHubRepoForReleases(source: string): {
   const owner = parts[0];
   const repo = parts[1].replace('.git', '');
 
-  if (owner.startsWith('git@github.com')) {
-    throw new Error(
-      `GitHub release-based extensions are not supported for SSH. You must use an HTTPS URI with a personal access token to download releases from private repositories. You can set your personal access token in the GITHUB_TOKEN environment variable and install the extension via SSH.`,
-    );
-  }
-
   return {
     owner,
     repo,
-    canonicalSourceUrl: `https://github.com/${owner}/${repo}`,
   };
 }
 
@@ -222,7 +220,7 @@ export async function checkForExtensionUpdate(
         console.error(`No "source" provided for extension.`);
         return ExtensionUpdateState.ERROR;
       }
-      const repoInfo = parseGitHubRepoForReleases(source);
+      const repoInfo = tryParseGithubUrl(source);
       if (!repoInfo) {
         console.error(
           `Source is not a valid GitHub repository for release checks: ${source}`,
@@ -270,28 +268,18 @@ export type GitHubDownloadResult =
   | {
       tagName?: string;
       type: 'git' | 'github-release';
-      canonicalSourceUrl: string;
       success: true;
     };
 export async function downloadFromGitHubRelease(
   installMetadata: ExtensionInstallMetadata,
   destination: string,
+  githubRepoInfo: GithubRepoInfo,
 ): Promise<GitHubDownloadResult> {
-  const { source, ref, allowPreRelease: preRelease } = installMetadata;
+  const { ref, allowPreRelease: preRelease } = installMetadata;
+  const { owner, repo } = githubRepoInfo;
   let releaseData: GithubReleaseData | null = null;
 
   try {
-    const parts = parseGitHubRepoForReleases(source);
-    if (!parts) {
-      return {
-        failureReason: 'no release data',
-        success: false,
-        type: 'github-release',
-        errorMessage: `Not a github repo: ${source}`,
-      };
-    }
-    const { owner, repo, canonicalSourceUrl } = parts;
-
     try {
       releaseData = await fetchReleaseFromGithub(owner, repo, ref, preRelease);
       if (!releaseData) {
@@ -402,7 +390,6 @@ export async function downloadFromGitHubRelease(
       tagName: releaseData.tag_name,
       type: 'github-release',
       success: true,
-      canonicalSourceUrl,
     };
   } catch (error) {
     return {

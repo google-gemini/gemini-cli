@@ -512,7 +512,29 @@ describe('extension tests', () => {
     });
 
     describe('id generation', () => {
-      it('should generate id from source for git extension', () => {
+      it('should generate id from source for non-github git urls', () => {
+        const extensionDir = createExtension({
+          extensionsDir: userExtensionsDir,
+          name: 'my-ext',
+          version: '1.0.0',
+          installMetadata: {
+            type: 'git',
+            source: 'http://somehost.com/foo/bar',
+          },
+        });
+
+        const extension = loadExtension({
+          extensionDir,
+          workspaceDir: tempWorkspaceDir,
+        });
+
+        const expectedHash = createHash('sha256')
+          .update('http://somehost.com/foo/bar')
+          .digest('hex');
+        expect(extension?.id).toBe(expectedHash);
+      });
+
+      it('should generate id from owner/repo for github http urls', () => {
         const extensionDir = createExtension({
           extensionsDir: userExtensionsDir,
           name: 'my-ext',
@@ -529,7 +551,29 @@ describe('extension tests', () => {
         });
 
         const expectedHash = createHash('sha256')
-          .update('http://github.com/foo/bar')
+          .update('https://github.com/foo/bar')
+          .digest('hex');
+        expect(extension?.id).toBe(expectedHash);
+      });
+
+      it('should generate id from owner/repo for github ssh urls', () => {
+        const extensionDir = createExtension({
+          extensionsDir: userExtensionsDir,
+          name: 'my-ext',
+          version: '1.0.0',
+          installMetadata: {
+            type: 'git',
+            source: 'git@github.com:foo/bar',
+          },
+        });
+
+        const extension = loadExtension({
+          extensionDir,
+          workspaceDir: tempWorkspaceDir,
+        });
+
+        const expectedHash = createHash('sha256')
+          .update('https://github.com/foo/bar')
           .digest('hex');
         expect(extension?.id).toBe(expectedHash);
       });
@@ -1245,7 +1289,6 @@ This extension will run the following MCP servers:
           success: true,
           tagName: 'v1.0.0',
           type: 'github-release',
-          canonicalSourceUrl: gitUrl,
         });
 
         const tempDir = path.join(tempHomeDir, 'temp-ext');
