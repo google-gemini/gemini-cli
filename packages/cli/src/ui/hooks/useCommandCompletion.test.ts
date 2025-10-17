@@ -252,57 +252,55 @@ describe('useCommandCompletion', () => {
         });
       });
 
-      it('should show slash command suggestions when shellModeActive is false', async () => {
-        setupMocks({
-          slashSuggestions: [{ label: 'clear', value: 'clear' }],
-        });
+      it.each([
+        {
+          shellModeActive: false,
+          expectedSuggestions: 1,
+          expectedShowSuggestions: true,
+          description:
+            'should show slash command suggestions when shellModeActive is false',
+        },
+        {
+          shellModeActive: true,
+          expectedSuggestions: 0,
+          expectedShowSuggestions: false,
+          description:
+            'should not show slash command suggestions when shellModeActive is true',
+        },
+      ])(
+        '$description',
+        async ({
+          shellModeActive,
+          expectedSuggestions,
+          expectedShowSuggestions,
+        }) => {
+          setupMocks({
+            slashSuggestions: [{ label: 'clear', value: 'clear' }],
+          });
 
-        const { result } = renderHook(() => {
-          const textBuffer = useTextBufferForTest('/');
-          const completion = useCommandCompletion(
-            textBuffer,
-            testDirs,
-            testRootDir,
-            [],
-            mockCommandContext,
-            false,
-            false, // shellModeActive
-            mockConfig,
-          );
-          return { ...completion, textBuffer };
-        });
+          const { result } = renderHook(() => {
+            const textBuffer = useTextBufferForTest('/');
+            const completion = useCommandCompletion(
+              textBuffer,
+              testDirs,
+              testRootDir,
+              [],
+              mockCommandContext,
+              false,
+              shellModeActive, // Parameterized shellModeActive
+              mockConfig,
+            );
+            return { ...completion, textBuffer };
+          });
 
-        await waitFor(() => {
-          expect(result.current.suggestions.length).toBe(1);
-          expect(result.current.showSuggestions).toBe(true);
-        });
-      });
-
-      it('should not show slash command suggestions when shellModeActive is true', async () => {
-        setupMocks({
-          slashSuggestions: [{ label: 'clear', value: 'clear' }],
-        });
-
-        const { result } = renderHook(() => {
-          const textBuffer = useTextBufferForTest('/');
-          const completion = useCommandCompletion(
-            textBuffer,
-            testDirs,
-            testRootDir,
-            [],
-            mockCommandContext,
-            false,
-            true, // shellModeActive
-            mockConfig,
-          );
-          return { ...completion, textBuffer };
-        });
-
-        await waitFor(() => {
-          expect(result.current.suggestions.length).toBe(0);
-          expect(result.current.showSuggestions).toBe(false);
-        });
-      });
+          await waitFor(() => {
+            expect(result.current.suggestions.length).toBe(expectedSuggestions);
+            expect(result.current.showSuggestions).toBe(
+              expectedShowSuggestions,
+            );
+          });
+        },
+      );
     });
 
     describe('Navigation', () => {
