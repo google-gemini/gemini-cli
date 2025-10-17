@@ -56,4 +56,42 @@ describe('Task', () => {
 
     expect(requests).toEqual(originalRequests);
   });
+
+  describe('acceptAgentMessage', () => {
+    it('should set currentTraceId when event has traceId', async () => {
+      const mockConfig = createMockConfig();
+      const mockEventBus: ExecutionEventBus = {
+        publish: vi.fn(),
+        on: vi.fn(),
+        off: vi.fn(),
+        once: vi.fn(),
+        removeAllListeners: vi.fn(),
+        finished: vi.fn(),
+      };
+
+      // @ts-expect-error - Calling private constructor for test purposes.
+      const task = new Task(
+        'task-id',
+        'context-id',
+        mockConfig as Config,
+        mockEventBus,
+      );
+
+      const event = {
+        type: 'content',
+        value: 'test',
+        traceId: 'test-trace-id',
+      };
+
+      await task.acceptAgentMessage(event);
+
+      expect(mockEventBus.publish).toHaveBeenCalledWith(
+        expect.objectContaining({
+          metadata: expect.objectContaining({
+            traceId: 'test-trace-id',
+          }),
+        }),
+      );
+    });
+  });
 });

@@ -66,6 +66,7 @@ export class Task {
   eventBus?: ExecutionEventBus;
   completedToolCalls: CompletedToolCall[];
   skipFinalTrueAfterInlineEdit = false;
+  currentTraceId: string | undefined;
 
   // For tool waiting logic
   private pendingToolCalls: Map<string, string> = new Map(); //toolCallId --> status
@@ -226,6 +227,7 @@ export class Task {
       model: string;
       userTier?: UserTierId;
       error?: string;
+      traceId?: string;
     } = {
       coderAgent: coderAgentMessage,
       model: this.config.getModel(),
@@ -234,6 +236,11 @@ export class Task {
 
     if (metadataError) {
       metadata.error = metadataError;
+    }
+
+    if (this.currentTraceId) {
+      metadata.traceId = this.currentTraceId;
+      this.currentTraceId = undefined;
     }
 
     return {
@@ -582,6 +589,9 @@ export class Task {
     const stateChange: StateChange = {
       kind: CoderAgentEvent.StateChangeEvent,
     };
+    if ('traceId' in event && event.traceId) {
+      this.currentTraceId = event.traceId;
+    }
     switch (event.type) {
       case GeminiEventType.Content:
         logger.info('[Task] Sending agent message content...');
