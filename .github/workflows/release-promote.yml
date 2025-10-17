@@ -79,9 +79,9 @@ jobs:
           GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
         run: |
           set -e
-          STABLE_COMMAND="node scripts/get-release-version.js --cli-package-name="${{ vars.CLI_PACKAGE_NAME }}" --type=stable ${{ github.event.inputs.stable_version_override && format('--stable_version_override={0}', github.event.inputs.stable_version_override) || '' }}"
-          PREVIEW_COMMAND="node scripts/get-release-version.js --cli-package-name="${{ vars.CLI_PACKAGE_NAME }}" --type=preview ${{ github.event.inputs.preview_version_override && format('--preview_version_override={0}', github.event.inputs.preview_version_override) || '' }}"
-          NIGHTLY_COMMAND="node scripts/get-release-version.js --cli-package-name="${{ vars.CLI_PACKAGE_NAME }}" --type=promote-nightly"
+          STABLE_COMMAND="node scripts/get-release-version.js --type=stable ${{ github.event.inputs.stable_version_override && format('--stable_version_override={0}', github.event.inputs.stable_version_override) || '' }}"
+          PREVIEW_COMMAND="node scripts/get-release-version.js --type=preview ${{ github.event.inputs.preview_version_override && format('--preview_version_override={0}', github.event.inputs.preview_version_override) || '' }}"
+          NIGHTLY_COMMAND="node scripts/get-release-version.js --type=promote-nightly"
           STABLE_JSON=$(${STABLE_COMMAND})
           PREVIEW_JSON=$(${PREVIEW_COMMAND})
           NIGHTLY_JSON=$(${NIGHTLY_COMMAND})
