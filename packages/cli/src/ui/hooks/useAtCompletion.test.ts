@@ -138,6 +138,39 @@ describe('useAtCompletion', () => {
         'file.txt',
       ]);
     });
+
+    it('should perform a case-insensitive search by lowercasing the pattern', async () => {
+      const structure: FileSystemStructure = { 'file.txt': '' };
+      testRootDir = await createTmpDir(structure);
+
+      const mockFileSearch: FileSearch = {
+        initialize: vi.fn().mockResolvedValue(undefined),
+        search: vi.fn().mockImplementation(async (pattern: string) => {
+          if (pattern === 'file') {
+            return ['file.txt'];
+          }
+          return [];
+        }),
+      };
+      vi.spyOn(FileSearchFactory, 'create').mockReturnValue(mockFileSearch);
+
+      const { result } = renderHook(() =>
+        useTestHarnessForAtCompletion(true, 'File', mockConfig, testRootDir),
+      );
+
+      await waitFor(() => {
+        // With the change, search is called with 'file' and we get a suggestion.
+        // Without the change, search is called with 'File' and we get no suggestions.
+        expect(result.current.suggestions.map((s) => s.value)).toEqual([
+          'file.txt',
+        ]);
+      });
+
+      expect(mockFileSearch.search).toHaveBeenCalledWith(
+        'file',
+        expect.any(Object),
+      );
+    });
   });
 
   describe('UI State and Loading Behavior', () => {

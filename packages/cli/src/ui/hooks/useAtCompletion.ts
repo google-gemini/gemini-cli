@@ -145,9 +145,9 @@ export function useAtCompletion(props: UseAtCompletionProps): void {
     } else if (
       (state.status === AtCompletionStatus.READY ||
         state.status === AtCompletionStatus.SEARCHING) &&
-      pattern !== state.pattern // Only search if the pattern has changed
+      pattern.toLowerCase() !== state.pattern // Only search if the pattern has changed
     ) {
-      dispatch({ type: 'SEARCH', payload: pattern });
+      dispatch({ type: 'SEARCH', payload: pattern.toLowerCase() });
     }
   }, [enabled, pattern, state.status, state.pattern]);
 
@@ -197,13 +197,10 @@ export function useAtCompletion(props: UseAtCompletionProps): void {
       }, 200);
 
       try {
-        const results = await fileSearch.current.search(
-          state.pattern.toLowerCase(),
-          {
-            signal: controller.signal,
-            maxResults: MAX_SUGGESTIONS_TO_SHOW * 3,
-          },
-        );
+        const results = await fileSearch.current.search(state.pattern, {
+          signal: controller.signal,
+          maxResults: MAX_SUGGESTIONS_TO_SHOW * 3,
+        });
 
         if (slowSearchTimer.current) {
           clearTimeout(slowSearchTimer.current);
