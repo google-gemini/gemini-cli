@@ -145,6 +145,7 @@ export async function startInteractiveUI(
   settings: LoadedSettings,
   startupWarnings: string[],
   workspaceRoot: string = process.cwd(),
+  resumedSessionData: ResumedSessionData | undefined,
   initializationResult: InitializationResult,
 ) {
   // Disable line wrapping.
@@ -183,6 +184,7 @@ export async function startInteractiveUI(
                 settings={settings}
                 startupWarnings={startupWarnings}
                 version={version}
+                resumedSessionData={resumedSessionData}
                 initializationResult={initializationResult}
               />
             </VimModeProvider>
@@ -461,6 +463,7 @@ export async function main() {
         settings,
         startupWarnings,
         process.cwd(),
+        resumedSessionData,
         initializationResult,
       );
       return;

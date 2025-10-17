@@ -450,6 +450,7 @@ describe('startInteractiveUI', () => {
       mockSettings,
       mockStartupWarnings,
       mockWorkspaceRoot,
+      undefined,
       mockInitializationResult,
     );
 
@@ -484,6 +485,7 @@ describe('startInteractiveUI', () => {
       mockSettings,
       mockStartupWarnings,
       mockWorkspaceRoot,
+      undefined,
       mockInitializationResult,
     );
 

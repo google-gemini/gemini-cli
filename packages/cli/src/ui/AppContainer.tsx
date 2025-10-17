@@ -41,8 +41,10 @@ import {
   getAllGeminiMdFilenames,
   AuthType,
   clearCachedCredentialFile,
+  type ResumedSessionData,
   ShellExecutionService,
 } from '@google/gemini-cli-core';
+import type { Part } from '@google/genai';
 import { validateAuthMethod } from '../config/auth.js';
 import { loadHierarchicalGeminiMemory } from '../config/config.js';
 import process from 'node:process';
@@ -89,6 +91,7 @@ import { useAutoAcceptIndicator } from './hooks/useAutoAcceptIndicator.js';
 import { useWorkspaceMigration } from './hooks/useWorkspaceMigration.js';
 import { useSessionStats } from './contexts/SessionContext.js';
 import { useGitBranchName } from './hooks/useGitBranchName.js';
+import { convertSessionToHistoryFormats } from './hooks/useSessionBrowser.js';
 import { useExtensionUpdates } from './hooks/useExtensionUpdates.js';
 import { ShellFocusContext } from './contexts/ShellFocusContext.js';
 
@@ -111,6 +114,7 @@ interface AppContainerProps {
   startupWarnings?: string[];
   version: string;
   initializationResult: InitializationResult;
+  resumedSessionData?: ResumedSessionData;
 }
 
 /**
@@ -126,7 +130,7 @@ const SHELL_WIDTH_FRACTION = 0.89;
 const SHELL_HEIGHT_PADDING = 10;
 
 export const AppContainer = (props: AppContainerProps) => {
-  const { settings, config, initializationResult } = props;
+  const { settings, config, initializationResult, resumedSessionData } = props;
   const historyManager = useHistory();
   useMemoryMonitor(historyManager);
   const [corgiMode, setCorgiMode] = useState(false);
@@ -356,6 +360,53 @@ export const AppContainer = (props: AppContainerProps) => {
   // Derive auth state variables for backward compatibility with UIStateContext
   const isAuthDialogOpen = authState === AuthState.Updating;
   const isAuthenticating = authState === AuthState.Unauthenticated;
+
+  const isGeminiClientInitialized = config.getGeminiClient()?.isInitialized();
+
+  const loadHistoryForResume = useCallback(
+    (
+      uiHistory: HistoryItemWithoutId[],
+      clientHistory: Array<{ role: 'user' | 'model'; parts: Part[] }>,
+      resumedData: ResumedSessionData,
+    ) => {
+      // Wait for the client.
+      if (!isGeminiClientInitialized) {
+        return;
+      }
+
+      // Now that we have the client, load the history into the UI and the client.
+      setQuittingMessages(null);
+      historyManager.clearItems();
+      uiHistory.forEach((item, index) => {
+        historyManager.addItem(item, index);
+      });
+      refreshStatic(); // Force Static component to re-render with the updated history.
+
+      // Give the history to the Gemini client.
+      config.getGeminiClient()?.resumeChat(clientHistory, resumedData);
+    },
+    [
+      historyManager,
+      config,
+      refreshStatic,
+      isGeminiClientInitialized,
+      setQuittingMessages,
+    ],
+  );
+  // Handle interactive resume from the command line (-r/--resume without -p/--prompt-interactive).
+  // Only if we're not authenticating, though.
+  useEffect(() => {
+    if (resumedSessionData && !isAuthenticating) {
+      const historyData = convertSessionToHistoryFormats(
+        resumedSessionData.conversation.messages,
+      );
+      loadHistoryForResume(
+        historyData.uiHistory,
+        historyData.clientHistory,
+        resumedSessionData,
+      );
+    }
+  }, [resumedSessionData, isAuthenticating, loadHistoryForResume]);
 
   // Create handleAuthSelect wrapper for backward compatibility
   const handleAuthSelect = useCallback(
