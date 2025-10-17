@@ -170,13 +170,17 @@ describe('isCommandAllowed', () => {
       expect(result.reason).toBeUndefined();
     });
 
-    it('should allow command substitution using `>(...)`', () => {
+    it('should block process substitution used in redirections', () => {
+      config.getWorkspaceContext = () =>
+        ({
+          getDirectories: () => ['/workspace'],
+        }) as Partial<WorkspaceContext> as WorkspaceContext;
       const result = isCommandAllowed(
         'echo "Log message" > >(tee log.txt)',
         config,
       );
-      expect(result.allowed).toBe(true);
-      expect(result.reason).toBeUndefined();
+      expect(result.allowed).toBe(false);
+      expect(result.reason).toContain('file redirection');
     });
 
     it('should allow command substitution using backticks', () => {
@@ -788,5 +792,35 @@ describe('checkForUnsafeRedirections', () => {
     );
     expect(result.isOutsideWorkspace).toBe(true);
     expect(result.unsafeTargets).toContain('/tmp/$(whoami).txt');
+  });
+
+  it('should block redirection with output process substitution', () => {
+    const result = checkForUnsafeRedirections(
+      'echo "pwned" > >(tee /tmp/outside_workspace.txt)',
+      ['/workspace'],
+      '/workspace',
+    );
+    expect(result.isOutsideWorkspace).toBe(true);
+    expect(result.unsafeTargets.length).toBeGreaterThan(0);
+  });
+
+  it('should block redirection with input process substitution', () => {
+    const result = checkForUnsafeRedirections(
+      'cat < <(echo secret)',
+      ['/workspace'],
+      '/workspace',
+    );
+    expect(result.isOutsideWorkspace).toBe(true);
+    expect(result.unsafeTargets.length).toBeGreaterThan(0);
+  });
+
+  it('should block process substitution in workspace-looking path', () => {
+    const result = checkForUnsafeRedirections(
+      'echo data > >(tee output.txt)',
+      ['/workspace'],
+      '/workspace',
+    );
+    expect(result.isOutsideWorkspace).toBe(true);
+    expect(result.unsafeTargets.length).toBeGreaterThan(0);
   });
 });

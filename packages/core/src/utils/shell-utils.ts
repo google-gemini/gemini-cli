@@ -298,7 +298,10 @@ function collectRedirections(root: Node, source: string): RedirectionDetail[] {
           // A redirection target is dynamic if it contains any shell expansions.
           // We cannot safely validate dynamic paths, so they must be blocked.
           const isDynamic =
+            destination.type === 'process_substitution' ||
+            destination.descendantsOfType('process_substitution').length > 0 ||
             destination.descendantsOfType('expansion').length > 0 ||
+            destination.descendantsOfType('simple_expansion').length > 0 ||
             destination.descendantsOfType('command_substitution').length > 0;
 
           // Determine redirect type by looking at the operator
