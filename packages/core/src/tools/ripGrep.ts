@@ -302,6 +302,12 @@ class GrepToolInvocation extends BaseToolInvocation<
       rgArgs.push('--glob', include);
     }
 
+    // Get file filtering options from config
+    const fileFilteringOptions = this.config.getFileFilteringOptions();
+
+    // Add ignore files based on configuration
+    this.addIgnoreFiles(rgArgs, absolutePath, fileFilteringOptions);
+
     const excludes = [
       '.git',
       'node_modules',
@@ -371,6 +377,42 @@ class GrepToolInvocation extends BaseToolInvocation<
       console.error(`GrepLogic: ripgrep failed: ${getErrorMessage(error)}`);
       throw error;
     }
+  }
+
+  /**
+   * Adds ignore files to ripgrep arguments based on configuration
+   * @param rgArgs Array of ripgrep arguments to modify
+   * @param searchPath The absolute path to search in
+   * @param options File filtering options from config
+   */
+  private addIgnoreFiles(
+    rgArgs: string[],
+    searchPath: string,
+    options: { respectGitIgnore: boolean; respectGeminiIgnore: boolean },
+  ): void {
+    // Control gitignore behavior based on configuration
+    if (!options.respectGitIgnore) {
+      // When respectGitIgnore is false, disable gitignore to search ignored files
+      rgArgs.push('--no-ignore-vcs');
+    }
+    // When respectGitIgnore is true, ripgrep will automatically respect .gitignore files by default
+    // We don't explicitly pass .gitignore files to let ripgrep handle its sophisticated discovery logic
+
+    const ignoreFiles: string[] = [];
+
+    // Add .geminiignore if enabled and exists
+    // This is the main reason we need --ignore-file since ripgrep doesn't know about .geminiignore by default
+    if (options.respectGeminiIgnore) {
+      const geminiignorePath = path.join(searchPath, '.geminiignore');
+      if (fs.existsSync(geminiignorePath)) {
+        ignoreFiles.push(geminiignorePath);
+      }
+    }
+
+    // Add --ignore-file parameters for each existing ignore file
+    ignoreFiles.forEach((ignoreFile) => {
+      rgArgs.push('--ignore-file', ignoreFile);
+    });
   }
 
   /**
