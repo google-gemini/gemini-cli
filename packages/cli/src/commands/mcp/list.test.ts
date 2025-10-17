@@ -4,7 +4,16 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
+import {
+  vi,
+  describe,
+  it,
+  expect,
+  beforeEach,
+  afterEach,
+  type Mock,
+  type MockInstance,
+} from 'vitest';
 import { listMcpServers } from './list.js';
 import { loadSettings } from '../../config/settings.js';
 import { ExtensionStorage, loadExtensions } from '../../config/extension.js';
@@ -37,24 +46,25 @@ vi.mock('@google/gemini-cli-core', () => ({
 }));
 vi.mock('@modelcontextprotocol/sdk/client/index.js');
 
-const mockedExtensionStorage = ExtensionStorage as vi.Mock;
-const mockedLoadSettings = loadSettings as vi.Mock;
-const mockedLoadExtensions = loadExtensions as vi.Mock;
-const mockedCreateTransport = createTransport as vi.Mock;
-const MockedClient = Client as vi.Mock;
+const mockedGetUserExtensionsDir =
+  ExtensionStorage.getUserExtensionsDir as Mock;
+const mockedLoadSettings = loadSettings as Mock;
+const mockedLoadExtensions = loadExtensions as Mock;
+const mockedCreateTransport = createTransport as Mock;
+const MockedClient = Client as Mock;
 
 interface MockClient {
-  connect: vi.Mock;
-  ping: vi.Mock;
-  close: vi.Mock;
+  connect: Mock;
+  ping: Mock;
+  close: Mock;
 }
 
 interface MockTransport {
-  close: vi.Mock;
+  close: Mock;
 }
 
 describe('mcp list command', () => {
-  let consoleSpy: vi.SpyInstance;
+  let consoleSpy: MockInstance;
   let mockClient: MockClient;
   let mockTransport: MockTransport;
 
@@ -73,9 +83,7 @@ describe('mcp list command', () => {
     MockedClient.mockImplementation(() => mockClient);
     mockedCreateTransport.mockResolvedValue(mockTransport);
     mockedLoadExtensions.mockReturnValue([]);
-    mockedExtensionStorage.getUserExtensionsDir.mockReturnValue(
-      '/mocked/extensions/dir',
-    );
+    mockedGetUserExtensionsDir.mockReturnValue('/mocked/extensions/dir');
   });
 
   afterEach(() => {
@@ -170,7 +178,7 @@ describe('mcp list command', () => {
     );
     expect(consoleSpy).toHaveBeenCalledWith(
       expect.stringContaining(
-        'extension-server: /ext/server  (stdio) - Connected',
+        'extension-server (from test-extension): /ext/server  (stdio) - Connected',
       ),
     );
   });

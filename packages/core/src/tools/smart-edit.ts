@@ -39,6 +39,7 @@ import { SmartEditCorrectionEvent } from '../telemetry/types.js';
 import { logSmartEditCorrectionEvent } from '../telemetry/loggers.js';
 
 import { correctPath } from '../utils/pathCorrector.js';
+import { EDIT_TOOL_NAME } from './tool-names.js';
 interface ReplacementContext {
   params: EditToolParams;
   currentContent: string;
@@ -815,7 +816,7 @@ export class SmartEditTool
   extends BaseDeclarativeTool<EditToolParams, ToolResult>
   implements ModifiableDeclarativeTool<EditToolParams>
 {
-  static readonly Name = 'replace';
+  static readonly Name = EDIT_TOOL_NAME;
 
   constructor(private readonly config: Config) {
     super(
