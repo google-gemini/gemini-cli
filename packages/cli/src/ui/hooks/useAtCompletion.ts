@@ -197,10 +197,13 @@ export function useAtCompletion(props: UseAtCompletionProps): void {
       }, 200);
 
       try {
-        const results = await fileSearch.current.search(state.pattern, {
-          signal: controller.signal,
-          maxResults: MAX_SUGGESTIONS_TO_SHOW * 3,
-        });
+        const results = await fileSearch.current.search(
+          state.pattern.toLowerCase(),
+          {
+            signal: controller.signal,
+            maxResults: MAX_SUGGESTIONS_TO_SHOW * 3,
+          },
+        );
 
         if (slowSearchTimer.current) {
           clearTimeout(slowSearchTimer.current);
