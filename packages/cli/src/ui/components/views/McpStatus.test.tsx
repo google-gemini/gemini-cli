@@ -43,7 +43,6 @@ describe('McpStatus', () => {
     connectingServers: [],
     showDescriptions: true,
     showSchema: false,
-    showTips: false,
   };
 
   it('renders correctly with a connected server', () => {
@@ -120,11 +119,6 @@ describe('McpStatus', () => {
         showSchema={true}
       />,
     );
-    expect(lastFrame()).toMatchSnapshot();
-  });
-
-  it('renders correctly with tips enabled', () => {
-    const { lastFrame } = render(<McpStatus {...baseProps} showTips={true} />);
     expect(lastFrame()).toMatchSnapshot();
   });
 

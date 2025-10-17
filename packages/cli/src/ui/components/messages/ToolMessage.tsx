@@ -13,6 +13,7 @@ import { MarkdownDisplay } from '../../utils/MarkdownDisplay.js';
 import { AnsiOutputText } from '../AnsiOutput.js';
 import { GeminiRespondingSpinner } from '../GeminiRespondingSpinner.js';
 import { MaxSizedBox } from '../shared/MaxSizedBox.js';
+import { TodoListDisplay } from './TodoListDisplay.js';
 import { ShellInputPrompt } from '../ShellInputPrompt.js';
 import {
   SHELL_COMMAND_NAME,
@@ -20,7 +21,7 @@ import {
   TOOL_STATUS,
 } from '../../constants.js';
 import { theme } from '../../semantic-colors.js';
-import type { AnsiOutput, Config } from '@google/gemini-cli-core';
+import type { AnsiOutput, Config, TodoList } from '@google/gemini-cli-core';
 import { useUIState } from '../../contexts/UIStateContext.js';
 
 const STATIC_HEIGHT = 1;
@@ -168,6 +169,12 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
                 diffContent={resultDisplay.fileDiff}
                 filename={resultDisplay.fileName}
                 availableTerminalHeight={availableHeight}
+                terminalWidth={childWidth}
+              />
+            ) : typeof resultDisplay === 'object' &&
+              'todos' in resultDisplay ? (
+              <TodoListDisplay
+                todos={resultDisplay as TodoList}
                 terminalWidth={childWidth}
               />
             ) : (
