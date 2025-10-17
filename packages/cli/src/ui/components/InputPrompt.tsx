@@ -75,6 +75,7 @@ export interface InputPromptProps {
   isEmbeddedShellFocused?: boolean;
   setQueueErrorMessage: (message: string | null) => void;
   streamingState: StreamingState;
+  popAllMessages?: (onPop: (messages: string | undefined) => void) => void;
 }
 
 // The input content, input container, and input suggestions list may have different widths
@@ -113,6 +114,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   isEmbeddedShellFocused,
   setQueueErrorMessage,
   streamingState,
+  popAllMessages,
 }) => {
   const kittyProtocol = useKittyKeyboardProtocol();
   const isShellFocused = useShellFocusState();
@@ -358,7 +360,24 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     [resetCompletionState, buffer, completionSuggestions, slashCommands],
   );
 
-  // Handle clipboard image pasting with Ctrl+V or Alt+V(Windows)
+  // Helper function to handle loading queued messages into input
+  // Returns true if we should continue with input history navigation
+  const tryLoadQueuedMessages = useCallback(() => {
+    if (buffer.text.trim() === '' && popAllMessages) {
+      popAllMessages((allMessages) => {
+        if (allMessages) {
+          buffer.setText(allMessages);
+        } else {
+          // No queued messages, proceed with input history
+          inputHistory.navigateUp();
+        }
+      });
+      return true; // We handled the up arrow key
+    }
+    return false;
+  }, [buffer, popAllMessages, inputHistory]);
+
+  // Handle clipboard image pasting with Ctrl+V
   const handleClipboardImage = useCallback(async () => {
     try {
       if (await clipboardHasImage()) {
@@ -667,6 +686,12 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         }
 
         if (keyMatchers[Command.HISTORY_UP](key)) {
+          // Check for queued messages first when input is empty
+          // If no queued messages, inputHistory.navigateUp() is called inside tryLoadQueuedMessages
+          if (tryLoadQueuedMessages()) {
+            return;
+          }
+          // Only navigate history if popAllMessages doesn't exist
           inputHistory.navigateUp();
           return;
         }
@@ -680,6 +705,12 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           (buffer.allVisualLines.length === 1 ||
             (buffer.visualCursor[0] === 0 && buffer.visualScrollRow === 0))
         ) {
+          // Check for queued messages first when input is empty
+          // If no queued messages, inputHistory.navigateUp() is called inside tryLoadQueuedMessages
+          if (tryLoadQueuedMessages()) {
+            return;
+          }
+          // Only navigate history if popAllMessages doesn't exist
           inputHistory.navigateUp();
           return;
         }
@@ -823,6 +854,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       commandSearchActive,
       commandSearchCompletion,
       kittyProtocol.supported,
+      tryLoadQueuedMessages,
     ],
   );
 
