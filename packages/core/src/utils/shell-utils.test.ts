@@ -12,6 +12,7 @@ import {
   getShellConfiguration,
   isCommandAllowed,
   stripShellWrapper,
+  removeEnvironmentVariablesFromCommand,
 } from './shell-utils.js';
 import type { Config } from '../config/config.js';
 
@@ -268,6 +269,42 @@ describe('checkCommandPermissions', () => {
   });
 });
 
+describe('removeEnvironmentVariablesFromCommand', () => {
+  it('should handle no environment variable assignments', () => {
+    expect(removeEnvironmentVariablesFromCommand('npm start')).toEqual(
+      'npm start',
+    );
+  });
+
+  it('should handle single environment variable assignment', () => {
+    expect(
+      removeEnvironmentVariablesFromCommand('DEBUG=true npm start'),
+    ).toEqual('npm start');
+  });
+
+  it('should handle multiple environment variable assignments', () => {
+    expect(
+      removeEnvironmentVariablesFromCommand('DEBUG=true ENV=dev npm start'),
+    ).toEqual('npm start');
+  });
+
+  it('should handle environment variable assignments on multiple commands', () => {
+    expect(
+      removeEnvironmentVariablesFromCommand(
+        'DEBUG=true ENV=dev npm start && TEST=false echo $TEST',
+      ),
+    ).toEqual('npm start && echo $TEST');
+  });
+
+  it('should handle environment variable assignments on subsequent commands', () => {
+    expect(
+      removeEnvironmentVariablesFromCommand(
+        'npm start && TEST=false echo $TEST',
+      ),
+    ).toEqual('npm start && echo $TEST');
+  });
+});
+
 describe('getCommandRoots', () => {
   it('should return a single command', () => {
     expect(getCommandRoots('ls -l')).toEqual(['ls']);
@@ -289,6 +326,33 @@ describe('getCommandRoots', () => {
   it('should correctly parse a chained command with quotes', () => {
     const result = getCommandRoots('echo "hello" && git commit -m "feat"');
     expect(result).toEqual(['echo', 'git']);
+  });
+
+  it('should handle single environment variable assignments', () => {
+    const result = getCommandRoots('DEBUG=true npm run start');
+    expect(result).toEqual(['npm']);
+  });
+
+  it('should handle single environment variable assignments across multiple commands', () => {
+    const result = getCommandRoots('DEBUG=true npm run start && echo test');
+    expect(result).toEqual(['npm', 'echo']);
+  });
+
+  it('should handle single environment variable only in a second command', () => {
+    const result = getCommandRoots('npm run start && TEST=true echo test');
+    expect(result).toEqual(['npm', 'echo']);
+  });
+
+  it('should handle multiple environment variable assignments', () => {
+    const result = getCommandRoots('DEBUG=true ENV=dev npm run start');
+    expect(result).toEqual(['npm']);
+  });
+
+  it('should handle multiple environment variable assignments across multiple commands', () => {
+    const result = getCommandRoots(
+      'DEBUG=true ENV=dev npm run start && TEST=false echo $TEST',
+    );
+    expect(result).toEqual(['npm', 'echo']);
   });
 });
 

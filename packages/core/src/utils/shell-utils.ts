@@ -164,6 +164,33 @@ export function splitCommands(command: string): string[] {
 }
 
 /**
+ * Removes any environment variable assignments from the given command.
+ * @param command The shell command string to parse
+ * @returns the command with any environment variable assignments removed
+ * @example removeEnvironmentVariablesFromCommand("DEBUG=true npm run test") returns "npm run test"
+ * @example removeEnvironmentVariablesFromCommand("DEBUG=true ENV=dev npm start") returns "npm start"
+ */
+export function removeEnvironmentVariablesFromCommand(command: string): string {
+  let commandNoEnvVars = command;
+  // Find all environment variable assignments e.g. ENV=dev
+  // So we can remove them prior to identifying the root command
+  let match = command.match(/([A-Za-z0-9_]+)=([^ ]+)/);
+  while (match) {
+    const envVar = match[0];
+    // Escape special regex characters in the substring
+    const escapedSubstr = envVar.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    // Create a regex pattern to match the substring literally
+    const regex = new RegExp(escapedSubstr, 'g');
+    // Replace all occurrences of the substring
+    commandNoEnvVars = commandNoEnvVars.replace(regex, '');
+    match = commandNoEnvVars.match(/([A-Za-z0-9_]+)=([^ ]+)/);
+  }
+  // Remove any white space we've created in the replacement
+  // and replace any double spaces created with single spaces
+  return commandNoEnvVars.trim().replaceAll('  ', ' ');
+}
+
+/**
  * Extracts the root command from a given shell command string.
  * This is used to identify the base command for permission checks.
  * @param command The shell command string to parse
@@ -177,10 +204,14 @@ export function getCommandRoot(command: string): string | undefined {
     return undefined;
   }
 
+  // Remove any environment variable assignments from being considered the root
+  const commandNoEnvVars =
+    removeEnvironmentVariablesFromCommand(trimmedCommand);
+
   // This regex is designed to find the first "word" of a command,
   // while respecting quotes. It looks for a sequence of non-whitespace
   // characters that are not inside quotes.
-  const match = trimmedCommand.match(/^"([^"]+)"|^'([^']+)'|^(\S+)/);
+  const match = commandNoEnvVars.match(/^"([^"]+)"|^'([^']+)'|^(\S+)/);
   if (match) {
     // The first element in the match array is the full match.
     // The subsequent elements are the capture groups.
