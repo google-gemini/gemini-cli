@@ -140,36 +140,38 @@ describe('useAtCompletion', () => {
     });
 
     it('should perform a case-insensitive search by lowercasing the pattern', async () => {
-      const structure: FileSystemStructure = { 'file.txt': '' };
-      testRootDir = await createTmpDir(structure);
+      testRootDir = await createTmpDir({ 'file.txt': '' });
 
-      const mockFileSearch: FileSearch = {
-        initialize: vi.fn().mockResolvedValue(undefined),
-        search: vi.fn().mockImplementation(async (pattern: string) => {
-          if (pattern === 'file') {
-            return ['file.txt'];
-          }
-          return [];
-        }),
-      };
-      vi.spyOn(FileSearchFactory, 'create').mockReturnValue(mockFileSearch);
+      // Use a real FileSearch instance to ensure end-to-end behavior.
+      const fileSearch = FileSearchFactory.create({
+        projectRoot: testRootDir,
+        ignoreDirs: [],
+        useGitignore: false,
+        useGeminiignore: false,
+        cache: false,
+        enableRecursiveFileSearch: true,
+        disableFuzzySearch: false,
+      });
+      await fileSearch.initialize();
+
+      // Spy on the real search method to verify the pattern.
+      const searchSpy = vi.spyOn(fileSearch, 'search');
+
+      // Mock the factory to return our real instance.
+      vi.spyOn(FileSearchFactory, 'create').mockReturnValue(fileSearch);
 
       const { result } = renderHook(() =>
         useTestHarnessForAtCompletion(true, 'File', mockConfig, testRootDir),
       );
 
       await waitFor(() => {
-        // With the change, search is called with 'file' and we get a suggestion.
-        // Without the change, search is called with 'File' and we get no suggestions.
         expect(result.current.suggestions.map((s) => s.value)).toEqual([
           'file.txt',
         ]);
       });
 
-      expect(mockFileSearch.search).toHaveBeenCalledWith(
-        'file',
-        expect.any(Object),
-      );
+      // Expect the search to have been called with the lowercased pattern.
+      expect(searchSpy).toHaveBeenCalledWith('file', expect.any(Object));
     });
   });
 
