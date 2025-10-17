@@ -165,115 +165,122 @@ const authCommand: SlashCommand = {
   },
 };
 
-const listCommand: SlashCommand = {
-  name: 'list',
-  description: 'List configured MCP servers and tools',
-  kind: CommandKind.BUILT_IN,
-  action: async (
-    context: CommandContext,
-    args: string,
-  ): Promise<void | MessageActionReturn> => {
-    const { config } = context.services;
-    if (!config) {
-      return {
-        type: 'message',
-        messageType: 'error',
-        content: 'Config not loaded.',
-      };
-    }
+const listAction = async (
+  context: CommandContext,
+  showDescriptions = false,
+  showSchema = false,
+): Promise<void | MessageActionReturn> => {
+  const { config } = context.services;
+  if (!config) {
+    return {
+      type: 'message',
+      messageType: 'error',
+      content: 'Config not loaded.',
+    };
+  }
 
-    const toolRegistry = config.getToolRegistry();
-    if (!toolRegistry) {
-      return {
-        type: 'message',
-        messageType: 'error',
-        content: 'Could not retrieve tool registry.',
-      };
-    }
+  const toolRegistry = config.getToolRegistry();
+  if (!toolRegistry) {
+    return {
+      type: 'message',
+      messageType: 'error',
+      content: 'Could not retrieve tool registry.',
+    };
+  }
 
-    const lowerCaseArgs = args.toLowerCase().split(/\s+/).filter(Boolean);
+  const mcpServers = config.getMcpServers() || {};
+  const serverNames = Object.keys(mcpServers);
+  const blockedMcpServers = config.getBlockedMcpServers() || [];
 
-    const hasDesc =
-      lowerCaseArgs.includes('desc') || lowerCaseArgs.includes('descriptions');
-    const hasNodesc =
-      lowerCaseArgs.includes('nodesc') ||
-      lowerCaseArgs.includes('nodescriptions');
-    const showSchema = lowerCaseArgs.includes('schema');
+  const connectingServers = serverNames.filter(
+    (name) => getMCPServerStatus(name) === MCPServerStatus.CONNECTING,
+  );
+  const discoveryState = getMCPDiscoveryState();
+  const discoveryInProgress =
+    discoveryState === MCPDiscoveryState.IN_PROGRESS ||
+    connectingServers.length > 0;
 
-    const showDescriptions = !hasNodesc && (hasDesc || showSchema);
-    const showTips = lowerCaseArgs.length === 0;
+  const allTools = toolRegistry.getAllTools();
+  const mcpTools = allTools.filter(
+    (tool) => tool instanceof DiscoveredMCPTool,
+  ) as DiscoveredMCPTool[];
 
-    const mcpServers = config.getMcpServers() || {};
-    const serverNames = Object.keys(mcpServers);
-    const blockedMcpServers = config.getBlockedMcpServers() || [];
+  const promptRegistry = await config.getPromptRegistry();
+  const mcpPrompts = promptRegistry
+    .getAllPrompts()
+    .filter(
+      (prompt) =>
+        'serverName' in prompt &&
+        serverNames.includes(prompt.serverName as string),
+    ) as DiscoveredMCPPrompt[];
 
-    const connectingServers = serverNames.filter(
-      (name) => getMCPServerStatus(name) === MCPServerStatus.CONNECTING,
-    );
-    const discoveryState = getMCPDiscoveryState();
-    const discoveryInProgress =
-      discoveryState === MCPDiscoveryState.IN_PROGRESS ||
-      connectingServers.length > 0;
-
-    const allTools = toolRegistry.getAllTools();
-    const mcpTools = allTools.filter(
-      (tool) => tool instanceof DiscoveredMCPTool,
-    ) as DiscoveredMCPTool[];
-
-    const promptRegistry = await config.getPromptRegistry();
-    const mcpPrompts = promptRegistry
-      .getAllPrompts()
-      .filter(
-        (prompt) =>
-          'serverName' in prompt &&
-          serverNames.includes(prompt.serverName as string),
-      ) as DiscoveredMCPPrompt[];
-
-    const authStatus: HistoryItemMcpStatus['authStatus'] = {};
-    const tokenStorage = new MCPOAuthTokenStorage();
-    for (const serverName of serverNames) {
-      const server = mcpServers[serverName];
-      if (server.oauth?.enabled) {
-        const creds = await tokenStorage.getCredentials(serverName);
-        if (creds) {
-          if (creds.token.expiresAt && creds.token.expiresAt < Date.now()) {
-            authStatus[serverName] = 'expired';
-          } else {
-            authStatus[serverName] = 'authenticated';
-          }
+  const authStatus: HistoryItemMcpStatus['authStatus'] = {};
+  const tokenStorage = new MCPOAuthTokenStorage();
+  for (const serverName of serverNames) {
+    const server = mcpServers[serverName];
+    if (server.oauth?.enabled) {
+      const creds = await tokenStorage.getCredentials(serverName);
+      if (creds) {
+        if (creds.token.expiresAt && creds.token.expiresAt < Date.now()) {
+          authStatus[serverName] = 'expired';
         } else {
-          authStatus[serverName] = 'unauthenticated';
+          authStatus[serverName] = 'authenticated';
         }
       } else {
-        authStatus[serverName] = 'not-configured';
+        authStatus[serverName] = 'unauthenticated';
       }
+    } else {
+      authStatus[serverName] = 'not-configured';
     }
+  }
 
-    const mcpStatusItem: HistoryItemMcpStatus = {
-      type: MessageType.MCP_STATUS,
-      servers: mcpServers,
-      tools: mcpTools.map((tool) => ({
-        serverName: tool.serverName,
-        name: tool.name,
-        description: tool.description,
-        schema: tool.schema,
-      })),
-      prompts: mcpPrompts.map((prompt) => ({
-        serverName: prompt.serverName as string,
-        name: prompt.name,
-        description: prompt.description,
-      })),
-      authStatus,
-      blockedServers: blockedMcpServers,
-      discoveryInProgress,
-      connectingServers,
-      showDescriptions,
-      showSchema,
-      showTips,
-    };
+  const mcpStatusItem: HistoryItemMcpStatus = {
+    type: MessageType.MCP_STATUS,
+    servers: mcpServers,
+    tools: mcpTools.map((tool) => ({
+      serverName: tool.serverName,
+      name: tool.name,
+      description: tool.description,
+      schema: tool.schema,
+    })),
+    prompts: mcpPrompts.map((prompt) => ({
+      serverName: prompt.serverName as string,
+      name: prompt.name,
+      description: prompt.description,
+    })),
+    authStatus,
+    blockedServers: blockedMcpServers,
+    discoveryInProgress,
+    connectingServers,
+    showDescriptions,
+    showSchema,
+  };
 
-    context.ui.addItem(mcpStatusItem, Date.now());
-  },
+  context.ui.addItem(mcpStatusItem, Date.now());
+};
+
+const listCommand: SlashCommand = {
+  name: 'list',
+  altNames: ['ls', 'nodesc', 'nodescription'],
+  description: 'List configured MCP servers and tools',
+  kind: CommandKind.BUILT_IN,
+  action: (context) => listAction(context),
+};
+
+const descCommand: SlashCommand = {
+  name: 'desc',
+  altNames: ['description'],
+  description: 'List configured MCP servers and tools with descriptions',
+  kind: CommandKind.BUILT_IN,
+  action: (context) => listAction(context, true),
+};
+
+const schemaCommand: SlashCommand = {
+  name: 'schema',
+  description:
+    'List configured MCP servers and tools with descriptions and schemas',
+  kind: CommandKind.BUILT_IN,
+  action: (context) => listAction(context, true, true),
 };
 
 const refreshCommand: SlashCommand = {
@@ -326,15 +333,14 @@ const refreshCommand: SlashCommand = {
 
 export const mcpCommand: SlashCommand = {
   name: 'mcp',
-  description:
-    'list configured MCP servers and tools, or authenticate with OAuth-enabled servers',
+  description: 'Manage configured Model Context Protocol (MCP) servers',
   kind: CommandKind.BUILT_IN,
-  subCommands: [listCommand, authCommand, refreshCommand],
-  // Default action when no subcommand is provided
-  action: async (
-    context: CommandContext,
-    args: string,
-  ): Promise<void | SlashCommandActionReturn> =>
-    // If no subcommand, run the list command
-    listCommand.action!(context, args),
+  subCommands: [
+    listCommand,
+    descCommand,
+    schemaCommand,
+    authCommand,
+    refreshCommand,
+  ],
+  action: async (context: CommandContext) => listAction(context),
 };
