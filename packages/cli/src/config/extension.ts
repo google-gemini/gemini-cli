@@ -494,12 +494,10 @@ export async function installOrUpdateExtension(
         await cloneFromGit(installMetadata, tempDir);
         installMetadata.type = 'git';
       } else {
-        const { owner, repo } = parsedGithubParts;
         const result = await downloadFromGitHubRelease(
           installMetadata,
           tempDir,
-          owner,
-          repo,
+          parsedGithubParts,
         );
         if (result.success) {
           installMetadata.type = result.type;
