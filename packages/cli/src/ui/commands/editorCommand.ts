@@ -12,7 +12,7 @@ import {
 
 export const editorCommand: SlashCommand = {
   name: 'editor',
-  description: 'set external editor preference',
+  description: 'Set external editor preference',
   kind: CommandKind.BUILT_IN,
   action: (): OpenDialogActionReturn => ({
     type: 'dialog',

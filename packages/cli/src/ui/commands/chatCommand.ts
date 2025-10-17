@@ -357,7 +357,7 @@ const shareCommand: SlashCommand = {
 
 export const chatCommand: SlashCommand = {
   name: 'chat',
-  description: 'Manage conversation history.',
+  description: 'Manage conversation history',
   kind: CommandKind.BUILT_IN,
   subCommands: [
     listCommand,

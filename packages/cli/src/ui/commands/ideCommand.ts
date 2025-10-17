@@ -138,7 +138,7 @@ export const ideCommand = async (): Promise<SlashCommand> => {
   if (!currentIDE) {
     return {
       name: 'ide',
-      description: 'manage IDE integration',
+      description: 'Manage IDE integration',
       kind: CommandKind.BUILT_IN,
       action: (): SlashCommandActionReturn =>
         ({
@@ -151,14 +151,14 @@ export const ideCommand = async (): Promise<SlashCommand> => {
 
   const ideSlashCommand: SlashCommand = {
     name: 'ide',
-    description: 'manage IDE integration',
+    description: 'Manage IDE integration',
     kind: CommandKind.BUILT_IN,
     subCommands: [],
   };
 
   const statusCommand: SlashCommand = {
     name: 'status',
-    description: 'check status of IDE integration',
+    description: 'Check status of IDE integration',
     kind: CommandKind.BUILT_IN,
     action: async (): Promise<SlashCommandActionReturn> => {
       const { messageType, content } =
@@ -173,7 +173,7 @@ export const ideCommand = async (): Promise<SlashCommand> => {
 
   const installCommand: SlashCommand = {
     name: 'install',
-    description: `install required IDE companion for ${ideClient.getDetectedIdeDisplayName()}`,
+    description: `Install required IDE companion for ${ideClient.getDetectedIdeDisplayName()}`,
     kind: CommandKind.BUILT_IN,
     action: async (context) => {
       const installer = getIdeInstaller(currentIDE);
@@ -246,7 +246,7 @@ export const ideCommand = async (): Promise<SlashCommand> => {
 
   const enableCommand: SlashCommand = {
     name: 'enable',
-    description: 'enable IDE integration',
+    description: 'Enable IDE integration',
     kind: CommandKind.BUILT_IN,
     action: async (context: CommandContext) => {
       context.services.settings.setValue(
@@ -268,7 +268,7 @@ export const ideCommand = async (): Promise<SlashCommand> => {
 
   const disableCommand: SlashCommand = {
     name: 'disable',
-    description: 'disable IDE integration',
+    description: 'Disable IDE integration',
     kind: CommandKind.BUILT_IN,
     action: async (context: CommandContext) => {
       context.services.settings.setValue(

@@ -15,7 +15,7 @@ import { CommandKind } from './types.js';
 
 export const initCommand: SlashCommand = {
   name: 'init',
-  description: 'Analyzes the project and creates a tailored GEMINI.md file.',
+  description: 'Analyzes the project and creates a tailored GEMINI.md file',
   kind: CommandKind.BUILT_IN,
   action: async (
     context: CommandContext,

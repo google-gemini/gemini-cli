@@ -13,7 +13,7 @@ import { IdeClient } from '@google/gemini-cli-core';
 
 export const aboutCommand: SlashCommand = {
   name: 'about',
-  description: 'show version info',
+  description: 'Show version info',
   kind: CommandKind.BUILT_IN,
   action: async (context) => {
     const osVersion = process.platform;
