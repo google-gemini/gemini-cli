@@ -145,9 +145,9 @@ export function useAtCompletion(props: UseAtCompletionProps): void {
     } else if (
       (state.status === AtCompletionStatus.READY ||
         state.status === AtCompletionStatus.SEARCHING) &&
-      pattern !== state.pattern // Only search if the pattern has changed
+      pattern.toLowerCase() !== state.pattern // Only search if the pattern has changed
     ) {
-      dispatch({ type: 'SEARCH', payload: pattern });
+      dispatch({ type: 'SEARCH', payload: pattern.toLowerCase() });
     }
   }, [enabled, pattern, state.status, state.pattern]);
 

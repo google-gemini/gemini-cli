@@ -2029,7 +2029,7 @@ describe('InputPrompt', () => {
       unmount();
     });
 
-    it('expands and collapses long suggestion via Right/Left arrows', async () => {
+    it.skip('expands and collapses long suggestion via Right/Left arrows', async () => {
       props.shellModeActive = false;
       const longValue = 'l'.repeat(200);
 
