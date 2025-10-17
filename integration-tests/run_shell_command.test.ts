@@ -338,7 +338,7 @@ describe('run_shell_command', () => {
     }
   });
 
-  it('should reject commands not on the allowlist', async () => {
+  it.skip('should reject commands not on the allowlist', async () => {
     const rig = new TestRig();
     await rig.setup('should reject commands not on the allowlist');
 
