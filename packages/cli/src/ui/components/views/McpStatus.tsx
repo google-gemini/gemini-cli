@@ -26,7 +26,6 @@ interface McpStatusProps {
   connectingServers: string[];
   showDescriptions: boolean;
   showSchema: boolean;
-  showTips: boolean;
 }
 
 export const McpStatus: React.FC<McpStatusProps> = ({
@@ -40,7 +39,6 @@ export const McpStatus: React.FC<McpStatusProps> = ({
   connectingServers,
   showDescriptions,
   showSchema,
-  showTips,
 }) => {
   const serverNames = Object.keys(servers);
 
@@ -249,29 +247,6 @@ export const McpStatus: React.FC<McpStatusProps> = ({
           <Text> - Blocked</Text>
         </Box>
       ))}
-
-      {showTips && (
-        <Box flexDirection="column" marginTop={1}>
-          <Text color={theme.text.accent}>💡 Tips:</Text>
-          <Text>
-            {'  '}- Use <Text color={theme.text.accent}>/mcp desc</Text> to show
-            server and tool descriptions
-          </Text>
-          <Text>
-            {'  '}- Use <Text color={theme.text.accent}>/mcp schema</Text> to
-            show tool parameter schemas
-          </Text>
-          <Text>
-            {'  '}- Use <Text color={theme.text.accent}>/mcp nodesc</Text> to
-            hide descriptions
-          </Text>
-          <Text>
-            {'  '}- Use{' '}
-            <Text color={theme.text.accent}>/mcp auth &lt;server-name&gt;</Text>{' '}
-            to authenticate with OAuth-enabled servers
-          </Text>
-        </Box>
-      )}
     </Box>
   );
 };
