@@ -14,6 +14,15 @@ export const IDE_DEFINITIONS = {
   trae: { name: 'trae', displayName: 'Trae' },
   vscode: { name: 'vscode', displayName: 'VS Code' },
   vscodefork: { name: 'vscodefork', displayName: 'IDE' },
+  jetbrains: { name: 'jetbrains', displayName: 'JetBrains IDE' },
+  intellijidea: { name: 'intellijidea', displayName: 'IntelliJ IDEA' },
+  webstorm: { name: 'webstorm', displayName: 'WebStorm' },
+  pycharm: { name: 'pycharm', displayName: 'PyCharm' },
+  goland: { name: 'goland', displayName: 'GoLand' },
+  androidstudio: { name: 'androidstudio', displayName: 'Android Studio' },
+  clion: { name: 'clion', displayName: 'CLion' },
+  rustrover: { name: 'rustrover', displayName: 'RustRover' },
+  datagrip: { name: 'datagrip', displayName: 'DataGrip' },
 } as const;
 
 export interface IdeInfo {
@@ -47,6 +56,9 @@ export function detectIdeFromEnv(): IdeInfo {
   if (process.env['MONOSPACE_ENV']) {
     return IDE_DEFINITIONS.firebasestudio;
   }
+  if (process.env['TERMINAL_EMULATOR']?.includes('JetBrains')) {
+    return IDE_DEFINITIONS.jetbrains;
+  }
   return IDE_DEFINITIONS.vscode;
 }
 
@@ -66,6 +78,41 @@ function verifyVSCode(
   return IDE_DEFINITIONS.vscodefork;
 }
 
+function verifyJetBrains(
+  ide: IdeInfo,
+  ideProcessInfo: {
+    pid: number;
+    command: string;
+  },
+): IdeInfo {
+  const command = ideProcessInfo.command.toLowerCase();
+  if (command.includes('idea')) {
+    return IDE_DEFINITIONS.intellijidea;
+  }
+  if (command.includes('webstorm')) {
+    return IDE_DEFINITIONS.webstorm;
+  }
+  if (command.includes('pycharm')) {
+    return IDE_DEFINITIONS.pycharm;
+  }
+  if (command.includes('goland')) {
+    return IDE_DEFINITIONS.goland;
+  }
+  if (command.includes('studio')) {
+    return IDE_DEFINITIONS.androidstudio;
+  }
+  if (command.includes('clion')) {
+    return IDE_DEFINITIONS.clion;
+  }
+  if (command.includes('rustrover')) {
+    return IDE_DEFINITIONS.rustrover;
+  }
+  if (command.includes('datagrip')) {
+    return IDE_DEFINITIONS.datagrip;
+  }
+  return ide;
+}
+
 export function detectIde(
   ideProcessInfo: {
     pid: number;
@@ -80,11 +127,17 @@ export function detectIde(
     };
   }
 
-  // Only VSCode-based integrations are currently supported.
-  if (process.env['TERM_PROGRAM'] !== 'vscode') {
-    return undefined;
+  const isJetBrains = process.env['TERMINAL_EMULATOR']?.includes('JetBrains');
+  if (isJetBrains) {
+    const ide = detectIdeFromEnv();
+    return verifyJetBrains(ide, ideProcessInfo);
   }
 
-  const ide = detectIdeFromEnv();
-  return verifyVSCode(ide, ideProcessInfo);
+  const isVscode = process.env['TERM_PROGRAM'] === 'vscode';
+  if (isVscode) {
+    const ide = detectIdeFromEnv();
+    return verifyVSCode(ide, ideProcessInfo);
+  }
+
+  return undefined;
 }

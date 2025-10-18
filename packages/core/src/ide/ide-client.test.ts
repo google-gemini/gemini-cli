@@ -20,7 +20,7 @@ import { getIdeProcessInfo } from './process-utils.js';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
-import { detectIde, IDE_DEFINITIONS } from './detect-ide.js';
+import { detectIde, detectIdeFromEnv, IDE_DEFINITIONS } from './detect-ide.js';
 import * as os from 'node:os';
 import * as path from 'node:path';
 
@@ -50,6 +50,8 @@ describe('IdeClient', () => {
   let mockStdioTransport: Mocked<StdioClientTransport>;
 
   beforeEach(async () => {
+    vi.resetAllMocks();
+
     // Reset singleton instance for test isolation
     (IdeClient as unknown as { instance: IdeClient | undefined }).instance =
       undefined;
@@ -57,6 +59,7 @@ describe('IdeClient', () => {
     // Mock environment variables
     process.env['GEMINI_CLI_IDE_WORKSPACE_PATH'] = '/test/workspace';
     delete process.env['GEMINI_CLI_IDE_SERVER_PORT'];
+    delete process.env['GEMINI_CLI_IDE_SERVER_AUTH_TOKEN'];
     delete process.env['GEMINI_CLI_IDE_SERVER_STDIO_COMMAND'];
     delete process.env['GEMINI_CLI_IDE_SERVER_STDIO_ARGS'];
 
@@ -257,6 +260,31 @@ describe('IdeClient', () => {
       );
       expect(ideClient.getConnectionStatus().details).toContain(
         'Failed to connect',
+      );
+    });
+
+    it('should be disconnected if workspace path from env is invalid', async () => {
+      vi.mocked(fs.promises.readFile).mockRejectedValue(
+        new Error('File not found'),
+      );
+      (
+        vi.mocked(fs.promises.readdir) as Mock<
+          (path: fs.PathLike) => Promise<string[]>
+        >
+      ).mockResolvedValue([]);
+      process.env['GEMINI_CLI_IDE_SERVER_PORT'] = '9090';
+      process.env['GEMINI_CLI_IDE_WORKSPACE_PATH'] = '/invalid/workspace';
+
+      const ideClient = await IdeClient.getInstance();
+      await ideClient.connect();
+
+      expect(StreamableHTTPClientTransport).not.toHaveBeenCalled();
+      expect(StdioClientTransport).not.toHaveBeenCalled();
+      expect(ideClient.getConnectionStatus().status).toBe(
+        IDEConnectionStatus.Disconnected,
+      );
+      expect(ideClient.getConnectionStatus().details).toContain(
+        'Directory mismatch',
       );
     });
   });
@@ -558,6 +586,255 @@ describe('IdeClient', () => {
     });
   });
 
+  describe('getConnectionConfigFromEnv', () => {
+    beforeEach(() => {
+      // Ensure detectIdeFromEnv is mocked to return vscode by default
+      vi.mocked(detectIdeFromEnv).mockReturnValue(IDE_DEFINITIONS.vscode);
+    });
+
+    afterEach(() => {
+      // Clean up environment variables between tests
+      delete process.env['GEMINI_CLI_IDE_SERVER_PORT'];
+      delete process.env['GEMINI_CLI_IDE_SERVER_AUTH_TOKEN'];
+      delete process.env['GEMINI_CLI_IDE_SERVER_STDIO_COMMAND'];
+      delete process.env['GEMINI_CLI_IDE_SERVER_STDIO_ARGS'];
+      delete process.env['GEMINI_CLI_IDE_WORKSPACE_PATH'];
+    });
+
+    it('should return config when port is provided in environment variables', async () => {
+      process.env['GEMINI_CLI_IDE_SERVER_PORT'] = '8080';
+      vi.mocked(detectIdeFromEnv).mockReturnValue(IDE_DEFINITIONS.vscode);
+
+      const ideClient = await IdeClient.getInstance();
+      const result = await (
+        ideClient as unknown as {
+          getConnectionConfigFromEnv: () => Promise<unknown>;
+        }
+      ).getConnectionConfigFromEnv();
+
+      expect(result).toEqual({
+        port: '8080',
+        authToken: undefined,
+        stdio: undefined,
+        workspacePath: '/test/workspace',
+        ideInfo: IDE_DEFINITIONS.vscode,
+      });
+    });
+
+    it('should return config when stdio command is provided in environment variables', async () => {
+      process.env['GEMINI_CLI_IDE_SERVER_STDIO_COMMAND'] = 'test-cmd';
+      process.env['GEMINI_CLI_IDE_SERVER_STDIO_ARGS'] = '["--arg1", "--arg2"]';
+      process.env['GEMINI_CLI_IDE_WORKSPACE_PATH'] = '/test/workspace';
+      delete process.env['GEMINI_CLI_IDE_SERVER_PORT'];
+      delete process.env['GEMINI_CLI_IDE_SERVER_AUTH_TOKEN'];
+
+      const ideClient = await IdeClient.getInstance();
+      const result = (
+        ideClient as unknown as {
+          getConnectionConfigFromEnv: () => ReturnType<
+            (typeof ideClient)['getConnectionConfigFromEnv']
+          >;
+        }
+      ).getConnectionConfigFromEnv();
+
+      expect(result).toEqual({
+        port: undefined,
+        authToken: undefined,
+        workspacePath: '/test/workspace',
+        ideInfo: IDE_DEFINITIONS.vscode,
+        stdio: {
+          command: 'test-cmd',
+          args: ['--arg1', '--arg2'],
+        },
+      });
+    });
+
+    it('should include authToken when provided in environment variables', async () => {
+      process.env['GEMINI_CLI_IDE_SERVER_PORT'] = '8080';
+      process.env['GEMINI_CLI_IDE_SERVER_AUTH_TOKEN'] = 'test-token';
+      process.env['GEMINI_CLI_IDE_WORKSPACE_PATH'] = '/test/workspace';
+
+      const ideClient = await IdeClient.getInstance();
+      const result = (
+        ideClient as unknown as {
+          getConnectionConfigFromEnv: () => ReturnType<
+            (typeof ideClient)['getConnectionConfigFromEnv']
+          >;
+        }
+      ).getConnectionConfigFromEnv();
+
+      expect(result).toEqual({
+        port: '8080',
+        authToken: 'test-token',
+        workspacePath: '/test/workspace',
+        ideInfo: IDE_DEFINITIONS.vscode,
+        stdio: undefined,
+      });
+    });
+
+    it('should prioritize port over stdio when both are provided', async () => {
+      process.env['GEMINI_CLI_IDE_SERVER_PORT'] = '8080';
+      process.env['GEMINI_CLI_IDE_SERVER_STDIO_COMMAND'] = 'test-cmd';
+      process.env['GEMINI_CLI_IDE_SERVER_STDIO_ARGS'] = '["--arg1"]';
+      process.env['GEMINI_CLI_IDE_WORKSPACE_PATH'] = '/test/workspace';
+
+      const ideClient = await IdeClient.getInstance();
+      const result = (
+        ideClient as unknown as {
+          getConnectionConfigFromEnv: () => ReturnType<
+            (typeof ideClient)['getConnectionConfigFromEnv']
+          >;
+        }
+      ).getConnectionConfigFromEnv();
+
+      expect(result).toEqual({
+        port: '8080',
+        authToken: undefined,
+        workspacePath: '/test/workspace',
+        ideInfo: IDE_DEFINITIONS.vscode,
+        stdio: {
+          command: 'test-cmd',
+          args: ['--arg1'],
+        },
+      });
+    });
+
+    it('should return undefined if workspace path is invalid', async () => {
+      process.env['GEMINI_CLI_IDE_SERVER_PORT'] = '8080';
+      process.env['GEMINI_CLI_IDE_WORKSPACE_PATH'] = '/invalid/workspace';
+
+      const ideClient = await IdeClient.getInstance();
+      const result = (
+        ideClient as unknown as {
+          getConnectionConfigFromEnv: () => ReturnType<
+            (typeof ideClient)['getConnectionConfigFromEnv']
+          >;
+        }
+      ).getConnectionConfigFromEnv();
+
+      expect(result).toBeUndefined();
+    });
+
+    it('should return undefined if workspace path is empty', async () => {
+      process.env['GEMINI_CLI_IDE_SERVER_PORT'] = '8080';
+      process.env['GEMINI_CLI_IDE_WORKSPACE_PATH'] = '';
+
+      const ideClient = await IdeClient.getInstance();
+      const result = (
+        ideClient as unknown as {
+          getConnectionConfigFromEnv: () => ReturnType<
+            (typeof ideClient)['getConnectionConfigFromEnv']
+          >;
+        }
+      ).getConnectionConfigFromEnv();
+
+      expect(result).toBeUndefined();
+    });
+
+    it('should return undefined if workspace path is missing', async () => {
+      process.env['GEMINI_CLI_IDE_SERVER_PORT'] = '8080';
+      delete process.env['GEMINI_CLI_IDE_WORKSPACE_PATH'];
+
+      const ideClient = await IdeClient.getInstance();
+      const result = (
+        ideClient as unknown as {
+          getConnectionConfigFromEnv: () => ReturnType<
+            (typeof ideClient)['getConnectionConfigFromEnv']
+          >;
+        }
+      ).getConnectionConfigFromEnv();
+
+      expect(result).toBeUndefined();
+    });
+
+    it('should return undefined if no connection method is provided', async () => {
+      delete process.env['GEMINI_CLI_IDE_SERVER_PORT'];
+      delete process.env['GEMINI_CLI_IDE_SERVER_STDIO_COMMAND'];
+      process.env['GEMINI_CLI_IDE_WORKSPACE_PATH'] = '/test/workspace';
+
+      const ideClient = await IdeClient.getInstance();
+      const result = (
+        ideClient as unknown as {
+          getConnectionConfigFromEnv: () => ReturnType<
+            (typeof ideClient)['getConnectionConfigFromEnv']
+          >;
+        }
+      ).getConnectionConfigFromEnv();
+
+      expect(result).toBeUndefined();
+    });
+
+    it('should handle invalid JSON in STDIO_ARGS gracefully', async () => {
+      process.env['GEMINI_CLI_IDE_SERVER_STDIO_COMMAND'] = 'test-cmd';
+      process.env['GEMINI_CLI_IDE_SERVER_STDIO_ARGS'] = 'invalid json';
+      process.env['GEMINI_CLI_IDE_WORKSPACE_PATH'] = '/test/workspace';
+
+      const ideClient = await IdeClient.getInstance();
+      const result = (
+        ideClient as unknown as {
+          getConnectionConfigFromEnv: () => ReturnType<
+            (typeof ideClient)['getConnectionConfigFromEnv']
+          >;
+        }
+      ).getConnectionConfigFromEnv();
+
+      expect(result).toEqual({
+        port: undefined,
+        authToken: undefined,
+        workspacePath: '/test/workspace',
+        ideInfo: IDE_DEFINITIONS.vscode,
+        stdio: {
+          command: 'test-cmd',
+          args: [],
+        },
+      });
+    });
+
+    it('should handle non-array STDIO_ARGS gracefully', async () => {
+      process.env['GEMINI_CLI_IDE_SERVER_STDIO_COMMAND'] = 'test-cmd';
+      process.env['GEMINI_CLI_IDE_SERVER_STDIO_ARGS'] = '{"not": "an array"}';
+      process.env['GEMINI_CLI_IDE_WORKSPACE_PATH'] = '/test/workspace';
+
+      const ideClient = await IdeClient.getInstance();
+      const result = (
+        ideClient as unknown as {
+          getConnectionConfigFromEnv: () => ReturnType<
+            (typeof ideClient)['getConnectionConfigFromEnv']
+          >;
+        }
+      ).getConnectionConfigFromEnv();
+
+      expect(result).toEqual({
+        port: undefined,
+        authToken: undefined,
+        workspacePath: '/test/workspace',
+        ideInfo: IDE_DEFINITIONS.vscode,
+        stdio: {
+          command: 'test-cmd',
+          args: [],
+        },
+      });
+    });
+
+    it('should call detectIdeFromEnv to get IDE info', async () => {
+      process.env['GEMINI_CLI_IDE_SERVER_PORT'] = '8080';
+      process.env['GEMINI_CLI_IDE_WORKSPACE_PATH'] = '/test/workspace';
+      const expectedIdeInfo = IDE_DEFINITIONS.cursor;
+      vi.mocked(detectIdeFromEnv).mockReturnValue(expectedIdeInfo);
+
+      const ideClient = await IdeClient.getInstance();
+      const result = (
+        ideClient as unknown as {
+          getConnectionConfigFromEnv: () => ReturnType<
+            (typeof ideClient)['getConnectionConfigFromEnv']
+          >;
+        }
+      ).getConnectionConfigFromEnv();
+
+      expect(result?.ideInfo).toEqual(expectedIdeInfo);
+    });
+  });
+
   describe('isDiffingEnabled', () => {
     it('should return false if not connected', async () => {
       const ideClient = await IdeClient.getInstance();
@@ -663,6 +940,39 @@ describe('IdeClient', () => {
 
       expect(StreamableHTTPClientTransport).toHaveBeenCalledWith(
         new URL('http://127.0.0.1:8080/mcp'),
+        expect.objectContaining({
+          requestInit: {
+            headers: {
+              Authorization: `Bearer ${authToken}`,
+            },
+          },
+        }),
+      );
+      expect(ideClient.getConnectionStatus().status).toBe(
+        IDEConnectionStatus.Connected,
+      );
+    });
+
+    it('should connect with an auth token if provided in the environment variables', async () => {
+      const authToken = 'test-auth-token-from-env';
+      process.env['GEMINI_CLI_IDE_SERVER_PORT'] = '8080';
+      process.env['GEMINI_CLI_IDE_SERVER_AUTH_TOKEN'] = authToken;
+      process.env['GEMINI_CLI_IDE_WORKSPACE_PATH'] = '/test/workspace';
+
+      vi.mocked(fs.promises.readFile).mockRejectedValue(
+        new Error('File not found'),
+      );
+      (
+        vi.mocked(fs.promises.readdir) as Mock<
+          (path: fs.PathLike) => Promise<string[]>
+        >
+      ).mockResolvedValue([]);
+
+      const ideClient = await IdeClient.getInstance();
+      await ideClient.connect();
+
+      expect(StreamableHTTPClientTransport).toHaveBeenCalledWith(
+        new URL('http://localhost:8080/mcp'),
         expect.objectContaining({
           requestInit: {
             headers: {
