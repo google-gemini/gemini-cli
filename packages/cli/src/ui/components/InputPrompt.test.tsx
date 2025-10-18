@@ -172,6 +172,9 @@ describe('InputPrompt', () => {
         text: '',
         accept: vi.fn(),
         clear: vi.fn(),
+        isLoading: false,
+        isActive: false,
+        markSelected: vi.fn(),
       },
     };
     mockedUseCommandCompletion.mockReturnValue(mockCommandCompletion);
@@ -200,6 +203,8 @@ describe('InputPrompt', () => {
 
     mockedUseKittyKeyboardProtocol.mockReturnValue({
       supported: false,
+      enabled: false,
+      checking: false,
     });
 
     props = {
@@ -223,6 +228,8 @@ describe('InputPrompt', () => {
       inputWidth: 80,
       suggestionsWidth: 80,
       focus: true,
+      setQueueErrorMessage: vi.fn(),
+      streamingState: StreamingState.Idle,
     };
   });
 
@@ -1553,7 +1560,11 @@ describe('InputPrompt', () => {
   describe('paste auto-submission protection', () => {
     beforeEach(() => {
       vi.useFakeTimers();
-      mockedUseKittyKeyboardProtocol.mockReturnValue({ supported: false });
+      mockedUseKittyKeyboardProtocol.mockReturnValue({
+        supported: false,
+        enabled: false,
+        checking: false,
+      });
     });
 
     afterEach(() => {
@@ -1618,7 +1629,11 @@ describe('InputPrompt', () => {
       {
         name: 'kitty',
         setup: () =>
-          mockedUseKittyKeyboardProtocol.mockReturnValue({ supported: true }),
+          mockedUseKittyKeyboardProtocol.mockReturnValue({
+            supported: true,
+            enabled: true,
+            checking: false,
+          }),
       },
     ])(
       'should allow immediate submission for a trusted paste ($name)',
