@@ -1,0 +1,43 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`<AnchoredTodoListDisplay /> > renders null when no todos are in the history 1`] = `""`;
+
+exports[`<AnchoredTodoListDisplay /> > renders null when todos exist but none are in progress and full view is off 1`] = `""`;
+
+exports[`<AnchoredTodoListDisplay /> > renders only the in-progress task when full view is off 1`] = `
+"┌──────────────────────────────────────────────────────────────────────────────────────────────────┐
+│ 📝 Todo:(ctrl+t to expand)» In Progress Task                                                     │"
+`;
+
+exports[`<AnchoredTodoListDisplay /> > renders the full todo list when full view is on 1`] = `
+"┌──────────────────────────────────────────────────────────────────────────────────────────────────┐
+│ 📝 Todo:(ctrl+t to collapse)                                                                     │
+│                                                                                                  │
+│     ☐ Pending Task                                                                               │
+│     » In Progress Task                                                                           │
+│     ✓ Completed Task                                                                             │"
+`;
+
+exports[`<TodoListDisplay /> > renders a single todo item 1`] = `"☐ Single task"`;
+
+exports[`<TodoListDisplay /> > renders a todo list with long descriptions that wrap 1`] = `
+"☐ This is a very long
+  description for a pending
+  task that should wrap around
+  multiple lines when the
+  terminal width is
+  constrained.
+✓ Another completed task with
+  an equally verbose
+  description to test wrapping
+  behavior."
+`;
+
+exports[`<TodoListDisplay /> > renders a todo list with various statuses correctly 1`] = `
+"☐ Task 1
+» Task 2
+✓ Task 3
+✗ Task 4"
+`;
+
+exports[`<TodoListDisplay /> > renders an empty todo list correctly 1`] = `""`;
