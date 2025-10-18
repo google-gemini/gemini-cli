@@ -334,12 +334,10 @@ describeE2E('Clipboard E2E Tests', () => {
       console.log('Clipboard contains an image, proceeding to save...');
 
       // Save the clipboard image to a file
-      const saveResult = await clipboardUtils.saveClipboardImage(tempDir);
-      expect(saveResult.filePath).toBeTruthy();
-      expect(saveResult.error).toBeUndefined();
+      const savedImagePath = await clipboardUtils.saveClipboardImage(tempDir);
+      expect(savedImagePath).toBeTruthy();
 
       // Verify the saved image
-      const savedImagePath = saveResult.filePath as string;
       console.log(`Saved image to: ${savedImagePath}`);
 
       const stats = await fs.stat(savedImagePath);
@@ -459,7 +457,7 @@ describeE2E('Clipboard E2E Tests', () => {
             `clipboard-${Date.now()}-test-image.png`,
           );
           await fs.writeFile(filePath, 'test-image-content');
-          return { filePath };
+          return filePath;
         });
 
       try {
@@ -469,13 +467,13 @@ describeE2E('Clipboard E2E Tests', () => {
         const result = await clipboardUtils.saveClipboardImage(tempDir);
 
         // Verify the result
-        expect(result).toHaveProperty('filePath');
-        expect(result.filePath).toContain('test-image');
+        expect(result).toBeTruthy();
+        expect(result).toContain('test-image');
         console.log('Clipboard image processing verified');
 
         // Clean up
-        if (result.filePath) {
-          await fs.unlink(result.filePath).catch(() => {});
+        if (result) {
+          await fs.unlink(result).catch(() => {});
         }
       } finally {
         // Restore the original implementation
@@ -581,13 +579,10 @@ describeE2E('Clipboard E2E Tests', () => {
       .spyOn(clipboardUtils, 'clipboardHasImage')
       .mockResolvedValue(false);
 
-    // Mock saveClipboardImage to return error for empty clipboard
+    // Mock saveClipboardImage to return null for empty clipboard
     const saveClipboardImageSpy = vi
       .spyOn(clipboardUtils, 'saveClipboardImage')
-      .mockResolvedValue({
-        filePath: null,
-        error: 'No image in clipboard',
-      });
+      .mockResolvedValue(null);
 
     try {
       // Test clipboardHasImage
@@ -598,8 +593,7 @@ describeE2E('Clipboard E2E Tests', () => {
       // Test saveClipboardImage
       const result = await clipboardUtils.saveClipboardImage(tempDir);
       expect(saveClipboardImageSpy).toHaveBeenCalledWith(tempDir);
-      expect(result.filePath).toBeNull();
-      expect(result.error).toBe('No image in clipboard');
+      expect(result).toBeNull();
     } finally {
       // Always restore the mocks to prevent affecting other tests
       clipboardHasImageSpy.mockRestore();
@@ -785,23 +779,21 @@ Line 4: Unicode: 🚀🌟💻🔥✨`;
       .mockImplementation(async () => {
         callCount++;
         if (callCount === 1) {
-          return { filePath: file1, error: undefined };
+          return file1;
         } else if (callCount === 2) {
           // On second call, return a different file to simulate duplicate detection
-          return { filePath: file2, error: undefined };
+          return file2;
         }
-        return { filePath: null, error: 'Unexpected call' };
+        return null;
       });
 
     // First call - should return the first file
     const result1 = await clipboardUtils.saveClipboardImage(tempDir);
-    expect(result1.filePath).toBe(file1);
-    expect(result1.error).toBeUndefined();
+    expect(result1).toBe(file1);
 
     // Second call - should return a different file to simulate duplicate detection
     const result2 = await clipboardUtils.saveClipboardImage(tempDir);
-    expect(result2.filePath).toBe(file2);
-    expect(result2.error).toBeUndefined();
+    expect(result2).toBe(file2);
 
     try {
       // Verify the function was called twice

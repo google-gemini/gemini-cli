@@ -1277,7 +1277,6 @@ describe('InputPrompt', () => {
     });
 
     it('should call handleInput when vim mode is disabled', async () => {
-      props.vimModeEnabled = false;
       // Mock vimHandleInput to return false (vim didn't handle the input)
       props.vimHandleInput = vi.fn().mockReturnValue(false);
       const { stdin, unmount } = renderWithProviders(
