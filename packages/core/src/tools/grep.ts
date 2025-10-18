@@ -219,10 +219,16 @@ class GrepToolInvocation extends BaseToolInvocation<
       try {
         const child = spawn(checkCommand, checkArgs, {
           stdio: 'ignore',
-          shell: process.platform === 'win32',
+          shell: true,
         });
         child.on('close', (code) => resolve(code === 0));
-        child.on('error', () => resolve(false));
+        child.on('error', (err) => {
+          console.error(
+            `[GrepTool] Failed to start process for '${command}':`,
+            err.message,
+          );
+          resolve(false);
+        });
       } catch {
         resolve(false);
       }
@@ -385,10 +391,14 @@ class GrepToolInvocation extends BaseToolInvocation<
       }
 
       // --- Strategy 2: System grep ---
+      console.debug(
+        'GrepLogic: System grep is being considered as fallback strategy.',
+      );
+
       const grepAvailable = await this.isCommandAvailable('grep');
       if (grepAvailable) {
         strategyUsed = 'system grep';
-        const grepArgs = ['-r', '-n', '-H', '-E'];
+        const grepArgs = ['-r', '-n', '-H', '-E', '-I'];
         // Extract directory names from exclusion patterns for grep --exclude-dir
         const globExcludes = this.fileExclusions.getGlobExcludes();
         const commonExcludes = globExcludes
