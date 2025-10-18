@@ -100,18 +100,26 @@ Slash commands provide meta-level control over the CLI itself.
     available commands and their usage.
 
 - **`/mcp`**
-  - **Description:** List configured Model Context Protocol (MCP) servers, their
-    connection status, server details, and available tools.
+  - **Description:** Manage configured Model Context Protocol (MCP) servers.
   - **Sub-commands:**
-    - **`desc`** or **`descriptions`**:
-      - **Description:** Show detailed descriptions for MCP servers and tools.
-    - **`nodesc`** or **`nodescriptions`**:
-      - **Description:** Hide tool descriptions, showing only the tool names.
+    - **`list`** or **`ls`**:
+      - **Description:** List configured MCP servers and tools. This is the
+        default action if no subcommand is specified.
+    - **`desc`**
+      - **Description:** List configured MCP servers and tools with
+        descriptions.
     - **`schema`**:
-      - **Description:** Show the full JSON schema for the tool's configured
-        parameters.
-  - **Keyboard Shortcut:** Press **Ctrl+T** at any time to toggle between
-    showing and hiding tool descriptions.
+      - **Description:** List configured MCP servers and tools with descriptions
+        and schemas.
+    - **`auth`**:
+      - **Description:** Authenticate with an OAuth-enabled MCP server.
+      - **Usage:** `/mcp auth <server-name>`
+      - **Details:** If `<server-name>` is provided, it initiates the OAuth flow
+        for that server. If no server name is provided, it lists all configured
+        servers that support OAuth authentication.
+    - **`refresh`**:
+      - **Description:** Restarts all MCP servers and re-discovers their
+        available tools.
 
 - **`/memory`**
   - **Description:** Manage the AI's instructional context (hierarchical memory
@@ -292,8 +300,9 @@ Gemini CLI.
 
 - **`!<shell_command>`**
   - **Description:** Execute the given `<shell_command>` using `bash` on
-    Linux/macOS or `cmd.exe` on Windows. Any output or errors from the command
-    are displayed in the terminal.
+    Linux/macOS or `powershell.exe -NoProfile -Command` on Windows (unless you
+    override `ComSpec`). Any output or errors from the command are displayed in
+    the terminal.
   - **Examples:**
     - `!ls -la` (executes `ls -la` and returns to Gemini CLI)
     - `!git status` (executes `git status` and returns to Gemini CLI)

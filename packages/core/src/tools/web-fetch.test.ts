@@ -22,10 +22,15 @@ import {
   logWebFetchFallbackAttempt,
   WebFetchFallbackAttemptEvent,
 } from '../telemetry/index.js';
+import { convert } from 'html-to-text';
 
 const mockGenerateContent = vi.fn();
 const mockGetGeminiClient = vi.fn(() => ({
   generateContent: mockGenerateContent,
+}));
+
+vi.mock('html-to-text', () => ({
+  convert: vi.fn((text) => `Converted: ${text}`),
 }));
 
 vi.mock('../telemetry/index.js', () => ({
@@ -243,6 +248,116 @@ describe('WebFetchTool', () => {
       expect(WebFetchFallbackAttemptEvent).toHaveBeenCalledWith(
         'primary_failed',
       );
+    });
+  });
+
+  describe('execute (fallback)', () => {
+    beforeEach(() => {
+      // Force fallback by mocking primary fetch to fail
+      vi.spyOn(fetchUtils, 'isPrivateIp').mockReturnValue(false);
+      mockGenerateContent.mockResolvedValueOnce({
+        candidates: [],
+      });
+    });
+
+    it('should convert HTML content using html-to-text', async () => {
+      const htmlContent = '<html><body><h1>Hello</h1></body></html>';
+      vi.spyOn(fetchUtils, 'fetchWithTimeout').mockResolvedValue({
+        ok: true,
+        headers: new Headers({ 'content-type': 'text/html; charset=utf-8' }),
+        text: () => Promise.resolve(htmlContent),
+      } as Response);
+
+      // Mock fallback LLM call to return the content passed to it
+      mockGenerateContent.mockImplementationOnce(async (req) => ({
+        candidates: [{ content: { parts: [{ text: req[0].parts[0].text }] } }],
+      }));
+
+      const tool = new WebFetchTool(mockConfig);
+      const params = { prompt: 'fetch https://example.com' };
+      const invocation = tool.build(params);
+      const result = await invocation.execute(new AbortController().signal);
+
+      expect(convert).toHaveBeenCalledWith(htmlContent, {
+        wordwrap: false,
+        selectors: [
+          { selector: 'a', options: { ignoreHref: true } },
+          { selector: 'img', format: 'skip' },
+        ],
+      });
+      expect(result.llmContent).toContain(`Converted: ${htmlContent}`);
+    });
+
+    it('should return raw text for JSON content', async () => {
+      const jsonContent = '{"key": "value"}';
+      vi.spyOn(fetchUtils, 'fetchWithTimeout').mockResolvedValue({
+        ok: true,
+        headers: new Headers({ 'content-type': 'application/json' }),
+        text: () => Promise.resolve(jsonContent),
+      } as Response);
+
+      // Mock fallback LLM call to return the content passed to it
+      mockGenerateContent.mockImplementationOnce(async (req) => ({
+        candidates: [{ content: { parts: [{ text: req[0].parts[0].text }] } }],
+      }));
+
+      const tool = new WebFetchTool(mockConfig);
+      const params = { prompt: 'fetch https://example.com' };
+      const invocation = tool.build(params);
+      const result = await invocation.execute(new AbortController().signal);
+
+      expect(convert).not.toHaveBeenCalled();
+      expect(result.llmContent).toContain(jsonContent);
+    });
+
+    it('should return raw text for plain text content', async () => {
+      const textContent = 'Just some text.';
+      vi.spyOn(fetchUtils, 'fetchWithTimeout').mockResolvedValue({
+        ok: true,
+        headers: new Headers({ 'content-type': 'text/plain' }),
+        text: () => Promise.resolve(textContent),
+      } as Response);
+
+      // Mock fallback LLM call to return the content passed to it
+      mockGenerateContent.mockImplementationOnce(async (req) => ({
+        candidates: [{ content: { parts: [{ text: req[0].parts[0].text }] } }],
+      }));
+
+      const tool = new WebFetchTool(mockConfig);
+      const params = { prompt: 'fetch https://example.com' };
+      const invocation = tool.build(params);
+      const result = await invocation.execute(new AbortController().signal);
+
+      expect(convert).not.toHaveBeenCalled();
+      expect(result.llmContent).toContain(textContent);
+    });
+
+    it('should treat content with no Content-Type header as HTML', async () => {
+      const content = '<p>No header</p>';
+      vi.spyOn(fetchUtils, 'fetchWithTimeout').mockResolvedValue({
+        ok: true,
+        headers: new Headers(),
+        text: () => Promise.resolve(content),
+      } as Response);
+
+      // Mock fallback LLM call to return the content passed to it
+      mockGenerateContent.mockImplementationOnce(async (req) => ({
+        candidates: [{ content: { parts: [{ text: req[0].parts[0].text }] } }],
+      }));
+
+      const tool = new WebFetchTool(mockConfig);
+      const params = { prompt: 'fetch https://example.com' };
+      const invocation = tool.build(params);
+      const result = await invocation.execute(new AbortController().signal);
+
+      expect(convert).toHaveBeenCalledWith(content, {
+        wordwrap: false,
+        selectors: [
+          { selector: 'a', options: { ignoreHref: true } },
+          { selector: 'img', format: 'skip' },
+        ],
+      });
+      expect(result.llmContent).toContain(`Converted: ${content}`);
     });
   });
 

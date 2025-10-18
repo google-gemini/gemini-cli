@@ -159,7 +159,6 @@ describe('Server Config (config.ts)', () => {
   const TARGET_DIR = '/path/to/target';
   const DEBUG_MODE = false;
   const QUESTION = 'test question';
-  const FULL_CONTEXT = false;
   const USER_MEMORY = 'Test User Memory';
   const TELEMETRY_SETTINGS = { enabled: false };
   const EMBEDDING_MODEL = 'gemini-embedding';
@@ -171,7 +170,6 @@ describe('Server Config (config.ts)', () => {
     targetDir: TARGET_DIR,
     debugMode: DEBUG_MODE,
     question: QUESTION,
-    fullContext: FULL_CONTEXT,
     userMemory: USER_MEMORY,
     telemetry: TELEMETRY_SETTINGS,
     sessionId: SESSION_ID,
@@ -1006,7 +1004,6 @@ describe('BaseLlmClient Lifecycle', () => {
   const TARGET_DIR = '/path/to/target';
   const DEBUG_MODE = false;
   const QUESTION = 'test question';
-  const FULL_CONTEXT = false;
   const USER_MEMORY = 'Test User Memory';
   const TELEMETRY_SETTINGS = { enabled: false };
   const EMBEDDING_MODEL = 'gemini-embedding';
@@ -1018,7 +1015,6 @@ describe('BaseLlmClient Lifecycle', () => {
     targetDir: TARGET_DIR,
     debugMode: DEBUG_MODE,
     question: QUESTION,
-    fullContext: FULL_CONTEXT,
     userMemory: USER_MEMORY,
     telemetry: TELEMETRY_SETTINGS,
     sessionId: SESSION_ID,

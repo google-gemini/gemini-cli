@@ -157,7 +157,7 @@ export function EditorSettingsDialog({
 
         <Box marginTop={1}>
           <Text color={theme.text.secondary}>
-            (Use Enter to select, Tab to change focus)
+            (Use Enter to select, Tab to change focus, Esc to close)
           </Text>
         </Box>
       </Box>

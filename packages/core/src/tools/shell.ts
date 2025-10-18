@@ -34,11 +34,13 @@ import { formatMemoryUsage } from '../utils/formatters.js';
 import type { AnsiOutput } from '../utils/terminalSerializer.js';
 import {
   getCommandRoots,
+  initializeShellParsers,
   isCommandAllowed,
   SHELL_TOOL_NAMES,
   stripShellWrapper,
 } from '../utils/shell-utils.js';
 import { doesToolInvocationMatch } from '../utils/tool-utils.js';
+import { SHELL_TOOL_NAME } from './tool-names.js';
 
 export const OUTPUT_UPDATE_INTERVAL_MS = 1000;
 
@@ -297,12 +299,12 @@ export class ShellToolInvocation extends BaseToolInvocation<
             },
           }
         : {};
-      if (summarizeConfig && summarizeConfig[ShellTool.Name]) {
+      if (summarizeConfig && summarizeConfig[SHELL_TOOL_NAME]) {
         const summary = await summarizeToolOutput(
           llmContent,
           this.config.getGeminiClient(),
           signal,
-          summarizeConfig[ShellTool.Name].tokenBudget,
+          summarizeConfig[SHELL_TOOL_NAME].tokenBudget,
         );
         return {
           llmContent: summary,
@@ -340,25 +342,17 @@ function getShellToolDescription(): string {
       Process Group PGID: Process group started or \`(none)\``;
 
   if (os.platform() === 'win32') {
-    return `This tool executes a given shell command as \`cmd.exe /c <command>\`. Command can start background processes using \`start /b\`.${returnedInfo}`;
+    return `This tool executes a given shell command as \`powershell.exe -NoProfile -Command <command>\`. Command can start background processes using PowerShell constructs such as \`Start-Process -NoNewWindow\` or \`Start-Job\`.${returnedInfo}`;
   } else {
     return `This tool executes a given shell command as \`bash -c <command>\`. Command can start background processes using \`&\`. Command is executed as a subprocess that leads its own process group. Command process group can be terminated as \`kill -- -PGID\` or signaled as \`kill -s SIGNAL -- -PGID\`.${returnedInfo}`;
   }
 }
 
 function getCommandDescription(): string {
-  const cmd_substitution_warning =
-    '\n*** WARNING: Command substitution using $(), `` ` ``, <(), or >() is not allowed for security reasons.';
   if (os.platform() === 'win32') {
-    return (
-      'Exact command to execute as `cmd.exe /c <command>`' +
-      cmd_substitution_warning
-    );
+    return 'Exact command to execute as `powershell.exe -NoProfile -Command <command>`';
   } else {
-    return (
-      'Exact bash command to execute as `bash -c <command>`' +
-      cmd_substitution_warning
-    );
+    return 'Exact bash command to execute as `bash -c <command>`';
   }
 }
 
@@ -366,12 +360,14 @@ export class ShellTool extends BaseDeclarativeTool<
   ShellToolParams,
   ToolResult
 > {
-  static Name: string = 'run_shell_command';
   private allowlist: Set<string> = new Set();
 
   constructor(private readonly config: Config) {
+    void initializeShellParsers().catch(() => {
+      // Errors are surfaced when parsing commands.
+    });
     super(
-      ShellTool.Name,
+      SHELL_TOOL_NAME,
       'Shell',
       getShellToolDescription(),
       Kind.Execute,
@@ -403,6 +399,10 @@ export class ShellTool extends BaseDeclarativeTool<
   protected override validateToolParamValues(
     params: ShellToolParams,
   ): string | null {
+    if (!params.command.trim()) {
+      return 'Command cannot be empty.';
+    }
+
     const commandCheck = isCommandAllowed(params.command, this.config);
     if (!commandCheck.allowed) {
       if (!commandCheck.reason) {
@@ -412,9 +412,6 @@ export class ShellTool extends BaseDeclarativeTool<
         return `Command is not allowed: ${params.command}`;
       }
       return commandCheck.reason;
-    }
-    if (!params.command.trim()) {
-      return 'Command cannot be empty.';
     }
     if (getCommandRoots(params.command).length === 0) {
       return 'Could not identify command root to obtain permission from user.';

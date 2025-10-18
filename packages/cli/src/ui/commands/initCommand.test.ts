@@ -9,7 +9,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { initCommand } from './initCommand.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
-import { type CommandContext } from './types.js';
+import type { SubmitPromptActionReturn, CommandContext } from './types.js';
 
 // Mock the 'fs' module
 vi.mock('fs', () => ({
@@ -61,7 +61,10 @@ describe('initCommand', () => {
     vi.mocked(fs.existsSync).mockReturnValue(false);
 
     // Act: Run the command's action
-    const result = await initCommand.action!(mockContext, '');
+    const result = (await initCommand.action!(
+      mockContext,
+      '',
+    )) as SubmitPromptActionReturn;
 
     // Assert: Check that writeFileSync was called correctly
     expect(fs.writeFileSync).toHaveBeenCalledWith(geminiMdPath, '', 'utf8');

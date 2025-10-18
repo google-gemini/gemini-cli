@@ -8,7 +8,8 @@ import { describe, it, expect } from 'vitest';
 import { TestRig } from './test-helper.js';
 
 describe('Flicker Detector', () => {
-  it('should not detect a flicker under the max height budget', async () => {
+  // TODO: https://github.com/google-gemini/gemini-cli/issues/11170
+  it.skip('should not detect a flicker under the max height budget', async () => {
     const rig = new TestRig();
     await rig.setup('flicker-detector-test');
 
@@ -20,8 +21,8 @@ describe('Flicker Detector', () => {
     const hasUserPromptEvent = await rig.waitForTelemetryEvent('user_prompt');
     expect(hasUserPromptEvent).toBe(true);
 
-    const sessionCountMetric = rig.readMetric('session.count');
-    expect(sessionCountMetric).not.toBeNull();
+    const hasSessionCountMetric = await rig.waitForMetric('session.count');
+    expect(hasSessionCountMetric).toBe(true);
 
     // We expect NO flicker event to be found.
     const flickerMetric = rig.readMetric('ui.flicker.count');

@@ -17,15 +17,38 @@ describe('mcp command', () => {
     expect(typeof mcpCommand.handler).toBe('function');
   });
 
-  it('should have exactly one option (help flag)', () => {
-    // Test to ensure that the global 'gemini' flags are not added to the mcp command
+  it('should show help when no subcommand is provided', async () => {
     const yargsInstance = yargs();
-    const builtYargs = mcpCommand.builder(yargsInstance);
-    const options = builtYargs.getOptions();
+    (mcpCommand.builder as (y: Argv) => Argv)(yargsInstance);
 
-    // Should have exactly 1 option (help flag)
-    expect(Object.keys(options.key).length).toBe(1);
-    expect(options.key).toHaveProperty('help');
+    const parser = yargsInstance.command(mcpCommand).help();
+
+    // Mock console.log and console.error to catch help output
+    const consoleLogMock = vi
+      .spyOn(console, 'log')
+      .mockImplementation(() => {});
+    const consoleErrorMock = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
+
+    try {
+      await parser.parse('mcp');
+    } catch (_error) {
+      // yargs might throw an error when demandCommand is not met
+    }
+
+    // Check if help output is shown
+    const helpOutput =
+      consoleLogMock.mock.calls.join('\n') +
+      consoleErrorMock.mock.calls.join('\n');
+    expect(helpOutput).toContain('Manage MCP servers');
+    expect(helpOutput).toContain('Commands:');
+    expect(helpOutput).toContain('add');
+    expect(helpOutput).toContain('remove');
+    expect(helpOutput).toContain('list');
+
+    consoleLogMock.mockRestore();
+    consoleErrorMock.mockRestore();
   });
 
   it('should register add, remove, and list subcommands', () => {
@@ -35,7 +58,7 @@ describe('mcp command', () => {
       version: vi.fn().mockReturnThis(),
     };
 
-    mcpCommand.builder(mockYargs as unknown as Argv);
+    (mcpCommand.builder as (y: Argv) => Argv)(mockYargs as unknown as Argv);
 
     expect(mockYargs.command).toHaveBeenCalledTimes(3);
 
