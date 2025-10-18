@@ -17,10 +17,6 @@
     "node_modules",
     "dist",
     // TODO(5691): Fix type errors and remove excludes.
-    "src/config/config.integration.test.ts",
-    "src/config/config.test.ts",
-    "src/config/extension.test.ts",
-    "src/config/settings.test.ts",
     "src/nonInteractiveCli.test.ts",
     "src/services/FileCommandLoader.test.ts",
     "src/services/prompt-processors/argumentProcessor.test.ts",
