@@ -32,7 +32,7 @@ import { useKittyKeyboardProtocol } from '../hooks/useKittyKeyboardProtocol.js';
 import { takeAndAddScreenshot } from '../utils/screenshotUtils.js';
 import {
   clipboardHasImage,
-  saveClipboardImage,
+  saveClipboardImageDetailed,
   cleanupOldClipboardImages,
 } from '../utils/clipboardUtils.js';
 import * as path from 'node:path';
@@ -308,7 +308,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           // Ignore cleanup errors
         });
 
-        const saveResult = await saveClipboardImage(targetDir);
+        const saveResult = await saveClipboardImageDetailed(targetDir);
 
         if (!saveResult?.filePath) {
           console.error('Failed to save image from clipboard');
