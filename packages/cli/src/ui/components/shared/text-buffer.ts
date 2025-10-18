@@ -986,9 +986,19 @@ function textBufferReducerLogic(
 
       const currentLine = (r: number) => newLines[r] ?? '';
 
-      const str = stripUnsafeCharacters(
-        action.payload.replace(/\r\n/g, '\n').replace(/\r/g, '\n'),
-      );
+      // Normalize Windows line endings.
+      // In Windows paste scenarios, \r is used as a line separator.
+      // Multiple consecutive \r should be collapsed to a single newline.
+      // Strategy: Replace all \r sequences (including \r\n) with \n
+      const cleanCarriageReturns = (text: string): string => {
+        // Step 1: Replace \r\n with just \n
+        let result = text.replace(/\r\n/g, '\n');
+        // Step 2: Replace any remaining \r (single or multiple) with \n
+        result = result.replace(/\r+/g, '\n');
+        return result;
+      };
+
+      const str = stripUnsafeCharacters(cleanCarriageReturns(action.payload));
       const parts = str.split('\n');
       const lineContent = currentLine(newCursorRow);
       const before = cpSlice(lineContent, 0, newCursorCol);

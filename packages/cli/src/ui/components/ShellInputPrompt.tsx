@@ -33,6 +33,12 @@ export const ShellInputPrompt: React.FC<ShellInputPromptProps> = ({
       if (!focus || !activeShellPtyId) {
         return;
       }
+
+      if (key.paste) {
+        ShellExecutionService.writeToPty(activeShellPtyId, key.sequence);
+        return;
+      }
+
       if (key.ctrl && key.shift && key.name === 'up') {
         ShellExecutionService.scrollPty(activeShellPtyId, -1);
         return;

@@ -21,6 +21,9 @@ import {
 } from 'react';
 import readline from 'node:readline';
 import { PassThrough } from 'node:stream';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import * as os from 'node:os';
 import {
   BACKSLASH_ENTER_DETECTION_WINDOW_MS,
   CHAR_CODE_ESC,
@@ -42,6 +45,55 @@ import { FOCUS_IN, FOCUS_OUT } from '../hooks/useFocus.js';
 const ESC = '\u001B';
 export const PASTE_MODE_PREFIX = `${ESC}[200~`;
 export const PASTE_MODE_SUFFIX = `${ESC}[201~`;
+
+// Windows paste debugging
+const isWindows = os.platform() === 'win32';
+let pasteDebugStream: fs.WriteStream | null = null;
+let pasteDebugEnabled = false;
+
+function initPasteDebugLog() {
+  if (
+    !pasteDebugEnabled &&
+    (isWindows || process.env['PASTE_DEBUG'] === 'true')
+  ) {
+    const logPath = path.join(process.cwd(), 'gemini-paste-debug.log');
+    pasteDebugStream = fs.createWriteStream(logPath, { flags: 'a' });
+    pasteDebugStream.write(
+      `\n\n=== New session started at ${new Date().toISOString()} ===\n`,
+    );
+    pasteDebugStream.write(
+      `Platform: ${os.platform()}, Node: ${process.version}\n`,
+    );
+    pasteDebugStream.write(
+      `PASTE_WORKAROUND: ${process.env['PASTE_WORKAROUND'] || 'not set'}\n`,
+    );
+    pasteDebugStream.write(
+      `Terminal: ${process.env['TERM_PROGRAM'] || 'unknown'}\n`,
+    );
+    pasteDebugStream.write(`TTY: ${process.stdin.isTTY ? 'yes' : 'no'}\n\n`);
+    pasteDebugEnabled = true;
+  }
+}
+
+function logPasteDebug(message: string, data?: unknown) {
+  if (pasteDebugStream) {
+    const timestamp = new Date().toISOString();
+    let logMessage = `[${timestamp}] ${message}`;
+    if (data !== undefined) {
+      if (Buffer.isBuffer(data)) {
+        const str = data.toString();
+        const preview = str.length > 50 ? str.substring(0, 50) + '...' : str;
+        logMessage += ` | Buffer(${data.length}): ${JSON.stringify(preview)} | Hex(first 20): ${data.toString('hex').substring(0, 40)}`;
+      } else if (typeof data === 'string') {
+        const preview = data.length > 50 ? data.substring(0, 50) + '...' : data;
+        logMessage += ` | String(${data.length}): ${JSON.stringify(preview)}`;
+      } else {
+        logMessage += ` | Data: ${JSON.stringify(data)}`;
+      }
+    }
+    pasteDebugStream.write(logMessage + '\n');
+  }
+}
 export const DRAG_COMPLETION_TIMEOUT_MS = 100; // Broadcast full path after 100ms if no more input
 export const KITTY_SEQUENCE_TIMEOUT_MS = 50; // Flush incomplete kitty sequences after 50ms
 export const SINGLE_QUOTE = "'";
@@ -124,6 +176,9 @@ export function KeypressProvider({
   const dragBufferRef = useRef('');
   const draggingTimerRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Initialize paste debug logging
+  initPasteDebugLog();
+
   const subscribe = useCallback(
     (handler: KeypressHandler) => {
       subscribers.add(handler);
@@ -151,6 +206,16 @@ export function KeypressProvider({
       setRawMode(true);
     }
 
+    // Windows-specific: ensure stdin is in raw mode without altering terminal echo/wrap
+    if (isWindows && stdin.isTTY) {
+      logPasteDebug(`Windows TTY detected, ensuring raw mode is set`);
+      try {
+        stdin.setRawMode?.(true);
+      } catch (e) {
+        logPasteDebug(`Failed to set raw mode on Windows: ${e}`);
+      }
+    }
+
     const keypressStream = new PassThrough();
     let usePassthrough = false;
     const nodeMajorVersion = parseInt(process.versions.node.split('.')[0], 10);
@@ -168,6 +233,17 @@ export function KeypressProvider({
     let kittySequenceTimeout: NodeJS.Timeout | null = null;
     let backslashTimeout: NodeJS.Timeout | null = null;
     let waitingForEnterAfterBackslash = false;
+
+    // Buffer for handling partial paste markers (Windows fix)
+    let partialDataBuffer = Buffer.alloc(0);
+    let lastDataTimestamp = Date.now();
+
+    // Windows paste detection without bracketed paste markers
+    let windowsPasteBuffer = '';
+    let windowsPasteTimer: NodeJS.Timeout | null = null;
+    let lastWindowsInputTime = Date.now();
+    let windowsPasteActive = false;
+    const WINDOWS_PASTE_TIMEOUT = 50; // ms to wait for more input
 
     // Check if a buffer could potentially be a valid kitty sequence or its prefix
     const couldBeKittySequence = (buffer: string): boolean => {
@@ -478,25 +554,33 @@ export function KeypressProvider({
         return;
       }
       if (key.name === 'paste-start') {
+        logPasteDebug('handleKeypress: paste-start event received');
         flushKittyBufferOnInterrupt('paste start');
         isPaste = true;
         return;
       }
       if (key.name === 'paste-end') {
+        logPasteDebug('handleKeypress: paste-end event received');
         isPaste = false;
+        const pasteContent = pasteBuffer.toString();
+        logPasteDebug(
+          `Broadcasting paste content, length: ${pasteContent.length}`,
+          pasteContent,
+        );
         broadcast({
           name: '',
           ctrl: false,
           meta: false,
           shift: false,
           paste: true,
-          sequence: pasteBuffer.toString(),
+          sequence: pasteContent,
         });
         pasteBuffer = Buffer.alloc(0);
         return;
       }
 
       if (isPaste) {
+        logPasteDebug('handleKeypress: accumulating paste data', key.sequence);
         pasteBuffer = Buffer.concat([pasteBuffer, Buffer.from(key.sequence)]);
         return;
       }
@@ -768,13 +852,191 @@ export function KeypressProvider({
     };
 
     const handleRawKeypress = (data: Buffer) => {
+      const currentTime = Date.now();
+      const timeSinceLastData = currentTime - lastDataTimestamp;
+      lastDataTimestamp = currentTime;
+
+      logPasteDebug(
+        `handleRawKeypress called, timeSinceLastData: ${timeSinceLastData}ms`,
+        data,
+      );
+
+      // Windows paste detection without bracketed paste markers
+      if (isWindows && !isPaste && usePassthrough) {
+        const dataStr = data.toString();
+        const timeSinceLastWindowsInput = currentTime - lastWindowsInputTime;
+
+        // Check if this is a special key sequence (arrow keys, function keys, etc.)
+        // These typically start with ESC and are short, or are control characters
+        const isSpecialKey =
+          (dataStr.startsWith(ESC) && dataStr.length <= 10) || // Increased to 10 for longer sequences
+          dataStr === '\x03' || // Ctrl+C
+          dataStr === '\x1a' || // Ctrl+Z
+          dataStr === '\x04' || // Ctrl+D
+          dataStr === '\t' || // Tab
+          (dataStr === '\r' && dataStr.length === 1) || // Single Enter
+          (dataStr === '\n' && dataStr.length === 1) || // Single Newline
+          // Arrow keys in various formats
+          dataStr === `${ESC}[A` || // Up
+          dataStr === `${ESC}[B` || // Down
+          dataStr === `${ESC}[C` || // Right
+          dataStr === `${ESC}[D` || // Left
+          dataStr === `${ESC}[H` || // Home
+          dataStr === `${ESC}[F` || // End
+          // Arrow keys with modifiers (e.g., ESC[1;5A for Ctrl+Up)
+          // eslint-disable-next-line no-control-regex
+          /^\x1b\[1;\d+[ABCDHF]/.test(dataStr) ||
+          // Function keys
+          // eslint-disable-next-line no-control-regex
+          /^\x1b\[\d+~/.test(dataStr) ||
+          // Other navigation keys
+          dataStr === `${ESC}[2~` || // Insert
+          dataStr === `${ESC}[3~` || // Delete
+          dataStr === `${ESC}[5~` || // PageUp
+          dataStr === `${ESC}[6~`; // PageDown
+
+        // Skip paste detection for special keys
+        if (isSpecialKey) {
+          logPasteDebug(
+            `Skipping paste detection for special key sequence`,
+            data,
+          );
+
+          // Flush Windows paste buffer if the user pressed a special key while buffering
+          if (windowsPasteTimer) {
+            clearTimeout(windowsPasteTimer);
+            windowsPasteTimer = null;
+          }
+          if (windowsPasteActive && windowsPasteBuffer.length > 0) {
+            logPasteDebug(
+              `Special key detected, flushing Windows paste buffer`,
+            );
+            broadcast({
+              name: '',
+              ctrl: false,
+              meta: false,
+              shift: false,
+              paste: true,
+              sequence: windowsPasteBuffer,
+            });
+          }
+          windowsPasteBuffer = '';
+          windowsPasteActive = false;
+
+          // Also flush any partial buffer before processing special key
+          if (partialDataBuffer.length > 0) {
+            logPasteDebug(
+              'Flushing partial buffer before special key',
+              partialDataBuffer,
+            );
+            keypressStream.write(partialDataBuffer);
+            partialDataBuffer = Buffer.alloc(0);
+          }
+
+          // Write special key directly to keypressStream and return immediately
+          logPasteDebug('Writing special key directly to keypressStream', data);
+          keypressStream.write(data);
+          return; // Bypass all further processing including partial buffer logic
+        } else {
+          // Check if this looks like paste (rapid multi-character input)
+          // Lower threshold for initial detection to catch paste start
+          const looksLikePaste =
+            (!windowsPasteActive && dataStr.length > 3) ||
+            (windowsPasteActive && timeSinceLastWindowsInput < 200) ||
+            (dataStr.includes('\r') && dataStr.length > 10);
+
+          if (looksLikePaste) {
+            logPasteDebug(
+              `Windows paste detection: buffering rapid input (${dataStr.length} chars, ${timeSinceLastWindowsInput}ms since last)`,
+            );
+
+            // Clear any existing timer
+            if (windowsPasteTimer) {
+              clearTimeout(windowsPasteTimer);
+            }
+
+            // Add to buffer
+            windowsPasteBuffer += dataStr;
+            lastWindowsInputTime = currentTime;
+            windowsPasteActive = true;
+
+            // Set timer to flush buffer as paste
+            windowsPasteTimer = setTimeout(() => {
+              if (windowsPasteBuffer.length > 0) {
+                logPasteDebug(
+                  `Windows paste detected! Flushing buffer as paste (${windowsPasteBuffer.length} chars)`,
+                );
+
+                // Directly broadcast the entire paste content
+                logPasteDebug(`Directly broadcasting Windows paste content`);
+                broadcast({
+                  name: '',
+                  ctrl: false,
+                  meta: false,
+                  shift: false,
+                  paste: true,
+                  sequence: windowsPasteBuffer,
+                });
+
+                windowsPasteBuffer = '';
+                windowsPasteTimer = null;
+                windowsPasteActive = false;
+              }
+            }, WINDOWS_PASTE_TIMEOUT);
+
+            // Don't process this data normally - it's being buffered
+            return;
+          } else if (windowsPasteTimer) {
+            // If we have a paste timer running but this doesn't look like paste,
+            // it might be the user typing after a paste - flush the buffer
+            logPasteDebug(
+              'Single char input during paste detection, flushing buffer early',
+            );
+            clearTimeout(windowsPasteTimer);
+
+            if (windowsPasteBuffer.length > 0) {
+              logPasteDebug(`Early flush: broadcasting Windows paste content`);
+              broadcast({
+                name: '',
+                ctrl: false,
+                meta: false,
+                shift: false,
+                paste: true,
+                sequence: windowsPasteBuffer,
+              });
+            }
+
+            windowsPasteBuffer = '';
+            windowsPasteTimer = null;
+            windowsPasteActive = false;
+            lastWindowsInputTime = currentTime;
+
+            // Continue processing this single character normally
+          }
+        }
+      }
+
+      // On Windows, combine with any partial data from previous chunk
+      // This handles cases where paste markers are split across chunks
+      let fullData = data;
+      if (partialDataBuffer.length > 0) {
+        logPasteDebug('Combining with partial buffer', partialDataBuffer);
+        fullData = Buffer.concat([partialDataBuffer, data]);
+        partialDataBuffer = Buffer.alloc(0);
+      }
+
       const pasteModePrefixBuffer = Buffer.from(PASTE_MODE_PREFIX);
       const pasteModeSuffixBuffer = Buffer.from(PASTE_MODE_SUFFIX);
 
       let pos = 0;
-      while (pos < data.length) {
-        const prefixPos = data.indexOf(pasteModePrefixBuffer, pos);
-        const suffixPos = data.indexOf(pasteModeSuffixBuffer, pos);
+      while (pos < fullData.length) {
+        const prefixPos = fullData.indexOf(pasteModePrefixBuffer, pos);
+        const suffixPos = fullData.indexOf(pasteModeSuffixBuffer, pos);
+
+        logPasteDebug(
+          `Searching from pos ${pos}: prefixPos=${prefixPos}, suffixPos=${suffixPos}`,
+        );
+
         const isPrefixNext =
           prefixPos !== -1 && (suffixPos === -1 || prefixPos < suffixPos);
         const isSuffixNext =
@@ -785,20 +1047,88 @@ export function KeypressProvider({
 
         if (isPrefixNext) {
           nextMarkerPos = prefixPos;
+          markerLength = pasteModePrefixBuffer.length;
         } else if (isSuffixNext) {
           nextMarkerPos = suffixPos;
+          markerLength = pasteModeSuffixBuffer.length;
         }
-        markerLength = pasteModeSuffixBuffer.length;
 
         if (nextMarkerPos === -1) {
-          keypressStream.write(data.slice(pos));
+          // No markers found in remaining data
+          const remainingData = fullData.slice(pos);
+
+          // On Windows, check if we might have a partial marker at the end
+          if (isWindows) {
+            // Windows often sends data in smaller chunks, be more aggressive about buffering
+            const remainingStr = remainingData.toString();
+
+            // First check if this is a complete special key sequence - don't buffer it
+            const isCompleteSpecialKey =
+              remainingStr === `${ESC}[A` || // Up
+              remainingStr === `${ESC}[B` || // Down
+              remainingStr === `${ESC}[C` || // Right
+              remainingStr === `${ESC}[D` || // Left
+              remainingStr === `${ESC}[H` || // Home
+              remainingStr === `${ESC}[F` || // End
+              // eslint-disable-next-line no-control-regex
+              /^\x1b\[1;\d+[ABCDHF]$/.test(remainingStr) || // Arrow keys with modifiers
+              // eslint-disable-next-line no-control-regex
+              /^\x1b\[\d+~$/.test(remainingStr); // Function keys
+
+            if (isCompleteSpecialKey) {
+              logPasteDebug(
+                'Complete special key detected, not buffering',
+                remainingData,
+              );
+              // Don't buffer, let it pass through
+            } else if (
+              remainingData.length < 10 &&
+              (remainingStr.includes(ESC) ||
+                remainingStr.endsWith(ESC) ||
+                remainingStr.endsWith(`${ESC}[`) ||
+                remainingStr.endsWith(`${ESC}[2`) ||
+                remainingStr.endsWith(`${ESC}[20`) ||
+                remainingStr.endsWith(`${ESC}[200`))
+            ) {
+              logPasteDebug(
+                'Saving potential partial marker for next chunk',
+                remainingData,
+              );
+              partialDataBuffer = remainingData;
+              return;
+            }
+
+            // Also check if we're in the middle of receiving paste data and hit a chunk boundary
+            if (isPaste && timeSinceLastData < 50) {
+              // If we're currently in paste mode and data is coming quickly,
+              // wait a bit for more data to avoid truncation
+              logPasteDebug(
+                'In paste mode, buffering data to avoid truncation',
+                remainingData,
+              );
+              partialDataBuffer = remainingData;
+              return;
+            }
+          }
+
+          logPasteDebug(
+            'Writing remaining data to keypressStream',
+            remainingData,
+          );
+          keypressStream.write(remainingData);
           return;
         }
 
-        const nextData = data.slice(pos, nextMarkerPos);
+        // Write data before the marker
+        const nextData = fullData.slice(pos, nextMarkerPos);
         if (nextData.length > 0) {
+          logPasteDebug(
+            `Writing data before marker (${isPrefixNext ? 'prefix' : 'suffix'})`,
+            nextData,
+          );
           keypressStream.write(nextData);
         }
+
         const createPasteKeyEvent = (
           name: 'paste-start' | 'paste-end',
         ): Key => ({
@@ -809,17 +1139,38 @@ export function KeypressProvider({
           paste: false,
           sequence: '',
         });
+
         if (isPrefixNext) {
+          logPasteDebug(
+            'Found paste-start marker, triggering paste-start event',
+          );
           handleKeypress(undefined, createPasteKeyEvent('paste-start'));
+          windowsPasteActive = true;
+          windowsPasteBuffer = '';
+          if (windowsPasteTimer) {
+            clearTimeout(windowsPasteTimer);
+            windowsPasteTimer = null;
+          }
         } else if (isSuffixNext) {
+          logPasteDebug('Found paste-end marker, triggering paste-end event');
           handleKeypress(undefined, createPasteKeyEvent('paste-end'));
+          windowsPasteActive = false;
+          windowsPasteBuffer = '';
+          if (windowsPasteTimer) {
+            clearTimeout(windowsPasteTimer);
+            windowsPasteTimer = null;
+          }
         }
+
         pos = nextMarkerPos + markerLength;
       }
     };
 
     let rl: readline.Interface;
     if (usePassthrough) {
+      logPasteDebug(
+        `Using passthrough mode (Node ${process.versions.node}, PASTE_WORKAROUND=${process.env['PASTE_WORKAROUND']})`,
+      );
       rl = readline.createInterface({
         input: keypressStream,
         escapeCodeTimeout: 0,
@@ -828,6 +1179,7 @@ export function KeypressProvider({
       keypressStream.on('keypress', handleKeypress);
       stdin.on('data', handleRawKeypress);
     } else {
+      logPasteDebug('Using direct stdin mode');
       rl = readline.createInterface({ input: stdin, escapeCodeTimeout: 0 });
       readline.emitKeypressEvents(stdin, rl);
       stdin.on('keypress', handleKeypress);
@@ -873,6 +1225,7 @@ export function KeypressProvider({
 
       // Flush any pending paste data to avoid data loss on exit.
       if (isPaste) {
+        logPasteDebug('Cleanup: flushing pending paste data');
         broadcast({
           name: '',
           ctrl: false,
@@ -882,6 +1235,23 @@ export function KeypressProvider({
           sequence: pasteBuffer.toString(),
         });
         pasteBuffer = Buffer.alloc(0);
+      }
+
+      // Clean up Windows paste timer
+      if (windowsPasteTimer) {
+        clearTimeout(windowsPasteTimer);
+        windowsPasteTimer = null;
+      }
+      windowsPasteBuffer = '';
+      windowsPasteActive = false;
+
+      // Clean up debug log
+      if (pasteDebugStream) {
+        pasteDebugStream.write(
+          `\n=== Session ended at ${new Date().toISOString()} ===\n`,
+        );
+        pasteDebugStream.end();
+        pasteDebugStream = null;
       }
 
       if (draggingTimerRef.current) {
