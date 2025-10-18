@@ -10,6 +10,7 @@ import * as path from 'node:path';
 import {
   EditTool,
   WriteFileTool,
+  DEFAULT_FILE_FILTERING_OPTIONS,
   DEFAULT_GEMINI_MODEL,
   DEFAULT_GEMINI_MODEL_AUTO,
   OutputFormat,
@@ -595,6 +596,28 @@ describe('loadCliConfig', () => {
         expect(config.getProxy()).toBe(expected);
       });
     });
+  });
+
+  it('should use default fileFilter options when unconfigured', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments({} as Settings);
+    const settings: Settings = {};
+    const config = await loadCliConfig(
+      settings,
+      [],
+      new ExtensionEnablementManager(
+        ExtensionStorage.getUserExtensionsDir(),
+        argv.extensions,
+      ),
+      'test-session',
+      argv,
+    );
+    expect(config.getFileFilteringRespectGitIgnore()).toBe(
+      DEFAULT_FILE_FILTERING_OPTIONS.respectGitIgnore,
+    );
+    expect(config.getFileFilteringRespectGeminiIgnore()).toBe(
+      DEFAULT_FILE_FILTERING_OPTIONS.respectGeminiIgnore,
+    );
   });
 });
 
