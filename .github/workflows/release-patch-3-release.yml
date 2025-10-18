@@ -71,6 +71,10 @@ jobs:
         with:
           github-token: '${{ secrets.GITHUB_TOKEN }}'
 
+      - name: 'Install Script Dependencies'
+        run: |-
+          npm ci
+
       - name: 'Install Dependencies'
         working-directory: './release'
         run: |-
