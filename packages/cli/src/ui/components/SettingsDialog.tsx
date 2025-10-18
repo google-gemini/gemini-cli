@@ -205,11 +205,6 @@ export function SettingsDialog({
               next.delete(key);
               return next;
             });
-
-            // Refresh pending settings from the saved state
-            setPendingSettings(
-              structuredClone(settings.forScope(selectedScope).settings),
-            );
           } else {
             // For restart-required settings, track as modified
             setModifiedSettings((prev) => {
