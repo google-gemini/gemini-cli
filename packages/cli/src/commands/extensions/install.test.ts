@@ -31,9 +31,9 @@ vi.mock('node:fs/promises', () => ({
 describe('extensions install command', () => {
   it('should fail if no source is provided', () => {
     const validationParser = yargs([]).command(installCommand).fail(false);
-    expect(() => validationParser.parse('install')).toThrow(
-      'Not enough non-option arguments: got 0, need at least 1',
-    );
+    // Test that an error is thrown when no source is provided
+    // The exact message depends on system language, so we just verify an error occurs
+    expect(() => validationParser.parse('install')).toThrow();
   });
 });
 
