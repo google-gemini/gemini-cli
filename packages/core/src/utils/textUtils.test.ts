@@ -5,7 +5,31 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { safeLiteralReplace } from './textUtils.js';
+import { isBinary, safeLiteralReplace } from './textUtils.js';
+
+describe('isBinary', () => {
+  it('should return false for an empty buffer', () => {
+    const emptyBuffer = Buffer.from([]);
+    expect(isBinary(emptyBuffer)).toBe(false);
+  });
+
+  it('should return true for a buffer with a null byte', () => {
+    const bufferWithNull = Buffer.from([0x68, 0x65, 0x6c, 0x6c, 0x6f, 0x00]);
+    expect(isBinary(bufferWithNull)).toBe(true);
+  });
+
+  it('should return false for a buffer without a null byte', () => {
+    const bufferWithoutNull = Buffer.from([0x68, 0x65, 0x6c, 0x6c, 0x6f]);
+    expect(isBinary(bufferWithoutNull)).toBe(false);
+  });
+
+  it('should return true for a buffer of sampleSize with a null byte at the end', () => {
+    const sampleSize = 512;
+    const buffer = Buffer.alloc(sampleSize);
+    buffer[sampleSize - 1] = 0x00;
+    expect(isBinary(buffer, sampleSize)).toBe(true);
+  });
+});
 
 describe('safeLiteralReplace', () => {
   it('returns original string when oldString empty or not found', () => {
