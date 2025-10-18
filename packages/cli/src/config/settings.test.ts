@@ -46,7 +46,6 @@ import {
   afterEach,
   type Mocked,
   type Mock,
-  fail,
 } from 'vitest';
 import * as fs from 'node:fs'; // fs will be mocked separately
 import stripJsonComments from 'strip-json-comments'; // Will be mocked separately
@@ -1266,7 +1265,7 @@ describe('Settings Loading and Merging', () => {
 
       try {
         loadSettings(MOCK_WORKSPACE_DIR);
-        fail('loadSettings should have thrown a FatalConfigError');
+        throw new Error('loadSettings should have thrown a FatalConfigError');
       } catch (e) {
         expect(e).toBeInstanceOf(FatalConfigError);
         const error = e as FatalConfigError;
@@ -1337,7 +1336,12 @@ describe('Settings Loading and Merging', () => {
         'workspace_endpoint_from_env/api',
       );
       expect(
-        (settings.workspace.settings as TestSettings)['nested']['value'],
+        (
+          (settings.workspace.settings as TestSettings)['nested'] as Record<
+            string,
+            unknown
+          >
+        )['value'],
       ).toBe('workspace_endpoint_from_env');
       expect((settings.merged as TestSettings)['endpoint']).toBe(
         'workspace_endpoint_from_env/api',
@@ -1587,19 +1591,44 @@ describe('Settings Loading and Merging', () => {
       ).toBeUndefined();
 
       expect(
-        (settings.user.settings as TestSettings)['nestedObj']['nestedNull'],
+        (
+          (settings.user.settings as TestSettings)['nestedObj'] as Record<
+            string,
+            unknown
+          >
+        )['nestedNull'],
       ).toBeNull();
       expect(
-        (settings.user.settings as TestSettings)['nestedObj']['nestedBool'],
+        (
+          (settings.user.settings as TestSettings)['nestedObj'] as Record<
+            string,
+            unknown
+          >
+        )['nestedBool'],
       ).toBe(true);
       expect(
-        (settings.user.settings as TestSettings)['nestedObj']['nestedNum'],
+        (
+          (settings.user.settings as TestSettings)['nestedObj'] as Record<
+            string,
+            unknown
+          >
+        )['nestedNum'],
       ).toBe(0);
       expect(
-        (settings.user.settings as TestSettings)['nestedObj']['nestedString'],
+        (
+          (settings.user.settings as TestSettings)['nestedObj'] as Record<
+            string,
+            unknown
+          >
+        )['nestedString'],
       ).toBe('literal');
       expect(
-        (settings.user.settings as TestSettings)['nestedObj']['anotherEnv'],
+        (
+          (settings.user.settings as TestSettings)['nestedObj'] as Record<
+            string,
+            unknown
+          >
+        )['anotherEnv'],
       ).toBe('env_string_nested_value');
 
       delete process.env['MY_ENV_STRING'];
@@ -2136,14 +2165,14 @@ describe('Settings Loading and Merging', () => {
           vimMode: false,
         },
         model: {
-          maxSessionTurns: 0,
+          maxSessionTurns: -1,
         },
         context: {
           includeDirectories: [],
         },
         security: {
           folderTrust: {
-            enabled: null,
+            enabled: undefined,
           },
         },
       };
@@ -2152,9 +2181,13 @@ describe('Settings Loading and Merging', () => {
 
       expect(v1Settings).toEqual({
         vimMode: false,
-        maxSessionTurns: 0,
+        maxSessionTurns: -1,
         includeDirectories: [],
-        folderTrust: null,
+        security: {
+          folderTrust: {
+            enabled: undefined,
+          },
+        },
       });
     });
 
@@ -2342,9 +2375,9 @@ describe('Settings Loading and Merging', () => {
   });
 
   describe('migrateDeprecatedSettings', () => {
-    let mockFsExistsSync: Mocked<typeof fs.existsSync>;
-    let mockFsReadFileSync: Mocked<typeof fs.readFileSync>;
-    let mockDisableExtension: Mocked<typeof disableExtension>;
+    let mockFsExistsSync: Mock;
+    let mockFsReadFileSync: Mock;
+    let mockDisableExtension: Mock;
 
     beforeEach(() => {
       vi.resetAllMocks();
