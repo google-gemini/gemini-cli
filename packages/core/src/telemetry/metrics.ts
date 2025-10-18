@@ -6,10 +6,16 @@
 
 import type { Attributes, Meter, Counter, Histogram } from '@opentelemetry/api';
 import { diag, metrics, ValueType } from '@opentelemetry/api';
-import { SERVICE_NAME, EVENT_CHAT_COMPRESSION } from './constants.js';
+import { SERVICE_NAME } from './constants.js';
+import { EVENT_CHAT_COMPRESSION } from './types.js';
 import type { Config } from '../config/config.js';
-import type { ModelRoutingEvent, ModelSlashCommandEvent } from './types.js';
+import type {
+  ModelRoutingEvent,
+  ModelSlashCommandEvent,
+  AgentFinishEvent,
+} from './types.js';
 import { AuthType } from '../core/contentGenerator.js';
+import { getCommonAttributes } from './telemetryAttributes.js';
 
 const TOOL_CALL_COUNT = 'gemini_cli.tool.call.count';
 const TOOL_CALL_LATENCY = 'gemini_cli.tool.call.latency';
@@ -26,6 +32,11 @@ const MODEL_ROUTING_LATENCY = 'gemini_cli.model_routing.latency';
 const MODEL_ROUTING_FAILURE_COUNT = 'gemini_cli.model_routing.failure.count';
 const MODEL_SLASH_COMMAND_CALL_COUNT =
   'gemini_cli.slash_command.model.call_count';
+
+// Agent Metrics
+const AGENT_RUN_COUNT = 'gemini_cli.agent.run.count';
+const AGENT_DURATION_MS = 'gemini_cli.agent.duration';
+const AGENT_TURNS = 'gemini_cli.agent.turns';
 
 // OpenTelemetry GenAI Semantic Convention Metrics
 const GEN_AI_CLIENT_TOKEN_USAGE = 'gen_ai.client.token.usage';
@@ -44,11 +55,10 @@ const REGRESSION_DETECTION = 'gemini_cli.performance.regression';
 const REGRESSION_PERCENTAGE_CHANGE =
   'gemini_cli.performance.regression.percentage_change';
 const BASELINE_COMPARISON = 'gemini_cli.performance.baseline.comparison';
+const FLICKER_FRAME_COUNT = 'gemini_cli.ui.flicker.count';
 
 const baseMetricDefinition = {
-  getCommonAttributes: (config: Config): Attributes => ({
-    'session.id': config.getSessionId(),
-  }),
+  getCommonAttributes,
 };
 
 const COUNTER_DEFINITIONS = {
@@ -61,6 +71,11 @@ const COUNTER_DEFINITIONS = {
       success: boolean;
       decision?: 'accept' | 'reject' | 'modify' | 'auto_accept';
       tool_type?: 'native' | 'mcp';
+      // Optional diff statistics for file-modifying tools
+      model_added_lines?: number;
+      model_removed_lines?: number;
+      user_added_lines?: number;
+      user_removed_lines?: number;
     },
   },
   [API_REQUEST_COUNT]: {
@@ -144,6 +159,22 @@ const COUNTER_DEFINITIONS = {
       tokens_after: number;
     },
   },
+  [AGENT_RUN_COUNT]: {
+    description: 'Counts agent runs, tagged by name and termination reason.',
+    valueType: ValueType.INT,
+    assign: (c: Counter) => (agentRunCounter = c),
+    attributes: {} as {
+      agent_name: string;
+      terminate_reason: string;
+    },
+  },
+  [FLICKER_FRAME_COUNT]: {
+    description:
+      'Counts UI frames that flicker (render taller than the terminal).',
+    valueType: ValueType.INT,
+    assign: (c: Counter) => (flickerFrameCounter = c),
+    attributes: {} as Record<string, never>,
+  },
 } as const;
 
 const HISTOGRAM_DEFINITIONS = {
@@ -173,6 +204,24 @@ const HISTOGRAM_DEFINITIONS = {
     attributes: {} as {
       'routing.decision_model': string;
       'routing.decision_source': string;
+    },
+  },
+  [AGENT_DURATION_MS]: {
+    description: 'Duration of agent runs in milliseconds.',
+    unit: 'ms',
+    valueType: ValueType.INT,
+    assign: (h: Histogram) => (agentDurationHistogram = h),
+    attributes: {} as {
+      agent_name: string;
+    },
+  },
+  [AGENT_TURNS]: {
+    description: 'Number of turns taken by agents.',
+    unit: 'turns',
+    valueType: ValueType.INT,
+    assign: (h: Histogram) => (agentTurnsHistogram = h),
+    attributes: {} as {
+      agent_name: string;
     },
   },
   [GEN_AI_CLIENT_TOKEN_USAGE]: {
@@ -405,6 +454,10 @@ let contentRetryFailureCounter: Counter | undefined;
 let modelRoutingLatencyHistogram: Histogram | undefined;
 let modelRoutingFailureCounter: Counter | undefined;
 let modelSlashCommandCallCounter: Counter | undefined;
+let agentRunCounter: Counter | undefined;
+let agentDurationHistogram: Histogram | undefined;
+let agentTurnsHistogram: Histogram | undefined;
+let flickerFrameCounter: Counter | undefined;
 
 // OpenTelemetry GenAI Semantic Convention Metrics
 let genAiClientTokenUsageHistogram: Histogram | undefined;
@@ -563,6 +616,14 @@ export function recordFileOperationMetric(
 // --- New Metric Recording Functions ---
 
 /**
+ * Records a metric for when a UI frame flickers.
+ */
+export function recordFlickerFrame(config: Config): void {
+  if (!flickerFrameCounter || !isMetricsInitialized) return;
+  flickerFrameCounter.add(1, baseMetricDefinition.getCommonAttributes(config));
+}
+
+/**
  * Records a metric for when an invalid chunk is received from a stream.
  */
 export function recordInvalidChunk(config: Config): void {
@@ -624,6 +685,37 @@ export function recordModelRoutingMetrics(
       'routing.error_message': event.error_message,
     });
   }
+}
+
+export function recordAgentRunMetrics(
+  config: Config,
+  event: AgentFinishEvent,
+): void {
+  if (
+    !agentRunCounter ||
+    !agentDurationHistogram ||
+    !agentTurnsHistogram ||
+    !isMetricsInitialized
+  )
+    return;
+
+  const commonAttributes = baseMetricDefinition.getCommonAttributes(config);
+
+  agentRunCounter.add(1, {
+    ...commonAttributes,
+    agent_name: event.agent_name,
+    terminate_reason: event.terminate_reason,
+  });
+
+  agentDurationHistogram.record(event.duration_ms, {
+    ...commonAttributes,
+    agent_name: event.agent_name,
+  });
+
+  agentTurnsHistogram.record(event.turn_count, {
+    ...commonAttributes,
+    agent_name: event.agent_name,
+  });
 }
 
 // OpenTelemetry GenAI Semantic Convention Recording Functions

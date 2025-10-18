@@ -29,11 +29,14 @@ import {
   makeChatCompressionEvent,
   ModelRoutingEvent,
   ToolCallEvent,
+  AgentStartEvent,
+  AgentFinishEvent,
+  WebFetchFallbackAttemptEvent,
 } from '../types.js';
+import { AgentTerminateMode } from '../../agents/types.js';
 import { GIT_COMMIT_INFO, CLI_VERSION } from '../../generated/git-commit.js';
 import { UserAccountManager } from '../../utils/userAccountManager.js';
 import { InstallationManager } from '../../utils/installationManager.js';
-import { safeJsonStringify } from '../../utils/safeJsonStringify.js';
 
 interface CustomMatchers<R = unknown> {
   toHaveMetadataValue: ([key, value]: [EventMetadataKey, string]) => R;
@@ -256,15 +259,13 @@ describe('ClearcutLogger', () => {
       const cli_version = CLI_VERSION;
       const git_commit_hash = GIT_COMMIT_INFO;
       const prompt_id = 'my-prompt-123';
-      const user_settings = safeJsonStringify([
-        { smart_edit_enabled: true, model_router_enabled: false },
-      ]);
 
       // Setup logger with expected values
       const { logger, loggerConfig } = setup({
         lifetimeGoogleAccounts: google_accounts,
         config: { sessionId: session_id },
       });
+
       vi.spyOn(loggerConfig, 'getContentGeneratorConfig').mockReturnValue({
         authType: auth_type,
       } as ContentGeneratorConfig);
@@ -311,7 +312,7 @@ describe('ClearcutLogger', () => {
           },
           {
             gemini_cli_key: EventMetadataKey.GEMINI_CLI_USER_SETTINGS,
-            value: user_settings,
+            value: logger?.getConfigJson(),
           },
         ]),
       );
@@ -342,11 +343,7 @@ describe('ClearcutLogger', () => {
       });
     });
 
-    it('logs the value of config.useSmartEdit and config.useModelRouter', () => {
-      const user_settings = safeJsonStringify([
-        { smart_edit_enabled: true, model_router_enabled: true },
-      ]);
-
+    it('logs all user settings', () => {
       const { logger } = setup({
         config: { useSmartEdit: true, useModelRouter: true },
       });
@@ -358,7 +355,7 @@ describe('ClearcutLogger', () => {
 
       expect(event?.event_metadata[0]).toContainEqual({
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_USER_SETTINGS,
-        value: user_settings,
+        value: logger?.getConfigJson(),
       });
     });
 
@@ -409,6 +406,11 @@ describe('ClearcutLogger', () => {
         const { logger } = setup({});
         for (const [key, value] of Object.entries(env)) {
           vi.stubEnv(key, value);
+        }
+        // Clear Cursor-specific environment variables that might interfere with tests
+        // Only clear if not explicitly testing Cursor detection
+        if (!env.CURSOR_TRACE_ID) {
+          vi.stubEnv('CURSOR_TRACE_ID', '');
         }
         const event = logger?.createLogEvent(EventNames.API_ERROR, []);
         expect(event?.event_metadata[0][3]).toEqual({
@@ -721,6 +723,87 @@ describe('ClearcutLogger', () => {
     });
   });
 
+  describe('logAgentStartEvent', () => {
+    it('logs an event with proper fields', () => {
+      const { logger } = setup();
+      const event = new AgentStartEvent('agent-123', 'TestAgent');
+
+      logger?.logAgentStartEvent(event);
+
+      const events = getEvents(logger!);
+      expect(events.length).toBe(1);
+      expect(events[0]).toHaveEventName(EventNames.AGENT_START);
+      expect(events[0]).toHaveMetadataValue([
+        EventMetadataKey.GEMINI_CLI_AGENT_ID,
+        'agent-123',
+      ]);
+      expect(events[0]).toHaveMetadataValue([
+        EventMetadataKey.GEMINI_CLI_AGENT_NAME,
+        'TestAgent',
+      ]);
+    });
+  });
+
+  describe('logAgentFinishEvent', () => {
+    it('logs an event with proper fields (success)', () => {
+      const { logger } = setup();
+      const event = new AgentFinishEvent(
+        'agent-123',
+        'TestAgent',
+        1000,
+        5,
+        AgentTerminateMode.GOAL,
+      );
+
+      logger?.logAgentFinishEvent(event);
+
+      const events = getEvents(logger!);
+      expect(events.length).toBe(1);
+      expect(events[0]).toHaveEventName(EventNames.AGENT_FINISH);
+      expect(events[0]).toHaveMetadataValue([
+        EventMetadataKey.GEMINI_CLI_AGENT_ID,
+        'agent-123',
+      ]);
+      expect(events[0]).toHaveMetadataValue([
+        EventMetadataKey.GEMINI_CLI_AGENT_NAME,
+        'TestAgent',
+      ]);
+      expect(events[0]).toHaveMetadataValue([
+        EventMetadataKey.GEMINI_CLI_AGENT_DURATION_MS,
+        '1000',
+      ]);
+      expect(events[0]).toHaveMetadataValue([
+        EventMetadataKey.GEMINI_CLI_AGENT_TURN_COUNT,
+        '5',
+      ]);
+      expect(events[0]).toHaveMetadataValue([
+        EventMetadataKey.GEMINI_CLI_AGENT_TERMINATE_REASON,
+        'GOAL',
+      ]);
+    });
+
+    it('logs an event with proper fields (error)', () => {
+      const { logger } = setup();
+      const event = new AgentFinishEvent(
+        'agent-123',
+        'TestAgent',
+        500,
+        2,
+        AgentTerminateMode.ERROR,
+      );
+
+      logger?.logAgentFinishEvent(event);
+
+      const events = getEvents(logger!);
+      expect(events.length).toBe(1);
+      expect(events[0]).toHaveEventName(EventNames.AGENT_FINISH);
+      expect(events[0]).toHaveMetadataValue([
+        EventMetadataKey.GEMINI_CLI_AGENT_TERMINATE_REASON,
+        'ERROR',
+      ]);
+    });
+  });
+
   describe('logToolCallEvent', () => {
     it('logs an event with all diff metadata', () => {
       const { logger } = setup();
@@ -854,6 +937,23 @@ describe('ClearcutLogger', () => {
       expect(events[0]).not.toHaveMetadataKey(
         EventMetadataKey.GEMINI_CLI_AI_ADDED_LINES,
       );
+    });
+  });
+
+  describe('logWebFetchFallbackAttemptEvent', () => {
+    it('logs an event with the proper name and reason', () => {
+      const { logger } = setup();
+      const event = new WebFetchFallbackAttemptEvent('private_ip');
+
+      logger?.logWebFetchFallbackAttemptEvent(event);
+
+      const events = getEvents(logger!);
+      expect(events.length).toBe(1);
+      expect(events[0]).toHaveEventName(EventNames.WEB_FETCH_FALLBACK_ATTEMPT);
+      expect(events[0]).toHaveMetadataValue([
+        EventMetadataKey.GEMINI_CLI_WEB_FETCH_FALLBACK_REASON,
+        'private_ip',
+      ]);
     });
   });
 });

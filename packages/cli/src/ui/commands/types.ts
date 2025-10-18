@@ -66,6 +66,7 @@ export interface CommandContext {
     loadHistory: UseHistoryManagerReturn['loadHistory'];
     /** Toggles a special display mode. */
     toggleCorgiMode: () => void;
+    toggleDebugProfiler: () => void;
     toggleVimEnabled: () => Promise<boolean>;
     setGeminiMdFileCount: (count: number) => void;
     reloadCommands: () => void;
