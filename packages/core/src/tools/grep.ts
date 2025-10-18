@@ -18,6 +18,7 @@ import { isGitRepository } from '../utils/gitUtils.js';
 import type { Config } from '../config/config.js';
 import type { FileExclusions } from '../utils/ignorePatterns.js';
 import { ToolErrorType } from './tool-error.js';
+import { debugLogger } from '../utils/debugLogger.js';
 
 // --- Interfaces ---
 
@@ -223,7 +224,7 @@ class GrepToolInvocation extends BaseToolInvocation<
         });
         child.on('close', (code) => resolve(code === 0));
         child.on('error', (err) => {
-          console.error(
+          debugLogger.debug(
             `[GrepTool] Failed to start process for '${command}':`,
             err.message,
           );
