@@ -76,6 +76,11 @@ const ALT_KEY_CHARACTER_MAP: Record<string, string> = {
   '\u03A9': 'z',
 };
 
+const CTRL_BACKSPACE_SEQUENCES = {
+  win32: '\x7f',
+  default: '\x08',
+} as const;
+
 export interface Key {
   name: string;
   ctrl: boolean;
@@ -110,11 +115,13 @@ export function useKeypressContext() {
 export function KeypressProvider({
   children,
   kittyProtocolEnabled,
+  ctrlBackspaceModeFix,
   config,
   debugKeystrokeLogging,
 }: {
   children: React.ReactNode;
   kittyProtocolEnabled: boolean;
+  ctrlBackspaceModeFix?: boolean;
   config?: Config;
   debugKeystrokeLogging?: boolean;
 }) {
@@ -764,6 +771,19 @@ export function KeypressProvider({
       if (key.name === 'return' && key.sequence === `${ESC}\r`) {
         key.meta = true;
       }
+
+      // readline doesn't set the ctrl flag for Ctrl+Backspace sequences
+      // (\x7f, \x08), so we set it manually when the ctrlBackspaceModeFix setting is enabled
+      if (ctrlBackspaceModeFix && key.name === 'backspace' && !key.ctrl) {
+        const expectedSequence =
+          process.platform === 'win32'
+            ? CTRL_BACKSPACE_SEQUENCES.win32
+            : CTRL_BACKSPACE_SEQUENCES.default;
+        if (key.sequence === expectedSequence) {
+          key.ctrl = true;
+        }
+      }
+
       broadcast({ ...key, paste: isPaste });
     };
 
@@ -908,6 +928,7 @@ export function KeypressProvider({
     config,
     subscribers,
     debugKeystrokeLogging,
+    ctrlBackspaceModeFix,
   ]);
 
   return (

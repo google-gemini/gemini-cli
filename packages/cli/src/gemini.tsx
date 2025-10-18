@@ -175,6 +175,7 @@ export async function startInteractiveUI(
           kittyProtocolEnabled={kittyProtocolStatus.enabled}
           config={config}
           debugKeystrokeLogging={settings.merged.general?.debugKeystrokeLogging}
+          ctrlBackspaceModeFix={settings.merged.general?.ctrlBackspaceModeFix}
         >
           <SessionStatsProvider>
             <VimModeProvider settings={settings}>

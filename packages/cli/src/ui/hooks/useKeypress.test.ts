@@ -105,6 +105,7 @@ describe('useKeypress', () => {
   const mockSetRawMode = vi.fn();
   const onKeypress = vi.fn();
   let originalNodeVersion: string;
+  let platformSpy: vi.SpyInstance | undefined;
 
   const wrapper = ({ children }: { children: React.ReactNode }) =>
     React.createElement(KeypressProvider, null, children);
@@ -126,6 +127,8 @@ describe('useKeypress', () => {
       value: originalNodeVersion,
       configurable: true,
     });
+    platformSpy?.mockRestore();
+    platformSpy = undefined;
   });
 
   const setNodeVersion = (version: string) => {
@@ -134,6 +137,20 @@ describe('useKeypress', () => {
       configurable: true,
     });
   };
+
+  const setPlatform = (platform: NodeJS.Platform) => {
+    platformSpy?.mockRestore();
+    platformSpy = vi
+      .spyOn(process, 'platform', 'get')
+      .mockReturnValue(platform);
+  };
+
+  const createKeypressProviderWrapper = (providerProps: {
+    ctrlBackspaceModeFix?: boolean;
+  }) =>
+    function KeypressWrapper({ children }: { children: React.ReactNode }) {
+      return React.createElement(KeypressProvider, providerProps, children);
+    };
 
   it('should not listen if isActive is false', () => {
     renderHook(() => useKeypress(onKeypress, { isActive: false }), {
@@ -182,6 +199,165 @@ describe('useKeypress', () => {
     expect(onKeypress).toHaveBeenCalledWith(
       expect.objectContaining({ ...key, meta: true, paste: false }),
     );
+  });
+
+  describe('Ctrl+Backspace Detection', () => {
+    describe('when ctrlBackspaceModeFix setting is true', () => {
+      it('should recognize byte sequence \\x08 on linux as ctrl modifier', () => {
+        setPlatform('linux');
+        const wrapper = createKeypressProviderWrapper({
+          ctrlBackspaceModeFix: true,
+        });
+        renderHook(() => useKeypress(onKeypress, { isActive: true }), {
+          wrapper,
+        });
+
+        const key = { name: 'backspace', ctrl: false, sequence: '\x08' };
+        act(() => stdin.pressKey(key));
+
+        expect(onKeypress).toHaveBeenCalledWith(
+          expect.objectContaining({
+            name: 'backspace',
+            ctrl: true,
+            sequence: '\x08',
+          }),
+        );
+      });
+
+      it('should recognize byte sequence \\x7f on windows as ctrl modifier', () => {
+        setPlatform('win32');
+        const wrapper = createKeypressProviderWrapper({
+          ctrlBackspaceModeFix: true,
+        });
+        renderHook(() => useKeypress(onKeypress, { isActive: true }), {
+          wrapper,
+        });
+
+        const key = { name: 'backspace', ctrl: false, sequence: '\x7f' };
+        act(() => stdin.pressKey(key));
+
+        expect(onKeypress).toHaveBeenCalledWith(
+          expect.objectContaining({
+            name: 'backspace',
+            ctrl: true,
+            sequence: '\x7f',
+          }),
+        );
+      });
+
+      it('should treat \\x08 as regular backspace on Windows', () => {
+        setPlatform('win32');
+        const wrapper = createKeypressProviderWrapper({
+          ctrlBackspaceModeFix: true,
+        });
+        renderHook(() => useKeypress(onKeypress, { isActive: true }), {
+          wrapper,
+        });
+
+        const key = { name: 'backspace', ctrl: false, sequence: '\x08' };
+        act(() => stdin.pressKey(key));
+
+        expect(onKeypress).toHaveBeenCalledWith(
+          expect.objectContaining({
+            name: 'backspace',
+            ctrl: false,
+            sequence: '\x08',
+          }),
+        );
+      });
+
+      it('should treat \\x7f as regular backspace on Linux', () => {
+        setPlatform('linux');
+        const wrapper = createKeypressProviderWrapper({
+          ctrlBackspaceModeFix: true,
+        });
+        renderHook(() => useKeypress(onKeypress, { isActive: true }), {
+          wrapper,
+        });
+
+        const key = { name: 'backspace', ctrl: false, sequence: '\x7f' };
+        act(() => stdin.pressKey(key));
+
+        expect(onKeypress).toHaveBeenCalledWith(
+          expect.objectContaining({
+            name: 'backspace',
+            ctrl: false,
+            sequence: '\x7f',
+          }),
+        );
+      });
+    });
+
+    describe('when ctrlBackspaceModeFix setting is false', () => {
+      it('should treat \\x7f as regular backspace on Windows', () => {
+        setPlatform('win32');
+        const wrapper = createKeypressProviderWrapper({
+          ctrlBackspaceModeFix: false,
+        });
+        renderHook(() => useKeypress(onKeypress, { isActive: true }), {
+          wrapper,
+        });
+
+        const key = { name: 'backspace', ctrl: false, sequence: '\x7f' };
+        act(() => stdin.pressKey(key));
+
+        expect(onKeypress).toHaveBeenCalledWith(
+          expect.objectContaining({
+            name: 'backspace',
+            ctrl: false,
+            sequence: '\x7f',
+          }),
+        );
+      });
+
+      it('should treat \\x08 as regular backspace on Linux', () => {
+        setPlatform('linux');
+        const wrapper = createKeypressProviderWrapper({
+          ctrlBackspaceModeFix: false,
+        });
+        renderHook(() => useKeypress(onKeypress, { isActive: true }), {
+          wrapper,
+        });
+
+        const key = { name: 'backspace', ctrl: false, sequence: '\x08' };
+        act(() => stdin.pressKey(key));
+
+        expect(onKeypress).toHaveBeenCalledWith(
+          expect.objectContaining({
+            name: 'backspace',
+            ctrl: false,
+            sequence: '\x08',
+          }),
+        );
+      });
+    });
+
+    it('should treat sequences as regular backspace when ctrlBackspaceModeFix setting is not set', () => {
+      const wrapper = createKeypressProviderWrapper({});
+      renderHook(() => useKeypress(onKeypress, { isActive: true }), {
+        wrapper,
+      });
+
+      const key1 = { name: 'backspace', ctrl: false, sequence: '\x08' };
+      act(() => stdin.pressKey(key1));
+      expect(onKeypress).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'backspace',
+          ctrl: false,
+          sequence: '\x08',
+        }),
+      );
+
+      const key2 = { name: 'backspace', ctrl: false, sequence: '\x7f' };
+      act(() => stdin.pressKey(key2));
+      expect(onKeypress).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'backspace',
+          ctrl: false,
+          sequence: '\x7f',
+        }),
+      );
+    });
   });
 
   describe.each([
