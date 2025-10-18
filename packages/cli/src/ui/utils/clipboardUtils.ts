@@ -199,9 +199,23 @@ export interface SaveClipboardImageResult {
  * Saves the image from clipboard to a temporary file with protection checks
  * @param targetDir The target directory to create temp files within
  * @param protectionOptions Optional paste protection options
- * @returns The result of the operation with file path or error
+ * @returns The path to the saved image file, or null if no image or error (backward compatible)
  */
 export async function saveClipboardImage(
+  targetDir?: string,
+  protectionOptions: Partial<PasteProtectionOptions> = {},
+): Promise<string | null> {
+  const result = await saveClipboardImageDetailed(targetDir, protectionOptions);
+  return result.filePath;
+}
+
+/**
+ * Saves the image from clipboard to a temporary file with protection checks (detailed result)
+ * @param targetDir The target directory to create temp files within
+ * @param protectionOptions Optional paste protection options
+ * @returns The detailed result of the operation with file path, display name, or error
+ */
+export async function saveClipboardImageDetailed(
   targetDir?: string,
   protectionOptions: Partial<PasteProtectionOptions> = {},
 ): Promise<SaveClipboardImageResult> {

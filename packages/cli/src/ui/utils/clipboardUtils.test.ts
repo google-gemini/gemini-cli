@@ -5,7 +5,6 @@
  */
 
 import { vi, describe, it, expect, beforeEach } from 'vitest';
-import type { SaveClipboardImageResult } from './clipboardUtils.js';
 
 // Mock modules first (hoisted)
 vi.mock('node:fs/promises', async (importOriginal) => {
@@ -48,7 +47,7 @@ type ClipboardUtilsModule = typeof clipboardUtils & {
 const utils = clipboardUtils as unknown as ClipboardUtilsModule;
 
 const {
-  saveClipboardImage,
+  saveClipboardImageDetailed,
   cleanupOldClipboardImages,
   clipboardState,
   getClipboardContent,
@@ -158,12 +157,12 @@ describe('clipboardUtils', () => {
       // Mock exec to reject with an error (simulates clipboard read failure)
       mockExec.mockRejectedValue(new Error('xclip is not installed'));
 
-      const result = await saveClipboardImage();
+      const result = await saveClipboardImageDetailed();
 
-      expect(result!.filePath).toBeNull();
-      expect(typeof result!.error).toBe('string');
+      expect(result.filePath).toBeNull();
+      expect(typeof result.error).toBe('string');
       // The implementation returns a generic error message for security reasons
-      expect(result!.error).toBe(
+      expect(result.error).toBe(
         'Unsupported platform or no image in clipboard',
       );
     }, 20000); // 20 second timeout for this test
@@ -175,7 +174,7 @@ describe('clipboardUtils', () => {
       // Mock getClipboardContent to return empty string
       vi.mocked(getClipboardContent).mockResolvedValue('');
 
-      const result = await saveClipboardImage();
+      const result = await saveClipboardImageDetailed();
 
       expect(result.filePath).toBeNull();
       expect(typeof result.error).toBe('string');
@@ -191,7 +190,7 @@ describe('clipboardUtils', () => {
       // Mock clipboardHasImage to return true to simulate image in clipboard
       vi.mocked(clipboardHasImage).mockResolvedValue(true);
 
-      const result = await saveClipboardImage();
+      const result = await saveClipboardImageDetailed();
 
       expect(result).toEqual({
         filePath: null,
@@ -206,7 +205,7 @@ describe('clipboardUtils', () => {
 
     it('should handle directory creation error with specific error', async () => {
       mockMkdir.mockRejectedValue(new Error('Failed to create directory'));
-      const result = (await saveClipboardImage()) as SaveClipboardImageResult;
+      const result = await saveClipboardImageDetailed();
       expect(result).toEqual({
         filePath: null,
         error: 'Failed to process clipboard image: Failed to create directory',
@@ -215,19 +214,19 @@ describe('clipboardUtils', () => {
 
     it('should not crash and return correct error on macOS (darwin)', async () => {
       mockPlatform.mockReturnValue('darwin');
-      const result = await saveClipboardImage();
+      const result = await saveClipboardImageDetailed();
       expect(result.filePath).toBeNull();
       expect(typeof result.error).toBe('string');
     });
     it('should not crash and return correct error on Windows (win32)', async () => {
       mockPlatform.mockReturnValue('win32');
-      const result = await saveClipboardImage();
+      const result = await saveClipboardImageDetailed();
       expect(result.filePath).toBeNull();
       expect(typeof result.error).toBe('string');
     });
     it('should not crash and return correct error on Linux', async () => {
       mockPlatform.mockReturnValue('linux');
-      const result = await saveClipboardImage();
+      const result = await saveClipboardImageDetailed();
       expect(result.filePath).toBeNull();
       expect(typeof result.error).toBe('string');
     });
