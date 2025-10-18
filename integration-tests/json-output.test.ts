@@ -39,7 +39,9 @@ describe('JSON output', () => {
     process.env['GOOGLE_GENAI_USE_GCA'] = 'true';
     await rig.setup('json-output-auth-mismatch', {
       settings: {
-        security: { auth: { enforcedType: 'gemini-api-key' } },
+        security: {
+          auth: { enforcedType: 'gemini-api-key', selectedType: '' },
+        },
       },
     });
 
