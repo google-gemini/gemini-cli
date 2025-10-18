@@ -25,10 +25,10 @@ import {
   ReadFileTool,
   ToolErrorType,
   ToolCallEvent,
-  ShellTool,
   logToolOutputTruncated,
   ToolOutputTruncatedEvent,
 } from '../index.js';
+import { SHELL_TOOL_NAME } from '../tools/tool-names.js';
 import type { Part, PartListUnion } from '@google/genai';
 import { getResponseTextFromParts } from '../utils/generateContentResponseUtilities.js';
 import type { ModifyContext } from '../tools/modifiable-tool.js';
@@ -1038,7 +1038,7 @@ export class CoreToolScheduler {
               typeof content === 'string' ? content.length : undefined;
             if (
               typeof content === 'string' &&
-              toolName === ShellTool.Name &&
+              toolName === SHELL_TOOL_NAME &&
               this.config.getEnableToolOutputTruncation() &&
               this.config.getTruncateToolOutputThreshold() > 0 &&
               this.config.getTruncateToolOutputLines() > 0
