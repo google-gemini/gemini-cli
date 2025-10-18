@@ -28,10 +28,19 @@ on:
         description: 'The original PR number to comment back on.'
         required: false
         type: 'string'
+      environment:
+        description: 'Environment'
+        required: false
+        type: 'choice'
+        options:
+          - 'prod'
+          - 'dev'
+        default: 'prod'
 
 jobs:
   create-patch:
     runs-on: 'ubuntu-latest'
+    environment: '${{ github.event.inputs.environment }}'
     permissions:
       contents: 'write'
       pull-requests: 'write'
@@ -49,8 +58,13 @@ jobs:
           node-version-file: '.nvmrc'
           cache: 'npm'
 
+      - name: 'configure .npmrc'
+        uses: './.github/actions/setup-npmrc'
+        with:
+          github-token: '${{ secrets.GITHUB_TOKEN }}'
+
       - name: 'Install Script Dependencies'
-        run: 'npm install yargs'
+        run: 'npm install yargs --no-package-lock'
 
       - name: 'Configure Git User'
         run: |-
@@ -68,7 +82,7 @@ jobs:
         run: |
           # Capture output and display it in logs using tee
           {
-            node scripts/releasing/create-patch-pr.js --commit=${{ github.event.inputs.commit }} --channel=${{ github.event.inputs.channel }} --pullRequestNumber=${{ github.event.inputs.original_pr }} --dry-run=${{ github.event.inputs.dry_run }}
+            node scripts/releasing/create-patch-pr.js --cli-package-name="${{ vars.CLI_PACKAGE_NAME }}" --commit=${{ github.event.inputs.commit }} --channel=${{ github.event.inputs.channel }} --pullRequestNumber=${{ github.event.inputs.original_pr }} --dry-run=${{ github.event.inputs.dry_run }}
             echo "EXIT_CODE=$?" >> "$GITHUB_OUTPUT"
           } 2>&1 | tee >(
             echo "LOG_CONTENT<<EOF" >> "$GITHUB_ENV"
