@@ -23,6 +23,7 @@ import {
 import { theme } from '../../semantic-colors.js';
 import type { AnsiOutput, Config, TodoList } from '@google/gemini-cli-core';
 import { useUIState } from '../../contexts/UIStateContext.js';
+import { parseOrRaw } from '../../../utils/jsonoutput.js';
 
 const STATIC_HEIGHT = 1;
 const RESERVED_LINE_COUNT = 5; // for tool name, status, padding etc.
@@ -123,6 +124,11 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
         '...' + resultDisplay.slice(-MAXIMUM_RESULT_DISPLAY_CHARACTERS);
     }
   }
+
+  const formatted =
+    typeof resultDisplay === 'string' ? parseOrRaw(resultDisplay) : null;
+  const isJSON = formatted !== null && formatted !== resultDisplay;
+
   return (
     <Box paddingX={1} paddingY={0} flexDirection="column">
       <Box minHeight={1}>
@@ -145,7 +151,15 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
       {resultDisplay && (
         <Box paddingLeft={STATUS_INDICATOR_WIDTH} width="100%" marginTop={1}>
           <Box flexDirection="column">
-            {typeof resultDisplay === 'string' && renderOutputAsMarkdown ? (
+            {typeof resultDisplay === 'string' && isJSON ? (
+              <MaxSizedBox maxHeight={availableHeight} maxWidth={childWidth}>
+                <Box>
+                  <Text wrap="wrap" color={theme.text.primary}>
+                    {formatted}
+                  </Text>
+                </Box>
+              </MaxSizedBox>
+            ) : typeof resultDisplay === 'string' && renderOutputAsMarkdown ? (
               <Box flexDirection="column">
                 <MarkdownDisplay
                   text={resultDisplay}
