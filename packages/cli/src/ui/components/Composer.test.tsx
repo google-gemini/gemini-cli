@@ -113,6 +113,7 @@ const createMockUIState = (overrides: Partial<UIState> = {}): UIState =>
     geminiMdFileCount: 0,
     renderMarkdown: true,
     filteredConsoleMessages: [],
+    history: [],
     sessionStats: {
       lastPromptTokenCount: 0,
       sessionTokenCount: 0,
