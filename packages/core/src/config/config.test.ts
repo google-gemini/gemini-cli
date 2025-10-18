@@ -138,9 +138,7 @@ vi.mock('../agents/registry.js', () => {
   return { AgentRegistry: AgentRegistryMock };
 });
 
-vi.mock('../agents/subagent-tool-wrapper.js', () => ({
-  SubagentToolWrapper: vi.fn(),
-}));
+vi.mock('../agents/subagent-tool-wrapper.js', () => ({ SubagentToolWrapper: vi.fn() }));
 
 const mockCoreEvents = vi.hoisted(() => ({
   emitFeedback: vi.fn(),
@@ -150,13 +148,9 @@ const mockCoreEvents = vi.hoisted(() => ({
 
 const mockSetGlobalProxy = vi.hoisted(() => vi.fn());
 
-vi.mock('../utils/events.js', () => ({
-  coreEvents: mockCoreEvents,
-}));
+vi.mock('../utils/events.js', () => ({ coreEvents: mockCoreEvents }));
 
-vi.mock('../utils/fetch.js', () => ({
-  setGlobalProxy: mockSetGlobalProxy,
-}));
+vi.mock('../utils/fetch.js', () => ({ setGlobalProxy: mockSetGlobalProxy }));
 
 import { BaseLlmClient } from '../core/baseLlmClient.js';
 import { tokenLimit } from '../core/tokenLimits.js';
@@ -166,9 +160,7 @@ import { getExperiments } from '../code_assist/experiments/experiments.js';
 import type { CodeAssistServer } from '../code_assist/server.js';
 
 vi.mock('../core/baseLlmClient.js');
-vi.mock('../core/tokenLimits.js', () => ({
-  tokenLimit: vi.fn(),
-}));
+vi.mock('../core/tokenLimits.js', () => ({ tokenLimit: vi.fn() }));
 vi.mock('../code_assist/codeAssist.js');
 vi.mock('../code_assist/experiments/experiments.js');
 
@@ -750,38 +742,36 @@ describe('Server Config (config.ts)', () => {
     });
   });
 
-  describe('ContinueOnFailedApiCall Configuration', () => {
-    it('should default continueOnFailedApiCall to false when not provided', () => {
+  describe('Model Router Configuration', () => {
+    it('should default useModelRouter to false when modelRouter settings are not provided', () => {
       const config = new Config(baseParams);
-      expect(config.getContinueOnFailedApiCall()).toBe(true);
+      expect(config.getUseModelRouter()).toBe(false);
     });
 
-    it('should set continueOnFailedApiCall to true when provided as true', () => {
-      const paramsWithContinueOnFailedApiCall: ConfigParameters = {
+    it('should set useModelRouter to true when enabled is true', () => {
+      const params: ConfigParameters = {
         ...baseParams,
-        continueOnFailedApiCall: true,
+        useModelRouter: true,
       };
-      const config = new Config(paramsWithContinueOnFailedApiCall);
-      expect(config.getContinueOnFailedApiCall()).toBe(true);
+      const config = new Config(params);
+      expect(config.getUseModelRouter()).toBe(true);
     });
 
-    it('should set continueOnFailedApiCall to false when explicitly provided as false', () => {
-      const paramsWithContinueOnFailedApiCall: ConfigParameters = {
+    it('should set useModelRouter to false when enabled is false', () => {
+      const params: ConfigParameters = {
         ...baseParams,
-        continueOnFailedApiCall: false,
+        useModelRouter: false,
       };
-      const config = new Config(paramsWithContinueOnFailedApiCall);
-      expect(config.getContinueOnFailedApiCall()).toBe(false);
+      const config = new Config(params);
+      expect(config.getUseModelRouter()).toBe(false);
     });
-  });
 
-  describe('Model Router Task Models Configuration', () => {
-    it('should default simpleTaskModel to DEFAULT_GEMINI_FLASH_MODEL when not provided', () => {
+    it('should default simpleTaskModel to DEFAULT_GEMINI_FLASH_MODEL', () => {
       const config = new Config(baseParams);
       expect(config.getSimpleTaskModel()).toBe('gemini-2.5-flash');
     });
 
-    it('should default complexTaskModel to DEFAULT_GEMINI_MODEL when not provided', () => {
+    it('should default complexTaskModel to DEFAULT_GEMINI_MODEL', () => {
       const config = new Config(baseParams);
       expect(config.getComplexTaskModel()).toBe('gemini-2.5-pro');
     });
@@ -811,7 +801,7 @@ describe('Server Config (config.ts)', () => {
     it('should register a tool if coreTools contains an argument-specific pattern', async () => {
       const params: ConfigParameters = {
         ...baseParams,
-        coreTools: ['ShellTool(git status)'],
+        coreTools: ['ShellTool(git status)']
       };
       const config = new Config(params);
       await config.initialize();
@@ -949,7 +939,7 @@ describe('Server Config (config.ts)', () => {
       it('should register a tool if coreTools contains an argument-specific pattern with the non-minified class name', async () => {
         const params: ConfigParameters = {
           ...baseParams,
-          coreTools: ['ShellTool(git status)'],
+          coreTools: ['ShellTool(git status)']
         };
         const config = new Config(params);
         await config.initialize();

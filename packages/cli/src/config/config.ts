@@ -15,6 +15,7 @@ import {
   setGeminiMdFilename as setServerGeminiMdFilename,
   getCurrentGeminiMdFilename,
   ApprovalMode,
+  DEFAULT_GEMINI_MODEL,
   DEFAULT_GEMINI_MODEL_AUTO,
   DEFAULT_GEMINI_EMBEDDING_MODEL,
   DEFAULT_FILE_FILTERING_OPTIONS,
@@ -491,7 +492,7 @@ export async function loadCliConfig(
   // Force approval mode to default if the folder is not trusted.
   if (!trustedFolder && approvalMode !== ApprovalMode.DEFAULT) {
     debugLogger.warn(
-      `Approval mode overridden to "default" because the current folder is not trusted.`,
+      `Approval mode overridden to "default" because the current folder is not trusted.`, 
     );
     approvalMode = ApprovalMode.DEFAULT;
   }
@@ -566,7 +567,10 @@ export async function loadCliConfig(
     extraExcludes.length > 0 ? extraExcludes : undefined,
   );
 
-  const defaultModel = DEFAULT_GEMINI_MODEL_AUTO;
+  const useModelRouter = settings.experimental?.modelRouter?.enabled ?? true;
+  const defaultModel = useModelRouter
+    ? DEFAULT_GEMINI_MODEL_AUTO
+    : DEFAULT_GEMINI_MODEL;
   const resolvedModel: string =
     argv.model ||
     process.env['GEMINI_MODEL'] ||
@@ -659,20 +663,9 @@ export async function loadCliConfig(
     output: {
       format: (argv.outputFormat ?? settings.output?.format) as OutputFormat,
     },
-    useModelRouter,
-    enableMessageBusIntegration,
-    codebaseInvestigatorSettings:
-      settings.experimental?.codebaseInvestigatorSettings,
-    fakeResponses: argv.fakeResponses,
-    recordResponses: argv.recordResponses,
-    retryFetchErrors: settings.general?.retryFetchErrors ?? false,
-    ptyInfo: ptyInfo?.name,
-    modelConfigServiceConfig: settings.modelConfigs,
-    // TODO: loading of hooks based on workspace trust
-    enableHooks: settings.tools?.enableHooks ?? false,
-    hooks: settings.hooks || {},
-    simpleTaskModel: settings.experimental?.router?.simpleTaskModel,
-    complexTaskModel: settings.experimental?.router?.complexTaskModel,
+    modelRouter: settings.experimental?.modelRouter,
+    enableMessageBusIntegration:
+      settings.tools?.enableMessageBusIntegration ?? false,
   });
 }
 

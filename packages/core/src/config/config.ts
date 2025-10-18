@@ -288,8 +288,13 @@ export interface ConfigParameters {
   useWriteTodos?: boolean;
   policyEngineConfig?: PolicyEngineConfig;
   output?: OutputSettings;
-  useModelRouter?: boolean;
+  modelRouter?: {
+    enabled?: boolean;
+    simpleTaskModel?: string;
+    complexTaskModel?: string;
+  };
   enableMessageBusIntegration?: boolean;
+<<<<<<< HEAD
   disableModelRouterForAuth?: AuthType[];
   codebaseInvestigatorSettings?: CodebaseInvestigatorSettings;
   continueOnFailedApiCall?: boolean;
@@ -309,6 +314,8 @@ export interface ConfigParameters {
   enableModelAvailabilityService?: boolean;
   simpleTaskModel?: string;
   complexTaskModel?: string;
+=======
+>>>>>>> cce2f06a (refactor(settings): consolidate model router settings)
 }
 
 export class Config {
@@ -526,6 +533,7 @@ export class Config {
       params.truncateToolOutputLines ?? DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES;
     this.enableToolOutputTruncation = params.enableToolOutputTruncation ?? true;
     this.useSmartEdit = params.useSmartEdit ?? true;
+<<<<<<< HEAD
     this.useWriteTodos = params.useWriteTodos ?? true;
     this.initialUseModelRouter = params.useModelRouter ?? false;
     this.useModelRouter = this.initialUseModelRouter;
@@ -551,6 +559,16 @@ export class Config {
     this.continueOnFailedApiCall = params.continueOnFailedApiCall ?? true;
     this.enableShellOutputEfficiency =
       params.enableShellOutputEfficiency ?? true;
+=======
+    this.useWriteTodos = params.useWriteTodos ?? false;
+    this.useModelRouter = params.modelRouter?.enabled ?? false;
+    this.enableMessageBusIntegration =
+      params.enableMessageBusIntegration ?? false;
+    this.simpleTaskModel =
+      params.modelRouter?.simpleTaskModel ?? DEFAULT_GEMINI_FLASH_MODEL;
+    this.complexTaskModel =
+      params.modelRouter?.complexTaskModel ?? DEFAULT_GEMINI_MODEL;
+>>>>>>> cce2f06a (refactor(settings): consolidate model router settings)
     this.extensionManagement = params.extensionManagement ?? true;
     this.enableExtensionReloading = params.enableExtensionReloading ?? false;
     this.storage = new Storage(this.targetDir);
