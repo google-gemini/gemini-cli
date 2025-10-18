@@ -12,6 +12,9 @@ export const GLOB_TOOL_NAME = 'glob';
 export const WRITE_TODOS_TOOL_NAME = 'write_todos';
 export const WRITE_FILE_TOOL_NAME = 'write_file';
 export const WEB_SEARCH_TOOL_NAME = 'google_web_search';
+export const WEB_FETCH_TOOL_NAME = 'web_fetch';
+export const EDIT_TOOL_NAME = 'replace';
+export const SHELL_TOOL_NAME = 'run_shell_command';
 
 // TODO: Migrate other tool names here to follow this pattern and prevent future circular dependencies.
 // Candidates for migration:

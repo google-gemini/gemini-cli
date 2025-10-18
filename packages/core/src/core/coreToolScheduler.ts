@@ -25,10 +25,10 @@ import {
   ReadFileTool,
   ToolErrorType,
   ToolCallEvent,
-  ShellTool,
   logToolOutputTruncated,
   ToolOutputTruncatedEvent,
 } from '../index.js';
+import { SHELL_TOOL_NAME } from '../tools/tool-names.js';
 import type { Part, PartListUnion } from '@google/genai';
 import { getResponseTextFromParts } from '../utils/generateContentResponseUtilities.js';
 import type { ModifyContext } from '../tools/modifiable-tool.js';
@@ -42,6 +42,8 @@ import * as path from 'node:path';
 import { doesToolInvocationMatch } from '../utils/tool-utils.js';
 import levenshtein from 'fast-levenshtein';
 import { ShellToolInvocation } from '../tools/shell.js';
+import type { ToolConfirmationRequest } from '../confirmation-bus/types.js';
+import { MessageBusType } from '../confirmation-bus/types.js';
 
 export type ValidatingToolCall = {
   status: 'validating';
@@ -352,6 +354,15 @@ export class CoreToolScheduler {
     this.onToolCallsUpdate = options.onToolCallsUpdate;
     this.getPreferredEditor = options.getPreferredEditor;
     this.onEditorClose = options.onEditorClose;
+
+    // Subscribe to message bus for ASK_USER policy decisions
+    if (this.config.getEnableMessageBusIntegration()) {
+      const messageBus = this.config.getMessageBus();
+      messageBus.subscribe(
+        MessageBusType.TOOL_CONFIRMATION_REQUEST,
+        this.handleToolConfirmationRequest.bind(this),
+      );
+    }
   }
 
   private setStatusInternal(
@@ -1027,7 +1038,7 @@ export class CoreToolScheduler {
               typeof content === 'string' ? content.length : undefined;
             if (
               typeof content === 'string' &&
-              toolName === ShellTool.Name &&
+              toolName === SHELL_TOOL_NAME &&
               this.config.getEnableToolOutputTruncation() &&
               this.config.getTruncateToolOutputThreshold() > 0 &&
               this.config.getTruncateToolOutputLines() > 0
@@ -1157,6 +1168,26 @@ export class CoreToolScheduler {
         ...call,
         outcome,
       };
+    });
+  }
+
+  /**
+   * Handle tool confirmation requests from the message bus when policy decision is ASK_USER.
+   * This publishes a response with requiresUserConfirmation=true to signal the tool
+   * that it should fall back to its legacy confirmation UI.
+   */
+  private handleToolConfirmationRequest(
+    request: ToolConfirmationRequest,
+  ): void {
+    // When ASK_USER policy decision is made, the message bus emits the request here.
+    // We respond with requiresUserConfirmation=true to tell the tool to use its
+    // legacy confirmation flow (which will show diffs, URLs, etc in the UI).
+    const messageBus = this.config.getMessageBus();
+    messageBus.publish({
+      type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
+      correlationId: request.correlationId,
+      confirmed: false, // Not auto-approved
+      requiresUserConfirmation: true, // Use legacy UI confirmation
     });
   }
 
