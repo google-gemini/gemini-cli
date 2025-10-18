@@ -218,7 +218,7 @@ jobs:
           UV_THREADPOOL_SIZE: '32'
           NODE_ENV: 'test'
         shell: 'pwsh'
-        run: 'npm run deflake:test:integration:sandbox:none'
+        run: 'npm run test:integration:sandbox:none'
 
   e2e:
     name: 'E2E'
