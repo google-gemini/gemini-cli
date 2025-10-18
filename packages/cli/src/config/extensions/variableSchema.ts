@@ -22,17 +22,18 @@ export interface LoadExtensionContext {
 
 const PATH_SEPARATOR_DEFINITION = {
   type: 'string',
-  description: 'The path separator.',
+  description: 'The path separator (differs per OS).',
 } as const;
 
 export const VARIABLE_SCHEMA = {
   extensionPath: {
     type: 'string',
-    description: 'The path of the extension in the filesystem.',
+    description:
+      "The fully-qualified path of the extension in the user's filesystem e.g., '/Users/username/.gemini/extensions/example-extension'. This will not unwrap symlinks.",
   },
   workspacePath: {
     type: 'string',
-    description: 'The absolute path of the current workspace.',
+    description: 'The fully-qualified path of the current workspace.',
   },
   '/': PATH_SEPARATOR_DEFINITION,
   pathSeparator: PATH_SEPARATOR_DEFINITION,
