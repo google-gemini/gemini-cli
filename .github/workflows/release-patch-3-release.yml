@@ -34,7 +34,7 @@ on:
         type: 'choice'
         options:
           - 'prod'
-          ## - 'dev' # TODO(richieforeman) - support dev
+          - 'dev'
         default: 'prod'
 
 jobs:
@@ -66,6 +66,11 @@ jobs:
           node-version-file: '.nvmrc'
           cache: 'npm'
 
+      - name: 'configure .npmrc'
+        uses: './.github/actions/setup-npmrc'
+        with:
+          github-token: '${{ secrets.GITHUB_TOKEN }}'
+
       - name: 'Install Dependencies'
         run: |-
           npm ci
@@ -83,7 +88,7 @@ jobs:
         run: |
           # Use the existing get-release-version.js script to calculate patch version
           # Run from main checkout which has full git history and access to npm
-          PATCH_JSON=$(node scripts/get-release-version.js --type=patch --patch-from=${{ github.event.inputs.type }})
+          PATCH_JSON=$(node scripts/get-release-version.js --cli-package-name="${{vars.CLI_PACKAGE_NAME}}" --type=patch --patch-from=${{ github.event.inputs.type }})
           echo "Patch version calculation result: ${PATCH_JSON}"
 
           RELEASE_VERSION=$(echo "${PATCH_JSON}" | jq -r .releaseVersion)
