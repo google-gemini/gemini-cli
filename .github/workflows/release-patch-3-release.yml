@@ -120,7 +120,7 @@ jobs:
 
           # Re-run the same version calculation script
           echo "Re-calculating version to check for changes..."
-          CURRENT_PATCH_JSON=$(node scripts/get-release-version.js --type=patch --patch-from="${CHANNEL}")
+          CURRENT_PATCH_JSON=$(node scripts/get-release-version.js --cli-package-name="${{vars.CLI_PACKAGE_NAME}}" --type=patch --patch-from="${CHANNEL}")
           CURRENT_RELEASE_VERSION=$(echo "${CURRENT_PATCH_JSON}" | jq -r .releaseVersion)
           CURRENT_RELEASE_TAG=$(echo "${CURRENT_PATCH_JSON}" | jq -r .releaseTag)
           CURRENT_PREVIOUS_TAG=$(echo "${CURRENT_PATCH_JSON}" | jq -r .previousReleaseTag)
