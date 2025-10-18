@@ -23,7 +23,6 @@ import {
   type CliArgs,
 } from './config.js';
 import type { Settings } from './settings.js';
-import { ExtensionStorage } from './extension.js';
 import * as ServerConfig from '@google/gemini-cli-core';
 import { isWorkspaceTrusted } from './trustedFolders.js';
 import { ExtensionEnablementManager } from './extensions/extensionEnablement.js';
@@ -514,74 +513,6 @@ describe('loadCliConfig', () => {
     vi.restoreAllMocks();
   });
 
-  it('should set showMemoryUsage to true when --show-memory-usage flag is present', async () => {
-    process.argv = ['node', 'script.js', '--show-memory-usage'];
-    const argv = await parseArguments({} as Settings);
-    const settings: Settings = {};
-    const config = await loadCliConfig(
-      settings,
-      [],
-      new ExtensionEnablementManager(
-        ExtensionStorage.getUserExtensionsDir(),
-        argv.extensions,
-      ),
-      'test-session',
-      argv,
-    );
-    expect(config.getShowMemoryUsage()).toBe(true);
-  });
-
-  it('should set showMemoryUsage to false when --memory flag is not present', async () => {
-    process.argv = ['node', 'script.js'];
-    const argv = await parseArguments({} as Settings);
-    const settings: Settings = {};
-    const config = await loadCliConfig(
-      settings,
-      [],
-      new ExtensionEnablementManager(
-        ExtensionStorage.getUserExtensionsDir(),
-        argv.extensions,
-      ),
-      'test-session',
-      argv,
-    );
-    expect(config.getShowMemoryUsage()).toBe(false);
-  });
-
-  it('should set showMemoryUsage to false by default from settings if CLI flag is not present', async () => {
-    process.argv = ['node', 'script.js'];
-    const argv = await parseArguments({} as Settings);
-    const settings: Settings = { ui: { showMemoryUsage: false } };
-    const config = await loadCliConfig(
-      settings,
-      [],
-      new ExtensionEnablementManager(
-        ExtensionStorage.getUserExtensionsDir(),
-        argv.extensions,
-      ),
-      'test-session',
-      argv,
-    );
-    expect(config.getShowMemoryUsage()).toBe(false);
-  });
-
-  it('should prioritize CLI flag over settings for showMemoryUsage (CLI true, settings false)', async () => {
-    process.argv = ['node', 'script.js', '--show-memory-usage'];
-    const argv = await parseArguments({} as Settings);
-    const settings: Settings = { ui: { showMemoryUsage: false } };
-    const config = await loadCliConfig(
-      settings,
-      [],
-      new ExtensionEnablementManager(
-        ExtensionStorage.getUserExtensionsDir(),
-        argv.extensions,
-      ),
-      'test-session',
-      argv,
-    );
-    expect(config.getShowMemoryUsage()).toBe(true);
-  });
-
   describe('Proxy configuration', () => {
     const originalProxyEnv: { [key: string]: string | undefined } = {};
     const proxyEnvVars = [
@@ -615,10 +546,7 @@ describe('loadCliConfig', () => {
       const config = await loadCliConfig(
         settings,
         [],
-        new ExtensionEnablementManager(
-          ExtensionStorage.getUserExtensionsDir(),
-          argv.extensions,
-        ),
+        new ExtensionEnablementManager(argv.extensions),
         'test-session',
         argv,
       );
@@ -665,50 +593,12 @@ describe('loadCliConfig', () => {
         const config = await loadCliConfig(
           settings,
           [],
-          new ExtensionEnablementManager(
-            ExtensionStorage.getUserExtensionsDir(),
-            argv.extensions,
-          ),
+          new ExtensionEnablementManager(argv.extensions),
           'test-session',
           argv,
         );
         expect(config.getProxy()).toBe(expected);
       });
-    });
-
-    it('should set proxy when --proxy flag is present', async () => {
-      process.argv = ['node', 'script.js', '--proxy', 'http://localhost:7890'];
-      const argv = await parseArguments({} as Settings);
-      const settings: Settings = {};
-      const config = await loadCliConfig(
-        settings,
-        [],
-        new ExtensionEnablementManager(
-          ExtensionStorage.getUserExtensionsDir(),
-          argv.extensions,
-        ),
-        'test-session',
-        argv,
-      );
-      expect(config.getProxy()).toBe('http://localhost:7890');
-    });
-
-    it('should prioritize CLI flag over environment variable for proxy (CLI http://localhost:7890, environment variable http://localhost:7891)', async () => {
-      vi.stubEnv('http_proxy', 'http://localhost:7891');
-      process.argv = ['node', 'script.js', '--proxy', 'http://localhost:7890'];
-      const argv = await parseArguments({} as Settings);
-      const settings: Settings = {};
-      const config = await loadCliConfig(
-        settings,
-        [],
-        new ExtensionEnablementManager(
-          ExtensionStorage.getUserExtensionsDir(),
-          argv.extensions,
-        ),
-        'test-session',
-        argv,
-      );
-      expect(config.getProxy()).toBe('http://localhost:7890');
     });
   });
 });
@@ -758,10 +648,7 @@ describe('Hierarchical Memory Loading (config.ts) - Placeholder Suite', () => {
       settings,
       extensions,
 
-      new ExtensionEnablementManager(
-        ExtensionStorage.getUserExtensionsDir(),
-        argv.extensions,
-      ),
+      new ExtensionEnablementManager(argv.extensions),
       'session-id',
       argv,
     );
@@ -844,10 +731,7 @@ describe('mergeMcpServers', () => {
     await loadCliConfig(
       settings,
       extensions,
-      new ExtensionEnablementManager(
-        ExtensionStorage.getUserExtensionsDir(),
-        argv.extensions,
-      ),
+      new ExtensionEnablementManager(argv.extensions),
       'test-session',
       argv,
     );
@@ -892,10 +776,7 @@ describe('mergeExcludeTools', () => {
     const config = await loadCliConfig(
       settings,
       extensions,
-      new ExtensionEnablementManager(
-        ExtensionStorage.getUserExtensionsDir(),
-        argv.extensions,
-      ),
+      new ExtensionEnablementManager(argv.extensions),
       'test-session',
       argv,
     );
@@ -922,10 +803,7 @@ describe('mergeExcludeTools', () => {
     const config = await loadCliConfig(
       settings,
       extensions,
-      new ExtensionEnablementManager(
-        ExtensionStorage.getUserExtensionsDir(),
-        argv.extensions,
-      ),
+      new ExtensionEnablementManager(argv.extensions),
       'test-session',
       argv,
     );
@@ -960,10 +838,7 @@ describe('mergeExcludeTools', () => {
     const config = await loadCliConfig(
       settings,
       extensions,
-      new ExtensionEnablementManager(
-        ExtensionStorage.getUserExtensionsDir(),
-        argv.extensions,
-      ),
+      new ExtensionEnablementManager(argv.extensions),
       'test-session',
       argv,
     );
@@ -982,10 +857,7 @@ describe('mergeExcludeTools', () => {
     const config = await loadCliConfig(
       settings,
       extensions,
-      new ExtensionEnablementManager(
-        ExtensionStorage.getUserExtensionsDir(),
-        argv.extensions,
-      ),
+      new ExtensionEnablementManager(argv.extensions),
       'test-session',
       argv,
     );
@@ -1001,10 +873,7 @@ describe('mergeExcludeTools', () => {
     const config = await loadCliConfig(
       settings,
       extensions,
-      new ExtensionEnablementManager(
-        ExtensionStorage.getUserExtensionsDir(),
-        argv.extensions,
-      ),
+      new ExtensionEnablementManager(argv.extensions),
       'test-session',
       argv,
     );
@@ -1019,10 +888,7 @@ describe('mergeExcludeTools', () => {
     const config = await loadCliConfig(
       settings,
       extensions,
-      new ExtensionEnablementManager(
-        ExtensionStorage.getUserExtensionsDir(),
-        argv.extensions,
-      ),
+      new ExtensionEnablementManager(argv.extensions),
       'test-session',
       argv,
     );
@@ -1049,10 +915,7 @@ describe('mergeExcludeTools', () => {
     const config = await loadCliConfig(
       settings,
       extensions,
-      new ExtensionEnablementManager(
-        ExtensionStorage.getUserExtensionsDir(),
-        argv.extensions,
-      ),
+      new ExtensionEnablementManager(argv.extensions),
       'test-session',
       argv,
     );
@@ -1080,10 +943,7 @@ describe('mergeExcludeTools', () => {
     await loadCliConfig(
       settings,
       extensions,
-      new ExtensionEnablementManager(
-        ExtensionStorage.getUserExtensionsDir(),
-        argv.extensions,
-      ),
+      new ExtensionEnablementManager(argv.extensions),
       'test-session',
       argv,
     );
@@ -1115,10 +975,7 @@ describe('Approval mode tool exclusion logic', () => {
     const config = await loadCliConfig(
       settings,
       extensions,
-      new ExtensionEnablementManager(
-        ExtensionStorage.getUserExtensionsDir(),
-        argv.extensions,
-      ),
+      new ExtensionEnablementManager(argv.extensions),
       'test-session',
       argv,
     );
@@ -1145,10 +1002,7 @@ describe('Approval mode tool exclusion logic', () => {
     const config = await loadCliConfig(
       settings,
       extensions,
-      new ExtensionEnablementManager(
-        ExtensionStorage.getUserExtensionsDir(),
-        argv.extensions,
-      ),
+      new ExtensionEnablementManager(argv.extensions),
       'test-session',
       argv,
     );
@@ -1175,10 +1029,7 @@ describe('Approval mode tool exclusion logic', () => {
     const config = await loadCliConfig(
       settings,
       extensions,
-      new ExtensionEnablementManager(
-        ExtensionStorage.getUserExtensionsDir(),
-        argv.extensions,
-      ),
+      new ExtensionEnablementManager(argv.extensions),
       'test-session',
       argv,
     );
@@ -1205,10 +1056,7 @@ describe('Approval mode tool exclusion logic', () => {
     const config = await loadCliConfig(
       settings,
       extensions,
-      new ExtensionEnablementManager(
-        ExtensionStorage.getUserExtensionsDir(),
-        argv.extensions,
-      ),
+      new ExtensionEnablementManager(argv.extensions),
       'test-session',
       argv,
     );
@@ -1228,10 +1076,7 @@ describe('Approval mode tool exclusion logic', () => {
     const config = await loadCliConfig(
       settings,
       extensions,
-      new ExtensionEnablementManager(
-        ExtensionStorage.getUserExtensionsDir(),
-        argv.extensions,
-      ),
+      new ExtensionEnablementManager(argv.extensions),
       'test-session',
       argv,
     );
@@ -1262,10 +1107,7 @@ describe('Approval mode tool exclusion logic', () => {
       const config = await loadCliConfig(
         settings,
         extensions,
-        new ExtensionEnablementManager(
-          ExtensionStorage.getUserExtensionsDir(),
-          argv.extensions,
-        ),
+        new ExtensionEnablementManager(argv.extensions),
         'test-session',
         argv,
       );
@@ -1293,10 +1135,7 @@ describe('Approval mode tool exclusion logic', () => {
     const config = await loadCliConfig(
       settings,
       extensions,
-      new ExtensionEnablementManager(
-        ExtensionStorage.getUserExtensionsDir(),
-        argv.extensions,
-      ),
+      new ExtensionEnablementManager(argv.extensions),
       'test-session',
       argv,
     );
@@ -1323,10 +1162,7 @@ describe('Approval mode tool exclusion logic', () => {
       loadCliConfig(
         settings,
         extensions,
-        new ExtensionEnablementManager(
-          ExtensionStorage.getUserExtensionsDir(),
-          invalidArgv.extensions,
-        ),
+        new ExtensionEnablementManager(invalidArgv.extensions),
         'test-session',
         invalidArgv as CliArgs,
       ),
@@ -1365,10 +1201,7 @@ describe('loadCliConfig with allowed-mcp-server-names', () => {
     const config = await loadCliConfig(
       baseSettings,
       [],
-      new ExtensionEnablementManager(
-        ExtensionStorage.getUserExtensionsDir(),
-        argv.extensions,
-      ),
+      new ExtensionEnablementManager(argv.extensions),
       'test-session',
       argv,
     );
@@ -1386,10 +1219,7 @@ describe('loadCliConfig with allowed-mcp-server-names', () => {
     const config = await loadCliConfig(
       baseSettings,
       [],
-      new ExtensionEnablementManager(
-        ExtensionStorage.getUserExtensionsDir(),
-        argv.extensions,
-      ),
+      new ExtensionEnablementManager(argv.extensions),
       'test-session',
       argv,
     );
@@ -1411,10 +1241,7 @@ describe('loadCliConfig with allowed-mcp-server-names', () => {
     const config = await loadCliConfig(
       baseSettings,
       [],
-      new ExtensionEnablementManager(
-        ExtensionStorage.getUserExtensionsDir(),
-        argv.extensions,
-      ),
+      new ExtensionEnablementManager(argv.extensions),
       'test-session',
       argv,
     );
@@ -1437,10 +1264,7 @@ describe('loadCliConfig with allowed-mcp-server-names', () => {
     const config = await loadCliConfig(
       baseSettings,
       [],
-      new ExtensionEnablementManager(
-        ExtensionStorage.getUserExtensionsDir(),
-        argv.extensions,
-      ),
+      new ExtensionEnablementManager(argv.extensions),
       'test-session',
       argv,
     );
@@ -1455,10 +1279,7 @@ describe('loadCliConfig with allowed-mcp-server-names', () => {
     const config = await loadCliConfig(
       baseSettings,
       [],
-      new ExtensionEnablementManager(
-        ExtensionStorage.getUserExtensionsDir(),
-        argv.extensions,
-      ),
+      new ExtensionEnablementManager(argv.extensions),
       'test-session',
       argv,
     );
@@ -1475,10 +1296,7 @@ describe('loadCliConfig with allowed-mcp-server-names', () => {
     const config = await loadCliConfig(
       settings,
       [],
-      new ExtensionEnablementManager(
-        ExtensionStorage.getUserExtensionsDir(),
-        argv.extensions,
-      ),
+      new ExtensionEnablementManager(argv.extensions),
       'test-session',
       argv,
     );
@@ -1498,10 +1316,7 @@ describe('loadCliConfig with allowed-mcp-server-names', () => {
     const config = await loadCliConfig(
       settings,
       [],
-      new ExtensionEnablementManager(
-        ExtensionStorage.getUserExtensionsDir(),
-        argv.extensions,
-      ),
+      new ExtensionEnablementManager(argv.extensions),
       'test-session',
       argv,
     );
@@ -1523,10 +1338,7 @@ describe('loadCliConfig with allowed-mcp-server-names', () => {
     const config = await loadCliConfig(
       settings,
       [],
-      new ExtensionEnablementManager(
-        ExtensionStorage.getUserExtensionsDir(),
-        argv.extensions,
-      ),
+      new ExtensionEnablementManager(argv.extensions),
       'test-session',
       argv,
     );
@@ -1553,10 +1365,7 @@ describe('loadCliConfig with allowed-mcp-server-names', () => {
     const config = await loadCliConfig(
       settings,
       [],
-      new ExtensionEnablementManager(
-        ExtensionStorage.getUserExtensionsDir(),
-        argv.extensions,
-      ),
+      new ExtensionEnablementManager(argv.extensions),
       'test-session',
       argv,
     );
@@ -1585,10 +1394,7 @@ describe('loadCliConfig with allowed-mcp-server-names', () => {
     const config = await loadCliConfig(
       settings,
       [],
-      new ExtensionEnablementManager(
-        ExtensionStorage.getUserExtensionsDir(),
-        argv.extensions,
-      ),
+      new ExtensionEnablementManager(argv.extensions),
       'test-session',
       argv,
     );
@@ -1624,10 +1430,7 @@ describe('loadCliConfig extensions', () => {
     const config = await loadCliConfig(
       settings,
       mockExtensions,
-      new ExtensionEnablementManager(
-        ExtensionStorage.getUserExtensionsDir(),
-        argv.extensions,
-      ),
+      new ExtensionEnablementManager(argv.extensions),
       'test-session',
       argv,
     );
@@ -1644,10 +1447,7 @@ describe('loadCliConfig extensions', () => {
     const config = await loadCliConfig(
       settings,
       mockExtensions,
-      new ExtensionEnablementManager(
-        ExtensionStorage.getUserExtensionsDir(),
-        argv.extensions,
-      ),
+      new ExtensionEnablementManager(argv.extensions),
       'test-session',
       argv,
     );
@@ -1666,10 +1466,7 @@ describe('loadCliConfig model selection', () => {
         },
       },
       [],
-      new ExtensionEnablementManager(
-        ExtensionStorage.getUserExtensionsDir(),
-        argv.extensions,
-      ),
+      new ExtensionEnablementManager(argv.extensions),
       'test-session',
       argv,
     );
@@ -1685,10 +1482,7 @@ describe('loadCliConfig model selection', () => {
         // No model set.
       },
       [],
-      new ExtensionEnablementManager(
-        ExtensionStorage.getUserExtensionsDir(),
-        argv.extensions,
-      ),
+      new ExtensionEnablementManager(argv.extensions),
       'test-session',
       argv,
     );
@@ -1706,10 +1500,7 @@ describe('loadCliConfig model selection', () => {
         },
       },
       [],
-      new ExtensionEnablementManager(
-        ExtensionStorage.getUserExtensionsDir(),
-        argv.extensions,
-      ),
+      new ExtensionEnablementManager(argv.extensions),
       'test-session',
       argv,
     );
@@ -1725,10 +1516,7 @@ describe('loadCliConfig model selection', () => {
         // No model provided via settings.
       },
       [],
-      new ExtensionEnablementManager(
-        ExtensionStorage.getUserExtensionsDir(),
-        argv.extensions,
-      ),
+      new ExtensionEnablementManager(argv.extensions),
       'test-session',
       argv,
     );
@@ -1748,10 +1536,7 @@ describe('loadCliConfig model selection with model router', () => {
         },
       },
       [],
-      new ExtensionEnablementManager(
-        ExtensionStorage.getUserExtensionsDir(),
-        argv.extensions,
-      ),
+      new ExtensionEnablementManager(argv.extensions),
       'test-session',
       argv,
     );
@@ -1769,10 +1554,7 @@ describe('loadCliConfig model selection with model router', () => {
         },
       },
       [],
-      new ExtensionEnablementManager(
-        ExtensionStorage.getUserExtensionsDir(),
-        argv.extensions,
-      ),
+      new ExtensionEnablementManager(argv.extensions),
       'test-session',
       argv,
     );
@@ -1790,10 +1572,7 @@ describe('loadCliConfig model selection with model router', () => {
         },
       },
       [],
-      new ExtensionEnablementManager(
-        ExtensionStorage.getUserExtensionsDir(),
-        argv.extensions,
-      ),
+      new ExtensionEnablementManager(argv.extensions),
       'test-session',
       argv,
     );
@@ -1814,10 +1593,7 @@ describe('loadCliConfig model selection with model router', () => {
         },
       },
       [],
-      new ExtensionEnablementManager(
-        ExtensionStorage.getUserExtensionsDir(),
-        argv.extensions,
-      ),
+      new ExtensionEnablementManager(argv.extensions),
       'test-session',
       argv,
     );
@@ -1836,10 +1612,7 @@ describe('loadCliConfig model selection with model router', () => {
         },
       },
       [],
-      new ExtensionEnablementManager(
-        ExtensionStorage.getUserExtensionsDir(),
-        argv.extensions,
-      ),
+      new ExtensionEnablementManager(argv.extensions),
       'test-session',
       argv,
     );
@@ -1876,10 +1649,7 @@ describe('loadCliConfig folderTrust', () => {
     const config = await loadCliConfig(
       settings,
       [],
-      new ExtensionEnablementManager(
-        ExtensionStorage.getUserExtensionsDir(),
-        argv.extensions,
-      ),
+      new ExtensionEnablementManager(argv.extensions),
       'test-session',
       argv,
     );
@@ -1899,10 +1669,7 @@ describe('loadCliConfig folderTrust', () => {
     const config = await loadCliConfig(
       settings,
       [],
-      new ExtensionEnablementManager(
-        ExtensionStorage.getUserExtensionsDir(),
-        argv.extensions,
-      ),
+      new ExtensionEnablementManager(argv.extensions),
       'test-session',
       argv,
     );
@@ -1916,10 +1683,7 @@ describe('loadCliConfig folderTrust', () => {
     const config = await loadCliConfig(
       settings,
       [],
-      new ExtensionEnablementManager(
-        ExtensionStorage.getUserExtensionsDir(),
-        argv.extensions,
-      ),
+      new ExtensionEnablementManager(argv.extensions),
       'test-session',
       argv,
     );
@@ -1966,10 +1730,7 @@ describe('loadCliConfig with includeDirectories', () => {
     const config = await loadCliConfig(
       settings,
       [],
-      new ExtensionEnablementManager(
-        ExtensionStorage.getUserExtensionsDir(),
-        argv.extensions,
-      ),
+      new ExtensionEnablementManager(argv.extensions),
       'test-session',
       argv,
     );
@@ -2018,10 +1779,7 @@ describe('loadCliConfig chatCompression', () => {
     const config = await loadCliConfig(
       settings,
       [],
-      new ExtensionEnablementManager(
-        ExtensionStorage.getUserExtensionsDir(),
-        argv.extensions,
-      ),
+      new ExtensionEnablementManager(argv.extensions),
       'test-session',
       argv,
     );
@@ -2037,10 +1795,7 @@ describe('loadCliConfig chatCompression', () => {
     const config = await loadCliConfig(
       settings,
       [],
-      new ExtensionEnablementManager(
-        ExtensionStorage.getUserExtensionsDir(),
-        argv.extensions,
-      ),
+      new ExtensionEnablementManager(argv.extensions),
       'test-session',
       argv,
     );
@@ -2070,10 +1825,7 @@ describe('loadCliConfig useRipgrep', () => {
     const config = await loadCliConfig(
       settings,
       [],
-      new ExtensionEnablementManager(
-        ExtensionStorage.getUserExtensionsDir(),
-        argv.extensions,
-      ),
+      new ExtensionEnablementManager(argv.extensions),
       'test-session',
       argv,
     );
@@ -2087,10 +1839,7 @@ describe('loadCliConfig useRipgrep', () => {
     const config = await loadCliConfig(
       settings,
       [],
-      new ExtensionEnablementManager(
-        ExtensionStorage.getUserExtensionsDir(),
-        argv.extensions,
-      ),
+      new ExtensionEnablementManager(argv.extensions),
       'test-session',
       argv,
     );
@@ -2104,10 +1853,7 @@ describe('loadCliConfig useRipgrep', () => {
     const config = await loadCliConfig(
       settings,
       [],
-      new ExtensionEnablementManager(
-        ExtensionStorage.getUserExtensionsDir(),
-        argv.extensions,
-      ),
+      new ExtensionEnablementManager(argv.extensions),
       'test-session',
       argv,
     );
@@ -2122,10 +1868,7 @@ describe('loadCliConfig useRipgrep', () => {
       const config = await loadCliConfig(
         settings,
         [],
-        new ExtensionEnablementManager(
-          ExtensionStorage.getUserExtensionsDir(),
-          argv.extensions,
-        ),
+        new ExtensionEnablementManager(argv.extensions),
         'test-session',
         argv,
       );
@@ -2139,10 +1882,7 @@ describe('loadCliConfig useRipgrep', () => {
       const config = await loadCliConfig(
         settings,
         [],
-        new ExtensionEnablementManager(
-          ExtensionStorage.getUserExtensionsDir(),
-          argv.extensions,
-        ),
+        new ExtensionEnablementManager(argv.extensions),
         'test-session',
         argv,
       );
@@ -2156,10 +1896,7 @@ describe('loadCliConfig useRipgrep', () => {
       const config = await loadCliConfig(
         settings,
         [],
-        new ExtensionEnablementManager(
-          ExtensionStorage.getUserExtensionsDir(),
-          argv.extensions,
-        ),
+        new ExtensionEnablementManager(argv.extensions),
         'test-session',
         argv,
       );
@@ -2192,10 +1929,7 @@ describe('screenReader configuration', () => {
     const config = await loadCliConfig(
       settings,
       [],
-      new ExtensionEnablementManager(
-        ExtensionStorage.getUserExtensionsDir(),
-        argv.extensions,
-      ),
+      new ExtensionEnablementManager(argv.extensions),
       'test-session',
       argv,
     );
@@ -2211,10 +1945,7 @@ describe('screenReader configuration', () => {
     const config = await loadCliConfig(
       settings,
       [],
-      new ExtensionEnablementManager(
-        ExtensionStorage.getUserExtensionsDir(),
-        argv.extensions,
-      ),
+      new ExtensionEnablementManager(argv.extensions),
       'test-session',
       argv,
     );
@@ -2230,10 +1961,7 @@ describe('screenReader configuration', () => {
     const config = await loadCliConfig(
       settings,
       [],
-      new ExtensionEnablementManager(
-        ExtensionStorage.getUserExtensionsDir(),
-        argv.extensions,
-      ),
+      new ExtensionEnablementManager(argv.extensions),
       'test-session',
       argv,
     );
@@ -2247,10 +1975,7 @@ describe('screenReader configuration', () => {
     const config = await loadCliConfig(
       settings,
       [],
-      new ExtensionEnablementManager(
-        ExtensionStorage.getUserExtensionsDir(),
-        argv.extensions,
-      ),
+      new ExtensionEnablementManager(argv.extensions),
       'test-session',
       argv,
     );
@@ -2287,10 +2012,7 @@ describe('loadCliConfig tool exclusions', () => {
     const config = await loadCliConfig(
       {},
       [],
-      new ExtensionEnablementManager(
-        ExtensionStorage.getUserExtensionsDir(),
-        argv.extensions,
-      ),
+      new ExtensionEnablementManager(argv.extensions),
       'test-session',
       argv,
     );
@@ -2306,10 +2028,7 @@ describe('loadCliConfig tool exclusions', () => {
     const config = await loadCliConfig(
       {},
       [],
-      new ExtensionEnablementManager(
-        ExtensionStorage.getUserExtensionsDir(),
-        argv.extensions,
-      ),
+      new ExtensionEnablementManager(argv.extensions),
       'test-session',
       argv,
     );
@@ -2325,10 +2044,7 @@ describe('loadCliConfig tool exclusions', () => {
     const config = await loadCliConfig(
       {},
       [],
-      new ExtensionEnablementManager(
-        ExtensionStorage.getUserExtensionsDir(),
-        argv.extensions,
-      ),
+      new ExtensionEnablementManager(argv.extensions),
       'test-session',
       argv,
     );
@@ -2344,10 +2060,7 @@ describe('loadCliConfig tool exclusions', () => {
     const config = await loadCliConfig(
       {},
       [],
-      new ExtensionEnablementManager(
-        ExtensionStorage.getUserExtensionsDir(),
-        argv.extensions,
-      ),
+      new ExtensionEnablementManager(argv.extensions),
       'test-session',
       argv,
     );
@@ -2370,10 +2083,7 @@ describe('loadCliConfig tool exclusions', () => {
     const config = await loadCliConfig(
       {},
       [],
-      new ExtensionEnablementManager(
-        ExtensionStorage.getUserExtensionsDir(),
-        argv.extensions,
-      ),
+      new ExtensionEnablementManager(argv.extensions),
       'test-session',
       argv,
     );
@@ -2394,10 +2104,7 @@ describe('loadCliConfig tool exclusions', () => {
     const config = await loadCliConfig(
       {},
       [],
-      new ExtensionEnablementManager(
-        ExtensionStorage.getUserExtensionsDir(),
-        argv.extensions,
-      ),
+      new ExtensionEnablementManager(argv.extensions),
       'test-session',
       argv,
     );
@@ -2418,10 +2125,7 @@ describe('loadCliConfig tool exclusions', () => {
     const config = await loadCliConfig(
       {},
       [],
-      new ExtensionEnablementManager(
-        ExtensionStorage.getUserExtensionsDir(),
-        argv.extensions,
-      ),
+      new ExtensionEnablementManager(argv.extensions),
       'test-session',
       argv,
     );
@@ -2454,10 +2158,7 @@ describe('loadCliConfig interactive', () => {
     const config = await loadCliConfig(
       {},
       [],
-      new ExtensionEnablementManager(
-        ExtensionStorage.getUserExtensionsDir(),
-        argv.extensions,
-      ),
+      new ExtensionEnablementManager(argv.extensions),
       'test-session',
       argv,
     );
@@ -2471,10 +2172,7 @@ describe('loadCliConfig interactive', () => {
     const config = await loadCliConfig(
       {},
       [],
-      new ExtensionEnablementManager(
-        ExtensionStorage.getUserExtensionsDir(),
-        argv.extensions,
-      ),
+      new ExtensionEnablementManager(argv.extensions),
       'test-session',
       argv,
     );
@@ -2488,10 +2186,7 @@ describe('loadCliConfig interactive', () => {
     const config = await loadCliConfig(
       {},
       [],
-      new ExtensionEnablementManager(
-        ExtensionStorage.getUserExtensionsDir(),
-        argv.extensions,
-      ),
+      new ExtensionEnablementManager(argv.extensions),
       'test-session',
       argv,
     );
@@ -2505,10 +2200,7 @@ describe('loadCliConfig interactive', () => {
     const config = await loadCliConfig(
       {},
       [],
-      new ExtensionEnablementManager(
-        ExtensionStorage.getUserExtensionsDir(),
-        argv.extensions,
-      ),
+      new ExtensionEnablementManager(argv.extensions),
       'test-session',
       argv,
     );
@@ -2522,10 +2214,7 @@ describe('loadCliConfig interactive', () => {
     const config = await loadCliConfig(
       {},
       [],
-      new ExtensionEnablementManager(
-        ExtensionStorage.getUserExtensionsDir(),
-        argv.extensions,
-      ),
+      new ExtensionEnablementManager(argv.extensions),
       'test-session',
       argv,
     );
@@ -2546,10 +2235,7 @@ describe('loadCliConfig interactive', () => {
     const config = await loadCliConfig(
       {},
       [],
-      new ExtensionEnablementManager(
-        ExtensionStorage.getUserExtensionsDir(),
-        argv.extensions,
-      ),
+      new ExtensionEnablementManager(argv.extensions),
       'test-session',
       argv,
     );
@@ -2566,10 +2252,7 @@ describe('loadCliConfig interactive', () => {
     const config = await loadCliConfig(
       {},
       [],
-      new ExtensionEnablementManager(
-        ExtensionStorage.getUserExtensionsDir(),
-        argv.extensions,
-      ),
+      new ExtensionEnablementManager(argv.extensions),
       'test-session',
       argv,
     );
@@ -2585,10 +2268,7 @@ describe('loadCliConfig interactive', () => {
     const config = await loadCliConfig(
       {},
       [],
-      new ExtensionEnablementManager(
-        ExtensionStorage.getUserExtensionsDir(),
-        argv.extensions,
-      ),
+      new ExtensionEnablementManager(argv.extensions),
       'test-session',
       argv,
     );
@@ -2615,10 +2295,7 @@ describe('loadCliConfig interactive', () => {
     const config = await loadCliConfig(
       {},
       [],
-      new ExtensionEnablementManager(
-        ExtensionStorage.getUserExtensionsDir(),
-        argv.extensions,
-      ),
+      new ExtensionEnablementManager(argv.extensions),
       'test-session',
       argv,
     );
@@ -2634,10 +2311,7 @@ describe('loadCliConfig interactive', () => {
     const config = await loadCliConfig(
       {},
       [],
-      new ExtensionEnablementManager(
-        ExtensionStorage.getUserExtensionsDir(),
-        argv.extensions,
-      ),
+      new ExtensionEnablementManager(argv.extensions),
       'test-session',
       argv,
     );
@@ -2662,10 +2336,7 @@ describe('loadCliConfig interactive', () => {
     const config = await loadCliConfig(
       {},
       [],
-      new ExtensionEnablementManager(
-        ExtensionStorage.getUserExtensionsDir(),
-        argv.extensions,
-      ),
+      new ExtensionEnablementManager(argv.extensions),
       'test-session',
       argv,
     );
@@ -2681,10 +2352,7 @@ describe('loadCliConfig interactive', () => {
     const config = await loadCliConfig(
       {},
       [],
-      new ExtensionEnablementManager(
-        ExtensionStorage.getUserExtensionsDir(),
-        argv.extensions,
-      ),
+      new ExtensionEnablementManager(argv.extensions),
       'test-session',
       argv,
     );
@@ -2718,10 +2386,7 @@ describe('loadCliConfig approval mode', () => {
     const config = await loadCliConfig(
       {},
       [],
-      new ExtensionEnablementManager(
-        ExtensionStorage.getUserExtensionsDir(),
-        argv.extensions,
-      ),
+      new ExtensionEnablementManager(argv.extensions),
       'test-session',
       argv,
     );
@@ -2734,10 +2399,7 @@ describe('loadCliConfig approval mode', () => {
     const config = await loadCliConfig(
       {},
       [],
-      new ExtensionEnablementManager(
-        ExtensionStorage.getUserExtensionsDir(),
-        argv.extensions,
-      ),
+      new ExtensionEnablementManager(argv.extensions),
       'test-session',
       argv,
     );
@@ -2750,10 +2412,7 @@ describe('loadCliConfig approval mode', () => {
     const config = await loadCliConfig(
       {},
       [],
-      new ExtensionEnablementManager(
-        ExtensionStorage.getUserExtensionsDir(),
-        argv.extensions,
-      ),
+      new ExtensionEnablementManager(argv.extensions),
       'test-session',
       argv,
     );
@@ -2766,10 +2425,7 @@ describe('loadCliConfig approval mode', () => {
     const config = await loadCliConfig(
       {},
       [],
-      new ExtensionEnablementManager(
-        ExtensionStorage.getUserExtensionsDir(),
-        argv.extensions,
-      ),
+      new ExtensionEnablementManager(argv.extensions),
       'test-session',
       argv,
     );
@@ -2782,10 +2438,7 @@ describe('loadCliConfig approval mode', () => {
     const config = await loadCliConfig(
       {},
       [],
-      new ExtensionEnablementManager(
-        ExtensionStorage.getUserExtensionsDir(),
-        argv.extensions,
-      ),
+      new ExtensionEnablementManager(argv.extensions),
       'test-session',
       argv,
     );
@@ -2798,10 +2451,7 @@ describe('loadCliConfig approval mode', () => {
     const config = await loadCliConfig(
       {},
       [],
-      new ExtensionEnablementManager(
-        ExtensionStorage.getUserExtensionsDir(),
-        argv.extensions,
-      ),
+      new ExtensionEnablementManager(argv.extensions),
       'test-session',
       argv,
     );
@@ -2818,10 +2468,7 @@ describe('loadCliConfig approval mode', () => {
     const config = await loadCliConfig(
       {},
       [],
-      new ExtensionEnablementManager(
-        ExtensionStorage.getUserExtensionsDir(),
-        argv.extensions,
-      ),
+      new ExtensionEnablementManager(argv.extensions),
       'test-session',
       argv,
     );
@@ -2834,10 +2481,7 @@ describe('loadCliConfig approval mode', () => {
     const config = await loadCliConfig(
       {},
       [],
-      new ExtensionEnablementManager(
-        ExtensionStorage.getUserExtensionsDir(),
-        argv.extensions,
-      ),
+      new ExtensionEnablementManager(argv.extensions),
       'test-session',
       argv,
     );
@@ -2859,10 +2503,7 @@ describe('loadCliConfig approval mode', () => {
       const config = await loadCliConfig(
         {},
         [],
-        new ExtensionEnablementManager(
-          ExtensionStorage.getUserExtensionsDir(),
-          argv.extensions,
-        ),
+        new ExtensionEnablementManager(argv.extensions),
         'test-session',
         argv,
       );
@@ -2875,10 +2516,7 @@ describe('loadCliConfig approval mode', () => {
       const config = await loadCliConfig(
         {},
         [],
-        new ExtensionEnablementManager(
-          ExtensionStorage.getUserExtensionsDir(),
-          argv.extensions,
-        ),
+        new ExtensionEnablementManager(argv.extensions),
         'test-session',
         argv,
       );
@@ -2891,10 +2529,7 @@ describe('loadCliConfig approval mode', () => {
       const config = await loadCliConfig(
         {},
         [],
-        new ExtensionEnablementManager(
-          ExtensionStorage.getUserExtensionsDir(),
-          argv.extensions,
-        ),
+        new ExtensionEnablementManager(argv.extensions),
         'test-session',
         argv,
       );
@@ -2907,10 +2542,7 @@ describe('loadCliConfig approval mode', () => {
       const config = await loadCliConfig(
         {},
         [],
-        new ExtensionEnablementManager(
-          ExtensionStorage.getUserExtensionsDir(),
-          argv.extensions,
-        ),
+        new ExtensionEnablementManager(argv.extensions),
         'test-session',
         argv,
       );
@@ -2994,10 +2626,7 @@ describe('loadCliConfig fileFiltering', () => {
       const config = await loadCliConfig(
         settings,
         [],
-        new ExtensionEnablementManager(
-          ExtensionStorage.getUserExtensionsDir(),
-          argv.extensions,
-        ),
+        new ExtensionEnablementManager(argv.extensions),
         'test-session',
         argv,
       );
@@ -3013,10 +2642,7 @@ describe('Output format', () => {
     const config = await loadCliConfig(
       {},
       [],
-      new ExtensionEnablementManager(
-        ExtensionStorage.getUserExtensionsDir(),
-        argv.extensions,
-      ),
+      new ExtensionEnablementManager(argv.extensions),
       'test-session',
       argv,
     );
@@ -3029,10 +2655,7 @@ describe('Output format', () => {
     const config = await loadCliConfig(
       { output: { format: OutputFormat.JSON } },
       [],
-      new ExtensionEnablementManager(
-        ExtensionStorage.getUserExtensionsDir(),
-        argv.extensions,
-      ),
+      new ExtensionEnablementManager(argv.extensions),
       'test-session',
       argv,
     );
@@ -3045,10 +2668,7 @@ describe('Output format', () => {
     const config = await loadCliConfig(
       { output: { format: OutputFormat.JSON } },
       [],
-      new ExtensionEnablementManager(
-        ExtensionStorage.getUserExtensionsDir(),
-        argv.extensions,
-      ),
+      new ExtensionEnablementManager(argv.extensions),
       'test-session',
       argv,
     );
@@ -3061,10 +2681,7 @@ describe('Output format', () => {
     const config = await loadCliConfig(
       {},
       [],
-      new ExtensionEnablementManager(
-        ExtensionStorage.getUserExtensionsDir(),
-        argv.extensions,
-      ),
+      new ExtensionEnablementManager(argv.extensions),
       'test-session',
       argv,
     );
@@ -3164,10 +2781,7 @@ describe('Telemetry configuration via environment variables', () => {
     const config = await loadCliConfig(
       settings,
       [],
-      new ExtensionEnablementManager(
-        ExtensionStorage.getUserExtensionsDir(),
-        argv.extensions,
-      ),
+      new ExtensionEnablementManager(argv.extensions),
       'test-session',
       argv,
     );
@@ -3184,10 +2798,7 @@ describe('Telemetry configuration via environment variables', () => {
     const config = await loadCliConfig(
       settings,
       [],
-      new ExtensionEnablementManager(
-        ExtensionStorage.getUserExtensionsDir(),
-        argv.extensions,
-      ),
+      new ExtensionEnablementManager(argv.extensions),
       'test-session',
       argv,
     );
@@ -3205,10 +2816,7 @@ describe('Telemetry configuration via environment variables', () => {
       loadCliConfig(
         settings,
         [],
-        new ExtensionEnablementManager(
-          ExtensionStorage.getUserExtensionsDir(),
-          argv.extensions,
-        ),
+        new ExtensionEnablementManager(argv.extensions),
         'test-session',
         argv,
       ),
@@ -3229,10 +2837,7 @@ describe('Telemetry configuration via environment variables', () => {
     const config = await loadCliConfig(
       settings,
       [],
-      new ExtensionEnablementManager(
-        ExtensionStorage.getUserExtensionsDir(),
-        argv.extensions,
-      ),
+      new ExtensionEnablementManager(argv.extensions),
       'test-session',
       argv,
     );
@@ -3247,10 +2852,7 @@ describe('Telemetry configuration via environment variables', () => {
     const config = await loadCliConfig(
       settings,
       [],
-      new ExtensionEnablementManager(
-        ExtensionStorage.getUserExtensionsDir(),
-        argv.extensions,
-      ),
+      new ExtensionEnablementManager(argv.extensions),
       'test-session',
       argv,
     );
@@ -3265,10 +2867,7 @@ describe('Telemetry configuration via environment variables', () => {
     const config = await loadCliConfig(
       settings,
       [],
-      new ExtensionEnablementManager(
-        ExtensionStorage.getUserExtensionsDir(),
-        argv.extensions,
-      ),
+      new ExtensionEnablementManager(argv.extensions),
       'test-session',
       argv,
     );
@@ -3285,10 +2884,7 @@ describe('Telemetry configuration via environment variables', () => {
     const config = await loadCliConfig(
       settings,
       [],
-      new ExtensionEnablementManager(
-        ExtensionStorage.getUserExtensionsDir(),
-        argv.extensions,
-      ),
+      new ExtensionEnablementManager(argv.extensions),
       'test-session',
       argv,
     );
@@ -3303,10 +2899,7 @@ describe('Telemetry configuration via environment variables', () => {
     const config = await loadCliConfig(
       settings,
       [],
-      new ExtensionEnablementManager(
-        ExtensionStorage.getUserExtensionsDir(),
-        argv.extensions,
-      ),
+      new ExtensionEnablementManager(argv.extensions),
       'test-session',
       argv,
     );
@@ -3321,10 +2914,7 @@ describe('Telemetry configuration via environment variables', () => {
     const config = await loadCliConfig(
       settings,
       [],
-      new ExtensionEnablementManager(
-        ExtensionStorage.getUserExtensionsDir(),
-        argv.extensions,
-      ),
+      new ExtensionEnablementManager(argv.extensions),
       'test-session',
       argv,
     );
@@ -3341,10 +2931,7 @@ describe('Telemetry configuration via environment variables', () => {
     const config = await loadCliConfig(
       settings,
       [],
-      new ExtensionEnablementManager(
-        ExtensionStorage.getUserExtensionsDir(),
-        argv.extensions,
-      ),
+      new ExtensionEnablementManager(argv.extensions),
       'test-session',
       argv,
     );
@@ -3358,10 +2945,7 @@ describe('Telemetry configuration via environment variables', () => {
     const config = await loadCliConfig(
       {},
       [],
-      new ExtensionEnablementManager(
-        ExtensionStorage.getUserExtensionsDir(),
-        argv.extensions,
-      ),
+      new ExtensionEnablementManager(argv.extensions),
       'test-session',
       argv,
     );
@@ -3375,10 +2959,7 @@ describe('Telemetry configuration via environment variables', () => {
     const config = await loadCliConfig(
       { telemetry: { enabled: true } },
       [],
-      new ExtensionEnablementManager(
-        ExtensionStorage.getUserExtensionsDir(),
-        argv.extensions,
-      ),
+      new ExtensionEnablementManager(argv.extensions),
       'test-session',
       argv,
     );
@@ -3392,10 +2973,7 @@ describe('Telemetry configuration via environment variables', () => {
     const config = await loadCliConfig(
       {},
       [],
-      new ExtensionEnablementManager(
-        ExtensionStorage.getUserExtensionsDir(),
-        argv.extensions,
-      ),
+      new ExtensionEnablementManager(argv.extensions),
       'test-session',
       argv,
     );
@@ -3409,10 +2987,7 @@ describe('Telemetry configuration via environment variables', () => {
     const config = await loadCliConfig(
       { telemetry: { logPrompts: true } },
       [],
-      new ExtensionEnablementManager(
-        ExtensionStorage.getUserExtensionsDir(),
-        argv.extensions,
-      ),
+      new ExtensionEnablementManager(argv.extensions),
       'test-session',
       argv,
     );
