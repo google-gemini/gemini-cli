@@ -500,4 +500,30 @@ describe('retryWithBackoff', () => {
       expect(fallbackCallback).toHaveBeenCalledWith('oauth-personal');
     });
   });
+  it('should abort the retry loop when the signal is aborted', async () => {
+    const abortController = new AbortController();
+    const mockFn = vi.fn().mockImplementation(async () => {
+      const error: HttpError = new Error('Server error');
+      error.status = 500;
+      throw error;
+    });
+
+    const promise = retryWithBackoff(mockFn, {
+      maxAttempts: 5,
+      initialDelayMs: 100,
+      signal: abortController.signal,
+    });
+
+    // eslint-disable-next-line vitest/valid-expect
+    const assertPromise = expect(promise).rejects.toThrow(
+      expect.objectContaining({ name: 'AbortError' }),
+    );
+    await vi.advanceTimersByTimeAsync(50);
+
+    abortController.abort();
+
+    await assertPromise;
+
+    expect(mockFn).toHaveBeenCalledTimes(1);
+  });
 });

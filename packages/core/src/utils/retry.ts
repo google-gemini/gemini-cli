@@ -31,6 +31,7 @@ export interface RetryOptions {
   ) => Promise<string | boolean | null>;
   authType?: string;
   retryFetchErrors?: boolean;
+  signal?: AbortSignal;
 }
 
 const DEFAULT_RETRY_OPTIONS: RetryOptions = {
@@ -80,10 +81,31 @@ function defaultShouldRetry(
  * @param ms The number of milliseconds to delay.
  * @returns A promise that resolves after the delay.
  */
-function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
+function delay(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const abortError = new Error('Aborted');
+    abortError.name = 'AbortError';
+    if (signal?.aborted) {
+      return reject(abortError);
+    }
 
+    const onAbort = () => {
+      clearTimeout(timeoutId);
+      reject(abortError);
+    };
+
+    const onTimeout = () => {
+      signal?.removeEventListener('abort', onAbort);
+      resolve();
+    };
+
+    const timeoutId = setTimeout(onTimeout, ms);
+
+    if (signal) {
+      signal.addEventListener('abort', onAbort, { once: true });
+    }
+  });
+}
 /**
  * Retries a function with exponential backoff and jitter.
  * @param fn The asynchronous function to retry.
@@ -95,6 +117,10 @@ export async function retryWithBackoff<T>(
   fn: () => Promise<T>,
   options?: Partial<RetryOptions>,
 ): Promise<T> {
+  if (options?.signal?.aborted) {
+    throw new Error('Aborted');
+  }
+
   if (options?.maxAttempts !== undefined && options.maxAttempts <= 0) {
     throw new Error('maxAttempts must be a positive number.');
   }
@@ -112,6 +138,7 @@ export async function retryWithBackoff<T>(
     shouldRetryOnError,
     shouldRetryOnContent,
     retryFetchErrors,
+    signal,
   } = {
     ...DEFAULT_RETRY_OPTIONS,
     ...cleanOptions,
@@ -122,6 +149,9 @@ export async function retryWithBackoff<T>(
   let consecutive429Count = 0;
 
   while (attempt < maxAttempts) {
+    if (signal?.aborted) {
+      throw new Error('Aborted');
+    }
     attempt++;
     try {
       const result = await fn();
@@ -132,13 +162,17 @@ export async function retryWithBackoff<T>(
       ) {
         const jitter = currentDelay * 0.3 * (Math.random() * 2 - 1);
         const delayWithJitter = Math.max(0, currentDelay + jitter);
-        await delay(delayWithJitter);
+        await delay(delayWithJitter, signal);
         currentDelay = Math.min(maxDelayMs, currentDelay * 2);
         continue;
       }
 
       return result;
     } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') {
+        throw error;
+      }
+
       const errorStatus = getErrorStatus(error);
 
       // Check for Pro quota exceeded error first - immediate fallback for OAuth users
@@ -243,7 +277,7 @@ export async function retryWithBackoff<T>(
           `Attempt ${attempt} failed with status ${delayErrorStatus ?? 'unknown'}. Retrying after explicit delay of ${delayDurationMs}ms...`,
           error,
         );
-        await delay(delayDurationMs);
+        await delay(delayDurationMs, signal);
         // Reset currentDelay for next potential non-429 error, or if Retry-After is not present next time
         currentDelay = initialDelayMs;
       } else {
@@ -252,7 +286,7 @@ export async function retryWithBackoff<T>(
         // Add jitter: +/- 30% of currentDelay
         const jitter = currentDelay * 0.3 * (Math.random() * 2 - 1);
         const delayWithJitter = Math.max(0, currentDelay + jitter);
-        await delay(delayWithJitter);
+        await delay(delayWithJitter, signal);
         currentDelay = Math.min(maxDelayMs, currentDelay * 2);
       }
     }
