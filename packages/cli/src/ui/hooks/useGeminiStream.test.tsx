@@ -2653,10 +2653,25 @@ describe('useGeminiStream', () => {
       };
       mockConfig.getGeminiClient = vi.fn().mockReturnValue(mockClient);
 
-      mockSendMessageStream.mockReturnValue(
+      // Mock for the initial request
+      mockSendMessageStream.mockReturnValueOnce(
         (async function* () {
           yield {
             type: ServerGeminiEventType.LoopDetected,
+          };
+        })(),
+      );
+
+      // Mock for the retry request
+      mockSendMessageStream.mockReturnValueOnce(
+        (async function* () {
+          yield {
+            type: ServerGeminiEventType.Content,
+            value: 'Retry successful',
+          };
+          yield {
+            type: ServerGeminiEventType.Finished,
+            value: { reason: 'STOP' },
           };
         })(),
       );
@@ -2691,10 +2706,21 @@ describe('useGeminiStream', () => {
       expect(mockAddItem).toHaveBeenCalledWith(
         {
           type: 'info',
-          text: 'Loop detection has been disabled for this session. Please try your request again.',
+          text: 'Loop detection has been disabled for this session. Retrying request...',
         },
         expect.any(Number),
       );
+
+      // Verify that the request was retried
+      await waitFor(() => {
+        expect(mockSendMessageStream).toHaveBeenCalledTimes(2);
+        expect(mockSendMessageStream).toHaveBeenNthCalledWith(
+          2,
+          'test query',
+          expect.any(AbortSignal),
+          expect.any(String),
+        );
+      });
     });
 
     it('should keep loop detection enabled and show message when user selects "keep"', async () => {
@@ -2747,6 +2773,9 @@ describe('useGeminiStream', () => {
         },
         expect.any(Number),
       );
+
+      // Verify that the request was NOT retried
+      expect(mockSendMessageStream).toHaveBeenCalledTimes(1);
     });
 
     it('should handle multiple loop detection events properly', async () => {
@@ -2797,6 +2826,20 @@ describe('useGeminiStream', () => {
         })(),
       );
 
+      // Mock for the retry request
+      mockSendMessageStream.mockReturnValueOnce(
+        (async function* () {
+          yield {
+            type: ServerGeminiEventType.Content,
+            value: 'Retry successful',
+          };
+          yield {
+            type: ServerGeminiEventType.Finished,
+            value: { reason: 'STOP' },
+          };
+        })(),
+      );
+
       // Second loop detection
       await act(async () => {
         await result.current.submitQuery('second query');
@@ -2819,10 +2862,21 @@ describe('useGeminiStream', () => {
       expect(mockAddItem).toHaveBeenCalledWith(
         {
           type: 'info',
-          text: 'Loop detection has been disabled for this session. Please try your request again.',
+          text: 'Loop detection has been disabled for this session. Retrying request...',
         },
         expect.any(Number),
       );
+
+      // Verify that the request was retried
+      await waitFor(() => {
+        expect(mockSendMessageStream).toHaveBeenCalledTimes(3); // 1st query, 2nd query, retry of 2nd query
+        expect(mockSendMessageStream).toHaveBeenNthCalledWith(
+          3,
+          'second query',
+          expect.any(AbortSignal),
+          expect.any(String),
+        );
+      });
     });
 
     it('should process LoopDetected event after moving pending history to history', async () => {
