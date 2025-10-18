@@ -166,7 +166,7 @@ describe('gemini.tsx main function', () => {
         getMcpServers: () => ({}),
         initialize: vi.fn(),
         getIdeMode: () => false,
-        getExperimentalZedIntegration: () => false,
+        getExperimentalACPIntegration: () => false,
         getScreenReader: () => false,
         getGeminiMdFileCount: () => 0,
         getProjectRoot: () => '/',
@@ -298,7 +298,7 @@ describe('gemini.tsx main function kitty protocol', () => {
       getMcpServers: () => ({}),
       initialize: vi.fn(),
       getIdeMode: () => false,
-      getExperimentalZedIntegration: () => false,
+      getExperimentalACPIntegration: () => false,
       getScreenReader: () => false,
       getGeminiMdFileCount: () => 0,
     } as unknown as Config);
