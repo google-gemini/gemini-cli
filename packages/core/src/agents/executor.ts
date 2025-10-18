@@ -20,13 +20,15 @@ import { executeToolCall } from '../core/nonInteractiveToolExecutor.js';
 import { ToolRegistry } from '../tools/tool-registry.js';
 import type { ToolCallRequestInfo } from '../core/turn.js';
 import { getDirectoryContextString } from '../utils/environmentContext.js';
-import { GrepTool } from '../tools/grep.js';
-import { RipGrepTool } from '../tools/ripGrep.js';
 import { LSTool } from '../tools/ls.js';
 import { MemoryTool } from '../tools/memoryTool.js';
-import { ReadFileTool } from '../tools/read-file.js';
-import { ReadManyFilesTool } from '../tools/read-many-files.js';
-import { GLOB_TOOL_NAME, WEB_SEARCH_TOOL_NAME } from '../tools/tool-names.js';
+import {
+  GLOB_TOOL_NAME,
+  GREP_TOOL_NAME,
+  READ_FILE_TOOL_NAME,
+  READ_MANY_FILES_TOOL_NAME,
+  WEB_SEARCH_TOOL_NAME,
+} from '../tools/tool-names.js';
 import { promptIdContext } from '../utils/promptIdContext.js';
 import { logAgentStart, logAgentFinish } from '../telemetry/loggers.js';
 import { AgentStartEvent, AgentFinishEvent } from '../telemetry/types.js';
@@ -709,11 +711,10 @@ Important Rules:
     // confirmations for subagents.
     const allowlist = new Set([
       LSTool.Name,
-      ReadFileTool.Name,
-      GrepTool.Name,
-      RipGrepTool.Name,
+      READ_FILE_TOOL_NAME,
+      GREP_TOOL_NAME,
       GLOB_TOOL_NAME,
-      ReadManyFilesTool.Name,
+      READ_MANY_FILES_TOOL_NAME,
       MemoryTool.Name,
       WEB_SEARCH_TOOL_NAME,
     ]);

@@ -9,7 +9,7 @@ import { AgentExecutor, type ActivityCallback } from './executor.js';
 import { makeFakeConfig } from '../test-utils/config.js';
 import { ToolRegistry } from '../tools/tool-registry.js';
 import { LSTool } from '../tools/ls.js';
-import { ReadFileTool } from '../tools/read-file.js';
+import { READ_FILE_TOOL_NAME } from '../tools/tool-names.js';
 import {
   GeminiChat,
   StreamEventType,
@@ -202,7 +202,9 @@ describe('AgentExecutor', () => {
     mockConfig = makeFakeConfig();
     parentToolRegistry = new ToolRegistry(mockConfig);
     parentToolRegistry.registerTool(new LSTool(mockConfig));
-    parentToolRegistry.registerTool(new ReadFileTool(mockConfig));
+    parentToolRegistry.registerTool(
+      new MockTool({ name: READ_FILE_TOOL_NAME }),
+    );
     parentToolRegistry.registerTool(MOCK_TOOL_NOT_ALLOWED);
 
     vi.spyOn(mockConfig, 'getToolRegistry').mockResolvedValue(
@@ -242,7 +244,10 @@ describe('AgentExecutor', () => {
     });
 
     it('should create an isolated ToolRegistry for the agent', async () => {
-      const definition = createTestDefinition([LSTool.Name, ReadFileTool.Name]);
+      const definition = createTestDefinition([
+        LSTool.Name,
+        READ_FILE_TOOL_NAME,
+      ]);
       const executor = await AgentExecutor.create(
         definition,
         mockConfig,
@@ -253,7 +258,7 @@ describe('AgentExecutor', () => {
 
       expect(agentRegistry).not.toBe(parentToolRegistry);
       expect(agentRegistry.getAllToolNames()).toEqual(
-        expect.arrayContaining([LSTool.Name, ReadFileTool.Name]),
+        expect.arrayContaining([LSTool.Name, READ_FILE_TOOL_NAME]),
       );
       expect(agentRegistry.getAllToolNames()).toHaveLength(2);
       expect(agentRegistry.getTool(MOCK_TOOL_NOT_ALLOWED.name)).toBeUndefined();
@@ -801,7 +806,7 @@ describe('AgentExecutor', () => {
       const badCallId = 'bad_call_1';
       mockModelResponse([
         {
-          name: ReadFileTool.Name,
+          name: READ_FILE_TOOL_NAME,
           args: { path: 'secret.txt' },
           id: badCallId,
         },
@@ -839,7 +844,7 @@ describe('AgentExecutor', () => {
         expect.objectContaining({
           functionResponse: expect.objectContaining({
             id: badCallId,
-            name: ReadFileTool.Name,
+            name: READ_FILE_TOOL_NAME,
             response: {
               error: expect.stringContaining('Unauthorized tool call'),
             },
@@ -853,7 +858,7 @@ describe('AgentExecutor', () => {
           type: 'ERROR',
           data: expect.objectContaining({
             context: 'tool_call_unauthorized',
-            name: ReadFileTool.Name,
+            name: READ_FILE_TOOL_NAME,
           }),
         }),
       );
