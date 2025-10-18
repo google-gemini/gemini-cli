@@ -16,12 +16,7 @@ import {
   type GeminiCLIExtension,
   SHELL_TOOL_NAME,
 } from '@google/gemini-cli-core';
-import {
-  loadCliConfig,
-  loadHierarchicalGeminiMemory,
-  parseArguments,
-  type CliArgs,
-} from './config.js';
+import { loadCliConfig, parseArguments, type CliArgs } from './config.js';
 import type { Settings } from './settings.js';
 import * as ServerConfig from '@google/gemini-cli-core';
 import { isWorkspaceTrusted } from './trustedFolders.js';
@@ -681,6 +676,9 @@ describe('Hierarchical Memory Loading (config.ts) - Placeholder Suite', () => {
   // 3. Spies on console functions (for logger output) are correctly set up if needed.
   // Example of a previously failing test structure:
   it.skip('should correctly use mocked homedir for global path', async () => {
+    // This test is skipped because mockFs and fsPromises are not properly imported/mocked
+    // TODO: Fix this test by properly setting up mock-fs and fs/promises mocks
+    /*
     const MOCK_GEMINI_DIR_LOCAL = path.join(
       '/mock/home/user',
       ServerConfig.GEMINI_DIR,
@@ -699,6 +697,7 @@ describe('Hierarchical Memory Loading (config.ts) - Placeholder Suite', () => {
       MOCK_GLOBAL_PATH_LOCAL,
       'utf-8',
     );
+    */
   });
 });
 
@@ -2567,8 +2566,11 @@ describe('loadCliConfig fileFiltering', () => {
     vi.restoreAllMocks();
   });
 
+  type FileFilteringSettings = NonNullable<
+    NonNullable<Settings['context']>['fileFiltering']
+  >;
   const testCases: Array<{
-    property: keyof NonNullable<Settings['fileFiltering']>;
+    property: keyof FileFilteringSettings;
     getter: (config: ServerConfig.Config) => boolean;
     value: boolean;
   }> = [
