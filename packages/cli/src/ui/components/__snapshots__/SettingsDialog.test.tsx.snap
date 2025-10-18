@@ -24,13 +24,7 @@ exports[`SettingsDialog > Snapshot Tests > should render default state correctly
 │                                                                                                  │
 │ ▼                                                                                                │
 │                                                                                                  │
-│                                                                                                  │
-│   Apply To                                                                                       │
-│ ● User Settings                                                                                  │
-│   Workspace Settings                                                                             │
-│   System Settings                                                                                │
-│                                                                                                  │
-│ (Use Enter to select, Tab to change focus, Esc to close)                                         │
+│ (Use Enter to select, Tab to configure scope, Esc to close)                                      │
 │                                                                                                  │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;
@@ -59,13 +53,7 @@ exports[`SettingsDialog > Snapshot Tests > should render focused on scope select
 │                                                                                                  │
 │ ▼                                                                                                │
 │                                                                                                  │
-│                                                                                                  │
-│   Apply To                                                                                       │
-│ ● User Settings                                                                                  │
-│   Workspace Settings                                                                             │
-│   System Settings                                                                                │
-│                                                                                                  │
-│ (Use Enter to select, Tab to change focus, Esc to close)                                         │
+│ (Use Enter to select, Tab to configure scope, Esc to close)                                      │
 │                                                                                                  │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;
@@ -94,13 +82,7 @@ exports[`SettingsDialog > Snapshot Tests > should render with accessibility sett
 │                                                                                                  │
 │ ▼                                                                                                │
 │                                                                                                  │
-│                                                                                                  │
-│   Apply To                                                                                       │
-│ ● User Settings                                                                                  │
-│   Workspace Settings                                                                             │
-│   System Settings                                                                                │
-│                                                                                                  │
-│ (Use Enter to select, Tab to change focus, Esc to close)                                         │
+│ (Use Enter to select, Tab to configure scope, Esc to close)                                      │
 │                                                                                                  │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;
@@ -129,13 +111,7 @@ exports[`SettingsDialog > Snapshot Tests > should render with all boolean settin
 │                                                                                                  │
 │ ▼                                                                                                │
 │                                                                                                  │
-│                                                                                                  │
-│   Apply To                                                                                       │
-│ ● User Settings                                                                                  │
-│   Workspace Settings                                                                             │
-│   System Settings                                                                                │
-│                                                                                                  │
-│ (Use Enter to select, Tab to change focus, Esc to close)                                         │
+│ (Use Enter to select, Tab to configure scope, Esc to close)                                      │
 │                                                                                                  │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;
@@ -164,13 +140,7 @@ exports[`SettingsDialog > Snapshot Tests > should render with different scope se
 │                                                                                                  │
 │ ▼                                                                                                │
 │                                                                                                  │
-│                                                                                                  │
-│   Apply To                                                                                       │
-│ ● User Settings                                                                                  │
-│   Workspace Settings                                                                             │
-│   System Settings                                                                                │
-│                                                                                                  │
-│ (Use Enter to select, Tab to change focus, Esc to close)                                         │
+│ (Use Enter to select, Tab to configure scope, Esc to close)                                      │
 │                                                                                                  │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;
@@ -199,13 +169,7 @@ exports[`SettingsDialog > Snapshot Tests > should render with different scope se
 │                                                                                                  │
 │ ▼                                                                                                │
 │                                                                                                  │
-│                                                                                                  │
-│   Apply To                                                                                       │
-│ ● User Settings                                                                                  │
-│   Workspace Settings                                                                             │
-│   System Settings                                                                                │
-│                                                                                                  │
-│ (Use Enter to select, Tab to change focus, Esc to close)                                         │
+│ (Use Enter to select, Tab to configure scope, Esc to close)                                      │
 │                                                                                                  │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;
@@ -234,13 +198,7 @@ exports[`SettingsDialog > Snapshot Tests > should render with file filtering set
 │                                                                                                  │
 │ ▼                                                                                                │
 │                                                                                                  │
-│                                                                                                  │
-│   Apply To                                                                                       │
-│ ● User Settings                                                                                  │
-│   Workspace Settings                                                                             │
-│   System Settings                                                                                │
-│                                                                                                  │
-│ (Use Enter to select, Tab to change focus, Esc to close)                                         │
+│ (Use Enter to select, Tab to configure scope, Esc to close)                                      │
 │                                                                                                  │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;
@@ -269,13 +227,7 @@ exports[`SettingsDialog > Snapshot Tests > should render with mixed boolean and 
 │                                                                                                  │
 │ ▼                                                                                                │
 │                                                                                                  │
-│                                                                                                  │
-│   Apply To                                                                                       │
-│ ● User Settings                                                                                  │
-│   Workspace Settings                                                                             │
-│   System Settings                                                                                │
-│                                                                                                  │
-│ (Use Enter to select, Tab to change focus, Esc to close)                                         │
+│ (Use Enter to select, Tab to configure scope, Esc to close)                                      │
 │                                                                                                  │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;
@@ -304,13 +256,7 @@ exports[`SettingsDialog > Snapshot Tests > should render with tools and security
 │                                                                                                  │
 │ ▼                                                                                                │
 │                                                                                                  │
-│                                                                                                  │
-│   Apply To                                                                                       │
-│ ● User Settings                                                                                  │
-│   Workspace Settings                                                                             │
-│   System Settings                                                                                │
-│                                                                                                  │
-│ (Use Enter to select, Tab to change focus, Esc to close)                                         │
+│ (Use Enter to select, Tab to configure scope, Esc to close)                                      │
 │                                                                                                  │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;
@@ -339,13 +285,7 @@ exports[`SettingsDialog > Snapshot Tests > should render with various boolean se
 │                                                                                                  │
 │ ▼                                                                                                │
 │                                                                                                  │
-│                                                                                                  │
-│   Apply To                                                                                       │
-│ ● User Settings                                                                                  │
-│   Workspace Settings                                                                             │
-│   System Settings                                                                                │
-│                                                                                                  │
-│ (Use Enter to select, Tab to change focus, Esc to close)                                         │
+│ (Use Enter to select, Tab to configure scope, Esc to close)                                      │
 │                                                                                                  │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;
