@@ -133,14 +133,29 @@ class WebFetchToolInvocation extends BaseToolInvocation<
           `Request failed with status code ${response.status} ${response.statusText}`,
         );
       }
-      const html = await response.text();
-      const textContent = convert(html, {
-        wordwrap: false,
-        selectors: [
-          { selector: 'a', options: { ignoreHref: true } },
-          { selector: 'img', format: 'skip' },
-        ],
-      }).substring(0, MAX_CONTENT_LENGTH);
+
+      const rawContent = await response.text();
+      const contentType = response.headers.get('content-type') || '';
+      let textContent: string;
+
+      // Only use html-to-text if content type is HTML, or if no content type is provided (assume HTML)
+      if (
+        contentType.toLowerCase().includes('text/html') ||
+        contentType === ''
+      ) {
+        textContent = convert(rawContent, {
+          wordwrap: false,
+          selectors: [
+            { selector: 'a', options: { ignoreHref: true } },
+            { selector: 'img', format: 'skip' },
+          ],
+        });
+      } else {
+        // For other content types (text/plain, application/json, etc.), use raw text
+        textContent = rawContent;
+      }
+
+      textContent = textContent.substring(0, MAX_CONTENT_LENGTH);
 
       const geminiClient = this.config.getGeminiClient();
       const fallbackPrompt = `The user requested the following: "${this.params.prompt}".

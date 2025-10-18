@@ -275,7 +275,7 @@ def fibonacci(n):
       <Box marginTop={1}>
         <Text color={theme.text.secondary} wrap="truncate">
           (Use Enter to {mode === 'theme' ? 'select' : 'apply scope'}, Tab to{' '}
-          {mode === 'theme' ? 'configure scope' : 'select theme'})
+          {mode === 'theme' ? 'configure scope' : 'select theme'}, Esc to close)
         </Text>
       </Box>
     </Box>

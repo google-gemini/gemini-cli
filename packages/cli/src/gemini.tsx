@@ -26,7 +26,7 @@ import { getStartupWarnings } from './utils/startupWarnings.js';
 import { getUserStartupWarnings } from './utils/userStartupWarnings.js';
 import { ConsolePatcher } from './ui/utils/ConsolePatcher.js';
 import { runNonInteractive } from './nonInteractiveCli.js';
-import { ExtensionStorage, loadExtensions } from './config/extension.js';
+import { loadExtensions } from './config/extension.js';
 import {
   cleanupCheckpoints,
   registerCleanup,
@@ -145,7 +145,7 @@ export async function startInteractiveUI(
   workspaceRoot: string = process.cwd(),
   initializationResult: InitializationResult,
 ) {
-  // Disable line wrapping.
+  // When not in screen reader mode, disable line wrapping.
   // We rely on Ink to manage all line wrapping by forcing all content to be
   // narrower than the terminal width so there is no need for the terminal to
   // also attempt line wrapping.
@@ -154,12 +154,14 @@ export async function startInteractiveUI(
   // such as Ghostty. Some terminals such as Iterm2 only respect line wrapping
   // when using the alternate buffer, which Gemini CLI does not use because we
   // do not yet have support for scrolling in that mode.
-  process.stdout.write('\x1b[?7l');
+  if (!config.getScreenReader()) {
+    process.stdout.write('\x1b[?7l');
 
-  registerCleanup(() => {
-    // Re-enable line wrapping on exit.
-    process.stdout.write('\x1b[?7h');
-  });
+    registerCleanup(() => {
+      // Re-enable line wrapping on exit.
+      process.stdout.write('\x1b[?7h');
+    });
+  }
 
   const version = await getCliVersion();
   setWindowTitle(basename(workspaceRoot), settings);
@@ -204,7 +206,7 @@ export async function startInteractiveUI(
     },
   );
 
-  checkForUpdates()
+  checkForUpdates(settings)
     .then((info) => {
       handleAutoUpdate(info, settings, config.getProjectRoot());
     })
@@ -284,7 +286,7 @@ export async function main() {
       const partialConfig = await loadCliConfig(
         settings.merged,
         [],
-        new ExtensionEnablementManager(ExtensionStorage.getUserExtensionsDir()),
+        new ExtensionEnablementManager(),
         sessionId,
         argv,
       );
@@ -356,7 +358,6 @@ export async function main() {
   // may have side effects.
   {
     const extensionEnablementManager = new ExtensionEnablementManager(
-      ExtensionStorage.getUserExtensionsDir(),
       argv.extensions,
     );
     const extensions = loadExtensions(extensionEnablementManager);

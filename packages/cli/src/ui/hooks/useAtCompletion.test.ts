@@ -138,6 +138,39 @@ describe('useAtCompletion', () => {
         'file.txt',
       ]);
     });
+
+    it('should perform a case-insensitive search by lowercasing the pattern', async () => {
+      testRootDir = await createTmpDir({ 'cRaZycAsE.txt': '' });
+
+      const fileSearch = FileSearchFactory.create({
+        projectRoot: testRootDir,
+        ignoreDirs: [],
+        useGitignore: false,
+        useGeminiignore: false,
+        cache: false,
+        enableRecursiveFileSearch: true,
+        disableFuzzySearch: false,
+      });
+      await fileSearch.initialize();
+
+      vi.spyOn(FileSearchFactory, 'create').mockReturnValue(fileSearch);
+
+      const { result } = renderHook(() =>
+        useTestHarnessForAtCompletion(
+          true,
+          'CrAzYCaSe',
+          mockConfig,
+          testRootDir,
+        ),
+      );
+
+      // The hook should find 'cRaZycAsE.txt' even though the pattern is 'CrAzYCaSe'.
+      await waitFor(() => {
+        expect(result.current.suggestions.map((s) => s.value)).toEqual([
+          'cRaZycAsE.txt',
+        ]);
+      });
+    });
   });
 
   describe('UI State and Loading Behavior', () => {

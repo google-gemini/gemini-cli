@@ -8,7 +8,7 @@
 import type { Mock } from 'vitest';
 import { vi, describe, it, expect, beforeEach, type Mocked } from 'vitest';
 import * as fs from 'node:fs';
-import { EditTool } from '../tools/edit.js';
+import { EDIT_TOOL_NAME } from '../tools/tool-names.js';
 import type { BaseLlmClient } from '../core/baseLlmClient.js';
 
 // MOCKS
@@ -168,7 +168,7 @@ describe('editCorrector', () => {
         targetDir: '/test',
         debugMode: false,
         question: undefined as string | undefined,
-        fullContext: false,
+
         coreTools: undefined as string[] | undefined,
         toolDiscoveryCommand: undefined as string | undefined,
         toolCallCommand: undefined as string | undefined,
@@ -188,7 +188,7 @@ describe('editCorrector', () => {
         getToolRegistry: vi.fn(() => mockToolRegistry),
         getDebugMode: vi.fn(() => configParams.debugMode),
         getQuestion: vi.fn(() => configParams.question),
-        getFullContext: vi.fn(() => configParams.fullContext),
+
         getCoreTools: vi.fn(() => configParams.coreTools),
         getToolDiscoveryCommand: vi.fn(() => configParams.toolDiscoveryCommand),
         getToolCallCommand: vi.fn(() => configParams.toolCallCommand),
@@ -582,8 +582,8 @@ describe('editCorrector', () => {
             parts: [
               {
                 functionResponse: {
-                  name: EditTool.Name,
-                  id: `${EditTool.Name}-${lastEditTime}-123`,
+                  name: EDIT_TOOL_NAME,
+                  id: `${EDIT_TOOL_NAME}-${lastEditTime}-123`,
                   response: {
                     output: {
                       llmContent: `Successfully modified file: ${filePath}`,

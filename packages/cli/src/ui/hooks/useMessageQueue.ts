@@ -18,6 +18,7 @@ export interface UseMessageQueueReturn {
   addMessage: (message: string) => void;
   clearQueue: () => void;
   getQueuedMessagesText: () => string;
+  popAllMessages: (onPop: (messages: string | undefined) => void) => void;
 }
 
 /**
@@ -51,6 +52,23 @@ export function useMessageQueue({
     return messageQueue.join('\n\n');
   }, [messageQueue]);
 
+  // Pop all messages from the queue and return them as a single string
+  const popAllMessages = useCallback(
+    (onPop: (messages: string | undefined) => void) => {
+      setMessageQueue((prev) => {
+        if (prev.length === 0) {
+          onPop(undefined);
+          return prev;
+        }
+        // Join all messages with double newlines, same as when they're sent
+        const allMessages = prev.join('\n\n');
+        onPop(allMessages);
+        return []; // Clear the entire queue
+      });
+    },
+    [],
+  );
+
   // Process queued messages when streaming becomes idle
   useEffect(() => {
     if (
@@ -71,5 +89,6 @@ export function useMessageQueue({
     addMessage,
     clearQueue,
     getQueuedMessagesText,
+    popAllMessages,
   };
 }
