@@ -961,11 +961,15 @@ export class TestRig {
     return null;
   }
 
-  async runInteractive(...args: string[]): Promise<InteractiveRun> {
+  async runInteractive(
+    args: string[] = [],
+    options: { waitForReady?: boolean } = {},
+  ): Promise<InteractiveRun> {
+    const { waitForReady = true } = options;
     const { command, initialArgs } = this._getCommandAndArgs(['--yolo']);
     const commandArgs = [...initialArgs, ...args];
 
-    const options: pty.IPtyForkOptions = {
+    const ptyOptions: pty.IPtyForkOptions = {
       name: 'xterm-color',
       cols: 80,
       rows: 24,
@@ -976,11 +980,13 @@ export class TestRig {
     };
 
     const executable = command === 'node' ? process.execPath : command;
-    const ptyProcess = pty.spawn(executable, commandArgs, options);
+    const ptyProcess = pty.spawn(executable, commandArgs, ptyOptions);
 
     const run = new InteractiveRun(ptyProcess);
-    // Wait for the app to be ready
-    await run.expectText('Type your message', 30000);
+    if (waitForReady) {
+      // Wait for the app to be ready
+      await run.expectText('Type your message', 30000);
+    }
     return run;
   }
 }
