@@ -11,11 +11,10 @@ import {
   ApprovalMode,
   // Read-only tools
   GlobTool,
-  GrepTool,
   LSTool,
-  ReadFileTool,
-  ReadManyFilesTool,
-  RipGrepTool,
+  GREP_TOOL_NAME,
+  READ_MANY_FILES_TOOL_NAME,
+  READ_FILE_TOOL_NAME,
   // Write tools
   EditTool,
   MemoryTool,
@@ -30,11 +29,10 @@ import type { Settings } from './settings.js';
 // files or system state.
 const READ_ONLY_TOOLS = new Set([
   GlobTool.Name,
-  GrepTool.Name,
-  RipGrepTool.Name,
+  GREP_TOOL_NAME,
   LSTool.Name,
-  ReadFileTool.Name,
-  ReadManyFilesTool.Name,
+  READ_FILE_TOOL_NAME,
+  READ_MANY_FILES_TOOL_NAME,
   WebSearchTool.Name,
 ]);
 
