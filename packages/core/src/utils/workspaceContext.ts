@@ -27,9 +27,9 @@ export class WorkspaceContext {
    * @param additionalDirectories Optional array of additional directories to include
    */
   constructor(directory: string, additionalDirectories: string[] = []) {
-    this.addDirectory(directory);
+    this.addDirectory(directory, path.dirname(directory));
     for (const additionalDirectory of additionalDirectories) {
-      this.addDirectory(additionalDirectory);
+      this.addDirectory(additionalDirectory, path.dirname(additionalDirectory));
     }
     this.initialDirectories = new Set(this.directories);
   }
@@ -72,6 +72,24 @@ export class WorkspaceContext {
       this.directories.add(resolved);
       this.notifyDirectoriesChanged();
     } catch (err) {
+      try {
+        const absolutePath = path.isAbsolute(directory)
+          ? directory
+          : path.resolve(basePath, directory);
+
+        for (const dir of this.directories) {
+          if (this.isPathWithinRoot(absolutePath, dir)) {
+            console.warn(
+              `[WARN] Directory was created externally, adding to workspace: ${directory}`,
+            );
+            this.directories.add(absolutePath);
+            this.notifyDirectoriesChanged();
+            return;
+          }
+        }
+      } catch (fallbackError) {
+      }
+
       console.warn(
         `[WARN] Skipping unreadable directory: ${directory} (${err instanceof Error ? err.message : String(err)})`,
       );
@@ -86,15 +104,27 @@ export class WorkspaceContext {
       ? directory
       : path.resolve(basePath, directory);
 
-    if (!fs.existsSync(absolutePath)) {
-      throw new Error(`Directory does not exist: ${absolutePath}`);
-    }
-    const stats = fs.statSync(absolutePath);
-    if (!stats.isDirectory()) {
-      throw new Error(`Path is not a directory: ${absolutePath}`);
+    if (fs.existsSync(absolutePath)) {
+      const stats = fs.statSync(absolutePath);
+      if (!stats.isDirectory()) {
+        throw new Error(`Path is not a directory: ${absolutePath}`);
+      }
+      return fs.realpathSync(absolutePath);
     }
 
-    return fs.realpathSync(absolutePath);
+    for (const dir of this.directories) {
+      const fullyResolvedPath = this.fullyResolvedPath(absolutePath);
+      if (this.isPathWithinRoot(fullyResolvedPath, dir)) {
+        try {
+          fs.mkdirSync(absolutePath, { recursive: true });
+          return fs.realpathSync(absolutePath);
+        } catch (error) {
+          throw new Error(`Failed to create directory: ${absolutePath} - ${error instanceof Error ? error.message : String(error)}`);
+        }
+      }
+    }
+
+    throw new Error(`Directory does not exist and is not within workspace scope: ${absolutePath}`);
   }
 
   /**
