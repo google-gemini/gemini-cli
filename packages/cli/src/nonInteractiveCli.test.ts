@@ -69,6 +69,7 @@ describe('runNonInteractive', () => {
   let processStdoutSpy: vi.SpyInstance;
   let mockGeminiClient: {
     sendMessageStream: vi.Mock;
+    resumeChat: vi.Mock;
     getChatRecordingService: vi.Mock;
   };
 
@@ -95,6 +96,7 @@ describe('runNonInteractive', () => {
 
     mockGeminiClient = {
       sendMessageStream: vi.fn(),
+      resumeChat: vi.fn().mockResolvedValue(undefined),
       getChatRecordingService: vi.fn(() => ({
         initialize: vi.fn(),
         recordMessage: vi.fn(),
