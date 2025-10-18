@@ -11,7 +11,7 @@ import {
   extractFile,
   findReleaseAsset,
   fetchReleaseFromGithub,
-  parseGitHubRepoForReleases,
+  tryParseGithubUrl,
 } from './github.js';
 import { simpleGit, type SimpleGit } from 'simple-git';
 import { ExtensionUpdateState } from '../../ui/state/extensions.js';
@@ -348,61 +348,62 @@ describe('git extension helpers', () => {
   describe('parseGitHubRepoForReleases', () => {
     it('should parse owner and repo from a full GitHub URL', () => {
       const source = 'https://github.com/owner/repo.git';
-      const { owner, repo } = parseGitHubRepoForReleases(source)!;
+      const { owner, repo } = tryParseGithubUrl(source)!;
       expect(owner).toBe('owner');
       expect(repo).toBe('repo');
     });
 
     it('should parse owner and repo from a full GitHub URL without .git', () => {
       const source = 'https://github.com/owner/repo';
-      const { owner, repo } = parseGitHubRepoForReleases(source)!;
+      const { owner, repo } = tryParseGithubUrl(source)!;
       expect(owner).toBe('owner');
       expect(repo).toBe('repo');
     });
 
     it('should parse owner and repo from a full GitHub URL with a trailing slash', () => {
       const source = 'https://github.com/owner/repo/';
-      const { owner, repo } = parseGitHubRepoForReleases(source)!;
+      const { owner, repo } = tryParseGithubUrl(source)!;
       expect(owner).toBe('owner');
       expect(repo).toBe('repo');
     });
 
-    it('should fail on a GitHub SSH URL', () => {
+    it('should parse owner and repo from a GitHub SSH URL', () => {
       const source = 'git@github.com:owner/repo.git';
-      expect(() => parseGitHubRepoForReleases(source)).toThrow(
-        'GitHub release-based extensions are not supported for SSH. You must use an HTTPS URI with a personal access token to download releases from private repositories. You can set your personal access token in the GITHUB_TOKEN environment variable and install the extension via SSH.',
-      );
+
+      const { owner, repo } = tryParseGithubUrl(source)!;
+      expect(owner).toBe('owner');
+      expect(repo).toBe('repo');
     });
 
     it('should return null on a non-GitHub URL', () => {
       const source = 'https://example.com/owner/repo.git';
-      expect(parseGitHubRepoForReleases(source)).toBe(null);
+      expect(tryParseGithubUrl(source)).toBe(null);
     });
 
     it('should parse owner and repo from a shorthand string', () => {
       const source = 'owner/repo';
-      const { owner, repo } = parseGitHubRepoForReleases(source)!;
+      const { owner, repo } = tryParseGithubUrl(source)!;
       expect(owner).toBe('owner');
       expect(repo).toBe('repo');
     });
 
     it('should handle .git suffix in repo name', () => {
       const source = 'owner/repo.git';
-      const { owner, repo } = parseGitHubRepoForReleases(source)!;
+      const { owner, repo } = tryParseGithubUrl(source)!;
       expect(owner).toBe('owner');
       expect(repo).toBe('repo');
     });
 
     it('should throw error for invalid source format', () => {
       const source = 'invalid-format';
-      expect(() => parseGitHubRepoForReleases(source)).toThrow(
+      expect(() => tryParseGithubUrl(source)).toThrow(
         'Invalid GitHub repository source: invalid-format. Expected "owner/repo" or a github repo uri.',
       );
     });
 
     it('should throw error for source with too many parts', () => {
       const source = 'https://github.com/owner/repo/extra';
-      expect(() => parseGitHubRepoForReleases(source)).toThrow(
+      expect(() => tryParseGithubUrl(source)).toThrow(
         'Invalid GitHub repository source: https://github.com/owner/repo/extra. Expected "owner/repo" or a github repo uri.',
       );
     });

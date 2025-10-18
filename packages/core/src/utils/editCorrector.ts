@@ -8,8 +8,7 @@ import type { Content, GenerateContentConfig } from '@google/genai';
 import type { GeminiClient } from '../core/client.js';
 import type { BaseLlmClient } from '../core/baseLlmClient.js';
 import type { EditToolParams } from '../tools/edit.js';
-import { EditTool } from '../tools/edit.js';
-import { WRITE_FILE_TOOL_NAME } from '../tools/tool-names.js';
+import { EDIT_TOOL_NAME, WRITE_FILE_TOOL_NAME } from '../tools/tool-names.js';
 import { ReadFileTool } from '../tools/read-file.js';
 import { ReadManyFilesTool } from '../tools/read-many-files.js';
 import { GrepTool } from '../tools/grep.js';
@@ -101,7 +100,7 @@ async function findLastEditTimestamp(
   // Tools that may reference the file path in their FunctionResponse `output`.
   const toolsInResp = new Set([
     WRITE_FILE_TOOL_NAME,
-    EditTool.Name,
+    EDIT_TOOL_NAME,
     ReadManyFilesTool.Name,
     GrepTool.Name,
   ]);

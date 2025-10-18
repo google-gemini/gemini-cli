@@ -11,6 +11,7 @@ import { KeypressProvider } from '../ui/contexts/KeypressContext.js';
 import { SettingsContext } from '../ui/contexts/SettingsContext.js';
 import { ShellFocusContext } from '../ui/contexts/ShellFocusContext.js';
 import { UIStateContext, type UIState } from '../ui/contexts/UIStateContext.js';
+import { StreamingState } from '../ui/types.js';
 import { ConfigContext } from '../ui/contexts/ConfigContext.js';
 import { calculateMainAreaWidth } from '../ui/utils/ui-sizing.js';
 import { VimModeProvider } from '../ui/contexts/VimModeContext.js';
@@ -59,6 +60,8 @@ export const createMockSettings = (
 // A minimal mock UIState to satisfy the context provider.
 // Tests that need specific UIState values should provide their own.
 const baseMockUiState = {
+  renderMarkdown: true,
+  streamingState: StreamingState.Idle,
   mainAreaWidth: 100,
   terminalWidth: 120,
 };
@@ -70,12 +73,14 @@ export const renderWithProviders = (
     settings = mockSettings,
     uiState: providedUiState,
     width,
+    kittyProtocolEnabled = true,
     config = configProxy as unknown as Config,
   }: {
     shellFocus?: boolean;
     settings?: LoadedSettings;
     uiState?: Partial<UIState>;
     width?: number;
+    kittyProtocolEnabled?: boolean;
     config?: Config;
   } = {},
 ): ReturnType<typeof render> => {
@@ -112,7 +117,7 @@ export const renderWithProviders = (
         <UIStateContext.Provider value={finalUiState}>
           <VimModeProvider settings={settings}>
             <ShellFocusContext.Provider value={shellFocus}>
-              <KeypressProvider kittyProtocolEnabled={true}>
+              <KeypressProvider kittyProtocolEnabled={kittyProtocolEnabled}>
                 {component}
               </KeypressProvider>
             </ShellFocusContext.Provider>

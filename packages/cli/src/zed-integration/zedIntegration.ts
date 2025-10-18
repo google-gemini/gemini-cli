@@ -42,7 +42,6 @@ import * as path from 'node:path';
 import { z } from 'zod';
 
 import { randomUUID } from 'node:crypto';
-import { ExtensionStorage } from '../config/extension.js';
 import type { CliArgs } from '../config/config.js';
 import { loadCliConfig } from '../config/config.js';
 import { ExtensionEnablementManager } from '../config/extensions/extensionEnablement.js';
@@ -207,10 +206,7 @@ class GeminiAgent {
     const config = await loadCliConfig(
       settings,
       this.extensions,
-      new ExtensionEnablementManager(
-        ExtensionStorage.getUserExtensionsDir(),
-        this.argv.extensions,
-      ),
+      new ExtensionEnablementManager(this.argv.extensions),
       sessionId,
       this.argv,
       cwd,

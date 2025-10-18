@@ -73,7 +73,7 @@ describe('AuthDialog', () => {
     settings: LoadedSettings;
     setAuthState: (state: AuthState) => void;
     authError: string | null;
-    onAuthError: (error: string) => void;
+    onAuthError: (error: string | null) => void;
   };
   const originalEnv = { ...process.env };
 

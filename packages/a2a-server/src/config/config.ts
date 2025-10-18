@@ -44,7 +44,7 @@ export async function loadConfig(
     targetDir: workspaceDir, // Or a specific directory the agent operates on
     debugMode: process.env['DEBUG'] === 'true' || false,
     question: '', // Not used in server mode directly like CLI
-    fullContext: false, // Server might have different context needs
+
     coreTools: settings.coreTools || undefined,
     excludeTools: settings.excludeTools || undefined,
     showMemoryUsage: settings.showMemoryUsage || false,

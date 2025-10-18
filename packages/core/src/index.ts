@@ -38,6 +38,7 @@ export * from './utils/schemaValidator.js';
 export * from './utils/errors.js';
 export * from './utils/getFolderStructure.js';
 export * from './utils/memoryDiscovery.js';
+export * from './utils/getPty.js';
 export * from './utils/gitIgnoreParser.js';
 export * from './utils/gitUtils.js';
 export * from './utils/editor.js';
@@ -57,6 +58,7 @@ export * from './utils/ignorePatterns.js';
 export * from './utils/partUtils.js';
 export * from './utils/promptIdContext.js';
 export * from './utils/thoughtUtils.js';
+export * from './utils/debugLogger.js';
 
 // Export services
 export * from './services/fileDiscoveryService.js';

@@ -29,12 +29,13 @@ import {
   DEFAULT_GEMINI_EMBEDDING_MODEL,
   DEFAULT_MEMORY_FILE_FILTERING_OPTIONS,
   FileDiscoveryService,
-  ShellTool,
   EditTool,
   WRITE_FILE_TOOL_NAME,
   SHELL_TOOL_NAMES,
+  SHELL_TOOL_NAME,
   resolveTelemetrySettings,
   FatalConfigError,
+  getPty,
 } from '@google/gemini-cli-core';
 import type { Settings } from './settings.js';
 
@@ -62,27 +63,17 @@ export interface CliArgs {
   query: string | undefined;
   model: string | undefined;
   sandbox: boolean | string | undefined;
-  sandboxImage: string | undefined;
   debug: boolean | undefined;
   prompt: string | undefined;
   promptInteractive: string | undefined;
-  allFiles: boolean | undefined;
-  showMemoryUsage: boolean | undefined;
+
   yolo: boolean | undefined;
   approvalMode: string | undefined;
-  telemetry: boolean | undefined;
-  checkpointing: boolean | undefined;
-  telemetryTarget: string | undefined;
-  telemetryOtlpEndpoint: string | undefined;
-  telemetryOtlpProtocol: string | undefined;
-  telemetryLogPrompts: boolean | undefined;
-  telemetryOutfile: string | undefined;
   allowedMcpServerNames: string[] | undefined;
   allowedTools: string[] | undefined;
   experimentalAcp: boolean | undefined;
   extensions: string[] | undefined;
   listExtensions: boolean | undefined;
-  proxy: string | undefined;
   includeDirectories: string[] | undefined;
   screenReader: boolean | undefined;
   useSmartEdit: boolean | undefined;
@@ -98,81 +89,13 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
     .usage(
       'Usage: gemini [options] [command]\n\nGemini CLI - Launch an interactive CLI, use -p/--prompt for non-interactive mode',
     )
-    .option('telemetry', {
-      type: 'boolean',
-      description:
-        'Enable telemetry? This flag specifically controls if telemetry is sent. Other --telemetry-* flags set specific values but do not enable telemetry on their own.',
-    })
-    .option('telemetry-target', {
-      type: 'string',
-      nargs: 1,
-      choices: ['local', 'gcp'],
-      description:
-        'Set the telemetry target (local or gcp). Overrides settings files.',
-    })
-    .option('telemetry-otlp-endpoint', {
-      type: 'string',
-      nargs: 1,
-      description:
-        'Set the OTLP endpoint for telemetry. Overrides environment variables and settings files.',
-    })
-    .option('telemetry-otlp-protocol', {
-      type: 'string',
-      nargs: 1,
-      choices: ['grpc', 'http'],
-      description:
-        'Set the OTLP protocol for telemetry (grpc or http). Overrides settings files.',
-    })
-    .option('telemetry-log-prompts', {
-      type: 'boolean',
-      description:
-        'Enable or disable logging of user prompts for telemetry. Overrides settings files.',
-    })
-    .option('telemetry-outfile', {
-      type: 'string',
-      nargs: 1,
-      description: 'Redirect all telemetry output to the specified file.',
-    })
-    .deprecateOption(
-      'telemetry',
-      'Use the "telemetry.enabled" setting in settings.json instead. This flag will be removed in a future version.',
-    )
-    .deprecateOption(
-      'telemetry-target',
-      'Use the "telemetry.target" setting in settings.json instead. This flag will be removed in a future version.',
-    )
-    .deprecateOption(
-      'telemetry-otlp-endpoint',
-      'Use the "telemetry.otlpEndpoint" setting in settings.json instead. This flag will be removed in a future version.',
-    )
-    .deprecateOption(
-      'telemetry-otlp-protocol',
-      'Use the "telemetry.otlpProtocol" setting in settings.json instead. This flag will be removed in a future version.',
-    )
-    .deprecateOption(
-      'telemetry-log-prompts',
-      'Use the "telemetry.logPrompts" setting in settings.json instead. This flag will be removed in a future version.',
-    )
-    .deprecateOption(
-      'telemetry-outfile',
-      'Use the "telemetry.outfile" setting in settings.json instead. This flag will be removed in a future version.',
-    )
+
     .option('debug', {
       alias: 'd',
       type: 'boolean',
       description: 'Run in debug mode?',
       default: false,
     })
-    .option('proxy', {
-      type: 'string',
-      nargs: 1,
-      description:
-        'Proxy for gemini client, like schema://user:password@host:port',
-    })
-    .deprecateOption(
-      'proxy',
-      'Use the "proxy" setting in settings.json instead. This flag will be removed in a future version.',
-    )
     .command('$0 [query..]', 'Launch Gemini CLI', (yargsInstance) =>
       yargsInstance
         .positional('query', {
@@ -203,22 +126,7 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
           type: 'boolean',
           description: 'Run in sandbox?',
         })
-        .option('sandbox-image', {
-          type: 'string',
-          nargs: 1,
-          description: 'Sandbox image URI.',
-        })
-        .option('all-files', {
-          alias: ['a'],
-          type: 'boolean',
-          description: 'Include ALL files in context?',
-          default: false,
-        })
-        .option('show-memory-usage', {
-          type: 'boolean',
-          description: 'Show memory usage in status bar',
-          default: false,
-        })
+
         .option('yolo', {
           alias: 'y',
           type: 'boolean',
@@ -232,12 +140,6 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
           choices: ['default', 'auto_edit', 'yolo'],
           description:
             'Set the approval mode: default (prompt for approval), auto_edit (auto-approve edit tools), yolo (auto-approve all tools)',
-        })
-        .option('checkpointing', {
-          alias: 'c',
-          type: 'boolean',
-          description: 'Enables checkpointing of file edits',
-          default: false,
         })
         .option('experimental-acp', {
           type: 'boolean',
@@ -302,22 +204,6 @@ export async function parseArguments(settings: Settings): Promise<CliArgs> {
           description: 'The format of the CLI output.',
           choices: ['text', 'json', 'stream-json'],
         })
-        .deprecateOption(
-          'show-memory-usage',
-          'Use the "ui.showMemoryUsage" setting in settings.json instead. This flag will be removed in a future version.',
-        )
-        .deprecateOption(
-          'sandbox-image',
-          'Use the "tools.sandbox" setting in settings.json instead. This flag will be removed in a future version.',
-        )
-        .deprecateOption(
-          'checkpointing',
-          'Use the "general.checkpointing.enabled" setting in settings.json instead. This flag will be removed in a future version.',
-        )
-        .deprecateOption(
-          'all-files',
-          'Use @ includes in the application instead. This flag will be removed in a future version.',
-        )
         .deprecateOption(
           'prompt',
           'Use the positional prompt instead. This flag will be removed in a future version.',
@@ -466,7 +352,7 @@ function createToolExclusionFilter(
   allowedToolsSet: Set<string>,
 ) {
   return (tool: string): boolean => {
-    if (tool === ShellTool.Name) {
+    if (tool === SHELL_TOOL_NAME) {
       // If any of the allowed tools is ShellTool (even with subcommands), don't exclude it.
       return !allowedTools.some((allowed) =>
         SHELL_TOOL_NAMES.some((shellName) => allowed.startsWith(shellName)),
@@ -593,7 +479,6 @@ export async function loadCliConfig(
   let telemetrySettings;
   try {
     telemetrySettings = await resolveTelemetrySettings({
-      argv,
       env: process.env as unknown as Record<string, string | undefined>,
       settings: settings.telemetry,
     });
@@ -620,11 +505,11 @@ export async function loadCliConfig(
   const extraExcludes: string[] = [];
   if (!interactive && !argv.experimentalAcp) {
     const defaultExcludes = [
-      ShellTool.Name,
+      SHELL_TOOL_NAME,
       EditTool.Name,
       WRITE_FILE_TOOL_NAME,
     ];
-    const autoEditExcludes = [ShellTool.Name];
+    const autoEditExcludes = [SHELL_TOOL_NAME];
 
     const toolExclusionFilter = createToolExclusionFilter(
       allowedTools,
@@ -698,6 +583,9 @@ export async function loadCliConfig(
     argv.screenReader !== undefined
       ? argv.screenReader
       : (settings.ui?.accessibility?.screenReader ?? false);
+
+  const ptyInfo = await getPty();
+
   return new Config({
     sessionId,
     embeddingModel: DEFAULT_GEMINI_EMBEDDING_MODEL,
@@ -708,7 +596,7 @@ export async function loadCliConfig(
       settings.context?.loadMemoryFromIncludeDirectories || false,
     debugMode,
     question,
-    fullContext: argv.allFiles || false,
+
     coreTools: settings.tools?.core || undefined,
     allowedTools: allowedTools.length > 0 ? allowedTools : undefined,
     policyEngineConfig,
@@ -721,8 +609,7 @@ export async function loadCliConfig(
     geminiMdFileCount: fileCount,
     geminiMdFilePaths: filePaths,
     approvalMode,
-    showMemoryUsage:
-      argv.showMemoryUsage || settings.ui?.showMemoryUsage || false,
+    showMemoryUsage: settings.ui?.showMemoryUsage || false,
     accessibility: {
       ...settings.ui?.accessibility,
       screenReader,
@@ -730,10 +617,8 @@ export async function loadCliConfig(
     telemetry: telemetrySettings,
     usageStatisticsEnabled: settings.privacy?.usageStatisticsEnabled ?? true,
     fileFiltering,
-    checkpointing:
-      argv.checkpointing || settings.general?.checkpointing?.enabled,
+    checkpointing: settings.general?.checkpointing?.enabled,
     proxy:
-      argv.proxy ||
       process.env['HTTPS_PROXY'] ||
       process.env['https_proxy'] ||
       process.env['HTTP_PROXY'] ||
@@ -775,6 +660,7 @@ export async function loadCliConfig(
     codebaseInvestigatorSettings:
       settings.experimental?.codebaseInvestigatorSettings,
     retryFetchErrors: settings.general?.retryFetchErrors ?? false,
+    ptyInfo: ptyInfo?.name,
   });
 }
 
