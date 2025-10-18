@@ -408,7 +408,7 @@ describe('InputPrompt', () => {
   describe('clipboard image paste', () => {
     beforeEach(() => {
       vi.mocked(clipboardUtils.clipboardHasImage).mockResolvedValue(false);
-      vi.mocked(clipboardUtils.saveClipboardImage).mockResolvedValue({
+      vi.mocked(clipboardUtils.saveClipboardImageDetailed).mockResolvedValue({
         filePath: null,
         error: 'No image in clipboard',
       });
@@ -420,9 +420,9 @@ describe('InputPrompt', () => {
     it('should handle Ctrl+V when clipboard has an image', async () => {
       const imagePath = '/test/.gemini-clipboard/clipboard-123.png';
       vi.mocked(clipboardUtils.clipboardHasImage).mockResolvedValue(true);
-      vi.mocked(clipboardUtils.saveClipboardImage).mockResolvedValue({
+      vi.mocked(clipboardUtils.saveClipboardImageDetailed).mockResolvedValue({
         filePath: imagePath,
-        error: undefined,
+        displayName: 'screenshot-1',
       });
       vi.mocked(clipboardUtils.cleanupOldClipboardImages).mockResolvedValue();
 
@@ -446,7 +446,7 @@ describe('InputPrompt', () => {
       });
 
       // Verify clipboard operations were called correctly
-      expect(clipboardUtils.saveClipboardImage).toHaveBeenCalledWith(
+      expect(clipboardUtils.saveClipboardImageDetailed).toHaveBeenCalledWith(
         props.config.getTargetDir(),
       );
       expect(clipboardUtils.cleanupOldClipboardImages).toHaveBeenCalledWith(
@@ -476,14 +476,14 @@ describe('InputPrompt', () => {
       });
 
       // Verify no save or buffer modification occurred
-      expect(clipboardUtils.saveClipboardImage).not.toHaveBeenCalled();
+      expect(clipboardUtils.saveClipboardImageDetailed).not.toHaveBeenCalled();
       expect(mockBuffer.replaceRangeByOffset).not.toHaveBeenCalled();
       unmount();
     });
 
     it('should handle image save failure gracefully', async () => {
       vi.mocked(clipboardUtils.clipboardHasImage).mockResolvedValue(true);
-      vi.mocked(clipboardUtils.saveClipboardImage).mockResolvedValue({
+      vi.mocked(clipboardUtils.saveClipboardImageDetailed).mockResolvedValue({
         filePath: null,
         error: 'Failed to save image',
       });
@@ -499,7 +499,7 @@ describe('InputPrompt', () => {
 
       // Wait for clipboard operations
       await waitFor(() => {
-        expect(clipboardUtils.saveClipboardImage).toHaveBeenCalled();
+        expect(clipboardUtils.saveClipboardImageDetailed).toHaveBeenCalled();
       });
 
       // Verify no buffer modification occurred on failure
@@ -523,9 +523,9 @@ describe('InputPrompt', () => {
       const expectedInsertion = `[${displayName}](@${relativePath})`;
 
       vi.mocked(clipboardUtils.clipboardHasImage).mockResolvedValue(true);
-      vi.mocked(clipboardUtils.saveClipboardImage).mockResolvedValue({
+      vi.mocked(clipboardUtils.saveClipboardImageDetailed).mockResolvedValue({
         filePath: imagePath,
-        error: undefined,
+        displayName: 'screenshot',
       });
 
       // Set initial text and cursor position
@@ -544,7 +544,7 @@ describe('InputPrompt', () => {
 
       // Wait for the clipboard operations to complete
       await waitFor(() => {
-        expect(clipboardUtils.saveClipboardImage).toHaveBeenCalled();
+        expect(clipboardUtils.saveClipboardImageDetailed).toHaveBeenCalled();
       });
 
       // Verify the buffer was updated with the correct parameters
