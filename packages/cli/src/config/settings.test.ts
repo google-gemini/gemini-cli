@@ -1335,14 +1335,10 @@ describe('Settings Loading and Merging', () => {
       expect((settings.workspace.settings as TestSettings)['endpoint']).toBe(
         'workspace_endpoint_from_env/api',
       );
-      expect(
-        (
-          (settings.workspace.settings as TestSettings)['nested'] as Record<
-            string,
-            unknown
-          >
-        )['value'],
-      ).toBe('workspace_endpoint_from_env');
+      const nested = (settings.workspace.settings as TestSettings)[
+        'nested'
+      ] as Record<string, unknown>;
+      expect(nested['value']).toBe('workspace_endpoint_from_env');
       expect((settings.merged as TestSettings)['endpoint']).toBe(
         'workspace_endpoint_from_env/api',
       );
@@ -1590,46 +1586,14 @@ describe('Settings Loading and Merging', () => {
         (settings.user.settings as TestSettings)['undefinedVal'],
       ).toBeUndefined();
 
-      expect(
-        (
-          (settings.user.settings as TestSettings)['nestedObj'] as Record<
-            string,
-            unknown
-          >
-        )['nestedNull'],
-      ).toBeNull();
-      expect(
-        (
-          (settings.user.settings as TestSettings)['nestedObj'] as Record<
-            string,
-            unknown
-          >
-        )['nestedBool'],
-      ).toBe(true);
-      expect(
-        (
-          (settings.user.settings as TestSettings)['nestedObj'] as Record<
-            string,
-            unknown
-          >
-        )['nestedNum'],
-      ).toBe(0);
-      expect(
-        (
-          (settings.user.settings as TestSettings)['nestedObj'] as Record<
-            string,
-            unknown
-          >
-        )['nestedString'],
-      ).toBe('literal');
-      expect(
-        (
-          (settings.user.settings as TestSettings)['nestedObj'] as Record<
-            string,
-            unknown
-          >
-        )['anotherEnv'],
-      ).toBe('env_string_nested_value');
+      const nestedObj = (settings.user.settings as TestSettings)[
+        'nestedObj'
+      ] as Record<string, unknown>;
+      expect(nestedObj['nestedNull']).toBeNull();
+      expect(nestedObj['nestedBool']).toBe(true);
+      expect(nestedObj['nestedNum']).toBe(0);
+      expect(nestedObj['nestedString']).toBe('literal');
+      expect(nestedObj['anotherEnv']).toBe('env_string_nested_value');
 
       delete process.env['MY_ENV_STRING'];
       delete process.env['MY_ENV_STRING_NESTED'];
