@@ -154,21 +154,29 @@ describe('computeSessionStats', () => {
   });
 
   it('should correctly calculate API and tool time percentages', () => {
-    const metrics = createEmptyMetrics();
-    metrics.models['gemini-pro'] = {
-      api: { totalRequests: 1, totalErrors: 0, totalLatencyMs: 750 },
-      tokens: {
-        prompt: 10,
-        candidates: 10,
-        total: 20,
-        cached: 0,
-        thoughts: 0,
-        tool: 0,
+    const metrics: SessionMetrics = {
+      ...createEmptyMetrics(),
+      models: {
+        'gemini-pro': {
+          api: { totalRequests: 1, totalErrors: 0, totalLatencyMs: 750 },
+          tokens: {
+            prompt: 10,
+            candidates: 10,
+            total: 20,
+            cached: 0,
+            thoughts: 0,
+            tool: 0,
+          },
+        },
+      },
+      tools: {
+        ...createEmptyMetrics().tools,
+        totalCalls: 1,
+        totalSuccess: 1,
+        totalFail: 0,
+        totalDurationMs: 250,
       },
     };
-    metrics.tools.totalCalls = 1;
-    metrics.tools.totalSuccess = 1;
-    metrics.tools.totalDurationMs = 250;
 
     const result = computeSessionStats(metrics);
 
@@ -180,16 +188,20 @@ describe('computeSessionStats', () => {
   });
 
   it('should correctly calculate cache efficiency', () => {
-    const metrics = createEmptyMetrics();
-    metrics.models['gemini-pro'] = {
-      api: { totalRequests: 2, totalErrors: 0, totalLatencyMs: 1000 },
-      tokens: {
-        prompt: 150,
-        candidates: 10,
-        total: 160,
-        cached: 50,
-        thoughts: 0,
-        tool: 0,
+    const metrics: SessionMetrics = {
+      ...createEmptyMetrics(),
+      models: {
+        'gemini-pro': {
+          api: { totalRequests: 2, totalErrors: 0, totalLatencyMs: 1000 },
+          tokens: {
+            prompt: 150,
+            candidates: 10,
+            total: 160,
+            cached: 50,
+            thoughts: 0,
+            tool: 0,
+          },
+        },
       },
     };
 
@@ -199,22 +211,49 @@ describe('computeSessionStats', () => {
   });
 
   it('should correctly calculate success and agreement rates', () => {
-    const metrics = createEmptyMetrics();
-    metrics.tools.totalCalls = 10;
-    metrics.tools.totalSuccess = 8;
-    metrics.tools.totalFail = 2;
-    metrics.tools.totalDurationMs = 1000;
-    metrics.tools.totalDecisions = {
-      accept: 6,
-      reject: 2,
-      modify: 2,
-      auto_accept: 0,
+    const metrics: SessionMetrics = {
+      ...createEmptyMetrics(),
+      tools: {
+        ...createEmptyMetrics().tools,
+        totalCalls: 10,
+        totalSuccess: 8,
+        totalFail: 2,
+        totalDurationMs: 1000,
+        totalDecisions: {
+          accept: 6,
+          reject: 2,
+          modify: 2,
+          auto_accept: 0,
+        },
+      },
     };
 
     const result = computeSessionStats(metrics);
 
     expect(result.successRate).toBe(80); // 8 / 10
     expect(result.agreementRate).toBe(60); // 6 / 10
+  });
+
+  it('should include auto_accept in agreement rate calculation', () => {
+    const metrics: SessionMetrics = {
+      ...createEmptyMetrics(),
+      tools: {
+        ...createEmptyMetrics().tools,
+        totalDecisions: {
+          accept: 5,
+          reject: 2,
+          modify: 3,
+          auto_accept: 10,
+        },
+      },
+    };
+
+    const result = computeSessionStats(metrics);
+
+    // Total decisions = 5 + 2 + 3 + 10 = 20
+    // Agreement = (5 + 10) / 20 = 15 / 20 = 0.75 = 75%
+    expect(result.totalDecisions).toBe(20);
+    expect(result.agreementRate).toBe(75);
   });
 
   it('should handle division by zero gracefully', () => {
@@ -230,9 +269,13 @@ describe('computeSessionStats', () => {
   });
 
   it('should correctly include line counts', () => {
-    const metrics = createEmptyMetrics();
-    metrics.files.totalLinesAdded = 42;
-    metrics.files.totalLinesRemoved = 18;
+    const metrics: SessionMetrics = {
+      ...createEmptyMetrics(),
+      files: {
+        totalLinesAdded: 42,
+        totalLinesRemoved: 18,
+      },
+    };
 
     const result = computeSessionStats(metrics);
 
