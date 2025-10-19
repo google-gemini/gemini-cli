@@ -7,7 +7,7 @@
 import { describe, it, expect, vi, type Mock } from 'vitest';
 import { render } from 'ink-testing-library';
 import { Text, useIsScreenReaderEnabled } from 'ink';
-import { type Config } from '@google/gemini-cli-core';
+import { makeFakeConfig } from '@google/gemini-cli-core';
 import { App } from './App.js';
 import { UIStateContext, type UIState } from './contexts/UIStateContext.js';
 import { StreamingState } from './types.js';
@@ -61,7 +61,7 @@ describe('App', () => {
     },
   };
 
-  const mockConfig = {} as unknown as Config;
+  const mockConfig = makeFakeConfig();
 
   const renderWithProviders = (ui: React.ReactElement, state: UIState) =>
     render(
