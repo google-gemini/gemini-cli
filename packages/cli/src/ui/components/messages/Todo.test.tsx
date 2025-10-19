@@ -7,7 +7,7 @@
 import { render } from 'ink-testing-library';
 import { describe, it, expect } from 'vitest';
 import { Box } from 'ink';
-import { AnchoredTodoListDisplay, TodoListDisplay } from './Todo.js';
+import { TodoTray, TodoListDisplay } from './Todo.js';
 import type { TodoList, TodoStatus } from '@google/gemini-cli-core';
 import type { UIState } from '../../contexts/UIStateContext.js';
 import { UIStateContext } from '../../contexts/UIStateContext.js';
@@ -66,7 +66,7 @@ describe('<TodoListDisplay />', () => {
   });
 });
 
-describe('<AnchoredTodoListDisplay />', () => {
+describe('<TodoTray />', () => {
   const mockHistoryItem = {
     type: 'tool_group',
     id: '1',
@@ -89,7 +89,7 @@ describe('<AnchoredTodoListDisplay />', () => {
   const renderWithUiState = (uiState: Partial<UIState>) =>
     render(
       <UIStateContext.Provider value={uiState as UIState}>
-        <AnchoredTodoListDisplay />
+        <TodoTray />
       </UIStateContext.Provider>,
     );
 
