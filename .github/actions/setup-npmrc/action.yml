@@ -6,11 +6,6 @@ inputs:
     description: 'the github token'
     required: true
 
-outputs:
-  auth-token:
-    description: 'The generated NPM auth token'
-    value: '${{ steps.npm_auth_token.outputs.auth-token }}'
-
 runs:
   using: 'composite'
   steps:
