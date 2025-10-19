@@ -14,7 +14,8 @@ export type EditorType =
   | 'vim'
   | 'neovim'
   | 'zed'
-  | 'emacs';
+  | 'emacs'
+  | 'micro';
 
 function isValidEditorType(editor: string): editor is EditorType {
   return [
@@ -26,6 +27,7 @@ function isValidEditorType(editor: string): editor is EditorType {
     'neovim',
     'zed',
     'emacs',
+    'micro',
   ].includes(editor);
 }
 
@@ -62,6 +64,7 @@ const editorCommands: Record<
   neovim: { win32: ['nvim'], default: ['nvim'] },
   zed: { win32: ['zed'], default: ['zed', 'zeditor'] },
   emacs: { win32: ['emacs.exe'], default: ['emacs'] },
+  micro: { win32: ['micro.exe'], default: ['micro'] },
 };
 
 export function checkHasEditorType(editor: EditorType): boolean {
@@ -76,7 +79,7 @@ export function allowEditorTypeInSandbox(editor: EditorType): boolean {
   if (['vscode', 'vscodium', 'windsurf', 'cursor', 'zed'].includes(editor)) {
     return notUsingSandbox;
   }
-  // For terminal-based editors like vim and emacs, allow in sandbox.
+  // For terminal-based editors like vim, emacs, and micro, allow in sandbox.
   return true;
 }
 
@@ -150,6 +153,13 @@ export function getDiffCommand(
         command: 'emacs',
         args: ['--eval', `(ediff "${oldPath}" "${newPath}")`],
       };
+    case 'micro':
+      // Micro doesn't have built-in diff mode, so we open both files side by side
+      // User can manually compare or use external diff tool
+      return {
+        command,
+        args: [oldPath, newPath],
+      };
     default:
       return null;
   }
@@ -173,7 +183,9 @@ export async function openDiff(
   }
 
   try {
-    const isTerminalEditor = ['vim', 'emacs', 'neovim'].includes(editor);
+    const isTerminalEditor = ['vim', 'emacs', 'neovim', 'micro'].includes(
+      editor,
+    );
 
     if (isTerminalEditor) {
       try {
