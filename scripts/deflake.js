@@ -163,8 +163,9 @@ async function main() {
     const summary = {
       fastestRunSeconds: Math.min(...durations),
       slowestRunSeconds: Math.max(...durations),
-      averageRunSeconds: (
-        durations.reduce((a, b) => a + b, 0) / durations.length
+      averageRunSeconds: (durations.length > 0
+        ? durations.reduce((a, b) => a + b, 0) / durations.length
+        : 0
       ).toFixed(2),
       passRuns: runResults.filter((r) => r.status === 'PASS').map((r) => r.run),
       failRuns: runResults.filter((r) => r.status === 'FAIL').map((r) => r.run),
