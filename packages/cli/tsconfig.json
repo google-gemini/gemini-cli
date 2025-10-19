@@ -17,14 +17,9 @@
     "node_modules",
     "dist",
     // TODO(5691): Fix type errors and remove excludes.
-    "src/nonInteractiveCli.test.ts",
-    "src/services/FileCommandLoader.test.ts",
-    "src/services/prompt-processors/argumentProcessor.test.ts",
     "src/utils/cleanup.test.ts",
     "src/utils/handleAutoUpdate.test.ts",
     "src/utils/startupWarnings.test.ts",
-    "src/ui/App.test.tsx",
-    "src/ui/contexts/SessionContext.test.tsx",
     "src/ui/hooks/slashCommandProcessor.test.ts",
     "src/ui/hooks/useAtCompletion.test.ts",
     "src/ui/hooks/useConsoleMessages.test.ts",
@@ -35,11 +30,7 @@
     "src/ui/hooks/useKeypress.test.ts",
     "src/ui/hooks/usePhraseCycler.test.ts",
     "src/ui/hooks/vim.test.ts",
-    "src/ui/utils/computeStats.test.ts",
-    "src/ui/themes/theme.test.ts",
-    "src/validateNonInterActiveAuth.test.ts",
-    "src/services/prompt-processors/shellProcessor.test.ts",
-    "src/commands/extensions/examples/**"
+    "src/ui/utils/computeStats.test.ts"
   ],
   "references": [{ "path": "../core" }]
 }
