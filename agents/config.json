@@ -1,0 +1,700 @@
+{
+  "agents": {
+    "coordinator": {
+      "name": "coordinator",
+      "description": "Pure manager, never does direct work, only coordinates other agents",
+      "model": "gemini-2.5-pro",
+      "temperature": 0.3,
+      "role": "management"
+    },
+    "verifier": {
+      "name": "verifier",
+      "description": "Final cross-verification and quality assurance",
+      "model": "gemini-2.5-pro",
+      "temperature": 0.2,
+      "role": "management"
+    },
+    "planner-1": {
+      "name": "planner-1",
+      "description": "Strategic planning and architecture design",
+      "model": "gemini-2.5-pro",
+      "temperature": 0.4,
+      "role": "planning"
+    },
+    "planner-2": {
+      "name": "planner-2",
+      "description": "Alternative planning for complex task breakdown",
+      "model": "gemini-2.5-pro",
+      "temperature": 0.4,
+      "role": "planning"
+    },
+    "analyzer-1": {
+      "name": "analyzer-1",
+      "description": "Requirements analysis and clarification",
+      "model": "gemini-2.5-pro",
+      "temperature": 0.3,
+      "role": "analysis",
+      "mandatory": true
+    },
+    "analyzer-2": {
+      "name": "analyzer-2",
+      "description": "Deep analysis and research",
+      "model": "gemini-2.5-pro",
+      "temperature": 0.3,
+      "role": "analysis"
+    },
+    "researcher-1": {
+      "name": "researcher-1",
+      "description": "Information gathering and research",
+      "model": "gemini-2.5-pro",
+      "temperature": 0.3,
+      "role": "research"
+    },
+    "researcher-2": {
+      "name": "researcher-2",
+      "description": "Alternative research approaches",
+      "model": "gemini-2.5-pro",
+      "temperature": 0.3,
+      "role": "research"
+    },
+    "researcher-3": {
+      "name": "researcher-3",
+      "description": "Fact-checking and verification research",
+      "model": "gemini-2.5-pro",
+      "temperature": 0.3,
+      "role": "research"
+    },
+    "coder-1": {
+      "name": "coder-1",
+      "description": "Primary code generation",
+      "model": "gemini-2.5-pro",
+      "temperature": 0.3,
+      "role": "coding"
+    },
+    "coder-2": {
+      "name": "coder-2",
+      "description": "Backend and API development",
+      "model": "gemini-2.5-pro",
+      "temperature": 0.3,
+      "role": "coding"
+    },
+    "coder-3": {
+      "name": "coder-3",
+      "description": "Frontend and UI code",
+      "model": "gemini-2.5-pro",
+      "temperature": 0.3,
+      "role": "coding"
+    },
+    "coder-4": {
+      "name": "coder-4",
+      "description": "Advanced algorithmic code",
+      "model": "gemini-2.5-pro",
+      "temperature": 0.3,
+      "role": "coding"
+    },
+    "coder-5": {
+      "name": "coder-5",
+      "description": "Complex system integration",
+      "model": "gemini-2.5-pro",
+      "temperature": 0.3,
+      "role": "coding"
+    },
+    "coder-6": {
+      "name": "coder-6",
+      "description": "Data processing and analytics",
+      "model": "gemini-2.5-pro",
+      "temperature": 0.3,
+      "role": "coding"
+    },
+    "coder-7": {
+      "name": "coder-7",
+      "description": "Infrastructure as code",
+      "model": "gemini-2.5-pro",
+      "temperature": 0.3,
+      "role": "coding"
+    },
+    "coder-8": {
+      "name": "coder-8",
+      "description": "Specialized domain code",
+      "model": "gemini-2.5-pro",
+      "temperature": 0.3,
+      "role": "coding"
+    },
+    "tester-1": {
+      "name": "tester-1",
+      "description": "Unit testing",
+      "model": "gemini-2.5-pro",
+      "temperature": 0.2,
+      "role": "testing"
+    },
+    "tester-2": {
+      "name": "tester-2",
+      "description": "Integration testing",
+      "model": "gemini-2.5-pro",
+      "temperature": 0.2,
+      "role": "testing"
+    },
+    "tester-3": {
+      "name": "tester-3",
+      "description": "End-to-end testing",
+      "model": "gemini-2.5-pro",
+      "temperature": 0.2,
+      "role": "testing"
+    },
+    "qa-1": {
+      "name": "qa-1",
+      "description": "Quality assurance review",
+      "model": "gemini-2.5-pro",
+      "temperature": 0.2,
+      "role": "qa"
+    },
+    "qa-2": {
+      "name": "qa-2",
+      "description": "Acceptance testing",
+      "model": "gemini-2.5-pro",
+      "temperature": 0.2,
+      "role": "qa"
+    },
+    "qa-3": {
+      "name": "qa-3",
+      "description": "Regression testing",
+      "model": "gemini-2.5-pro",
+      "temperature": 0.2,
+      "role": "qa"
+    },
+    "debugger-1": {
+      "name": "debugger-1",
+      "description": "Bug diagnosis",
+      "model": "gemini-2.5-pro",
+      "temperature": 0.2,
+      "role": "debugging"
+    },
+    "debugger-2": {
+      "name": "debugger-2",
+      "description": "Root cause analysis",
+      "model": "gemini-2.5-pro",
+      "temperature": 0.2,
+      "role": "debugging"
+    },
+    "debugger-3": {
+      "name": "debugger-3",
+      "description": "Performance debugging",
+      "model": "gemini-2.5-pro",
+      "temperature": 0.2,
+      "role": "debugging"
+    },
+    "reviewer-1": {
+      "name": "reviewer-1",
+      "description": "Code review",
+      "model": "gemini-2.5-pro",
+      "temperature": 0.2,
+      "role": "review"
+    },
+    "reviewer-2": {
+      "name": "reviewer-2",
+      "description": "Architecture review",
+      "model": "gemini-2.5-pro",
+      "temperature": 0.2,
+      "role": "review"
+    },
+    "reviewer-3": {
+      "name": "reviewer-3",
+      "description": "Security review",
+      "model": "gemini-2.5-pro",
+      "temperature": 0.2,
+      "role": "review"
+    },
+    "refactorer-1": {
+      "name": "refactorer-1",
+      "description": "Code refactoring",
+      "model": "gemini-2.5-pro",
+      "temperature": 0.3,
+      "role": "refactoring"
+    },
+    "refactorer-2": {
+      "name": "refactorer-2",
+      "description": "Performance refactoring",
+      "model": "gemini-2.5-pro",
+      "temperature": 0.3,
+      "role": "refactoring"
+    },
+    "optimizer-1": {
+      "name": "optimizer-1",
+      "description": "Performance optimization",
+      "model": "gemini-2.5-pro",
+      "temperature": 0.3,
+      "role": "optimization"
+    },
+    "optimizer-2": {
+      "name": "optimizer-2",
+      "description": "Memory optimization",
+      "model": "gemini-2.5-pro",
+      "temperature": 0.3,
+      "role": "optimization"
+    },
+    "optimizer-3": {
+      "name": "optimizer-3",
+      "description": "Algorithm optimization",
+      "model": "gemini-2.5-pro",
+      "temperature": 0.3,
+      "role": "optimization"
+    },
+    "documenter-1": {
+      "name": "documenter-1",
+      "description": "API documentation",
+      "model": "gemini-2.5-pro",
+      "temperature": 0.4,
+      "role": "documentation"
+    },
+    "documenter-2": {
+      "name": "documenter-2",
+      "description": "User documentation",
+      "model": "gemini-2.5-pro",
+      "temperature": 0.4,
+      "role": "documentation"
+    },
+    "documenter-3": {
+      "name": "documenter-3",
+      "description": "Technical documentation",
+      "model": "gemini-2.5-pro",
+      "temperature": 0.4,
+      "role": "documentation"
+    },
+    "architect-1": {
+      "name": "architect-1",
+      "description": "System architecture design",
+      "model": "gemini-2.5-pro",
+      "temperature": 0.3,
+      "role": "architecture"
+    },
+    "architect-2": {
+      "name": "architect-2",
+      "description": "Microservices architecture",
+      "model": "gemini-2.5-pro",
+      "temperature": 0.3,
+      "role": "architecture"
+    },
+    "architect-3": {
+      "name": "architect-3",
+      "description": "Cloud architecture",
+      "model": "gemini-2.5-pro",
+      "temperature": 0.3,
+      "role": "architecture"
+    },
+    "security-1": {
+      "name": "security-1",
+      "description": "Security analysis",
+      "model": "gemini-2.5-pro",
+      "temperature": 0.2,
+      "role": "security"
+    },
+    "security-2": {
+      "name": "security-2",
+      "description": "Vulnerability assessment",
+      "model": "gemini-2.5-pro",
+      "temperature": 0.2,
+      "role": "security"
+    },
+    "security-3": {
+      "name": "security-3",
+      "description": "Security hardening",
+      "model": "gemini-2.5-pro",
+      "temperature": 0.2,
+      "role": "security"
+    },
+    "devops-1": {
+      "name": "devops-1",
+      "description": "CI/CD pipelines",
+      "model": "gemini-2.5-pro",
+      "temperature": 0.3,
+      "role": "devops"
+    },
+    "devops-2": {
+      "name": "devops-2",
+      "description": "Container orchestration",
+      "model": "gemini-2.5-pro",
+      "temperature": 0.3,
+      "role": "devops"
+    },
+    "devops-3": {
+      "name": "devops-3",
+      "description": "Infrastructure automation",
+      "model": "gemini-2.5-pro",
+      "temperature": 0.3,
+      "role": "devops"
+    },
+    "database-1": {
+      "name": "database-1",
+      "description": "Schema design",
+      "model": "gemini-2.5-pro",
+      "temperature": 0.3,
+      "role": "database"
+    },
+    "database-2": {
+      "name": "database-2",
+      "description": "Query optimization",
+      "model": "gemini-2.5-pro",
+      "temperature": 0.3,
+      "role": "database"
+    },
+    "database-3": {
+      "name": "database-3",
+      "description": "Database migrations",
+      "model": "gemini-2.5-pro",
+      "temperature": 0.3,
+      "role": "database"
+    },
+    "api-1": {
+      "name": "api-1",
+      "description": "REST API design",
+      "model": "gemini-2.5-pro",
+      "temperature": 0.3,
+      "role": "api"
+    },
+    "api-2": {
+      "name": "api-2",
+      "description": "GraphQL API design",
+      "model": "gemini-2.5-pro",
+      "temperature": 0.3,
+      "role": "api"
+    },
+    "api-3": {
+      "name": "api-3",
+      "description": "API integration",
+      "model": "gemini-2.5-pro",
+      "temperature": 0.3,
+      "role": "api"
+    },
+    "frontend-1": {
+      "name": "frontend-1",
+      "description": "React/Vue development",
+      "model": "gemini-2.5-pro",
+      "temperature": 0.3,
+      "role": "frontend"
+    },
+    "frontend-2": {
+      "name": "frontend-2",
+      "description": "State management",
+      "model": "gemini-2.5-pro",
+      "temperature": 0.3,
+      "role": "frontend"
+    },
+    "frontend-3": {
+      "name": "frontend-3",
+      "description": "Component libraries",
+      "model": "gemini-2.5-pro",
+      "temperature": 0.3,
+      "role": "frontend"
+    },
+    "ux-1": {
+      "name": "ux-1",
+      "description": "User experience design",
+      "model": "gemini-2.5-pro",
+      "temperature": 0.4,
+      "role": "ux"
+    },
+    "ux-2": {
+      "name": "ux-2",
+      "description": "Accessibility design",
+      "model": "gemini-2.5-pro",
+      "temperature": 0.4,
+      "role": "ux"
+    },
+    "ux-3": {
+      "name": "ux-3",
+      "description": "Interaction design",
+      "model": "gemini-2.5-pro",
+      "temperature": 0.4,
+      "role": "ux"
+    },
+    "performance-1": {
+      "name": "performance-1",
+      "description": "Load testing",
+      "model": "gemini-2.5-pro",
+      "temperature": 0.3,
+      "role": "performance"
+    },
+    "performance-2": {
+      "name": "performance-2",
+      "description": "Performance profiling",
+      "model": "gemini-2.5-pro",
+      "temperature": 0.3,
+      "role": "performance"
+    },
+    "performance-3": {
+      "name": "performance-3",
+      "description": "Optimization strategies",
+      "model": "gemini-2.5-pro",
+      "temperature": 0.3,
+      "role": "performance"
+    },
+    "data-engineer-1": {
+      "name": "data-engineer-1",
+      "description": "Data pipeline design",
+      "model": "gemini-2.5-pro",
+      "temperature": 0.3,
+      "role": "data"
+    },
+    "data-engineer-2": {
+      "name": "data-engineer-2",
+      "description": "ETL processes",
+      "model": "gemini-2.5-pro",
+      "temperature": 0.3,
+      "role": "data"
+    },
+    "ml-engineer-1": {
+      "name": "ml-engineer-1",
+      "description": "Machine learning models",
+      "model": "gemini-2.5-pro",
+      "temperature": 0.3,
+      "role": "ml"
+    },
+    "ai-specialist-1": {
+      "name": "ai-specialist-1",
+      "description": "AI/ML architecture",
+      "model": "gemini-2.5-pro",
+      "temperature": 0.3,
+      "role": "ai"
+    },
+    "ai-specialist-2": {
+      "name": "ai-specialist-2",
+      "description": "Model training and optimization",
+      "model": "gemini-2.5-pro",
+      "temperature": 0.3,
+      "role": "ai"
+    },
+    "validator-1": {
+      "name": "validator-1",
+      "description": "Input validation",
+      "model": "gemini-2.5-pro",
+      "temperature": 0.2,
+      "role": "validation",
+      "mandatory": true
+    },
+    "validator-2": {
+      "name": "validator-2",
+      "description": "Output validation",
+      "model": "gemini-2.5-pro",
+      "temperature": 0.2,
+      "role": "validation",
+      "mandatory": true
+    },
+    "error-handler-1": {
+      "name": "error-handler-1",
+      "description": "Error handling enforcement",
+      "model": "gemini-2.5-pro",
+      "temperature": 0.2,
+      "role": "error-handling",
+      "mandatory": true
+    },
+    "error-handler-2": {
+      "name": "error-handler-2",
+      "description": "Error recovery strategies",
+      "model": "gemini-2.5-pro",
+      "temperature": 0.2,
+      "role": "error-handling"
+    },
+    "formatter-1": {
+      "name": "formatter-1",
+      "description": "Code formatting",
+      "model": "gemini-2.5-pro",
+      "temperature": 0.2,
+      "role": "formatting",
+      "mandatory": true
+    },
+    "formatter-2": {
+      "name": "formatter-2",
+      "description": "Documentation formatting",
+      "model": "gemini-2.5-pro",
+      "temperature": 0.2,
+      "role": "formatting"
+    },
+    "linter-1": {
+      "name": "linter-1",
+      "description": "Code linting",
+      "model": "gemini-2.5-pro",
+      "temperature": 0.2,
+      "role": "linting",
+      "mandatory": true
+    },
+    "linter-2": {
+      "name": "linter-2",
+      "description": "Style enforcement",
+      "model": "gemini-2.5-pro",
+      "temperature": 0.2,
+      "role": "linting"
+    },
+    "config-1": {
+      "name": "config-1",
+      "description": "Configuration management",
+      "model": "gemini-2.5-pro",
+      "temperature": 0.3,
+      "role": "configuration"
+    },
+    "config-2": {
+      "name": "config-2",
+      "description": "Environment setup",
+      "model": "gemini-2.5-pro",
+      "temperature": 0.3,
+      "role": "configuration"
+    },
+    "dependencies-1": {
+      "name": "dependencies-1",
+      "description": "Dependency management",
+      "model": "gemini-2.5-pro",
+      "temperature": 0.3,
+      "role": "dependencies"
+    },
+    "dependencies-2": {
+      "name": "dependencies-2",
+      "description": "Package updates",
+      "model": "gemini-2.5-pro",
+      "temperature": 0.3,
+      "role": "dependencies"
+    },
+    "monitoring-1": {
+      "name": "monitoring-1",
+      "description": "Application monitoring",
+      "model": "gemini-2.5-pro",
+      "temperature": 0.3,
+      "role": "monitoring"
+    },
+    "monitoring-2": {
+      "name": "monitoring-2",
+      "description": "Log aggregation",
+      "model": "gemini-2.5-pro",
+      "temperature": 0.3,
+      "role": "monitoring"
+    },
+    "monitoring-3": {
+      "name": "monitoring-3",
+      "description": "Alerting systems",
+      "model": "gemini-2.5-pro",
+      "temperature": 0.3,
+      "role": "monitoring"
+    },
+    "compliance-1": {
+      "name": "compliance-1",
+      "description": "Regulatory compliance",
+      "model": "gemini-2.5-pro",
+      "temperature": 0.2,
+      "role": "compliance"
+    },
+    "compliance-2": {
+      "name": "compliance-2",
+      "description": "Standards compliance",
+      "model": "gemini-2.5-pro",
+      "temperature": 0.2,
+      "role": "compliance"
+    },
+    "accessibility-1": {
+      "name": "accessibility-1",
+      "description": "WCAG compliance",
+      "model": "gemini-2.5-pro",
+      "temperature": 0.2,
+      "role": "accessibility"
+    },
+    "accessibility-2": {
+      "name": "accessibility-2",
+      "description": "Screen reader optimization",
+      "model": "gemini-2.5-pro",
+      "temperature": 0.2,
+      "role": "accessibility"
+    },
+    "i18n-1": {
+      "name": "i18n-1",
+      "description": "Internationalization",
+      "model": "gemini-2.5-pro",
+      "temperature": 0.3,
+      "role": "i18n"
+    },
+    "i18n-2": {
+      "name": "i18n-2",
+      "description": "Localization",
+      "model": "gemini-2.5-pro",
+      "temperature": 0.3,
+      "role": "i18n"
+    },
+    "backup-1": {
+      "name": "backup-1",
+      "description": "Backup strategies",
+      "model": "gemini-2.5-pro",
+      "temperature": 0.2,
+      "role": "backup"
+    },
+    "backup-2": {
+      "name": "backup-2",
+      "description": "Disaster recovery",
+      "model": "gemini-2.5-pro",
+      "temperature": 0.2,
+      "role": "backup"
+    },
+    "migration-1": {
+      "name": "migration-1",
+      "description": "Data migration",
+      "model": "gemini-2.5-pro",
+      "temperature": 0.3,
+      "role": "migration"
+    },
+    "migration-2": {
+      "name": "migration-2",
+      "description": "System migration",
+      "model": "gemini-2.5-pro",
+      "temperature": 0.3,
+      "role": "migration"
+    },
+    "cache-1": {
+      "name": "cache-1",
+      "description": "Caching strategies",
+      "model": "gemini-2.5-pro",
+      "temperature": 0.3,
+      "role": "caching"
+    },
+    "cache-2": {
+      "name": "cache-2",
+      "description": "Cache invalidation",
+      "model": "gemini-2.5-pro",
+      "temperature": 0.3,
+      "role": "caching"
+    },
+    "blockchain-1": {
+      "name": "blockchain-1",
+      "description": "Smart contract development",
+      "model": "gemini-2.5-pro",
+      "temperature": 0.3,
+      "role": "blockchain"
+    },
+    "blockchain-2": {
+      "name": "blockchain-2",
+      "description": "Blockchain integration",
+      "model": "gemini-2.5-pro",
+      "temperature": 0.3,
+      "role": "blockchain"
+    },
+    "integrator": {
+      "name": "integrator",
+      "description": "Final integration and assembly",
+      "model": "gemini-2.5-pro",
+      "temperature": 0.3,
+      "role": "integration",
+      "mandatory": true
+    }
+  },
+  "system_config": {
+    "total_agents": 96,
+    "coordinator_model": "gemini-2.5-pro",
+    "completion_enforcement": true,
+    "intelligent_delegation": true,
+    "cost_per_10_agents": "$0.08",
+    "mandatory_agents": [
+      "analyzer-1",
+      "validator-1",
+      "validator-2",
+      "error-handler-1",
+      "formatter-1",
+      "linter-1",
+      "integrator",
+      "verifier"
+    ]
+  }
+}
