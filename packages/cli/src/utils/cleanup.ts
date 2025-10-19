@@ -14,6 +14,10 @@ export function registerCleanup(fn: (() => void) | (() => Promise<void>)) {
   cleanupFunctions.push(fn);
 }
 
+export function resetCleanupForTesting() {
+  cleanupFunctions.length = 0;
+}
+
 export async function runExitCleanup() {
   for (const fn of cleanupFunctions) {
     try {
