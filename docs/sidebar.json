@@ -183,6 +183,23 @@
     ]
   },
   {
+    "label": "Contributing",
+    "items": [
+      {
+        "label": "Overview",
+        "slug": "docs/contributing"
+      },
+      {
+        "label": "Contributing Code",
+        "slug": "docs/contributing/code"
+      },
+      {
+        "label": "Contributing Documentation",
+        "slug": "docs/contributing/documentation"
+      }
+    ]
+  },
+  {
     "label": "Development",
     "items": [
       {

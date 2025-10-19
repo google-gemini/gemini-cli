@@ -338,8 +338,8 @@ encourage the community to:
 - Submit code improvements.
 - Share your MCP servers and extensions.
 
-See our [Contributing Guide](./CONTRIBUTING.md) for development setup, coding
-standards, and how to submit pull requests.
+See our [Contributing Guide](./docs/contributing/) to learn how to contribute code,
+improve documentation, and more.
 
 Check our [Official Roadmap](https://github.com/orgs/google-gemini/projects/11)
 for planned features and priorities.

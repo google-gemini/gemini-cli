@@ -89,9 +89,8 @@ This documentation is organized into the following sections:
 
 - **[Architecture Overview](./architecture.md):** Understand the high-level
   design of Gemini CLI, including its components and how they interact.
-- **[Contributing & Development Guide](../CONTRIBUTING.md):** Information for
-  contributors and developers, including setup, building, testing, and coding
-  conventions.
+- **[Contributing Guide](./contributing/):** Learn how to contribute code,
+  improve documentation, and help make Gemini CLI better.
 - **[NPM](./npm.md):** Details on how the project's packages are structured.
 - **[Troubleshooting Guide](./troubleshooting.md):** Find solutions to common
   problems.

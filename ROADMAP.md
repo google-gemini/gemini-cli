@@ -15,7 +15,7 @@ that are tracked live in our GitHub Issues.
 As an
 [Apache 2.0 open source project](https://github.com/google-gemini/gemini-cli?tab=Apache-2.0-1-ov-file#readme),
 we appreciate and welcome
-[public contributions](https://github.com/google-gemini/gemini-cli/blob/main/CONTRIBUTING.md),
+[public contributions](https://github.com/google-gemini/gemini-cli/blob/main/docs/contributing/code.md),
 and will give first priority to those contributions aligned with our roadmap. If
 you want to propose a new feature or change to our roadmap, please start by
 [opening an issue for discussion](https://github.com/google-gemini/gemini-cli/issues/new/choose).
@@ -91,7 +91,7 @@ initiatives that interest you.
 Gemini CLI is an open-source project, and we welcome contributions from the
 community! Whether you're a developer, a designer, or just an enthusiastic user
 you can find our
-[Community Guidelines here](https://github.com/google-gemini/gemini-cli/blob/main/CONTRIBUTING.md)
+[Community Guidelines here](https://github.com/google-gemini/gemini-cli/blob/main/docs/contributing/code.md)
 to learn how to get started. There are many ways to get involved:
 
 - **Roadmap:** Please review and find areas in our
@@ -105,7 +105,7 @@ to learn how to get started. There are many ways to get involved:
 - **Suggest Features:** Have a great idea? We'd love to hear it! Open a
   [feature request](https://github.com/google-gemini/gemini-cli/issues/new?template=feature_request.yml).
 - **Contribute Code:** Check out our
-  [CONTRIBUTING.md](https://github.com/google-gemini/gemini-cli/blob/main/CONTRIBUTING.md)
+  [CONTRIBUTING.md](https://github.com/google-gemini/gemini-cli/blob/main/docs/contributing/code.md)
   file for guidelines on how to submit pull requests. We have a list of "good
   first issues" for new contributors.
 - **Write Documentation:** Help us improve our documentation, tutorials, and
