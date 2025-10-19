@@ -162,10 +162,11 @@ runs:
         NODE_AUTH_TOKEN: '${{ steps.core-token.outputs.auth-token }}'
       shell: 'bash'
       run: |
-        npm publish \
-          --dry-run="${{ inputs.dry-run }}" \
-          --workspace="${{ inputs.core-package-name }}" \
-          --no-tag
+        if [[ "${{ inputs.dry-run }}" == "true" ]]; then
+          npm publish --dry-run --workspace="${{ inputs.core-package-name }}" --no-tag
+        else
+          npm publish --workspace="${{ inputs.core-package-name }}" --no-tag
+        fi
         npm dist-tag rm ${{ inputs.core-package-name }} false --silent
 
     - name: '🔗 Install latest core package'
@@ -194,10 +195,11 @@ runs:
         NODE_AUTH_TOKEN: '${{ steps.cli-token.outputs.auth-token }}'
       shell: 'bash'
       run: |
-        npm publish \
-          --dry-run="${{ inputs.dry-run }}" \
-          --workspace="${{ inputs.cli-package-name }}" \
-          --no-tag
+        if [[ "${{ inputs.dry-run }}" == "true" ]]; then
+          npm publish --dry-run --workspace="${{ inputs.cli-package-name }}" --no-tag
+        else
+          npm publish --workspace="${{ inputs.cli-package-name }}" --no-tag
+        fi
         npm dist-tag rm ${{ inputs.cli-package-name }} false --silent
 
     - name: 'Get a2a-server Token'
@@ -217,10 +219,11 @@ runs:
       shell: 'bash'
       # Tag staging for initial release
       run: |
-        npm publish \
-          --dry-run="${{ inputs.dry-run }}" \
-          --workspace="${{ inputs.a2a-package-name }}" \
-          --no-tag
+        if [[ "${{ inputs.dry-run }}" == "true" ]]; then
+          npm publish --dry-run --workspace="${{ inputs.a2a-package-name }}" --no-tag
+        else
+          npm publish --workspace="${{ inputs.a2a-package-name }}" --no-tag
+        fi
         npm dist-tag rm ${{ inputs.a2a-package-name }} false --silent
 
     - name: '🔬 Verify NPM release by version'
