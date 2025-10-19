@@ -55,7 +55,7 @@ These agents run for EVERY task to ensure baseline quality:
 
 - All agents use **Gemini 2.5 Pro** for consistent, cost-effective execution
 - ~$0.08 per 10-agent task
-- 73% savings compared to Claude-based approaches
+- 73% cost savings compared to alternative approaches
 
 ## How It Works
 
@@ -104,11 +104,6 @@ All 96 agents are configured in `agents/config.json` with:
 - **Temperature**: Optimized per agent role (0.2-0.4)
 - **Mandatory flags**: Identified for QA agents
 - **Roles**: Categorized for intelligent delegation
-
----
-
-**Note**: This contribution is from a 15-year-old developer passionate about
-AI-powered development tools and multi-agent systems.
 
 ---
 
@@ -198,7 +193,7 @@ IDK/
 
 - All agents use **Gemini 2.5 Pro**
 - ~$0.08 per 10-agent task
-- 73% savings vs Claude-based approaches
+- 73% cost savings vs alternative approaches
 
 ## Usage
 
@@ -245,9 +240,6 @@ Gemini CLI repository:
   https://github.com/google-gemini/gemini-cli/compare/main...Millsondylan:Gemini555:main
 - Option 2:
   https://github.com/google-gemini/gemini-cli/compare/main...Millsondylan:gemini-cli:clean-multi-agent
-
-**Contributor**: 15-year-old developer passionate about AI-powered development
-tools and multi-agent systems
 
 ---
 
