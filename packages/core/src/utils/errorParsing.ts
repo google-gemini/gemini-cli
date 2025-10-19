@@ -16,6 +16,11 @@ import {
 } from '../config/models.js';
 import { UserTierId } from '../code_assist/types.js';
 import { AuthType } from '../core/contentGenerator.js';
+import {
+  isTokenLimitExceededError,
+  getTokenLimitErrorMessage,
+  extractTokenInfo,
+} from './tokenErrorHandling.js';
 
 // Free Tier message functions
 const getRateLimitErrorMessageGoogleFree = (
@@ -108,6 +113,30 @@ export function parseAndFormatApiError(
   currentModel?: string,
   fallbackModel?: string,
 ): string {
+  // Check for token limit errors first
+  if (isTokenLimitExceededError(error)) {
+    const errorString =
+      typeof error === 'string' ? error : JSON.stringify(error);
+    const tokenInfo = extractTokenInfo(errorString);
+
+    if (tokenInfo) {
+      const tokenLimitError = {
+        kind: 'token-limit-exceeded' as const,
+        currentTokens: tokenInfo.current,
+        maxTokens: tokenInfo.max,
+        message: errorString,
+      };
+
+      return getTokenLimitErrorMessage(
+        tokenLimitError,
+        authType,
+        userTier,
+        currentModel,
+        fallbackModel,
+      );
+    }
+  }
+
   if (isStructuredError(error)) {
     let text = `[API Error: ${error.message}]`;
     if (error.status === 429) {
