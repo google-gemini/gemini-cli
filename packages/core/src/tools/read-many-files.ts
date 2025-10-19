@@ -27,6 +27,7 @@ import { getProgrammingLanguage } from '../telemetry/telemetry-utils.js';
 import { logFileOperation } from '../telemetry/loggers.js';
 import { FileOperationEvent } from '../telemetry/types.js';
 import { ToolErrorType } from './tool-error.js';
+import { READ_MANY_FILES_TOOL_NAME } from './tool-names.js';
 
 /**
  * Parameters for the ReadManyFilesTool.
@@ -392,7 +393,7 @@ ${finalExclusionPatternsForDescription
           logFileOperation(
             this.config,
             new FileOperationEvent(
-              ReadManyFilesTool.Name,
+              READ_MANY_FILES_TOOL_NAME,
               FileOperation.READ,
               lines,
               mimetype,
@@ -474,8 +475,6 @@ export class ReadManyFilesTool extends BaseDeclarativeTool<
   ReadManyFilesParams,
   ToolResult
 > {
-  static readonly Name: string = 'read_many_files';
-
   constructor(private config: Config) {
     const parameterSchema = {
       type: 'object',
@@ -544,7 +543,7 @@ export class ReadManyFilesTool extends BaseDeclarativeTool<
     };
 
     super(
-      ReadManyFilesTool.Name,
+      READ_MANY_FILES_TOOL_NAME,
       'ReadManyFiles',
       `Reads content from multiple files specified by paths or glob patterns within a configured target directory. For text files, it concatenates their content into a single string. It is primarily designed for text-based files. However, it can also process image (e.g., .png, .jpg) and PDF (.pdf) files if their file names or extensions are explicitly included in the 'paths' argument. For these explicitly requested non-text files, their data is read and included in a format suitable for model consumption (e.g., base64 encoded).
 
