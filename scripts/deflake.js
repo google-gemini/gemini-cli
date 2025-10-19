@@ -176,7 +176,7 @@ async function main() {
       command: COMMAND,
       runs: NUM_RUNS,
       failures,
-      passRate: (((NUM_RUNS - failures) / NUM_RUNS) * 100).toFixed(2) + '%',
+      passRate: (NUM_RUNS > 0 ? (((NUM_RUNS - failures) / NUM_RUNS) * 100).toFixed(2) : '0.00') + '%',
       runDetails: runResults,
       summary,
       env: {
