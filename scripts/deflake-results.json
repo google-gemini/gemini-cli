@@ -1,0 +1,33 @@
+{
+  "timestamp": "2025-10-19T09:56:44.175Z",
+  "command": "npm run test:e2e",
+  "runs": 1,
+  "failures": 1,
+  "passRate": "0.00%",
+  "runDetails": [
+    {
+      "run": 1,
+      "status": "FAIL",
+      "exitCode": 1,
+      "startTime": "2025-10-19T09:54:28.208Z",
+      "endTime": "2025-10-19T09:56:44.017Z",
+      "durationSeconds": 135.809
+    }
+  ],
+  "summary": {
+    "fastestRunSeconds": 135.809,
+    "slowestRunSeconds": 135.809,
+    "averageRunSeconds": "135.81",
+    "passRuns": [],
+    "failRuns": [1]
+  },
+  "env": {
+    "nodeVersion": "v22.17.1",
+    "npmVersion": "10.9.2",
+    "platform": "darwin",
+    "arch": "arm64",
+    "cwd": "/Users/jay/Desktop/open-source/gemini-cli/scripts",
+    "cpuCores": 10,
+    "memoryMB": 16384
+  }
+}

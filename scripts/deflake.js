@@ -10,6 +10,9 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
+import os from 'node:os';
+import { exec } from 'node:child_process';
+import { promisify } from 'node:util';
 
 // Script to deflake tests
 // Ex. npm run deflake -- --command="npm run test:e2e -- --test-name-pattern 'extension'" --runs=3
@@ -49,6 +52,17 @@ function runCommand(cmd, args = []) {
   });
 }
 // -------------------------------------------------------------------
+const execAsync = promisify(exec);
+
+async function getNpmVersion() {
+  try {
+    const { stdout } = await execAsync('npm --version');
+    return stdout.trim();
+  } catch (err) {
+    console.warn('Could not detect npm version:', err);
+    return null;
+  }
+}
 
 async function main() {
   const argv = await yargs(hideBin(process.argv))
@@ -61,12 +75,18 @@ async function main() {
       type: 'number',
       default: 5,
       description: 'The number of runs to perform',
+    })
+    .option('output', {
+      type: 'string',
+      description:
+        'Optional path to save results as JSON (e.g., deflake-results.json)',
     }).argv;
 
   const NUM_RUNS = argv.runs;
   const COMMAND = argv.command;
   const ARGS = argv._;
   let failures = 0;
+  const runResults = [];
 
   const backupDockerIgnorePath = dockerIgnorePath + '.bak';
   let originalDockerIgnoreRenamed = false;
@@ -88,9 +108,10 @@ async function main() {
 
     for (let i = 1; i <= NUM_RUNS; i++) {
       console.log(`\n[RUN ${i}/${NUM_RUNS}]`);
-
+      const startTime = new Date();
+      let exitCode = 1;
       try {
-        const exitCode = await runCommand(COMMAND, ARGS);
+        exitCode = await runCommand(COMMAND, ARGS);
 
         if (exitCode === 0) {
           console.log('✅ Run PASS');
@@ -102,6 +123,16 @@ async function main() {
         console.error('❌ Run FAIL (Execution Error)', error);
         failures++;
       }
+      const endTime = new Date();
+      const durationSeconds = (endTime - startTime) / 1000;
+      runResults.push({
+        run: i,
+        status: exitCode === 0 ? 'PASS' : 'FAIL',
+        exitCode,
+        startTime: startTime.toISOString(),
+        endTime: endTime.toISOString(),
+        durationSeconds,
+      });
     }
   } finally {
     try {
@@ -125,6 +156,46 @@ async function main() {
   console.log(`Total Runs: ${NUM_RUNS}`);
   console.log(`Total Failures: ${failures}`);
 
+  // Save results to JSON if --output is provided
+  if (argv.output) {
+    const outputPath = path.resolve(argv.output || 'deflake-results.json');
+    const durations = runResults.map((r) => r.durationSeconds);
+    const summary = {
+      fastestRunSeconds: Math.min(...durations),
+      slowestRunSeconds: Math.max(...durations),
+      averageRunSeconds: (
+        durations.reduce((a, b) => a + b, 0) / durations.length
+      ).toFixed(2),
+      passRuns: runResults.filter((r) => r.status === 'PASS').map((r) => r.run),
+      failRuns: runResults.filter((r) => r.status === 'FAIL').map((r) => r.run),
+    };
+    const npmVersion = await getNpmVersion();
+    const resultData = {
+      timestamp: new Date().toISOString(),
+      command: COMMAND,
+      runs: NUM_RUNS,
+      failures,
+      passRate: (((NUM_RUNS - failures) / NUM_RUNS) * 100).toFixed(2) + '%',
+      runDetails: runResults,
+      summary,
+      env: {
+        nodeVersion: process.version,
+        npmVersion,
+        platform: process.platform,
+        arch: process.arch,
+        cwd: process.cwd(),
+        cpuCores: os.cpus().length,
+        memoryMB: Math.round(os.totalmem() / 1024 / 1024),
+      },
+    };
+
+    try {
+      await fs.writeFile(outputPath, JSON.stringify(resultData, null, 2));
+      console.log(`\nResults saved to ${outputPath}`);
+    } catch (err) {
+      console.error('Failed to write results file:', err);
+    }
+  }
   process.exit(failures > 0 ? 1 : 0);
 }
 
