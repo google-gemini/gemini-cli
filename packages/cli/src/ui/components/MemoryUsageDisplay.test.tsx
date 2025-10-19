@@ -4,7 +4,16 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import {
+  describe,
+  it,
+  expect,
+  vi,
+  beforeEach,
+  afterEach,
+  type Mock,
+  type MockInstance,
+} from 'vitest';
 import { render, cleanup } from 'ink-testing-library';
 import { waitFor } from '@testing-library/react';
 import { MemoryUsageDisplay } from './MemoryUsageDisplay.js';
@@ -22,8 +31,8 @@ vi.mock('../utils/formatters.js', () => ({
 }));
 
 describe('MemoryUsageDisplay', () => {
-  const mockedUseUIState = useUIState as vi.Mock;
-  let memoryUsageSpy: vi.SpyInstance;
+  const mockedUseUIState = useUIState as Mock;
+  let memoryUsageSpy: MockInstance;
 
   beforeEach(() => {
     // Spy on process.memoryUsage to track calls
