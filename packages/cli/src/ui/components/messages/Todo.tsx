@@ -41,7 +41,7 @@ const TodoStatusDisplay: React.FC<{ status: TodoStatus }> = ({ status }) => {
   }
 };
 
-export const AnchoredTodoListDisplay: React.FC = () => {
+export const TodoTray: React.FC = () => {
   const uiState = useUIState();
 
   const todos: TodoList | null = useMemo(() => {
