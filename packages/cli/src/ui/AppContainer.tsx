@@ -86,7 +86,6 @@ import { ConsolePatcher } from './utils/ConsolePatcher.js';
 import { registerCleanup, runExitCleanup } from '../utils/cleanup.js';
 import { useMessageQueue } from './hooks/useMessageQueue.js';
 import { useAutoAcceptIndicator } from './hooks/useAutoAcceptIndicator.js';
-import { useWorkspaceMigration } from './hooks/useWorkspaceMigration.js';
 import { useSessionStats } from './contexts/SessionContext.js';
 import { useGitBranchName } from './hooks/useGitBranchName.js';
 import { useExtensionUpdates } from './hooks/useExtensionUpdates.js';
@@ -336,6 +335,7 @@ export const AppContainer = (props: AppContainerProps) => {
   const {
     isThemeDialogOpen,
     openThemeDialog,
+    closeThemeDialog,
     handleThemeSelect,
     handleThemeHighlight,
   } = useThemeCommand(
@@ -447,13 +447,6 @@ Logging in with Google... Please restart Gemini CLI to continue.
 
   const { isModelDialogOpen, openModelDialog, closeModelDialog } =
     useModelCommand();
-
-  const {
-    showWorkspaceMigrationDialog,
-    workspaceExtensions,
-    onWorkspaceMigrationDialogOpen,
-    onWorkspaceMigrationDialogClose,
-  } = useWorkspaceMigration(settings);
 
   const { toggleVimEnabled } = useVimMode();
 
@@ -621,12 +614,17 @@ Logging in with Google... Please restart Gemini CLI to continue.
     onApprovalModeChange: handleApprovalModeChange,
   });
 
-  const { messageQueue, addMessage, clearQueue, getQueuedMessagesText } =
-    useMessageQueue({
-      isConfigInitialized,
-      streamingState,
-      submitQuery,
-    });
+  const {
+    messageQueue,
+    addMessage,
+    clearQueue,
+    getQueuedMessagesText,
+    popAllMessages,
+  } = useMessageQueue({
+    isConfigInitialized,
+    streamingState,
+    submitQuery,
+  });
 
   cancelHandlerRef.current = useCallback(() => {
     const pendingHistoryItems = [
@@ -791,8 +789,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
   );
 
   const [showErrorDetails, setShowErrorDetails] = useState<boolean>(false);
-  const [showToolDescriptions, setShowToolDescriptions] =
-    useState<boolean>(false);
+  const [showFullTodos, setShowFullTodos] = useState<boolean>(false);
   const [renderMarkdown, setRenderMarkdown] = useState<boolean>(true);
 
   const [ctrlCPressedOnce, setCtrlCPressedOnce] = useState(false);
@@ -966,14 +963,8 @@ Logging in with Google... Please restart Gemini CLI to continue.
 
       if (keyMatchers[Command.SHOW_ERROR_DETAILS](key)) {
         setShowErrorDetails((prev) => !prev);
-      } else if (keyMatchers[Command.TOGGLE_TOOL_DESCRIPTIONS](key)) {
-        const newValue = !showToolDescriptions;
-        setShowToolDescriptions(newValue);
-
-        const mcpServers = config.getMcpServers();
-        if (Object.keys(mcpServers || {}).length > 0) {
-          handleSlashCommand(newValue ? '/mcp desc' : '/mcp nodesc');
-        }
+      } else if (keyMatchers[Command.SHOW_FULL_TODOS](key)) {
+        setShowFullTodos((prev) => !prev);
       } else if (keyMatchers[Command.TOGGLE_MARKDOWN](key)) {
         setRenderMarkdown((prev) => {
           const newValue = !prev;
@@ -1002,8 +993,6 @@ Logging in with Google... Please restart Gemini CLI to continue.
       constrainHeight,
       setConstrainHeight,
       setShowErrorDetails,
-      showToolDescriptions,
-      setShowToolDescriptions,
       config,
       ideContextState,
       handleExit,
@@ -1080,7 +1069,6 @@ Logging in with Google... Please restart Gemini CLI to continue.
   const nightly = props.version.includes('nightly');
 
   const dialogsVisible =
-    showWorkspaceMigrationDialog ||
     shouldShowIdePrompt ||
     isFolderTrustDialogOpen ||
     !!shellConfirmationRequest ||
@@ -1145,9 +1133,9 @@ Logging in with Google... Please restart Gemini CLI to continue.
       isTrustedFolder,
       constrainHeight,
       showErrorDetails,
+      showFullTodos,
       filteredConsoleMessages,
       ideContextState,
-      showToolDescriptions,
       renderMarkdown,
       ctrlCPressedOnce,
       ctrlDPressedOnce,
@@ -1159,8 +1147,6 @@ Logging in with Google... Please restart Gemini CLI to continue.
       messageQueue,
       queueErrorMessage,
       showAutoAcceptIndicator,
-      showWorkspaceMigrationDialog,
-      workspaceExtensions,
       currentModel,
       userTier,
       proQuotaRequest,
@@ -1228,9 +1214,9 @@ Logging in with Google... Please restart Gemini CLI to continue.
       isTrustedFolder,
       constrainHeight,
       showErrorDetails,
+      showFullTodos,
       filteredConsoleMessages,
       ideContextState,
-      showToolDescriptions,
       renderMarkdown,
       ctrlCPressedOnce,
       ctrlDPressedOnce,
@@ -1242,8 +1228,6 @@ Logging in with Google... Please restart Gemini CLI to continue.
       messageQueue,
       queueErrorMessage,
       showAutoAcceptIndicator,
-      showWorkspaceMigrationDialog,
-      workspaceExtensions,
       userTier,
       proQuotaRequest,
       contextFileNames,
@@ -1283,6 +1267,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
   const uiActions: UIActions = useMemo(
     () => ({
       handleThemeSelect,
+      closeThemeDialog,
       handleThemeHighlight,
       handleAuthSelect,
       setAuthState,
@@ -1302,13 +1287,13 @@ Logging in with Google... Please restart Gemini CLI to continue.
       refreshStatic,
       handleFinalSubmit,
       handleClearScreen,
-      onWorkspaceMigrationDialogOpen,
-      onWorkspaceMigrationDialogClose,
       handleProQuotaChoice,
       setQueueErrorMessage,
+      popAllMessages,
     }),
     [
       handleThemeSelect,
+      closeThemeDialog,
       handleThemeHighlight,
       handleAuthSelect,
       setAuthState,
@@ -1328,10 +1313,9 @@ Logging in with Google... Please restart Gemini CLI to continue.
       refreshStatic,
       handleFinalSubmit,
       handleClearScreen,
-      onWorkspaceMigrationDialogOpen,
-      onWorkspaceMigrationDialogClose,
       handleProQuotaChoice,
       setQueueErrorMessage,
+      popAllMessages,
     ],
   );
 

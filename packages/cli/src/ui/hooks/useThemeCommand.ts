@@ -13,10 +13,8 @@ import process from 'node:process';
 interface UseThemeCommandReturn {
   isThemeDialogOpen: boolean;
   openThemeDialog: () => void;
-  handleThemeSelect: (
-    themeName: string | undefined,
-    scope: SettingScope,
-  ) => void; // Added scope
+  closeThemeDialog: () => void;
+  handleThemeSelect: (themeName: string, scope: SettingScope) => void;
   handleThemeHighlight: (themeName: string | undefined) => void;
 }
 
@@ -63,8 +61,14 @@ export const useThemeCommand = (
     [applyTheme],
   );
 
+  const closeThemeDialog = useCallback(() => {
+    // Re-apply the saved theme to revert any preview changes from highlighting
+    applyTheme(loadedSettings.merged.ui?.theme);
+    setIsThemeDialogOpen(false);
+  }, [applyTheme, loadedSettings]);
+
   const handleThemeSelect = useCallback(
-    (themeName: string | undefined, scope: SettingScope) => {
+    (themeName: string, scope: SettingScope) => {
       try {
         // Merge user and workspace custom themes (workspace takes precedence)
         const mergedCustomThemes = {
@@ -95,6 +99,7 @@ export const useThemeCommand = (
   return {
     isThemeDialogOpen,
     openThemeDialog,
+    closeThemeDialog,
     handleThemeSelect,
     handleThemeHighlight,
   };

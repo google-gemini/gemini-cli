@@ -170,6 +170,10 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
                 availableTerminalHeight={availableHeight}
                 terminalWidth={childWidth}
               />
+            ) : typeof resultDisplay === 'object' &&
+              'todos' in resultDisplay ? (
+              // display nothing, as the TodoTray will handle rendering todos
+              <></>
             ) : (
               <AnsiOutputText
                 data={resultDisplay as AnsiOutput}

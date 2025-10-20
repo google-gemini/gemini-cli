@@ -1,0 +1,19 @@
+name: 'Trigger E2E'
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch_ref:
+        description: 'Branch to run on'
+        required: true
+        default: 'main'
+        type: 'string'
+
+jobs:
+  trigger_e2e:
+    name: 'Trigger e2e'
+    runs-on: 'gemini-cli-ubuntu-16-core'
+    steps:
+      - id: 'trigger-e2e'
+        run: |
+          echo "Trigger e2e workflow"

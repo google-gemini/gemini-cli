@@ -395,14 +395,12 @@ export class WebFetchTool extends BaseDeclarativeTool<
   WebFetchToolParams,
   ToolResult
 > {
-  static readonly Name: string = WEB_FETCH_TOOL_NAME;
-
   constructor(
     private readonly config: Config,
     messageBus?: MessageBus,
   ) {
     super(
-      WebFetchTool.Name,
+      WEB_FETCH_TOOL_NAME,
       'WebFetch',
       "Processes content from URL(s), including local and private network addresses (e.g., localhost), embedded in a prompt. Include up to 20 URLs and instructions (e.g., summarize, extract specific data) directly in the 'prompt' parameter.",
       Kind.Fetch,
@@ -410,7 +408,7 @@ export class WebFetchTool extends BaseDeclarativeTool<
         properties: {
           prompt: {
             description:
-              'A comprehensive prompt that includes the URL(s) (up to 20) to fetch and specific instructions on how to process their content (e.g., "Summarize https://example.com/article and extract key points from https://another.com/data"). Must contain as least one URL starting with http:// or https://.',
+              'A comprehensive prompt that includes the URL(s) (up to 20) to fetch and specific instructions on how to process their content (e.g., "Summarize https://example.com/article and extract key points from https://another.com/data"). All URLs to be fetched must be valid and complete, starting with "http://" or "https://", and be fully-formed with a valid hostname (e.g., a domain name like "example.com" or an IP address). For example, "https://example.com" is valid, but "example.com" is not.',
             type: 'string',
           },
         },
