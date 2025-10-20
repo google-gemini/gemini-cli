@@ -10,6 +10,7 @@ import { ThemeDialog } from './ThemeDialog.js';
 import { LoadedSettings } from '../../config/settings.js';
 import { KeypressProvider } from '../contexts/KeypressContext.js';
 import { SettingsContext } from '../contexts/SettingsContext.js';
+import { ThemeContext } from '../contexts/ThemeContext.js';
 import { DEFAULT_THEME, themeManager } from '../themes/theme-manager.js';
 import { act } from 'react';
 
@@ -76,9 +77,11 @@ describe('ThemeDialog Snapshots', () => {
     const settings = createMockSettings();
     const { lastFrame } = render(
       <SettingsContext.Provider value={settings}>
-        <KeypressProvider kittyProtocolEnabled={false}>
-          <ThemeDialog {...baseProps} settings={settings} />
-        </KeypressProvider>
+        <ThemeContext.Provider value={{ terminalBackground: 'dark' }}>
+          <KeypressProvider kittyProtocolEnabled={false}>
+            <ThemeDialog {...baseProps} settings={settings} />
+          </KeypressProvider>
+        </ThemeContext.Provider>
       </SettingsContext.Provider>,
     );
 
@@ -89,9 +92,11 @@ describe('ThemeDialog Snapshots', () => {
     const settings = createMockSettings();
     const { lastFrame, stdin } = render(
       <SettingsContext.Provider value={settings}>
-        <KeypressProvider kittyProtocolEnabled={false}>
-          <ThemeDialog {...baseProps} settings={settings} />
-        </KeypressProvider>
+        <ThemeContext.Provider value={{ terminalBackground: 'dark' }}>
+          <KeypressProvider kittyProtocolEnabled={false}>
+            <ThemeDialog {...baseProps} settings={settings} />
+          </KeypressProvider>
+        </ThemeContext.Provider>
       </SettingsContext.Provider>,
     );
 

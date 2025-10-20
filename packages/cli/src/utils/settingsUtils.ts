@@ -495,4 +495,21 @@ export function getEffectiveDisplayValue(
   return getSettingValue(key, settings, mergedSettings);
 }
 
+/**
+ * Gets theme preferences from settings with proper defaults.
+ * Used for auto-theme resolution across the application.
+ *
+ * @param settings The loaded settings object
+ * @returns Theme preferences with light and dark theme names
+ */
+export function getThemePreferences(settings: LoadedSettings): {
+  light: string;
+  dark: string;
+} {
+  return {
+    light: settings.merged.ui?.themePreferences?.light ?? 'Default Light',
+    dark: settings.merged.ui?.themePreferences?.dark ?? 'Default',
+  };
+}
+
 export const TEST_ONLY = { clearFlattenedSchema };
