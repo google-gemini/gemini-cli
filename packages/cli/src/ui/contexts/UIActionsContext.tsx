@@ -13,10 +13,8 @@ import { type SettingScope } from '../../config/settings.js';
 import type { AuthState } from '../types.js';
 
 export interface UIActions {
-  handleThemeSelect: (
-    themeName: string | undefined,
-    scope: SettingScope,
-  ) => void;
+  handleThemeSelect: (themeName: string, scope: SettingScope) => void;
+  closeThemeDialog: () => void;
   handleThemeHighlight: (themeName: string | undefined) => void;
   handleAuthSelect: (
     authType: AuthType | undefined,

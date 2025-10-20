@@ -115,6 +115,7 @@ export const DialogManager = ({
         )}
         <ThemeDialog
           onSelect={uiActions.handleThemeSelect}
+          onCancel={uiActions.closeThemeDialog}
           onHighlight={uiActions.handleThemeHighlight}
           settings={settings}
           availableTerminalHeight={
