@@ -188,7 +188,7 @@ export function createPolicyUpdater(
 ) {
   messageBus.subscribe(
     MessageBusType.UPDATE_POLICY,
-    async (message: UpdatePolicy) => {
+    (message: UpdatePolicy) => {
       const toolName = message.toolName;
 
       policyEngine.addRule({
