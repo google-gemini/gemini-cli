@@ -194,7 +194,7 @@ export function createPolicyUpdater(
       policyEngine.addRule({
         toolName,
         decision: PolicyDecision.ALLOW,
-        priority: 200, // High priority to override other rules
+        priority: 199, // High priority, but lower than explicit DENY (200)
       });
     },
   );
