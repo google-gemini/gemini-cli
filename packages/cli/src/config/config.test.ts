@@ -616,6 +616,7 @@ describe('Hierarchical Memory Loading (config.ts) - Placeholder Suite', () => {
       {
         path: '/path/to/ext1',
         name: 'ext1',
+        id: 'ext1-id',
         version: '1.0.0',
         contextFiles: ['/path/to/ext1/GEMINI.md'],
         isActive: true,
@@ -623,6 +624,7 @@ describe('Hierarchical Memory Loading (config.ts) - Placeholder Suite', () => {
       {
         path: '/path/to/ext2',
         name: 'ext2',
+        id: 'ext2-id',
         version: '1.0.0',
         contextFiles: [],
         isActive: true,
@@ -630,6 +632,7 @@ describe('Hierarchical Memory Loading (config.ts) - Placeholder Suite', () => {
       {
         path: '/path/to/ext3',
         name: 'ext3',
+        id: 'ext3-id',
         version: '1.0.0',
         contextFiles: [
           '/path/to/ext3/context1.md',
@@ -714,6 +717,8 @@ describe('mergeMcpServers', () => {
       {
         path: '/path/to/ext1',
         name: 'ext1',
+        id: 'ext1-id',
+
         version: '1.0.0',
         mcpServers: {
           'ext1-server': {
@@ -760,6 +765,7 @@ describe('mergeExcludeTools', () => {
       {
         path: '/path/to/ext1',
         name: 'ext1',
+        id: 'ext1-id',
         version: '1.0.0',
         excludeTools: ['tool3', 'tool4'],
         contextFiles: [],
@@ -768,6 +774,7 @@ describe('mergeExcludeTools', () => {
       {
         path: '/path/to/ext2',
         name: 'ext2',
+        id: 'ext2-id',
         version: '1.0.0',
         excludeTools: ['tool5'],
         contextFiles: [],
@@ -795,6 +802,7 @@ describe('mergeExcludeTools', () => {
       {
         path: '/path/to/ext1',
         name: 'ext1',
+        id: 'ext1-id',
         version: '1.0.0',
         excludeTools: ['tool2', 'tool3'],
         contextFiles: [],
@@ -822,6 +830,7 @@ describe('mergeExcludeTools', () => {
       {
         path: '/path/to/ext1',
         name: 'ext1',
+        id: 'ext1-id',
         version: '1.0.0',
         excludeTools: ['tool2', 'tool3'],
         contextFiles: [],
@@ -830,6 +839,7 @@ describe('mergeExcludeTools', () => {
       {
         path: '/path/to/ext2',
         name: 'ext2',
+        id: 'ext2-id',
         version: '1.0.0',
         excludeTools: ['tool3', 'tool4'],
         contextFiles: [],
@@ -907,6 +917,7 @@ describe('mergeExcludeTools', () => {
       {
         path: '/path/to/ext',
         name: 'ext1',
+        id: 'ext1-id',
         version: '1.0.0',
         excludeTools: ['tool1', 'tool2'],
         contextFiles: [],
@@ -934,6 +945,7 @@ describe('mergeExcludeTools', () => {
       {
         path: '/path/to/ext',
         name: 'ext1',
+        id: 'ext1-id',
         version: '1.0.0',
         excludeTools: ['tool2'],
         contextFiles: [],
@@ -1413,6 +1425,7 @@ describe('loadCliConfig extensions', () => {
     {
       path: '/path/to/ext1',
       name: 'ext1',
+      id: 'ext1-id',
       version: '1.0.0',
       contextFiles: ['/path/to/ext1.md'],
       isActive: true,
@@ -1420,6 +1433,7 @@ describe('loadCliConfig extensions', () => {
     {
       path: '/path/to/ext2',
       name: 'ext2',
+      id: 'ext2-id',
       version: '1.0.0',
       contextFiles: ['/path/to/ext2.md'],
       isActive: true,

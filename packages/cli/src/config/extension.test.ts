@@ -649,6 +649,7 @@ describe('extension tests', () => {
       {
         path: '/path/to/ext1',
         name: 'ext1',
+        id: 'ext1-id',
         version: '1.0.0',
         contextFiles: [],
         isActive: true,
@@ -656,6 +657,8 @@ describe('extension tests', () => {
       {
         path: '/path/to/ext2',
         name: 'ext2',
+        id: 'ext2-id',
+
         version: '1.0.0',
         contextFiles: [],
         isActive: true,
@@ -663,6 +666,8 @@ describe('extension tests', () => {
       {
         path: '/path/to/ext3',
         name: 'ext3',
+        id: 'ext3-id',
+
         version: '1.0.0',
         contextFiles: [],
         isActive: true,
@@ -770,6 +775,7 @@ describe('extension tests', () => {
           {
             path: '/path/to/ext1',
             name: 'ext1',
+            id: 'ext1-id',
             version: '1.0.0',
             contextFiles: [],
             installMetadata: {
@@ -782,6 +788,7 @@ describe('extension tests', () => {
           {
             path: '/path/to/ext2',
             name: 'ext2',
+            id: 'ext2-id',
             version: '1.0.0',
             contextFiles: [],
             installMetadata: {
@@ -794,6 +801,7 @@ describe('extension tests', () => {
           {
             path: '/path/to/ext3',
             name: 'ext3',
+            id: 'ext3-id',
             version: '1.0.0',
             contextFiles: [],
             isActive: true,
@@ -1439,6 +1447,7 @@ This extension will run the following MCP servers:
           expect(mockLogExtensionUninstall).toHaveBeenCalled();
           expect(ExtensionUninstallEvent).toHaveBeenCalledWith(
             'my-local-extension',
+            'fe81db027406b828f7e645b0c546e50bd7f0792f7ce497280902b39042902f85',
             'success',
           );
         }
@@ -1483,6 +1492,7 @@ This extension will run the following MCP servers:
       expect(mockLogExtensionUninstall).toHaveBeenCalled();
       expect(ExtensionUninstallEvent).toHaveBeenCalledWith(
         'gemini-sql-extension',
+        'bdeffe2899009e7f9b667576d12efdc3ea76df83b7560add4b01824dbeb9075e',
         'success',
       );
     });
@@ -1582,6 +1592,7 @@ This extension will run the following MCP servers:
       expect(mockLogExtensionDisable).toHaveBeenCalled();
       expect(ExtensionDisableEvent).toHaveBeenCalledWith(
         'ext1',
+        'e7fe907b3287888acfd1b4783f3ce5b528593e6c60d4d7f2923662da6d41fe8b',
         SettingScope.Workspace,
       );
     });
@@ -1647,6 +1658,7 @@ This extension will run the following MCP servers:
       expect(mockLogExtensionEnable).toHaveBeenCalled();
       expect(ExtensionEnableEvent).toHaveBeenCalledWith(
         'ext1',
+        'e7fe907b3287888acfd1b4783f3ce5b528593e6c60d4d7f2923662da6d41fe8b',
         SettingScope.Workspace,
       );
     });

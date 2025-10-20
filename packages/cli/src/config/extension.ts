@@ -199,28 +199,6 @@ export function loadExtension(
       )
       .filter((contextFilePath) => fs.existsSync(contextFilePath));
 
-    // IDs are created by hashing details of the installation source in order to
-    // deduplicate extensions with conflicting names and also obfuscate any
-    // potentially sensitive information such as private git urls, system paths,
-    // or project names.
-    const hash = createHash('sha256');
-    const githubUrlParts =
-      installMetadata &&
-      (installMetadata.type === 'git' ||
-        installMetadata.type === 'github-release')
-        ? tryParseGithubUrl(installMetadata.source)
-        : null;
-    if (githubUrlParts) {
-      // For github repos, we use the https URI to the repo as the ID.
-      hash.update(
-        `https://github.com/${githubUrlParts.owner}/${githubUrlParts.repo}`,
-      );
-    } else {
-      hash.update(installMetadata?.source ?? config.name);
-    }
-
-    const id = hash.digest('hex');
-
     return {
       name: config.name,
       version: config.version,
@@ -230,7 +208,7 @@ export function loadExtension(
       mcpServers: config.mcpServers,
       excludeTools: config.excludeTools,
       isActive: true, // Barring any other signals extensions should be considered Active.
-      id,
+      id: getExtensionId(config, installMetadata),
     };
   } catch (e) {
     console.error(
@@ -532,15 +510,15 @@ export async function installOrUpdateExtension(
         await fs.promises.rm(tempDir, { recursive: true, force: true });
       }
     }
-
     if (isUpdate) {
       logExtensionUpdateEvent(
         telemetryConfig,
         new ExtensionUpdateEvent(
           newExtensionConfig.name,
+          getExtensionId(newExtensionConfig, installMetadata),
           newExtensionConfig.version,
           previousExtensionConfig.version,
-          installMetadata.source,
+          installMetadata.type,
           'success',
         ),
       );
@@ -549,8 +527,9 @@ export async function installOrUpdateExtension(
         telemetryConfig,
         new ExtensionInstallEvent(
           newExtensionConfig.name,
+          getExtensionId(newExtensionConfig, installMetadata),
           newExtensionConfig.version,
-          installMetadata.source,
+          installMetadata.type,
           'success',
         ),
       );
@@ -571,14 +550,19 @@ export async function installOrUpdateExtension(
         // Ignore error, this is just for logging.
       }
     }
+    const config = newExtensionConfig ?? previousExtensionConfig;
+    const extensionId = config
+      ? getExtensionId(config, installMetadata)
+      : undefined;
     if (isUpdate) {
       logExtensionUpdateEvent(
         telemetryConfig,
         new ExtensionUpdateEvent(
-          newExtensionConfig?.name ?? previousExtensionConfig.name,
+          config?.name ?? '',
+          extensionId ?? '',
           newExtensionConfig?.version ?? '',
           previousExtensionConfig.version,
-          installMetadata.source,
+          installMetadata.type,
           'error',
         ),
       );
@@ -587,8 +571,9 @@ export async function installOrUpdateExtension(
         telemetryConfig,
         new ExtensionInstallEvent(
           newExtensionConfig?.name ?? '',
+          extensionId ?? '',
           newExtensionConfig?.version ?? '',
-          installMetadata.source,
+          installMetadata.type,
           'error',
         ),
       );
@@ -714,16 +699,16 @@ export async function uninstallExtension(
     new ExtensionEnablementManager(),
     cwd,
   );
-  const extensionName = installedExtensions.find(
+  const extension = installedExtensions.find(
     (installed) =>
       installed.name.toLowerCase() === extensionIdentifier.toLowerCase() ||
       installed.installMetadata?.source.toLowerCase() ===
         extensionIdentifier.toLowerCase(),
-  )?.name;
-  if (!extensionName) {
+  );
+  if (!extension) {
     throw new Error(`Extension not found.`);
   }
-  const storage = new ExtensionStorage(extensionName);
+  const storage = new ExtensionStorage(extension.name);
 
   await fs.promises.rm(storage.getExtensionDir(), {
     recursive: true,
@@ -734,13 +719,13 @@ export async function uninstallExtension(
   // uninstalls related to updates.
   if (isUpdate) return;
 
-  const manager = new ExtensionEnablementManager([extensionName]);
-  manager.remove(extensionName);
+  const manager = new ExtensionEnablementManager([extension.name]);
+  manager.remove(extension.name);
 
   const telemetryConfig = getTelemetryConfig(cwd);
   logExtensionUninstall(
     telemetryConfig,
-    new ExtensionUninstallEvent(extensionName, 'success'),
+    new ExtensionUninstallEvent(extension.name, extension.id, 'success'),
   );
 }
 
@@ -754,6 +739,7 @@ export function toOutputString(
 
   const status = workspaceEnabled ? chalk.green('✓') : chalk.red('✗');
   let output = `${status} ${extension.name} (${extension.version})`;
+  output += `\n ID: ${extension.id}`;
   output += `\n Path: ${extension.path}`;
   if (extension.installMetadata) {
     output += `\n Source: ${extension.installMetadata.source} (Type: ${extension.installMetadata.type})`;
@@ -804,7 +790,10 @@ export function disableExtension(
   const manager = new ExtensionEnablementManager([name]);
   const scopePath = scope === SettingScope.Workspace ? cwd : os.homedir();
   manager.disable(name, true, scopePath);
-  logExtensionDisable(config, new ExtensionDisableEvent(name, scope));
+  logExtensionDisable(
+    config,
+    new ExtensionDisableEvent(name, extension.id, scope),
+  );
 }
 
 export function enableExtension(
@@ -823,5 +812,35 @@ export function enableExtension(
   const scopePath = scope === SettingScope.Workspace ? cwd : os.homedir();
   manager.enable(name, true, scopePath);
   const config = getTelemetryConfig(cwd);
-  logExtensionEnable(config, new ExtensionEnableEvent(name, scope));
+  logExtensionEnable(
+    config,
+    new ExtensionEnableEvent(name, extension.id, scope),
+  );
+}
+
+function getExtensionId(
+  config: ExtensionConfig,
+  installMetadata?: ExtensionInstallMetadata,
+): string {
+  // IDs are created by hashing details of the installation source in order to
+  // deduplicate extensions with conflicting names and also obfuscate any
+  // potentially sensitive information such as private git urls, system paths,
+  // or project names.
+  const hash = createHash('sha256');
+  const githubUrlParts =
+    installMetadata &&
+    (installMetadata.type === 'git' ||
+      installMetadata.type === 'github-release')
+      ? tryParseGithubUrl(installMetadata.source)
+      : null;
+  if (githubUrlParts) {
+    // For github repos, we use the https URI to the repo as the ID.
+    hash.update(
+      `https://github.com/${githubUrlParts.owner}/${githubUrlParts.repo}`,
+    );
+  } else {
+    hash.update(installMetadata?.source ?? config.name);
+  }
+
+  return hash.digest('hex');
 }

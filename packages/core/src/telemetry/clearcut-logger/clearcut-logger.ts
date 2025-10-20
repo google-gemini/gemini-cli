@@ -902,6 +902,10 @@ export class ClearcutLogger {
         value: event.extension_name,
       },
       {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_EXTENSION_ID,
+        value: event.extension_id,
+      },
+      {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_EXTENSION_VERSION,
         value: event.extension_version,
       },
@@ -930,6 +934,10 @@ export class ClearcutLogger {
         value: event.extension_name,
       },
       {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_EXTENSION_ID,
+        value: event.extension_id,
+      },
+      {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_EXTENSION_UNINSTALL_STATUS,
         value: event.status,
       },
@@ -948,6 +956,10 @@ export class ClearcutLogger {
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_EXTENSION_NAME,
         value: event.extension_name,
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_EXTENSION_ID,
+        value: event.extension_id,
       },
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_EXTENSION_VERSION,
@@ -1046,6 +1058,10 @@ export class ClearcutLogger {
         value: event.extension_name,
       },
       {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_EXTENSION_ID,
+        value: event.extension_id,
+      },
+      {
         gemini_cli_key:
           EventMetadataKey.GEMINI_CLI_EXTENSION_ENABLE_SETTING_SCOPE,
         value: event.setting_scope,
@@ -1079,6 +1095,10 @@ export class ClearcutLogger {
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_EXTENSION_NAME,
         value: event.extension_name,
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_EXTENSION_ID,
+        value: event.extension_id,
       },
       {
         gemini_cli_key:

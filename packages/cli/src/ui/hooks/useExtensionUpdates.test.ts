@@ -60,6 +60,7 @@ describe('useExtensionUpdates', () => {
     const extensions = [
       {
         name: 'test-extension',
+        id: 'test-extension-id',
         type: 'git',
         version: '1.0.0',
         path: '/some/path',
@@ -253,6 +254,7 @@ describe('useExtensionUpdates', () => {
     const extensions = [
       {
         name: 'test-extension-1',
+        id: 'test-extension-1-id',
         type: 'git',
         version: '1.0.0',
         path: '/some/path1',
@@ -266,6 +268,8 @@ describe('useExtensionUpdates', () => {
       },
       {
         name: 'test-extension-2',
+        id: 'test-extension-2-id',
+
         type: 'git',
         version: '2.0.0',
         path: '/some/path2',

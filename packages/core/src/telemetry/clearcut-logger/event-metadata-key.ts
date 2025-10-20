@@ -7,7 +7,7 @@
 // Defines valid event metadata keys for Clearcut logging.
 export enum EventMetadataKey {
   // Deleted enums: 24
-  // Next ID: 117
+  // Next ID: 122
 
   GEMINI_CLI_KEY_UNKNOWN = 0,
 
@@ -372,6 +372,9 @@ export enum EventMetadataKey {
 
   // Logs the name of the extension.
   GEMINI_CLI_EXTENSION_NAME = 85,
+
+  // Logs the name of the extension.
+  GEMINI_CLI_EXTENSION_ID = 121,
 
   // Logs the version of the extension.
   GEMINI_CLI_EXTENSION_VERSION = 86,
