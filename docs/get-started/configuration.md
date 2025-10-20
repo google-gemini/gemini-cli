@@ -128,7 +128,7 @@ their corresponding top-level category object in your `settings.json` file.
 - **`output.format`** (string):
   - **Description:** The format of the CLI output.
   - **Default:** `"text"`
-  - **Values:** `"text"`, `"json"`
+  - **Values:** `"text"`, `"json"`, `"stream-json"`
 
 #### `ui`
 
@@ -718,17 +718,16 @@ for that specific session.
   - **Values:**
     - `text`: (Default) The standard human-readable output.
     - `json`: A machine-readable JSON output.
+    - `stream-json`: A streaming JSON output that emits real-time events.
   - **Note:** For structured output and scripting, use the
-    `--output-format json` flag.
+    `--output-format json` or `--output-format stream-json` flag.
 - **`--sandbox`** (**`-s`**):
   - Enables sandbox mode for this session.
 - **`--sandbox-image`**:
   - Sets the sandbox image URI.
 - **`--debug`** (**`-d`**):
   - Enables debug mode for this session, providing more verbose output.
-- **`--all-files`** (**`-a`**):
-  - If set, recursively includes all files within the current directory as
-    context for the prompt.
+
 - **`--help`** (or **`-h`**):
   - Displays help information about command-line arguments.
 - **`--show-memory-usage`**:

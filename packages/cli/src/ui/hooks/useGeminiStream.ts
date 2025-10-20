@@ -327,41 +327,43 @@ export const useGeminiStream = (
         onDebugMessage(`User query: '${trimmedQuery}'`);
         await logger?.logMessage(MessageSenderType.USER, trimmedQuery);
 
-        // Handle UI-only commands first
-        const slashCommandResult = isSlashCommand(trimmedQuery)
-          ? await handleSlashCommand(trimmedQuery)
-          : false;
+        if (!shellModeActive) {
+          // Handle UI-only commands first
+          const slashCommandResult = isSlashCommand(trimmedQuery)
+            ? await handleSlashCommand(trimmedQuery)
+            : false;
 
-        if (slashCommandResult) {
-          switch (slashCommandResult.type) {
-            case 'schedule_tool': {
-              const { toolName, toolArgs } = slashCommandResult;
-              const toolCallRequest: ToolCallRequestInfo = {
-                callId: `${toolName}-${Date.now()}-${Math.random().toString(16).slice(2)}`,
-                name: toolName,
-                args: toolArgs,
-                isClientInitiated: true,
-                prompt_id,
-              };
-              scheduleToolCalls([toolCallRequest], abortSignal);
-              return { queryToSend: null, shouldProceed: false };
-            }
-            case 'submit_prompt': {
-              localQueryToSendToGemini = slashCommandResult.content;
+          if (slashCommandResult) {
+            switch (slashCommandResult.type) {
+              case 'schedule_tool': {
+                const { toolName, toolArgs } = slashCommandResult;
+                const toolCallRequest: ToolCallRequestInfo = {
+                  callId: `${toolName}-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+                  name: toolName,
+                  args: toolArgs,
+                  isClientInitiated: true,
+                  prompt_id,
+                };
+                scheduleToolCalls([toolCallRequest], abortSignal);
+                return { queryToSend: null, shouldProceed: false };
+              }
+              case 'submit_prompt': {
+                localQueryToSendToGemini = slashCommandResult.content;
 
-              return {
-                queryToSend: localQueryToSendToGemini,
-                shouldProceed: true,
-              };
-            }
-            case 'handled': {
-              return { queryToSend: null, shouldProceed: false };
-            }
-            default: {
-              const unreachable: never = slashCommandResult;
-              throw new Error(
-                `Unhandled slash command result type: ${unreachable}`,
-              );
+                return {
+                  queryToSend: localQueryToSendToGemini,
+                  shouldProceed: true,
+                };
+              }
+              case 'handled': {
+                return { queryToSend: null, shouldProceed: false };
+              }
+              default: {
+                const unreachable: never = slashCommandResult;
+                throw new Error(
+                  `Unhandled slash command result type: ${unreachable}`,
+                );
+              }
             }
           }
         }
