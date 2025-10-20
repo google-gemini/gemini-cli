@@ -32,6 +32,7 @@ jobs:
 
   download_repo_name:
     runs-on: 'gemini-cli-ubuntu-16-core'
+    if: github.event_name == 'workflow_run'
     outputs:
       repo_name: '${{ steps.output-repo-name.outputs.repo_name }}'
     steps:
@@ -96,8 +97,8 @@ jobs:
       - name: 'Checkout'
         uses: 'actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955' # ratchet:actions/checkout@v5
         with:
-          ref: '${{ github.event.workflow_run.head_sha }}'
-          repository: '${{ needs.download_repo_name.outputs.repo_name }}'
+          ref: '${{ github.event.inputs.head_sha || github.event.workflow_run.head_sha }}'
+          repository: '${{ github.event.inputs.repo_name || needs.download_repo_name.outputs.repo_name }}'
 
       - name: 'Set up Node.js ${{ matrix.node-version }}'
         uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions-node@v4
@@ -139,8 +140,8 @@ jobs:
       - name: 'Checkout'
         uses: 'actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955' # ratchet:actions/checkout@v5
         with:
-          ref: '${{ github.event.workflow_run.head_sha }}'
-          repository: '${{ needs.download_repo_name.outputs.repo_name }}'
+          ref: '${{ github.event.inputs.head_sha || github.event.workflow_run.head_sha }}'
+          repository: '${{ github.event.inputs.repo_name || needs.download_repo_name.outputs.repo_name }}'
 
       - name: 'Set up Node.js 20.x'
         uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions-node@v4
@@ -180,8 +181,8 @@ jobs:
       - name: 'Checkout'
         uses: 'actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955' # ratchet:actions/checkout@v5
         with:
-          ref: '${{ github.event.workflow_run.head_sha }}'
-          repository: '${{ needs.download_repo_name.outputs.repo_name }}'
+          ref: '${{ github.event.inputs.head_sha || github.event.workflow_run.head_sha }}'
+          repository: '${{ github.event.inputs.repo_name || needs.download_repo_name.outputs.repo_name }}'
 
       - name: 'Set up Node.js 20.x'
         uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions-node@v4
