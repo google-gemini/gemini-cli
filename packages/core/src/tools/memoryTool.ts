@@ -23,9 +23,10 @@ import type {
   ModifyContext,
 } from './modifiable-tool.js';
 import { ToolErrorType } from './tool-error.js';
+import { MEMORY_TOOL_NAME } from './tool-names.js';
 
 const memoryToolSchemaData: FunctionDeclaration = {
-  name: 'save_memory',
+  name: MEMORY_TOOL_NAME,
   description:
     'Saves a specific piece of information or fact to your long-term memory. Use this when the user explicitly asks you to remember something, or when they state a clear, concise fact that seems important to retain for future interactions.',
   parametersJsonSchema: {
@@ -60,7 +61,6 @@ Do NOT use this tool:
 - \`fact\` (string, required): The specific fact or piece of information to remember. This should be a clear, self-contained statement. For example, if the user says "My favorite color is blue", the fact would be "My favorite color is blue".
 `;
 
-export const GEMINI_CONFIG_DIR = '.gemini';
 export const DEFAULT_CONTEXT_FILENAME = 'GEMINI.md';
 export const MEMORY_SECTION_HEADER = '## Gemini Added Memories';
 
@@ -98,7 +98,7 @@ interface SaveMemoryParams {
   modified_content?: string;
 }
 
-function getGlobalMemoryFilePath(): string {
+export function getGlobalMemoryFilePath(): string {
   return path.join(Storage.getGlobalGeminiDir(), getCurrentGeminiMdFilename());
 }
 
@@ -289,10 +289,9 @@ export class MemoryTool
   extends BaseDeclarativeTool<SaveMemoryParams, ToolResult>
   implements ModifiableDeclarativeTool<SaveMemoryParams>
 {
-  static readonly Name: string = memoryToolSchemaData.name!;
   constructor() {
     super(
-      MemoryTool.Name,
+      MEMORY_TOOL_NAME,
       'Save Memory',
       memoryToolDescription,
       Kind.Think,

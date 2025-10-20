@@ -289,7 +289,7 @@ describe('Gemini Client (client.ts)', () => {
       getVertexAI: vi.fn().mockReturnValue(false),
       getUserAgent: vi.fn().mockReturnValue('test-agent'),
       getUserMemory: vi.fn().mockReturnValue(''),
-      getFullContext: vi.fn().mockReturnValue(false),
+
       getSessionId: vi.fn().mockReturnValue('test-session-id'),
       getProxy: vi.fn().mockReturnValue(undefined),
       getWorkingDir: vi.fn().mockReturnValue('/test/dir'),
@@ -590,16 +590,37 @@ describe('Gemini Client (client.ts)', () => {
       expect(newChat).toBe(initialChat);
     });
 
+    it('should return NOOP if history is too short to compress', async () => {
+      const { client } = setup({
+        chatHistory: [{ role: 'user', parts: [{ text: 'hi' }] }],
+        originalTokenCount: 50,
+      });
+
+      const result = await client.tryCompressChat('prompt-id-noop', false);
+
+      expect(result).toEqual({
+        compressionStatus: CompressionStatus.NOOP,
+        originalTokenCount: 50,
+        newTokenCount: 50,
+      });
+      expect(mockGenerateContentFn).not.toHaveBeenCalled();
+    });
+
     it('logs a telemetry event when compressing', async () => {
       vi.spyOn(ClearcutLogger.prototype, 'logChatCompressionEvent');
-
       const MOCKED_TOKEN_LIMIT = 1000;
       const MOCKED_CONTEXT_PERCENTAGE_THRESHOLD = 0.5;
-      vi.mocked(tokenLimit).mockReturnValue(MOCKED_TOKEN_LIMIT);
       vi.spyOn(client['config'], 'getChatCompression').mockReturnValue({
         contextPercentageThreshold: MOCKED_CONTEXT_PERCENTAGE_THRESHOLD,
       });
-      const history = [{ role: 'user', parts: [{ text: '...history...' }] }];
+      const history = [
+        { role: 'user', parts: [{ text: '...history...' }] },
+        { role: 'model', parts: [{ text: '...history...' }] },
+        { role: 'user', parts: [{ text: '...history...' }] },
+        { role: 'model', parts: [{ text: '...history...' }] },
+        { role: 'user', parts: [{ text: '...history...' }] },
+        { role: 'model', parts: [{ text: '...history...' }] },
+      ];
       mockGetHistory.mockReturnValue(history);
 
       const originalTokenCount =
@@ -674,7 +695,14 @@ describe('Gemini Client (client.ts)', () => {
       vi.spyOn(client['config'], 'getChatCompression').mockReturnValue({
         contextPercentageThreshold: MOCKED_CONTEXT_PERCENTAGE_THRESHOLD,
       });
-      const history = [{ role: 'user', parts: [{ text: '...history...' }] }];
+      const history = [
+        { role: 'user', parts: [{ text: '...history...' }] },
+        { role: 'model', parts: [{ text: '...history...' }] },
+        { role: 'user', parts: [{ text: '...history...' }] },
+        { role: 'model', parts: [{ text: '...history...' }] },
+        { role: 'user', parts: [{ text: '...history...' }] },
+        { role: 'model', parts: [{ text: '...history...' }] },
+      ];
       mockGetHistory.mockReturnValue(history);
 
       const originalTokenCount =
@@ -838,7 +866,14 @@ describe('Gemini Client (client.ts)', () => {
     });
 
     it('should always trigger summarization when force is true, regardless of token count', async () => {
-      const history = [{ role: 'user', parts: [{ text: '...history...' }] }];
+      const history = [
+        { role: 'user', parts: [{ text: '...history...' }] },
+        { role: 'model', parts: [{ text: '...history...' }] },
+        { role: 'user', parts: [{ text: '...history...' }] },
+        { role: 'model', parts: [{ text: '...history...' }] },
+        { role: 'user', parts: [{ text: '...history...' }] },
+        { role: 'model', parts: [{ text: '...history...' }] },
+      ];
       mockGetHistory.mockReturnValue(history);
 
       const originalTokenCount = 100; // Well below threshold, but > estimated new count
