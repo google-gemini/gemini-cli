@@ -44,7 +44,7 @@ describe('Interactive file system', () => {
       30000,
       (args) => args.includes('1.0.1') && args.includes(fileName),
     );
-    
+
     // Wait for telemetry to flush and file system to sync, especially in sandboxed environments
     await rig.waitForTelemetryReady();
   });
