@@ -10,7 +10,6 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import {
   EXTENSIONS_CONFIG_FILENAME,
-  ExtensionStorage,
   INSTALL_METADATA_FILENAME,
   annotateActiveExtensions,
   loadExtension,
@@ -137,7 +136,7 @@ describe('update tests', () => {
           })!,
         ],
         process.cwd(),
-        new ExtensionEnablementManager(ExtensionStorage.getUserExtensionsDir()),
+        new ExtensionEnablementManager(),
       )[0];
       const updateInfo = await updateExtension(
         extension,
@@ -194,7 +193,7 @@ describe('update tests', () => {
           })!,
         ],
         process.cwd(),
-        new ExtensionEnablementManager(ExtensionStorage.getUserExtensionsDir()),
+        new ExtensionEnablementManager(),
       )[0];
       await updateExtension(
         extension,
@@ -244,7 +243,7 @@ describe('update tests', () => {
           })!,
         ],
         process.cwd(),
-        new ExtensionEnablementManager(ExtensionStorage.getUserExtensionsDir()),
+        new ExtensionEnablementManager(),
       )[0];
       await expect(
         updateExtension(
@@ -292,7 +291,7 @@ describe('update tests', () => {
           })!,
         ],
         process.cwd(),
-        new ExtensionEnablementManager(ExtensionStorage.getUserExtensionsDir()),
+        new ExtensionEnablementManager(),
       )[0];
 
       mockGit.getRemotes.mockResolvedValue([
@@ -334,7 +333,7 @@ describe('update tests', () => {
           })!,
         ],
         process.cwd(),
-        new ExtensionEnablementManager(ExtensionStorage.getUserExtensionsDir()),
+        new ExtensionEnablementManager(),
       )[0];
 
       mockGit.getRemotes.mockResolvedValue([
@@ -380,7 +379,7 @@ describe('update tests', () => {
           })!,
         ],
         process.cwd(),
-        new ExtensionEnablementManager(ExtensionStorage.getUserExtensionsDir()),
+        new ExtensionEnablementManager(),
       )[0];
       const dispatch = vi.fn();
       await checkForAllExtensionUpdates(
@@ -419,7 +418,7 @@ describe('update tests', () => {
           })!,
         ],
         process.cwd(),
-        new ExtensionEnablementManager(ExtensionStorage.getUserExtensionsDir()),
+        new ExtensionEnablementManager(),
       )[0];
       const dispatch = vi.fn();
       await checkForAllExtensionUpdates(
@@ -454,7 +453,7 @@ describe('update tests', () => {
           })!,
         ],
         process.cwd(),
-        new ExtensionEnablementManager(ExtensionStorage.getUserExtensionsDir()),
+        new ExtensionEnablementManager(),
       )[0];
 
       mockGit.getRemotes.mockRejectedValue(new Error('Git error'));
