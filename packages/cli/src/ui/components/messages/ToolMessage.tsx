@@ -13,7 +13,7 @@ import { MarkdownDisplay } from '../../utils/MarkdownDisplay.js';
 import { AnsiOutputText } from '../AnsiOutput.js';
 import { GeminiRespondingSpinner } from '../GeminiRespondingSpinner.js';
 import { MaxSizedBox } from '../shared/MaxSizedBox.js';
-import { TodoListDisplay } from './TodoListDisplay.js';
+import { TodoListDisplay } from './Todo.js';
 import { ShellInputPrompt } from '../ShellInputPrompt.js';
 import {
   SHELL_COMMAND_NAME,
@@ -173,10 +173,7 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
               />
             ) : typeof resultDisplay === 'object' &&
               'todos' in resultDisplay ? (
-              <TodoListDisplay
-                todos={resultDisplay as TodoList}
-                terminalWidth={childWidth}
-              />
+              <TodoListDisplay todos={resultDisplay as TodoList} />
             ) : (
               <AnsiOutputText
                 data={resultDisplay as AnsiOutput}
