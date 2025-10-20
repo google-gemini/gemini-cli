@@ -38,8 +38,10 @@ export function useHistoryWithActivity(
   const messageIdCounterRef = useRef(0);
 
   // Activity recording hooks
-  const { recordMessageAdded, recordHistoryUpdate } =
-    useActivityRecorder(config);
+  const { recordMessageAdded, recordHistoryUpdate } = useActivityRecorder(
+    config,
+    enableActivityMonitoring,
+  );
 
   // Generates a unique message ID based on a timestamp and a counter.
   const getNextMessageId = useCallback((baseTimestamp: number): number => {
