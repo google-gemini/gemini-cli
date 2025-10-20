@@ -36,7 +36,7 @@ jobs:
       repo_name: '${{ steps.output-repo-name.outputs.repo_name }}'
     steps:
       - name: 'Download artifact'
-        if: '${{github.event_name == "workflow_run"}}'
+        if: ${{ github.event_name == 'workflow_run' }}
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # ratchet:actions/github-script@v8
         with:
           script: |
