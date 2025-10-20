@@ -39,9 +39,8 @@ export const handleSlashCommand = async (
   }
 
   // Only custom commands are supported for now.
-  const loaders = [new FileCommandLoader(config)];
   const commandService = await CommandService.create(
-    loaders,
+    [new FileCommandLoader(config)],
     abortController.signal,
   );
   const commands = commandService.getCommands();

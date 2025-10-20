@@ -9,6 +9,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { SessionSummaryDisplay } from './SessionSummaryDisplay.js';
 import * as SessionContext from '../contexts/SessionContext.js';
 import type { SessionMetrics } from '../contexts/SessionContext.js';
+import { ToolCallDecision } from '@google/gemini-cli-core';
 
 vi.mock('../contexts/SessionContext.js', async (importOriginal) => {
   const actual = await importOriginal<typeof SessionContext>();
@@ -23,6 +24,7 @@ const useSessionStatsMock = vi.mocked(SessionContext.useSessionStats);
 const renderWithMockedStats = (metrics: SessionMetrics) => {
   useSessionStatsMock.mockReturnValue({
     stats: {
+      sessionId: 'test-session',
       sessionStartTime: new Date(),
       metrics,
       lastPromptTokenCount: 0,
@@ -57,7 +59,12 @@ describe('<SessionSummaryDisplay />', () => {
         totalSuccess: 0,
         totalFail: 0,
         totalDurationMs: 0,
-        totalDecisions: { accept: 0, reject: 0, modify: 0 },
+        totalDecisions: {
+          accept: 0,
+          reject: 0,
+          modify: 0,
+          [ToolCallDecision.AUTO_ACCEPT]: 0,
+        },
         byName: {},
       },
       files: {

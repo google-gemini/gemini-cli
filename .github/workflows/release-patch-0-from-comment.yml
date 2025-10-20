@@ -90,6 +90,7 @@ jobs:
                   commit: '${{ steps.pr_status.outputs.MERGE_COMMIT_SHA }}',
                   channel: channel,
                   original_pr: '${{ github.event.issue.number }}'
+                  environment: 'prod'
                 }
               });
 
