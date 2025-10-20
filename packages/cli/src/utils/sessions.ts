@@ -41,15 +41,36 @@ export async function deleteSession(
   sessionIndex: string,
 ): Promise<void> {
   const sessionSelector = new SessionSelector(config);
+  const sessions = await sessionSelector.listSessions();
+
+  if (sessions.length === 0) {
+    console.error('No sessions found for this project.');
+    return;
+  }
+
+  // Sort sessions by start time to match list-sessions ordering
+  const sortedSessions = sessions.sort(
+    (a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime(),
+  );
 
   let sessionToDelete: SessionInfo;
-  try {
-    sessionToDelete = await sessionSelector.findSession(sessionIndex);
-  } catch (error) {
-    console.error(
-      error instanceof Error ? error.message : 'Unknown error occurred.',
-    );
-    return;
+
+  // Try to find by UUID first
+  const sessionByUuid = sortedSessions.find(
+    (session) => session.id === sessionIndex,
+  );
+  if (sessionByUuid) {
+    sessionToDelete = sessionByUuid;
+  } else {
+    // Parse session index
+    const index = parseInt(sessionIndex, 10);
+    if (isNaN(index) || index < 1 || index > sessions.length) {
+      console.error(
+        `Invalid session identifier "${sessionIndex}". Use --list-sessions to see available sessions.`,
+      );
+      return;
+    }
+    sessionToDelete = sortedSessions[index - 1];
   }
 
   // Prevent deleting the current session
