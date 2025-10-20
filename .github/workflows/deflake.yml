@@ -66,9 +66,9 @@ jobs:
         shell: 'bash'
         run: |
           if [[ "${{ matrix.sandbox }}" == "sandbox:docker" ]]; then
-            npm run test:integration:sandbox:docker
+            npm run deflake:test:integration:sandbox:docker -- --test_name_pattern="${{ github.event.inputs.test_name_pattern }}" --runs="${{ github.event.inputs.runs }}"
           else
-            npm run test:integration:sandbox:none
+            npm run deflake:integration:sandbox:none  -- --test_name_pattern="${{ github.event.inputs.test_name_pattern }}" --runs="${{ github.event.inputs.runs }}"
           fi
 
   deflake_e2e_mac:
@@ -103,7 +103,7 @@ jobs:
           KEEP_OUTPUT: 'true'
           SANDBOX: 'sandbox:none'
           VERBOSE: 'true'
-        run: 'npm run test:integration:sandbox:none'
+        run: 'npm run deflake:integration:sandbox:none -- --test_name_pattern="${{ github.event.inputs.test_name_pattern }}" --runs="${{ github.event.inputs.runs }}"'
 
   deflake_e2e_windows:
     name: 'Slow E2E - Win'
@@ -158,4 +158,4 @@ jobs:
           UV_THREADPOOL_SIZE: '32'
           NODE_ENV: 'test'
         shell: 'pwsh'
-        run: 'npm run deflake:test:integration:sandbox:none'
+        run: 'npm run deflake:test:integration:sandbox:none -- --test_name_pattern="${{ github.event.inputs.test_name_pattern }}" --runs="${{ github.event.inputs.runs }}"'
