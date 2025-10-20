@@ -18,6 +18,7 @@ import { getErrorMessage, isNodeError } from '../utils/errors.js';
 import type { Config } from '../config/config.js';
 import { fileExists } from '../utils/fileUtils.js';
 import { Storage } from '../config/storage.js';
+import { GREP_TOOL_NAME } from './tool-names.js';
 
 const DEFAULT_TOTAL_MAX_MATCHES = 20000;
 
@@ -423,14 +424,13 @@ export class RipGrepTool extends BaseDeclarativeTool<
   RipGrepToolParams,
   ToolResult
 > {
-  static readonly Name = 'search_file_content';
 
   constructor(
     private readonly config: Config,
     messageBus?: MessageBus,
   ) {
     super(
-      RipGrepTool.Name,
+      GREP_TOOL_NAME,
       'SearchText',
       'Searches for a regular expression pattern within the content of files in a specified directory (or current working directory). Can filter files by a glob pattern. Returns the lines containing matches, along with their file paths and line numbers. Total results limited to 20,000 matches like VSCode.',
       Kind.Search,
