@@ -61,6 +61,6 @@ export function setGlobalProxy(proxy: string) {
   try {
     setGlobalDispatcher(new ProxyAgent(proxy));
   } catch (e) {
-    console.error(`Failed to set proxy: ${e}`);
+    console.error(`Failed to set proxy: ${getErrorMessage(e)}`);
   }
 }
