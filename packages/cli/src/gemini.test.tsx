@@ -524,6 +524,7 @@ describe('startInteractiveUI', () => {
       mockSettings,
       mockStartupWarnings,
       mockWorkspaceRoot,
+      undefined,
       mockInitializationResult,
     );
 

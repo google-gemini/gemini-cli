@@ -4,17 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, type Mock } from 'vitest';
 import { render } from 'ink-testing-library';
 import { Text, useIsScreenReaderEnabled } from 'ink';
+import { makeFakeConfig } from '@google/gemini-cli-core';
 import { App } from './App.js';
 import { UIStateContext, type UIState } from './contexts/UIStateContext.js';
 import { StreamingState } from './types.js';
-import {
-  ConfigContext,
-  type Config,
-  type Telemetry,
-} from './contexts/ConfigContext.js';
+import { ConfigContext } from './contexts/ConfigContext.js';
 
 vi.mock('ink', async (importOriginal) => {
   const original = await importOriginal<typeof import('ink')>();
@@ -64,9 +61,7 @@ describe('App', () => {
     },
   };
 
-  const mockConfig = {
-    telemetry: {} as Telemetry,
-  } as Config;
+  const mockConfig = makeFakeConfig();
 
   const renderWithProviders = (ui: React.ReactElement, state: UIState) =>
     render(
@@ -132,7 +127,7 @@ describe('App', () => {
   });
 
   it('should render ScreenReaderAppLayout when screen reader is enabled', () => {
-    (useIsScreenReaderEnabled as vi.Mock).mockReturnValue(true);
+    (useIsScreenReaderEnabled as Mock).mockReturnValue(true);
 
     const { lastFrame } = renderWithProviders(<App />, mockUIState as UIState);
 
@@ -142,7 +137,7 @@ describe('App', () => {
   });
 
   it('should render DefaultAppLayout when screen reader is not enabled', () => {
-    (useIsScreenReaderEnabled as vi.Mock).mockReturnValue(false);
+    (useIsScreenReaderEnabled as Mock).mockReturnValue(false);
 
     const { lastFrame } = renderWithProviders(<App />, mockUIState as UIState);
 
