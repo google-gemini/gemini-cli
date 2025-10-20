@@ -16,17 +16,6 @@ import { useUIState } from '../../contexts/UIStateContext.js';
 import { useMemo } from 'react';
 import type { HistoryItemToolGroup } from '../../types.js';
 
-const TodoItemDisplay: React.FC<{ todo: Todo }> = ({ todo }) => (
-  <Box flexDirection="row">
-    <Box marginRight={1}>
-      <TodoStatusDisplay status={todo.status} />
-    </Box>
-    <Box flexShrink={1}>
-      <Text color={theme.text.primary}>{todo.description}</Text>
-    </Box>
-  </Box>
-);
-
 const TodoStatusDisplay: React.FC<{ status: TodoStatus }> = ({ status }) => {
   switch (status) {
     case 'completed':
@@ -40,6 +29,17 @@ const TodoStatusDisplay: React.FC<{ status: TodoStatus }> = ({ status }) => {
       return <Text color={theme.status.error}>✗</Text>;
   }
 };
+
+const TodoItemDisplay: React.FC<{ todo: Todo }> = ({ todo }) => (
+  <Box flexDirection="row">
+    <Box marginRight={1}>
+      <TodoStatusDisplay status={todo.status} />
+    </Box>
+    <Box flexShrink={1}>
+      <Text color={theme.text.primary}>{todo.description}</Text>
+    </Box>
+  </Box>
+);
 
 export const TodoTray: React.FC = () => {
   const uiState = useUIState();
@@ -120,11 +120,11 @@ export const TodoTray: React.FC = () => {
   );
 };
 
-export interface TodoListDisplayProps {
+interface TodoListDisplayProps {
   todos: TodoList;
 }
 
-export const TodoListDisplay: React.FC<TodoListDisplayProps> = ({ todos }) => (
+const TodoListDisplay: React.FC<TodoListDisplayProps> = ({ todos }) => (
   <Box flexDirection="column">
     {todos.todos.map((todo: Todo, index: number) => (
       <TodoItemDisplay todo={todo} key={index} />
