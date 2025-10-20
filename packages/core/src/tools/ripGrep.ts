@@ -21,28 +21,45 @@ import { GREP_TOOL_NAME } from './tool-names.js';
 
 const DEFAULT_TOTAL_MAX_MATCHES = 20000;
 
-function getRgPath(): string {
-  return path.join(Storage.getGlobalBinDir(), 'rg');
+function getRgCandidateFilenames(): readonly string[] {
+  return process.platform === 'win32' ? ['rg.exe', 'rg'] : ['rg'];
+}
+
+async function resolveExistingRgPath(): Promise<string | null> {
+  const binDir = Storage.getGlobalBinDir();
+  for (const fileName of getRgCandidateFilenames()) {
+    const candidatePath = path.join(binDir, fileName);
+    if (await fileExists(candidatePath)) {
+      return candidatePath;
+    }
+  }
+  return null;
 }
 
 /**
  * Checks if `rg` exists, if not then attempt to download it.
  */
 export async function canUseRipgrep(): Promise<boolean> {
-  if (await fileExists(getRgPath())) {
+  if (await resolveExistingRgPath()) {
     return true;
   }
 
   await downloadRipGrep(Storage.getGlobalBinDir());
-  return await fileExists(getRgPath());
+  return (await resolveExistingRgPath()) !== null;
 }
 
 /**
  * Ensures `rg` is downloaded, or throws.
  */
 export async function ensureRgPath(): Promise<string> {
-  if (await canUseRipgrep()) {
-    return getRgPath();
+  const existingPath = await resolveExistingRgPath();
+  if (existingPath) {
+    return existingPath;
+  }
+  await downloadRipGrep(Storage.getGlobalBinDir());
+  const downloadedPath = await resolveExistingRgPath();
+  if (downloadedPath) {
+    return downloadedPath;
   }
   throw new Error('Cannot use ripgrep.');
 }
