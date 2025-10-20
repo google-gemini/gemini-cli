@@ -41,7 +41,7 @@ straightforward authentication method uses your existing Google account:
 4. Click on **Sign in**.
 
 For other authentication options and information, see
-[GeminI CLI Authentication Setup](./authentication.md).
+[Gemini CLI Authentication Setup](./authentication.md).
 
 ## Configure
 

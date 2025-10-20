@@ -23,7 +23,7 @@ import {
 } from '@google/gemini-cli-core';
 import type { Part } from '@google/genai';
 import { runNonInteractive } from './nonInteractiveCli.js';
-import { vi } from 'vitest';
+import { vi, type Mock, type MockInstance } from 'vitest';
 import type { LoadedSettings } from './config/settings.js';
 
 // Mock core modules
@@ -63,13 +63,13 @@ describe('runNonInteractive', () => {
   let mockConfig: Config;
   let mockSettings: LoadedSettings;
   let mockToolRegistry: ToolRegistry;
-  let mockCoreExecuteToolCall: vi.Mock;
-  let mockShutdownTelemetry: vi.Mock;
-  let consoleErrorSpy: vi.SpyInstance;
-  let processStdoutSpy: vi.SpyInstance;
+  let mockCoreExecuteToolCall: Mock;
+  let mockShutdownTelemetry: Mock;
+  let consoleErrorSpy: MockInstance;
+  let processStdoutSpy: MockInstance;
   let mockGeminiClient: {
-    sendMessageStream: vi.Mock;
-    getChatRecordingService: vi.Mock;
+    sendMessageStream: Mock;
+    getChatRecordingService: Mock;
   };
 
   beforeEach(async () => {
@@ -114,7 +114,7 @@ describe('runNonInteractive', () => {
         getProjectTempDir: vi.fn().mockReturnValue('/test/project/.gemini/tmp'),
       },
       getIdeMode: vi.fn().mockReturnValue(false),
-      getFullContext: vi.fn().mockReturnValue(false),
+
       getContentGeneratorConfig: vi.fn().mockReturnValue({}),
       getDebugMode: vi.fn().mockReturnValue(false),
       getOutputFormat: vi.fn().mockReturnValue('text'),

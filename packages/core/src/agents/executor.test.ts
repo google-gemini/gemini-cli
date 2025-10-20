@@ -9,7 +9,7 @@ import { AgentExecutor, type ActivityCallback } from './executor.js';
 import { makeFakeConfig } from '../test-utils/config.js';
 import { ToolRegistry } from '../tools/tool-registry.js';
 import { LSTool } from '../tools/ls.js';
-import { ReadFileTool } from '../tools/read-file.js';
+import { LS_TOOL_NAME, READ_FILE_TOOL_NAME } from '../tools/tool-names.js';
 import {
   GeminiChat,
   StreamEventType,
@@ -146,7 +146,7 @@ let parentToolRegistry: ToolRegistry;
  * Type-safe helper to create agent definitions for tests.
  */
 const createTestDefinition = <TOutput extends z.ZodTypeAny>(
-  tools: Array<string | MockTool> = [LSTool.Name],
+  tools: Array<string | MockTool> = [LS_TOOL_NAME],
   runConfigOverrides: Partial<AgentDefinition<TOutput>['runConfig']> = {},
   outputConfigMode: 'default' | 'none' = 'default',
   schema: TOutput = z.string() as unknown as TOutput,
@@ -202,7 +202,9 @@ describe('AgentExecutor', () => {
     mockConfig = makeFakeConfig();
     parentToolRegistry = new ToolRegistry(mockConfig);
     parentToolRegistry.registerTool(new LSTool(mockConfig));
-    parentToolRegistry.registerTool(new ReadFileTool(mockConfig));
+    parentToolRegistry.registerTool(
+      new MockTool({ name: READ_FILE_TOOL_NAME }),
+    );
     parentToolRegistry.registerTool(MOCK_TOOL_NOT_ALLOWED);
 
     vi.spyOn(mockConfig, 'getToolRegistry').mockResolvedValue(
@@ -225,7 +227,7 @@ describe('AgentExecutor', () => {
 
   describe('create (Initialization and Validation)', () => {
     it('should create successfully with allowed tools', async () => {
-      const definition = createTestDefinition([LSTool.Name]);
+      const definition = createTestDefinition([LS_TOOL_NAME]);
       const executor = await AgentExecutor.create(
         definition,
         mockConfig,
@@ -242,7 +244,10 @@ describe('AgentExecutor', () => {
     });
 
     it('should create an isolated ToolRegistry for the agent', async () => {
-      const definition = createTestDefinition([LSTool.Name, ReadFileTool.Name]);
+      const definition = createTestDefinition([
+        LS_TOOL_NAME,
+        READ_FILE_TOOL_NAME,
+      ]);
       const executor = await AgentExecutor.create(
         definition,
         mockConfig,
@@ -253,7 +258,7 @@ describe('AgentExecutor', () => {
 
       expect(agentRegistry).not.toBe(parentToolRegistry);
       expect(agentRegistry.getAllToolNames()).toEqual(
-        expect.arrayContaining([LSTool.Name, ReadFileTool.Name]),
+        expect.arrayContaining([LS_TOOL_NAME, READ_FILE_TOOL_NAME]),
       );
       expect(agentRegistry.getAllToolNames()).toHaveLength(2);
       expect(agentRegistry.getTool(MOCK_TOOL_NOT_ALLOWED.name)).toBeUndefined();
@@ -315,14 +320,14 @@ describe('AgentExecutor', () => {
 
       // Turn 1: Model calls ls
       mockModelResponse(
-        [{ name: LSTool.Name, args: { path: '.' }, id: 'call1' }],
+        [{ name: LS_TOOL_NAME, args: { path: '.' }, id: 'call1' }],
         'T1: Listing',
       );
       mockExecuteToolCall.mockResolvedValueOnce({
         status: 'success',
         request: {
           callId: 'call1',
-          name: LSTool.Name,
+          name: LS_TOOL_NAME,
           args: { path: '.' },
           isClientInitiated: false,
           prompt_id: 'test-prompt',
@@ -335,7 +340,7 @@ describe('AgentExecutor', () => {
           responseParts: [
             {
               functionResponse: {
-                name: LSTool.Name,
+                name: LS_TOOL_NAME,
                 response: { result: 'file1.txt' },
                 id: 'call1',
               },
@@ -385,7 +390,7 @@ describe('AgentExecutor', () => {
 
       expect(sentTools).toEqual(
         expect.arrayContaining([
-          expect.objectContaining({ name: LSTool.Name }),
+          expect.objectContaining({ name: LS_TOOL_NAME }),
           expect.objectContaining({ name: TASK_COMPLETE_TOOL_NAME }),
         ]),
       );
@@ -434,7 +439,7 @@ describe('AgentExecutor', () => {
           }),
           expect.objectContaining({
             type: 'TOOL_CALL_END',
-            data: { name: LSTool.Name, output: 'file1.txt' },
+            data: { name: LS_TOOL_NAME, output: 'file1.txt' },
           }),
           expect.objectContaining({
             type: 'TOOL_CALL_START',
@@ -455,7 +460,7 @@ describe('AgentExecutor', () => {
     });
 
     it('should execute successfully when model calls complete_task without output (Happy Path No Output)', async () => {
-      const definition = createTestDefinition([LSTool.Name], {}, 'none');
+      const definition = createTestDefinition([LS_TOOL_NAME], {}, 'none');
       const executor = await AgentExecutor.create(
         definition,
         mockConfig,
@@ -463,13 +468,13 @@ describe('AgentExecutor', () => {
       );
 
       mockModelResponse([
-        { name: LSTool.Name, args: { path: '.' }, id: 'call1' },
+        { name: LS_TOOL_NAME, args: { path: '.' }, id: 'call1' },
       ]);
       mockExecuteToolCall.mockResolvedValueOnce({
         status: 'success',
         request: {
           callId: 'call1',
-          name: LSTool.Name,
+          name: LS_TOOL_NAME,
           args: { path: '.' },
           isClientInitiated: false,
           prompt_id: 'test-prompt',
@@ -482,7 +487,7 @@ describe('AgentExecutor', () => {
           responseParts: [
             {
               functionResponse: {
-                name: LSTool.Name,
+                name: LS_TOOL_NAME,
                 response: {},
                 id: 'call1',
               },
@@ -535,13 +540,13 @@ describe('AgentExecutor', () => {
       );
 
       mockModelResponse([
-        { name: LSTool.Name, args: { path: '.' }, id: 'call1' },
+        { name: LS_TOOL_NAME, args: { path: '.' }, id: 'call1' },
       ]);
       mockExecuteToolCall.mockResolvedValueOnce({
         status: 'success',
         request: {
           callId: 'call1',
-          name: LSTool.Name,
+          name: LS_TOOL_NAME,
           args: { path: '.' },
           isClientInitiated: false,
           prompt_id: 'test-prompt',
@@ -554,7 +559,7 @@ describe('AgentExecutor', () => {
           responseParts: [
             {
               functionResponse: {
-                name: LSTool.Name,
+                name: LS_TOOL_NAME,
                 response: {},
                 id: 'call1',
               },
@@ -695,7 +700,7 @@ describe('AgentExecutor', () => {
     });
 
     it('should execute parallel tool calls and then complete', async () => {
-      const definition = createTestDefinition([LSTool.Name]);
+      const definition = createTestDefinition([LS_TOOL_NAME]);
       const executor = await AgentExecutor.create(
         definition,
         mockConfig,
@@ -703,12 +708,12 @@ describe('AgentExecutor', () => {
       );
 
       const call1: FunctionCall = {
-        name: LSTool.Name,
+        name: LS_TOOL_NAME,
         args: { path: '/a' },
         id: 'c1',
       };
       const call2: FunctionCall = {
-        name: LSTool.Name,
+        name: LS_TOOL_NAME,
         args: { path: '/b' },
         id: 'c2',
       };
@@ -790,7 +795,7 @@ describe('AgentExecutor', () => {
     });
 
     it('SECURITY: should block unauthorized tools and provide explicit failure to model', async () => {
-      const definition = createTestDefinition([LSTool.Name]);
+      const definition = createTestDefinition([LS_TOOL_NAME]);
       const executor = await AgentExecutor.create(
         definition,
         mockConfig,
@@ -801,7 +806,7 @@ describe('AgentExecutor', () => {
       const badCallId = 'bad_call_1';
       mockModelResponse([
         {
-          name: ReadFileTool.Name,
+          name: READ_FILE_TOOL_NAME,
           args: { path: 'secret.txt' },
           id: badCallId,
         },
@@ -839,7 +844,7 @@ describe('AgentExecutor', () => {
         expect.objectContaining({
           functionResponse: expect.objectContaining({
             id: badCallId,
-            name: ReadFileTool.Name,
+            name: READ_FILE_TOOL_NAME,
             response: {
               error: expect.stringContaining('Unauthorized tool call'),
             },
@@ -853,7 +858,7 @@ describe('AgentExecutor', () => {
           type: 'ERROR',
           data: expect.objectContaining({
             context: 'tool_call_unauthorized',
-            name: ReadFileTool.Name,
+            name: READ_FILE_TOOL_NAME,
           }),
         }),
       );
@@ -862,12 +867,12 @@ describe('AgentExecutor', () => {
 
   describe('run (Termination Conditions)', () => {
     const mockWorkResponse = (id: string) => {
-      mockModelResponse([{ name: LSTool.Name, args: { path: '.' }, id }]);
+      mockModelResponse([{ name: LS_TOOL_NAME, args: { path: '.' }, id }]);
       mockExecuteToolCall.mockResolvedValueOnce({
         status: 'success',
         request: {
           callId: id,
-          name: LSTool.Name,
+          name: LS_TOOL_NAME,
           args: { path: '.' },
           isClientInitiated: false,
           prompt_id: 'test-prompt',
@@ -878,7 +883,7 @@ describe('AgentExecutor', () => {
           callId: id,
           resultDisplay: 'ok',
           responseParts: [
-            { functionResponse: { name: LSTool.Name, response: {}, id } },
+            { functionResponse: { name: LS_TOOL_NAME, response: {}, id } },
           ],
           error: undefined,
           errorType: undefined,
@@ -889,7 +894,7 @@ describe('AgentExecutor', () => {
 
     it('should terminate when max_turns is reached', async () => {
       const MAX = 2;
-      const definition = createTestDefinition([LSTool.Name], {
+      const definition = createTestDefinition([LS_TOOL_NAME], {
         max_turns: MAX,
       });
       const executor = await AgentExecutor.create(definition, mockConfig);
@@ -904,12 +909,14 @@ describe('AgentExecutor', () => {
     });
 
     it('should terminate if timeout is reached', async () => {
-      const definition = createTestDefinition([LSTool.Name], {
+      const definition = createTestDefinition([LS_TOOL_NAME], {
         max_time_minutes: 1,
       });
       const executor = await AgentExecutor.create(definition, mockConfig);
 
-      mockModelResponse([{ name: LSTool.Name, args: { path: '.' }, id: 't1' }]);
+      mockModelResponse([
+        { name: LS_TOOL_NAME, args: { path: '.' }, id: 't1' },
+      ]);
 
       // Long running tool
       mockExecuteToolCall.mockImplementationOnce(async (_ctx, reqInfo) => {

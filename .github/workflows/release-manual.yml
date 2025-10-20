@@ -47,7 +47,7 @@ on:
 
 jobs:
   release:
-    runs-on: 'self-hosted'
+    runs-on: 'ubuntu-latest'
     environment: '${{ github.event.inputs.environment }}'
     permissions:
       contents: 'write'
@@ -75,7 +75,7 @@ jobs:
       - name: 'Setup Node.js'
         uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020'
         with:
-          node-version-file: '.nvmrc'
+          node-version-file: './release/.nvmrc'
           cache: 'npm'
 
       - name: 'Install Dependencies'
