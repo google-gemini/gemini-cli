@@ -71,7 +71,7 @@ export class AtFileProcessor implements IPromptProcessor {
 
           // `context.invocation` should always be present at this point.
           debugLogger.error(
-            `Error while loading custom command (${context.invocation?.name}) ${uiMessage}. Leaving placeholder in prompt.`,
+            `Error while loading custom command (${context.invocation!.name}) ${uiMessage}. Leaving placeholder in prompt.`,
           );
           context.ui.addItem(
             { type: MessageType.ERROR, text: uiMessage },
