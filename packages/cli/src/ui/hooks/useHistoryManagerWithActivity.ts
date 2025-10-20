@@ -145,4 +145,3 @@ export function useHistoryWithActivity(
     loadHistory,
   };
 }
-

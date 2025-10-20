@@ -77,10 +77,7 @@ enum StreamProcessingStatus {
 
 const EDIT_TOOL_NAMES = new Set(['replace', WRITE_FILE_TOOL_NAME]);
 
-function showCitations(
-  settings: LoadedSettings,
-  config: Config,
-): boolean {
+function showCitations(settings: LoadedSettings, config: Config): boolean {
   const enabled = settings?.merged?.ui?.showCitations;
   if (enabled !== undefined) {
     return enabled;

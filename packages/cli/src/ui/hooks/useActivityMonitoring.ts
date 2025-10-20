@@ -146,4 +146,3 @@ export function useActivityRecorder(_config: Config, enabled: boolean = true) {
     recordHistoryUpdate: recordSimpleActivity,
   };
 }
-
