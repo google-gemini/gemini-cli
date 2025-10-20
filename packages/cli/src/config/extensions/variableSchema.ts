@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type { ExtensionEnablementManager } from './extensionEnablement.js';
+
 export interface VariableDefinition {
   type: 'string';
   description: string;
@@ -18,6 +20,7 @@ export interface VariableSchema {
 export interface LoadExtensionContext {
   extensionDir: string;
   workspaceDir: string;
+  extensionEnablementManager: ExtensionEnablementManager;
 }
 
 const PATH_SEPARATOR_DEFINITION = {

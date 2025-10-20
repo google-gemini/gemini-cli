@@ -11,8 +11,6 @@ import { ExtensionUpdateState } from '../../state/extensions.js';
 export const ExtensionsList = () => {
   const { commandContext, extensionsUpdateState } = useUIState();
   const allExtensions = commandContext.services.config!.getExtensions();
-  const settings = commandContext.services.settings;
-  const disabledExtensions = settings.merged.extensions?.disabled ?? [];
 
   if (allExtensions.length === 0) {
     return <Text>No extensions installed.</Text>;
@@ -24,8 +22,9 @@ export const ExtensionsList = () => {
       <Box flexDirection="column" paddingLeft={2}>
         {allExtensions.map((ext) => {
           const state = extensionsUpdateState.get(ext.name);
-          const isActive = !disabledExtensions.includes(ext.name);
+          const isActive = ext.isActive;
           const activeString = isActive ? 'active' : 'disabled';
+          const activeColor = isActive ? 'green' : 'grey';
 
           let stateColor = 'gray';
           const stateText = state || 'unknown state';
@@ -55,7 +54,7 @@ export const ExtensionsList = () => {
             <Box key={ext.name}>
               <Text>
                 <Text color="cyan">{`${ext.name} (v${ext.version})`}</Text>
-                {` - ${activeString}`}
+                <Text color={activeColor}>{` - ${activeString}`}</Text>
                 {<Text color={stateColor}>{` (${stateText})`}</Text>}
               </Text>
             </Box>

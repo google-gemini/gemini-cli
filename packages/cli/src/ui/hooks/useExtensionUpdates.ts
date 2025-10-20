@@ -23,6 +23,7 @@ import {
   type ExtensionUpdateInfo,
 } from '../../config/extension.js';
 import { checkExhaustive } from '../../utils/checks.js';
+import type { ExtensionEnablementManager } from '../../config/extensions/extensionEnablement.js';
 
 type ConfirmationRequestWrapper = {
   prompt: React.ReactNode;
@@ -49,6 +50,7 @@ function confirmationRequestsReducer(
 
 export const useExtensionUpdates = (
   extensions: GeminiCLIExtension[],
+  extensionEnablementManager: ExtensionEnablementManager,
   addItem: UseHistoryManagerReturn['addItem'],
   cwd: string,
 ) => {
@@ -93,11 +95,13 @@ export const useExtensionUpdates = (
     if (extensionsToCheck.length === 0) return;
     checkForAllExtensionUpdates(
       extensionsToCheck,
+      extensionEnablementManager,
       dispatchExtensionStateUpdate,
       cwd,
     );
   }, [
     extensions,
+    extensionEnablementManager,
     extensionsUpdateState.extensionStatuses,
     cwd,
     dispatchExtensionStateUpdate,
@@ -154,6 +158,7 @@ export const useExtensionUpdates = (
       } else {
         const updatePromise = updateExtension(
           extension,
+          extensionEnablementManager,
           cwd,
           (description) =>
             requestConsentInteractive(
@@ -210,6 +215,7 @@ export const useExtensionUpdates = (
     }
   }, [
     extensions,
+    extensionEnablementManager,
     extensionsUpdateState,
     addConfirmUpdateExtensionRequest,
     addItem,

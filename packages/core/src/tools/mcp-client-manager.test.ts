@@ -8,8 +8,6 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { McpClientManager } from './mcp-client-manager.js';
 import { McpClient } from './mcp-client.js';
 import type { ToolRegistry } from './tool-registry.js';
-import type { PromptRegistry } from '../prompts/prompt-registry.js';
-import type { WorkspaceContext } from '../utils/workspaceContext.js';
 import type { Config } from '../config/config.js';
 
 vi.mock('./mcp-client.js', async () => {
@@ -38,18 +36,16 @@ describe('McpClientManager', () => {
     vi.mocked(McpClient).mockReturnValue(
       mockedMcpClient as unknown as McpClient,
     );
-    const manager = new McpClientManager(
-      {
-        'test-server': {},
-      },
-      '',
-      {} as ToolRegistry,
-      {} as PromptRegistry,
-      false,
-      {} as WorkspaceContext,
-    );
+    const manager = new McpClientManager({} as ToolRegistry);
     await manager.discoverAllMcpTools({
       isTrustedFolder: () => true,
+      getMcpServers: () => ({
+        'test-server': {},
+      }),
+      getMcpServerCommand: () => '',
+      getPromptRegistry: () => {},
+      getDebugMode: () => false,
+      getWorkspaceContext: () => {},
     } as unknown as Config);
     expect(mockedMcpClient.connect).toHaveBeenCalledOnce();
     expect(mockedMcpClient.discover).toHaveBeenCalledOnce();
@@ -65,18 +61,16 @@ describe('McpClientManager', () => {
     vi.mocked(McpClient).mockReturnValue(
       mockedMcpClient as unknown as McpClient,
     );
-    const manager = new McpClientManager(
-      {
-        'test-server': {},
-      },
-      '',
-      {} as ToolRegistry,
-      {} as PromptRegistry,
-      false,
-      {} as WorkspaceContext,
-    );
+    const manager = new McpClientManager({} as ToolRegistry);
     await manager.discoverAllMcpTools({
       isTrustedFolder: () => false,
+      getMcpServers: () => ({
+        'test-server': {},
+      }),
+      getMcpServerCommand: () => '',
+      getPromptRegistry: () => {},
+      getDebugMode: () => false,
+      getWorkspaceContext: () => {},
     } as unknown as Config);
     expect(mockedMcpClient.connect).not.toHaveBeenCalled();
     expect(mockedMcpClient.discover).not.toHaveBeenCalled();

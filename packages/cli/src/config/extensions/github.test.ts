@@ -22,6 +22,7 @@ import * as path from 'node:path';
 import * as tar from 'tar';
 import * as archiver from 'archiver';
 import type { GeminiCLIExtension } from '@google/gemini-cli-core';
+import { ExtensionEnablementManager } from './extensionEnablement.js';
 
 const mockPlatform = vi.hoisted(() => vi.fn());
 const mockArch = vi.hoisted(() => vi.fn());
@@ -149,7 +150,10 @@ describe('git extension helpers', () => {
         },
         contextFiles: [],
       };
-      const result = await checkForExtensionUpdate(extension);
+      const result = await checkForExtensionUpdate(
+        extension,
+        new ExtensionEnablementManager(),
+      );
       expect(result).toBe(ExtensionUpdateState.NOT_UPDATABLE);
     });
 
@@ -166,7 +170,10 @@ describe('git extension helpers', () => {
         contextFiles: [],
       };
       mockGit.getRemotes.mockResolvedValue([]);
-      const result = await checkForExtensionUpdate(extension);
+      const result = await checkForExtensionUpdate(
+        extension,
+        new ExtensionEnablementManager(),
+      );
       expect(result).toBe(ExtensionUpdateState.ERROR);
     });
 
@@ -188,7 +195,10 @@ describe('git extension helpers', () => {
       mockGit.listRemote.mockResolvedValue('remote-hash\tHEAD');
       mockGit.revparse.mockResolvedValue('local-hash');
 
-      const result = await checkForExtensionUpdate(extension);
+      const result = await checkForExtensionUpdate(
+        extension,
+        new ExtensionEnablementManager(),
+      );
       expect(result).toBe(ExtensionUpdateState.UPDATE_AVAILABLE);
     });
 
@@ -210,7 +220,10 @@ describe('git extension helpers', () => {
       mockGit.listRemote.mockResolvedValue('same-hash\tHEAD');
       mockGit.revparse.mockResolvedValue('same-hash');
 
-      const result = await checkForExtensionUpdate(extension);
+      const result = await checkForExtensionUpdate(
+        extension,
+        new ExtensionEnablementManager(),
+      );
       expect(result).toBe(ExtensionUpdateState.UP_TO_DATE);
     });
 
@@ -228,7 +241,10 @@ describe('git extension helpers', () => {
       };
       mockGit.getRemotes.mockRejectedValue(new Error('git error'));
 
-      const result = await checkForExtensionUpdate(extension);
+      const result = await checkForExtensionUpdate(
+        extension,
+        new ExtensionEnablementManager(),
+      );
       expect(result).toBe(ExtensionUpdateState.ERROR);
     });
   });
