@@ -76,10 +76,14 @@ export abstract class BaseToolInvocation<
   constructor(
     readonly params: TParams,
     protected readonly messageBus?: MessageBus,
+    readonly _toolName?: string,
+    readonly _toolDisplayName?: string,
   ) {
     if (this.messageBus) {
       console.debug(
-        `[DEBUG] Tool ${this.constructor.name} created with messageBus: YES`,
+        `[DEBUG] Tool ${
+          this._toolName || this.constructor.name
+        } created with messageBus: YES`,
       );
     }
   }
@@ -90,11 +94,43 @@ export abstract class BaseToolInvocation<
     return [];
   }
 
-  shouldConfirmExecute(
-    _abortSignal: AbortSignal,
+  async shouldConfirmExecute(
+    abortSignal: AbortSignal,
   ): Promise<ToolCallConfirmationDetails | false> {
-    // Default implementation for tools that don't override it.
-    return Promise.resolve(false);
+    if (this.messageBus) {
+      const decision = await this.getMessageBusDecision(abortSignal);
+      if (decision === 'ALLOW') {
+        return false;
+      }
+
+      if (decision === 'DENY') {
+        throw new Error(
+          `Tool execution for "${
+            this._toolDisplayName || this._toolName
+          }" denied by policy.`,
+        );
+      }
+
+      if (decision === 'ASK_USER') {
+        const confirmationDetails: ToolCallConfirmationDetails = {
+          type: 'info',
+          title: `Confirm: ${this._toolDisplayName || this._toolName}`,
+          prompt: this.getDescription(),
+          onConfirm: async (outcome: ToolConfirmationOutcome) => {
+            if (outcome === ToolConfirmationOutcome.ProceedAlways) {
+              if (this.messageBus && this._toolName) {
+                this.messageBus.publish({
+                  type: MessageBusType.UPDATE_POLICY,
+                  toolName: this._toolName,
+                });
+              }
+            }
+          },
+        };
+        return confirmationDetails;
+      }
+    }
+    return false;
   }
 
   protected getMessageBusDecision(
@@ -108,7 +144,7 @@ export abstract class BaseToolInvocation<
 
     const correlationId = randomUUID();
     const toolCall = {
-      name: this.constructor.name,
+      name: this._toolName || this.constructor.name,
       args: this.params as Record<string, unknown>,
     };
 
@@ -385,7 +421,12 @@ export abstract class BaseDeclarativeTool<
     if (validationError) {
       throw new Error(validationError);
     }
-    return this.createInvocation(params, this.messageBus);
+    return this.createInvocation(
+      params,
+      this.messageBus,
+      this.name,
+      this.displayName,
+    );
   }
 
   override validateToolParams(params: TParams): string | null {
@@ -408,6 +449,8 @@ export abstract class BaseDeclarativeTool<
   protected abstract createInvocation(
     params: TParams,
     messageBus?: MessageBus,
+    _toolName?: string,
+    _toolDisplayName?: string,
   ): ToolInvocation<TParams, TResult>;
 }
 

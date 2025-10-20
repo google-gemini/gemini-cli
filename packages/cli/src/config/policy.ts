@@ -23,8 +23,12 @@ import {
   WRITE_FILE_TOOL_NAME,
   WEB_FETCH_TOOL_NAME,
   WebSearchTool,
+  type PolicyEngine,
+  type MessageBus,
+  MessageBusType,
+  type UpdatePolicy,
 } from '@google/gemini-cli-core';
-import type { Settings } from './settings.js';
+import { type Settings } from './settings.js';
 
 // READ_ONLY_TOOLS is a list of built-in tools that do not modify the user's
 // files or system state.
@@ -139,16 +143,14 @@ export function createPolicyEngineConfig(
     }
   }
 
-  // If auto-accept is enabled, allow all read-only tools.
+  // Allow all read-only tools.
   // Priority: 50
-  if (settings.tools?.autoAccept) {
-    for (const tool of READ_ONLY_TOOLS) {
-      rules.push({
-        toolName: tool,
-        decision: PolicyDecision.ALLOW,
-        priority: 50,
-      });
-    }
+  for (const tool of READ_ONLY_TOOLS) {
+    rules.push({
+      toolName: tool,
+      decision: PolicyDecision.ALLOW,
+      priority: 50,
+    });
   }
 
   // Only add write tool rules if not in YOLO mode
@@ -180,4 +182,22 @@ export function createPolicyEngineConfig(
     rules,
     defaultDecision: PolicyDecision.ASK_USER,
   };
+}
+
+export function createPolicyUpdater(
+  policyEngine: PolicyEngine,
+  messageBus: MessageBus,
+) {
+  messageBus.subscribe(
+    MessageBusType.UPDATE_POLICY,
+    async (message: UpdatePolicy) => {
+      const toolName = message.toolName;
+
+      policyEngine.addRule({
+        toolName,
+        decision: PolicyDecision.ALLOW,
+        priority: 200, // High priority to override other rules
+      });
+    },
+  );
 }
