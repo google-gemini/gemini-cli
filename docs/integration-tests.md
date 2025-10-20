@@ -59,10 +59,10 @@ npm run test:e2e -- --test-name-pattern "reads a file"
 ### Deflaking a test
 
 Before adding a **new** integration test, you should test it at least 5 times
-with the deflake script to make sure that it is not flaky.
+with the deflake workflow to make sure that it is not flaky.
 
 ```bash
-npm run deflake -- --runs=5 --command="npm run test:e2e -- -- --testNamePattern '<your-new-test-name>'"
+gh workflow run deflake.yml --ref <your-branch> -f test_name_pattern="<your-test-name-pattern>"
 ```
 
 ### Running all tests
