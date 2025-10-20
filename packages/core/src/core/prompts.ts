@@ -7,10 +7,11 @@
 import path from 'node:path';
 import fs from 'node:fs';
 import os from 'node:os';
-import { GlobTool } from '../tools/glob.js';
 import {
   EDIT_TOOL_NAME,
+  GLOB_TOOL_NAME,
   GREP_TOOL_NAME,
+  MEMORY_TOOL_NAME,
   READ_FILE_TOOL_NAME,
   READ_MANY_FILES_TOOL_NAME,
   SHELL_TOOL_NAME,
@@ -18,7 +19,6 @@ import {
 } from '../tools/tool-names.js';
 import process from 'node:process';
 import { isGitRepository } from '../utils/gitUtils.js';
-import { MemoryTool } from '../tools/memoryTool.js';
 import { CodebaseInvestigatorAgent } from '../agents/codebase-investigator.js';
 import type { Config } from '../config/config.js';
 import { GEMINI_DIR } from '../utils/paths.js';
@@ -131,11 +131,11 @@ When requested to perform tasks like fixing bugs, adding features, refactoring, 
 ${(function () {
   if (enableCodebaseInvestigator) {
     return `
-1. **Understand & Strategize:** Think about the user's request and the relevant codebase context. When the task involves **complex refactoring, codebase exploration or system-wide analysis**, your **first and primary tool** must be '${CodebaseInvestigatorAgent.name}'. Use it to build a comprehensive understanding of the code, its structure, and dependencies. For **simple, targeted searches** (like finding a specific function name, file path, or variable declaration), you should use '${GREP_TOOL_NAME}' or '${GlobTool.Name}' directly.
+1. **Understand & Strategize:** Think about the user's request and the relevant codebase context. When the task involves **complex refactoring, codebase exploration or system-wide analysis**, your **first and primary tool** must be '${CodebaseInvestigatorAgent.name}'. Use it to build a comprehensive understanding of the code, its structure, and dependencies. For **simple, targeted searches** (like finding a specific function name, file path, or variable declaration), you should use '${GREP_TOOL_NAME}' or '${GLOB_TOOL_NAME}' directly.
 2. **Plan:** Build a coherent and grounded (based on the understanding in step 1) plan for how you intend to resolve the user's task. If '${CodebaseInvestigatorAgent.name}' was used, do not ignore the output of '${CodebaseInvestigatorAgent.name}', you must use it as the foundation of your plan. Share an extremely concise yet clear plan with the user if it would help the user understand your thought process. As part of the plan, you should use an iterative development process that includes writing unit tests to verify your changes. Use output logs or debug statements as part of this process to arrive at a solution.`;
   }
   return `
-1. **Understand:** Think about the user's request and the relevant codebase context. Use '${GREP_TOOL_NAME}' and '${GlobTool.Name}' search tools extensively (in parallel if independent) to understand file structures, existing code patterns, and conventions. Use '${READ_FILE_TOOL_NAME}' and '${READ_MANY_FILES_TOOL_NAME}' to understand context and validate any assumptions you may have.
+1. **Understand:** Think about the user's request and the relevant codebase context. Use '${GREP_TOOL_NAME}' and '${GLOB_TOOL_NAME}' search tools extensively (in parallel if independent) to understand file structures, existing code patterns, and conventions. Use '${READ_FILE_TOOL_NAME}' and '${READ_MANY_FILES_TOOL_NAME}' to understand context and validate any assumptions you may have.
 2. **Plan:** Build a coherent and grounded (based on the understanding in step 1) plan for how you intend to resolve the user's task. Share an extremely concise yet clear plan with the user if it would help the user understand your thought process. As part of the plan, you should use an iterative development process that includes writing unit tests to verify your changes. Use output logs or debug statements as part of this process to arrive at a solution.`;
 })()}
 3. **Implement:** Use the available tools (e.g., '${EDIT_TOOL_NAME}', '${WRITE_FILE_TOOL_NAME}' '${SHELL_TOOL_NAME}' ...) to act on the plan, strictly adhering to the project's established conventions (detailed under 'Core Mandates').
@@ -216,7 +216,7 @@ ${(function () {
     return `- **Interactive Commands:** Prefer non-interactive commands when it makes sense; however, some commands are only interactive and expect user input during their execution (e.g. ssh, vim). If you choose to execute an interactive command consider letting the user know they can press \`ctrl + f\` to focus into the shell to provide input.`;
   }
 })()}
-- **Remembering Facts:** Use the '${MemoryTool.Name}' tool to remember specific, *user-related* facts or preferences when the user explicitly asks, or when they state a clear, concise piece of information that would help personalize or streamline *your future interactions with them* (e.g., preferred coding style, common project paths they use, personal tool aliases). This tool is for user-specific information that should persist across sessions. Do *not* use it for general project context or information. If unsure whether to save something, you can ask the user, "Should I remember that for you?"
+- **Remembering Facts:** Use the '${MEMORY_TOOL_NAME}' tool to remember specific, *user-related* facts or preferences when the user explicitly asks, or when they state a clear, concise piece of information that would help personalize or streamline *your future interactions with them* (e.g., preferred coding style, common project paths they use, personal tool aliases). This tool is for user-specific information that should persist across sessions. Do *not* use it for general project context or information. If unsure whether to save something, you can ask the user, "Should I remember that for you?"
 - **Respect User Confirmations:** Most tool calls (also denoted as 'function calls') will first require confirmation from the user, where they will either approve or cancel the function call. If a user cancels a function call, respect their choice and do _not_ try to make the function call again. It is okay to request the tool call again _only_ if the user requests that same tool call on a subsequent prompt. When a user cancels a function call, assume best intentions from the user and consider inquiring if they prefer any alternative paths forward.
 
 ## Interaction Details

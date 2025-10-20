@@ -260,11 +260,9 @@ class GlobToolInvocation extends BaseToolInvocation<
  * Implementation of the Glob tool logic
  */
 export class GlobTool extends BaseDeclarativeTool<GlobToolParams, ToolResult> {
-  static readonly Name = GLOB_TOOL_NAME;
-
   constructor(private config: Config) {
     super(
-      GlobTool.Name,
+      GLOB_TOOL_NAME,
       'FindFiles',
       'Efficiently finds files matching specific glob patterns (e.g., `src/**/*.ts`, `**/*.md`), returning absolute paths sorted by modification time (newest first). Ideal for quickly locating files based on their name or path structure, especially in large codebases.',
       Kind.Search,
