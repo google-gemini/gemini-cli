@@ -1,8 +1,9 @@
 name: 'Test Chained E2E'
 
-workflow_run:
-    workflows: ['Trigger E2E']
-    types: ['completed']
+on:
+  workflow_run:
+      workflows: ['Trigger E2E']
+      types: ['completed']
 
 jobs:
   chained_e2e:
