@@ -79,10 +79,7 @@ jobs:
   e2e_linux:
     name: 'E2E Test (Linux) - ${{ matrix.sandbox }}'
     needs: 
-      - 'merge_queue_skipper'
       - 'download_repo_name'
-    if: |
-      needs.merge_queue_skipper.outputs.skip == 'false'
     runs-on: 'gemini-cli-ubuntu-16-core'
     strategy:
       fail-fast: false
@@ -131,10 +128,7 @@ jobs:
   e2e_mac:
     name: 'E2E Test (macOS)'
     needs: 
-      - 'merge_queue_skipper'
       - 'download_repo_name'
-    if: |
-      needs.merge_queue_skipper.outputs.skip == 'false'
     runs-on: 'macos-latest'
     steps:
       - name: 'Checkout'
@@ -231,10 +225,11 @@ jobs:
   e2e:
     name: 'E2E'
     if: |
-      always()
+      always() && needs.merge_queue_skipper.outputs.skip == 'false'
     needs:
       - 'e2e_linux'
       - 'e2e_mac'
+      - 'merge_queue_skipper'
     runs-on: 'gemini-cli-ubuntu-16-core'
     steps:
       - name: 'Check E2E test results'
