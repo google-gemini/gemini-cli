@@ -8,6 +8,8 @@ on:
         required: true
         default: 'main'
         type: 'string'
+      repo_name:
+        description: 
 
 jobs:
   save_repo_name:

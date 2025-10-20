@@ -4,6 +4,15 @@ on:
   workflow_run:
     workflows: ['Trigger E2E']
     types: ['completed']
+  workflow_dispatch:
+    inputs:
+      head_sha:
+        description: 'SHA of the commit to test'
+        required: true
+      repo_name:
+        description: 'Repository name (e.g., owner/repo)'
+        required: true
+        default: '${{ github.repository }}'
 
 concurrency:
   group: '${{ github.workflow }}-${{ github.head_ref || github.ref }}'
