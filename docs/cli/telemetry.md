@@ -222,79 +222,75 @@ For local development and debugging, you can capture telemetry data locally:
 
 ## Performance Monitoring
 
-Gemini CLI captures startup timing, memory usage, and operational efficiency so
-you can spot regressions early and understand runtime behavior.
+Gemini CLI ships a performance monitoring toolkit that rides on the telemetry
+stack. When telemetry is enabled, the toolkit can publish startup timings,
+activity-aware memory samples, and regression signals without flooding your
+backend.
 
-### Memory Monitoring
+### Architecture
 
-The memory monitor records snapshots based on user activity, high-water marks,
-and rate limiting to minimize noise while preserving fidelity.
+- **Activity detection**: a global `ActivityDetector` tracks user interaction
+  state and goes idle after 30 seconds without input.
+- **Memory monitor**: `MemoryMonitor` samples V8/Node memory every 10 seconds,
+  but only records snapshots when the session is active and growth is
+  meaningful.
+- **Performance metrics API**: the metrics layer exposes counters and histograms
+  for startup phases, memory usage, CPU, tool execution, API request breakdowns,
+  token efficiency, and regression scoring.
 
-#### Activity-Driven Monitoring
+### Activity-Aware Memory Monitoring
 
-- **Idle detection** pauses monitoring after 30 seconds of inactivity.
-- **Activity triggers** capture snapshots for user input, streaming start/end,
-  tool scheduling, and history updates.
-- **Smart frequency** samples every 10 seconds but records only when recent
-  activity signals meaningful change.
+- **Activity triggers**: the CLI records user activity for prompt submission,
+  tool scheduling, and stream start/end. Idle sessions stop emitting memory
+  telemetry after ~30 seconds of inactivity.
+- **High-water marks**: snapshots are emitted when RSS or heap usage grows more
+  than 5 % beyond the previous maximum. Baseline snapshots still run so long as
+  the monitor remains active.
+- **Rate limiting**: routine snapshots are limited to once per minute. Growth
+  events bypass the routine limit but are capped at one every 30 seconds.
+- **Metrics recorded**: `heap_used`, `heap_total`, `external`, and `rss` metrics
+  are exported for each snapshot.
 
-#### High-Water Mark Tracking
+### Enabling the Monitors in Integrations
 
-- **Growth thresholds** record once memory grows 5% beyond the prior maximum.
-- **Noise filtering** smooths garbage-collection spikes via weighted averages.
-- **Per-metric tracking** maintains independent high-water marks for RSS and
-  heap usage.
+Telemetry initialization is automatic, but performance monitoring is opt-in so
+you can control when to start emitting data:
 
-#### Rate Limiting
+```ts
+import {
+  startGlobalActivityMonitoring,
+  startGlobalMemoryMonitoring,
+  stopGlobalActivityMonitoring,
+  stopGlobalMemoryMonitoring,
+} from '@google/gemini-cli-core';
 
-- **Standard interval** limits routine recordings to once per minute.
-- **High-priority events** bypass the standard limit but are capped (for
-  example, once every 30 seconds).
-- **Context awareness** maintains separate cadence for startup, periodic, and
-  activity-triggered events.
+// Once telemetry has been initialized:
+startGlobalActivityMonitoring(config);
+startGlobalMemoryMonitoring(config); // defaults to a 10 s sampling interval
 
-#### Memory Metrics Tracked
-
-- **Heap usage** (current and total V8 allocation)
-- **External memory** (C++ objects retained by the runtime)
-- **Resident Set Size (RSS)** (physical memory in use)
-- **Array buffers** (dedicated tracking of ArrayBuffer allocations)
-- **Heap size limit** (configured upper bound for V8)
-
-#### Configuration Example
-
-Configure activity-aware monitoring in `settings.json`:
-
-```json
-{
-  "activityMonitoring": {
-    "enabled": true,
-    "snapshotThrottleMs": 1000,
-    "maxEventBuffer": 100,
-    "triggerActivities": [
-      "user_input_start",
-      "message_added",
-      "tool_call_scheduled",
-      "stream_start"
-    ]
-  }
-}
+// On shutdown:
+stopGlobalActivityMonitoring();
+stopGlobalMemoryMonitoring(config);
 ```
 
-#### Performance Impact
-
-- **Reduced noise**: inactive sessions emit no telemetry.
-- **Targeted sampling**: activity-driven triggers cut volume by 80–90% compared
-  with naive polling.
-- **Resource awareness**: lightweight tracking avoids additional CPU or memory
-  pressure.
+Both monitors honour `isPerformanceMonitoringActive()`, so they only run when
+telemetry is enabled for the session.
 
 ### Performance Scoring and Regression Detection
 
-- **Baseline comparison** tracks changes against stored performance baselines.
-- **Regression detection** flags degradations with severity levels.
-- **Efficiency metrics** cover token usage, API breakdowns, and composite
-  performance scores.
+The metrics layer also provides helpers such as `recordPerformanceScore`,
+`recordPerformanceRegression`, and `recordBaselineComparison`. Supply your own
+scores or baseline comparisons and the telemetry pipeline will publish them as
+histograms and counters. This keeps regression detection flexible while reusing
+the same OpenTelemetry exporters.
+
+### Configuration and Defaults
+
+There are no additional `settings.json` switches for activity monitoring yet.
+Use the existing telemetry settings (`enabled`, `target`, `otlpEndpoint`, etc.)
+to activate the pipeline. Snapshot throttling (1 s), buffer sizes (100 events),
+and trigger sets are currently fixed in code so that all environments share the
+same defaults.
 
 ## Logs and Metrics
 
