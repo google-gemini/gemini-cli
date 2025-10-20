@@ -44,7 +44,6 @@ describe('directoryCommand', () => {
       shouldLoadMemoryFromIncludeDirectories: () => false,
       getDebugMode: () => false,
       getFileService: () => ({}),
-      getExtensionContextFilePaths: () => [],
       getFileFilteringOptions: () => ({ ignore: [], include: [] }),
       setUserMemory: vi.fn(),
       setGeminiMdFileCount: vi.fn(),
