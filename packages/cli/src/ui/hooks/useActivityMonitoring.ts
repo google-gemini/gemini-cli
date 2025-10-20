@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useCallback, useMemo } from 'react';
+import { useCallback, useEffect, useMemo } from 'react';
 import type { Config } from '@google/gemini-cli-core';
 import {
   getActivityMonitor,
@@ -116,6 +116,16 @@ export function useActivityMonitoring(
       timeRange: null,
     };
   }, []);
+
+  // Cleanup on unmount
+  useEffect(
+    () => () => {
+      if (enabled) {
+        stopGlobalActivityMonitoring();
+      }
+    },
+    [enabled],
+  );
 
   return {
     recordActivity,
