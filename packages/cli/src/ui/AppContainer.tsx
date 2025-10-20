@@ -44,7 +44,6 @@ import {
   type ResumedSessionData,
   ShellExecutionService,
 } from '@google/gemini-cli-core';
-import type { Part } from '@google/genai';
 import { validateAuthMethod } from '../config/auth.js';
 import { loadHierarchicalGeminiMemory } from '../config/config.js';
 import process from 'node:process';
@@ -90,9 +89,9 @@ import { useMessageQueue } from './hooks/useMessageQueue.js';
 import { useAutoAcceptIndicator } from './hooks/useAutoAcceptIndicator.js';
 import { useSessionStats } from './contexts/SessionContext.js';
 import { useGitBranchName } from './hooks/useGitBranchName.js';
-import { convertSessionToHistoryFormats } from './hooks/useSessionBrowser.js';
 import { useExtensionUpdates } from './hooks/useExtensionUpdates.js';
 import { ShellFocusContext } from './contexts/ShellFocusContext.js';
+import { useSessionResume } from './hooks/useSessionResume.js';
 
 const CTRL_EXIT_PROMPT_DURATION_MS = 1000;
 const QUEUE_ERROR_DISPLAY_DURATION_MS = 3000;
@@ -366,52 +365,18 @@ export const AppContainer = (props: AppContainerProps) => {
   const isAuthDialogOpen = authState === AuthState.Updating;
   const isAuthenticating = authState === AuthState.Unauthenticated;
 
+  // Session browser and resume functionality
   const isGeminiClientInitialized = config.getGeminiClient()?.isInitialized();
 
-  const loadHistoryForResume = useCallback(
-    (
-      uiHistory: HistoryItemWithoutId[],
-      clientHistory: Array<{ role: 'user' | 'model'; parts: Part[] }>,
-      resumedData: ResumedSessionData,
-    ) => {
-      // Wait for the client.
-      if (!isGeminiClientInitialized) {
-        return;
-      }
-
-      // Now that we have the client, load the history into the UI and the client.
-      setQuittingMessages(null);
-      historyManager.clearItems();
-      uiHistory.forEach((item, index) => {
-        historyManager.addItem(item, index);
-      });
-      refreshStatic(); // Force Static component to re-render with the updated history.
-
-      // Give the history to the Gemini client.
-      config.getGeminiClient()?.resumeChat(clientHistory, resumedData);
-    },
-    [
-      historyManager,
-      config,
-      refreshStatic,
-      isGeminiClientInitialized,
-      setQuittingMessages,
-    ],
-  );
-  // Handle interactive resume from the command line (-r/--resume without -p/--prompt-interactive).
-  // Only if we're not authenticating, though.
-  useEffect(() => {
-    if (resumedSessionData && !isAuthenticating) {
-      const historyData = convertSessionToHistoryFormats(
-        resumedSessionData.conversation.messages,
-      );
-      loadHistoryForResume(
-        historyData.uiHistory,
-        historyData.clientHistory,
-        resumedSessionData,
-      );
-    }
-  }, [resumedSessionData, isAuthenticating, loadHistoryForResume]);
+  useSessionResume({
+    config,
+    historyManager,
+    refreshStatic,
+    isGeminiClientInitialized,
+    setQuittingMessages,
+    resumedSessionData,
+    isAuthenticating,
+  });
 
   // Create handleAuthSelect wrapper for backward compatibility
   const handleAuthSelect = useCallback(
