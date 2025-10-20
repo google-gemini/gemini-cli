@@ -29,13 +29,13 @@ import {
   DEFAULT_GEMINI_EMBEDDING_MODEL,
   DEFAULT_MEMORY_FILE_FILTERING_OPTIONS,
   FileDiscoveryService,
-  EditTool,
   WRITE_FILE_TOOL_NAME,
   SHELL_TOOL_NAMES,
   SHELL_TOOL_NAME,
   resolveTelemetrySettings,
   FatalConfigError,
   getPty,
+  EDIT_TOOL_NAME,
 } from '@google/gemini-cli-core';
 import type { Settings } from './settings.js';
 
@@ -506,7 +506,7 @@ export async function loadCliConfig(
   if (!interactive && !argv.experimentalAcp) {
     const defaultExcludes = [
       SHELL_TOOL_NAME,
-      EditTool.Name,
+      EDIT_TOOL_NAME,
       WRITE_FILE_TOOL_NAME,
     ];
     const autoEditExcludes = [SHELL_TOOL_NAME];
