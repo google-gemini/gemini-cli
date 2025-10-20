@@ -873,10 +873,10 @@ Logging in with Google... Please restart Gemini CLI to continue.
   }, [handleNewMessage]);
 
   useEffect(() => {
-    if (ctrlCPressCount >= 2) {
+    if (ctrlCPressCount > 2) {
       recordExitFail(config);
     }
-    if (ctrlCPressCount >= 1) {
+    if (ctrlCPressCount > 1) {
       handleSlashCommand('/quit');
     } else {
       ctrlCTimerRef.current = setTimeout(() => {
@@ -887,10 +887,10 @@ Logging in with Google... Please restart Gemini CLI to continue.
   }, [ctrlCPressCount, config, setCtrlCPressCount, handleSlashCommand]);
 
   useEffect(() => {
-    if (ctrlDPressCount >= 2) {
+    if (ctrlDPressCount > 2) {
       recordExitFail(config);
     }
-    if (ctrlDPressCount >= 1) {
+    if (ctrlDPressCount > 1) {
       handleSlashCommand('/quit');
     } else {
       ctrlDTimerRef.current = setTimeout(() => {
