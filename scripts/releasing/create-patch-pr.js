@@ -275,8 +275,6 @@ function branchExists(branchName) {
 
 function getLatestReleaseInfo({ argv, channel } = {}) {
   console.log(`Fetching latest release info for channel: ${channel}...`);
-  // 'stable' or 'preview'
-  const command = `node scripts/get-release-version.js --type=patch --patch-from=${channel}`;
   const patchFrom = channel; // 'stable' or 'preview'
   const command = `node scripts/get-release-version.js --cli-package-name="${argv['cli-package-name']}" --type=patch --patch-from=${patchFrom}`;
   try {

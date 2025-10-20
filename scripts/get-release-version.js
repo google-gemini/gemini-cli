@@ -231,7 +231,6 @@ function doesVersionExist({ args, version } = {}) {
   return false;
 }
 
-function getAndVerifyTags(npmDistTag) {
 function getAndVerifyTags({ npmDistTag, args } = {}) {
   // Detect rollback scenarios and get the correct baseline
   const rollbackInfo = detectRollbackAndGetBaseline({ args, npmDistTag });
