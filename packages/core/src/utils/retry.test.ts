@@ -513,17 +513,12 @@ describe('retryWithBackoff', () => {
       initialDelayMs: 100,
       signal: abortController.signal,
     });
-
-    // eslint-disable-next-line vitest/valid-expect
-    const assertPromise = expect(promise).rejects.toThrow(
-      expect.objectContaining({ name: 'AbortError' }),
-    );
     await vi.advanceTimersByTimeAsync(50);
-
     abortController.abort();
 
-    await assertPromise;
-
+    await expect(promise).rejects.toThrow(
+      expect.objectContaining({ name: 'AbortError' }),
+    );
     expect(mockFn).toHaveBeenCalledTimes(1);
   });
 });
