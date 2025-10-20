@@ -135,13 +135,17 @@ describe('useActivityMonitoring', () => {
     expect(stopGlobalActivityMonitoring).toHaveBeenCalled();
   });
 
-  it('should cleanup on unmount', () => {
+  it('should cleanup on unmount', async () => {
     const { unmount } = renderHook(() => useActivityMonitoring(mockConfig));
+
+    const { stopGlobalActivityMonitoring } = await import(
+      '@google/gemini-cli-core'
+    );
 
     unmount();
 
-    // Cleanup should happen automatically via useEffect
-    expect(true).toBe(true); // Test passes if no errors thrown
+    // Verify cleanup was called automatically via useEffect
+    expect(stopGlobalActivityMonitoring).toHaveBeenCalled();
   });
 });
 
