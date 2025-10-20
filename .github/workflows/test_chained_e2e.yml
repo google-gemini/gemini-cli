@@ -32,11 +32,11 @@ jobs:
 
   download_repo_name:
     runs-on: 'gemini-cli-ubuntu-16-core'
-    if: ${{ github.event_name == 'workflow_run' }}
     outputs:
       repo_name: '${{ steps.output-repo-name.outputs.repo_name }}'
     steps:
       - name: 'Download artifact'
+        if: ${{ github.event_name == 'workflow_run' }}
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # ratchet:actions/github-script@v8
         with:
           script: |
@@ -62,8 +62,10 @@ jobs:
             }
             fs.writeFileSync(path.join(temp, 'repo_name.zip'), Buffer.from(download.data));
       - name: 'Unzip artifact'
+        if: ${{ github.event_name == 'workflow_run' }}
         run: unzip "${{ runner.temp }}/artifacts/repo_name.zip" -d "${{ runner.temp }}/artifacts"
       - name: 'Output Repo Name'
+        if: ${{ github.event_name == 'workflow_run' }}
         id: 'output-repo-name'
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # ratchet:actions/github-script@v8
         with:
@@ -75,13 +77,17 @@ jobs:
             const repo_name = Number(fs.readFileSync(path.join(temp, 'repo_name')));
             core.setOutput('repo_name', repo_name);'
           core: true
+      - name: 'Output Input Repo Name'
+        if: ${{ github.event_name != 'workflow_run' }}
+        id: 'output-input-repo-name'
+        run: |
+          echo "repo_name=${{ github.event.inputs.repo_name }}" >> "$GITHUB_OUTPUT"
+        shell: bash
 
   e2e_linux:
     name: 'E2E Test (Linux) - ${{ matrix.sandbox }}'
     needs: 
       - 'download_repo_name'
-    if: |
-      needs.download_repo_name.result == 'success' || needs.download_repo_name.result == 'skipped'
     runs-on: 'gemini-cli-ubuntu-16-core'
     strategy:
       fail-fast: false
@@ -97,7 +103,7 @@ jobs:
         uses: 'actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955' # ratchet:actions/checkout@v5
         with:
           ref: '${{ github.event.inputs.head_sha || github.event.workflow_run.head_sha }}'
-          repository: '${{ github.event.inputs.repo_name || needs.download_repo_name.outputs.repo_name }}'
+          repository: '${{ needs.download_repo_name.outputs.repo_name }}'
 
       - name: 'Set up Node.js ${{ matrix.node-version }}'
         uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions-node@v4
@@ -131,15 +137,13 @@ jobs:
     name: 'E2E Test (macOS)'
     needs: 
       - 'download_repo_name'
-    if: |
-      needs.download_repo_name.result == 'success' || needs.download_repo_name.result == 'skipped'
     runs-on: 'macos-latest'
     steps:
       - name: 'Checkout'
         uses: 'actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955' # ratchet:actions/checkout@v5
         with:
           ref: '${{ github.event.inputs.head_sha || github.event.workflow_run.head_sha }}'
-          repository: '${{ github.event.inputs.repo_name || needs.download_repo_name.outputs.repo_name }}'
+          repository: '${{ needs.download_repo_name.outputs.repo_name }}'
 
       - name: 'Set up Node.js 20.x'
         uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions-node@v4
@@ -171,8 +175,7 @@ jobs:
       - 'merge_queue_skipper'
       - 'download_repo_name'
     if: |
-      needs.merge_queue_skipper.outputs.skip == 'false' &&
-      (needs.download_repo_name.result == 'success' || needs.download_repo_name.result == 'skipped')
+      needs.merge_queue_skipper.outputs.skip == 'false'
     runs-on: 'gemini-cli-windows-16-core'
     continue-on-error: true
 
@@ -181,7 +184,7 @@ jobs:
         uses: 'actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955' # ratchet:actions/checkout@v5
         with:
           ref: '${{ github.event.inputs.head_sha || github.event.workflow_run.head_sha }}'
-          repository: '${{ github.event.inputs.repo_name || needs.download_repo_name.outputs.repo_name }}'
+          repository: '${{ needs.download_repo_name.outputs.repo_name }}'
 
       - name: 'Set up Node.js 20.x'
         uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions-node@v4
