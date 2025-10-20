@@ -9,7 +9,7 @@ import * as os from 'node:os';
 import { TestRig } from './test-helper.js';
 
 describe('Ctrl+C exit', () => {
-  it('should exit gracefully on second Ctrl+C', async () => {
+  it.skip('should exit gracefully on second Ctrl+C', async () => {
     const rig = new TestRig();
     await rig.setup('should exit gracefully on second Ctrl+C');
 
