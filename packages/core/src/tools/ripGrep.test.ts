@@ -107,7 +107,9 @@ describe('canUseRipgrep', () => {
     const expectedPath = path.join(binDir, candidateNames[0]);
     const existenceMap = new Map<string, boolean>();
 
-    (fileExists as Mock).mockImplementation(async (filePath: string) => existenceMap.get(filePath) ?? false);
+    (fileExists as Mock).mockImplementation(
+      async (filePath: string) => existenceMap.get(filePath) ?? false,
+    );
 
     const downloadMock = downloadRipGrep as Mock;
     downloadMock.mockImplementation(
