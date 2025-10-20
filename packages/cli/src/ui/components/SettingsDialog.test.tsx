@@ -28,6 +28,7 @@ import { LoadedSettings, SettingScope } from '../../config/settings.js';
 import { VimModeProvider } from '../contexts/VimModeContext.js';
 import { KeypressProvider } from '../contexts/KeypressContext.js';
 import { act } from 'react';
+import { waitFor } from '@testing-library/react';
 import { saveModifiedSettings, TEST_ONLY } from '../../utils/settingsUtils.js';
 import {
   getSettingsSchema,
@@ -247,29 +248,6 @@ const TOOLS_SHELL_FAKE_SCHEMA: SettingsSchemaType = {
 describe('SettingsDialog', () => {
   // Simple delay function for remaining tests that need gradual migration
   const wait = (ms = 50) => new Promise((resolve) => setTimeout(resolve, ms));
-
-  // Custom waitFor utility for ink testing environment (not compatible with @testing-library/react)
-  const waitFor = async (
-    predicate: () => void,
-    options: { timeout?: number; interval?: number } = {},
-  ) => {
-    const { timeout = 1000, interval = 10 } = options;
-    const start = Date.now();
-    let lastError: unknown;
-    while (Date.now() - start < timeout) {
-      try {
-        predicate();
-        return;
-      } catch (e) {
-        lastError = e;
-      }
-      await new Promise((resolve) => setTimeout(resolve, interval));
-    }
-    if (lastError) {
-      throw lastError;
-    }
-    throw new Error('waitFor timed out');
-  };
 
   beforeEach(() => {
     // Reset keypress mock state (variables are commented out)
