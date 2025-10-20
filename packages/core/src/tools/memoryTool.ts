@@ -23,9 +23,10 @@ import type {
   ModifyContext,
 } from './modifiable-tool.js';
 import { ToolErrorType } from './tool-error.js';
+import { MEMORY_TOOL_NAME } from './tool-names.js';
 
 const memoryToolSchemaData: FunctionDeclaration = {
-  name: 'save_memory',
+  name: MEMORY_TOOL_NAME,
   description:
     'Saves a specific piece of information or fact to your long-term memory. Use this when the user explicitly asks you to remember something, or when they state a clear, concise fact that seems important to retain for future interactions.',
   parametersJsonSchema: {
@@ -288,10 +289,9 @@ export class MemoryTool
   extends BaseDeclarativeTool<SaveMemoryParams, ToolResult>
   implements ModifiableDeclarativeTool<SaveMemoryParams>
 {
-  static readonly Name: string = memoryToolSchemaData.name!;
   constructor() {
     super(
-      MemoryTool.Name,
+      MEMORY_TOOL_NAME,
       'Save Memory',
       memoryToolDescription,
       Kind.Think,

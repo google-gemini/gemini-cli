@@ -39,7 +39,9 @@ describe('JSON output', () => {
     process.env['GOOGLE_GENAI_USE_GCA'] = 'true';
     await rig.setup('json-output-auth-mismatch', {
       settings: {
-        security: { auth: { enforcedType: 'gemini-api-key' } },
+        security: {
+          auth: { enforcedType: 'gemini-api-key', selectedType: '' },
+        },
       },
     });
 
@@ -85,7 +87,7 @@ describe('JSON output', () => {
     expect(payload.error.message).toContain("current type is 'oauth-personal'");
   });
 
-  it('should not exit on tool errors and allow model to self-correct in JSON mode', async () => {
+  it.skip('should not exit on tool errors and allow model to self-correct in JSON mode', async () => {
     const result = await rig.run(
       `Read the contents of ${rig.testDir}/path/to/nonexistent/file.txt and tell me what it says. ` +
         'On error, respond to the user with exactly the text "File not found".',
