@@ -46,6 +46,8 @@ import { StartSessionEvent } from '../telemetry/index.js';
 import {
   DEFAULT_GEMINI_EMBEDDING_MODEL,
   DEFAULT_GEMINI_FLASH_MODEL,
+  DEFAULT_GEMINI_MODEL,
+  DEFAULT_THINKING_MODE,
 } from './models.js';
 import { shouldAttemptBrowserLaunch } from '../utils/browser.js';
 import type { MCPOAuthConfig } from '../mcp/oauth-provider.js';
@@ -139,6 +141,7 @@ export interface GeminiCLIExtension {
   mcpServers?: Record<string, MCPServerConfig>;
   contextFiles: string[];
   excludeTools?: string[];
+  id?: string;
 }
 
 export interface ExtensionInstallMetadata {
@@ -216,7 +219,7 @@ export interface ConfigParameters {
   targetDir: string;
   debugMode: boolean;
   question?: string;
-  fullContext?: boolean;
+
   coreTools?: string[];
   allowedTools?: string[];
   excludeTools?: string[];
@@ -278,7 +281,9 @@ export interface ConfigParameters {
   enableMessageBusIntegration?: boolean;
   codebaseInvestigatorSettings?: CodebaseInvestigatorSettings;
   continueOnFailedApiCall?: boolean;
+  retryFetchErrors?: boolean;
   enableShellOutputEfficiency?: boolean;
+  ptyInfo?: string;
 }
 
 export class Config {
@@ -295,7 +300,7 @@ export class Config {
   private workspaceContext: WorkspaceContext;
   private readonly debugMode: boolean;
   private readonly question: string | undefined;
-  private readonly fullContext: boolean;
+
   private readonly coreTools: string[] | undefined;
   private readonly allowedTools: string[] | undefined;
   private readonly excludeTools: string[] | undefined;
@@ -349,6 +354,7 @@ export class Config {
   private readonly loadMemoryFromIncludeDirectories: boolean = false;
   private readonly chatCompression: ChatCompressionSettings | undefined;
   private readonly interactive: boolean;
+  private readonly ptyInfo: string;
   private readonly trustedFolder: boolean | undefined;
   private readonly useRipgrep: boolean;
   private readonly enableInteractiveShell: boolean;
@@ -370,8 +376,9 @@ export class Config {
   private readonly outputSettings: OutputSettings;
   private readonly useModelRouter: boolean;
   private readonly enableMessageBusIntegration: boolean;
-  private readonly codebaseInvestigatorSettings?: CodebaseInvestigatorSettings;
+  private readonly codebaseInvestigatorSettings: CodebaseInvestigatorSettings;
   private readonly continueOnFailedApiCall: boolean;
+  private readonly retryFetchErrors: boolean;
   private readonly enableShellOutputEfficiency: boolean;
 
   constructor(params: ConfigParameters) {
@@ -387,7 +394,7 @@ export class Config {
     );
     this.debugMode = params.debugMode;
     this.question = params.question;
-    this.fullContext = params.fullContext ?? false;
+
     this.coreTools = params.coreTools;
     this.allowedTools = params.allowedTools;
     this.excludeTools = params.excludeTools;
@@ -444,6 +451,7 @@ export class Config {
       params.loadMemoryFromIncludeDirectories ?? false;
     this.chatCompression = params.chatCompression;
     this.interactive = params.interactive ?? false;
+    this.ptyInfo = params.ptyInfo ?? 'child_process';
     this.trustedFolder = params.trustedFolder;
     this.useRipgrep = params.useRipgrep ?? true;
     this.enableInteractiveShell = params.enableInteractiveShell ?? false;
@@ -465,7 +473,15 @@ export class Config {
     this.useModelRouter = params.useModelRouter ?? false;
     this.enableMessageBusIntegration =
       params.enableMessageBusIntegration ?? false;
-    this.codebaseInvestigatorSettings = params.codebaseInvestigatorSettings;
+    this.codebaseInvestigatorSettings = {
+      enabled: params.codebaseInvestigatorSettings?.enabled ?? true,
+      maxNumTurns: params.codebaseInvestigatorSettings?.maxNumTurns ?? 15,
+      maxTimeMinutes: params.codebaseInvestigatorSettings?.maxTimeMinutes ?? 5,
+      thinkingBudget:
+        params.codebaseInvestigatorSettings?.thinkingBudget ??
+        DEFAULT_THINKING_MODE,
+      model: params.codebaseInvestigatorSettings?.model ?? DEFAULT_GEMINI_MODEL,
+    };
     this.continueOnFailedApiCall = params.continueOnFailedApiCall ?? true;
     this.enableShellOutputEfficiency =
       params.enableShellOutputEfficiency ?? true;
@@ -479,6 +495,7 @@ export class Config {
     this.outputSettings = {
       format: params.output?.format ?? OutputFormat.TEXT,
     };
+    this.retryFetchErrors = params.retryFetchErrors ?? false;
 
     if (params.contextFileName) {
       setGeminiMdFilename(params.contextFileName);
@@ -677,10 +694,6 @@ export class Config {
   }
   getQuestion(): string | undefined {
     return this.question;
-  }
-
-  getFullContext(): boolean {
-    return this.fullContext;
   }
 
   getCoreTools(): string[] | undefined {
@@ -950,6 +963,14 @@ export class Config {
     return this.chatCompression;
   }
 
+  isInteractiveShellEnabled(): boolean {
+    return (
+      this.interactive &&
+      this.ptyInfo !== 'child_process' &&
+      this.enableInteractiveShell
+    );
+  }
+
   isInteractive(): boolean {
     return this.interactive;
   }
@@ -968,6 +989,10 @@ export class Config {
 
   getContinueOnFailedApiCall(): boolean {
     return this.continueOnFailedApiCall;
+  }
+
+  getRetryFetchErrors(): boolean {
+    return this.retryFetchErrors;
   }
 
   getEnableShellOutputEfficiency(): boolean {
@@ -1055,7 +1080,7 @@ export class Config {
     return this.enableMessageBusIntegration;
   }
 
-  getCodebaseInvestigatorSettings(): CodebaseInvestigatorSettings | undefined {
+  getCodebaseInvestigatorSettings(): CodebaseInvestigatorSettings {
     return this.codebaseInvestigatorSettings;
   }
 
@@ -1151,7 +1176,7 @@ export class Config {
     }
 
     // Register Subagents as Tools
-    if (this.getCodebaseInvestigatorSettings()?.enabled) {
+    if (this.getCodebaseInvestigatorSettings().enabled) {
       const definition = this.agentRegistry.getDefinition(
         'codebase_investigator',
       );

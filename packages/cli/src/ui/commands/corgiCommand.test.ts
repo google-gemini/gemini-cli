@@ -29,6 +29,6 @@ describe('corgiCommand', () => {
 
   it('should have the correct name and description', () => {
     expect(corgiCommand.name).toBe('corgi');
-    expect(corgiCommand.description).toBe('Toggles corgi mode.');
+    expect(corgiCommand.description).toBe('Toggles corgi mode');
   });
 });

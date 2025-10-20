@@ -216,6 +216,7 @@ describe('extensionsCommand', () => {
         version: '1.0.0',
         isActive: true,
         path: '/test/dir/ext-one',
+        contextFiles: [],
         installMetadata: {
           type: 'git',
           autoUpdate: false,
@@ -227,6 +228,7 @@ describe('extensionsCommand', () => {
         version: '1.0.0',
         isActive: true,
         path: '/test/dir/another-ext',
+        contextFiles: [],
         installMetadata: {
           type: 'git',
           autoUpdate: false,
@@ -238,6 +240,7 @@ describe('extensionsCommand', () => {
         version: '1.0.0',
         isActive: true,
         path: '/test/dir/all-ext',
+        contextFiles: [],
         installMetadata: {
           type: 'git',
           autoUpdate: false,
