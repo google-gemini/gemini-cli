@@ -96,6 +96,39 @@ describe('canUseRipgrep', () => {
     expect(fileExists).toHaveBeenCalledTimes(1);
     expect(downloadRipGrep).toHaveBeenCalledWith('/mock/bin/dir');
   });
+
+  it('should only download once when called concurrently', async () => {
+    const storageBinDirMock = Storage.getGlobalBinDir as Mock;
+    const binDir = '/mock/bin/dir';
+    storageBinDirMock.mockReturnValue(binDir);
+
+    const candidateNames =
+      process.platform === 'win32' ? ['rg.exe', 'rg'] : ['rg'];
+    const expectedPath = path.join(binDir, candidateNames[0]);
+    const existenceMap = new Map<string, boolean>();
+
+    (fileExists as Mock).mockImplementation(async (filePath: string) => existenceMap.get(filePath) ?? false);
+
+    const downloadMock = downloadRipGrep as Mock;
+    downloadMock.mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          setTimeout(() => {
+            existenceMap.set(expectedPath, true);
+            resolve();
+          }, 0);
+        }),
+    );
+
+    const firstCall = ensureRgPath();
+    const secondCall = ensureRgPath();
+
+    const [pathOne, pathTwo] = await Promise.all([firstCall, secondCall]);
+
+    expect(pathOne).toBe(expectedPath);
+    expect(pathTwo).toBe(expectedPath);
+    expect(downloadMock).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe('ensureRgPath', () => {

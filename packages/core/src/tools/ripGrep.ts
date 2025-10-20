@@ -36,13 +36,24 @@ async function resolveExistingRgPath(): Promise<string | null> {
   return null;
 }
 
+let ripgrepAcquisitionPromise: Promise<string | null> | null = null;
+
 async function ensureRipgrepAvailable(): Promise<string | null> {
   const existingPath = await resolveExistingRgPath();
   if (existingPath) {
     return existingPath;
   }
-  await downloadRipGrep(Storage.getGlobalBinDir());
-  return resolveExistingRgPath();
+  if (!ripgrepAcquisitionPromise) {
+    ripgrepAcquisitionPromise = (async () => {
+      try {
+        await downloadRipGrep(Storage.getGlobalBinDir());
+        return await resolveExistingRgPath();
+      } finally {
+        ripgrepAcquisitionPromise = null;
+      }
+    })();
+  }
+  return ripgrepAcquisitionPromise;
 }
 
 /**
