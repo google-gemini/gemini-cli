@@ -13,6 +13,7 @@ import { shortenPath, makeRelative } from '../utils/paths.js';
 import { type Config } from '../config/config.js';
 import { DEFAULT_FILE_FILTERING_OPTIONS } from '../config/constants.js';
 import { ToolErrorType } from './tool-error.js';
+import { GLOB_TOOL_NAME } from './tool-names.js';
 
 // Subset of 'Path' interface provided by 'glob' that we can implement for testing
 export interface GlobPath {
@@ -259,11 +260,9 @@ class GlobToolInvocation extends BaseToolInvocation<
  * Implementation of the Glob tool logic
  */
 export class GlobTool extends BaseDeclarativeTool<GlobToolParams, ToolResult> {
-  static readonly Name = 'glob';
-
   constructor(private config: Config) {
     super(
-      GlobTool.Name,
+      GLOB_TOOL_NAME,
       'FindFiles',
       'Efficiently finds files matching specific glob patterns (e.g., `src/**/*.ts`, `**/*.md`), returning absolute paths sorted by modification time (newest first). Ideal for quickly locating files based on their name or path structure, especially in large codebases.',
       Kind.Search,

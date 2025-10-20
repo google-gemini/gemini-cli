@@ -7,6 +7,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import * as Diff from 'diff';
+import { WRITE_FILE_TOOL_NAME } from './tool-names.js';
 import type { Config } from '../config/config.js';
 import { ApprovalMode } from '../config/config.js';
 import type {
@@ -318,7 +319,7 @@ class WriteFileToolInvocation extends BaseToolInvocation<
       logFileOperation(
         this.config,
         new FileOperationEvent(
-          WriteFileTool.Name,
+          WRITE_FILE_TOOL_NAME,
           operation,
           fileContent.split('\n').length,
           mimetype,
@@ -389,11 +390,9 @@ export class WriteFileTool
   extends BaseDeclarativeTool<WriteFileToolParams, ToolResult>
   implements ModifiableDeclarativeTool<WriteFileToolParams>
 {
-  static readonly Name: string = 'write_file';
-
   constructor(private readonly config: Config) {
     super(
-      WriteFileTool.Name,
+      WRITE_FILE_TOOL_NAME,
       'WriteFile',
       `Writes content to a specified file in the local filesystem.
 

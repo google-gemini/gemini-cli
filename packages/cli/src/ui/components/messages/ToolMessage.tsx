@@ -13,6 +13,7 @@ import { MarkdownDisplay } from '../../utils/MarkdownDisplay.js';
 import { AnsiOutputText } from '../AnsiOutput.js';
 import { GeminiRespondingSpinner } from '../GeminiRespondingSpinner.js';
 import { MaxSizedBox } from '../shared/MaxSizedBox.js';
+import { TodoListDisplay } from './Todo.js';
 import { ShellInputPrompt } from '../ShellInputPrompt.js';
 import {
   SHELL_COMMAND_NAME,
@@ -20,7 +21,8 @@ import {
   TOOL_STATUS,
 } from '../../constants.js';
 import { theme } from '../../semantic-colors.js';
-import type { AnsiOutput, Config } from '@google/gemini-cli-core';
+import type { AnsiOutput, Config, TodoList } from '@google/gemini-cli-core';
+import { useUIState } from '../../contexts/UIStateContext.js';
 
 const STATIC_HEIGHT = 1;
 const RESERVED_LINE_COUNT = 5; // for tool name, status, padding etc.
@@ -56,16 +58,48 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
   ptyId,
   config,
 }) => {
+  const { renderMarkdown } = useUIState();
   const isThisShellFocused =
     (name === SHELL_COMMAND_NAME || name === 'Shell') &&
     status === ToolCallStatus.Executing &&
     ptyId === activeShellPtyId &&
     embeddedShellFocused;
 
+  const [lastUpdateTime, setLastUpdateTime] = React.useState<Date | null>(null);
+  const [userHasFocused, setUserHasFocused] = React.useState(false);
+  const [showFocusHint, setShowFocusHint] = React.useState(false);
+
+  React.useEffect(() => {
+    if (resultDisplay) {
+      setLastUpdateTime(new Date());
+    }
+  }, [resultDisplay]);
+
+  React.useEffect(() => {
+    if (!lastUpdateTime) {
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      setShowFocusHint(true);
+    }, 5000);
+
+    return () => clearTimeout(timer);
+  }, [lastUpdateTime]);
+
+  React.useEffect(() => {
+    if (isThisShellFocused) {
+      setUserHasFocused(true);
+    }
+  }, [isThisShellFocused]);
+
   const isThisShellFocusable =
     (name === SHELL_COMMAND_NAME || name === 'Shell') &&
     status === ToolCallStatus.Executing &&
-    config?.getShouldUseNodePtyShell();
+    config?.getEnableInteractiveShell();
+
+  const shouldShowFocusHint =
+    isThisShellFocusable && (showFocusHint || userHasFocused);
 
   const availableHeight = availableTerminalHeight
     ? Math.max(
@@ -99,7 +133,7 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
           description={description}
           emphasis={emphasis}
         />
-        {isThisShellFocusable && (
+        {shouldShowFocusHint && (
           <Box marginLeft={1} flexShrink={0}>
             <Text color={theme.text.accent}>
               {isThisShellFocused ? '(Focused)' : '(ctrl+f to focus)'}
@@ -118,6 +152,7 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
                   isPending={false}
                   availableTerminalHeight={availableHeight}
                   terminalWidth={childWidth}
+                  renderMarkdown={renderMarkdown}
                 />
               </Box>
             ) : typeof resultDisplay === 'string' && !renderOutputAsMarkdown ? (
@@ -136,10 +171,14 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
                 availableTerminalHeight={availableHeight}
                 terminalWidth={childWidth}
               />
+            ) : typeof resultDisplay === 'object' &&
+              'todos' in resultDisplay ? (
+              <TodoListDisplay todos={resultDisplay as TodoList} />
             ) : (
               <AnsiOutputText
                 data={resultDisplay as AnsiOutput}
                 availableTerminalHeight={availableHeight}
+                width={childWidth}
               />
             )}
           </Box>

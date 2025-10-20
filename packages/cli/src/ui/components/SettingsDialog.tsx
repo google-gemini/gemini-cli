@@ -373,7 +373,7 @@ export function SettingsDialog({
   };
 
   // Height constraint calculations similar to ThemeDialog
-  const DIALOG_PADDING = 2;
+  const DIALOG_PADDING = 4;
   const SETTINGS_TITLE_HEIGHT = 2; // "Settings" title + spacing
   const SCROLL_ARROWS_HEIGHT = 2; // Up and down arrows
   const SPACING_HEIGHT = 1; // Space between settings list and scope
@@ -897,7 +897,7 @@ export function SettingsDialog({
         <Box height={1} />
         <Text color={theme.text.secondary}>
           (Use Enter to select
-          {showScopeSelection ? ', Tab to change focus' : ''})
+          {showScopeSelection ? ', Tab to change focus' : ''}, Esc to close)
         </Text>
         {showRestartPrompt && (
           <Text color={theme.status.warning}>

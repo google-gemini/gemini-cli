@@ -22,13 +22,12 @@ import {
   ToolConfirmationOutcome,
   ApprovalMode,
   logToolCall,
-  ReadFileTool,
   ToolErrorType,
   ToolCallEvent,
-  ShellTool,
   logToolOutputTruncated,
   ToolOutputTruncatedEvent,
 } from '../index.js';
+import { READ_FILE_TOOL_NAME, SHELL_TOOL_NAME } from '../tools/tool-names.js';
 import type { Part, PartListUnion } from '@google/genai';
 import { getResponseTextFromParts } from '../utils/generateContentResponseUtilities.js';
 import type { ModifyContext } from '../tools/modifiable-tool.js';
@@ -42,6 +41,8 @@ import * as path from 'node:path';
 import { doesToolInvocationMatch } from '../utils/tool-utils.js';
 import levenshtein from 'fast-levenshtein';
 import { ShellToolInvocation } from '../tools/shell.js';
+import type { ToolConfirmationRequest } from '../confirmation-bus/types.js';
+import { MessageBusType } from '../confirmation-bus/types.js';
 
 export type ValidatingToolCall = {
   status: 'validating';
@@ -299,10 +300,10 @@ export async function truncateAndSaveToFile(
     return {
       content: `Tool output was too large and has been truncated.
 The full output has been saved to: ${outputFile}
-To read the complete output, use the ${ReadFileTool.Name} tool with the absolute file path above. For large files, you can use the offset and limit parameters to read specific sections:
-- ${ReadFileTool.Name} tool with offset=0, limit=100 to see the first 100 lines
-- ${ReadFileTool.Name} tool with offset=N to skip N lines from the beginning
-- ${ReadFileTool.Name} tool with limit=M to read only M lines at a time
+To read the complete output, use the ${READ_FILE_TOOL_NAME} tool with the absolute file path above. For large files, you can use the offset and limit parameters to read specific sections:
+- ${READ_FILE_TOOL_NAME} tool with offset=0, limit=100 to see the first 100 lines
+- ${READ_FILE_TOOL_NAME} tool with offset=N to skip N lines from the beginning
+- ${READ_FILE_TOOL_NAME} tool with limit=M to read only M lines at a time
 The truncated output below shows the beginning and end of the content. The marker '... [CONTENT TRUNCATED] ...' indicates where content was removed.
 This allows you to efficiently examine different parts of the output without loading the entire file.
 Truncated part of the output:
@@ -352,6 +353,15 @@ export class CoreToolScheduler {
     this.onToolCallsUpdate = options.onToolCallsUpdate;
     this.getPreferredEditor = options.getPreferredEditor;
     this.onEditorClose = options.onEditorClose;
+
+    // Subscribe to message bus for ASK_USER policy decisions
+    if (this.config.getEnableMessageBusIntegration()) {
+      const messageBus = this.config.getMessageBus();
+      messageBus.subscribe(
+        MessageBusType.TOOL_CONFIRMATION_REQUEST,
+        this.handleToolConfirmationRequest.bind(this),
+      );
+    }
   }
 
   private setStatusInternal(
@@ -819,7 +829,7 @@ export class CoreToolScheduler {
           );
         }
       }
-      this.attemptExecutionOfScheduledCalls(signal);
+      await this.attemptExecutionOfScheduledCalls(signal);
       void this.checkAndNotifyCompletion();
     } finally {
       this.isScheduling = false;
@@ -894,7 +904,7 @@ export class CoreToolScheduler {
       }
       this.setStatusInternal(callId, 'scheduled');
     }
-    this.attemptExecutionOfScheduledCalls(signal);
+    await this.attemptExecutionOfScheduledCalls(signal);
   }
 
   /**
@@ -940,7 +950,9 @@ export class CoreToolScheduler {
     });
   }
 
-  private attemptExecutionOfScheduledCalls(signal: AbortSignal): void {
+  private async attemptExecutionOfScheduledCalls(
+    signal: AbortSignal,
+  ): Promise<void> {
     const allCallsFinalOrScheduled = this.toolCalls.every(
       (call) =>
         call.status === 'scheduled' ||
@@ -954,8 +966,8 @@ export class CoreToolScheduler {
         (call) => call.status === 'scheduled',
       );
 
-      callsToExecute.forEach((toolCall) => {
-        if (toolCall.status !== 'scheduled') return;
+      for (const toolCall of callsToExecute) {
+        if (toolCall.status !== 'scheduled') continue;
 
         const scheduledCall = toolCall;
         const { callId, name: toolName } = scheduledCall.request;
@@ -1007,107 +1019,106 @@ export class CoreToolScheduler {
           );
         }
 
-        promise
-          .then(async (toolResult: ToolResult) => {
-            if (signal.aborted) {
-              this.setStatusInternal(
-                callId,
-                'cancelled',
-                'User cancelled tool execution.',
-              );
-              return;
-            }
+        try {
+          const toolResult: ToolResult = await promise;
+          if (signal.aborted) {
+            this.setStatusInternal(
+              callId,
+              'cancelled',
+              'User cancelled tool execution.',
+            );
+            continue;
+          }
 
-            if (toolResult.error === undefined) {
-              let content = toolResult.llmContent;
-              let outputFile: string | undefined = undefined;
-              const contentLength =
-                typeof content === 'string' ? content.length : undefined;
-              if (
-                typeof content === 'string' &&
-                toolName === ShellTool.Name &&
-                this.config.getEnableToolOutputTruncation() &&
-                this.config.getTruncateToolOutputThreshold() > 0 &&
-                this.config.getTruncateToolOutputLines() > 0
-              ) {
-                const originalContentLength = content.length;
-                const threshold = this.config.getTruncateToolOutputThreshold();
-                const lines = this.config.getTruncateToolOutputLines();
-                const truncatedResult = await truncateAndSaveToFile(
-                  content,
-                  callId,
-                  this.config.storage.getProjectTempDir(),
-                  threshold,
-                  lines,
-                );
-                content = truncatedResult.content;
-                outputFile = truncatedResult.outputFile;
-
-                if (outputFile) {
-                  logToolOutputTruncated(
-                    this.config,
-                    new ToolOutputTruncatedEvent(
-                      scheduledCall.request.prompt_id,
-                      {
-                        toolName,
-                        originalContentLength,
-                        truncatedContentLength: content.length,
-                        threshold,
-                        lines,
-                      },
-                    ),
-                  );
-                }
-              }
-
-              const response = convertToFunctionResponse(
-                toolName,
-                callId,
+          if (toolResult.error === undefined) {
+            let content = toolResult.llmContent;
+            let outputFile: string | undefined = undefined;
+            const contentLength =
+              typeof content === 'string' ? content.length : undefined;
+            if (
+              typeof content === 'string' &&
+              toolName === SHELL_TOOL_NAME &&
+              this.config.getEnableToolOutputTruncation() &&
+              this.config.getTruncateToolOutputThreshold() > 0 &&
+              this.config.getTruncateToolOutputLines() > 0
+            ) {
+              const originalContentLength = content.length;
+              const threshold = this.config.getTruncateToolOutputThreshold();
+              const lines = this.config.getTruncateToolOutputLines();
+              const truncatedResult = await truncateAndSaveToFile(
                 content,
-              );
-              const successResponse: ToolCallResponseInfo = {
                 callId,
-                responseParts: response,
-                resultDisplay: toolResult.returnDisplay,
-                error: undefined,
-                errorType: undefined,
-                outputFile,
-                contentLength,
-              };
-              this.setStatusInternal(callId, 'success', successResponse);
-            } else {
-              // It is a failure
-              const error = new Error(toolResult.error.message);
-              const errorResponse = createErrorResponse(
+                this.config.storage.getProjectTempDir(),
+                threshold,
+                lines,
+              );
+              content = truncatedResult.content;
+              outputFile = truncatedResult.outputFile;
+
+              if (outputFile) {
+                logToolOutputTruncated(
+                  this.config,
+                  new ToolOutputTruncatedEvent(
+                    scheduledCall.request.prompt_id,
+                    {
+                      toolName,
+                      originalContentLength,
+                      truncatedContentLength: content.length,
+                      threshold,
+                      lines,
+                    },
+                  ),
+                );
+              }
+            }
+
+            const response = convertToFunctionResponse(
+              toolName,
+              callId,
+              content,
+            );
+            const successResponse: ToolCallResponseInfo = {
+              callId,
+              responseParts: response,
+              resultDisplay: toolResult.returnDisplay,
+              error: undefined,
+              errorType: undefined,
+              outputFile,
+              contentLength,
+            };
+            this.setStatusInternal(callId, 'success', successResponse);
+          } else {
+            // It is a failure
+            const error = new Error(toolResult.error.message);
+            const errorResponse = createErrorResponse(
+              scheduledCall.request,
+              error,
+              toolResult.error.type,
+            );
+            this.setStatusInternal(callId, 'error', errorResponse);
+          }
+        } catch (executionError: unknown) {
+          if (signal.aborted) {
+            this.setStatusInternal(
+              callId,
+              'cancelled',
+              'User cancelled tool execution.',
+            );
+          } else {
+            this.setStatusInternal(
+              callId,
+              'error',
+              createErrorResponse(
                 scheduledCall.request,
-                error,
-                toolResult.error.type,
-              );
-              this.setStatusInternal(callId, 'error', errorResponse);
-            }
-          })
-          .catch((executionError: Error) => {
-            if (signal.aborted) {
-              this.setStatusInternal(
-                callId,
-                'cancelled',
-                'User cancelled tool execution.',
-              );
-            } else {
-              this.setStatusInternal(
-                callId,
-                'error',
-                createErrorResponse(
-                  scheduledCall.request,
-                  executionError instanceof Error
-                    ? executionError
-                    : new Error(String(executionError)),
-                  ToolErrorType.UNHANDLED_EXCEPTION,
-                ),
-              );
-            }
-          });
-      });
+                executionError instanceof Error
+                  ? executionError
+                  : new Error(String(executionError)),
+                ToolErrorType.UNHANDLED_EXCEPTION,
+              ),
+            );
+          }
+        }
+      }
     }
   }
 
@@ -1156,6 +1167,26 @@ export class CoreToolScheduler {
         ...call,
         outcome,
       };
+    });
+  }
+
+  /**
+   * Handle tool confirmation requests from the message bus when policy decision is ASK_USER.
+   * This publishes a response with requiresUserConfirmation=true to signal the tool
+   * that it should fall back to its legacy confirmation UI.
+   */
+  private handleToolConfirmationRequest(
+    request: ToolConfirmationRequest,
+  ): void {
+    // When ASK_USER policy decision is made, the message bus emits the request here.
+    // We respond with requiresUserConfirmation=true to tell the tool to use its
+    // legacy confirmation flow (which will show diffs, URLs, etc in the UI).
+    const messageBus = this.config.getMessageBus();
+    messageBus.publish({
+      type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
+      correlationId: request.correlationId,
+      confirmed: false, // Not auto-approved
+      requiresUserConfirmation: true, // Use legacy UI confirmation
     });
   }
 

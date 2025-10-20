@@ -70,9 +70,9 @@ vi.mock('./hooks/useBracketedPaste.js');
 vi.mock('./hooks/useKeypress.js');
 vi.mock('./hooks/useLoadingIndicator.js');
 vi.mock('./hooks/useFolderTrust.js');
+vi.mock('./hooks/useIdeTrustListener.js');
 vi.mock('./hooks/useMessageQueue.js');
 vi.mock('./hooks/useAutoAcceptIndicator.js');
-vi.mock('./hooks/useWorkspaceMigration.js');
 vi.mock('./hooks/useGitBranchName.js');
 vi.mock('./contexts/VimModeContext.js');
 vi.mock('./contexts/SessionContext.js');
@@ -96,9 +96,9 @@ import { useConsoleMessages } from './hooks/useConsoleMessages.js';
 import { useGeminiStream } from './hooks/useGeminiStream.js';
 import { useVim } from './hooks/vim.js';
 import { useFolderTrust } from './hooks/useFolderTrust.js';
+import { useIdeTrustListener } from './hooks/useIdeTrustListener.js';
 import { useMessageQueue } from './hooks/useMessageQueue.js';
 import { useAutoAcceptIndicator } from './hooks/useAutoAcceptIndicator.js';
-import { useWorkspaceMigration } from './hooks/useWorkspaceMigration.js';
 import { useGitBranchName } from './hooks/useGitBranchName.js';
 import { useVimMode } from './contexts/VimModeContext.js';
 import { useSessionStats } from './contexts/SessionContext.js';
@@ -127,9 +127,9 @@ describe('AppContainer State Management', () => {
   const mockedUseGeminiStream = useGeminiStream as Mock;
   const mockedUseVim = useVim as Mock;
   const mockedUseFolderTrust = useFolderTrust as Mock;
+  const mockedUseIdeTrustListener = useIdeTrustListener as Mock;
   const mockedUseMessageQueue = useMessageQueue as Mock;
   const mockedUseAutoAcceptIndicator = useAutoAcceptIndicator as Mock;
-  const mockedUseWorkspaceMigration = useWorkspaceMigration as Mock;
   const mockedUseGitBranchName = useGitBranchName as Mock;
   const mockedUseVimMode = useVimMode as Mock;
   const mockedUseSessionStats = useSessionStats as Mock;
@@ -222,6 +222,10 @@ describe('AppContainer State Management', () => {
       handleFolderTrustSelect: vi.fn(),
       isRestarting: false,
     });
+    mockedUseIdeTrustListener.mockReturnValue({
+      needsRestart: false,
+      restartReason: 'NONE',
+    });
     mockedUseMessageQueue.mockReturnValue({
       messageQueue: [],
       addMessage: vi.fn(),
@@ -229,12 +233,6 @@ describe('AppContainer State Management', () => {
       getQueuedMessagesText: vi.fn().mockReturnValue(''),
     });
     mockedUseAutoAcceptIndicator.mockReturnValue(false);
-    mockedUseWorkspaceMigration.mockReturnValue({
-      showWorkspaceMigrationDialog: false,
-      workspaceExtensions: [],
-      onWorkspaceMigrationDialogOpen: vi.fn(),
-      onWorkspaceMigrationDialogClose: vi.fn(),
-    });
     mockedUseGitBranchName.mockReturnValue('main');
     mockedUseVimMode.mockReturnValue({
       isVimEnabled: false,
@@ -946,6 +944,109 @@ describe('AppContainer State Management', () => {
         `\x1b]2;${'Custom Gemini Title'.padEnd(80, ' ')}\x07`,
       );
       unmount();
+    });
+  });
+
+  describe('Queue Error Message', () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('should set and clear the queue error message after a timeout', async () => {
+      const { rerender } = render(
+        <AppContainer
+          config={mockConfig}
+          settings={mockSettings}
+          version="1.0.0"
+          initializationResult={mockInitResult}
+        />,
+      );
+
+      expect(capturedUIState.queueErrorMessage).toBeNull();
+
+      capturedUIActions.setQueueErrorMessage('Test error');
+      rerender(
+        <AppContainer
+          config={mockConfig}
+          settings={mockSettings}
+          version="1.0.0"
+          initializationResult={mockInitResult}
+        />,
+      );
+      expect(capturedUIState.queueErrorMessage).toBe('Test error');
+
+      vi.advanceTimersByTime(3000);
+      rerender(
+        <AppContainer
+          config={mockConfig}
+          settings={mockSettings}
+          version="1.0.0"
+          initializationResult={mockInitResult}
+        />,
+      );
+      expect(capturedUIState.queueErrorMessage).toBeNull();
+    });
+
+    it('should reset the timer if a new error message is set', async () => {
+      const { rerender } = render(
+        <AppContainer
+          config={mockConfig}
+          settings={mockSettings}
+          version="1.0.0"
+          initializationResult={mockInitResult}
+        />,
+      );
+
+      capturedUIActions.setQueueErrorMessage('First error');
+      rerender(
+        <AppContainer
+          config={mockConfig}
+          settings={mockSettings}
+          version="1.0.0"
+          initializationResult={mockInitResult}
+        />,
+      );
+      expect(capturedUIState.queueErrorMessage).toBe('First error');
+
+      vi.advanceTimersByTime(1500);
+
+      capturedUIActions.setQueueErrorMessage('Second error');
+      rerender(
+        <AppContainer
+          config={mockConfig}
+          settings={mockSettings}
+          version="1.0.0"
+          initializationResult={mockInitResult}
+        />,
+      );
+      expect(capturedUIState.queueErrorMessage).toBe('Second error');
+
+      vi.advanceTimersByTime(2000);
+      rerender(
+        <AppContainer
+          config={mockConfig}
+          settings={mockSettings}
+          version="1.0.0"
+          initializationResult={mockInitResult}
+        />,
+      );
+      expect(capturedUIState.queueErrorMessage).toBe('Second error');
+
+      // 5. Advance time past the 3 second timeout from the second message
+      vi.advanceTimersByTime(1000);
+      rerender(
+        <AppContainer
+          config={mockConfig}
+          settings={mockSettings}
+          version="1.0.0"
+          initializationResult={mockInitResult}
+        />,
+      );
+      expect(capturedUIState.queueErrorMessage).toBeNull();
     });
   });
 

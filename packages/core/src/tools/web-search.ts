@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { WEB_SEARCH_TOOL_NAME } from './tool-names.js';
 import type { GroundingMetadata } from '@google/genai';
 import type { ToolInvocation, ToolResult } from './tools.js';
 import { BaseDeclarativeTool, BaseToolInvocation, Kind } from './tools.js';
@@ -184,11 +185,9 @@ export class WebSearchTool extends BaseDeclarativeTool<
   WebSearchToolParams,
   WebSearchToolResult
 > {
-  static readonly Name: string = 'google_web_search';
-
   constructor(private readonly config: Config) {
     super(
-      WebSearchTool.Name,
+      WEB_SEARCH_TOOL_NAME,
       'GoogleSearch',
       'Performs a web search using Google Search (via the Gemini API) and returns the results. This tool is useful for finding information on the internet based on a query.',
       Kind.Search,

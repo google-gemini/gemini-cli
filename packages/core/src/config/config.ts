@@ -46,6 +46,8 @@ import { StartSessionEvent } from '../telemetry/index.js';
 import {
   DEFAULT_GEMINI_EMBEDDING_MODEL,
   DEFAULT_GEMINI_FLASH_MODEL,
+  DEFAULT_GEMINI_MODEL,
+  DEFAULT_THINKING_MODE,
 } from './models.js';
 import { shouldAttemptBrowserLaunch } from '../utils/browser.js';
 import type { MCPOAuthConfig } from '../mcp/oauth-provider.js';
@@ -75,6 +77,9 @@ import { PolicyEngine } from '../policy/policy-engine.js';
 import type { PolicyEngineConfig } from '../policy/types.js';
 import type { UserTierId } from '../code_assist/types.js';
 import { ProxyAgent, setGlobalDispatcher } from 'undici';
+
+import { AgentRegistry } from '../agents/registry.js';
+import { SubagentToolWrapper } from '../agents/subagent-tool-wrapper.js';
 
 export enum ApprovalMode {
   DEFAULT = 'default',
@@ -113,12 +118,30 @@ export interface OutputSettings {
   format?: OutputFormat;
 }
 
+export interface CodebaseInvestigatorSettings {
+  enabled?: boolean;
+  maxNumTurns?: number;
+  maxTimeMinutes?: number;
+  thinkingBudget?: number;
+  model?: string;
+}
+
+/**
+ * All information required in CLI to handle an extension. Defined in Core so
+ * that the collection of loaded, active, and inactive extensions can be passed
+ * around on the config object though Core does not use this information
+ * directly.
+ */
 export interface GeminiCLIExtension {
   name: string;
   version: string;
   isActive: boolean;
   path: string;
   installMetadata?: ExtensionInstallMetadata;
+  mcpServers?: Record<string, MCPServerConfig>;
+  contextFiles: string[];
+  excludeTools?: string[];
+  id?: string;
 }
 
 export interface ExtensionInstallMetadata {
@@ -127,18 +150,19 @@ export interface ExtensionInstallMetadata {
   releaseTag?: string; // Only present for github-release installs.
   ref?: string;
   autoUpdate?: boolean;
+  allowPreRelease?: boolean;
 }
 
 import type { FileFilteringOptions } from './constants.js';
 import {
-  DEFAULT_MEMORY_FILE_FILTERING_OPTIONS,
   DEFAULT_FILE_FILTERING_OPTIONS,
+  DEFAULT_MEMORY_FILE_FILTERING_OPTIONS,
 } from './constants.js';
 
 export type { FileFilteringOptions };
 export {
-  DEFAULT_MEMORY_FILE_FILTERING_OPTIONS,
   DEFAULT_FILE_FILTERING_OPTIONS,
+  DEFAULT_MEMORY_FILE_FILTERING_OPTIONS,
 };
 
 export const DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD = 4_000_000;
@@ -195,7 +219,7 @@ export interface ConfigParameters {
   targetDir: string;
   debugMode: boolean;
   question?: string;
-  fullContext?: boolean;
+
   coreTools?: string[];
   allowedTools?: string[];
   excludeTools?: string[];
@@ -205,6 +229,7 @@ export interface ConfigParameters {
   mcpServers?: Record<string, MCPServerConfig>;
   userMemory?: string;
   geminiMdFileCount?: number;
+  geminiMdFilePaths?: string[];
   approvalMode?: ApprovalMode;
   showMemoryUsage?: boolean;
   contextFileName?: string | string[];
@@ -232,7 +257,6 @@ export interface ConfigParameters {
   blockedMcpServers?: Array<{ name: string; extensionName: string }>;
   noBrowser?: boolean;
   summarizeToolOutput?: Record<string, SummarizeToolOutputSettings>;
-  folderTrustFeature?: boolean;
   folderTrust?: boolean;
   ideMode?: boolean;
   loadMemoryFromIncludeDirectories?: boolean;
@@ -240,7 +264,7 @@ export interface ConfigParameters {
   interactive?: boolean;
   trustedFolder?: boolean;
   useRipgrep?: boolean;
-  shouldUseNodePtyShell?: boolean;
+  enableInteractiveShell?: boolean;
   skipNextSpeakerCheck?: boolean;
   shellExecutionConfig?: ShellExecutionConfig;
   extensionManagement?: boolean;
@@ -255,11 +279,17 @@ export interface ConfigParameters {
   output?: OutputSettings;
   useModelRouter?: boolean;
   enableMessageBusIntegration?: boolean;
+  codebaseInvestigatorSettings?: CodebaseInvestigatorSettings;
+  continueOnFailedApiCall?: boolean;
+  retryFetchErrors?: boolean;
+  enableShellOutputEfficiency?: boolean;
+  ptyInfo?: string;
 }
 
 export class Config {
   private toolRegistry!: ToolRegistry;
   private promptRegistry!: PromptRegistry;
+  private agentRegistry!: AgentRegistry;
   private readonly sessionId: string;
   private fileSystemService: FileSystemService;
   private contentGeneratorConfig!: ContentGeneratorConfig;
@@ -270,7 +300,7 @@ export class Config {
   private workspaceContext: WorkspaceContext;
   private readonly debugMode: boolean;
   private readonly question: string | undefined;
-  private readonly fullContext: boolean;
+
   private readonly coreTools: string[] | undefined;
   private readonly allowedTools: string[] | undefined;
   private readonly excludeTools: string[] | undefined;
@@ -280,6 +310,7 @@ export class Config {
   private readonly mcpServers: Record<string, MCPServerConfig> | undefined;
   private userMemory: string;
   private geminiMdFileCount: number;
+  private geminiMdFilePaths: string[];
   private approvalMode: ApprovalMode;
   private readonly showMemoryUsage: boolean;
   private readonly accessibility: AccessibilitySettings;
@@ -303,7 +334,6 @@ export class Config {
   private model: string;
   private readonly extensionContextFilePaths: string[];
   private readonly noBrowser: boolean;
-  private readonly folderTrustFeature: boolean;
   private readonly folderTrust: boolean;
   private ideMode: boolean;
 
@@ -324,9 +354,10 @@ export class Config {
   private readonly loadMemoryFromIncludeDirectories: boolean = false;
   private readonly chatCompression: ChatCompressionSettings | undefined;
   private readonly interactive: boolean;
+  private readonly ptyInfo: string;
   private readonly trustedFolder: boolean | undefined;
   private readonly useRipgrep: boolean;
-  private readonly shouldUseNodePtyShell: boolean;
+  private readonly enableInteractiveShell: boolean;
   private readonly skipNextSpeakerCheck: boolean;
   private shellExecutionConfig: ShellExecutionConfig;
   private readonly extensionManagement: boolean = true;
@@ -345,6 +376,10 @@ export class Config {
   private readonly outputSettings: OutputSettings;
   private readonly useModelRouter: boolean;
   private readonly enableMessageBusIntegration: boolean;
+  private readonly codebaseInvestigatorSettings: CodebaseInvestigatorSettings;
+  private readonly continueOnFailedApiCall: boolean;
+  private readonly retryFetchErrors: boolean;
+  private readonly enableShellOutputEfficiency: boolean;
 
   constructor(params: ConfigParameters) {
     this.sessionId = params.sessionId;
@@ -359,7 +394,7 @@ export class Config {
     );
     this.debugMode = params.debugMode;
     this.question = params.question;
-    this.fullContext = params.fullContext ?? false;
+
     this.coreTools = params.coreTools;
     this.allowedTools = params.allowedTools;
     this.excludeTools = params.excludeTools;
@@ -369,6 +404,7 @@ export class Config {
     this.mcpServers = params.mcpServers;
     this.userMemory = params.userMemory ?? '';
     this.geminiMdFileCount = params.geminiMdFileCount ?? 0;
+    this.geminiMdFilePaths = params.geminiMdFilePaths ?? [];
     this.approvalMode = params.approvalMode ?? ApprovalMode.DEFAULT;
     this.showMemoryUsage = params.showMemoryUsage ?? false;
     this.accessibility = params.accessibility ?? {};
@@ -384,8 +420,12 @@ export class Config {
     this.usageStatisticsEnabled = params.usageStatisticsEnabled ?? true;
 
     this.fileFiltering = {
-      respectGitIgnore: params.fileFiltering?.respectGitIgnore ?? true,
-      respectGeminiIgnore: params.fileFiltering?.respectGeminiIgnore ?? true,
+      respectGitIgnore:
+        params.fileFiltering?.respectGitIgnore ??
+        DEFAULT_FILE_FILTERING_OPTIONS.respectGitIgnore,
+      respectGeminiIgnore:
+        params.fileFiltering?.respectGeminiIgnore ??
+        DEFAULT_FILE_FILTERING_OPTIONS.respectGeminiIgnore,
       enableRecursiveFileSearch:
         params.fileFiltering?.enableRecursiveFileSearch ?? true,
       disableFuzzySearch: params.fileFiltering?.disableFuzzySearch ?? false,
@@ -405,16 +445,16 @@ export class Config {
     this._blockedMcpServers = params.blockedMcpServers ?? [];
     this.noBrowser = params.noBrowser ?? false;
     this.summarizeToolOutput = params.summarizeToolOutput;
-    this.folderTrustFeature = params.folderTrustFeature ?? false;
     this.folderTrust = params.folderTrust ?? false;
     this.ideMode = params.ideMode ?? false;
     this.loadMemoryFromIncludeDirectories =
       params.loadMemoryFromIncludeDirectories ?? false;
     this.chatCompression = params.chatCompression;
     this.interactive = params.interactive ?? false;
+    this.ptyInfo = params.ptyInfo ?? 'child_process';
     this.trustedFolder = params.trustedFolder;
     this.useRipgrep = params.useRipgrep ?? true;
-    this.shouldUseNodePtyShell = params.shouldUseNodePtyShell ?? false;
+    this.enableInteractiveShell = params.enableInteractiveShell ?? false;
     this.skipNextSpeakerCheck = params.skipNextSpeakerCheck ?? true;
     this.shellExecutionConfig = {
       terminalWidth: params.shellExecutionConfig?.terminalWidth ?? 80,
@@ -427,13 +467,24 @@ export class Config {
       DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD;
     this.truncateToolOutputLines =
       params.truncateToolOutputLines ?? DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES;
-    this.enableToolOutputTruncation =
-      params.enableToolOutputTruncation ?? false;
+    this.enableToolOutputTruncation = params.enableToolOutputTruncation ?? true;
     this.useSmartEdit = params.useSmartEdit ?? true;
     this.useWriteTodos = params.useWriteTodos ?? false;
     this.useModelRouter = params.useModelRouter ?? false;
     this.enableMessageBusIntegration =
       params.enableMessageBusIntegration ?? false;
+    this.codebaseInvestigatorSettings = {
+      enabled: params.codebaseInvestigatorSettings?.enabled ?? true,
+      maxNumTurns: params.codebaseInvestigatorSettings?.maxNumTurns ?? 15,
+      maxTimeMinutes: params.codebaseInvestigatorSettings?.maxTimeMinutes ?? 5,
+      thinkingBudget:
+        params.codebaseInvestigatorSettings?.thinkingBudget ??
+        DEFAULT_THINKING_MODE,
+      model: params.codebaseInvestigatorSettings?.model ?? DEFAULT_GEMINI_MODEL,
+    };
+    this.continueOnFailedApiCall = params.continueOnFailedApiCall ?? true;
+    this.enableShellOutputEfficiency =
+      params.enableShellOutputEfficiency ?? true;
     this.extensionManagement = params.extensionManagement ?? true;
     this.storage = new Storage(this.targetDir);
     this.enablePromptCompletion = params.enablePromptCompletion ?? false;
@@ -444,6 +495,7 @@ export class Config {
     this.outputSettings = {
       format: params.output?.format ?? OutputFormat.TEXT,
     };
+    this.retryFetchErrors = params.retryFetchErrors ?? false;
 
     if (params.contextFileName) {
       setGeminiMdFilename(params.contextFileName);
@@ -475,6 +527,10 @@ export class Config {
       await this.getGitService();
     }
     this.promptRegistry = new PromptRegistry();
+
+    this.agentRegistry = new AgentRegistry(this);
+    await this.agentRegistry.initialize();
+
     this.toolRegistry = await this.createToolRegistry();
 
     await this.geminiClient.initialize();
@@ -621,6 +677,10 @@ export class Config {
     return this.workspaceContext;
   }
 
+  getAgentRegistry(): AgentRegistry {
+    return this.agentRegistry;
+  }
+
   getToolRegistry(): ToolRegistry {
     return this.toolRegistry;
   }
@@ -634,10 +694,6 @@ export class Config {
   }
   getQuestion(): string | undefined {
     return this.question;
-  }
-
-  getFullContext(): boolean {
-    return this.fullContext;
   }
 
   getCoreTools(): string[] | undefined {
@@ -682,6 +738,14 @@ export class Config {
 
   setGeminiMdFileCount(count: number): void {
     this.geminiMdFileCount = count;
+  }
+
+  getGeminiMdFilePaths(): string[] {
+    return this.geminiMdFilePaths;
+  }
+
+  setGeminiMdFilePaths(paths: string[]): void {
+    this.geminiMdFilePaths = paths;
   }
 
   getApprovalMode(): ApprovalMode {
@@ -847,18 +911,17 @@ export class Config {
     return this.ideMode;
   }
 
-  getFolderTrustFeature(): boolean {
-    return this.folderTrustFeature;
+  /**
+   * Returns 'true' if the folder trust feature is enabled.
+   */
+  getFolderTrust(): boolean {
+    return this.folderTrust;
   }
 
   /**
    * Returns 'true' if the workspace is considered "trusted".
    * 'false' for untrusted.
    */
-  getFolderTrust(): boolean {
-    return this.folderTrust;
-  }
-
   isTrustedFolder(): boolean {
     // isWorkspaceTrusted in cli/src/config/trustedFolder.js returns undefined
     // when the file based trust value is unavailable, since it is mainly used
@@ -900,6 +963,14 @@ export class Config {
     return this.chatCompression;
   }
 
+  isInteractiveShellEnabled(): boolean {
+    return (
+      this.interactive &&
+      this.ptyInfo !== 'child_process' &&
+      this.enableInteractiveShell
+    );
+  }
+
   isInteractive(): boolean {
     return this.interactive;
   }
@@ -908,12 +979,24 @@ export class Config {
     return this.useRipgrep;
   }
 
-  getShouldUseNodePtyShell(): boolean {
-    return this.shouldUseNodePtyShell;
+  getEnableInteractiveShell(): boolean {
+    return this.enableInteractiveShell;
   }
 
   getSkipNextSpeakerCheck(): boolean {
     return this.skipNextSpeakerCheck;
+  }
+
+  getContinueOnFailedApiCall(): boolean {
+    return this.continueOnFailedApiCall;
+  }
+
+  getRetryFetchErrors(): boolean {
+    return this.retryFetchErrors;
+  }
+
+  getEnableShellOutputEfficiency(): boolean {
+    return this.enableShellOutputEfficiency;
   }
 
   getShellExecutionConfig(): ShellExecutionConfig {
@@ -995,6 +1078,10 @@ export class Config {
 
   getEnableMessageBusIntegration(): boolean {
     return this.enableMessageBusIntegration;
+  }
+
+  getCodebaseInvestigatorSettings(): CodebaseInvestigatorSettings {
+    return this.codebaseInvestigatorSettings;
   }
 
   async createToolRegistry(): Promise<ToolRegistry> {
@@ -1086,6 +1173,43 @@ export class Config {
     registerCoreTool(WebSearchTool, this);
     if (this.getUseWriteTodos()) {
       registerCoreTool(WriteTodosTool, this);
+    }
+
+    // Register Subagents as Tools
+    if (this.getCodebaseInvestigatorSettings().enabled) {
+      const definition = this.agentRegistry.getDefinition(
+        'codebase_investigator',
+      );
+      if (definition) {
+        // We must respect the main allowed/exclude lists for agents too.
+        const excludeTools = this.getExcludeTools() || [];
+        const allowedTools = this.getAllowedTools();
+
+        const isExcluded = excludeTools.includes(definition.name);
+        const isAllowed =
+          !allowedTools || allowedTools.includes(definition.name);
+
+        if (isAllowed && !isExcluded) {
+          try {
+            const messageBusEnabled = this.getEnableMessageBusIntegration();
+            const wrapper = new SubagentToolWrapper(
+              definition,
+              this,
+              messageBusEnabled ? this.getMessageBus() : undefined,
+            );
+            registry.registerTool(wrapper);
+          } catch (error) {
+            console.error(
+              `Failed to wrap agent '${definition.name}' as a tool:`,
+              error,
+            );
+          }
+        } else if (this.getDebugMode()) {
+          console.log(
+            `[Config] Skipping registration of agent '${definition.name}' due to allow/exclude configuration.`,
+          );
+        }
+      }
     }
 
     await registry.discoverAllTools();
