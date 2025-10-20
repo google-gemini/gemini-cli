@@ -1,0 +1,15 @@
+name: 'Test Chained E2E'
+
+on:
+  workflow_run:
+    workflows: ['Trigger E2E']
+    types: ['completed']
+
+jobs:
+  chained_e2e:
+    name: 'Chained e2e'
+    runs-on: 'gemini-cli-ubuntu-16-core'
+    steps:
+      - id: 'chained-e2e'
+        run: |
+          echo "Chained e2e workflow"
