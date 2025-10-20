@@ -12,7 +12,6 @@ on:
       repo_name:
         description: 'Repository name (e.g., owner/repo)'
         required: true
-        default: '${{ github.repository }}'
 
 concurrency:
   group: '${{ github.workflow }}-${{ github.head_ref || github.ref }}'
