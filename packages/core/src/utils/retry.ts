@@ -11,6 +11,7 @@ import {
   isProQuotaExceededError,
   isGenericQuotaExceededError,
 } from './quotaErrorDetection.js';
+import { delay, createAbortError } from './delay.js';
 
 const FETCH_FAILED_MESSAGE =
   'exception TypeError: fetch failed sending request';
@@ -77,36 +78,6 @@ function defaultShouldRetry(
 }
 
 /**
- * Delays execution for a specified number of milliseconds.
- * @param ms The number of milliseconds to delay.
- * @returns A promise that resolves after the delay.
- */
-function delay(ms: number, signal?: AbortSignal): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const abortError = new Error('Aborted');
-    abortError.name = 'AbortError';
-    if (signal?.aborted) {
-      return reject(abortError);
-    }
-
-    const onAbort = () => {
-      clearTimeout(timeoutId);
-      reject(abortError);
-    };
-
-    const onTimeout = () => {
-      signal?.removeEventListener('abort', onAbort);
-      resolve();
-    };
-
-    const timeoutId = setTimeout(onTimeout, ms);
-
-    if (signal) {
-      signal.addEventListener('abort', onAbort, { once: true });
-    }
-  });
-}
-/**
  * Retries a function with exponential backoff and jitter.
  * @param fn The asynchronous function to retry.
  * @param options Optional retry configuration.
@@ -118,7 +89,7 @@ export async function retryWithBackoff<T>(
   options?: Partial<RetryOptions>,
 ): Promise<T> {
   if (options?.signal?.aborted) {
-    throw new Error('Aborted');
+    throw createAbortError();
   }
 
   if (options?.maxAttempts !== undefined && options.maxAttempts <= 0) {
@@ -150,7 +121,7 @@ export async function retryWithBackoff<T>(
 
   while (attempt < maxAttempts) {
     if (signal?.aborted) {
-      throw new Error('Aborted');
+      throw createAbortError();
     }
     attempt++;
     try {
