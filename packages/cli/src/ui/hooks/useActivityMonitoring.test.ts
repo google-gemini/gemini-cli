@@ -225,4 +225,3 @@ describe('useActivityRecorder', () => {
     expect(mockRecordActivity).not.toHaveBeenCalled();
   });
 });
-
