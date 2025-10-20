@@ -8,11 +8,13 @@ import type { Content, GenerateContentConfig } from '@google/genai';
 import type { GeminiClient } from '../core/client.js';
 import type { BaseLlmClient } from '../core/baseLlmClient.js';
 import type { EditToolParams } from '../tools/edit.js';
-import { EditTool } from '../tools/edit.js';
-import { WRITE_FILE_TOOL_NAME } from '../tools/tool-names.js';
-import { ReadFileTool } from '../tools/read-file.js';
-import { ReadManyFilesTool } from '../tools/read-many-files.js';
-import { GrepTool } from '../tools/grep.js';
+import {
+  EDIT_TOOL_NAME,
+  GREP_TOOL_NAME,
+  READ_FILE_TOOL_NAME,
+  READ_MANY_FILES_TOOL_NAME,
+  WRITE_FILE_TOOL_NAME,
+} from '../tools/tool-names.js';
 import { LruCache } from './LruCache.js';
 import { DEFAULT_GEMINI_FLASH_LITE_MODEL } from '../config/models.js';
 import {
@@ -101,12 +103,12 @@ async function findLastEditTimestamp(
   // Tools that may reference the file path in their FunctionResponse `output`.
   const toolsInResp = new Set([
     WRITE_FILE_TOOL_NAME,
-    EditTool.Name,
-    ReadManyFilesTool.Name,
-    GrepTool.Name,
+    EDIT_TOOL_NAME,
+    READ_MANY_FILES_TOOL_NAME,
+    GREP_TOOL_NAME,
   ]);
   // Tools that may reference the file path in their FunctionCall `args`.
-  const toolsInCall = new Set([...toolsInResp, ReadFileTool.Name]);
+  const toolsInCall = new Set([...toolsInResp, READ_FILE_TOOL_NAME]);
 
   // Iterate backwards to find the most recent relevant action.
   for (const entry of history.slice().reverse()) {

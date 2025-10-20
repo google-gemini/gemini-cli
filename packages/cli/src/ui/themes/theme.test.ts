@@ -86,7 +86,9 @@ describe('themeManager.loadCustomThemes', () => {
     delete legacyTheme.DiffAdded;
     delete legacyTheme.DiffRemoved;
 
-    themeManager.loadCustomThemes({ 'Legacy Custom Theme': legacyTheme });
+    themeManager.loadCustomThemes({
+      'Legacy Custom Theme': legacyTheme as CustomTheme,
+    });
     const result = themeManager.getTheme('Legacy Custom Theme')!;
 
     expect(result.colors.DiffAdded).toBe(darkTheme.DiffAdded);
