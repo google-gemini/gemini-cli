@@ -29,20 +29,12 @@ describe('<ExtensionsList />', () => {
   const mockUIState = (
     extensions: unknown[],
     extensionsUpdateState: Map<string, ExtensionUpdateState>,
-    disabledExtensions: string[] = [],
   ) => {
     mockUseUIState.mockReturnValue({
       commandContext: createMockCommandContext({
         services: {
           config: {
             getExtensions: () => extensions,
-          },
-          settings: {
-            merged: {
-              extensions: {
-                disabled: disabledExtensions,
-              },
-            },
           },
         },
       }),
@@ -58,7 +50,7 @@ describe('<ExtensionsList />', () => {
   });
 
   it('should render a list of extensions with their version and status', () => {
-    mockUIState(mockExtensions, new Map(), ['ext-disabled']);
+    mockUIState(mockExtensions, new Map());
     const { lastFrame } = render(<ExtensionsList />);
     const output = lastFrame();
     expect(output).toContain('ext-one (v1.0.0) - active');
