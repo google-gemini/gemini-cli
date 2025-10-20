@@ -19,6 +19,7 @@ import path from 'node:path';
 import fs from 'node:fs/promises';
 import os, { EOL } from 'node:os';
 import type { Config } from '../config/config.js';
+import { Storage } from '../config/storage.js';
 import { createMockWorkspaceContext } from '../test-utils/mockWorkspaceContext.js';
 import type { ChildProcess } from 'node:child_process';
 import { spawn } from 'node:child_process';
@@ -138,6 +139,35 @@ describe('ensureRgPath', () => {
     expect(fileExists).toHaveBeenCalledTimes(1);
     expect(downloadRipGrep).toHaveBeenCalledWith('/mock/bin/dir');
   });
+
+  it.runIf(process.platform === 'win32')(
+    'should fail to detect ripgrep when only rg.exe exists on Windows',
+    async () => {
+      const windowsBinDir = String.raw`C:\mock\bin\dir`;
+      const storageBinDirMock = Storage.getGlobalBinDir as Mock;
+      const defaultBinDir = '/mock/bin/dir';
+
+      storageBinDirMock.mockImplementation(() => windowsBinDir);
+      (fileExists as Mock).mockImplementation(async (filePath: string) =>
+        filePath.endsWith('.exe'),
+      );
+      (downloadRipGrep as Mock).mockResolvedValue(undefined);
+
+      const expectedRgPath = path.win32.join(windowsBinDir, 'rg');
+      const expectedRgExePath = path.win32.join(windowsBinDir, 'rg.exe');
+
+      try {
+        await expect(ensureRgPath()).rejects.toThrow('Cannot use ripgrep.');
+        expect(downloadRipGrep).toHaveBeenCalledWith(windowsBinDir);
+        expect(fileExists).toHaveBeenCalledWith(expectedRgPath);
+        expect(fileExists).not.toHaveBeenCalledWith(expectedRgExePath);
+      } finally {
+        storageBinDirMock.mockImplementation(() => defaultBinDir);
+        (fileExists as Mock).mockReset();
+        (downloadRipGrep as Mock).mockReset();
+      }
+    },
+  );
 });
 
 // Helper function to create mock spawn implementations
