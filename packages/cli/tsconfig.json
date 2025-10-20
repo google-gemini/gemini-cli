@@ -20,16 +20,6 @@
     "src/utils/cleanup.test.ts",
     "src/utils/handleAutoUpdate.test.ts",
     "src/utils/startupWarnings.test.ts",
-    "src/ui/hooks/slashCommandProcessor.test.ts",
-    "src/ui/hooks/useAtCompletion.test.ts",
-    "src/ui/hooks/useConsoleMessages.test.ts",
-    "src/ui/hooks/useCommandCompletion.test.ts",
-    "src/ui/hooks/useFocus.test.ts",
-    "src/ui/hooks/useFolderTrust.test.ts",
-    "src/ui/hooks/useGeminiStream.test.tsx",
-    "src/ui/hooks/useKeypress.test.ts",
-    "src/ui/hooks/usePhraseCycler.test.ts",
-    "src/ui/hooks/vim.test.ts",
     "src/ui/utils/computeStats.test.ts"
   ],
   "references": [{ "path": "../core" }]

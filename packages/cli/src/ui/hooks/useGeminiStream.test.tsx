@@ -1396,10 +1396,14 @@ describe('useGeminiStream', () => {
           status: 'awaiting_approval',
           responseSubmittedToGemini: false,
           confirmationDetails: {
+            type: 'edit',
+            title: 'Confirm Edit',
             onConfirm: mockOnConfirm,
-            onCancel: vi.fn(),
-            message: 'Replace text?',
-            displayedText: 'Replace old with new',
+            fileName: 'file.txt',
+            filePath: '/test/file.txt',
+            fileDiff: 'fake diff',
+            originalContent: 'old',
+            newContent: 'new',
           },
           tool: {
             name: 'replace',
@@ -1422,10 +1426,10 @@ describe('useGeminiStream', () => {
           status: 'awaiting_approval',
           responseSubmittedToGemini: false,
           confirmationDetails: {
+            type: 'info',
+            title: 'Read File',
             onConfirm: mockOnConfirm,
-            onCancel: vi.fn(),
-            message: 'Read file?',
-            displayedText: 'Read /test/file.txt',
+            prompt: 'Read /test/file.txt?',
           },
           tool: {
             name: 'read_file',
@@ -1474,10 +1478,14 @@ describe('useGeminiStream', () => {
           status: 'awaiting_approval',
           responseSubmittedToGemini: false,
           confirmationDetails: {
+            type: 'edit',
+            title: 'Confirm Edit',
             onConfirm: mockOnConfirmReplace,
-            onCancel: vi.fn(),
-            message: 'Replace text?',
-            displayedText: 'Replace old with new',
+            fileName: 'file.txt',
+            filePath: '/test/file.txt',
+            fileDiff: 'fake diff',
+            originalContent: 'old',
+            newContent: 'new',
           },
           tool: {
             name: 'replace',
@@ -1500,10 +1508,14 @@ describe('useGeminiStream', () => {
           status: 'awaiting_approval',
           responseSubmittedToGemini: false,
           confirmationDetails: {
+            type: 'edit',
+            title: 'Confirm Edit',
             onConfirm: mockOnConfirmWrite,
-            onCancel: vi.fn(),
-            message: 'Write file?',
-            displayedText: 'Write to /test/new.txt',
+            fileName: 'new.txt',
+            filePath: '/test/new.txt',
+            fileDiff: 'fake diff',
+            originalContent: null,
+            newContent: 'content',
           },
           tool: {
             name: 'write_file',
@@ -1526,10 +1538,10 @@ describe('useGeminiStream', () => {
           status: 'awaiting_approval',
           responseSubmittedToGemini: false,
           confirmationDetails: {
+            type: 'info',
+            title: 'Read File',
             onConfirm: mockOnConfirmRead,
-            onCancel: vi.fn(),
-            message: 'Read file?',
-            displayedText: 'Read /test/file.txt',
+            prompt: 'Read /test/file.txt?',
           },
           tool: {
             name: 'read_file',
@@ -1577,10 +1589,14 @@ describe('useGeminiStream', () => {
           status: 'awaiting_approval',
           responseSubmittedToGemini: false,
           confirmationDetails: {
+            type: 'edit',
+            title: 'Confirm Edit',
             onConfirm: mockOnConfirm,
-            onCancel: vi.fn(),
-            message: 'Replace text?',
-            displayedText: 'Replace old with new',
+            fileName: 'file.txt',
+            filePath: '/test/file.txt',
+            fileDiff: 'fake diff',
+            originalContent: 'old',
+            newContent: 'new',
           },
           tool: {
             name: 'replace',
@@ -1597,9 +1613,7 @@ describe('useGeminiStream', () => {
       const { result } = renderTestHook(awaitingApprovalToolCalls);
 
       await act(async () => {
-        await result.current.handleApprovalModeChange(
-          ApprovalMode.REQUIRE_CONFIRMATION,
-        );
+        await result.current.handleApprovalModeChange(ApprovalMode.DEFAULT);
       });
 
       // No tools should be auto-approved
@@ -1627,10 +1641,14 @@ describe('useGeminiStream', () => {
           status: 'awaiting_approval',
           responseSubmittedToGemini: false,
           confirmationDetails: {
+            type: 'edit',
+            title: 'Confirm Edit',
             onConfirm: mockOnConfirmSuccess,
-            onCancel: vi.fn(),
-            message: 'Replace text?',
-            displayedText: 'Replace old with new',
+            fileName: 'file.txt',
+            filePath: '/test/file.txt',
+            fileDiff: 'fake diff',
+            originalContent: 'old',
+            newContent: 'new',
           },
           tool: {
             name: 'replace',
@@ -1653,10 +1671,14 @@ describe('useGeminiStream', () => {
           status: 'awaiting_approval',
           responseSubmittedToGemini: false,
           confirmationDetails: {
+            type: 'edit',
+            title: 'Confirm Edit',
             onConfirm: mockOnConfirmError,
-            onCancel: vi.fn(),
-            message: 'Write file?',
-            displayedText: 'Write to /test/file.txt',
+            fileName: 'file.txt',
+            filePath: '/test/file.txt',
+            fileDiff: 'fake diff',
+            originalContent: null,
+            newContent: 'content',
           },
           tool: {
             name: 'write_file',
@@ -1711,7 +1733,7 @@ describe('useGeminiStream', () => {
           invocation: {
             getDescription: () => 'Mock description',
           } as unknown as AnyToolInvocation,
-        } as TrackedWaitingToolCall,
+        } as unknown as TrackedWaitingToolCall,
       ];
 
       const { result } = renderTestHook(awaitingApprovalToolCalls);
@@ -1735,10 +1757,14 @@ describe('useGeminiStream', () => {
           status: 'awaiting_approval',
           responseSubmittedToGemini: false,
           confirmationDetails: {
-            onCancel: vi.fn(),
-            message: 'Replace text?',
-            displayedText: 'Replace old with new',
+            type: 'edit',
+            title: 'Confirm Edit',
             // No onConfirm method
+            fileName: 'file.txt',
+            filePath: '/test/file.txt',
+            fileDiff: 'fake diff',
+            originalContent: 'old',
+            newContent: 'new',
           } as any,
           tool: {
             name: 'replace',
@@ -1776,10 +1802,14 @@ describe('useGeminiStream', () => {
           status: 'awaiting_approval',
           responseSubmittedToGemini: false,
           confirmationDetails: {
+            type: 'edit',
+            title: 'Confirm Edit',
             onConfirm: mockOnConfirmAwaiting,
-            onCancel: vi.fn(),
-            message: 'Replace text?',
-            displayedText: 'Replace old with new',
+            fileName: 'file.txt',
+            filePath: '/test/file.txt',
+            fileDiff: 'fake diff',
+            originalContent: 'old',
+            newContent: 'new',
           },
           tool: {
             name: 'replace',
@@ -1801,12 +1831,6 @@ describe('useGeminiStream', () => {
           },
           status: 'executing',
           responseSubmittedToGemini: false,
-          confirmationDetails: {
-            onConfirm: mockOnConfirmExecuting,
-            onCancel: vi.fn(),
-            message: 'Write file?',
-            displayedText: 'Write to /test/file.txt',
-          },
           tool: {
             name: 'write_file',
             displayName: 'write_file',

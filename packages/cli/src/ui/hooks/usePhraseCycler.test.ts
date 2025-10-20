@@ -50,7 +50,6 @@ describe('usePhraseCycler', () => {
     const { result } = renderHook(() => usePhraseCycler(true, false));
     // Initial phrase should be one of the witty phrases
     expect(WITTY_LOADING_PHRASES).toContain(result.current);
-    const _initialPhrase = result.current;
 
     act(() => {
       vi.advanceTimersByTime(PHRASE_CHANGE_INTERVAL_MS);
@@ -58,7 +57,6 @@ describe('usePhraseCycler', () => {
     // Phrase should change and be one of the witty phrases
     expect(WITTY_LOADING_PHRASES).toContain(result.current);
 
-    const _secondPhrase = result.current;
     act(() => {
       vi.advanceTimersByTime(PHRASE_CHANGE_INTERVAL_MS);
     });
@@ -159,7 +157,7 @@ describe('usePhraseCycler', () => {
     randomMock.mockRestore();
     vi.spyOn(Math, 'random').mockImplementation(() => 0.5); // Always witty
 
-    rerender({ isActive: true, isWaiting: false, customPhrases: undefined });
+    rerender({ isActive: true, isWaiting: false, customPhrases: [] });
 
     expect(WITTY_LOADING_PHRASES).toContain(result.current);
   });
@@ -188,8 +186,7 @@ describe('usePhraseCycler', () => {
       { initialProps: { isActive: true, isWaiting: false } },
     );
 
-    const _initialPhrase = result.current;
-    expect(WITTY_LOADING_PHRASES).toContain(_initialPhrase);
+    expect(WITTY_LOADING_PHRASES).toContain(result.current);
 
     // Cycle to a different phrase (potentially)
     act(() => {

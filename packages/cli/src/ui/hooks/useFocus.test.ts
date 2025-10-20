@@ -7,7 +7,7 @@
 import { renderHook, act } from '@testing-library/react';
 import { EventEmitter } from 'node:events';
 import { useFocus } from './useFocus.js';
-import { vi } from 'vitest';
+import { vi, type Mock } from 'vitest';
 import { useStdin, useStdout } from 'ink';
 import { KeypressProvider } from '../contexts/KeypressContext.js';
 import React from 'react';
@@ -29,15 +29,18 @@ const wrapper = ({ children }: { children: React.ReactNode }) =>
   React.createElement(KeypressProvider, null, children);
 
 describe('useFocus', () => {
-  let stdin: EventEmitter;
-  let stdout: { write: vi.Func };
+  let stdin: EventEmitter & { resume: Mock; pause: Mock };
+  let stdout: { write: Mock };
 
   beforeEach(() => {
-    stdin = new EventEmitter();
-    stdin.resume = vi.fn();
-    stdin.pause = vi.fn();
+    stdin = Object.assign(new EventEmitter(), {
+      resume: vi.fn(),
+      pause: vi.fn(),
+    });
     stdout = { write: vi.fn() };
-    mockedUseStdin.mockReturnValue({ stdin } as ReturnType<typeof useStdin>);
+    mockedUseStdin.mockReturnValue({ stdin } as unknown as ReturnType<
+      typeof useStdin
+    >);
     mockedUseStdout.mockReturnValue({ stdout } as unknown as ReturnType<
       typeof useStdout
     >);
