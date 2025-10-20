@@ -891,29 +891,31 @@ Logging in with Google... Please restart Gemini CLI to continue.
 
   const handleExit = useCallback(
     (
-      pressCount: number,
-      setPressCount: (value: number) => void,
+      setPressCount: React.Dispatch<React.SetStateAction<number>>,
       timerRef: React.MutableRefObject<NodeJS.Timeout | null>,
     ) => {
-      // User has triggered exit keys multiple times within CTRL_EXIT_PROMPT_DURATION_MS
-      if (pressCount >= 2) {
-        recordExitFail(config);
-      }
-      if (pressCount >= 1) {
-        if (timerRef.current) {
-          clearTimeout(timerRef.current);
+      setPressCount((pressCount) => {
+        // User has triggered exit keys multiple times within CTRL_EXIT_PROMPT_DURATION_MS
+        if (pressCount >= 2) {
+          recordExitFail(config);
         }
-        handleSlashCommand('/quit');
-      } else {
-        if (timerRef.current) {
-          clearTimeout(timerRef.current);
+
+        if (pressCount >= 1) {
+          if (timerRef.current) {
+            clearTimeout(timerRef.current);
+          }
+          handleSlashCommand('/quit');
+        } else {
+          if (timerRef.current) {
+            clearTimeout(timerRef.current);
+          }
+          timerRef.current = setTimeout(() => {
+            setPressCount(0);
+            timerRef.current = null;
+          }, CTRL_EXIT_PROMPT_DURATION_MS);
         }
-        timerRef.current = setTimeout(() => {
-          setPressCount(0);
-          timerRef.current = null;
-        }, CTRL_EXIT_PROMPT_DURATION_MS);
-      }
-      setPressCount(pressCount + 1);
+        return pressCount + 1;
+      });
     },
     [handleSlashCommand, config],
   );
@@ -930,13 +932,13 @@ Logging in with Google... Please restart Gemini CLI to continue.
         // This should happen on the first press, regardless of the count.
         cancelOngoingRequest?.();
 
-        handleExit(ctrlCPressCount, setCtrlCPressCount, ctrlCTimerRef);
+        handleExit(setCtrlCPressCount, ctrlCTimerRef);
         return;
       } else if (keyMatchers[Command.EXIT](key)) {
         if (buffer.text.length > 0) {
           return;
         }
-        handleExit(ctrlDPressCount, setCtrlDPressCount, ctrlDTimerRef);
+        handleExit(setCtrlDPressCount, ctrlDTimerRef);
         return;
       }
 
@@ -982,11 +984,9 @@ Logging in with Google... Please restart Gemini CLI to continue.
       config,
       ideContextState,
       handleExit,
-      ctrlCPressCount,
       setCtrlCPressCount,
       ctrlCTimerRef,
       buffer.text.length,
-      ctrlDPressCount,
       setCtrlDPressCount,
       ctrlDTimerRef,
       handleSlashCommand,
