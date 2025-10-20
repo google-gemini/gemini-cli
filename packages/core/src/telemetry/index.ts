@@ -62,6 +62,7 @@ export {
   KittySequenceOverflowEvent,
   ToolOutputTruncatedEvent,
   WebFetchFallbackAttemptEvent,
+  ToolCallDecision,
 } from './types.js';
 export { makeSlashCommandEvent, makeChatCompressionEvent } from './types.js';
 export type { TelemetryEvent } from './types.js';

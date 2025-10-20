@@ -185,11 +185,9 @@ export class WebSearchTool extends BaseDeclarativeTool<
   WebSearchToolParams,
   WebSearchToolResult
 > {
-  static readonly Name: string = WEB_SEARCH_TOOL_NAME;
-
   constructor(private readonly config: Config) {
     super(
-      WebSearchTool.Name,
+      WEB_SEARCH_TOOL_NAME,
       'GoogleSearch',
       'Performs a web search using Google Search (via the Gemini API) and returns the results. This tool is useful for finding information on the internet based on a query.',
       Kind.Search,
