@@ -29,13 +29,13 @@ import {
   DEFAULT_GEMINI_EMBEDDING_MODEL,
   DEFAULT_MEMORY_FILE_FILTERING_OPTIONS,
   FileDiscoveryService,
-  ShellTool,
-  EditTool,
   WRITE_FILE_TOOL_NAME,
   SHELL_TOOL_NAMES,
+  SHELL_TOOL_NAME,
   resolveTelemetrySettings,
   FatalConfigError,
   getPty,
+  EDIT_TOOL_NAME,
 } from '@google/gemini-cli-core';
 import type { Settings } from './settings.js';
 
@@ -352,7 +352,7 @@ function createToolExclusionFilter(
   allowedToolsSet: Set<string>,
 ) {
   return (tool: string): boolean => {
-    if (tool === ShellTool.Name) {
+    if (tool === SHELL_TOOL_NAME) {
       // If any of the allowed tools is ShellTool (even with subcommands), don't exclude it.
       return !allowedTools.some((allowed) =>
         SHELL_TOOL_NAMES.some((shellName) => allowed.startsWith(shellName)),
@@ -505,11 +505,11 @@ export async function loadCliConfig(
   const extraExcludes: string[] = [];
   if (!interactive && !argv.experimentalAcp) {
     const defaultExcludes = [
-      ShellTool.Name,
-      EditTool.Name,
+      SHELL_TOOL_NAME,
+      EDIT_TOOL_NAME,
       WRITE_FILE_TOOL_NAME,
     ];
-    const autoEditExcludes = [ShellTool.Name];
+    const autoEditExcludes = [SHELL_TOOL_NAME];
 
     const toolExclusionFilter = createToolExclusionFilter(
       allowedTools,

@@ -4,8 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { vi, describe, it, expect, beforeEach } from 'vitest';
+import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { checkForUpdates } from './updateCheck.js';
+import type { LoadedSettings } from '../../config/settings.js';
 
 const getPackageJson = vi.hoisted(() => vi.fn());
 vi.mock('../../utils/package.js', () => ({
@@ -18,16 +19,34 @@ vi.mock('update-notifier', () => ({
 }));
 
 describe('checkForUpdates', () => {
+  let mockSettings: LoadedSettings;
+
   beforeEach(() => {
     vi.useFakeTimers();
     vi.resetAllMocks();
     // Clear DEV environment variable before each test
     delete process.env['DEV'];
+
+    mockSettings = {
+      merged: {
+        general: {
+          disableUpdateNag: false,
+        },
+      },
+    } as LoadedSettings;
   });
 
   afterEach(() => {
     vi.useRealTimers();
     vi.restoreAllMocks();
+  });
+
+  it('should return null if disableUpdateNag is true', async () => {
+    mockSettings.merged.general!.disableUpdateNag = true;
+    const result = await checkForUpdates(mockSettings);
+    expect(result).toBeNull();
+    expect(getPackageJson).not.toHaveBeenCalled();
+    expect(updateNotifier).not.toHaveBeenCalled();
   });
 
   it('should return null when running from source (DEV=true)', async () => {
@@ -41,7 +60,7 @@ describe('checkForUpdates', () => {
         .fn()
         .mockResolvedValue({ current: '1.0.0', latest: '1.1.0' }),
     });
-    const result = await checkForUpdates();
+    const result = await checkForUpdates(mockSettings);
     expect(result).toBeNull();
     expect(getPackageJson).not.toHaveBeenCalled();
     expect(updateNotifier).not.toHaveBeenCalled();
@@ -49,7 +68,7 @@ describe('checkForUpdates', () => {
 
   it('should return null if package.json is missing', async () => {
     getPackageJson.mockResolvedValue(null);
-    const result = await checkForUpdates();
+    const result = await checkForUpdates(mockSettings);
     expect(result).toBeNull();
   });
 
@@ -61,7 +80,7 @@ describe('checkForUpdates', () => {
     updateNotifier.mockReturnValue({
       fetchInfo: vi.fn().mockResolvedValue(null),
     });
-    const result = await checkForUpdates();
+    const result = await checkForUpdates(mockSettings);
     expect(result).toBeNull();
   });
 
@@ -76,7 +95,7 @@ describe('checkForUpdates', () => {
         .mockResolvedValue({ current: '1.0.0', latest: '1.1.0' }),
     });
 
-    const result = await checkForUpdates();
+    const result = await checkForUpdates(mockSettings);
     expect(result?.message).toContain('1.0.0 → 1.1.0');
     expect(result?.update).toEqual({ current: '1.0.0', latest: '1.1.0' });
   });
@@ -91,7 +110,7 @@ describe('checkForUpdates', () => {
         .fn()
         .mockResolvedValue({ current: '1.0.0', latest: '1.0.0' }),
     });
-    const result = await checkForUpdates();
+    const result = await checkForUpdates(mockSettings);
     expect(result).toBeNull();
   });
 
@@ -105,7 +124,7 @@ describe('checkForUpdates', () => {
         .fn()
         .mockResolvedValue({ current: '1.1.0', latest: '1.0.0' }),
     });
-    const result = await checkForUpdates();
+    const result = await checkForUpdates(mockSettings);
     expect(result).toBeNull();
   });
 
@@ -118,13 +137,13 @@ describe('checkForUpdates', () => {
       fetchInfo: vi.fn().mockRejectedValue(new Error('Timeout')),
     });
 
-    const result = await checkForUpdates();
+    const result = await checkForUpdates(mockSettings);
     expect(result).toBeNull();
   });
 
   it('should handle errors gracefully', async () => {
     getPackageJson.mockRejectedValue(new Error('test error'));
-    const result = await checkForUpdates();
+    const result = await checkForUpdates(mockSettings);
     expect(result).toBeNull();
   });
 
@@ -155,7 +174,7 @@ describe('checkForUpdates', () => {
         fetchInfo: () => fetchInfoMock({ pkg, distTag }),
       }));
 
-      const result = await checkForUpdates();
+      const result = await checkForUpdates(mockSettings);
       expect(result?.message).toContain('1.2.3-nightly.1 → 1.2.3-nightly.2');
       expect(result?.update.latest).toBe('1.2.3-nightly.2');
     });
