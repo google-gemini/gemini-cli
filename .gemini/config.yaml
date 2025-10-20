@@ -10,3 +10,5 @@ code_review:
     summary: true
     code_review: true
 ignore_patterns: []
+security:
+  disableYoloMode: true

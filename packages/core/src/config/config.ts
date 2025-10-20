@@ -284,6 +284,7 @@ export interface ConfigParameters {
   retryFetchErrors?: boolean;
   enableShellOutputEfficiency?: boolean;
   ptyInfo?: string;
+  disableYoloMode?: boolean;
 }
 
 export class Config {
@@ -380,6 +381,7 @@ export class Config {
   private readonly continueOnFailedApiCall: boolean;
   private readonly retryFetchErrors: boolean;
   private readonly enableShellOutputEfficiency: boolean;
+  private readonly disableYoloMode: boolean;
 
   constructor(params: ConfigParameters) {
     this.sessionId = params.sessionId;
@@ -496,6 +498,7 @@ export class Config {
       format: params.output?.format ?? OutputFormat.TEXT,
     };
     this.retryFetchErrors = params.retryFetchErrors ?? false;
+    this.disableYoloMode = params.disableYoloMode ?? false;
 
     if (params.contextFileName) {
       setGeminiMdFilename(params.contextFileName);
@@ -759,6 +762,10 @@ export class Config {
       );
     }
     this.approvalMode = mode;
+  }
+
+  isYoloModeDisabled(): boolean {
+    return this.disableYoloMode || !this.isTrustedFolder();
   }
 
   getShowMemoryUsage(): boolean {
