@@ -310,6 +310,27 @@ describe('converter', () => {
       const genaiRes = fromGenerateContentResponse(codeAssistRes);
       expect(genaiRes.modelVersion).toEqual('gemini-2.5-pro');
     });
+
+    it('should handle traceId', () => {
+      const codeAssistRes: CaGenerateContentResponse = {
+        response: {
+          candidates: [],
+        },
+        traceId: 'my-trace-id',
+      };
+      const genaiRes = fromGenerateContentResponse(codeAssistRes);
+      expect(genaiRes.responseId).toEqual('my-trace-id');
+    });
+
+    it('should handle missing traceId', () => {
+      const codeAssistRes: CaGenerateContentResponse = {
+        response: {
+          candidates: [],
+        },
+      };
+      const genaiRes = fromGenerateContentResponse(codeAssistRes);
+      expect(genaiRes.responseId).toBeUndefined();
+    });
   });
 
   describe('toContents', () => {
