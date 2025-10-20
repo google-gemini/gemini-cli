@@ -53,27 +53,49 @@ const mockSpawn = vi.mocked(spawn);
 describe('canUseRipgrep', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    (Storage.getGlobalBinDir as Mock).mockReturnValue('/mock/bin/dir');
   });
 
   it('should return true if ripgrep already exists', async () => {
-    (fileExists as Mock).mockResolvedValue(true);
+    const binDir = Storage.getGlobalBinDir() as string;
+    const candidateNames =
+      process.platform === 'win32' ? ['rg.exe', 'rg'] : ['rg'];
+    const existingPath = path.join(binDir, candidateNames[0]);
+
+    (fileExists as Mock).mockImplementation(
+      async (filePath: string) => filePath === existingPath,
+    );
+
     const result = await canUseRipgrep();
     expect(result).toBe(true);
-    expect(fileExists).toHaveBeenCalledWith(path.join('/mock/bin/dir', 'rg'));
+    expect(fileExists).toHaveBeenCalledWith(existingPath);
     expect(downloadRipGrep).not.toHaveBeenCalled();
   });
 
   it('should download ripgrep and return true if it does not exist initially', async () => {
-    (fileExists as Mock)
-      .mockResolvedValueOnce(false)
-      .mockResolvedValueOnce(true);
-    (downloadRipGrep as Mock).mockResolvedValue(undefined);
+    const binDir = Storage.getGlobalBinDir() as string;
+    const candidateNames =
+      process.platform === 'win32' ? ['rg.exe', 'rg'] : ['rg'];
+    const candidatePaths = candidateNames.map((name) =>
+      path.join(binDir, name),
+    );
+    const availability = new Map<string, boolean>();
+
+    (fileExists as Mock).mockImplementation(
+      async (filePath: string) => availability.get(filePath) ?? false,
+    );
+
+    (downloadRipGrep as Mock).mockImplementation(async () => {
+      candidatePaths.forEach((candidatePath) =>
+        availability.set(candidatePath, true),
+      );
+    });
 
     const result = await canUseRipgrep();
 
     expect(result).toBe(true);
-    expect(fileExists).toHaveBeenCalledTimes(2);
     expect(downloadRipGrep).toHaveBeenCalledWith('/mock/bin/dir');
+    expect(fileExists).toHaveBeenCalledWith(candidatePaths[0]);
   });
 
   it('should return false if download fails and file does not exist', async () => {
@@ -83,7 +105,6 @@ describe('canUseRipgrep', () => {
     const result = await canUseRipgrep();
 
     expect(result).toBe(false);
-    expect(fileExists).toHaveBeenCalledTimes(2);
     expect(downloadRipGrep).toHaveBeenCalledWith('/mock/bin/dir');
   });
 
@@ -93,7 +114,6 @@ describe('canUseRipgrep', () => {
     (downloadRipGrep as Mock).mockRejectedValue(error);
 
     await expect(canUseRipgrep()).rejects.toThrow(error);
-    expect(fileExists).toHaveBeenCalledTimes(1);
     expect(downloadRipGrep).toHaveBeenCalledWith('/mock/bin/dir');
   });
 
@@ -136,25 +156,48 @@ describe('canUseRipgrep', () => {
 describe('ensureRgPath', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    (Storage.getGlobalBinDir as Mock).mockReturnValue('/mock/bin/dir');
   });
 
   it('should return rg path if ripgrep already exists', async () => {
-    (fileExists as Mock).mockResolvedValue(true);
+    const binDir = Storage.getGlobalBinDir() as string;
+    const candidateNames =
+      process.platform === 'win32' ? ['rg.exe', 'rg'] : ['rg'];
+    const existingPath = path.join(binDir, candidateNames[0]);
+
+    (fileExists as Mock).mockImplementation(
+      async (filePath: string) => filePath === existingPath,
+    );
+
     const rgPath = await ensureRgPath();
-    expect(rgPath).toBe(path.join('/mock/bin/dir', 'rg'));
-    expect(fileExists).toHaveBeenCalledOnce();
+    expect(rgPath).toBe(existingPath);
+    expect(fileExists).toHaveBeenCalledWith(existingPath);
     expect(downloadRipGrep).not.toHaveBeenCalled();
   });
 
   it('should return rg path if ripgrep is downloaded successfully', async () => {
-    (fileExists as Mock)
-      .mockResolvedValueOnce(false)
-      .mockResolvedValueOnce(true);
-    (downloadRipGrep as Mock).mockResolvedValue(undefined);
+    const binDir = Storage.getGlobalBinDir() as string;
+    const candidateNames =
+      process.platform === 'win32' ? ['rg.exe', 'rg'] : ['rg'];
+    const candidatePaths = candidateNames.map((name) =>
+      path.join(binDir, name),
+    );
+    const availability = new Map<string, boolean>();
+
+    (fileExists as Mock).mockImplementation(
+      async (filePath: string) => availability.get(filePath) ?? false,
+    );
+
+    (downloadRipGrep as Mock).mockImplementation(async () => {
+      candidatePaths.forEach((candidatePath) =>
+        availability.set(candidatePath, true),
+      );
+    });
+
     const rgPath = await ensureRgPath();
-    expect(rgPath).toBe(path.join('/mock/bin/dir', 'rg'));
+    expect(rgPath).toBe(candidatePaths[0]);
     expect(downloadRipGrep).toHaveBeenCalledOnce();
-    expect(fileExists).toHaveBeenCalledTimes(2);
+    expect(fileExists).toHaveBeenCalledWith(candidatePaths[0]);
   });
 
   it('should throw an error if ripgrep cannot be used after download attempt', async () => {
@@ -162,7 +205,6 @@ describe('ensureRgPath', () => {
     (downloadRipGrep as Mock).mockResolvedValue(undefined);
     await expect(ensureRgPath()).rejects.toThrow('Cannot use ripgrep.');
     expect(downloadRipGrep).toHaveBeenCalledOnce();
-    expect(fileExists).toHaveBeenCalledTimes(2);
   });
 
   it('should propagate errors from downloadRipGrep', async () => {
@@ -171,7 +213,6 @@ describe('ensureRgPath', () => {
     (downloadRipGrep as Mock).mockRejectedValue(error);
 
     await expect(ensureRgPath()).rejects.toThrow(error);
-    expect(fileExists).toHaveBeenCalledTimes(1);
     expect(downloadRipGrep).toHaveBeenCalledWith('/mock/bin/dir');
   });
 
