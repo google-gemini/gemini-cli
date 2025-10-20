@@ -189,7 +189,6 @@ export class WebSearchTool extends BaseDeclarativeTool<
   WebSearchToolParams,
   WebSearchToolResult
 > {
-
   constructor(
     private readonly config: Config,
     messageBus?: MessageBus,

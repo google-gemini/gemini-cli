@@ -424,7 +424,6 @@ export class RipGrepTool extends BaseDeclarativeTool<
   RipGrepToolParams,
   ToolResult
 > {
-
   constructor(
     private readonly config: Config,
     messageBus?: MessageBus,

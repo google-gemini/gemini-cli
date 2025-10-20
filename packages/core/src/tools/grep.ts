@@ -568,7 +568,6 @@ class GrepToolInvocation extends BaseToolInvocation<
  * Implementation of the Grep tool logic (moved from CLI)
  */
 export class GrepTool extends BaseDeclarativeTool<GrepToolParams, ToolResult> {
-
   constructor(
     private readonly config: Config,
     messageBus?: MessageBus,

@@ -264,7 +264,6 @@ class GlobToolInvocation extends BaseToolInvocation<
  * Implementation of the Glob tool logic
  */
 export class GlobTool extends BaseDeclarativeTool<GlobToolParams, ToolResult> {
-
   constructor(
     private config: Config,
     messageBus?: MessageBus,

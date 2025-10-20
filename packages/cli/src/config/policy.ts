@@ -22,6 +22,10 @@ import {
   EDIT_TOOL_NAME,
   MEMORY_TOOL_NAME,
   WEB_SEARCH_TOOL_NAME,
+  type PolicyEngine,
+  type MessageBus,
+  MessageBusType,
+  type UpdatePolicy,
 } from '@google/gemini-cli-core';
 import { type Settings } from './settings.js';
 

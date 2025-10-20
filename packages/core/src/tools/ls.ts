@@ -257,7 +257,6 @@ class LSToolInvocation extends BaseToolInvocation<LSToolParams, ToolResult> {
  * Implementation of the LS tool logic
  */
 export class LSTool extends BaseDeclarativeTool<LSToolParams, ToolResult> {
-
   constructor(
     private config: Config,
     messageBus?: MessageBus,

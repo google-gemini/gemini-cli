@@ -140,7 +140,6 @@ export class ReadFileTool extends BaseDeclarativeTool<
   ReadFileToolParams,
   ToolResult
 > {
-
   constructor(
     private config: Config,
     messageBus?: MessageBus,

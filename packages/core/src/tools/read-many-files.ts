@@ -479,7 +479,6 @@ export class ReadManyFilesTool extends BaseDeclarativeTool<
   ReadManyFilesParams,
   ToolResult
 > {
-
   constructor(
     private config: Config,
     messageBus?: MessageBus,
