@@ -55,7 +55,7 @@ export class StartSessionEvent implements BaseTelemetryEvent {
   mcp_tools?: string;
   output_format: OutputFormat;
   extensions_count: number;
-  extensions: string;
+  extension_ids: string;
 
   constructor(config: Config, toolRegistry?: ToolRegistry) {
     const generatorConfig = config.getContentGeneratorConfig();
@@ -89,7 +89,7 @@ export class StartSessionEvent implements BaseTelemetryEvent {
     this.output_format = config.getOutputFormat();
     const extensions = config.getExtensions();
     this.extensions_count = extensions.length;
-    this.extensions = extensions.map((e) => e.name).join(',');
+    this.extension_ids = extensions.map((e) => e.id).join(',');
     if (toolRegistry) {
       const mcpTools = toolRegistry
         .getAllTools()
@@ -122,7 +122,7 @@ export class StartSessionEvent implements BaseTelemetryEvent {
       mcp_tools_count: this.mcp_tools_count,
       output_format: this.output_format,
       extensions_count: this.extensions_count,
-      extensions: this.extensions,
+      extension_ids: this.extension_ids,
     };
   }
 

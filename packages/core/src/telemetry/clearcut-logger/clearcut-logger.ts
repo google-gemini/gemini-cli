@@ -451,8 +451,8 @@ export class ClearcutLogger {
         value: event.extensions_count.toString(),
       },
       {
-        gemini_cli_key: EventMetadataKey.GEMINI_CLI_START_SESSION_EXTENSIONS,
-        value: event.extensions,
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_START_SESSION_EXTENSION_IDS,
+        value: event.extension_ids.toString(),
       },
     ];
     this.sessionData = data;

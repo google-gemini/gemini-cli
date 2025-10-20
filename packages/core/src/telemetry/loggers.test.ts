@@ -230,7 +230,7 @@ describe('loggers', () => {
           mcp_tools: undefined,
           mcp_tools_count: undefined,
           output_format: 'json',
-          extensions: '',
+          extension_ids: '',
           extensions_count: 0,
         },
       });

@@ -398,7 +398,7 @@ export enum EventMetadataKey {
   GEMINI_CLI_START_SESSION_EXTENSIONS_COUNT = 119,
 
   // Logs the name of extensions as a comma-separated string
-  GEMINI_CLI_START_SESSION_EXTENSIONS = 120,
+  GEMINI_CLI_START_SESSION_EXTENSION_IDS = 120,
 
   // Logs the setting scope for an extension enablement.
   GEMINI_CLI_EXTENSION_ENABLE_SETTING_SCOPE = 102,
