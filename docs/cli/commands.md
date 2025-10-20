@@ -8,6 +8,28 @@ with a forward slash (`/`), an at symbol (`@`), or an exclamation mark (`!`).
 
 Slash commands provide meta-level control over the CLI itself.
 
+### Command-line Flags
+
+- **`--context-file <path>`** (alias: **`-f`**)
+  - **Description:** Overrides the default `GEMINI.md` memory file for a single
+    session. The file path provided will be used as the read/write memory, which
+    is ideal for managing separate contexts for parallel tasks.
+  - **Behavior:**
+    - The specified file is used for both reading initial context and writing
+      new memories during the session.
+    - **The file must exist before running the command.** If the file does not
+      exist, the CLI will exit with an error. This prevents accidentally
+      creating a new, empty context due to a typo.
+    - This flag takes precedence over any `context.fileName` setting in your
+      `settings.json` files (see [CLI Configuration](./configuration.md) for
+      more details).
+    - When this flag is used, the default `GEMINI.md` file is ignored.
+  - **Example:**
+    ```bash
+    # Run a session using a specific context file for a frontend task
+    gemini -f frontend-task.md "Refactor the login component."
+    ```
+
 ### Built-in Commands
 
 - **`/bug`**

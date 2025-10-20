@@ -6,6 +6,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as os from 'node:os';
+import * as fs from 'node:fs';
 import * as path from 'node:path';
 import {
   DEFAULT_GEMINI_MODEL,
@@ -88,6 +89,8 @@ vi.mock('@google/gemini-cli-core', async () => {
   );
   return {
     ...actualServer,
+    setGeminiMdFilename: vi.fn(),
+    getCurrentGeminiMdFilename: vi.fn(),
     IdeClient: {
       getInstance: vi.fn().mockResolvedValue({
         getConnectionStatus: vi.fn(),
@@ -595,6 +598,160 @@ describe('loadCliConfig', () => {
         expect(config.getProxy()).toBe(expected);
       });
     });
+  });
+});
+
+describe('Context file configuration', () => {
+  beforeEach(() => {
+    // Mocks are now module-level, just clear them before each test
+    vi.clearAllMocks();
+    vi.mocked(ServerConfig.getCurrentGeminiMdFilename).mockReturnValue(
+      'DEFAULT.md',
+    );
+  });
+
+  it('should use default filename when no flag or setting is provided', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments({} as Settings);
+    const settings: Settings = {};
+    await loadCliConfig(
+      settings,
+      [],
+      new ExtensionEnablementManager(argv.extensions),
+      'test-session',
+      argv,
+    );
+    expect(ServerConfig.getCurrentGeminiMdFilename).toHaveBeenCalled();
+    expect(ServerConfig.setGeminiMdFilename).toHaveBeenCalledWith('DEFAULT.md');
+  });
+
+  it('should use filename from settings when no flag is provided', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments({} as Settings);
+    const settings: Settings = { context: { fileName: 'settings.md' } };
+    await loadCliConfig(
+      settings,
+      [],
+      new ExtensionEnablementManager(argv.extensions),
+      'test-session',
+      argv,
+    );
+    expect(ServerConfig.setGeminiMdFilename).toHaveBeenCalledWith(
+      'settings.md',
+    );
+  });
+
+  it('should prioritize --context-file flag over settings', async () => {
+    const statSpy = vi
+      .spyOn(fs.promises, 'stat')
+      .mockResolvedValue({ isDirectory: () => false } as fs.Stats);
+    process.argv = ['node', 'script.js', '--context-file', 'cli.md'];
+    const argv = await parseArguments({} as Settings);
+    const settings: Settings = { context: { fileName: 'settings.md' } };
+    await loadCliConfig(
+      settings,
+      [],
+      new ExtensionEnablementManager(argv.extensions),
+      'test-session',
+      argv,
+    );
+    expect(ServerConfig.setGeminiMdFilename).toHaveBeenCalledWith(
+      expect.stringContaining('cli.md'),
+    );
+    statSpy.mockRestore();
+  });
+
+  it('should prioritize -f flag over settings', async () => {
+    const statSpy = vi
+      .spyOn(fs.promises, 'stat')
+      .mockResolvedValue({ isDirectory: () => false } as fs.Stats);
+    process.argv = ['node', 'script.js', '-f', 'cli.md'];
+    const argv = await parseArguments({} as Settings);
+    const settings: Settings = { context: { fileName: 'settings.md' } };
+    await loadCliConfig(
+      settings,
+      [],
+      new ExtensionEnablementManager(argv.extensions),
+      'test-session',
+      argv,
+    );
+    expect(ServerConfig.setGeminiMdFilename).toHaveBeenCalledWith(
+      expect.stringContaining('cli.md'),
+    );
+    statSpy.mockRestore();
+  });
+
+  it('should throw an error if --context-file is a directory', async () => {
+    const statSpy = vi
+      .spyOn(fs.promises, 'stat')
+      .mockResolvedValue({ isDirectory: () => true } as fs.Stats);
+
+    process.argv = ['node', 'script.js', '--context-file', 'a-directory'];
+    const argv = await parseArguments({} as Settings);
+    const settings: Settings = {};
+
+    await expect(
+      loadCliConfig(
+        settings,
+        [],
+        new ExtensionEnablementManager(argv.extensions),
+        'test-session',
+        argv,
+      ),
+    ).rejects.toThrow(
+      'Path specified by --context-file is a directory: a-directory',
+    );
+    statSpy.mockRestore();
+  });
+
+  it('should throw an error if --context-file does not exist', async () => {
+    const statSpy = vi.spyOn(fs.promises, 'stat').mockImplementation(() => {
+      const error = new Error('ENOENT: no such file or directory');
+      (error as NodeJS.ErrnoException).code = 'ENOENT';
+      return Promise.reject(error);
+    });
+
+    process.argv = ['node', 'script.js', '--context-file', 'new-file.md'];
+    const argv = await parseArguments({} as Settings);
+    const settings: Settings = {};
+
+    await expect(
+      loadCliConfig(
+        settings,
+        [],
+        new ExtensionEnablementManager(argv.extensions),
+        'test-session',
+        argv,
+      ),
+    ).rejects.toThrow(
+      'File specified by --context-file does not exist: new-file.md',
+    );
+    statSpy.mockRestore();
+  });
+
+  it('should throw an error if --context-file path is inaccessible', async () => {
+    const statSpy = vi.spyOn(fs.promises, 'stat').mockImplementation(() => {
+      const error = new Error('EACCES: permission denied');
+      (error as NodeJS.ErrnoException).code = 'EACCES';
+      return Promise.reject(error);
+    });
+
+    process.argv = ['node', 'script.js', '--context-file', 'inaccessible.md'];
+    const argv = await parseArguments({} as Settings);
+    const settings: Settings = {};
+
+    await expect(
+      loadCliConfig(
+        settings,
+        [],
+        new ExtensionEnablementManager(argv.extensions),
+        'test-session',
+        argv,
+      ),
+    ).rejects.toThrow(
+      `Permission denied for file specified by --context-file: inaccessible.md`,
+    );
+    statSpy.mockRestore();
   });
 });
 
