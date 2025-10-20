@@ -395,14 +395,12 @@ export class WebFetchTool extends BaseDeclarativeTool<
   WebFetchToolParams,
   ToolResult
 > {
-  static readonly Name: string = WEB_FETCH_TOOL_NAME;
-
   constructor(
     private readonly config: Config,
     messageBus?: MessageBus,
   ) {
     super(
-      WebFetchTool.Name,
+      WEB_FETCH_TOOL_NAME,
       'WebFetch',
       "Processes content from URL(s), including local and private network addresses (e.g., localhost), embedded in a prompt. Include up to 20 URLs and instructions (e.g., summarize, extract specific data) directly in the 'prompt' parameter.",
       Kind.Fetch,
