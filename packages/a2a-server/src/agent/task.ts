@@ -66,7 +66,6 @@ export class Task {
   eventBus?: ExecutionEventBus;
   completedToolCalls: CompletedToolCall[];
   skipFinalTrueAfterInlineEdit = false;
-  currentTraceId: string | undefined;
 
   // For tool waiting logic
   private pendingToolCalls: Map<string, string> = new Map(); //toolCallId --> status
@@ -221,6 +220,7 @@ export class Task {
     final = false,
     timestamp?: string,
     metadataError?: string,
+    traceId?: string,
   ): TaskStatusUpdateEvent {
     const metadata: {
       coderAgent: CoderAgentMessage;
@@ -238,9 +238,8 @@ export class Task {
       metadata.error = metadataError;
     }
 
-    if (this.currentTraceId) {
-      metadata.traceId = this.currentTraceId;
-      this.currentTraceId = undefined;
+    if (traceId) {
+      metadata.traceId = traceId;
     }
 
     return {
@@ -264,6 +263,7 @@ export class Task {
     messageParts?: Part[], // For more complex messages
     final = false,
     metadataError?: string,
+    traceId?: string,
   ): void {
     this.taskState = newState;
     let message: Message | undefined;
@@ -288,6 +288,7 @@ export class Task {
       final,
       undefined,
       metadataError,
+      traceId,
     );
     this.eventBus?.publish(event);
   }
@@ -589,13 +590,13 @@ export class Task {
     const stateChange: StateChange = {
       kind: CoderAgentEvent.StateChangeEvent,
     };
-    if ('traceId' in event && event.traceId) {
-      this.currentTraceId = event.traceId;
-    }
+    const traceId =
+      'traceId' in event && event.traceId ? event.traceId : undefined;
+
     switch (event.type) {
       case GeminiEventType.Content:
         logger.info('[Task] Sending agent message content...');
-        this._sendTextContent(event.value);
+        this._sendTextContent(event.value, traceId);
         break;
       case GeminiEventType.ToolCallRequest:
         // This is now handled by the agent loop, which collects all requests
@@ -634,11 +635,13 @@ export class Task {
           'Task cancelled by user',
           undefined,
           true,
+          undefined,
+          traceId,
         );
         break;
       case GeminiEventType.Thought:
         logger.info('[Task] Sending agent thought...');
-        this._sendThought(event.value);
+        this._sendThought(event.value, traceId);
         break;
       case GeminiEventType.ChatCompressed:
         break;
@@ -668,6 +671,7 @@ export class Task {
           undefined,
           false,
           errMessage,
+          traceId,
         );
         break;
       }
@@ -925,7 +929,7 @@ export class Task {
     }
   }
 
-  _sendTextContent(content: string): void {
+  _sendTextContent(content: string, traceId?: string): void {
     if (content === '') {
       return;
     }
@@ -940,11 +944,14 @@ export class Task {
         textContent,
         message,
         false,
+        undefined,
+        undefined,
+        traceId,
       ),
     );
   }
 
-  _sendThought(content: ThoughtSummary): void {
+  _sendThought(content: ThoughtSummary, traceId?: string): void {
     if (!content.subject && !content.description) {
       return;
     }
@@ -966,7 +973,15 @@ export class Task {
       kind: CoderAgentEvent.ThoughtEvent,
     };
     this.eventBus?.publish(
-      this._createStatusUpdateEvent(this.taskState, thought, message, false),
+      this._createStatusUpdateEvent(
+        this.taskState,
+        thought,
+        message,
+        false,
+        undefined,
+        undefined,
+        traceId,
+      ),
     );
   }
 }
