@@ -376,6 +376,10 @@ async function promptForConsentInteractive(
   });
 }
 
+export function hashValue(value: string): string {
+  return createHash('sha256').update(value).digest('hex');
+}
+
 export async function installOrUpdateExtension(
   installMetadata: ExtensionInstallMetadata,
   requestConsent: (consent: string) => Promise<boolean>,
@@ -514,7 +518,7 @@ export async function installOrUpdateExtension(
       logExtensionUpdateEvent(
         telemetryConfig,
         new ExtensionUpdateEvent(
-          newExtensionConfig.name,
+          hashValue(newExtensionConfig.name),
           getExtensionId(newExtensionConfig, installMetadata),
           newExtensionConfig.version,
           previousExtensionConfig.version,
@@ -526,7 +530,7 @@ export async function installOrUpdateExtension(
       logExtensionInstallEvent(
         telemetryConfig,
         new ExtensionInstallEvent(
-          newExtensionConfig.name,
+          hashValue(newExtensionConfig.name),
           getExtensionId(newExtensionConfig, installMetadata),
           newExtensionConfig.version,
           installMetadata.type,
@@ -558,7 +562,7 @@ export async function installOrUpdateExtension(
       logExtensionUpdateEvent(
         telemetryConfig,
         new ExtensionUpdateEvent(
-          config?.name ?? '',
+          hashValue(config?.name ?? ''),
           extensionId ?? '',
           newExtensionConfig?.version ?? '',
           previousExtensionConfig.version,
@@ -570,7 +574,7 @@ export async function installOrUpdateExtension(
       logExtensionInstallEvent(
         telemetryConfig,
         new ExtensionInstallEvent(
-          newExtensionConfig?.name ?? '',
+          hashValue(newExtensionConfig?.name ?? ''),
           extensionId ?? '',
           newExtensionConfig?.version ?? '',
           installMetadata.type,
@@ -725,7 +729,11 @@ export async function uninstallExtension(
   const telemetryConfig = getTelemetryConfig(cwd);
   logExtensionUninstall(
     telemetryConfig,
-    new ExtensionUninstallEvent(extension.name, extension.id, 'success'),
+    new ExtensionUninstallEvent(
+      hashValue(extension.name),
+      extension.id,
+      'success',
+    ),
   );
 }
 
@@ -792,7 +800,7 @@ export function disableExtension(
   manager.disable(name, true, scopePath);
   logExtensionDisable(
     config,
-    new ExtensionDisableEvent(name, extension.id, scope),
+    new ExtensionDisableEvent(hashValue(name), extension.id, scope),
   );
 }
 
@@ -814,7 +822,7 @@ export function enableExtension(
   const config = getTelemetryConfig(cwd);
   logExtensionEnable(
     config,
-    new ExtensionEnableEvent(name, extension.id, scope),
+    new ExtensionEnableEvent(hashValue(name), extension.id, scope),
   );
 }
 
@@ -826,7 +834,7 @@ function getExtensionId(
   // deduplicate extensions with conflicting names and also obfuscate any
   // potentially sensitive information such as private git urls, system paths,
   // or project names.
-  const hash = createHash('sha256');
+  let idValue = config.name;
   const githubUrlParts =
     installMetadata &&
     (installMetadata.type === 'git' ||
@@ -835,12 +843,9 @@ function getExtensionId(
       : null;
   if (githubUrlParts) {
     // For github repos, we use the https URI to the repo as the ID.
-    hash.update(
-      `https://github.com/${githubUrlParts.owner}/${githubUrlParts.repo}`,
-    );
+    idValue = `https://github.com/${githubUrlParts.owner}/${githubUrlParts.repo}`;
   } else {
-    hash.update(installMetadata?.source ?? config.name);
+    idValue = installMetadata?.source ?? config.name;
   }
-
-  return hash.digest('hex');
+  return hashValue(idValue);
 }
