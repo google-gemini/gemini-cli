@@ -116,7 +116,7 @@ export abstract class BaseToolInvocation<
           type: 'info',
           title: `Confirm: ${this._toolDisplayName || this._toolName}`,
           prompt: this.getDescription(),
-          onConfirm: (outcome: ToolConfirmationOutcome) => {
+          onConfirm: async (outcome: ToolConfirmationOutcome) => {
             if (outcome === ToolConfirmationOutcome.ProceedAlways) {
               if (this.messageBus && this._toolName) {
                 this.messageBus.publish({
