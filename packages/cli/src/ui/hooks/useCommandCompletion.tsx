@@ -51,6 +51,7 @@ export function useCommandCompletion(
   slashCommands: readonly SlashCommand[],
   commandContext: CommandContext,
   reverseSearchActive: boolean = false,
+  shellModeActive: boolean,
   config?: Config,
 ): UseCommandCompletionReturn {
   const {
@@ -163,7 +164,7 @@ export function useCommandCompletion(
   });
 
   const slashCompletionRange = useSlashCompletion({
-    enabled: completionMode === CompletionMode.SLASH,
+    enabled: completionMode === CompletionMode.SLASH && !shellModeActive,
     query,
     slashCommands,
     commandContext,
@@ -230,7 +231,11 @@ export function useCommandCompletion(
 
       const lineCodePoints = toCodePoints(buffer.lines[cursorRow] || '');
       const charAfterCompletion = lineCodePoints[end];
-      if (charAfterCompletion !== ' ') {
+      if (
+        charAfterCompletion !== ' ' &&
+        !suggestionText.endsWith('/') &&
+        !suggestionText.endsWith('\\')
+      ) {
         suggestionText += ' ';
       }
 

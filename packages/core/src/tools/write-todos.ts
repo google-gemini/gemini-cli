@@ -9,6 +9,7 @@ import {
   BaseDeclarativeTool,
   BaseToolInvocation,
   Kind,
+  type Todo,
   type ToolResult,
 } from './tools.js';
 import { WRITE_TODOS_TOOL_NAME } from './tool-names.js';
@@ -79,13 +80,6 @@ The agent did not use the todo list because this task could be completed by a ti
 </example>
 `;
 
-export type TodoStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled';
-
-export interface Todo {
-  description: string;
-  status: TodoStatus;
-}
-
 export interface WriteTodosToolParams {
   /**
    * The full list of todos. This will overwrite any existing list.
@@ -123,7 +117,7 @@ class WriteTodosToolInvocation extends BaseToolInvocation<
 
     return {
       llmContent,
-      returnDisplay: llmContent,
+      returnDisplay: { todos },
     };
   }
 }
@@ -132,11 +126,9 @@ export class WriteTodosTool extends BaseDeclarativeTool<
   WriteTodosToolParams,
   ToolResult
 > {
-  static readonly Name: string = WRITE_TODOS_TOOL_NAME;
-
   constructor() {
     super(
-      WriteTodosTool.Name,
+      WRITE_TODOS_TOOL_NAME,
       'Write Todos',
       WRITE_TODOS_DESCRIPTION,
       Kind.Other,

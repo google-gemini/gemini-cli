@@ -12,6 +12,18 @@ verify that it behaves as expected when interacting with the file system.
 These tests are located in the `integration-tests` directory and are run using a
 custom test runner.
 
+## Building the tests
+
+Prior to running any integration tests, you need to create a release bundle that
+you want to actually test:
+
+```bash
+npm run bundle
+```
+
+You must re-run this command after making any changes to the CLI source code,
+but not after making changes to tests.
+
 ## Running the tests
 
 The integration tests are not run as part of the default `npm run test` command.
