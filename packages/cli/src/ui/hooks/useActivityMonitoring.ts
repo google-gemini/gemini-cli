@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import type { Config } from '@google/gemini-cli-core';
 import {
   getActivityMonitor,
@@ -127,22 +127,26 @@ export function useActivityMonitoring(
  * Provides convenient functions for recording specific activity types
  */
 export function useActivityRecorder(_config: Config, enabled: boolean = true) {
-  const recordSimpleActivity = useCallback(() => {
-    if (enabled) {
-      const monitor = getActivityMonitor();
-      if (monitor) {
-        monitor.recordActivity(ActivityType.USER_INPUT_START);
+  const record = useCallback(
+    (type: ActivityType) => {
+      if (enabled) {
+        const monitor = getActivityMonitor();
+        monitor?.recordActivity(type);
       }
-    }
-  }, [enabled]);
+    },
+    [enabled],
+  );
 
-  return {
-    recordUserInput: recordSimpleActivity,
-    recordUserInputEnd: recordSimpleActivity,
-    recordMessageAdded: recordSimpleActivity,
-    recordToolCall: recordSimpleActivity,
-    recordStreamStart: recordSimpleActivity,
-    recordStreamEnd: recordSimpleActivity,
-    recordHistoryUpdate: recordSimpleActivity,
-  };
+  return useMemo(
+    () => ({
+      recordUserInput: () => record(ActivityType.USER_INPUT_START),
+      recordUserInputEnd: () => record(ActivityType.USER_INPUT_END),
+      recordMessageAdded: () => record(ActivityType.MESSAGE_ADDED),
+      recordToolCall: () => record(ActivityType.TOOL_CALL_SCHEDULED),
+      recordStreamStart: () => record(ActivityType.STREAM_START),
+      recordStreamEnd: () => record(ActivityType.STREAM_END),
+      recordHistoryUpdate: () => record(ActivityType.HISTORY_UPDATED),
+    }),
+    [record],
+  );
 }
