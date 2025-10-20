@@ -80,6 +80,8 @@ jobs:
     name: 'E2E Test (Linux) - ${{ matrix.sandbox }}'
     needs: 
       - 'download_repo_name'
+    if: |
+      needs.download_repo_name.result == 'success' || needs.download_repo_name.result == 'skipped'
     runs-on: 'gemini-cli-ubuntu-16-core'
     strategy:
       fail-fast: false
@@ -129,6 +131,8 @@ jobs:
     name: 'E2E Test (macOS)'
     needs: 
       - 'download_repo_name'
+    if: |
+      needs.download_repo_name.result == 'success' || needs.download_repo_name.result == 'skipped'
     runs-on: 'macos-latest'
     steps:
       - name: 'Checkout'
@@ -167,7 +171,8 @@ jobs:
       - 'merge_queue_skipper'
       - 'download_repo_name'
     if: |
-      needs.merge_queue_skipper.outputs.skip == 'false'
+      needs.merge_queue_skipper.outputs.skip == 'false' &&
+      (needs.download_repo_name.result == 'success' || needs.download_repo_name.result == 'skipped')
     runs-on: 'gemini-cli-windows-16-core'
     continue-on-error: true
 
