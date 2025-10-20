@@ -894,7 +894,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
       handleSlashCommand('/quit');
     } else {
       ctrlDTimerRef.current = setTimeout(() => {
-        setCtrlCPressCount(0);
+        setCtrlDPressCount(0);
         ctrlDTimerRef.current = null;
       }, CTRL_EXIT_PROMPT_DURATION_MS);
     }
