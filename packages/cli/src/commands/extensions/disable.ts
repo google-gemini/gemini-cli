@@ -8,6 +8,7 @@ import { type CommandModule } from 'yargs';
 import { disableExtension } from '../../config/extension.js';
 import { SettingScope } from '../../config/settings.js';
 import { getErrorMessage } from '../../utils/errors.js';
+import { debugLogger } from '@google/gemini-cli-core';
 
 interface DisableArgs {
   name: string;
@@ -21,11 +22,11 @@ export function handleDisable(args: DisableArgs) {
     } else {
       disableExtension(args.name, SettingScope.User);
     }
-    console.log(
+    debugLogger.log(
       `Extension "${args.name}" successfully disabled for scope "${args.scope}".`,
     );
   } catch (error) {
-    console.error(getErrorMessage(error));
+    debugLogger.error(getErrorMessage(error));
     process.exit(1);
   }
 }
