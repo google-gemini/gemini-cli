@@ -263,7 +263,7 @@ contain other project-specific files related to Gemini CLI's operation, such as:
 - **`checkpointing`** (object):
   - **Description:** Configures the checkpointing feature, which allows you to
     save and restore conversation and file states. See the
-    [Checkpointing documentation](../checkpointing.md) for more details.
+    [Checkpointing documentation](./checkpointing.md) for more details.
   - **Default:** `{"enabled": false}`
   - **Properties:**
     - **`enabled`** (boolean): When `true`, the `/restore` command is available.
