@@ -36,28 +36,27 @@ async function resolveExistingRgPath(): Promise<string | null> {
   return null;
 }
 
+async function ensureRipgrepAvailable(): Promise<string | null> {
+  const existingPath = await resolveExistingRgPath();
+  if (existingPath) {
+    return existingPath;
+  }
+  await downloadRipGrep(Storage.getGlobalBinDir());
+  return resolveExistingRgPath();
+}
+
 /**
  * Checks if `rg` exists, if not then attempt to download it.
  */
 export async function canUseRipgrep(): Promise<boolean> {
-  if (await resolveExistingRgPath()) {
-    return true;
-  }
-
-  await downloadRipGrep(Storage.getGlobalBinDir());
-  return (await resolveExistingRgPath()) !== null;
+  return (await ensureRipgrepAvailable()) !== null;
 }
 
 /**
  * Ensures `rg` is downloaded, or throws.
  */
 export async function ensureRgPath(): Promise<string> {
-  const existingPath = await resolveExistingRgPath();
-  if (existingPath) {
-    return existingPath;
-  }
-  await downloadRipGrep(Storage.getGlobalBinDir());
-  const downloadedPath = await resolveExistingRgPath();
+  const downloadedPath = await ensureRipgrepAvailable();
   if (downloadedPath) {
     return downloadedPath;
   }
