@@ -18,6 +18,7 @@ import { isGitRepository } from '../utils/gitUtils.js';
 import type { Config } from '../config/config.js';
 import type { FileExclusions } from '../utils/ignorePatterns.js';
 import { ToolErrorType } from './tool-error.js';
+import { GREP_TOOL_NAME } from './tool-names.js';
 import { debugLogger } from '../utils/debugLogger.js';
 
 // --- Interfaces ---
@@ -563,11 +564,9 @@ class GrepToolInvocation extends BaseToolInvocation<
  * Implementation of the Grep tool logic (moved from CLI)
  */
 export class GrepTool extends BaseDeclarativeTool<GrepToolParams, ToolResult> {
-  static readonly Name = 'search_file_content'; // Keep static name
-
   constructor(private readonly config: Config) {
     super(
-      GrepTool.Name,
+      GREP_TOOL_NAME,
       'SearchText',
       'Searches for a regular expression pattern within the content of files in a specified directory (or current working directory). Can filter files by a glob pattern. Returns the lines containing matches, along with their file paths and line numbers.',
       Kind.Search,
