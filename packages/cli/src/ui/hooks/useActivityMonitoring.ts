@@ -36,7 +36,7 @@ export interface ActivityStats {
 export interface UseActivityMonitoringReturn {
   /** Record a user activity event */
   recordActivity: (
-    type: string,
+    type: ActivityType,
     context?: string,
     metadata?: Record<string, unknown>,
   ) => void;
@@ -65,11 +65,15 @@ export function useActivityMonitoring(
 
   // Record activity callback
   const recordActivity = useCallback(
-    (type: string, context?: string, metadata?: Record<string, unknown>) => {
+    (
+      type: ActivityType,
+      context?: string,
+      metadata?: Record<string, unknown>,
+    ) => {
       if (enabled) {
         const monitor = getActivityMonitor();
         if (monitor) {
-          monitor.recordActivity(type as ActivityType, context, metadata);
+          monitor.recordActivity(type, context, metadata);
         }
       }
     },
