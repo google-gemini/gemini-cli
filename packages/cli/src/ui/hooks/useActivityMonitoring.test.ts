@@ -10,6 +10,7 @@ import {
   useActivityMonitoring,
   useActivityRecorder,
 } from './useActivityMonitoring.js';
+import { ActivityType } from '@google/gemini-cli-core';
 import type { Config } from '@google/gemini-cli-core';
 
 // Mock the core package
@@ -92,11 +93,14 @@ describe('useActivityMonitoring', () => {
     const { result } = renderHook(() => useActivityMonitoring(mockConfig));
 
     await act(() => {
-      result.current.recordActivity('user_input_start', 'test-context');
+      result.current.recordActivity(
+        ActivityType.USER_INPUT_START,
+        'test-context',
+      );
     });
 
     expect(mockRecordActivity).toHaveBeenCalledWith(
-      'user_input_start',
+      ActivityType.USER_INPUT_START,
       'test-context',
       undefined,
     );
