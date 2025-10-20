@@ -40,6 +40,7 @@ import {
   AuthType,
   getOauthClient,
   UserPromptEvent,
+  debugLogger,
 } from '@google/gemini-cli-core';
 import {
   initializeApp,
@@ -79,7 +80,7 @@ export function validateDnsResolutionOrder(
     return order;
   }
   // We don't want to throw here, just warn and use the default.
-  console.warn(
+  debugLogger.warn(
     `Invalid value for dnsResolutionOrder in settings: "${order}". Using default "${defaultValue}".`,
   );
   return defaultValue;
@@ -95,7 +96,7 @@ function getNodeMemoryArgs(isDebugMode: boolean): string[] {
   // Set target to 50% of total memory
   const targetMaxOldSpaceSizeInMB = Math.floor(totalMemoryMB * 0.5);
   if (isDebugMode) {
-    console.debug(
+    debugLogger.debug(
       `Current heap size ${currentMaxOldSpaceSizeMb.toFixed(2)} MB`,
     );
   }
@@ -106,7 +107,7 @@ function getNodeMemoryArgs(isDebugMode: boolean): string[] {
 
   if (targetMaxOldSpaceSizeInMB > currentMaxOldSpaceSizeMb) {
     if (isDebugMode) {
-      console.debug(
+      debugLogger.debug(
         `Need to relaunch with more memory: ${targetMaxOldSpaceSizeInMB.toFixed(2)} MB`,
       );
     }
@@ -213,7 +214,7 @@ export async function startInteractiveUI(
     .catch((err) => {
       // Silently ignore update check errors.
       if (config.getDebugMode()) {
-        console.error('Update check failed:', err);
+        debugLogger.warn('Update check failed:', err);
       }
     });
 
@@ -230,7 +231,7 @@ export async function main() {
 
   // Check for invalid input combinations early to prevent crashes
   if (argv.promptInteractive && !process.stdin.isTTY) {
-    console.error(
+    debugLogger.error(
       'Error: The --prompt-interactive flag cannot be used when input is piped from stdin.',
     );
     process.exit(1);
@@ -266,7 +267,9 @@ export async function main() {
     if (!themeManager.setActiveTheme(settings.merged.ui?.theme)) {
       // If the theme is not found during initial load, log a warning and continue.
       // The useThemeCommand hook in AppContainer.tsx will handle opening the dialog.
-      console.warn(`Warning: Theme "${settings.merged.ui?.theme}" not found.`);
+      debugLogger.warn(
+        `Warning: Theme "${settings.merged.ui?.theme}" not found.`,
+      );
     }
   }
 
@@ -308,7 +311,7 @@ export async function main() {
             settings.merged.security.auth.selectedType,
           );
         } catch (err) {
-          console.error('Error authenticating:', err);
+          debugLogger.error('Error authenticating:', err);
           process.exit(1);
         }
       }
@@ -373,9 +376,9 @@ export async function main() {
     await cleanupExpiredSessions(config, settings.merged);
 
     if (config.getListExtensions()) {
-      console.log('Installed extensions:');
+      debugLogger.log('Installed extensions:');
       for (const extension of extensions) {
-        console.log(`- ${extension.name}`);
+        debugLogger.log(`- ${extension.name}`);
       }
       process.exit(0);
     }
@@ -443,7 +446,7 @@ export async function main() {
       }
     }
     if (!input) {
-      console.error(
+      debugLogger.error(
         `No input provided via stdin. Input can be provided by piping data into gemini or using the --prompt option.`,
       );
       process.exit(1);
@@ -468,7 +471,7 @@ export async function main() {
     );
 
     if (config.getDebugMode()) {
-      console.log('Session ID: %s', sessionId);
+      debugLogger.log('Session ID: %s', sessionId);
     }
 
     await runNonInteractive(nonInteractiveConfig, settings, input, prompt_id);
