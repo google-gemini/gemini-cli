@@ -227,6 +227,35 @@ describe('GCSTaskStore', () => {
         'tar.c command failed to create',
       );
     });
+
+    it('should throw an error if taskId contains path traversal sequences', async () => {
+      const store = new GCSTaskStore('test-bucket');
+      const maliciousTask: SDKTask = {
+        id: '../../../malicious-task',
+        metadata: {
+          _internal: {
+            agentSettings: {
+              cacheDir: '/tmp/cache',
+              dataDir: '/tmp/data',
+              logDir: '/tmp/logs',
+              tempDir: '/tmp/temp',
+            },
+            taskState: 'working',
+          },
+        },
+        kind: 'task',
+        status: {
+          state: 'working',
+          timestamp: new Date().toISOString(),
+        },
+        contextId: 'test-context',
+        history: [],
+        artifacts: [],
+      };
+      await expect(store.save(maliciousTask)).rejects.toThrow(
+        'Invalid taskId: ../../../malicious-task',
+      );
+    });
   });
 
   describe('load', () => {
@@ -322,6 +351,14 @@ describe('GCSTaskStore', () => {
         expect.stringContaining('workspace archive not found'),
       );
     });
+  });
+
+  it('should throw an error if taskId contains path traversal sequences', async () => {
+    const store = new GCSTaskStore('test-bucket');
+    const maliciousTaskId = '../../../malicious-task';
+    await expect(store.load(maliciousTaskId)).rejects.toThrow(
+      `Invalid taskId: ${maliciousTaskId}`,
+    );
   });
 });
 
