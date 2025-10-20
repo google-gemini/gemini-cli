@@ -5,6 +5,7 @@
  */
 
 import { execSync, spawn, spawnSync } from 'node:child_process';
+import { debugLogger } from './debugLogger.js';
 
 export type EditorType =
   | 'vscode'
@@ -168,50 +169,45 @@ export async function openDiff(
 ): Promise<void> {
   const diffCommand = getDiffCommand(oldPath, newPath, editor);
   if (!diffCommand) {
-    console.error('No diff tool available. Install a supported editor.');
+    debugLogger.error('No diff tool available. Install a supported editor.');
     return;
   }
 
-  try {
-    const isTerminalEditor = ['vim', 'emacs', 'neovim'].includes(editor);
+  const isTerminalEditor = ['vim', 'emacs', 'neovim'].includes(editor);
 
-    if (isTerminalEditor) {
-      try {
-        const result = spawnSync(diffCommand.command, diffCommand.args, {
-          stdio: 'inherit',
-        });
-        if (result.error) {
-          throw result.error;
-        }
-        if (result.status !== 0) {
-          throw new Error(`${editor} exited with code ${result.status}`);
-        }
-      } finally {
-        onEditorClose();
-      }
-      return;
-    }
-
-    return new Promise<void>((resolve, reject) => {
-      const childProcess = spawn(diffCommand.command, diffCommand.args, {
+  if (isTerminalEditor) {
+    try {
+      const result = spawnSync(diffCommand.command, diffCommand.args, {
         stdio: 'inherit',
-        shell: process.platform === 'win32',
       });
-
-      childProcess.on('close', (code) => {
-        if (code === 0) {
-          resolve();
-        } else {
-          reject(new Error(`${editor} exited with code ${code}`));
-        }
-      });
-
-      childProcess.on('error', (error) => {
-        reject(error);
-      });
-    });
-  } catch (error) {
-    console.error(error);
-    throw error;
+      if (result.error) {
+        throw result.error;
+      }
+      if (result.status !== 0) {
+        throw new Error(`${editor} exited with code ${result.status}`);
+      }
+    } finally {
+      onEditorClose();
+    }
+    return;
   }
+
+  return new Promise<void>((resolve, reject) => {
+    const childProcess = spawn(diffCommand.command, diffCommand.args, {
+      stdio: 'inherit',
+      shell: process.platform === 'win32',
+    });
+
+    childProcess.on('close', (code) => {
+      if (code === 0) {
+        resolve();
+      } else {
+        reject(new Error(`${editor} exited with code ${code}`));
+      }
+    });
+
+    childProcess.on('error', (error) => {
+      reject(error);
+    });
+  });
 }

@@ -23,6 +23,7 @@ import {
   StreamJsonFormatter,
   JsonStreamEventType,
   uiTelemetryService,
+  debugLogger,
 } from '@google/gemini-cli-core';
 
 import type { Content, Part } from '@google/genai';
@@ -255,7 +256,7 @@ export async function runNonInteractive(
               .getChat()
               .recordCompletedToolCalls(currentModel, completedToolCalls);
           } catch (error) {
-            console.error(
+            debugLogger.error(
               `Error recording completed tool call information: ${error}`,
             );
           }

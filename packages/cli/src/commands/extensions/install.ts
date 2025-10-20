@@ -10,7 +10,10 @@ import {
   installOrUpdateExtension,
   requestConsentNonInteractive,
 } from '../../config/extension.js';
-import type { ExtensionInstallMetadata } from '@google/gemini-cli-core';
+import {
+  debugLogger,
+  type ExtensionInstallMetadata,
+} from '@google/gemini-cli-core';
 import { getErrorMessage } from '../../utils/errors.js';
 import { stat } from 'node:fs/promises';
 
@@ -60,16 +63,16 @@ export async function handleInstall(args: InstallArgs) {
       ? () => Promise.resolve(true)
       : requestConsentNonInteractive;
     if (args.consent) {
-      console.log('You have consented to the following:');
-      console.log(INSTALL_WARNING_MESSAGE);
+      debugLogger.log('You have consented to the following:');
+      debugLogger.log(INSTALL_WARNING_MESSAGE);
     }
     const name = await installOrUpdateExtension(
       installMetadata,
       requestConsent,
     );
-    console.log(`Extension "${name}" installed successfully and enabled.`);
+    debugLogger.log(`Extension "${name}" installed successfully and enabled.`);
   } catch (error) {
-    console.error(getErrorMessage(error));
+    debugLogger.error(getErrorMessage(error));
     process.exit(1);
   }
 }
