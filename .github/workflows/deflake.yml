@@ -41,7 +41,7 @@ jobs:
         uses: 'actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955' # ratchet:actions/checkout@v5
         with:
           ref: '${{ github.event.pull_request.head.sha }}'
-          repository: '${{ github.event.repository.name }}'
+          repository: '${{ github.repository }}'
 
       - name: 'Set up Node.js ${{ matrix.node-version }}'
         uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions-node@v4
@@ -79,7 +79,7 @@ jobs:
         uses: 'actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955' # ratchet:actions/checkout@v5
         with:
           ref: '${{ github.event.pull_request.head.sha }}'
-          repository: '${{ github.event.repository.name }}'
+          repository: '${{ github.repository }}'
 
       - name: 'Set up Node.js 20.x'
         uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions-node@v4
@@ -114,7 +114,7 @@ jobs:
         uses: 'actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955' # ratchet:actions/checkout@v5
         with:
           ref: '${{ github.event.pull_request.head.sha }}'
-          repository: '${{ github.event.repository.name }}'
+          repository: '${{ github.repository }}'
 
       - name: 'Set up Node.js 20.x'
         uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions-node@v4
