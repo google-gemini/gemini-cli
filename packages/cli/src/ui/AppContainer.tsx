@@ -90,6 +90,7 @@ import { useSessionStats } from './contexts/SessionContext.js';
 import { useGitBranchName } from './hooks/useGitBranchName.js';
 import { useExtensionUpdates } from './hooks/useExtensionUpdates.js';
 import { ShellFocusContext } from './contexts/ShellFocusContext.js';
+import { ExtensionEnablementManager } from '../config/extensions/extensionEnablement.js';
 
 const CTRL_EXIT_PROMPT_DURATION_MS = 1000;
 const QUEUE_ERROR_DISPLAY_DURATION_MS = 3000;
@@ -159,6 +160,9 @@ export const AppContainer = (props: AppContainerProps) => {
   );
 
   const extensions = config.getExtensions();
+  const [extensionEnablementManager] = useState<ExtensionEnablementManager>(
+    new ExtensionEnablementManager(config.getEnabledExtensions()),
+  );
   const {
     extensionsUpdateState,
     extensionsUpdateStateInternal,
@@ -167,6 +171,7 @@ export const AppContainer = (props: AppContainerProps) => {
     addConfirmUpdateExtensionRequest,
   } = useExtensionUpdates(
     extensions,
+    extensionEnablementManager,
     historyManager.addItem,
     config.getWorkingDir(),
   );
@@ -529,7 +534,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
           config.getDebugMode(),
           config.getFileService(),
           settings.merged,
-          config.getExtensionContextFilePaths(),
+          config.getExtensions(),
           config.isTrustedFolder(),
           settings.merged.context?.importFormat || 'tree', // Use setting or default to 'tree'
           config.getFileFilteringOptions(),
