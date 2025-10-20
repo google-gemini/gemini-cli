@@ -104,7 +104,29 @@ export const copyToClipboard = async (text: string): Promise<void> => {
       return run('clip', []);
     case 'darwin':
       return run('pbcopy', []);
-    case 'linux':
+    case 'linux': {
+      const sessionType = process.env['XDG_SESSION_TYPE'];
+      if (sessionType === 'wayland') {
+        try {
+          await run('wl-copy', [], linuxOptions);
+          return;
+        } catch (error) {
+          const wlCopyNotFound =
+            error instanceof Error &&
+            (error as NodeJS.ErrnoException).code === 'ENOENT';
+          if (wlCopyNotFound) {
+            throw new Error(
+              'Please ensure wl-clipboard is installed and configured.',
+            );
+          }
+
+          const errorMessage =
+            error instanceof Error ? error.message : String(error);
+
+          throw new Error(`wl-copy command failed. "${errorMessage}".`);
+        }
+      }
+
       try {
         await run('xclip', ['-selection', 'clipboard'], linuxOptions);
       } catch (primaryError) {
@@ -145,6 +167,7 @@ export const copyToClipboard = async (text: string): Promise<void> => {
         }
       }
       return;
+    }
     default:
       throw new Error(`Unsupported platform: ${process.platform}`);
   }
