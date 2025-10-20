@@ -38,6 +38,10 @@ import {
 import * as Diff from 'diff';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
+import {
+  isShellInvocationAllowlisted,
+  SHELL_TOOL_NAMES,
+} from '../utils/shell-utils.js';
 import { doesToolInvocationMatch } from '../utils/tool-utils.js';
 import levenshtein from 'fast-levenshtein';
 import { ShellToolInvocation } from '../tools/shell.js';
@@ -728,7 +732,8 @@ export class CoreToolScheduler {
           continue;
         }
 
-        const { request: reqInfo, invocation } = toolCall;
+        const validatingCall = toolCall as ValidatingToolCall;
+        const { request: reqInfo, invocation } = validatingCall;
 
         try {
           if (signal.aborted) {
@@ -752,11 +757,7 @@ export class CoreToolScheduler {
             continue;
           }
 
-          const allowedTools = this.config.getAllowedTools() || [];
-          if (
-            this.config.getApprovalMode() === ApprovalMode.YOLO ||
-            doesToolInvocationMatch(toolCall.tool, invocation, allowedTools)
-          ) {
+          if (this.isAutoApproved(validatingCall)) {
             this.setToolCallOutcome(
               reqInfo.callId,
               ToolConfirmationOutcome.ProceedAlways,
@@ -1188,6 +1189,22 @@ export class CoreToolScheduler {
       confirmed: false, // Not auto-approved
       requiresUserConfirmation: true, // Use legacy UI confirmation
     });
+  }
+
+  private isAutoApproved(toolCall: ValidatingToolCall): boolean {
+    if (this.config.getApprovalMode() === ApprovalMode.YOLO) {
+      return true;
+    }
+
+    const allowedTools = this.config.getAllowedTools() || [];
+    const { tool, invocation } = toolCall;
+    const toolName = typeof tool === 'string' ? tool : tool.name;
+
+    if (SHELL_TOOL_NAMES.includes(toolName)) {
+      return isShellInvocationAllowlisted(invocation, allowedTools);
+    }
+
+    return doesToolInvocationMatch(tool, invocation, allowedTools);
   }
 
   private async autoApproveCompatiblePendingTools(

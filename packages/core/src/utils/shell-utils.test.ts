@@ -21,8 +21,10 @@ import {
   isCommandAllowed,
   initializeShellParsers,
   stripShellWrapper,
+  isShellInvocationAllowlisted,
 } from './shell-utils.js';
 import type { Config } from '../config/config.js';
+import type { AnyToolInvocation } from '../index.js';
 
 const mockPlatform = vi.hoisted(() => vi.fn());
 const mockHomedir = vi.hoisted(() => vi.fn());
@@ -417,6 +419,53 @@ describe('stripShellWrapper', () => {
 
   it('should not strip anything if no wrapper is present', () => {
     expect(stripShellWrapper('ls -l')).toEqual('ls -l');
+  });
+});
+
+describe('isShellInvocationAllowlisted', () => {
+  function createInvocation(command: string): AnyToolInvocation {
+    return { params: { command } } as unknown as AnyToolInvocation;
+  }
+
+  it('should return false when any chained command segment is not allowlisted', () => {
+    const invocation = createInvocation(
+      'git status && rm -rf /tmp/should-not-run',
+    );
+    expect(
+      isShellInvocationAllowlisted(invocation, ['run_shell_command(git)']),
+    ).toBe(false);
+  });
+
+  it('should return true when every segment is explicitly allowlisted', () => {
+    const invocation = createInvocation(
+      'git status && rm -rf /tmp/should-run && git diff',
+    );
+    expect(
+      isShellInvocationAllowlisted(invocation, [
+        'run_shell_command(git)',
+        'run_shell_command(rm -rf)',
+      ]),
+    ).toBe(true);
+  });
+
+  it('should return true when the allowlist contains a wildcard shell entry', () => {
+    const invocation = createInvocation('git status && rm -rf /tmp/should-run');
+    expect(
+      isShellInvocationAllowlisted(invocation, ['run_shell_command']),
+    ).toBe(true);
+  });
+
+  it('should treat piped commands as separate segments that must be allowlisted', () => {
+    const invocation = createInvocation('git status | tail -n 1');
+    expect(
+      isShellInvocationAllowlisted(invocation, ['run_shell_command(git)']),
+    ).toBe(false);
+    expect(
+      isShellInvocationAllowlisted(invocation, [
+        'run_shell_command(git)',
+        'run_shell_command(tail)',
+      ]),
+    ).toBe(true);
   });
 });
 
