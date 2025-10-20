@@ -628,7 +628,11 @@ export class TestRig {
     );
   }
 
-  async expectToolCallSuccess(toolNames: string[], timeout?: number) {
+  async expectToolCallSuccess(
+    toolNames: string[],
+    timeout?: number,
+    matchArgs?: (args: string) => boolean,
+  ) {
     // Use environment-specific timeout
     if (!timeout) {
       timeout = getDefaultTimeout();
@@ -642,7 +646,10 @@ export class TestRig {
         const toolLogs = this.readToolLogs();
         return toolNames.some((name) =>
           toolLogs.some(
-            (log) => log.toolRequest.name === name && log.toolRequest.success,
+            (log) =>
+              log.toolRequest.name === name &&
+              log.toolRequest.success &&
+              (matchArgs?.call(this, log.toolRequest.args) ?? true),
           ),
         );
       },
@@ -908,6 +915,34 @@ export class TestRig {
         logData.attributes['event.name'] === 'gemini_cli.api_request',
     );
     return apiRequests.pop() || null;
+  }
+
+  async waitForMetric(metricName: string, timeout?: number) {
+    await this.waitForTelemetryReady();
+
+    const fullName = metricName.startsWith('gemini_cli.')
+      ? metricName
+      : `gemini_cli.${metricName}`;
+
+    return poll(
+      () => {
+        const logs = this._readAndParseTelemetryLog();
+        for (const logData of logs) {
+          if (logData.scopeMetrics) {
+            for (const scopeMetric of logData.scopeMetrics) {
+              for (const metric of scopeMetric.metrics) {
+                if (metric.descriptor.name === fullName) {
+                  return true;
+                }
+              }
+            }
+          }
+        }
+        return false;
+      },
+      timeout ?? getDefaultTimeout(),
+      100,
+    );
   }
 
   readMetric(metricName: string): Record<string, unknown> | null {
