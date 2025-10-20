@@ -126,11 +126,9 @@ export class WriteTodosTool extends BaseDeclarativeTool<
   WriteTodosToolParams,
   ToolResult
 > {
-  static readonly Name: string = WRITE_TODOS_TOOL_NAME;
-
   constructor() {
     super(
-      WriteTodosTool.Name,
+      WRITE_TODOS_TOOL_NAME,
       'Write Todos',
       WRITE_TODOS_DESCRIPTION,
       Kind.Other,

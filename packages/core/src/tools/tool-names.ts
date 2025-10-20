@@ -18,7 +18,5 @@ export const SHELL_TOOL_NAME = 'run_shell_command';
 export const GREP_TOOL_NAME = 'search_file_content';
 export const READ_MANY_FILES_TOOL_NAME = 'read_many_files';
 export const READ_FILE_TOOL_NAME = 'read_file';
-
-// TODO: Migrate other tool names here to follow this pattern and prevent future circular dependencies.
-// Candidates for migration:
-// - LSTool ('list_directory')
+export const LS_TOOL_NAME = 'list_directory';
+export const MEMORY_TOOL_NAME = 'save_memory';

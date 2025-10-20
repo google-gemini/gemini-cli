@@ -319,7 +319,7 @@ class WriteFileToolInvocation extends BaseToolInvocation<
       logFileOperation(
         this.config,
         new FileOperationEvent(
-          WriteFileTool.Name,
+          WRITE_FILE_TOOL_NAME,
           operation,
           fileContent.split('\n').length,
           mimetype,
@@ -390,11 +390,9 @@ export class WriteFileTool
   extends BaseDeclarativeTool<WriteFileToolParams, ToolResult>
   implements ModifiableDeclarativeTool<WriteFileToolParams>
 {
-  static readonly Name: string = WRITE_FILE_TOOL_NAME;
-
   constructor(private readonly config: Config) {
     super(
-      WriteFileTool.Name,
+      WRITE_FILE_TOOL_NAME,
       'WriteFile',
       `Writes content to a specified file in the local filesystem.
 
