@@ -190,7 +190,7 @@ export class WebSearchTool extends BaseDeclarativeTool<
   WebSearchToolResult
 > {
   static readonly Name = WEB_SEARCH_TOOL_NAME;
-  
+
   constructor(
     private readonly config: Config,
     messageBus?: MessageBus,

@@ -141,7 +141,7 @@ export class ReadFileTool extends BaseDeclarativeTool<
   ToolResult
 > {
   static readonly Name = READ_FILE_TOOL_NAME;
-  
+
   constructor(
     private config: Config,
     messageBus?: MessageBus,

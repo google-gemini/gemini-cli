@@ -480,7 +480,7 @@ export class ReadManyFilesTool extends BaseDeclarativeTool<
   ToolResult
 > {
   static readonly Name = READ_MANY_FILES_TOOL_NAME;
-  
+
   constructor(
     private config: Config,
     messageBus?: MessageBus,

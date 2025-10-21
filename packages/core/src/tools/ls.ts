@@ -258,7 +258,7 @@ class LSToolInvocation extends BaseToolInvocation<LSToolParams, ToolResult> {
  */
 export class LSTool extends BaseDeclarativeTool<LSToolParams, ToolResult> {
   static readonly Name = LS_TOOL_NAME;
-  
+
   constructor(
     private config: Config,
     messageBus?: MessageBus,

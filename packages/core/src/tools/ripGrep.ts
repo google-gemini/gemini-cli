@@ -452,7 +452,7 @@ export class RipGrepTool extends BaseDeclarativeTool<
   ToolResult
 > {
   static readonly Name = GREP_TOOL_NAME;
-  
+
   constructor(
     private readonly config: Config,
     messageBus?: MessageBus,
