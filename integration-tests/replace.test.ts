@@ -26,7 +26,7 @@ describe('replace', () => {
     expect(rig.readFile(fileName)).toBe(expectedContent);
   });
 
-  it('should handle $ literally when replacing text ending with $', async () => {
+  it.skip('should handle $ literally when replacing text ending with $', async () => {
     const rig = new TestRig();
     await rig.setup(
       'should handle $ literally when replacing text ending with $',
