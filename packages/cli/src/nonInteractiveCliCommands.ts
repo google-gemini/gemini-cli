@@ -14,6 +14,7 @@ import {
 } from '@google/gemini-cli-core';
 import { CommandService } from './services/CommandService.js';
 import { FileCommandLoader } from './services/FileCommandLoader.js';
+import { McpPromptLoader } from './services/McpPromptLoader.js';
 import type { CommandContext } from './ui/commands/types.js';
 import { createNonInteractiveUI } from './ui/noninteractive/nonInteractiveUi.js';
 import type { LoadedSettings } from './config/settings.js';
@@ -38,9 +39,8 @@ export const handleSlashCommand = async (
     return;
   }
 
-  // Only custom commands are supported for now.
   const commandService = await CommandService.create(
-    [new FileCommandLoader(config)],
+    [new McpPromptLoader(config), new FileCommandLoader(config)],
     abortController.signal,
   );
   const commands = commandService.getCommands();
