@@ -176,7 +176,7 @@ describe('memoryCommand', () => {
         getWorkingDir: () => '/test/dir',
         getDebugMode: () => false,
         getFileService: () => ({}) as FileDiscoveryService,
-        getExtensionContextFilePaths: () => [],
+        getExtensions: () => [],
         shouldLoadMemoryFromIncludeDirectories: () => false,
         getWorkspaceContext: () => ({
           getDirectories: () => [],
@@ -198,7 +198,7 @@ describe('memoryCommand', () => {
                 importFormat: 'tree',
               },
             },
-          } as LoadedSettings,
+          } as unknown as LoadedSettings,
         },
         ui: {
           setGeminiMdFileCount: vi.fn(),

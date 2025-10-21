@@ -185,7 +185,7 @@ export class WebSearchTool extends BaseDeclarativeTool<
   WebSearchToolParams,
   WebSearchToolResult
 > {
-  static readonly Name: string = WEB_SEARCH_TOOL_NAME;
+  static readonly Name = WEB_SEARCH_TOOL_NAME;
 
   constructor(private readonly config: Config) {
     super(

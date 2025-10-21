@@ -628,7 +628,11 @@ export class TestRig {
     );
   }
 
-  async expectToolCallSuccess(toolNames: string[], timeout?: number) {
+  async expectToolCallSuccess(
+    toolNames: string[],
+    timeout?: number,
+    matchArgs?: (args: string) => boolean,
+  ) {
     // Use environment-specific timeout
     if (!timeout) {
       timeout = getDefaultTimeout();
@@ -642,7 +646,10 @@ export class TestRig {
         const toolLogs = this.readToolLogs();
         return toolNames.some((name) =>
           toolLogs.some(
-            (log) => log.toolRequest.name === name && log.toolRequest.success,
+            (log) =>
+              log.toolRequest.name === name &&
+              log.toolRequest.success &&
+              (matchArgs?.call(this, log.toolRequest.args) ?? true),
           ),
         );
       },

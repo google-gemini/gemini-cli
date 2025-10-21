@@ -12,6 +12,7 @@ import { makeRelative, shortenPath } from '../utils/paths.js';
 import type { Config } from '../config/config.js';
 import { DEFAULT_FILE_FILTERING_OPTIONS } from '../config/constants.js';
 import { ToolErrorType } from './tool-error.js';
+import { LS_TOOL_NAME } from './tool-names.js';
 
 /**
  * Parameters for the LS tool
@@ -252,7 +253,7 @@ class LSToolInvocation extends BaseToolInvocation<LSToolParams, ToolResult> {
  * Implementation of the LS tool logic
  */
 export class LSTool extends BaseDeclarativeTool<LSToolParams, ToolResult> {
-  static readonly Name = 'list_directory';
+  static readonly Name = LS_TOOL_NAME;
 
   constructor(private config: Config) {
     super(

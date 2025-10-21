@@ -51,8 +51,7 @@ describe('keyMatchers', () => {
       key.ctrl && (key.name === 'x' || key.sequence === '\x18'),
     [Command.PASTE_CLIPBOARD_IMAGE]: (key: Key) => key.ctrl && key.name === 'v',
     [Command.SHOW_ERROR_DETAILS]: (key: Key) => key.ctrl && key.name === 'o',
-    [Command.TOGGLE_TOOL_DESCRIPTIONS]: (key: Key) =>
-      key.ctrl && key.name === 't',
+    [Command.SHOW_FULL_TODOS]: (key: Key) => key.ctrl && key.name === 't',
     [Command.TOGGLE_IDE_CONTEXT_DETAIL]: (key: Key) =>
       key.ctrl && key.name === 'g',
     [Command.TOGGLE_MARKDOWN]: (key: Key) => key.meta && key.name === 'm',
@@ -217,9 +216,9 @@ describe('keyMatchers', () => {
       negative: [createKey('o'), createKey('e', { ctrl: true })],
     },
     {
-      command: Command.TOGGLE_TOOL_DESCRIPTIONS,
+      command: Command.SHOW_FULL_TODOS,
       positive: [createKey('t', { ctrl: true })],
-      negative: [createKey('t'), createKey('s', { ctrl: true })],
+      negative: [createKey('t'), createKey('e', { ctrl: true })],
     },
     {
       command: Command.TOGGLE_IDE_CONTEXT_DETAIL,
