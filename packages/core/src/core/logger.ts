@@ -342,7 +342,7 @@ export class Logger {
       const fileContent = await fs.readFile(path, 'utf-8');
       const parsedContent = JSON.parse(fileContent);
       if (!Array.isArray(parsedContent)) {
-        console.warn(
+        debugLogger.warn(
           `Checkpoint file at ${path} is not a valid JSON array. Returning empty checkpoint.`,
         );
         return [];

@@ -73,7 +73,7 @@ export class AgentRegistry {
   ): void {
     // Basic validation
     if (!definition.name || !definition.description) {
-      console.warn(
+      debugLogger.warn(
         `[AgentRegistry] Skipping invalid agent definition. Missing name or description.`,
       );
       return;

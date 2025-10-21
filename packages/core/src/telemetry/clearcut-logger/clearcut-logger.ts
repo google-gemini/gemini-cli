@@ -1255,7 +1255,7 @@ export class ClearcutLogger {
 
     // Log a warning if we're dropping events
     if (eventsToSend.length > MAX_RETRY_EVENTS && this.config?.getDebugMode()) {
-      console.warn(
+      debugLogger.warn(
         `ClearcutLogger: Dropping ${
           eventsToSend.length - MAX_RETRY_EVENTS
         } events due to retry queue limit. Total events: ${

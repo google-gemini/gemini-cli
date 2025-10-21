@@ -111,7 +111,7 @@ async function initOauthClient(
         await fetchAndCacheUserInfo(client);
       } catch (error) {
         // Non-fatal, continue with existing auth.
-        console.warn('Failed to fetch user info:', getErrorMessage(error));
+        debugLogger.warn('Failed to fetch user info:', getErrorMessage(error));
       }
     }
     debugLogger.log('Loaded cached credentials.');
@@ -340,7 +340,7 @@ async function authWithWeb(client: OAuth2Client): Promise<OauthWebLogin> {
             try {
               await fetchAndCacheUserInfo(client);
             } catch (error) {
-              console.warn(
+              debugLogger.warn(
                 'Failed to retrieve Google Account ID during authentication:',
                 getErrorMessage(error),
               );
