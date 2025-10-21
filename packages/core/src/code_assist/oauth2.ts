@@ -465,7 +465,7 @@ async function loadCachedCredentials(client: OAuth2Client): Promise<boolean> {
       return true;
     } catch (error) {
       // Log specific error for debugging, but continue trying other paths
-      console.debug(
+      debugLogger.debug(
         `Failed to load credentials from ${keyFile}:`,
         getErrorMessage(error),
       );

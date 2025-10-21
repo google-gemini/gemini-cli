@@ -8,11 +8,13 @@ import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import type { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import type { FileFilteringOptions } from '../config/constants.js';
+import { debugLogger } from './debugLogger.js';
 // Simple console logger for now.
 // TODO: Integrate with a more robust server-side logger.
 const logger = {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  debug: (...args: any[]) => console.debug('[DEBUG] [BfsFileSearch]', ...args),
+  debug: (...args: any[]) =>
+    debugLogger.debug('[DEBUG] [BfsFileSearch]', ...args),
 };
 
 interface BfsFileSearchOptions {

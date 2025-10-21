@@ -30,6 +30,7 @@ import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
 import { isKittyProtocolEnabled } from './kittyProtocolDetector.js';
 import { VSCODE_SHIFT_ENTER_SEQUENCE } from './platformConstants.js';
+import { debugLogger } from '@google/gemini-cli-core';
 
 const execAsync = promisify(exec);
 
@@ -88,7 +89,7 @@ async function detectTerminal(): Promise<SupportedTerminal | null> {
         return 'vscode';
     } catch (error) {
       // Continue detection even if process check fails
-      console.debug('Parent process detection failed:', error);
+      debugLogger.debug('Parent process detection failed:', error);
     }
   }
 

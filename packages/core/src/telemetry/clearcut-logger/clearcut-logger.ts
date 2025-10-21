@@ -239,7 +239,7 @@ export class ClearcutLogger {
       ]);
 
       if (wasAtCapacity && this.config?.getDebugMode()) {
-        console.debug(
+        debugLogger.debug(
           `ClearcutLogger: Dropped old event to prevent memory leak (queue size: ${this.events.size})`,
         );
       }
@@ -283,14 +283,14 @@ export class ClearcutLogger {
     }
 
     this.flushToClearcut().catch((error) => {
-      console.debug('Error flushing to Clearcut:', error);
+      debugLogger.debug('Error flushing to Clearcut:', error);
     });
   }
 
   async flushToClearcut(): Promise<LogResponse> {
     if (this.flushing) {
       if (this.config?.getDebugMode()) {
-        console.debug(
+        debugLogger.debug(
           'ClearcutLogger: Flush already in progress, marking pending flush.',
         );
       }
@@ -360,7 +360,7 @@ export class ClearcutLogger {
       // Fire and forget the pending flush
       this.flushToClearcut().catch((error) => {
         if (this.config?.getDebugMode()) {
-          console.debug('Error in pending flush to Clearcut:', error);
+          debugLogger.debug('Error in pending flush to Clearcut:', error);
         }
       });
     }
@@ -452,7 +452,7 @@ export class ClearcutLogger {
     // Flush start event immediately
     this.enqueueLogEvent(this.createLogEvent(EventNames.START_SESSION, data));
     this.flushToClearcut().catch((error) => {
-      console.debug('Error flushing to Clearcut:', error);
+      debugLogger.debug('Error flushing to Clearcut:', error);
     });
   }
 
@@ -669,14 +669,14 @@ export class ClearcutLogger {
   logFlashFallbackEvent(): void {
     this.enqueueLogEvent(this.createLogEvent(EventNames.FLASH_FALLBACK, []));
     this.flushToClearcut().catch((error) => {
-      console.debug('Error flushing to Clearcut:', error);
+      debugLogger.debug('Error flushing to Clearcut:', error);
     });
   }
 
   logRipgrepFallbackEvent(): void {
     this.enqueueLogEvent(this.createLogEvent(EventNames.RIPGREP_FALLBACK, []));
     this.flushToClearcut().catch((error) => {
-      console.debug('Error flushing to Clearcut:', error);
+      debugLogger.debug('Error flushing to Clearcut:', error);
     });
   }
 
@@ -812,7 +812,7 @@ export class ClearcutLogger {
     // Flush immediately on session end.
     this.enqueueLogEvent(this.createLogEvent(EventNames.END_SESSION, []));
     this.flushToClearcut().catch((error) => {
-      console.debug('Error flushing to Clearcut:', error);
+      debugLogger.debug('Error flushing to Clearcut:', error);
     });
   }
 
@@ -911,7 +911,7 @@ export class ClearcutLogger {
       this.createLogEvent(EventNames.EXTENSION_INSTALL, data),
     );
     this.flushToClearcut().catch((error) => {
-      console.debug('Error flushing to Clearcut:', error);
+      debugLogger.debug('Error flushing to Clearcut:', error);
     });
   }
 
@@ -931,7 +931,7 @@ export class ClearcutLogger {
       this.createLogEvent(EventNames.EXTENSION_UNINSTALL, data),
     );
     this.flushToClearcut().catch((error) => {
-      console.debug('Error flushing to Clearcut:', error);
+      debugLogger.debug('Error flushing to Clearcut:', error);
     });
   }
 
@@ -963,7 +963,7 @@ export class ClearcutLogger {
       this.createLogEvent(EventNames.EXTENSION_UPDATE, data),
     );
     this.flushToClearcut().catch((error) => {
-      console.debug('Error flushing to Clearcut:', error);
+      debugLogger.debug('Error flushing to Clearcut:', error);
     });
   }
 
@@ -1048,7 +1048,7 @@ export class ClearcutLogger {
       this.createLogEvent(EventNames.EXTENSION_ENABLE, data),
     );
     this.flushToClearcut().catch((error) => {
-      console.debug('Error flushing to Clearcut:', error);
+      debugLogger.debug('Error flushing to Clearcut:', error);
     });
   }
 
@@ -1083,7 +1083,7 @@ export class ClearcutLogger {
       this.createLogEvent(EventNames.EXTENSION_DISABLE, data),
     );
     this.flushToClearcut().catch((error) => {
-      console.debug('Error flushing to Clearcut:', error);
+      debugLogger.debug('Error flushing to Clearcut:', error);
     });
   }
 
@@ -1241,7 +1241,7 @@ export class ClearcutLogger {
 
   getConfigJson() {
     const configJson = safeJsonStringifyBooleanValuesOnly(this.config);
-    console.debug(configJson);
+    debugLogger.debug(configJson);
     return safeJsonStringifyBooleanValuesOnly(this.config);
   }
 
@@ -1270,7 +1270,7 @@ export class ClearcutLogger {
 
     if (numEventsToRequeue === 0) {
       if (this.config?.getDebugMode()) {
-        console.debug(
+        debugLogger.debug(
           `ClearcutLogger: No events re-queued (queue size: ${this.events.size})`,
         );
       }
@@ -1293,7 +1293,7 @@ export class ClearcutLogger {
     }
 
     if (this.config?.getDebugMode()) {
-      console.debug(
+      debugLogger.debug(
         `ClearcutLogger: Re-queued ${numEventsToRequeue} events for retry (queue size: ${this.events.size})`,
       );
     }
