@@ -953,7 +953,7 @@ Logging in with Google... Please restart Gemini CLI to continue.
 
       if (keyMatchers[Command.QUIT](key)) {
         // If the user presses Ctrl+C, we want to cancel any ongoing requests.
-        // This should happen on the first press, regardless of the count.
+        // This should happen regardless of the count.
         cancelOngoingRequest?.();
 
         setCtrlCPressCount((prev) => prev + 1);
