@@ -941,7 +941,7 @@ const SETTINGS_SCHEMA = {
         type: 'boolean',
         label: 'Disable YOLO Mode',
         category: 'Security',
-        requiresRestart: false,
+        requiresRestart: true,
         default: false,
         description: 'Disable YOLO mode, even if enabled by a flag.',
         showInDialog: true,

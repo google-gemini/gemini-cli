@@ -41,8 +41,8 @@ export function useAutoAcceptIndicator({
           if (addItem) {
             addItem(
               {
-                type: MessageType.INFO,
-                text: 'YOLO mode is disabled in your settings.',
+                type: MessageType.WARNING,
+                text: 'You cannot enter YOLO mode since it is disabled in your settings.',
               },
               Date.now(),
             );

@@ -502,8 +502,8 @@ describe('useAutoAcceptIndicator', () => {
       // An info message should be added
       expect(mockAddItem).toHaveBeenCalledWith(
         {
-          type: MessageType.INFO,
-          text: 'YOLO mode is disabled in your settings.',
+          type: MessageType.WARNING,
+          text: 'You cannot enter YOLO mode since it is disabled in your settings.',
         },
         expect.any(Number),
       );

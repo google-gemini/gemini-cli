@@ -471,8 +471,9 @@ export async function loadCliConfig(
   // Override approval mode if disableYoloMode is set.
   if (settings.security?.disableYoloMode) {
     if (approvalMode === ApprovalMode.YOLO) {
-      logger.warn(
-        'YOLO mode is disabled by the "disableYolo" setting. Overriding to "default" approval mode.',
+      logger.error('YOLO mode is disabled by the "disableYolo" setting.');
+      throw new FatalConfigError(
+        'Cannot start in YOLO mode when it is disabled by settings',
       );
     }
     approvalMode = ApprovalMode.DEFAULT;
