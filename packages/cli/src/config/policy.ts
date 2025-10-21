@@ -73,6 +73,7 @@ export function createPolicyEngineConfig(
   //   90: MCP servers with trust=true
   //   100: Explicitly allowed individual tools
   //   195: Explicitly excluded MCP servers
+  //   199: Tools that the user has selected as "Always Allow" in the interactive UI.
   //   200: Explicitly excluded individual tools (highest priority)
 
   // MCP servers that are explicitly allowed in settings.mcp.allowed
