@@ -7,7 +7,6 @@
 import type { CommandModule } from 'yargs';
 import {
   loadExtensions,
-  annotateActiveExtensions,
   requestConsentNonInteractive,
 } from '../../config/extension.js';
 import {
@@ -20,6 +19,7 @@ import { checkForExtensionUpdate } from '../../config/extensions/github.js';
 import { getErrorMessage } from '../../utils/errors.js';
 import { ExtensionUpdateState } from '../../ui/state/extensions.js';
 import { ExtensionEnablementManager } from '../../config/extensions/extensionEnablement.js';
+import { debugLogger } from '@google/gemini-cli-core';
 
 interface UpdateArgs {
   name?: string;
@@ -36,35 +36,34 @@ export async function handleUpdate(args: UpdateArgs) {
     // ones.
     args.name ? [args.name] : [],
   );
-  const allExtensions = loadExtensions(extensionEnablementManager);
-  const extensions = annotateActiveExtensions(
-    allExtensions,
-    workingDir,
-    extensionEnablementManager,
-  );
+  const extensions = loadExtensions(extensionEnablementManager);
   if (args.name) {
     try {
       const extension = extensions.find(
         (extension) => extension.name === args.name,
       );
       if (!extension) {
-        console.log(`Extension "${args.name}" not found.`);
+        debugLogger.log(`Extension "${args.name}" not found.`);
         return;
       }
       if (!extension.installMetadata) {
-        console.log(
+        debugLogger.log(
           `Unable to install extension "${args.name}" due to missing install metadata`,
         );
         return;
       }
-      const updateState = await checkForExtensionUpdate(extension);
+      const updateState = await checkForExtensionUpdate(
+        extension,
+        extensionEnablementManager,
+      );
       if (updateState !== ExtensionUpdateState.UPDATE_AVAILABLE) {
-        console.log(`Extension "${args.name}" is already up to date.`);
+        debugLogger.log(`Extension "${args.name}" is already up to date.`);
         return;
       }
       // TODO(chrstnb): we should list extensions if the requested extension is not installed.
       const updatedExtensionInfo = (await updateExtension(
         extension,
+        extensionEnablementManager,
         workingDir,
         requestConsentNonInteractive,
         updateState,
@@ -74,14 +73,14 @@ export async function handleUpdate(args: UpdateArgs) {
         updatedExtensionInfo.originalVersion !==
         updatedExtensionInfo.updatedVersion
       ) {
-        console.log(
+        debugLogger.log(
           `Extension "${args.name}" successfully updated: ${updatedExtensionInfo.originalVersion} → ${updatedExtensionInfo.updatedVersion}.`,
         );
       } else {
-        console.log(`Extension "${args.name}" is already up to date.`);
+        debugLogger.log(`Extension "${args.name}" is already up to date.`);
       }
     } catch (error) {
-      console.error(getErrorMessage(error));
+      debugLogger.error(getErrorMessage(error));
     }
   }
   if (args.all) {
@@ -89,6 +88,7 @@ export async function handleUpdate(args: UpdateArgs) {
       const extensionState = new Map();
       await checkForAllExtensionUpdates(
         extensions,
+        extensionEnablementManager,
         (action) => {
           if (action.type === 'SET_STATE') {
             extensionState.set(action.payload.name, {
@@ -103,18 +103,19 @@ export async function handleUpdate(args: UpdateArgs) {
         requestConsentNonInteractive,
         extensions,
         extensionState,
+        extensionEnablementManager,
         () => {},
       );
       updateInfos = updateInfos.filter(
         (info) => info.originalVersion !== info.updatedVersion,
       );
       if (updateInfos.length === 0) {
-        console.log('No extensions to update.');
+        debugLogger.log('No extensions to update.');
         return;
       }
-      console.log(updateInfos.map((info) => updateOutput(info)).join('\n'));
+      debugLogger.log(updateInfos.map((info) => updateOutput(info)).join('\n'));
     } catch (error) {
-      console.error(getErrorMessage(error));
+      debugLogger.error(getErrorMessage(error));
     }
   }
 }

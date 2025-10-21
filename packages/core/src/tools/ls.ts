@@ -257,12 +257,14 @@ class LSToolInvocation extends BaseToolInvocation<LSToolParams, ToolResult> {
  * Implementation of the LS tool logic
  */
 export class LSTool extends BaseDeclarativeTool<LSToolParams, ToolResult> {
+  static readonly Name = LS_TOOL_NAME;
+  
   constructor(
     private config: Config,
     messageBus?: MessageBus,
   ) {
     super(
-      LS_TOOL_NAME,
+      LSTool.Name,
       'ReadFolder',
       'Lists the names of files and subdirectories directly within a specified directory path. Can optionally ignore entries matching provided glob patterns.',
       Kind.Search,
