@@ -19,6 +19,7 @@ import type { Config } from '../config/config.js';
 import { fileExists } from '../utils/fileUtils.js';
 import { Storage } from '../config/storage.js';
 import { GREP_TOOL_NAME } from './tool-names.js';
+import { debugLogger } from '../utils/debugLogger.js';
 
 const DEFAULT_TOTAL_MAX_MATCHES = 20000;
 
@@ -179,7 +180,7 @@ class GrepToolInvocation extends BaseToolInvocation<
       const totalMaxMatches = DEFAULT_TOTAL_MAX_MATCHES;
 
       if (this.config.getDebugMode()) {
-        console.log(`[GrepTool] Total result limit: ${totalMaxMatches}`);
+        debugLogger.log(`[GrepTool] Total result limit: ${totalMaxMatches}`);
       }
 
       for (const searchDir of searchDirectories) {
