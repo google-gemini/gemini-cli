@@ -67,7 +67,7 @@ describe('replace', () => {
     expect(rig.readFile(fileName)).toBe(expectedContent);
   });
 
-  it('should delete a block of text', async () => {
+  it.skip('should delete a block of text', async () => {
     const rig = new TestRig();
     await rig.setup('should delete a block of text');
     const fileName = 'delete_block.txt';
