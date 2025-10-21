@@ -19,6 +19,7 @@ import fs from 'node:fs';
 import fsPromises from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
+import { fileURLToPath } from 'node:url';
 // eslint-disable-next-line import/no-internal-modules
 import mime from 'mime/lite';
 
@@ -30,6 +31,7 @@ import {
   detectBOM,
   readFileWithEncoding,
   fileExists,
+  readWasmBinaryFromDisk,
 } from './fileUtils.js';
 import { StandardFileSystemService } from '../services/fileSystemService.js';
 
@@ -75,6 +77,23 @@ describe('fileUtils', () => {
     }
     process.cwd = originalProcessCwd;
     vi.restoreAllMocks(); // Restore any spies
+  });
+
+  describe('readWasmBinaryFromDisk', () => {
+    it('loads a WASM binary from disk as a Uint8Array', async () => {
+      const wasmFixtureUrl = new URL(
+        './__fixtures__/dummy.wasm',
+        import.meta.url,
+      );
+      const wasmFixturePath = fileURLToPath(wasmFixtureUrl);
+      const result = await readWasmBinaryFromDisk(wasmFixturePath);
+      const expectedBytes = new Uint8Array(
+        await fsPromises.readFile(wasmFixturePath),
+      );
+
+      expect(result).toBeInstanceOf(Uint8Array);
+      expect(result).toStrictEqual(expectedBytes);
+    });
   });
 
   describe('isWithinRoot', () => {
