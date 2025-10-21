@@ -37,7 +37,7 @@ jobs:
     permissions:
       actions: read
     steps:
-      - name: 'Save Repo name'
+      - name: 'Mock Repo Artifact'
         if: "${{ github.event_name != 'workflow_run' }}"
         env:
           REPO_NAME: '${{ github.event.inputs.repo_name }}'
