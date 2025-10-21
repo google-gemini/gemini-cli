@@ -21,17 +21,22 @@ describe('useLoadingIndicator', () => {
   afterEach(() => {
     vi.useRealTimers(); // Restore real timers after each test
     act(() => vi.runOnlyPendingTimers);
+    vi.restoreAllMocks();
   });
 
   it('should initialize with default values when Idle', () => {
+    vi.spyOn(Math, 'random').mockImplementation(() => 0.5); // Always witty
     const { result } = renderHook(() =>
       useLoadingIndicator(StreamingState.Idle),
     );
     expect(result.current.elapsedTime).toBe(0);
-    expect(result.current.currentLoadingPhrase).toBe(WITTY_LOADING_PHRASES[0]);
+    expect(WITTY_LOADING_PHRASES).toContain(
+      result.current.currentLoadingPhrase,
+    );
   });
 
   it('should reflect values when Responding', async () => {
+    vi.spyOn(Math, 'random').mockImplementation(() => 0.5); // Always witty
     const { result } = renderHook(() =>
       useLoadingIndicator(StreamingState.Responding),
     );
@@ -80,6 +85,7 @@ describe('useLoadingIndicator', () => {
   });
 
   it('should reset elapsedTime and use a witty phrase when transitioning from WaitingForConfirmation to Responding', async () => {
+    vi.spyOn(Math, 'random').mockImplementation(() => 0.5); // Always witty
     const { result, rerender } = renderHook(
       ({ streamingState }) => useLoadingIndicator(streamingState),
       { initialProps: { streamingState: StreamingState.Responding } },
@@ -113,6 +119,7 @@ describe('useLoadingIndicator', () => {
   });
 
   it('should reset timer and phrase when streamingState changes from Responding to Idle', async () => {
+    vi.spyOn(Math, 'random').mockImplementation(() => 0.5); // Always witty
     const { result, rerender } = renderHook(
       ({ streamingState }) => useLoadingIndicator(streamingState),
       { initialProps: { streamingState: StreamingState.Responding } },
@@ -128,7 +135,9 @@ describe('useLoadingIndicator', () => {
     });
 
     expect(result.current.elapsedTime).toBe(0);
-    expect(result.current.currentLoadingPhrase).toBe(WITTY_LOADING_PHRASES[0]);
+    expect(WITTY_LOADING_PHRASES).toContain(
+      result.current.currentLoadingPhrase,
+    );
 
     // Timer should not advance
     await act(async () => {

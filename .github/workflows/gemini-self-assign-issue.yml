@@ -36,7 +36,6 @@ jobs:
           private-key: '${{ secrets.PRIVATE_KEY }}'
           # Add 'assignments' write permission
           permission-issues: 'write'
-          permission-assignements: 'write'
 
       - name: 'Assign issue to user'
         uses: 'actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea'
@@ -51,7 +50,8 @@ jobs:
 
             // Search for open issues already assigned to the commenter in this repo
             const { data: assignedIssues } = await github.rest.search.issuesAndPullRequests({
-              q: `is:issue repo:${owner}/${repo} assignee:${commenter} is:open`
+              q: `is:issue repo:${owner}/${repo} assignee:${commenter} is:open`,
+              advanced_search: true
             });
 
             if (assignedIssues.total_count >= MAX_ISSUES_ASSIGNED) {

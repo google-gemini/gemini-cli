@@ -6,12 +6,24 @@
 
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { aboutCommand } from './aboutCommand.js';
-import type { CommandContext } from './types.js';
+import { type CommandContext } from './types.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
 import * as versionUtils from '../../utils/version.js';
 import { MessageType } from '../types.js';
+import { IdeClient } from '@google/gemini-cli-core';
 
-import type { IdeClient } from '@google/gemini-cli-core';
+vi.mock('@google/gemini-cli-core', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('@google/gemini-cli-core')>();
+  return {
+    ...actual,
+    IdeClient: {
+      getInstance: vi.fn().mockResolvedValue({
+        getDetectedIdeDisplayName: vi.fn().mockReturnValue('test-ide'),
+      }),
+    },
+  };
+});
 
 vi.mock('../../utils/version.js', () => ({
   getCliVersion: vi.fn(),
@@ -27,13 +39,15 @@ describe('aboutCommand', () => {
       services: {
         config: {
           getModel: vi.fn(),
-          getIdeClient: vi.fn(),
           getIdeMode: vi.fn().mockReturnValue(true),
-          getGeminiClient: vi.fn(),
         },
         settings: {
           merged: {
-            selectedAuthType: 'oauth-gca',
+            security: {
+              auth: {
+                selectedType: 'test-auth',
+              },
+            },
           },
         },
       },
@@ -50,14 +64,6 @@ describe('aboutCommand', () => {
     Object.defineProperty(process, 'platform', {
       value: 'test-os',
     });
-    vi.spyOn(mockContext.services.config!, 'getIdeClient').mockReturnValue({
-      getDetectedIdeDisplayName: vi.fn().mockReturnValue('test-ide'),
-    } as Partial<IdeClient> as IdeClient);
-    vi.spyOn(mockContext.services.config!, 'getGeminiClient').mockReturnValue({
-      getUserTier: vi.fn().mockReturnValue(undefined),
-    } as unknown as ReturnType<
-      NonNullable<typeof mockContext.services.config>['getGeminiClient']
-    >);
   });
 
   afterEach(() => {
@@ -71,7 +77,7 @@ describe('aboutCommand', () => {
 
   it('should have the correct name and description', () => {
     expect(aboutCommand.name).toBe('about');
-    expect(aboutCommand.description).toBe('show version info');
+    expect(aboutCommand.description).toBe('Show version info');
   });
 
   it('should call addItem with all version info', async () => {
@@ -89,10 +95,9 @@ describe('aboutCommand', () => {
         osVersion: 'test-os',
         sandboxEnv: 'no sandbox',
         modelVersion: 'test-model',
-        selectedAuthType: 'oauth-gca',
+        selectedAuthType: 'test-auth',
         gcpProject: 'test-gcp-project',
         ideClient: 'test-ide',
-        userTier: undefined,
       },
       expect.any(Number),
     );
@@ -132,12 +137,9 @@ describe('aboutCommand', () => {
   });
 
   it('should not show ide client when it is not detected', async () => {
-    // Change to oauth type that doesn't use GCP project
-    mockContext.services.settings.merged.selectedAuthType = 'oauth';
-
-    vi.spyOn(mockContext.services.config!, 'getIdeClient').mockReturnValue({
+    vi.mocked(IdeClient.getInstance).mockResolvedValue({
       getDetectedIdeDisplayName: vi.fn().mockReturnValue(undefined),
-    } as Partial<IdeClient> as IdeClient);
+    } as unknown as IdeClient);
 
     process.env['SANDBOX'] = '';
     if (!aboutCommand.action) {
@@ -153,8 +155,8 @@ describe('aboutCommand', () => {
         osVersion: 'test-os',
         sandboxEnv: 'no sandbox',
         modelVersion: 'test-model',
-        selectedAuthType: 'oauth',
-        gcpProject: '',
+        selectedAuthType: 'test-auth',
+        gcpProject: 'test-gcp-project',
         ideClient: '',
       }),
       expect.any(Number),

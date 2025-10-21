@@ -5,7 +5,7 @@
  */
 
 import type { CSSProperties } from 'react';
-import { SemanticColors } from './semantic-tokens.js';
+import type { SemanticColors } from './semantic-tokens.js';
 import { resolveColor } from './color-utils.js';
 
 export type ThemeType = 'light' | 'dark' | 'ansi' | 'custom';
@@ -80,7 +80,7 @@ export interface CustomTheme {
 export const lightTheme: ColorsTheme = {
   type: 'light',
   Background: '#FAFAFA',
-  Foreground: '#3C3C43',
+  Foreground: '',
   LightBlue: '#89BDCD',
   AccentBlue: '#3B82F6',
   AccentPurple: '#8B5CF6',
@@ -98,7 +98,7 @@ export const lightTheme: ColorsTheme = {
 export const darkTheme: ColorsTheme = {
   type: 'dark',
   Background: '#1E1E2E',
-  Foreground: '#CDD6F4',
+  Foreground: '',
   LightBlue: '#ADD8E6',
   AccentBlue: '#89B4FA',
   AccentPurple: '#CBA6F7',
@@ -141,6 +141,7 @@ export class Theme {
    * to Ink-compatible color strings (hex or name).
    */
   protected readonly _colorMap: Readonly<Record<string, string>>;
+  readonly semanticColors: SemanticColors;
 
   /**
    * Creates a new Theme instance.
@@ -152,8 +153,37 @@ export class Theme {
     readonly type: ThemeType,
     rawMappings: Record<string, CSSProperties>,
     readonly colors: ColorsTheme,
-    readonly semanticColors: SemanticColors,
+    semanticColors?: SemanticColors,
   ) {
+    this.semanticColors = semanticColors ?? {
+      text: {
+        primary: this.colors.Foreground,
+        secondary: this.colors.Gray,
+        link: this.colors.AccentBlue,
+        accent: this.colors.AccentPurple,
+      },
+      background: {
+        primary: this.colors.Background,
+        diff: {
+          added: this.colors.DiffAdded,
+          removed: this.colors.DiffRemoved,
+        },
+      },
+      border: {
+        default: this.colors.Gray,
+        focused: this.colors.AccentBlue,
+      },
+      ui: {
+        comment: this.colors.Gray,
+        symbol: this.colors.AccentCyan,
+        gradient: this.colors.GradientColors,
+      },
+      status: {
+        error: this.colors.AccentRed,
+        success: this.colors.AccentGreen,
+        warning: this.colors.AccentYellow,
+      },
+    };
     this._colorMap = Object.freeze(this._buildColorMap(rawMappings)); // Build and freeze the map
 
     // Determine the default foreground color
@@ -380,31 +410,31 @@ export function createCustomTheme(customTheme: CustomTheme): Theme {
 
   const semanticColors: SemanticColors = {
     text: {
-      primary: colors.Foreground,
-      secondary: colors.Gray,
-      link: colors.AccentBlue,
-      accent: colors.AccentPurple,
+      primary: customTheme.text?.primary ?? colors.Foreground,
+      secondary: customTheme.text?.secondary ?? colors.Gray,
+      link: customTheme.text?.link ?? colors.AccentBlue,
+      accent: customTheme.text?.accent ?? colors.AccentPurple,
     },
     background: {
-      primary: colors.Background,
+      primary: customTheme.background?.primary ?? colors.Background,
       diff: {
-        added: colors.DiffAdded,
-        removed: colors.DiffRemoved,
+        added: customTheme.background?.diff?.added ?? colors.DiffAdded,
+        removed: customTheme.background?.diff?.removed ?? colors.DiffRemoved,
       },
     },
     border: {
-      default: colors.Gray,
-      focused: colors.AccentBlue,
+      default: customTheme.border?.default ?? colors.Gray,
+      focused: customTheme.border?.focused ?? colors.AccentBlue,
     },
     ui: {
-      comment: colors.Comment,
-      symbol: colors.Gray,
-      gradient: colors.GradientColors,
+      comment: customTheme.ui?.comment ?? colors.Comment,
+      symbol: customTheme.ui?.symbol ?? colors.Gray,
+      gradient: customTheme.ui?.gradient ?? colors.GradientColors,
     },
     status: {
-      error: colors.AccentRed,
-      success: colors.AccentGreen,
-      warning: colors.AccentYellow,
+      error: customTheme.status?.error ?? colors.AccentRed,
+      success: customTheme.status?.success ?? colors.AccentGreen,
+      warning: customTheme.status?.warning ?? colors.AccentYellow,
     },
   };
 

@@ -6,19 +6,26 @@
 
 /** @vitest-environment jsdom */
 
-import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
+import {
+  describe,
+  it,
+  expect,
+  beforeEach,
+  vi,
+  afterEach,
+  type Mock,
+} from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { useCommandCompletion } from './useCommandCompletion.js';
-import { CommandContext } from '../commands/types.js';
-import { Config } from '@google/gemini-cli-core';
+import type { CommandContext } from '../commands/types.js';
+import type { Config } from '@google/gemini-cli-core';
 import { useTextBuffer } from '../components/shared/text-buffer.js';
 import { useEffect } from 'react';
-import { Suggestion } from '../components/SuggestionsDisplay.js';
-import { UseAtCompletionProps, useAtCompletion } from './useAtCompletion.js';
-import {
-  UseSlashCompletionProps,
-  useSlashCompletion,
-} from './useSlashCompletion.js';
+import type { Suggestion } from '../components/SuggestionsDisplay.js';
+import type { UseAtCompletionProps } from './useAtCompletion.js';
+import { useAtCompletion } from './useAtCompletion.js';
+import type { UseSlashCompletionProps } from './useSlashCompletion.js';
+import { useSlashCompletion } from './useSlashCompletion.js';
 
 vi.mock('./useAtCompletion', () => ({
   useAtCompletion: vi.fn(),
@@ -46,7 +53,7 @@ const setupMocks = ({
   slashCompletionRange?: { completionStart: number; completionEnd: number };
 }) => {
   // Mock for @-completions
-  (useAtCompletion as vi.Mock).mockImplementation(
+  (useAtCompletion as Mock).mockImplementation(
     ({
       enabled,
       setSuggestions,
@@ -62,7 +69,7 @@ const setupMocks = ({
   );
 
   // Mock for /-completions
-  (useSlashCompletion as vi.Mock).mockImplementation(
+  (useSlashCompletion as Mock).mockImplementation(
     ({
       enabled,
       setSuggestions,
@@ -122,6 +129,7 @@ describe('useCommandCompletion', () => {
             [],
             mockCommandContext,
             false,
+            false,
             mockConfig,
           ),
         );
@@ -146,6 +154,7 @@ describe('useCommandCompletion', () => {
             testRootDir,
             [],
             mockCommandContext,
+            false,
             false,
             mockConfig,
           );
@@ -180,6 +189,7 @@ describe('useCommandCompletion', () => {
             [],
             mockCommandContext,
             false,
+            false,
             mockConfig,
           ),
         );
@@ -208,6 +218,7 @@ describe('useCommandCompletion', () => {
             [],
             mockCommandContext,
             false,
+            false,
             mockConfig,
           ),
         );
@@ -234,6 +245,7 @@ describe('useCommandCompletion', () => {
             [],
             mockCommandContext,
             false,
+            false,
             mockConfig,
           ),
         );
@@ -247,6 +259,56 @@ describe('useCommandCompletion', () => {
           );
         });
       });
+
+      it.each([
+        {
+          shellModeActive: false,
+          expectedSuggestions: 1,
+          expectedShowSuggestions: true,
+          description:
+            'should show slash command suggestions when shellModeActive is false',
+        },
+        {
+          shellModeActive: true,
+          expectedSuggestions: 0,
+          expectedShowSuggestions: false,
+          description:
+            'should not show slash command suggestions when shellModeActive is true',
+        },
+      ])(
+        '$description',
+        async ({
+          shellModeActive,
+          expectedSuggestions,
+          expectedShowSuggestions,
+        }) => {
+          setupMocks({
+            slashSuggestions: [{ label: 'clear', value: 'clear' }],
+          });
+
+          const { result } = renderHook(() => {
+            const textBuffer = useTextBufferForTest('/');
+            const completion = useCommandCompletion(
+              textBuffer,
+              testDirs,
+              testRootDir,
+              [],
+              mockCommandContext,
+              false,
+              shellModeActive, // Parameterized shellModeActive
+              mockConfig,
+            );
+            return { ...completion, textBuffer };
+          });
+
+          await waitFor(() => {
+            expect(result.current.suggestions.length).toBe(expectedSuggestions);
+            expect(result.current.showSuggestions).toBe(
+              expectedShowSuggestions,
+            );
+          });
+        },
+      );
     });
 
     describe('Navigation', () => {
@@ -273,6 +335,7 @@ describe('useCommandCompletion', () => {
             [],
             mockCommandContext,
             false,
+            false,
             mockConfig,
           ),
         );
@@ -294,6 +357,7 @@ describe('useCommandCompletion', () => {
             [],
             mockCommandContext,
             false,
+            false,
             mockConfig,
           ),
         );
@@ -313,6 +377,7 @@ describe('useCommandCompletion', () => {
             testRootDir,
             [],
             mockCommandContext,
+            false,
             false,
             mockConfig,
           ),
@@ -339,6 +404,7 @@ describe('useCommandCompletion', () => {
             testRootDir,
             [],
             mockCommandContext,
+            false,
             false,
             mockConfig,
           ),
@@ -368,6 +434,7 @@ describe('useCommandCompletion', () => {
             testRootDir,
             [],
             mockCommandContext,
+            false,
             false,
             mockConfig,
           ),
@@ -406,6 +473,7 @@ describe('useCommandCompletion', () => {
             [],
             mockCommandContext,
             false,
+            false,
             mockConfig,
           ),
         );
@@ -436,6 +504,7 @@ describe('useCommandCompletion', () => {
           [],
           mockCommandContext,
           false,
+          false,
           mockConfig,
         );
         return { ...completion, textBuffer };
@@ -465,6 +534,7 @@ describe('useCommandCompletion', () => {
           testRootDir,
           [],
           mockCommandContext,
+          false,
           false,
           mockConfig,
         );
@@ -499,6 +569,7 @@ describe('useCommandCompletion', () => {
           [],
           mockCommandContext,
           false,
+          false,
           mockConfig,
         );
         return { ...completion, textBuffer };
@@ -514,6 +585,150 @@ describe('useCommandCompletion', () => {
 
       expect(result.current.textBuffer.text).toBe(
         '@src/file1.txt is a good file',
+      );
+    });
+
+    it('should complete a directory path ending with / without a trailing space', async () => {
+      setupMocks({
+        atSuggestions: [{ label: 'src/components/', value: 'src/components/' }],
+      });
+
+      const { result } = renderHook(() => {
+        const textBuffer = useTextBufferForTest('@src/comp');
+        const completion = useCommandCompletion(
+          textBuffer,
+          testDirs,
+          testRootDir,
+          [],
+          mockCommandContext,
+          false,
+          false,
+          mockConfig,
+        );
+        return { ...completion, textBuffer };
+      });
+
+      await waitFor(() => {
+        expect(result.current.suggestions.length).toBe(1);
+      });
+
+      act(() => {
+        result.current.handleAutocomplete(0);
+      });
+
+      expect(result.current.textBuffer.text).toBe('@src/components/');
+    });
+
+    it('should complete a directory path ending with \\ without a trailing space', async () => {
+      setupMocks({
+        atSuggestions: [
+          { label: 'src\\components\\', value: 'src\\components\\' },
+        ],
+      });
+
+      const { result } = renderHook(() => {
+        const textBuffer = useTextBufferForTest('@src\\comp');
+        const completion = useCommandCompletion(
+          textBuffer,
+          testDirs,
+          testRootDir,
+          [],
+          mockCommandContext,
+          false,
+          false,
+          mockConfig,
+        );
+        return { ...completion, textBuffer };
+      });
+
+      await waitFor(() => {
+        expect(result.current.suggestions.length).toBe(1);
+      });
+
+      act(() => {
+        result.current.handleAutocomplete(0);
+      });
+
+      expect(result.current.textBuffer.text).toBe('@src\\components\\');
+    });
+  });
+
+  describe('prompt completion filtering', () => {
+    it('should not trigger prompt completion for line comments', async () => {
+      const mockConfig = {
+        getEnablePromptCompletion: () => true,
+      } as Config;
+
+      const { result } = renderHook(() => {
+        const textBuffer = useTextBufferForTest('// This is a line comment');
+        const completion = useCommandCompletion(
+          textBuffer,
+          testDirs,
+          testRootDir,
+          [],
+          mockCommandContext,
+          false,
+          false,
+          mockConfig,
+        );
+        return { ...completion, textBuffer };
+      });
+
+      // Should not trigger prompt completion for comments
+      expect(result.current.suggestions.length).toBe(0);
+    });
+
+    it('should not trigger prompt completion for block comments', async () => {
+      const mockConfig = {
+        getEnablePromptCompletion: () => true,
+      } as Config;
+
+      const { result } = renderHook(() => {
+        const textBuffer = useTextBufferForTest(
+          '/* This is a block comment */',
+        );
+        const completion = useCommandCompletion(
+          textBuffer,
+          testDirs,
+          testRootDir,
+          [],
+          mockCommandContext,
+          false,
+          false,
+          mockConfig,
+        );
+        return { ...completion, textBuffer };
+      });
+
+      // Should not trigger prompt completion for comments
+      expect(result.current.suggestions.length).toBe(0);
+    });
+
+    it('should trigger prompt completion for regular text when enabled', async () => {
+      const mockConfig = {
+        getEnablePromptCompletion: () => true,
+      } as Config;
+
+      const { result } = renderHook(() => {
+        const textBuffer = useTextBufferForTest(
+          'This is regular text that should trigger completion',
+        );
+        const completion = useCommandCompletion(
+          textBuffer,
+          testDirs,
+          testRootDir,
+          [],
+          mockCommandContext,
+          false,
+          false,
+          mockConfig,
+        );
+        return { ...completion, textBuffer };
+      });
+
+      // This test verifies that comments are filtered out while regular text is not
+      expect(result.current.textBuffer.text).toBe(
+        'This is regular text that should trigger completion',
       );
     });
   });

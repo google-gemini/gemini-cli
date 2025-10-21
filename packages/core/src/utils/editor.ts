@@ -4,7 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { execSync, spawn } from 'child_process';
+import { execSync, spawn, spawnSync } from 'node:child_process';
+import { debugLogger } from './debugLogger.js';
 
 export type EditorType =
   | 'vscode'
@@ -168,62 +169,45 @@ export async function openDiff(
 ): Promise<void> {
   const diffCommand = getDiffCommand(oldPath, newPath, editor);
   if (!diffCommand) {
-    console.error('No diff tool available. Install a supported editor.');
+    debugLogger.error('No diff tool available. Install a supported editor.');
     return;
   }
 
-  try {
-    switch (editor) {
-      case 'vscode':
-      case 'vscodium':
-      case 'windsurf':
-      case 'cursor':
-      case 'zed':
-        // Use spawn for GUI-based editors to avoid blocking the entire process
-        return new Promise((resolve, reject) => {
-          const childProcess = spawn(diffCommand.command, diffCommand.args, {
-            stdio: 'inherit',
-            shell: true,
-          });
+  const isTerminalEditor = ['vim', 'emacs', 'neovim'].includes(editor);
 
-          childProcess.on('close', (code) => {
-            if (code === 0) {
-              resolve();
-            } else {
-              reject(new Error(`${editor} exited with code ${code}`));
-            }
-          });
-
-          childProcess.on('error', (error) => {
-            reject(error);
-          });
-        });
-
-      case 'vim':
-      case 'emacs':
-      case 'neovim': {
-        // Use execSync for terminal-based editors
-        const command =
-          process.platform === 'win32'
-            ? `${diffCommand.command} ${diffCommand.args.join(' ')}`
-            : `${diffCommand.command} ${diffCommand.args.map((arg) => `"${arg}"`).join(' ')}`;
-        try {
-          execSync(command, {
-            stdio: 'inherit',
-            encoding: 'utf8',
-          });
-        } catch (e) {
-          console.error('Error in onEditorClose callback:', e);
-        } finally {
-          onEditorClose();
-        }
-        break;
+  if (isTerminalEditor) {
+    try {
+      const result = spawnSync(diffCommand.command, diffCommand.args, {
+        stdio: 'inherit',
+      });
+      if (result.error) {
+        throw result.error;
       }
-
-      default:
-        throw new Error(`Unsupported editor: ${editor}`);
+      if (result.status !== 0) {
+        throw new Error(`${editor} exited with code ${result.status}`);
+      }
+    } finally {
+      onEditorClose();
     }
-  } catch (error) {
-    console.error(error);
+    return;
   }
+
+  return new Promise<void>((resolve, reject) => {
+    const childProcess = spawn(diffCommand.command, diffCommand.args, {
+      stdio: 'inherit',
+      shell: process.platform === 'win32',
+    });
+
+    childProcess.on('close', (code) => {
+      if (code === 0) {
+        resolve();
+      } else {
+        reject(new Error(`${editor} exited with code ${code}`));
+      }
+    });
+
+    childProcess.on('error', (error) => {
+      reject(error);
+    });
+  });
 }

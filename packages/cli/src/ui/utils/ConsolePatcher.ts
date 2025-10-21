@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import util from 'util';
-import { ConsoleMessageItem } from '../types.js';
+import util from 'node:util';
+import type { ConsoleMessageItem } from '../types.js';
 
 interface ConsolePatcherParams {
   onNewMessage?: (message: Omit<ConsoleMessageItem, 'id'>) => void;

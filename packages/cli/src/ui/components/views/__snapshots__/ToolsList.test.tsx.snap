@@ -1,0 +1,32 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`<ToolsList /> > renders correctly with descriptions 1`] = `
+"Available Gemini CLI tools:
+
+  - Test Tool One (test-tool-one)
+    This is the first test tool.
+  - Test Tool Two (test-tool-two)
+    This is the second test tool.
+       1. Tool descriptions support markdown formatting.
+       2. note use this tool wisely and be sure to consider how this tool interacts with word wrap.
+       3. important this tool is awesome.
+  - Test Tool Three (test-tool-three)
+    This is the third test tool.
+"
+`;
+
+exports[`<ToolsList /> > renders correctly with no tools 1`] = `
+"Available Gemini CLI tools:
+
+ No tools available
+"
+`;
+
+exports[`<ToolsList /> > renders correctly without descriptions 1`] = `
+"Available Gemini CLI tools:
+
+  - Test Tool One
+  - Test Tool Two
+  - Test Tool Three
+"
+`;

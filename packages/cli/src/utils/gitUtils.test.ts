@@ -5,7 +5,7 @@
  */
 
 import { vi, describe, expect, it, afterEach, beforeEach } from 'vitest';
-import * as child_process from 'child_process';
+import * as child_process from 'node:child_process';
 import {
   isGitHubRepository,
   getGitRepoRoot,
@@ -120,7 +120,7 @@ describe('getLatestRelease', async () => {
 
   it('throws an error if the fetch fails', async () => {
     global.fetch = vi.fn(() => Promise.reject('nope'));
-    expect(getLatestGitHubRelease()).rejects.toThrowError(
+    await expect(getLatestGitHubRelease()).rejects.toThrowError(
       /Unable to determine the latest/,
     );
   });
@@ -132,7 +132,7 @@ describe('getLatestRelease', async () => {
         json: () => Promise.resolve({ foo: 'bar' }),
       } as Response),
     );
-    expect(getLatestGitHubRelease()).rejects.toThrowError(
+    await expect(getLatestGitHubRelease()).rejects.toThrowError(
       /Unable to determine the latest/,
     );
   });
@@ -144,6 +144,6 @@ describe('getLatestRelease', async () => {
         json: () => Promise.resolve({ tag_name: 'v1.2.3' }),
       } as Response),
     );
-    expect(getLatestGitHubRelease()).resolves.toBe('v1.2.3');
+    await expect(getLatestGitHubRelease()).resolves.toBe('v1.2.3');
   });
 });

@@ -4,21 +4,18 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import * as fs from 'fs/promises';
-import * as fsSync from 'fs';
-import * as path from 'path';
-import { homedir } from 'os';
+import * as fs from 'node:fs/promises';
+import * as fsSync from 'node:fs';
+import * as path from 'node:path';
+import { homedir } from 'node:os';
 import { bfsFileSearch } from './bfsFileSearch.js';
-import {
-  GEMINI_CONFIG_DIR,
-  getAllGeminiMdFilenames,
-} from '../tools/memoryTool.js';
-import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
+import { getAllGeminiMdFilenames } from '../tools/memoryTool.js';
+import type { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import { processImports } from './memoryImportProcessor.js';
-import {
-  DEFAULT_MEMORY_FILE_FILTERING_OPTIONS,
-  FileFilteringOptions,
-} from '../config/config.js';
+import type { FileFilteringOptions } from '../config/constants.js';
+import { DEFAULT_MEMORY_FILE_FILTERING_OPTIONS } from '../config/constants.js';
+import { GEMINI_DIR } from './paths.js';
+import type { GeminiCLIExtension } from '../config/config.js';
 
 // Simple console logger, similar to the one previously in CLI's config.ts
 // TODO: Integrate with a more robust server-side logger if available/appropriate.
@@ -88,7 +85,7 @@ async function getGeminiMdFilePathsInternal(
   userHomePath: string,
   debugMode: boolean,
   fileService: FileDiscoveryService,
-  extensionContextFilePaths: string[] = [],
+  folderTrust: boolean,
   fileFilteringOptions: FileFilteringOptions,
   maxDirs: number,
 ): Promise<string[]> {
@@ -110,7 +107,7 @@ async function getGeminiMdFilePathsInternal(
         userHomePath,
         debugMode,
         fileService,
-        extensionContextFilePaths,
+        folderTrust,
         fileFilteringOptions,
         maxDirs,
       ),
@@ -139,7 +136,7 @@ async function getGeminiMdFilePathsInternalForEachDir(
   userHomePath: string,
   debugMode: boolean,
   fileService: FileDiscoveryService,
-  extensionContextFilePaths: string[] = [],
+  folderTrust: boolean,
   fileFilteringOptions: FileFilteringOptions,
   maxDirs: number,
 ): Promise<string[]> {
@@ -150,7 +147,7 @@ async function getGeminiMdFilePathsInternalForEachDir(
     const resolvedHome = path.resolve(userHomePath);
     const globalMemoryPath = path.join(
       resolvedHome,
-      GEMINI_CONFIG_DIR,
+      GEMINI_DIR,
       geminiMdFilename,
     );
 
@@ -168,7 +165,7 @@ async function getGeminiMdFilePathsInternalForEachDir(
 
     // FIX: Only perform the workspace search (upward and downward scans)
     // if a valid currentWorkingDirectory is provided.
-    if (dir) {
+    if (dir && folderTrust) {
       const resolvedCwd = path.resolve(dir);
       if (debugMode)
         logger.debug(
@@ -186,7 +183,7 @@ async function getGeminiMdFilePathsInternalForEachDir(
         : path.dirname(resolvedHome);
 
       while (currentDir && currentDir !== path.dirname(currentDir)) {
-        if (currentDir === path.join(resolvedHome, GEMINI_CONFIG_DIR)) {
+        if (currentDir === path.join(resolvedHome, GEMINI_DIR)) {
           break;
         }
 
@@ -208,7 +205,7 @@ async function getGeminiMdFilePathsInternalForEachDir(
       }
       upwardPaths.forEach((p) => allPaths.add(p));
 
-      const mergedOptions = {
+      const mergedOptions: FileFilteringOptions = {
         ...DEFAULT_MEMORY_FILE_FILTERING_OPTIONS,
         ...fileFilteringOptions,
       };
@@ -225,11 +222,6 @@ async function getGeminiMdFilePathsInternalForEachDir(
         allPaths.add(dPath);
       }
     }
-  }
-
-  // Add extension context file paths.
-  for (const extensionPath of extensionContextFilePaths) {
-    allPaths.add(extensionPath);
   }
 
   const finalPaths = Array.from(allPaths);
@@ -329,6 +321,12 @@ function concatenateInstructions(
     .join('\n\n');
 }
 
+export interface LoadServerHierarchicalMemoryResponse {
+  memoryContent: string;
+  fileCount: number;
+  filePaths: string[];
+}
+
 /**
  * Loads hierarchical GEMINI.md files and concatenates their content.
  * This function is intended for use by the server.
@@ -338,11 +336,12 @@ export async function loadServerHierarchicalMemory(
   includeDirectoriesToReadGemini: readonly string[],
   debugMode: boolean,
   fileService: FileDiscoveryService,
-  extensionContextFilePaths: string[] = [],
+  extensions: GeminiCLIExtension[],
+  folderTrust: boolean,
   importFormat: 'flat' | 'tree' = 'tree',
   fileFilteringOptions?: FileFilteringOptions,
   maxDirs: number = 200,
-): Promise<{ memoryContent: string; fileCount: number }> {
+): Promise<LoadServerHierarchicalMemoryResponse> {
   if (debugMode)
     logger.debug(
       `Loading server hierarchical memory for CWD: ${currentWorkingDirectory} (importFormat: ${importFormat})`,
@@ -357,14 +356,22 @@ export async function loadServerHierarchicalMemory(
     userHomePath,
     debugMode,
     fileService,
-    extensionContextFilePaths,
+    folderTrust,
     fileFilteringOptions || DEFAULT_MEMORY_FILE_FILTERING_OPTIONS,
     maxDirs,
   );
+
+  // Add extension file paths separately since they may be conditionally enabled.
+  filePaths.push(
+    ...extensions
+      .filter((ext) => ext.isActive)
+      .flatMap((ext) => ext.contextFiles),
+  );
+
   if (filePaths.length === 0) {
     if (debugMode)
       logger.debug('No GEMINI.md files found in hierarchy of the workspace.');
-    return { memoryContent: '', fileCount: 0 };
+    return { memoryContent: '', fileCount: 0, filePaths: [] };
   }
   const contentsWithPaths = await readGeminiMdFiles(
     filePaths,
@@ -387,5 +394,6 @@ export async function loadServerHierarchicalMemory(
   return {
     memoryContent: combinedInstructions,
     fileCount: contentsWithPaths.length,
+    filePaths,
   };
 }

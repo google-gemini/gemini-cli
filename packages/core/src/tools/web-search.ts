@@ -4,19 +4,16 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { GroundingMetadata } from '@google/genai';
-import {
-  BaseDeclarativeTool,
-  BaseToolInvocation,
-  Kind,
-  ToolInvocation,
-  ToolResult,
-} from './tools.js';
+import { WEB_SEARCH_TOOL_NAME } from './tool-names.js';
+import type { GroundingMetadata } from '@google/genai';
+import type { ToolInvocation, ToolResult } from './tools.js';
+import { BaseDeclarativeTool, BaseToolInvocation, Kind } from './tools.js';
 import { ToolErrorType } from './tool-error.js';
 
 import { getErrorMessage } from '../utils/errors.js';
-import { Config } from '../config/config.js';
-import { getResponseText } from '../utils/generateContentResponseUtilities.js';
+import { type Config } from '../config/config.js';
+import { getResponseText } from '../utils/partUtils.js';
+import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
 
 interface GroundingChunkWeb {
   uri?: string;
@@ -83,6 +80,7 @@ class WebSearchToolInvocation extends BaseToolInvocation<
         [{ role: 'user', parts: [{ text: this.params.query }] }],
         { tools: [{ googleSearch: {} }] },
         signal,
+        DEFAULT_GEMINI_FLASH_MODEL,
       );
 
       const responseText = getResponseText(response);
@@ -187,7 +185,7 @@ export class WebSearchTool extends BaseDeclarativeTool<
   WebSearchToolParams,
   WebSearchToolResult
 > {
-  static readonly Name: string = 'google_web_search';
+  static readonly Name = WEB_SEARCH_TOOL_NAME;
 
   constructor(private readonly config: Config) {
     super(

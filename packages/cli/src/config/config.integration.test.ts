@@ -5,14 +5,15 @@
  */
 
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
-import * as fs from 'fs';
-import * as path from 'path';
-import { tmpdir } from 'os';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import { tmpdir } from 'node:os';
+import type { ConfigParameters } from '@google/gemini-cli-core';
 import {
   Config,
-  ConfigParameters,
-  ContentGeneratorConfig,
+  DEFAULT_FILE_FILTERING_OPTIONS,
 } from '@google/gemini-cli-core';
+import type { Settings } from './settingsSchema.js';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 
@@ -32,12 +33,6 @@ afterAll(() => {
 });
 
 const CLEARCUT_URL = 'https://play.googleapis.com/log';
-
-const TEST_CONTENT_GENERATOR_CONFIG: ContentGeneratorConfig = {
-  apiKey: 'test-key',
-  model: 'test-model',
-  userAgent: 'test-agent',
-};
 
 // Mock file discovery service and tool registry
 vi.mock('@google/gemini-cli-core', async () => {
@@ -72,26 +67,29 @@ describe('Configuration Integration Tests', () => {
   describe('File Filtering Configuration', () => {
     it('should load default file filtering settings', async () => {
       const configParams: ConfigParameters = {
+        sessionId: 'test-session',
         cwd: '/tmp',
-        contentGeneratorConfig: TEST_CONTENT_GENERATOR_CONFIG,
+        model: 'test-model',
         embeddingModel: 'test-embedding-model',
-        sandbox: false,
+        sandbox: undefined,
         targetDir: tempDir,
         debugMode: false,
-        fileFilteringRespectGitIgnore: undefined, // Should default to true
       };
 
       const config = new Config(configParams);
 
-      expect(config.getFileFilteringRespectGitIgnore()).toBe(true);
+      expect(config.getFileFilteringRespectGitIgnore()).toBe(
+        DEFAULT_FILE_FILTERING_OPTIONS.respectGitIgnore,
+      );
     });
 
     it('should load custom file filtering settings from configuration', async () => {
       const configParams: ConfigParameters = {
+        sessionId: 'test-session',
         cwd: '/tmp',
-        contentGeneratorConfig: TEST_CONTENT_GENERATOR_CONFIG,
+        model: 'test-model',
         embeddingModel: 'test-embedding-model',
-        sandbox: false,
+        sandbox: undefined,
         targetDir: tempDir,
         debugMode: false,
         fileFiltering: {
@@ -106,13 +104,16 @@ describe('Configuration Integration Tests', () => {
 
     it('should merge user and workspace file filtering settings', async () => {
       const configParams: ConfigParameters = {
+        sessionId: 'test-session',
         cwd: '/tmp',
-        contentGeneratorConfig: TEST_CONTENT_GENERATOR_CONFIG,
+        model: 'test-model',
         embeddingModel: 'test-embedding-model',
-        sandbox: false,
+        sandbox: undefined,
         targetDir: tempDir,
         debugMode: false,
-        fileFilteringRespectGitIgnore: true,
+        fileFiltering: {
+          respectGitIgnore: true,
+        },
       };
 
       const config = new Config(configParams);
@@ -124,10 +125,11 @@ describe('Configuration Integration Tests', () => {
   describe('Configuration Integration', () => {
     it('should handle partial configuration objects gracefully', async () => {
       const configParams: ConfigParameters = {
+        sessionId: 'test-session',
         cwd: '/tmp',
-        contentGeneratorConfig: TEST_CONTENT_GENERATOR_CONFIG,
+        model: 'test-model',
         embeddingModel: 'test-embedding-model',
-        sandbox: false,
+        sandbox: undefined,
         targetDir: tempDir,
         debugMode: false,
         fileFiltering: {
@@ -143,27 +145,31 @@ describe('Configuration Integration Tests', () => {
 
     it('should handle empty configuration objects gracefully', async () => {
       const configParams: ConfigParameters = {
+        sessionId: 'test-session',
         cwd: '/tmp',
-        contentGeneratorConfig: TEST_CONTENT_GENERATOR_CONFIG,
+        model: 'test-model',
         embeddingModel: 'test-embedding-model',
-        sandbox: false,
+        sandbox: undefined,
         targetDir: tempDir,
         debugMode: false,
-        fileFilteringRespectGitIgnore: undefined,
+        fileFiltering: {},
       };
 
       const config = new Config(configParams);
 
       // All settings should use defaults
-      expect(config.getFileFilteringRespectGitIgnore()).toBe(true);
+      expect(config.getFileFilteringRespectGitIgnore()).toBe(
+        DEFAULT_FILE_FILTERING_OPTIONS.respectGitIgnore,
+      );
     });
 
     it('should handle missing configuration sections gracefully', async () => {
       const configParams: ConfigParameters = {
+        sessionId: 'test-session',
         cwd: '/tmp',
-        contentGeneratorConfig: TEST_CONTENT_GENERATOR_CONFIG,
+        model: 'test-model',
         embeddingModel: 'test-embedding-model',
-        sandbox: false,
+        sandbox: undefined,
         targetDir: tempDir,
         debugMode: false,
         // Missing fileFiltering configuration
@@ -172,20 +178,25 @@ describe('Configuration Integration Tests', () => {
       const config = new Config(configParams);
 
       // All git-aware settings should use defaults
-      expect(config.getFileFilteringRespectGitIgnore()).toBe(true);
+      expect(config.getFileFilteringRespectGitIgnore()).toBe(
+        DEFAULT_FILE_FILTERING_OPTIONS.respectGitIgnore,
+      );
     });
   });
 
   describe('Real-world Configuration Scenarios', () => {
     it('should handle a security-focused configuration', async () => {
       const configParams: ConfigParameters = {
+        sessionId: 'test-session',
         cwd: '/tmp',
-        contentGeneratorConfig: TEST_CONTENT_GENERATOR_CONFIG,
+        model: 'test-model',
         embeddingModel: 'test-embedding-model',
-        sandbox: false,
+        sandbox: undefined,
         targetDir: tempDir,
         debugMode: false,
-        fileFilteringRespectGitIgnore: true,
+        fileFiltering: {
+          respectGitIgnore: true,
+        },
       };
 
       const config = new Config(configParams);
@@ -195,10 +206,11 @@ describe('Configuration Integration Tests', () => {
 
     it('should handle a CI/CD environment configuration', async () => {
       const configParams: ConfigParameters = {
+        sessionId: 'test-session',
         cwd: '/tmp',
-        contentGeneratorConfig: TEST_CONTENT_GENERATOR_CONFIG,
+        model: 'test-model',
         embeddingModel: 'test-embedding-model',
-        sandbox: false,
+        sandbox: undefined,
         targetDir: tempDir,
         debugMode: false,
         fileFiltering: {
@@ -215,10 +227,11 @@ describe('Configuration Integration Tests', () => {
   describe('Checkpointing Configuration', () => {
     it('should enable checkpointing when the setting is true', async () => {
       const configParams: ConfigParameters = {
+        sessionId: 'test-session',
         cwd: '/tmp',
-        contentGeneratorConfig: TEST_CONTENT_GENERATOR_CONFIG,
+        model: 'test-model',
         embeddingModel: 'test-embedding-model',
-        sandbox: false,
+        sandbox: undefined,
         targetDir: tempDir,
         debugMode: false,
         checkpointing: true,
@@ -230,42 +243,12 @@ describe('Configuration Integration Tests', () => {
     });
   });
 
-  describe('Extension Context Files', () => {
-    it('should have an empty array for extension context files by default', () => {
-      const configParams: ConfigParameters = {
-        cwd: '/tmp',
-        contentGeneratorConfig: TEST_CONTENT_GENERATOR_CONFIG,
-        embeddingModel: 'test-embedding-model',
-        sandbox: false,
-        targetDir: tempDir,
-        debugMode: false,
-      };
-      const config = new Config(configParams);
-      expect(config.getExtensionContextFilePaths()).toEqual([]);
-    });
-
-    it('should correctly store and return extension context file paths', () => {
-      const contextFiles = ['/path/to/file1.txt', '/path/to/file2.js'];
-      const configParams: ConfigParameters = {
-        cwd: '/tmp',
-        contentGeneratorConfig: TEST_CONTENT_GENERATOR_CONFIG,
-        embeddingModel: 'test-embedding-model',
-        sandbox: false,
-        targetDir: tempDir,
-        debugMode: false,
-        extensionContextFilePaths: contextFiles,
-      };
-      const config = new Config(configParams);
-      expect(config.getExtensionContextFilePaths()).toEqual(contextFiles);
-    });
-  });
-
   describe('Approval Mode Integration Tests', () => {
-    let parseArguments: typeof import('./config').parseArguments;
+    let parseArguments: typeof import('./config.js').parseArguments;
 
     beforeEach(async () => {
       // Import the argument parsing function for integration testing
-      const { parseArguments: parseArgs } = await import('./config');
+      const { parseArguments: parseArgs } = await import('./config.js');
       parseArguments = parseArgs;
     });
 
@@ -282,7 +265,7 @@ describe('Configuration Integration Tests', () => {
           'test',
         ];
 
-        const argv = await parseArguments();
+        const argv = await parseArguments({} as Settings);
 
         // Verify that the argument was parsed correctly
         expect(argv.approvalMode).toBe('auto_edit');
@@ -306,7 +289,7 @@ describe('Configuration Integration Tests', () => {
           'test',
         ];
 
-        const argv = await parseArguments();
+        const argv = await parseArguments({} as Settings);
 
         expect(argv.approvalMode).toBe('yolo');
         expect(argv.prompt).toBe('test');
@@ -329,7 +312,7 @@ describe('Configuration Integration Tests', () => {
           'test',
         ];
 
-        const argv = await parseArguments();
+        const argv = await parseArguments({} as Settings);
 
         expect(argv.approvalMode).toBe('default');
         expect(argv.prompt).toBe('test');
@@ -345,7 +328,7 @@ describe('Configuration Integration Tests', () => {
       try {
         process.argv = ['node', 'script.js', '--yolo', '-p', 'test'];
 
-        const argv = await parseArguments();
+        const argv = await parseArguments({} as Settings);
 
         expect(argv.yolo).toBe(true);
         expect(argv.approvalMode).toBeUndefined(); // Should NOT be set when using --yolo
@@ -362,7 +345,7 @@ describe('Configuration Integration Tests', () => {
         process.argv = ['node', 'script.js', '--approval-mode', 'invalid_mode'];
 
         // Should throw during argument parsing due to yargs validation
-        await expect(parseArguments()).rejects.toThrow();
+        await expect(parseArguments({} as Settings)).rejects.toThrow();
       } finally {
         process.argv = originalArgv;
       }
@@ -381,7 +364,7 @@ describe('Configuration Integration Tests', () => {
         ];
 
         // Should throw during argument parsing due to conflict validation
-        await expect(parseArguments()).rejects.toThrow();
+        await expect(parseArguments({} as Settings)).rejects.toThrow();
       } finally {
         process.argv = originalArgv;
       }
@@ -394,7 +377,7 @@ describe('Configuration Integration Tests', () => {
         // Test that no approval mode arguments defaults to no flags set
         process.argv = ['node', 'script.js', '-p', 'test'];
 
-        const argv = await parseArguments();
+        const argv = await parseArguments({} as Settings);
 
         expect(argv.approvalMode).toBeUndefined();
         expect(argv.yolo).toBe(false);

@@ -5,9 +5,14 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { TestRig, printDebugInfo, validateModelOutput } from './test-helper.js';
-import { existsSync } from 'fs';
-import { join } from 'path';
+import {
+  TestRig,
+  poll,
+  printDebugInfo,
+  validateModelOutput,
+} from './test-helper.js';
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
 
 describe('list_directory', () => {
   it('should be able to list a directory', async () => {
@@ -18,7 +23,7 @@ describe('list_directory', () => {
     rig.sync();
 
     // Poll for filesystem changes to propagate in containers
-    await rig.poll(
+    await poll(
       () => {
         // Check if the files exist in the test directory
         const file1Path = join(rig.testDir!, 'file1.txt');
@@ -29,7 +34,7 @@ describe('list_directory', () => {
       50, // check every 50ms
     );
 
-    const prompt = `Can you list the files in the current directory. Display them in the style of 'ls'`;
+    const prompt = `Can you list the files in the current directory.`;
 
     const result = await rig.run(prompt);
 

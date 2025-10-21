@@ -4,12 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { exec } from 'child_process';
-import { promisify } from 'util';
-import * as fs from 'fs/promises';
-import * as path from 'path';
-
-const execAsync = promisify(exec);
+import * as fs from 'node:fs/promises';
+import * as path from 'node:path';
+import { spawnAsync } from '@google/gemini-cli-core';
 
 /**
  * Checks if the system clipboard contains an image (macOS only for now)
@@ -22,11 +19,10 @@ export async function clipboardHasImage(): Promise<boolean> {
 
   try {
     // Use osascript to check clipboard type
-    const { stdout } = await execAsync(
-      `osascript -e 'clipboard info' 2>/dev/null | grep -qE "«class PNGf»|TIFF picture|JPEG picture|GIF picture|«class JPEG»|«class TIFF»" && echo "true" || echo "false"`,
-      { shell: '/bin/bash' },
-    );
-    return stdout.trim() === 'true';
+    const { stdout } = await spawnAsync('osascript', ['-e', 'clipboard info']);
+    const imageRegex =
+      /«class PNGf»|TIFF picture|JPEG picture|GIF picture|«class JPEG»|«class TIFF»/;
+    return imageRegex.test(stdout);
   } catch {
     return false;
   }
@@ -84,7 +80,7 @@ export async function saveClipboardImage(
         end try
       `;
 
-      const { stdout } = await execAsync(`osascript -e '${script}'`);
+      const { stdout } = await spawnAsync('osascript', ['-e', script]);
 
       if (stdout.trim() === 'success') {
         // Verify the file was created and has content

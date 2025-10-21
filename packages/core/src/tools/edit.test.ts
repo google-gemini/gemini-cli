@@ -10,7 +10,13 @@ const mockEnsureCorrectEdit = vi.hoisted(() => vi.fn());
 const mockGenerateJson = vi.hoisted(() => vi.fn());
 const mockOpenDiff = vi.hoisted(() => vi.fn());
 
-import { IDEConnectionStatus } from '../ide/ide-client.js';
+import { IdeClient } from '../ide/ide-client.js';
+
+vi.mock('../ide/ide-client.js', () => ({
+  IdeClient: {
+    getInstance: vi.fn(),
+  },
+}));
 
 vi.mock('../utils/editCorrector.js', () => ({
   ensureCorrectEdit: mockEnsureCorrectEdit,
@@ -30,15 +36,19 @@ vi.mock('../telemetry/loggers.js', () => ({
   logFileOperation: vi.fn(),
 }));
 
-import { describe, it, expect, beforeEach, afterEach, vi, Mock } from 'vitest';
-import { applyReplacement, EditTool, EditToolParams } from './edit.js';
-import { FileDiff, ToolConfirmationOutcome } from './tools.js';
+import type { Mock } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import type { EditToolParams } from './edit.js';
+import { applyReplacement, EditTool } from './edit.js';
+import type { FileDiff } from './tools.js';
+import { ToolConfirmationOutcome } from './tools.js';
 import { ToolErrorType } from './tool-error.js';
-import path from 'path';
-import fs from 'fs';
-import os from 'os';
-import { ApprovalMode, Config } from '../config/config.js';
-import { Content, Part, SchemaUnion } from '@google/genai';
+import path from 'node:path';
+import fs from 'node:fs';
+import os from 'node:os';
+import type { Config } from '../config/config.js';
+import { ApprovalMode } from '../config/config.js';
+import type { Content, Part, SchemaUnion } from '@google/genai';
 import { createMockWorkspaceContext } from '../test-utils/mockWorkspaceContext.js';
 import { StandardFileSystemService } from '../services/fileSystemService.js';
 
@@ -48,6 +58,7 @@ describe('EditTool', () => {
   let rootDir: string;
   let mockConfig: Config;
   let geminiClient: any;
+  let baseLlmClient: any;
 
   beforeEach(() => {
     vi.restoreAllMocks();
@@ -59,14 +70,18 @@ describe('EditTool', () => {
       generateJson: mockGenerateJson, // mockGenerateJson is already defined and hoisted
     };
 
+    baseLlmClient = {
+      generateJson: vi.fn(),
+    };
+
     mockConfig = {
       getGeminiClient: vi.fn().mockReturnValue(geminiClient),
+      getBaseLlmClient: vi.fn().mockReturnValue(baseLlmClient),
       getTargetDir: () => rootDir,
       getApprovalMode: vi.fn(),
       setApprovalMode: vi.fn(),
       getWorkspaceContext: () => createMockWorkspaceContext(rootDir),
       getFileSystemService: () => new StandardFileSystemService(),
-      getIdeClient: () => undefined,
       getIdeMode: () => false,
       // getGeminiConfig: () => ({ apiKey: 'test-api-key' }), // This was not a real Config method
       // Add other properties/methods of Config if EditTool uses them
@@ -76,7 +91,7 @@ describe('EditTool', () => {
       getSandbox: () => false,
       getDebugMode: () => false,
       getQuestion: () => undefined,
-      getFullContext: () => false,
+
       getToolDiscoveryCommand: () => undefined,
       getToolCallCommand: () => undefined,
       getMcpServerCommand: () => undefined,
@@ -184,6 +199,86 @@ describe('EditTool', () => {
       expect(applyReplacement('hello world', '', 'new', false)).toBe(
         'hello world',
       );
+    });
+
+    it('should treat $ literally and not as replacement pattern', () => {
+      const current = "price is $100 and pattern end is ' '";
+      const oldStr = 'price is $100';
+      const newStr = 'price is $200';
+      const result = applyReplacement(current, oldStr, newStr, false);
+      expect(result).toBe("price is $200 and pattern end is ' '");
+    });
+
+    it("should treat $' literally and not as a replacement pattern", () => {
+      const current = 'foo';
+      const oldStr = 'foo';
+      const newStr = "bar$'baz";
+      const result = applyReplacement(current, oldStr, newStr, false);
+      expect(result).toBe("bar$'baz");
+    });
+
+    it('should treat $& literally and not as a replacement pattern', () => {
+      const current = 'hello world';
+      const oldStr = 'hello';
+      const newStr = '$&-replacement';
+      const result = applyReplacement(current, oldStr, newStr, false);
+      expect(result).toBe('$&-replacement world');
+    });
+
+    it('should treat $` literally and not as a replacement pattern', () => {
+      const current = 'prefix-middle-suffix';
+      const oldStr = 'middle';
+      const newStr = 'new$`content';
+      const result = applyReplacement(current, oldStr, newStr, false);
+      expect(result).toBe('prefix-new$`content-suffix');
+    });
+
+    it('should treat $1, $2 capture groups literally', () => {
+      const current = 'test string';
+      const oldStr = 'test';
+      const newStr = '$1$2replacement';
+      const result = applyReplacement(current, oldStr, newStr, false);
+      expect(result).toBe('$1$2replacement string');
+    });
+
+    it('should use replaceAll for normal strings without problematic $ sequences', () => {
+      const current = 'normal text replacement';
+      const oldStr = 'text';
+      const newStr = 'string';
+      const result = applyReplacement(current, oldStr, newStr, false);
+      expect(result).toBe('normal string replacement');
+    });
+
+    it('should handle multiple occurrences with problematic $ sequences', () => {
+      const current = 'foo bar foo baz';
+      const oldStr = 'foo';
+      const newStr = "test$'end";
+      const result = applyReplacement(current, oldStr, newStr, false);
+      expect(result).toBe("test$'end bar test$'end baz");
+    });
+
+    it('should handle complex regex patterns with $ at end', () => {
+      const current = "| select('match', '^[sv]d[a-z]$')";
+      const oldStr = "'^[sv]d[a-z]$'";
+      const newStr = "'^[sv]d[a-z]$' # updated";
+      const result = applyReplacement(current, oldStr, newStr, false);
+      expect(result).toBe("| select('match', '^[sv]d[a-z]$' # updated)");
+    });
+
+    it('should handle empty replacement with problematic $ in newString', () => {
+      const current = 'test content';
+      const oldStr = 'nothing';
+      const newStr = "replacement$'text";
+      const result = applyReplacement(current, oldStr, newStr, false);
+      expect(result).toBe('test content'); // No replacement because oldStr not found
+    });
+
+    it('should handle $$ (escaped dollar) correctly', () => {
+      const current = 'price value';
+      const oldStr = 'value';
+      const newStr = '$$100';
+      const result = applyReplacement(current, oldStr, newStr, false);
+      expect(result).toBe('price $$100');
     });
   });
 
@@ -335,11 +430,12 @@ describe('EditTool', () => {
       // Set a specific mock for this test case
       let mockCalled = false;
       mockEnsureCorrectEdit.mockImplementationOnce(
-        async (_, content, p, client) => {
+        async (_, content, p, client, baseClient) => {
           mockCalled = true;
           expect(content).toBe(originalContent);
           expect(p).toBe(params);
           expect(client).toBe(geminiClient);
+          expect(baseClient).toBe(baseLlmClient);
           return {
             params: {
               file_path: filePath,
@@ -374,6 +470,34 @@ describe('EditTool', () => {
         correctedNewString, // This was the string identified by ensureCorrectEdit as the replacement
       );
       expect(patchedContent).toBe(expectedFinalContent);
+    });
+
+    it('should rethrow calculateEdit errors when the abort signal is triggered', async () => {
+      const filePath = path.join(rootDir, 'abort-confirmation.txt');
+      const params: EditToolParams = {
+        file_path: filePath,
+        old_string: 'old',
+        new_string: 'new',
+      };
+
+      const invocation = tool.build(params);
+      const abortController = new AbortController();
+      const abortError = new Error('Abort requested');
+
+      const calculateSpy = vi
+        .spyOn(invocation as any, 'calculateEdit')
+        .mockImplementation(async () => {
+          if (!abortController.signal.aborted) {
+            abortController.abort();
+          }
+          throw abortError;
+        });
+
+      await expect(
+        invocation.shouldConfirmExecute(abortController.signal),
+      ).rejects.toBe(abortError);
+
+      calculateSpy.mockRestore();
     });
   });
 
@@ -417,6 +541,33 @@ describe('EditTool', () => {
       expect(() => tool.build(params)).toThrow(
         /The 'file_path' parameter must be non-empty./,
       );
+    });
+
+    it('should reject when calculateEdit fails after an abort signal', async () => {
+      const params: EditToolParams = {
+        file_path: path.join(rootDir, 'abort-execute.txt'),
+        old_string: 'old',
+        new_string: 'new',
+      };
+
+      const invocation = tool.build(params);
+      const abortController = new AbortController();
+      const abortError = new Error('Abort requested during execute');
+
+      const calculateSpy = vi
+        .spyOn(invocation as any, 'calculateEdit')
+        .mockImplementation(async () => {
+          if (!abortController.signal.aborted) {
+            abortController.abort();
+          }
+          throw abortError;
+        });
+
+      await expect(invocation.execute(abortController.signal)).rejects.toBe(
+        abortError,
+      );
+
+      calculateSpy.mockRestore();
     });
 
     it('should edit an existing file and return diff with fileName', async () => {
@@ -463,7 +614,20 @@ describe('EditTool', () => {
       expect(result.llmContent).toMatch(/Created new file/);
       expect(fs.existsSync(newFilePath)).toBe(true);
       expect(fs.readFileSync(newFilePath, 'utf8')).toBe(fileContent);
-      expect(result.returnDisplay).toBe(`Created ${newFileName}`);
+
+      const display = result.returnDisplay as FileDiff;
+      expect(display.fileDiff).toMatch(/\+Content for the new file\./);
+      expect(display.fileName).toBe(newFileName);
+      expect((result.returnDisplay as FileDiff).diffStat).toStrictEqual({
+        model_added_lines: 1,
+        model_removed_lines: 0,
+        model_added_chars: 25,
+        model_removed_chars: 0,
+        user_added_lines: 0,
+        user_removed_lines: 0,
+        user_added_chars: 0,
+        user_removed_chars: 0,
+      });
     });
 
     it('should return error if old_string is not found in file', async () => {
@@ -503,7 +667,7 @@ describe('EditTool', () => {
     });
 
     it('should successfully replace multiple occurrences when expected_replacements specified', async () => {
-      fs.writeFileSync(filePath, 'old text old text old text', 'utf8');
+      fs.writeFileSync(filePath, 'old text\nold text\nold text', 'utf8');
       const params: EditToolParams = {
         file_path: filePath,
         old_string: 'old',
@@ -516,12 +680,23 @@ describe('EditTool', () => {
 
       expect(result.llmContent).toMatch(/Successfully modified file/);
       expect(fs.readFileSync(filePath, 'utf8')).toBe(
-        'new text new text new text',
+        'new text\nnew text\nnew text',
       );
       const display = result.returnDisplay as FileDiff;
-      expect(display.fileDiff).toMatch(/old text old text old text/);
-      expect(display.fileDiff).toMatch(/new text new text new text/);
+
+      expect(display.fileDiff).toMatch(/-old text\n-old text\n-old text/);
+      expect(display.fileDiff).toMatch(/\+new text\n\+new text\n\+new text/);
       expect(display.fileName).toBe(testFile);
+      expect((result.returnDisplay as FileDiff).diffStat).toStrictEqual({
+        model_added_lines: 3,
+        model_removed_lines: 3,
+        model_added_chars: 24,
+        model_removed_chars: 24,
+        user_added_lines: 0,
+        user_removed_lines: 0,
+        user_added_chars: 0,
+        user_removed_chars: 0,
+      });
     });
 
     it('should return error if expected_replacements does not match actual occurrences', async () => {
@@ -558,13 +733,14 @@ describe('EditTool', () => {
     });
 
     it('should include modification message when proposed content is modified', async () => {
-      const initialContent = 'This is some old text.';
+      const initialContent = 'Line 1\nold line\nLine 3\nLine 4\nLine 5\n';
       fs.writeFileSync(filePath, initialContent, 'utf8');
       const params: EditToolParams = {
         file_path: filePath,
         old_string: 'old',
         new_string: 'new',
         modified_by_user: true,
+        ai_proposed_content: 'Line 1\nAI line\nLine 3\nLine 4\nLine 5\n',
       };
 
       (mockConfig.getApprovalMode as Mock).mockReturnValueOnce(
@@ -576,6 +752,16 @@ describe('EditTool', () => {
       expect(result.llmContent).toMatch(
         /User modified the `new_string` content/,
       );
+      expect((result.returnDisplay as FileDiff).diffStat).toStrictEqual({
+        model_added_lines: 1,
+        model_removed_lines: 1,
+        model_added_chars: 7,
+        model_removed_chars: 8,
+        user_added_lines: 1,
+        user_removed_lines: 1,
+        user_added_chars: 8,
+        user_removed_chars: 7,
+      });
     });
 
     it('should not include modification message when proposed content is not modified', async () => {
@@ -848,12 +1034,10 @@ describe('EditTool', () => {
       filePath = path.join(rootDir, testFile);
       ideClient = {
         openDiff: vi.fn(),
-        getConnectionStatus: vi.fn().mockReturnValue({
-          status: IDEConnectionStatus.Connected,
-        }),
+        isDiffingEnabled: vi.fn().mockReturnValue(true),
       };
+      vi.mocked(IdeClient.getInstance).mockResolvedValue(ideClient);
       (mockConfig as any).getIdeMode = () => true;
-      (mockConfig as any).getIdeClient = () => ideClient;
     });
 
     it('should call ideClient.openDiff and update params on confirmation', async () => {

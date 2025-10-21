@@ -1,0 +1,5 @@
+{
+  "name": "excludeTools",
+  "version": "1.0.0",
+  "excludeTools": ["run_shell_command(rm -rf)"]
+}

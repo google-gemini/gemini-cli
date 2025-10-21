@@ -4,8 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { lightTheme, Theme, type ColorsTheme } from './theme.js';
-import { lightSemanticColors } from './semantic-tokens.js';
+import { type ColorsTheme, Theme, lightTheme } from './theme.js';
 
 const googleCodeColors: ColorsTheme = {
   type: 'light',
@@ -142,5 +141,4 @@ export const GoogleCode: Theme = new Theme(
     },
   },
   googleCodeColors,
-  lightSemanticColors,
 );

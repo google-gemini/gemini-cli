@@ -5,12 +5,8 @@
  */
 
 import type { Key } from './hooks/useKeypress.js';
-import {
-  Command,
-  KeyBinding,
-  KeyBindingConfig,
-  defaultKeyBindings,
-} from '../config/keyBindings.js';
+import type { KeyBinding, KeyBindingConfig } from '../config/keyBindings.js';
+import { Command, defaultKeyBindings } from '../config/keyBindings.js';
 
 /**
  * Matches a KeyBinding against an actual Key press

@@ -1,0 +1,38 @@
+name: 'Run Tests'
+description: 'Runs the preflight checks and integration tests.'
+
+inputs:
+  gemini_api_key:
+    description: 'The API key for running integration tests.'
+    required: true
+  working-directory:
+    description: 'The working directory to run the tests in.'
+    required: false
+    default: '.'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: '📝 Print Inputs'
+      shell: 'bash'
+      env:
+        JSON_INPUTS: '${{ toJSON(inputs) }}'
+      run: 'echo "$JSON_INPUTS"'
+    - name: 'Run Tests'
+      env:
+        GEMINI_API_KEY: '${{ inputs.gemini_api_key }}'
+      working-directory: '${{ inputs.working-directory }}'
+      run: |-
+        echo "::group::Build"
+        npm run build
+        echo "::endgroup::"
+        echo "::group::Unit Tests"
+        npm run test:ci
+        echo "::endgroup::"
+        echo "::group::Integration Tests (no sandbox)"
+        npm run test:integration:sandbox:none
+        echo "::endgroup::"
+        echo "::group::Integration Tests (docker sandbox)"
+        npm run test:integration:sandbox:docker
+        echo "::endgroup::"
+      shell: 'bash'

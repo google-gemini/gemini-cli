@@ -4,16 +4,19 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { WritableStream, ReadableStream } from 'node:stream/web';
+import type { WritableStream, ReadableStream } from 'node:stream/web';
 
-import {
-  AuthType,
+import type {
   Config,
   GeminiChat,
-  logToolCall,
   ToolResult,
-  convertToFunctionResponse,
   ToolCallConfirmationDetails,
+  GeminiCLIExtension,
+} from '@google/gemini-cli-core';
+import {
+  AuthType,
+  logToolCall,
+  convertToFunctionResponse,
   ToolConfirmationOutcome,
   clearCachedCredentialFile,
   isNodeError,
@@ -22,24 +25,43 @@ import {
   getErrorStatus,
   MCPServerConfig,
   DiscoveredMCPTool,
+  StreamEventType,
+  ToolCallEvent,
+  DEFAULT_GEMINI_MODEL,
+  DEFAULT_GEMINI_MODEL_AUTO,
+  DEFAULT_GEMINI_FLASH_MODEL,
 } from '@google/gemini-cli-core';
 import * as acp from './acp.js';
 import { AcpFileSystemService } from './fileSystemService.js';
 import { Readable, Writable } from 'node:stream';
-import { Content, Part, FunctionCall } from '@google/genai';
-import { LoadedSettings, SettingScope } from '../config/settings.js';
-import * as fs from 'fs/promises';
-import * as path from 'path';
+import type { Content, Part, FunctionCall } from '@google/genai';
+import type { LoadedSettings } from '../config/settings.js';
+import { SettingScope } from '../config/settings.js';
+import * as fs from 'node:fs/promises';
+import * as path from 'node:path';
 import { z } from 'zod';
 
-import { randomUUID } from 'crypto';
-import { Extension } from '../config/extension.js';
-import { CliArgs, loadCliConfig } from '../config/config.js';
+import { randomUUID } from 'node:crypto';
+import type { CliArgs } from '../config/config.js';
+import { loadCliConfig } from '../config/config.js';
+
+/**
+ * Resolves the model to use based on the current configuration.
+ *
+ * If the model is set to "auto", it will use the flash model if in fallback
+ * mode, otherwise it will use the default model.
+ */
+export function resolveModel(model: string, isInFallbackMode: boolean): string {
+  if (model === DEFAULT_GEMINI_MODEL_AUTO) {
+    return isInFallbackMode ? DEFAULT_GEMINI_FLASH_MODEL : DEFAULT_GEMINI_MODEL;
+  }
+  return model;
+}
 
 export async function runZedIntegration(
   config: Config,
   settings: LoadedSettings,
-  extensions: Extension[],
+  extensions: GeminiCLIExtension[],
   argv: CliArgs,
 ) {
   const stdout = Writable.toWeb(process.stdout) as WritableStream;
@@ -66,7 +88,7 @@ class GeminiAgent {
   constructor(
     private config: Config,
     private settings: LoadedSettings,
-    private extensions: Extension[],
+    private extensions: GeminiCLIExtension[],
     private argv: CliArgs,
     private client: acp.Client,
   ) {}
@@ -113,7 +135,11 @@ class GeminiAgent {
 
     await clearCachedCredentialFile();
     await this.config.refreshAuth(method);
-    this.settings.setValue(SettingScope.User, 'selectedAuthType', method);
+    this.settings.setValue(
+      SettingScope.User,
+      'security.auth.selectedType',
+      method,
+    );
   }
 
   async newSession({
@@ -124,9 +150,11 @@ class GeminiAgent {
     const config = await this.newSessionConfig(sessionId, cwd, mcpServers);
 
     let isAuthenticated = false;
-    if (this.settings.merged.selectedAuthType) {
+    if (this.settings.merged.security?.auth?.selectedType) {
       try {
-        await config.refreshAuth(this.settings.merged.selectedAuthType);
+        await config.refreshAuth(
+          this.settings.merged.security.auth.selectedType,
+        );
         isAuthenticated = true;
       } catch (e) {
         console.error(`Authentication failed: ${e}`);
@@ -244,6 +272,7 @@ class Session {
 
       try {
         const responseStream = await chat.sendMessageStream(
+          resolveModel(this.config.getModel(), this.config.isInFallbackMode()),
           {
             message: nextMessage?.parts ?? [],
             config: {
@@ -259,8 +288,12 @@ class Session {
             return { stopReason: 'cancelled' };
           }
 
-          if (resp.candidates && resp.candidates.length > 0) {
-            const candidate = resp.candidates[0];
+          if (
+            resp.type === StreamEventType.CHUNK &&
+            resp.value.candidates &&
+            resp.value.candidates.length > 0
+          ) {
+            const candidate = resp.value.candidates[0];
             for (const part of candidate.content?.parts ?? []) {
               if (!part.text) {
                 continue;
@@ -280,8 +313,8 @@ class Session {
             }
           }
 
-          if (resp.functionCalls) {
-            functionCalls.push(...resp.functionCalls);
+          if (resp.type === StreamEventType.CHUNK && resp.value.functionCalls) {
+            functionCalls.push(...resp.value.functionCalls);
           }
         }
       } catch (error) {
@@ -331,20 +364,21 @@ class Session {
 
     const errorResponse = (error: Error) => {
       const durationMs = Date.now() - startTime;
-      logToolCall(this.config, {
-        'event.name': 'tool_call',
-        'event.timestamp': new Date().toISOString(),
-        prompt_id: promptId,
-        function_name: fc.name ?? '',
-        function_args: args,
-        duration_ms: durationMs,
-        success: false,
-        error: error.message,
-        tool_type:
+      logToolCall(
+        this.config,
+        new ToolCallEvent(
+          undefined,
+          fc.name ?? '',
+          args,
+          durationMs,
+          false,
+          promptId,
           typeof tool !== 'undefined' && tool instanceof DiscoveredMCPTool
             ? 'mcp'
             : 'native',
-      });
+          error.message,
+        ),
+      );
 
       return [
         {
@@ -370,74 +404,75 @@ class Session {
       );
     }
 
-    const invocation = tool.build(args);
-    const confirmationDetails =
-      await invocation.shouldConfirmExecute(abortSignal);
+    try {
+      const invocation = tool.build(args);
 
-    if (confirmationDetails) {
-      const content: acp.ToolCallContent[] = [];
+      const confirmationDetails =
+        await invocation.shouldConfirmExecute(abortSignal);
 
-      if (confirmationDetails.type === 'edit') {
-        content.push({
-          type: 'diff',
-          path: confirmationDetails.fileName,
-          oldText: confirmationDetails.originalContent,
-          newText: confirmationDetails.newContent,
+      if (confirmationDetails) {
+        const content: acp.ToolCallContent[] = [];
+
+        if (confirmationDetails.type === 'edit') {
+          content.push({
+            type: 'diff',
+            path: confirmationDetails.fileName,
+            oldText: confirmationDetails.originalContent,
+            newText: confirmationDetails.newContent,
+          });
+        }
+
+        const params: acp.RequestPermissionRequest = {
+          sessionId: this.id,
+          options: toPermissionOptions(confirmationDetails),
+          toolCall: {
+            toolCallId: callId,
+            status: 'pending',
+            title: invocation.getDescription(),
+            content,
+            locations: invocation.toolLocations(),
+            kind: tool.kind,
+          },
+        };
+
+        const output = await this.client.requestPermission(params);
+        const outcome =
+          output.outcome.outcome === 'cancelled'
+            ? ToolConfirmationOutcome.Cancel
+            : z
+                .nativeEnum(ToolConfirmationOutcome)
+                .parse(output.outcome.optionId);
+
+        await confirmationDetails.onConfirm(outcome);
+
+        switch (outcome) {
+          case ToolConfirmationOutcome.Cancel:
+            return errorResponse(
+              new Error(`Tool "${fc.name}" was canceled by the user.`),
+            );
+          case ToolConfirmationOutcome.ProceedOnce:
+          case ToolConfirmationOutcome.ProceedAlways:
+          case ToolConfirmationOutcome.ProceedAlwaysServer:
+          case ToolConfirmationOutcome.ProceedAlwaysTool:
+          case ToolConfirmationOutcome.ModifyWithEditor:
+            break;
+          default: {
+            const resultOutcome: never = outcome;
+            throw new Error(`Unexpected: ${resultOutcome}`);
+          }
+        }
+      } else {
+        await this.sendUpdate({
+          sessionUpdate: 'tool_call',
+          toolCallId: callId,
+          status: 'in_progress',
+          title: invocation.getDescription(),
+          content: [],
+          locations: invocation.toolLocations(),
+          kind: tool.kind,
         });
       }
 
-      const params: acp.RequestPermissionRequest = {
-        sessionId: this.id,
-        options: toPermissionOptions(confirmationDetails),
-        toolCall: {
-          toolCallId: callId,
-          status: 'pending',
-          title: invocation.getDescription(),
-          content,
-          locations: invocation.toolLocations(),
-          kind: tool.kind,
-        },
-      };
-
-      const output = await this.client.requestPermission(params);
-      const outcome =
-        output.outcome.outcome === 'cancelled'
-          ? ToolConfirmationOutcome.Cancel
-          : z
-              .nativeEnum(ToolConfirmationOutcome)
-              .parse(output.outcome.optionId);
-
-      await confirmationDetails.onConfirm(outcome);
-
-      switch (outcome) {
-        case ToolConfirmationOutcome.Cancel:
-          return errorResponse(
-            new Error(`Tool "${fc.name}" was canceled by the user.`),
-          );
-        case ToolConfirmationOutcome.ProceedOnce:
-        case ToolConfirmationOutcome.ProceedAlways:
-        case ToolConfirmationOutcome.ProceedAlwaysServer:
-        case ToolConfirmationOutcome.ProceedAlwaysTool:
-        case ToolConfirmationOutcome.ModifyWithEditor:
-          break;
-        default: {
-          const resultOutcome: never = outcome;
-          throw new Error(`Unexpected: ${resultOutcome}`);
-        }
-      }
-    } else {
-      await this.sendUpdate({
-        sessionUpdate: 'tool_call',
-        toolCallId: callId,
-        status: 'in_progress',
-        title: invocation.getDescription(),
-        content: [],
-        locations: invocation.toolLocations(),
-        kind: tool.kind,
-      });
-    }
-
-    try {
       const toolResult: ToolResult = await invocation.execute(abortSignal);
       const content = toToolCallContent(toolResult);
 
@@ -449,19 +484,20 @@ class Session {
       });
 
       const durationMs = Date.now() - startTime;
-      logToolCall(this.config, {
-        'event.name': 'tool_call',
-        'event.timestamp': new Date().toISOString(),
-        function_name: fc.name,
-        function_args: args,
-        duration_ms: durationMs,
-        success: true,
-        prompt_id: promptId,
-        tool_type:
+      logToolCall(
+        this.config,
+        new ToolCallEvent(
+          undefined,
+          fc.name ?? '',
+          args,
+          durationMs,
+          true,
+          promptId,
           typeof tool !== 'undefined' && tool instanceof DiscoveredMCPTool
             ? 'mcp'
             : 'native',
-      });
+        ),
+      );
 
       return convertToFunctionResponse(fc.name, callId, toolResult.llmContent);
     } catch (e) {
@@ -836,12 +872,15 @@ function toToolCallContent(toolResult: ToolResult): acp.ToolCallContent | null {
         content: { type: 'text', text: toolResult.returnDisplay },
       };
     } else {
-      return {
-        type: 'diff',
-        path: toolResult.returnDisplay.fileName,
-        oldText: toolResult.returnDisplay.originalContent,
-        newText: toolResult.returnDisplay.newContent,
-      };
+      if ('fileName' in toolResult.returnDisplay) {
+        return {
+          type: 'diff',
+          path: toolResult.returnDisplay.fileName,
+          oldText: toolResult.returnDisplay.originalContent,
+          newText: toolResult.returnDisplay.newContent,
+        };
+      }
+      return null;
     }
   } else {
     return null;

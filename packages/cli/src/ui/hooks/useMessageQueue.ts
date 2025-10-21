@@ -8,6 +8,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { StreamingState } from '../types.js';
 
 export interface UseMessageQueueOptions {
+  isConfigInitialized: boolean;
   streamingState: StreamingState;
   submitQuery: (query: string) => void;
 }
@@ -17,6 +18,7 @@ export interface UseMessageQueueReturn {
   addMessage: (message: string) => void;
   clearQueue: () => void;
   getQueuedMessagesText: () => string;
+  popAllMessages: (onPop: (messages: string | undefined) => void) => void;
 }
 
 /**
@@ -25,6 +27,7 @@ export interface UseMessageQueueReturn {
  * sends them when streaming completes.
  */
 export function useMessageQueue({
+  isConfigInitialized,
   streamingState,
   submitQuery,
 }: UseMessageQueueOptions): UseMessageQueueReturn {
@@ -49,21 +52,43 @@ export function useMessageQueue({
     return messageQueue.join('\n\n');
   }, [messageQueue]);
 
+  // Pop all messages from the queue and return them as a single string
+  const popAllMessages = useCallback(
+    (onPop: (messages: string | undefined) => void) => {
+      setMessageQueue((prev) => {
+        if (prev.length === 0) {
+          onPop(undefined);
+          return prev;
+        }
+        // Join all messages with double newlines, same as when they're sent
+        const allMessages = prev.join('\n\n');
+        onPop(allMessages);
+        return []; // Clear the entire queue
+      });
+    },
+    [],
+  );
+
   // Process queued messages when streaming becomes idle
   useEffect(() => {
-    if (streamingState === StreamingState.Idle && messageQueue.length > 0) {
+    if (
+      isConfigInitialized &&
+      streamingState === StreamingState.Idle &&
+      messageQueue.length > 0
+    ) {
       // Combine all messages with double newlines for clarity
       const combinedMessage = messageQueue.join('\n\n');
       // Clear the queue and submit
       setMessageQueue([]);
       submitQuery(combinedMessage);
     }
-  }, [streamingState, messageQueue, submitQuery]);
+  }, [isConfigInitialized, streamingState, messageQueue, submitQuery]);
 
   return {
     messageQueue,
     addMessage,
     clearQueue,
     getQueuedMessagesText,
+    popAllMessages,
   };
 }

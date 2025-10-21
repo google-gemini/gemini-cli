@@ -1,0 +1,56 @@
+name: 'Create Pull Request'
+description: 'Creates a pull request.'
+
+inputs:
+  branch-name:
+    description: 'The name of the branch to create the PR from.'
+    required: true
+  pr-title:
+    description: 'The title of the pull request.'
+    required: true
+  pr-body:
+    description: 'The body of the pull request.'
+    required: true
+  base-branch:
+    description: 'The branch to merge into.'
+    required: true
+    default: 'main'
+  github-token:
+    description: 'The GitHub token to use for creating the pull request.'
+    required: true
+  dry-run:
+    description: 'Whether to run in dry-run mode.'
+    required: false
+    default: 'false'
+  working-directory:
+    description: 'The working directory to run the commands in.'
+    required: false
+    default: '.'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: '📝 Print Inputs'
+      shell: 'bash'
+      env:
+        JSON_INPUTS: '${{ toJSON(inputs) }}'
+      run: 'echo "$JSON_INPUTS"'
+    - name: 'Creates a Pull Request'
+      if: "inputs.dry-run != 'true'"
+      env:
+        GH_TOKEN: '${{ inputs.github-token }}'
+      shell: 'bash'
+      working-directory: '${{ inputs.working-directory }}'
+      run: |
+        set -e
+        if ! git ls-remote --exit-code --heads origin "${{ inputs.branch-name }}"; then
+          echo "::error::Branch '${{ inputs.branch-name }}' does not exist on the remote repository."
+          exit 1
+        fi
+        PR_URL=$(gh pr create \
+          --title "${{ inputs.pr-title }}" \
+          --body "${{ inputs.pr-body }}" \
+          --base "${{ inputs.base-branch }}" \
+          --head "${{ inputs.branch-name }}" \
+          --fill)
+        gh pr merge "$PR_URL" --auto

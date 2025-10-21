@@ -5,10 +5,10 @@
  */
 
 import { AuthType } from '@google/gemini-cli-core';
-import { loadEnvironment } from './settings.js';
+import { loadEnvironment, loadSettings } from './settings.js';
 
-export const validateAuthMethod = (authMethod: string): string | null => {
-  loadEnvironment();
+export function validateAuthMethod(authMethod: string): string | null {
+  loadEnvironment(loadSettings().merged);
   if (
     authMethod === AuthType.LOGIN_WITH_GOOGLE ||
     authMethod === AuthType.CLOUD_SHELL
@@ -16,21 +16,13 @@ export const validateAuthMethod = (authMethod: string): string | null => {
     return null;
   }
 
-  if (authMethod === AuthType.LOGIN_WITH_GOOGLE_GCA) {
-    if (!process.env['GOOGLE_CLOUD_PROJECT']) {
-      return (
-        '[Error] GOOGLE_CLOUD_PROJECT is not set.\n' +
-        'Please set it using:\n' +
-        '  export GOOGLE_CLOUD_PROJECT=<your-project-id>\n' +
-        'and try again.'
-      );
-    }
-    return null;
-  }
-
   if (authMethod === AuthType.USE_GEMINI) {
     if (!process.env['GEMINI_API_KEY']) {
-      return 'GEMINI_API_KEY environment variable not found. Add that to your environment and try again (no reload needed if using .env)!';
+      return (
+        'GEMINI_API_KEY not found. Find your existing key or generate a new one at: https://aistudio.google.com/apikey\n' +
+        '\n' +
+        'To continue, please set the GEMINI_API_KEY environment variable or add it to a .env file.'
+      );
     }
     return null;
   }
@@ -52,4 +44,4 @@ export const validateAuthMethod = (authMethod: string): string | null => {
   }
 
   return 'Invalid auth method selected.';
-};
+}

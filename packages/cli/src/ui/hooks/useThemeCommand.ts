@@ -4,19 +4,17 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import { themeManager } from '../themes/theme-manager.js';
-import { LoadedSettings, SettingScope } from '../../config/settings.js'; // Import LoadedSettings, AppSettings, MergedSetting
+import type { LoadedSettings, SettingScope } from '../../config/settings.js'; // Import LoadedSettings, AppSettings, MergedSetting
 import { type HistoryItem, MessageType } from '../types.js';
 import process from 'node:process';
 
 interface UseThemeCommandReturn {
   isThemeDialogOpen: boolean;
   openThemeDialog: () => void;
-  handleThemeSelect: (
-    themeName: string | undefined,
-    scope: SettingScope,
-  ) => void; // Added scope
+  closeThemeDialog: () => void;
+  handleThemeSelect: (themeName: string, scope: SettingScope) => void;
   handleThemeHighlight: (themeName: string | undefined) => void;
 }
 
@@ -24,19 +22,10 @@ export const useThemeCommand = (
   loadedSettings: LoadedSettings,
   setThemeError: (error: string | null) => void,
   addItem: (item: Omit<HistoryItem, 'id'>, timestamp: number) => void,
+  initialThemeError: string | null,
 ): UseThemeCommandReturn => {
-  const [isThemeDialogOpen, setIsThemeDialogOpen] = useState(false);
-
-  // Check for invalid theme configuration on startup
-  useEffect(() => {
-    const effectiveTheme = loadedSettings.merged.theme;
-    if (effectiveTheme && !themeManager.findThemeByName(effectiveTheme)) {
-      setIsThemeDialogOpen(true);
-      setThemeError(`Theme "${effectiveTheme}" not found.`);
-    } else {
-      setThemeError(null);
-    }
-  }, [loadedSettings.merged.theme, setThemeError]);
+  const [isThemeDialogOpen, setIsThemeDialogOpen] =
+    useState(!!initialThemeError);
 
   const openThemeDialog = useCallback(() => {
     if (process.env['NO_COLOR']) {
@@ -72,13 +61,19 @@ export const useThemeCommand = (
     [applyTheme],
   );
 
+  const closeThemeDialog = useCallback(() => {
+    // Re-apply the saved theme to revert any preview changes from highlighting
+    applyTheme(loadedSettings.merged.ui?.theme);
+    setIsThemeDialogOpen(false);
+  }, [applyTheme, loadedSettings]);
+
   const handleThemeSelect = useCallback(
-    (themeName: string | undefined, scope: SettingScope) => {
+    (themeName: string, scope: SettingScope) => {
       try {
         // Merge user and workspace custom themes (workspace takes precedence)
         const mergedCustomThemes = {
-          ...(loadedSettings.user.settings.customThemes || {}),
-          ...(loadedSettings.workspace.settings.customThemes || {}),
+          ...(loadedSettings.user.settings.ui?.customThemes || {}),
+          ...(loadedSettings.workspace.settings.ui?.customThemes || {}),
         };
         // Only allow selecting themes available in the merged custom themes or built-in themes
         const isBuiltIn = themeManager.findThemeByName(themeName);
@@ -88,11 +83,11 @@ export const useThemeCommand = (
           setIsThemeDialogOpen(true);
           return;
         }
-        loadedSettings.setValue(scope, 'theme', themeName); // Update the merged settings
-        if (loadedSettings.merged.customThemes) {
-          themeManager.loadCustomThemes(loadedSettings.merged.customThemes);
+        loadedSettings.setValue(scope, 'ui.theme', themeName); // Update the merged settings
+        if (loadedSettings.merged.ui?.customThemes) {
+          themeManager.loadCustomThemes(loadedSettings.merged.ui?.customThemes);
         }
-        applyTheme(loadedSettings.merged.theme); // Apply the current theme
+        applyTheme(loadedSettings.merged.ui?.theme); // Apply the current theme
         setThemeError(null);
       } finally {
         setIsThemeDialogOpen(false); // Close the dialog
@@ -104,6 +99,7 @@ export const useThemeCommand = (
   return {
     isThemeDialogOpen,
     openThemeDialog,
+    closeThemeDialog,
     handleThemeSelect,
     handleThemeHighlight,
   };

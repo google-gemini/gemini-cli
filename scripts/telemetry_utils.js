@@ -6,13 +6,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import path from 'path';
-import fs from 'fs';
-import net from 'net';
-import os from 'os';
-import { execSync } from 'child_process';
-import { fileURLToPath } from 'url';
+import path from 'node:path';
+import fs from 'node:fs';
+import net from 'node:net';
+import os from 'node:os';
+import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import crypto from 'node:crypto';
+import { GEMINI_DIR } from '@google/gemini-cli-core';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -24,9 +25,9 @@ const projectHash = crypto
   .digest('hex');
 
 // User-level .gemini directory in home
-const USER_GEMINI_DIR = path.join(os.homedir(), '.gemini');
+const USER_GEMINI_DIR = path.join(os.homedir(), GEMINI_DIR);
 // Project-level .gemini directory in the workspace
-const WORKSPACE_GEMINI_DIR = path.join(projectRoot, '.gemini');
+const WORKSPACE_GEMINI_DIR = path.join(projectRoot, GEMINI_DIR);
 
 // Telemetry artifacts are stored in a hashed directory under the user's ~/.gemini/tmp
 export const OTEL_DIR = path.join(USER_GEMINI_DIR, 'tmp', projectHash, 'otel');
@@ -44,10 +45,14 @@ export function getJson(url) {
     `gemini-cli-releases-${Date.now()}.json`,
   );
   try {
-    execSync(
-      `curl -sL -H "User-Agent: gemini-cli-dev-script" -o "${tmpFile}" "${url}"`,
-      { stdio: 'pipe' },
+    const result = spawnSync(
+      'curl',
+      ['-sL', '-H', 'User-Agent: gemini-cli-dev-script', '-o', tmpFile, url],
+      { stdio: 'pipe', encoding: 'utf-8' },
     );
+    if (result.status !== 0) {
+      throw new Error(result.stderr);
+    }
     const content = fs.readFileSync(tmpFile, 'utf-8');
     return JSON.parse(content);
   } catch (e) {
@@ -62,9 +67,13 @@ export function getJson(url) {
 
 export function downloadFile(url, dest) {
   try {
-    execSync(`curl -fL -sS -o "${dest}" "${url}"`, {
+    const result = spawnSync('curl', ['-fL', '-sS', '-o', dest, url], {
       stdio: 'pipe',
+      encoding: 'utf-8',
     });
+    if (result.status !== 0) {
+      throw new Error(result.stderr);
+    }
     return dest;
   } catch (e) {
     console.error(`Failed to download file from ${url}`);
@@ -254,10 +263,20 @@ export async function ensureBinary(
 
     const actualExt = asset.name.endsWith('.zip') ? 'zip' : 'tar.gz';
 
+    let result;
     if (actualExt === 'zip') {
-      execSync(`unzip -o "${archivePath}" -d "${tmpDir}"`, { stdio: 'pipe' });
+      result = spawnSync('unzip', ['-o', archivePath, '-d', tmpDir], {
+        stdio: 'pipe',
+        encoding: 'utf-8',
+      });
     } else {
-      execSync(`tar -xzf "${archivePath}" -C "${tmpDir}"`, { stdio: 'pipe' });
+      result = spawnSync('tar', ['-xzf', archivePath, '-C', tmpDir], {
+        stdio: 'pipe',
+        encoding: 'utf-8',
+      });
+    }
+    if (result.status !== 0) {
+      throw new Error(result.stderr);
     }
 
     const nameToFind = binaryNameInArchive || executableName;

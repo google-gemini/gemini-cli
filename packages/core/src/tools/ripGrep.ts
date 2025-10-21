@@ -4,24 +4,75 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import fs from 'fs';
-import path from 'path';
-import { EOL } from 'os';
-import { spawn } from 'child_process';
-import { rgPath } from '@lvce-editor/ripgrep';
-import {
-  BaseDeclarativeTool,
-  BaseToolInvocation,
-  Kind,
-  ToolInvocation,
-  ToolResult,
-} from './tools.js';
+import fs from 'node:fs';
+import path from 'node:path';
+import { EOL } from 'node:os';
+import { spawn } from 'node:child_process';
+import { downloadRipGrep } from '@joshua.litt/get-ripgrep';
+import type { ToolInvocation, ToolResult } from './tools.js';
+import { BaseDeclarativeTool, BaseToolInvocation, Kind } from './tools.js';
 import { SchemaValidator } from '../utils/schemaValidator.js';
 import { makeRelative, shortenPath } from '../utils/paths.js';
 import { getErrorMessage, isNodeError } from '../utils/errors.js';
-import { Config } from '../config/config.js';
+import type { Config } from '../config/config.js';
+import { fileExists } from '../utils/fileUtils.js';
+import { Storage } from '../config/storage.js';
+import { GREP_TOOL_NAME } from './tool-names.js';
 
 const DEFAULT_TOTAL_MAX_MATCHES = 20000;
+
+function getRgCandidateFilenames(): readonly string[] {
+  return process.platform === 'win32' ? ['rg.exe', 'rg'] : ['rg'];
+}
+
+async function resolveExistingRgPath(): Promise<string | null> {
+  const binDir = Storage.getGlobalBinDir();
+  for (const fileName of getRgCandidateFilenames()) {
+    const candidatePath = path.join(binDir, fileName);
+    if (await fileExists(candidatePath)) {
+      return candidatePath;
+    }
+  }
+  return null;
+}
+
+let ripgrepAcquisitionPromise: Promise<string | null> | null = null;
+
+async function ensureRipgrepAvailable(): Promise<string | null> {
+  const existingPath = await resolveExistingRgPath();
+  if (existingPath) {
+    return existingPath;
+  }
+  if (!ripgrepAcquisitionPromise) {
+    ripgrepAcquisitionPromise = (async () => {
+      try {
+        await downloadRipGrep(Storage.getGlobalBinDir());
+        return await resolveExistingRgPath();
+      } finally {
+        ripgrepAcquisitionPromise = null;
+      }
+    })();
+  }
+  return ripgrepAcquisitionPromise;
+}
+
+/**
+ * Checks if `rg` exists, if not then attempt to download it.
+ */
+export async function canUseRipgrep(): Promise<boolean> {
+  return (await ensureRipgrepAvailable()) !== null;
+}
+
+/**
+ * Ensures `rg` is downloaded, or throws.
+ */
+export async function ensureRgPath(): Promise<string> {
+  const downloadedPath = await ensureRipgrepAvailable();
+  if (downloadedPath) {
+    return downloadedPath;
+  }
+  throw new Error('Cannot use ripgrep.');
+}
 
 /**
  * Parameters for the GrepTool
@@ -297,6 +348,7 @@ class GrepToolInvocation extends BaseToolInvocation<
     rgArgs.push(absolutePath);
 
     try {
+      const rgPath = await ensureRgPath();
       const output = await new Promise<string>((resolve, reject) => {
         const child = spawn(rgPath, rgArgs, {
           windowsHide: true,
@@ -395,7 +447,7 @@ export class RipGrepTool extends BaseDeclarativeTool<
   RipGrepToolParams,
   ToolResult
 > {
-  static readonly Name = 'search_file_content';
+  static readonly Name = GREP_TOOL_NAME;
 
   constructor(private readonly config: Config) {
     super(

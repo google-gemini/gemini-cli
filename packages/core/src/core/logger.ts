@@ -6,8 +6,8 @@
 
 import path from 'node:path';
 import { promises as fs } from 'node:fs';
-import { Content } from '@google/genai';
-import { Storage } from '../config/storage.js';
+import type { Content } from '@google/genai';
+import type { Storage } from '../config/storage.js';
 
 const LOG_FILE_NAME = 'logs.json';
 

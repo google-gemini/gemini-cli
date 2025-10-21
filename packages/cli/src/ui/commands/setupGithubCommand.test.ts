@@ -10,8 +10,12 @@ import fs from 'node:fs/promises';
 
 import { vi, describe, expect, it, afterEach, beforeEach } from 'vitest';
 import * as gitUtils from '../../utils/gitUtils.js';
-import { setupGithubCommand, updateGitignore } from './setupGithubCommand.js';
-import { CommandContext, ToolActionReturn } from './types.js';
+import {
+  setupGithubCommand,
+  updateGitignore,
+  GITHUB_WORKFLOW_PATHS,
+} from './setupGithubCommand.js';
+import type { CommandContext, ToolActionReturn } from './types.js';
 import * as commandUtils from '../utils/commandUtils.js';
 
 vi.mock('child_process');
@@ -51,12 +55,7 @@ describe('setupGithubCommand', async () => {
     const fakeRepoRoot = scratchDir;
     const fakeReleaseVersion = 'v1.2.3';
 
-    const workflows = [
-      'gemini-cli.yml',
-      'gemini-issue-automated-triage.yml',
-      'gemini-issue-scheduled-triage.yml',
-      'gemini-pr-review.yml',
-    ];
+    const workflows = GITHUB_WORKFLOW_PATHS.map((p) => path.basename(p));
     for (const workflow of workflows) {
       vi.mocked(global.fetch).mockReturnValueOnce(
         Promise.resolve(new Response(workflow)),

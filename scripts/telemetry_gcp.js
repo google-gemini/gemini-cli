@@ -6,9 +6,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import path from 'path';
-import fs from 'fs';
-import { spawn, execSync } from 'child_process';
+import path from 'node:path';
+import fs from 'node:fs';
+import { spawn, execSync } from 'node:child_process';
 import {
   OTEL_DIR,
   BIN_DIR,

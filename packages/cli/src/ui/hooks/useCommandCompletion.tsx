@@ -5,22 +5,20 @@
  */
 
 import { useCallback, useMemo, useEffect } from 'react';
-import { Suggestion } from '../components/SuggestionsDisplay.js';
-import { CommandContext, SlashCommand } from '../commands/types.js';
-import {
-  logicalPosToOffset,
-  TextBuffer,
-} from '../components/shared/text-buffer.js';
+import type { Suggestion } from '../components/SuggestionsDisplay.js';
+import type { CommandContext, SlashCommand } from '../commands/types.js';
+import type { TextBuffer } from '../components/shared/text-buffer.js';
+import { logicalPosToOffset } from '../components/shared/text-buffer.js';
 import { isSlashCommand } from '../utils/commandUtils.js';
 import { toCodePoints } from '../utils/textUtils.js';
 import { useAtCompletion } from './useAtCompletion.js';
 import { useSlashCompletion } from './useSlashCompletion.js';
+import type { PromptCompletion } from './usePromptCompletion.js';
 import {
   usePromptCompletion,
-  PromptCompletion,
   PROMPT_COMPLETION_MIN_LENGTH,
 } from './usePromptCompletion.js';
-import { Config } from '@google/gemini-cli-core';
+import type { Config } from '@google/gemini-cli-core';
 import { useCompletion } from './useCompletion.js';
 
 export enum CompletionMode {
@@ -53,6 +51,7 @@ export function useCommandCompletion(
   slashCommands: readonly SlashCommand[],
   commandContext: CommandContext,
   reverseSearchActive: boolean = false,
+  shellModeActive: boolean,
   config?: Config,
 ): UseCommandCompletionReturn {
   const {
@@ -136,7 +135,7 @@ export function useCommandCompletion(
       if (
         isPromptCompletionEnabled &&
         trimmedText.length >= PROMPT_COMPLETION_MIN_LENGTH &&
-        !trimmedText.startsWith('/') &&
+        !isSlashCommand(trimmedText) &&
         !trimmedText.includes('@')
       ) {
         return {
@@ -165,7 +164,7 @@ export function useCommandCompletion(
   });
 
   const slashCompletionRange = useSlashCompletion({
-    enabled: completionMode === CompletionMode.SLASH,
+    enabled: completionMode === CompletionMode.SLASH && !shellModeActive,
     query,
     slashCommands,
     commandContext,
@@ -232,7 +231,11 @@ export function useCommandCompletion(
 
       const lineCodePoints = toCodePoints(buffer.lines[cursorRow] || '');
       const charAfterCompletion = lineCodePoints[end];
-      if (charAfterCompletion !== ' ') {
+      if (
+        charAfterCompletion !== ' ' &&
+        !suggestionText.endsWith('/') &&
+        !suggestionText.endsWith('\\')
+      ) {
         suggestionText += ' ';
       }
 

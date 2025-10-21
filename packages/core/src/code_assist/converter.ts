@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {
+import type {
   Content,
   ContentListUnion,
   ContentUnion,
@@ -12,7 +12,6 @@ import {
   GenerateContentParameters,
   CountTokensParameters,
   CountTokensResponse,
-  GenerateContentResponse,
   GenerationConfigRoutingConfig,
   MediaResolution,
   Candidate,
@@ -27,6 +26,7 @@ import {
   ToolListUnion,
   ToolConfig,
 } from '@google/genai';
+import { GenerateContentResponse } from '@google/genai';
 
 export interface CAGenerateContentRequest {
   model: string;
@@ -73,6 +73,7 @@ interface VertexGenerationConfig {
 
 export interface CaGenerateContentResponse {
   response: VertexGenerateContentResponse;
+  traceId?: string;
 }
 
 interface VertexGenerateContentResponse {
@@ -80,6 +81,7 @@ interface VertexGenerateContentResponse {
   automaticFunctionCallingHistory?: Content[];
   promptFeedback?: GenerateContentResponsePromptFeedback;
   usageMetadata?: GenerateContentResponseUsageMetadata;
+  modelVersion?: string;
 }
 
 export interface CaCountTokenRequest {
@@ -137,6 +139,8 @@ export function fromGenerateContentResponse(
   out.automaticFunctionCallingHistory = inres.automaticFunctionCallingHistory;
   out.promptFeedback = inres.promptFeedback;
   out.usageMetadata = inres.usageMetadata;
+  out.modelVersion = inres.modelVersion;
+  out.responseId = res.traceId;
   return out;
 }
 
@@ -204,7 +208,7 @@ function toContent(content: ContentUnion): Content {
   };
 }
 
-function toParts(parts: PartUnion[]): Part[] {
+export function toParts(parts: PartUnion[]): Part[] {
   return parts.map(toPart);
 }
 

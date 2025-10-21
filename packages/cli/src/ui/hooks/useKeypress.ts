@@ -5,13 +5,10 @@
  */
 
 import { useEffect } from 'react';
-import {
-  useKeypressContext,
-  KeypressHandler,
-  Key,
-} from '../contexts/KeypressContext.js';
+import type { KeypressHandler, Key } from '../contexts/KeypressContext.js';
+import { useKeypressContext } from '../contexts/KeypressContext.js';
 
-export { Key };
+export type { Key };
 
 /**
  * A hook that listens for keypress events from stdin.

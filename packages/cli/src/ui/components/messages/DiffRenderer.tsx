@@ -4,14 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React from 'react';
-import { Box, Text } from 'ink';
-import { EOL } from 'os';
-import { Colors } from '../../colors.js';
-import crypto from 'crypto';
+import type React from 'react';
+import { Box, Text, useIsScreenReaderEnabled } from 'ink';
+import crypto from 'node:crypto';
 import { colorizeCode, colorizeLine } from '../../utils/CodeColorizer.js';
 import { MaxSizedBox } from '../shared/MaxSizedBox.js';
-import { theme } from '../../semantic-colors.js';
+import { theme as semanticTheme } from '../../semantic-colors.js';
+import type { Theme } from '../../themes/theme.js';
 
 interface DiffLine {
   type: 'add' | 'del' | 'context' | 'hunk' | 'other';
@@ -21,7 +20,7 @@ interface DiffLine {
 }
 
 function parseDiffWithLineNumbers(diffContent: string): DiffLine[] {
-  const lines = diffContent.split(EOL);
+  const lines = diffContent.split('\n');
   const result: DiffLine[] = [];
   let currentOldLine = 0;
   let currentNewLine = 0;
@@ -43,18 +42,9 @@ function parseDiffWithLineNumbers(diffContent: string): DiffLine[] {
     }
     if (!inHunk) {
       // Skip standard Git header lines more robustly
-      if (
-        line.startsWith('--- ') ||
-        line.startsWith('+++ ') ||
-        line.startsWith('diff --git') ||
-        line.startsWith('index ') ||
-        line.startsWith('similarity index') ||
-        line.startsWith('rename from') ||
-        line.startsWith('rename to') ||
-        line.startsWith('new file mode') ||
-        line.startsWith('deleted file mode')
-      )
+      if (line.startsWith('--- ')) {
         continue;
+      }
       // If it's not a hunk or header, skip (or handle as 'other' if needed)
       continue;
     }
@@ -95,7 +85,7 @@ interface DiffRendererProps {
   tabWidth?: number;
   availableTerminalHeight?: number;
   terminalWidth: number;
-  theme?: import('../../themes/theme.js').Theme;
+  theme?: Theme;
 }
 
 const DEFAULT_TAB_WIDTH = 4; // Spaces per tab for normalization
@@ -108,16 +98,32 @@ export const DiffRenderer: React.FC<DiffRendererProps> = ({
   terminalWidth,
   theme,
 }) => {
+  const screenReaderEnabled = useIsScreenReaderEnabled();
   if (!diffContent || typeof diffContent !== 'string') {
-    return <Text color={Colors.AccentYellow}>No diff content.</Text>;
+    return <Text color={semanticTheme.status.warning}>No diff content.</Text>;
   }
 
   const parsedLines = parseDiffWithLineNumbers(diffContent);
 
   if (parsedLines.length === 0) {
     return (
-      <Box borderStyle="round" borderColor={Colors.Gray} padding={1}>
+      <Box
+        borderStyle="round"
+        borderColor={semanticTheme.border.default}
+        padding={1}
+      >
         <Text dimColor>No changes detected.</Text>
+      </Box>
+    );
+  }
+  if (screenReaderEnabled) {
+    return (
+      <Box flexDirection="column">
+        {parsedLines.map((line, index) => (
+          <Text key={index}>
+            {line.type}: {line.content}
+          </Text>
+        ))}
       </Box>
     );
   }
@@ -185,7 +191,11 @@ const renderDiffContent = (
 
   if (displayableLines.length === 0) {
     return (
-      <Box borderStyle="round" borderColor={Colors.Gray} padding={1}>
+      <Box
+        borderStyle="round"
+        borderColor={semanticTheme.border.default}
+        padding={1}
+      >
         <Text dimColor>No changes detected.</Text>
       </Box>
     );
@@ -249,7 +259,7 @@ const renderDiffContent = (
         ) {
           acc.push(
             <Box key={`gap-${index}`}>
-              <Text wrap="truncate" color={Colors.Gray}>
+              <Text wrap="truncate" color={semanticTheme.text.secondary}>
                 {'═'.repeat(terminalWidth)}
               </Text>
             </Box>,
@@ -290,12 +300,12 @@ const renderDiffContent = (
         acc.push(
           <Box key={lineKey} flexDirection="row">
             <Text
-              color={theme.text.secondary}
+              color={semanticTheme.text.secondary}
               backgroundColor={
                 line.type === 'add'
-                  ? theme.background.diff.added
+                  ? semanticTheme.background.diff.added
                   : line.type === 'del'
-                    ? theme.background.diff.removed
+                    ? semanticTheme.background.diff.removed
                     : undefined
               }
             >
@@ -312,16 +322,16 @@ const renderDiffContent = (
               <Text
                 backgroundColor={
                   line.type === 'add'
-                    ? theme.background.diff.added
-                    : theme.background.diff.removed
+                    ? semanticTheme.background.diff.added
+                    : semanticTheme.background.diff.removed
                 }
                 wrap="wrap"
               >
                 <Text
                   color={
                     line.type === 'add'
-                      ? theme.status.success
-                      : theme.status.error
+                      ? semanticTheme.status.success
+                      : semanticTheme.status.error
                   }
                 >
                   {prefixSymbol}

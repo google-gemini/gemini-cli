@@ -4,7 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { vi, describe, it, expect, beforeEach, Mock } from 'vitest';
+import type { Mock } from 'vitest';
+import { vi, describe, it, expect, beforeEach } from 'vitest';
 import { clearCommand } from './clearCommand.js';
 import { type CommandContext } from './types.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
@@ -15,12 +16,13 @@ vi.mock('@google/gemini-cli-core', async () => {
   return {
     ...actual,
     uiTelemetryService: {
-      resetLastPromptTokenCount: vi.fn(),
+      setLastPromptTokenCount: vi.fn(),
     },
   };
 });
 
-import { GeminiClient, uiTelemetryService } from '@google/gemini-cli-core';
+import type { GeminiClient } from '@google/gemini-cli-core';
+import { uiTelemetryService } from '@google/gemini-cli-core';
 
 describe('clearCommand', () => {
   let mockContext: CommandContext;
@@ -55,9 +57,8 @@ describe('clearCommand', () => {
     expect(mockContext.ui.setDebugMessage).toHaveBeenCalledTimes(1);
 
     expect(mockResetChat).toHaveBeenCalledTimes(1);
-    expect(uiTelemetryService.resetLastPromptTokenCount).toHaveBeenCalledTimes(
-      1,
-    );
+    expect(uiTelemetryService.setLastPromptTokenCount).toHaveBeenCalledWith(0);
+    expect(uiTelemetryService.setLastPromptTokenCount).toHaveBeenCalledTimes(1);
     expect(mockContext.ui.clear).toHaveBeenCalledTimes(1);
 
     // Check the order of operations.
@@ -65,7 +66,7 @@ describe('clearCommand', () => {
       .invocationCallOrder[0];
     const resetChatOrder = mockResetChat.mock.invocationCallOrder[0];
     const resetTelemetryOrder = (
-      uiTelemetryService.resetLastPromptTokenCount as Mock
+      uiTelemetryService.setLastPromptTokenCount as Mock
     ).mock.invocationCallOrder[0];
     const clearOrder = (mockContext.ui.clear as Mock).mock
       .invocationCallOrder[0];
@@ -92,9 +93,8 @@ describe('clearCommand', () => {
       'Clearing terminal.',
     );
     expect(mockResetChat).not.toHaveBeenCalled();
-    expect(uiTelemetryService.resetLastPromptTokenCount).toHaveBeenCalledTimes(
-      1,
-    );
+    expect(uiTelemetryService.setLastPromptTokenCount).toHaveBeenCalledWith(0);
+    expect(uiTelemetryService.setLastPromptTokenCount).toHaveBeenCalledTimes(1);
     expect(nullConfigContext.ui.clear).toHaveBeenCalledTimes(1);
   });
 });

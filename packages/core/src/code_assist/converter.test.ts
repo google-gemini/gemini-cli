@@ -5,19 +5,21 @@
  */
 
 import { describe, it, expect } from 'vitest';
+import type { CaGenerateContentResponse } from './converter.js';
 import {
   toGenerateContentRequest,
   fromGenerateContentResponse,
-  CaGenerateContentResponse,
   toContents,
 } from './converter.js';
-import {
+import type {
   ContentListUnion,
   GenerateContentParameters,
+} from '@google/genai';
+import {
   GenerateContentResponse,
   FinishReason,
   BlockedReason,
-  Part,
+  type Part,
 } from '@google/genai';
 
 describe('converter', () => {
@@ -296,6 +298,38 @@ describe('converter', () => {
       expect(genaiRes.automaticFunctionCallingHistory).toEqual(
         codeAssistRes.response.automaticFunctionCallingHistory,
       );
+    });
+
+    it('should handle modelVersion', () => {
+      const codeAssistRes: CaGenerateContentResponse = {
+        response: {
+          candidates: [],
+          modelVersion: 'gemini-2.5-pro',
+        },
+      };
+      const genaiRes = fromGenerateContentResponse(codeAssistRes);
+      expect(genaiRes.modelVersion).toEqual('gemini-2.5-pro');
+    });
+
+    it('should handle traceId', () => {
+      const codeAssistRes: CaGenerateContentResponse = {
+        response: {
+          candidates: [],
+        },
+        traceId: 'my-trace-id',
+      };
+      const genaiRes = fromGenerateContentResponse(codeAssistRes);
+      expect(genaiRes.responseId).toEqual('my-trace-id');
+    });
+
+    it('should handle missing traceId', () => {
+      const codeAssistRes: CaGenerateContentResponse = {
+        response: {
+          candidates: [],
+        },
+      };
+      const genaiRes = fromGenerateContentResponse(codeAssistRes);
+      expect(genaiRes.responseId).toBeUndefined();
     });
   });
 

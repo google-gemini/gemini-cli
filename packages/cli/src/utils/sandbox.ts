@@ -11,13 +11,12 @@ import fs from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { quote, parse } from 'shell-quote';
-import {
-  USER_SETTINGS_DIR,
-  SETTINGS_DIRECTORY_NAME,
-} from '../config/settings.js';
-import { promisify } from 'util';
-import { Config, SandboxConfig } from '@google/gemini-cli-core';
+import { USER_SETTINGS_DIR } from '../config/settings.js';
+import { promisify } from 'node:util';
+import type { Config, SandboxConfig } from '@google/gemini-cli-core';
+import { FatalSandboxError, GEMINI_DIR } from '@google/gemini-cli-core';
 import { ConsolePatcher } from '../ui/utils/ConsolePatcher.js';
+import { randomBytes } from 'node:crypto';
 
 const execAsync = promisify(exec);
 
@@ -154,10 +153,7 @@ function entrypoint(workdir: string, cliArgs: string[]): string[] {
     shellCmds.push(`export PYTHONPATH="$PYTHONPATH${pythonPathSuffix}";`);
   }
 
-  const projectSandboxBashrc = path.join(
-    SETTINGS_DIRECTORY_NAME,
-    'sandbox.bashrc',
-  );
+  const projectSandboxBashrc = path.join(GEMINI_DIR, 'sandbox.bashrc');
   if (fs.existsSync(projectSandboxBashrc)) {
     shellCmds.push(`source ${getContainerPath(projectSandboxBashrc)};`);
   }
@@ -187,7 +183,7 @@ export async function start_sandbox(
   nodeArgs: string[] = [],
   cliConfig?: Config,
   cliArgs: string[] = [],
-) {
+): Promise<number> {
   const patcher = new ConsolePatcher({
     debugMode: cliConfig?.getDebugMode() || !!process.env['DEBUG'],
     stderr: true,
@@ -198,8 +194,9 @@ export async function start_sandbox(
     if (config.command === 'sandbox-exec') {
       // disallow BUILD_SANDBOX
       if (process.env['BUILD_SANDBOX']) {
-        console.error('ERROR: cannot BUILD_SANDBOX when using macOS Seatbelt');
-        process.exit(1);
+        throw new FatalSandboxError(
+          'Cannot BUILD_SANDBOX when using macOS Seatbelt',
+        );
       }
 
       const profile = (process.env['SEATBELT_PROFILE'] ??= 'permissive-open');
@@ -208,16 +205,12 @@ export async function start_sandbox(
       );
       // if profile name is not recognized, then look for file under project settings directory
       if (!BUILTIN_SEATBELT_PROFILES.includes(profile)) {
-        profileFile = path.join(
-          SETTINGS_DIRECTORY_NAME,
-          `sandbox-macos-${profile}.sb`,
-        );
+        profileFile = path.join(GEMINI_DIR, `sandbox-macos-${profile}.sb`);
       }
       if (!fs.existsSync(profileFile)) {
-        console.error(
-          `ERROR: missing macos seatbelt profile file '${profileFile}'`,
+        throw new FatalSandboxError(
+          `Missing macos seatbelt profile file '${profileFile}'`,
         );
-        process.exit(1);
       }
       // Log on STDERR so it doesn't clutter the output on STDOUT
       console.error(`using macos seatbelt (profile: ${profile}) ...`);
@@ -325,13 +318,12 @@ export async function start_sandbox(
           console.error(data.toString());
         });
         proxyProcess.on('close', (code, signal) => {
-          console.error(
-            `ERROR: proxy command '${proxyCommand}' exited with code ${code}, signal ${signal}`,
-          );
           if (sandboxProcess?.pid) {
             process.kill(-sandboxProcess.pid, 'SIGTERM');
           }
-          process.exit(1);
+          throw new FatalSandboxError(
+            `Proxy command '${proxyCommand}' exited with code ${code}, signal ${signal}`,
+          );
         });
         console.log('waiting for proxy to start ...');
         await execAsync(
@@ -339,11 +331,17 @@ export async function start_sandbox(
         );
       }
       // spawn child and let it inherit stdio
+      process.stdin.pause();
       sandboxProcess = spawn(config.command, args, {
         stdio: 'inherit',
       });
-      await new Promise((resolve) => sandboxProcess?.on('close', resolve));
-      return;
+      return new Promise((resolve, reject) => {
+        sandboxProcess?.on('error', reject);
+        sandboxProcess?.on('close', (code) => {
+          process.stdin.resume();
+          resolve(code ?? 1);
+        });
+      });
     }
 
     console.error(`hopping into sandbox (command: ${config.command}) ...`);
@@ -352,7 +350,7 @@ export async function start_sandbox(
     const gcPath = fs.realpathSync(process.argv[1]);
 
     const projectSandboxDockerfile = path.join(
-      SETTINGS_DIRECTORY_NAME,
+      GEMINI_DIR,
       'sandbox.Dockerfile',
     );
     const isCustomProjectSandbox = fs.existsSync(projectSandboxDockerfile);
@@ -366,18 +364,17 @@ export async function start_sandbox(
     // note this can only be done with binary linked from gemini-cli repo
     if (process.env['BUILD_SANDBOX']) {
       if (!gcPath.includes('gemini-cli/packages/')) {
-        console.error(
-          'ERROR: cannot build sandbox using installed gemini binary; ' +
+        throw new FatalSandboxError(
+          'Cannot build sandbox using installed gemini binary; ' +
             'run `npm link ./packages/cli` under gemini-cli repo to switch to linked binary.',
         );
-        process.exit(1);
       } else {
         console.error('building sandbox ...');
         const gcRoot = gcPath.split('/packages/')[0];
         // if project folder has sandbox.Dockerfile under project settings folder, use that
         let buildArgs = '';
         const projectSandboxDockerfile = path.join(
-          SETTINGS_DIRECTORY_NAME,
+          GEMINI_DIR,
           'sandbox.Dockerfile',
         );
         if (isCustomProjectSandbox) {
@@ -403,10 +400,9 @@ export async function start_sandbox(
         image === LOCAL_DEV_SANDBOX_IMAGE_NAME
           ? 'Try running `npm run build:all` or `npm run build:sandbox` under the gemini-cli repo to build it locally, or check the image name and your network connection.'
           : 'Please check the image name, your network connection, or notify gemini-cli-dev@google.com if the issue persists.';
-      console.error(
-        `ERROR: Sandbox image '${image}' is missing or could not be pulled. ${remedy}`,
+      throw new FatalSandboxError(
+        `Sandbox image '${image}' is missing or could not be pulled. ${remedy}`,
       );
-      process.exit(1);
     }
 
     // use interactive mode and auto-remove container on exit
@@ -426,6 +422,9 @@ export async function start_sandbox(
       args.push('-t');
     }
 
+    // allow access to host.docker.internal
+    args.push('--add-host', 'host.docker.internal:host-gateway');
+
     // mount current directory as working directory in sandbox (set via --workdir)
     args.push('--volume', `${workdir}:${containerWorkdir}`);
 
@@ -433,7 +432,7 @@ export async function start_sandbox(
     // note user/home changes inside sandbox and we mount at BOTH paths for consistency
     const userSettingsDirOnHost = USER_SETTINGS_DIR;
     const userSettingsDirInSandbox = getContainerPath(
-      `/home/node/${SETTINGS_DIRECTORY_NAME}`,
+      `/home/node/${GEMINI_DIR}`,
     );
     if (!fs.existsSync(userSettingsDirOnHost)) {
       fs.mkdirSync(userSettingsDirOnHost);
@@ -484,17 +483,15 @@ export async function start_sandbox(
           mount = `${from}:${to}:${opts}`;
           // check that from path is absolute
           if (!path.isAbsolute(from)) {
-            console.error(
-              `ERROR: path '${from}' listed in SANDBOX_MOUNTS must be absolute`,
+            throw new FatalSandboxError(
+              `Path '${from}' listed in SANDBOX_MOUNTS must be absolute`,
             );
-            process.exit(1);
           }
           // check that from path exists on host
           if (!fs.existsSync(from)) {
-            console.error(
-              `ERROR: missing mount path '${from}' listed in SANDBOX_MOUNTS`,
+            throw new FatalSandboxError(
+              `Missing mount path '${from}' listed in SANDBOX_MOUNTS`,
             );
-            process.exit(1);
           }
           console.error(`SANDBOX_MOUNTS: ${from} -> ${to} (${opts})`);
           args.push('--volume', mount);
@@ -553,19 +550,38 @@ export async function start_sandbox(
       }
     }
 
-    // name container after image, plus numeric suffix to avoid conflicts
+    // name container after image, plus random suffix to avoid conflicts
     const imageName = parseImageName(image);
-    let index = 0;
-    const containerNameCheck = execSync(
-      `${config.command} ps -a --format "{{.Names}}"`,
-    )
-      .toString()
-      .trim();
-    while (containerNameCheck.includes(`${imageName}-${index}`)) {
-      index++;
+    const isIntegrationTest =
+      process.env['GEMINI_CLI_INTEGRATION_TEST'] === 'true';
+    let containerName;
+    if (isIntegrationTest) {
+      containerName = `gemini-cli-integration-test-${randomBytes(4).toString(
+        'hex',
+      )}`;
+      console.log(`ContainerName: ${containerName}`);
+    } else {
+      let index = 0;
+      const containerNameCheck = execSync(
+        `${config.command} ps -a --format "{{.Names}}"`,
+      )
+        .toString()
+        .trim();
+      while (containerNameCheck.includes(`${imageName}-${index}`)) {
+        index++;
+      }
+      containerName = `${imageName}-${index}`;
+      console.log(`ContainerName (regular): ${containerName}`);
     }
-    const containerName = `${imageName}-${index}`;
     args.push('--name', containerName, '--hostname', containerName);
+
+    // copy GEMINI_CLI_TEST_VAR for integration tests
+    if (process.env['GEMINI_CLI_TEST_VAR']) {
+      args.push(
+        '--env',
+        `GEMINI_CLI_TEST_VAR=${process.env['GEMINI_CLI_TEST_VAR']}`,
+      );
+    }
 
     // copy GEMINI_API_KEY(s)
     if (process.env['GEMINI_API_KEY']) {
@@ -640,10 +656,7 @@ export async function start_sandbox(
         ?.toLowerCase()
         .startsWith(workdir.toLowerCase())
     ) {
-      const sandboxVenvPath = path.resolve(
-        SETTINGS_DIRECTORY_NAME,
-        'sandbox.venv',
-      );
+      const sandboxVenvPath = path.resolve(GEMINI_DIR, 'sandbox.venv');
       if (!fs.existsSync(sandboxVenvPath)) {
         fs.mkdirSync(sandboxVenvPath, { recursive: true });
       }
@@ -665,10 +678,9 @@ export async function start_sandbox(
             console.error(`SANDBOX_ENV: ${env}`);
             args.push('--env', env);
           } else {
-            console.error(
-              'ERROR: SANDBOX_ENV must be a comma-separated list of key=value pairs',
+            throw new FatalSandboxError(
+              'SANDBOX_ENV must be a comma-separated list of key=value pairs',
             );
-            process.exit(1);
           }
         }
       }
@@ -776,13 +788,12 @@ export async function start_sandbox(
         console.error(data.toString().trim());
       });
       proxyProcess.on('close', (code, signal) => {
-        console.error(
-          `ERROR: proxy container command '${proxyContainerCommand}' exited with code ${code}, signal ${signal}`,
-        );
         if (sandboxProcess?.pid) {
           process.kill(-sandboxProcess.pid, 'SIGTERM');
         }
-        process.exit(1);
+        throw new FatalSandboxError(
+          `Proxy container command '${proxyContainerCommand}' exited with code ${code}, signal ${signal}`,
+        );
       });
       console.log('waiting for proxy to start ...');
       await execAsync(
@@ -796,22 +807,25 @@ export async function start_sandbox(
     }
 
     // spawn child and let it inherit stdio
+    process.stdin.pause();
     sandboxProcess = spawn(config.command, args, {
       stdio: 'inherit',
     });
 
-    sandboxProcess.on('error', (err) => {
-      console.error('Sandbox process error:', err);
-    });
+    return new Promise<number>((resolve, reject) => {
+      sandboxProcess.on('error', (err) => {
+        console.error('Sandbox process error:', err);
+        reject(err);
+      });
 
-    await new Promise<void>((resolve) => {
       sandboxProcess?.on('close', (code, signal) => {
-        if (code !== 0) {
+        process.stdin.resume();
+        if (code !== 0 && code !== null) {
           console.log(
             `Sandbox process exited with code: ${code}, signal: ${signal}`,
           );
         }
-        resolve();
+        resolve(code ?? 1);
       });
     });
   } finally {

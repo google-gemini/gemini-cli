@@ -7,20 +7,21 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { UiTelemetryService } from './uiTelemetry.js';
 import { ToolCallDecision } from './tool-call-decision.js';
-import { ApiErrorEvent, ApiResponseEvent, ToolCallEvent } from './types.js';
+import type { ApiErrorEvent, ApiResponseEvent } from './types.js';
+import { ToolCallEvent } from './types.js';
 import {
   EVENT_API_ERROR,
   EVENT_API_RESPONSE,
   EVENT_TOOL_CALL,
-} from './constants.js';
-import {
+} from './types.js';
+import type {
   CompletedToolCall,
   ErroredToolCall,
   SuccessfulToolCall,
 } from '../core/coreToolScheduler.js';
 import { ToolErrorType } from '../tools/tool-error.js';
 import { ToolConfirmationOutcome } from '../tools/tools.js';
-import { MockTool } from '../test-utils/tools.js';
+import { MockTool } from '../test-utils/mock-tool.js';
 
 const createFakeCompletedToolCall = (
   name: string,
@@ -36,7 +37,7 @@ const createFakeCompletedToolCall = (
     isClientInitiated: false,
     prompt_id: 'prompt-id-1',
   };
-  const tool = new MockTool(name);
+  const tool = new MockTool({ name });
 
   if (success) {
     return {
@@ -141,7 +142,7 @@ describe('UiTelemetryService', () => {
     expect(spy).toHaveBeenCalledOnce();
     const { metrics, lastPromptTokenCount } = spy.mock.calls[0][0];
     expect(metrics).toBeDefined();
-    expect(lastPromptTokenCount).toBe(10);
+    expect(lastPromptTokenCount).toBe(0);
   });
 
   describe('API Response Event Processing', () => {
@@ -176,7 +177,7 @@ describe('UiTelemetryService', () => {
           tool: 3,
         },
       });
-      expect(service.getLastPromptTokenCount()).toBe(10);
+      expect(service.getLastPromptTokenCount()).toBe(0);
     });
 
     it('should aggregate multiple ApiResponseEvents for the same model', () => {
@@ -226,7 +227,7 @@ describe('UiTelemetryService', () => {
           tool: 9,
         },
       });
-      expect(service.getLastPromptTokenCount()).toBe(15);
+      expect(service.getLastPromptTokenCount()).toBe(0);
     });
 
     it('should handle ApiResponseEvents for different models', () => {
@@ -265,7 +266,7 @@ describe('UiTelemetryService', () => {
       expect(metrics.models['gemini-2.5-flash']).toBeDefined();
       expect(metrics.models['gemini-2.5-pro'].api.totalRequests).toBe(1);
       expect(metrics.models['gemini-2.5-flash'].api.totalRequests).toBe(1);
-      expect(service.getLastPromptTokenCount()).toBe(100);
+      expect(service.getLastPromptTokenCount()).toBe(0);
     });
   });
 
@@ -542,10 +543,10 @@ describe('UiTelemetryService', () => {
       } as ApiResponseEvent & { 'event.name': typeof EVENT_API_RESPONSE };
 
       service.addEvent(event);
-      expect(service.getLastPromptTokenCount()).toBe(100);
+      expect(service.getLastPromptTokenCount()).toBe(0);
 
       // Now reset the token count
-      service.resetLastPromptTokenCount();
+      service.setLastPromptTokenCount(0);
       expect(service.getLastPromptTokenCount()).toBe(0);
     });
 
@@ -569,7 +570,7 @@ describe('UiTelemetryService', () => {
       service.addEvent(event);
       spy.mockClear(); // Clear the spy to focus on the reset call
 
-      service.resetLastPromptTokenCount();
+      service.setLastPromptTokenCount(0);
 
       expect(spy).toHaveBeenCalledOnce();
       const { metrics, lastPromptTokenCount } = spy.mock.calls[0][0];
@@ -595,7 +596,7 @@ describe('UiTelemetryService', () => {
 
       const metricsBefore = service.getMetrics();
 
-      service.resetLastPromptTokenCount();
+      service.setLastPromptTokenCount(0);
 
       const metricsAfter = service.getMetrics();
 
@@ -624,15 +625,15 @@ describe('UiTelemetryService', () => {
       } as ApiResponseEvent & { 'event.name': typeof EVENT_API_RESPONSE };
 
       service.addEvent(event);
-      expect(service.getLastPromptTokenCount()).toBe(100);
+      expect(service.getLastPromptTokenCount()).toBe(0);
 
       // Reset once
-      service.resetLastPromptTokenCount();
+      service.setLastPromptTokenCount(0);
       expect(service.getLastPromptTokenCount()).toBe(0);
 
       // Reset again - should still be 0 and still emit event
       spy.mockClear();
-      service.resetLastPromptTokenCount();
+      service.setLastPromptTokenCount(0);
       expect(service.getLastPromptTokenCount()).toBe(0);
       expect(spy).toHaveBeenCalledOnce();
     });
@@ -645,8 +646,8 @@ describe('UiTelemetryService', () => {
         ...structuredClone(new ToolCallEvent(toolCall)),
         'event.name': EVENT_TOOL_CALL,
         metadata: {
-          ai_added_lines: 10,
-          ai_removed_lines: 5,
+          model_added_lines: 10,
+          model_removed_lines: 5,
         },
       } as ToolCallEvent & { 'event.name': typeof EVENT_TOOL_CALL };
 
@@ -663,8 +664,8 @@ describe('UiTelemetryService', () => {
         ...structuredClone(new ToolCallEvent(toolCall)),
         'event.name': EVENT_TOOL_CALL,
         metadata: {
-          ai_added_lines: null,
-          ai_removed_lines: undefined,
+          model_added_lines: null,
+          model_removed_lines: undefined,
         },
       } as ToolCallEvent & { 'event.name': typeof EVENT_TOOL_CALL };
 

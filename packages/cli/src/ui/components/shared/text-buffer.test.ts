@@ -7,20 +7,29 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import stripAnsi from 'strip-ansi';
 import { renderHook, act } from '@testing-library/react';
-import {
-  useTextBuffer,
+import type {
   Viewport,
   TextBuffer,
+  TextBufferState,
+  TextBufferAction,
+  VisualLayout,
+} from './text-buffer.js';
+import {
+  useTextBuffer,
   offsetToLogicalPos,
   logicalPosToOffset,
   textBufferReducer,
-  TextBufferState,
-  TextBufferAction,
   findWordEndInLine,
   findNextWordStartInLine,
   isWordCharStrict,
 } from './text-buffer.js';
 import { cpLen } from '../../utils/textUtils.js';
+
+const defaultVisualLayout: VisualLayout = {
+  visualLines: [''],
+  logicalToVisualMap: [[[0, 0]]],
+  visualToLogicalMap: [[0, 0]],
+};
 
 const initialState: TextBufferState = {
   lines: [''],
@@ -31,6 +40,9 @@ const initialState: TextBufferState = {
   redoStack: [],
   clipboard: null,
   selectionAnchor: null,
+  viewportWidth: 80,
+  viewportHeight: 24,
+  visualLayout: defaultVisualLayout,
 };
 
 describe('textBufferReducer', () => {
@@ -168,6 +180,117 @@ describe('textBufferReducer', () => {
       expect(state.undoStack[0].lines).toEqual(['hello']);
       expect(state.undoStack[0].cursorRow).toBe(0);
       expect(state.undoStack[0].cursorCol).toBe(5);
+    });
+  });
+
+  describe('delete_word_left action', () => {
+    it('should delete a simple word', () => {
+      const stateWithText: TextBufferState = {
+        ...initialState,
+        lines: ['hello world'],
+        cursorRow: 0,
+        cursorCol: 11,
+      };
+      const action: TextBufferAction = { type: 'delete_word_left' };
+      const state = textBufferReducer(stateWithText, action);
+      expect(state.lines).toEqual(['hello ']);
+      expect(state.cursorCol).toBe(6);
+    });
+
+    it('should delete a path segment', () => {
+      const stateWithText: TextBufferState = {
+        ...initialState,
+        lines: ['path/to/file'],
+        cursorRow: 0,
+        cursorCol: 12,
+      };
+      const action: TextBufferAction = { type: 'delete_word_left' };
+      const state = textBufferReducer(stateWithText, action);
+      expect(state.lines).toEqual(['path/to/']);
+      expect(state.cursorCol).toBe(8);
+    });
+
+    it('should delete variable_name parts', () => {
+      const stateWithText: TextBufferState = {
+        ...initialState,
+        lines: ['variable_name'],
+        cursorRow: 0,
+        cursorCol: 13,
+      };
+      const action: TextBufferAction = { type: 'delete_word_left' };
+      const state = textBufferReducer(stateWithText, action);
+      expect(state.lines).toEqual(['variable_']);
+      expect(state.cursorCol).toBe(9);
+    });
+
+    it('should act like backspace at the beginning of a line', () => {
+      const stateWithText: TextBufferState = {
+        ...initialState,
+        lines: ['hello', 'world'],
+        cursorRow: 1,
+        cursorCol: 0,
+      };
+      const action: TextBufferAction = { type: 'delete_word_left' };
+      const state = textBufferReducer(stateWithText, action);
+      expect(state.lines).toEqual(['helloworld']);
+      expect(state.cursorRow).toBe(0);
+      expect(state.cursorCol).toBe(5);
+    });
+  });
+
+  describe('delete_word_right action', () => {
+    it('should delete a simple word', () => {
+      const stateWithText: TextBufferState = {
+        ...initialState,
+        lines: ['hello world'],
+        cursorRow: 0,
+        cursorCol: 0,
+      };
+      const action: TextBufferAction = { type: 'delete_word_right' };
+      const state = textBufferReducer(stateWithText, action);
+      expect(state.lines).toEqual(['world']);
+      expect(state.cursorCol).toBe(0);
+    });
+
+    it('should delete a path segment', () => {
+      const stateWithText: TextBufferState = {
+        ...initialState,
+        lines: ['path/to/file'],
+        cursorRow: 0,
+        cursorCol: 0,
+      };
+      const action: TextBufferAction = { type: 'delete_word_right' };
+      let state = textBufferReducer(stateWithText, action);
+      expect(state.lines).toEqual(['/to/file']);
+      state = textBufferReducer(state, action);
+      expect(state.lines).toEqual(['to/file']);
+    });
+
+    it('should delete variable_name parts', () => {
+      const stateWithText: TextBufferState = {
+        ...initialState,
+        lines: ['variable_name'],
+        cursorRow: 0,
+        cursorCol: 0,
+      };
+      const action: TextBufferAction = { type: 'delete_word_right' };
+      const state = textBufferReducer(stateWithText, action);
+      expect(state.lines).toEqual(['_name']);
+      expect(state.cursorCol).toBe(0);
+    });
+
+    it('should act like delete at the end of a line', () => {
+      const stateWithText: TextBufferState = {
+        ...initialState,
+        lines: ['hello', 'world'],
+        cursorRow: 0,
+        cursorCol: 5,
+      };
+      const action: TextBufferAction = { type: 'delete_word_right' };
+      const state = textBufferReducer(stateWithText, action);
+      expect(state.lines).toEqual(['helloworld']);
+      expect(state.cursorRow).toBe(0);
+      expect(state.cursorCol).toBe(5);
     });
   });
 });
@@ -893,7 +1016,7 @@ describe('useTextBuffer', () => {
       expect(getBufferState(result).cursor).toEqual([0, 2]);
     });
 
-    it('should handle inserts that contain delete characters ', () => {
+    it('should handle inserts that contain delete characters', () => {
       const { result } = renderHook(() =>
         useTextBuffer({
           initialText: 'abcde',
@@ -911,7 +1034,7 @@ describe('useTextBuffer', () => {
       expect(getBufferState(result).cursor).toEqual([0, 2]);
     });
 
-    it('should handle inserts with a mix of regular and delete characters ', () => {
+    it('should handle inserts with a mix of regular and delete characters', () => {
       const { result } = renderHook(() =>
         useTextBuffer({
           initialText: 'abcde',
@@ -1280,6 +1403,69 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
       expect(getBufferState(result).text).toBe('Pasted Text');
     });
 
+    it('should sanitize large text (>5000 chars) and strip unsafe characters', () => {
+      const { result } = renderHook(() =>
+        useTextBuffer({ viewport, isValidPath: () => false }),
+      );
+      const unsafeChars = '\x07\x08\x0B\x0C';
+      const largeTextWithUnsafe =
+        'safe text'.repeat(600) + unsafeChars + 'more safe text';
+
+      expect(largeTextWithUnsafe.length).toBeGreaterThan(5000);
+
+      act(() =>
+        result.current.handleInput({
+          name: '',
+          ctrl: false,
+          meta: false,
+          shift: false,
+          paste: false,
+          sequence: largeTextWithUnsafe,
+        }),
+      );
+
+      const resultText = getBufferState(result).text;
+      expect(resultText).not.toContain('\x07');
+      expect(resultText).not.toContain('\x08');
+      expect(resultText).not.toContain('\x0B');
+      expect(resultText).not.toContain('\x0C');
+      expect(resultText).toContain('safe text');
+      expect(resultText).toContain('more safe text');
+    });
+
+    it('should sanitize large ANSI text (>5000 chars) and strip escape codes', () => {
+      const { result } = renderHook(() =>
+        useTextBuffer({ viewport, isValidPath: () => false }),
+      );
+      const largeTextWithAnsi =
+        '\x1B[31m' +
+        'red text'.repeat(800) +
+        '\x1B[0m' +
+        '\x1B[32m' +
+        'green text'.repeat(200) +
+        '\x1B[0m';
+
+      expect(largeTextWithAnsi.length).toBeGreaterThan(5000);
+
+      act(() =>
+        result.current.handleInput({
+          name: '',
+          ctrl: false,
+          meta: false,
+          shift: false,
+          paste: false,
+          sequence: largeTextWithAnsi,
+        }),
+      );
+
+      const resultText = getBufferState(result).text;
+      expect(resultText).not.toContain('\x1B[31m');
+      expect(resultText).not.toContain('\x1B[32m');
+      expect(resultText).not.toContain('\x1B[0m');
+      expect(resultText).toContain('red text');
+      expect(resultText).toContain('green text');
+    });
+
     it('should not strip popular emojis', () => {
       const { result } = renderHook(() =>
         useTextBuffer({ viewport, isValidPath: () => false }),
@@ -1317,6 +1503,53 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
 
     it('should handle empty string', () => {
       expect(stripAnsi('')).toBe('');
+    });
+  });
+
+  describe('Memoization', () => {
+    it('should keep action references stable across re-renders', () => {
+      // We pass a stable `isValidPath` so that callbacks that depend on it
+      // are not recreated on every render.
+      const isValidPath = () => false;
+      const { result, rerender } = renderHook(() =>
+        useTextBuffer({ viewport, isValidPath }),
+      );
+
+      const initialInsert = result.current.insert;
+      const initialBackspace = result.current.backspace;
+      const initialMove = result.current.move;
+      const initialHandleInput = result.current.handleInput;
+
+      rerender();
+
+      expect(result.current.insert).toBe(initialInsert);
+      expect(result.current.backspace).toBe(initialBackspace);
+      expect(result.current.move).toBe(initialMove);
+      expect(result.current.handleInput).toBe(initialHandleInput);
+    });
+
+    it('should have memoized actions that operate on the latest state', () => {
+      const isValidPath = () => false;
+      const { result } = renderHook(() =>
+        useTextBuffer({ viewport, isValidPath }),
+      );
+
+      // Store a reference to the memoized insert function.
+      const memoizedInsert = result.current.insert;
+
+      // Update the buffer state.
+      act(() => {
+        result.current.insert('hello');
+      });
+      expect(getBufferState(result).text).toBe('hello');
+
+      // Now, call the original memoized function reference.
+      act(() => {
+        memoizedInsert(' world');
+      });
+
+      // It should have operated on the updated state.
+      expect(getBufferState(result).text).toBe('hello world');
     });
   });
 });
@@ -1477,28 +1710,40 @@ describe('logicalPosToOffset', () => {
   });
 });
 
+// Helper to create state for reducer tests
+const createTestState = (
+  lines: string[],
+  cursorRow: number,
+  cursorCol: number,
+  viewportWidth = 80,
+): TextBufferState => {
+  const text = lines.join('\n');
+  let state = textBufferReducer(initialState, {
+    type: 'set_text',
+    payload: text,
+  });
+  state = textBufferReducer(state, {
+    type: 'set_cursor',
+    payload: { cursorRow, cursorCol, preferredCol: null },
+  });
+  state = textBufferReducer(state, {
+    type: 'set_viewport',
+    payload: { width: viewportWidth, height: 24 },
+  });
+  return state;
+};
+
 describe('textBufferReducer vim operations', () => {
   describe('vim_delete_line', () => {
     it('should delete a single line including newline in multi-line text', () => {
-      const initialState: TextBufferState = {
-        lines: ['line1', 'line2', 'line3'],
-        cursorRow: 1,
-        cursorCol: 2,
-        preferredCol: null,
-        visualLines: [['line1'], ['line2'], ['line3']],
-        visualScrollRow: 0,
-        visualCursor: { row: 1, col: 2 },
-        viewport: { width: 10, height: 5 },
-        undoStack: [],
-        redoStack: [],
-      };
+      const state = createTestState(['line1', 'line2', 'line3'], 1, 2);
 
       const action: TextBufferAction = {
         type: 'vim_delete_line',
         payload: { count: 1 },
       };
 
-      const result = textBufferReducer(initialState, action);
+      const result = textBufferReducer(state, action);
       expect(result).toHaveOnlyValidCharacters();
 
       // After deleting line2, we should have line1 and line3, with cursor on line3 (now at index 1)
@@ -1508,25 +1753,14 @@ describe('textBufferReducer vim operations', () => {
     });
 
     it('should delete multiple lines when count > 1', () => {
-      const initialState: TextBufferState = {
-        lines: ['line1', 'line2', 'line3', 'line4'],
-        cursorRow: 1,
-        cursorCol: 0,
-        preferredCol: null,
-        visualLines: [['line1'], ['line2'], ['line3'], ['line4']],
-        visualScrollRow: 0,
-        visualCursor: { row: 1, col: 0 },
-        viewport: { width: 10, height: 5 },
-        undoStack: [],
-        redoStack: [],
-      };
+      const state = createTestState(['line1', 'line2', 'line3', 'line4'], 1, 0);
 
       const action: TextBufferAction = {
         type: 'vim_delete_line',
         payload: { count: 2 },
       };
 
-      const result = textBufferReducer(initialState, action);
+      const result = textBufferReducer(state, action);
       expect(result).toHaveOnlyValidCharacters();
 
       // Should delete line2 and line3, leaving line1 and line4
@@ -1536,25 +1770,14 @@ describe('textBufferReducer vim operations', () => {
     });
 
     it('should clear single line content when only one line exists', () => {
-      const initialState: TextBufferState = {
-        lines: ['only line'],
-        cursorRow: 0,
-        cursorCol: 5,
-        preferredCol: null,
-        visualLines: [['only line']],
-        visualScrollRow: 0,
-        visualCursor: { row: 0, col: 5 },
-        viewport: { width: 10, height: 5 },
-        undoStack: [],
-        redoStack: [],
-      };
+      const state = createTestState(['only line'], 0, 5);
 
       const action: TextBufferAction = {
         type: 'vim_delete_line',
         payload: { count: 1 },
       };
 
-      const result = textBufferReducer(initialState, action);
+      const result = textBufferReducer(state, action);
       expect(result).toHaveOnlyValidCharacters();
 
       // Should clear the line content but keep the line
@@ -1564,25 +1787,14 @@ describe('textBufferReducer vim operations', () => {
     });
 
     it('should handle deleting the last line properly', () => {
-      const initialState: TextBufferState = {
-        lines: ['line1', 'line2'],
-        cursorRow: 1,
-        cursorCol: 0,
-        preferredCol: null,
-        visualLines: [['line1'], ['line2']],
-        visualScrollRow: 0,
-        visualCursor: { row: 1, col: 0 },
-        viewport: { width: 10, height: 5 },
-        undoStack: [],
-        redoStack: [],
-      };
+      const state = createTestState(['line1', 'line2'], 1, 0);
 
       const action: TextBufferAction = {
         type: 'vim_delete_line',
         payload: { count: 1 },
       };
 
-      const result = textBufferReducer(initialState, action);
+      const result = textBufferReducer(state, action);
       expect(result).toHaveOnlyValidCharacters();
 
       // Should delete the last line completely, not leave empty line
@@ -1592,18 +1804,7 @@ describe('textBufferReducer vim operations', () => {
     });
 
     it('should handle deleting all lines and maintain valid state for subsequent paste', () => {
-      const initialState: TextBufferState = {
-        lines: ['line1', 'line2', 'line3', 'line4'],
-        cursorRow: 0,
-        cursorCol: 0,
-        preferredCol: null,
-        visualLines: [['line1'], ['line2'], ['line3'], ['line4']],
-        visualScrollRow: 0,
-        visualCursor: { row: 0, col: 0 },
-        viewport: { width: 10, height: 5 },
-        undoStack: [],
-        redoStack: [],
-      };
+      const state = createTestState(['line1', 'line2', 'line3', 'line4'], 0, 0);
 
       // Delete all 4 lines with 4dd
       const deleteAction: TextBufferAction = {
@@ -1611,7 +1812,7 @@ describe('textBufferReducer vim operations', () => {
         payload: { count: 4 },
       };
 
-      const afterDelete = textBufferReducer(initialState, deleteAction);
+      const afterDelete = textBufferReducer(state, deleteAction);
       expect(afterDelete).toHaveOnlyValidCharacters();
 
       // After deleting all lines, should have one empty line

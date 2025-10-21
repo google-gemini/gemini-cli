@@ -6,6 +6,9 @@
 
 // Defines valid event metadata keys for Clearcut logging.
 export enum EventMetadataKey {
+  // Deleted enums: 24
+  // Next ID: 117
+
   GEMINI_CLI_KEY_UNKNOWN = 0,
 
   // ==========================================================================
@@ -48,6 +51,9 @@ export enum EventMetadataKey {
   // Logs whether the session was configured to respect gitignore files.
   GEMINI_CLI_START_SESSION_RESPECT_GITIGNORE = 12,
 
+  // Logs the output format of the session.
+  GEMINI_CLI_START_SESSION_OUTPUT_FORMAT = 94,
+
   // ==========================================================================
   // User Prompt Event Keys
   // ===========================================================================
@@ -62,6 +68,9 @@ export enum EventMetadataKey {
   // Logs the function name.
   GEMINI_CLI_TOOL_CALL_NAME = 14,
 
+  // Logs the MCP server name.
+  GEMINI_CLI_TOOL_CALL_MCP_SERVER_NAME = 95,
+
   // Logs the user's decision about how to handle the tool call.
   GEMINI_CLI_TOOL_CALL_DECISION = 15,
 
@@ -71,11 +80,27 @@ export enum EventMetadataKey {
   // Logs the tool call duration in milliseconds.
   GEMINI_CLI_TOOL_CALL_DURATION_MS = 17,
 
-  // Logs the tool call error message, if any.
-  GEMINI_CLI_TOOL_ERROR_MESSAGE = 18,
+  // Do not use.
+  DEPRECATED_GEMINI_CLI_TOOL_ERROR_MESSAGE = 18,
 
   // Logs the tool call error type, if any.
   GEMINI_CLI_TOOL_CALL_ERROR_TYPE = 19,
+
+  // Logs the length of tool output
+  GEMINI_CLI_TOOL_CALL_CONTENT_LENGTH = 93,
+
+  // ==========================================================================
+  // Replace Tool Call Event Keys
+  // ===========================================================================
+
+  // Logs a smart edit tool strategy choice.
+  GEMINI_CLI_SMART_EDIT_STRATEGY = 109,
+
+  // Logs a smart edit correction event.
+  GEMINI_CLI_SMART_EDIT_CORRECTION = 110,
+
+  // Logs the reason for web fetch fallback.
+  GEMINI_CLI_WEB_FETCH_FALLBACK_REASON = 116,
 
   // ==========================================================================
   // GenAI API Request Event Keys
@@ -96,9 +121,6 @@ export enum EventMetadataKey {
 
   // Logs the duration of the API call in milliseconds.
   GEMINI_CLI_API_RESPONSE_DURATION_MS = 23,
-
-  // Logs the error message of the API call, if any.
-  GEMINI_CLI_API_ERROR_MESSAGE = 24,
 
   // Logs the input token count of the API call.
   GEMINI_CLI_API_RESPONSE_INPUT_TOKEN_COUNT = 25,
@@ -163,6 +185,12 @@ export enum EventMetadataKey {
   // Logs the Gemini CLI Git commit hash
   GEMINI_CLI_GIT_COMMIT_HASH = 55,
 
+  // Logs the Gemini CLI OS
+  GEMINI_CLI_OS = 82,
+
+  // Logs active user settings
+  GEMINI_CLI_USER_SETTINGS = 84,
+
   // ==========================================================================
   // Loop Detected Event Keys
   // ===========================================================================
@@ -219,18 +247,37 @@ export enum EventMetadataKey {
   // Logs user removed lines in edit/write tool response.
   GEMINI_CLI_USER_REMOVED_LINES = 50,
 
-  // Logs the programming language of the project.
-  GEMINI_CLI_PROGRAMMING_LANGUAGE = 56,
+  // Logs AI added characters in edit/write tool response.
+  GEMINI_CLI_AI_ADDED_CHARS = 103,
+
+  // Logs AI removed characters in edit/write tool response.
+  GEMINI_CLI_AI_REMOVED_CHARS = 104,
+
+  // Logs user added characters in edit/write tool response.
+  GEMINI_CLI_USER_ADDED_CHARS = 105,
+
+  // Logs user removed characters in edit/write tool response.
+  GEMINI_CLI_USER_REMOVED_CHARS = 106,
 
   // ==========================================================================
   // Kitty Sequence Overflow Event Keys
   // ===========================================================================
 
-  // Logs the truncated kitty sequence.
-  GEMINI_CLI_KITTY_TRUNCATED_SEQUENCE = 52,
+  // Do not use.
+  DEPRECATED_GEMINI_CLI_KITTY_TRUNCATED_SEQUENCE = 52,
 
   // Logs the length of the kitty sequence that overflowed.
   GEMINI_CLI_KITTY_SEQUENCE_LENGTH = 53,
+
+  // ==========================================================================
+  // Conversation Finished Event Keys
+  // ===========================================================================
+
+  // Logs the approval mode of the session.
+  GEMINI_CLI_APPROVAL_MODE = 58,
+
+  // Logs the number of turns
+  GEMINI_CLI_CONVERSATION_TURN_COUNT = 59,
 
   // Logs the number of tokens before context window compression.
   GEMINI_CLI_COMPRESSION_TOKENS_BEFORE = 60,
@@ -247,22 +294,165 @@ export enum EventMetadataKey {
   // Logs count of MCP tools in Start Session Event
   GEMINI_CLI_START_SESSION_MCP_TOOLS_COUNT = 64,
 
-  // Logs name of MCP tools as comma seperated string
+  // Logs name of MCP tools as comma separated string
   GEMINI_CLI_START_SESSION_MCP_TOOLS = 65,
+
+  // ==========================================================================
+  // Research Event Keys
+  // ===========================================================================
+
+  // Logs the research opt-in status (true/false)
+  GEMINI_CLI_RESEARCH_OPT_IN_STATUS = 66,
+
+  // Logs the contact email for research participation
+  GEMINI_CLI_RESEARCH_CONTACT_EMAIL = 67,
+
+  // Logs the user ID for research events
+  GEMINI_CLI_RESEARCH_USER_ID = 68,
+
+  // Logs the type of research feedback
+  GEMINI_CLI_RESEARCH_FEEDBACK_TYPE = 69,
+
+  // Logs the content of research feedback
+  GEMINI_CLI_RESEARCH_FEEDBACK_CONTENT = 70,
+
+  // Logs survey responses for research feedback (JSON stringified)
+  GEMINI_CLI_RESEARCH_SURVEY_RESPONSES = 71,
 
   // ==========================================================================
   // File Operation Event Keys
   // ===========================================================================
 
+  // Logs the programming language of the project.
+  GEMINI_CLI_PROGRAMMING_LANGUAGE = 56,
+
   // Logs the operation type of the file operation.
-  GEMINI_CLI_FILE_OPERATION_TYPE = 66,
+  GEMINI_CLI_FILE_OPERATION_TYPE = 57,
 
   // Logs the number of lines in the file operation.
-  GEMINI_CLI_FILE_OPERATION_LINES = 67,
+  GEMINI_CLI_FILE_OPERATION_LINES = 72,
 
   // Logs the mimetype of the file in the file operation.
-  GEMINI_CLI_FILE_OPERATION_MIMETYPE = 68,
+  GEMINI_CLI_FILE_OPERATION_MIMETYPE = 73,
 
   // Logs the extension of the file in the file operation.
-  GEMINI_CLI_FILE_OPERATION_EXTENSION = 69,
+  GEMINI_CLI_FILE_OPERATION_EXTENSION = 74,
+
+  // ==========================================================================
+  // Content Streaming Event Keys
+  // ===========================================================================
+
+  // Logs the error message for an invalid chunk.
+  GEMINI_CLI_INVALID_CHUNK_ERROR_MESSAGE = 75,
+
+  // Logs the attempt number for a content retry.
+  GEMINI_CLI_CONTENT_RETRY_ATTEMPT_NUMBER = 76,
+
+  // Logs the error type for a content retry.
+  GEMINI_CLI_CONTENT_RETRY_ERROR_TYPE = 77,
+
+  // Logs the delay in milliseconds for a content retry.
+  GEMINI_CLI_CONTENT_RETRY_DELAY_MS = 78,
+
+  // Logs the total number of attempts for a content retry failure.
+  GEMINI_CLI_CONTENT_RETRY_FAILURE_TOTAL_ATTEMPTS = 79,
+
+  // Logs the final error type for a content retry failure.
+  GEMINI_CLI_CONTENT_RETRY_FAILURE_FINAL_ERROR_TYPE = 80,
+
+  // Logs the total duration in milliseconds for a content retry failure.
+  GEMINI_CLI_CONTENT_RETRY_FAILURE_TOTAL_DURATION_MS = 81,
+
+  // Logs the current nodejs version
+  GEMINI_CLI_NODE_VERSION = 83,
+
+  // ==========================================================================
+  // Extension Event Keys
+  // ===========================================================================
+
+  // Logs the name of the extension.
+  GEMINI_CLI_EXTENSION_NAME = 85,
+
+  // Logs the version of the extension.
+  GEMINI_CLI_EXTENSION_VERSION = 86,
+
+  // Logs the previous version of the extension.
+  GEMINI_CLI_EXTENSION_PREVIOUS_VERSION = 117,
+
+  // Logs the source of the extension.
+  GEMINI_CLI_EXTENSION_SOURCE = 87,
+
+  // Logs the status of the extension install.
+  GEMINI_CLI_EXTENSION_INSTALL_STATUS = 88,
+
+  // Logs the status of the extension uninstall
+  GEMINI_CLI_EXTENSION_UNINSTALL_STATUS = 96,
+
+  // Logs the status of the extension uninstall
+  GEMINI_CLI_EXTENSION_UPDATE_STATUS = 118,
+
+  // Logs the setting scope for an extension enablement.
+  GEMINI_CLI_EXTENSION_ENABLE_SETTING_SCOPE = 102,
+
+  // Logs the setting scope for an extension disablement.
+  GEMINI_CLI_EXTENSION_DISABLE_SETTING_SCOPE = 107,
+
+  // ==========================================================================
+  // Tool Output Truncated Event Keys
+  // ===========================================================================
+
+  // Logs the original length of the tool output.
+  GEMINI_CLI_TOOL_OUTPUT_TRUNCATED_ORIGINAL_LENGTH = 89,
+
+  // Logs the truncated length of the tool output.
+  GEMINI_CLI_TOOL_OUTPUT_TRUNCATED_TRUNCATED_LENGTH = 90,
+
+  // Logs the threshold at which the tool output was truncated.
+  GEMINI_CLI_TOOL_OUTPUT_TRUNCATED_THRESHOLD = 91,
+
+  // Logs the number of lines the tool output was truncated to.
+  GEMINI_CLI_TOOL_OUTPUT_TRUNCATED_LINES = 92,
+
+  // ==========================================================================
+  // Model Router Event Keys
+  // ==========================================================================
+
+  // Logs the outcome of a model routing decision (e.g., which route/model was
+  // selected).
+  GEMINI_CLI_ROUTING_DECISION = 97,
+
+  // Logs an event when the model router fails to make a decision or the chosen
+  // route fails.
+  GEMINI_CLI_ROUTING_FAILURE = 98,
+
+  // Logs the latency in milliseconds for the router to make a decision.
+  GEMINI_CLI_ROUTING_LATENCY_MS = 99,
+
+  // Logs a specific reason for a routing failure.
+  GEMINI_CLI_ROUTING_FAILURE_REASON = 100,
+
+  // Logs the source of the decision.
+  GEMINI_CLI_ROUTING_DECISION_SOURCE = 101,
+
+  // Logs an event when the user uses the /model command.
+  GEMINI_CLI_MODEL_SLASH_COMMAND = 108,
+
+  // ==========================================================================
+  // Agent Event Keys
+  // ==========================================================================
+
+  // Logs the name of the agent.
+  GEMINI_CLI_AGENT_NAME = 111,
+
+  // Logs the unique ID of the agent instance.
+  GEMINI_CLI_AGENT_ID = 112,
+
+  // Logs the duration of the agent execution in milliseconds.
+  GEMINI_CLI_AGENT_DURATION_MS = 113,
+
+  // Logs the number of turns the agent took.
+  GEMINI_CLI_AGENT_TURN_COUNT = 114,
+
+  // Logs the reason for agent termination.
+  GEMINI_CLI_AGENT_TERMINATE_REASON = 115,
 }

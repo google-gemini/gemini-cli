@@ -7,7 +7,7 @@
 import React, { Fragment, useEffect, useId } from 'react';
 import { Box, Text } from 'ink';
 import stringWidth from 'string-width';
-import { Colors } from '../../colors.js';
+import { theme } from '../../semantic-colors.js';
 import { toCodePoints } from '../../utils/textUtils.js';
 import { useOverflowActions } from '../../contexts/OverflowContext.js';
 
@@ -186,14 +186,14 @@ export const MaxSizedBox: React.FC<MaxSizedBoxProps> = ({
   return (
     <Box flexDirection="column" width={maxWidth} flexShrink={0}>
       {totalHiddenLines > 0 && overflowDirection === 'top' && (
-        <Text color={Colors.Gray} wrap="truncate">
+        <Text color={theme.text.secondary} wrap="truncate">
           ... first {totalHiddenLines} line{totalHiddenLines === 1 ? '' : 's'}{' '}
           hidden ...
         </Text>
       )}
       {visibleLines}
       {totalHiddenLines > 0 && overflowDirection === 'bottom' && (
-        <Text color={Colors.Gray} wrap="truncate">
+        <Text color={theme.text.secondary} wrap="truncate">
           ... last {totalHiddenLines} line{totalHiddenLines === 1 ? '' : 's'}{' '}
           hidden ...
         </Text>
@@ -264,13 +264,12 @@ function visitBoxRow(element: React.ReactNode): Row {
 
   if (enableDebugLog) {
     const boxProps = element.props as {
-      children?: React.ReactNode | undefined;
+      children?: React.ReactNode;
       readonly flexDirection?:
         | 'row'
         | 'column'
         | 'row-reverse'
-        | 'column-reverse'
-        | undefined;
+        | 'column-reverse';
     };
     // Ensure the Box has no props other than the default ones and key.
     let maxExpectedProps = 4;

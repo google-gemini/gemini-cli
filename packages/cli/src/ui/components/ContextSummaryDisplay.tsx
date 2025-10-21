@@ -4,9 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React from 'react';
+import type React from 'react';
 import { Box, Text } from 'ink';
-import { Colors } from '../colors.js';
+import { theme } from '../semantic-colors.js';
 import { type IdeContext, type MCPServerConfig } from '@google/gemini-cli-core';
 import { useTerminalSize } from '../hooks/useTerminalSize.js';
 import { isNarrowWidth } from '../utils/isNarrowWidth.js';
@@ -16,7 +16,6 @@ interface ContextSummaryDisplayProps {
   contextFileNames: string[];
   mcpServers?: Record<string, MCPServerConfig>;
   blockedMcpServers?: Array<{ name: string; extensionName: string }>;
-  showToolDescriptions?: boolean;
   ideContext?: IdeContext;
 }
 
@@ -25,7 +24,6 @@ export const ContextSummaryDisplay: React.FC<ContextSummaryDisplayProps> = ({
   contextFileNames,
   mcpServers,
   blockedMcpServers,
-  showToolDescriptions,
   ideContext,
 }) => {
   const { columns: terminalWidth } = useTerminalSize();
@@ -82,26 +80,17 @@ export const ContextSummaryDisplay: React.FC<ContextSummaryDisplayProps> = ({
       }
       parts.push(blockedText);
     }
-    let text = parts.join(', ');
-    // Add ctrl+t hint when MCP servers are available
-    if (mcpServers && Object.keys(mcpServers).length > 0) {
-      if (showToolDescriptions) {
-        text += ' (ctrl+t to toggle)';
-      } else {
-        text += ' (ctrl+t to view)';
-      }
-    }
-    return text;
+    return parts.join(', ');
   })();
 
   const summaryParts = [openFilesText, geminiMdText, mcpText].filter(Boolean);
 
   if (isNarrow) {
     return (
-      <Box flexDirection="column">
-        <Text color={Colors.Gray}>Using:</Text>
+      <Box flexDirection="column" paddingX={1}>
+        <Text color={theme.text.secondary}>Using:</Text>
         {summaryParts.map((part, index) => (
-          <Text key={index} color={Colors.Gray}>
+          <Text key={index} color={theme.text.secondary}>
             {'  '}- {part}
           </Text>
         ))}
@@ -110,8 +99,10 @@ export const ContextSummaryDisplay: React.FC<ContextSummaryDisplayProps> = ({
   }
 
   return (
-    <Box>
-      <Text color={Colors.Gray}>Using: {summaryParts.join(' | ')}</Text>
+    <Box paddingX={1}>
+      <Text color={theme.text.secondary}>
+        Using: {summaryParts.join(' | ')}
+      </Text>
     </Box>
   );
 };
