@@ -3000,3 +3000,92 @@ describe('Telemetry configuration via environment variables', () => {
     expect(config.getTelemetryLogPromptsEnabled()).toBe(false);
   });
 });
+
+describe('loadCliConfig YOLO mode override', () => {
+  const originalArgv = process.argv;
+
+  beforeEach(() => {
+    vi.resetAllMocks();
+    vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
+    vi.stubEnv('GEMINI_API_KEY', 'test-api-key');
+    process.argv = ['node', 'script.js']; // Reset argv for each test
+    vi.mocked(isWorkspaceTrusted).mockReturnValue({
+      isTrusted: true,
+      source: undefined,
+    });
+  });
+
+  afterEach(() => {
+    process.argv = originalArgv;
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
+  });
+
+  it('should override YOLO to DEFAULT when disableYoloMode is true in settings', async () => {
+    process.argv = ['node', 'script.js', '--yolo'];
+    const argv = await parseArguments({} as Settings);
+    const settings: Settings = {
+      security: {
+        disableYoloMode: true,
+      },
+    };
+    const config = await loadCliConfig(
+      settings,
+      [],
+      new ExtensionEnablementManager(argv.extensions),
+      'test-session',
+      argv,
+    );
+    expect(config.getApprovalMode()).toBe(ServerConfig.ApprovalMode.DEFAULT);
+  });
+
+  it('should override --approval-mode=yolo to DEFAULT when disableYoloMode is true', async () => {
+    process.argv = ['node', 'script.js', '--approval-mode', 'yolo'];
+    const argv = await parseArguments({} as Settings);
+    const settings: Settings = {
+      security: {
+        disableYoloMode: true,
+      },
+    };
+    const config = await loadCliConfig(
+      settings,
+      [],
+      new ExtensionEnablementManager(argv.extensions),
+      'test-session',
+      argv,
+    );
+    expect(config.getApprovalMode()).toBe(ServerConfig.ApprovalMode.DEFAULT);
+  });
+
+  it('should allow YOLO mode when disableYoloMode is false', async () => {
+    process.argv = ['node', 'script.js', '--yolo'];
+    const argv = await parseArguments({} as Settings);
+    const settings: Settings = {
+      security: {
+        disableYoloMode: false,
+      },
+    };
+    const config = await loadCliConfig(
+      settings,
+      [],
+      new ExtensionEnablementManager(argv.extensions),
+      'test-session',
+      argv,
+    );
+    expect(config.getApprovalMode()).toBe(ServerConfig.ApprovalMode.YOLO);
+  });
+
+  it('should allow YOLO mode when disableYoloMode is not set', async () => {
+    process.argv = ['node', 'script.js', '--yolo'];
+    const argv = await parseArguments({} as Settings);
+    const settings: Settings = {};
+    const config = await loadCliConfig(
+      settings,
+      [],
+      new ExtensionEnablementManager(argv.extensions),
+      'test-session',
+      argv,
+    );
+    expect(config.getApprovalMode()).toBe(ServerConfig.ApprovalMode.YOLO);
+  });
+});
