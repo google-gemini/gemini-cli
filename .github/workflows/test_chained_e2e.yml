@@ -34,6 +34,8 @@ jobs:
     runs-on: 'gemini-cli-ubuntu-16-core'
     outputs:
       repo_name: '${{ steps.output-repo-name.outputs.repo_name }}'
+    permissions:
+      actions: read
     steps:
       - name: 'Save Repo name'
         if: "${{ github.event_name != 'workflow_run' }}"
