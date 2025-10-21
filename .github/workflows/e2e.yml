@@ -94,10 +94,12 @@ jobs:
           VERBOSE: 'true'
         shell: 'bash'
         run: |
-          for i in {1..100}; do
-            echo "Run #$i"
-            npm run test -w @google/gemini-cli -- src/ui/components/shared/BaseSelectionList.test.tsx || exit 1
-          done
+          if [[ "${{ matrix.sandbox }}" == "sandbox:docker" ]]; then
+            npm run test:integration:sandbox:docker
+          else
+            npm run test:integration:sandbox:none
+          fi
+
   e2e_mac:
     name: 'E2E Test (macOS)'
     needs: 'merge_queue_skipper'
@@ -145,12 +147,8 @@ jobs:
           KEEP_OUTPUT: 'true'
           SANDBOX: 'sandbox:none'
           VERBOSE: 'true'
-        shell: bash
-        run: |
-          for i in {1..100}; do
-            echo "Run #$i"
-            npm run test -w @google/gemini-cli -- src/ui/components/shared/BaseSelectionList.test.tsx || exit 1
-          done
+        run: 'npm run test:integration:sandbox:none'
+
   e2e_windows:
     name: 'Slow E2E - Win'
     needs: 'merge_queue_skipper'
@@ -220,8 +218,8 @@ jobs:
           UV_THREADPOOL_SIZE: '32'
           NODE_ENV: 'test'
         shell: 'pwsh'
-        run: |
-          for ($i=1; $i -le 100; $i++) { Write-Host "Run #$i"; npm run test -w @google/gemini-cli -- src/ui/components/shared/BaseSelectionList.test.tsx; if ($LASTEXITCODE -ne 0) { exit 1 } }
+        run: 'npm run test:integration:sandbox:none'
+
   e2e:
     name: 'E2E'
     if: |
