@@ -64,7 +64,7 @@ jobs:
           github-token: '${{ secrets.GITHUB_TOKEN }}'
 
       - name: 'Install Script Dependencies'
-        run: 'npm install yargs --no-package-lock'
+        run: 'npm ci'
 
       - name: 'Configure Git User'
         env:
