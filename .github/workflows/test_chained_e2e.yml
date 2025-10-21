@@ -35,37 +35,28 @@ jobs:
     outputs:
       repo_name: '${{ steps.output-repo-name.outputs.repo_name }}'
     steps:
-      - name: 'Download artifact'
-        if: "${{ github.event_name == 'workflow_run' }}"
-        uses: 'actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd' # ratchet:actions/github-script@v8
+      - name: 'Save Repo name'
+        if: "${{ github.event_name != 'workflow_run' }}"
+        env:
+          REPO_NAME: '${{ github.event.inputs.repo_name }}'
+        run: |
+          mkdir -p ./pr
+          echo '$REPO_NAME' > ./pr/repo_name
+      - uses: 'actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02' # ratchet:actions/upload-artifact@v4
         with:
-          script: |
-            let allArtifacts = await github.rest.actions.listWorkflowRunArtifacts({
-               owner: context.repo.owner,
-               repo: context.repo.repo,
-               run_id: context.payload.workflow_run.id,
-            });
-            let matchArtifact = allArtifacts.data.artifacts.filter((artifact) => {
-              return artifact.name == "repo_name"
-            })[0];
-            let download = await github.rest.actions.downloadArtifact({
-               owner: context.repo.owner,
-               repo: context.repo.repo,
-               artifact_id: matchArtifact.id,
-               archive_format: 'zip',
-            });
-            const fs = require('fs');
-            const path = require('path');
-            const temp = '${{ runner.temp }}/artifacts';
-            if (!fs.existsSync(temp)){
-              fs.mkdirSync(temp);
-            }
-            fs.writeFileSync(path.join(temp, 'repo_name.zip'), Buffer.from(download.data));
+          name: 'repo_name'
+          path: 'pr/'
+      - name: 'Download the repo_name artifact'
+        uses: 'actions/download-artifact@v5'
+        with:
+          github-token: '${{ secrets.GITHUB_TOKEN }}'
+          name: 'repo_name'
+          run-id: ${{ github.event.workflow_run.id }}
+          path: '${{ runner.temp }}/artifacts'
       - name: 'Unzip artifact'
         if: "${{ github.event_name == 'workflow_run' }}"
         run: 'unzip "${{ runner.temp }}/artifacts/repo_name.zip" -d "${{ runner.temp }}/artifacts"'
       - name: 'Output Repo Name'
-        if: "${{ github.event_name == 'workflow_run' }}"
         id: 'output-repo-name'
         uses: 'actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd' # ratchet:actions/github-script@v8
         with:
@@ -76,12 +67,6 @@ jobs:
             const temp = '${{ runner.temp }}/artifacts';
             const repo_name = Number(fs.readFileSync(path.join(temp, 'repo_name')));
             core.setOutput('repo_name', repo_name);
-      - name: 'Output Input Repo Name'
-        if: "${{ github.event_name != 'workflow_run' }}"
-        id: 'output-input-repo-name'
-        run: |
-          echo "repo_name=${{ github.event.inputs.repo_name }}" >> "$GITHUB_OUTPUT"
-        shell: 'bash'
 
   e2e_linux:
     name: 'E2E Test (Linux) - ${{ matrix.sandbox }}'
