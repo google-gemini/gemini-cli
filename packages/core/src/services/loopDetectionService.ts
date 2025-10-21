@@ -439,7 +439,7 @@ export class LoopDetectionService {
     if (typeof result['confidence'] === 'number') {
       if (result['confidence'] > 0.9) {
         if (typeof result['reasoning'] === 'string' && result['reasoning']) {
-          console.warn(result['reasoning']);
+          debugLogger.warn(result['reasoning']);
         }
         logLoopDetected(
           this.config,

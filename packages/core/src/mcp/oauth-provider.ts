@@ -317,7 +317,7 @@ export class MCPOAuthProvider {
           OAuthUtils.buildResourceParameter(mcpServerUrl),
         );
       } catch (error) {
-        console.warn(
+        debugLogger.warn(
           `Could not add resource parameter: ${getErrorMessage(error)}`,
         );
       }
@@ -374,7 +374,7 @@ export class MCPOAuthProvider {
           OAuthUtils.buildResourceParameter(resourceUrl),
         );
       } catch (error) {
-        console.warn(
+        debugLogger.warn(
           `Could not add resource parameter: ${getErrorMessage(error)}`,
         );
       }
@@ -416,7 +416,7 @@ export class MCPOAuthProvider {
       !contentType.includes('application/json') &&
       !contentType.includes('application/x-www-form-urlencoded')
     ) {
-      console.warn(
+      debugLogger.warn(
         `Token endpoint returned unexpected content-type: ${contentType}. ` +
           `Expected application/json or application/x-www-form-urlencoded. ` +
           `Will attempt to parse response.`,
@@ -496,7 +496,7 @@ export class MCPOAuthProvider {
           OAuthUtils.buildResourceParameter(mcpServerUrl),
         );
       } catch (error) {
-        console.warn(
+        debugLogger.warn(
           `Could not add resource parameter: ${getErrorMessage(error)}`,
         );
       }
@@ -538,7 +538,7 @@ export class MCPOAuthProvider {
       !contentType.includes('application/json') &&
       !contentType.includes('application/x-www-form-urlencoded')
     ) {
-      console.warn(
+      debugLogger.warn(
         `Token refresh endpoint returned unexpected content-type: ${contentType}. ` +
           `Expected application/json or application/x-www-form-urlencoded. ` +
           `Will attempt to parse response.`,
@@ -750,7 +750,7 @@ ${authUrl}
     try {
       await openBrowserSecurely(authUrl);
     } catch (error) {
-      console.warn(
+      debugLogger.warn(
         'Failed to open browser automatically:',
         getErrorMessage(error),
       );

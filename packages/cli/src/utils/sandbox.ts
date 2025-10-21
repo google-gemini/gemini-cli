@@ -96,7 +96,7 @@ async function shouldUseCurrentUserInSandbox(): Promise<boolean> {
     } catch (_err) {
       // Silently ignore if /etc/os-release is not found or unreadable.
       // The default (false) will be applied in this case.
-      console.warn(
+      debugLogger.warn(
         'Warning: Could not read /etc/os-release to auto-detect Debian/Ubuntu for UID/GID default.',
       );
     }
@@ -851,7 +851,7 @@ async function imageExists(sandbox: string, image: string): Promise<boolean> {
     }
 
     checkProcess.on('error', (err) => {
-      console.warn(
+      debugLogger.warn(
         `Failed to start '${sandbox}' command for image check: ${err.message}`,
       );
       resolve(false);
@@ -886,7 +886,7 @@ async function pullImage(sandbox: string, image: string): Promise<boolean> {
     };
 
     const onError = (err: Error) => {
-      console.warn(
+      debugLogger.warn(
         `Failed to start '${sandbox} pull ${image}' command: ${err.message}`,
       );
       cleanup();
@@ -899,7 +899,7 @@ async function pullImage(sandbox: string, image: string): Promise<boolean> {
         cleanup();
         resolve(true);
       } else {
-        console.warn(
+        debugLogger.warn(
           `Failed to pull image ${image}. '${sandbox} pull ${image}' exited with code ${code}.`,
         );
         if (stderrData.trim()) {
@@ -957,7 +957,7 @@ async function ensureSandboxImageIsPresent(
       console.info(`Sandbox image ${image} is now available after pulling.`);
       return true;
     } else {
-      console.warn(
+      debugLogger.warn(
         `Sandbox image ${image} still not found after a pull attempt. This might indicate an issue with the image name or registry, or the pull command reported success but failed to make the image available.`,
       );
       return false;

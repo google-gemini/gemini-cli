@@ -1348,7 +1348,7 @@ export function isEnabled(
   mcpServerConfig: MCPServerConfig,
 ): boolean {
   if (!funcDecl.name) {
-    console.warn(
+    debugLogger.warn(
       `Discovered a function declaration without a name from MCP server '${mcpServerName}'. Skipping.`,
     );
     return false;

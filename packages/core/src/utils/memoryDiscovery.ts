@@ -25,7 +25,8 @@ const logger = {
   debug: (...args: any[]) =>
     debugLogger.debug('[DEBUG] [MemoryDiscovery]', ...args),
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  warn: (...args: any[]) => console.warn('[WARN] [MemoryDiscovery]', ...args),
+  warn: (...args: any[]) =>
+    debugLogger.warn('[WARN] [MemoryDiscovery]', ...args),
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   error: (...args: any[]) =>
     console.error('[ERROR] [MemoryDiscovery]', ...args),

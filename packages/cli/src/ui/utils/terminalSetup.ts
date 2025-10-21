@@ -104,7 +104,7 @@ async function backupFile(filePath: string): Promise<void> {
     await fs.copyFile(filePath, backupPath);
   } catch (error) {
     // Log backup errors but continue with operation
-    console.warn(`Failed to create backup of ${filePath}:`, error);
+    debugLogger.warn(`Failed to create backup of ${filePath}:`, error);
   }
 }
 
