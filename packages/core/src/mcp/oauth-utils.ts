@@ -6,6 +6,7 @@
 
 import type { MCPOAuthConfig } from './oauth-provider.js';
 import { getErrorMessage } from '../utils/errors.js';
+import { debugLogger } from '../utils/debugLogger.js';
 
 /**
  * OAuth authorization server metadata as per RFC 8414.
@@ -249,7 +250,7 @@ export class OAuthUtils {
         if (authServerMetadata) {
           const config = this.metadataToOAuthConfig(authServerMetadata);
           if (authServerMetadata.registration_endpoint) {
-            console.log(
+            debugLogger.log(
               'Dynamic client registration is supported at:',
               authServerMetadata.registration_endpoint,
             );
@@ -266,7 +267,7 @@ export class OAuthUtils {
       if (authServerMetadata) {
         const config = this.metadataToOAuthConfig(authServerMetadata);
         if (authServerMetadata.registration_endpoint) {
-          console.log(
+          debugLogger.log(
             'Dynamic client registration is supported at:',
             authServerMetadata.registration_endpoint,
           );

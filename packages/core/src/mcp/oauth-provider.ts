@@ -13,6 +13,7 @@ import type { OAuthToken } from './token-storage/types.js';
 import { MCPOAuthTokenStorage } from './oauth-token-storage.js';
 import { getErrorMessage } from '../utils/errors.js';
 import { OAuthUtils } from './oauth-utils.js';
+import { debugLogger } from '../utils/debugLogger.js';
 
 export const OAUTH_DISPLAY_MESSAGE_EVENT = 'oauth-display-message' as const;
 
@@ -258,7 +259,9 @@ export class MCPOAuthProvider {
 
       server.on('error', reject);
       server.listen(REDIRECT_PORT, () => {
-        console.log(`OAuth callback server listening on port ${REDIRECT_PORT}`);
+        debugLogger.log(
+          `OAuth callback server listening on port ${REDIRECT_PORT}`,
+        );
       });
 
       // Timeout after 5 minutes
@@ -593,7 +596,7 @@ export class MCPOAuthProvider {
       if (events) {
         events.emit(OAUTH_DISPLAY_MESSAGE_EVENT, message);
       } else {
-        console.log(message);
+        debugLogger.log(message);
       }
     };
 
@@ -851,7 +854,9 @@ ${authUrl}
     // Try to refresh if we have a refresh token
     if (token.refreshToken && config.clientId && credentials.tokenUrl) {
       try {
-        console.log(`Refreshing expired token for MCP server: ${serverName}`);
+        debugLogger.log(
+          `Refreshing expired token for MCP server: ${serverName}`,
+        );
 
         const newTokenResponse = await this.refreshAccessToken(
           config,

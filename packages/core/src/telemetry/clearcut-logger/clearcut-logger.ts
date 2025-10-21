@@ -53,6 +53,7 @@ import {
   detectIdeFromEnv,
   isCloudShell,
 } from '../../ide/detect-ide.js';
+import { debugLogger } from '../../utils/debugLogger.js';
 
 export enum EventNames {
   START_SESSION = 'start_session',
@@ -299,7 +300,7 @@ export class ClearcutLogger {
     this.flushing = true;
 
     if (this.config?.getDebugMode()) {
-      console.log('Flushing log events to Clearcut.');
+      debugLogger.log('Flushing log events to Clearcut.');
     }
     const eventsToSend = this.events.toArray() as LogEventEntry[][];
     this.events.clear();
