@@ -146,7 +146,6 @@ export const Composer = () => {
           shellModeActive={uiState.shellModeActive}
           setShellModeActive={uiActions.setShellModeActive}
           approvalMode={showAutoAcceptIndicator}
-          yoloModeDisabled={config.isYoloModeDisabled()}
           onEscapePromptChange={uiActions.onEscapePromptChange}
           focus={true}
           vimHandleInput={uiActions.vimHandleInput}

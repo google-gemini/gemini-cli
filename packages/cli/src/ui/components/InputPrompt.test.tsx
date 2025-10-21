@@ -219,7 +219,6 @@ describe('InputPrompt', () => {
         getWorkspaceContext: () => ({
           getDirectories: () => ['/test/project/src'],
         }),
-        isYoloModeDisabled: vi.fn(() => false),
       } as unknown as Config,
       slashCommands: mockSlashCommands,
       commandContext: mockCommandContext,
@@ -231,7 +230,6 @@ describe('InputPrompt', () => {
       focus: true,
       setQueueErrorMessage: vi.fn(),
       streamingState: StreamingState.Idle,
-      yoloModeDisabled: false,
     };
   });
 
@@ -2345,19 +2343,6 @@ describe('InputPrompt', () => {
       );
       await wait();
       expect(stdout.lastFrame()).toMatchSnapshot();
-      unmount();
-    });
-
-    it('should render correctly in yolo mode when yolo is disabled', async () => {
-      props.approvalMode = ApprovalMode.YOLO;
-      props.yoloModeDisabled = true;
-      const { stdout, unmount } = renderWithProviders(
-        <InputPrompt {...props} />,
-      );
-      await wait();
-      expect(stripAnsi(stdout.lastFrame()!)).toContain(
-        'YOLO mode disabled because the current folder is not trusted.',
-      );
       unmount();
     });
 

@@ -34,6 +34,21 @@ export function useAutoAcceptIndicator({
       let nextApprovalMode: ApprovalMode | undefined;
 
       if (key.ctrl && key.name === 'y') {
+        if (
+          config.isYoloModeDisabled() &&
+          config.getApprovalMode() !== ApprovalMode.YOLO
+        ) {
+          if (addItem) {
+            addItem(
+              {
+                type: MessageType.INFO,
+                text: 'YOLO mode is disabled in your settings.',
+              },
+              Date.now(),
+            );
+          }
+          return;
+        }
         nextApprovalMode =
           config.getApprovalMode() === ApprovalMode.YOLO
             ? ApprovalMode.DEFAULT

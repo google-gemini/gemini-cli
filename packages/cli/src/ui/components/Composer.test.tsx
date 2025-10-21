@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { render } from 'ink-testing-library';
 import { Text } from 'ink';
 import { Composer } from './Composer.js';
@@ -48,9 +48,8 @@ vi.mock('./DetailedMessagesDisplay.js', () => ({
   DetailedMessagesDisplay: () => <Text>DetailedMessagesDisplay</Text>,
 }));
 
-const MockInputPrompt = vi.hoisted(() => vi.fn(() => <Text>InputPrompt</Text>));
 vi.mock('./InputPrompt.js', () => ({
-  InputPrompt: MockInputPrompt,
+  InputPrompt: () => <Text>InputPrompt</Text>,
   calculatePromptWidths: vi.fn(() => ({
     inputWidth: 80,
     suggestionsWidth: 40,
@@ -146,7 +145,6 @@ const createMockConfig = (overrides = {}) => ({
   getAccessibility: vi.fn(() => ({})),
   getMcpServers: vi.fn(() => ({})),
   getBlockedMcpServers: vi.fn(() => []),
-  isYoloModeDisabled: vi.fn(() => false),
   ...overrides,
 });
 
@@ -179,9 +177,6 @@ const renderComposer = (
 /* eslint-enable @typescript-eslint/no-explicit-any */
 
 describe('Composer', () => {
-  beforeEach(() => {
-    MockInputPrompt.mockClear();
-  });
   describe('Footer Display Settings', () => {
     it('renders Footer by default when hideFooter is false', () => {
       const uiState = createMockUIState();
@@ -428,24 +423,6 @@ describe('Composer', () => {
       const { lastFrame } = renderComposer(uiState);
 
       expect(lastFrame()).not.toContain('raw markdown mode');
-    });
-
-    it('passes yoloModeDisabled to InputPrompt when yolo mode is disabled', () => {
-      const uiState = createMockUIState({
-        isInputActive: true,
-      });
-      const config = createMockConfig({
-        isYoloModeDisabled: vi.fn(() => true),
-      });
-
-      renderComposer(uiState, undefined, config);
-
-      expect(MockInputPrompt).toHaveBeenCalledWith(
-        expect.objectContaining({
-          yoloModeDisabled: true,
-        }),
-        undefined,
-      );
     });
   });
 
