@@ -84,5 +84,6 @@ jobs:
           FORCE_SKIP_TESTS: '${{ github.event.inputs.force_skip_tests }}'
           TEST_MODE: '${{ github.event.inputs.test_mode }}'
           ENVIRONMENT: '${{ github.event.inputs.environment }}'
+          DRY_RUN: '${{ github.event.inputs.dry_run }}'
         run: |
-          node scripts/releasing/patch-trigger.js --dry-run=${{ github.event.inputs.dry_run }}
+          node scripts/releasing/patch-trigger.js --dry-run="${DRY_RUN}"

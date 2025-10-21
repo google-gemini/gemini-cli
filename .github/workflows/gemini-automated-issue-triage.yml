@@ -70,8 +70,10 @@ jobs:
       - name: 'Check for triage label on manual trigger'
         if: |-
           github.event_name == 'workflow_dispatch' && !contains(steps.get_issue_data.outputs.labels, 'status/need-triage')
+        env:
+          ISSUE_NUMBER_INPUT: '${{ github.event.inputs.issue_number }}'
         run: |
-          echo "Issue #${{ github.event.inputs.issue_number }} does not have the 'status/need-triage' label. Stopping workflow."
+          echo "Issue #${ISSUE_NUMBER_INPUT} does not have the 'status/need-triage' label. Stopping workflow."
           exit 1
 
       - name: 'Checkout'
