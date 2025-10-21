@@ -113,8 +113,10 @@ class WebFetchToolInvocation extends BaseToolInvocation<
     private readonly config: Config,
     params: WebFetchToolParams,
     messageBus?: MessageBus,
+    _toolName?: string,
+    _toolDisplayName?: string,
   ) {
-    super(params, messageBus);
+    super(params, messageBus, _toolName, _toolDisplayName);
   }
 
   private async executeFallback(signal: AbortSignal): Promise<ToolResult> {
@@ -453,7 +455,15 @@ export class WebFetchTool extends BaseDeclarativeTool<
   protected createInvocation(
     params: WebFetchToolParams,
     messageBus?: MessageBus,
+    _toolName?: string,
+    _toolDisplayName?: string,
   ): ToolInvocation<WebFetchToolParams, ToolResult> {
-    return new WebFetchToolInvocation(this.config, params, messageBus);
+    return new WebFetchToolInvocation(
+      this.config,
+      params,
+      messageBus,
+      _toolName,
+      _toolDisplayName,
+    );
   }
 }
