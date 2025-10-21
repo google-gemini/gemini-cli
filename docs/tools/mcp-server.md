@@ -930,7 +930,7 @@ This is the default transport for running local servers.
 gemini mcp add <name> <command> [args...]
 
 # Example: Adding a local server
-gemini mcp add my-stdio-server -e API_KEY=123 /path/to/server arg1 arg2 arg3
+gemini mcp add -e API_KEY=123 my-stdio-server /path/to/server arg1 arg2 arg3
 
 # Example: Adding a local python server
 gemini mcp add python-server python server.py --port 8080
@@ -948,7 +948,7 @@ gemini mcp add --transport http <name> <url>
 gemini mcp add --transport http http-server https://api.example.com/mcp/
 
 # Example: Adding an HTTP server with an authentication header
-gemini mcp add --transport http secure-http https://api.example.com/mcp/ --header "Authorization: Bearer abc123"
+gemini mcp add --transport http --header "Authorization: Bearer abc123" secure-http https://api.example.com/mcp/
 ```
 
 #### Adding an SSE server
@@ -963,7 +963,7 @@ gemini mcp add --transport sse <name> <url>
 gemini mcp add --transport sse sse-server https://api.example.com/sse/
 
 # Example: Adding an SSE server with an authentication header
-gemini mcp add --transport sse secure-sse https://api.example.com/sse/ --header "Authorization: Bearer abc123"
+gemini mcp add --transport sse --header "Authorization: Bearer abc123" secure-sse https://api.example.com/sse/
 ```
 
 ### Listing Servers (`gemini mcp list`)
