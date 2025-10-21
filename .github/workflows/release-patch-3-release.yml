@@ -91,7 +91,7 @@ jobs:
         env:
           GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
           PATCH_FROM: '${{ github.event.inputs.type }}'
-          CLI_PACKAGE_NAME: '${{vars.CLI_PACKAGE_NAME}}''
+          CLI_PACKAGE_NAME: '${{vars.CLI_PACKAGE_NAME}}'
         run: |
           # Use the existing get-release-version.js script to calculate patch version
           # Run from main checkout which has full git history and access to npm
