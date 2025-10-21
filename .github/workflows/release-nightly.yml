@@ -20,9 +20,18 @@ on:
         required: false
         type: 'string'
         default: 'main'
+      environment:
+        description: 'Environment'
+        required: false
+        type: 'choice'
+        options:
+          - 'prod'
+          - 'dev'
+        default: 'prod'
 
 jobs:
   release:
+    environment: '${{ github.event.inputs.environment }}'
     runs-on: 'ubuntu-latest'
     permissions:
       contents: 'write'
@@ -53,11 +62,25 @@ jobs:
         run: 'npm ci'
 
       - name: 'Print Inputs'
-        run: |
-          echo "${{ toJSON(github.event.inputs) }}"
+        shell: 'bash'
+        env:
+          JSON_INPUTS: '${{ toJSON(github.event.inputs) }}'
+        run: 'echo "$JSON_INPUTS"'
+
+      - name: 'Calculate Release Variables'
+        id: 'vars'
+        uses: './.github/actions/calculate-vars'
+        with:
+          dry_run: '${{ github.event.inputs.dry_run }}'
+
+      - name: 'Print Calculated vars'
+        shell: 'bash'
+        env:
+          JSON_VARS: '${{ toJSON(steps.vars.outputs) }}'
+        run: 'echo "$JSON_VARS"'
 
       - name: 'Run Tests'
-        if: "${{github.event.inputs.force_skip_tests == 'false'}}"
+        if: "${{ github.event_name == 'schedule' || github.event.inputs.force_skip_tests == 'false' }}"
         uses: './.github/actions/run-tests'
         with:
           gemini_api_key: '${{ secrets.GEMINI_API_KEY }}'
@@ -98,26 +121,34 @@ jobs:
           npm-tag: '${{ steps.nightly_version.outputs.NPM_TAG }}'
           wombat-token-core: '${{ secrets.WOMBAT_TOKEN_CORE }}'
           wombat-token-cli: '${{ secrets.WOMBAT_TOKEN_CLI }}'
+          wombat-token-a2a-server: '${{ secrets.WOMBAT_TOKEN_A2A_SERVER }}'
           github-token: '${{ secrets.GITHUB_TOKEN }}'
-          dry-run: '${{ github.event.inputs.dry_run }}'
+          dry-run: '${{ steps.vars.outputs.is_dry_run }}'
           previous-tag: '${{ steps.nightly_version.outputs.PREVIOUS_TAG }}'
           working-directory: './release'
           skip-branch-cleanup: true
-          force-skip-tests: '${{ github.event.inputs.force_skip_tests }}'
+          force-skip-tests: "${{ github.event_name != 'schedule' && github.event.inputs.force_skip_tests == 'true' }}"
           gemini_api_key: '${{ secrets.GEMINI_API_KEY }}'
+          npm-registry-publish-url: '${{ vars.NPM_REGISTRY_PUBLISH_URL }}'
+          npm-registry-url: '${{ vars.NPM_REGISTRY_URL }}'
+          npm-registry-scope: '${{ vars.NPM_REGISTRY_SCOPE }}'
+          cli-package-name: '${{ vars.CLI_PACKAGE_NAME }}'
+          core-package-name: '${{ vars.CORE_PACKAGE_NAME }}'
+          a2a-package-name: '${{ vars.A2A_PACKAGE_NAME }}'
 
       - name: 'Create and Merge Pull Request'
+        if: "github.event.inputs.environment == 'prod'"
         uses: './.github/actions/create-pull-request'
         with:
           branch-name: 'release/${{ steps.nightly_version.outputs.RELEASE_TAG }}'
           pr-title: 'chore/release: bump version to ${{ steps.nightly_version.outputs.RELEASE_VERSION }}'
           pr-body: 'Automated version bump for nightly release.'
           github-token: '${{ secrets.GEMINI_CLI_ROBOT_GITHUB_PAT }}'
-          dry-run: '${{ github.event.inputs.dry_run }}'
+          dry-run: '${{ steps.vars.outputs.is_dry_run }}'
           working-directory: './release'
 
       - name: 'Create Issue on Failure'
-        if: "${{ failure() && github.event.inputs.dry_run != 'true' }}"
+        if: "${{ failure() && github.event.inputs.environment == 'prod' && (github.event_name == 'schedule' || github.event.inputs.dry_run != 'true') }}"
         env:
           GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
           RELEASE_TAG: '${{ steps.nightly_version.outputs.RELEASE_TAG }}'

@@ -51,6 +51,7 @@ interface SlashCommandProcessorActions {
   quit: (messages: HistoryItem[]) => void;
   setDebugMessage: (message: string) => void;
   toggleCorgiMode: () => void;
+  toggleDebugProfiler: () => void;
   dispatchExtensionStateUpdate: (action: ExtensionUpdateAction) => void;
   addConfirmUpdateExtensionRequest: (request: ConfirmationRequest) => void;
 }
@@ -73,7 +74,9 @@ export const useSlashCommandProcessor = (
   isConfigInitialized: boolean,
 ) => {
   const session = useSessionStats();
-  const [commands, setCommands] = useState<readonly SlashCommand[]>([]);
+  const [commands, setCommands] = useState<readonly SlashCommand[] | undefined>(
+    undefined,
+  );
   const [reloadTrigger, setReloadTrigger] = useState(0);
 
   const reloadCommands = useCallback(() => {
@@ -197,6 +200,7 @@ export const useSlashCommandProcessor = (
         pendingItem,
         setPendingItem,
         toggleCorgiMode: actions.toggleCorgiMode,
+        toggleDebugProfiler: actions.toggleDebugProfiler,
         toggleVimEnabled,
         setGeminiMdFileCount,
         reloadCommands,
@@ -255,20 +259,18 @@ export const useSlashCommandProcessor = (
 
   useEffect(() => {
     const controller = new AbortController();
-    const load = async () => {
-      const loaders = [
-        new McpPromptLoader(config),
-        new BuiltinCommandLoader(config),
-        new FileCommandLoader(config),
-      ];
+
+    (async () => {
       const commandService = await CommandService.create(
-        loaders,
+        [
+          new McpPromptLoader(config),
+          new BuiltinCommandLoader(config),
+          new FileCommandLoader(config),
+        ],
         controller.signal,
       );
       setCommands(commandService.getCommands());
-    };
-
-    load();
+    })();
 
     return () => {
       controller.abort();
@@ -281,6 +283,9 @@ export const useSlashCommandProcessor = (
       oneTimeShellAllowlist?: Set<string>,
       overwriteConfirmed?: boolean,
     ): Promise<SlashCommandProcessorResult | false> => {
+      if (!commands) {
+        return false;
+      }
       if (typeof rawQuery !== 'string') {
         return false;
       }

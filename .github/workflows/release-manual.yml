@@ -11,24 +11,16 @@ on:
         description: 'The branch, tag, or SHA to release from.'
         required: true
         type: 'string'
-      registry:
-        description: 'The registry to publish to.'
-        required: true
-        type: 'choice'
-        options:
-          - 'npm-wombat'
-          - 'github'
-        default: 'npm-wombat'
       npm_channel:
-        description: 'The npm channel to publish to (only used when registry is npm-wombat)'
+        description: 'The npm channel to publish to'
         required: true
         type: 'choice'
         options:
+          - 'dev'
           - 'preview'
           - 'nightly'
           - 'latest'
-          - 'dev'
-        default: 'dev'
+        default: 'latest'
       dry_run:
         description: 'Run a dry-run of the release process; no branches, npm packages or GitHub releases will be created.'
         required: true
@@ -40,14 +32,23 @@ on:
         type: 'boolean'
         default: false
       skip_github_release:
-        description: 'Select to skip creating a GitHub release (only used when registry is npm-wombat)'
+        description: 'Select to skip creating a GitHub release (only used when environment is PROD)'
         required: false
         type: 'boolean'
         default: false
+      environment:
+        description: 'Environment'
+        required: false
+        type: 'choice'
+        options:
+          - 'prod'
+          - 'dev'
+        default: 'prod'
 
 jobs:
   release:
-    runs-on: 'self-hosted'
+    runs-on: 'ubuntu-latest'
+    environment: '${{ github.event.inputs.environment }}'
     permissions:
       contents: 'write'
       packages: 'write'
@@ -66,12 +67,15 @@ jobs:
           fetch-depth: 0
 
       - name: 'Debug Inputs'
-        run: 'echo "${{ toJSON(inputs) }}"'
+        shell: 'bash'
+        env:
+          JSON_INPUTS: '${{ toJSON(inputs) }}'
+        run: 'echo "$JSON_INPUTS"'
 
       - name: 'Setup Node.js'
         uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020'
         with:
-          node-version-file: '.nvmrc'
+          node-version-file: './release/.nvmrc'
           cache: 'npm'
 
       - name: 'Install Dependencies'
@@ -102,13 +106,19 @@ jobs:
           npm-tag: '${{ github.event.inputs.npm_channel }}'
           wombat-token-core: '${{ secrets.WOMBAT_TOKEN_CORE }}'
           wombat-token-cli: '${{ secrets.WOMBAT_TOKEN_CLI }}'
+          wombat-token-a2a-server: '${{ secrets.WOMBAT_TOKEN_A2A_SERVER }}'
           github-token: '${{ secrets.GITHUB_TOKEN }}'
           dry-run: '${{ github.event.inputs.dry_run }}'
           previous-tag: '${{ steps.release_info.outputs.PREVIOUS_TAG }}'
           skip-github-release: '${{ github.event.inputs.skip_github_release }}'
           working-directory: './release'
           gemini_api_key: '${{ secrets.GEMINI_API_KEY }}'
-          registry: '${{ github.event.inputs.registry }}'
+          npm-registry-publish-url: '${{ vars.NPM_REGISTRY_PUBLISH_URL }}'
+          npm-registry-url: '${{ vars.NPM_REGISTRY_URL }}'
+          npm-registry-scope: '${{ vars.NPM_REGISTRY_SCOPE }}'
+          cli-package-name: '${{ vars.CLI_PACKAGE_NAME }}'
+          core-package-name: '${{ vars.CORE_PACKAGE_NAME }}'
+          a2a-package-name: '${{ vars.A2A_PACKAGE_NAME }}'
 
       - name: 'Create Issue on Failure'
         if: '${{ failure() && github.event.inputs.dry_run == false }}'

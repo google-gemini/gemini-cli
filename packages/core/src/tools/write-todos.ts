@@ -9,10 +9,12 @@ import {
   BaseDeclarativeTool,
   BaseToolInvocation,
   Kind,
+  type Todo,
   type ToolResult,
 } from './tools.js';
+import { WRITE_TODOS_TOOL_NAME } from './tool-names.js';
 
-// Insprired by langchain/deepagents.
+// Inspired by langchain/deepagents.
 export const WRITE_TODOS_DESCRIPTION = `This tool can help you list out the current subtasks that are required to be completed for a given user request. The list of subtasks helps you keep track of the current task, organize complex queries and help ensure that you don't miss any steps. With this list, the user can also see the current progress you are making in executing a given task.
 
 Depending on the task complexity, you should first divide a given task into subtasks and then use this tool to list out the subtasks that are required to be completed for a given user request.
@@ -26,7 +28,7 @@ DO NOT use this tool for simple tasks that can be completed in less than 2 steps
 
 - pending: Work has not begun on a given subtask.
 - in_progress: Marked just prior to beginning work on a given subtask. You should only have one subtask as in_progress at a time.
-- completed: Subtask was succesfully completed with no errors or issues. If the subtask required more steps to complete, update the todo list with the subtasks. All steps should be identified as completed only when they are completed.
+- completed: Subtask was successfully completed with no errors or issues. If the subtask required more steps to complete, update the todo list with the subtasks. All steps should be identified as completed only when they are completed.
 - cancelled: As you update the todo list, some tasks are not required anymore due to the dynamic nature of the task. In this case, mark the subtasks as cancelled.
 
 
@@ -78,13 +80,6 @@ The agent did not use the todo list because this task could be completed by a ti
 </example>
 `;
 
-export type TodoStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled';
-
-export interface Todo {
-  description: string;
-  status: TodoStatus;
-}
-
 export interface WriteTodosToolParams {
   /**
    * The full list of todos. This will overwrite any existing list.
@@ -122,7 +117,7 @@ class WriteTodosToolInvocation extends BaseToolInvocation<
 
     return {
       llmContent,
-      returnDisplay: llmContent,
+      returnDisplay: { todos },
     };
   }
 }
@@ -131,11 +126,9 @@ export class WriteTodosTool extends BaseDeclarativeTool<
   WriteTodosToolParams,
   ToolResult
 > {
-  static readonly Name: string = 'write_todos_list';
-
   constructor() {
     super(
-      WriteTodosTool.Name,
+      WRITE_TODOS_TOOL_NAME,
       'Write Todos',
       WRITE_TODOS_DESCRIPTION,
       Kind.Other,

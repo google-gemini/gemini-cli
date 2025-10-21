@@ -5,13 +5,13 @@
  */
 
 import { Box, Text, useIsScreenReaderEnabled } from 'ink';
-import { useMemo } from 'react';
 import { LoadingIndicator } from './LoadingIndicator.js';
 import { ContextSummaryDisplay } from './ContextSummaryDisplay.js';
 import { AutoAcceptIndicator } from './AutoAcceptIndicator.js';
 import { ShellModeIndicator } from './ShellModeIndicator.js';
 import { DetailedMessagesDisplay } from './DetailedMessagesDisplay.js';
-import { InputPrompt, calculatePromptWidths } from './InputPrompt.js';
+import { RawMarkdownIndicator } from './RawMarkdownIndicator.js';
+import { InputPrompt } from './InputPrompt.js';
 import { Footer } from './Footer.js';
 import { ShowMoreLines } from './ShowMoreLines.js';
 import { QueuedMessageDisplay } from './QueuedMessageDisplay.js';
@@ -26,6 +26,7 @@ import { useSettings } from '../contexts/SettingsContext.js';
 import { ApprovalMode } from '@google/gemini-cli-core';
 import { StreamingState } from '../types.js';
 import { ConfigInitDisplay } from '../components/ConfigInitDisplay.js';
+import { TodoTray } from './messages/Todo.js';
 
 export const Composer = () => {
   const config = useConfig();
@@ -40,14 +41,8 @@ export const Composer = () => {
 
   const { contextFileNames, showAutoAcceptIndicator } = uiState;
 
-  // Use the container width of InputPrompt for width of DetailedMessagesDisplay
-  const { containerWidth } = useMemo(
-    () => calculatePromptWidths(uiState.terminalWidth),
-    [uiState.terminalWidth],
-  );
-
   return (
-    <Box flexDirection="column">
+    <Box flexDirection="column" width={uiState.mainAreaWidth} flexShrink={0}>
       {!uiState.embeddedShellFocused && (
         <LoadingIndicator
           thought={
@@ -65,7 +60,9 @@ export const Composer = () => {
         />
       )}
 
-      {!uiState.isConfigInitialized && <ConfigInitDisplay />}
+      {(!uiState.slashCommands || !uiState.isConfigInitialized) && (
+        <ConfigInitDisplay />
+      )}
 
       <QueuedMessageDisplay messageQueue={uiState.messageQueue} />
 
@@ -94,6 +91,8 @@ export const Composer = () => {
             </Text>
           ) : uiState.showEscapePrompt ? (
             <Text color={theme.text.secondary}>Press Esc again to clear.</Text>
+          ) : uiState.queueErrorMessage ? (
+            <Text color={theme.status.error}>{uiState.queueErrorMessage}</Text>
           ) : (
             !settings.merged.ui?.hideContextSummary && (
               <ContextSummaryDisplay
@@ -102,7 +101,6 @@ export const Composer = () => {
                 contextFileNames={contextFileNames}
                 mcpServers={config.getMcpServers()}
                 blockedMcpServers={config.getBlockedMcpServers()}
-                showToolDescriptions={uiState.showToolDescriptions}
               />
             )
           )}
@@ -113,6 +111,7 @@ export const Composer = () => {
               <AutoAcceptIndicator approvalMode={showAutoAcceptIndicator} />
             )}
           {uiState.shellModeActive && <ShellModeIndicator />}
+          {!uiState.renderMarkdown && <RawMarkdownIndicator />}
         </Box>
       </Box>
 
@@ -124,12 +123,14 @@ export const Composer = () => {
               maxHeight={
                 uiState.constrainHeight ? debugConsoleMaxHeight : undefined
               }
-              width={containerWidth}
+              width={uiState.mainAreaWidth}
             />
             <ShowMoreLines constrainHeight={uiState.constrainHeight} />
           </Box>
         </OverflowProvider>
       )}
+
+      <TodoTray />
 
       {uiState.isInputActive && (
         <InputPrompt
@@ -140,7 +141,7 @@ export const Composer = () => {
           userMessages={uiState.userMessages}
           onClearScreen={uiActions.handleClearScreen}
           config={config}
-          slashCommands={uiState.slashCommands}
+          slashCommands={uiState.slashCommands || []}
           commandContext={uiState.commandContext}
           shellModeActive={uiState.shellModeActive}
           setShellModeActive={uiActions.setShellModeActive}
@@ -149,11 +150,14 @@ export const Composer = () => {
           focus={true}
           vimHandleInput={uiActions.vimHandleInput}
           isEmbeddedShellFocused={uiState.embeddedShellFocused}
+          popAllMessages={uiActions.popAllMessages}
           placeholder={
             vimEnabled
               ? "  Press 'i' for INSERT mode and 'Esc' for NORMAL mode."
               : '  Type your message or @path/to/file'
           }
+          setQueueErrorMessage={uiActions.setQueueErrorMessage}
+          streamingState={uiState.streamingState}
         />
       )}
 
