@@ -66,8 +66,7 @@ jobs:
             const fs = require('fs');
             const path = require('path');
             const temp = '${{ runner.temp }}/artifacts';
-            const repo_name = Number(fs.readFileSync(path.join(temp, 'repo_name')));
-            console.log('repo_name:', repo_name);
+            const repo_name = fs.readFileSync(path.join(temp, 'repo_name'));
             core.setOutput('repo_name', repo_name);
 
   e2e_linux:
