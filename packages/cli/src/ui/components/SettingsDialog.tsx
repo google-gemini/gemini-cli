@@ -153,18 +153,15 @@ export function SettingsDialog({
             );
           }
 
-          setPendingSettings((prev) =>
-            setPendingSettingValue(key, newValue as boolean, prev),
-          );
-
           if (!requiresRestart(key)) {
             const immediateSettings = new Set([key]);
+            const currentScopeSettings =
+              settings.forScope(selectedScope).settings;
             const immediateSettingsObject = setPendingSettingValueAny(
               key,
               newValue,
-              {} as Settings,
+              currentScopeSettings,
             );
-
             console.log(
               `[DEBUG SettingsDialog] Saving ${key} immediately with value:`,
               newValue,
@@ -205,11 +202,6 @@ export function SettingsDialog({
               next.delete(key);
               return next;
             });
-
-            // Refresh pending settings from the saved state
-            setPendingSettings(
-              structuredClone(settings.forScope(selectedScope).settings),
-            );
           } else {
             // For restart-required settings, track as modified
             setModifiedSettings((prev) => {
@@ -299,10 +291,11 @@ export function SettingsDialog({
 
     if (!requiresRestart(key)) {
       const immediateSettings = new Set([key]);
+      const currentScopeSettings = settings.forScope(selectedScope).settings;
       const immediateSettingsObject = setPendingSettingValueAny(
         key,
         parsed,
-        {} as Settings,
+        currentScopeSettings,
       );
       saveModifiedSettings(
         immediateSettings,
@@ -658,14 +651,16 @@ export function SettingsDialog({
                       typeof defaultValue === 'string'
                     ? defaultValue
                     : undefined;
+              const currentScopeSettings =
+                settings.forScope(selectedScope).settings;
               const immediateSettingsObject =
                 toSaveValue !== undefined
                   ? setPendingSettingValueAny(
                       currentSetting.value,
                       toSaveValue,
-                      {} as Settings,
+                      currentScopeSettings,
                     )
-                  : ({} as Settings);
+                  : currentScopeSettings;
 
               saveModifiedSettings(
                 immediateSettings,

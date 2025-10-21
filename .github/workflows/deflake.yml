@@ -1,0 +1,36 @@
+name: 'Deflake E2E'
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch_ref:
+        description: 'Branch to run on'
+        required: true
+        default: 'main'
+        type: 'string'
+      test_name_pattern:
+        description: 'The test name pattern to use'
+        required: false
+        type: 'string'
+      runs:
+        description: 'The number of runs'
+        required: false
+        default: 5
+        type: 'number'
+
+concurrency:
+  group: '${{ github.workflow }}-${{ github.head_ref || github.ref }}'
+  cancel-in-progress: |-
+    ${{ github.ref != 'refs/heads/main' && !startsWith(github.ref, 'refs/heads/release/') }}
+
+jobs:
+  deflake:
+    name: 'Deflake'
+    runs-on: 'gemini-cli-ubuntu-16-core'
+    strategy:
+      fail-fast: false
+    steps:
+      - name: 'Deflake'
+        shell: 'bash'
+        run: |
+          ECHO 'DEFLAKE WORKFLOW'
