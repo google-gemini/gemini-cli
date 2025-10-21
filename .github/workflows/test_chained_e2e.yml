@@ -51,10 +51,9 @@ jobs:
         with:
           github-token: '${{ secrets.GITHUB_TOKEN }}'
           name: 'repo_name'
-          run-id: ${{ github.event.workflow_run.id }}
+          run-id: ${{ github.event.workflow_run.id || '' }}
           path: '${{ runner.temp }}/artifacts'
       - name: 'Unzip artifact'
-        if: "${{ github.event_name == 'workflow_run' }}"
         run: 'unzip "${{ runner.temp }}/artifacts/repo_name.zip" -d "${{ runner.temp }}/artifacts"'
       - name: 'Output Repo Name'
         id: 'output-repo-name'
