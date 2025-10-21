@@ -39,6 +39,7 @@ import { logSmartEditCorrectionEvent } from '../telemetry/loggers.js';
 
 import { correctPath } from '../utils/pathCorrector.js';
 import { EDIT_TOOL_NAME, READ_FILE_TOOL_NAME } from './tool-names.js';
+import { debugLogger } from '../utils/debugLogger.js';
 interface ReplacementContext {
   params: EditToolParams;
   currentContent: string;
@@ -616,12 +617,12 @@ class EditToolInvocation implements ToolInvocation<EditToolParams, ToolResult> {
         throw error;
       }
       const errorMsg = error instanceof Error ? error.message : String(error);
-      console.log(`Error preparing edit: ${errorMsg}`);
+      debugLogger.log(`Error preparing edit: ${errorMsg}`);
       return false;
     }
 
     if (editData.error) {
-      console.log(`Error: ${editData.error.display}`);
+      debugLogger.log(`Error: ${editData.error.display}`);
       return false;
     }
 
