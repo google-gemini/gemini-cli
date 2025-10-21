@@ -78,7 +78,7 @@ describe('replace', () => {
     rig.createFile(fileName, originalContent);
 
     await rig.run(
-      `In ${fileName}, delete the entire block from "## DELETE THIS ##" to "## END DELETE ##" including the markers.`,
+      `In ${fileName}, delete the entire block from "## DELETE THIS ##" to "## END DELETE ##" including the markers and the newline that follows it.`,
     );
 
     const foundToolCall = await rig.waitForToolCall('replace');
