@@ -110,8 +110,10 @@ class WebFetchToolInvocation extends BaseToolInvocation<
     private readonly config: Config,
     params: WebFetchToolParams,
     messageBus?: MessageBus,
+    _toolName?: string,
+    _toolDisplayName?: string,
   ) {
-    super(params, messageBus);
+    super(params, messageBus, _toolName, _toolDisplayName);
   }
 
   private async executeFallback(signal: AbortSignal): Promise<ToolResult> {
@@ -395,12 +397,14 @@ export class WebFetchTool extends BaseDeclarativeTool<
   WebFetchToolParams,
   ToolResult
 > {
+  static readonly Name = WEB_FETCH_TOOL_NAME;
+
   constructor(
     private readonly config: Config,
     messageBus?: MessageBus,
   ) {
     super(
-      WEB_FETCH_TOOL_NAME,
+      WebFetchTool.Name,
       'WebFetch',
       "Processes content from URL(s), including local and private network addresses (e.g., localhost), embedded in a prompt. Include up to 20 URLs and instructions (e.g., summarize, extract specific data) directly in the 'prompt' parameter.",
       Kind.Fetch,
@@ -448,7 +452,15 @@ export class WebFetchTool extends BaseDeclarativeTool<
   protected createInvocation(
     params: WebFetchToolParams,
     messageBus?: MessageBus,
+    _toolName?: string,
+    _toolDisplayName?: string,
   ): ToolInvocation<WebFetchToolParams, ToolResult> {
-    return new WebFetchToolInvocation(this.config, params, messageBus);
+    return new WebFetchToolInvocation(
+      this.config,
+      params,
+      messageBus,
+      _toolName,
+      _toolDisplayName,
+    );
   }
 }
