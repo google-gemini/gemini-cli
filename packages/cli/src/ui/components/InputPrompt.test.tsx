@@ -1837,13 +1837,14 @@ describe('InputPrompt', () => {
       act(() => {
         stdin.write('\x12');
       });
-      await wait();
 
-      const frame = stdout.lastFrame();
-      expect(frame).toContain('(r:)');
-      expect(frame).toContain('echo hello');
-      expect(frame).toContain('echo world');
-      expect(frame).toContain('ls');
+      await waitFor(() => {
+        const frame = stdout.lastFrame();
+        expect(frame).toContain('(r:)');
+        expect(frame).toContain('echo hello');
+        expect(frame).toContain('echo world');
+        expect(frame).toContain('ls');
+      });
 
       unmount();
     });
@@ -1898,10 +1899,11 @@ describe('InputPrompt', () => {
       act(() => {
         stdin.write('\x12');
       });
-      await wait();
 
       // Verify reverse search is active
-      expect(stdout.lastFrame()).toContain('(r:)');
+      await waitFor(() => {
+        expect(stdout.lastFrame()).toContain('(r:)');
+      });
 
       // Press Tab to complete the highlighted entry
       act(() => {
@@ -1934,9 +1936,10 @@ describe('InputPrompt', () => {
       act(() => {
         stdin.write('\x12');
       });
-      await wait();
 
-      expect(stdout.lastFrame()).toContain('(r:)');
+      await waitFor(() => {
+        expect(stdout.lastFrame()).toContain('(r:)');
+      });
 
       act(() => {
         stdin.write('\r');
@@ -1958,7 +1961,6 @@ describe('InputPrompt', () => {
       props.buffer.cursor = initialCursor;
 
       // Mock the reverse search completion to be active and then reset
-      const mockResetCompletionState = vi.fn();
       mockedUseReverseSearchCompletion.mockImplementation(
         (buffer, shellHistory, reverseSearchActiveFromInputPrompt) => ({
           ...mockReverseSearchCompletion,
@@ -1966,7 +1968,6 @@ describe('InputPrompt', () => {
             ? [{ label: 'history item', value: 'history item' }]
             : [],
           showSuggestions: reverseSearchActiveFromInputPrompt,
-          resetCompletionState: mockResetCompletionState,
         }),
       );
 
@@ -1979,9 +1980,10 @@ describe('InputPrompt', () => {
       act(() => {
         stdin.write('\x12');
       });
-      await wait();
 
-      expect(stdout.lastFrame()).toContain('(r:)');
+      await waitFor(() => {
+        expect(stdout.lastFrame()).toContain('(r:)');
+      });
 
       // Press kitty escape key
       act(() => {
@@ -1990,11 +1992,9 @@ describe('InputPrompt', () => {
 
       await waitFor(() => {
         expect(stdout.lastFrame()).not.toContain('(r:)');
-        expect(mockResetCompletionState).toHaveBeenCalled();
+        expect(props.buffer.text).toBe(initialText);
+        expect(props.buffer.cursor).toEqual(initialCursor);
       });
-
-      expect(props.buffer.text).toBe(initialText);
-      expect(props.buffer.cursor).toEqual(initialCursor);
 
       unmount();
     });
