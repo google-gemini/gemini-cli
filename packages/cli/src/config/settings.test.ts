@@ -1073,8 +1073,6 @@ describe('Settings Loading and Merging', () => {
       );
 
       const settings = loadSettings(MOCK_WORKSPACE_DIR);
-      const e = settings.user.settings.model?.chatCompression;
-      console.log(e);
 
       expect(settings.user.settings.model?.chatCompression).toEqual({
         contextPercentageThreshold: 0.5,

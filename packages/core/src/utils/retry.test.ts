@@ -10,6 +10,7 @@ import { ApiError } from '@google/genai';
 import type { HttpError } from './retry.js';
 import { retryWithBackoff } from './retry.js';
 import { setSimulate429 } from './testUtils.js';
+import { debugLogger } from './debugLogger.js';
 
 // Helper to create a mock function that fails a certain number of times
 const createFailingFunction = (
@@ -43,7 +44,7 @@ describe('retryWithBackoff', () => {
     // Disable 429 simulation for tests
     setSimulate429(false);
     // Suppress unhandled promise rejection warnings for tests that expect errors
-    console.warn = vi.fn();
+    debugLogger.warn = vi.fn();
   });
 
   afterEach(() => {

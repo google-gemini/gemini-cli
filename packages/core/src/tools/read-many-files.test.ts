@@ -733,8 +733,6 @@ Content of file[1]
       const invocation = tool.build({ paths: files });
       await invocation.execute(new AbortController().signal);
 
-      console.log('Execution order:', executionOrder);
-
       // Verify concurrent execution pattern
       // In parallel execution: all "start:" events should come before all "end:" events
       // In sequential execution: "start:file1", "end:file1", "start:file2", "end:file2", etc.

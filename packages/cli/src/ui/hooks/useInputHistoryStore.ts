@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { debugLogger } from '@google/gemini-cli-core';
 import { useState, useCallback } from 'react';
 
 interface Logger {
@@ -69,7 +70,10 @@ export function useInputHistoryStore(): UseInputHistoryStoreReturn {
         setIsInitialized(true);
       } catch (error) {
         // Start with empty history even if logger initialization fails
-        console.warn('Failed to initialize input history from logger:', error);
+        debugLogger.warn(
+          'Failed to initialize input history from logger:',
+          error,
+        );
         setPastSessionMessages([]);
         recalculateHistory([], []);
         setIsInitialized(true);

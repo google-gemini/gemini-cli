@@ -222,8 +222,6 @@ export const useShellCommandProcessor = (
             shellExecutionConfig,
           );
 
-          console.log(terminalHeight, terminalWidth);
-
           executionPid = pid;
           if (pid) {
             setActiveShellPtyId(pid);

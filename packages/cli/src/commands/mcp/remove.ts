@@ -7,6 +7,7 @@
 // File for 'gemini mcp remove' command
 import type { CommandModule } from 'yargs';
 import { loadSettings, SettingScope } from '../../config/settings.js';
+import { debugLogger } from '@google/gemini-cli-core';
 
 async function removeMcpServer(
   name: string,
@@ -23,7 +24,7 @@ async function removeMcpServer(
   const mcpServers = existingSettings.mcpServers || {};
 
   if (!mcpServers[name]) {
-    console.log(`Server "${name}" not found in ${scope} settings.`);
+    debugLogger.log(`Server "${name}" not found in ${scope} settings.`);
     return;
   }
 
@@ -31,7 +32,7 @@ async function removeMcpServer(
 
   settings.setValue(settingsScope, 'mcpServers', mcpServers);
 
-  console.log(`Server "${name}" removed from ${scope} settings.`);
+  debugLogger.log(`Server "${name}" removed from ${scope} settings.`);
 }
 
 export const removeCommand: CommandModule = {
