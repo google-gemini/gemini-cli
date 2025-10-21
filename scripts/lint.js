@@ -263,18 +263,15 @@ export function runTSConfigLinter() {
 
   let files = [];
   try {
-    // Find all tsconfig.json files under packages/
-    files = execSync("git ls-files | grep 'packages/.*/tsconfig.json$'")
+    // Find all tsconfig.json files under packages/ using a git pathspec
+    files = execSync("git ls-files 'packages/**/tsconfig.json'")
       .toString()
       .trim()
       .split('\n')
       .filter(Boolean);
   } catch (e) {
-    // If grep finds nothing, it might exit with 1.
-    if (e.status !== 1) {
-      console.error('Error finding tsconfig.json files:', e.message);
-      process.exit(1);
-    }
+    console.error('Error finding tsconfig.json files:', e.message);
+    process.exit(1);
   }
 
   let hasError = false;
