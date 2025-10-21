@@ -2,7 +2,7 @@ name: 'Release: Nightly'
 
 on:
   schedule:
-    - cron: '0 17 * * *'
+    - cron: '0 18 * * *'
   workflow_dispatch:
     inputs:
       dry_run:
