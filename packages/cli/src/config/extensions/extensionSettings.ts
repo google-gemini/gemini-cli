@@ -9,7 +9,7 @@ import * as path from 'node:path';
 import { ExtensionStorage } from '../extension.js';
 import type { ExtensionConfig } from '../extension.js';
 
-import { Writable } from 'node:stream';
+import prompts from 'prompts';
 
 export interface ExtensionSetting {
   name: string;
@@ -45,43 +45,25 @@ export async function maybePromptForSettings(
 export async function promptForSetting(
   setting: ExtensionSetting,
 ): Promise<string> {
-  const readline = await import('node:readline');
-  const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout,
-  });
-
-  return new Promise((resolve) => {
-    const query = `${setting.name}\n${setting.description}\n> `;
-    if (setting.sensitive) {
-      // TODO(b/361036983): Mask sensitive input.
-      // This is non-trivial in Node.js and will be implemented separately.
-      // For now, we just don't echo the output.
-      const silentOutput = new Writable({
-        write: (
-          _chunk: unknown,
-          _encoding: string,
-          callback: (error?: Error | null) => void,
-        ) => {
-          callback();
-        },
-      });
-      const rlSensitive = readline.createInterface({
-        input: process.stdin,
-        output: silentOutput,
-        terminal: true,
-      });
-      process.stdout.write(query);
-      rlSensitive.question(query, (answer) => {
-        process.stdout.write('\n');
-        rlSensitive.close();
-        resolve(answer);
-      });
-    } else {
+  if (setting.sensitive) {
+    const response = await prompts({
+      type: 'password',
+      name: 'value',
+      message: `${setting.name}\n${setting.description}`,
+    });
+    return response.value;
+  } else {
+    const readline = await import('node:readline');
+    const rl = readline.createInterface({
+      input: process.stdin,
+      output: process.stdout,
+    });
+    return new Promise((resolve) => {
+      const query = `${setting.name}\n${setting.description}\n> `;
       rl.question(query, (answer) => {
         rl.close();
         resolve(answer);
       });
-    }
-  });
+    });
+  }
 }

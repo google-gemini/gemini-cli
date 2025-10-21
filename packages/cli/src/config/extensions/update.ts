@@ -88,7 +88,6 @@ export async function updateExtension(
       requestConsent,
       cwd,
       previousExtensionConfig,
-      false, // Do not prompt for settings
     );
 
     if (fs.existsSync(tempSettingsPath)) {

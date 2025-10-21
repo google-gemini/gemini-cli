@@ -50,7 +50,7 @@ import type { ConfirmationRequest } from '../ui/types.js';
 import { escapeAnsiCtrlCodes } from '../ui/utils/textUtils.js';
 import {
   maybePromptForSettings,
-  promptForSetting,
+  type ExtensionSetting,
 } from './extensions/extensionSettings.js';
 
 export const EXTENSIONS_DIRECTORY_NAME = path.join(GEMINI_DIR, 'extensions');
@@ -76,12 +76,6 @@ export interface ExtensionConfig {
   contextFileName?: string | string[];
   excludeTools?: string[];
   settings?: ExtensionSetting[];
-}
-
-export interface ExtensionSetting {
-  name: string;
-  description: string;
-  envVar: string;
 }
 
 export interface ExtensionUpdateInfo {
@@ -411,7 +405,7 @@ export async function installOrUpdateExtension(
   requestConsent: (consent: string) => Promise<boolean>,
   cwd: string = process.cwd(),
   previousExtensionConfig?: ExtensionConfig,
-  promptForSettings = true,
+  requestSetting?: (setting: ExtensionSetting) => Promise<string>,
 ): Promise<string> {
   const isUpdate = !!previousExtensionConfig;
   const telemetryConfig = getTelemetryConfig(cwd);
@@ -523,8 +517,8 @@ export async function installOrUpdateExtension(
       }
 
       await fs.promises.mkdir(destinationPath, { recursive: true });
-      if (promptForSettings) {
-        await maybePromptForSettings(newExtensionConfig, promptForSetting);
+      if (requestSetting !== undefined) {
+        await maybePromptForSettings(newExtensionConfig, requestSetting);
       }
 
       if (

@@ -34,6 +34,7 @@ import { isWorkspaceTrusted } from './trustedFolders.js';
 import { createExtension } from '../test-utils/createExtension.js';
 import { ExtensionEnablementManager } from './extensions/extensionEnablement.js';
 import { join } from 'node:path';
+import type { ExtensionSetting } from './extensions/extensionSettings.js';
 
 const mockGit = {
   clone: vi.fn(),
@@ -337,6 +338,36 @@ describe('extension tests', () => {
         delete process.env['TEST_API_KEY'];
         delete process.env['TEST_DB_URL'];
       }
+    });
+
+    it('should resolve environment variables from an extension .env file', () => {
+      const extDir = createExtension({
+        extensionsDir: userExtensionsDir,
+        name: 'test-extension',
+        version: '1.0.0',
+        mcpServers: {
+          'test-server': {
+            command: 'node',
+            args: ['server.js'],
+            env: {
+              API_KEY: '$MY_API_KEY',
+              STATIC_VALUE: 'no-substitution',
+            },
+          },
+        },
+      });
+
+      const envFilePath = path.join(extDir, '.env');
+      fs.writeFileSync(envFilePath, 'MY_API_KEY=test-key-from-file\n');
+
+      const extensions = loadExtensions(new ExtensionEnablementManager());
+
+      expect(extensions).toHaveLength(1);
+      const extension = extensions[0];
+      const serverConfig = extension.mcpServers!['test-server'];
+      expect(serverConfig.env).toBeDefined();
+      expect(serverConfig.env!['API_KEY']).toBe('test-key-from-file');
+      expect(serverConfig.env!['STATIC_VALUE']).toBe('no-substitution');
     });
 
     it('should handle missing environment variables gracefully', () => {
@@ -1033,11 +1064,8 @@ This extension will run the following MCP servers:
     });
 
     it('should prompt for settings if promptForSettings is true', async () => {
-      const sourceDir = fs.mkdtempSync(
-        path.join(os.tmpdir(), 'gemini-cli-test-source-'),
-      );
       const sourceExtDir = createExtension({
-        extensionsDir: sourceDir,
+        extensionsDir: tempHomeDir,
         name: 'my-local-extension',
         version: '1.0.0',
         settings: [
@@ -1049,16 +1077,18 @@ This extension will run the following MCP servers:
         ],
       });
 
+      const promptForSettingsMock = vi.fn(
+        async (_: ExtensionSetting): Promise<string> => Promise.resolve(''),
+      );
       await installOrUpdateExtension(
         { source: sourceExtDir, type: 'local' },
         async (_) => true,
         process.cwd(),
         undefined,
-        true, // Prompt for settings
+        promptForSettingsMock,
       );
 
-      expect(true).toBe(true);
-      fs.rmSync(sourceDir, { recursive: true, force: true });
+      expect(promptForSettingsMock).toHaveBeenCalled();
     });
 
     it('should not prompt for settings if promptForSettings is false', async () => {
@@ -1078,9 +1108,6 @@ This extension will run the following MCP servers:
       await installOrUpdateExtension(
         { source: sourceExtDir, type: 'local' },
         async (_) => true,
-        process.cwd(),
-        undefined,
-        false, // Do not prompt for settings
       );
     });
 
