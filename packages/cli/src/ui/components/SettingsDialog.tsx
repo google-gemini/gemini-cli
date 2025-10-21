@@ -153,18 +153,15 @@ export function SettingsDialog({
             );
           }
 
-          setPendingSettings((prev) =>
-            setPendingSettingValue(key, newValue as boolean, prev),
-          );
-
           if (!requiresRestart(key)) {
             const immediateSettings = new Set([key]);
+            const currentScopeSettings =
+              settings.forScope(selectedScope).settings;
             const immediateSettingsObject = setPendingSettingValueAny(
               key,
               newValue,
-              {} as Settings,
+              currentScopeSettings,
             );
-
             console.log(
               `[DEBUG SettingsDialog] Saving ${key} immediately with value:`,
               newValue,
@@ -205,11 +202,6 @@ export function SettingsDialog({
               next.delete(key);
               return next;
             });
-
-            // Refresh pending settings from the saved state
-            setPendingSettings(
-              structuredClone(settings.forScope(selectedScope).settings),
-            );
           } else {
             // For restart-required settings, track as modified
             setModifiedSettings((prev) => {
@@ -299,10 +291,11 @@ export function SettingsDialog({
 
     if (!requiresRestart(key)) {
       const immediateSettings = new Set([key]);
+      const currentScopeSettings = settings.forScope(selectedScope).settings;
       const immediateSettingsObject = setPendingSettingValueAny(
         key,
         parsed,
-        {} as Settings,
+        currentScopeSettings,
       );
       saveModifiedSettings(
         immediateSettings,
@@ -358,7 +351,10 @@ export function SettingsDialog({
   };
 
   // Scope selector items
-  const scopeItems = getScopeItems();
+  const scopeItems = getScopeItems().map((item) => ({
+    ...item,
+    key: item.value,
+  }));
 
   const handleScopeHighlight = (scope: SettingScope) => {
     setSelectedScope(scope);
@@ -370,7 +366,7 @@ export function SettingsDialog({
   };
 
   // Height constraint calculations similar to ThemeDialog
-  const DIALOG_PADDING = 2;
+  const DIALOG_PADDING = 4;
   const SETTINGS_TITLE_HEIGHT = 2; // "Settings" title + spacing
   const SCROLL_ARROWS_HEIGHT = 2; // Up and down arrows
   const SPACING_HEIGHT = 1; // Space between settings list and scope
@@ -655,14 +651,16 @@ export function SettingsDialog({
                       typeof defaultValue === 'string'
                     ? defaultValue
                     : undefined;
+              const currentScopeSettings =
+                settings.forScope(selectedScope).settings;
               const immediateSettingsObject =
                 toSaveValue !== undefined
                   ? setPendingSettingValueAny(
                       currentSetting.value,
                       toSaveValue,
-                      {} as Settings,
+                      currentScopeSettings,
                     )
-                  : ({} as Settings);
+                  : currentScopeSettings;
 
               saveModifiedSettings(
                 immediateSettings,
@@ -894,7 +892,7 @@ export function SettingsDialog({
         <Box height={1} />
         <Text color={theme.text.secondary}>
           (Use Enter to select
-          {showScopeSelection ? ', Tab to change focus' : ''})
+          {showScopeSelection ? ', Tab to change focus' : ''}, Esc to close)
         </Text>
         {showRestartPrompt && (
           <Text color={theme.status.warning}>

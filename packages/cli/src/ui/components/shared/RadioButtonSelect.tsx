@@ -8,15 +8,14 @@ import type React from 'react';
 import { Text } from 'ink';
 import { theme } from '../../semantic-colors.js';
 import { BaseSelectionList } from './BaseSelectionList.js';
+import type { SelectionListItem } from '../../hooks/useSelectionList.js';
 
 /**
  * Represents a single option for the RadioButtonSelect.
  * Requires a label for display and a value to be returned on selection.
  */
-export interface RadioSelectItem<T> {
+export interface RadioSelectItem<T> extends SelectionListItem<T> {
   label: string;
-  value: T;
-  disabled?: boolean;
   themeNameDisplay?: string;
   themeTypeDisplay?: string;
 }
@@ -74,7 +73,7 @@ export function RadioButtonSelect<T>({
         // Handle special theme display case for ThemeDialog compatibility
         if (item.themeNameDisplay && item.themeTypeDisplay) {
           return (
-            <Text color={titleColor} wrap="truncate">
+            <Text color={titleColor} wrap="truncate" key={item.key}>
               {item.themeNameDisplay}{' '}
               <Text color={theme.text.secondary}>{item.themeTypeDisplay}</Text>
             </Text>

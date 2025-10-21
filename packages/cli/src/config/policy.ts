@@ -10,32 +10,30 @@ import {
   type PolicyRule,
   ApprovalMode,
   // Read-only tools
-  GlobTool,
-  GrepTool,
-  LSTool,
-  ReadFileTool,
-  ReadManyFilesTool,
-  RipGrepTool,
+  GREP_TOOL_NAME,
+  LS_TOOL_NAME,
+  READ_MANY_FILES_TOOL_NAME,
+  READ_FILE_TOOL_NAME,
   // Write tools
-  EditTool,
-  MemoryTool,
-  ShellTool,
-  WriteFileTool,
-  WebFetchTool,
-  WebSearchTool,
+  SHELL_TOOL_NAME,
+  WRITE_FILE_TOOL_NAME,
+  WEB_FETCH_TOOL_NAME,
+  GLOB_TOOL_NAME,
+  EDIT_TOOL_NAME,
+  MEMORY_TOOL_NAME,
+  WEB_SEARCH_TOOL_NAME,
 } from '@google/gemini-cli-core';
 import type { Settings } from './settings.js';
 
 // READ_ONLY_TOOLS is a list of built-in tools that do not modify the user's
 // files or system state.
 const READ_ONLY_TOOLS = new Set([
-  GlobTool.Name,
-  GrepTool.Name,
-  RipGrepTool.Name,
-  LSTool.Name,
-  ReadFileTool.Name,
-  ReadManyFilesTool.Name,
-  WebSearchTool.Name,
+  GLOB_TOOL_NAME,
+  GREP_TOOL_NAME,
+  LS_TOOL_NAME,
+  READ_FILE_TOOL_NAME,
+  READ_MANY_FILES_TOOL_NAME,
+  WEB_SEARCH_TOOL_NAME,
 ]);
 
 // WRITE_TOOLS is a list of built-in tools that can modify the user's files or
@@ -45,11 +43,11 @@ const READ_ONLY_TOOLS = new Set([
 // any tool that isn't read only will require a confirmation unless altered by
 // config and policy.
 const WRITE_TOOLS = new Set([
-  EditTool.Name,
-  MemoryTool.Name,
-  ShellTool.Name,
-  WriteFileTool.Name,
-  WebFetchTool.Name,
+  EDIT_TOOL_NAME,
+  MEMORY_TOOL_NAME,
+  SHELL_TOOL_NAME,
+  WRITE_FILE_TOOL_NAME,
+  WEB_FETCH_TOOL_NAME,
 ]);
 
 export function createPolicyEngineConfig(
@@ -170,7 +168,7 @@ export function createPolicyEngineConfig(
     });
   } else if (approvalMode === ApprovalMode.AUTO_EDIT) {
     rules.push({
-      toolName: EditTool.Name,
+      toolName: EDIT_TOOL_NAME,
       decision: PolicyDecision.ALLOW,
       priority: 15, // Higher than write tools (10) to override ASK_USER
     });

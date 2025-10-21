@@ -13,17 +13,15 @@ import { type SettingScope } from '../../config/settings.js';
 import type { AuthState } from '../types.js';
 
 export interface UIActions {
-  handleThemeSelect: (
-    themeName: string | undefined,
-    scope: SettingScope,
-  ) => void;
+  handleThemeSelect: (themeName: string, scope: SettingScope) => void;
+  closeThemeDialog: () => void;
   handleThemeHighlight: (themeName: string | undefined) => void;
   handleAuthSelect: (
     authType: AuthType | undefined,
     scope: SettingScope,
   ) => void;
   setAuthState: (state: AuthState) => void;
-  onAuthError: (error: string) => void;
+  onAuthError: (error: string | null) => void;
   handleEditorSelect: (
     editorType: EditorType | undefined,
     scope: SettingScope,
@@ -42,9 +40,9 @@ export interface UIActions {
   refreshStatic: () => void;
   handleFinalSubmit: (value: string) => void;
   handleClearScreen: () => void;
-  onWorkspaceMigrationDialogOpen: () => void;
-  onWorkspaceMigrationDialogClose: () => void;
   handleProQuotaChoice: (choice: 'auth' | 'continue') => void;
+  setQueueErrorMessage: (message: string | null) => void;
+  popAllMessages: (onPop: (messages: string | undefined) => void) => void;
 }
 
 export const UIActionsContext = createContext<UIActions | null>(null);

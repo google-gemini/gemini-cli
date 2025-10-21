@@ -19,6 +19,7 @@ import { FileOperation } from '../telemetry/metrics.js';
 import { getProgrammingLanguage } from '../telemetry/telemetry-utils.js';
 import { logFileOperation } from '../telemetry/loggers.js';
 import { FileOperationEvent } from '../telemetry/types.js';
+import { READ_FILE_TOOL_NAME } from './tool-names.js';
 
 /**
  * Parameters for the ReadFile tool
@@ -112,7 +113,7 @@ ${result.llmContent}`;
     logFileOperation(
       this.config,
       new FileOperationEvent(
-        ReadFileTool.Name,
+        READ_FILE_TOOL_NAME,
         FileOperation.READ,
         lines,
         mimetype,
@@ -135,7 +136,7 @@ export class ReadFileTool extends BaseDeclarativeTool<
   ReadFileToolParams,
   ToolResult
 > {
-  static readonly Name: string = 'read_file';
+  static readonly Name = READ_FILE_TOOL_NAME;
 
   constructor(private config: Config) {
     super(

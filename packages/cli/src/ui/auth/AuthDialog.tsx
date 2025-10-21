@@ -26,7 +26,7 @@ interface AuthDialogProps {
   settings: LoadedSettings;
   setAuthState: (state: AuthState) => void;
   authError: string | null;
-  onAuthError: (error: string) => void;
+  onAuthError: (error: string | null) => void;
 }
 
 export function AuthDialog({
@@ -40,20 +40,27 @@ export function AuthDialog({
     {
       label: 'Login with Google',
       value: AuthType.LOGIN_WITH_GOOGLE,
+      key: AuthType.LOGIN_WITH_GOOGLE,
     },
     ...(process.env['CLOUD_SHELL'] === 'true'
       ? [
           {
             label: 'Use Cloud Shell user credentials',
             value: AuthType.CLOUD_SHELL,
+            key: AuthType.CLOUD_SHELL,
           },
         ]
       : []),
     {
       label: 'Use Gemini API Key',
       value: AuthType.USE_GEMINI,
+      key: AuthType.USE_GEMINI,
     },
-    { label: 'Vertex AI', value: AuthType.USE_VERTEX_AI },
+    {
+      label: 'Vertex AI',
+      value: AuthType.USE_VERTEX_AI,
+      key: AuthType.USE_VERTEX_AI,
+    },
   ];
 
   if (settings.merged.security?.auth?.enforcedType) {
@@ -167,6 +174,9 @@ Logging in with Google... Please restart Gemini CLI to continue.
           items={items}
           initialIndex={initialAuthIndex}
           onSelect={handleAuthSelect}
+          onHighlight={() => {
+            onAuthError(null);
+          }}
         />
       </Box>
       {authError && (
@@ -175,7 +185,9 @@ Logging in with Google... Please restart Gemini CLI to continue.
         </Box>
       )}
       <Box marginTop={1}>
-        <Text color={theme.text.secondary}>(Use Enter to select)</Text>
+        <Text color={theme.text.secondary}>
+          (Use Enter to select, Esc to close)
+        </Text>
       </Box>
       <Box marginTop={1}>
         <Text color={theme.text.primary}>
