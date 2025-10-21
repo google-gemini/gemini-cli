@@ -66,6 +66,9 @@ jobs:
       - name: 'Install dependencies'
         run: 'npm ci'
 
+      - name: 'Validate NOTICES.txt'
+        run: 'git diff --exit-code packages/vscode-ide-companion/NOTICES.txt'
+
       - name: 'Check lockfile'
         run: 'npm run check:lockfile'
 
