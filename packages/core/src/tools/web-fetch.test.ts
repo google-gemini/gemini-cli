@@ -471,7 +471,7 @@ describe('WebFetchTool', () => {
       expect(publishSpy).toHaveBeenCalledWith({
         type: MessageBusType.TOOL_CONFIRMATION_REQUEST,
         toolCall: {
-          name: 'WebFetchToolInvocation',
+          name: 'web_fetch',
           args: { prompt: 'fetch https://example.com' },
         },
         correlationId: 'test-correlation-id',

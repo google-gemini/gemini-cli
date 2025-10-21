@@ -491,7 +491,7 @@ export class Config {
     this.fileExclusions = new FileExclusions(this);
     this.eventEmitter = params.eventEmitter;
     this.policyEngine = new PolicyEngine(params.policyEngineConfig);
-    this.messageBus = new MessageBus(this.policyEngine);
+    this.messageBus = new MessageBus(this.policyEngine, this.debugMode);
     this.outputSettings = {
       format: params.output?.format ?? OutputFormat.TEXT,
     };

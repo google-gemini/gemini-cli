@@ -67,6 +67,7 @@ import {
   relaunchOnExitCode,
 } from './utils/relaunch.js';
 import { loadSandboxConfig } from './config/sandboxConfig.js';
+import { createPolicyUpdater } from './config/policy.js';
 import { ExtensionEnablementManager } from './config/extensions/extensionEnablement.js';
 
 export function validateDnsResolutionOrder(
@@ -369,6 +370,10 @@ export async function main() {
       sessionId,
       argv,
     );
+
+    const policyEngine = config.getPolicyEngine();
+    const messageBus = config.getMessageBus();
+    createPolicyUpdater(policyEngine, messageBus);
 
     // Cleanup sessions after config initialization
     await cleanupExpiredSessions(config, settings.merged);
