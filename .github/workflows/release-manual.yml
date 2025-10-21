@@ -48,7 +48,7 @@ on:
 jobs:
   release:
     runs-on: 'ubuntu-latest'
-    environment: '${{ github.event.inputs.environment }}'
+    environment: "${{ github.event.inputs.environment || 'prod' }}"
     permissions:
       contents: 'write'
       packages: 'write'
