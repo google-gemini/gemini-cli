@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import type { ToolInvocation, ToolResult } from './tools.js';
@@ -71,8 +72,11 @@ class LSToolInvocation extends BaseToolInvocation<LSToolParams, ToolResult> {
   constructor(
     private readonly config: Config,
     params: LSToolParams,
+    messageBus?: MessageBus,
+    _toolName?: string,
+    _toolDisplayName?: string,
   ) {
-    super(params);
+    super(params, messageBus, _toolName, _toolDisplayName);
   }
 
   /**
@@ -255,7 +259,10 @@ class LSToolInvocation extends BaseToolInvocation<LSToolParams, ToolResult> {
 export class LSTool extends BaseDeclarativeTool<LSToolParams, ToolResult> {
   static readonly Name = LS_TOOL_NAME;
 
-  constructor(private config: Config) {
+  constructor(
+    private config: Config,
+    messageBus?: MessageBus,
+  ) {
     super(
       LSTool.Name,
       'ReadFolder',
@@ -296,6 +303,9 @@ export class LSTool extends BaseDeclarativeTool<LSToolParams, ToolResult> {
         required: ['path'],
         type: 'object',
       },
+      true,
+      false,
+      messageBus,
     );
   }
 
@@ -323,7 +333,16 @@ export class LSTool extends BaseDeclarativeTool<LSToolParams, ToolResult> {
 
   protected createInvocation(
     params: LSToolParams,
+    messageBus?: MessageBus,
+    _toolName?: string,
+    _toolDisplayName?: string,
   ): ToolInvocation<LSToolParams, ToolResult> {
-    return new LSToolInvocation(this.config, params);
+    return new LSToolInvocation(
+      this.config,
+      params,
+      messageBus,
+      _toolName,
+      _toolDisplayName,
+    );
   }
 }
