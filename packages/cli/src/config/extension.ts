@@ -47,6 +47,10 @@ import { resolveEnvVarsInObject } from '../utils/envVarResolver.js';
 import * as dotenv from 'dotenv';
 import type { ConfirmationRequest } from '../ui/types.js';
 import { escapeAnsiCtrlCodes } from '../ui/utils/textUtils.js';
+import {
+  maybePromptForSettings,
+  promptForSetting,
+} from './extensions/extensionSettings.js';
 
 export const EXTENSIONS_DIRECTORY_NAME = path.join(GEMINI_DIR, 'extensions');
 
@@ -64,7 +68,7 @@ export const INSTALL_WARNING_MESSAGE =
  * outside of the loading process that data needs to be stored on the
  * GeminiCLIExtension class defined in Core.
  */
-interface ExtensionConfig {
+export interface ExtensionConfig {
   name: string;
   version: string;
   mcpServers?: Record<string, MCPServerConfig>;
@@ -393,23 +397,6 @@ async function promptForConsentNonInteractive(
   });
 }
 
-async function promptForSetting(setting: ExtensionSetting): Promise<string> {
-  const readline = await import('node:readline');
-  const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout,
-  });
-
-  return new Promise((resolve) => {
-    console.info(chalk.bold(setting.name));
-    console.info(setting.description);
-    rl.question('> ', (answer) => {
-      rl.close();
-      resolve(answer);
-    });
-  });
-}
-
 /**
  * Asks users an interactive yes/no prompt.
  *
@@ -431,33 +418,6 @@ async function promptForConsentInteractive(
       },
     });
   });
-}
-
-async function maybePromptForSettings(
-  extensionConfig: ExtensionConfig,
-  destinationPath: string,
-) {
-  const settingsPath = path.join(destinationPath, EXTENSION_SETTINGS_FILENAME);
-  if (fs.existsSync(settingsPath)) {
-    return;
-  }
-
-  if (!extensionConfig.settings) {
-    return;
-  }
-
-  const settings: Record<string, string> = {};
-
-  for (const setting of extensionConfig.settings) {
-    const value = await promptForSetting(setting);
-    settings[setting.envVar] = value;
-  }
-
-  const settingsString = Object.entries(settings)
-    .map(([key, value]) => `${key}=${value}`)
-    .join('\n');
-
-  await fs.promises.writeFile(settingsPath, settingsString);
 }
 
 export async function installOrUpdateExtension(
@@ -576,7 +536,7 @@ export async function installOrUpdateExtension(
 
       await fs.promises.mkdir(destinationPath, { recursive: true });
       if (promptForSettings) {
-        await maybePromptForSettings(newExtensionConfig, destinationPath);
+        await maybePromptForSettings(newExtensionConfig, promptForSetting);
       }
 
       if (
