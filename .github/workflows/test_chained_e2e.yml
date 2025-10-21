@@ -55,7 +55,7 @@ jobs:
         with:
           github-token: '${{ secrets.GITHUB_TOKEN }}'
           name: 'repo_name'
-          run-id: ${{ env.RUN_ID }}
+          run-id: '${{ env.RUN_ID }}'
           path: '${{ runner.temp }}/artifacts'
       - name: 'Output Repo Name'
         id: 'output-repo-name'
