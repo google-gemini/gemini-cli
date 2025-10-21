@@ -75,8 +75,7 @@ jobs:
             const path = require('path');
             const temp = '${{ runner.temp }}/artifacts';
             const repo_name = Number(fs.readFileSync(path.join(temp, 'repo_name')));
-            core.setOutput('repo_name', repo_name);'
-          core: true
+            core.setOutput('repo_name', repo_name);
       - name: 'Output Input Repo Name'
         if: "${{ github.event_name != 'workflow_run' }}"
         id: 'output-input-repo-name'
