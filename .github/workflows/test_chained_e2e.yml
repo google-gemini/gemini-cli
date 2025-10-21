@@ -57,8 +57,6 @@ jobs:
           name: 'repo_name'
           run-id: ${{ env.RUN_ID }}
           path: '${{ runner.temp }}/artifacts'
-      - name: 'Unzip artifact'
-        run: 'unzip "${{ runner.temp }}/artifacts/repo_name.zip" -d "${{ runner.temp }}/artifacts"'
       - name: 'Output Repo Name'
         id: 'output-repo-name'
         uses: 'actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd' # ratchet:actions/github-script@v8
