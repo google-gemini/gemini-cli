@@ -42,6 +42,7 @@ import { FileOperationEvent } from '../telemetry/types.js';
 import { FileOperation } from '../telemetry/metrics.js';
 import { getSpecificMimeType } from '../utils/fileUtils.js';
 import { getLanguageFromFilePath } from '../utils/language-detection.js';
+import type { MessageBus } from '../confirmation-bus/message-bus.js';
 
 /**
  * Parameters for the WriteFile tool
@@ -144,8 +145,11 @@ class WriteFileToolInvocation extends BaseToolInvocation<
   constructor(
     private readonly config: Config,
     params: WriteFileToolParams,
+    messageBus?: MessageBus,
+    toolName?: string,
+    displayName?: string,
   ) {
-    super(params);
+    super(params, messageBus, toolName, displayName);
   }
 
   override toolLocations(): ToolLocation[] {
@@ -163,6 +167,20 @@ class WriteFileToolInvocation extends BaseToolInvocation<
   override async shouldConfirmExecute(
     abortSignal: AbortSignal,
   ): Promise<ToolCallConfirmationDetails | false> {
+    if (this.messageBus) {
+      const decision = await this.getMessageBusDecision(abortSignal);
+      if (decision === 'ALLOW') {
+        return false;
+      }
+      if (decision === 'DENY') {
+        throw new Error(
+          `Tool execution for "${
+            this._toolDisplayName || this._toolName
+          }" denied by policy.`,
+        );
+      }
+    }
+
     if (this.config.getApprovalMode() === ApprovalMode.AUTO_EDIT) {
       return false;
     }
@@ -390,7 +408,10 @@ export class WriteFileTool
   extends BaseDeclarativeTool<WriteFileToolParams, ToolResult>
   implements ModifiableDeclarativeTool<WriteFileToolParams>
 {
-  constructor(private readonly config: Config) {
+  constructor(
+    private readonly config: Config,
+    messageBus?: MessageBus,
+  ) {
     super(
       WRITE_FILE_TOOL_NAME,
       'WriteFile',
@@ -413,6 +434,9 @@ export class WriteFileTool
         required: ['file_path', 'content'],
         type: 'object',
       },
+      true,
+      false,
+      messageBus,
     );
   }
 
@@ -456,7 +480,13 @@ export class WriteFileTool
   protected createInvocation(
     params: WriteFileToolParams,
   ): ToolInvocation<WriteFileToolParams, ToolResult> {
-    return new WriteFileToolInvocation(this.config, params);
+    return new WriteFileToolInvocation(
+      this.config,
+      params,
+      this.messageBus,
+      this.name,
+      this.displayName,
+    );
   }
 
   getModifyContext(
