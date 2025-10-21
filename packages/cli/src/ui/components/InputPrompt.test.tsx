@@ -1950,22 +1950,51 @@ describe('InputPrompt', () => {
       unmount();
     });
 
-    it.skip('text and cursor position should be restored after reverse search', async () => {
-      props.buffer.setText('initial text');
-      props.buffer.cursor = [0, 3];
+    it('should restore text and cursor position after reverse search"', async () => {
+      const initialText = 'initial text';
+      const initialCursor: [number, number] = [0, 3];
+
+      props.buffer.setText(initialText);
+      props.buffer.cursor = initialCursor;
+
+      // Mock the reverse search completion to be active and then reset
+      const mockResetCompletionState = vi.fn();
+      mockedUseReverseSearchCompletion.mockImplementation(
+        (buffer, shellHistory, reverseSearchActiveFromInputPrompt) => ({
+          ...mockReverseSearchCompletion,
+          suggestions: reverseSearchActiveFromInputPrompt
+            ? [{ label: 'history item', value: 'history item' }]
+            : [],
+          showSuggestions: reverseSearchActiveFromInputPrompt,
+          resetCompletionState: mockResetCompletionState,
+        }),
+      );
+
       const { stdin, stdout, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
       );
-      stdin.write('\x12');
       await wait();
+
+      // reverse search with Ctrl+R
+      act(() => {
+        stdin.write('\x12');
+      });
+      await wait();
+
       expect(stdout.lastFrame()).toContain('(r:)');
-      stdin.write('\u001b[27u'); // Press kitty escape key
+
+      // Press kitty escape key
+      act(() => {
+        stdin.write('\u001b[27u');
+      });
 
       await waitFor(() => {
         expect(stdout.lastFrame()).not.toContain('(r:)');
+        expect(mockResetCompletionState).toHaveBeenCalled();
       });
-      expect(props.buffer.text).toBe('initial text');
-      expect(props.buffer.cursor).toEqual([0, 3]);
+
+      expect(props.buffer.text).toBe(initialText);
+      expect(props.buffer.cursor).toEqual(initialCursor);
 
       unmount();
     });
