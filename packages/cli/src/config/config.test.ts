@@ -1328,7 +1328,7 @@ describe('loadCliConfig model selection', () => {
       argv,
     );
 
-    expect(config.getModel()).toBe(DEFAULT_GEMINI_MODEL);
+    expect(config.getModel()).toBe('auto');
   });
 
   it('always prefers model from argv', async () => {
@@ -1641,12 +1641,12 @@ describe('loadCliConfig useRipgrep', () => {
   });
 
   describe('loadCliConfig useModelRouter', () => {
-    it('should be false by default when useModelRouter is not set in settings', async () => {
+    it('should be true by default when useModelRouter is not set in settings', async () => {
       process.argv = ['node', 'script.js'];
       const argv = await parseArguments({} as Settings);
       const settings: Settings = {};
       const config = await loadCliConfig(settings, [], 'test-session', argv);
-      expect(config.getUseModelRouter()).toBe(false);
+      expect(config.getUseModelRouter()).toBe(true);
     });
 
     it('should be true when useModelRouter is set to true in settings', async () => {
