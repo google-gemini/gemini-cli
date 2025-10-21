@@ -447,9 +447,11 @@ export class RipGrepTool extends BaseDeclarativeTool<
   RipGrepToolParams,
   ToolResult
 > {
+  static readonly Name = GREP_TOOL_NAME;
+
   constructor(private readonly config: Config) {
     super(
-      GREP_TOOL_NAME,
+      RipGrepTool.Name,
       'SearchText',
       'Searches for a regular expression pattern within the content of files in a specified directory (or current working directory). Can filter files by a glob pattern. Returns the lines containing matches, along with their file paths and line numbers. Total results limited to 20,000 matches like VSCode.',
       Kind.Search,
