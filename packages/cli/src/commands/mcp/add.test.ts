@@ -122,7 +122,7 @@ describe('mcp add command', () => {
 
   it('should handle MCP server args with -- separator', async () => {
     await parser.parseAsync(
-      'add my-server -- npx -y http://example.com/some-package',
+      'add my-server npx -- -y http://example.com/some-package',
     );
 
     expect(mockSetValue).toHaveBeenCalledWith(
