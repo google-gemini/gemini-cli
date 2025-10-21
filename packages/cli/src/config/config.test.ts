@@ -85,7 +85,6 @@ vi.mock('@google/gemini-cli-core', async () => {
   const actualServer = await vi.importActual<typeof ServerConfig>(
     '@google/gemini-cli-core',
   );
-
   return {
     ...actualServer,
     IdeClient: {
