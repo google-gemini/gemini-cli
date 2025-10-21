@@ -312,9 +312,11 @@ export class MemoryTool
   extends BaseDeclarativeTool<SaveMemoryParams, ToolResult>
   implements ModifiableDeclarativeTool<SaveMemoryParams>
 {
+  static readonly Name = MEMORY_TOOL_NAME;
+
   constructor(messageBus?: MessageBus) {
     super(
-      MEMORY_TOOL_NAME,
+      MemoryTool.Name,
       'Save Memory',
       memoryToolDescription,
       Kind.Think,

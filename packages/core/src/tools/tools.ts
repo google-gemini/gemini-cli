@@ -78,15 +78,7 @@ export abstract class BaseToolInvocation<
     protected readonly messageBus?: MessageBus,
     readonly _toolName?: string,
     readonly _toolDisplayName?: string,
-  ) {
-    if (this.messageBus) {
-      console.debug(
-        `[DEBUG] Tool ${
-          this._toolName || this.constructor.name
-        } created with messageBus: YES`,
-      );
-    }
-  }
+  ) {}
 
   abstract getDescription(): string;
 

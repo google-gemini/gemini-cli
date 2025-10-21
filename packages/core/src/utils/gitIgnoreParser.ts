@@ -42,7 +42,7 @@ export class GitIgnoreParser implements GitIgnoreFilter {
 
     return content
       .split('\n')
-      .map((p) => p.trim())
+      .map((p) => p.trimStart())
       .filter((p) => p !== '' && !p.startsWith('#'))
       .map((p) => {
         const isNegative = p.startsWith('!');

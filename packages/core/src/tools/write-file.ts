@@ -408,12 +408,14 @@ export class WriteFileTool
   extends BaseDeclarativeTool<WriteFileToolParams, ToolResult>
   implements ModifiableDeclarativeTool<WriteFileToolParams>
 {
+  static readonly Name = WRITE_FILE_TOOL_NAME;
+
   constructor(
     private readonly config: Config,
     messageBus?: MessageBus,
   ) {
     super(
-      WRITE_FILE_TOOL_NAME,
+      WriteFileTool.Name,
       'WriteFile',
       `Writes content to a specified file in the local filesystem.
 

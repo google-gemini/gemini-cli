@@ -841,12 +841,14 @@ export class SmartEditTool
   extends BaseDeclarativeTool<EditToolParams, ToolResult>
   implements ModifiableDeclarativeTool<EditToolParams>
 {
+  static readonly Name = EDIT_TOOL_NAME;
+
   constructor(
     private readonly config: Config,
     messageBus?: MessageBus,
   ) {
     super(
-      EDIT_TOOL_NAME,
+      SmartEditTool.Name,
       'Edit',
       `Replaces text within a file. Replaces a single occurrence. This tool requires providing significant context around the change to ensure precise targeting. Always use the ${READ_FILE_TOOL_NAME} tool to examine the file's current content before attempting a text replacement.
       
