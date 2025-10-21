@@ -1239,8 +1239,6 @@ export class ClearcutLogger {
   }
 
   getConfigJson() {
-    const configJson = safeJsonStringifyBooleanValuesOnly(this.config);
-    console.debug(configJson);
     return safeJsonStringifyBooleanValuesOnly(this.config);
   }
 
