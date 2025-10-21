@@ -879,6 +879,10 @@ Logging in with Google... Please restart Gemini CLI to continue.
   }, [handleNewMessage]);
 
   useEffect(() => {
+    if (ctrlCTimerRef.current) {
+      clearTimeout(ctrlCTimerRef.current);
+      ctrlCTimerRef.current = null;
+    }
     if (ctrlCPressCount > 2) {
       recordExitFail(config);
     }
@@ -893,6 +897,10 @@ Logging in with Google... Please restart Gemini CLI to continue.
   }, [ctrlCPressCount, config, setCtrlCPressCount, handleSlashCommand]);
 
   useEffect(() => {
+    if (ctrlDTimerRef.current) {
+      clearTimeout(ctrlDTimerRef.current);
+      ctrlCTimerRef.current = null;
+    }
     if (ctrlDPressCount > 2) {
       recordExitFail(config);
     }
@@ -936,22 +944,6 @@ Logging in with Google... Please restart Gemini CLI to continue.
     settings.merged.ui?.customWittyPhrases,
   );
 
-  const handleExit = useCallback(
-    (
-      setPressedCount: (
-        value: number | ((prevCount: number) => number),
-      ) => void,
-      timerRef: React.MutableRefObject<NodeJS.Timeout | null>,
-    ) => {
-      if (timerRef.current) {
-        clearTimeout(timerRef.current);
-        timerRef.current = null;
-      }
-      setPressedCount((count) => count + 1);
-    },
-    [],
-  );
-
   const handleGlobalKeypress = useCallback(
     (key: Key) => {
       // Debug log keystrokes if enabled
@@ -964,13 +956,13 @@ Logging in with Google... Please restart Gemini CLI to continue.
         // This should happen on the first press, regardless of the count.
         cancelOngoingRequest?.();
 
-        handleExit(setCtrlCPressCount, ctrlCTimerRef);
+        setCtrlCPressCount((prev) => prev + 1);
         return;
       } else if (keyMatchers[Command.EXIT](key)) {
         if (buffer.text.length > 0) {
           return;
         }
-        handleExit(setCtrlDPressCount, ctrlDTimerRef);
+        setCtrlDPressCount((prev) => prev + 1);
         return;
       }
 
@@ -1014,12 +1006,9 @@ Logging in with Google... Please restart Gemini CLI to continue.
       setShowErrorDetails,
       config,
       ideContextState,
-      handleExit,
       setCtrlCPressCount,
-      ctrlCTimerRef,
       buffer.text.length,
       setCtrlDPressCount,
-      ctrlDTimerRef,
       handleSlashCommand,
       cancelOngoingRequest,
       activePtyId,
