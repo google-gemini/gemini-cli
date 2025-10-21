@@ -74,6 +74,12 @@ async function initOauthClient(
   authType: AuthType,
   config: Config,
 ): Promise<OAuth2Client> {
+  const byoidClient = await tryLoadByoidCredentials(config);
+  if (byoidClient) {
+    console.log('Loaded BYOID credentials.');
+    return byoidClient;
+  }
+
   const client = new OAuth2Client({
     clientId: OAUTH_CLIENT_ID,
     clientSecret: OAUTH_CLIENT_SECRET,
@@ -430,6 +436,49 @@ export function getAvailablePort(): Promise<number> {
   });
 }
 
+async function tryLoadByoidCredentials(
+  config: Config,
+): Promise<OAuth2Client | null> {
+  const pathsToTry = [
+    Storage.getOAuthCredsPath(),
+    process.env['GOOGLE_APPLICATION_CREDENTIALS'],
+  ].filter((p): p is string => !!p);
+
+  for (const keyFile of pathsToTry) {
+    try {
+      const credsStr = await fs.readFile(keyFile, 'utf-8');
+      const creds = JSON.parse(credsStr);
+      if (creds.type === 'external_account_authorized_user') {
+        const auth = new GoogleAuth({
+          scopes: OAUTH_SCOPE,
+          clientOptions: {
+            transporterOptions: {
+              proxy: config.getProxy(),
+            },
+          },
+        });
+        const externalAccountAuthorizedUserClient = await auth.fromJSON(creds);
+        // This will verify locally that the credentials look good and refresh if needed.
+        const token =
+          await externalAccountAuthorizedUserClient.getAccessToken();
+        if (!token) {
+          continue;
+        }
+        // The client from fromJSON will handle token refreshes automatically.
+        return externalAccountAuthorizedUserClient as OAuth2Client;
+      }
+    } catch (error) {
+      // Log specific error for debugging, but continue trying other paths
+      console.debug(
+        `Failed to load credentials from ${keyFile}:`,
+        getErrorMessage(error),
+      );
+    }
+  }
+
+  return null;
+}
+
 async function loadCachedCredentials(client: OAuth2Client): Promise<boolean> {
   const useEncryptedStorage = getUseEncryptedStorageFlag();
   if (useEncryptedStorage) {
@@ -451,21 +500,10 @@ async function loadCachedCredentials(client: OAuth2Client): Promise<boolean> {
       const credsStr = await fs.readFile(keyFile, 'utf-8');
       const creds = JSON.parse(credsStr);
       if (creds.type === 'external_account_authorized_user') {
-        const auth = new GoogleAuth({
-          scopes: OAUTH_SCOPE,
-        });
-        const externalAccountAuthorizedUserClient = await auth.fromJSON(creds);
-        const token =
-          await externalAccountAuthorizedUserClient.getAccessToken();
-        if (token) {
-          client.setCredentials({
-            access_token: token.token,
-          });
-          return true;
-        }
-      } else {
-        client.setCredentials(JSON.parse(creds));
+        // This is now handled by `tryLoadByoidCredentials`
+        continue;
       }
+      client.setCredentials(creds);
 
       // This will verify locally that the credentials look good.
       const { token } = await client.getAccessToken();
