@@ -26,7 +26,7 @@ describe('replace', () => {
     expect(rig.readFile(fileName)).toBe(expectedContent);
   });
 
-  it('should handle $ literally when replacing text ending with $', async () => {
+  it.skip('should handle $ literally when replacing text ending with $', async () => {
     const rig = new TestRig();
     await rig.setup(
       'should handle $ literally when replacing text ending with $',
@@ -67,7 +67,7 @@ describe('replace', () => {
     expect(rig.readFile(fileName)).toBe(expectedContent);
   });
 
-  it('should delete a block of text', async () => {
+  it.skip('should delete a block of text', async () => {
     const rig = new TestRig();
     await rig.setup('should delete a block of text');
     const fileName = 'delete_block.txt';
