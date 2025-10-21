@@ -60,6 +60,15 @@ export function useHistory(): UseHistoryManagerReturn {
           ) {
             return prevHistory; // Don't add the duplicate
           }
+          // Prevent adding duplicate consecutive info messages
+          // This prevents duplicate system messages from appearing during streaming
+          if (
+            lastItem.type === 'info' &&
+            newItem.type === 'info' &&
+            lastItem.text === newItem.text
+          ) {
+            return prevHistory; // Don't add the duplicate
+          }
         }
         return [...prevHistory, newItem];
       });
