@@ -44,6 +44,7 @@ import {
   GcpLogExporter,
 } from './gcp-exporters.js';
 import { TelemetryTarget } from './index.js';
+import { debugLogger } from '../utils/debugLogger.js';
 
 // For troubleshooting, set the log level to DiagLogLevel.DEBUG
 diag.setLogger(new DiagConsoleLogger(), DiagLogLevel.INFO);
@@ -207,7 +208,7 @@ export function initializeTelemetry(config: Config): void {
   try {
     sdk.start();
     if (config.getDebugMode()) {
-      console.log('OpenTelemetry SDK started successfully.');
+      debugLogger.log('OpenTelemetry SDK started successfully.');
     }
     telemetryInitialized = true;
     initializeMetrics(config);
@@ -234,7 +235,7 @@ export async function shutdownTelemetry(config: Config): Promise<void> {
     ClearcutLogger.getInstance()?.shutdown();
     await sdk.shutdown();
     if (config.getDebugMode()) {
-      console.log('OpenTelemetry SDK shut down successfully.');
+      debugLogger.log('OpenTelemetry SDK shut down successfully.');
     }
   } catch (error) {
     console.error('Error shutting down SDK:', error);

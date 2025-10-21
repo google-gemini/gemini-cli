@@ -158,6 +158,7 @@ import {
   DEFAULT_FILE_FILTERING_OPTIONS,
   DEFAULT_MEMORY_FILE_FILTERING_OPTIONS,
 } from './constants.js';
+import { debugLogger } from '../utils/debugLogger.js';
 
 export type { FileFilteringOptions };
 export {
@@ -1129,7 +1130,7 @@ export class Config {
         // the tool registry.
         const messageBusEnabled = this.getEnableMessageBusIntegration();
         if (this.debugMode && messageBusEnabled) {
-          console.log(
+          debugLogger.log(
             `[DEBUG] enableMessageBusIntegration setting: ${messageBusEnabled}`,
           );
         }
@@ -1137,7 +1138,7 @@ export class Config {
           ? [...args, this.getMessageBus()]
           : args;
         if (this.debugMode && messageBusEnabled) {
-          console.log(
+          debugLogger.log(
             `[DEBUG] Registering ${className} with messageBus: ${messageBusEnabled ? 'YES' : 'NO'}`,
           );
         }
@@ -1212,7 +1213,7 @@ export class Config {
             );
           }
         } else if (this.getDebugMode()) {
-          console.log(
+          debugLogger.log(
             `[Config] Skipping registration of agent '${definition.name}' due to allow/exclude configuration.`,
           );
         }

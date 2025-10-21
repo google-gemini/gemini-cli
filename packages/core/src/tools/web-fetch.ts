@@ -32,6 +32,7 @@ import {
   WebFetchFallbackAttemptEvent,
 } from '../telemetry/index.js';
 import { WEB_FETCH_TOOL_NAME } from './tool-names.js';
+import { debugLogger } from '../utils/debugLogger.js';
 
 const URL_FETCH_TIMEOUT_MS = 10000;
 const MAX_CONTENT_LENGTH = 100000;
@@ -274,7 +275,7 @@ ${textContent}
         DEFAULT_GEMINI_FLASH_MODEL,
       );
 
-      console.debug(
+      debugLogger.debug(
         `[WebFetchTool] Full response for prompt "${userPrompt.substring(
           0,
           50,
@@ -367,7 +368,7 @@ ${sourceListFormatted.join('\n')}`;
 
       const llmContent = responseText;
 
-      console.debug(
+      debugLogger.debug(
         `[WebFetchTool] Formatted tool response for prompt "${userPrompt}:\n\n":`,
         llmContent,
       );
