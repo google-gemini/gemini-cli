@@ -35,7 +35,7 @@ jobs:
     outputs:
       repo_name: '${{ steps.output-repo-name.outputs.repo_name }}'
     permissions:
-      actions: read
+      actions: 'read'
     steps:
       - name: 'Mock Repo Artifact'
         if: "${{ github.event_name != 'workflow_run' }}"
