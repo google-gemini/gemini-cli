@@ -96,7 +96,7 @@ jobs:
         run: |
           for i in {1..100}; do
             echo "Run #$i"
-            npm run test packages/cli/src/ui/components/shared/BaseSelectionList.test.tsx || exit 1
+            npm run test -w @google/gemini-cli -- src/ui/components/shared/BaseSelectionList.test.tsx || exit 1
           done
   e2e_mac:
     name: 'E2E Test (macOS)'
@@ -149,7 +149,7 @@ jobs:
         run: |
           for i in {1..100}; do
             echo "Run #$i"
-            npm run test packages/cli/src/ui/components/shared/BaseSelectionList.test.tsx || exit 1
+            npm run test -w @google/gemini-cli -- src/ui/components/shared/BaseSelectionList.test.tsx || exit 1
           done
   e2e_windows:
     name: 'Slow E2E - Win'
@@ -221,7 +221,7 @@ jobs:
           NODE_ENV: 'test'
         shell: 'pwsh'
         run: |
-          for ($i=1; $i -le 100; $i++) { Write-Host "Run #$i"; npm run test packages/cli/src/ui/components/shared/BaseSelectionList.test.tsx; if ($LASTEXITCODE -ne 0) { exit 1 } }
+          for ($i=1; $i -le 100; $i++) { Write-Host "Run #$i"; npm run test -w @google/gemini-cli -- src/ui/components/shared/BaseSelectionList.test.tsx; if ($LASTEXITCODE -ne 0) { exit 1 } }
   e2e:
     name: 'E2E'
     if: |
