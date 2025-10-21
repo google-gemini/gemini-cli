@@ -66,9 +66,9 @@ jobs:
         shell: 'bash'
         run: |
           if [[ "${{ matrix.sandbox }}" == "sandbox:docker" ]]; then
-            npm run test:integration:sandbox:docker -- --runs="${{ github.event.inputs.runs }}" -- --testNamePattern "'${{ github.event.inputs.test_name_pattern }}'" --retry=0
+            npm run deflake:test:integration:sandbox:docker -- --runs="${{ github.event.inputs.runs }}" -- --testNamePattern "'${{ github.event.inputs.test_name_pattern }}'"
           else
-            npm run test:integration:sandbox:none -- --runs="${{ github.event.inputs.runs }}" -- --testNamePattern "'${{ github.event.inputs.test_name_pattern }}'" --retry=0
+            npm run deflake:test:integration:sandbox:none -- --runs="${{ github.event.inputs.runs }}" -- --testNamePattern "'${{ github.event.inputs.test_name_pattern }}'"
           fi
 
   deflake_e2e_mac:
@@ -104,7 +104,7 @@ jobs:
           SANDBOX: 'sandbox:none'
           VERBOSE: 'true'
         run: |
-          npm run test:integration:sandbox:none -- --runs="${{ github.event.inputs.runs }}" -- --testNamePattern "'${{ github.event.inputs.test_name_pattern }}'" --retry=0
+          npm run deflake:test:integration:sandbox:none -- --runs="${{ github.event.inputs.runs }}" -- --testNamePattern "'${{ github.event.inputs.test_name_pattern }}'"
 
   deflake_e2e_windows:
     name: 'Slow E2E - Win'
@@ -160,4 +160,4 @@ jobs:
           NODE_ENV: 'test'
         shell: 'pwsh'
         run: |
-          npm run test:integration:sandbox:none -- --runs="${{ github.event.inputs.runs }}" -- --testNamePattern "'${{ github.event.inputs.test_name_pattern }}'" --retry=0
+          npm run deflake:test:integration:sandbox:none -- --runs="${{ github.event.inputs.runs }}" -- --testNamePattern "'${{ github.event.inputs.test_name_pattern }}'"
